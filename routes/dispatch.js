@@ -1345,11 +1345,6 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
   });
 
   /**
-   * POST /api/dispatch/take/:itemId
-   * Atomically claim and remove an item from the queue.
-   * Requires token authentication.
-   */
-  /**
    * POST /api/dispatch/heartbeat (LIN-1952)
    * Consumer heartbeat from a dispatch consumer (simple-dispatcher). Shares its
    * handler with POST /api/proxy/runner/heartbeat. Writes only to the
@@ -1361,6 +1356,11 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     identify: (req) => ({ urlKey: req.dispatchUrlKey, tokenId: req.dispatchTokenId ?? null })
   }));
 
+  /**
+   * POST /api/dispatch/take/:itemId
+   * Atomically claim and remove an item from the queue.
+   * Requires token authentication.
+   */
   router.post('/api/dispatch/take/:itemId', authenticateDispatchToken, async (req, res) => {
     const { itemId } = req.params;
 

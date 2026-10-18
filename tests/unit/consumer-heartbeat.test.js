@@ -52,6 +52,12 @@ test('parseHeartbeat returns null for each missing or bad required field', () =>
   assert.equal(parseHeartbeat({ ...minimal(), instanceId: 'has space' }), null);
   assert.equal(parseHeartbeat({ ...minimal(), instanceId: 'x'.repeat(65) }), null);
   assert.equal(parseHeartbeat({ ...minimal(), sentAt: 'yesterday' }), null);
+  // Date.parse tolerates free text around a date; the privacy allowlist must not (LIN-1952 close-out).
+  assert.equal(parseHeartbeat({ ...minimal(), sentAt: '/Users/jk/ 2020-01-01' }), null);
+  assert.equal(parseHeartbeat({ ...minimal(), sentAt: 'john kershaw macbook 2020' }), null);
+  assert.equal(parseHeartbeat({ ...minimal(), sentAt: '2026-10-18T12:00:00+01:00' }), null);
+  assert.equal(parseHeartbeat({ ...minimal(), sentAt: '2026-10-18' }), null);
+  assert.equal(parseHeartbeat({ ...minimal(), sentAt: '2026-13-45T99:99:99Z' }), null);
   assert.equal(parseHeartbeat({ ...minimal(), intervalMs: 999 }), null);
   assert.equal(parseHeartbeat({ ...minimal(), intervalMs: 3600001 }), null);
   assert.equal(parseHeartbeat({ ...minimal(), intervalMs: 1500.5 }), null);
@@ -76,6 +82,14 @@ test('parseHeartbeat drops non-finite, negative, wrong-typed and over-long optio
     lastPollOkAt: 'not a date', activeSessionCount: 2
   });
   assert.deepEqual(parsed, { ...minimal(), activeSessionCount: 2 });
+});
+
+test('parseHeartbeat drops a lastPollOkAt that is not a strict ISO UTC timestamp', () => {
+  for (const bad of ['john kershaw macbook 2020', '/Users/jk/ 2020-01-01', '2026-10-18T12:00:00+01:00']) {
+    assert.deepEqual(parseHeartbeat({ ...minimal(), lastPollOkAt: bad }), minimal(), bad);
+  }
+  const good = '2026-10-18T12:00:00.000Z';
+  assert.equal(parseHeartbeat({ ...minimal(), lastPollOkAt: good }).lastPollOkAt, good);
 });
 
 test('parseHeartbeat never throws on garbage', () => {
