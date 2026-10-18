@@ -78,6 +78,13 @@ for (const [name, read] of Object.entries(readers)) {
       assert.equal(out.truncated, true);
     });
 
+    test('a cap that is not a multiple of 100 still flags the clipped read truncated', async () => {
+      const { fetchImpl } = pagedFetch({ total: 200 });
+      const out = await read(fetchImpl, { cap: 150 });
+      assert.equal(out.length, 150);
+      assert.equal(out.truncated, true, 'rows were clipped off the last page, so the read is not complete');
+    });
+
     test('the default bound is 500 and flags a larger set truncated', async () => {
       const { fetchImpl } = pagedFetch({ total: 1000 });
       const out = await read(fetchImpl);
