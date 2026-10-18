@@ -50,3 +50,26 @@ secondary number, the four-way sort's details, and the full reading list.
 - **Checks:** an in-session fresh reader read a draft for flow and accuracy (7 must-fix, 31 should-fix, 20 nits).
   Its findings are applied here and, where they also held for the long version, there too.
 
+
+## Version 2 (18 October)
+
+John read version 1 in the Library and asked for two things: links to further reading inside the text, not only in
+the reading list, and an explanation of each Harbour term where a reader new to Harbour first meets it. He also asked
+for a readability pass, since agents will mostly read the long version and people will mostly skim this one. Revised
+on judgement, with no fresh reader.
+
+- **Links:** each source is linked once where the text uses it, beside its marker. Harbour papers resolve to their
+  Library pages (so this essay appears in their backlinks), records under `experiments/` and `scripts/` go to
+  GitHub, and the reading list's Harbour entries are links too, here and in the long version. Seven Harbour papers
+  joined the reading list for the new links: the growth atlas, `theseus.md`, `drawing-the-ship.md`,
+  `one-job-many-paths.md`, `test-surplus.md`, `test-estate.md` and `review-loops.md`.
+- **Terms:** what Harbour is and its pipeline (section 1); areas, the agent API and the providers (Find); the runner
+  setup page and credential lifetimes (Figure 4); grants (Figure 5); rulings, workers, rounds, the data store,
+  seeds, the operator and `proposals.md` where each first appears; and the outside terms strangler fig, shotgun
+  surgery, DRY and hotspots.
+- **Readability:** the method in brief, as five bullets, after the opening paragraph; long paragraphs in sections 2
+  and 4 split; what may be new and what is not yet known set out as lists; the history of the name corrected to
+  say the ship came first (`theseus.md` and `drawing-the-ship.md`, 15 October).
+- **Length:** about 4,700 words of body, against 4,100 for version 1.
+- **Standard:** `docs/papers/standard.md` now says an essay's body can link its sources and other archive documents
+  where it uses them, and explains a Harbour term where it first appears.

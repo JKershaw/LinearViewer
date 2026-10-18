@@ -72,7 +72,11 @@ An essay:
 
 1. **The argument.** The first paragraph makes it; the header states it in one sentence.
 2. **The body.** Sections in whatever order the argument needs. Every claim taken from a
-   source carries a marker into the reading list.
+   source carries a marker into the reading list. The body can also link the source, or
+   another document in the archive, where the text uses it, once, beside the marker: an
+   essay is read most often in the Library, and a link there gives a curious reader
+   somewhere to go. A term a reader outside Harbour would not know is explained in plain
+   words where it first appears.
 3. **Annotated reading list.** One entry per source: the reference, what it supports, and
    what it does not. A source from another field or another century says so — an analogy is
    a mechanism to consider, never an estimate.
