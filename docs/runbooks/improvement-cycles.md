@@ -60,7 +60,7 @@ All calls go through the proxy with a readWrite token held on disk. Never put th
 1. Mint and run the Drift & Coherence Review, then Seams & Tangles. Mint means one `POST /api/proxy/dispatch` of the periodical's prompt (kind `periodical`, with its `periodicalId`: `drift-coherence` or `seams-tangles`; an unknown id is a 400). `GET /api/proxy/periodicals` shows which are due. It files one ticket. Then kick off a scoped run on that ticket.
 2. Read the reports through a sub-agent. List the top finds.
 3. Favour areas the next known round touches. That makes the later work cheaper.
-4. Choose the move for each (untie a knot, free the seam, consolidate, rebuild) by the decision table in the long version, section 13.
+4. Choose the move for each (untie a knot, free the seam, consolidate, rebuild) by step 4 of "The loop" in the long version, section 13.
 5. Write the ticket from the clauses there and the standard rules block. Include a prediction and an independent replay. Run a fresh reader. File. Launch in the heavy lane.
 6. Do not steer a running ticket. If a review loop hits its bound, pre-fill the ruling.
 
@@ -82,7 +82,7 @@ Every sub-agent prompt says: no `rm`, no `git clean`, no worktree removal, temp 
 * Run the operator's replay on the PR head before merge, not only after. On LIN-3648 the after-merge replay found three behaviour changes nobody listed and a close-out claiming "no deviations"; they were harmless, but review could no longer send them back. A small watcher that exits when a run's feedback names its PR gives the window.
 * Say in the ticket that a class (d) behaviour is kept byte for byte even if it looks wrong, and that the PR lists every difference it makes. Workers "fix" what looks wrong.
 * A worker that parks `PENDING-EXTERNAL` on a PR's CI is not woken when CI finishes (two stalls of 1–2 hours on 18 Oct). Until the CI-result wake (LIN-3661) lands, check parked workers on each wake and relay a green result with a follow-up beat (`POST /dispatch` with `followUpTo`). The same applies to a close-out waiting on evidence that already exists.
-* The plan-review loop bound stopped five converging plans on 18 Oct. LIN-3651 has landed: a converging plan now continues up to a ceiling of 5 rounds, so pre-fill "review again" only for a plan still not converging at the ceiling.
+* The plan-review loop bound stopped five converging plans on 18 Oct. LIN-3651 has landed: a plan whose latest two Request Changes verdicts show narrowing blocking-finding counts now gets another round without a press, up to five verdicts since its latest Approve (REVIEW_LOOP_CEILING). A plan that is not converging still stops at three send-backs. When the bound does stop a plan, pre-fill the ruling as usual ("review again" if it is still narrowing).
 * The heartbeat's load cannot tell runaway processes from the owner using the laptop (video playback read as load 20–30). Ask before assuming a fault; run fewer lanes while the owner is using the machine. A gated launch must not launch on timeout.
 * Local full unit runs show 19 `scripts/code-shape` failures because the runner's checkout has no `acorn`; CI is the real check.
 
