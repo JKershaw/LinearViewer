@@ -13,10 +13,11 @@ import { test, describe, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { GraphQLClient } from 'graphql-request';
 import {
-  assemblePlanReviewFacts, reviewLoopExhausted, REVIEW_LOOP_BOUND
+  assemblePlanReviewFacts, reviewLoopExhausted, reviewLoopConverging, reviewLoopStop, REVIEW_LOOP_BOUND, REVIEW_LOOP_CEILING
 } from '../../lib/recommendation-facts.js';
 import { formatIssueContext, getRecommendation, getRecommendationStream, setFetchImpl } from '../../lib/openrouter.js';
 import { routeStage, parseRouteDecision, parseRecommendedAction } from '../../lib/stage-router.js';
+import { formatStageContract } from '../../lib/prompt-contract.js';
 import { generatePrompt } from '../../lib/prompt-templates.js';
 import { readRunLedger } from '../../lib/run-ledger.js';
 import { isRequestChangesRound } from '../../lib/prompts/revision-brief.js';
@@ -27,6 +28,8 @@ import { createLocalProvider } from '../fixtures/local-harness.js';
 const RC = (at, id = at) => ({ id, createdAt: at, body: `### Plan Review Verdict\n\nFinding.\n\n**Verdict: Request Changes.**` });
 const ND = (at, id = at) => ({ id, createdAt: at, body: `### Plan Review Verdict\n\n**Verdict: Needs Discussion.**` });
 const APP = (at, id = at) => ({ id, createdAt: at, body: `### Plan Review Verdict\n\n**Verdict: Approve.**` });
+// A Request Changes verdict that states its count on the contract's own line (LIN-3651).
+const RCn = (at, n, id = at) => ({ id, createdAt: at, body: `### Plan Review Verdict\n\n**Verdict: Request Changes.**\n\nFinding.\n\nBlocking findings: ${n}` });
 const REVIEW = { identifier: 'LIN-1', title: 'A task', description: 'Do it.', state: { name: 'In Progress', type: 'started' } };
 
 describe('relations reach the router (LIN-3309 S1)', () => {
@@ -300,6 +303,109 @@ describe('the review loop bound: the one route code settles (LIN-3309)', () => {
       assert.equal(calls.length, 3, 'the router model is called each time');
       assert.match(calls[2], /- Plan-review verdicts: 3 \(3 request changes\); latest: request changes/);
       for (const c of calls) assert.doesNotMatch(c, /Route this pass|since the latest Approve|first match wins/, 'no steer and no loop count');
+    } finally {
+      setFetchImpl(null);
+    }
+  });
+});
+
+describe('a converging plan gets another round, up to a ceiling (LIN-3651)', () => {
+  const open = { name: 'In Progress', type: 'started' };
+  const leaf = () => ({ identifier: 'T-9', title: 't', description: 'A plan.', state: open, labels: [] });
+  const bundle = (comments) => ({ parent: null, siblings: [], project: null, children: [], comments, focusedChild: null });
+  const counted = (...ns) => ns.map((n, i) => RCn(`2026-01-0${i + 1}T00:00:00Z`, n));
+  const after = (body) => ({ createdAt: '2026-01-09T00:00:00Z', body });
+
+  test('the ceiling is separate from the bound', () => {
+    assert.equal(REVIEW_LOOP_BOUND, 3);
+    assert.equal(REVIEW_LOOP_CEILING, 5);
+  });
+
+  test('narrowing counts (3,3,1; 2,2,1) and a steady one (1,1,1) are not exhausted at the bound', () => {
+    for (const ns of [[3, 3, 1], [2, 2, 1], [1, 1, 1]]) {
+      assert.equal(reviewLoopExhausted(leaf(), counted(...ns)), false, ns.join(','));
+    }
+    assert.equal(reviewLoopStop(leaf(), counted(3, 3, 1)), null);
+  });
+
+  test('rising, flat above 1, and uncounted runs stop at the bound', () => {
+    for (const ns of [[1, 3, 4], [3, 3, 3]]) {
+      assert.equal(reviewLoopExhausted(leaf(), counted(...ns)), true, ns.join(','));
+      assert.equal(reviewLoopStop(leaf(), counted(...ns)), 'not-converging');
+    }
+    const plain = [RC('2026-01-01T00:00:00Z'), RC('2026-01-02T00:00:00Z'), RC('2026-01-03T00:00:00Z')];
+    assert.equal(reviewLoopExhausted(leaf(), plain), true, 'no count lines: today\'s behaviour');
+  });
+
+  test('five verdicts stop at the ceiling even while narrowing', () => {
+    assert.equal(reviewLoopExhausted(leaf(), counted(3, 2, 2, 1)), false, 'four, still narrowing: another round');
+    assert.equal(reviewLoopExhausted(leaf(), counted(3, 2, 2, 1, 1)), true);
+    assert.equal(reviewLoopStop(leaf(), counted(3, 2, 2, 1, 1)), 'ceiling');
+  });
+
+  test('a Needs Discussion latest verdict is not converging', () => {
+    const run = [RCn('2026-01-01T00:00:00Z', 3), RCn('2026-01-02T00:00:00Z', 1), ND('2026-01-03T00:00:00Z')];
+    assert.equal(reviewLoopExhausted(leaf(), run), true);
+    assert.equal(reviewLoopConverging(assemblePlanReviewFacts(run).run), false);
+  });
+
+  test('a Needs Discussion latest verdict that carries a count line is still not converging (LIN-3651)', () => {
+    const nd = { createdAt: '2026-01-03T00:00:00Z', body: '### Plan Review Verdict\n\n**Verdict: Needs Discussion.**\n\nBlocking findings: 1' };
+    const run = [RCn('2026-01-01T00:00:00Z', 3), RCn('2026-01-02T00:00:00Z', 2), nd];
+    assert.equal(reviewLoopExhausted(leaf(), run), true);
+    assert.equal(assemblePlanReviewFacts(run).run[2].blocking, null);
+  });
+
+  test('person comment, landed work and Approve still lift it, at the ceiling too', () => {
+    const five = counted(3, 2, 2, 1, 1);
+    assert.equal(reviewLoopExhausted(leaf(), [...five, after('go on, take it to implementation')]), false);
+    assert.equal(reviewLoopExhausted(leaf(), [...five, after('Implementation landed: https://github.com/o/r/pull/7')]), false);
+    assert.equal(reviewLoopExhausted(leaf(), [...five, APP('2026-01-08T00:00:00Z')]), false);
+    assert.equal(reviewLoopExhausted(leaf(), [...counted(3, 3, 3), APP('2026-01-08T00:00:00Z')]), false);
+  });
+
+  test('the run since the latest Approve carries each verdict\'s count; only Request Changes has one', () => {
+    const f = assemblePlanReviewFacts([RCn('2026-01-01T00:00:00Z', 4), APP('2026-01-02T00:00:00Z'), RCn('2026-01-03T00:00:00Z', 2), ND('2026-01-04T00:00:00Z')]);
+    assert.deepEqual(f.run, [{ verdict: 'request changes', blocking: 2 }, { verdict: 'needs discussion', blocking: null }]);
+    assert.equal(f.count, 2);
+  });
+
+  test('the count line parses from the contract\'s own wording; zero, junk and quoted lines do not mislead', () => {
+    const wording = formatStageContract('plan-review', 'LIN-1').match(/`(Blocking findings: <n>)`/)?.[1];
+    assert.ok(wording, 'the contract names the line');
+    const verdict = (text) => assemblePlanReviewFacts([{ createdAt: '2026-01-01T00:00:00Z', body: `### Plan Review Verdict\n\n**Verdict: Request Changes.**\n\n${text}` }]).run[0].blocking;
+    assert.equal(verdict(wording.replace('<n>', '2')), 2);
+    assert.equal(verdict('**Blocking findings: 3**'), 3);
+    assert.equal(verdict('> - Blocking findings: 4'), 4);
+    assert.equal(verdict('blocking FINDINGS: 5'), 5);
+    assert.equal(verdict('Blocking findings: 0'), null);
+    assert.equal(verdict('Blocking findings: many'), null);
+    assert.equal(verdict('The reviewer wrote that Blocking findings: 2 earlier.'), null, 'mid-line is not the line');
+    assert.equal(verdict('> Blocking findings: 2\n\nBlocking findings: 1'), 2, 'first line match wins');
+  });
+
+  test('order does not matter to the run', () => {
+    const trail = counted(3, 3, 1);
+    assert.deepEqual(assemblePlanReviewFacts(trail), assemblePlanReviewFacts([...trail].reverse()));
+  });
+
+  test('getRecommendation: 3,3,1 makes its routing call; 1,3,4 and the ceiling stop at blocked, naming the stop', async () => {
+    let calls = 0;
+    setFetchImpl(async () => {
+      calls++;
+      return { ok: true, json: async () => ({ choices: [{ message: { content: '## Reasoning\n→ **plan**' }, finish_reason: 'stop' }], usage: { completion_tokens: 3 } }) };
+    });
+    try {
+      const rec = await getRecommendation(leaf(), bundle(counted(3, 3, 1)), { apiKey: 'stub', model: 'x' });
+      assert.equal(rec.codeRoute, undefined);
+      assert.equal(calls, 1);
+      const rising = await getRecommendation(leaf(), bundle(counted(1, 3, 4)), { apiKey: 'stub', model: 'x' });
+      assert.equal(rising.codeRoute, 'blocked');
+      assert.match(rising.reasoning, /not narrowing/);
+      const capped = await getRecommendation(leaf(), bundle(counted(3, 2, 2, 1, 1)), { apiKey: 'stub', model: 'x' });
+      assert.equal(capped.codeRoute, 'blocked');
+      assert.match(capped.reasoning, /ceiling of 5/);
+      assert.equal(calls, 1, 'no routing call at either stop');
     } finally {
       setFetchImpl(null);
     }

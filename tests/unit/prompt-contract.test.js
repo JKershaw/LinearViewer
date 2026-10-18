@@ -46,6 +46,11 @@ test('plan-review: the verdict comment shape resolves its verdict, even when a f
   assert.strictEqual(extractVerdict(comment), 'request changes');
 });
 
+test('plan-review: the contract asks for a Blocking findings count line on Request Changes (LIN-3651)', () => {
+  const c = formatStageContract('plan-review', 'LIN-1');
+  assert.ok(c.includes('On Request Changes, also write `Blocking findings: <n>` on its own line'));
+});
+
 test('implementation: the PR URL shape is the one run-evidence extracts', () => {
   const c = formatStageContract('implementation', 'LIN-1');
   const shape = ticks(c)[0];
