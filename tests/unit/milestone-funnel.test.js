@@ -54,6 +54,32 @@ const aggDeps = (w) => ({
   dispatchHistory: w.dispatchHistory
 });
 
+// A dispatch collection with the real driver's projection semantics: a dotted
+// projection on an array field (`feedback.kind`) keeps EVERY entry, narrowed to
+// the projected subfields. MangoDB instead collapses the array to one object, so
+// a multi-entry row only reads right against this wrapper (LIN-3501).
+function driverProjected(collection) {
+  const project = (doc, projection) => {
+    const out = { _id: doc._id };
+    for (const key of Object.keys(projection)) {
+      const [field, sub] = key.split('.');
+      if (sub === undefined) {
+        if (field in doc) out[field] = doc[field];
+      } else if (Array.isArray(doc[field])) {
+        out[field] = (out[field] || doc[field].map(() => ({})));
+        doc[field].forEach((entry, i) => { if (sub in entry) out[field][i][sub] = entry[sub]; });
+      }
+    }
+    return out;
+  };
+  return {
+    find(filter, { projection } = {}) {
+      return { toArray: async () => (await collection.find(filter).toArray()).map(doc => (projection ? project(doc, projection) : doc)) };
+    }
+  };
+}
+
+const DAY = 24 * 60 * 60 * 1000;
 const PAST = (msAgo) => new Date(Date.now() - msAgo);
 const dispatchRow = (accountId, dispatchedAt, over = {}) => ({
   _id: `d-${Math.random().toString(36).slice(2)}`,
@@ -344,8 +370,46 @@ describe('stepsForAccountGroup — five steps, three states (LIN-2952)', () => {
       ]
     }));
 
-    const { steps } = await readSteps(w, [a._id]);
+    const { steps } = await readSteps(w, [a._id], { dispatchHistory: driverProjected(w.dispatchHistory) });
     assert.equal(steps.prOpened.at, prAt.toISOString());
+  });
+
+  test('PR opened reads a collapsed feedback object without throwing (MangoDB projection)', async () => {
+    const w = freshWorld();
+    const a = await w.accountStore.createAccount();
+    await w.dispatchHistory.insertOne(dispatchRow(a._id, PAST(3000), {
+      feedback: [{ kind: 'evidence', url: 'https://github.com/o/r/pull/6', timestamp: PAST(1000) }]
+    }));
+
+    const { steps } = await readSteps(w, [a._id]);
+    assert.equal(steps.prOpened.state, STEP_STATES.REACHED);
+  });
+
+  test('the route reader projects both dispatch reads: no prompt, no feedback message', async () => {
+    const w = freshWorld();
+    const seen = [];
+    const recording = () => ({
+      find(_filter, options) { seen.push(options?.projection ?? null); return { toArray: async () => [] }; }
+    });
+    await readSteps(w, ['a'], { dispatchQueue: recording(), dispatchHistory: recording() });
+
+    assert.equal(seen.length, 2, 'both dispatch collections were read');
+    for (const projection of seen) {
+      assert.ok(projection, 'the read is projected');
+      assert.equal(projection.prompt, undefined, 'prompt must never be projected');
+      assert.equal(projection['feedback.message'], undefined, 'the raw feedback body must never be projected');
+      assert.equal(projection['feedback.kind'], 1);
+      assert.equal(projection['feedback.url'], 1);
+    }
+  });
+
+  test('no dispatch collection injected is no-signal, not not-reached', async () => {
+    const w = freshWorld();
+    const a = await w.accountStore.createAccount();
+
+    const { steps } = await readSteps(w, [a._id], { dispatchQueue: null, dispatchHistory: null });
+    assert.equal(steps.firstGo.state, STEP_STATES.NO_SIGNAL);
+    assert.equal(steps.prOpened.state, STEP_STATES.NO_SIGNAL);
   });
 
   test('flags an out-of-order step without reordering or dropping it', async () => {
@@ -474,41 +538,105 @@ describe('collectMilestoneFunnel — cross-account aggregate (LIN-2952)', () => 
     assert.equal(copy.notReady, 1, 'the not-ready subset is published alongside the entry count');
   });
 
-  test('R3: an absent dep is no-signal, but a throwing dep propagates — no quiet degrade', async () => {
-    const w = freshWorld();
-
+  test('an absent dep is no-signal for every step, and the mode is null', async () => {
     const absent = await collectMilestoneFunnel({ since: WINDOW_START });
     for (const key of ['login', 'connected', 'firstGo', 'prOpened', 'mergeClicked']) {
       assert.equal(absent.steps[key].state, STEP_STATES.NO_SIGNAL, `${key} must be no-signal`);
       assert.equal(absent.steps[key].count, null);
     }
     assert.equal(absent.mode, null);
+  });
 
+  test('a failing cohort read makes all five steps no-signal, never zero (funnel only, LIN-3501)', async () => {
+    const w = freshWorld();
     const throwing = { collection: { find() { throw new Error('boom'); } } };
+    const { steps, mode } = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w), taskModeStore: undefined, accountStore: throwing });
+    for (const key of ['login', 'connected', 'firstGo', 'prOpened', 'mergeClicked']) {
+      assert.equal(steps[key].state, STEP_STATES.NO_SIGNAL, `${key} must be no-signal`);
+      assert.equal(steps[key].count, null);
+    }
+    assert.equal(mode, null);
+  });
+
+  // LIN-3501 close-out L2: "any person's no-signal step makes the whole step no-signal, count null,
+  // never a partial count". A person B who DID reach must not leak a count of 1 when person A's
+  // read fails, which is what `every(no-signal)` instead of `includes(no-signal)` would do.
+  test('one person\'s unreadable step makes the whole step no-signal, never a partial count (LIN-3501)', async () => {
+    const w = freshWorld();
+    const a = await w.accountStore.createAccount();
+    const b = await w.accountStore.createAccount();
+    const prEvidence = [{ kind: 'evidence', url: 'https://github.com/o/r/pull/1', timestamp: PAST(500) }];
+    await w.dispatchHistory.insertOne(dispatchRow(a._id, PAST(2000), { feedback: prEvidence }));
+    await w.dispatchHistory.insertOne(dispatchRow(b._id, PAST(1500), { feedback: prEvidence }));
+
+    // Throws only for A's group; B's read delegates to the real collection.
+    const failsForA = {
+      find(filter, options) {
+        if (filter?.dispatchedBy?.$in?.includes(a._id)) throw new Error('read failed for A');
+        return w.dispatchHistory.find(filter, options);
+      }
+    };
+
+    const { steps } = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w), dispatchHistory: failsForA });
+    assert.equal(steps.login.count, 2, 'both people signed up in the window');
+    for (const key of ['firstGo', 'prOpened']) {
+      assert.equal(steps[key].state, STEP_STATES.NO_SIGNAL, `${key}: one person's no-signal makes the step no-signal`);
+      assert.equal(steps[key].count, null, `${key}: never a partial count of the person who did read`);
+    }
+
+    // Control: with A's read healthy, both people reach both steps.
+    const healthy = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w) });
+    assert.equal(healthy.steps.firstGo.count, 2);
+    assert.equal(healthy.steps.prOpened.count, 2);
+  });
+
+  test('a candidate whose sign-in cannot be read makes all five steps no-signal, not an under-count', async () => {
+    const w = freshWorld();
+    await w.accountStore.createAccount();
+    const accountStore = Object.create(w.accountStore, { getAccount: { value: async () => { throw new Error('boom'); } } });
+
+    const { steps } = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w), accountStore });
+    for (const key of ['login', 'connected', 'firstGo', 'prOpened', 'mergeClicked']) {
+      assert.equal(steps[key].state, STEP_STATES.NO_SIGNAL, `${key} must be no-signal`);
+    }
+  });
+
+  test('a throwing dispatch collection: first go and PR opened are no-signal, the other steps still count', async () => {
+    const w = freshWorld();
+    const a = await w.accountStore.createAccount();
+    await w.accountWorkspaceStore.bindAccountToWorkspace(a._id, 'ws-1');
+    const rejecting = { find: () => ({ toArray: async () => { throw new Error('boom'); } }) };
+
+    const { steps } = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w), dispatchHistory: rejecting });
+    assert.equal(steps.firstGo.state, STEP_STATES.NO_SIGNAL);
+    assert.equal(steps.firstGo.count, null, 'never a partial count');
+    assert.equal(steps.prOpened.state, STEP_STATES.NO_SIGNAL);
+    assert.equal(steps.prOpened.count, null);
+    assert.equal(steps.login.count, 1);
+    assert.equal(steps.connected.count, 1);
+  });
+
+  test('R3: the mode still rejects — a throwing task-mode store, or an unreadable account list under it (LIN-3002)', async () => {
+    const w = freshWorld();
     await assert.rejects(
-      collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w), accountStore: throwing }),
+      collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w), taskModeStore: { countByEntryRung: async () => { throw new Error('boom'); } } }),
+      /boom/
+    );
+    // Only the unfiltered account read throws, so the funnel's own cohort read works.
+    const allThrows = { ...w.accountStore, collection: { find: (filter, opts) => {
+      if (Object.keys(filter || {}).length === 0) throw new Error('boom');
+      return w.accountStore.collection.find(filter, opts);
+    } } };
+    Object.setPrototypeOf(allThrows, w.accountStore);
+    await assert.rejects(
+      collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w), accountStore: allThrows }),
       /boom/
     );
   });
 
-  test('R3: every aggregate dep read propagates, not only accountStore', async () => {
-    const w = freshWorld();
-    const rejecting = { find: () => ({ toArray: async () => { throw new Error('boom'); } }) };
-    const worlds = [
-      { accountWorkspaceStore: { collection: rejecting } },
-      { dispatchHistory: rejecting },
-      { taskModeStore: { countByEntryRung: async () => { throw new Error('boom'); } } }
-    ];
-    for (const overrides of worlds) {
-      await assert.rejects(
-        collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w), ...overrides }),
-        /boom/
-      );
-    }
-  });
-
   test('R4: the aggregate dispatch read is projected to predicate + feedback-link fields only', async () => {
     const w = freshWorld();
+    await w.accountStore.createAccount();
     const seen = [];
     const recording = () => ({
       find(_filter, options) { seen.push(options?.projection ?? null); return { toArray: async () => [] }; }
@@ -541,16 +669,13 @@ describe('collectMilestoneFunnel — cross-account aggregate (LIN-2952)', () => 
     assert.equal(result.steps.firstGo.count, 1, 'the abort row is not a Go press');
   });
 
-  test('M3: an out-of-window dispatch is excluded from the aggregate', async () => {
+  test('M3: a person\'s first-ever dispatch counts, however old (the funnel is first-ever, not windowed)', async () => {
     const w = freshWorld();
     const a = await w.accountStore.createAccount();
-    const b = await w.accountStore.createAccount();
-    await w.dispatchHistory.insertOne(dispatchRow(a._id, PAST(1000)));
-    await w.dispatchHistory.insertOne(dispatchRow(b._id, PAST(31 * 24 * 60 * 60 * 1000)));
+    await w.dispatchHistory.insertOne(dispatchRow(a._id, PAST(31 * DAY)));
 
     const result = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w) });
-    assert.equal(result.steps.firstGo.state, 'reached');
-    assert.equal(result.steps.firstGo.count, 1, 'only the in-window dispatch counts');
+    assert.equal(result.steps.firstGo.count, 1);
   });
 
   test('M4: an out-of-window account is excluded from aggregate login', async () => {
@@ -564,17 +689,14 @@ describe('collectMilestoneFunnel — cross-account aggregate (LIN-2952)', () => 
     assert.equal(result.steps.login.count, 1, 'only the in-window account counted');
   });
 
-  test('M5: an out-of-window membership edge is excluded from aggregate connected', async () => {
+  test('M5: a person with an old membership edge and an in-window sign-in still counts as connected', async () => {
     const w = freshWorld();
     const a = await w.accountStore.createAccount();
-    const b = await w.accountStore.createAccount();
     await w.accountWorkspaceStore.bindAccountToWorkspace(a._id, 'ws-1');
-    await w.accountWorkspaceStore.bindAccountToWorkspace(b._id, 'ws-1');
-    await w.accountWorkspaceStore.collection.updateOne({ accountId: b._id }, { $set: { createdAt: PAST(31 * 24 * 60 * 60 * 1000) } });
+    await w.accountWorkspaceStore.collection.updateOne({ accountId: a._id }, { $set: { createdAt: PAST(31 * DAY) } });
 
     const result = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w) });
-    assert.equal(result.steps.connected.state, 'reached');
-    assert.equal(result.steps.connected.count, 1, 'only the in-window edge counted');
+    assert.equal(result.steps.connected.count, 1);
   });
 
   test('M6: a non-evidence entry with a PR URL does not count as PR opened', async () => {
@@ -614,6 +736,87 @@ describe('collectMilestoneFunnel — cross-account aggregate (LIN-2952)', () => 
 
     const route = await stepsForAccountGroup({ accountIds: [a._id], ...aggDeps(w) });
     assert.equal(route.steps.prOpened.state, 'not-reached');
+  });
+
+  test('an older account active in the window is left out of every step', async () => {
+    const w = freshWorld();
+    const old = await w.accountStore.createAccount();
+    await w.accountStore.collection.updateOne({ _id: old._id }, { $set: { createdAt: PAST(40 * DAY) } });
+    await w.accountWorkspaceStore.bindAccountToWorkspace(old._id, 'ws-1');
+    await w.dispatchHistory.insertOne(dispatchRow(old._id, PAST(1000), {
+      feedback: [{ kind: 'evidence', url: 'https://github.com/o/r/pull/9', timestamp: PAST(500) }]
+    }));
+
+    const { steps } = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w) });
+    for (const key of ['login', 'connected', 'firstGo', 'prOpened']) {
+      assert.equal(steps[key].state, STEP_STATES.REACHED, key);
+      assert.equal(steps[key].count, 0, `${key}: the 40-day-old account is not in the cohort`);
+    }
+  });
+
+  test('one person active in two workspaces counts once per step', async () => {
+    const w = freshWorld();
+    const a = await w.accountStore.createAccount();
+    await w.accountWorkspaceStore.bindAccountToWorkspace(a._id, 'ws-1');
+    await w.accountWorkspaceStore.bindAccountToWorkspace(a._id, 'ws-2');
+    await w.dispatchHistory.insertOne(dispatchRow(a._id, PAST(3000), { urlKey: 'ws-1' }));
+    await w.dispatchHistory.insertOne(dispatchRow(a._id, PAST(2000), { urlKey: 'ws-2' }));
+    await w.dispatchQueue.insertOne(dispatchRow(a._id, PAST(1000), { urlKey: 'ws-2' }));
+
+    const { steps } = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w) });
+    assert.equal(steps.login.count, 1);
+    assert.equal(steps.connected.count, 1);
+    assert.equal(steps.firstGo.count, 1);
+  });
+
+  test('a merged group with both accounts in the window counts once, under rows from either id', async () => {
+    const w = freshWorld();
+    const canonical = await w.accountStore.createAccount();
+    const merged = await w.accountStore.createAccount();
+    assert.equal((await w.accountStore.mergeAccounts(canonical._id, merged._id)).ok, true);
+    await w.accountWorkspaceStore.bindAccountToWorkspace(merged._id, 'ws-1');
+    await w.dispatchHistory.insertOne(dispatchRow(merged._id, PAST(1000)));
+
+    const { steps } = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w) });
+    assert.equal(steps.login.count, 1, 'two accounts, one person');
+    assert.equal(steps.connected.count, 1);
+    assert.equal(steps.firstGo.count, 1);
+  });
+
+  test('an in-window account merged into a 40-day-old canonical is not a new person', async () => {
+    const w = freshWorld();
+    const canonical = await w.accountStore.createAccount();
+    await w.accountStore.collection.updateOne({ _id: canonical._id }, { $set: { createdAt: PAST(40 * DAY) } });
+    const fresh = await w.accountStore.createAccount();
+    assert.equal((await w.accountStore.mergeAccounts(canonical._id, fresh._id)).ok, true);
+    await w.dispatchHistory.insertOne(dispatchRow(fresh._id, PAST(1000)));
+
+    const { steps } = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w) });
+    assert.equal(steps.login.count, 0);
+    assert.equal(steps.firstGo.count, 0);
+  });
+
+  test('a person counts at their first-ever step even when it predates the window', async () => {
+    const w = freshWorld();
+    const a = await w.accountStore.createAccount();
+    await w.dispatchHistory.insertOne(dispatchRow(a._id, PAST(1000)));
+    await w.dispatchHistory.insertOne(dispatchRow(a._id, PAST(100)));
+
+    const { steps } = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w) });
+    assert.equal(steps.firstGo.count, 1, 'a second Go is not a second person');
+  });
+
+  test('an empty cohort reads an absent or uninstrumented step as no-signal, a present one as zero', async () => {
+    const w = freshWorld();
+    const empty = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w) });
+    assert.equal(empty.steps.login.count, 0);
+    assert.equal(empty.steps.firstGo.count, 0);
+    assert.equal(empty.steps.mergeClicked.state, STEP_STATES.NO_SIGNAL, 'not instrumented');
+
+    const noDispatch = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w), dispatchQueue: null, dispatchHistory: null });
+    assert.equal(noDispatch.steps.firstGo.state, STEP_STATES.NO_SIGNAL);
+    assert.equal(noDispatch.steps.prOpened.state, STEP_STATES.NO_SIGNAL);
+    assert.equal(noDispatch.steps.login.count, 0);
   });
 
   test('carries counts and labels only — no account id, workspace key, issue id or PR url', async () => {

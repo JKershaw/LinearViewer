@@ -1,7 +1,10 @@
 /**
- * Milestone-funnel route (LIN-2952): the per-account query the milestone demo
- * pastes — one signed-in account's five funnel timestamps and states, plus the
- * task-mode record joined in.
+ * Milestone-funnel route (LIN-2952, LIN-3501): the per-person query the milestone
+ * demo pastes — the funnel counts people (their merge group, across all their
+ * workspaces) and a person's funnel is their first-ever moment at each step;
+ * this route returns the signed-in person's five timestamps and states, plus the
+ * task-mode record joined in, read through the same `stepsForAccountGroup` that
+ * /kpis folds over the people who signed up in the last 30 days.
  *
  *   GET /workspace/:urlKey/api/milestone-funnel
  *

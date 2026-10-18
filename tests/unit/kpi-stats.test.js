@@ -36,6 +36,7 @@ function createMockCollection(docs = []) {
       if ('$gt' in condition) return value > condition.$gt;
       if ('$lt' in condition) return value < condition.$lt;
       if ('$lte' in condition) return value <= condition.$lte;
+      if ('$in' in condition) return condition.$in.includes(value);
     }
     return value === condition;
   };
@@ -525,10 +526,13 @@ describe('collectKpiStats', () => {
     const milestoneFunnelDeps = {
       accountStore: {
         collection: createMockCollection([leakyAccount]),
-        resolveCanonicalAccountId: async (id) => id
+        resolveCanonicalAccountId: async (id) => id,
+        listMergedAccounts: async () => [],
+        getAccount: async (id) => (id === leakyAccount._id ? leakyAccount : null)
       },
       accountWorkspaceStore: {
-        collection: createMockCollection([{ accountId: 'MILESTONE-SECRET-ACCOUNT', workspaceId: 'MILESTONE-SECRET-WSID', createdAt: NOW }])
+        collection: createMockCollection([{ accountId: 'MILESTONE-SECRET-ACCOUNT', workspaceId: 'MILESTONE-SECRET-WSID', createdAt: NOW }]),
+        listEdgesForAccounts: async () => [{ accountId: 'MILESTONE-SECRET-ACCOUNT', workspaceId: 'MILESTONE-SECRET-WSID', createdAt: NOW }]
       },
       taskModeStore: { countByEntryRung: async () => ({ total: 1, byRung: [{ rung: 'copy', entries: 1, notReady: 0 }], coverage: { surfaces: ['swipe'] } }) },
       funnelEventStore: { firstPerAccount: async () => [leakyAccount] },
@@ -1763,12 +1767,21 @@ describe('LIN-2952 — milestoneFunnel aggregate key', () => {
     assert.deepStrictEqual(Object.keys(stats.milestoneFunnel.steps).sort(), ['connected', 'firstGo', 'login', 'mergeClicked', 'prOpened']);
   });
 
-  test('R3: a throwing milestone dep propagates — collectKpiStats rejects (LIN-3002)', async () => {
+  test('R3 (LIN-3002, LIN-3501): a throwing funnel dep reads no-signal, but the mode store still rejects collectKpiStats', async () => {
     const throwingAccountStore = { collection: { find() { throw new Error('boom'); } } };
+    const stats = await collectKpiStats(buildCollections(), {
+      now: NOW,
+      milestoneFunnelDeps: { ...NO_MILESTONE_FUNNEL_DEPS, accountStore: throwingAccountStore }
+    });
+    for (const step of Object.values(stats.milestoneFunnel.steps)) {
+      assert.strictEqual(step.state, 'no-signal');
+      assert.strictEqual(step.count, null);
+    }
+
     await assert.rejects(
       collectKpiStats(buildCollections(), {
         now: NOW,
-        milestoneFunnelDeps: { ...NO_MILESTONE_FUNNEL_DEPS, accountStore: throwingAccountStore }
+        milestoneFunnelDeps: { ...NO_MILESTONE_FUNNEL_DEPS, taskModeStore: { countByEntryRung: async () => { throw new Error('boom'); } } }
       }),
       /boom/
     );
