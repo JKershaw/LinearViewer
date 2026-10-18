@@ -219,7 +219,8 @@ describe('the route', () => {
 
   test('LIN-3648: an unrecognised answer is "unavailable", with one fixed-tail warn and no raw answer in it', async () => {
     const fn = Object.assign(() => {}, { status: 'owner' });
-    const answers = [fn, null, undefined, 5, { status: 'weird' }, { status: 'unavailable' }, {}];
+    const throwingGetterFn = Object.defineProperty(() => {}, 'status', { get() { throw new Error('getter'); } });
+    const answers = [fn, throwingGetterFn, null, undefined, 5, { status: 'weird' }, { status: 'unavailable' }, {}];
     for (const answer of answers) {
       const warns = [];
       const orig = console.warn;
