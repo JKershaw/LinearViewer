@@ -91,13 +91,13 @@ function makeFakeProvider() {
   return { provider, calls };
 }
 
-function buildApp({ provider, sessionApiKey = null, freeTierStore = {} }) {
+function buildApp({ provider, sessionApiKey = null, freeTierStore = {}, accessToken = 'ws-token' }) {
   registerProvider(provider);
   const app = express();
   app.use(express.json({ limit: '250kb' }));
   const router = createWorkspaceApiRoutes({
     workspaceFromUrl: (req, res, next) => {
-      req.workspace = { urlKey: req.params.urlKey, provider: PROVIDER_NAME, accessToken: 'ws-token' };
+      req.workspace = { urlKey: req.params.urlKey, provider: PROVIDER_NAME, accessToken };
       req.session = { linearUserId: 'user-1', openRouterApiKey: sessionApiKey };
       next();
     },
@@ -295,6 +295,20 @@ describe('feedback title resolution (LIN-643)', () => {
       const { status } = await submit(buildApp({ provider, freeTierStore: store }), 'acme', { message: LONG_MESSAGE, title: 'Mine' });
       assert.strictEqual(status, 201);
       assert.strictEqual(calls.length, 0);
+    });
+
+    // The mock path makes no billed call, so it must not burn hourly-net slots.
+    // `test-token` + NODE_ENV=test makes shouldMockAi true.
+    test('mock path is not charged', async () => {
+      process.env.OPENROUTER_FREE_TIER_KEY = 'free-key';
+      const counter = { n: 0 };
+      restoreFetch = installFetchStub(['LLM title'], { counter });
+      const { calls, store } = gateStore(() => ({ allowed: true }));
+      const { provider } = makeFakeProvider();
+      const { status } = await submit(buildApp({ provider, freeTierStore: store, accessToken: 'test-token' }), 'acme', { message: LONG_MESSAGE });
+      assert.strictEqual(status, 201);
+      assert.strictEqual(calls.length, 0);
+      assert.strictEqual(counter.n, 0);
     });
 
     test('own-key (non-free-tier) user is not charged', async () => {
