@@ -58,6 +58,8 @@ function makeRouter({
   isStopAtRun = null,
   runnerReady = () => true,
   markDone = null,
+  dispatchQueueStore = undefined,
+  resolveProvider = null,
 } = {}) {
   const collection = harness.freshDb().collection('close-out-events');
   const store = new CloseOutEventsStore({ collection });
@@ -65,8 +67,9 @@ function makeRouter({
   const router = createWorkspaceApiRoutes({
     workspaceFromUrl: (req, res, next) => next(),
     closeOutEventsStore: store,
+    dispatchQueueStore,
     closeOut: {
-      resolveProvider: () => ({ provider: fakeProvider({ comments }), callScope: 'scope' }),
+      resolveProvider: resolveProvider || (() => ({ provider: fakeProvider({ comments }), callScope: 'scope' })),
       readPrStatus: readPrStatus || (async ({ number }) => statuses[number] || unknownStatus(number)),
       isStopAtRun: isStopAtRun || (async () => 'pr'),
       runnerReady,
@@ -551,5 +554,111 @@ describe('LIN-3395: close-out-press after a merged event exists', () => {
     assert.equal(res.statusCode, 201, JSON.stringify(res.jsonBody));
     const stored = await rows(built.collection);
     assert.equal(stored.filter(e => e.by === 'press').length, 1);
+  });
+});
+
+// LIN-3657: the press route asks the readiness question the dispatch lane asks
+// (LIN-3634), so a press for a head-moved close-out is refused, not recorded.
+describe('LIN-3657: close-out-press on a head-moved close-out', () => {
+  const REVIEWED = 'aaaaaaa1111111';
+  const MOVED = 'bbbbbbb2222222';
+  const headReview = `## Review\n\nReviewed head \`${REVIEWED}\`.\n\n### What CI Did Not Prove\n| # | Claim | In/Out | Discharge |\n| --- | --- | --- | --- |\n| 1 | one claim | In | none |\n\n**Verdict: Approve**`;
+  const comments = [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(headReview, '2026-07-02T00:00:00.000Z')];
+  const movedStatuses = { 41: openStatus(41, MOVED) };
+  const pressReq = (body = {}) => baseReq({ body: { prUrl: PR_A, headSha: MOVED, dispatchId: 'd-9', ...body } });
+
+  test('a head-moved press is refused with the pinned 409 body and writes nothing', async () => {
+    const built = makeRouter({ comments, statuses: movedStatuses });
+    const res = await press(built, pressReq());
+    assert.equal(res.statusCode, 409, JSON.stringify(res.jsonBody));
+    // Typed literal, not read from the helper: a typo in the helper fails here.
+    assert.deepEqual(res.jsonBody, {
+      error: 'The pull request changed since the review approved it',
+      code: 'CLOSE_OUT_NOT_READY',
+      reason: 'head-moved',
+      state: res.jsonBody.state,
+    });
+    assert.equal(res.jsonBody.state.reason, 'head-moved');
+    assert.equal((await rows(built.collection)).length, 0);
+  });
+
+  test('a ready press (head equals the reviewed head) is recorded', async () => {
+    const built = makeRouter({ comments, statuses: { 41: openStatus(41, REVIEWED) } });
+    const res = await press(built, pressReq({ headSha: REVIEWED }));
+    assert.equal(res.statusCode, 201, JSON.stringify(res.jsonBody));
+    assert.equal((await rows(built.collection)).filter(e => e.by === 'press').length, 1);
+  });
+
+  test('a task that does not stop at the PR is recorded even with a moved head', async () => {
+    const built = makeRouter({ comments, statuses: movedStatuses, isStopAtRun: async () => null });
+    const res = await press(built, pressReq());
+    assert.equal(res.statusCode, 201, JSON.stringify(res.jsonBody));
+  });
+
+  test('an unreadable PR fails open: the press is recorded', async () => {
+    const built = makeRouter({ comments, statuses: { 41: unknownStatus(41) } });
+    const res = await press(built, pressReq());
+    assert.equal(res.statusCode, 201, JSON.stringify(res.jsonBody));
+  });
+
+  test('a merged event is refused (LIN-3395) before any readiness read', async () => {
+    const counts = { provider: 0, pr: 0 };
+    const built = makeRouter({
+      comments,
+      resolveProvider: () => { counts.provider += 1; return { provider: fakeProvider({ comments }), callScope: 'scope' }; },
+      readPrStatus: async ({ number }) => { counts.pr += 1; return openStatus(number, MOVED); },
+    });
+    await built.collection.insertOne({
+      urlKey: 'ws', issueIdentifier: 'LIN-1', by: 'check', prUrl: PR_A, headSha: MOVED, merged: true,
+      openItems: { inside: 0, outside: 0, unknown: 0, total: 0 }, createdAt: new Date(),
+    });
+    const res = await press(built, pressReq());
+    assert.equal(res.statusCode, 409);
+    assert.equal(res.jsonBody.code, 'CLOSE_OUT_ALREADY_MERGED');
+    assert.deepEqual(counts, { provider: 0, pr: 0 });
+  });
+
+  describe('source resolution (the press body carries no source)', () => {
+    async function withRow(row) {
+      const db = harness.freshDb();
+      const queueStore = new DispatchQueueStore({ collection: db.collection('dispatch-queue'), historyCollection: db.collection('dispatch-history') });
+      const added = await queueStore.addItem('ws', { prompt: 'close out', promptName: 'close-out', kind: 'implementation', stopAt: 'pr', ...row });
+      const seen = [];
+      const built = makeRouter({
+        comments, statuses: movedStatuses, dispatchQueueStore: queueStore,
+        resolveProvider: (_workspace, source) => { seen.push(source ?? null); return { provider: fakeProvider({ comments }), callScope: 'scope' }; },
+      });
+      return { built, seen, id: added._id };
+    }
+
+    test("falls back to the named dispatch row's issueSource", async () => {
+      const { built, seen, id } = await withRow({ issueIdentifier: 'LIN-1', issueSource: 'jira' });
+      const res = await press(built, pressReq({ dispatchId: id }));
+      assert.equal(res.statusCode, 409, JSON.stringify(res.jsonBody));
+      assert.ok(seen.length > 0);
+      assert.ok(seen.every(s => s === 'jira'), JSON.stringify(seen));
+    });
+
+    test('a request source (body or query) wins over the row', async () => {
+      const { built, seen, id } = await withRow({ issueIdentifier: 'LIN-1', issueSource: 'jira' });
+      await press(built, pressReq({ dispatchId: id, source: 'github' }));
+      assert.ok(seen.length > 0 && seen.every(s => s === 'github'), JSON.stringify(seen));
+      seen.length = 0;
+      await press(built, baseReq({ query: { source: 'gitlab' }, body: { prUrl: PR_A, headSha: MOVED, dispatchId: id } }));
+      assert.ok(seen.length > 0 && seen.every(s => s === 'gitlab'), JSON.stringify(seen));
+    });
+
+    test("a row for a different issue does not steer the source", async () => {
+      const { built, seen, id } = await withRow({ issueIdentifier: 'LIN-2', issueSource: 'jira' });
+      await press(built, pressReq({ dispatchId: id }));
+      assert.ok(seen.length > 0 && seen.every(s => s === null), JSON.stringify(seen));
+    });
+
+    test('a dispatchId with no row gives the provider default and still runs the guard', async () => {
+      const { built, seen } = await withRow({ issueIdentifier: 'LIN-1', issueSource: 'jira' });
+      const res = await press(built, pressReq({ dispatchId: 'no-such-row' }));
+      assert.equal(res.statusCode, 409);
+      assert.ok(seen.length > 0 && seen.every(s => s === null), JSON.stringify(seen));
+    });
   });
 });

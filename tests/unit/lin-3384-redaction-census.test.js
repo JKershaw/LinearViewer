@@ -127,6 +127,8 @@ const TABLE = {
   // routes — in-process only
   // LIN-3398: the delete handler's owner-gate read (target only; the row is never sent)
   'routes/dispatch.js :: /workspace/:urlKey/api/dispatch/:itemId': [SRV, 1],
+  // LIN-3657: the press route reads the named dispatch row for its issueSource only (the row is never sent)
+  'routes/workspace-api.js :: /workspace/:urlKey/api/run-evidence/:issueIdentifier/close-out-press': [SRV, 1],
   'routes/dispatch.js :: host': [SRV, 1],
   'routes/dispatch.js :: refuse': [SRV, 1],
   'routes/proxy-kickoff.js :: parentRun': [SRV, 1],

@@ -49,7 +49,7 @@ import { generateScan, parseScanResponse, buildScanMessages, isExplicitRetiremen
 import { generateFeedbackTitle } from '../lib/feedback-title.js';
 import { readRunEvidence } from '../lib/run-evidence.js';
 import { closeOutSetsDone } from '../lib/run-closeout-state.js';
-import { readCloseOutChain } from '../lib/close-out-readiness.js';
+import { readCloseOutChain, closeOutNotReady, closeOutNotReadyRefusal } from '../lib/close-out-readiness.js';
 import { buildContextGraph } from '../lib/context-graph.js';
 import { hashContext } from '../lib/recap-cache.js';
 import { scanBasisHashFromContext, dueBasisHashFromContext, dueChanged, basisChanged as computeBasisChanged, BASIS_VERSION } from '../lib/scan-fingerprint.js';
@@ -3720,6 +3720,22 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       // next check cannot add a second `close-out` event or a second Done write.
       if (closeOutEventsStore && await closeOutEventsStore.hasMergedEvent({ urlKey, prUrl })) {
         return jsonError(res, 409, 'This pull request is already merged; the close-out press was not recorded', { code: 'CLOSE_OUT_ALREADY_MERGED' });
+      }
+      // LIN-3657: the dispatch lane refuses a head-moved close-out (LIN-3634); the
+      // press asks the same question so it never records one. The guard keeps
+      // `closeOutNotReady`'s scope (the task's sole open PR, not `prUrl`) and fails
+      // open on an unreadable read. Source: the request's, else the named dispatch
+      // row's (the clients' press body carries none; the row is what their dispatch
+      // call stamped), and only when that row is this task's.
+      let source = [req.body?.source, req.query.source].find((v) => typeof v === 'string') ?? null;
+      if (source === null && typeof dispatchId === 'string' && typeof dispatchQueueStore?.getItemStatus === 'function') {
+        const row = await Promise.resolve(dispatchQueueStore.getItemStatus(urlKey, dispatchId)).catch(() => null);
+        if (row?.issueIdentifier === req.params.issueIdentifier) source = row.issueSource ?? null;
+      }
+      const notReady = await closeOutNotReady({ workspace: req.workspace, issueIdentifier: req.params.issueIdentifier, source, store: dispatchQueueStore, seam: closeOut || {} });
+      if (notReady) {
+        const refusal = closeOutNotReadyRefusal(notReady);
+        return jsonError(res, 409, refusal.error, refusal.extra);
       }
       const event = closeOutEventsStore && await closeOutEventsStore.record({
         accountId: req.session.accountId,
