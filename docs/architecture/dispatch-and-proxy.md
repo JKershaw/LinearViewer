@@ -47,6 +47,10 @@ path is best-effort under degradation; the degraded-mode path is the proxy verb 
   key, omitted when unset; the runner honours it)
 - `POST /api/dispatch/take/:itemId` - Atomically claim an item
 - `POST /api/dispatch/feedback/:itemId` - Post feedback on a taken item
+- `POST /api/dispatch/heartbeat` - Consumer heartbeat (LIN-1952): host load and session counts, 204 or 400.
+  The same handler answers `POST /api/proxy/runner/heartbeat` (runner `take` gate). Stored in
+  `consumer-heartbeats` (one replaced doc per workspace + instance, 15 min expiry, 20 per workspace),
+  read at `GET /api/proxy/heartbeats`. Field set and parser: `lib/consumer-heartbeat.js`.
 
 Items expire after 24 hours. Tokens are workspace-scoped. Dispatch tokens have an optional `expiresAt` (none by default); they can be revoked, and are revoked with the workspace by the account that made them.
 Feedback is append-only, **retained for the life of the project**, and requires strict token ownership.

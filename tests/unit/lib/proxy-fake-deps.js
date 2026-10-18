@@ -118,6 +118,11 @@ export const BASE_DEPS = () => ({
   sessionsFeedCache: {
     clear: () => {},
   },
+  // LIN-1952: GET /api/proxy/heartbeats and POST /api/proxy/runner/heartbeat.
+  consumerHeartbeatStore: {
+    record: async () => {},
+    listLive: async () => [],
+  },
 });
 
 /**

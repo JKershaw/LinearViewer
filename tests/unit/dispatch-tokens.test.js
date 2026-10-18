@@ -47,9 +47,11 @@ describe('LIN-1397 — DispatchTokenStore createdBy plumbing', () => {
   });
 
   test('createToken stamps createdBy and validateToken returns it', async () => {
-    const { token } = await store.createToken('acme', 'my-label', 'account-A');
+    const { token, tokenId } = await store.createToken('acme', 'my-label', 'account-A');
     const validated = await store.validateToken(token);
-    assert.deepEqual(validated, { urlKey: 'acme', label: 'my-label', createdBy: 'account-A' });
+    // LIN-1952: tokenId is the token doc _id, so heartbeat storage can record the sender.
+    assert.ok(tokenId && typeof tokenId === 'string');
+    assert.deepEqual(validated, { urlKey: 'acme', label: 'my-label', createdBy: 'account-A', tokenId });
   });
 
   test('createToken with no createdBy arg -> validateToken returns createdBy: null (never fabricated)', async () => {

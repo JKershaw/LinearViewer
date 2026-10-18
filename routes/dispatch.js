@@ -21,6 +21,7 @@
  */
 
 import { Router } from 'express';
+import { createHeartbeatIngest } from '../lib/consumer-heartbeat-ingest.js';
 import { badRequest, jsonError, notFound, unauthorized, serviceUnavailable } from '../lib/errors.js';
 import rateLimit from 'express-rate-limit';
 import fs from 'fs';
@@ -78,6 +79,17 @@ const feedbackLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many feedback requests, please try again later' },
   // Skip rate limiting in test mode
+  skip: () => process.env.NODE_ENV === 'test'
+});
+
+// Consumer heartbeat (LIN-1952): same 100/min/IP shape as feedback. A consumer
+// sends one a minute; the headroom is for several consumers behind one IP.
+const heartbeatLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many heartbeat requests, please try again later' },
   skip: () => process.env.NODE_ENV === 'test'
 });
 
@@ -247,7 +259,7 @@ function presetBodyCheck({ model, harness, effort, byKind }) {
  *   closed with OWNER_CHECK_UNAVAILABLE. Never consulted on the verify path.
  * @returns {Router} Express router with dispatch routes
  */
-export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, provider: injectedProvider = null, getWorkspaceAccessToken = null, fetchIssueContext = null, workspaceHaltStore = null, haltReadTimeoutMs = POLL_HALT_READ_TIMEOUT_MS, sessionsFeedCache = null, workspaceOwnerCheck = null, taskModeStore = null, freeTierStore = null, accountStore = null }) {
+export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, provider: injectedProvider = null, getWorkspaceAccessToken = null, fetchIssueContext = null, workspaceHaltStore = null, haltReadTimeoutMs = POLL_HALT_READ_TIMEOUT_MS, sessionsFeedCache = null, workspaceOwnerCheck = null, taskModeStore = null, freeTierStore = null, accountStore = null, consumerHeartbeatStore = null }) {
   const router = Router();
 
   // =========================================================================
@@ -281,6 +293,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
       req.dispatchUrlKey = result.urlKey;
       req.dispatchTokenLabel = result.label;
+      req.dispatchTokenId = result.tokenId ?? null; // LIN-1952: recorded on heartbeats
       // LIN-1397: the dispatch token's creating account, if any — null for
       // tokens minted before createdBy existed. Consumed by the broker-token
       // mint endpoint below, which must not stamp a null owner onto a bootstrap.
@@ -1330,6 +1343,18 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
     res.status(201).json({ token: minted.token, expiresAt: minted.expiresAt });
   });
+
+  /**
+   * POST /api/dispatch/heartbeat (LIN-1952)
+   * Consumer heartbeat from a dispatch consumer (simple-dispatcher). Shares its
+   * handler with POST /api/proxy/runner/heartbeat. Writes only to the
+   * `consumer-heartbeats` store, never to runner or session state.
+   */
+  router.post('/api/dispatch/heartbeat', heartbeatLimiter, authenticateDispatchToken, createHeartbeatIngest({
+    store: consumerHeartbeatStore,
+    endpoint: '/api/dispatch/heartbeat',
+    identify: (req) => ({ urlKey: req.dispatchUrlKey, tokenId: req.dispatchTokenId ?? null })
+  }));
 
   /**
    * POST /api/dispatch/take/:itemId

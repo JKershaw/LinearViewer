@@ -35,7 +35,9 @@ const ROSTER = [
   ['observerStateStore', n => `Observer state cleanup: removed ${n} decommissioned instance(s)`, 'Observer state cleanup error:'],
   ['observerShadowLogStore', n => `Observer shadow log cleanup: removed ${n} aged entries`, 'Observer shadow log cleanup error:'],
   // LIN-3424: the 8th block, appended last.
-  ['sessionStore', n => `Session cleanup: removed ${n} expired sessions`, 'Session cleanup error:']
+  ['sessionStore', n => `Session cleanup: removed ${n} expired sessions`, 'Session cleanup error:'],
+  // LIN-1952: the 9th block, appended last.
+  ['consumerHeartbeatStore', n => `Consumer heartbeat cleanup: removed ${n} expired heartbeats`, 'Consumer heartbeat cleanup error:']
 ];
 
 // Recording stubs: each cleanup() counts its calls and returns / throws on cue.

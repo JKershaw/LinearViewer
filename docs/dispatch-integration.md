@@ -228,6 +228,56 @@ Content-Type: application/json
 
 Feedback entries are displayed in the dispatch history UI and are **retained for the life of the project** (dispatch history has no time-based expiry; LIN-3157 B+D, LIN-3163).
 
+### Consumer Heartbeat (LIN-1952)
+
+Optional. A consumer may report its host load and session counts so the operator can pace lanes
+from one read (`GET /api/proxy/heartbeats` on the Agent API) instead of guessing. It is a different
+channel from the per-item `[working]` line: it is about the consumer, not an item. It adds to, and
+does not replace, last-poll tracking.
+
+```
+POST /api/dispatch/heartbeat
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+```json
+{
+  "schema": 1,
+  "consumerKind": "simple-dispatcher",
+  "instanceId": "random-per-process-start",
+  "sentAt": "2026-10-18T12:00:00.000Z",
+  "intervalMs": 60000,
+  "uptimeSec": 3600,
+  "platform": "darwin",
+  "lastPollOkAt": "2026-10-18T11:59:58.000Z",
+  "pollIntervalMs": 5000,
+  "loadAvg1": 1.2, "loadAvg5": 0.9, "loadAvg15": 0.7,
+  "cpuCount": 8,
+  "hostMemFreeBytes": 1200000000,
+  "hostMemTotalBytes": 17179869184,
+  "activeSessionCount": 3,
+  "heldSessionCount": 1
+}
+```
+
+- **Required:** `schema` (`1`), `consumerKind` (`[a-z0-9-]{1,32}`), `instanceId` (`[A-Za-z0-9._-]{1,64}`,
+  random per process start), `sentAt` (ISO), `intervalMs` (integer, 1000-3600000).
+- **Optional:** `uptimeSec`, `platform` (at most 16 chars), `version` (at most 40), `lastPollOkAt` (ISO),
+  `pollIntervalMs`, `loadAvg1`, `loadAvg5`, `loadAvg15`, `cpuCount`, `hostMemFreeBytes`,
+  `hostMemTotalBytes`, `activeSessionCount` (sessions running now), `heldSessionCount` (parked waiting
+  for a follow-up). Send only what you actually measure; never a guess or a placeholder `0`.
+  Unknown keys, non-finite numbers and over-long strings are dropped. Hostnames, usernames, paths and
+  content must not be sent.
+- `hostMemFreeBytes` is what `os.freemem()` reports. It is **not** "available" memory and reads low on macOS.
+- **Responses:** `204` accepted; `400` (error envelope) for an invalid or over-4 KB body (an oversize
+  body is a `400`, not a `413`); `401` without a valid token. Limit: 100 requests a minute per IP.
+- A beat replaces the previous one for the same workspace and `instanceId`, expires 15 minutes
+  after it arrives, and a workspace keeps at most 20 live instances (the oldest is evicted).
+  Harbour reads a consumer as stale after 3 x `intervalMs`.
+- A Harbour that predates this route answers `404`; a consumer should log that once and carry on.
+- The runner kit sends the same body to `POST /api/proxy/runner/heartbeat` under its `take` grant.
+
 ### Minting a Broker Bootstrap Token
 
 ```

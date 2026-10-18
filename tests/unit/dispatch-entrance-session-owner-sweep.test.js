@@ -32,7 +32,7 @@ import assert from 'node:assert/strict';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { enumerateRoutes, sampleUrl, appAround, request, makeSpy, SAMPLE_UUID } from './lib/entrance-route-sweep.js';
 
-const ROUTE_COUNT = 26;
+const ROUTE_COUNT = 27;
 const COPY = "Only this workspace's owner can act on its runner.";
 const OWNER = 'acct-owner';
 const MEMBER = 'acct-member';
@@ -146,6 +146,7 @@ const TABLE = {
   'GET /api/dispatch/poll': { verdict: 'dispatch-token', reason: 'runner poll: dispatch token only; no credential is a 401', probes: [{}] },
   'POST /api/dispatch/broker-token': { verdict: 'dispatch-token', reason: 'LIN-3135 refire broker: dispatch token only; no credential is a 401', probes: [{ body: {} }] },
   'POST /api/dispatch/take/:itemId': { verdict: 'dispatch-token', reason: 'runner take: dispatch token only; no credential is a 401', probes: [{ body: {} }] },
+  'POST /api/dispatch/heartbeat': { verdict: 'dispatch-token', reason: 'LIN-1952 consumer heartbeat: no credential is a 401 and nothing is written; the handler writes only to the new consumer-heartbeats store, never to runner or session state', probes: [{ body: {} }] },
   'POST /api/dispatch/feedback/:itemId': { verdict: 'feedback-token', reason: 'runner feedback: single-use Harbour OS feedback token or dispatch token; no credential is a 401', probes: [{ body: { message: 'm' } }] }
 };
 

@@ -8,7 +8,7 @@
  *     /states/:teamId, /labels, /cycles, /cycles|cycle/:cycleId,
  *     /issues/:issueId/relations | /relations/:issueId
  *   store-backed (read this token's own event rows, no provider):
- *     /credential-health, /credential-trail
+ *     /credential-health, /credential-trail, /heartbeats
  *   byte relay:
  *     /attachments/:id
  *
@@ -32,6 +32,7 @@
  *   handler sends a bare 500 and logs nothing.
  */
 import { Router } from 'express';
+import { buildHeartbeatView } from '../lib/consumer-heartbeat.js';
 import { applyTrashedSignal, isTrashed } from '../lib/trashed-signal.js';
 import {
   flattenIssue,
@@ -69,7 +70,7 @@ const createdAtMs = (comment) => new Date(comment.createdAt).getTime() || 0;
  * @param {Function} deps.graphqlErrorStatus - Maps a provider/GraphQL error to an HTTP status (closure-local; its own internal call closes over rejectedCredentialRegistry/BYTE_IDENTICAL_ESCALATION_THRESHOLD from the SAME createProxyRoutes invocation — safe by reference, not by absence of D-local refs)
  * @param {Object} deps.proxyEventStore - Proxy event/audit storage instance (composer param); used by the two store-backed routes, whose own catch turns a missed injection into a generic 500
  */
-export function createReadRoutes({ proxyLimiter, authenticateProxyToken, resolveProviderAccess, denyIfUnsupported, logEvent, workspaceUnavailable, graphqlErrorStatus, proxyEventStore }) {
+export function createReadRoutes({ proxyLimiter, authenticateProxyToken, resolveProviderAccess, denyIfUnsupported, logEvent, workspaceUnavailable, graphqlErrorStatus, proxyEventStore, consumerHeartbeatStore = null }) {
   const router = Router();
 
   // The status and body for a provider/GraphQL failure, logged against the
@@ -365,6 +366,20 @@ export function createReadRoutes({ proxyLimiter, authenticateProxyToken, resolve
       windowMs: optionalInt(req.query.windowMs),
       limit: optionalInt(req.query.limit),
     }),
+  ));
+
+  // LIN-1952: which dispatch consumers are reporting, how loaded each host is,
+  // how many sessions each runs. Read scope, this token's workspace only. Not
+  // under /api/proxy/runner/*, which needs the `take` grant. Newest first; an
+  // entry is `stale` once ageMs > 3 x its intervalMs. Expired docs (15 min) are
+  // filtered by the store query, not by a sweep.
+  router.get('/api/proxy/heartbeats', proxyLimiter, authenticateProxyToken, storeRead(
+    { endpoint: '/api/proxy/heartbeats', failure: 'Failed to read consumer heartbeats' },
+    async (req) => {
+      const now = new Date();
+      const docs = await consumerHeartbeatStore.listLive(req.proxyUrlKey, now);
+      return { heartbeats: docs.map(doc => buildHeartbeatView(doc, now)) };
+    },
   ));
 
   // ---------------------------------------------------------------------------

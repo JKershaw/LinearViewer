@@ -115,7 +115,8 @@ function sessionWorld({ canary, accountId, target }) {
 
 // Runner routes: they authenticate with a dispatch token, not a session, and
 // MUST carry the live token.
-const SESSION_RUNNER = { 'GET /api/dispatch/poll': true, 'POST /api/dispatch/take/:itemId': true };
+// LIN-1952: the heartbeat route is a dispatch-token consumer route too (no session, no prompt, no mint).
+const SESSION_RUNNER = { 'GET /api/dispatch/poll': true, 'POST /api/dispatch/take/:itemId': true, 'POST /api/dispatch/heartbeat': true };
 // Routes whose reply may carry the owner's own prompt (and only that).
 const SESSION_OWNER_PROMPT = new Set([
   'GET /workspace/:urlKey/api/dispatch',
@@ -133,8 +134,8 @@ describe('LIN-3601 redaction canary sweep — session routes (routes/dispatch.js
     assert.match(canary, /^HB[A-Za-z0-9_-]{41}$/);
   });
 
-  test('enumerates exactly 26 session routes', () => {
-    assert.equal(routes.length, 26);
+  test('enumerates exactly 27 session routes', () => {
+    assert.equal(routes.length, 27);
   });
 
   for (const route of routes) {

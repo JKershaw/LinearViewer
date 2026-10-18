@@ -80,7 +80,7 @@ export const URLKEY_SOURCES = Object.freeze([
     'task-snapshots', 'task-decisions', 'run-paragraph', 'workspaces', 'task_share_links',
     'observer-shadow-log', 'saved-chats', 'funnel-events', 'credential-lifecycle-events',
     'owner-credentials', 'dismissal-suggestions', 'dispatch-presets', 'run-proposals', 'shelved-rulings',
-    'ship-biscuit-editions', 'collective-characters', 'collective-presets'
+    'ship-biscuit-editions', 'collective-characters', 'collective-presets', 'consumer-heartbeats'
   ].map(collection => ({ collection, shape: 'field', field: 'urlKey' })),
   { collection: 'local-issues', shape: 'field', field: 'scope' },
   { collection: 'workspace-halt', shape: 'id' },

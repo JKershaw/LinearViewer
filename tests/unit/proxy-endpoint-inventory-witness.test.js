@@ -169,6 +169,12 @@ const ROWS = [
     run: () => call(buildApp(), 'GET', '/api/proxy/credential-trail'),
   },
   {
+    group: 'D', method: 'GET', url: '/api/proxy/heartbeats', expect: 200,
+    note: 'consumerHeartbeatStore.listLive() (routes/proxy-reads.js, LIN-1952); BASE_DEPS() store is empty',
+    expectBody: { heartbeats: [] },
+    run: () => call(buildApp(), 'GET', '/api/proxy/heartbeats'),
+  },
+  {
     group: 'D', method: 'GET', url: '/api/proxy/teams', expect: 200,
     note: 'provider.fetchTeams() (:1959)',
     run: () => call(buildApp(), 'GET', '/api/proxy/teams'),
@@ -547,6 +553,12 @@ const ROWS = [
     note: 'the shared feedback validator runs before any store is touched',
     expectBody: { error: 'message is required and must be a string' },
     run: () => call(runnerApp(), 'POST', '/api/proxy/runner/feedback/00000000-0000-4000-8000-000000000000', { body: {} }),
+  },
+  {
+    group: 'L', method: 'POST', url: '/api/proxy/runner/heartbeat', expect: 400,
+    note: 'LIN-1952: the shared heartbeat parser runs before the store is touched',
+    expectBody: { error: 'Invalid heartbeat: schema 1 with consumerKind, instanceId, sentAt and intervalMs (1000-3600000) is required' },
+    run: () => call(runnerApp(), 'POST', '/api/proxy/runner/heartbeat', { body: {} }),
   },
 ];
 

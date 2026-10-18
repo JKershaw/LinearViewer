@@ -5,6 +5,7 @@
  *   GET  /api/proxy/runner/poll
  *   POST /api/proxy/runner/take/:id
  *   POST /api/proxy/runner/feedback/:id
+ *   POST /api/proxy/runner/heartbeat   (LIN-1952, lib/consumer-heartbeat-ingest.js)
  *
  * Mount shape (F2). `routes/proxy.js` mounts this factory PATH-LESS, like the
  * halt/kickoff/dispatch sub-routers, and this factory's FIRST statement is the
@@ -37,12 +38,14 @@ import { validateFeedbackBody } from '../lib/dispatch-feedback-validation.js';
 import { buildWakeCredentialProvisioner } from '../lib/wake-credential.js';
 import { readHaltForPoll, POLL_HALT_READ_TIMEOUT_MS } from '../lib/poll-halt.js';
 import { getConsumerLastSeenAt } from '../lib/consumer-poll-warning.js';
+import { createHeartbeatIngest } from '../lib/consumer-heartbeat-ingest.js';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const POLL_ROUTE = '/api/proxy/runner/poll';
 const TAKE_ROUTE = '/api/proxy/runner/take/:id';
 const FEEDBACK_ROUTE = '/api/proxy/runner/feedback/:id';
+const HEARTBEAT_ROUTE = '/api/proxy/runner/heartbeat';
 
 /**
  * @param {Object} deps
@@ -55,6 +58,7 @@ const FEEDBACK_ROUTE = '/api/proxy/runner/feedback/:id';
  * @param {Object} deps.proxyTokenStore - Proxy token store, used to provision wake credentials
  * @param {Object} deps.workspaceHaltStore - Durable per-workspace operator halt store
  * @param {Object} [deps.sessionsFeedCache] - Sessions-feed cache; cleared on decision-withdrawn
+ * @param {Object} [deps.consumerHeartbeatStore] - Consumer heartbeat store (LIN-1952)
  * @param {number} [deps.haltReadTimeoutMs] - Bounded halt-read timeout (default POLL_HALT_READ_TIMEOUT_MS)
  */
 export function createProxyRunnerRoutes({
@@ -67,6 +71,7 @@ export function createProxyRunnerRoutes({
   proxyTokenStore,
   workspaceHaltStore,
   sessionsFeedCache = null,
+  consumerHeartbeatStore = null,
   haltReadTimeoutMs = POLL_HALT_READ_TIMEOUT_MS
 }) {
   const router = Router();
@@ -110,6 +115,18 @@ export function createProxyRunnerRoutes({
       jsonError(res, 500, 'Failed to poll dispatch queue');
     }
   });
+
+  /**
+   * POST /api/proxy/runner/heartbeat (LIN-1952)
+   * The runner kit's consumer heartbeat. Same handler as POST
+   * /api/dispatch/heartbeat; the `take` gate above is its only auth.
+   */
+  router.post(HEARTBEAT_ROUTE, createHeartbeatIngest({
+    store: consumerHeartbeatStore,
+    logEvent,
+    endpoint: HEARTBEAT_ROUTE,
+    identify: (req) => ({ urlKey: req.proxyUrlKey, tokenId: req.proxyTokenId ?? null })
+  }));
 
   /**
    * POST /api/proxy/runner/take/:id
