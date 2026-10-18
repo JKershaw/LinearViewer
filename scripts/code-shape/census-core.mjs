@@ -1,7 +1,7 @@
 // Census of decisions held in many places ("specks") — pure core (LIN-3628).
 // runCensus is the body of experiments/consolidate-1-census/census.mjs wrapped in a function:
-// file contents in, report out. Detectors and thresholds are unchanged; the git reads, argv and
-// output live in census.mjs. Detectors:
+// file contents in, report out. Detectors and thresholds are unchanged except for one addition
+// (LIN-3629, detector 5, `cmp`); the git reads, argv and output live in census.mjs. Detectors:
 //   1. clone      near-duplicate functions (alpha-renamed structural hash + MinHash/Jaccard)
 //   2. set        repeated string sets: array/Set literals and lookup-table keys
 //   3. discrim    repeated discriminations: switch / if-chain / ||-chain / ternary-chain
@@ -11,6 +11,9 @@
 //   2b. record    repeated record shapes: object literals with >= 5 keys whose key sets agree
 //   4. contract   text-protocol contracts: markdown headings / [bracket] markers inside string,
 //                 template or regex literals that more than one file writes or parses
+//   5. cmp        repeated single comparisons: one subject compared with the same string literal
+//                 in more than one file (`x.status === 'blocked'`), unless the comparison is already
+//                 inside a set / chain site that the census groups (LIN-3629)
 // Nothing in here names anything specific to one codebase.
 import { createHash } from 'node:crypto';
 import * as acorn from 'acorn';
@@ -411,8 +414,24 @@ export function runCensus({ files, areaMap = null, fileCommits = new Map(), comm
     if (n.type === 'ChainExpression') n = n.expression;
     if (n.type !== 'BinaryExpression' || !isEq(n.operator)) return null;
     const ls = strOf(p, n.left), rs = strOf(p, n.right);
-    if (rs != null && ls == null) return { shape: shapeOf(n.left), value: rs };
-    if (ls != null && rs == null) return { shape: shapeOf(n.right), value: ls };
+    if (rs != null && ls == null) return { shape: shapeOf(n.left), value: rs, node: n };
+    if (ls != null && rs == null) return { shape: shapeOf(n.right), value: ls, node: n };
+    return null;
+  };
+  // cmpOf plus the subject node and the comparison node (for `cmp`, LIN-3629).
+  const cmpDetail = (p, n) => {
+    if (n.type === 'ChainExpression') n = n.expression;
+    const c = cmpOf(p, n);
+    if (!c) return null;
+    return { ...c, node: n, subject: strOf(p, n.left) != null && strOf(p, n.right) == null ? n.right : n.left };
+  };
+  // The subject's last name: `a.b.status` and `status` and `getStatus()` read as status / getStatus().
+  // A subject that is neither a name, a property nor a call has no name worth a key.
+  const subjectName = (n) => {
+    if (n.type === 'ChainExpression') return subjectName(n.expression);
+    if (n.type === 'Identifier') return n.name;
+    if (n.type === 'MemberExpression' && !n.computed && n.property.name) return n.property.name;
+    if (n.type === 'CallExpression') { const c = subjectName(n.callee); return c ? `${c}()` : null; }
     return null;
   };
   // `ARR.includes(E)` / `SET.has(E)` with an inline literal receiver is already an array site.
@@ -422,16 +441,18 @@ export function runCensus({ files, areaMap = null, fileCommits = new Map(), comm
     else out.push(n);
     return out;
   };
+  // `nodes` are the comparison nodes a site covers, so `cmp` can skip what a grouped site already counts.
   const pushDiscrim = (p, line, kind, cmps) => {
     const byShape = new Map();
-    for (const c of cmps) { if (!c) continue; const k = c.shape; if (!byShape.has(k)) byShape.set(k, new Set()); byShape.get(k).add(c.value); }
-    for (const [shape, vals] of byShape) if (vals.size >= T.setMinMembers) setSites.push({ file: p, line, kind, members: [...vals], label: shape, shape: tailShape(shape) });
+    for (const c of cmps) { if (!c) continue; const k = c.shape; if (!byShape.has(k)) byShape.set(k, { vals: new Set(), nodes: [] }); byShape.get(k).vals.add(c.value); byShape.get(k).nodes.push(c.node); }
+    for (const [shape, { vals, nodes }] of byShape) if (vals.size >= T.setMinMembers) setSites.push({ file: p, line, kind, members: [...vals], label: shape, shape: tailShape(shape), nodes });
   };
 
   // Names used as maps: NAME[expr] with a non-literal key, `x in NAME`, Object.keys/values/entries(NAME).
   const mapUses = new Map();
   const filteredLiteralRecords = { count: 0 };
   const literalRecords = [];
+  const cmpCands = [];   // { file, line, name, value, node } — every comparison against a string literal
   for (const [p, ast] of Object.entries(asts)) {
     const s = new Set();
     walk(ast, (n) => {
@@ -489,7 +510,16 @@ export function runCensus({ files, areaMap = null, fileCommits = new Map(), comm
       }
       if (n.type === 'SwitchStatement') {
         const vals = n.cases.map((c) => (c.test ? strOf(p, c.test) : null)).filter((v) => v != null);
-        if (new Set(vals).size >= T.setMinMembers) setSites.push({ file: p, line, kind: 'switch', members: [...new Set(vals)], label: shapeOf(n.discriminant), shape: tailShape(shapeOf(n.discriminant)) });
+        if (new Set(vals).size >= T.setMinMembers) setSites.push({ file: p, line, kind: 'switch', members: [...new Set(vals)], label: shapeOf(n.discriminant), shape: tailShape(shapeOf(n.discriminant)), nodes: n.cases.filter((c) => c.test && strOf(p, c.test) != null) });
+        const name = subjectName(n.discriminant);
+        if (name && n.discriminant.type !== 'UnaryExpression') {
+          for (const c of n.cases) { const v = c.test ? strOf(p, c.test) : null; if (v != null) cmpCands.push({ file: p, line: c.loc.start.line, name, value: v, node: c }); }
+        }
+      }
+      if (n.type === 'BinaryExpression' && isEq(n.operator)) {
+        const c = cmpDetail(p, n);
+        const name = c && subjectName(c.subject);
+        if (name) cmpCands.push({ file: p, line, name, value: c.value, node: n });
       }
       if (n.type === 'LogicalExpression' && !consumedLogical.has(n)) {
         const leaves = flattenLogical(n, []);
@@ -523,6 +553,7 @@ export function runCensus({ files, areaMap = null, fileCommits = new Map(), comm
   // Noise filter for sets: members that carry no domain meaning.
   const noiseMember = (s) => s.trim().length === 0 || /^[\s\W]$/.test(s);
   const filteredSets = { emptyOrPunctuation: 0, singleFile: 0 };
+  const groupedNodes = new Set();   // comparison nodes inside a site that became a group
   const cleanSites = setSites.filter((s) => {
     s.members = s.members.filter((m) => !noiseMember(m));
     if (s.members.length < T.setMinMembers) { filteredSets.emptyOrPunctuation++; return false; }
@@ -550,6 +581,7 @@ export function runCensus({ files, areaMap = null, fileCommits = new Map(), comm
     for (const sites of comps.values()) {
       const fs = new Set(sites.map((s) => s.file));
       if (fs.size < T.minFiles) { filteredSets.singleFile++; continue; }
+      for (const s of sites) for (const x of s.nodes || []) groupedNodes.add(x);
       // Core = members present in at least half the sites.
       const cnt = new Map();
       for (const s of sites) for (const m of new Set(s.members)) cnt.set(m, (cnt.get(m) || 0) + 1);
@@ -568,6 +600,35 @@ export function runCensus({ files, areaMap = null, fileCommits = new Map(), comm
         members: core,
         shapes,
         sites: sites.map((s) => ({ file: s.file, line: s.line, kind: s.kind, label: s.label ?? null, size: s.members.length })),
+      });
+    }
+  }
+
+  // ── detector 5: repeated single comparisons (LIN-3629) ──────────────────────
+  // `x.status === 'blocked'` in several files is one decision with a single member, below the set
+  // detector's two-member floor. A comparison already inside a grouped set or chain site is that
+  // group's, so it is not counted again; a chain that never formed a group hides nothing.
+  // `typeof` checks are not decisions about the domain and are never candidates (their subject is a
+  // UnaryExpression, which has no name). The same name on two different objects is one key: the
+  // review rules on that noise.
+  {
+    const by = new Map();
+    for (const c of cmpCands) {
+      if (groupedNodes.has(c.node) || noiseMember(c.value)) continue;
+      const key = `${c.name}\u0001${c.value}`;
+      if (!by.has(key)) by.set(key, []);
+      by.get(key).push(c);
+    }
+    for (const cs of by.values()) {
+      if (new Set(cs.map((c) => c.file)).size < T.minFiles) continue;
+      const { name, value } = cs[0];
+      groups.push({
+        detector: 'cmp',
+        decision: `repeated comparison ${name} == '${value.length > 40 ? `${value.slice(0, 37)}...` : value}'`,
+        match: 'exact-comparison',
+        subject: name,
+        value,
+        sites: cs.map((c) => ({ file: c.file, line: c.line, label: name })),
       });
     }
   }

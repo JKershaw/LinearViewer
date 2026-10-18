@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { UsageError, areaOf, compileGuide, compileScope, loadAreas, parseArgs } from './code-shape-lib.mjs';
+import { UsageError, areaOf, compileGuide, compileScope, loadAreas, ownChurnByPattern, parseArgs } from './code-shape-lib.mjs';
+import { makeRepo } from './test-helpers.mjs';
 
 test('default scope: JavaScript minus node_modules, vendored dirs, minified files and tests', () => {
   const inScope = compileScope();
@@ -52,4 +53,21 @@ test('parseArgs: values, booleans, positionals; unknown flags and missing values
   assert.deepEqual(parseArgs(['x', '--a', '1', '--b', 'y'], spec), { positional: ['x', 'y'], flags: { '--a': '1', '--b': true } });
   assert.throws(() => parseArgs(['--c'], spec), UsageError);
   assert.throws(() => parseArgs(['--a'], spec), UsageError);
+});
+
+// LIN-3629 review: the CLI test's churn fixture has every commit matching, so it could not tell `-G` or `--since` was missing.
+test('ownChurnByPattern: -G keeps only commits whose changed lines match; --since bounds the window; -i is opt-in', () => {
+  const repo = makeRepo();
+  try {
+    repo.commit({ 'lib/a.js': "x === 'open';\n" }, '2026-01-01T00:00:00Z');
+    repo.commit({ 'lib/a.js': "x === 'open';\n// Next Steps\n" }, '2026-05-01T00:00:00Z');
+    repo.commit({ 'lib/a.js': "x === 'open';\n// Next Steps\nlet y = 1;\n" }, '2026-05-10T00:00:00Z');
+    const head = repo.commit({ 'lib/a.js': "x === 'open' || x === 'closed';\n// Next Steps\nlet y = 1;\n" }, '2026-05-20T00:00:00Z');
+    const date = '2026-05-20T00:00:00Z';
+    const open = "['\"`](open)['\"`]";
+    assert.equal(ownChurnByPattern(repo.dir, head, date, 90, ['lib/a.js'], open), 1);
+    assert.equal(ownChurnByPattern(repo.dir, head, date, 365, ['lib/a.js'], open), 2);
+    assert.equal(ownChurnByPattern(repo.dir, head, date, 90, ['lib/a.js'], 'next[[:space:]]+steps', { ignoreCase: true }), 1);
+    assert.equal(ownChurnByPattern(repo.dir, head, date, 90, ['lib/a.js'], 'next[[:space:]]+steps'), 0);
+  } finally { repo.cleanup(); }
 });

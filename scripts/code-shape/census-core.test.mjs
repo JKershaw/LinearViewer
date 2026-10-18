@@ -118,3 +118,57 @@ test('parity: runCensus equals the original script on a fixture repo', { skip: !
     assert.deepEqual(mine, original);
   } finally { repo.cleanup(); }
 });
+
+// ── cmp: repeated single comparisons (LIN-3629) ─────────────────────────────
+const cmpGroups = (r) => r.groups.filter((g) => g.detector === 'cmp');
+
+test('cmp: one subject compared with the same literal in two files is a group keyed by last name + literal', () => {
+  const r = run({
+    'lib/a.js': "export const f = (x) => x.status === 'blocked';\n",
+    'routes/b.js': "export const g = (job) => 'blocked' != job.state.status && job.id;\n",
+    'lib/c.js': "export const h = (x) => x.status === 'open';\n",
+  });
+  assert.deepEqual(cmpGroups(r).map((g) => [g.decision, g.files]), [["repeated comparison status == 'blocked'", ['lib/a.js', 'routes/b.js']]]);
+  assert.equal(r.totals.byDetector.cmp.groups, 1);
+});
+
+test('cmp: typeof checks are dropped, on either side', () => {
+  const r = run({
+    'lib/a.js': "export const f = (x) => typeof x === 'string' && 'string' === typeof x;\n",
+    'lib/b.js': "export const g = (x) => typeof x === 'string';\n",
+  });
+  assert.deepEqual(cmpGroups(r), []);
+});
+
+test('cmp: a switch case counts, and a call subject is keyed as name()', () => {
+  const r = run({
+    'lib/a.js': "export function f(x) { switch (x.kind) { case 'ping': return 1; default: return 0; } }\n",
+    'lib/b.js': "export const g = (y) => y.kind === 'ping';\n",
+    'lib/c.js': "export const h = (y) => getMode(y) === 'fast';\n",
+    'lib/d.js': "export const i = (z) => getMode(z) == 'fast';\n",
+  });
+  assert.deepEqual(cmpGroups(r).map((g) => g.decision).sort(), ["repeated comparison getMode() == 'fast'", "repeated comparison kind == 'ping'"]);
+});
+
+test('cmp: a comparison inside a grouped chain is not counted again; a chain that formed no group hides nothing', () => {
+  const chain = "export const f = (x) => x.status === 'open' || x.status === 'closed';\n";
+  // The chain is in two files, so the set/discrim group owns both comparisons.
+  const grouped = run({ 'lib/a.js': chain, 'lib/b.js': chain });
+  assert.deepEqual(detectors(grouped), ['discrim']);
+  // The same chain in ONE file forms no group, so its comparisons are free to repeat elsewhere.
+  const alone = run({ 'lib/a.js': chain, 'lib/b.js': "export const g = (x) => x.status === 'open';\n" });
+  assert.deepEqual(cmpGroups(alone).map((g) => g.decision), ["repeated comparison status == 'open'"]);
+});
+
+test('cmp: a repeat inside one file is not a group; a constant resolves to its literal', () => {
+  assert.deepEqual(cmpGroups(run({ 'lib/a.js': "export const f = (x, y) => x.status === 'blocked' || y.status === 'blocked';\n" })), []);
+  const r = run({
+    'lib/a.js': "const BLOCKED = 'blocked';\nexport const f = (x) => x.status === BLOCKED;\n",
+    'lib/b.js': "export const g = (x) => x.status === 'blocked';\n",
+  });
+  assert.deepEqual(cmpGroups(r).map((g) => g.siteCount), [2]);
+});
+
+test('cmp is the one addition to the parity fixture: it holds no repeated comparison, so parity is still meaningful', () => {
+  assert.deepEqual(cmpGroups(run({ 'lib/a.js': fn('alpha'), 'routes/b.js': fn('beta') })), []);
+});
