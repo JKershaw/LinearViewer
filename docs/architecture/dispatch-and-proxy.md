@@ -48,7 +48,7 @@ path is best-effort under degradation; the degraded-mode path is the proxy verb 
 - `POST /api/dispatch/take/:itemId` - Atomically claim an item
 - `POST /api/dispatch/feedback/:itemId` - Post feedback on a taken item
 
-Items expire after 24 hours. Tokens are workspace-scoped and never expire (but can be revoked).
+Items expire after 24 hours. Tokens are workspace-scoped. Dispatch tokens have an optional `expiresAt` (none by default); they can be revoked, and are revoked with the workspace by the account that made them.
 Feedback is append-only, **retained for the life of the project**, and requires strict token ownership.
 
 A dispatch item may carry an optional `followUpTo` field (the `id` of an earlier dispatch) to resume that

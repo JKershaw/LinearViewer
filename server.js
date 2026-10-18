@@ -162,6 +162,7 @@ import { createTaskPageLoader } from './lib/task-page-loader.js'
 import { createTaskShareRoutes } from './routes/task-share.js'
 import { createLibraryRouter } from './routes/library.js'
 import { TaskShareStore } from './lib/task-share-store.js'
+import { createWorkspaceRemovalRevoker } from './lib/workspace-removal-revocation.js'
 import { createGuestTaskAccess } from './lib/task-share-access.js'
 import { isTokenRefreshExempt } from './lib/guest-task-path.js'
 import { createNextRunRoutes } from './routes/next-run.js'
@@ -379,6 +380,10 @@ const dispatchQueueStore = new DispatchQueueStore({
 const dispatchTokenStore = new DispatchTokenStore({
   collection: dispatchTokensCollection
 })
+
+// LIN-3421: hoisted from beside its routes — the workspace routes mount (earlier
+// in this file) needs it for the removal revoker, or boot throws.
+const taskShareStore = new TaskShareStore({ collection: db.collection('task_share_links') })
 
 // Short-TTL single-use tokens that authorise repo-level Claude hooks to
 // post feedback against a specific Harbour dispatch item. Bound to the
@@ -643,6 +648,14 @@ const accountWorkspaceStore = new AccountWorkspaceStore({ collection: accountWor
 // into a named const so the legacy dispatch-token mint consumes the SAME seam.
 const workspaceOwnerCheck = createWorkspaceOwnerCheck({ accountWorkspaceStore, accountStore })
 proxyTokenStore.setOwnerCheck(workspaceOwnerCheck)
+// LIN-3421: what removing a workspace revokes for the removing account.
+const workspaceRemovalRevoker = createWorkspaceRemovalRevoker({
+  proxyTokenStore,
+  dispatchTokenStore,
+  taskShareStore,
+  workspaceOwnerCheck,
+  resolveCanonicalAccountId: (id) => accountStore.resolveCanonicalAccountId(id)
+})
 
 // Email magic-link sign-in (LIN-1892 S2). The transport exists exactly when
 // email sign-in is available (lib/email-availability.js — the one predicate;
@@ -1415,7 +1428,7 @@ for (const provider of getAllProviders()) {
 app.use(createAccountMergeRoutes({ accountStore, accountWorkspaceStore, ownerCredentialStore, accountMergeLogStore, userPreferencesStore, connectionStore }))
 // LIN-1892 S2: the email magic-link door. Every route 503s when emailTransport is null.
 app.use(createEmailAuthRoutes({ accountStore, accountWorkspaceStore, userPreferencesStore, magicLinkStore, transport: emailTransport, linkOrigin: emailLinkOrigin, promptStep: resolvePromptStepMode(process.env) }))
-app.use(createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, connectionStore, resolveWorkspaceUrlKey }))
+app.use(createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, connectionStore, resolveWorkspaceUrlKey, revokeWorkspaceArtifacts: (args) => workspaceRemovalRevoker.revoke(args) }))
 app.use(createOpenRouterAuthRoutes({ userPreferencesStore }))
 // Note: Dispatch routes mounted after workspaceFromUrl middleware is defined
 
@@ -3025,7 +3038,6 @@ app.use(createTaskPageRoutes({
 // exempt from PAT auto-login and token refresh via the shared guest-path predicate
 // (`isGuestTaskPath` / `isTokenRefreshExempt` in `lib/guest-task-path.js`).
 // Mounted right after the task page, before the proxy default/legacy catch-alls.
-const taskShareStore = new TaskShareStore({ collection: db.collection('task_share_links') })
 app.use(createTaskShareRoutes({
   taskShareStore,
   loader: taskPageLoader,
