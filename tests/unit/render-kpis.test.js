@@ -6,6 +6,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { renderKpisPage, renderChartBox } from '../../lib/render-kpis.js';
+import { extractEmbeddedData, embeddedDataText } from '../helpers/embedded-data.js';
 
 function buildStats(overrides = {}) {
   return {
@@ -396,7 +397,7 @@ describe('renderKpisPage', () => {
 
   test('embeds the stats payload for the client script', () => {
     const html = renderKpisPage(buildStats());
-    assert.ok(html.includes('window.__KPI_DATA__ = {'));
+    assert.ok(embeddedDataText(html, '__KPI_DATA__').startsWith('{'));
     assert.ok(html.includes('"agentActions":1234'));
   });
 

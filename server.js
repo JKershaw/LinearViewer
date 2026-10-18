@@ -185,6 +185,7 @@ import { DISPATCH_DEFAULT_KINDS } from './lib/prompt-templates.js'
 import { validateOpaqueDispatchField, MAX_NAME_LENGTH } from './lib/dispatch-validation.js'
 import { getDeployInfo } from './lib/deploy-info.js'
 import { getPlanFeeConfig } from './lib/plan-fee-config.js'
+import { securityHeaders } from './lib/security-headers.js'
 
 // =============================================================================
 // Environment Variable Validation
@@ -986,6 +987,9 @@ app.use((req, res, next) => {
 })
 
 app.use(express.static('public'))
+// CSP / frame-ancestors for every HTML response (LIN-3420). After static so
+// assets are untouched, before the session so even early error pages carry it.
+app.use(securityHeaders())
 app.use(express.urlencoded({ extended: false }))
 app.use(express.json({ limit: '250kb' }))
 
