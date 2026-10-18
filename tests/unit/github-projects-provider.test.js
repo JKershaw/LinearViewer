@@ -374,3 +374,17 @@ describe('createGitHubProjectsClient GraphQL wire (LIN-560)', () => {
     await assert.rejects(() => client.fetchBoard('octocat/5'), /Bad credentials/);
   });
 });
+
+describe('GitHubProjectsProvider.listUserInstallations (LIN-3404)', () => {
+  test('the public method delegates to _listUserInstallations with the same token and returns its result', async () => {
+    // The route fakes define listUserInstallations themselves, so only this test
+    // pins the REAL provider's public method: if it were missing or broken every
+    // Projects fresh install would fail closed while the route suites stayed green.
+    const provider = new GitHubProjectsProvider();
+    let seen = null;
+    const installs = [{ id: 7, account: null }];
+    provider._listUserInstallations = async (t) => { seen = t; return installs; };
+    assert.strictEqual(await provider.listUserInstallations('tok'), installs);
+    assert.equal(seen, 'tok');
+  });
+});

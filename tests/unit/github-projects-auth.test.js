@@ -461,6 +461,29 @@ describe('GitHub Projects auth routes', () => {
       assert.equal(session.githubHumanId, 'human-42');
     });
 
+    test('the REAL GitHubProjectsProvider feeds the membership check: a listed id mints, an unlisted one is refused', async () => {
+      // Every other test here uses a fake that defines listUserInstallations itself;
+      // this one drives the route's descriptor closure through the real class so a
+      // missing/broken public method (fail-closed for every user) cannot hide.
+      const minted = [];
+      const real = new GitHubProjectsProvider();
+      real.completeAuth = async () => ({ access_token: 'gho_user' });
+      real.fetchViewer = async () => ({ id: 'human-42', login: 'octocat', name: 'The Octocat' });
+      real._listUserInstallations = async () => [{ id: 7, account: null }];
+      real.completeInstallation = async (id) => {
+        minted.push(id);
+        return { token: 'ghs_inst', login: 'octocat', userId: '42', installationId: String(id), tokenExpiresAt: '2026-06-25T20:00:00Z' };
+      };
+      real.listBoards = async () => [];
+      const listed = await callback(real, { installation_id: '7', setup_action: 'install', code: 'oauth-code' });
+      assert.equal(listed.res.statusCode, 200);
+      assert.deepEqual(minted, ['7'], 'the numeric id is mapped to the string the request carries');
+      const unlisted = await callback(real, { installation_id: '8', setup_action: 'install', code: 'oauth-code' });
+      assert.equal(unlisted.res.statusCode, 400);
+      assert.match(unlisted.res.body, /cannot access that installation/);
+      assert.deepEqual(minted, ['7'], 'the unlisted id is never minted');
+    });
+
     test('arm 2: installation_id with no code is a plain 400 page (no redirect, no mint) that restarts the flow', async () => {
       const { provider, calls } = mintSpy();
       const { res } = await callback(provider, { installation_id: '99', setup_action: 'install' });
@@ -626,6 +649,10 @@ describe('GitHub Projects auth routes', () => {
     await handler({ query: { installation_id: 'bad', code: 'oauth-code', state: 'real' }, session: makeSession({ oauthState: 'real' }) }, res);
     assert.equal(res.statusCode, 400);
     assert.match(res.body, /Authentication Failed/);
+    // Reached the mint catch, not the LIN-3404 membership refusal (which also
+    // renders "Authentication Failed"): 'bad' is on the fake's list.
+    assert.doesNotMatch(res.body, /cannot access that installation/);
+    assert.match(res.body, /Could not complete authentication with GitHub/);
   });
 
   test('POST link (new) find-or-creates the GitHub account container and writes the LIN-711 binding', async () => {

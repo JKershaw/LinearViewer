@@ -787,6 +787,10 @@ describe('GitHub auth routes', () => {
     await handler({ query: { installation_id: 'bad', code: 'oauth-code', state: 'real' }, session: makeSession({ oauthState: 'real' }) }, res);
     assert.equal(res.statusCode, 400);
     assert.match(res.body, /Authentication Failed/);
+    // Reached the mint catch, not the LIN-3404 membership refusal (which also
+    // renders "Authentication Failed"): 'bad' is on the fake's list.
+    assert.doesNotMatch(res.body, /cannot access that installation/);
+    assert.match(res.body, /Could not complete authentication with GitHub/);
   });
 
   // ---------------------------------------------------------------------------
