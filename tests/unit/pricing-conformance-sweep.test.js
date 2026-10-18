@@ -7,8 +7,10 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { findPricingConformanceViolations, createPricingConformanceSweepRun } from '../../lib/pricing-conformance-sweep.js';
+import { findPricingConformanceViolations, findUnpricedModels, createPricingConformanceSweepRun } from '../../lib/pricing-conformance-sweep.js';
 import { MODEL_PRICING } from '../../lib/model-pricing.js';
+import { parseUsage } from '../../lib/session-telemetry.js';
+import { recordUnpricedModel, getSeenModels, resetSeenModels, MAX_SEEN_MODELS } from '../../lib/unpriced-models.js';
 
 // A live-catalog-shaped fixture matching the corrected MODEL_PRICING table
 // exactly, for every id the table carries. Built once here rather than
@@ -259,5 +261,81 @@ describe('createPricingConformanceSweepRun', () => {
     await assert.doesNotReject(run());
     assert.strictEqual(calls.error.length, 1);
     assert.match(calls.error[0][0], /sweep tick failed/);
+  });
+});
+
+describe('findUnpricedModels (LIN-3094)', () => {
+  test('priced models yield nothing; <synthetic> is ignored', () => {
+    assert.deepStrictEqual(findUnpricedModels(['claude-opus-5-5', 'claude-opus-5-5-20251001', '<synthetic>']), { unpriced: [], unresolvable: [] });
+  });
+
+  test('a resolvable id with no row is unpriced; a bare alias is unresolvable', () => {
+    assert.deepStrictEqual(findUnpricedModels(['claude-opus-9-9', 'opus', 'claude-opus-9-9']), {
+      unpriced: ['anthropic/claude-opus-9.9'],
+      unresolvable: ['opus'],
+    });
+  });
+
+  test('accepts any iterable, not only arrays (a Set registry must not report nothing)', () => {
+    assert.deepStrictEqual(findUnpricedModels(new Set(['claude-opus-9-9'])), { unpriced: ['anthropic/claude-opus-9.9'], unresolvable: [] });
+  });
+
+  test('non-array input is tolerated', () => {
+    assert.deepStrictEqual(findUnpricedModels(undefined), { unpriced: [], unresolvable: [] });
+  });
+});
+
+describe('createPricingConformanceSweepRun unpriced-model check (LIN-3094)', () => {
+  function fakeLogger() {
+    const calls = { warn: [], error: [] };
+    return { logger: { warn: (...a) => calls.warn.push(a), error: (...a) => calls.error.push(a) }, calls };
+  }
+
+  test('logs each unpriced id even when the catalog is unavailable (no early-return skip)', async () => {
+    const { logger, calls } = fakeLogger();
+    const run = createPricingConformanceSweepRun({ getCatalog: async () => [], getSeenModels: () => ['claude-opus-9-9', 'claude-opus-5-5'], logger });
+    await run();
+    assert.deepStrictEqual(calls.error.map(a => a[0]), ['[pricing-conformance] unpriced model in use: anthropic/claude-opus-9.9']);
+    assert.match(calls.warn[0][0], /not verified this tick/);
+  });
+
+  test('logs on every tick it is seen', async () => {
+    const { logger, calls } = fakeLogger();
+    const run = createPricingConformanceSweepRun({ getCatalog: async () => [], getSeenModels: () => ['opus'], logger });
+    await run(); await run();
+    assert.strictEqual(calls.error.length, 2);
+    assert.match(calls.error[0][0], /unpriced model in use: opus/);
+  });
+
+  test('default (empty) reader logs nothing', async () => {
+    const { logger, calls } = fakeLogger();
+    await createPricingConformanceSweepRun({ getCatalog: async () => [], logger })();
+    assert.strictEqual(calls.error.length, 0);
+  });
+});
+
+describe('unpriced-model registry wiring (LIN-3094)', () => {
+  const usageFeedback = (model) => [{ kind: 'usage', message: `[usage] ${JSON.stringify({ model, inputTokens: 10, outputTokens: 5 })}` }];
+
+  test('an unpriced usage parsed through parseUsage shows up in a sweep tick log; the default reader is the registry', async () => {
+    resetSeenModels();
+    parseUsage(usageFeedback('claude-opus-9-9'));
+    parseUsage(usageFeedback('claude-opus-5-5')); // priced: must not be recorded
+    assert.deepStrictEqual(getSeenModels(), ['claude-opus-9-9']);
+    const errors = [];
+    await createPricingConformanceSweepRun({ getCatalog: async () => [], logger: { warn() {}, error: (...a) => errors.push(a[0]) } })();
+    assert.deepStrictEqual(errors, ['[pricing-conformance] unpriced model in use: anthropic/claude-opus-9.9']);
+    resetSeenModels();
+  });
+
+  test('registry is bounded at 50 ids, evicting the oldest', () => {
+    resetSeenModels();
+    for (let i = 0; i < MAX_SEEN_MODELS + 5; i++) recordUnpricedModel(`m-${i}`);
+    const seen = getSeenModels();
+    assert.strictEqual(seen.length, 50);
+    assert.strictEqual(seen[0], 'm-5');
+    recordUnpricedModel(42); recordUnpricedModel('');
+    assert.strictEqual(getSeenModels().length, 50);
+    resetSeenModels();
   });
 });

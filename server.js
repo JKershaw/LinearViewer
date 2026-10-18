@@ -75,6 +75,7 @@ import { ObserverShadowLogStore } from './lib/observer-shadow-log.js'
 import { createCredentialInvariantSweepRun } from './lib/credential-invariant-sweep.js'
 import { createHourlyCleanupRun } from './lib/hourly-cleanup.js'
 import { createPricingConformanceSweepRun } from './lib/pricing-conformance-sweep.js'
+import { getSeenModels } from './lib/unpriced-models.js' // LIN-3094: models whose derived cost was null
 import { LivenessAlarmStore } from './lib/liveness-alarm-store.js'
 import { createLivenessAlarmSweepRun } from './lib/liveness-alarm-sweep.js'
 import { SessionSummaryCacheStore } from './lib/session-summary-cache.js'
@@ -887,7 +888,7 @@ scheduler.register({
   name: 'pricing-conformance-sweep',
   intervalMs: PRICING_CONFORMANCE_SWEEP_INTERVAL_MS,
   leaseMs: PRICING_CONFORMANCE_SWEEP_LEASE_MS,
-  run: createPricingConformanceSweepRun({ getCatalog: getModelCatalog })
+  run: createPricingConformanceSweepRun({ getCatalog: getModelCatalog, getSeenModels })
 // Same discipline as the two sweeps above: not awaited (a failed seed write
 // must not abort server boot), with a purpose-written catch so a
 // silent-never-runs state is diagnosable rather than inferred.
