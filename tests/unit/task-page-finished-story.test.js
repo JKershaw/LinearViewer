@@ -195,6 +195,13 @@ describe('the witness: a guest reads a finished, merged task', () => {
     assert.match(text, /This task was cancelled\./);
     assert.doesNotMatch(text, /This task is done\./);
   });
+
+  test('a duplicate task does not claim it is done (read as canceled, LIN-276)', async () => {
+    const { html } = await guestPage({ ctx: ctxFor({ stateType: 'duplicate' }) });
+    const text = pageText(body(html));
+    assert.match(text, /This task was cancelled\./);
+    assert.doesNotMatch(text, /This task is done\./);
+  });
 });
 
 describe('B1 freshness gate', () => {
