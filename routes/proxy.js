@@ -484,7 +484,7 @@ async function fetchWithTimeout(workFn, ms) {
  *   workspace selects it, and via this injection.
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore = null, llmCallLogStore, taskDecisionsStore = null, shelvedRulingsStore = null, dismissalSuggestionsStore = null, harbourCommentsStore = null, sessionsFeedCache = null, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace = null, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore = null, provider: injectedProvider = null, rejectedCredentialRegistry = null, observerStateStore, flightCompanionChatClient = undefined, flightCompanionCreateToolCatalog = undefined, savedChatStore = null, workspaceHaltStore = null, workspaceOwnerCheck = null, livenessAlarmStore = null, onTicketWrite = null }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore = null, llmCallLogStore, taskDecisionsStore = null, shelvedRulingsStore = null, dismissalSuggestionsStore = null, harbourCommentsStore = null, sessionsFeedCache = null, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace = null, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore = null, provider: injectedProvider = null, rejectedCredentialRegistry = null, observerStateStore, flightCompanionChatClient = undefined, flightCompanionCreateToolCatalog = undefined, savedChatStore = null, workspaceHaltStore = null, workspaceOwnerCheck = null, livenessAlarmStore = null, onTicketWrite = null, consumerHeartbeatStore = null }) {
   const router = Router();
 
   /**
@@ -1328,7 +1328,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
 
   // Group D reads (LIN-679 Stage 3a / LIN-2536): extracted to
   // routes/proxy-reads.js, mounted at its original position.
-  router.use(createReadRoutes({ proxyLimiter, authenticateProxyToken, resolveProviderAccess, denyIfUnsupported, logEvent, workspaceUnavailable, graphqlErrorStatus, proxyEventStore }));
+  router.use(createReadRoutes({ proxyLimiter, authenticateProxyToken, resolveProviderAccess, denyIfUnsupported, logEvent, workspaceUnavailable, graphqlErrorStatus, proxyEventStore, consumerHeartbeatStore }));
 
   // Group E writes (LIN-679 Stage 3b / LIN-2537): extracted to
   // routes/proxy-writes.js, mounted at its original position.
@@ -1593,7 +1593,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   // sub-router's path-scoped gate never runs a second pass over it (R8).
   router.use(createProxyRunnerPromptRoutes({ proxyLimiter, authenticateProxyToken, requireGrant, logEvent }));
 
-  router.use(createProxyRunnerRoutes({ proxyLimiter, authenticateProxyToken, requireGrant, logEvent, dispatchQueueStore, dispatchTokenStore, proxyTokenStore, workspaceHaltStore, sessionsFeedCache }));
+  router.use(createProxyRunnerRoutes({ proxyLimiter, authenticateProxyToken, requireGrant, logEvent, dispatchQueueStore, dispatchTokenStore, proxyTokenStore, workspaceHaltStore, sessionsFeedCache, consumerHeartbeatStore }));
 
   // LIN-2620: the Flight Companion turn, over the proxy — a LIN-679 sub-router
   // (routes/proxy-flight-companion.js) built on the extracted turn core

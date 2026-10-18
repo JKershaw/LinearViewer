@@ -100,7 +100,7 @@ function kitFor(row) {
       }
     }
     case 'heartbeat':
-      return 'not yet defined (LIN-1952)';
+      return 'not sent (the runner-kit producer, POST /api/proxy/runner/heartbeat, is a follow-up)';
     default:
       throw new Error(`unknown area ${row.area}`);
   }

@@ -36,7 +36,8 @@ function otherStores() {
     observationSessionsStore: noopStore(),
     harbourFeedbackTokenStore: noopStore(),
     observerStateStore: noopStore(),
-    observerShadowLogStore: noopStore()
+    observerShadowLogStore: noopStore(),
+    consumerHeartbeatStore: noopStore()
   };
 }
 

@@ -122,6 +122,7 @@ import { MagicLinkStore, MAGIC_LINK_COLLECTION } from './lib/email-auth.js'
 import { resolveEmailTransportKind, resolveEmailTransportRefusal, resolveEmailLinkOrigin, resolveEmailLinkOriginWarning, isEmailSignInAvailable, resolvePromptStepMode } from './lib/email-availability.js'
 import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
 import { createDispatchRoutes } from './routes/dispatch.js'
+import { ConsumerHeartbeatStore } from './lib/consumer-heartbeat-store.js'
 import { createTaskModeRoutes } from './routes/task-mode.js'
 import { createProxyRoutes, commentDedupe } from './routes/proxy.js'
 import { createProxyDefaultRoute } from './lib/settings-proxy-default.js'
@@ -732,6 +733,11 @@ const funnelEventStore = new FunnelEventStore({ collection: funnelEventsCollecti
 // the sweep (LIN-2131, P1-3); this store owns only identity/versioning/retention.
 const observerStateCollection = db.collection('observer-state')
 const observerStateStore = new ObserverStateStore({ collection: observerStateCollection })
+
+// Consumer heartbeats (LIN-1952): one replaced doc per (urlKey, instanceId),
+// 15 min expiry, cap 20 per workspace. Written by POST /api/dispatch/heartbeat
+// and POST /api/proxy/runner/heartbeat, read by GET /api/proxy/heartbeats.
+const consumerHeartbeatStore = new ConsumerHeartbeatStore({ collection: db.collection('consumer-heartbeats') })
 
 // Read-only shadow action log (LIN-2132, P1-5): logs what the sweep's
 // diagnosis WOULD have relayed, in the incumbent's own marker/comment
@@ -2347,7 +2353,7 @@ function workspaceFromUrl(req, res, next) {
 }
 
 // Mount dispatch routes (requires workspaceFromUrl middleware)
-app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, workspaceOwnerCheck, getWorkspaceAccessToken, fetchIssueContext, workspaceHaltStore, sessionsFeedCache, taskModeStore, freeTierStore, accountStore }))
+app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, workspaceOwnerCheck, getWorkspaceAccessToken, fetchIssueContext, workspaceHaltStore, sessionsFeedCache, taskModeStore, freeTierStore, accountStore, consumerHeartbeatStore }))
 
 // Task-mode routes (LIN-2942): the ladder's client-side press record and the
 // per-account per-task mode read.
@@ -2979,7 +2985,7 @@ const onTicketWrite = createOnTicketWrite({
   sessionsFeedCache,
   agentStatusStore
 })
-app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore, workspaceOwnerCheck, livenessAlarmStore, onTicketWrite }))
+app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore, workspaceOwnerCheck, livenessAlarmStore, onTicketWrite, consumerHeartbeatStore }))
 
 // LIN-3098 S3: the runner kit (lib/runner-kit/*.mjs), public, for the served
 // runner prompt to fetch and verify against its sha256 pins (routes/runner-kit.js).
@@ -4532,7 +4538,8 @@ const server = app.listen(PORT, () => {
     harbourFeedbackTokenStore,
     observerStateStore,
     observerShadowLogStore,
-    sessionStore
+    sessionStore,
+    consumerHeartbeatStore
   })
   cleanupTimer = setInterval(runHourlyCleanup, CLEANUP_INTERVAL_MS)
 })

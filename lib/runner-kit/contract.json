@@ -274,8 +274,9 @@
       "item": {
         "route": "heartbeat"
       },
-      "sd": "not yet defined (LIN-1952)",
-      "kit": "not yet defined (LIN-1952)"
+      "sd": "a consumer may send the fields in lib/consumer-heartbeat.js (HEARTBEAT_FIELDS) every intervalMs to POST /api/dispatch/heartbeat; Harbour reads it as stale after 3 x intervalMs (LIN-1952)",
+      "kit": "not sent (the runner-kit producer, POST /api/proxy/runner/heartbeat, is a follow-up)",
+      "difference": "SD is the first producer (LIN-1952). The Harbour receiver accepts the kit already, on the runner door; the kit does not send a beat yet."
     }
   ]
 }

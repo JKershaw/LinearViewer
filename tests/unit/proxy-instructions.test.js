@@ -204,6 +204,15 @@ describe('buildInstructions — proxy-token 401 fields + Class-B retry guidance 
     assert.match(text, /"credentialSource": "connection"/);
     assert.match(text, /never\s+token bytes/);
   });
+
+  test('LIN-1952: documents the heartbeats read, and the runner heartbeat POST only for a take grant', () => {
+    const text = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite' });
+    assert.match(text, new RegExp(`GET ${BASE_URL}/api/proxy/heartbeats`));
+    assert.match(text, /3 x fields\.intervalMs/);
+    assert.doesNotMatch(text, /runner\/heartbeat/);
+    const runner = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite', grants: ['take'] });
+    assert.match(runner, new RegExp(`POST ${BASE_URL}/api/proxy/runner/heartbeat`));
+  });
 });
 
 // LIN-2773 Area 4: the published contract now carries "effect" beside

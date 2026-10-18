@@ -98,7 +98,7 @@ server-side.
 
 | Grant | Authorises | Status |
 | --- | --- | --- |
-| `take` | `GET /api/proxy/runner/poll`, `POST /api/proxy/runner/take/{id}`, `POST /api/proxy/runner/feedback/{id}` | Enforced (LIN-3059 S2a) |
+| `take` | `GET /api/proxy/runner/poll`, `POST /api/proxy/runner/take/{id}`, `POST /api/proxy/runner/feedback/{id}`, `POST /api/proxy/runner/heartbeat` (LIN-1952) | Enforced (LIN-3059 S2a) |
 | `dispatch` | `POST /api/proxy/dispatch`, `/recommend-and-dispatch`, `/autopilot/kickoff` | Enforced (LIN-2884 T3 / LIN-3136): `403 DISPATCH_GRANT_REQUIRED` without it |
 
 A plain `read`/`readWrite` token carries no grants, so it gets `403 TAKE_GRANT_REQUIRED` on the
@@ -594,6 +594,46 @@ Response:
   read `null` — there is no backfill.
 - `limit` defaults to `50` (cap `100`); `windowMs` defaults to `900000`
   (15 min, cap 86400000). Both are clamped server-side.
+
+#### Consumer Heartbeats (LIN-1952)
+
+Which dispatch consumers are reporting for this workspace, how loaded each host is and how many
+sessions each runs. Read-only, newest first, scoped to the token's workspace. It needs no grant (it is
+not under `/api/proxy/runner/*`). It adds to `otherConsumerLastSeenAt` on the poll, which only says when a
+consumer last polled.
+
+```
+GET /api/proxy/heartbeats
+```
+
+```json
+{
+  "heartbeats": [
+    {
+      "consumerKind": "simple-dispatcher",
+      "instanceId": "k3j9x0",
+      "receivedAt": "2026-10-18T12:00:05.000Z",
+      "ageMs": 12000,
+      "stale": false,
+      "clockSkewMs": 5000,
+      "fields": {
+        "schema": 1, "sentAt": "2026-10-18T12:00:00.000Z", "intervalMs": 60000,
+        "loadAvg1": 1.2, "cpuCount": 8, "hostMemFreeBytes": 1200000000,
+        "activeSessionCount": 3, "heldSessionCount": 1
+      }
+    }
+  ]
+}
+```
+
+- `fields` holds only what that consumer measured. An absent field was not sent; it is not zero.
+- `stale` is `true` when `ageMs` is greater than 3 x `fields.intervalMs`. `ageMs` uses Harbour's `receivedAt`;
+  `clockSkewMs` is `receivedAt - sentAt`, reported and never corrected.
+- An entry disappears 15 minutes after its last beat. At most 20 instances are kept per workspace.
+- `hostMemFreeBytes` is `os.freemem()`, not "available" memory; it reads low on macOS.
+- Consumers send beats with `POST /api/dispatch/heartbeat` (dispatch token; see `docs/dispatch-integration.md`)
+  or `POST /api/proxy/runner/heartbeat` (the runner `take` grant). Both answer `204`, or `400` for an
+  invalid or over-4 KB body.
 
 #### List Teams
 
