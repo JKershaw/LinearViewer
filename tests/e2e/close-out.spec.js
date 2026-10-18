@@ -233,23 +233,4 @@ test.describe('Close-out box on the session page (LIN-3248)', () => {
     await page.waitForTimeout(600);
     expect(checks, 'a non-stop-at merged page must not POST check').toHaveLength(0);
   });
-
-  // LIN-3634: the server re-derives readiness on the press. Seed the reviewed head and
-  // load (the box is ready), then move the head: re-seeding does not fire the focus-driven
-  // check, so the click reaches the dispatch guard, which refuses (409 CLOSE_OUT_NOT_READY)
-  // and the page repaints the box not-ready.
-  test('LIN-3634: a head that moves after the page loaded is refused on the press and the box repaints', async ({ page }) => {
-    await openReadySession(page);
-    await expect(page.locator('[data-testid="run-evidence-closeout"][data-state="ready"]')).toBeVisible();
-
-    await page.request.post('/test/seed-pr-status', {
-      data: { repo: REPO, number: 12, readable: true, state: 'open', merged: false, headSha: 'fff9999deadbeefdeadbeefdeadbeefdeadbeef0', checks: [{ name: 'unit', conclusion: 'success' }] },
-    });
-    const refused = page.waitForResponse(r => r.url().endsWith(`/workspace/${URL_KEY}/api/dispatch`) && r.request().method() === 'POST');
-    await page.locator('[data-testid="run-evidence-closeout-press"]').click();
-    const res = await refused;
-    expect(res.status()).toBe(409);
-    expect((await res.json()).code).toBe('CLOSE_OUT_NOT_READY');
-    await expect(page.locator('[data-testid="run-evidence-closeout"][data-state="not-ready"]')).toBeVisible();
-  });
 });

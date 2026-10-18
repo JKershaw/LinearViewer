@@ -504,6 +504,61 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await page.request.get('/test/clear-pr-status');
   });
 
+  // LIN-3634: the server re-derives readiness on the press. Load with the reviewed head
+  // (the box is ready), then move the head: re-seeding does not fire the focus-driven
+  // check, so the click reaches the dispatch guard, which refuses with 409
+  // CLOSE_OUT_NOT_READY, and the page repaints the box not-ready.
+  test('LIN-3634: a head that moves after the page loaded is refused on the press and the box repaints', async ({ page }) => {
+    await page.request.get('/test/clear-pr-status');
+    const id = (raw) => localSeedId(URL_KEY, raw);
+    const PR_URL = 'https://github.com/acme/app/pull/41';
+    const TASK_UUID = '33333333-4444-5555-6666-777777777777';
+    const resp = await page.request.post('/test/set-local-session', {
+      data: {
+        urlKey: URL_KEY,
+        append: true,
+        features: { dispatch: true },
+        projects: [{ id: id('tp-proj'), name: 'Task page project', content: 'A project', sortOrder: 1 }],
+        issues: [{
+          id: TASK_UUID, identifier: 'LOCAL-TP1', title: 'A task with a moving head',
+          description: 'The task description.', projectId: id('tp-proj'), sortOrder: 1,
+          state: { name: 'In Progress', type: 'started' }, url: `/workspace/${URL_KEY}/issue/${TASK_UUID}`,
+          comments: [
+            { id: 'c-pr', body: `Opened the pull request: ${PR_URL}`, createdAt: '2026-10-06T09:00:00Z', user: 'Runner' },
+            { id: 'c-review', body: REVIEW_BODY, createdAt: '2026-10-06T10:00:00Z', user: 'Reviewer' },
+          ],
+        }],
+      },
+    });
+    expect(resp.ok(), `local seed failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();
+
+    const token = await runnerToken(page);
+    const anchor = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+      data: { prompt: 'orchestrate', promptName: 'Autopilot (LOCAL-TP1)', kind: 'autopilot', issueIdentifier: 'LOCAL-TP1', issueTitle: 'A task with a moving head', target: 'cli', stopAt: 'pr', variant: 'standard' },
+    });
+    expect(anchor.status(), `anchor seed failed: ${await anchor.text()}`).toBe(201);
+    const anchorId = (await anchor.json()).item.id;
+    await page.request.post(`/api/dispatch/take/${anchorId}`, { headers: { Authorization: `Bearer ${token}` } });
+    await postFeedback(page, token, anchorId, '[done] orchestrated the run');
+    const seedHead = (headSha) => page.request.post('/test/seed-pr-status', {
+      data: { repo: 'acme/app', number: 41, readable: true, state: 'open', merged: false, headSha, checks: [{ name: 'unit', conclusion: 'success' }] },
+    });
+    await seedHead('abc1234deadbeefdeadbeefdeadbeefdeadbeef0');
+
+    await page.goto(`/workspace/${URL_KEY}/task/LOCAL-TP1`);
+    await page.locator('[data-testid="task-page-pr-raw"] > summary').click();
+    await expect(page.locator('[data-testid="run-evidence-closeout"][data-state="ready"]')).toBeVisible();
+
+    await seedHead('fff9999deadbeefdeadbeefdeadbeefdeadbeef0');
+    const refused = page.waitForResponse((r) => r.url().endsWith(`/workspace/${URL_KEY}/api/dispatch`) && r.request().method() === 'POST');
+    await page.locator('[data-testid="run-evidence-closeout-press"]').click();
+    const res = await refused;
+    expect(res.status()).toBe(409);
+    expect((await res.json()).code).toBe('CLOSE_OUT_NOT_READY');
+    await expect(page.locator('[data-testid="run-evidence-closeout"][data-state="not-ready"]')).toBeVisible();
+    await page.request.get('/test/clear-pr-status');
+  });
+
   // LIN-3340 B1 (review `388f4246`): once a merge has been recorded, `/check`
   // returns `done: true` on EVERY later call. An owner opening the page when the
   // PR is already merged and the tracker is already Done must NOT reload in a
