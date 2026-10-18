@@ -57,6 +57,7 @@ import {
 } from '../lib/render-email-auth.js';
 import { renderAccountHomePage } from '../lib/render-account-home.js';
 import { getProvider } from '../lib/providers/index.js';
+import { APP_CSP } from '../lib/security-headers.js';
 
 const WELL_FORMED_TOKEN = /^[A-Za-z0-9_-]{43}$/;
 
@@ -92,9 +93,14 @@ export const emailSendLimiter = createEmailSendLimiter();
 
 // The confirm page must not be framed (a framed page could be clicked
 // through), cached, or leak its `?t=` URL in a Referer.
+// LIN-3627: the CSP is the shared APP_CSP, not a one-off `frame-ancestors`
+// only: a route CSP replaces the middleware's, so the old value left these
+// pages with no `script-src`. APP_CSP already carries `frame-ancestors 'none'`.
+// It is set here, not left to the middleware, so the frame guarantee does not
+// depend on mount order or on the middleware being mounted at all.
 function setConfirmPageHeaders(res) {
   res.set({
-    'Content-Security-Policy': "frame-ancestors 'none'",
+    'Content-Security-Policy': APP_CSP,
     'X-Frame-Options': 'DENY',
     'Cache-Control': 'no-store',
     'Referrer-Policy': 'no-referrer',

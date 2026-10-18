@@ -126,7 +126,7 @@ in this order and before any token is touched: (a) `Sec-Fetch-Site` is absent or
 the confirm page, bound to the token, at most 15 minutes old, and single use. The session
 cookie is `sameSite:'lax'` (`lib/session-options.js`, shared with the tests), so a
 cross-site POST carries no cookie and so no nonce. The confirm page is served with
-`frame-ancestors 'none'`, `X-Frame-Options: DENY`, `no-store` and `no-referrer`. The send
+the app CSP (which includes `frame-ancestors 'none'`), `X-Frame-Options: DENY`, `no-store` and `no-referrer`. The send
 form carries a send nonce, so a cross-site send can't plant a session in a victim's browser.
 Opening a link in another browser is supported: that browser's GET mints its own nonce and
 shows an "asked for from another device" notice.

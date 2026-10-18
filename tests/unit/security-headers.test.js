@@ -2,8 +2,9 @@
  * LIN-3420 — the app-wide CSP / frame-ancestors middleware.
  *
  * Real `securityHeaders()` in front of the real renderers and routers: every
- * HTML response carries the policy, while JSON, static-style and own-CSP routes
- * (Library, email confirm) are left alone.
+ * HTML response carries the policy, while JSON, static-style and the own-CSP
+ * route (Library) are left alone. The email confirm pages set `APP_CSP` themselves
+ * (LIN-3627); that is asserted in email-auth-csrf.test.js.
  *
  * Run with: node --test tests/unit/security-headers.test.js
  */
@@ -20,7 +21,6 @@ import { createTaskShareRoutes } from '../../routes/task-share.js';
 
 const docsRoot = fileURLToPath(new URL('../fixtures/library-docs', import.meta.url));
 const TOKEN = 'A'.repeat(43);
-const CONFIRM_CSP = "frame-ancestors 'none'";
 
 function scriptSrc(csp) {
   return csp.split(';').map(d => d.trim()).find(d => d.startsWith('script-src'));
@@ -39,11 +39,6 @@ async function build() {
   });
   app.get('/api/thing', (req, res) => res.json({ ok: true }));
   app.get('/plain', (req, res) => res.type('text/plain').send('hello'));
-  app.get('/confirm', (req, res) => {
-    // Mirrors routes/email-auth.js setConfirmPageHeaders.
-    res.set({ 'Content-Security-Policy': CONFIRM_CSP, 'X-Frame-Options': 'DENY' });
-    res.send(renderErrorPage('Confirm', 'x'));
-  });
   app.use(createLibraryRouter({ docsRoot }));
   const shareStore = {
     async getByToken() { return null; },
@@ -153,20 +148,16 @@ describe('securityHeaders()', () => {
     } finally { await close(); }
   });
 
-  test('a route with its own CSP keeps it byte-for-byte (Library, email confirm)', async () => {
+  test('a route with its own CSP keeps it byte-for-byte (Library)', async () => {
     const { base, close } = await build();
     try {
       const lib = await fetch(`${base}/library/hostile`);
       assert.equal(lib.headers.get('content-security-policy'), LIBRARY_CSP);
       assert.equal(lib.headers.get('x-frame-options'), null, 'Library keeps frame-ancestors self; no DENY added');
-      const confirm = await fetch(`${base}/confirm`);
-      assert.equal(confirm.headers.get('content-security-policy'), CONFIRM_CSP);
-      assert.equal(confirm.headers.get('x-frame-options'), 'DENY');
-      assert.equal(confirm.headers.get('x-content-type-options'), 'nosniff');
     } finally { await close(); }
   });
 
-  test('the policy keeps the open questions as they were: img-src https:, no form-action', () => {
+  test('the policy keeps the decided-as-is choices (LIN-3627): img-src https:, no form-action', () => {
     assert.match(APP_CSP, /img-src 'self' data: https:/);
     assert.ok(!APP_CSP.includes('form-action'));
   });
