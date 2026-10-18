@@ -1,0 +1,281 @@
+{
+  "version": 1,
+  "note": "LIN-3451: Simple Dispatcher is the reference; a row where kit differs from sd carries a difference. Test fixture only: the kit never loads this file. Byte-copied to simple-dispatcher test/fixtures/runner-contract.json.",
+  "rows": [
+    {
+      "area": "halt",
+      "case": "abort row under pause",
+      "halt": {
+        "mode": "pause"
+      },
+      "item": {
+        "route": "abort"
+      },
+      "sd": "claimed",
+      "kit": "claimed"
+    },
+    {
+      "area": "halt",
+      "case": "abort row under stop",
+      "halt": {
+        "mode": "stop"
+      },
+      "item": {
+        "route": "abort"
+      },
+      "sd": "claimed",
+      "kit": "claimed"
+    },
+    {
+      "area": "halt",
+      "case": "fresh item under pause",
+      "halt": {
+        "mode": "pause"
+      },
+      "item": {
+        "route": "fresh"
+      },
+      "sd": "left",
+      "kit": "left"
+    },
+    {
+      "area": "halt",
+      "case": "fresh item under stop",
+      "halt": {
+        "mode": "stop"
+      },
+      "item": {
+        "route": "fresh"
+      },
+      "sd": "left",
+      "kit": "left"
+    },
+    {
+      "area": "halt",
+      "case": "follow-up to a live session under pause",
+      "halt": {
+        "mode": "pause"
+      },
+      "item": {
+        "route": "follow-up",
+        "session": "live"
+      },
+      "sd": "claimed",
+      "kit": "claimed"
+    },
+    {
+      "area": "halt",
+      "case": "follow-up to a live session under stop (held)",
+      "halt": {
+        "mode": "stop"
+      },
+      "item": {
+        "route": "follow-up",
+        "session": "live"
+      },
+      "sd": "left",
+      "kit": "left"
+    },
+    {
+      "area": "halt",
+      "case": "follow-up with no live session under pause",
+      "halt": {
+        "mode": "pause"
+      },
+      "item": {
+        "route": "follow-up",
+        "session": "none"
+      },
+      "sd": "failed",
+      "kit": "failed"
+    },
+    {
+      "area": "halt",
+      "case": "follow-up with no live session under stop",
+      "halt": {
+        "mode": "stop"
+      },
+      "item": {
+        "route": "follow-up",
+        "session": "none"
+      },
+      "sd": "failed",
+      "kit": "left",
+      "difference": "SD fails a no-session follow-up under stop (the stop hold covers only a resumable one, pacing.js:113); the kit leaves it queued. Open question in LIN-3451; today's kit behaviour kept."
+    },
+    {
+      "area": "halt",
+      "case": "unknown halt mode on a fresh item",
+      "halt": {
+        "mode": "drain"
+      },
+      "item": {
+        "route": "fresh"
+      },
+      "sd": "claimed",
+      "kit": "left",
+      "difference": "The kit fails closed on a mode it does not know; SD fails open (dispatcher.js collectHarbourHalt). Deliberate (LIN-3451); whether SD should fail closed is an open question."
+    },
+    {
+      "area": "halt-text",
+      "case": "line posted on a running row when a stop halt sweeps it",
+      "halt": {
+        "mode": "stop"
+      },
+      "item": {
+        "route": "sweep"
+      },
+      "sd": "[aborted] Cancelled running session <id8> (<phase>).",
+      "kit": "[aborted] Cancelled running session <id8> (stopped by operator).",
+      "difference": "Cosmetic: Harbour reads [aborted] by its prefix only, so the kit keeps its own wording."
+    },
+    {
+      "area": "target",
+      "case": "target cli",
+      "halt": null,
+      "item": {
+        "route": "fresh",
+        "target": "cli"
+      },
+      "sd": "claimed",
+      "kit": "claimed"
+    },
+    {
+      "area": "target",
+      "case": "target web",
+      "halt": null,
+      "item": {
+        "route": "fresh",
+        "target": "web"
+      },
+      "sd": "claimed",
+      "kit": "claimed"
+    },
+    {
+      "area": "target",
+      "case": "target dash",
+      "halt": null,
+      "item": {
+        "route": "fresh",
+        "target": "dash"
+      },
+      "sd": "left",
+      "kit": "left"
+    },
+    {
+      "area": "target",
+      "case": "target local",
+      "halt": null,
+      "item": {
+        "route": "fresh",
+        "target": "local"
+      },
+      "sd": "left",
+      "kit": "left"
+    },
+    {
+      "area": "target",
+      "case": "no target (defaults to cli)",
+      "halt": null,
+      "item": {
+        "route": "fresh"
+      },
+      "sd": "claimed",
+      "kit": "claimed"
+    },
+    {
+      "area": "repo",
+      "case": "no repo on a fresh item",
+      "halt": null,
+      "item": {
+        "route": "fresh"
+      },
+      "sd": "claimed",
+      "kit": "claimed"
+    },
+    {
+      "area": "repo",
+      "case": "repo that resolves, fresh item",
+      "halt": null,
+      "item": {
+        "route": "fresh",
+        "repo": "found"
+      },
+      "sd": "claimed",
+      "kit": "claimed",
+      "difference": "SD resolves a repo to a configured workspace with that folder basename; the kit resolves a directory with that name under its working directory (repoDir)."
+    },
+    {
+      "area": "repo",
+      "case": "repo that does not resolve, fresh item",
+      "halt": null,
+      "item": {
+        "route": "fresh",
+        "repo": "missing"
+      },
+      "sd": "failed",
+      "kit": "failed",
+      "difference": "Same outcome, different text: SD names workspaces.json, the kit names the directory it looked under."
+    },
+    {
+      "area": "repo",
+      "case": "unknown repo on a follow-up",
+      "halt": null,
+      "item": {
+        "route": "follow-up",
+        "session": "live",
+        "repo": "missing"
+      },
+      "sd": "not-checked",
+      "kit": "not-checked",
+      "difference": "SD refuses an unknown repo only on a fresh item (dispatcher.js reaches assess after the abort and follow-up routes); the kit matches."
+    },
+    {
+      "area": "repo",
+      "case": "unknown repo on an abort",
+      "halt": null,
+      "item": {
+        "route": "abort",
+        "repo": "missing"
+      },
+      "sd": "not-checked",
+      "kit": "not-checked",
+      "difference": "As above: aborts are never repo-checked."
+    },
+    {
+      "area": "cap",
+      "case": "status message over 2000 characters",
+      "halt": null,
+      "item": {
+        "route": "feedback",
+        "kind": "status",
+        "length": 2500
+      },
+      "sd": "truncated",
+      "kit": "truncated"
+    },
+    {
+      "area": "cap",
+      "case": "decision message over 2000 characters",
+      "halt": null,
+      "item": {
+        "route": "feedback",
+        "kind": "decision",
+        "length": 2500
+      },
+      "sd": "dropped",
+      "kit": "error",
+      "difference": "Truncated JSON is a silent malformed ruling, so the kit errors instead; SD's hook drops an over-gate decision (hook.js). Deliberate (LIN-3451)."
+    },
+    {
+      "area": "heartbeat",
+      "case": "consumer-level heartbeat field set",
+      "halt": null,
+      "item": {
+        "route": "heartbeat"
+      },
+      "sd": "not yet defined (LIN-1952)",
+      "kit": "not yet defined (LIN-1952)"
+    }
+  ]
+}

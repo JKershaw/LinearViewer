@@ -424,13 +424,23 @@ describe('haltAction and haltSweep (Simple Dispatcher\'s halt meaning)', () => {
     assert.equal(haltAction({ mode: 'pause' }, item(), live).decision, 'leave');
     assert.equal(haltAction({ mode: 'pause' }, item({ followUpTo: K }), live).decision, 'take');
     assert.equal(haltAction({ mode: 'pause' }, item({ kind: 'wake', followUpTo: K }), live).decision, 'take');
-    assert.equal(haltAction({ mode: 'pause' }, item({ followUpTo: W2 }), live).decision, 'leave');
     assert.equal(haltAction({ mode: 'pause' }, item({ abort: true, abortTo: K, prompt: null }), live).decision, 'take');
   });
 
-  test('stop: nothing is taken', () => {
+  test('stop: nothing fresh or follow-up is taken; aborts flow as in Simple Dispatcher (LIN-3451)', () => {
+    assert.equal(haltAction({ mode: 'stop' }, item(), live).decision, 'leave');
     assert.equal(haltAction({ mode: 'stop' }, item({ followUpTo: K }), live).decision, 'leave');
-    assert.equal(haltAction({ mode: 'stop' }, item({ abort: true, abortTo: K, prompt: null }), live).decision, 'leave');
+    assert.equal(haltAction({ mode: 'stop' }, item({ abort: true, abortTo: K, prompt: null }), live).decision, 'take');
+  });
+
+  test('pause: a follow-up with no live session is taken so it is failed, not left queued (LIN-3451)', () => {
+    assert.equal(haltAction({ mode: 'pause' }, item({ followUpTo: W2 }), live).decision, 'take');
+    assert.equal(haltAction({ mode: 'pause' }, item({ followUpTo: X }), live).decision, 'take');
+  });
+
+  test('an unknown halt mode fails closed (a deliberate difference from Simple Dispatcher)', () => {
+    assert.equal(haltAction({ mode: 'drain' }, item(), live).decision, 'leave');
+    assert.equal(haltAction({ mode: 'drain' }, item({ abort: true, abortTo: K, prompt: null }), live).decision, 'leave');
   });
 
   test('stop sweeps every running subagent with Simple Dispatcher\'s [aborted] line and keeps it in the ledger as stopped (N4)', () => {
@@ -532,7 +542,7 @@ describe('resolveFollowUp', () => {
   test('a miss posts Simple Dispatcher\'s failure line, which reads as failed', () => {
     const r = resolveFollowUp(item({ followUpTo: X }), ledger);
     assert.equal(r.action, 'reject');
-    assert.equal(r.message, `[failed] No live subagent to resume for follow-up (original dispatch ${X} not found).`);
+    assert.equal(r.message, `[failed] No live session to resume for follow-up (original dispatch ${X} not found or already archived).`);
     assert.equal(findTerminalFeedback(fb(r.message)).status, 'failed');
   });
 });
@@ -1376,6 +1386,16 @@ describe('commands (against a fake Harbour)', () => {
     harbour.state.queue.length = 0;
     const r = await run(['wait'], { waitPollMs: 10, waitHeartbeatMs: 10, waitCapMs: 60 });
     assert.equal(r.reason, 'cap');
+  });
+
+  // LIN-3451: the target gate lives in preConfirmDecision, which wait calls too; a dash item is not work.
+  test('wait does not report a dash-target item as work (left queued, target:dash)', TIMEOUT, async () => {
+    harbour.state.queue.length = 0;
+    const dash = harbour.enqueue({ target: 'dash' });
+    assert.deepEqual(preConfirmDecision(dash, ctx()), { decision: 'leave', reason: 'target:dash' });
+    const r = await run(['wait'], { waitPollMs: 10, waitHeartbeatMs: 10, waitCapMs: 60 });
+    assert.equal(r.reason, 'cap');
+    harbour.state.queue.length = 0;
   });
 
   describe('wait debounce (LIN-3213)', () => {

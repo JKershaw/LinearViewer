@@ -105,7 +105,7 @@ poll loop died. Re-arm it.
 
 If your environment can't run background commands, use `/loop 2m` and on each tick run
 `runner wait` in the foreground (it returns within {{WAIT_CAP_MIN}} minutes), then act on its reason.
-Never loop on `runner poll` alone: only `wait` refreshes the brokers' heartbeat and runs the watchdog (§5).
+Never loop on `runner poll` alone: only `wait` refreshes the heartbeat and runs the watchdog (§5).
 
 ## 3. Decide at poll time; leave refused items queued
 
@@ -146,7 +146,7 @@ one) and starts nothing.
 the item's credential. Never give a subagent a token, and never paste one into its prompt.
 
 - **New item** (`handoff.mode: "new"`): launch a subagent (the Agent tool, in the background so
-  you can keep polling), passing `subagent.model` as its model when it isn't null. Its prompt is
+  you can keep polling; in `repoDir` if `take` printed one), passing `subagent.model` as its model when it isn't null. Its prompt is
   the `environment` block, then the item's `prompt` **verbatim**, then the closing contract below.
   Then run `runner handoff <id> <agentId>`, which posts
   `[handoff] item <id> → subagent <agentId> (new)`.
@@ -206,43 +206,40 @@ Harbour reads.
 ## 5. Your own watchdog
 
 With no Simple Dispatcher reaper, the kit watches for you. A running item silent for
-{{WATCHDOG_STALL_MIN}} minutes (no transcript activity, or no subagent ever handed off) gets
+{{WATCHDOG_STALL_MIN}} minutes (no transcript activity, or never handed off) gets
 `[blocked] stalled: …`; one silent for {{WATCHDOG_FAIL_MIN}} minutes gets `[failed] stalled: …`.
 When `wait` exits with `stall`, stop each subagent marked `stop: true`. A `[blocked] stalled`
-subagent that comes back to life is cleared, and a second stall is flagged again.
+subagent that revives is cleared; a second stall is flagged again.
 
 ## 6. Halts are binding
 
-Halts ({{HALT_MODES}}) are binding here, with Simple Dispatcher's meaning.
+Halts ({{HALT_MODES}}) are binding here: Simple Dispatcher's meaning, except the differences in
+`lib/runner-kit/contract.json`.
 
-- `pause`: take no fresh items. Running subagents carry on; follow-ups and wakes for your own
-  subagents, and aborts, still flow.
-- `stop`: take nothing. `runner poll` stops every running item: each gets
-  `[aborted] Cancelled running session <id8> (stopped by operator).` Stop each subagent it lists
-  in `stopAgents`. They stay in the ledger as stopped, so a follow-up after the stop clears
-  continues them.
+- `pause`: take no fresh items. Running subagents carry on; follow-ups, wakes and aborts flow.
+- `stop`: take no fresh items or follow-ups; aborts flow. `runner poll` stops every running item:
+  each gets `[aborted] Cancelled running session <id8> (stopped by operator).` Stop each subagent
+  in `stopAgents`. They stay in the ledger as stopped, so a follow-up after the stop continues them.
 
 ## 7. What can go wrong, plainly
 
 - **The laptop sleeps.** Everything pauses; brokers don't count the sleep against their
   heartbeat, and `wait` re-arms on waking. A subagent mid-call may need its step retried.
-- **The laptop closes, or this session ends.** The runner is gone. Rows it took stay `taken` —
-  Harbour keeps that history for the project's lifetime, so nothing expires them and nothing can
-  close them from outside. A parent
-  Autopilot waiting on one hangs: the owner should re-dispatch. Each item's broker exits
+- **The laptop closes, or this session ends.** The runner is gone. Rows it took stay `taken`:
+  Harbour keeps them for the project's lifetime and nothing can close them from outside. A parent
+  Autopilot waiting on one hangs: re-dispatch. Each item's broker exits
   on its own about {{BROKER_STALE_MIN}} minutes after the heartbeat stops (at most
   {{BROKER_MAX_LIFETIME_HOURS}}h). The next session's `recover` posts
   `[failed] runner restarted: subagent lost` on rows this credential took, and lists the rest as
   orphans.
 - **The credential expires** after {{WORKING_TTL_HOURS}}h; near the end, fresh items are left
   queued. Ask the person for a new credential, then run
-  `runner recover --session <your session id>` and `runner login` again: your running subagents are
-  kept. Rows the old credential took can't take the new one's posts, so a task running
+  `runner recover --session <your session id>` and `runner login` again; running subagents are kept. Rows the old credential took can't take the new one's posts, so a task running
   longer than about {{WORKING_TTL_HOURS}}h loses its original rows' own terminals (they stay `taken`).
 - **The same-user boundary.** Your subagents never receive a token. But the runner credential
-  rests in a credential file (mode 600, in a mode-700 directory) and each item's broker listens on
-  a same-user socket, so any process of the same OS user, subagents included, could read that
-  file or use a live broker. Run only work you'd run yourself.
+  rests in a credential file (mode 600, in a mode-700 directory) and each item's broker listens on a
+  same-user socket, so any process of the same OS user, subagents included, could read that file
+  or use a live broker. Run only work you'd run yourself.
 
 ## 8. End summary
 
@@ -268,7 +265,7 @@ DECISION: {"decision_id":"keep-schema","question":"Which schema do we keep?","op
 [blocked] stalled: subagent a1b2c3d4 silent for 21 min
 [failed] stalled: subagent a1b2c3d4 silent for 61 min
 [failed] runner restarted: subagent lost
-[failed] No live subagent to resume for follow-up (original dispatch 0f3a9c2e-1b4d-4e8f-9a7b-2c6d8e0f1a3b not found).
+[failed] No live session to resume for follow-up (original dispatch 0f3a9c2e-1b4d-4e8f-9a7b-2c6d8e0f1a3b not found or already archived).
 [aborted] Cancelled running session 0f3a9c2e (running).
 [aborted] Closed finished session 0f3a9c2e (done).
 [aborted] Cancelled running session 0f3a9c2e (stopped by operator).

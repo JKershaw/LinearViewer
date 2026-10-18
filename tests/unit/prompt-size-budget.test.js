@@ -122,9 +122,9 @@ export const ROUTER_PROMPT_RENDERED_CEILING = 9545; // LIN-3378: -10 net of b an
 export const STAGE_INTENT_SOURCE_CEILING = 2912; // LIN-3326: +82, close-out's own line (engineering calls in finishing the work are its), paid from close-out's rendered ceiling
 
 /** Served runner prompt, source bytes (docs/runner-prompt.md). */
-export const RUNNER_PROMPT_SOURCE_CEILING = 17500;
+export const RUNNER_PROMPT_SOURCE_CEILING = 17474;
 /** Served runner prompt, rendered bytes (buildRunnerKickoff at BASE_URL). */
-export const RUNNER_PROMPT_RENDERED_CEILING = 15815;
+export const RUNNER_PROMPT_RENDERED_CEILING = 15789;
 
 /**
  * The net-zero total: the sum of every ceiling above at the freeze. A PR may
