@@ -101,6 +101,12 @@ export const SELECTORS = {
   project: (name) => `[data-testid="project"][data-project-name="${name}"]`,
   /** An issue row by id (pairs the testid with the existing data-id hook). */
   issue: (id) => `[data-testid="issue-line"][data-id="${id}"]`,
+  /** Workspace KPIs page (LIN-3689): section, card and empty-state test ids. */
+  workspaceKpis: {
+    section: (name) => `[data-testid="workspace-kpis-section-${name}"]`,
+    card: (name) => `[data-testid="workspace-kpis-card-${name}"]`,
+    empty: '[data-testid="workspace-kpis-empty"]',
+  },
   dispatchHalt: {
     status: '[data-testid="dispatch-halt-status"]',
     disclaimer: '[data-testid="dispatch-halt-disclaimer"]',
@@ -121,6 +127,21 @@ export function dispatchHalt(page) {
     pause: () => page.locator(SELECTORS.dispatchHalt.pause),
     stop: () => page.locator(SELECTORS.dispatchHalt.stop),
     resume: () => page.locator(SELECTORS.dispatchHalt.resume),
+  }
+}
+
+/**
+ * Workspace KPIs page object (LIN-3689).
+ * @param {import('@playwright/test').Page} page
+ */
+export function workspaceKpis(page) {
+  return {
+    section: (name) => page.locator(SELECTORS.workspaceKpis.section(name)),
+    card: (name) => page.locator(SELECTORS.workspaceKpis.card(name)),
+    empty: () => page.locator(SELECTORS.workspaceKpis.empty),
+    /** Text of a card's windowed value, e.g. value('dispatches', '30d'). */
+    value: (card, window) => page.locator(`[data-testid="workspace-kpis-value-${card}-${window}"]`),
+    kindRows: () => page.locator('[data-testid="workspace-kpis-kind-row"]'),
   }
 }
 
