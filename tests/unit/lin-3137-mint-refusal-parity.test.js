@@ -5,7 +5,7 @@
  * The shared `lib/owner-mint-refusals.js` supplies the same status / code /
  * category / retryable / wording to both mints. Since LIN-3673 both resolve
  * through `resolveOwnerMintRefusal` (the runner copy via the proxy token
- * store's `mintGrantBootstrap`, which wraps the record in its own thrown
+ * store's grant-bootstrap mint, which wraps the record in its own thrown
  * `grantRefusal`). The guard against drift is still an END-TO-END comparison of
  * what the two REAL routes put on the wire for every refusal — not the shared
  * table compared with itself.
