@@ -164,6 +164,52 @@ describe('browser terminal-state predicate (public/common.js)', () => {
   }
 });
 
+// LIN-3674 step B: the context panel hand-matches getStateDisplay. context.js has an
+// existing export (ContextSection.renderSession), so the glyph table is driven through
+// it with the real common.js loaded first (context.js reads window.escapeHtml at load).
+describe('context panel state glyphs (public/context.js)', () => {
+  const load = (file) => readFileSync(fileURLToPath(new URL(`../../public/${file}`, import.meta.url)), 'utf8');
+  const sandbox = { console, document: { addEventListener() {}, querySelector() { return null; } }, location: { search: '', href: '' } };
+  sandbox.window = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(load('common.js'), sandbox, { filename: 'common.js' });
+  vm.runInContext(load('context.js'), sandbox, { filename: 'context.js' });
+
+  const expected = [
+    ['completed', '✓', 'done'],
+    ['canceled', '✕', 'done'],
+    ['duplicate', '✕', 'done'],
+    ['started', '◐', 'in-progress'],
+    ['unstarted', '○', 'todo'],
+    ['backlog', '◌', 'backlog'],
+    ['triage', '○', 'backlog'],
+    [undefined, '○', 'backlog'],
+    [null, '○', 'backlog'],
+  ];
+
+  const html = sandbox.window.ContextSection.renderSession({
+    graph: {
+      tasks: [{
+        identifier: 'S-1',
+        provenance: 'seed',
+        root: { identifier: 'S-1', stateType: 'started' },
+        blockers: expected.map(([stateType], i) => ({ identifier: `B-${i}`, stateType })),
+      }],
+    },
+  });
+
+  for (const [type, char, cls] of expected) {
+    test(`blocker with stateType ${String(type)} draws ${char} (${cls})`, () => {
+      const id = `B-${expected.findIndex(([t]) => t === type)}`;
+      const node = html.split('<a ').find(chunk => chunk.includes(`data-context-nav="${id}"`));
+      const m = /<span class="state ([^ "]+) [^"]*">([^<]*)<\/span>/.exec(node);
+      assert.ok(m, 'state span found');
+      assert.equal(m[1], cls);
+      assert.equal(m[2], char);
+    });
+  }
+});
+
 // LIN-3674: a closed task draws the same everywhere. The class is 'done' for all three
 // terminal types (data-status and the done styling are unchanged); only char/label vary.
 describe('getStateDisplay: closed-but-not-completed', () => {
