@@ -60,7 +60,7 @@ const handleWorkspaceRemovalSrc = () => sliceBetween(
 );
 
 /** The shared collaborator set both dispatches are executed against. */
-function makeContext({ workspace, extraWorkspaces = [], durableRecord = null, calls, refreshResult, remintResult, definitiveRevocation = false }) {
+function makeContext({ workspace, extraWorkspaces = [], durableRecord = null, calls, refreshResult, remintResult, remintError, definitiveRevocation = false }) {
   const session = {
     accountId: 'acct-1',
     activeWorkspaceId: workspace.id,
@@ -90,7 +90,7 @@ function makeContext({ workspace, extraWorkspaces = [], durableRecord = null, ca
       if (typeof refreshResult === 'function') return refreshResult(args);
       return refreshResult;
     },
-    remintActiveCredential: async () => { calls.remint++; return remintResult; },
+    remintActiveCredential: async () => { calls.remint++; if (remintError) throw remintError; return remintResult; },
     refreshAccessToken: Object.assign(async () => ({}), { __name: 'linear' }),
     refreshJiraAccessToken: Object.assign(async () => ({}), { __name: 'jira' }),
     getProviderForWorkspace: () => ({ name: workspace.provider }),
@@ -580,6 +580,22 @@ describe('LIN-3619 — workspace-removal revocation on the involuntary paths', (
   test('reactive: no durable record on a destructive provider removes the workspace and revokes', async () => {
     const { calls } = await runReactive({ workspace: { id: 'w-x', urlKey: 'acme', provider: 'linear' }, durableRecord: null });
     assert.deepEqual(calls.revokes, expectedRevoke);
+  });
+
+  test('reactive: a GitHub-family re-mint failure removes the workspace without revoking (deleteDurable=false)', async () => {
+    const errorLog = console.error;
+    console.error = () => {};
+    let result;
+    try {
+      result = await runReactive({ workspace: { id: 'w-x', urlKey: 'acme', provider: 'github' }, remintError: new Error('installation token mint failed') });
+    } finally {
+      console.error = errorLog;
+    }
+    const { calls, session } = result;
+    assert.equal(calls.remint, 1);
+    assert.equal(session.workspaces.length, 0, 'the workspace is still removed');
+    assert.deepEqual(calls.durableDeleteAlls, [], 'no durable delete on this arm');
+    assert.deepEqual(calls.revokes, [], 'a re-mint failure is no evidence of revocation: nothing to revoke');
   });
 
   test('reactive: a non-destructive provider\'s revoked credential revokes nothing', async () => {

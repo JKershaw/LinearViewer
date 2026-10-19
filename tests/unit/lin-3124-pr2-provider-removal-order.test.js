@@ -68,6 +68,14 @@ describe('LIN-3619 — unlink revokes artifacts only when the last binding goes'
     assert.deepStrictEqual(JSON.parse(JSON.stringify(revokes)), []);
   });
 
+  // Pins the raw-array check: a legacy workspace has no bindings[], so only the
+  // post-unlink workspace.bindings.length === 0 fires; a synthesized-binding
+  // count (e.g. `|| 1`) would never revoke here.
+  test('a legacy workspace with no bindings[] revokes when its synthesized binding is unlinked', async () => {
+    const revokes = await runUnlink({ id: 'w-1', urlKey: 'acme', provider: 'linear' }, { provider: 'linear', scope: 'w-1' });
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(revokes)), [{ urlKey: 'acme', workspaceId: 'w-1', accountId: 'acc' }]);
+  });
+
   test('a no-op unlink (no matching binding) revokes nothing', async () => {
     const revokes = await runUnlink({ id: 'w-1', urlKey: 'acme', provider: 'linear', bindings: [{ ...linear }] }, { provider: 'linear', scope: 'other' });
     assert.deepStrictEqual(JSON.parse(JSON.stringify(revokes)), []);
