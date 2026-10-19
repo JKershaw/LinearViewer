@@ -83,6 +83,16 @@ function makeRig({ isTerminal = () => false, generateParagraph } = {}) {
 }
 
 describe('resolvePrecomputeApiKey (the shared offline guard)', () => {
+  test('LIN-3664: a whitespace free-tier key is no key; a padded one is trimmed', () => {
+    assert.equal(resolvePrecomputeApiKey({ OPENROUTER_FREE_TIER_KEY: '   ' }), null);
+    assert.equal(resolvePrecomputeApiKey({ OPENROUTER_FREE_TIER_KEY: ' free ' }), 'free');
+  });
+
+  test('LIN-3664: a whitespace paid key is no key, so it falls through to the free-tier key (as resolveChatCredential does)', () => {
+    assert.equal(resolvePrecomputeApiKey({ OPENROUTER_API_KEY: '  ', OPENROUTER_FREE_TIER_KEY: 'free' }), 'free');
+    assert.equal(resolvePrecomputeApiKey({ OPENROUTER_API_KEY: '  ' }), null);
+  });
+
   test('returns null under NODE_ENV=test (tests stay offline)', () => {
     assert.equal(resolvePrecomputeApiKey({ NODE_ENV: 'test', OPENROUTER_API_KEY: 'k' }), null);
   });
