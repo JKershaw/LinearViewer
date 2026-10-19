@@ -834,8 +834,9 @@ describe('dispatchEvidence (LIN-3669)', () => {
     for (const s of ['done', 'failed', 'aborted', 'closed']) assert.equal(dispatchEvidence({ status: 200, json: { status: s } }), 'terminal', s);
     for (const s of ['skipped', 'taken', 'queued', 'running']) assert.equal(dispatchEvidence({ status: 200, json: { status: s } }), 'open', s);
   });
-  test('non-200, a missing body or a thrown call is unreadable', () => {
-    assert.equal(dispatchEvidence({ status: 404, json: { error: 'nf' } }), 'unreadable');
+  test('a 404 is gone (LIN-3676); any other non-200, a missing body or a thrown call is unreadable', () => {
+    assert.equal(dispatchEvidence({ status: 404, json: { error: 'nf' } }), 'gone');
+    assert.equal(dispatchEvidence({ status: 500, json: { error: 'boom' } }), 'unreadable');
     assert.equal(dispatchEvidence({ status: 500, json: null }), 'unreadable');
     assert.equal(dispatchEvidence(null), 'unreadable');
   });
@@ -1195,6 +1196,8 @@ async function fakeHarbour() {
     otherConsumerLastSeenAt: null,
     takes: [],
     watch: new Map(),
+    watchFail: new Map(), // id -> HTTP status the dispatch read answers instead (LIN-3676: 500 is unreadable, 404 is gone)
+    watchReads: [], // every id the dispatch read was asked for
     promptOverride: new Map()
   };
   const json = (res, status, body) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
@@ -1244,7 +1247,10 @@ async function fakeHarbour() {
       return json(res, 200, { id: it.id, prompt: it.prompt, followUpTo: it.followUpTo || null, kind: it.kind });
     }
     if (req.method === 'GET' && (m = url.pathname.match(/^\/api\/proxy\/dispatch\/([^/]+)$/))) {
-      const w = state.watch.get(m[1]);
+      state.watchReads.push(m[1]);
+      if (state.watchFail.has(m[1])) return json(res, state.watchFail.get(m[1]), { error: 'fail' });
+      // A taken item is live on Harbour unless a test says otherwise; an id it never saw is gone (404).
+      const w = state.watch.get(m[1]) || (state.history.has(m[1]) ? { id: m[1], status: 'taken' } : null);
       return w ? json(res, 200, w) : json(res, 404, { error: 'nf' });
     }
     return json(res, 200, { ok: true, url: req.url });
@@ -1636,6 +1642,7 @@ describe('commands (against a fake Harbour)', () => {
     const same = await run(['recover', '--session', session]);
     assert.ok(same.live.includes(it.id));
     assert.ok(!same.fail.includes(it.id));
+    harbour.state.watch.set(it.id, { id: it.id, status: 'taken' }); // LIN-3675: recover reads the dispatch first
     const fresh = await run(['recover']);
     assert.ok(fresh.fail.includes(it.id));
     const post = harbour.state.feedback.filter((p) => p.itemId === it.id).at(-1);
@@ -1655,6 +1662,7 @@ describe('commands (against a fake Harbour)', () => {
       tokenId: 'sha256:0000000000000000', session: null, takenAt: new Date().toISOString(), socket: null, ...over
     };
     writeFileSync(file, JSON.stringify(ledger));
+    harbour.state.watch.set(id, { id, status: 'taken' }); // live on Harbour (an unknown id would read 404: gone)
     return ledger.items[id];
   };
   const ledgerNow = () => JSON.parse(readFileSync(join(home, 'acme', 'ledger.json'), 'utf8'));
@@ -1673,6 +1681,138 @@ describe('commands (against a fake Harbour)', () => {
       harbour.state.halt = null;
       await run(['poll']);
     }
+  });
+
+  // LIN-3675: recover and the stop halt read Harbour before a terminal post (Harbour reads
+  // markers last-wins, so a late [failed]/[aborted] would override an earlier [done]).
+  const takeRunning = async () => {
+    const it = harbour.enqueue();
+    await run(['poll']);
+    await run(['take', it.id]);
+    await run(['handoff', it.id, `agent-${it.id.slice(0, 6)}`]);
+    harbour.state.queue.length = 0;
+    return it;
+  };
+  const stopHalt = async () => {
+    harbour.state.halt = { mode: 'stop', setAt: new Date().toISOString(), setBy: OWNER };
+    try { return await run(['poll']); } finally { harbour.state.halt = null; await run(['poll']); }
+  };
+
+  test('LIN-3675: recover on a row whose dispatch is already done posts nothing, settles it and stops its broker', TIMEOUT, async () => {
+    const it = await takeRunning();
+    const socket = ledgerNow().items[it.id].socket;
+    assert.equal(existsSync(socket), true);
+    harbour.state.watch.set(it.id, { id: it.id, status: 'done' });
+    const before = harbour.state.feedback.length;
+    const r = await run(['recover']);
+    assert.ok(r.settled.includes(it.id));
+    assert.ok(!r.fail.includes(it.id));
+    // Review: the row stays `lost` (the restart killed its subagent), so a follow-up is rejected, not continued.
+    assert.equal(ledgerNow().items[it.id].state, 'lost');
+    assert.equal(resolveFollowUp({ followUpTo: it.id }, ledgerNow()).action, 'reject');
+    assert.equal(existsSync(socket), false, 'broker stopped');
+    assert.ok(!harbour.state.feedback.slice(before).some((f) => f.itemId === it.id));
+  });
+
+  test('LIN-3676: recover on a dropped item (404) posts nothing and settles it, row stays lost', TIMEOUT, async () => {
+    const it = await takeRunning();
+    harbour.state.watchFail.set(it.id, 404); // gone
+    const before = harbour.state.feedback.length;
+    const r = await run(['recover']);
+    assert.ok(r.settled.includes(it.id));
+    assert.equal(ledgerNow().items[it.id].state, 'lost');
+    assert.ok(!harbour.state.feedback.slice(before).some((f) => f.itemId === it.id));
+  });
+
+  test('LIN-3676: a stop halt on a dropped item (404) posts no [aborted] but still stops it', TIMEOUT, async () => {
+    const it = await takeRunning();
+    harbour.state.watchFail.set(it.id, 404);
+    const before = harbour.state.feedback.length;
+    const r = await stopHalt();
+    assert.ok(r.stopAgents.includes(`agent-${it.id.slice(0, 6)}`));
+    assert.equal(ledgerNow().items[it.id].state, 'stopped');
+    assert.ok(!harbour.state.feedback.slice(before).some((f) => f.itemId === it.id));
+  });
+
+  test('LIN-3675: an abort row on a running target whose dispatch is already done posts no child [aborted] but stops it', TIMEOUT, async () => {
+    const target = await takeRunning();
+    const socket = ledgerNow().items[target.id].socket;
+    harbour.state.watch.set(target.id, { id: target.id, status: 'done' });
+    const abortRow = harbour.enqueue({ abort: true, abortTo: target.id, prompt: null, bootstrapToken: null });
+    await run(['poll']);
+    const before = harbour.state.feedback.length;
+    const r = await run(['take', abortRow.id]);
+    assert.equal(r.abort.stopAgent, `agent-${target.id.slice(0, 6)}`);
+    assert.equal(ledgerNow().items[target.id].state, 'stopped');
+    assert.equal(existsSync(socket), false, 'broker stopped');
+    const posts = harbour.state.feedback.slice(before);
+    assert.deepEqual(posts.map((f) => f.itemId), [abortRow.id], 'only the ack on the abort row');
+    assert.match(posts[0].body.message, /^\[aborted\] Closed finished session/);
+  });
+
+  test('LIN-3675: an abort row on a running target with an unreadable dispatch still posts the child [aborted]', TIMEOUT, async () => {
+    const target = await takeRunning();
+    harbour.state.watchFail.set(target.id, 500);
+    const abortRow = harbour.enqueue({ abort: true, abortTo: target.id, prompt: null, bootstrapToken: null });
+    await run(['poll']);
+    const before = harbour.state.feedback.length;
+    await run(['take', abortRow.id]);
+    assert.deepEqual(harbour.state.feedback.slice(before).map((f) => f.itemId), [abortRow.id, target.id]);
+  });
+
+  test('LIN-3675: recover on an unreadable dispatch defers: no post, the row stays so a later recover retries', TIMEOUT, async () => {
+    const it = await takeRunning();
+    harbour.state.watchFail.set(it.id, 500); // LIN-3676: a 500 is unreadable (a 404 is gone)
+    const before = harbour.state.feedback.length;
+    const r = await run(['recover']);
+    assert.ok(r.deferred.includes(it.id));
+    assert.ok(!r.fail.includes(it.id));
+    assert.equal(ledgerNow().items[it.id].state, 'running');
+    assert.ok(!harbour.state.feedback.slice(before).some((f) => f.itemId === it.id));
+    harbour.state.watchFail.delete(it.id);
+    harbour.state.watch.set(it.id, { id: it.id, status: 'taken' });
+    const again = await run(['recover']);
+    assert.ok(again.fail.includes(it.id), 'a later recover retries');
+  });
+
+  test('LIN-3675: recover treats skipped as not terminal and fails the row as before', TIMEOUT, async () => {
+    const it = await takeRunning();
+    harbour.state.watch.set(it.id, { id: it.id, status: 'skipped' });
+    const r = await run(['recover']);
+    assert.ok(r.fail.includes(it.id));
+    assert.equal(harbour.state.feedback.filter((f) => f.itemId === it.id).at(-1).body.message, '[failed] runner restarted: subagent lost');
+  });
+
+  test('LIN-3675: a stop halt on a row whose dispatch is already done posts no [aborted] but still stops it', TIMEOUT, async () => {
+    const it = await takeRunning();
+    const socket = ledgerNow().items[it.id].socket;
+    harbour.state.watch.set(it.id, { id: it.id, status: 'done' });
+    const before = harbour.state.feedback.length;
+    const r = await stopHalt();
+    assert.ok(r.stopAgents.includes(`agent-${it.id.slice(0, 6)}`));
+    assert.equal(ledgerNow().items[it.id].state, 'stopped');
+    assert.equal(existsSync(socket), false, 'broker stopped');
+    assert.ok(!harbour.state.feedback.slice(before).some((f) => f.itemId === it.id));
+  });
+
+  test('LIN-3675: a stop halt on an unreadable dispatch still stops the row and posts [aborted]', TIMEOUT, async () => {
+    const it = await takeRunning();
+    harbour.state.watchFail.set(it.id, 500);
+    const before = harbour.state.feedback.length;
+    await stopHalt();
+    assert.equal(ledgerNow().items[it.id].state, 'stopped');
+    const posted = harbour.state.feedback.slice(before).filter((f) => f.itemId === it.id);
+    assert.equal(posted.length, 1);
+    assert.match(posted[0].body.message, /^\[aborted\] Cancelled running session/);
+  });
+
+  test('LIN-3675: haltSweep lists a terminal-evidence row as settled, not posted', () => {
+    const ledger = { items: { [K]: { itemId: K, agentId: 'agent-k', rootItemId: K, state: 'running' } } };
+    const sweep = haltSweep({ mode: 'stop' }, ledger, { evidenceFor: () => 'terminal' });
+    assert.deepEqual(sweep.posts, []);
+    assert.deepEqual(sweep.settled, [{ itemId: K }]);
+    assert.deepEqual(sweep.stopAgents, ['agent-k']);
+    assert.equal(sweep.ledger.items[K].state, 'stopped');
   });
 
   test('F2: the watchdog in wait records an old-token stall without posting or throwing', TIMEOUT, async () => {
@@ -1735,12 +1875,38 @@ describe('commands (against a fake Harbour)', () => {
   test('LIN-3669: an unreadable dispatch read defers: no post, row stays running, wait ends on cap not stall', TIMEOUT, async () => {
     harbour.state.queue.length = 0;
     const row = await takeAged(61);
-    harbour.state.watch.delete(row.itemId); // the fake answers 404: unreadable
+    harbour.state.watchFail.set(row.itemId, 500); // LIN-3676: 500 is unreadable; 404 is the gone test below
     const before = harbour.state.feedback.length;
     const r = await run(['wait'], { waitPollMs: 10, waitHeartbeatMs: 10, waitCapMs: 300 });
     assert.equal(r.reason, 'cap');
     assert.ok(!harbour.state.feedback.slice(before).some((f) => f.itemId === row.itemId));
     assert.equal(ledgerNow().items[row.itemId].state, 'running');
+  });
+
+  // LIN-3676: a 404 is a dropped item: settle locally, post nothing, report no stall, and do
+  // not read Harbour again for that row on the next pass.
+  test('LIN-3676: a row silent 61 min whose dispatch read is 404 ends done, posts nothing, no stall, one read', TIMEOUT, async () => {
+    harbour.state.queue.length = 0;
+    const row = await takeAged(61);
+    harbour.state.watchFail.set(row.itemId, 404); // gone
+    const before = harbour.state.feedback.length;
+    const reads = harbour.state.watchReads.length;
+    const r = await run(['wait'], { waitPollMs: 10, waitHeartbeatMs: 10, waitCapMs: 400 });
+    assert.equal(r.reason, 'cap');
+    assert.equal(ledgerNow().items[row.itemId].state, 'done');
+    assert.ok(!harbour.state.feedback.slice(before).some((f) => f.itemId === row.itemId));
+    assert.equal(harbour.state.watchReads.slice(reads).filter((id) => id === row.itemId).length, 1);
+  });
+
+  test('LIN-3676: the evidence of a still-deferred row is cached between passes', TIMEOUT, async () => {
+    harbour.state.queue.length = 0;
+    const row = await takeAged(61);
+    harbour.state.watchFail.set(row.itemId, 500);
+    const reads = harbour.state.watchReads.length;
+    const r = await run(['wait'], { waitPollMs: 10, waitHeartbeatMs: 10, waitCapMs: 400 });
+    assert.equal(r.reason, 'cap');
+    assert.equal(ledgerNow().items[row.itemId].state, 'running');
+    assert.equal(harbour.state.watchReads.slice(reads).filter((id) => id === row.itemId).length, 1, 'many passes, one read');
   });
 
   test('LIN-3669: a transcript ending in DONE: gets exactly one [blocked] … finished …, stays running, never [failed]', TIMEOUT, async () => {
