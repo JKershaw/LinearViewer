@@ -80,6 +80,7 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
     try {
       const result = await loader.loadTaskPage({
         urlKey: workspace.urlKey,
+        workspaceId: workspace.id,
         identifier,
         access,
         viewerIsOwner: true,

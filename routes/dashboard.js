@@ -55,7 +55,7 @@ import { renderUpstreamAwareErrorPage, renderErrorPage } from '../lib/render-pag
 import { resolveIssueBinding, getWorkspaceByUrlKey } from '../lib/workspace.js';
 import { readRunEvidence, buildRunEvidence } from '../lib/run-evidence.js';
 import { createPrStateStore, resolveRunPrRef } from '../lib/pr-state-store.js';
-import { prReadToken } from '../lib/github-pr-status.js';
+import { resolvePrReadToken } from '../lib/github-pr-status.js';
 import { prStateCopy } from '../lib/pr-state-copy.js';
 import { resolveRunVariant, listRows } from '../lib/run-closeout-state.js';
 import { buildSessionContextGraph } from '../lib/context-graph.js';
@@ -687,6 +687,9 @@ export function createDashboardRoutes({
   // existing session-page assertion) sees no provider I/O and no page change.
   // server.js injects the real `lib/run-evidence.js` reader.
   readRunEvidence: readRunEvidenceFn = null,
+  // LIN-3285: `installationTokenFor({ workspaceId, repo })` (lib/connection-credential.js),
+  // the owner's GitHub App installation token for a Linear/Jira workspace's PR reads.
+  installationTokenFor = null,
   // LIN-3251: PR-state cache/budget/DI seam. Default null -> a fresh per-router
   // store, which is process-wide in production (one router). Tests inject
   // `{ now, resolveProvider, loadRun, githubFetch, cache, bucket }`.
@@ -1482,7 +1485,8 @@ export function createDashboardRoutes({
         return res.json({ ...payload, message: prStateCopy(payload) });
       }
       // LIN-3443: the bound repo is read with the workspace's own token.
-      const token = prReadToken(callScope, ref.repo);
+      // LIN-3285: a Linear/Jira workspace reads with the owner's installation token.
+      const token = await resolvePrReadToken({ callScope, repo: ref.repo, providerKind: provider?.name, workspaceId: workspace.id, installationTokenFor });
       const payload = await prStateStore.readPayload(ref, nowMs, token ? { token, scopeKey: workspace.urlKey } : undefined);
       return res.json({ ...payload, message: prStateCopy(payload) });
     } catch (error) {
@@ -1720,6 +1724,8 @@ export function createDashboardRoutes({
         evidenceUrls,
         asked: asked || session.seedIssue,
         urlKey: workspace.urlKey,
+        workspaceId: workspace.id,
+        installationTokenFor,
         stopAt: facts.stopAt || null,
         variant: facts.variant || 'unknown',
         runnerReady: !!runnerReady,

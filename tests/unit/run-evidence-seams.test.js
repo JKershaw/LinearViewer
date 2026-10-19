@@ -120,8 +120,8 @@ describe('run page owner path (routes/dashboard.js)', () => {
     assert.equal(res.statusCode, 200);
     assert.equal(calls.length, 1);
     const args = calls[0];
-    assert.deepEqual(Object.keys(args).sort(), ['asked', 'callScope', 'evidenceUrls', 'issueIdentifier', 'provider', 'runnerReady', 'stopAt', 'urlKey', 'variant', 'viewerIsOwner'],
-      'the same keys the pre-split readSessionRunEvidence passed — no allowlist/readPrStatus on the owner page');
+    assert.deepEqual(Object.keys(args).sort(), ['asked', 'callScope', 'evidenceUrls', 'installationTokenFor', 'issueIdentifier', 'provider', 'runnerReady', 'stopAt', 'urlKey', 'variant', 'viewerIsOwner', 'workspaceId'],
+      'the pre-split readSessionRunEvidence keys plus LIN-3285\'s workspaceId + installationTokenFor — no allowlist/readPrStatus on the owner page');
     assert.equal(args.viewerIsOwner, true, 'the owner page still passes true explicitly');
     assert.equal(args.asked, 'Anchor title');
     assert.equal(args.issueIdentifier, 'LIN-10');

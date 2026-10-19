@@ -498,6 +498,9 @@ export function createFlightCompanionRoutes({
   // LIN-3383: the hoisted workspace-owner seam (server.js). Approve and reply
   // (send_follow_up) are owner-only.
   workspaceOwnerCheck = null,
+  // LIN-3285: the owner's GitHub App installation token for `get_pr_status` on a
+  // Linear/Jira workspace (server.js builds the one instance).
+  installationTokenFor = null,
   // LIN-2617: the two extra inputs `list_pending_decisions` needs to return the
   // same rows the rulings feed returns. Optional, like every other store here —
   // absent, that ONE tool reports "not configured" and the rest of the catalog
@@ -735,6 +738,7 @@ export function createFlightCompanionRoutes({
           dispatchQueueStore, agentStatusStore, taskDecisionsStore, shelvedRulingsStore,
           proxyTokenStore, sessionIsTerminal, enrichLoop,
           chatClient, createToolCatalog,
+          installationTokenFor,
           getProvider: getProviderForWorkspace,
           getScope: getWorkspaceCallScope,
           buildCensusSeedText,
@@ -893,6 +897,7 @@ export function createFlightCompanionRoutes({
           dispatchQueueStore, agentStatusStore, taskDecisionsStore, shelvedRulingsStore,
           proxyTokenStore, sessionIsTerminal, enrichLoop,
           chatClient, createToolCatalog,
+          installationTokenFor,
           getProvider: getProviderForWorkspace,
           getScope: getWorkspaceCallScope,
           buildCensusSeedText,

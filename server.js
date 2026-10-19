@@ -62,7 +62,7 @@ import { AccountWorkspaceStore } from './lib/account-workspace-store.js'
 import { createWorkspaceOwnerCheck } from './lib/workspace-owner.js'
 import { OwnerCredentialStore } from './lib/owner-credential-store.js'
 import { ConnectionStore } from './lib/connection-store.js'
-import { sanitizeSessionForPersist, createHydrationMiddleware, createConnectionRefresher, createConnectionAccess, createSweepConnectionDataLoader, rehydrateAfterRefresh, createAuthorizedAccountConnectionReader, createReferentHolderReader, heldConnectionCredentials, connectionBackedWritesEnabled, convertToConnectionBacked, CONNECTION_RETRY_TITLE, CONNECTION_RETRY_MESSAGE } from './lib/connection-credential.js'
+import { sanitizeSessionForPersist, createHydrationMiddleware, createConnectionRefresher, createConnectionAccess, createSweepConnectionDataLoader, rehydrateAfterRefresh, createAuthorizedAccountConnectionReader, createInstallationTokenResolver, createReferentHolderReader, heldConnectionCredentials, connectionBackedWritesEnabled, convertToConnectionBacked, CONNECTION_RETRY_TITLE, CONNECTION_RETRY_MESSAGE } from './lib/connection-credential.js'
 import { createUrlKeyHolderFinder } from './lib/urlkey-holders.js'
 import { createWorkspaceUrlKeyResolver } from './lib/workspace-urlkey.js'
 import { isConnectionBacked, activeBindingIsConnectionBacked, activeConnectionBackedBinding, readWorkspaceCredential } from './lib/connection-binding.js'
@@ -697,6 +697,21 @@ const ownerCredentialStore = new OwnerCredentialStore({ collection: ownerCredent
 const connectionsCollection = db.collection('connections')
 const connectionStore = new ConnectionStore({ collection: connectionsCollection })
 
+// LIN-3285: the workspace OWNER's GitHub App installation token for a Linear- or
+// Jira-bound workspace's PR-state reads. Built here, after `connectionStore` and
+// before the eager `createCiWakeSweepRun` below (a later definition is a TDZ
+// error at boot). `fetchImpl` and `now` are passed explicitly: the seam never
+// falls back to a global. Injected into the session-side readers only; the
+// worker proxy chat and the guest share page get none and stay anonymous.
+const installationTokenFor = createInstallationTokenResolver({
+  connectionStore,
+  resolveCanonicalAccountId: (id) => accountStore.resolveCanonicalAccountId(id),
+  getWorkspaceOwnerAccountId: (workspaceId) => accountWorkspaceStore.getWorkspaceOwnerAccountId(workspaceId, accountStore),
+  workspaceOwnerCheck,
+  fetchImpl: globalThis.fetch,
+  now: Date.now
+})
+
 // Credential-lifecycle event log (LIN-2236, L5.1 of the LIN-2231 design):
 // durable, append-only record of refresh_skip/refresh_fail/refresh_success/
 // owner_mismatch_503/spend_intent events, so this survives Railway's rolling
@@ -964,7 +979,8 @@ scheduler.register({
       resolveWorkspaceAccess,
       getProviderByName: (name) => getProviderForWorkspace({ provider: name })
     }),
-    baseUrl: ciWakeBaseUrl
+    baseUrl: ciWakeBaseUrl,
+    installationTokenFor
   })
 // Same discipline as the sweeps above: not awaited, with a purpose-written catch.
 }).catch((err) => {
@@ -2379,7 +2395,7 @@ function workspaceFromUrl(req, res, next) {
 }
 
 // Mount dispatch routes (requires workspaceFromUrl middleware)
-app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, workspaceOwnerCheck, getWorkspaceAccessToken, fetchIssueContext, workspaceHaltStore, sessionsFeedCache, taskModeStore, freeTierStore, accountStore, consumerHeartbeatStore }))
+app.use(createDispatchRoutes({ installationTokenFor, dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, workspaceOwnerCheck, getWorkspaceAccessToken, fetchIssueContext, workspaceHaltStore, sessionsFeedCache, taskModeStore, freeTierStore, accountStore, consumerHeartbeatStore }))
 
 // Task-mode routes (LIN-2942): the ladder's client-side press record and the
 // per-account per-task mode read.
@@ -3021,7 +3037,7 @@ app.use(createRunnerKitRoutes())
 // LIN-3383: workspace-api, collective, dashboard, task-chat and flight-companion
 // all receive the ONE hoisted `workspaceOwnerCheck` (never a second
 // createWorkspaceOwnerCheck) for the owner-only runner enqueue gate.
-app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, accountStore, adoptConnectionCredential: (args) => connectionAccess.adoptConnectionCredential(args), closeOutEventsStore, workspaceOwnerCheck, onTicketWrite }))
+app.use(createWorkspaceApiRoutes({ installationTokenFor, workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, accountStore, adoptConnectionCredential: (args) => connectionAccess.adoptConnectionCredential(args), closeOutEventsStore, workspaceOwnerCheck, onTicketWrite }))
 
 // Mount collective routes (experimental cross-project discussion — LIN-450).
 // yapClient falls back to DEFAULT_YAP_BASE_URL (lib/yap-client.js) when YAP_BASE_URL is unset.
@@ -3031,14 +3047,14 @@ app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyToke
 // Mount dashboard routes (experimental combined realtime autopilot dashboard — LIN-509).
 // Merges Mongo-only Loop reads across session.workspaces; Linear is hydrated lazily
 // (drill-down only), never fanned out per poll.
-app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, briefCacheStore, recapCacheStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, llmCallLogStore, runProposalsStore, proxyTokenStore, readRunEvidence, prStateStore, workspaceOwnerCheck }))
+app.use(createDashboardRoutes({ installationTokenFor, workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, briefCacheStore, recapCacheStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, llmCallLogStore, runProposalsStore, proxyTokenStore, readRunEvidence, prStateStore, workspaceOwnerCheck }))
 
 // Mount task-chat routes (experimental "talk to a task" conversation).
 // LIN-2966: taskDecisionsStore + shelvedRulingsStore thread the
 // `list_pending_decisions` chat tool the same way createFlightCompanionRoutes
 // already does below (LIN-2617) — Task Chat now builds its catalog through the
 // same createChatToolCatalog call the turn core makes for every surface.
-app.use(createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, runProposalsStore, workspaceOwnerCheck }))
+app.use(createTaskChatRoutes({ installationTokenFor, workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, runProposalsStore, workspaceOwnerCheck }))
 
 // Mount the task-edit page (LIN-1565) — the dedicated drill-down that replaces
 // the inline edit form formerly hidden inside a tree row's Details panel. No
@@ -3055,7 +3071,7 @@ app.use(createTaskCreateRoutes({ workspaceFromUrl, getOpenRouterSource, getDeplo
 // MUST mount after createTaskCreateRoutes: ISSUE_ID_REGEX accepts `new`, so
 // `/task/:identifier` would otherwise swallow `/task/new`. `enrichLoop` and
 // `deriveSessionWaiting` are injected (a lib/ loader must not import a route).
-const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore, agentStatusStore, briefCacheStore, recapCacheStore, readRunEvidence, prStateStore, closeOutEventsStore, enrichLoop, deriveSessionWaiting })
+const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore, agentStatusStore, briefCacheStore, recapCacheStore, readRunEvidence, prStateStore, installationTokenFor, closeOutEventsStore, enrichLoop, deriveSessionWaiting })
 app.use(createTaskPageRoutes({
   workspaceFromUrl,
   getOpenRouterSource,
@@ -3090,7 +3106,7 @@ app.use(createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspacePreferen
 // `list_pending_decisions` chat tool needs to return the same rows the rulings
 // feed returns. LIN-2966 threads the same pair into createTaskChatRoutes above,
 // so both surfaces' catalogs now answer that tool identically.
-app.use(createFlightCompanionRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo, observerStateStore, freeTierStore, workspacePreferencesStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, workspaceOwnerCheck }))
+app.use(createFlightCompanionRoutes({ installationTokenFor, workspaceFromUrl, getOpenRouterSource, getDeployInfo, observerStateStore, freeTierStore, workspacePreferencesStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, workspaceOwnerCheck }))
 
 // Mount passage-planner routes (experimental one-click kickoff prompt, Flight Companion parity — LIN-1849).
 app.use(createPassagePlannerRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo }))
