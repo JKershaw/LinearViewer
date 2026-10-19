@@ -1666,6 +1666,33 @@ describe('commands (against a fake Harbour)', () => {
     assert.ok(!harbour.state.feedback.slice(before).some((f) => f.itemId === row.itemId));
   });
 
+  // LIN-3669 review: settle must stop the item's broker, like fail does (the terminal-stop
+  // assertion of the `feedback [done]` test). Red when settle is dropped from the stop line.
+  test('LIN-3669: a settled row also has its broker stopped', TIMEOUT, async () => {
+    harbour.state.queue.length = 0;
+    const row = await takeAged(61);
+    const socket = row.socket;
+    assert.ok(socket, 'the taken row has a broker socket');
+    assert.equal(existsSync(socket), true, 'broker is live before the sweep');
+    harbour.state.watch.set(row.itemId, { id: row.itemId, status: 'closed' });
+    await run(['wait'], { waitPollMs: 10, waitHeartbeatMs: 10, waitCapMs: 400 });
+    assert.equal(ledgerNow().items[row.itemId].state, 'done');
+    assert.equal(existsSync(socket), false, 'broker stopped on settle');
+  });
+
+  // LIN-3669 review: a pass whose only action is `defer` (unreadable read at 61 min) must
+  // keep polling, not exit as a stall. Red when `defer` is dropped from the waitLoop skip.
+  test('LIN-3669: an unreadable dispatch read defers: no post, row stays running, wait ends on cap not stall', TIMEOUT, async () => {
+    harbour.state.queue.length = 0;
+    const row = await takeAged(61);
+    harbour.state.watch.delete(row.itemId); // the fake answers 404: unreadable
+    const before = harbour.state.feedback.length;
+    const r = await run(['wait'], { waitPollMs: 10, waitHeartbeatMs: 10, waitCapMs: 300 });
+    assert.equal(r.reason, 'cap');
+    assert.ok(!harbour.state.feedback.slice(before).some((f) => f.itemId === row.itemId));
+    assert.equal(ledgerNow().items[row.itemId].state, 'running');
+  });
+
   test('LIN-3669: a transcript ending in DONE: gets exactly one [blocked] … finished …, stays running, never [failed]', TIMEOUT, async () => {
     harbour.state.queue.length = 0;
     const row = await takeAged(61);
