@@ -404,6 +404,57 @@ describe('session rows', () => {
     });
   });
 
+  describe('sessionMessage: the [pending] line shows only while parked (LIN-3513)', () => {
+    const parked = { loopId: 'p1', feedback: [{ message: '[pending] waiting on CI' }] };
+    const msgs = (loops) => buildTaskPageModel({ identifier: 'LIN-50', loops, enrichLoop, deriveSessionWaiting, now: NOW }).sessions;
+
+    test('running and parked: shows the line', () => {
+      const [s] = msgs([loop(parked)]);
+      assert.equal(s.state, 'running');
+      assert.equal(s.message, 'waiting on CI');
+    });
+
+    test('running after a resume: hides the line', () => {
+      const [s] = msgs([loop({ ...parked, feedback: [...parked.feedback, { message: '[working] Session resumed.' }] })]);
+      assert.equal(s.state, 'running');
+      assert.equal(s.message, null);
+    });
+
+    test('continued: hides the line, shows the closing line when there is one', () => {
+      const [a] = msgs([loop(parked), done({ loopId: 'f1', followUpTo: 'p1' })]);
+      assert.equal(a.state, 'continued');
+      assert.equal(a.message, null);
+      const [b] = msgs([loop({ ...parked, agentSummary: 'wrapped up' }), done({ loopId: 'f1', followUpTo: 'p1' })]);
+      assert.equal(b.message, 'wrapped up');
+    });
+
+    test('ended (closed): hides the line', () => {
+      const [s] = msgs([loop({ ...parked, bookkeeping: { by: 'close-out' } })]);
+      assert.equal(s.state, 'closed');
+      assert.equal(s.message, null);
+    });
+
+    test('waiting: a [blocked] question after a [pending] line is unchanged', () => {
+      const [s] = msgs([loop({ loopId: 'b1', wakeMarker: 'blocked', waitingMessage: '[blocked] need a key', feedback: [{ message: '[pending] ci' }, { message: '[blocked] need a key' }] })]);
+      assert.equal(s.state, 'waiting');
+      assert.equal(s.message, 'need a key');
+    });
+
+    test('waiting (agentState): keeps a [pending] line as today', () => {
+      const [s] = msgs([loop({ ...parked, agentState: 'waiting' })]);
+      assert.equal(s.state, 'waiting');
+      assert.equal(s.message, 'waiting on CI');
+      assert.equal(sessionMessage(loop(parked), 'waiting'), 'waiting on CI');
+    });
+
+    test('direct: only a running state keeps the line', () => {
+      for (const state of ['queued', 'continued', 'done', 'failed', 'closed', 'cancelled', 'expired', 'aborted']) {
+        assert.equal(sessionMessage(loop(parked), state), null, state);
+      }
+      assert.equal(sessionMessage(loop(parked), 'running'), 'waiting on CI');
+    });
+  });
+
   test('evidence is task-level on the model; no session hosts an evidence slot', () => {
     const model = buildTaskPageModel({
       identifier: 'LIN-50',
@@ -531,7 +582,24 @@ describe('buildTaskStages (LIN-3356)', () => {
     assert.deepEqual(stages[0].checkIns.map(c => c.loopId), ['w1', 'abort', 'w2']);
     assert.equal(stages[0].id, 'b1', 'keyed by the first session, stable when an attempt is added');
     assert.equal(stages[0].state, 'done', 'the LAST session decides');
-    assert.equal(stages[0].durationMs, 60 * 60 * 1000, 'first start to last end');
+    assert.equal(stages[0].durationMs, 38 * 60 * 1000, 'LIN-3498: latest attempt start to last end');
+  });
+
+  // LIN-3498: a stage's clock starts with its latest attempt, not its first.
+  test("a stage's startedAt is its latest attempt's takenAt, falling back to dispatchedAt", () => {
+    const [two] = buildTaskStages([
+      sess('b1', 'implementation', 'failed', 0, 10),
+      sess('b2', 'implementation', 'running', 50),
+    ], { trackerType: 'started' });
+    assert.equal(two.startedAt, at(50), 'the second attempt, not the failed first');
+    assert.equal(two.attempts, 2);
+    const untaken = sess('b2', 'implementation', 'queued', 50);
+    untaken.loop = { takenAt: null, dispatchedAt: at(45) };
+    const [fallback] = buildTaskStages([sess('b1', 'implementation', 'failed', 0, 10), untaken], { trackerType: 'started' });
+    assert.equal(fallback.startedAt, at(45), 'dispatchedAt when the latest attempt was never taken');
+    const [one] = buildTaskStages([sess('b1', 'implementation', 'done', 3, 9)], { trackerType: 'completed' });
+    assert.equal(one.startedAt, at(3), 'a single attempt is unchanged');
+    assert.equal(one.durationMs, 6 * 60 * 1000);
   });
 
   test('a trailing check-in folds into the last stage; a running stage has no end or duration', () => {

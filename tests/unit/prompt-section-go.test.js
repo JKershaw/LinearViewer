@@ -322,24 +322,50 @@ describe('LIN-3341 — Go is one press', () => {
     await dup.flush();
     assert.equal(dup.calls.dispatch.length, 1, 'no second dispatch after the refusal');
 
-    const limited = await mount({ dispatch: async () => { const e = new Error('429'); e.status = 429; e.body = { code: 'RUN_LIMIT_REACHED' }; throw e; } });
-    await limited.container.click({ action: 'go', rung: 'run-task' });
-    await limited.flush();
-    assert.match(limited.container.innerHTML, /used today\u2019s runs/);
+    // LIN-3494: every other refusal shows the server's own reason, then the link.
+    const refuse = async (status, body, message) => {
+      const m = await mount({ dispatch: async () => { const e = new Error(message || String(status)); e.status = status; e.body = body; throw e; } });
+      await m.container.click({ action: 'go', rung: 'run-task' });
+      await m.flush();
+      return m.container.innerHTML;
+    };
+    const LINK = /href="\/workspace\/ws\/runner">run on my machine \u203A<\/a>/;
 
-    // A code-less 503 (proxyAttachFailed) must NOT read as the run limit.
-    const nolimit = await mount({ dispatch: async () => { const e = new Error('503'); e.status = 503; e.body = {}; throw e; } });
-    await nolimit.container.click({ action: 'go', rung: 'run-task' });
-    await nolimit.flush();
-    assert.doesNotMatch(nolimit.container.innerHTML, /used today\u2019s runs/);
-    assert.match(nolimit.container.innerHTML, /Couldn\u2019t start the run/);
+    const limitReason = 'Daily run limit reached (10 of 10 today). Resets at midnight UTC.';
+    const limited = await refuse(429, { code: 'RUN_LIMIT_REACHED', error: limitReason });
+    assert.ok(limited.includes(limitReason), 'the server\u2019s run-limit reason is shown');
+    assert.match(limited, LINK);
+    assert.doesNotMatch(limited, /used today\u2019s runs/);
 
-    // RUN_LIMIT_UNVERIFIED (a 503 WITH a code) also gets the generic line.
-    const unverified = await mount({ dispatch: async () => { const e = new Error('503'); e.status = 503; e.body = { code: 'RUN_LIMIT_UNVERIFIED' }; throw e; } });
-    await unverified.container.click({ action: 'go', rung: 'run-task' });
-    await unverified.flush();
-    assert.doesNotMatch(unverified.container.innerHTML, /used today\u2019s runs/);
-    assert.match(unverified.container.innerHTML, /Couldn\u2019t start the run/);
+    // Witness: an arbitrary reason is shown exactly, then the link (escaping is
+    // window.escapeHtml's job; the harness stubs it as identity).
+    const arbitrary = await refuse(503, { error: 'Zebras are loose today' });
+    assert.ok(arbitrary.includes('Zebras are loose today'), 'the reason is shown exactly');
+    assert.match(arbitrary, LINK);
+    assert.doesNotMatch(arbitrary, /Couldn\u2019t start the run/);
+
+    // A code-less 503 (proxyAttachFailed) shows its reason, not the run limit.
+    const nolimit = await refuse(503, { error: 'Proxy attach failed' });
+    assert.ok(nolimit.includes('Proxy attach failed'));
+    assert.match(nolimit, LINK);
+    assert.doesNotMatch(nolimit, /used today\u2019s runs/);
+
+    // RUN_LIMIT_UNVERIFIED (a 503 WITH a code) shows the server's reason too.
+    const unverified = await refuse(503, { code: 'RUN_LIMIT_UNVERIFIED', error: 'Could not verify the run limit' });
+    assert.ok(unverified.includes('Could not verify the run limit'));
+    assert.match(unverified, LINK);
+
+    // Reader order: body.error, else body.message, else error.message.
+    assert.ok((await refuse(500, { message: 'from message' }, 'thrown')).includes('from message'));
+    const both = await refuse(500, { error: 'from error', message: 'from message' }, 'thrown');
+    assert.ok(both.includes('from error'), 'body.error wins over body.message');
+    assert.ok(!both.includes('from message'));
+    assert.ok((await refuse(0, null, 'Failed to fetch')).includes('Failed to fetch'), 'a network error shows the Error message');
+
+    // Nothing at all: just the link, no fixed sentence.
+    const empty = await refuse(500, {}, '');
+    assert.match(empty, LINK);
+    assert.doesNotMatch(empty, /Couldn\u2019t start the run/);
   });
 
   test('a not-set-up Go press records intent and dispatches nothing', async () => {
