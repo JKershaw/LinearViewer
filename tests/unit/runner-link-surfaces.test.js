@@ -28,6 +28,7 @@ import '../../lib/providers/linear/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROMPT_SECTION_SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
+const COMMON_SRC = readFileSync(join(__dirname, '../../public/common.js'), 'utf8');
 const SWIPE_SRC = readFileSync(join(__dirname, '../../public/swipe.js'), 'utf8');
 
 const LINK = '<a class="opened-task-runner-link" href="/workspace/ws/runner" data-testid="opened-task-runner-link">run on my machine ›</a>';
@@ -194,6 +195,8 @@ function renderSwipeCard(swipeData) {
   };
   sandbox.window = sandbox;
   vm.createContext(sandbox);
+  // The real common.js, as the page loads it first: it owns the terminal-state set swipe.js reads.
+  vm.runInContext(COMMON_SRC, sandbox);
   vm.runInContext(PROMPT_SECTION_SRC, sandbox);
   vm.runInContext(SWIPE_SRC, sandbox);
   return el('#swipe-card').innerHTML;

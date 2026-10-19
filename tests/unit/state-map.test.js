@@ -10,6 +10,9 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
+import { fileURLToPath } from 'node:url';
 import {
   getStateDisplay,
   getStateOrder,
@@ -140,4 +143,21 @@ describe('isHiddenState (LIN-769)', () => {
     assert.equal(isHiddenState(undefined), false);
     assert.equal(isHiddenState({ state: { type: 'mystery' } }), false);
   });
+});
+
+// Step A of LIN-3674: the browser cannot import isTerminalState, so public/common.js
+// mirrors the set once. This loads the real file and pins it to the server predicate
+// (the one parity test, not a standing sweep).
+describe('browser terminal-state predicate (public/common.js)', () => {
+  const src = readFileSync(fileURLToPath(new URL('../../public/common.js', import.meta.url)), 'utf8');
+  const sandbox = { console, document: { addEventListener() {} }, location: { search: '', href: '' } };
+  sandbox.window = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(src, sandbox, { filename: 'common.js' });
+
+  for (const type of ['completed', 'canceled', 'duplicate', 'started', 'unstarted', 'backlog', 'triage', undefined, null]) {
+    test(`agrees with isTerminalState for ${String(type)}`, () => {
+      assert.equal(sandbox.window.isTerminalState(type), isTerminalState(type));
+    });
+  }
 });

@@ -6,11 +6,7 @@
  * embedded as the fourth card accordion.
  */
 
-// Terminal states are non-actionable; mirrored from lib/tree.js (no shared import in public/).
-const TERMINAL_STATES = ['completed', 'canceled', 'duplicate'];
-function isTerminalState(stateType) {
-  return TERMINAL_STATES.includes(stateType);
-}
+// isTerminalState comes from public/common.js (loaded first), the one browser home for the terminal set.
 
 // ==========================================================================
 // State

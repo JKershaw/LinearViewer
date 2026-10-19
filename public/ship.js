@@ -9,11 +9,8 @@
  */
 
 (function () {
-  // Terminal states are non-actionable; mirrored from lib/tree.js (no shared import in public/).
-  var TERMINAL_STATES = ['completed', 'canceled', 'duplicate'];
-  function isTerminalState(stateType) {
-    return TERMINAL_STATES.indexOf(stateType) !== -1;
-  }
+  // The terminal set lives in public/common.js (loaded first), the one browser home.
+  var isTerminalState = window.isTerminalState;
 
   // =============================================================================
   // Layout primitives (mirror of lib/ship-layout.js)

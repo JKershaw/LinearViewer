@@ -6,6 +6,20 @@
  */
 
 // =============================================================================
+// Terminal workflow states
+// =============================================================================
+
+// The browser's one home for the terminal (closed) set: non-actionable states.
+// The authority is TERMINAL_TYPES in lib/providers/models.js (isTerminalState,
+// LIN-276); public/ has no build step, so it cannot import it and mirrors it
+// here once. swipe.js, swim.js, ship.js and the record-target helpers below
+// read it from here rather than writing the list again.
+window.TERMINAL_STATE_TYPES = ['completed', 'canceled', 'duplicate'];
+window.isTerminalState = function (stateType) {
+  return window.TERMINAL_STATE_TYPES.indexOf(stateType) !== -1;
+};
+
+// =============================================================================
 // HTML Escaping
 // =============================================================================
 
@@ -1152,7 +1166,6 @@ window.ReplyDelivery = (function () {
   //
   // DOM-free, same discipline as deliverReply: every caller supplies its own
   // UI through the handlers.
-  var RECORD_TARGET_TERMINAL_TYPES = ['completed', 'canceled', 'duplicate'];
   var RECORD_TARGET_OUTSIDE_NOTE = 'outside the checked neighbourhood';
   var RECORD_TARGET_TERMINAL_NOTE = 'the declared target is already closed';
   var RULING_DISPATCH_PROMPT_NAME = 'Ruling reply';
@@ -1190,7 +1203,7 @@ window.ReplyDelivery = (function () {
     }
 
     if (!match) return { issueId: fallback.issueId, issueIdentifier: fallback.issueIdentifier, note: RECORD_TARGET_OUTSIDE_NOTE };
-    if (match.state && RECORD_TARGET_TERMINAL_TYPES.indexOf(match.state.type) !== -1) {
+    if (match.state && window.isTerminalState(match.state.type)) {
       return { issueId: fallback.issueId, issueIdentifier: fallback.issueIdentifier, note: RECORD_TARGET_TERMINAL_NOTE };
     }
     return { issueId: match.id || null, issueIdentifier: match.identifier, note: null };
@@ -1285,7 +1298,7 @@ window.ReplyDelivery = (function () {
         if (!hydrateResult || !hydrateResult.hydrated) {
           return deliverRulingRecord(Object.assign({}, opts, { downgradeNote: PRESS_TIME_HYDRATION_FAILURE_NOTE }), handlers);
         }
-        if (hydrateResult.state && RECORD_TARGET_TERMINAL_TYPES.indexOf(hydrateResult.state.type) !== -1) {
+        if (hydrateResult.state && window.isTerminalState(hydrateResult.state.type)) {
           return deliverRulingRecord(Object.assign({}, opts, { downgradeNote: PRESS_TIME_DOWNGRADE_NOTE }), handlers);
         }
 

@@ -17,11 +17,7 @@ function swimTokenColor(name, fallback) {
   return (v && v.trim()) || fallback;
 }
 
-// Terminal states are non-actionable; mirrored from lib/tree.js (no shared import in public/).
-var TERMINAL_STATES = ['completed', 'canceled', 'duplicate'];
-function isTerminalState(stateType) {
-  return TERMINAL_STATES.indexOf(stateType) !== -1;
-}
+// isTerminalState comes from public/common.js (loaded first), the one browser home for the terminal set.
 
 // NOTE: Canonical source of truth for state ordering is lib/providers/models.js +
 // state-map.js. This browser copy (terminal-collapse variant, matching

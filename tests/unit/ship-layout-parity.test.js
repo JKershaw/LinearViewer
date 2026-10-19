@@ -50,7 +50,12 @@ const sandbox = {
   },
   console
 };
-vm.runInNewContext(readFileSync(join(__dirname, '../../public/ship.js'), 'utf8'), sandbox, {
+// The real common.js first, as the page loads it: it owns the terminal-state set ship.js reads.
+vm.createContext(sandbox);
+vm.runInContext(readFileSync(join(__dirname, '../../public/common.js'), 'utf8'), sandbox, {
+  filename: 'common.js'
+});
+vm.runInContext(readFileSync(join(__dirname, '../../public/ship.js'), 'utf8'), sandbox, {
   filename: 'ship.js'
 });
 const {
