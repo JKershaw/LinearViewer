@@ -21,10 +21,13 @@ async function clearBoth(page) {
   }
 }
 
+// One dispatch per seeded local issue (LOCAL-1..3): a made-up identifier is
+// refused as a dangling referent (422), and a second dispatch for the same
+// issue and prompt would trip the duplicate guard.
 async function dispatch(page, key, promptName, count) {
   for (let i = 0; i < count; i++) {
     const res = await page.request.post(`/workspace/${key}/api/dispatch`, {
-      data: { prompt: 'p', promptName, kind: promptName, issueIdentifier: `KPI-${promptName}-${i}`, issueTitle: 'KPI fixture', target: 'cli' }
+      data: { prompt: 'p', promptName, kind: promptName, issueIdentifier: `LOCAL-${i + 1}`, target: 'cli' }
     });
     expect(res.status()).toBe(201);
   }
