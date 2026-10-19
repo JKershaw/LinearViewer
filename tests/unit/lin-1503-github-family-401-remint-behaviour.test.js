@@ -190,6 +190,7 @@ async function runGitHubFamilyBranch({
     renderLandingPage: () => '<landing/>',
     // LIN-1892: handleWorkspaceRemoval's landing render reads the email predicate.
     isEmailSignInAvailable: () => false,
+    getFreeTierKey: () => null,
     // LIN-2010: this harness evals REAL server.js source, so every free
     // identifier that source references must be declared here. The landing
     // render inside handleWorkspaceRemoval now reads GitHub/Jira configured-ness

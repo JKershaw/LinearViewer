@@ -33,9 +33,9 @@ function withEnv({ envKey, freeKey }, fn) {
 // env paid key states: unset / blank / whitespace (not paid, LIN-961) / real
 const PAID = [undefined, '', '   ', 'env_paid'];
 const isPaid = (v) => v === 'env_paid';
-// free-tier key states: unset / blank / whitespace (counts as set: class (d)) / real
+// free-tier key states: unset / blank / whitespace (not set, trimmed like the paid key: LIN-3664) / real
 const FREE = [undefined, '', '  ', 'free_k'];
-const freeSet = (v) => v !== undefined && v !== '';
+const freeSet = (v) => v !== undefined && v.trim() !== '';
 
 test('resolveOpenRouterSource: full truth table (session key × paid env × free env × flag)', () => {
   let rows = 0;
@@ -79,10 +79,20 @@ test('class (d) kept: flag with no key says "free" for the source but resolveCha
   });
 });
 
-test('class (d) kept: a whitespace free-tier key counts as set', () => {
-  withEnv({ envKey: undefined, freeKey: '  ' }, () => {
+test('LIN-3664: a whitespace free-tier key is not set (source, credential and getFreeTierKey agree)', () => {
+  for (const freeKey of ['  ', '\t\n', '']) {
+    withEnv({ envKey: undefined, freeKey }, () => {
+      assert.equal(resolveOpenRouterSource({ sessionApiKey: undefined, sessionFreeTierFlag: false }), null);
+      assert.deepEqual(resolveChatCredential({ sessionApiKey: undefined }), { apiKey: null, isFreeTier: false, available: false });
+      assert.equal(home.getFreeTierKey(), null);
+    });
+  }
+});
+
+test('LIN-3664: a padded free-tier key is trimmed and still counts as free', () => {
+  withEnv({ envKey: undefined, freeKey: '  free_k \n' }, () => {
     assert.equal(resolveOpenRouterSource({ sessionApiKey: undefined, sessionFreeTierFlag: false }), 'free');
-    assert.equal(resolveChatCredential({ sessionApiKey: undefined }).isFreeTier, true);
+    assert.deepEqual(resolveChatCredential({ sessionApiKey: undefined }), { apiKey: 'free_k', isFreeTier: true, available: true });
   });
 });
 

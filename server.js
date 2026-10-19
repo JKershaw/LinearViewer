@@ -180,7 +180,7 @@ import { renderRoadmapPage } from './lib/render-roadmap.js'
 import { buildRoadmapModel } from './lib/roadmap.js'
 import { renderProxyPage } from './lib/render-proxy.js'
 import { AVAILABLE_MODELS, setLlmCallRecorder, setPromptTraceRecorder, getPaidEnvKey, getFreeTierModelConfigWarning, streamChatWithTools } from './lib/openrouter.js'
-import { resolveOpenRouterSource } from './lib/chat-request.js'
+import { resolveOpenRouterSource, getFreeTierKey } from './lib/chat-request.js'
 import { resolveWorkspaceModel, resolveAiOperationModel, getWorkspaceFeatures, isWorkspaceFeatureEnabled, setWorkspaceFeature, resolveDispatchDefaults, AI_OPERATION_KINDS } from './lib/workspace-preferences.js'
 import { getFeatureFlags, isValidFeatureKey, isValidWorkspaceFeatureKey, WORKSPACE_FEATURES } from './lib/feature-defaults.js'
 import { DISPATCH_DEFAULT_KINDS } from './lib/prompt-templates.js'
@@ -1755,7 +1755,7 @@ async function handleWorkspaceRemoval(session, workspaceId, res, deleteDurable =
   return new Promise((resolve) => {
     session.destroy((err) => {
       if (err) console.error('Session destroy error:', err);
-      const html = renderLandingPage({ deployInfo, githubEnabled: getProvider('github').entryCta.isConfigured(), jiraEnabled: getProvider('jira').entryCta.isConfigured(), emailEnabled: isEmailSignInAvailable(), freeTierEnabled: !!process.env.OPENROUTER_FREE_TIER_KEY });
+      const html = renderLandingPage({ deployInfo, githubEnabled: getProvider('github').entryCta.isConfigured(), jiraEnabled: getProvider('jira').entryCta.isConfigured(), emailEnabled: isEmailSignInAvailable(), freeTierEnabled: !!getFreeTierKey() });
       res.send(html);
       resolve();
     });
@@ -2137,7 +2137,7 @@ app.get('/', (req, res) => {
   const setupNotice = (isLocalhost && hasNoAuth) ? 'setup' : null
 
   // Unauthenticated users see the bespoke Harbour showcase landing (LIN-980).
-  const html = renderLandingPage({ deployInfo, setupNotice, githubEnabled: getProvider('github').entryCta.isConfigured(), jiraEnabled: getProvider('jira').entryCta.isConfigured(), emailEnabled: isEmailSignInAvailable(), freeTierEnabled: !!process.env.OPENROUTER_FREE_TIER_KEY })
+  const html = renderLandingPage({ deployInfo, setupNotice, githubEnabled: getProvider('github').entryCta.isConfigured(), jiraEnabled: getProvider('jira').entryCta.isConfigured(), emailEnabled: isEmailSignInAvailable(), freeTierEnabled: !!getFreeTierKey() })
   res.send(html)
 })
 
