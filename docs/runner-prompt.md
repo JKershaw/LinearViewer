@@ -218,9 +218,9 @@ Halts ({{HALT_MODES}}) are binding here: Simple Dispatcher's meaning, except the
 `lib/runner-kit/contract.json`.
 
 - `pause`: take no fresh items. Running subagents carry on; follow-ups, wakes and aborts flow.
-- `stop`: take no fresh items or follow-ups; aborts flow. `runner poll` stops every running item:
+- `stop`: take no fresh items; a follow-up with no live session fails; aborts flow. `runner poll` stops every running item:
   each gets `[aborted] Cancelled running session <id8> (stopped by operator).` Stop each subagent
-  in `stopAgents`. They stay in the ledger as stopped, so a follow-up after the stop continues them.
+  in `stopAgents`. They stay as stopped; a later follow-up continues them.
 
 ## 7. What can go wrong, plainly
 

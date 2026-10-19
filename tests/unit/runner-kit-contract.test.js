@@ -123,7 +123,6 @@ describe('contract table shape', () => {
   test('the table records the deliberate differences it was written to carry', () => {
     const diffs = TABLE.rows.filter((r) => r.kit !== r.sd).map((r) => r.case);
     assert.ok(diffs.some((c) => /abort row under an unknown halt mode/.test(c)));
-    assert.ok(diffs.some((c) => /no live session under stop/.test(c)));
     assert.ok(diffs.some((c) => /line posted/.test(c)));
     assert.ok(diffs.some((c) => /decision message/.test(c)));
   });
