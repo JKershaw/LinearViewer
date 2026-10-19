@@ -72,7 +72,7 @@ describe('defaultCacheControl', () => {
       app.get('/set', (q, r) => { r.set('Cache-Control', 'public, max-age=3600'); r.send('x'); });
       app.get('/late', (q, r) => { r.setHeader('Cache-Control', 'no-cache'); r.flushHeaders(); r.end('x'); });
       app.get('/flush', (q, r) => { r.flushHeaders(); r.end('x'); });
-      app.get('/latebeforewrite', (q, r) => { r.write('a'); r.end('b'); });
+      app.get('/writebeforeend', (q, r) => { r.write('a'); r.end('b'); });
       app.get('/writehead', (q, r) => { r.writeHead(200, { 'Cache-Control': 'no-cache' }); r.end('x'); });
       app.get('/file', (q, r) => r.sendFile(join(dir, 'a.txt')));
       app.use('/lib', createLibraryRouter());
@@ -86,7 +86,7 @@ describe('defaultCacheControl', () => {
   });
   test('flushHeaders() before any end() still gets the default', async () => {
     assert.strictEqual(await cc('/flush'), 'private, no-store');
-    assert.strictEqual(await cc('/latebeforewrite'), 'private, no-store');
+    assert.strictEqual(await cc('/writebeforeend'), 'private, no-store');
   });
   test('a route-set Cache-Control survives, however it is set', async () => {
     assert.strictEqual(await cc('/set'), 'public, max-age=3600');
@@ -101,6 +101,25 @@ describe('defaultCacheControl', () => {
     assert.strictEqual(await cc('/lib/sitemap.xml'), 'public, max-age=3600');
     assert.strictEqual(await cc('/lib/library'), 'private, no-store');
     assert.strictEqual(await cc('/lib/robots.txt'), 'private, no-store');
+  });
+  test('the real library router keeps safeHost: a malformed Host falls back to harbour.cat', async () => {
+    // Witness for routes/library.js passing { safeHost: true } to publicOrigin (LIN-3692).
+    const saved = { p: process.env.PUBLIC_ORIGIN, e: process.env.EMAIL_LINK_ORIGIN };
+    delete process.env.PUBLIC_ORIGIN;
+    delete process.env.EMAIL_LINK_ORIGIN;
+    try {
+      const body = await new Promise((resolve, reject) => {
+        const req = request({ host: '127.0.0.1', port: s.port, path: '/lib/sitemap.xml', headers: { host: 'evil.example/<x>' } }, (res) => {
+          let b = ''; res.setEncoding('utf8'); res.on('data', (c) => { b += c; }); res.on('end', () => resolve(b));
+        });
+        req.on('error', reject); req.end();
+      });
+      assert.ok(body.includes('<loc>http://harbour.cat/'), body.slice(0, 200));
+      assert.ok(!body.includes('evil.example'), 'the forged Host is not echoed');
+    } finally {
+      if (saved.p === undefined) delete process.env.PUBLIC_ORIGIN; else process.env.PUBLIC_ORIGIN = saved.p;
+      if (saved.e === undefined) delete process.env.EMAIL_LINK_ORIGIN; else process.env.EMAIL_LINK_ORIGIN = saved.e;
+    }
   });
 });
 
@@ -121,7 +140,7 @@ describe('source scans (LIN-3692)', () => {
   const server = readFileSync(join(ROOT, 'server.js'), 'utf8');
   const files = [join(ROOT, 'server.js'), ...listJsFiles(join(ROOT, 'lib')), ...listJsFiles(join(ROOT, 'routes'))];
   const rel = (f) => relative(ROOT, f).split(sep).join('/');
-  const HOST_READ = /req\.protocol|req\.hostname|get\(['"]host['"]\)|headers\.host|headers\[['"]host/g;
+  const HOST_READ = /req\.protocol|req\.hostname|req\.host\b|get\(['"]host['"]\)|headers\.host|headers\[['"]host|x-forwarded-host/gi;
   // The 7 localhost-only reads (no URL is built from them).
   const LOCAL_ONLY = { 'lib/dispatch-entrance.js': 1, 'routes/next-run.js': 1, 'routes/workspace-api.js': 1, 'server.js': 5 };
 
