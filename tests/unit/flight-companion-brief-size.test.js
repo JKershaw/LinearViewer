@@ -1,7 +1,7 @@
-// LIN-3362: the Flight Companion system prompt has a pinned byte ceiling. Wording
-// added for the local-time clock (and the "how to use" pointer) must be funded by
-// cuts elsewhere in the brief, not by growth. prompt-size-budget.test.js does not
-// cover this brief.
+// LIN-3362: the Flight Companion system prompt has a pinned byte ceiling. The brief
+// grows only with its reason recorded beside the ceiling it raises (the ticket, the
+// bytes, and why the lesson cannot be code or a test; LIN-3633). The
+// prompt-size-budget.test.js freeze does not cover this brief.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildFlightCompanionMessages, formatCompanionClock } from '../../lib/prompts/flight-companion-brief.js';
