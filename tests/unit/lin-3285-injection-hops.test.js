@@ -15,6 +15,7 @@ import express from 'express';
 import { clearFailOpenPrStatus } from '../../lib/github-pr-status.js';
 import { clearPrStateCache, createPrStateStore } from '../../lib/pr-state-store.js';
 import { registerProvider } from '../../lib/providers/registry.js';
+import { setProxyFetchImpl } from '../../lib/proxy-fetch.js';
 import { readRunEvidence } from '../../lib/run-evidence.js';
 import { createTaskPageLoader } from '../../lib/task-page-loader.js';
 import { createTickWorkspaceResolver, createCiWakeSweepRun } from '../../lib/ci-wake-sweep.js';
@@ -95,11 +96,14 @@ function makeRes() {
   };
 }
 
-/** While `fn` runs, `api.github.com` goes to the fake; every other URL (the test's own loopback client) is untouched. */
-async function withGitHubOnGlobalFetch(github, fn) {
-  const real = globalThis.fetch;
-  globalThis.fetch = (url, opts) => (String(url).startsWith('https://api.github.com') ? github(String(url), opts) : real(url, opts));
-  try { return await fn(); } finally { globalThis.fetch = real; }
+/**
+ * While `fn` runs, the chat catalog's default GitHub transport (`createProxyFetch()`, which the
+ * hermetic proxy-env arm makes non-null) is the fake. The catalog's own `githubFetch` seam is not
+ * reachable through the routes, which is the point: the route -> agent turn -> catalog path is real.
+ */
+async function withGitHubTransport(github, fn) {
+  setProxyFetchImpl(github);
+  try { return await fn(); } finally { setProxyFetchImpl(null); }
 }
 
 async function listen(app) {
@@ -348,7 +352,7 @@ describe('hop 5: get_pr_status through the chat routes', () => {
     }));
     const { base, close } = await listen(app);
     try {
-      await withGitHubOnGlobalFetch(github, async () => {
+      await withGitHubTransport(github, async () => {
         const res = await fetch(`${base}/workspace/${URL_KEY}/api/task-chat/LIN-500`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: 'where is the PR?' }),
         });
@@ -391,7 +395,7 @@ describe('hop 5: get_pr_status through the chat routes', () => {
       const outcome = {};
       const { base, close } = await listen(flightCompanionApp({ github, installationTokenFor, outcome }));
       try {
-        await withGitHubOnGlobalFetch(github, async () => {
+        await withGitHubTransport(github, async () => {
           const res = await fetch(`${base}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           await res.text();
           assert.equal(res.status, 200);
@@ -505,7 +509,7 @@ describe('hop 7: the worker proxy chat never resolves an installation', () => {
     }));
     const { base, close } = await listen(app);
     try {
-      await withGitHubOnGlobalFetch(github, async () => {
+      await withGitHubTransport(github, async () => {
         const res = await fetch(`${base}/api/proxy/flight-companion/turn`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'pr state?' }),
         });
