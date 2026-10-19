@@ -1131,8 +1131,24 @@ describe('pass-3 write tool — send_follow_up (LIN-1073)', () => {
     const { executeTool } = makeCatalog({ history });
     await assert.rejects(
       () => executeTool({ name: 'send_follow_up', arguments: { sessionId: 'sess-dash', prompt: 'hi' } }),
-      /dash\/local targets are not supported/,
+      /only cli and web sessions can be followed up/,
     );
+  });
+
+  test('LIN-3677: refuses an anchor with an unknown target string, naming the real allowed targets', async () => {
+    const history = [
+      ...twoSessionHistory(),
+      sessionHistoryItem({
+        id: 'sess-pigeon', kind: 'autopilot', issueIdentifier: 'LIN-503', target: 'carrier-pigeon',
+        feedback: [{ message: '[working] 1 tools/2s · alive', timestamp: '2026-04-11T11:05:00.000Z' }],
+      }),
+    ];
+    const { executeTool, dispatchQueueStore } = makeCatalog({ history });
+    await assert.rejects(
+      () => executeTool({ name: 'send_follow_up', arguments: { sessionId: 'sess-pigeon', prompt: 'hi' } }),
+      /only cli and web sessions can be followed up/,
+    );
+    assert.strictEqual(dispatchQueueStore.calls.length, 0);
   });
 
   test('rejects an unknown session and empty sessionId/prompt before touching the store', async () => {
@@ -1434,12 +1450,12 @@ describe('deriveFollowUpDispatch — direct unit coverage (LIN-2433 review ledge
 
   test('throws for a dash anchor target — not supported for follow-up', () => {
     const session = { sessionId: 'sess-dash', loops: [{ loopId: 'sess-dash', kind: 'autopilot', target: 'dash' }] };
-    assert.throws(() => deriveFollowUpDispatch(session), /dash\/local targets are not supported/);
+    assert.throws(() => deriveFollowUpDispatch(session), /only cli and web sessions can be followed up/);
   });
 
   test('throws for a local anchor target — not supported for follow-up', () => {
     const session = { sessionId: 'sess-local', loops: [{ loopId: 'sess-local', kind: 'autopilot', target: 'local' }] };
-    assert.throws(() => deriveFollowUpDispatch(session), /dash\/local targets are not supported/);
+    assert.throws(() => deriveFollowUpDispatch(session), /only cli and web sessions can be followed up/);
   });
 
   test('a true orphan (no loops at all) falls back to session.sessionId with force:false, target defaulting to cli', () => {
