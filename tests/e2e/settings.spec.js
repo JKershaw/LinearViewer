@@ -240,6 +240,9 @@ test.describe('Token Management', () => {
     await page.fill('.token-label-input', 'listed-token')
     await page.click('#create-token-form button[type="submit"]')
 
+    // LIN-3618: the mint modal shows the expiry from the 201 body
+    await expect(page.locator('.token-modal')).toContainText('expires')
+
     // Close modal
     await page.click('.token-modal-close')
 

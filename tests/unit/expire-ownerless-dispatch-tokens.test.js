@@ -87,8 +87,10 @@ describe('expire-ownerless-dispatch-tokens (real MangoDB tmpdir)', () => {
     const collection = await seed();
     const before = await collection.find({}).toArray();
     const events = [];
+    const findArgs = [];
     const spied = new Proxy(collection, {
       get(target, prop) {
+        if (prop === 'find') return (...a) => { findArgs.push(a); return target.find(...a); };
         if (prop === 'updateOne') return (...a) => { events.push('write'); return target.updateOne(...a); };
         const v = target[prop];
         return typeof v === 'function' ? v.bind(target) : v;
@@ -99,6 +101,8 @@ describe('expire-ownerless-dispatch-tokens (real MangoDB tmpdir)', () => {
     const report = await expireOwnerlessDispatchTokens({ collection: spied, backend: 'mongodb', now: NOW, dryRun: false, logger });
 
     assert.deepEqual(report.expired.sort(), EXPECT_EXPIRED);
+    assert.equal(findArgs.length, 1, 'the script lists the collection once');
+    assert.deepEqual(findArgs[0][1].projection, { _id: 1, urlKey: 1, createdBy: 1, lastUsedAt: 1, expiresAt: 1 }, 'inclusion projection: never reads the token hash or label');
     const firstWrite = events.indexOf('write');
     assert.equal(events.filter(e => e === 'plan').length, 4);
     assert.ok(events.lastIndexOf('plan') < firstWrite, 'every plan line prints before the first write');
@@ -145,6 +149,25 @@ describe('expire-ownerless-dispatch-tokens (real MangoDB tmpdir)', () => {
     const report = await expireOwnerlessDispatchTokens({ collection: racing, backend: 'mongodb', now: NOW, dryRun: false, logger: capture() });
     assert.deepEqual(report.expired, []);
     assert.equal((await collection.findOne({ _id: '88888888-race' })).expiresAt, null);
+  });
+
+  test('a row that expires between listing and write is skipped', async () => {
+    const collection = await seed([row('88888888-race', { createdBy: null, expiresAt: null })]);
+    const racing = new Proxy(collection, {
+      get(target, prop) {
+        if (prop === 'find') {
+          return (...a) => {
+            const cursor = target.find(...a);
+            return { toArray: async () => { const rows = await cursor.toArray(); await target.updateOne({ _id: '88888888-race' }, { $set: { expiresAt: ago(1) } }); return rows; } };
+          };
+        }
+        const v = target[prop];
+        return typeof v === 'function' ? v.bind(target) : v;
+      }
+    });
+    const report = await expireOwnerlessDispatchTokens({ collection: racing, backend: 'mongodb', now: NOW, dryRun: false, logger: capture() });
+    assert.deepEqual(report.expired, []);
+    assert.equal((await collection.findOne({ _id: '88888888-race' })).expiresAt.getTime(), ago(1).getTime(), 'the earlier expiry is not overwritten with now');
   });
 
   describe('the 30-day gate', () => {
@@ -231,8 +254,14 @@ describe('scripts/expire-ownerless-dispatch-tokens.mjs (child process)', () => {
 
   test('--execute with no HARBOUR_DATA_DIR on the mangodb backend exits 2', () => {
     const env = { ...process.env }; delete env.HARBOUR_DATA_DIR;
-    const res = spawnSync(process.execPath, [script, '--execute'], { env: (() => { delete env.MONGODB_URI; return env; })(), encoding: 'utf8', cwd: tmpdir() });
-    assert.equal(res.status, 2, res.stdout + res.stderr);
+    // The mangodb backend opens ./data relative to cwd, so run in a throwaway dir rather than leaving data/ in the OS tmpdir.
+    const cwd = mkdtempSync(join(tmpdir(), 'lin-3618-cwd-'));
+    try {
+      const res = spawnSync(process.execPath, [script, '--execute'], { env: (() => { delete env.MONGODB_URI; return env; })(), encoding: 'utf8', cwd });
+      assert.equal(res.status, 2, res.stdout + res.stderr);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
   });
 
   test('the default run exits 0', () => {
