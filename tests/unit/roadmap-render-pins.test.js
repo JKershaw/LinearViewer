@@ -80,3 +80,14 @@ test('zero still renders as "0" in numeric slots', () => {
   });
   assert.ok(html.includes('0% · 0/0 done'));
 });
+
+// LIN-3678: the task glyph comes from getStateDisplay, the one glyph rule.
+test('task glyphs follow getStateDisplay: backlog ◌, unstarted ○, started ◐', () => {
+  const task = (stateType, identifier) => ({ id: identifier, identifier, title: 't', stateType });
+  const html = render({
+    milestones: [milestone({ tasksInQueue: [task('backlog', 'B-1'), task('unstarted', 'U-1'), task('started', 'S-1')] })]
+  });
+  assert.match(html, /◌ <span class="task-id">B-1/);
+  assert.match(html, /○ <span class="task-id">U-1/);
+  assert.match(html, /◐ <span class="task-id">S-1/);
+});
