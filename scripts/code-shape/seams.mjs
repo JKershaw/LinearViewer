@@ -1,12 +1,12 @@
 // Seams & Tangles measurement: how the areas of the code import each other.
 // Usage: node seams.mjs <repoDir> <commit> [areaGuidePath]  → JSON on stdout
 // Facts only: links, knots (mutual pairs and groups) and entry files. Judgement is the reviewer's.
-import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'acorn';
 import { simple } from 'acorn-walk';
+import { readCommit } from './code-shape-lib.mjs';
 
 const DEFAULT_GUIDE = fileURLToPath(new URL('./areas.json', import.meta.url));
 
@@ -147,33 +147,11 @@ export function measureSeams({ files, areaMap, commit, areaMapSource = null }) {
   };
 }
 
-// --- CLI: reads the tree from the git object store, no checkout ---
-function readTree(repo, commit) {
-  const git = (args, input) => {
-    const r = spawnSync('git', ['-C', repo, ...args], { input, maxBuffer: 1 << 30 });
-    if (r.status !== 0) throw new Error(`git ${args.join(' ')}: ${r.stderr}`);
-    return r.stdout;
-  };
-  const sha = git(['rev-parse', '--verify', `${commit}^{commit}`]).toString().trim();
-  const tree = git(['ls-tree', '-r', sha]).toString().split('\n').filter(Boolean)
-    .map((l) => { const [meta, path] = l.split('\t'); const [, type, obj] = meta.split(' '); return { type, obj, path }; })
-    .filter((e) => e.type === 'blob' && inScope(e.path));
-  const out = tree.length ? git(['cat-file', '--batch'], tree.map((e) => e.obj).join('\n') + '\n') : Buffer.alloc(0);
-  const files = {};
-  let pos = 0;
-  for (const e of tree) {
-    const nl = out.indexOf(10, pos);
-    const size = Number(out.subarray(pos, nl).toString().split(' ')[2]);
-    files[e.path] = out.subarray(nl + 1, nl + 1 + size).toString('utf8');
-    pos = nl + 1 + size + 1;
-  }
-  return { sha, files };
-}
-
+// --- CLI: reads the tree from the git object store (the kit's readCommit), no checkout ---
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const [repo, commit, guidePath = DEFAULT_GUIDE] = process.argv.slice(2);
   if (!repo || !commit) { console.error('usage: node seams.mjs <repoDir> <commit> [areaGuidePath]'); process.exit(2); }
-  const { sha, files } = readTree(repo, commit);
+  const { sha, files } = readCommit(repo, commit, inScope);
   const areaMap = JSON.parse(readFileSync(guidePath, 'utf8'));
   process.stdout.write(JSON.stringify(measureSeams({ files, areaMap, commit: sha, areaMapSource: guidePath }), null, 2) + '\n');
 }

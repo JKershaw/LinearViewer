@@ -26,7 +26,7 @@ export const T = {
   shingleK: 5,                  // structural token 5-grams
   fuzzyJaccard: 0.7,            // structural shingle Jaccard for a fuzzy clone edge
   fuzzyVocabJaccard: 0.3,       // ... and at least this much shared vocabulary
-  structureOnlyMinStatements: 10,
+  structureOnlyMinStatements: 10, // exact-structure groups with no shared vocabulary rank only above this
   tinyMinNodes: 18,             // tiny pass: 1-4 statement functions with at least this many nodes
   tinyShingleJaccard: 0.5,      // structural 3-gram Jaccard for a tiny-function edge
   tinyVocabJaccard: 0.5,        // ... and IDF-weighted vocabulary Jaccard
@@ -34,7 +34,7 @@ export const T = {
   vocabMinItems: 8,             // vocabulary pass: at least 8 distinct names/strings
   vocabMaxDf: 300,              // names in more functions than this do not seed candidates
   vocabJaccard: 0.6,            // IDF-weighted vocabulary Jaccard for a dialect-copy edge
-  vocabSizeRatio: 0.5,          // ... between functions within 2x of each other's size // exact-structure groups with no shared vocabulary rank only above this
+  vocabSizeRatio: 0.5,          // ... between functions within 2x of each other's size
   setMinMembers: 2,
   setMergeJaccard: 0.66,        // merge string sets of size >= 3 at this Jaccard (one member drift)
   literalRecordMinPairs: 3,     // literal records: >= 3 identical key=value pairs
@@ -46,7 +46,6 @@ export const T = {
 // files: { path: text } (already scoped); areaMap: seams-format area map or null;
 // fileCommits: Map<path, Set<commit>> for the churn window (see churnByFile).
 export function runCensus({ files, areaMap = null, fileCommits = new Map(), commit, commitDate, churnDays = 90, repo = null }) {
-  const SHA = commit, COMMIT_DATE = commitDate, CHURN_DAYS = churnDays, REPO = repo;
   const paths = Object.keys(files).sort();
   const areaGuide = areaMap ? compileGuide(areaMap) : null;
   const areaOf = (p) => areaOfGuide(areaGuide, p);
@@ -808,10 +807,10 @@ export function runCensus({ files, areaMap = null, fileCommits = new Map(), comm
   }
   const rankable = groups.filter((g) => g.rankable);
   const report = {
-    repo: REPO,
-    commit: SHA,
-    commitDate: COMMIT_DATE,
-    churnWindowDays: CHURN_DAYS,
+    repo,
+    commit,
+    commitDate,
+    churnWindowDays: churnDays,
     scope: { files: paths.length, parsed: Object.keys(asts).length, parseErrors, functionsConsidered: fns.length, tinyFunctionsConsidered: tiny.length, setSites: setSites.length, recordSites: recordSites.length },
     thresholds: T,
     filtered: { ...filtered, ...filteredSets, literalRecordsNotUsedAsMaps: filteredLiteralRecords.count, structureOnlyCloneGroupsUnranked: groups.filter((g) => !g.rankable).length },
