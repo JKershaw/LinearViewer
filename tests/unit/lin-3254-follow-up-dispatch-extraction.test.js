@@ -187,7 +187,7 @@ describe('dispatchSessionFollowUp — the extracted composition', () => {
     const outcome = await dispatchSessionFollowUp(helperOptions(stores));
 
     assert.strictEqual(outcome.status, 422);
-    assert.match(outcome.body.error, /dash\/local targets are not supported/);
+    assert.match(outcome.body.error, /only cli and web sessions can be followed up/);
     assert.strictEqual(stores.addItemCalls.length, 0);
   });
 

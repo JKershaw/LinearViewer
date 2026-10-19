@@ -247,7 +247,7 @@ describe('dash/local anchor mapping', () => {
     const res = await post(app, PATH, { sessionId: 'sess-dash', prompt: 'p' });
 
     assert.strictEqual(res.status, 422);
-    assert.match(res.json.error, /dash\/local targets are not supported/);
+    assert.match(res.json.error, /only cli and web sessions can be followed up/);
     assert.strictEqual(addItemCalls.length, 0);
   });
 
@@ -259,7 +259,7 @@ describe('dash/local anchor mapping', () => {
     const res = await post(app, PATH, { sessionId: 'sess-local', prompt: 'p' });
 
     assert.strictEqual(res.status, 422);
-    assert.match(res.json.error, /dash\/local targets are not supported/);
+    assert.match(res.json.error, /only cli and web sessions can be followed up/);
     assert.strictEqual(addItemCalls.length, 0);
   });
 });

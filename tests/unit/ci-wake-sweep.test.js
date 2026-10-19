@@ -416,6 +416,12 @@ describe('ci-wake-sweep: over a real DispatchQueueStore', () => {
     assert.equal(posted.length, 0);
   });
 
+  test('LIN-3677: an unknown target string is skipped (a miss), not sent to cli', async () => {
+    await seedParked({ target: 'carrier-pigeon' });
+    await buildRun()();
+    assert.equal(posted.length, 0);
+  });
+
   test('a 403 on a PR read ends that tick\'s reads', async () => {
     for (let i = 0; i < 3; i++) {
       await seedParked({ message: `[pending] https://github.com/o/r/pull/${300 + i}`, issue: `LIN-${i + 30}` });
