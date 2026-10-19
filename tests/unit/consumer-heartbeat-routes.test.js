@@ -101,6 +101,12 @@ describe('POST /api/dispatch/heartbeat', () => {
     assert.equal(doc.tokenId, 'tok-sd');
     assert.equal(doc.fields.activeSessionCount, 2);
   });
+  test('a beat carrying 16 workspace names of 64 characters is accepted and stored whole (LIN-3618)', async () => {
+    const names = Array.from({ length: 16 }, (_, i) => String(i).padStart(2, '0').padEnd(64, 'w'));
+    const res = await post(dispatchApp(), PATH, { body: beat({ authStoppedWorkspaces: names }) });
+    assert.equal(res.status, 204);
+    assert.deepEqual((await collection.findOne({ _id: 'acme::inst-1' })).fields.authStoppedWorkspaces, names);
+  });
   test('an invalid beat is 400 with the error envelope and nothing stored', async () => {
     const res = await post(dispatchApp(), PATH, { body: { schema: 1, hostname: 'laptop-canary' } });
     assert.equal(res.status, 400);

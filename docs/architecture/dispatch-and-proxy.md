@@ -53,7 +53,7 @@ path is best-effort under degradation; the degraded-mode path is the proxy verb 
   `consumer-heartbeats` (one replaced doc per workspace + instance, 15 min expiry, 20 per workspace),
   read at `GET /api/proxy/heartbeats`. Field set and parser: `lib/consumer-heartbeat.js`.
 
-Items expire after 24 hours. Tokens are workspace-scoped. Dispatch tokens have an optional `expiresAt` (none by default); they can be revoked, and are revoked with the workspace by the account that made them.
+Items expire after 24 hours. Tokens are workspace-scoped. New dispatch tokens expire after 90 days (`expiresAt`); older rows keep working until expired; they can be revoked, and are revoked with the workspace by the account that made them.
 Feedback is append-only, **retained for the life of the project**, and requires strict token ownership.
 
 A dispatch item may carry an optional `followUpTo` field (the `id` of an earlier dispatch) to resume that

@@ -9,7 +9,8 @@ const FIELD_SET = [
   'uptimeSec', 'platform', 'version', 'lastPollOkAt', 'pollIntervalMs',
   'loadAvg1', 'loadAvg5', 'loadAvg15', 'cpuCount',
   'hostMemFreeBytes', 'hostMemTotalBytes',
-  'activeSessionCount', 'heldSessionCount'
+  'activeSessionCount', 'heldSessionCount',
+  'authStoppedWorkspaces'
 ];
 
 const minimal = () => ({
@@ -35,7 +36,8 @@ test('parseHeartbeat accepts every optional field', () => {
     lastPollOkAt: '2026-10-18T11:59:58.000Z', pollIntervalMs: 5000,
     loadAvg1: 1.5, loadAvg5: 1, loadAvg15: 0.5, cpuCount: 8,
     hostMemFreeBytes: 1e9, hostMemTotalBytes: 16e9,
-    activeSessionCount: 3, heldSessionCount: 0
+    activeSessionCount: 3, heldSessionCount: 0,
+    authStoppedWorkspaces: ['acme', 'side.project_2']
   };
   assert.deepEqual(parseHeartbeat(full), full);
 });
@@ -116,4 +118,41 @@ test('buildHeartbeatView reports ageMs and stale at 3 x intervalMs', () => {
   assert.equal(stale.stale, true);
   assert.deepEqual(Object.keys(stale).sort(), ['ageMs', 'clockSkewMs', 'consumerKind', 'fields', 'instanceId', 'receivedAt', 'stale']);
   assert.equal(stale.receivedAt, '2026-10-18T12:06:59.000Z');
+});
+
+// LIN-3618: Harbour's half of LIN-3695. Bounded array of workspace-name strings;
+// one bad element (or too many) drops the whole field, the rest of the beat stays.
+test('authStoppedWorkspaces is kept when valid, including empty and exactly 16 x 64 chars', () => {
+  assert.deepEqual(parseHeartbeat({ ...minimal(), authStoppedWorkspaces: ['acme', 'b-2'] }).authStoppedWorkspaces, ['acme', 'b-2']);
+  assert.deepEqual(parseHeartbeat({ ...minimal(), authStoppedWorkspaces: [] }).authStoppedWorkspaces, []);
+  const max = Array.from({ length: 16 }, () => 'w'.repeat(64));
+  assert.deepEqual(parseHeartbeat({ ...minimal(), authStoppedWorkspaces: max }).authStoppedWorkspaces, max);
+});
+
+test('authStoppedWorkspaces is dropped whole for any bad shape, keeping the rest of the beat', () => {
+  const bad = [
+    'acme',                                  // not an array
+    { 0: 'acme' },                           // array-like object
+    Array.from({ length: 17 }, () => 'w'),   // over 16 items
+    ['ok', 'w'.repeat(65)],                  // element over 64 characters
+    ['ok', 'a/b'],                           // slash
+    ['ok', 'has space'],                     // space
+    ['ok', ''],                              // empty string
+    ['ok', 5],                               // non-string element
+    ['ok', null],
+    ['/Users/jk/project']                    // a path must not ride in
+  ];
+  for (const value of bad) {
+    assert.deepEqual(parseHeartbeat({ ...minimal(), activeSessionCount: 1, authStoppedWorkspaces: value }), { ...minimal(), activeSessionCount: 1 }, JSON.stringify(value));
+  }
+});
+
+test('a beat without authStoppedWorkspaces is unchanged, and the view returns it in fields', () => {
+  assert.ok(!('authStoppedWorkspaces' in parseHeartbeat(minimal())));
+  const fields = parseHeartbeat({ ...minimal(), authStoppedWorkspaces: ['acme'] });
+  const view = buildHeartbeatView(
+    { consumerKind: 'simple-dispatcher', instanceId: 'a', receivedAt: new Date('2026-10-18T12:00:00.000Z'), clockSkewMs: 0, fields },
+    new Date('2026-10-18T12:00:30.000Z')
+  );
+  assert.deepEqual(view.fields.authStoppedWorkspaces, ['acme']);
 });

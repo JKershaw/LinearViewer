@@ -42,7 +42,7 @@ import { CustomPromptsStore } from './lib/custom-prompts-store.js'
 import { CollectiveCharactersStore } from './lib/collective-characters-store.js'
 import { CollectivePresetsStore } from './lib/collective-presets-store.js'
 import { DispatchPresetsStore } from './lib/dispatch-presets-store.js'
-import { DispatchTokenStore } from './lib/dispatch-tokens.js'
+import { DispatchTokenStore, DISPATCH_TOKEN_DEFAULT_TTL_SECONDS } from './lib/dispatch-tokens.js'
 import { HarbourFeedbackTokenStore } from './lib/harbour-feedback-tokens.js'
 import { ProxyTokenStore } from './lib/proxy-tokens.js'
 import { ProxyEventStore } from './lib/proxy-events.js'
@@ -140,6 +140,7 @@ import { renderAuditPage } from './lib/render-audit.js'
 import { renderPrivacyPolicy, renderTermsOfService } from './lib/render-legal.js'
 import { renderStyleguide } from './lib/render-styleguide.js'
 import { renderKpisPage } from './lib/render-kpis.js'
+import { createWorkspaceKpisRoutes } from './routes/workspace-kpis.js'
 import { renderTemplatesPage } from './lib/render-templates.js'
 import { collectKpiStats } from './lib/kpi-stats.js'
 import { renderSettingsPage } from './lib/render-settings.js'
@@ -381,7 +382,8 @@ const dispatchQueueStore = new DispatchQueueStore({
 })
 
 const dispatchTokenStore = new DispatchTokenStore({
-  collection: dispatchTokensCollection
+  collection: dispatchTokensCollection,
+  defaultTtlSeconds: DISPATCH_TOKEN_DEFAULT_TTL_SECONDS // LIN-3618: new dispatch tokens live 90 days
 })
 
 // LIN-3421: hoisted from beside its routes — the workspace routes mount (earlier
@@ -2409,6 +2411,9 @@ app.use(createDispatchRoutes({ installationTokenFor, dispatchQueueStore, dispatc
 // per-account per-task mode read.
 app.use(createTaskModeRoutes({ taskModeStore, accountStore, workspaceFromUrl }))
 app.use(createMilestoneFunnelRoutes({ taskModeStore, accountStore, accountWorkspaceStore, dispatchQueue: dispatchQueueCollection, dispatchHistory: dispatchHistoryCollection, closeOutEventsStore, workspaceFromUrl }))
+
+// Workspace KPIs page (LIN-3689): one workspace's counts, next to Settings
+app.use(createWorkspaceKpisRoutes({ workspaceFromUrl, collections: { dispatchQueue: dispatchQueueCollection, dispatchHistory: dispatchHistoryCollection, proxyEvents: proxyEventsCollection, agentStatus: agentStatusCollection, reportHistory: reportHistoryCollection, customPrompts: customPromptsCollection } }))
 
 // The ONE PR-state store (LIN-3311): the LIN-3251 cache,
 // sliding 36/h GitHub budget and PR-state cache. The dashboard router

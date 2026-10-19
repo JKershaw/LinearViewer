@@ -42,7 +42,7 @@ Tokens are created by authenticated users in the Linear Viewer settings page:
 3. In the "Dispatch Tokens" section, create a new token with a descriptive label
 4. **Save the token immediately** - it's only shown once
 
-Minting is **owner-only** as of LIN-3137 (LIN-2884 J5): a never-expiring dispatch token is a
+Minting is **owner-only** as of LIN-3137 (LIN-2884 J5): a dispatch token (it expires after 90 days, LIN-3618) is a
 take path, so only the workspace's owner can create one. A non-owner member is refused `403
 GRANT_OWNER_ONLY`; an ownerless workspace is refused `409 WORKSPACE_OWNER_UNSET` until an owner
 is assigned; a session with no account is refused `503 GRANT_OWNERLESS`; and an unavailable owner
@@ -64,6 +64,7 @@ Response:
   "tokenId": "uuid",
   "token": "base64url-encoded-token",
   "label": "My Consumer",
+  "expiresAt": "2027-01-17T12:00:00.000Z",
   "message": "Token created. Save this token now - it cannot be retrieved later."
 }
 ```
@@ -267,7 +268,9 @@ Content-Type: application/json
 - **Optional:** `uptimeSec`, `platform` (at most 16 chars), `version` (at most 40), `lastPollOkAt` (ISO),
   `pollIntervalMs`, `loadAvg1`, `loadAvg5`, `loadAvg15`, `cpuCount`, `hostMemFreeBytes`,
   `hostMemTotalBytes`, `activeSessionCount` (sessions running now), `heldSessionCount` (parked waiting
-  for a follow-up). Send only what you actually measure; never a guess or a placeholder `0`.
+  for a follow-up), `authStoppedWorkspaces` (workspaces the consumer has paused because Harbour
+  rejected their token: an array of at most 16 names, each `[A-Za-z0-9._-]{1,64}`; one bad element drops
+  the whole field). Send only what you actually measure; never a guess or a placeholder `0`.
   Unknown keys, non-finite numbers and over-long strings are dropped. Hostnames, usernames, paths and
   content must not be sent.
 - `hostMemFreeBytes` is what `os.freemem()` reports. It is **not** "available" memory and reads low on macOS.
@@ -1206,7 +1209,7 @@ done
 
 - Tokens have 256 bits of entropy (cryptographically secure)
 - Only the SHA-256 hash is stored server-side
-- Tokens have no expiry by default (optional `expiresAt`, enforced at validate time) and can be revoked; removing a workspace revokes the tokens the removing account made for it
+- New tokens expire after 90 days (`expiresAt`, enforced at validate time; older rows keep working until expired or revoked) and can be revoked; removing a workspace revokes the tokens the removing account made for it
 - Each token is scoped to a single workspace
 - Validation hashes the presented token and looks the hash up in the database (an exact-match query). There is no constant-time string compare — timing is a non-concern because the lookup keys off the hash, not a byte-by-byte comparison of the raw token
 

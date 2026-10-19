@@ -240,12 +240,19 @@ test.describe('Token Management', () => {
     await page.fill('.token-label-input', 'listed-token')
     await page.click('#create-token-form button[type="submit"]')
 
+    // LIN-3618: the mint modal shows the expiry from the 201 body
+    // ('never expires' also contains 'expires', so pin the dated form)
+    await expect(page.locator('.token-modal')).toContainText('This token expires')
+    await expect(page.locator('.token-modal')).not.toContainText('never expires')
+
     // Close modal
     await page.click('.token-modal-close')
 
     // Token should be in list
     await expect(page.locator('.token-item .token-label-text')).toContainText('listed-token')
     await expect(page.locator('.token-item .token-meta')).toContainText('created')
+    // LIN-3618: a new token carries a 90-day expiry and the list shows it
+    await expect(page.locator('.token-item .token-meta')).toContainText('expires')
   })
 
   test('can revoke a token', async ({ page }) => {
