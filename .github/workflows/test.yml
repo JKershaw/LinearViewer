@@ -18,11 +18,13 @@ jobs:
     # no credentials, just localhost:27017.
     services:
       mongodb:
-        # LIN-3694: mongo 8.x refuses to start on kernel 6.19+ (SERVER-121912),
-        # which GitHub's runners moved to on 19 Oct. GLIBC_TUNABLES disables
-        # glibc's rseq use, the reported workaround. If this stops working,
-        # pin mongo:7.0 instead. Don't drop the env or bump the image blindly.
-        image: mongo:8.0
+        # LIN-3693: mongo 8.x refuses to start on kernel 6.19 to 7.0.13
+        # (SERVER-121912), and the runner fleet is mixed (6.8 / 6.17 / 7.0.0).
+        # Measured on 7.0.0: with glibc.pthread.rseq=1 the refused 8.x images
+        # start and take load; rseq=0 doesn't help (probe run 39302841645,
+        # PR #1991). Pinned to production's 8.0.32, so the pin must move with
+        # production. Don't drop the env.
+        image: mongo:8.0.32
         env:
           GLIBC_TUNABLES: glibc.pthread.rseq=1
         ports:
@@ -34,6 +36,9 @@ jobs:
           --health-retries 5
     steps:
       - uses: actions/checkout@v4
+
+      - name: Runner kernel
+        run: uname -r
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
