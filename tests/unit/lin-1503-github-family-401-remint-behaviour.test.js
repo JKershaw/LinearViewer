@@ -177,6 +177,8 @@ async function runGitHubFamilyBranch({
     // LIN-3124 PR2: the sliced source references these free identifiers.
     connectionStore: {},
     releaseConnectionCredential: async () => ({ released: 0, referents: [] }),
+    // LIN-3619: the sliced source calls the revoker on removal paths.
+    workspaceRemovalRevoker: { revoke: async () => ({}) },
     evictReferentFor: () => () => {},
     // LIN-3124 PR3 checkpoint C: legacy fixtures have no connection-backed binding.
     activeConnectionIdForWorkspace: () => null,

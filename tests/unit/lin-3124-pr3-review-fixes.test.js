@@ -152,6 +152,7 @@ describe('LIN-3124 PR3 review fixes (verdict 71b71694)', () => {
       applyAccessTokenToWorkspace: ws.applyAccessTokenToWorkspace, removeWorkspace: ws.removeWorkspace,
       TOKEN_REFRESH_BUFFER_MS, fingerprintCredential, CREDENTIAL_LIFECYCLE_EVENT_KINDS,
       connectionStore: s.connectionStore, ownerCredentialStore: s.ownerCredentialStore, releaseConnectionCredential,
+      workspaceRemovalRevoker: { revoke: async () => ({}) }, // LIN-3619
       evictReferentFor: () => () => {}, evictWorkspaceTokenPair: () => {}, evictWorkspaceToken: () => {}, evictAllWorkspaceTokens: () => {},
       refreshOnResolveGate: { shouldAttempt: () => true },
       credentialLifecycleEventStore: { recordEvent: async () => {} },

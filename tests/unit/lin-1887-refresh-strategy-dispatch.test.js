@@ -105,6 +105,8 @@ function makeContext({ workspace, extraWorkspaces = [], durableRecord = null, ca
     // reference these free identifiers.
     connectionStore: {},
     releaseConnectionCredential: async () => ({ released: 0, referents: [] }),
+    // LIN-3619: the sliced source calls the revoker on removal paths.
+    workspaceRemovalRevoker: { revoke: async (args) => { calls.revokes.push(args); return {}; } },
     evictReferentFor: () => () => {},
     // LIN-3124 PR3 checkpoint C: legacy fixtures have no connection-backed binding.
     activeConnectionIdForWorkspace: () => null,
@@ -163,7 +165,7 @@ function makeContext({ workspace, extraWorkspaces = [], durableRecord = null, ca
 function freshCalls() {
   return {
     renderErrorPage: [], refreshCalls: [], exchangesUsed: [], durableGets: [], durableDeletes: [],
-    durableDeleteAlls: [], evictions: [], remint: 0, save: 0, evictAll: 0, tokenRefreshAndRetry: 0,
+    durableDeleteAlls: [], revokes: [], evictions: [], remint: 0, save: 0, evictAll: 0, tokenRefreshAndRetry: 0,
     sessionDestroyed: false, nextCalled: false,
   };
 }
@@ -541,6 +543,51 @@ describe('LIN-1887 close-out F2 — a definitively-revoked non-destructive crede
       assert.deepEqual(calls.durableDeletes, [], `${provider} re-mints and owns no durable record`);
       assert.deepEqual(calls.durableDeleteAlls, []);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LIN-3619 — involuntary removals revoke tokens and /t/ links like LIN-3421
+// ---------------------------------------------------------------------------
+
+describe('LIN-3619 — workspace-removal revocation on the involuntary paths', () => {
+  const revoked = () => { throw new TokenRefreshError('invalid_grant', 'EXPIRED'); };
+  const blip = () => { throw new TokenRefreshError('upstream 503', 'NETWORK'); };
+  const expectedRevoke = [{ urlKey: 'acme', workspaceId: 'w-x', accountId: 'acct-1' }];
+
+  test('proactive: a definitive revocation that removes the workspace revokes its artifacts', async () => {
+    const { calls } = await runProactive({ workspace: expired({ provider: 'linear' }), definitiveRevocation: true, refreshResult: revoked });
+    assert.deepEqual(calls.revokes, expectedRevoke);
+  });
+
+  test('proactive: the non-destructive (Jira) arm keeps the workspace, so it revokes nothing', async () => {
+    const { calls } = await runProactive({ workspace: expired({ provider: 'jira' }), definitiveRevocation: true, refreshResult: revoked });
+    assert.deepEqual(calls.revokes, []);
+  });
+
+  test('proactive: a transient refresh failure revokes nothing', async () => {
+    const { calls } = await runProactive({ workspace: expired({ provider: 'linear' }), definitiveRevocation: false, refreshResult: blip });
+    assert.deepEqual(calls.revokes, []);
+  });
+
+  test('proactive: a non-definitive failure that still removes the workspace keeps today\'s behaviour (no revoke)', async () => {
+    // Documented divergence from the reactive path (LIN-3619 open question).
+    const { calls, session } = await runProactive({ workspace: expired({ provider: 'linear' }), definitiveRevocation: false, refreshResult: () => { throw new Error('rotate/save failed'); } });
+    assert.equal(session.workspaces.length, 0);
+    assert.deepEqual(calls.revokes, []);
+  });
+
+  test('reactive: no durable record on a destructive provider removes the workspace and revokes', async () => {
+    const { calls } = await runReactive({ workspace: { id: 'w-x', urlKey: 'acme', provider: 'linear' }, durableRecord: null });
+    assert.deepEqual(calls.revokes, expectedRevoke);
+  });
+
+  test('reactive: a non-destructive provider\'s revoked credential revokes nothing', async () => {
+    const { calls } = await runReactive({
+      workspace: { id: 'w-x', urlKey: 'acme', provider: 'jira' },
+      durableRecord: { refreshToken: 'r' }, definitiveRevocation: true, refreshResult: revoked,
+    });
+    assert.deepEqual(calls.revokes, []);
   });
 });
 
