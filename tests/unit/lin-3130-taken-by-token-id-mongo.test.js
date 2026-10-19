@@ -21,6 +21,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { MongoClient } from 'mongodb';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
+import { SESSION_TARGETS } from '../../lib/dispatch-targets.js';
 
 const uri = process.env.MONGODB_TEST_URI;
 if (!uri && process.env.CI) {
@@ -31,6 +32,7 @@ if (!uri && process.env.CI) {
 
 const URL_KEY = 'acme';
 const ROW_ID = '33333333-3333-4333-8333-333333333333';
+const DASH_ID = '44444444-4444-4444-8444-444444444444';
 
 describe(
   'LIN-3130 — { takenByTokenId: null } real-MongoDB semantics',
@@ -98,6 +100,56 @@ describe(
 
       const runner = await store().addFeedback(ROW_ID, URL_KEY, { message: 'right token' }, 'runner-label', null, { takenByTokenId: 'tok-runner-1' });
       assert.ok(runner && runner.success, 'the runner branch keys on its own takenByTokenId');
+    });
+
+    // LIN-3622: the runner take gate is `target: { $in: [...SESSION_TARGETS, null] }`
+    // inside the atomic findOneAndDelete. The `null` is what lets a pre-field
+    // row (no `target`, read as `cli`) through; the runner-ownership test only
+    // proves that on MangoDB, so pin it on real mongod here.
+    describe('LIN-3622 — takeItem({ targets }) real-MongoDB semantics', () => {
+      let queue;
+
+      before(() => {
+        queue = db.collection('dispatch-queue');
+      });
+
+      function queued(id, extra = {}) {
+        return { _id: id, urlKey: URL_KEY, prompt: 'p', expiresAt: new Date(Date.now() + 60_000), ...extra };
+      }
+
+      test('refuses a dash row without removing or archiving it', async () => {
+        await queue.deleteMany({});
+        await history.deleteMany({});
+        await queue.insertOne(queued(DASH_ID, { target: 'dash' }));
+
+        const taken = await store().takeItem(DASH_ID, URL_KEY, 'runner-label', 'tok-1', { targets: SESSION_TARGETS });
+
+        assert.equal(taken, null, 'a dash row must not be claimed by a session-target take');
+        assert.ok(await queue.findOne({ _id: DASH_ID }), 'the refused dash row must stay queued');
+        assert.equal(await history.countDocuments({ _id: DASH_ID }), 0, 'a refused row must not be archived');
+      });
+
+      test('takes a row with an ABSENT target field (legacy row counts as cli) and deletes it', async () => {
+        await queue.deleteMany({});
+        await history.deleteMany({});
+        await queue.insertOne(queued(ROW_ID));
+
+        const taken = await store().takeItem(ROW_ID, URL_KEY, 'runner-label', 'tok-1', { targets: SESSION_TARGETS });
+
+        assert.ok(taken, 'null in $in must match an absent target on real MongoDB');
+        assert.equal(await queue.findOne({ _id: ROW_ID }), null, 'the taken row must be removed from the queue');
+        assert.equal(await history.countDocuments({ _id: ROW_ID }), 1, 'the taken row must be archived');
+      });
+
+      test('without targets the same dash row is still taken (option stays opt-in)', async () => {
+        await queue.deleteMany({});
+        await history.deleteMany({});
+        await queue.insertOne(queued(DASH_ID, { target: 'dash' }));
+
+        const taken = await store().takeItem(DASH_ID, URL_KEY, 'dash-label', null);
+
+        assert.ok(taken, 'dispatch-token and Harbour OS takes keep claiming dash rows');
+      });
     });
   }
 );
