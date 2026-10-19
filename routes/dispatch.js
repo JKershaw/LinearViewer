@@ -43,7 +43,8 @@ import { HALT_MODES, HALT_MODE_ERROR } from '../lib/workspace-halt.js';
 import { deriveTerminalStatus } from '../lib/dispatch-terminal.js';
 import { resolveOwnerMintRefusal } from '../lib/owner-mint-refusals.js';
 import { resolveRunnerOwnerRefusal, sendRunnerRefusal } from '../lib/runner-owner-gate.js';
-import { resolveChatCredential } from '../lib/chat-request.js';
+import { readPlanFacts } from '../lib/chat-request.js';
+import { planOf, quotaAnswer } from '../lib/plan-allowance.js';
 import { resolveAccountGroup } from '../lib/account-group.js';
 import { redactSessionItem, redactSessionItems } from '../lib/dispatch-session-redaction.js';
 import { publicOrigin } from '../lib/public-origin.js';
@@ -545,19 +546,14 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
   router.get('/workspace/:urlKey/api/dispatch/quota', workspaceFromUrl, async (req, res) => {
     try {
       const accountId = req.session?.accountId;
-      const { isFreeTier } = resolveChatCredential({ sessionApiKey: req.session?.openRouterApiKey });
-      if (!isFreeTier || !accountId) {
-        return res.json({ limited: false, runsUsed: null, limit: null, remaining: null, resetsAt: null });
+      const plan = planOf(readPlanFacts({ sessionApiKey: req.session?.openRouterApiKey }));
+      if (!plan || !accountId) {
+        return res.json(quotaAnswer(null));
       }
       const accountIds = await resolveAccountGroup(accountStore, accountId);
-      const usage = await freeTierStore.getRunUsage(accountIds);
-      return res.json({
-        limited: true,
-        runsUsed: usage.runsUsed,
-        limit: usage.limit,
-        remaining: usage.remaining,
-        resetsAt: usage.resetsAt
-      });
+      // No guard on a null answer: quotaAnswer reads it inside this try, so a
+      // null or throwing getRunUsage is still the 500 below (LIN-3598, LIN-3706).
+      return res.json(quotaAnswer(plan, await freeTierStore.getRunUsage(accountIds)));
     } catch (err) {
       return reportFailure(res, 'Read dispatch quota error:', err, 'Failed to read dispatch quota');
     }

@@ -50,7 +50,8 @@ import { AgentStatusStore } from './lib/agent-status-store.js'
 import { ObservationSessionsStore } from './lib/observation-sessions-store.js'
 import { createObservationMaterializer } from './lib/observation-sessions-materializer.js'
 import { createWorkspaceTitleResolver } from './lib/workspace-title-resolver.js'
-import { FreeTierStore, DEFAULT_RUN_LIMIT } from './lib/free-tier-store.js'
+import { FreeTierStore } from './lib/free-tier-store.js'
+import { FREE_PLAN, allowanceOf, readAllowanceEnv } from './lib/plan-allowance.js'
 import { RecapCacheStore } from './lib/recap-cache.js'
 import { BriefCacheStore } from './lib/brief-cache.js'
 import { RunSummaryCacheStore } from './lib/run-summary-cache.js'
@@ -182,7 +183,7 @@ import { renderRoadmapPage } from './lib/render-roadmap.js'
 import { buildRoadmapModel } from './lib/roadmap.js'
 import { renderProxyPage } from './lib/render-proxy.js'
 import { AVAILABLE_MODELS, setLlmCallRecorder, setPromptTraceRecorder, getPaidEnvKey, getFreeTierModelConfigWarning, streamChatWithTools } from './lib/openrouter.js'
-import { resolveOpenRouterSource, getFreeTierKey } from './lib/chat-request.js'
+import { resolveOpenRouterSource, isFreeTierOffered } from './lib/chat-request.js'
 import { resolveWorkspaceModel, resolveAiOperationModel, getWorkspaceFeatures, isWorkspaceFeatureEnabled, setWorkspaceFeature, resolveDispatchDefaults, AI_OPERATION_KINDS } from './lib/workspace-preferences.js'
 import { getFeatureFlags, isValidFeatureKey, isValidWorkspaceFeatureKey, WORKSPACE_FEATURES } from './lib/feature-defaults.js'
 import { DISPATCH_DEFAULT_KINDS } from './lib/prompt-templates.js'
@@ -451,13 +452,16 @@ agentStatusStore.onWrite = ({ urlKey, issueIdentifier }) =>
 
 // Free tier usage tracking
 const freeTierCollection = db.collection('free-tier-usage')
+// LIN-3706: the allowance env is read once, here, and the plan's numbers are the
+// defaults (lib/plan-allowance.js).
+const freeTierAllowance = allowanceOf(FREE_PLAN, readAllowanceEnv())
 const freeTierStore = new FreeTierStore({
   collection: freeTierCollection,
-  hourlyLimit: parseInt(process.env.FREE_TIER_HOURLY_LIMIT, 10) || 50,
+  hourlyLimit: freeTierAllowance.promptsPerHour,
   // LIN-3238: the per-account fresh-run limit. The dispatch store is the SAME
   // instance the queue/history live in — without it `checkRun` returns
   // `unverified` and every free-tier dispatch would 503.
-  runLimit: parseInt(process.env.FREE_TIER_RUN_LIMIT, 10) || DEFAULT_RUN_LIMIT,
+  runLimit: freeTierAllowance.runsPerDay,
   dispatchStore: dispatchQueueStore
 })
 
@@ -1766,7 +1770,7 @@ async function handleWorkspaceRemoval(session, workspaceId, res, deleteDurable =
   return new Promise((resolve) => {
     session.destroy((err) => {
       if (err) console.error('Session destroy error:', err);
-      const html = renderLandingPage({ deployInfo, githubEnabled: getProvider('github').entryCta.isConfigured(), jiraEnabled: getProvider('jira').entryCta.isConfigured(), emailEnabled: isEmailSignInAvailable(), freeTierEnabled: !!getFreeTierKey() });
+      const html = renderLandingPage({ deployInfo, githubEnabled: getProvider('github').entryCta.isConfigured(), jiraEnabled: getProvider('jira').entryCta.isConfigured(), emailEnabled: isEmailSignInAvailable(), freeTierEnabled: isFreeTierOffered() });
       res.send(html);
       resolve();
     });
@@ -2148,7 +2152,7 @@ app.get('/', (req, res) => {
   const setupNotice = (isLocalhost && hasNoAuth) ? 'setup' : null
 
   // Unauthenticated users see the bespoke Harbour showcase landing (LIN-980).
-  const html = renderLandingPage({ deployInfo, setupNotice, githubEnabled: getProvider('github').entryCta.isConfigured(), jiraEnabled: getProvider('jira').entryCta.isConfigured(), emailEnabled: isEmailSignInAvailable(), freeTierEnabled: !!getFreeTierKey() })
+  const html = renderLandingPage({ deployInfo, setupNotice, githubEnabled: getProvider('github').entryCta.isConfigured(), jiraEnabled: getProvider('jira').entryCta.isConfigured(), emailEnabled: isEmailSignInAvailable(), freeTierEnabled: isFreeTierOffered() })
   res.send(html)
 })
 
