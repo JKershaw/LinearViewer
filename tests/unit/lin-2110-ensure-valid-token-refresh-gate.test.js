@@ -89,6 +89,8 @@ function makeContext({ workspace, durableRecord, calls, refreshOnResolveGate }) 
     // LIN-3124 PR2: the sliced `ensureValidToken` references these free identifiers.
     connectionStore: {},
     releaseConnectionCredential: async () => ({ released: 0, referents: [] }),
+    // LIN-3619: the sliced source calls the revoker on removal paths.
+    workspaceRemovalRevoker: { revoke: async () => ({}) },
     evictReferentFor: () => () => {},
     // LIN-3124 PR3 checkpoint C: legacy fixtures have no connection-backed
     // binding, so the arm is a no-op and the legacy path is byte-identical.

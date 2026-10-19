@@ -39,13 +39,17 @@
  *
  * Known durable-delete call sites (7, all `if-guarded or unconditional`
  * `ownerCredentialStore.delete(`/`ownerCredentialStore.deleteAll(` calls):
- *   - server.js: ensureValidToken's NON-destructive arm (per-partition, gated on definitive revocation — LIN-1887 close-out F2)
- *   - server.js: handleUnauthorizedError's NON-destructive arm (the reactive twin of the same — LIN-1887 close-out F2)
- *   - server.js: ensureValidToken's catch block (gated on definitive revocation — LIN-1545 S1)
- *   - server.js: handleWorkspaceRemoval (both the remaining>0 and destroy arms — one call site, shared; gated on `deleteDurable`, only ever reached on definitive revocation from the 401-retry path — LIN-1545 S2)
- *   - server.js: /workspace/:urlKey/settings/providers/remove (Linear-only, gated on an actual unlink — Finding #2)
- *   - routes/workspace.js: /workspace/:urlKey/remove, single-workspace-logout-equivalent arm
- *   - routes/workspace.js: /workspace/:urlKey/remove, multi-workspace remove-one arm
+ *   - server.js: ensureValidToken's NON-destructive arm (per-partition, gated on definitive revocation — LIN-1887 close-out F2) [exempt: the workspace survives]
+ *   - server.js: handleUnauthorizedError's NON-destructive arm (the reactive twin of the same — LIN-1887 close-out F2) [exempt: the workspace survives; removal goes via handleWorkspaceRemoval]
+ *   - server.js: ensureValidToken's catch block (gated on definitive revocation — LIN-1545 S1) [revoke: the workspace is removed]
+ *   - server.js: handleWorkspaceRemoval (both the remaining>0 and destroy arms — one call site, shared; gated on `deleteDurable`, only ever reached on definitive revocation from the 401-retry path — LIN-1545 S2) [revoke: the whole workspace leaves the session]
+ *   - server.js: /workspace/:urlKey/settings/providers/remove (per-partition, any provider; gated on an actual unlink — Finding #2) [revoke only when the unlink empties workspace.bindings]
+ *   - routes/workspace.js: /workspace/:urlKey/remove, single-workspace-logout-equivalent arm [revoke: LIN-3421]
+ *   - routes/workspace.js: /workspace/:urlKey/remove, multi-workspace remove-one arm [revoke: LIN-3421]
+ *
+ * LIN-3619: each of the 7 sites is classified revoke/exempt in the census below.
+ * A new site must be added to that CLASSES table with a revoke/exempt decision;
+ * bumping KNOWN_DURABLE_DELETE_COUNT alone is not enough.
  *
  * Run with: node --test tests/unit/owner-credential-durable-delete-census.test.js
  */
@@ -89,6 +93,8 @@ describe('LIN-1524 close-out Finding #1 — ownerCredentialStore.delete( census'
       KNOWN_DURABLE_DELETE_COUNT,
       `Found ${total} ownerCredentialStore.delete( call site(s) (${JSON.stringify(counts)}), expected exactly ` +
       `${KNOWN_DURABLE_DELETE_COUNT}. A NEW workspace/session-disconnect path needs a matching durable delete, ` +
+      'AND a revoke/exempt classification in the LIN-3619 CLASSES table below (revoke: call ' +
+      'workspaceRemovalRevoker.revoke({ urlKey, workspaceId, accountId }) beside the delete; exempt: say why in the CLASSES comment), ' +
       'per LIN-1524 close-out Finding #1: a durable Linear credential must not outlive the workspace connection ' +
       "that granted it. Before touching KNOWN_DURABLE_DELETE_COUNT, add (or remove) a matching " +
       'ownerCredentialStore.delete(accountId, urlKey, provider) call for the new/removed teardown path. See the existing ' +
@@ -108,6 +114,86 @@ describe('LIN-1524 close-out Finding #1 — ownerCredentialStore.delete( census'
       'credential survives logout (only workspace disconnect/removal revokes it). If this fails, someone wired ' +
       'a durable delete into /logout; revert it and use a session-only eviction instead.'
     );
+  });
+});
+
+// LIN-3619: every owner-credential delete is also CLASSIFIED against workspace-
+// removal revocation (LIN-3421): a site that takes the workspace (or its last
+// binding) out of the session must also revoke the account's proxy tokens,
+// dispatch tokens and /t/ links; a site that keeps the workspace must not. The
+// count above only proves a delete exists; this proves the revoke decision was
+// made for it, so a new delete site fails here until it is classified.
+describe('LIN-3619 — every owner-credential delete site is classified revoke / exempt', () => {
+  const REVOKE_CALL = /\b(?:workspaceRemovalRevoker\.revoke|revokeWorkspaceArtifacts)\(/;
+
+  // Enclosing function/route -> (marker that splits it into arms) -> class.
+  function classify(source, file, idx) {
+    if (file === 'routes/workspace.js') return 'routes/workspace.js:remove';
+    const enclosing = [
+      ['ensureValidToken', 'async function ensureValidToken('],
+      ['handleWorkspaceRemoval', 'async function handleWorkspaceRemoval('],
+      ['handleUnauthorizedError', 'async function handleUnauthorizedError('],
+      ['providers/remove', "app.post('/workspace/:urlKey/settings/providers/remove'"],
+    ].map(([name, marker]) => [name, source.lastIndexOf(marker, idx)])
+      .filter(([, at]) => at !== -1)
+      .sort((x, y) => y[1] - x[1])[0];
+    if (!enclosing) return null;
+    const [name, at] = enclosing;
+    // A column-0 close between the marker and the site means the site is not inside that function.
+    if (/\n}\n|\n}\);\n/.test(source.slice(at, idx))) return null;
+    if (name === 'ensureValidToken') {
+      const removed = source.lastIndexOf('const remaining = removeWorkspace(req.session, workspace.id)', idx) > at;
+      return removed ? 'ensureValidToken:removal' : 'ensureValidToken:non-destructive';
+    }
+    return name;
+  }
+
+  const CLASSES = {
+    'ensureValidToken:non-destructive': { count: 1, kind: 'exempt' },   // workspace survives; only the dead partition goes
+    'ensureValidToken:removal': { count: 1, kind: 'revoke' },           // definitive revocation removes the workspace
+    'handleWorkspaceRemoval': { count: 1, kind: 'revoke' },             // whole workspace leaves the session
+    'handleUnauthorizedError': { count: 1, kind: 'exempt' },            // non-destructive arm only; removal goes via handleWorkspaceRemoval
+    'providers/remove': { count: 1, kind: 'revoke' },                   // only when the unlink empties workspace.bindings
+    'routes/workspace.js:remove': { count: 2, kind: 'revoke' },         // LIN-3421, both arms
+  };
+
+  function sites() {
+    const out = [];
+    for (const file of ['server.js', 'routes/workspace.js']) {
+      const source = read(file);
+      for (const m of source.matchAll(/\bownerCredentialStore\.delete(?:All)?\(/g)) {
+        // Up to the next delete site or 1500 chars: the revoke sits beside its delete.
+        const rest = source.slice(m.index + 1);
+        const next = rest.search(/\bownerCredentialStore\.delete(?:All)?\(/);
+        const window = source.slice(m.index, m.index + 1 + Math.min(next === -1 ? 1500 : next, 1500));
+        out.push({ file, cls: classify(source, file, m.index), revokes: REVOKE_CALL.test(window) });
+      }
+    }
+    return out;
+  }
+
+  test('every delete site falls in a known class, with the expected number per class', () => {
+    const found = {};
+    for (const { file, cls } of sites()) {
+      assert.ok(cls && CLASSES[cls], `an ownerCredentialStore.delete( site in ${file} is not classified: decide revoke vs exempt, add a CLASSES entry and a classify() marker for its enclosing function`);
+      found[cls] = (found[cls] || 0) + 1;
+    }
+    for (const [cls, { count }] of Object.entries(CLASSES)) assert.equal(
+      found[cls] || 0,
+      count,
+      `class ${cls}: expected ${count}, found ${found[cls] || 0}. If you added an ownerCredentialStore.delete( site, add a CLASSES entry (revoke/exempt) and a classify() marker for its enclosing function rather than bumping this count`
+    );
+  });
+
+  test('revoke sites call the revoker beside the delete; exempt sites do not', () => {
+    for (const { file, cls, revokes } of sites()) {
+      const { kind } = CLASSES[cls];
+      assert.equal(revokes, kind === 'revoke', `${file} ${cls} is ${kind}, but ${revokes ? 'calls' : 'does not call'} the workspace-removal revoker`);
+    }
+  });
+
+  test('the revoker is wired exactly at the three server.js revoke sites (plus the routes/workspace.js hand-off)', () => {
+    assert.equal((read('server.js').match(/\bworkspaceRemovalRevoker\.revoke\(/g) || []).length, 3 + 1);
   });
 });
 

@@ -29,6 +29,59 @@ function sliceProviderRemoveHandler() {
   return SERVER_SRC.slice(start, end + 4);
 }
 
+// LIN-3619: drives the real route with a recording revoker over a given workspace.
+async function runUnlink(workspace, body) {
+  const revokes = [];
+  let handler;
+  const sandbox = {
+    app: { post: (_path, _mw, h) => { handler = h; } },
+    workspaceFromUrl: (_req, _res, next) => next?.(),
+    encodeURIComponent,
+    unlinkProvider,
+    releaseConnectionCredential: async () => ({}),
+    workspaceRemovalRevoker: { revoke: async (a) => { revokes.push(a); return {}; } },
+    evictReferentFor: () => () => {},
+    connectionStore: {},
+    ownerCredentialStore: { async delete() { return true; } },
+    saveSession: async () => {},
+    renderErrorPage: () => '<error/>',
+    console: { error() {}, log() {} },
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(sliceProviderRemoveHandler(), sandbox);
+  const res = { redirect: () => res, status: () => res, send: () => res };
+  await handler({ workspace, body, session: { accountId: 'acc' } }, res);
+  return revokes;
+}
+
+describe('LIN-3619 — unlink revokes artifacts only when the last binding goes', () => {
+  const linear = { provider: 'linear', scope: 'org-1' };
+  const jira = { provider: 'jira', scope: 'https://acme.atlassian.net' };
+
+  test('unlinking the only binding revokes tokens and /t/ links', async () => {
+    const revokes = await runUnlink({ id: 'w-1', urlKey: 'acme', provider: 'linear', bindings: [{ ...linear }] }, linear);
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(revokes)), [{ urlKey: 'acme', workspaceId: 'w-1', accountId: 'acc' }]);
+  });
+
+  test('a partial unlink (another binding remains) revokes nothing', async () => {
+    const revokes = await runUnlink({ id: 'w-1', urlKey: 'acme', provider: 'linear', bindings: [{ ...linear }, { ...jira }] }, linear);
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(revokes)), []);
+  });
+
+  // Pins the raw-array check: a legacy workspace has no bindings[], so only the
+  // post-unlink workspace.bindings.length === 0 fires; a synthesized-binding
+  // count (e.g. `|| 1`) would never revoke here.
+  test('a legacy workspace with no bindings[] revokes when its synthesized binding is unlinked', async () => {
+    const revokes = await runUnlink({ id: 'w-1', urlKey: 'acme', provider: 'linear' }, { provider: 'linear', scope: 'w-1' });
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(revokes)), [{ urlKey: 'acme', workspaceId: 'w-1', accountId: 'acc' }]);
+  });
+
+  test('a no-op unlink (no matching binding) revokes nothing', async () => {
+    const revokes = await runUnlink({ id: 'w-1', urlKey: 'acme', provider: 'linear', bindings: [{ ...linear }] }, { provider: 'linear', scope: 'other' });
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(revokes)), []);
+  });
+});
+
 describe('LIN-3124 PR2 B1 — provider removal releases the pre-unlink binding', () => {
   test('the real route order calls removeReferent + deleteIfUnreferenced', async () => {
     const calls = { removeReferent: [], deleteIfUnreferenced: [], durableDeletes: [] };
@@ -49,6 +102,7 @@ describe('LIN-3124 PR2 B1 — provider removal releases the pre-unlink binding',
       encodeURIComponent,
       unlinkProvider,
       releaseConnectionCredential,
+      workspaceRemovalRevoker: { revoke: async () => ({}) }, // LIN-3619
       evictReferentFor: () => () => {},
       connectionStore,
       ownerCredentialStore,

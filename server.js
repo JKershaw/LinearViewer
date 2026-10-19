@@ -1407,6 +1407,11 @@ async function ensureValidToken(req, res, next) {
     // and leave the dead one in place.
     if (isDefinitiveRevocation(error)) {
       await ownerCredentialStore.delete(accountId, workspace.urlKey, provider)
+      // LIN-3619: this arm removed the workspace (removeWorkspace above), so the
+      // proxy/dispatch tokens and /t/ links this account made for it die too, as
+      // on a voluntary removal (LIN-3421). Only here: the non-destructive arm
+      // above keeps the workspace, and a transient blip returned earlier.
+      await workspaceRemovalRevoker.revoke({ urlKey: workspace.urlKey, workspaceId: workspace.id, accountId })
       // LIN-3124 PR2 (D4, definitive revocation).
       // Review blocker 3 (see above).
       if (connectionId) await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider, scope: workspace.activeBinding.scope, mode: 'revoke', evict: evictReferentFor(accountId) })
@@ -1720,6 +1725,9 @@ async function handleWorkspaceRemoval(session, workspaceId, res, deleteDurable =
   // verb would have been a silent regression rather than a visible one.
   if (removedWorkspace && deleteDurable) {
     await ownerCredentialStore.deleteAll(session.accountId, removedWorkspace.urlKey);
+    // LIN-3619: whole workspace left the session, so its tokens and /t/ links
+    // go with the credential (LIN-3421's rule; runner lineage stays owner-only).
+    await workspaceRemovalRevoker.revoke({ urlKey: removedWorkspace.urlKey, workspaceId: removedWorkspace.id, accountId: session.accountId });
     // LIN-3124 PR2 (D4, whole-workspace removal): last-referent per
     // connection-backed binding. Inert for a legacy workspace.
     await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace: removedWorkspace, mode: 'remove', evict: evictReferentFor(session.accountId) })
@@ -4330,6 +4338,13 @@ app.post('/workspace/:urlKey/settings/providers/remove', workspaceFromUrl, async
   // achieved by not running.
   if (bindingRemoved) {
     await ownerCredentialStore.delete(req.session.accountId, workspace.urlKey, provider);
+    // LIN-3619: unlinking the LAST binding leaves nothing for the tokens and
+    // /t/ links to reach, so they are revoked; a partial unlink keeps them.
+    // Decided on the post-unlink raw `workspace.bindings`, not
+    // getBindingsForWorkspace, which synthesizes a binding when the array is empty.
+    if (workspace.bindings.length === 0) {
+      await workspaceRemovalRevoker.revoke({ urlKey: workspace.urlKey, workspaceId: workspace.id, accountId: req.session.accountId })
+    }
     // LIN-3124 PR2 (D4, last-referent unlink): release the connection-backed
     // credential only when this binding was the last referent. Inert for legacy.
     // B1: `unlinkProvider` above has ALREADY reassigned `workspace.bindings`
