@@ -162,6 +162,7 @@ workspace). Workspaces don't follow a person to a new device yet (follow-up behi
 
 When `OPENROUTER_FREE_TIER_KEY` is set, users without an OpenRouter connection get a free allowance of fresh **runs per account per UTC day**. Prompts themselves are unlimited.
 
+- Where the plan and the allowance live (LIN-3706): `lib/plan-allowance.js`, a leaf module with no repo imports. It holds the plan table (`PLANS`; production ships one row, Free: 10 runs a UTC day, 50 prompts a UTC hour), `FREE_FOR` (who counts as Free for which purpose, as data with a reason per row), the allowance reading (`readAllowanceEnv` once where `server.js` builds the store, `allowanceOf`), the UTC day and hour windows, the run-limit codes and their status, and the three refusal / answer shapes. `lib/chat-request.js` reads the facts (`readPlanFacts`) and asks the table (`resolveChatCredential`, `resolveOpenRouterSource`, `isFlagFreeTier`, `isFreeTierOffered`); `lib/free-tier-store.js` keeps the collection reads and writes. A later plan is a row in `PLANS` plus a cell in `FREE_FOR`; the plain-boolean sites that remain are listed in `docs/plan-allowance-design.md` (1e). It is unrelated to `lib/plan-fee-config.js`, which reads a cash figure for a KPI
 - API key source priority: user OAuth > env key > free tier key > none
 - Per-account daily limit: `FREE_TIER_RUN_LIMIT` fresh runs per UTC day (default 10, resets at midnight UTC); the count is read by `GET /workspace/:urlKey/api/dispatch/quota`, and a run-gate denial is a `RUN_LIMIT_REACHED` 429 carrying `freeTier.used: true` + `runsUsed`
 - Prompts are never refused for a person's daily usage. The only prompt refusal is the global hourly safety net (`Service busy, try again later`, 50/hour across all workspaces), which resets at the top of the next UTC hour
@@ -175,7 +176,7 @@ When `OPENROUTER_FREE_TIER_KEY` is set, users without an OpenRouter connection g
   the operator's shared key (LIN-513). The clamp lives in the `forceDefault` branches of
   `resolveWorkspaceModel`/`resolveAiOperationModel` (`lib/workspace-preferences.js`) and
   returns **before** the prefs lookup, so it fails closed. `resolveRoadmapModelOverride`
-  (`routes/workspace-api.js`) is the same gate on the LIN-819 per-request override path.
+  (`routes/workspace-api-roadmap.js`) is the same gate on the LIN-819 per-request override path.
 - The **value** it clamps to is `resolveFreeTierModel()` (`lib/openrouter.js`, LIN-1333):
   `OPENROUTER_FREE_TIER_MODEL` when set to a curated `AVAILABLE_MODELS` id, else
   `DEFAULT_MODEL`. Only that value is configurable — the precedence above is unchanged.
