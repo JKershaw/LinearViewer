@@ -609,6 +609,13 @@ describe('apply refuses what it cannot prove', () => {
     assert.match(a.planId, /^[0-9a-f]{8}$/);
   });
 
+  test('an Alone pair set that grows (same counts, same status) changes the planId', async () => {
+    const { db } = await fresh();
+    const plan = await planOf(db, 'full');
+    await db.collection('connections').updateOne({ _id: `${PERSON.accountId}::linear::ws-acme` }, { $push: { referents: { provider: 'linear', scope: 'ws-acme-2', urlKey: 'acme' } } });
+    await expectErasure(applyOf(db, plan), 'PLAN_MISMATCH');
+  });
+
   test('a Full wipe refuses while any owned workspace is unmapped, with no allow flag', async () => {
     const { db } = await fresh();
     await db.collection('account-workspaces').insertOne({ _id: 'orphan', accountId: PERSON.accountId, workspaceId: 'ws-orphan', role: 'owner' });

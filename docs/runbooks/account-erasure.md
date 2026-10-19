@@ -206,10 +206,11 @@ theirs; one continuing a teammate's run is not touched.
 
 ```js
 // node --input-type=module, from the repo root, with HARBOUR_DATA_DIR or MONGODB_URI set
+import { MongoClient } from 'mongodb';
 import { MangoClient } from '@jkershaw/mangodb';
 import { DispatchQueueStore } from './lib/dispatch-store.js';
 
-const client = new MangoClient(process.env.HARBOUR_DATA_DIR);
+const client = process.env.MONGODB_URI ? new MongoClient(process.env.MONGODB_URI) : new MangoClient(process.env.HARBOUR_DATA_DIR || './data');
 await client.connect();
 const db = client.db('linear-viewer');
 const store = new DispatchQueueStore({
