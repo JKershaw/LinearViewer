@@ -25,8 +25,7 @@
  *   wins when two things are wrong at once (LIN-677: a down workspace is a
  *   wait, so it answers 503 before an unsupported capability answers 422).
  * - ENDPOINT STRINGS are a data contract. `logEvent` writes them to the
- *   event store, and /credential-trail, lib/kpi-stats.js and public/kpis.js
- *   read them back. They stay literal beside the routes they name.
+ *   event store, and /credential-trail and lib/kpi-stats.js read them back. They stay literal beside the routes they name.
  * - A LOCAL catch (rather than the global error handler) is what gives a
  *   failure its mapped status, its `detail`, and a logged event. The global
  *   handler sends a bare 500 and logs nothing.

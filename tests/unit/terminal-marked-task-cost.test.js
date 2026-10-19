@@ -918,8 +918,8 @@ describe('computeTerminalMarkedTaskCost — LIN-2418: denominator excludes noLin
     assert.equal(result.noLineageCount, 3, 'non-vacuity: every issue in T must be noLineage — the point of this fixture');
 
     // `!== 0` is explicitly not sufficient — the distinction between a
-    // genuine 0 and an absent value is the point (render-kpis.test.js:475
-    // already pins it on the render side).
+    // genuine 0 and an absent value is the point (the render-side pin went
+    // with the public cost card in LIN-3703).
     assert.equal(result.unknownHarnessShare, null, 'must be null, not 0, over a population the system knows nothing about');
     assert.equal(result.opencodeSummedShare, null, 'must be null, not 0, over a population the system knows nothing about');
   });

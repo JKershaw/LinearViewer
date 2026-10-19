@@ -13,6 +13,7 @@ import {
   PRIVACY_PROCESSORS,
   PRIVACY_CONTACT_EMAIL
 } from '../../lib/render-legal.js';
+import { PUBLIC_COUNT_FLOOR } from '../../lib/kpi-stats.js';
 import { HEARTBEAT_TTL_MS } from '../../lib/consumer-heartbeat-store.js';
 import { SESSION_TTL_SECONDS } from '../../lib/session-options.js';
 import { THEME_COOKIE_MAX_AGE_MS } from '../../lib/user-preferences.js';
@@ -184,5 +185,14 @@ describe('terms page', () => {
     const terms = renderTermsOfService();
     assert.match(terms, /<a href="\/privacy">Privacy Policy<\/a>/);
     assert.match(terms, /href="https:\/\/github\.com\/JKershaw\/LinearViewer\/issues"/);
+  });
+});
+
+describe('privacy page: the public /kpis counts (LIN-3703)', () => {
+  test('says the public page shows totals and counts, counts below the floor as "fewer than N", and never names, workspace keys or content', () => {
+    assert.ok(
+      text.includes(`The public statistics page ( /kpis ) shows totals and counts only: a count below ${PUBLIC_COUNT_FLOOR} shows as &ldquo;fewer than ${PUBLIC_COUNT_FLOOR}&rdquo;, and it never shows names, workspace keys or content.`),
+      text.slice(text.indexOf('public statistics'), text.indexOf('public statistics') + 240)
+    );
   });
 });

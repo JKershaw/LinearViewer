@@ -51,7 +51,7 @@
     {
       "name": "Platform & plumbing",
       "match": [
-        "^lib/utils/|^lib/(db-indexes|scheduler|hourly-cleanup|errors|async-errors|sse|http-keepalive|loose-json|deploy-info|feature-defaults|read-horizon|secret-scan|scan-public-pages|partial-write-error|drop-shares-collection|expire-ownerless-dispatch-tokens|kpi-stats|workspace-kpi-stats|milestone-funnel|free-tier-store|plan-fee-config|pricing-conformance-sweep|workflow-config)\\.js$"
+        "^lib/utils/|^lib/(db-indexes|scheduler|hourly-cleanup|errors|async-errors|sse|http-keepalive|loose-json|deploy-info|feature-defaults|read-horizon|secret-scan|scan-public-pages|partial-write-error|drop-shares-collection|expire-ownerless-dispatch-tokens|kpi-stats|kpi-page|workspace-kpi-stats|milestone-funnel|free-tier-store|plan-fee-config|pricing-conformance-sweep|workflow-config)\\.js$"
       ]
     },
     {

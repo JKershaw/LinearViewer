@@ -52,7 +52,7 @@ import { primePrStateCache, clearPrStateCache, prStateUpstreamFetchCount } from 
  * @param {Function} options.getWorkspaceAccessToken - Function to look up workspace access token
  * @param {Object} options.dispatchHistoryCollection - Raw dispatch-history collection (LIN-3002: /kpis aggregation-failure fault injection)
  * @param {Object} options.proxyEventsCollection - Raw proxy-events collection (LIN-3002: /kpis aggregation-failure fault injection)
- * @param {Function} options.resetKpiCache - Resets server.js's kpiCache to cold (LIN-3002)
+ * @param {Function} options.resetKpiCache - Resets lib/kpi-page.js's cache (LIN-3002; server.js wires it)
  * @param {Object|null} [options.emailTransport] - The capture email transport (LIN-1892), or null when email sign-in isn't in capture mode
  * @param {Object|null} [options.commentDedupe] - In-process comment dedupe cache (LIN-3198 reset seam), or null when not wired
  * @param {Object|null} [options.decisionStampDedupe] - In-process decision-stamp dedupe cache (LIN-3198), or null
