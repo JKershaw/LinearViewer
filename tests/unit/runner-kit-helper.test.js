@@ -56,6 +56,9 @@ import {
   recoverAction,
   watchdogAction,
   watchdogSweep,
+  stallCandidates,
+  transcriptFinished,
+  dispatchEvidence,
   canPost,
   wakeRootFrom,
   sumTranscriptUsage,
@@ -695,6 +698,131 @@ describe('watchdogAction', () => {
   test('no transcript: silence is measured from the take', () => {
     const r = watchdogAction(inflight, NOW, { stallMin: WATCHDOG_STALL_MIN, failMin: WATCHDOG_FAIL_MIN, transcriptMtime: null });
     assert.equal(r.action, 'fail');
+  });
+});
+
+// LIN-3669: the watchdog judged silence alone, so a run that had already finished
+// (Harbour settled it, or the subagent printed its outcome and the parent never
+// posted the marker) was failed at minute 60, and Harbour's last-wins terminal
+// read let that [failed] override an earlier [done]. Evidence is injected into
+// the pure decision; with none, every case above is unchanged.
+describe('watchdogAction with dispatch evidence (LIN-3669)', () => {
+  const inflight = { itemId: K, agentId: 'agent-k', takenAt: new Date(NOW - 90 * 60_000).toISOString() };
+  const at = (mins, evidence, row = inflight) => watchdogAction(row, NOW, { transcriptMtime: NOW - mins * 60_000, evidence });
+  const LATE = WATCHDOG_FAIL_MIN + 1;
+  const FINISHED_MSG = '[blocked] stalled: subagent agent-k finished but its outcome was never posted';
+
+  for (const [status, dispatch] of [['done', 'terminal'], ['closed', 'terminal']]) {
+    test(`silent 61 min, Harbour already ${status}: settled, nothing posted`, () => {
+      const r = at(LATE, { dispatch, finished: false });
+      assert.equal(r.action, 'settle');
+      assert.equal(r.message, null);
+      assert.equal(r.stop, true);
+    });
+  }
+  test('settled wins over finished, and also over a would-be [blocked]', () => {
+    assert.equal(at(LATE, { dispatch: 'terminal', finished: true }).action, 'settle');
+    assert.equal(at(WATCHDOG_STALL_MIN + 1, { dispatch: 'terminal', finished: false }).action, 'settle');
+  });
+  test('a finished transcript gets the non-terminal [blocked], never [failed]', () => {
+    for (const mins of [WATCHDOG_STALL_MIN + 1, LATE]) {
+      const r = at(mins, { dispatch: 'open', finished: true });
+      assert.equal(r.action, 'block');
+      assert.equal(r.finished, true);
+      assert.equal(r.stop, false);
+      assert.equal(r.message, FINISHED_MSG);
+      assert.equal(findTerminalFeedback(fb(r.message)), null);
+      assert.equal(findWakeEvent(fb(r.message)).marker, 'blocked');
+    }
+  });
+  test('finished with [blocked] already posted: nothing posted again', () => {
+    const blockedAt = new Date(NOW - 5 * 60_000).toISOString();
+    assert.equal(at(LATE, { dispatch: 'open', finished: true }, { ...inflight, blockedAt }), null);
+  });
+  test('unreadable read at 61 min: defer (nothing terminal), at 21 min: today\'s [blocked]', () => {
+    const d = at(LATE, { dispatch: 'unreadable', finished: false });
+    assert.equal(d.action, 'defer');
+    assert.equal(d.message, null);
+    assert.equal(d.stop, false);
+    const b = at(WATCHDOG_STALL_MIN + 1, { dispatch: 'unreadable', finished: false });
+    assert.equal(b.action, 'block');
+    assert.match(b.message, /^\[blocked\] stalled: subagent agent-k silent for 21 min$/);
+  });
+  test('a genuinely silent row with a non-terminal status still gets [failed] stalled', () => {
+    const r = at(LATE, { dispatch: 'open', finished: false });
+    assert.equal(r.action, 'fail');
+    assert.equal(findTerminalFeedback(fb(r.message)).status, 'failed');
+  });
+  test('evidence never creates a stall: recent activity stays null / clear', () => {
+    assert.equal(at(1, { dispatch: 'terminal', finished: true }), null);
+    const blockedAt = new Date(NOW - 10 * 60_000).toISOString();
+    assert.equal(at(1, { dispatch: 'terminal', finished: true }, { ...inflight, blockedAt }).action, 'clear');
+  });
+  test('watchdogSweep: settle marks the row done without posting; defer leaves the ledger alone', () => {
+    const ledger = ledgerWith([
+      { itemId: K, agentId: 'agent-k', rootItemId: K, state: 'running', tokenId: 't', takenAt: new Date(NOW - 90 * 60_000).toISOString() },
+      { itemId: W1, agentId: 'agent-w', rootItemId: W1, state: 'running', tokenId: 't', takenAt: new Date(NOW - 90 * 60_000).toISOString() }
+    ]);
+    const r = watchdogSweep(ledger, NOW, {
+      currentTokenId: 't', transcriptMtimeFor: () => null,
+      evidenceFor: (row) => (row.itemId === K ? { dispatch: 'terminal', finished: false } : { dispatch: 'unreadable', finished: false })
+    });
+    const by = Object.fromEntries(r.actions.map((a) => [a.itemId, a]));
+    assert.equal(by[K].action, 'settle');
+    assert.equal(by[K].post, false);
+    assert.equal(r.ledger.items[K].state, 'done');
+    assert.equal(by[W1].action, 'defer');
+    assert.equal(by[W1].post, false);
+    assert.deepEqual(r.ledger.items[W1], ledger.items[W1]);
+  });
+  test('watchdogSweep: a finished block sets blockedAt and carries finished', () => {
+    const ledger = ledgerWith([{ itemId: K, agentId: 'agent-k', rootItemId: K, state: 'running', tokenId: 't', takenAt: new Date(NOW - 90 * 60_000).toISOString() }]);
+    const r = watchdogSweep(ledger, NOW, { currentTokenId: 't', transcriptMtimeFor: () => null, evidenceFor: () => ({ dispatch: 'open', finished: true }) });
+    assert.equal(r.actions[0].action, 'block');
+    assert.equal(r.actions[0].finished, true);
+    assert.equal(r.actions[0].post, true);
+    assert.equal(r.ledger.items[K].state, 'running');
+    assert.ok(r.ledger.items[K].blockedAt);
+  });
+  test('stallCandidates: only running rows past a threshold', () => {
+    const ledger = ledgerWith([
+      { itemId: K, agentId: 'agent-k', rootItemId: K, state: 'running', tokenId: 't', takenAt: new Date(NOW - 90 * 60_000).toISOString() },
+      { itemId: W1, agentId: 'agent-w', rootItemId: W1, state: 'running', tokenId: 't', takenAt: new Date(NOW - 90 * 60_000).toISOString() },
+      { itemId: 'dddddddd', agentId: 'agent-d', rootItemId: 'dddddddd', state: 'done', tokenId: 't', takenAt: new Date(NOW - 90 * 60_000).toISOString() }
+    ]);
+    const rows = stallCandidates(ledger, NOW, { transcriptMtimeFor: (row) => (row.itemId === W1 ? NOW - 60_000 : null) });
+    assert.deepEqual(rows.map((r) => r.itemId), [K]);
+  });
+});
+
+describe('transcriptFinished (LIN-3669)', () => {
+  const entry = (type, content) => JSON.stringify({ type, message: { role: type, content } });
+  const text = (t) => entry('assistant', [{ type: 'text', text: t }]);
+  test('ends with each closing-contract outcome line (a DECISION: line may precede it)', () => {
+    for (const line of ['DONE: shipped', 'FAILED: no repro', 'BLOCKED: needs a key']) {
+      assert.equal(transcriptFinished([entry('user', 'go'), text(`DECISION: x\n${line}\n`), '']), true, line);
+    }
+  });
+  test('ends with a tool_use or a user entry: not finished, even after an earlier DONE:', () => {
+    assert.equal(transcriptFinished([text('DONE: x'), entry('assistant', [{ type: 'tool_use', id: 't', name: 'Bash', input: {} }])]), false);
+    assert.equal(transcriptFinished([text('DONE: x'), entry('user', 'carry on')]), false);
+  });
+  test('prose mentioning DONE: mid-line, empty and garbage lines: not finished', () => {
+    assert.equal(transcriptFinished([text('I am not DONE: yet')]), false);
+    assert.equal(transcriptFinished([]), false);
+    assert.equal(transcriptFinished(['', 'not json', '{']), false);
+  });
+});
+
+describe('dispatchEvidence (LIN-3669)', () => {
+  test('200 with a terminal status is terminal; skipped and live statuses are open', () => {
+    for (const s of ['done', 'failed', 'aborted', 'closed']) assert.equal(dispatchEvidence({ status: 200, json: { status: s } }), 'terminal', s);
+    for (const s of ['skipped', 'taken', 'queued', 'running']) assert.equal(dispatchEvidence({ status: 200, json: { status: s } }), 'open', s);
+  });
+  test('non-200, a missing body or a thrown call is unreadable', () => {
+    assert.equal(dispatchEvidence({ status: 404, json: { error: 'nf' } }), 'unreadable');
+    assert.equal(dispatchEvidence({ status: 500, json: null }), 'unreadable');
+    assert.equal(dispatchEvidence(null), 'unreadable');
   });
 });
 
@@ -1508,6 +1636,55 @@ describe('commands (against a fake Harbour)', () => {
     assert.equal(mine.posted, false);
     assert.ok(ledgerNow().items[row.itemId].blockedAt);
     assert.ok(!harbour.state.feedback.slice(before).some((f) => f.itemId === row.itemId));
+  });
+
+  // A row this token took and handed off (so Harbour accepts its posts), aged `mins` back.
+  const takeAged = async (mins) => {
+    const it = harbour.enqueue();
+    await run(['poll']);
+    await run(['take', it.id]);
+    await run(['handoff', it.id, `agent-${it.id.slice(0, 6)}`]);
+    const file = join(home, 'acme', 'ledger.json');
+    const ledger = JSON.parse(readFileSync(file, 'utf8'));
+    ledger.items[it.id].takenAt = new Date(Date.now() - mins * 60_000).toISOString();
+    writeFileSync(file, JSON.stringify(ledger));
+    harbour.state.queue.length = 0;
+    return ledger.items[it.id];
+  };
+
+  // LIN-3669: the watchdog reads Harbour before a terminal post. The fake's watch
+  // entry is the dispatch the kit reads; a row silent 61 minutes whose item is
+  // already settled must not get [failed] stalled over that finish.
+  test('LIN-3669: a row silent 61 min whose dispatch is done posts nothing, ends done, and wait does not stall', TIMEOUT, async () => {
+    harbour.state.queue.length = 0;
+    const row = await takeAged(61);
+    harbour.state.watch.set(row.itemId, { id: row.itemId, status: 'done' });
+    const before = harbour.state.feedback.length;
+    const r = await run(['wait'], { waitPollMs: 10, waitHeartbeatMs: 10, waitCapMs: 400 });
+    assert.equal(r.reason, 'cap');
+    assert.equal(ledgerNow().items[row.itemId].state, 'done');
+    assert.ok(!harbour.state.feedback.slice(before).some((f) => f.itemId === row.itemId));
+  });
+
+  test('LIN-3669: a transcript ending in DONE: gets exactly one [blocked] … finished …, stays running, never [failed]', TIMEOUT, async () => {
+    harbour.state.queue.length = 0;
+    const row = await takeAged(61);
+    harbour.state.watch.set(row.itemId, { id: row.itemId, status: 'taken' });
+    const dir = join(home, 'transcripts');
+    mkdirSync(dir, { recursive: true });
+    const tfile = join(dir, `agent-${row.agentId}.jsonl`);
+    writeFileSync(tfile, `${JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: 'DONE: shipped' }] } })}\n`);
+    const old = new Date(Date.now() - 61 * 60_000);
+    utimesSync(tfile, old, old);
+    const before = harbour.state.feedback.length;
+    const first = await run(['wait'], { waitPollMs: 10, waitHeartbeatMs: 10 });
+    assert.equal(first.reason, 'stall');
+    assert.equal(first.stalls.find((x) => x.itemId === row.itemId).finished, true);
+    await run(['wait'], { waitPollMs: 10, waitHeartbeatMs: 10, waitCapMs: 300 });
+    const posts = harbour.state.feedback.slice(before).filter((f) => f.itemId === row.itemId);
+    assert.equal(posts.length, 1);
+    assert.equal(posts[0].body.message, `[blocked] stalled: subagent ${row.agentId} finished but its outcome was never posted`);
+    assert.equal(ledgerNow().items[row.itemId].state, 'running');
   });
 
   test('F2: an abort of an old-token target acks, stops it, and skips the child post', TIMEOUT, async () => {

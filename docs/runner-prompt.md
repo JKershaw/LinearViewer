@@ -207,9 +207,10 @@ Harbour reads.
 
 With no Simple Dispatcher reaper, the kit watches for you. A running item silent for
 {{WATCHDOG_STALL_MIN}} minutes (no transcript activity, or never handed off) gets
-`[blocked] stalled: …`; one silent for {{WATCHDOG_FAIL_MIN}} minutes gets `[failed] stalled: …`.
-When `wait` exits with `stall`, stop each subagent marked `stop: true`. A `[blocked] stalled`
-subagent that revives is cleared; a second stall is flagged again.
+`[blocked] stalled: …`; one silent for {{WATCHDOG_FAIL_MIN}} minutes gets `[failed] stalled: …`,
+unless Harbour settled it (nothing posted) or the subagent printed its outcome (a `[blocked] stalled`
+that says it finished but never posted: post its §4 marker). When `wait` exits with `stall`, stop each subagent marked `stop: true`.
+A `[blocked] stalled` subagent that revives is cleared; a second stall is flagged again.
 
 ## 6. Halts are binding
 
