@@ -236,6 +236,55 @@ describe('createInstallationTokenResolver', () => {
     assert.equal(posts(), 2, 'retried once the error TTL has passed');
   });
 
+  test('LIN-3673: an owner-seam throw is the error-TTL path (60 s, with a warn), not the 5 min "not the owner" null', async () => {
+    const getterThrows = { get status() { throw new Error('getter down'); } };
+    const rows = [
+      ['rejected Error', async () => { throw new Error('seam down'); }, 'seam down'],
+      ['status getter throw', async () => getterThrows, 'getter down'],
+      ['thrown string', async () => { throw 'plain'; }, 'unknown error'],
+      ['thrown undefined', async () => { throw undefined; }, 'unknown error']
+    ];
+    for (const [label, ownerAnswer, text] of rows) {
+      let t = NOW;
+      const github = fakeGitHub({ clock: () => t });
+      const { installationTokenFor, ownerChecks } = makeSeam({
+        rows: [connection(OWNER, 'github', 'inst-1')], github, clock: () => t, ownerAnswer
+      });
+      const warns = [];
+      const orig = console.warn;
+      console.warn = (...a) => warns.push(a.join(' '));
+      try {
+        for (let i = 0; i < 5; i++) assert.equal(await installationTokenFor({ workspaceId: WS, repo: REPO }), null, label);
+        assert.equal(ownerChecks.length, 1, `${label}: remembered inside the error TTL`);
+        assert.deepEqual(warns, [`[installation-token] repo installation lookup failed: ${text}`], label);
+        t = NOW + 61 * 1000; // past the 60 s error TTL, well inside the 5 min lookup TTL
+        await installationTokenFor({ workspaceId: WS, repo: REPO });
+        assert.equal(ownerChecks.length, 2, `${label}: the seam re-runs once the error TTL has passed`);
+        assert.equal(warns.length, 2, `${label}: and warns again`);
+      } finally { console.warn = orig; }
+      assert.equal(github.calls.length, 0, `${label}: GitHub is never asked`);
+    }
+  });
+
+  test('LIN-3673: an unrecognised owner answer is the quiet 5 min null (no warn, no re-run at 61 s)', async () => {
+    for (const answer of [null, 5, { status: 'weird' }, { status: 'not-owner' }]) {
+      let t = NOW;
+      const { installationTokenFor, ownerChecks } = makeSeam({
+        rows: [connection(OWNER, 'github', 'inst-1')], clock: () => t, ownerAnswer: async () => answer
+      });
+      const warns = [];
+      const orig = console.warn;
+      console.warn = (...a) => warns.push(a.join(' '));
+      try {
+        assert.equal(await installationTokenFor({ workspaceId: WS, repo: REPO }), null);
+        t = NOW + 61 * 1000;
+        assert.equal(await installationTokenFor({ workspaceId: WS, repo: REPO }), null);
+      } finally { console.warn = orig; }
+      assert.equal(ownerChecks.length, 1, `${JSON.stringify(answer)}: cached past the error TTL`);
+      assert.deepEqual(warns, []);
+    }
+  });
+
   test('N2: the lookup cache is bounded: a flood of distinct repos evicts the oldest entry', async () => {
     const github = fakeGitHub({ coveredBy: null });
     const { installationTokenFor } = makeSeam({ rows: [connection(OWNER, 'github', 'inst-1')], github });

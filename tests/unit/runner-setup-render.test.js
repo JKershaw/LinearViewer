@@ -234,6 +234,27 @@ describe('the route', () => {
     }
   });
 
+  test('LIN-3673: a seam throw is "unavailable" with its own warn text (the thrown message, not the unrecognised-answer tail)', async () => {
+    const getterThrows = { get status() { throw new Error('getter down'); } };
+    const rows = [
+      ['rejected Error', () => Promise.reject(new Error('seam down')), 'seam down'],
+      ['sync Error', () => { throw new Error('sync down'); }, 'sync down'],
+      ['status getter throw', () => getterThrows, 'getter down'],
+      ['thrown string', () => Promise.reject('plain string'), 'plain string'],
+      ['thrown null (LIN-3654)', () => Promise.reject(null), 'null'],
+      ['thrown undefined', () => Promise.reject(undefined), 'undefined']
+    ];
+    for (const [label, ownerCheck, text] of rows) {
+      const warns = [];
+      const orig = console.warn;
+      console.warn = (...a) => warns.push(a.join(' '));
+      let r;
+      try { r = await get(app({ ownerCheck }).app); } finally { console.warn = orig; }
+      assert.match(r.body, /data-state="unavailable"/, label);
+      assert.deepEqual(warns, [`Runner setup: owner check unavailable (urlKey=acme): ${text}`], label);
+    }
+  });
+
   test('LIN-3648: a recognised answer does not warn', async () => {
     const warns = [];
     const orig = console.warn;

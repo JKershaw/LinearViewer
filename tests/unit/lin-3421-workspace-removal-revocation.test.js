@@ -190,6 +190,37 @@ describe('workspace removal revokes the removing account\'s artifacts (LIN-3421)
     }
   });
 
+  test('LIN-3673: a seam throw logs one fixed line, keeps the lineage, and an unrecognised answer is silent', async () => {
+    const getterThrows = { get status() { throw new Error('getter down'); } };
+    const thrown = [
+      ['rejected Error', async () => { throw new Error('down'); }, 'down'],
+      ['status getter throw', async () => getterThrows, 'getter down'],
+      ['thrown string', async () => { throw 'plain'; }, 'plain'],
+      ['thrown undefined', async () => { throw undefined; }, undefined],
+      ['thrown null', async () => { throw null; }, null]
+    ];
+    const logsFor = async (check) => {
+      await proxy.mintGrantBootstrap({ urlKey: KEY, workspaceId: WS, ownerAccountId: 'acct-a', grants: ['take'], label: 'runner' });
+      const lines = [];
+      const orig = console.error;
+      console.error = (...a) => lines.push(a);
+      try {
+        await createWorkspaceRemovalRevoker({
+          proxyTokenStore: proxy, dispatchTokenStore: dispatch, taskShareStore: shares, workspaceOwnerCheck: check
+        }).revoke({ urlKey: KEY, workspaceId: WS, accountId: 'acct-a' });
+      } finally { console.error = orig; }
+      return { lines };
+    };
+    for (const [label, check, shown] of thrown) {
+      const { lines } = await logsFor(check);
+      assert.deepEqual(lines, [['Workspace removal: owner check failed:', shown]], label);
+    }
+    for (const answer of [null, undefined, 5, { status: 'weird' }]) {
+      const { lines } = await logsFor(async () => answer);
+      assert.deepEqual(lines, [], `unrecognised answer ${String(answer)} does not log`);
+    }
+  });
+
   test('one failing store does not block the others', async () => {
     const a = await seed('acct-a');
     revoker = createWorkspaceRemovalRevoker({

@@ -201,6 +201,38 @@ describe('LIN-3129 — owner is re-checked at exchange for grant-bearing bootstr
     }
   });
 
+  test('LIN-3673: a seam throw logs one fixed line and fails closed; an unrecognised answer fails closed silently', async () => {
+    const getterThrows = { get status() { throw new Error('getter down'); } };
+    const thrown = [
+      ['rejected Error', async () => { throw new Error('boom'); }, 'boom'],
+      ['status getter throw', async () => getterThrows, 'getter down'],
+      ['thrown string', async () => { throw 'plain'; }, 'plain'],
+      ['thrown undefined', async () => { throw undefined; }, undefined],
+      ['thrown null', async () => { throw null; }, null]
+    ];
+    const run = async (check) => {
+      const { store, collection } = newStore(check);
+      const plain = 'boot-' + crypto.randomUUID();
+      const boot = await seedDoc(collection, { plain, grants: ['take'] });
+      const lines = [];
+      const orig = { error: console.error, warn: console.warn };
+      console.error = (...a) => lines.push(a);
+      console.warn = () => {};
+      let working;
+      try { working = await store.exchangeBootstrapToken(plain); } finally { Object.assign(console, orig); }
+      assert.equal(working, null);
+      assert.equal(docById(collection, boot._id).consumed, true, 'the bootstrap is spent');
+      assert.equal(standardDocs(collection).length, 0);
+      return lines;
+    };
+    for (const [label, check, shown] of thrown) {
+      assert.deepEqual(await run(check), [['Owner re-check failed during exchange:', shown]], label);
+    }
+    for (const answer of [null, undefined, 5, { status: 'weird' }]) {
+      assert.deepEqual(await run(async () => answer), [], `unrecognised answer ${String(answer)} does not log`);
+    }
+  });
+
   test('an unwired seam fails closed for a grant-bearing bootstrap', async () => {
     const { store, collection } = newStore(); // no setOwnerCheck
     const plain = 'boot-' + crypto.randomUUID();
