@@ -120,6 +120,7 @@ function makeContext({ workspace, durableRecord, calls, refreshOnResolveGate }) 
     // LIN-1892: handleWorkspaceRemoval's landing render reads the email predicate.
     isEmailSignInAvailable: () => false,
     getFreeTierKey: () => null,
+    isFreeTierOffered: () => false,
     getProvider: () => ({ entryCta: { isConfigured: () => true } }),
     Date,
     process: { env: {} },
