@@ -164,10 +164,13 @@ describe('LIN-2522 — roadmap route fetches the team list unconditionally', () 
   });
 
   test('a filtered load (teamId present) calls provider.fetchTeams exactly once, same as before', async () => {
-    const { calls } = await runRoadmapRoute({ isTestMode: false, teamId: 't1', fetchedTeams: [{ id: 't1', name: 'Engineering' }], matchedTeamId: 't1' });
+    // LIN-3683: the raw request id ('Engineering') differs from the id
+    // matchTeamId resolves it to ('t1'), so a handler that hands the raw
+    // teamId to fetchProjects instead of the matched id fails here.
+    const { calls } = await runRoadmapRoute({ isTestMode: false, teamId: 'Engineering', fetchedTeams: [{ id: 't1', name: 'Engineering' }], matchedTeamId: 't1' });
     assert.equal(calls.fetchTeamsCallCount, 1);
-    assert.equal(calls.matchTeamIdArgs.rawTeamId, 't1');
-    assert.equal(calls.fetchProjectsArgs[1], 't1', 'the matched team id must reach fetchProjects');
+    assert.equal(calls.matchTeamIdArgs.rawTeamId, 'Engineering');
+    assert.equal(calls.fetchProjectsArgs[1], 't1', 'the matched team id (not the raw request id) must reach fetchProjects');
   });
 
   test('AC2 — isTestMode arm is unchanged: no real provider call for teams OR projects, even unfiltered (the LIN-1034 regression guard)', async () => {
