@@ -177,13 +177,14 @@ function applyFilter(filterKey) {
 function getStateInfo(stateType) {
   switch (stateType) {
     case 'completed':
+      return { char: '\u2713', cls: 'done' };
     case 'canceled':
     case 'duplicate':
-      return { char: '\u2713', cls: 'done' };
+      return { char: '\u2715', cls: 'done' };
     case 'started':
       return { char: '\u25D0', cls: 'in-progress' };
     case 'backlog':
-      return { char: '\u25CB', cls: 'backlog' };
+      return { char: '\u25CC', cls: 'backlog' };
     default:
       return { char: '\u25CB', cls: 'todo' };
   }

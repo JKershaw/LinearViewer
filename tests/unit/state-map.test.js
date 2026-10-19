@@ -50,8 +50,8 @@ describe('models.js canonical vocabulary', () => {
 describe('getStateDisplay', () => {
   const expected = {
     completed: { class: 'done', char: '✓', label: 'Completed' },
-    canceled: { class: 'done', char: '✓', label: 'Completed' },
-    duplicate: { class: 'done', char: '✓', label: 'Completed' },
+    canceled: { class: 'done', char: '✕', label: 'Cancelled' },
+    duplicate: { class: 'done', char: '✕', label: 'Cancelled' },
     started: { class: 'in-progress', char: '◐', label: 'In Progress' },
     backlog: { class: 'backlog', char: '◌', label: 'Backlog' },
     unstarted: { class: 'todo', char: '○', label: 'To Do' },
@@ -66,6 +66,8 @@ describe('getStateDisplay', () => {
   test('unknown/undefined falls back to To Do (matches render default)', () => {
     assert.deepEqual(getStateDisplay(undefined), { class: 'todo', char: '○', label: 'To Do' });
     assert.deepEqual(getStateDisplay('mystery'), { class: 'todo', char: '○', label: 'To Do' });
+    assert.deepEqual(getStateDisplay('triage'), { class: 'todo', char: '○', label: 'To Do' });
+    assert.deepEqual(getStateDisplay(null), { class: 'todo', char: '○', label: 'To Do' });
   });
 });
 
@@ -160,4 +162,22 @@ describe('browser terminal-state predicate (public/common.js)', () => {
       assert.equal(sandbox.window.isTerminalState(type), isTerminalState(type));
     });
   }
+});
+
+// LIN-3674: a closed task draws the same everywhere. The class is 'done' for all three
+// terminal types (data-status and the done styling are unchanged); only char/label vary.
+describe('getStateDisplay: closed-but-not-completed', () => {
+  test('only completed is a check; canceled and duplicate are a cross reading Cancelled', () => {
+    assert.equal(getStateDisplay('completed').char, '✓');
+    for (const type of ['canceled', 'duplicate']) {
+      assert.equal(getStateDisplay(type).char, '✕', type);
+      assert.equal(getStateDisplay(type).label, 'Cancelled', type);
+    }
+  });
+
+  test('class stays done for every terminal type', () => {
+    for (const type of ['completed', 'canceled', 'duplicate']) {
+      assert.equal(getStateDisplay(type).class, 'done', type);
+    }
+  });
 });

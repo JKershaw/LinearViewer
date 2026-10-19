@@ -500,3 +500,25 @@ describe('shared renderers stay as the run page has them (LIN-3356)', () => {
     }
   });
 });
+
+// LIN-3674 — the reference lists (blockers, parent, subtasks) take their glyph from
+// getStateDisplay, so a closed task reads the same here as on the dashboard.
+describe('reference-list state glyph (LIN-3674)', () => {
+  const GLYPHS = [
+    ['completed', '✓'], ['canceled', '✕'], ['duplicate', '✕'], ['started', '◐'],
+    ['unstarted', '○'], ['backlog', '◌'], ['triage', '○'],
+  ];
+
+  test('each state type draws the getStateDisplay glyph; an absent state draws ○', () => {
+    const mdl = model('no-sessions');
+    const subtasks = [
+      ...GLYPHS.map(([type], i) => ({ identifier: `LIN-${100 + i}`, title: type, state: { name: type, type } })),
+      { identifier: 'LIN-200', title: 'no state', state: null },
+    ];
+    mdl.tracker = { ...mdl.tracker, subtasks };
+    const html = renderTaskPage(mdl, { viewer: 'owner', urlKey: 'acme', binding: BINDING, now: NOW, pageOptions: PAGE_OPTIONS });
+    const list = html.match(/<ul class="task-ref-list" data-testid="task-page-subtasks">.*?<\/ul>/s)[0];
+    const glyphs = [...list.matchAll(/class="task-ref-glyph" aria-hidden="true">([^<]*)</g)].map(m => m[1]);
+    assert.deepEqual(glyphs, [...GLYPHS.map(([, g]) => g), '○']);
+  });
+});

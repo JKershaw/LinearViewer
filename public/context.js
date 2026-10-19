@@ -32,7 +32,7 @@
     return window.api(contextUrl(urlKey, identifier, source), { on401: false });
   }
 
-  // ✓ done · ◐ in-progress · ○ todo/backlog — the shared status vocabulary.
+  // ✓ completed · ✕ canceled/duplicate · ◐ in-progress · ○ todo · ◌ backlog — hand-matched to getStateDisplay.
   function stateGlyph(stateType) {
     switch (stateType) {
       case 'completed': return { char: '✓', cls: 'done' };
@@ -40,6 +40,7 @@
       case 'duplicate': return { char: '✕', cls: 'done' };
       case 'started': return { char: '◐', cls: 'in-progress' };
       case 'unstarted': return { char: '○', cls: 'todo' };
+      case 'backlog': return { char: '◌', cls: 'backlog' };
       default: return { char: '○', cls: 'backlog' };
     }
   }

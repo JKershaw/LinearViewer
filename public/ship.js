@@ -737,10 +737,10 @@
   const computeFitZoom = window.computeFitZoom;
 
   function stateIndicator(stateType) {
-    if (isTerminalState(stateType)) return '<span class="swim-box-state done status-pill__char status-pill--done">✓</span>';
+    if (isTerminalState(stateType)) return '<span class="swim-box-state done status-pill__char status-pill--done">' + (stateType === 'completed' ? '✓' : '✕') + '</span>';
     switch (stateType) {
       case 'started': return '<span class="swim-box-state in-progress status-pill__char status-pill--in-progress">◐</span>';
-      case 'backlog': return '<span class="swim-box-state backlog status-pill__char status-pill--backlog">○</span>';
+      case 'backlog': return '<span class="swim-box-state backlog status-pill__char status-pill--backlog">◌</span>';
       default: return '<span class="swim-box-state todo status-pill__char status-pill--todo">○</span>';
     }
   }

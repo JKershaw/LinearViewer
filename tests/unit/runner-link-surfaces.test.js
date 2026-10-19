@@ -229,3 +229,20 @@ describe('Swipe card (public/swipe.js)', () => {
     assert.ok(!html.includes(TESTID));
   });
 });
+
+// LIN-3674 — the swipe status pill draws the same glyph getStateDisplay does.
+describe('Swipe status pill glyph (LIN-3674)', () => {
+  const PILLS = [
+    ['completed', '✓', 'done'], ['canceled', '✕', 'done'], ['duplicate', '✕', 'done'],
+    ['started', '◐', 'in-progress'], ['unstarted', '○', 'todo'], ['backlog', '◌', 'backlog'],
+    ['triage', '○', 'todo'],
+  ];
+  for (const [stateType, char, cls] of PILLS) {
+    test(`${stateType} draws ${char} in the ${cls} pill`, () => {
+      const data = swipeData();
+      data.issues[0].stateType = stateType;
+      const html = renderSwipeCard(data);
+      assert.ok(html.includes(`<span class="status-pill status-pill--${cls}"><span class="status-pill__char">${char}</span>`), stateType);
+    });
+  }
+});

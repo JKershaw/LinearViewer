@@ -34,6 +34,7 @@ The papers and essays behind Harbour are published unauthenticated at `/library`
 - ◌ (backlog) - `data-status="backlog"` - In the queue (not coming soon)
 - ◐ (in-progress) - `data-status="in-progress"` - In progress
 - ✓ (done) - `data-status="done"` - Completed
+- ✕ (done) - `data-status="done"` - Cancelled (a duplicate task; a canceled task is not shown on the dashboard)
 
 ## DOM Structure
 
