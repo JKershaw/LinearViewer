@@ -1573,6 +1573,36 @@ describe('commands (against a fake Harbour)', () => {
     assert.match(r.message, /rejected \(expired or revoked\)/);
   });
 
+  // LIN-3685: the wake item's root read (`GET /api/proxy/dispatch/:id`) follows a good poll; it classifies like the poll does.
+  test('wait returns network when the wake root read is refused after a good poll', TIMEOUT, async () => {
+    harbour.state.queue.length = 0;
+    const root = harbour.enqueue();
+    harbour.enqueue({ kind: 'wake', dispatchedBy: null, followUpTo: root.id });
+    const refused = Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:1'), { code: 'ECONNREFUSED' }) });
+    const fetchImpl = async (url, init) => {
+      if (/\/api\/proxy\/dispatch\/[^/]+$/.test(String(url))) throw refused;
+      return fetch(url, init);
+    };
+    const r = await run(['wait'], { waitPollMs: 10, waitHeartbeatMs: 10, waitCapMs: 60, fetchImpl });
+    assert.equal(r.reason, 'network');
+    assert.match(r.message, /ECONNREFUSED/);
+    harbour.state.queue.length = 0;
+  });
+
+  test('wait returns credential when the wake root read gets a 401 after a good poll', TIMEOUT, async () => {
+    harbour.state.queue.length = 0;
+    const root = harbour.enqueue();
+    harbour.enqueue({ kind: 'wake', dispatchedBy: null, followUpTo: root.id });
+    const fetchImpl = async (url, init) => {
+      if (/\/api\/proxy\/dispatch\/[^/]+$/.test(String(url))) return new Response('{"error":"unauthorized"}', { status: 401 });
+      return fetch(url, init);
+    };
+    const r = await run(['wait'], { waitPollMs: 10, waitHeartbeatMs: 10, waitCapMs: 60, fetchImpl });
+    assert.equal(r.reason, 'credential');
+    assert.match(r.message, /rejected \(expired or revoked\)/);
+    harbour.state.queue.length = 0;
+  });
+
   // LIN-3451: the target gate lives in preConfirmDecision, which wait calls too; a dash item is not work.
   test('wait does not report a dash-target item as work (left queued, target:dash)', TIMEOUT, async () => {
     harbour.state.queue.length = 0;
