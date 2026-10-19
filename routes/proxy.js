@@ -76,7 +76,7 @@ import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
 import { hashContext } from '../lib/recap-cache.js';
 import { snapshotFromContext } from '../lib/task-snapshot-store.js';
-import { isBlocked } from '../lib/providers/state-map.js';
+import { isBlocked, isTerminalState } from '../lib/providers/state-map.js';
 import { buildTaskStack } from '../lib/task-stack.js';
 import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
 import { getPeriodicals, resolvePeriodicalIdFromGateMarker } from '../lib/periodicals.js';
@@ -1413,7 +1413,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       // label and a blocking RELATIONSHIP (LIN-357: blocked is the relationship, not a
       // label) still take precedence so the existing routes stay covered.
       const mockChildren = mockData.issues.filter(i => i.parent?.id === mockIssue.id);
-      const focusChild = mockChildren.find(c => c.state?.type !== 'completed' && c.state?.type !== 'canceled');
+      const focusChild = mockChildren.find(c => !isTerminalState(c.state?.type));
 
       if (labels.includes('bug')) {
         reasoning = 'This is a bug. Investigating systematically will help find the root cause.';

@@ -25,6 +25,7 @@ import { createChatToolCatalog, deriveFollowUpDispatch } from '../lib/chat-tools
 import { runAgentTurn } from '../lib/agent-turn.js';
 import { resolveRunnerOwnerRefusal } from '../lib/runner-owner-gate.js';
 import { getSessionsForWorkspace } from '../lib/pipeline-loops.js';
+import { isTerminalState } from '../lib/providers/state-map.js';
 import { UUID_REGEX } from '../lib/dispatch-validation.js';
 import { sessionIsTerminal, enrichLoop } from './dashboard.js';
 import { resolveIssueBinding, isValidIssueId, getWorkspaceCallScope } from '../lib/workspace.js';
@@ -180,9 +181,9 @@ function buildMockSlowStreamFrames() {
  * task is supplied (the simulated tool lookup), the answer references it so the
  * e2e can assert tool-derived data surfaced.
  */
-function buildMockAnswer(context, question, related) {
+export function buildMockAnswer(context, question, related) {
   const issue = context.issue || {};
-  const open = (context.children || []).filter(c => c.state?.type !== 'completed' && c.state?.type !== 'canceled');
+  const open = (context.children || []).filter(c => !isTerminalState(c.state?.type));
   const lines = [
     `You asked: ${String(question).trim()}`,
     `I'm ${issue.identifier || 'this task'}${issue.title ? ` — ${issue.title}` : ''}.`,
