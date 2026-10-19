@@ -38,7 +38,7 @@ describe('privacy page', () => {
   });
 
   test('discloses the consumer heartbeat and its retention (LIN-3637)', () => {
-    assert.match(text, /dispatch consumer, it reports its kind, a random per-process id, its platform, uptime, CPU count, load averages, free and total memory, its active and held session counts, and when it last polled Harbour, about once a minute/);
+    assert.match(text, /dispatch consumer, it reports its kind, a random per-process id, its platform, uptime, CPU count, load averages, free and total memory, its active and held session counts, when it last polled Harbour, and the names of any workspaces it has paused because Harbour rejected their token, about once a minute/);
     assert.match(text, /reports no hostname, username, file path or run content/);
     assert.match(text, new RegExp(`heartbeat is replaced by the next one and stops being served ${HEARTBEAT_TTL_MS / 60000} minutes after the last; the expired record is deleted by an hourly cleanup`));
   });

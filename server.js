@@ -42,7 +42,7 @@ import { CustomPromptsStore } from './lib/custom-prompts-store.js'
 import { CollectiveCharactersStore } from './lib/collective-characters-store.js'
 import { CollectivePresetsStore } from './lib/collective-presets-store.js'
 import { DispatchPresetsStore } from './lib/dispatch-presets-store.js'
-import { DispatchTokenStore } from './lib/dispatch-tokens.js'
+import { DispatchTokenStore, DISPATCH_TOKEN_DEFAULT_TTL_SECONDS } from './lib/dispatch-tokens.js'
 import { HarbourFeedbackTokenStore } from './lib/harbour-feedback-tokens.js'
 import { ProxyTokenStore } from './lib/proxy-tokens.js'
 import { ProxyEventStore } from './lib/proxy-events.js'
@@ -382,7 +382,8 @@ const dispatchQueueStore = new DispatchQueueStore({
 })
 
 const dispatchTokenStore = new DispatchTokenStore({
-  collection: dispatchTokensCollection
+  collection: dispatchTokensCollection,
+  defaultTtlSeconds: DISPATCH_TOKEN_DEFAULT_TTL_SECONDS // LIN-3618: new dispatch tokens live 90 days
 })
 
 // LIN-3421: hoisted from beside its routes — the workspace routes mount (earlier

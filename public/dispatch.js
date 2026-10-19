@@ -927,6 +927,16 @@ async function loadDispatchTokenList(urlKey) {
 }
 
 /**
+ * LIN-3618: a token's expiry as list/modal text. Null or absent `expiresAt` is a
+ * token with no expiry (every legacy row); `now` is injectable for tests.
+ */
+function formatDispatchTokenExpiry(expiresAt, now = new Date()) {
+  if (!expiresAt) return 'never expires'
+  const when = new Date(expiresAt)
+  return `${when.getTime() > now.getTime() ? 'expires' : 'expired'} ${when.toLocaleDateString()}`
+}
+
+/**
  * Render token list in container
  */
 function renderDispatchTokenList(container, tokens, urlKey) {
@@ -952,7 +962,7 @@ function renderDispatchTokenList(container, tokens, urlKey) {
       <div class="card token-item" data-token-id="${escapeHtml(t.tokenId)}">
         <div class="token-info">
           <span class="token-label-text">${escapeHtml(t.label)}</span>
-          <div class="token-meta">created ${created} · ${lastUsed}${ownerless ? ' · ' : ''}${ownerless}</div>
+          <div class="token-meta">created ${created} · ${lastUsed} · ${formatDispatchTokenExpiry(t.expiresAt)}${ownerless ? ' · ' : ''}${ownerless}</div>
         </div>
         <button class="action-btn token-revoke" data-token-id="${escapeHtml(t.tokenId)}">revoke</button>
       </div>
@@ -972,7 +982,7 @@ async function createDispatchToken(urlKey, label) {
 
     // on401:false — keep the existing throw→catch→toast path (no redirect) so
     // the button-text reset in `finally` still runs.
-    const { token } = await api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/tokens`, {
+    const { token, expiresAt } = await api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/tokens`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ label }),
@@ -980,7 +990,7 @@ async function createDispatchToken(urlKey, label) {
     })
 
     // Show token in modal (one-time display)
-    showDispatchTokenModal(token)
+    showDispatchTokenModal(token, expiresAt)
 
     // Refresh list
     await loadDispatchTokenList(urlKey)
@@ -1018,20 +1028,29 @@ async function revokeDispatchToken(urlKey, tokenId) {
 }
 
 /**
- * Show modal with newly created token (one-time display)
+ * LIN-3618: the mint modal's body, pure so it can run under test. Shows the
+ * token's expiry ("expires <date>" / "never expires") beside the one-time token.
  */
-function showDispatchTokenModal(token) {
-  const bodyHtml = `
+function dispatchTokenModalBody(token, expiresAt) {
+  return `
     <p>Copy this token now - it won't be shown again:</p>
     <div class="token-display">
       <span class="token-value">${escapeHtml(token)}</span>
       <button class="token-copy-btn">copy</button>
     </div>
     <div class="token-usage-hint">
+      This token ${formatDispatchTokenExpiry(expiresAt)}.<br>
       Use in Authorization header:<br>
       <code>Authorization: Bearer &lt;token&gt;</code>
     </div>
   `
+}
+
+/**
+ * Show modal with newly created token (one-time display)
+ */
+function showDispatchTokenModal(token, expiresAt) {
+  const bodyHtml = dispatchTokenModalBody(token, expiresAt)
 
   const { modal } = showModal({ className: 'token-modal', title: 'Token Created', bodyHtml })
 

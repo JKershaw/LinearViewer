@@ -140,7 +140,7 @@ describe('LIN-3137 — owner session mints as today', () => {
     const res = await call(app, {});
 
     assert.equal(res.status, 201, JSON.stringify(res.body));
-    assert.deepEqual(Object.keys(res.body).sort(), ['label', 'message', 'token', 'tokenId'].sort());
+    assert.deepEqual(Object.keys(res.body).sort(), ['expiresAt', 'label', 'message', 'token', 'tokenId'].sort());
     assert.equal(res.body.label, 'default');
     assert.ok(res.body.token && res.body.tokenId);
     assert.equal(collection._docs().length, 1, 'the owner mints exactly one token');

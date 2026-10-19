@@ -246,6 +246,8 @@ test.describe('Token Management', () => {
     // Token should be in list
     await expect(page.locator('.token-item .token-label-text')).toContainText('listed-token')
     await expect(page.locator('.token-item .token-meta')).toContainText('created')
+    // LIN-3618: a new token carries a 90-day expiry and the list shows it
+    await expect(page.locator('.token-item .token-meta')).toContainText('expires')
   })
 
   test('can revoke a token', async ({ page }) => {

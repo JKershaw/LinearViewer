@@ -233,7 +233,7 @@ uses which one so a value change there is not also a doc-drift bug here.
 | Agent prompt bootstrap (`{ "purpose": "agent" }`, label `agent-prompt-dispatch`; the Proxy page's "read-write + dispatch") | `LIFETIME_PROFILES.worker` | 48h |
 | Agent prompt working token (its exchange) | `LIFETIME_PROFILES.worker` | 48h |
 | An orchestrator's declared launch credential (kickoff child, owner Autopilot dispatch, feedback autopilot): bootstrap and working token | `LIFETIME_PROFILES.worker` | 48h |
-| Dispatch tokens (`DispatchTokenStore`) | optional `expiresAt` (none by default; checked at validate time only) | no expiry unless `expiresAt` is set; revoked with the workspace by the account that made them |
+| Dispatch tokens (`DispatchTokenStore`) | `expiresAt`, 90 days for new tokens (checked at validate time only) | older rows have no `expiresAt` and keep working until expired; revoked with the workspace by the account that made them |
 
 Every ordinary path an agent reaches programmatically is 48h; a **runner copy** is the 1h/24h
 exception above (re-copy the prompt when its working token expires). There is no mint-time
