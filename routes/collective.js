@@ -36,6 +36,7 @@ import {
   CHARACTER_FIELDS,
 } from '../lib/prompts/collective-participant.js';
 import { SESSION_TARGETS } from '../lib/dispatch-targets.js';
+import { publicOrigin } from '../lib/public-origin.js';
 
 // Substrate is DECIDED (John, 2026-06-13): full Claude Code sessions only.
 // `dash` is pure-code-change execution and `local`/Harbour OS isn't a fan-out
@@ -203,7 +204,7 @@ export function createCollectiveRoutes({
       ? rawTopic.trim().slice(0, 500)
       : DEFAULT_COLLECTIVE_TOPIC;
 
-    const proxyBaseUrl = `${req.protocol}://${req.get('host')}`;
+    const proxyBaseUrl = publicOrigin(req);
     const yapBaseUrl = yapClient?.baseUrl || process.env.YAP_BASE_URL || '';
     const yapPassword = process.env.YAP_PASSWORD || null;
 
@@ -558,7 +559,7 @@ export function createCollectiveRoutes({
       yapBaseUrl: yapClient?.baseUrl || process.env.YAP_BASE_URL || '',
       yapPassword: process.env.YAP_PASSWORD || null,
       topic,
-      proxyBaseUrl: `${req.protocol}://${req.get('host')}`,
+      proxyBaseUrl: publicOrigin(req),
       proxyToken: 'YOUR_READWRITE_PROXY_TOKEN', // placeholder — real token minted at dispatch
       character,
     });

@@ -46,6 +46,7 @@ import { resolveRunnerOwnerRefusal, sendRunnerRefusal } from '../lib/runner-owne
 import { resolveChatCredential } from '../lib/chat-request.js';
 import { resolveAccountGroup } from '../lib/account-group.js';
 import { redactSessionItem, redactSessionItems } from '../lib/dispatch-session-redaction.js';
+import { publicOrigin } from '../lib/public-origin.js';
 
 // Directory for Harbour OS dispatch prompt staging files. The OS tmp dir is
 // shared between the Node server and the Harbour OS terminal that reads the
@@ -392,7 +393,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       let mintedToken;
       if (harbourFeedbackTokenStore) {
         const minted = await harbourFeedbackTokenStore.mintToken(item._id, workspace.urlKey);
-        feedbackUrl = `${req.protocol}://${req.get('host')}/api/dispatch/feedback/${item._id}`;
+        feedbackUrl = `${publicOrigin(req)}/api/dispatch/feedback/${item._id}`;
         mintedToken = minted.token;
       }
 
@@ -1293,7 +1294,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         // where the row vanished between the two reads, where the helper's plain
         // path then mints exactly today's grant-less bootstrap for this caller —
         // never an ownerless one, and never claiming to be declared.
-        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        const baseUrl = publicOrigin(req);
         let resumed;
         try {
           resumed = await provisionResumeCredential({
@@ -1411,7 +1412,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     // lib/wake-credential.js for LIN-3130 S2a so the runner feedback route
     // reuses it rather than forking. The store calls the returned callback
     // between building the wake descriptor and the LIN-1357 CAS/witness update.
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const baseUrl = publicOrigin(req);
     const createdBy = req.dispatchTokenOwner ?? null;
     const provisionWakeCredential = buildWakeCredentialProvisioner({
       proxyTokenStore,

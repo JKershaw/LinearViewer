@@ -36,6 +36,7 @@ import { filterChatTurns } from '../lib/chat-transcript.js';
 import { resolveChatCredential, checkFreeTierGate, CHAT_MESSAGE_MAX_LENGTH, freeTierRefusalBlock } from '../lib/chat-request.js';
 import { sendSSE } from '../lib/sse.js';
 import { badRequest, jsonError, notFound, serverError, serviceUnavailable, unauthorized } from '../lib/errors.js';
+import { publicOrigin } from '../lib/public-origin.js';
 
 const MAX_QUESTION_LENGTH = CHAT_MESSAGE_MAX_LENGTH;
 
@@ -678,7 +679,7 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
           // of these, so a tool-driven follow-up onto a claude-code session can carry
           // a live credential instead of resuming into a dead broker (LIN-1362/1375).
           proxyTokenStore,
-          baseUrl: `${req.protocol}://${req.get('host')}`,
+          baseUrl: publicOrigin(req),
           dispatchedBy: req.session?.accountId || null,
           // LIN-3383: an ordinary (not run-scoped) turn runs send_follow_up in
           // execute mode, which enqueues on the owner's runner: owner-only. A

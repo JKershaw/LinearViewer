@@ -41,6 +41,7 @@ import { getConsumerLastSeenAt } from '../lib/consumer-poll-warning.js';
 import { createHeartbeatIngest } from '../lib/consumer-heartbeat-ingest.js';
 import { isRunnerTarget } from '../lib/runner-owner-gate.js';
 import { SESSION_TARGETS } from '../lib/dispatch-targets.js';
+import { publicOrigin } from '../lib/public-origin.js';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -187,7 +188,7 @@ export function createProxyRunnerRoutes({
 
     // Wake-path credential provisioning policy — shared with the dispatch
     // feedback route (lib/wake-credential.js).
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const baseUrl = publicOrigin(req);
     const createdBy = req.proxyCreatedBy ?? null;
     const provisionWakeCredential = buildWakeCredentialProvisioner({
       proxyTokenStore,

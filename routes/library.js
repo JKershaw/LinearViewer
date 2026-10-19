@@ -27,6 +27,7 @@ import { themePrepaintScriptHash } from '../lib/components/page.js';
 import { DEFAULT_DOCS_ROOT, FIGURE_TYPES, loadLibrary } from '../lib/library.js';
 import { renderLibraryDoc, renderLibraryIndex } from '../lib/render-library.js';
 import { isPublicLibraryPath } from '../lib/guest-task-path.js';
+import { publicOrigin } from '../lib/public-origin.js';
 
 /** The HTML CSP: only the shell's inline theme script may run. */
 export const LIBRARY_CSP = `default-src 'none'; script-src '${themePrepaintScriptHash()}'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; form-action 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'self'`;
@@ -37,11 +38,9 @@ export const MARKDOWN_CSP = "default-src 'none'; sandbox";
 /** The figure CSP: an SVG may style itself, but may not run script or load. */
 export const FIGURE_CSP = "default-src 'none'; style-src 'unsafe-inline'";
 
-/** The absolute origin for canonical tags, from a validated Host header. */
+/** The absolute origin for canonical tags: the configured public origin, else a validated Host header (LIN-3692). */
 function baseUrl(req) {
-  const host = req.get('host') || 'harbour.cat';
-  const safe = /^[a-z0-9.-]+(:\d+)?$/i.test(host) ? host : 'harbour.cat';
-  return `${req.protocol}://${safe}`;
+  return publicOrigin(req, { safeHost: true });
 }
 
 /** XML-escape a value destined for a sitemap `<loc>`/`<lastmod>`. */

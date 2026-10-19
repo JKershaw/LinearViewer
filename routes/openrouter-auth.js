@@ -15,6 +15,7 @@ import { Router } from 'express'
 import { renderErrorPage, renderOpenRouterConsentPage } from '../lib/render.js'
 import { saveSession, getActiveWorkspace } from '../lib/workspace.js'
 import { jsonError } from '../lib/errors.js'
+import { publicOrigin } from '../lib/public-origin.js'
 
 /**
  * Generate a cryptographically secure code verifier for PKCE
@@ -102,7 +103,7 @@ export function createOpenRouterAuthRoutes({ userPreferencesStore } = {}) {
 
     // Build callback URL from environment or derive from request
     const callbackUrl = process.env.OPENROUTER_REDIRECT_URI ||
-      `${req.protocol}://${req.get('host')}/auth/openrouter/callback`
+      `${publicOrigin(req)}/auth/openrouter/callback`
 
     const params = new URLSearchParams({
       callback_url: callbackUrl,

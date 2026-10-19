@@ -84,6 +84,7 @@ import { armKeepalive, armSseKeepalive, clientGoneSignal } from '../lib/http-kee
 import { testMockData } from '../lib/sample-data/mock-data.js';
 import { shouldMockAi } from '../lib/should-mock-ai.js';
 import { sendSSE } from '../lib/sse.js';
+import { publicOrigin } from '../lib/public-origin.js';
 import {
   generateMockRecommendation,
   buildMockRecommendationHop,
@@ -296,7 +297,7 @@ function sendPromptResult(req, res, { json, prompt, identifier, downloadName }) 
 function autopilotParams(req) {
   const mode = AUTOPILOT_MODES.includes(req.query.mode) ? req.query.mode : AUTOPILOT_MODE_DEFAULT;
   const variant = AUTOPILOT_VARIANTS.includes(req.query.variant) ? req.query.variant : AUTOPILOT_VARIANT_DEFAULT;
-  return { mode, variant, stepper: variant === 'stepper', baseUrl: `${req.protocol}://${req.get('host')}` };
+  return { mode, variant, stepper: variant === 'stepper', baseUrl: publicOrigin(req) };
 }
 
 function sendAutopilotPrompt(req, res, { stepper, identifier, promptName, prompt }) {
@@ -3265,7 +3266,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       // 'triage' always enqueues triage, 'autopilot' enqueues a scoped autopilot run
       // carrying the feedback-origin brief. With none (the legacy plain send) the
       // old behaviour holds: triage only when the per-user flag is on.
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const baseUrl = publicOrigin(req);
       // LIN-3238 Q10 free-tier run gate: the title step's `isFreeTier` is scoped to
       // it, so re-derive it at the dispatch point. It goes to both enqueue helpers
       // through `overrides`; a refusal leaves the filed ticket intact and reports

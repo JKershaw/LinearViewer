@@ -39,6 +39,7 @@ import { sessionIsTerminal, enrichLoop } from './dashboard.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { jsonError, keepaliveError } from '../lib/errors.js';
 import { CHAT_MESSAGE_MAX_LENGTH, resolveChatCredential, isAiUnavailable } from '../lib/chat-request.js';
+import { publicOrigin } from '../lib/public-origin.js';
 
 // LIN-2970: a proxy caller's message body is capped the same as the
 // browser's, via the shared chat-lane constant — no longer kept in sync by
@@ -285,7 +286,7 @@ export function createProxyFlightCompanionRoutes({
             getProvider: () => provider,
             getScope: () => accessToken,
             buildCensusSeedText,
-            baseUrl: `${req.protocol}://${req.get('host')}`,
+            baseUrl: publicOrigin(req),
             dispatchedBy: req.proxyCreatedBy || null,
           },
         });

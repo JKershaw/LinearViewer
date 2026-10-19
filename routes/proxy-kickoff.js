@@ -11,6 +11,7 @@ import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPIL
 import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
 import { buildPassageRunnerKickoff } from '../lib/prompts/passage-runner-kickoff.js';
 import { enterKickoff } from '../lib/dispatch-entrance.js';
+import { publicOrigin } from '../lib/public-origin.js';
 
 /**
  * @param {Object} deps
@@ -68,7 +69,7 @@ export function createKickoffRoutes({
    * beat-stepping disposition.
    */
   router.get('/api/proxy/autopilot/kickoff', proxyLimiter, authenticateProxyToken, async (req, res) => {
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const baseUrl = publicOrigin(req);
     const mode = AUTOPILOT_MODES.includes(req.query.mode) ? req.query.mode : AUTOPILOT_MODE_DEFAULT;
     const variant = AUTOPILOT_VARIANTS.includes(req.query.variant) ? req.query.variant : AUTOPILOT_VARIANT_DEFAULT;
     // LIN-2818: unlike the POST body's goal cap (now 100000), this preview-only

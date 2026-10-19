@@ -61,6 +61,10 @@ const MATRIX = [
   { name: 'production / key + from + EMAIL_TRANSPORT=resend, no origin', env: { NODE_ENV: 'production', RESEND_API_KEY: KEY, EMAIL_FROM: FROM, EMAIL_TRANSPORT: 'resend' }, kind: null, step: 'off', warns: true },
   { name: 'unset / key + from + origin (self-hosted with a real key)', env: { RESEND_API_KEY: KEY, EMAIL_FROM: FROM, EMAIL_LINK_ORIGIN: ORIGIN }, kind: 'resend', step: 'on', warns: false },
   { name: 'unset / key + from, no origin (self-hosted)', env: { RESEND_API_KEY: KEY, EMAIL_FROM: FROM }, kind: null, step: 'off', warns: true },
+  // LIN-3692: PUBLIC_ORIGIN is the variable, EMAIL_LINK_ORIGIN its alias.
+  { name: 'production / key + from + PUBLIC_ORIGIN alone', env: { NODE_ENV: 'production', RESEND_API_KEY: KEY, EMAIL_FROM: FROM, PUBLIC_ORIGIN: ORIGIN }, kind: 'resend', step: 'on', warns: false },
+  { name: 'production / key + from + both origins', env: { NODE_ENV: 'production', RESEND_API_KEY: KEY, EMAIL_FROM: FROM, PUBLIC_ORIGIN: ORIGIN, EMAIL_LINK_ORIGIN: 'https://alias.example' }, kind: 'resend', step: 'on', warns: false },
+  { name: 'production / key + from + an invalid PUBLIC_ORIGIN (valid alias is not consulted)', env: { NODE_ENV: 'production', RESEND_API_KEY: KEY, EMAIL_FROM: FROM, PUBLIC_ORIGIN: 'harbour.example', EMAIL_LINK_ORIGIN: ORIGIN }, kind: null, step: 'off', warns: true },
   { name: 'unset / origin only', env: { EMAIL_LINK_ORIGIN: ORIGIN }, kind: null, step: 'off', warns: false },
   { name: 'unset / EMAIL_TRANSPORT=console + origin', env: { EMAIL_TRANSPORT: 'console', EMAIL_LINK_ORIGIN: ORIGIN }, kind: 'console', step: 'off', warns: false },
   { name: 'production / key + from + EMAIL_TRANSPORT=console', env: { NODE_ENV: 'production', RESEND_API_KEY: KEY, EMAIL_FROM: FROM, EMAIL_TRANSPORT: 'console' }, kind: null, step: 'off', warns: true },
@@ -150,6 +154,25 @@ describe('email link origin (Host-header poisoning guard)', () => {
     assert.strictEqual(resolveEmailLinkOrigin({ EMAIL_LINK_ORIGIN: 'http://localhost:3000' }), 'http://localhost:3000');
     assert.strictEqual(resolveEmailLinkOrigin({ EMAIL_LINK_ORIGIN: 'javascript:alert(1)' }), null);
     assert.strictEqual(resolveEmailLinkOrigin({ EMAIL_LINK_ORIGIN: 'not a url' }), null);
+  });
+
+  test('PUBLIC_ORIGIN is read first; the alias applies only when it is unset or empty (LIN-3692)', () => {
+    assert.strictEqual(resolveEmailLinkOrigin({ PUBLIC_ORIGIN: 'https://a.example/x?y=1' }), 'https://a.example');
+    assert.strictEqual(resolveEmailLinkOrigin({ PUBLIC_ORIGIN: 'https://a.example', EMAIL_LINK_ORIGIN: 'https://b.example' }), 'https://a.example');
+    assert.strictEqual(resolveEmailLinkOrigin({ PUBLIC_ORIGIN: '', EMAIL_LINK_ORIGIN: 'https://b.example' }), 'https://b.example');
+    assert.strictEqual(resolveEmailLinkOrigin({ EMAIL_LINK_ORIGIN: 'https://b.example' }), 'https://b.example');
+    assert.strictEqual(resolveEmailLinkOrigin({ PUBLIC_ORIGIN: 'nope', EMAIL_LINK_ORIGIN: 'https://b.example' }), null, 'invalid PUBLIC_ORIGIN: null, alias not consulted');
+  });
+
+  test('the refusal and warning name both variables and keep the pinned substrings (LIN-3692)', () => {
+    const refusal = resolveEmailTransportRefusal({ NODE_ENV: 'production', RESEND_API_KEY: KEY, EMAIL_FROM: FROM, PUBLIC_ORIGIN: 'nope' });
+    assert.match(refusal, /PUBLIC_ORIGIN/);
+    assert.match(refusal, /EMAIL_LINK_ORIGIN/);
+    assert.match(refusal, /not an http\(s\) URL/);
+    const warning = resolveEmailLinkOriginWarning({ EMAIL_TRANSPORT: 'console', PUBLIC_ORIGIN: 'nope' });
+    assert.match(warning, /PUBLIC_ORIGIN/);
+    assert.match(warning, /EMAIL_LINK_ORIGIN/);
+    assert.match(warning, /not an http\(s\) URL/);
   });
 
   test('the link-origin warning: only an unusable origin under a dev/test transport (Resend refuses instead)', () => {
