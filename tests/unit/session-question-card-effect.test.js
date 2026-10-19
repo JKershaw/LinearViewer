@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const QUESTION_CARDS_JS_SRC = readFileSync(join(__dirname, '../../public/question-cards.js'), 'utf8');
 const SESSION_JS_SRC = readFileSync(join(__dirname, '../../public/session.js'), 'utf8');
 const COMMON_JS_SRC = readFileSync(join(__dirname, '../../public/common.js'), 'utf8');
 
@@ -88,6 +89,7 @@ function makeSandbox(cards) {
     console
   };
   vm.createContext(sandbox);
+  vm.runInContext(QUESTION_CARDS_JS_SRC, sandbox, { filename: 'question-cards.js' });
   vm.runInContext(SESSION_JS_SRC, sandbox, { filename: 'session.js' });
   return { sandbox, captured };
 }
@@ -135,6 +137,7 @@ function makeRealDeliverySandbox(cards, { hydrate, commentOk = true } = {}) {
   sandbox.window.api = async () => hydrate || { hydrated: false };
   const dispatched = [];
   sandbox.window.dispatchPrompt = async (opts) => { dispatched.push(opts); return { id: 'run-1' }; };
+  vm.runInContext(QUESTION_CARDS_JS_SRC, sandbox, { filename: 'question-cards.js' });
   vm.runInContext(SESSION_JS_SRC, sandbox, { filename: 'session.js' });
   return { sandbox, calls, dispatched };
 }

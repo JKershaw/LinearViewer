@@ -116,7 +116,7 @@ describe('Rule A: no unlisted delegated label listener in public/*.js', () => {
 });
 
 // ── Rule B ──────────────────────────────────────────────────────────────────
-const PAGE_SCRIPTS = ['session.js', 'task-page.js', 'close-out.js', 'flight-companion.js', 'feedback-widget.js'];
+const PAGE_SCRIPTS = ['session.js', 'question-cards.js', 'task-page.js', 'close-out.js', 'flight-companion.js', 'feedback-widget.js'];
 // `file:selector` -> classification. 'captured' = taken before the first
 // markdown render on its page (Rule C pins the order); 'ui-only' = no action.
 const LOOKUP_ALLOW = {
@@ -126,7 +126,7 @@ const LOOKUP_ALLOW = {
   'session.js:.sess-run': 'ui-only: expands run rows',
   'session.js:[data-testid="session-run-transcript"]': 'renders into Harbour-rendered transcript containers (the markdown sink itself)',
   'session.js:[data-testid="session-inline-reply"]': 'captured: initInlineReplies, before renderRunTranscripts',
-  'session.js:[data-testid="session-question-card"]': 'captured: initQuestionCards, before renderRunTranscripts',
+  'question-cards.js:[data-testid="session-question-card"]': 'captured: initQuestionCards (LIN-3499: shared by both pages), before renderRunTranscripts / enhanceContextMarkdown',
   'session.js:.sess-ctx-panel.brief-section': 'captured: initContextWidgets, before renderRunTranscripts',
   'session.js:.sess-ctx-panel.recap-section': 'captured: initContextWidgets, before renderRunTranscripts',
   'session.js:[data-testid="session-run-elapsed"]': 'ui-only: textContent clock',
@@ -137,6 +137,7 @@ const LOOKUP_ALLOW = {
   'task-page.js:[data-testid="task-page-share-slot"][data-shares-url]': 'owner share slot, outside every markdown body (server-rendered; initShare runs before enhanceMarkdown)',
   'task-page.js:[data-testid="task-page"][data-state-url]': 'page root, an ancestor of all ticket text',
   'task-page.js:[data-testid="task-page-owner-widgets"]': 'captured: mountWidgets, before enhanceContextMarkdown',
+  'task-page.js:[data-testid="task-page-question"]': 'captured: init (LIN-3499), before markdown; the poll only removes it',
   'task-page.js:[data-testid="task-page-answer"]': 'init, before markdown; repaint target only',
   'task-page.js:[data-testid="task-page-track-mount"]': 'init, before markdown; repaint target only',
   'task-page.js:[data-testid="task-page-context-mount"]': 'init, before markdown; repaint target only',

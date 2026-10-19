@@ -150,7 +150,7 @@ import { renderSwipePage, orderIssuesForSwipe } from './lib/render-swipe.js'
 import { renderSwimPage } from './lib/render-swim.js'
 import { renderShipPage } from './lib/render-ship.js'
 import { createCollectiveRoutes } from './routes/collective.js'
-import { createDashboardRoutes, sessionIsTerminal, enrichLoop, deriveSessionWaiting } from './routes/dashboard.js'
+import { createDashboardRoutes, sessionIsTerminal, enrichLoop, deriveSessionWaiting, deriveSessionDecisions } from './routes/dashboard.js'
 import { readRunEvidence } from './lib/run-evidence.js'
 import { createPrStateStore } from './lib/pr-state-store.js'
 import { createSessionsFeedCache } from './lib/sessions-feed-cache.js'
@@ -3071,7 +3071,7 @@ app.use(createTaskCreateRoutes({ workspaceFromUrl, getOpenRouterSource, getDeplo
 // MUST mount after createTaskCreateRoutes: ISSUE_ID_REGEX accepts `new`, so
 // `/task/:identifier` would otherwise swallow `/task/new`. `enrichLoop` and
 // `deriveSessionWaiting` are injected (a lib/ loader must not import a route).
-const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore, agentStatusStore, briefCacheStore, recapCacheStore, readRunEvidence, prStateStore, installationTokenFor, closeOutEventsStore, enrichLoop, deriveSessionWaiting })
+const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore, agentStatusStore, briefCacheStore, recapCacheStore, readRunEvidence, prStateStore, installationTokenFor, closeOutEventsStore, enrichLoop, deriveSessionWaiting, deriveSessionDecisions })
 app.use(createTaskPageRoutes({
   workspaceFromUrl,
   getOpenRouterSource,
