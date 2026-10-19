@@ -338,7 +338,7 @@ function groupByAssignee(issues) {
 
 function groupByStatus(issues) {
   var order = ['started', 'unstarted', 'backlog', 'completed', 'canceled'];
-  var labels = { started: 'In Progress', unstarted: 'Todo', backlog: 'Backlog', completed: 'Done', canceled: 'Canceled' };
+  var labels = { started: 'In Progress', unstarted: 'Todo', backlog: 'Backlog', completed: 'Done', canceled: 'Cancelled' };
   var groups = new Map();
   issues.forEach(function(issue) {
     // Fold duplicate into canceled so the two share a lane (LIN-276).
@@ -852,7 +852,7 @@ var labelGoalIds = new Set(); // Tracks which issues are "goals" for visual mark
 var FLOW_PRIO = { 1: 'Urgent', 2: 'High', 3: 'Medium', 4: 'Low' };
 
 function flowStateLabel(t) {
-  var m = { started: 'In Progress', unstarted: 'Todo', backlog: 'Backlog', completed: 'Done', canceled: 'Canceled', duplicate: 'Duplicate' };
+  var m = { started: 'In Progress', unstarted: 'Todo', backlog: 'Backlog', completed: 'Done', canceled: 'Cancelled', duplicate: 'Cancelled' };
   return m[t] || t || 'Todo';
 }
 

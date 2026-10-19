@@ -299,15 +299,15 @@ describe('status grouping', () => {
     assert.strictEqual(lanes[2].label, 'Backlog');
   });
 
-  test('folds duplicate-state issues into the Canceled lane (LIN-276)', () => {
+  test('folds duplicate-state issues into the Cancelled lane (LIN-276)', () => {
     const cards = [
       createCard({ id: 'a', stateType: 'canceled' }),
       createCard({ id: 'b', stateType: 'duplicate' })
     ];
     const { lanes } = assignLanes(cards, { grouping: 'status', maxLanes: 10, showCompleted: true });
-    // Only one lane — both cards merged into 'Canceled'.
+    // Only one lane — both cards merged into 'Cancelled'.
     assert.strictEqual(lanes.length, 1);
-    assert.strictEqual(lanes[0].label, 'Canceled');
+    assert.strictEqual(lanes[0].label, 'Cancelled');
     assert.strictEqual(lanes[0].items.length, 2);
     const ids = lanes[0].items.map(i => i.id).sort();
     assert.deepStrictEqual(ids, ['a', 'b']);
