@@ -13,6 +13,7 @@ import {
   PRIVACY_PROCESSORS,
   PRIVACY_CONTACT_EMAIL
 } from '../../lib/render-legal.js';
+import { HEARTBEAT_TTL_MS } from '../../lib/consumer-heartbeat-store.js';
 import { SESSION_TTL_SECONDS } from '../../lib/session-options.js';
 import { THEME_COOKIE_MAX_AGE_MS } from '../../lib/user-preferences.js';
 
@@ -34,6 +35,12 @@ describe('privacy page', () => {
     assert.strictEqual(PRIVACY_COOKIES[1].lifetimeSeconds * 1000, THEME_COOKIE_MAX_AGE_MS);
     assert.match(text, /connect\.sid : keeps you signed in\. Lasts 30 days/);
     assert.match(text, /theme : remembers light or dark mode\. Lasts 1 year/);
+  });
+
+  test('discloses the consumer heartbeat and its retention (LIN-3637)', () => {
+    assert.match(text, /dispatch consumer, it reports its kind, a random per-process id, its platform, uptime, CPU count, load averages, free and total memory, its active and held session counts, and when it last polled Harbour, about once a minute/);
+    assert.match(text, /reports no hostname, username, file path or run content/);
+    assert.match(text, new RegExp(`heartbeat is replaced by the next one and stops being served ${HEARTBEAT_TTL_MS / 60000} minutes after the last; the expired record is deleted by an hourly cleanup`));
   });
 
   test('labels unencrypted tokens and says own tokens are hashed', () => {
