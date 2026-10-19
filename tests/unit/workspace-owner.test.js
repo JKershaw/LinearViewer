@@ -360,6 +360,47 @@ describe('LIN-3131 — L2: an absent workspaceId fails closed for mint and excha
   });
 });
 
+describe('LIN-3655 — a throwing status getter at grant mint fails closed with a coded 503', () => {
+  function storeWithSeam(ownerCheck) {
+    const collection = createMockCollection();
+    const store = new ProxyTokenStore({ collection });
+    store.setOwnerCheck(ownerCheck);
+    return { store, collection };
+  }
+  const mint = (store) => store.mintGrantBootstrap({
+    urlKey: 'acme', workspaceId: 'ws-1', ownerAccountId: 'account-A', grants: RUNNER_GRANTS
+  });
+  const assertUnavailable = (err) => {
+    assert.equal(err.code, 'OWNER_CHECK_UNAVAILABLE', `expected unavailable, got ${err.code} (${err.message})`);
+    assert.equal(err.status, 503);
+    assert.equal(err.retryable, true);
+    return true;
+  };
+
+  test('an object answer whose status getter throws is OWNER_CHECK_UNAVAILABLE, logged, and mints nothing', async () => {
+    const { store, collection } = storeWithSeam(async () => ({ get status() { throw new Error('boom'); } }));
+    const logged = [];
+    const original = console.error;
+    console.error = (...args) => { logged.push(args); };
+    try {
+      await assert.rejects(mint(store), assertUnavailable);
+    } finally {
+      console.error = original;
+    }
+    assert.deepEqual(logged, [['Owner check failed during grant mint:', 'boom']]);
+    assert.equal(collection._docs().length, 0, 'a refused mint must not write');
+  });
+
+  test('a function-shaped answer with a throwing getter is unchanged: never read, refused as unavailable', async () => {
+    let reads = 0;
+    const answer = Object.defineProperty(() => {}, 'status', { get() { reads++; throw new Error('getter'); } });
+    const { store, collection } = storeWithSeam(async () => answer);
+    await assert.rejects(mint(store), assertUnavailable);
+    assert.equal(reads, 0, 'the getter on a function-shaped answer is never read');
+    assert.equal(collection._docs().length, 0);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // LIN-3648 — the one reader of the answer contract
 // ---------------------------------------------------------------------------
