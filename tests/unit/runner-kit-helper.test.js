@@ -981,6 +981,7 @@ describe('parseCredentialBlock', () => {
       `- ownerAccountId: ${OWNER}`,
       `- bootstrap: \`${boot}\``,
       '- expiresAt: 2026-09-29T13:00:00.000Z',
+      '',
       'Pipe this into `runner.mjs login`; never echo it.'
     ].join('\n');
     assert.deepEqual(parseCredentialBlock(text), {
