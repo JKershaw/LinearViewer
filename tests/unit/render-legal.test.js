@@ -97,6 +97,50 @@ describe('privacy page', () => {
     assert.ok(text.includes(PRIVACY_CONTACT_EMAIL));
   });
 
+  // LIN-3423: deletion is by request, at one of two levels. Each sentence is traced
+  // to the INVENTORY rows and runbook step in docs/runbooks/account-erasure.md.
+  describe('deletion by request (LIN-3423)', () => {
+    test('says deletion is a request to the contact address, not a button, and you choose a level', () => {
+      assert.match(text, new RegExp(`Deletion is by request, not a button: write to ${PRIVACY_CONTACT_EMAIL.replace('.', '\\.')} and choose a level`));
+    });
+
+    test('the old no-self-serve first sentence is gone and the pinned span is untouched', () => {
+      assert.doesNotMatch(text, /There is no self-serve delete\./);
+      // Byte-identical: tests above pin this span (render-legal.test.js:75).
+      assert.ok(html.includes('Removing a workspace deletes its stored sign-in tokens, not its history. What else it revokes is set out under &ldquo;Who can see it&rdquo;.'));
+    });
+
+    test('explains Standard in plain words, including the internal id and the alone-owned workspace', () => {
+      assert.match(text, /Standard removes your account, your email address, your sign-in identities and sessions, and the tokens and credentials you own/);
+      assert.match(text, /history keeps an internal id that no longer belongs to an account/);
+      assert.match(text, /history of a workspace you owned alone stays visible to anyone who later connects the same tracker workspace/);
+    });
+
+    test('explains Full wipe, including shared workspaces and what stays', () => {
+      assert.match(text, /Full wipe does everything Standard does and also deletes the history of workspaces you own alone/);
+      assert.match(text, /In workspaces shared with other people, the account id on your history is replaced/);
+      assert.match(text, /text you wrote and names you gave tokens stay/);
+    });
+
+    test('lists what is outside both levels and keeps the revoke-at-the-tracker sentence', () => {
+      for (const outside of ['your tracker&rsquo;s own copies', 'the services under &ldquo;Who processes it&rdquo;', 'server logs', 'host backups', 'the confirmation email']) {
+        assert.ok(html.includes(outside), `${outside} missing from the deletion section`);
+      }
+      assert.match(text, /You should also revoke Harbour&rsquo;s access in Linear, GitHub or Atlassian, because removing a workspace does not do that for you/);
+    });
+
+    test('promises no response time and does not imply backups are purged', () => {
+      const deletion = text.slice(text.indexOf('Getting your data deleted'));
+      assert.doesNotMatch(deletion, /within \d+|business days|hours|promptly|purged/i);
+    });
+
+    test('the retention bullets carry the deletion exceptions; the pinned cleanup sentence is untouched', () => {
+      assert.match(text, /kept for the life of the service, except what a deletion request removes \(see Getting your data deleted\)/);
+      assert.match(text, /Sign-in tokens are kept until you remove the workspace, unlink the provider or ask for deletion\./);
+      assert.match(text, /A session stops working after 30 days, but the expired session record, with its tokens, is deleted by an hourly cleanup\./);
+    });
+  });
+
   test('keeps header, wrapper and footer behaviour', () => {
     assert.match(html, /<h2>Privacy Policy<\/h2>/);
     assert.match(html, /class="legal-content"/);

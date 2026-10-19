@@ -68,7 +68,12 @@ const VERDICTS = ['gated', 'token-scoped', 'store-gated', 'test-only'];
 const IMPLEMENTATION_FILES = new Set([
   'lib/dispatch-factory.js', 'lib/dispatch-store.js',
   // LIN-3409: the halt store and the two token stores implement the new sinks.
-  'lib/workspace-halt.js', 'lib/proxy-tokens.js', 'lib/dispatch-tokens.js'
+  'lib/workspace-halt.js', 'lib/proxy-tokens.js', 'lib/dispatch-tokens.js',
+  // LIN-3423: operator-run account erasure cancels a person's queued runs through
+  // DispatchQueueStore#removeItem. No session reaches it: only scripts/erase-account.mjs
+  // imports it, and tests/unit/account-erasure.test.js fails if a route, server.js or
+  // another lib module ever does.
+  'lib/account-erasure.js'
 ]);
 
 const SINK_RE = /\b(createDispatchItem|dispatchSessionFollowUp|expandCascadeAborts|addFeedback|_mintWake)\(|\.(addItem|removeItem|trimSessionBudget|setWorkspaceHalt|clearWorkspaceHalt|revokeToken)\(/g;

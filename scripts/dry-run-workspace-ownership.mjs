@@ -56,6 +56,7 @@
 
 import { MongoClient } from 'mongodb'
 import { MangoClient } from '@jkershaw/mangodb'
+import { sessionWorkspaceRefs } from '../lib/urlkey-holders.js'
 
 export const SESSIONS_FIND_PROJECTION = Object.freeze({ _id: 0, 'session.workspaces': 1 })
 
@@ -95,22 +96,6 @@ function byCreatedAtThenId(a, b) {
   const diff = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
   if (diff !== 0) return diff
   return a._id < b._id ? -1 : a._id > b._id ? 1 : 0
-}
-
-/**
- * Only `id`/`urlKey` survive from a session's `workspaces` entries.
- * @param {Object} row - one projected `sessions` row
- * @returns {{id: string, urlKey: (string|null)}[]}
- */
-export function sessionWorkspaceRefs(row) {
-  const workspaces = row?.session?.workspaces
-  if (!Array.isArray(workspaces)) return []
-  const refs = []
-  for (const ws of workspaces) {
-    if (typeof ws?.id !== 'string') continue
-    refs.push({ id: ws.id, urlKey: typeof ws.urlKey === 'string' ? ws.urlKey : null })
-  }
-  return refs
 }
 
 /**
