@@ -57,7 +57,13 @@ describe('privacy page', () => {
     // section points there instead of contradicting it.
     assert.doesNotMatch(text, /does not revoke/);
     // LIN-3421: removing a workspace revokes what the account made for it.
-    assert.match(text, /Removing a workspace revokes the API tokens, dispatch tokens and task links that you made for it, and revokes its runner credentials only if you own the workspace/);
+    // Review F3: revokeByCreator deletes grant-bearing rows only where createdBy is
+    // the removing account, so the owner's removal revokes the runner credentials
+    // *that account made*, not every runner token for the workspace.
+    assert.match(text, /Removing a workspace revokes the API tokens, dispatch tokens and task links that you made for it, and revokes the runner credentials you made for it only if you own the workspace/);
+    // Review F2: tokens expire (90-day API default, 48h runner, dispatch ttl).
+    assert.match(text, /give access to whoever holds them until they expire or you revoke them/);
+    assert.doesNotMatch(text, /until you revoke them\. Task links/);
     assert.match(text, /Signing out, a removal you did not make, and unlinking one provider from a workspace revoke none of these/);
     assert.match(text, /Removing a workspace deletes its stored sign-in tokens, not its history\. What else it revokes is set out under &ldquo;Who can see it&rdquo;\./);
   });
@@ -108,11 +114,19 @@ describe('terms page', () => {
     for (const n of ['Linear', 'GitHub', 'GitHub Projects', 'Jira', 'local', 'email sign-in link']) {
       assert.ok(terms.includes(n), `${n} missing from Terms`);
     }
+    // Review F1: GitHub Projects and local workspaces have no sign-in entry point
+    // (no entryCta in their providers; lib/components/landing-hero.js offers only
+    // Linear, GitHub, Jira and email, the last three config-gated).
+    assert.doesNotMatch(terms, /sign in with one of those/);
+    assert.match(terms, /you can sign in with Linear, GitHub or Jira, or with an email sign-in link, where this server offers them/);
   });
 
   test('says the user is responsible for the tokens and share links they create', () => {
     const terms = renderTermsOfService().replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
     assert.match(terms, /responsible for the API tokens, runner tokens and task share links you create/);
+    // Review F2: access lasts until the token expires or is revoked.
+    assert.match(terms, /whoever holds one has access until it expires or is revoked/);
+    assert.doesNotMatch(terms, /has access until it is revoked/);
   });
 
   test('links to the Privacy Policy and keeps the GitHub issues contact', () => {
