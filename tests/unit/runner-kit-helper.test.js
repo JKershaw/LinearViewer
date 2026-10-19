@@ -436,6 +436,18 @@ describe('haltAction and haltSweep (Simple Dispatcher\'s halt meaning)', () => {
     assert.equal(haltAction({ mode: 'stop' }, item({ abort: true, abortTo: K, prompt: null }), live).decision, 'take');
   });
 
+  test('stop: a follow-up with no live session is taken so it is failed; one that can resume is held (LIN-3670)', () => {
+    assert.deepEqual(haltAction({ mode: 'stop' }, item({ followUpTo: W2 }), live), { decision: 'take', reason: 'halt:stop:follow-up-rejects' });
+    assert.equal(haltAction({ mode: 'stop' }, item({ followUpTo: X }), live).decision, 'take');
+    const resumable = ledgerWith([
+      { itemId: W1, agentId: 'agent-w', rootItemId: W1, state: 'done' },
+      { itemId: F1, agentId: 'agent-f', rootItemId: F1, state: 'stopped' }
+    ]);
+    assert.equal(haltAction({ mode: 'stop' }, item({ followUpTo: K }), live).decision, 'leave');
+    assert.equal(haltAction({ mode: 'stop' }, item({ followUpTo: W1 }), resumable).decision, 'leave');
+    assert.equal(haltAction({ mode: 'stop' }, item({ followUpTo: F1 }), resumable).decision, 'leave');
+  });
+
   test('pause: a follow-up with no live session is taken so it is failed, not left queued (LIN-3451)', () => {
     assert.equal(haltAction({ mode: 'pause' }, item({ followUpTo: W2 }), live).decision, 'take');
     assert.equal(haltAction({ mode: 'pause' }, item({ followUpTo: X }), live).decision, 'take');
@@ -1490,6 +1502,27 @@ describe('commands (against a fake Harbour)', () => {
     const t = await run(['take', fu.id]);
     assert.equal(t.handoff.mode, 'continue');
     assert.equal(t.handoff.agentId, 'agent-3');
+  });
+
+  test('a stop halt takes a follow-up with no live session and fails it; one that can resume stays queued (LIN-3670)', TIMEOUT, async () => {
+    const first = harbour.enqueue();
+    await run(['poll']);
+    await run(['take', first.id]);
+    await run(['handoff', first.id, 'agent-4']);
+    await run(['feedback', first.id, 'status', '[done]']);
+    harbour.state.halt = { mode: 'stop', setAt: new Date().toISOString(), setBy: OWNER };
+    const orphan = harbour.enqueue({ followUpTo: 'ffffffff-ffff-4fff-8fff-ffffffffffff' });
+    const resumable = harbour.enqueue({ followUpTo: first.id });
+    const polled = await run(['poll']);
+    assert.equal(polled.decisions.find((d) => d.id === orphan.id).decision, 'take');
+    assert.equal(polled.decisions.find((d) => d.id === resumable.id).decision, 'leave');
+    const t = await run(['take', orphan.id]);
+    assert.equal(t.rejected, '[failed] No live session to resume for follow-up (original dispatch ffffffff-ffff-4fff-8fff-ffffffffffff not found or already archived).');
+    const post = harbour.state.feedback.at(-1);
+    assert.equal(post.itemId, orphan.id);
+    assert.equal(post.body.message, t.rejected);
+    harbour.state.halt = null;
+    await run(['poll']); // records the cleared halt, as the stop test above does, so a later `wait` sees no change
   });
 
   test('wait refreshes the heartbeat and exits on work', TIMEOUT, async () => {

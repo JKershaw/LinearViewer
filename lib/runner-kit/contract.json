@@ -100,8 +100,7 @@
         "session": "none"
       },
       "sd": "failed",
-      "kit": "left",
-      "difference": "SD fails a no-session follow-up under stop (the stop hold covers only a resumable one, pacing.js:113); the kit leaves it queued. Open question in LIN-3451; today's kit behaviour kept."
+      "kit": "failed"
     },
     {
       "area": "halt",
