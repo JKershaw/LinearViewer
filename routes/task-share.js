@@ -38,7 +38,7 @@ import { isValidIssueId } from '../lib/workspace.js';
 import { isWellFormedTaskShareToken } from '../lib/task-share-store.js';
 import { maskSecretsInHtml } from '../lib/mask-secrets-in-html.js';
 import { resolveOwnerMintRefusal } from '../lib/owner-mint-refusals.js';
-import { isOwnerAnswer } from '../lib/workspace-owner.js';
+import { readOwnerSeamStatus } from '../lib/workspace-owner.js';
 import {
   renderTaskPage,
   renderTaskStatus,
@@ -147,16 +147,14 @@ export function createTaskShareRoutes({
       return { kind: 'unavailable' };
     }
     if (!record || record.revokedAt) return { kind: 'notfound' };
-    // LIN-3655: isOwnerAnswer runs inside the try so a throwing `status` getter
-    // on the answer maps to unavailable, as the seam's own throw does.
-    let isOwner;
-    try {
-      const owner = await workspaceOwnerCheck({ workspaceId: record.workspaceId, accountId: record.ownerAccountId });
-      isOwner = isOwnerAnswer(owner);
-    } catch {
-      return { kind: 'unavailable' };
-    }
-    if (!isOwner) return { kind: 'notfound' };
+    // LIN-3655 / LIN-3673: a throw (the seam's, or a throwing `status` getter on
+    // the answer) is the 503 page; any other non-owner verdict, an unrecognised
+    // answer included, is the 404 page. `threw` tells them apart.
+    const { status, threw } = await readOwnerSeamStatus(
+      () => workspaceOwnerCheck({ workspaceId: record.workspaceId, accountId: record.ownerAccountId })
+    );
+    if (threw) return { kind: 'unavailable' };
+    if (status !== 'owner') return { kind: 'notfound' };
     return { kind: 'ok', record };
   }
 

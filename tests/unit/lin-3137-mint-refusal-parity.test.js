@@ -3,12 +3,12 @@
  * mints (plan review carry-forward 2).
  *
  * The shared `lib/owner-mint-refusals.js` supplies the same status / code /
- * category / retryable / wording to both mints, but each route keeps its OWN
- * outcome→code mapping: the runner copy gets its codes from the proxy token
- * store's throws, the dispatch mint resolves through `resolveOwnerMintRefusal`.
- * The guard against drift is therefore an END-TO-END comparison of what the two
- * REAL routes put on the wire for every refusal — not the shared table compared
- * with itself.
+ * category / retryable / wording to both mints. Since LIN-3673 both resolve
+ * through `resolveOwnerMintRefusal` (the runner copy via the proxy token
+ * store's grant-bootstrap mint, which wraps the record in its own thrown
+ * refusal error). The guard against drift is still an END-TO-END comparison of
+ * what the two REAL routes put on the wire for every refusal — not the shared
+ * table compared with itself.
  *
  * `NODE_ENV=test` before import so both module-scope creation limiters skip.
  */
