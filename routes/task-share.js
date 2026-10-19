@@ -147,13 +147,16 @@ export function createTaskShareRoutes({
       return { kind: 'unavailable' };
     }
     if (!record || record.revokedAt) return { kind: 'notfound' };
-    let owner;
+    // LIN-3655: isOwnerAnswer runs inside the try so a throwing `status` getter
+    // on the answer maps to unavailable, as the seam's own throw does.
+    let isOwner;
     try {
-      owner = await workspaceOwnerCheck({ workspaceId: record.workspaceId, accountId: record.ownerAccountId });
+      const owner = await workspaceOwnerCheck({ workspaceId: record.workspaceId, accountId: record.ownerAccountId });
+      isOwner = isOwnerAnswer(owner);
     } catch {
       return { kind: 'unavailable' };
     }
-    if (!isOwnerAnswer(owner)) return { kind: 'notfound' };
+    if (!isOwner) return { kind: 'notfound' };
     return { kind: 'ok', record };
   }
 

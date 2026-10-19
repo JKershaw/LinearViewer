@@ -186,6 +186,24 @@ describe('GET /t/:token — guest page matrix', () => {
     }
   });
 
+  test('LIN-3655: an object owner answer with a throwing status getter is a 503 on both entry points; a non-owner answer stays 404', async () => {
+    const throwing = { get status() { throw new Error('boom'); } };
+    const unavailable = await build({ store: fakeStore({ getByToken: async () => RECORD }), owner: async () => throwing });
+    try {
+      for (const path of [`/t/${TOKEN}`, `/t/${TOKEN}/state`]) {
+        const res = await get(unavailable.base, path);
+        assert.equal(res.status, 503, path);
+        assert.match(res.text, /available right now/);
+      }
+      assert.equal(unavailable.loader.calls.loadTaskPage.length, 0, 'no page is rendered');
+    } finally { await unavailable.close(); }
+
+    const notOwner = await build({ store: fakeStore({ getByToken: async () => RECORD }), owner: async () => ({ status: 'not-owner' }) });
+    try {
+      assert.equal((await get(notOwner.base, `/t/${TOKEN}`)).status, 404);
+    } finally { await notOwner.close(); }
+  });
+
   test('row 5: no usable owner credential is a 503, never a stored-only page', async () => {
     const loader = fakeLoader();
     const { base, close } = await build({ store: fakeStore({ getByToken: async () => RECORD }), loader, access: async () => null });
