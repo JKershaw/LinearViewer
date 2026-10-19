@@ -121,6 +121,28 @@ describe('collectWorkspaceKpis (real MangoDB)', () => {
     assert.equal(stats.stored.customPrompts, 2);
   });
 
+  test('proxy or agent-status activity with no dispatches is not empty (the && rule)', async () => {
+    await seedWorkspace(A, { proxy: 2 });
+    const viaProxy = await run(A);
+    assert.equal(viaProxy.empty, false);
+    assert.equal(viaProxy.activity.last30.dispatches, 0);
+    assert.ok(viaProxy.activity.last30.agentActions >= 1);
+
+    await seedWorkspace(B, { statuses: 1 });
+    const viaStatus = await run(B);
+    assert.equal(viaStatus.empty, false);
+    assert.equal(viaStatus.activity.last30.dispatches, 0);
+    assert.ok(viaStatus.activity.last30.agentActions >= 1);
+  });
+
+  test('one dispatch with no proxy or agent-status rows is not empty (the && rule)', async () => {
+    await seedWorkspace(A, { queued: 1 });
+    const stats = await run(A);
+    assert.equal(stats.empty, false);
+    assert.equal(stats.activity.last30.dispatches, 1);
+    assert.equal(stats.activity.last30.agentActions, 0);
+  });
+
   test('an 8-day-old dispatch counts in 30d but not 7d', async () => {
     await collections.dispatchHistory.insertOne({ urlKey: A, status: 'expired', kind: 'implementation', dispatchedAt: daysAgo(8) });
     await collections.dispatchHistory.insertOne({ urlKey: A, status: 'expired', kind: 'implementation', dispatchedAt: daysAgo(6) });
