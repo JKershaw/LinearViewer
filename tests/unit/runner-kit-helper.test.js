@@ -430,7 +430,7 @@ describe('haltAction and haltSweep (Simple Dispatcher\'s halt meaning)', () => {
     assert.equal(haltAction({ mode: 'pause' }, item({ abort: true, abortTo: K, prompt: null }), live).decision, 'take');
   });
 
-  test('stop: nothing fresh or follow-up is taken; aborts flow as in Simple Dispatcher (LIN-3451)', () => {
+  test('stop: fresh items and resumable follow-ups are held; aborts flow as in Simple Dispatcher (LIN-3451)', () => {
     assert.equal(haltAction({ mode: 'stop' }, item(), live).decision, 'leave');
     assert.equal(haltAction({ mode: 'stop' }, item({ followUpTo: K }), live).decision, 'leave');
     assert.equal(haltAction({ mode: 'stop' }, item({ abort: true, abortTo: K, prompt: null }), live).decision, 'take');
