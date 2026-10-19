@@ -1054,16 +1054,20 @@
       // press-time read finding one: the running/watch line and the poll, never
       // a pressable Go.
       if (code === 'DUPLICATE_DISPATCH') { setGoRunning(null); return; }
-      const g = { status: 'ready', headerHtml: null, notice: null, noticeLink: null, noticeLinkLabel: null };
-      if (code === 'RUN_LIMIT_REACHED') {
-        g.notice = 'You\u2019ve used today\u2019s runs \u00b7 resets at midnight UTC';
-      } else {
-        // Includes a code-less 503 (proxyAttachFailed) and RUN_LIMIT_UNVERIFIED:
-        // branch on `code`, never on the status (review 1, outcomes).
-        g.notice = 'Couldn\u2019t start the run. Try again in a minute, or';
-        g.noticeLink = runnerSetupHref(opts);
-        g.noticeLinkLabel = 'run on my machine \u203A';
-      }
+      // LIN-3494: this is the only place a refusal is worded. Every refusal
+      // (run limit reached/unverified, a code-less 503, a network error) shows
+      // the server's own reason, then the runner link. The reason is the reply
+      // body's `error`, else its `message`, else the thrown Error's message; if
+      // all are empty the notice is just the link. paintGo escapes the text.
+      const body = (error && error.body) || {};
+      const reason = body.error || body.message || (error && error.message) || '';
+      const g = {
+        status: 'ready',
+        headerHtml: null,
+        notice: typeof reason === 'string' && reason ? reason : null,
+        noticeLink: runnerSetupHref(opts),
+        noticeLinkLabel: 'run on my machine \u203A'
+      };
       state.go = g;
       paintGo();
     }
