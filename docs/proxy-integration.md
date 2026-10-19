@@ -1094,6 +1094,10 @@ completes:
 `spent: false` means the gate or a quota refused before any model call — `text`/
 `tools`/`proposals` are empty, `usage`/`model` are `null`, and `reason` names why
 (`no-census`, `hash-identical`, `lost-race`, `free-tier`, `not-configured`, …).
+A user-initiated `free-tier` refusal is the one that answers HTTP `429`, and its body
+also carries `freeTier: { used, remaining, limit, resetsAt }` right after `reason` (so a
+client can show what is left and when it resets). There is no `error` key on this route.
+An auto-wake `free-tier` refusal stays a silent `200` without `freeTier`.
 
 `stream: true` instead yields the same Server-Sent-Events frames the browser's own chat
 receives (`token`/`tool`/`done`/`error` event types; `call`/`result`/`error`/`proposed`/

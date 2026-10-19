@@ -304,21 +304,24 @@ export function createProxyFlightCompanionRoutes({
         const { tools, proposals } = mergeToolEvents(events);
         const doneEvent = events.find((e) => e.type === 'done');
         const text = events.filter((e) => e.type === 'token').map((e) => e.data?.token || '').join('');
+        // Mirrors the session route exactly: a user-initiated free-tier
+        // refusal is the one case that surfaces as an error status (429) —
+        // an auto-wake free-tier refusal (nobody necessarily watching) stays
+        // a silent 200, same as every other gate/quota refusal here.
+        const status = (!outcome.spent && outcome.reason === 'free-tier' && turnKind === 'user-initiated') ? 429 : 200;
         const responseBody = {
           turnKind: outcome.turnKind,
           spent: outcome.spent,
           ...(outcome.spent ? {} : { reason: outcome.reason }),
+          // LIN-3665: the freeTier block chargeFreeTierOrReject already built,
+          // passed through on the 429 only (an auto-wake 200 refusal stays as it was).
+          ...(status === 429 && outcome.freeTierCheck ? { freeTier: outcome.freeTierCheck } : {}),
           text,
           tools,
           proposals,
           usage: doneEvent?.data?.usage ?? null,
           model: doneEvent?.data?.model ?? null,
         };
-        // Mirrors the session route exactly: a user-initiated free-tier
-        // refusal is the one case that surfaces as an error status (429) —
-        // an auto-wake free-tier refusal (nobody necessarily watching) stays
-        // a silent 200, same as every other gate/quota refusal here.
-        const status = (!outcome.spent && outcome.reason === 'free-tier' && turnKind === 'user-initiated') ? 429 : 200;
         logEvent(req, ENDPOINT, status);
         keepalive?.stop();
         keepalive ? keepalive.send(status, responseBody) : res.status(status).json(responseBody);
