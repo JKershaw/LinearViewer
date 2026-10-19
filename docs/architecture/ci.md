@@ -43,4 +43,6 @@ sleep 30 && curl -s "https://api.github.com/repos/JKershaw/LinearViewer/actions/
 | `status` | `queued`, `in_progress`, `completed` |
 | `conclusion` | `success`, `failure`, `cancelled`, `skipped` (only when completed) |
 
+**Unit job MongoDB**: the `Unit tests` job's `mongodb` service is `mongo:8.0` with `GLIBC_TUNABLES=glibc.pthread.rseq=1`, because mongo 8.x refuses to start on kernel 6.19+ runners (SERVER-121912, LIN-3694); fall back to `mongo:7.0` if the tunable stops working.
+
 **Note**: CI runs on pull requests targeting `main` and on pushes to `main` (i.e. after a PR merges). The `ci-success` job aggregates the unit and e2e jobs into a single stable check — require it as a branch-protection status check so automated agents can confirm CI is green before merging.

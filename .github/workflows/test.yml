@@ -18,7 +18,13 @@ jobs:
     # no credentials, just localhost:27017.
     services:
       mongodb:
+        # LIN-3694: mongo 8.x refuses to start on kernel 6.19+ (SERVER-121912),
+        # which GitHub's runners moved to on 19 Oct. GLIBC_TUNABLES disables
+        # glibc's rseq use, the reported workaround. If this stops working,
+        # pin mongo:7.0 instead. Don't drop the env or bump the image blindly.
         image: mongo:8.0
+        env:
+          GLIBC_TUNABLES: glibc.pthread.rseq=1
         ports:
           - 27017:27017
         options: >-
