@@ -100,6 +100,18 @@ const EVIDENCE = {
   closeOut: { owner: true, status: 'ready', pr: { url: 'https://github.com/acme/app/pull/41', number: 41, headSha: 'abc1234' }, stopAt: 'pr', variant: 'standard', urlKey: 'acme', issueIdentifier: 'LIN-50' },
 };
 
+// LIN-3379: merged, not Done yet — a review ledger with two open items and a close-out summary.
+const SETTLING_EVIDENCE = {
+  state: { status: 'merged', pr: { url: 'https://github.com/acme/app/pull/41', number: 41, headSha: 'abc1234' } },
+  evidence: { asked: 'Build the task page', done: 'PR #41', checked: { review: { verdict: 'approve-conditional', at: '2026-10-06T11:40:00.000Z' }, now: { state: 'passing', checks: [], headSha: 'abc1234', prUrl: 'https://github.com/acme/app/pull/41', checksUrl: 'https://github.com/acme/app/pull/41/checks', headMoved: false } } },
+  ledger: { ledger: { present: true, empty: false, unparsed: false, items: [
+    { id: 'F1', scope: 'inside', claim: 'the first claim', discharged: false },
+    { id: 'F2', scope: 'inside', claim: 'the second claim', discharged: false },
+  ] } },
+  closeOut: { owner: true, status: 'merged', pr: { url: 'https://github.com/acme/app/pull/41', number: 41, headSha: 'abc1234' }, stopAt: 'pr', variant: 'standard', urlKey: 'acme', issueIdentifier: 'LIN-50' },
+  closeOutSummary: { at: '2026-10-06T14:30:00.000Z', text: '## Close-out\n\nBoth items are discharged; merged at abc1234.' },
+};
+
 const RUNNING_LOOPS = [
   done({ loopId: 'plan-1', kind: 'plan', dispatchedAt: '2026-10-06T08:00:00.000Z', terminalCompletedAt: '2026-10-06T08:30:00.000Z' }),
   done({ loopId: 'impl-1', kind: 'implementation', dispatchedAt: '2026-10-06T09:00:00.000Z', telemetry: { runtime: { ms: 90000 }, metrics: [], producedArtifacts: [{ url: 'https://github.com/acme/app/pull/41', label: 'PR #41' }] } }),
@@ -149,6 +161,8 @@ function model(name) {
       return buildTaskPageModel({ ...base, loops: [done({ loopId: 'plan-1', kind: 'plan' }), loop({ loopId: 'impl-2', wakeMarker: 'blocked', waitingMessage: '[blocked] which API key?', feedback: [{ message: '[blocked] which API key?' }] })], ctx: ctx() });
     case 'done':
       return buildTaskPageModel({ ...base, loops: [done({ loopId: 'impl-1' }), loop({ loopId: 'rev-stale', kind: 'review' })], ctx: ctx({ stateType: 'completed', stateName: 'Done' }), evidence: EVIDENCE });
+    case 'settling':
+      return buildTaskPageModel({ ...base, loops: [done({ loopId: 'impl-1' })], ctx: ctx(), evidence: SETTLING_EVIDENCE });
     case 'lin-3351':
       return buildTaskPageModel({ ...base, loops: LIN3351_LOOPS, ctx: ctx(), evidence: EVIDENCE });
     case 'no-sessions':
@@ -158,7 +172,7 @@ function model(name) {
   }
 }
 
-const CASES = ['running-blocked-repeat', 'waiting', 'done', 'no-sessions', 'lin-3351'];
+const CASES = ['running-blocked-repeat', 'waiting', 'done', 'no-sessions', 'lin-3351', 'settling'];
 
 function render(name, viewer = 'owner') {
   return renderTaskPage(model(name), {
@@ -328,7 +342,13 @@ describe('task page structure', () => {
       assert.match(says, /task-page-pr-lead">[^<]{12,}</, `${status}: a plain-words lead`);
       const detail = (says.match(/task-page-pr-detail">([^<]*)</) || [])[1] || '';
       assert.match(detail, /Review approved it on 6 Oct/, `${status}: the review sentence`);
-      assert.match(detail, /2 things CI couldn&#039;t prove: 1 of 2 checked/, `${status}: the ledger sentence`);
+      // LIN-3379: merged and not Done yet is the one status that doesn't count.
+      if (status === 'merged') {
+        assert.doesNotMatch(detail, /of 2 checked/, `${status}: no count while the close-out is finishing`);
+        assert.match(detail, /close-out is still finishing/, `${status}: the settling sentence`);
+      } else {
+        assert.match(detail, /2 things CI couldn&#039;t prove: 1 of 2 checked/, `${status}: the ledger sentence`);
+      }
       assert.doesNotMatch(says, /\b(?=[0-9a-f]*\d)[0-9a-f]{7,40}\b|\d{4}-\d{2}-\d{2}T\d{2}:/, `${status}: no SHA or ISO time in the justification`);
       // One clear button, and only when the close-out is ready.
       const buttons = html.match(/data-action="closeout-press"/g) || [];

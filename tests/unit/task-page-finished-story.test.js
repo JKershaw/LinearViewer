@@ -366,14 +366,17 @@ describe('closeOutSummaryFor', () => {
 });
 
 describe('not finished stays on today\'s banner', () => {
-  test('person-merge, no close-out: still the "N of M checked" sentence and "open at merge" stamps', async () => {
+  // LIN-3379: the merged-but-not-Done window used to keep the count and stamps
+  // (pinned here by LIN-3373); it now says the close-out is still finishing.
+  test('person-merge, no close-out: no count or stamps; says the close-out is still finishing', async () => {
     const { loader, access } = makeLoader({ ctx: ctxFor({ stateType: 'started', comments: [OPENED, REVIEW] }), events: [] });
     const { model } = await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-51', access });
     assert.equal(model.finished, false);
     const html = renderTaskPullRequest(model, '', NOW);
-    assert.match(html, /5 things CI couldn&#0?39;t prove: 0 of 5 checked\./);
-    assert.match(html, /open at merge/);
-    assert.match(html, /Review ledger — 5 items/);
+    assert.doesNotMatch(html, /\d+ of \d+ checked/);
+    assert.doesNotMatch(html, /open at merge/);
+    assert.match(html, /Review ledger — as the review wrote it/);
+    assert.match(html, /The pull request is merged and the close-out is still finishing; it settles these items\./);
     assert.doesNotMatch(html, /Close-out summary|as reported in the close-out/);
   });
 
