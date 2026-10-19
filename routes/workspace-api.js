@@ -828,7 +828,7 @@ async function defaultMarkDone({ provider, callScope, issueIdentifier }) {
  * @param {Object} [options.closeOut] - LIN-3248 test seam for the check/press routes: optional `{ resolveProvider, readPrStatus, githubFetch, isStopAtRun, runnerReady, markDone }` overrides
  * @returns {Router} Express router
  */
-export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore = null, sessionsFeedCache = null, ownerCredentialStore = null, adoptConnectionCredential = null, accountStore = null, runEvidence = null, closeOutEventsStore = null, closeOut = null, workspaceOwnerCheck = null, onTicketWrite = null }) {
+export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore = null, sessionsFeedCache = null, ownerCredentialStore = null, adoptConnectionCredential = null, accountStore = null, runEvidence = null, closeOutEventsStore = null, closeOut = null, workspaceOwnerCheck = null, onTicketWrite = null, installationTokenFor = null }) {
   const router = Router();
 
   // The test-token DATA mock charges the free tier on its own (the AI-gate above it is
@@ -3522,6 +3522,8 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         callScope,
         viewerIsOwner: (seam.viewerIsOwner || (() => true))(req),
         urlKey: req.workspace.urlKey,
+        workspaceId: req.workspace.id,
+        installationTokenFor,
         readPrStatus: seam.readPrStatus || undefined,
         githubFetch: seam.githubFetch || null,
       });
@@ -3665,6 +3667,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         runnerReady: seam.runnerReady ? !!seam.runnerReady(req) : getFeatureFlags(req.session).dispatch === true,
         owner: true,
         byPersonCheck: true,
+        installationTokenFor,
       });
 
       // B1' (review `a1845467`): `done` is true on EVERY later call once a merge
@@ -3732,7 +3735,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         const row = await Promise.resolve(dispatchQueueStore.getItemStatus(urlKey, dispatchId)).catch(() => null);
         if (row?.issueIdentifier === req.params.issueIdentifier) source = row.issueSource ?? null;
       }
-      const notReady = await closeOutNotReady({ workspace: req.workspace, issueIdentifier: req.params.issueIdentifier, source, store: dispatchQueueStore, seam: closeOut || {} });
+      const notReady = await closeOutNotReady({ workspace: req.workspace, issueIdentifier: req.params.issueIdentifier, source, store: dispatchQueueStore, seam: closeOut || {}, installationTokenFor });
       if (notReady) {
         const refusal = closeOutNotReadyRefusal(notReady);
         return jsonError(res, 409, refusal.error, refusal.extra);

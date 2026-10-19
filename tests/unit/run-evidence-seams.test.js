@@ -80,7 +80,7 @@ describe('run page owner path (routes/dashboard.js)', () => {
     };
   }
 
-  function makeRouter({ readRunEvidence: reader = null, runParagraphStore = new InMemoryRunParagraphStore() } = {}) {
+  function makeRouter({ readRunEvidence: reader = null, runParagraphStore = new InMemoryRunParagraphStore(), installationTokenFor = null } = {}) {
     const data = { 'ws-a': workspaceData() };
     return createDashboardRoutes({
       workspaceFromUrl: (req, res, next) => next(),
@@ -98,7 +98,8 @@ describe('run page owner path (routes/dashboard.js)', () => {
       fetchWorkspaceIssues: async () => [],
       getOpenRouterSource: () => 'env',
       getDeployInfo: () => ({}),
-      readRunEvidence: reader
+      readRunEvidence: reader,
+      installationTokenFor
     });
   }
 
@@ -110,18 +111,22 @@ describe('run page owner path (routes/dashboard.js)', () => {
 
   test('the owner page calls the reader with exactly the pre-split arguments', async () => {
     const { calls, reader } = capturingReader();
-    const router = makeRouter({ readRunEvidence: reader });
+    const installationTokenFor = async () => null;
+    const router = makeRouter({ readRunEvidence: reader, installationTokenFor });
     const layer = router.stack.find(l => l.route?.path === '/workspace/:urlKey/observation/session/:sessionId' && l.route.methods.get);
     const handler = layer.route.stack[layer.route.stack.length - 1].handle;
     const res = { statusCode: 200, status(c) { this.statusCode = c; return this; }, send(b) { this.sentBody = b; return this; } };
     let nextErr = null;
-    await handler({ session: { features: { dispatch: true }, workspaces: [{ urlKey: 'ws-a', name: 'A' }] }, workspace: { urlKey: 'ws-a' }, params: { sessionId: SID }, query: {} }, res, (err) => { nextErr = err; });
+    await handler({ session: { features: { dispatch: true }, workspaces: [{ urlKey: 'ws-a', name: 'A' }] }, workspace: { urlKey: 'ws-a', id: 'ws-id-7' }, params: { sessionId: SID }, query: {} }, res, (err) => { nextErr = err; });
     assert.equal(nextErr, null);
     assert.equal(res.statusCode, 200);
     assert.equal(calls.length, 1);
     const args = calls[0];
-    assert.deepEqual(Object.keys(args).sort(), ['asked', 'callScope', 'evidenceUrls', 'issueIdentifier', 'provider', 'runnerReady', 'stopAt', 'urlKey', 'variant', 'viewerIsOwner'],
-      'the same keys the pre-split readSessionRunEvidence passed — no allowlist/readPrStatus on the owner page');
+    assert.deepEqual(Object.keys(args).sort(), ['asked', 'callScope', 'evidenceUrls', 'installationTokenFor', 'issueIdentifier', 'provider', 'runnerReady', 'stopAt', 'urlKey', 'variant', 'viewerIsOwner', 'workspaceId'],
+      'the pre-split readSessionRunEvidence keys plus LIN-3285\'s workspaceId + installationTokenFor — no allowlist/readPrStatus on the owner page');
+    // LIN-3285: the values, not just the keys: the owner is read from this id through this seam.
+    assert.equal(args.workspaceId, 'ws-id-7', 'the session page hands the reader the workspace id');
+    assert.equal(args.installationTokenFor, installationTokenFor, 'and the router\'s own seam');
     assert.equal(args.viewerIsOwner, true, 'the owner page still passes true explicitly');
     assert.equal(args.asked, 'Anchor title');
     assert.equal(args.issueIdentifier, 'LIN-10');
