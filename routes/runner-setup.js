@@ -28,7 +28,7 @@ import { Router } from 'express';
 import { renderRunnerSetupPage } from '../lib/render-runner-setup.js';
 import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
-import { checkWorkspaceOwner, readOwnerStatus } from '../lib/workspace-owner.js';
+import { checkWorkspaceOwner, readOwnerSeamStatus } from '../lib/workspace-owner.js';
 import { buildRunnerKickoff } from '../lib/prompts/runner-kickoff.js';
 
 /**
@@ -62,15 +62,13 @@ export function createRunnerSetupRoutes({
     if (featureFlags.proxy !== true) {
       state = 'proxy-off';
     } else {
-      let status;
-      try {
-        status = readOwnerStatus(await ownerCheck({ workspaceId: workspace.id, accountId }));
-        if (status === 'unavailable') {
-          console.warn(`Runner setup: owner check unavailable (urlKey=${workspace.urlKey}): unrecognised owner answer`);
-        }
-      } catch (err) {
+      // LIN-3673: a throw and an unrecognised answer are both 'unavailable' but
+      // word their warn differently, so `threw` is kept apart.
+      const { status, threw, error: err } = await readOwnerSeamStatus(() => ownerCheck({ workspaceId: workspace.id, accountId }));
+      if (threw) {
         console.warn(`Runner setup: owner check unavailable (urlKey=${workspace.urlKey}): ${err?.message ?? String(err)}`);
-        status = 'unavailable';
+      } else if (status === 'unavailable') {
+        console.warn(`Runner setup: owner check unavailable (urlKey=${workspace.urlKey}): unrecognised owner answer`);
       }
       if (status === 'owner') state = featureFlags.dispatch === true ? 'owner' : 'owner-dispatch-off';
       else if (status === 'no-owner') state = 'no-owner';
