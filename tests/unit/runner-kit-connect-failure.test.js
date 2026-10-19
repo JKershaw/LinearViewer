@@ -3,7 +3,8 @@
  * the cause the network gave (SELF_SIGNED_CERT_IN_CHAIN, ECONNREFUSED, ...) and
  * never says "unreachable". One function (`describeConnectFailure`, broker.mjs)
  * words it for the three sites: `exchangeBootstrap`, the broker's 502 reply and
- * `runner.mjs login`. Every upstream is an injected `fetchImpl`; no socket to
+ * `runner.mjs login`; the runner's `client().call` (poll/take/feedback/...) says
+ * the same instead of the bare `fetch failed`. Every upstream is an injected `fetchImpl`; no socket to
  * a real host is opened.
  */
 import { test, describe } from 'node:test';
@@ -45,7 +46,7 @@ describe('describeConnectFailure', () => {
   });
 });
 
-describe('the three sites use it', () => {
+describe('the sites use it', () => {
   test('exchangeBootstrap names the cause', TIMEOUT, async () => {
     await assert.rejects(
       exchangeBootstrap({ base: 'http://127.0.0.1:1', bootstrap: 'b', fetchImpl: throwing(tlsFailure) }),
@@ -72,6 +73,26 @@ describe('the three sites use it', () => {
       await assert.rejects(
         runCommand(['login'], { home, stdin, fetchImpl: throwing(leakyFailure) }),
         (e) => !/sk-live|Bearer|boot-secret|harbour\.example/.test(e.message)
+      );
+    } finally { rmSync(home, { recursive: true, force: true }); }
+  });
+
+  test('client().call (poll) names the cause, not a bare "fetch failed"', TIMEOUT, async () => {
+    const home = mkdtempSync(join(tmpdir(), 'lin3495-call-'));
+    try {
+      const stdin = '- baseUrl: http://127.0.0.1:1\n- urlKey: acme\n- ownerAccountId: o1\n- bootstrap: boot-secret\n';
+      const mint = async () => new Response(JSON.stringify({
+        token: 'working-token', grants: ['take'], expiresAt: new Date(Date.now() + 3_600_000).toISOString()
+      }), { status: 200 });
+      await runCommand(['login'], { home, stdin, fetchImpl: mint });
+      await assert.rejects(
+        runCommand(['poll'], { home, fetchImpl: throwing(tlsFailure) }),
+        (e) => /^GET \/api\/proxy\/runner\/poll failed: /.test(e.message) && /SELF_SIGNED_CERT_IN_CHAIN/.test(e.message)
+          && !/^fetch failed$/.test(e.message) && !/unreachable|working-token/.test(e.message)
+      );
+      await assert.rejects(
+        runCommand(['poll'], { home, fetchImpl: throwing(leakyFailure) }),
+        (e) => !/sk-live|Bearer|working-token|harbour\.example/.test(e.message)
       );
     } finally { rmSync(home, { recursive: true, force: true }); }
   });
