@@ -51,8 +51,8 @@
 
 import { MongoClient } from 'mongodb'
 import { MangoClient } from '@jkershaw/mangodb'
-import { canonicalise, sessionWorkspaceRefs } from './dry-run-workspace-ownership.mjs'
-import { createUrlKeyHolderFinder } from '../lib/urlkey-holders.js'
+import { canonicalise } from './dry-run-workspace-ownership.mjs'
+import { createUrlKeyHolderFinder, sessionWorkspaceRefs } from '../lib/urlkey-holders.js'
 import { createReferentHolderReader } from '../lib/connection-credential.js'
 import { ConnectionStore } from '../lib/connection-store.js'
 import { OwnerCredentialStore } from '../lib/owner-credential-store.js'

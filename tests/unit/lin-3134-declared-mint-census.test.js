@@ -78,8 +78,11 @@ function scanTokens(files, tokens, extraAllow = new Set()) {
   return offenders;
 }
 
-const scanF3 = (files) => scanTokens(files, ['declaredGrants', 'grantDeclaration']);
-const scanC4 = (files) => scanTokens(files, ['grantDeclaration', 'grantRefusal'], new Set(['proxy-tokens']));
+// LIN-3423: lib/account-erasure.js names the field path `grantDeclaration.ownerAccountId` (an account id on
+// dispatch rows that Full wipe replaces). It reads, writes and prints nothing of the record itself.
+const ERASURE_FIELD_PATH_ONLY = new Set(['account-erasure']);
+const scanF3 = (files) => scanTokens(files, ['declaredGrants', 'grantDeclaration'], ERASURE_FIELD_PATH_ONLY);
+const scanC4 = (files) => scanTokens(files, ['grantDeclaration', 'grantRefusal'], new Set(['proxy-tokens', ...ERASURE_FIELD_PATH_ONLY]));
 
 function extractMethod(src, name) {
   const start = src.indexOf(`${name}(doc) {`);
