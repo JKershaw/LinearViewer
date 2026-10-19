@@ -52,9 +52,14 @@ describe('privacy page', () => {
     assert.match(text, /runner tokens issued before these checks keep working until they expire or are revoked/);
     assert.match(text, /not swept every path|have not swept every path/);
     assert.doesNotMatch(text, /some controls such as halt and resume, are not covered/);
-    assert.match(text, /does not revoke/);
+    // LIN-3414: the page used to say both "revokes" and "does not revoke"; it now
+    // says what lib/workspace-removal-revocation.js does, once, and the deletion
+    // section points there instead of contradicting it.
+    assert.doesNotMatch(text, /does not revoke/);
     // LIN-3421: removing a workspace revokes what the account made for it.
-    assert.match(text, /Removing a workspace revokes the task links and tokens you made for it/);
+    assert.match(text, /Removing a workspace revokes the API tokens, dispatch tokens and task links that you made for it, and revokes its runner credentials only if you own the workspace/);
+    assert.match(text, /Signing out, a removal you did not make, and unlinking one provider from a workspace revoke none of these/);
+    assert.match(text, /Removing a workspace deletes its stored sign-in tokens, not its history\. What else it revokes is set out under &ldquo;Who can see it&rdquo;\./);
   });
 
   // LIN-3424: the hourly cleanup loop (lib/hourly-cleanup.js) now removes
@@ -86,11 +91,33 @@ describe('privacy page', () => {
   });
 });
 
-describe('terms page is unchanged', () => {
+describe('terms page', () => {
   test('keeps its headings', () => {
     const terms = renderTermsOfService();
     for (const h of ['Service Description', 'No Warranty', 'Your Responsibilities', 'Limitation of Liability', 'Changes to Terms', 'Contact']) {
       assert.ok(terms.includes(`>${h}<`), h);
     }
+  });
+
+  // LIN-3414: the Terms no longer name one backend or tell every user their
+  // "Linear account" is the thing they are responsible for.
+  test('names the supported backends and email sign-in, not just Linear', () => {
+    const terms = renderTermsOfService().replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    assert.doesNotMatch(terms, /such as Linear/);
+    assert.doesNotMatch(terms, /your Linear account/);
+    for (const n of ['Linear', 'GitHub', 'GitHub Projects', 'Jira', 'local', 'email sign-in link']) {
+      assert.ok(terms.includes(n), `${n} missing from Terms`);
+    }
+  });
+
+  test('says the user is responsible for the tokens and share links they create', () => {
+    const terms = renderTermsOfService().replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    assert.match(terms, /responsible for the API tokens, runner tokens and task share links you create/);
+  });
+
+  test('links to the Privacy Policy and keeps the GitHub issues contact', () => {
+    const terms = renderTermsOfService();
+    assert.match(terms, /<a href="\/privacy">Privacy Policy<\/a>/);
+    assert.match(terms, /href="https:\/\/github\.com\/JKershaw\/LinearViewer\/issues"/);
   });
 });
