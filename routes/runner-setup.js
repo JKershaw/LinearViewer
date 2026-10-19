@@ -69,7 +69,7 @@ export function createRunnerSetupRoutes({
           console.warn(`Runner setup: owner check unavailable (urlKey=${workspace.urlKey}): unrecognised owner answer`);
         }
       } catch (err) {
-        console.warn(`Runner setup: owner check unavailable (urlKey=${workspace.urlKey}): ${err.message}`);
+        console.warn(`Runner setup: owner check unavailable (urlKey=${workspace.urlKey}): ${err?.message ?? String(err)}`);
         status = 'unavailable';
       }
       if (status === 'owner') state = featureFlags.dispatch === true ? 'owner' : 'owner-dispatch-off';

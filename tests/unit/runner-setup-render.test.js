@@ -206,7 +206,9 @@ describe('the route', () => {
     ['owner, dispatch off', { features: { proxy: true, dispatch: false } }, () => ({ status: 'owner' }), 'owner-dispatch-off'],
     ['not the owner', {}, () => ({ status: 'not-owner' }), 'not-owner'],
     ['no recorded owner', {}, () => ({ status: 'no-owner' }), 'no-owner'],
-    ['the owner check throws', {}, () => { throw new Error('corrupt merge chain'); }, 'unavailable']
+    ['the owner check throws', {}, () => { throw new Error('corrupt merge chain'); }, 'unavailable'],
+    ['the owner check throws null (LIN-3654)', {}, () => { throw null; }, 'unavailable'],
+    ['the owner check throws undefined (LIN-3654)', {}, () => { throw undefined; }, 'unavailable']
   ];
   for (const [name, over, ownerCheck, want] of rows) {
     test(`${name} → 200, ${want}, never a redirect`, async () => {
