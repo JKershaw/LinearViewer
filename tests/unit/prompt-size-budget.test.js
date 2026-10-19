@@ -128,9 +128,9 @@ export const ROUTER_PROMPT_RENDERED_CEILING = 9545; // LIN-3378: -10 net of b an
 export const STAGE_INTENT_SOURCE_CEILING = 2912; // LIN-3326: +82, close-out's own line (engineering calls in finishing the work are its), paid from close-out's rendered ceiling
 
 /** Served runner prompt, source bytes (docs/runner-prompt.md). */
-export const RUNNER_PROMPT_SOURCE_CEILING = 17474; // LIN-3451: at 17474 since the runner kit matched Simple Dispatcher (halt / target / repo / cap)
+export const RUNNER_PROMPT_SOURCE_CEILING = 17638; // LIN-3669: +164 (17474), §5 names the watchdog's three outcomes; the parent's response to a finished-but-unposted subagent is prose (the parent is a model), the rest of LIN-3669 is code and tests. Earlier: // LIN-3451: at 17474 since the runner kit matched Simple Dispatcher (halt / target / repo / cap)
 /** Served runner prompt, rendered bytes (buildRunnerKickoff at BASE_URL). */
-export const RUNNER_PROMPT_RENDERED_CEILING = 15789; // LIN-3451: at 15789 since the runner kit matched Simple Dispatcher (halt / target / repo / cap)
+export const RUNNER_PROMPT_RENDERED_CEILING = 15953; // LIN-3669: +164 (15789), the same §5 lines rendered; the parent's response to a finished-but-unposted subagent is prose (the parent is a model), the rest of LIN-3669 is code and tests. Earlier: // LIN-3451: at 15789 since the runner kit matched Simple Dispatcher (halt / target / repo / cap)
 
 /**
  * The total: the sum of every ceiling above. A PR that raises a ceiling raises
@@ -150,7 +150,7 @@ export const RUNNER_PROMPT_RENDERED_CEILING = 15789; // LIN-3451: at 15789 since
  * LIN-3326 lowered it again (364994 -> 342621): close-out and review shed the authoring
  * bound and the pre-merge risk gates (-22455), less close-out's Scope and Authority line (+82).
  */
-export const FROZEN_TOTAL_BYTES = 342957; // LIN-3651: +365 (342592), contract source +232 and plan-review rendered +133. Earlier: // LIN-3612: +15 (342577), prompt-templates.js import path. Earlier: // LIN-3615: -22 (342599), net of plan-review -99, review +88, defs -11. Earlier: // LIN-3614: -2 (342601), net of review -521, close-out +520, defs -1. Earlier: // LIN-3378: -20 (342621)
+export const FROZEN_TOTAL_BYTES = 343285; // LIN-3669: +328 (342957), runner prompt source +164 and rendered +164. Earlier: // LIN-3651: +365 (342592), contract source +232 and plan-review rendered +133. Earlier: // LIN-3612: +15 (342577), prompt-templates.js import path. Earlier: // LIN-3615: -22 (342599), net of plan-review -99, review +88, defs -11. Earlier: // LIN-3614: -2 (342601), net of review -521, close-out +520, defs -1. Earlier: // LIN-3378: -20 (342621)
 
 const BASE_URL = 'https://harbour.example';
 
