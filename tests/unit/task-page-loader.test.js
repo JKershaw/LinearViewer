@@ -440,8 +440,15 @@ describe('session rows', () => {
       assert.equal(s.message, 'need a key');
     });
 
+    test('waiting (agentState): keeps a [pending] line as today', () => {
+      const [s] = msgs([loop({ ...parked, agentState: 'waiting' })]);
+      assert.equal(s.state, 'waiting');
+      assert.equal(s.message, 'waiting on CI');
+      assert.equal(sessionMessage(loop(parked), 'waiting'), 'waiting on CI');
+    });
+
     test('direct: only a running state keeps the line', () => {
-      for (const state of ['continued', 'done', 'failed', 'closed', 'cancelled', 'expired', 'aborted']) {
+      for (const state of ['queued', 'continued', 'done', 'failed', 'closed', 'cancelled', 'expired', 'aborted']) {
         assert.equal(sessionMessage(loop(parked), state), null, state);
       }
       assert.equal(sessionMessage(loop(parked), 'running'), 'waiting on CI');
