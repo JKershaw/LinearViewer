@@ -384,3 +384,92 @@ describe('LIN-3130 — wake provisioning through runner feedback yields a grant-
     assert.deepEqual(validated.grants, [], 'the wake child bootstrap is grant-LESS (S2b owns minting take)');
   });
 });
+
+// ── LIN-3622: the runner entrances serve only session targets ───────────────
+
+describe('LIN-3622 — runner poll/take are limited to session targets; dispatch-token door is not', () => {
+  // One row per target plus a legacy row with NO `target` field (raw insert:
+  // the formatter default `target || 'cli'` is what the no-target row guards).
+  async function seedTargets(store) {
+    const ids = {};
+    for (const target of ['cli', 'web', 'dash', 'local']) {
+      ids[target] = (await store.addItem(ACME, { prompt: `p-${target}`, kind: 'implementation', target }))._id;
+    }
+    const seeded = await store.addItem(ACME, { prompt: 'p-none', kind: 'implementation' });
+    await store.collection.updateOne({ _id: seeded._id }, { $unset: { target: '' } });
+    assert.equal((await store.collection.findOne({ _id: seeded._id })).target, undefined, 'the legacy row really has no target');
+    ids.none = seeded._id;
+    return ids;
+  }
+
+  async function setup() {
+    const db = freshDb();
+    const store = freshDispatchStore(db);
+    const proxyTokenStore = freshProxyTokenStore(db);
+    const dispatchTokenStore = freshDispatchTokenStore(db);
+    const working = await mintRunnerWorking(proxyTokenStore);
+    const runner = runnerApp({ proxyTokenStore, dispatchQueueStore: store, dispatchTokenStore });
+    const dispatcher = dispatchApp({ dispatchQueueStore: store, dispatchTokenStore });
+    const { token: dispatchToken } = await dispatchTokenStore.createToken(ACME, 'consumer', 'account-A');
+    const ids = await seedTargets(store);
+    return { store, runner, dispatcher, working, dispatchToken, ids };
+  }
+
+  const take = (app, token, id, path = '/api/proxy/runner/take/') =>
+    call(app, 'POST', `${path}${id}`, { headers: bearer(token), body: {} });
+
+  test('runner poll returns only cli, web and the no-target row', async () => {
+    const { runner, working, ids } = await setup();
+    const res = await call(runner, 'GET', '/api/proxy/runner/poll', { headers: bearer(working.token) });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.deepEqual(res.body.items.map(i => i.id).sort(), [ids.cli, ids.web, ids.none].sort());
+    assert.ok(res.body.items.every(i => i.target === 'cli' || i.target === 'web'), 'a no-target row is formatted as cli');
+  });
+
+  test('the dispatch-token poll still sees dash (pollAvailable is not filtered)', async () => {
+    const { dispatcher, dispatchToken, ids } = await setup();
+    const res = await call(dispatcher, 'GET', '/api/dispatch/poll', { headers: bearer(dispatchToken) });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    const got = res.body.items.map(i => i.id);
+    for (const t of ['cli', 'web', 'dash', 'none']) assert.ok(got.includes(ids[t]), `dispatch poll keeps ${t}`);
+  });
+
+  test('runner take refuses dash and local with 404 and leaves both rows queued and unarchived', async () => {
+    const { store, runner, dispatcher, working, dispatchToken, ids } = await setup();
+    for (const t of ['dash', 'local']) {
+      const res = await take(runner, working.token, ids[t]);
+      assert.equal(res.status, 404, `${t}: ${JSON.stringify(res.body)}`);
+      assert.ok(await store.collection.findOne({ _id: ids[t] }), `${t} row is still queued`);
+      assert.equal(await historyDoc(store, ids[t]), null, `${t} row was not archived`);
+    }
+    const poll = await call(dispatcher, 'GET', '/api/dispatch/poll', { headers: bearer(dispatchToken) });
+    assert.ok(poll.body.items.some(i => i.id === ids.dash), 'the dash consumer still sees its row');
+  });
+
+  test('runner take still claims cli, web and the no-target row', async () => {
+    const { runner, working, ids } = await setup();
+    for (const t of ['cli', 'web', 'none']) {
+      const res = await take(runner, working.token, ids[t]);
+      assert.equal(res.status, 200, `${t}: ${JSON.stringify(res.body)}`);
+    }
+  });
+
+  test('dispatch-token take of a dash row is still 200 (the store option is opt-in)', async () => {
+    const { dispatcher, dispatchToken, ids } = await setup();
+    const res = await take(dispatcher, dispatchToken, ids.dash, '/api/dispatch/take/');
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+  });
+
+  test('store takeItem: no targets option takes dash; targets option refuses dash but takes a legacy absent-target doc', async () => {
+    const db = freshDb();
+    const store = freshDispatchStore(db);
+    const dash = await store.addItem(ACME, { prompt: 'd', kind: 'implementation', target: 'dash' });
+    assert.equal((await store.takeItem(dash._id, ACME, 'l', null, { targets: ['cli', 'web'] })), null);
+    assert.ok(await store.collection.findOne({ _id: dash._id }), 'refused row not removed');
+    assert.ok(await store.takeItem(dash._id, ACME, 'l'), 'default behaviour unchanged');
+
+    const legacy = await store.addItem(ACME, { prompt: 'x', kind: 'implementation' });
+    await store.collection.updateOne({ _id: legacy._id }, { $unset: { target: '' } });
+    assert.ok(await store.takeItem(legacy._id, ACME, 'l', null, { targets: ['cli', 'web'] }), 'absent target counts as cli');
+  });
+});
