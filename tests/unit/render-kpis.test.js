@@ -1,999 +1,210 @@
 /**
- * Unit tests for lib/render-kpis.js
+ * Unit tests for lib/render-kpis.js: the public /kpis page, rebuilt in LIN-3703
+ * (docs/plans/kpis-public-design.md). The page renders the public view
+ * (`toPublicKpis`), never raw stats.
  *
  * Run with: node --test tests/unit/render-kpis.test.js
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { renderKpisPage, renderChartBox } from '../../lib/render-kpis.js';
+import { renderKpisPage } from '../../lib/render-kpis.js';
+import { toPublicKpis, PUBLIC_COUNT_FLOOR } from '../../lib/kpi-stats.js';
+import { extractScriptsFromHtml } from '../../lib/scan-public-pages.js';
+import { scanText } from '../../lib/secret-scan.js';
 import { extractEmbeddedData, embeddedDataText } from '../helpers/embedded-data.js';
+import { buildStats, buildFunnel, buildMode } from '../helpers/public-kpis-fixture.js';
 
-function buildStats(overrides = {}) {
-  return {
-    generatedAt: '2026-06-10T12:00:00.000Z',
-    totals: {
-      workspaces: 4,
-      users: 12,
-      activeSessions: 3,
-      agentActions: 1234,
-      dispatches: 56,
-      autopilotRuns: 8,
-      feedbackNotes: 7,
-      aiSummaries: 89,
-      roadmapReports: 10,
-      customPrompts: 2,
-      localIssues: 5,
-      localProjects: 1,
-      activeTokens: 6
-    },
-    proxyCategories: {
-      days: ['2026-06-09', '2026-06-10'],
-      orienting: [10, 20],
-      deciding: [2, 3],
-      acting: [1, 1],
-      watching: [4, 5],
-      reporting: [2, 2]
-    },
-    proxyCategoriesHourly: {
-      hours: ['2026-06-10T11', '2026-06-10T12'],
-      orienting: [3, 7],
-      deciding: [1, 1],
-      acting: [0, 1],
-      watching: [2, 2],
-      reporting: [1, 0]
-    },
-    dispatchByDay: {
-      days: ['2026-06-09', '2026-06-10'],
-      kinds: [
-        { label: 'autopilot', counts: [1, 2] },
-        { label: 'research', counts: [0, 1] }
-      ]
-    },
-    dispatchOutcomes: {
-      windowDays: 30,
-      total: 63,
-      resolved: 47,
-      done: 41,
-      failed: 4,
-      aborted: 2,
-      rate: 0.872,
-      weeks: ['2026-05-13', '2026-05-20', '2026-05-27', '2026-06-03'],
-      weeklyRate: [0.5, null, 1, 0.875],
-      weeklyResolved: [2, 0, 3, 8]
-    },
-    terminalMarkedTaskCost: {
-      windowDays: 30,
-      issueCount: 10,
-      unpriced: 2,
-      costUsd: 176.4,
-      cashUsd: 100,
-      unknownLaneUsd: 10,
-      inFlightUsd: 42.5,
-      overheadUsd: 12.3,
-      closeOutLineageShare: 0.7,
-      evidenceLinkedShare: 0.9,
-      opencodeSummedShare: 0.4,
-      unknownHarnessShare: 0.05,
-      pricedLineageShare: 0.8,
-      attributableLineageShare: 0.95,
-      captureRateShare: 0.85
-    },
-    weeklyBudgetGauge: {
-      resetAt: '2026-06-05T06:00:00.000Z',
-      nextResetAt: '2026-06-12T06:00:00.000Z',
-      hoursElapsed: 126,
-      usdPerPoint: 39.65,
-      percentConsumed: 56.3,
-      percentSource: 'telemetry-estimate',
-      burnRatePerHour: 1.5,
-      projectedExhaustionAt: '2026-06-13T02:00:00.000Z',
-      checkpoint: null,
-      windowLineageCount: 40,
-      windowPricedLineageShare: 0.9,
-      dayBars: { days: ['2026-06-09', '2026-06-10'], costUsd: [45.2, 61.8] }
-    },
-    funnel: { dispatched: 20, taken: 15, reported: 12, completed: 9 },
-    milestoneFunnel: {
-      steps: {
-        login: { state: 'reached', count: 4, coverage: 'account.createdAt (first sign-in across the group)' },
-        connected: { state: 'reached', count: 3, coverage: 'account↔workspace membership-edge createdAt' },
-        firstGo: { state: 'reached', count: 2, coverage: 'fresh Go presses (one Go press = one fresh dispatch row), oldest first' },
-        prOpened: { state: 'reached', count: 1, coverage: 'runner [evidence] feedback with a PR URL — a witnessed proxy for open time' },
-        mergeClicked: { state: 'no-signal', count: null, coverage: 'close-out press events (by: press), earliest for the group' }
-      },
-      mode: { total: 3, byRung: [{ rung: 'copy', entries: 2, notReady: 1 }], coverage: { surfaces: ['swipe'] } }
-    },
-    dispatchKinds: [{ label: 'autopilot', count: 4 }, { label: 'research', count: 3 }],
-    stepOutcomes: { completed: 5, failed: 1, blocked: 0, other: 2 },
-    proxyStatus: { ok: 30, clientError: 2, serverError: 1 },
-    proxyStatusHourly: { ok: 5, clientError: 0, serverError: 1 },
-    topEndpoints: [{ label: '/api/proxy/me', count: 9 }],
-    topEndpointsHourly: [{ label: '/api/proxy/me', count: 2 }],
-    hourOfDay: Array.from({ length: 24 }, (_, h) => h),
-    freeTier: { days: ['2026-06-09', '2026-06-10'], counts: [4, 6] },
-    vanity: {
-      busiestDay: { day: '2026-06-10', count: 26 },
-      readsPerWrite: 12.4,
-      medianQueueToTakeMinutes: 11,
-      dbBackend: 'mangodb'
-    },
-    ...overrides
-  };
+const F = PUBLIC_COUNT_FLOOR;
+
+function render(statsOverrides = {}, viewOverrides = {}) {
+  return renderKpisPage({ ...toPublicKpis(buildStats(statsOverrides)), ...viewOverrides });
 }
 
-describe('renderKpisPage', () => {
-  test('renders stat cards with formatted values', () => {
-    const html = renderKpisPage(buildStats());
+const testid = (html, id) => [...html.matchAll(new RegExp(`<[^>]*data-testid="${id}"[^>]*>`, 'g'))].map(m => m[0]);
+const cardValue = (html, name) => new RegExp(`data-testid="kpis-card-${name}"[^>]*>.*?kpi-card-value[^>]*>([^<]*)<`, 's').exec(html)?.[1];
 
-    assert.ok(html.includes('instance kpis'));
-    assert.ok(html.includes('1,234'), 'agent actions formatted with separator');
-    assert.ok(html.includes('workspaces'));
-    assert.ok(html.includes('autopilot runs · 30d'));
-    assert.ok(html.includes('prompts dispatched · 30d'));
-    assert.ok(html.includes('data-section="kpi-cards"'));
+describe('renderKpisPage: frame', () => {
+  const html = render();
+
+  test('is noindex, titled, and loads Chart.js and the page script', () => {
+    assert.match(html, /<meta name="robots" content="noindex">/);
+    assert.match(html, /<title>KPIs - Harbour<\/title>/);
+    assert.match(html, /chart\.umd\.min\.js/);
+    assert.match(html, /\/kpis\.js/);
   });
 
-  test('stat cards ride on the shared .card primitive alongside kpi-* hooks', () => {
-    const html = renderKpisPage(buildStats());
-
-    // Shared primitive class + KPI hook + value/label spans preserved.
-    assert.ok(html.includes('class="card kpi-card"'), 'stat blocks use the .card primitive');
-    assert.ok(html.includes('<span class="kpi-card-value">'), 'value span hook preserved');
-    assert.ok(html.includes('<span class="kpi-card-label">'), 'label span hook preserved');
+  test('is not linked to anything: no nav link points at /kpis', () => {
+    assert.ok(!/href="\/kpis"/.test(html));
   });
 
-  test('a stat card with no basis renders the original two-span body byte-identically (LIN-2325 regression guard)', () => {
-    // The default fixture sets no *Basis field on any total, so every card
-    // must fall back to the pre-LIN-2325 two-span form exactly.
-    const html = renderKpisPage(buildStats());
-    assert.ok(
-      html.includes('<span class="kpi-card-value">4</span><span class="kpi-card-label">workspaces</span></div>'),
-      'a falsy basis must render no third span at all'
-    );
-    assert.ok(!html.includes('kpi-card-basis'), 'no basis span anywhere when no total carries a basis string');
+  test('states the story and the three sections in order', () => {
+    const order = ['kpis-section-outcome', 'kpis-section-activity', 'kpis-section-people'].map(id => html.indexOf(`data-testid="${id}"`));
+    assert.ok(order.every(i => i > 0), String(order));
+    assert.deepStrictEqual([...order].sort((a, b) => a - b), order);
+    assert.match(html, /Does the work land\?/);
+    assert.match(html, /What the agents do/);
+    assert.match(html, /How people get started/);
   });
 
-  test('a truthy basis renders the third disclosure span beside the stat card it belongs to (LIN-2325)', () => {
-    const html = renderKpisPage(buildStats({
-      totals: {
-        workspaces: 4, users: 12, activeSessions: 3, agentActions: 1234, dispatches: 56,
-        autopilotRuns: 8, feedbackNotes: 7, aiSummaries: 89, roadmapReports: 10, customPrompts: 2,
-        localIssues: 5, localProjects: 1, activeTokens: 6,
-        workspacesBasis: 'workspaces with activity in the 30-day read window or stored preferences',
-        roadmapReportsBasis: 'newest 20 reports per workspace'
-      }
-    }));
-    assert.ok(html.includes('<span class="kpi-card-basis">workspaces with activity in the 30-day read window or stored preferences</span>'));
-    assert.ok(html.includes('<span class="kpi-card-basis">newest 20 reports per workspace</span>'));
+  test('the subtitle discloses the real age of generatedAt', () => {
+    const view = toPublicKpis(buildStats());
+    const old = renderKpisPage({ ...view, generatedAt: new Date(Date.now() - 3 * 3600 * 1000).toISOString() });
+    assert.match(old, /collected 3 hours ago/);
+    assert.ok(!/just now/.test(old));
+    assert.match(old, /data-testid="kpis-generated"[^>]*data-timestamp=/);
   });
 
-  test('chart boxes ride on the shared boxed .section primitive alongside kpi-* hooks', () => {
-    const html = renderKpisPage(buildStats());
-
-    // Shared primitive classes + KPI hook + tree glyph + unclassed h3 preserved.
-    assert.ok(
-      html.includes('class="section section--boxed kpi-chart-box"'),
-      'chart boxes use the boxed .section primitive'
-    );
-    assert.ok(
-      html.includes('class="section section--boxed kpi-chart-box kpi-chart-wide"'),
-      'the wide hero chart keeps its kpi-chart-wide hook alongside the primitive'
-    );
-    assert.ok(html.includes('<span class="kpi-tree-glyph">├─</span>'), 'tree glyph preserved');
-    // titleClass:'' leaves the h3 unclassed so `.kpi-chart-box h3` still styles it.
-    assert.ok(html.includes('<h3><span><span class="kpi-tree-glyph">'), 'chart h3 stays unclassed');
-  });
-
-  describe('milestone funnel (LIN-3501)', () => {
-    const step = (state, count) => ({ state, count, coverage: 'a coverage label' });
-
-    test('the caption says who is counted', () => {
-      const html = renderKpisPage(buildStats());
-      assert.ok(html.includes('people who signed up in the last 30 days, and how many have reached each step so far'));
-    });
-
-    test('every no-signal step is a text row, naming the step and its coverage', () => {
-      const html = renderKpisPage(buildStats());
-      assert.ok(html.includes('data-milestone-step="mergeClicked"'));
-      assert.ok(html.includes('merge clicked: no signal, close-out press events (by: press), earliest for the group'));
-
-      const all = renderKpisPage(buildStats({
-        milestoneFunnel: { steps: {
-          login: step('no-signal', null), connected: step('no-signal', null), firstGo: step('no-signal', null),
-          prOpened: step('no-signal', null), mergeClicked: step('no-signal', null)
-        }, mode: null }
-      }));
-      for (const label of ['signed up', 'connected', 'first go', 'pr opened', 'merge clicked']) {
-        assert.ok(all.includes(`${label}: no signal, a coverage label`), `${label} row`);
-      }
-    });
-
-    test('a reached step with a zero count is a bar, never a no-signal row', () => {
-      const html = renderKpisPage(buildStats({
-        milestoneFunnel: { steps: {
-          login: step('reached', 0), connected: step('reached', 0), firstGo: step('reached', 0),
-          prOpened: step('reached', 0), mergeClicked: step('reached', 0)
-        }, mode: null }
-      }));
-      assert.ok(!html.includes('data-milestone-step'));
-      assert.ok(!html.includes('no signal,'));
-    });
-
-    test('the rows sit outside the canvas wrapper the client replaces on an empty chart', () => {
-      const html = renderKpisPage(buildStats());
-      const canvasBlock = html.match(/<div class="kpi-chart-canvas"><canvas id="chart-milestone-funnel"><\/canvas><\/div>/);
-      assert.ok(canvasBlock, 'canvas wrapper present');
-      assert.ok(html.indexOf('data-milestone-step="mergeClicked"') > html.indexOf(canvasBlock[0]) + canvasBlock[0].length - 1);
-    });
-  });
-
-  test('renders all chart canvases and loads Chart.js + page script', () => {
-    const html = renderKpisPage(buildStats());
-
-    for (const id of [
-      'chart-proxy-phases', 'chart-weekly-budget', 'chart-outcome-trend', 'chart-dispatch-weekly',
-      'chart-dispatch-kinds', 'chart-funnel', 'chart-milestone-funnel', 'chart-step-outcomes',
-      'chart-proxy-status', 'chart-top-endpoints', 'chart-hour-of-day',
-      'chart-free-tier'
-    ]) {
-      assert.ok(html.includes(`id="${id}"`), `missing canvas ${id}`);
+  test('embeds the public view only: none of the dropped fields reach the page', () => {
+    const data = extractEmbeddedData(html, '__KPI_DATA__');
+    assert.deepStrictEqual(Object.keys(data).sort(), ['dispatchKinds', 'generatedAt', 'milestoneFunnel', 'outcomes', 'phases', 'totals']);
+    for (const dropped of ['terminalMarkedTaskCost', 'weeklyBudgetGauge', 'topEndpoints', 'hourOfDay', 'vanity', 'activeTokens', 'dbBackend', 'mangodb', 'cash:']) {
+      assert.ok(!html.includes(dropped), dropped);
     }
-    assert.ok(html.includes('src="/chart.umd.min.js"'));
-    assert.ok(html.includes('src="/kpis.js"'));
-    assert.ok(html.includes('href="/kpis.css"'));
-  });
-
-  test('renders a 30d/24h range toggle on the proxy-phases chart, defaulting to 30d', () => {
-    const html = renderKpisPage(buildStats());
-
-    assert.ok(html.includes('class="kpi-range-toggle" data-chart="chart-proxy-phases"'));
-    assert.ok(html.includes('class="kpi-range-btn is-active" data-range="30d"'));
-    assert.ok(html.includes('class="kpi-range-btn" data-range="24h"'));
-  });
-
-  test('renders a 30d/24h range toggle on proxy responses and top proxy endpoints too (LIN-1846)', () => {
-    const html = renderKpisPage(buildStats());
-
-    assert.ok(html.includes('class="kpi-range-toggle" data-chart="chart-proxy-status"'));
-    assert.ok(html.includes('class="kpi-range-toggle" data-chart="chart-top-endpoints"'));
-    // Hero chart + proxy responses + top endpoints: exactly these three, and
-    // no other chart (the volume-led scope decision — LIN-1846).
-    assert.strictEqual(html.match(/kpi-range-toggle/g).length, 3);
-  });
-
-  test('omits the truncation caption on dispatch-kinds when nothing was dropped, but always renders a (hidden) captioned slot for the range-toggled top-endpoints chart (LIN-2325 F1/F4)', () => {
-    // chart-funnel always carries its own unconditional caption (see below),
-    // so scope the assertion to the two top-8 chart titles specifically
-    // rather than the whole page. Unlike dispatch-kinds (no range toggle),
-    // top-endpoints is range-toggled, so its caption slot is always present
-    // — id'd, so the client can rewrite it per view — even when the active
-    // (30d) view has nothing to disclose (LIN-2325 F1 review fix).
-    const html = renderKpisPage(buildStats({ dispatchKindsOtherCount: 0, topEndpointsOtherCount: 0 }));
-    assert.ok(html.includes('<span class="kpi-tree-glyph">├─</span> dispatch kinds · 30d</span></h3>'), 'no caption span after the dispatch-kinds title');
-    assert.ok(html.includes('<span class="kpi-tree-glyph">├─</span> top proxy endpoints · 30d</span><span class="kpi-chart-caption" id="chart-top-endpoints-caption" style="display:none"></span><span class="kpi-range-toggle"'), 'top-endpoints caption slot present but hidden when otherCount is 0');
-  });
-
-  test('renders "+N more" captions on dispatch-kinds/top-endpoints charts when the top-8 cut drops values (LIN-2325 F4)', () => {
-    const html = renderKpisPage(buildStats({ dispatchKindsOtherCount: 3, topEndpointsOtherCount: 2 }));
-    // The caption lives in the TITLE area (emptyUnless() replaces `body`
-    // wholesale, which would destroy a caption living there instead).
-    assert.ok(html.includes('<h3><span><span class="kpi-tree-glyph">├─</span> dispatch kinds · 30d</span><span class="kpi-chart-caption">+3 more</span>'));
-    assert.ok(html.includes('<h3><span><span class="kpi-tree-glyph">├─</span> top proxy endpoints · 30d</span><span class="kpi-chart-caption" id="chart-top-endpoints-caption">+2 more</span>'));
-  });
-
-  test('the top-endpoints caption is range-aware: the 24h view does not inherit the 30d truncation count (LIN-2325 F1)', () => {
-    // Regression guard for the review's exact repro: 30d has more than 8
-    // distinct endpoints (truncated), but 24h has 8 or fewer (nothing
-    // dropped in the narrower window) — the two counts must be able to
-    // disagree, and each must be independently available to the renderer.
-    const html = renderKpisPage(buildStats({ topEndpointsOtherCount: 4, topEndpointsHourlyOtherCount: 0 }));
-    assert.ok(html.includes('<span class="kpi-chart-caption" id="chart-top-endpoints-caption">+4 more</span>'), 'initial (30d) view discloses its own truncation');
-    // The 24h count is published in the embedded payload (asserted below)
-    // for the client-side range toggle to read; wireRangeToggle's caption
-    // rewrite itself is a client-side interaction, verified in
-    // tests/e2e/kpis.spec.js, not here (node:test cannot execute browser JS).
-    assert.ok(html.includes('"topEndpointsHourlyOtherCount":0'), 'the 24h count must be published so the toggle can rewrite the caption honestly');
-  });
-
-  test('renders the funnel lower-bound caption unconditionally (LIN-2325 F4)', () => {
-    // A non-reporting agent is structurally indistinguishable from an
-    // incomplete task, so the caveat holds regardless of the funnel's own
-    // counts — no *OtherCount gate, unlike the top-list captions above.
-    const html = renderKpisPage(buildStats());
-    assert.ok(html.includes('<h3><span><span class="kpi-tree-glyph">├─</span> work funnel · 30d</span><span class="kpi-chart-caption">reported/completed are lower bounds</span>'));
-  });
-
-  test('renderChartBox rejects a static caption on a range-toggled chart with no dynamicCaption (LIN-2325 close-out ledger item 3)', () => {
-    // A static `caption` computed for one range (e.g. 30d) is only true of
-    // that range — the exact F1 class this ticket exists to close. The
-    // honest fixes are a `dynamicCaption` updater or dropping the caption;
-    // do NOT auto-upgrade to dynamicCaption here, since that would render
-    // the slot with no client updater wired, leaving the stale-claim risk
-    // intact under a different name.
-    assert.throws(() => {
-      renderChartBox('chart-example', 'example chart', { ranges: ['30d', '24h'], caption: '+3 more' });
-    }, /static caption/i);
-  });
-
-  test('renderChartBox permits a static caption on a non-toggled chart, and a dynamicCaption on a toggled chart with no static caption', () => {
-    assert.doesNotThrow(() => {
-      renderChartBox('chart-example', 'example chart', { caption: '+3 more' });
-    });
-    assert.doesNotThrow(() => {
-      renderChartBox('chart-example', 'example chart', { ranges: ['30d', '24h'], dynamicCaption: true });
-    });
-  });
-
-  test('titles the newly-windowed charts honestly (LIN-1846)', () => {
-    const html = renderKpisPage(buildStats());
-
-    // The 35-day weekly span exceeded the 30-day reporting window; it is now a genuine
-    // 30-day daily-bucketed window, so the title drops "weekly".
-    assert.ok(html.includes('dispatched work by kind · 30d'));
-    assert.ok(!html.includes('dispatched work by kind · weekly'));
-    // proxy responses previously carried no window label at all
-    assert.ok(html.includes('proxy responses · 30d'));
-  });
-
-  test('renders the headline outcome number with its slices and coverage label', () => {
-    const html = renderKpisPage(buildStats());
-
-    assert.ok(html.includes('class="card kpi-headline"'), 'headline rides the shared .card primitive');
-    assert.ok(html.includes('>87%</a>'), '0.872 renders as a rounded percentage, not a raw ratio');
-    assert.ok(html.includes('of dispatched work landed · 30d'));
-    assert.ok(html.includes('done 41 · failed 4 · aborted 2'), 'the three slices stay legible');
-    assert.ok(
-      html.includes('47 of 63 dispatches resolved · 30d'),
-      'the coverage sub-label is mandatory: the rate must not read as covering all dispatched work'
-    );
-  });
-
-  test('the headline links to the chart box that substantiates it', () => {
-    const html = renderKpisPage(buildStats());
-
-    assert.ok(html.includes('<a class="kpi-headline-value" href="#kpi-outcome-evidence">'), 'headline value is the link');
-    // The anchor must sit on the SECTION WRAPPER: emptyUnless() replaces the
-    // canvas with a note, which would destroy a canvas-borne id.
-    assert.ok(
-      html.includes('class="section section--boxed kpi-chart-box" id="kpi-outcome-evidence"'),
-      'anchor id belongs on the chart box wrapper'
-    );
-    assert.ok(
-      !html.includes('<canvas id="kpi-outcome-evidence"'),
-      'anchor id must NOT be on the canvas'
-    );
-    // Exactly one anchor target, and only the outcome box carries one.
-    assert.strictEqual(html.match(/id="kpi-outcome-evidence"/g).length, 1);
-  });
-
-  test('renders an em dash with no anchor when the rate is unavailable', () => {
-    const html = renderKpisPage(buildStats({
-      dispatchOutcomes: {
-        windowDays: 30, total: 4, resolved: 0, done: 0, failed: 0, aborted: 0,
-        rate: null, weeks: ['2026-05-13', '2026-05-20', '2026-05-27', '2026-06-03'],
-        weeklyRate: [null, null, null, null], weeklyResolved: [0, 0, 0, 0]
-      }
-    }));
-
-    assert.ok(html.includes('<span class="kpi-headline-value">—</span>'), 'empty state renders a dash');
-    // A link to an empty chart is a dead end.
-    assert.ok(!html.includes('href="#kpi-outcome-evidence"'), 'no anchor when there is no rate');
-    assert.ok(html.includes('of dispatched work landed · 30d'), 'the label stays intact');
-    assert.ok(html.includes('0 of 4 dispatches resolved · 30d'), 'coverage still tells the truth');
-  });
-
-  test('the headline sits above the volume cards and is not one of them', () => {
-    const html = renderKpisPage(buildStats());
-
-    assert.ok(
-      html.indexOf('kpi-headline') < html.indexOf('data-section="kpi-cards"'),
-      'headline renders above the stat card grid'
-    );
-    // It is a ratio, not a count — it must not join the .kpi-cards grid (the
-    // e2e count of 11 volume cards depends on this).
-    const cardsBlock = html.slice(html.indexOf('data-section="kpi-cards"'));
-    assert.ok(!cardsBlock.slice(0, cardsBlock.indexOf('</div>')).includes('kpi-headline'));
-  });
-
-  test('embeds the stats payload for the client script', () => {
-    const html = renderKpisPage(buildStats());
-    assert.ok(embeddedDataText(html, '__KPI_DATA__').startsWith('{'));
-    assert.ok(html.includes('"agentActions":1234'));
   });
 
   test('escapes < in the embedded payload so it cannot close the script tag', () => {
-    const stats = buildStats({
-      dispatchKinds: [{ label: '</script><script>alert(1)', count: 1 }]
-    });
-    const html = renderKpisPage(stats);
-    assert.ok(!html.includes('</script><script>alert(1)'));
-    assert.ok(html.includes('\\u003c/script>'));
-  });
-
-  test('renders vanity strip and noindex meta', () => {
-    const html = renderKpisPage(buildStats());
-    assert.ok(html.includes('busiest day'));
-    assert.ok(html.includes('reads per write: <strong>12.4:1</strong>'));
-    assert.ok(html.includes('median queue→take latency: <strong>11m</strong>'));
-    assert.ok(html.includes('mangodb'));
-    assert.ok(html.includes('<meta name="robots" content="noindex">'));
-  });
-
-  test('formats long median queue→take latency in hours', () => {
-    const html = renderKpisPage(buildStats({
-      vanity: { busiestDay: null, readsPerWrite: null, medianQueueToTakeMinutes: 150, dbBackend: null }
-    }));
-    assert.ok(html.includes('median queue→take latency: <strong>2.5h</strong>'));
-  });
-
-  test('the subtitle discloses the real age of generatedAt instead of a false cache-TTL claim (LIN-2325 F3)', () => {
-    // server.js's SWR cache can serve an unboundedly stale snapshot on a
-    // repeated refresh failure, so "cached for 60s" was a claim the serving
-    // mechanism does not guarantee. The subtitle must render the actual age
-    // of stats.generatedAt instead, reusing formatRelativeTime (lib/render.js)
-    // rather than a fourth duplicate formatter.
-    const html = renderKpisPage(buildStats({
-      generatedAt: new Date(Date.now() - 5 * 60 * 1000).toISOString() // 5 minutes ago
-    }));
-    assert.ok(!html.includes('cached for 60s'), 'the false TTL claim must be gone');
-    assert.ok(html.includes('collected 5m ago'), 'the subtitle must reflect the real age');
-  });
-
-  test('omits empty vanity stats when there is no activity', () => {
-    const html = renderKpisPage(buildStats({
-      vanity: { busiestDay: null, readsPerWrite: null, medianQueueToTakeMinutes: null, dbBackend: null }
-    }));
-    assert.ok(!html.includes('busiest day'));
-    assert.ok(!html.includes('reads per write'));
-    assert.ok(!html.includes('median queue→take latency'));
-    assert.ok(html.includes('generated:'));
+    const hostile = renderKpisPage({ ...toPublicKpis(buildStats()), dispatchKinds: [{ label: '</script><script>alert(1)</script>', count: 1 }] });
+    const text = embeddedDataText(hostile, '__KPI_DATA__');
+    assert.ok(!text.includes('</script>'));
+    assert.strictEqual(extractEmbeddedData(hostile, '__KPI_DATA__').dispatchKinds[0].label, '</script><script>alert(1)</script>');
   });
 });
 
-describe('renderKpisPage: cost-per-terminal-marked-task card (LIN-1958)', () => {
-  test('renders the pinned label exactly', () => {
-    const html = renderKpisPage(buildStats());
-    assert.ok(
-      html.includes('<span class="kpi-cost-label">cost per terminal-marked task</span>'),
-      'label must be pinned verbatim, exact string'
-    );
+describe('renderKpisPage: does the work land?', () => {
+  test('headlines the rate with its slices and a coverage label', () => {
+    const html = render();
+    assert.match(html, /data-testid="kpis-headline"/);
+    assert.match(html, /kpi-headline-value[^>]*>87%</);
+    assert.match(html, /of dispatched work landed · 30d/);
+    assert.match(html, /done 41 · failed 4 · aborted 2/);
+    assert.match(html, /47 of 63 dispatches resolved · 30d/);
   });
 
-  test('LIN-2253 (narrowed): the per-task figure divides by pricedTicketCount, NOT (issueCount - unpriced)', () => {
-    // costUsd 176.4 over pricedTicketCount 30 (a lane-heavy window: far more
-    // priced tickets than the old issueCount/unpriced pair would suggest —
-    // 176.4 / 30 = 5.88. The OLD formula (issueCount 10 - unpriced 2 = 8,
-    // 176.4 / 8 = 22.05) is the exact regression this guards against: a
-    // "simplification" that reverts to the old denominator produces a
-    // DIFFERENT number, so this test fails loudly if that happens.
-    const html = renderKpisPage(buildStats({
-      terminalMarkedTaskCost: {
-        windowDays: 30, issueCount: 10, unpriced: 2, pricedTicketCount: 30, costUsd: 176.4,
-        cashUsd: 100, unknownLaneUsd: 10, inFlightUsd: 42.5, overheadUsd: 12.3,
-        closeOutLineageShare: 0.7, evidenceLinkedShare: 0.9,
-        opencodeSummedShare: 0.4, unknownHarnessShare: 0.05,
-        pricedLineageShare: 0.8, attributableLineageShare: 0.95
-      }
-    }));
-    assert.ok(html.includes('<span class="kpi-cost-value">$5.88</span>'), 'must divide by pricedTicketCount');
-    assert.ok(!html.includes('$22.05'), 'must NOT divide by the old (issueCount - unpriced) denominator');
+  test('the headline links to the chart box that substantiates it', () => {
+    const html = render();
+    assert.match(html, /<a class="kpi-headline-value" href="#kpi-outcome-evidence">/);
+    // The anchor target is the section wrapper, not the canvas the script may replace.
+    assert.match(html, /<section[^>]*id="kpi-outcome-evidence"/);
+    assert.ok(!/<canvas[^>]*id="kpi-outcome-evidence"/.test(html));
   });
 
-  test('LIN-2253 review F1 (Request Changes): the headline divides pricedTicketCostUsd by pricedTicketCount, NEVER costUsd by pricedTicketCount', () => {
-    // A contaminated-component shape: costUsd (the per-issue fold) includes a
-    // sibling issue's own priced spend that pricedTicketCount's component
-    // fold excludes (or vice versa) — the exact F1 mismatch. costUsd=180 /
-    // pricedTicketCount=10 would render $18.00 (the wrong, per-issue-fold
-    // numerator); pricedTicketCostUsd=120 / 10 is the correct $12.00.
-    const html = renderKpisPage(buildStats({
-      terminalMarkedTaskCost: {
-        windowDays: 30, issueCount: 11, unpriced: 1, pricedTicketCount: 10,
-        costUsd: 180, pricedTicketCostUsd: 120,
-        cashUsd: 100, unknownLaneUsd: 10, inFlightUsd: 42.5, overheadUsd: 12.3,
-        closeOutLineageShare: 0.7, evidenceLinkedShare: 0.9,
-        opencodeSummedShare: 0.4, unknownHarnessShare: 0.05,
-        pricedLineageShare: 0.8, attributableLineageShare: 0.95
-      }
-    }));
-    assert.ok(html.includes('<span class="kpi-cost-value">$12.00</span>'), 'must divide pricedTicketCostUsd (120) by pricedTicketCount (10)');
-    assert.ok(!html.includes('$18.00'), 'must NOT divide costUsd (180, a different inclusion population) by pricedTicketCount');
-  });
-
-  test('renders "—" when pricedTicketCostUsd is explicitly null even though costUsd is a real number', () => {
-    // The compute layer emits pricedTicketCostUsd: null (never a fallback to
-    // costUsd) when there is no included component to sum over — the render
-    // layer's `= costUsd` default must apply only when the field is ABSENT
-    // (a caller/fixture predating this field), never override an explicit null.
-    const html = renderKpisPage(buildStats({
-      terminalMarkedTaskCost: {
-        windowDays: 30, issueCount: 5, unpriced: 1, pricedTicketCount: 4,
-        costUsd: 40, pricedTicketCostUsd: null,
-        cashUsd: 40, unknownLaneUsd: 0, inFlightUsd: null, overheadUsd: null,
-        closeOutLineageShare: 0, evidenceLinkedShare: 0,
-        opencodeSummedShare: 0, unknownHarnessShare: 0,
-        pricedLineageShare: 0, attributableLineageShare: 0
-      }
-    }));
-    assert.ok(html.includes('<span class="kpi-cost-value">—</span>'), 'an explicit null pricedTicketCostUsd must render a dash, never fall back to costUsd');
-    assert.ok(!html.includes('$10.00'), 'must not silently compute 40/4 from the unrelated costUsd field');
-  });
-
-  test('renders "—" when pricedTicketCount is zero (no priced lane/ticket to divide by)', () => {
-    const html = renderKpisPage(buildStats({
-      terminalMarkedTaskCost: {
-        windowDays: 30, issueCount: 5, unpriced: 5, pricedTicketCount: 0, costUsd: null,
-        cashUsd: null, unknownLaneUsd: null, inFlightUsd: null, overheadUsd: null,
-        closeOutLineageShare: 0, evidenceLinkedShare: 0,
-        opencodeSummedShare: 0, unknownHarnessShare: 0,
-        pricedLineageShare: 0, attributableLineageShare: 0
-      }
-    }));
-    assert.ok(html.includes('<span class="kpi-cost-value">—</span>'), 'zero pricedTicketCount must render a dash, never $0/NaN');
-  });
-
-  test('renders "—" when costUsd is null even though pricedTicketCount > 0', () => {
-    const html = renderKpisPage(buildStats({
-      terminalMarkedTaskCost: {
-        windowDays: 30, issueCount: 10, unpriced: 2, pricedTicketCount: 8, costUsd: null,
-        cashUsd: null, unknownLaneUsd: null, inFlightUsd: null, overheadUsd: null,
-        closeOutLineageShare: 0.7, evidenceLinkedShare: 0.9,
-        opencodeSummedShare: 0.4, unknownHarnessShare: 0.05,
-        pricedLineageShare: 0.8, attributableLineageShare: 0.95
-      }
-    }));
-    assert.ok(html.includes('<span class="kpi-cost-value">—</span>'), 'a null costUsd must render a dash regardless of a non-zero pricedTicketCount');
-  });
-
-  test('LIN-2253 (narrowed): renders ticketsPerPricedLane as the amortisation factor beside the rate', () => {
-    const html = renderKpisPage(buildStats({
-      terminalMarkedTaskCost: {
-        windowDays: 30, issueCount: 33, unpriced: 3, pricedTicketCount: 33, ticketsPerPricedLane: 3.3, costUsd: 150,
-        cashUsd: 100, unknownLaneUsd: 10, inFlightUsd: 42.5, overheadUsd: 12.3,
-        closeOutLineageShare: 0.7, evidenceLinkedShare: 0.9,
-        opencodeSummedShare: 0.4, unknownHarnessShare: 0.05,
-        pricedLineageShare: 0.8, attributableLineageShare: 0.95
-      }
-    }));
-    assert.ok(
-      html.includes('<span class="kpi-cost-tickets-per-lane">3.3 tickets per priced lane</span>'),
-      'the amortisation factor must render beside the rate'
-    );
-  });
-
-  test('LIN-2253 (narrowed): renders "—" for the amortisation factor when null (no included lane)', () => {
-    const html = renderKpisPage(buildStats({
-      terminalMarkedTaskCost: {
-        windowDays: 30, issueCount: 5, unpriced: 5, pricedTicketCount: 0, ticketsPerPricedLane: null, costUsd: null,
-        cashUsd: null, unknownLaneUsd: null, inFlightUsd: null, overheadUsd: null,
-        closeOutLineageShare: 0, evidenceLinkedShare: 0,
-        opencodeSummedShare: 0, unknownHarnessShare: 0,
-        pricedLineageShare: 0, attributableLineageShare: 0
-      }
-    }));
-    assert.ok(
-      html.includes('<span class="kpi-cost-tickets-per-lane">— tickets per priced lane</span>'),
-      'a null factor must render a dash, never $0/NaN'
-    );
-  });
-
-  test('null renders "—" for all four shares plus both coverage ratios, distinct from a genuine 0 rendering "0%"', () => {
-    const nullHtml = renderKpisPage(buildStats({
-      terminalMarkedTaskCost: {
-        windowDays: 30, issueCount: 0, unpriced: 0, costUsd: null,
-        cashUsd: null, unknownLaneUsd: null, inFlightUsd: null, overheadUsd: null,
-        closeOutLineageShare: null, evidenceLinkedShare: null,
-        opencodeSummedShare: null, unknownHarnessShare: null,
-        pricedLineageShare: null, attributableLineageShare: null, captureRateShare: null
-      }
-    }));
-    assert.ok(nullHtml.includes('close-out linked — · evidence linked —'), 'null goodness shares render as dashes');
-    assert.ok(nullHtml.includes('opencode summed — · unknown harness —'), 'null ignorance shares render as dashes');
-    assert.ok(nullHtml.includes('priced lineages — · capture rate — · attributable lineages —'), 'null coverage ratios render as dashes');
-
-    const zeroHtml = renderKpisPage(buildStats({
-      terminalMarkedTaskCost: {
-        windowDays: 30, issueCount: 4, unpriced: 0, costUsd: 40,
-        cashUsd: 0, unknownLaneUsd: 0, inFlightUsd: null, overheadUsd: null,
-        closeOutLineageShare: 0, evidenceLinkedShare: 0,
-        opencodeSummedShare: 0, unknownHarnessShare: 0,
-        pricedLineageShare: 0, attributableLineageShare: 0, captureRateShare: 0
-      }
-    }));
-    assert.ok(zeroHtml.includes('close-out linked 0% · evidence linked 0%'), 'a genuine 0 must render as 0%, not be conflated with null (goodness group)');
-    assert.ok(zeroHtml.includes('opencode summed 0% · unknown harness 0%'), 'a genuine 0 must render as 0%, not be conflated with null (ignorance group) — this is the P2 real-0-vs-null render pin');
-    assert.ok(zeroHtml.includes('priced lineages 0% · capture rate 0% · attributable lineages 0%'), 'a genuine 0 coverage ratio must render as 0%');
-  });
-
-  test('inFlightUsd/overheadUsd null render "—", never $0', () => {
-    const html = renderKpisPage(buildStats({
-      terminalMarkedTaskCost: {
-        windowDays: 30, issueCount: 3, unpriced: 0, costUsd: 30,
-        cashUsd: 30, unknownLaneUsd: 0, inFlightUsd: null, overheadUsd: null,
-        closeOutLineageShare: 1, evidenceLinkedShare: 1,
-        opencodeSummedShare: 0, unknownHarnessShare: 0,
-        pricedLineageShare: 1, attributableLineageShare: 1
-      }
-    }));
-    assert.ok(html.includes('unresolved — · resolved overhead —'), 'null USD lines render as dashes, never $0');
-  });
-
-  test('labels inFlightUsd "unresolved", never "in-flight" — it includes failed/aborted spend, not just running work', () => {
-    const html = renderKpisPage(buildStats());
-    assert.ok(html.includes('unresolved $42.50'), 'inFlightUsd must be labelled "unresolved"');
-    assert.ok(!/in-flight/i.test(html), 'the rendered page must never say "in-flight"');
-  });
-
-  test('labels overheadUsd "resolved overhead", never a bare "overhead" (LIN-1958 review F2)', () => {
-    // The LIN-1957 blocking handoff forbids deriving a rendered label from a
-    // field name: overheadUsd is done AND issue-less spend ONLY (unresolved
-    // issue-less spend routes to inFlightUsd/"unresolved" instead), so a
-    // bare "overhead" would overstate it to a public reader as covering all
-    // non-task spend. This test fails if the label regresses to the field
-    // name, mirroring the existing "unresolved" regression test above.
-    const html = renderKpisPage(buildStats());
-    assert.ok(html.includes('resolved overhead $12.30'), 'overheadUsd must be labelled "resolved overhead"');
-    // Scope the "no bare overhead" check to the rendered usd-lines span, not
-    // the whole document — the embedded __KPI_DATA__ JSON payload legitimately
-    // contains the raw "overheadUsd" field name (the ticket's own carve-out:
-    // "the whole stats object is already embedded publicly ... anything
-    // Session 1 emitted is already readable here"), which is not a rendered
-    // label and must not fail this test.
-    const usdLines = html.match(/<span class="kpi-cost-usd-lines">([^<]*)<\/span>/)[1];
-    const withoutQualifiedLabel = usdLines.replace(/resolved overhead/g, '');
-    assert.ok(!withoutQualifiedLabel.includes('overhead'), 'must never render a bare "overhead" once the qualified label text is stripped out');
-  });
-
-  test('plan-fee seam: unset renders "—" with the unset sub-label', () => {
-    const html = renderKpisPage(buildStats(), { planFeeConfig: { monthlyUsd: null } });
-    assert.ok(html.includes('cash: — · pending plan-fee configuration</span>'));
-  });
-
-  test('plan-fee seam: configured STILL renders "—", now with the amortisation-rule sub-label (no value invented)', () => {
-    const html = renderKpisPage(buildStats(), { planFeeConfig: { monthlyUsd: 1500 } });
-    assert.ok(
-      html.includes('cash: — · plan fee configured · pending amortisation rule</span>'),
-      'a configured plan fee must not invent a cash figure, but the blocker wording must change to name the missing amortisation rule'
-    );
-    assert.ok(!html.includes('pending plan-fee configuration</span>'), 'must not keep the unset-state wording once a value is configured');
-  });
-
-  test('plan-fee seam: an omitted planFeeConfig option degrades to the unset dash safely', () => {
-    const html = renderKpisPage(buildStats());
-    assert.ok(html.includes('cash: — · pending plan-fee configuration</span>'));
-  });
-
-  test('the card renders on the shared .card primitive, above and outside .kpi-cards (grid count unaffected)', () => {
-    const html = renderKpisPage(buildStats());
-    assert.ok(html.includes('class="card kpi-cost-card"'), 'rides the shared .card primitive');
-    assert.ok(
-      html.indexOf('kpi-cost-card') < html.indexOf('data-section="kpi-cards"'),
-      'the cost card renders above the stat card grid'
-    );
-    const cardsBlock = html.slice(html.indexOf('data-section="kpi-cards"'));
-    assert.ok(
-      !cardsBlock.slice(0, cardsBlock.indexOf('</div>')).includes('kpi-cost-card'),
-      'the cost card must not be one of the .kpi-cards grid cards (the e2e count of 11 depends on this)'
-    );
-    // 11 stat cards from buildStats().totals, unaffected by the new card.
-    assert.strictEqual((html.match(/class="card kpi-card"/g) || []).length, 11);
-  });
-
-  test('never uses "verified" or a reserved-word synonym anywhere in the rendered page', () => {
-    const html = renderKpisPage(buildStats(), { planFeeConfig: { monthlyUsd: 1500 } });
-    assert.ok(!/verified/i.test(html), 'the metric is a strictly-weaker proxy and must never read as "verified"');
-  });
-
-  test('degrades safely when terminalMarkedTaskCost is entirely absent from stats', () => {
-    const stats = buildStats();
-    delete stats.terminalMarkedTaskCost;
-    const html = renderKpisPage(stats);
-    assert.ok(html.includes('<span class="kpi-cost-value">—</span>'));
-    assert.ok(html.includes('close-out linked — · evidence linked —'));
-    assert.ok(html.includes('opencode summed — · unknown harness —'));
-    assert.ok(html.includes('unresolved — · resolved overhead —'));
-  });
-
-  test('publishes the figure\'s window as its own span, separate from the pinned label (LIN-1958 review F3)', () => {
-    const html = renderKpisPage(buildStats({
-      terminalMarkedTaskCost: {
-        windowDays: 30, issueCount: 10, unpriced: 2, costUsd: 176.4,
-        cashUsd: 100, unknownLaneUsd: 10, inFlightUsd: 42.5, overheadUsd: 12.3,
-        closeOutLineageShare: 0.7, evidenceLinkedShare: 0.9,
-        opencodeSummedShare: 0.4, unknownHarnessShare: 0.05,
-        pricedLineageShare: 0.8, attributableLineageShare: 0.95
-      }
-    }));
-    assert.ok(html.includes('<span class="kpi-cost-window">30d window</span>'), 'the window must be disclosed');
-    // The pinned label itself must stay byte-identical — the window is a
-    // sibling span, never appended into the label text.
-    assert.ok(html.includes('<span class="kpi-cost-label">cost per terminal-marked task</span>'));
-  });
-
-  test('publishes the sample size (issueCount) and exclusion count (unpriced) beside the shares (LIN-1958 review F4)', () => {
-    const html = renderKpisPage(buildStats({
-      terminalMarkedTaskCost: {
-        windowDays: 30, issueCount: 14, unpriced: 3, costUsd: 251.9384,
-        cashUsd: 100, unknownLaneUsd: 10, inFlightUsd: 42.5, overheadUsd: 12.3,
-        closeOutLineageShare: 0.7, evidenceLinkedShare: 0.9,
-        opencodeSummedShare: 0.4, unknownHarnessShare: 1,
-        pricedLineageShare: 0.8, attributableLineageShare: 0.95
-      }
-    }));
-    // The handoff specifically nominated unpriced/issueCount as the coverage
-    // story that DOES cover whole-lineage capture loss, unlike
-    // pricedLineageShare — so a reader of "unknown harness 100%" can see the
-    // N it is a share of, not just the bare ratio.
-    assert.ok(html.includes('<span class="kpi-cost-sample">14 terminal-marked issues · 3 unpriced (excluded), of which 0 never observed (no lineage) · headline ÷ 0 priced tickets</span>'));
-  });
-
-  test('renders laneLandedCount so lane-landed issues that were never observed are distinguished from pricing exclusions (LIN-2325 F1)', () => {
-    // The compute layer (lib/terminal-marked-task-cost.js, LIN-2253) already
-    // emits laneLandedCount and publishes it in the embedded __KPI_DATA__
-    // payload; this card is the one place that must actually render it, so a
-    // public reader can tell "never observed" apart from "unpriced".
-    // laneLandedCount is always a subset of unpriced (lib/terminal-marked-task-cost.js) —
-    // 8 unpriced, 7 of which were never observed at all; unpriced > laneLandedCount so the
-    // fixture also exercises the "unpriced but had a lineage" remainder (LIN-2325 F2).
-    const html = renderKpisPage(buildStats({
-      terminalMarkedTaskCost: {
-        windowDays: 30, issueCount: 10, unpriced: 8, laneLandedCount: 7, costUsd: 176.4,
-        cashUsd: 100, unknownLaneUsd: 10, inFlightUsd: 42.5, overheadUsd: 12.3,
-        closeOutLineageShare: 0.7, evidenceLinkedShare: 0.9,
-        opencodeSummedShare: 0.4, unknownHarnessShare: 0.05,
-        pricedLineageShare: 0.8, attributableLineageShare: 0.95
-      }
-    }));
-    assert.ok(html.includes('<span class="kpi-cost-sample">10 terminal-marked issues · 8 unpriced (excluded), of which 7 never observed (no lineage) · headline ÷ 0 priced tickets</span>'));
-  });
-
-  test('LIN-2253 review F2: renders laneLandedCount, NOT the deprecated noLineageCount alias, when both are present with different values', () => {
-    // Real __KPI_DATA__ never disagrees (laneLandedCount/noLineageCount are
-    // derived from the SAME filter) — this fixture deliberately sets them
-    // apart to prove the render layer reads the canonical field, closing the
-    // "migrate in-repo consumers off the deprecated alias" review finding.
-    const html = renderKpisPage(buildStats({
-      terminalMarkedTaskCost: {
-        windowDays: 30, issueCount: 10, unpriced: 8, laneLandedCount: 7, noLineageCount: 999, costUsd: 176.4,
-        cashUsd: 100, unknownLaneUsd: 10, inFlightUsd: 42.5, overheadUsd: 12.3,
-        closeOutLineageShare: 0.7, evidenceLinkedShare: 0.9,
-        opencodeSummedShare: 0.4, unknownHarnessShare: 0.05,
-        pricedLineageShare: 0.8, attributableLineageShare: 0.95
-      }
-    }));
-    // Scoped to the rendered sample span, not the whole document — the
-    // embedded __KPI_DATA__ JSON payload legitimately contains the raw
-    // `noLineageCount: 999` field (it republishes the whole stats object),
-    // which is not a render decision and must not fail this test.
-    const sample = html.match(/<span class="kpi-cost-sample">([^<]*)<\/span>/)[1];
-    assert.ok(sample.includes('7 never observed (no lineage)'), 'must read laneLandedCount (7)');
-    assert.ok(!sample.includes('999'), 'must never render the deprecated noLineageCount alias (999)');
-  });
-
-  test('LIN-2423: renders the marker-channel occupancy figure beside laneLandedCount', () => {
-    const html = renderKpisPage(buildStats({
-      terminalMarkedTaskCost: {
-        windowDays: 30, issueCount: 10, unpriced: 8, laneLandedCount: 7, costUsd: 176.4,
-        cashUsd: 100, unknownLaneUsd: 10, inFlightUsd: 42.5, overheadUsd: 12.3,
-        closeOutLineageShare: 0.7, evidenceLinkedShare: 0.9,
-        opencodeSummedShare: 0.4, unknownHarnessShare: 0.05,
-        pricedLineageShare: 0.8, attributableLineageShare: 0.95,
-        markerOccupiedLineages: 4, markerOccupancyShare: 0.5
-      }
-    }));
-    assert.ok(
-      html.includes('<span class="kpi-cost-marker-occupancy">marker channel: 4 lineages occupied (50%) — distinguishes no lane-landed tickets from an empty channel</span>'),
-      'the occupancy figure must render with its count and share'
-    );
-  });
-
-  test('LIN-2423: destructuring-default safety — a stats payload with no occupancy fields renders 0/— rather than throwing', () => {
-    // Mirrors the laneLandedCount review precedent this card already follows: a field-rename
-    // upstream must degrade sanely (a stale card reading 0/—), never throw and blank the
-    // whole card.
-    const html = renderKpisPage(buildStats({
-      terminalMarkedTaskCost: {
-        windowDays: 30, issueCount: 10, unpriced: 8, laneLandedCount: 7, costUsd: 176.4,
-        cashUsd: 100, unknownLaneUsd: 10, inFlightUsd: 42.5, overheadUsd: 12.3,
-        closeOutLineageShare: 0.7, evidenceLinkedShare: 0.9,
-        opencodeSummedShare: 0.4, unknownHarnessShare: 0.05,
-        pricedLineageShare: 0.8, attributableLineageShare: 0.95
-        // markerOccupiedLineages/markerOccupancyShare deliberately omitted
-      }
-    }));
-    assert.ok(
-      html.includes('<span class="kpi-cost-marker-occupancy">marker channel: 0 lineages occupied (—) — distinguishes no lane-landed tickets from an empty channel</span>'),
-      'must degrade to the destructuring defaults, never throw'
-    );
-  });
-
-  test('pins the exact ignorance-basis string, so the render layer\'s own lineageBearingCount derivation cannot drift (LIN-2418 review F1)', () => {
-    // The compute layer denominates opencodeSummedShare/unknownHarnessShare
-    // over `issueCount - noLineageCount` but deliberately publishes no
-    // `lineageBearingCount` field (LIN-2418 step 5: no new wire field), so
-    // this card RE-DERIVES that denominator locally at
-    // lib/render-kpis.js:217. Nothing else pins it: the e2e spec matches only
-    // /with a lineage/, and the review measured that mutating the derivation
-    // to a bare `issueCount` leaves the whole unit suite AND kpis.spec.js
-    // green while the card renders 'of 25 with a lineage (23 no-lineage
-    // excluded)' — a basis line that contradicts its own parenthetical and
-    // misstates the population the two shares are over. That is this
-    // ticket's own thesis one layer up, so the numbers themselves are pinned
-    // here, not just the wording.
-    //
-    // Fixture is the ticket's own Measured table at N = 23 (25 terminal-marked
-    // issues, 23 of them lane-landed with no lineage at all), which is exactly
-    // the issueCount !== noLineageCount case that makes the two candidate
-    // derivations produce different strings.
-    const html = renderKpisPage(buildStats({
-      terminalMarkedTaskCost: {
-        windowDays: 30, issueCount: 25, unpriced: 23, laneLandedCount: 23, costUsd: 176.4,
-        cashUsd: 100, unknownLaneUsd: 10, inFlightUsd: 42.5, overheadUsd: 12.3,
-        closeOutLineageShare: 0.08, evidenceLinkedShare: 0.08,
-        opencodeSummedShare: 0.5, unknownHarnessShare: 0.5,
-        pricedLineageShare: 0.8, attributableLineageShare: 0.95
-      }
-    }));
-    assert.ok(
-      html.includes('<span class="kpi-cost-shares-ignorance-basis">of 2 with a lineage (23 no-lineage excluded) · opencode share also excludes issues with no declared harness</span>'),
-      'the ignorance basis must name the lineage-bearing population (issueCount - laneLandedCount = 2), not the headline count'
-    );
-    // Kills the exact mutation the review measured as surviving CI.
-    assert.ok(
-      !html.includes('of 25 with a lineage'),
-      'the basis must never re-use issueCount as its own denominator — that is the undisclosed-basis bug this ticket fixes'
-    );
-    // Non-vacuity: the fixture must genuinely distinguish the two
-    // derivations, i.e. laneLandedCount > 0 and issueCount !== laneLandedCount,
-    // both readable straight off the sample line beside it.
-    assert.ok(html.includes('<span class="kpi-cost-sample">25 terminal-marked issues · 23 unpriced (excluded), of which 23 never observed (no lineage) · headline ÷ 0 priced tickets</span>'));
-  });
-
-  test('captureRateShare (LIN-1959) renders beside pricedLineageShare and discloses the capture loss pricedLineageShare cannot see', () => {
-    // The exact scenario the ticket names: priced lineages reads 100% (every
-    // usage-bearing lineage priced) while the true capture rate is low (most
-    // of what ran never posted usage at all) — pricedLineageShare alone would
-    // read as full coverage next to it. Both must render, and pricedLineageShare
-    // must NOT be replaced.
-    const html = renderKpisPage(buildStats({
-      terminalMarkedTaskCost: {
-        windowDays: 30, issueCount: 5, unpriced: 0, costUsd: 50,
-        cashUsd: 50, unknownLaneUsd: 0, inFlightUsd: null, overheadUsd: null,
-        closeOutLineageShare: 1, evidenceLinkedShare: 1,
-        opencodeSummedShare: 0, unknownHarnessShare: 0,
-        pricedLineageShare: 1, attributableLineageShare: 0.29, captureRateShare: 0.29
-      }
-    }));
-    assert.ok(
-      html.includes('priced lineages 100% · capture rate 29% · attributable lineages 29%'),
-      'the true capture rate must sit directly beside priced lineages, and priced lineages must remain published unchanged'
-    );
-  });
-
-  test('formatShare: a real non-zero share below the rounding threshold renders "<1%", never a false "0%" (LIN-1958 review F5)', () => {
-    const html = renderKpisPage(buildStats({
-      terminalMarkedTaskCost: {
-        windowDays: 30, issueCount: 250, unpriced: 0, costUsd: 100,
-        cashUsd: 0, unknownLaneUsd: 0, inFlightUsd: null, overheadUsd: null,
-        closeOutLineageShare: 0.004, evidenceLinkedShare: 1,
-        opencodeSummedShare: 0, unknownHarnessShare: 0,
-        pricedLineageShare: 1, attributableLineageShare: 1
-      }
-    }));
-    // "<1%" is HTML-escaped by escapeHtml() like any other rendered text.
-    assert.ok(html.includes('close-out linked &lt;1%'), 'a real non-zero share under the rounding threshold must not collapse to a false "0%"');
-  });
-
-  test('formatShare: a genuine zero still renders "0%", distinct from "<1%" and "—"', () => {
-    const html = renderKpisPage(buildStats({
-      terminalMarkedTaskCost: {
-        windowDays: 30, issueCount: 4, unpriced: 0, costUsd: 40,
-        cashUsd: 0, unknownLaneUsd: 0, inFlightUsd: null, overheadUsd: null,
-        closeOutLineageShare: 0, evidenceLinkedShare: 1,
-        opencodeSummedShare: 0, unknownHarnessShare: 0,
-        pricedLineageShare: 1, attributableLineageShare: 1
-      }
-    }));
-    assert.ok(html.includes('close-out linked 0%'), 'an exact 0 must still render as 0%, not <1% or —');
-  });
-
-  test('formatShare: null still renders "—", distinct from "0%" and "<1%"', () => {
-    const html = renderKpisPage(buildStats({
-      terminalMarkedTaskCost: {
-        windowDays: 30, issueCount: 0, unpriced: 0, costUsd: null,
-        cashUsd: null, unknownLaneUsd: null, inFlightUsd: null, overheadUsd: null,
-        closeOutLineageShare: null, evidenceLinkedShare: null,
-        opencodeSummedShare: null, unknownHarnessShare: null,
-        pricedLineageShare: null, attributableLineageShare: null
-      }
-    }));
-    assert.ok(html.includes('close-out linked —'), 'null must still render as a dash, not 0% or <1%');
+  test('renders an em dash with no anchor when the rate is unavailable', () => {
+    const view = toPublicKpis(buildStats());
+    const html = renderKpisPage({ ...view, outcomes: { ...view.outcomes, rate: null, resolved: 0, done: 0, failed: 0, aborted: 0 } });
+    assert.match(html, /<span class="kpi-headline-value">—<\/span>/);
+    assert.ok(!/class="kpi-headline-value" href/.test(html));
+    assert.ok(!/>0%</.test(html));
   });
 });
 
-describe('renderKpisPage: weekly-budget burn gauge card (LIN-2118)', () => {
-  test('renders the estimate value, and labels it as an estimate never a direct meter read', () => {
-    const html = renderKpisPage(buildStats());
-    assert.ok(html.includes('<span class="kpi-budget-value">56.3%</span>'));
-    assert.ok(html.includes('of weekly subscription window consumed (estimate)'));
-    assert.ok(html.includes('never a direct meter read'));
+describe('renderKpisPage: what the agents do', () => {
+  test('renders the event cards with formatted values on the shared .card primitive', () => {
+    const html = render();
+    assert.strictEqual(cardValue(html, 'agent-actions'), '1,234');
+    assert.strictEqual(cardValue(html, 'dispatches'), '56');
+    assert.strictEqual(cardValue(html, 'autopilot-runs'), '8');
+    assert.match(html, /<div class="card kpi-card"[^>]*data-testid="kpis-card-agent-actions"/);
   });
 
-  test('sources the estimate from telemetry when no operator checkpoint exists this window', () => {
-    const html = renderKpisPage(buildStats());
-    assert.ok(html.includes('estimate from telemetry alone — no operator reading yet this window'));
+  test('the workspaces card discloses its basis; a hidden count renders as text with a data hook', () => {
+    const shown = render();
+    assert.strictEqual(cardValue(shown, 'workspaces'), '40');
+    assert.match(shown, /kpi-card-basis[^>]*>workspaces with activity in the 30-day read window/);
+
+    const low = render({ workspaces: F - 1 });
+    assert.strictEqual(cardValue(low, 'workspaces'), `fewer than ${F}`);
+    assert.match(low, /data-testid="kpis-hidden" data-hidden="below-floor"/);
   });
 
-  test('sources the estimate from an operator reading, naming its timestamp, when a checkpoint exists', () => {
-    const html = renderKpisPage(buildStats({
-      weeklyBudgetGauge: {
-        resetAt: '2026-06-05T06:00:00.000Z', nextResetAt: '2026-06-12T06:00:00.000Z',
-        hoursElapsed: 10, usdPerPoint: 39.65, percentConsumed: 42, percentSource: 'operator-reading',
-        burnRatePerHour: 1.2, projectedExhaustionAt: null,
-        checkpoint: { percent: 40, at: '2026-06-05T16:00:00.000Z' },
-        windowLineageCount: 5, windowPricedLineageShare: 1, dayBars: { days: [], costUsd: [] }
-      }
-    }));
-    assert.ok(html.includes('estimate anchored to an operator reading at 2026-06-05 16:00 UTC'));
+  test('draws the phases and dispatch-kinds charts', () => {
+    const html = render();
+    for (const id of ['chart-proxy-phases', 'chart-dispatch-kinds', 'chart-outcome-trend']) {
+      assert.match(html, new RegExp(`<canvas id="${id}"></canvas>`), id);
+    }
+  });
+});
+
+describe('renderKpisPage: how people get started', () => {
+  test('every no-signal step is a text row naming the step and its coverage', () => {
+    const html = render();
+    assert.match(html, /<p class="kpi-chart-empty" data-milestone-step="mergeClicked">merge clicked: no signal, mergeClicked: app-defined coverage label<\/p>/);
   });
 
-  test('renders the burn rate and the projected clip time', () => {
-    const html = renderKpisPage(buildStats());
-    assert.ok(html.includes('burn rate 1.5 pts/hr (last 24h)'));
-    assert.ok(html.includes('at this rate the window exhausts 2026-06-13 02:00 UTC'));
+  test('a reached step with a zero count is a bar, never a hidden or no-signal row', () => {
+    const html = render({ funnel: buildFunnel({ login: 3 * F, connected: 2 * F, firstGo: 0, prOpened: 0, mergeClicked: 0 }) });
+    assert.ok(!/data-milestone-step="firstGo"/.test(html));
+    assert.ok(!/data-testid="kpis-hidden"/.test(html));
+    const steps = extractEmbeddedData(html, '__KPI_DATA__').milestoneFunnel.steps;
+    assert.deepStrictEqual([steps.firstGo.state, steps.firstGo.count], ['reached', 0]);
   });
 
-  test('a null projection renders an honest "not projected", never a fabricated time', () => {
-    const html = renderKpisPage(buildStats({
-      weeklyBudgetGauge: {
-        resetAt: '2026-06-05T06:00:00.000Z', nextResetAt: '2026-06-12T06:00:00.000Z',
-        hoursElapsed: 1, usdPerPoint: 39.65, percentConsumed: null, percentSource: 'none',
-        burnRatePerHour: null, projectedExhaustionAt: null, checkpoint: null,
-        windowLineageCount: 0, windowPricedLineageShare: null, dayBars: { days: [], costUsd: [] }
-      }
-    }));
-    assert.ok(html.includes('<span class="kpi-budget-value">—</span>'));
-    assert.ok(html.includes('no data yet this window'));
-    assert.ok(html.includes('not projected to exhaust at the current rate'));
+  test('a below-floor step is a server-side text row: "fewer than N" from the constant, with data hooks', () => {
+    const html = render({ funnel: buildFunnel({ login: 3 * F, connected: F - 1, firstGo: 0, prOpened: 0, mergeClicked: 0 }) });
+    assert.match(html, new RegExp(`<p class="kpi-chart-empty" data-testid="kpis-hidden" data-hidden="below-floor" data-milestone-step="connected">connected: fewer than ${F}</p>`));
+    // And the withheld one says so, without its number.
+    assert.match(html, /data-hidden="withheld" data-milestone-step="login">signed up: not shown</);
+    assert.ok(!html.includes(String(3 * F)), 'the withheld count is nowhere in the page');
   });
 
-  test('publishes the window span and the priced-lineage provenance disclosure beside the number', () => {
-    const html = renderKpisPage(buildStats());
-    assert.ok(html.includes('window 2026-06-05 06:00 UTC → 2026-06-12 06:00 UTC'));
-    assert.ok(html.includes('40 lineages this window · 90% priced'));
+  test('the rows sit outside the canvas wrapper the script replaces on an empty chart', () => {
+    const html = render({ funnel: buildFunnel({ login: F - 1 }) });
+    const wrapperEnd = html.indexOf('</div>', html.indexOf('<canvas id="chart-milestone-funnel">'));
+    assert.ok(html.indexOf('data-milestone-step="login"') > wrapperEnd);
   });
 
-  test('degrades safely when weeklyBudgetGauge is entirely absent from stats', () => {
-    const stats = buildStats();
-    delete stats.weeklyBudgetGauge;
-    const html = renderKpisPage(stats);
-    assert.ok(html.includes('<span class="kpi-budget-value">—</span>'));
-    assert.ok(html.includes('no data yet this window'));
+  test('the entry-mode rows show exact counts, or hidden text with hooks', () => {
+    const exact = render({ funnel: buildFunnel({ login: 3 * F }, buildMode(10 * F, [[6 * F, 2 * F], [4 * F, 0], [0, 0]])) });
+    assert.match(exact, new RegExp(`data-mode-rung="copy"[^>]*>.*?data-field="entries">${6 * F}<.*?data-field="notReady">${2 * F}<`, 's'));
+    assert.match(exact, /data-mode-rung="run-task"[^>]*>.*?data-field="entries">0</s);
+
+    const low = render({ funnel: buildFunnel({ login: 3 * F }, buildMode(10 * F, [[6 * F, F - 1], [4 * F, 0], [0, 0]])) });
+    assert.match(low, /data-mode-rung="copy"[^>]*>.*?data-field="entries"[^>]*data-hidden="withheld"[^>]*>not shown</s);
+    assert.match(low, new RegExp(`data-field="notReady"[^>]*data-hidden="below-floor"[^>]*>fewer than ${F}<`));
+    assert.match(low, /data-testid="kpis-mode-total"[^>]*data-hidden="withheld"/);
   });
 
-  test('the card renders on the shared .card primitive, above and outside .kpi-cards (grid count unaffected)', () => {
-    const html = renderKpisPage(buildStats());
-    assert.ok(html.includes('class="card kpi-budget-card"'));
-    assert.ok(
-      html.indexOf('kpi-budget-card') < html.indexOf('data-section="kpi-cards"'),
-      'the budget card renders above the stat card grid'
-    );
-    assert.strictEqual((html.match(/class="card kpi-card"/g) || []).length, 11);
+  test('no mode block renders no mode rows', () => {
+    assert.ok(!/data-mode-rung/.test(render({ funnel: buildFunnel({ login: 3 * F }, null) })));
+  });
+});
+
+describe('renderKpisPage: the small-count floor in the page source', () => {
+  // A fixture sparse enough that every floored count is below the floor.
+  const sparse = { workspaces: 2, funnel: buildFunnel({ login: 4, connected: 3, firstGo: 2, prOpened: 1, mergeClicked: 0 }, buildMode(4, [[2, 1], [1, 0], [1, 1]])) };
+  const html = render(sparse);
+  const data = extractEmbeddedData(html, '__KPI_DATA__');
+
+  test('__KPI_DATA__ holds no floored leaf in 1..floor-1', () => {
+    const floored = [
+      data.totals.workspaces,
+      ...Object.values(data.milestoneFunnel.steps).map(s => s.count),
+      data.milestoneFunnel.mode.total,
+      ...data.milestoneFunnel.mode.byRung.flatMap(r => [r.entries, r.notReady])
+    ];
+    for (const leaf of floored) {
+      assert.ok(leaf === null || leaf === 0 || typeof leaf === 'object', JSON.stringify(leaf));
+    }
+    assert.deepStrictEqual(data.totals.workspaces, { hidden: 'below-floor' });
   });
 
-  test('never uses "verified" or a reserved-word synonym anywhere in the rendered page', () => {
-    const html = renderKpisPage(buildStats());
-    assert.ok(!/verified/i.test(html));
+  test('the visible text shows no raw count for them either', () => {
+    const text = html.replace(/<script[\s\S]*?<\/script>/g, '').replace(/<[^>]+>/g, ' ');
+    assert.match(text, new RegExp(`signed up: fewer than ${F}`));
+    assert.match(text, new RegExp(`workspaces`));
+    assert.ok(!new RegExp(`(?:signed up|connected|first go|pr opened):\\s*[1-${F - 1}]\\b`).test(text));
   });
 
-  test('carries the DEFAULT_USD_PER_POINT calibration provenance (window/sample/date) as a caption (LIN-2404)', () => {
-    const html = renderKpisPage(buildStats());
-    assert.ok(html.includes('class="kpi-budget-calibration"'));
-    assert.ok(html.includes('default $/point calibrated 2026-08-14'));
-    assert.ok(html.includes('from 27 weekly-window points'));
-    assert.ok(html.includes('against $1,070.58 spend'));
-    assert.ok(html.includes('LIN-2087'));
-    // Also carried as a title attribute, so it surfaces on hover even where
-    // the caption's small print goes unread.
-    assert.ok(html.includes('title="default $/point calibrated 2026-08-14'));
+  test('states the floor on the page, built from the constant', () => {
+    assert.match(html, new RegExp(`data-testid="kpis-privacy"[^>]*>[^<]*fewer than ${F}[^<]*never[^<]*names, workspace keys or content`));
+  });
+
+  test('offline scan witness: the rendered page and its scripts pass the secret scan', () => {
+    const scripts = extractScriptsFromHtml(html, 'http://127.0.0.1:3000/kpis');
+    assert.ok(scripts.length >= 1);
+    const findings = [
+      ...scripts.filter(s => s.type === 'inline').flatMap(s => scanText(s.content, { filePath: 'kpis-inline' })),
+      ...scanText(html, { filePath: 'kpis.html' })
+    ];
+    assert.deepStrictEqual(findings, []);
   });
 });

@@ -107,6 +107,15 @@ export const SELECTORS = {
     card: (name) => `[data-testid="workspace-kpis-card-${name}"]`,
     empty: '[data-testid="workspace-kpis-empty"]',
   },
+  /** Public /kpis page (LIN-3703): section, card, chart and hidden-row test ids. */
+  publicKpis: {
+    headline: '[data-testid="kpis-headline"]',
+    section: (name) => `[data-testid="kpis-section-${name}"]`,
+    card: (name) => `[data-testid="kpis-card-${name}"]`,
+    chart: (name) => `[data-testid="kpis-chart-${name}"]`,
+    hidden: '[data-testid="kpis-hidden"]',
+    privacy: '[data-testid="kpis-privacy"]',
+  },
   dispatchHalt: {
     status: '[data-testid="dispatch-halt-status"]',
     disclaimer: '[data-testid="dispatch-halt-disclaimer"]',
