@@ -241,7 +241,9 @@ test.describe('Token Management', () => {
     await page.click('#create-token-form button[type="submit"]')
 
     // LIN-3618: the mint modal shows the expiry from the 201 body
-    await expect(page.locator('.token-modal')).toContainText('expires')
+    // ('never expires' also contains 'expires', so pin the dated form)
+    await expect(page.locator('.token-modal')).toContainText('This token expires')
+    await expect(page.locator('.token-modal')).not.toContainText('never expires')
 
     // Close modal
     await page.click('.token-modal-close')
