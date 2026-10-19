@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { renderTaskPage, renderOwnerControls, renderTaskTrack, renderTaskStatus, harbourHref } from '../../lib/render-task-page.js';
 import { renderCloseOutBox } from '../../lib/render-run-evidence.js';
 import { buildTaskPageModel } from '../../lib/task-page-loader.js';
-import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
+import { enrichLoop, deriveSessionWaiting, deriveSessionDecisions } from '../../routes/dashboard.js';
 import { buildRunEvidence } from '../../lib/run-evidence.js';
 import { CLOSE_OUT_STATUS, deriveCloseOutState } from '../../lib/run-closeout-state.js';
 
@@ -151,7 +151,7 @@ const LIN3351_LOOPS = [
 ];
 
 function model(name) {
-  const base = { identifier: 'LIN-50', enrichLoop, deriveSessionWaiting, now: NOW };
+  const base = { identifier: 'LIN-50', enrichLoop, deriveSessionWaiting, deriveSessionDecisions, now: NOW };
   switch (name) {
     case 'running-blocked-repeat':
       return buildTaskPageModel({ ...base, loops: RUNNING_LOOPS, ctx: ctx(), evidence: EVIDENCE,
@@ -447,7 +447,7 @@ describe('viewer isolation', () => {
       const guest = render(name, 'guest');
       const fragments = renderOwnerControls(model(name), { urlKey: 'acme', binding: BINDING });
       let stripped = owner;
-      for (const f of [fragments.context, fragments.pullRequest, fragments.share]) {
+      for (const f of [fragments.context, fragments.pullRequest, fragments.share, fragments.question]) {
         if (!f) continue;
         assert.ok(stripped.includes(f), 'the owner page carries the fragment verbatim');
         stripped = stripped.replace(f, '');

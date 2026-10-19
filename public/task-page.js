@@ -518,6 +518,12 @@
     // keeps `data-*`/`id`/`class`, so a control looked up after it lands could
     // resolve to look-alike ticket text. The close-out box is captured here and
     // its press button is bound directly (close-out.js is idempotent per box).
+    // LIN-3499: the owner's question card (the shared public/question-cards.js)
+    // is captured here too. It sits outside `task-page-answer`, so no poll
+    // repaints it.
+    if (window.QuestionCards && typeof window.QuestionCards.initQuestionCards === 'function') window.QuestionCards.initQuestionCards();
+    var questionCard = doc.querySelector('[data-testid="task-page-question"]');
+    var isOwnerPage = !!doc.querySelector('[data-testid="task-page-owner-widgets"]');
     var closeOutBox = window.CloseOut && typeof window.CloseOut.init === 'function' ? window.CloseOut.init(doc) : null;
 
     // Owner's live widgets (if the libs loaded). Once mounted, the context
@@ -558,6 +564,22 @@
     // for a tab focus. `runCheck` owns the eligibility gate.
     var lastPolled = main.getAttribute('data-status') || 'idle';
 
+    // LIN-3499: the question card shows exactly while the task is waiting. A
+    // poll that finds it no longer waiting (answered, or the run moved on)
+    // removes it; a poll that finds it newly waiting reloads the page once, since
+    // the card is server-rendered for the owner and the state read carries none.
+    // Both are captured at init, before any markdown renders (LIN-3385). The
+    // owner-widgets marker is the owner signal — no second owner check.
+    function syncQuestion(state) {
+      if (questionCard && state.status !== 'waiting') {
+        if (questionCard.parentNode) questionCard.parentNode.removeChild(questionCard);
+        questionCard = null;
+      } else if (!questionCard && state.status === 'waiting' && lastPolled !== 'waiting' && isOwnerPage) {
+        var win = doc.defaultView;
+        if (win && win.location && typeof win.location.reload === 'function') win.location.reload();
+      }
+    }
+
     function apply(state) {
       // Read the box first: a check may have moved it off `ready` since the
       // last poll, and then the ready header must not be painted.
@@ -580,6 +602,7 @@
       applyOpenMemory(rows(), memory);
       main.setAttribute('data-status', readyHtml ? (paintedStatus || 'waiting') : state.status);
       main.setAttribute('data-live', state.live ? 'true' : 'false');
+      syncQuestion(state);
       tickClocks(main);
       if (lastPolled === 'running' && state.status === 'idle' && closeOutBox && window.CloseOut && typeof window.CloseOut.runCheck === 'function') {
         // The check may move the box off `ready` without Done (so no reload):
