@@ -140,6 +140,7 @@ import { renderAuditPage } from './lib/render-audit.js'
 import { renderPrivacyPolicy, renderTermsOfService } from './lib/render-legal.js'
 import { renderStyleguide } from './lib/render-styleguide.js'
 import { renderKpisPage } from './lib/render-kpis.js'
+import { createWorkspaceKpisRoutes } from './routes/workspace-kpis.js'
 import { renderTemplatesPage } from './lib/render-templates.js'
 import { collectKpiStats } from './lib/kpi-stats.js'
 import { renderSettingsPage } from './lib/render-settings.js'
@@ -2409,6 +2410,9 @@ app.use(createDispatchRoutes({ installationTokenFor, dispatchQueueStore, dispatc
 // per-account per-task mode read.
 app.use(createTaskModeRoutes({ taskModeStore, accountStore, workspaceFromUrl }))
 app.use(createMilestoneFunnelRoutes({ taskModeStore, accountStore, accountWorkspaceStore, dispatchQueue: dispatchQueueCollection, dispatchHistory: dispatchHistoryCollection, closeOutEventsStore, workspaceFromUrl }))
+
+// Workspace KPIs page (LIN-3689): one workspace's counts, next to Settings
+app.use(createWorkspaceKpisRoutes({ workspaceFromUrl, collections: { dispatchQueue: dispatchQueueCollection, dispatchHistory: dispatchHistoryCollection, proxyEvents: proxyEventsCollection, agentStatus: agentStatusCollection, reportHistory: reportHistoryCollection, customPrompts: customPromptsCollection } }))
 
 // The ONE PR-state store (LIN-3311): the LIN-3251 cache,
 // sliding 36/h GitHub budget and PR-state cache. The dashboard router

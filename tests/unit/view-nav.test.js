@@ -28,7 +28,7 @@ const STYLE_CSS = join(__dirname, '../../public/style.css');
 test('getViewNavLinks always includes the first-class views, workspace-prefixed', () => {
   const links = getViewNavLinks('acme', {});
   const texts = links.map(l => l.text);
-  assert.deepEqual(texts, ['projects', 'swipe', 'swim', 'observation', 'settings']);
+  assert.deepEqual(texts, ['projects', 'swipe', 'swim', 'observation', 'settings', 'kpis']);
   for (const link of links) {
     assert.match(link.href, /^\/workspace\/acme\//);
   }
@@ -85,7 +85,7 @@ test('getViewNavLinks surfaces experimental views ONLY when their flag is on (ga
 test('renderViewNav emits stable nav-view-<text> testids for each link', () => {
   const html = renderViewNav({ urlKey: 'acme', currentPage: 'swim', featureFlags: {} });
   assert.match(html, /class="nav-views"/);
-  for (const text of ['observation', 'swipe', 'swim', 'projects', 'settings']) {
+  for (const text of ['observation', 'swipe', 'swim', 'projects', 'settings', 'kpis']) {
     assert.match(html, new RegExp(`data-testid="nav-view-${text}"`));
   }
 });
@@ -121,7 +121,7 @@ test('renderViewNav shows visible label "tasks" but testid keeps internal key "p
 test('partitionViewLinks splits first-class (primary) from flag-gated (overflow)', () => {
   const links = getViewNavLinks('acme', { roadmap: true, dispatch: true, proxy: true });
   const { primary, overflow } = partitionViewLinks(links, 'observation');
-  assert.deepEqual(primary.map(l => l.text), ['projects', 'swipe', 'swim', 'observation', 'settings']);
+  assert.deepEqual(primary.map(l => l.text), ['projects', 'swipe', 'swim', 'observation', 'settings', 'kpis']);
   assert.deepEqual(overflow.map(l => l.text), ['roadmap', 'dispatch', 'proxy']);
 });
 
@@ -129,7 +129,7 @@ test('partitionViewLinks HOISTS the active overflow view inline (never hidden)',
   const links = getViewNavLinks('acme', { roadmap: true, dispatch: true, proxy: true });
   const { primary, overflow } = partitionViewLinks(links, 'dispatch');
   // Active flag-gated view is lifted onto the primary strip, after the five.
-  assert.deepEqual(primary.map(l => l.text), ['projects', 'swipe', 'swim', 'observation', 'settings', 'dispatch']);
+  assert.deepEqual(primary.map(l => l.text), ['projects', 'swipe', 'swim', 'observation', 'settings', 'kpis', 'dispatch']);
   // …and removed from overflow so it is not rendered twice.
   assert.deepEqual(overflow.map(l => l.text), ['roadmap', 'proxy']);
 });
@@ -141,7 +141,7 @@ test('partitionViewLinks HOISTS the active experimental overflow view inline (LI
   const { primary, overflow } = partitionViewLinks(links, 'task-chat');
   // Active experimental view lifted onto the primary strip after the five, keyed
   // on its kebab route (`task-chat`), matching the kebab `currentPage`.
-  assert.deepEqual(primary.map(l => l.text), ['projects', 'swipe', 'swim', 'observation', 'settings', 'task-chat']);
+  assert.deepEqual(primary.map(l => l.text), ['projects', 'swipe', 'swim', 'observation', 'settings', 'kpis', 'task-chat']);
   // …and removed from overflow so it is not rendered twice; ship stays behind ⋯ more.
   assert.deepEqual(overflow.map(l => l.text), ['ship']);
 });
