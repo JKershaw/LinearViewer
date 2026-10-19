@@ -126,3 +126,20 @@ test('LIN-3687: formatHaltStatusHtml labels an unknown mode with its capitalised
   assert.ok(format({ mode: 'pause', setAt: 0 }).startsWith('Pause requested'));
   assert.ok(format({ mode: 'stop', setAt: 0 }).startsWith('Stop requested'));
 });
+
+// LIN-3687: an unknown mode now reaches innerHTML through `verb`, so it must be
+// escaped. The test above stubs escapeHtml as identity and cannot see this.
+test('LIN-3687: formatHaltStatusHtml escapes the unknown-mode verb', () => {
+  const labelsStart = DISPATCH_JS_SRC.indexOf('const HALT_MODE_LABELS');
+  const fnStart = DISPATCH_JS_SRC.indexOf('function formatHaltStatusHtml');
+  const labelsSlice = DISPATCH_JS_SRC.slice(labelsStart, DISPATCH_JS_SRC.indexOf('}', labelsStart) + 1);
+  const fnSlice = DISPATCH_JS_SRC.slice(fnStart, DISPATCH_JS_SRC.indexOf('\n}\n', fnStart) + 3);
+  const sandbox = {
+    escapeHtml: (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
+  };
+  vm.createContext(sandbox);
+  const format = vm.runInContext(`${labelsSlice}\n${fnSlice}\nformatHaltStatusHtml`, sandbox);
+  const html = format({ mode: '<b>x', setAt: 0 });
+  assert.ok(!html.includes('<b>'), html);
+  assert.ok(html.includes('&lt;b&gt;x'), html);
+});
