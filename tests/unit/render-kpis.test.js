@@ -152,6 +152,18 @@ describe('renderKpisPage: how people get started', () => {
     assert.ok(html.indexOf('data-milestone-step="login"') > wrapperEnd);
   });
 
+  test('the rows still sit outside the canvas wrapper when every step is hidden and the chart is empty', () => {
+    const html = render({ funnel: buildFunnel({ login: F - 1, connected: F - 2, firstGo: F - 3, prOpened: 1, mergeClicked: F - 1 }) });
+    const wrapperEnd = html.indexOf('</div>', html.indexOf('<canvas id="chart-milestone-funnel">'));
+    const rows = [...html.matchAll(/data-milestone-step="(\w+)"/g)];
+    assert.deepStrictEqual(rows.map(m => m[1]), ['login', 'connected', 'firstGo', 'prOpened', 'mergeClicked']);
+    for (const row of rows) assert.ok(row.index > wrapperEnd, row[1]);
+  });
+
+  test('the funnel caption says who is counted (LIN-3501)', () => {
+    assert.match(render(), /people who signed up in the last 30 days/);
+  });
+
   test('the entry-mode rows show exact counts, or hidden text with hooks', () => {
     const exact = render({ funnel: buildFunnel({ login: 3 * F }, buildMode(10 * F, [[6 * F, 2 * F], [4 * F, 0], [0, 0]])) });
     assert.match(exact, new RegExp(`data-mode-rung="copy"[^>]*>.*?data-field="entries">${6 * F}<.*?data-field="notReady">${2 * F}<`, 's'));
@@ -196,6 +208,7 @@ describe('renderKpisPage: the small-count floor in the page source', () => {
 
   test('states the floor on the page, built from the constant', () => {
     assert.match(html, new RegExp(`data-testid="kpis-privacy"[^>]*>[^<]*fewer than ${F}[^<]*never[^<]*names, workspace keys or content`));
+    assert.match(html, /data-testid="kpis-privacy"[^>]*>[^]*?<a href="\/privacy">/);
   });
 
   test('offline scan witness: the rendered page and its scripts pass the secret scan', () => {

@@ -2250,7 +2250,7 @@ app.get('/styleguide', (req, res) => {
 
 // Public templates catalog (LIN-1889): publishes the 16 non-meta prompt
 // templates for anyone to view/copy without auth. Indexable (no noindex) —
-// unlike /styleguide and /kpis above, discovery is the point.
+// unlike /styleguide and the public /kpis page (mounted below), discovery is the point.
 app.get('/templates', (req, res) => {
   res.send(renderTemplatesPage({ deployInfo: getDeployInfo() }))
 })

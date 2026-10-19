@@ -131,3 +131,37 @@ Then, in scratch: replay (old `collectKpiStats` against `toPublicKpis`), verbati
 ## Out of scope
 
 The in-app page and any admin dashboard; rebuilding `kpi-stats.js` internals; new reads, metrics, or per-workspace or per-person numbers; the live site scan; an operator surface for the dropped cost card and budget gauge (default: none in this PR); linking the page from anywhere (default: no; `noindex` stays).
+
+## Divergences from the approved plan
+
+The plan approved in review dropped `mode`, put the route in `routes/public-kpis.js`, defined the group rule as "every nonzero member becomes withheld", split the build into three commits and linked the floor note to `/privacy`. The build differs in the five ways below; each is recorded here and in the PR rather than left implicit.
+
+1. **`milestoneFunnel.mode` is published and drawn** (the approved design listed it under "Dropped"). It is floored as group `mode`, and the page-source test, the registry walk and the recovery grid cover it. It adds a published surface the plan review did not approve, and the rung names (copy, run-step, run-task) are not labelled for a stranger. Privacy is not affected: every `mode` leaf goes through the same floor and group rule. Kept because the entry rungs say how first runs start, which belongs to "How people get started"; the labelling is a copy question for John.
+2. **The route module is `lib/kpi-page.js` (`createKpiPage`), not `routes/public-kpis.js` (`createPublicKpisRoutes`).** The module is pure and imports nothing: it holds the cache, the single-flight refresh and the handler, and `server.js` does the `app.get` mount. It is not a router, so the `^routes/` area pattern does not fit it. `scripts/code-shape/areas.json` gained `kpi-page` under "Platform & plumbing" for that reason. Because it imports nothing it adds no area-pair edge.
+3. **The group rule differs from decision 4.** A member that is itself 1 to floor-1 stays `{ hidden: 'below-floor' }` instead of becoming `withheld`; every other nonzero member is `withheld`. Checked: this reveals nothing the leaf rule does not already publish (a member in 1 to floor-1 is already known to be small, and it is hidden). The design text above was changed to match in the build commit, after the fact. This is an open question for John beside the floor ruling (`lin3703-floor-rule`); the default is to keep it.
+4. **Commits 3a, 3b and 3c were collapsed into one build commit** (`f40ac3fd`), so the red witness for the catch fix is not in history. It was reproduced in review: restoring the re-render in the catch makes `a renderer that throws is not called again` (`tests/unit/kpi-page.test.js`) fail.
+5. **The floor note links `/privacy`.** The plan called for this and the build omitted it (only the footer linked it). Fixed in close-out: the `kpis-privacy` paragraph now carries `<a href="/privacy">`, pinned in `render-kpis.test.js`.
+
+## Consumer sweep (class: code and docs that describe the old public page or its payload)
+
+Query, at `dca50589` (104 hits): `grep -rn "/kpis\b" lib routes public scripts server.js docs/architecture CLAUDE.md .env.example playwright.config.js | grep -v 'workspace/:urlKey/kpis\|${prefix}/kpis'`, together with `render-kpis|renderKpisPage|public/kpis|kpis.js|kpis.css|__KPI_DATA__`.
+
+| Member | Verdict | Reason |
+|---|---|---|
+| `lib/render-kpis.js`, `public/kpis.js`, `public/kpis.css`, the `server.js` KPI block | rebuilt | the change itself |
+| `tests/unit/render-kpis.test.js`, `tests/e2e/kpis.spec.js` | rewritten | pins of the old page (see "Pin conversions") |
+| `lib/terminal-marked-task-cost.js` :43, :50, :278, :573, :577, :600, :613, :621 | comment-only edit (close-out) | claimed `__KPI_DATA__` is public wire, that `render-kpis.js` divides the headline, and that the occupancy probe is visible on `/kpis`; none holds once the cost card is gone. The builder and the `noLineageCount` alias stay; the alias's remaining consumers are in `tests/unit/terminal-marked-task-cost.test.js` |
+| `.env.example:126-128` | comment-only edit | said `PLAN_FEE_MONTHLY_USD` feeds the `/kpis` card |
+| `tests/unit/terminal-marked-task-cost.test.js:921` | comment-only edit (close-out) | cited the dropped `render-kpis.test.js:475` pin |
+| `routes/proxy-reads.js:28` | comment-only edit (close-out) | top endpoints are dropped, so `public/kpis.js` no longer reads endpoint strings back |
+| `server.js:2253` | comment-only edit (close-out) | "above" was wrong and the route moved |
+| `docs/architecture/source-map.md`, `configuration.md:36-37`, `playwright.config.js:44-45` | edited | new files, changed roles, dropped cards |
+| `lib/render-templates.js:6-7`, `public/swim.js:13` | no edit | the new renderer keeps the shell (`is-landing`, `noindex`); the script keeps CSS-var colours |
+| "never fed to /kpis" privacy notes (`saved-chat-store.js:23`, `prompt-trace-store.js:11,18,199`, `routes/workspace-api-prompts.js:28`, `routes/task-chat.js:301`, `routes/dashboard.js:2394`, `server.js:596,615`) | no edit | still true |
+| collector and read-history notes (`kpi-stats.js`, `proxy-events.js:65,573`, `read-horizon.js:9`, `scripts/lin3014/*`, `routes/milestone-funnel.js:7`, `digest-feedback.js:7`) | no edit | the collector and raw aggregate are unchanged; the floor applies downstream |
+| `lib/milestone-funnel.js:164` | no edit | a MangoDB feedback-projection caveat ("dev /kpis only"); belongs with the collector notes |
+| route and test plumbing (`guest-task-path.js:80`, `scan-public-pages.js:4,23`, `scripts/scan-public-pages.mjs:7`, `routes/test.js:53,54,921,975`, `routes/test.js:937` (the `/test/kpis-fail-next-aggregate` seam), `render-workspace-kpis.js`, `render-escalation-kpis.js:10`, `components/view-nav.js:74`, `server.js:1069`, `CLAUDE.md:28,78`, `llms.txt:25,236`) | no edit | still true |
+| `scripts/survey-tests-friction-tickets.mjs`, `scripts/eval/fixtures/**` | out of scope | dated records or generated data |
+| `experiments/`, `docs/papers/`, `docs/reviews/`, `docs/runbooks/harbour-degraded.md`, `docs/incidents/`, `docs/steady-base.md`, `docs/view-tiers.md` | out of scope | dated records (the last is still true) |
+
+Env vars of the dropped builders: `PLAN_FEE_MONTHLY_USD`, `WEEKLY_BUDGET_USD_PER_POINT`, `WEEKLY_BUDGET_CHECKPOINT_PERCENT`, `WEEKLY_BUDGET_CHECKPOINT_AT`. Edited where the text names `/kpis` (`configuration.md:36-37`, `playwright.config.js:44-45`, `.env.example:126-128`); the libs and their tests stay.
