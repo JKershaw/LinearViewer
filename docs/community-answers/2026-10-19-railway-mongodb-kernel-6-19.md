@@ -40,6 +40,11 @@ Notes:
 
 Test run (public logs): https://github.com/JKershaw/LinearViewer/actions/runs/39302841645
 
+## Since posting
+
+- **The variable has a stated cost.** With `GLIBC_TUNABLES=glibc.pthread.rseq=1`, mongod 8.0.32 logs warning id 8718500 at start-up: "Your system has glibc support for rseq built in, which is not yet supported by tcmalloc-google and has critical performance implications. Please set the environment variable GLIBC_TUNABLES=glibc.pthread.rseq=0". On kernels 6.19 to 7.0.13, `rseq=0` is the setting that refuses to start. So `rseq=1` gets past the refusal, and MongoDB itself says it costs allocator performance. Treat it as a stopgap until the host kernel is 7.0.14 or newer, or an 8.x release fixes TCMalloc, rather than as a free fix. (Seen in Harbour's CI, run 39306927693, PR #1990.)
+- **Not yet witnessed:** minutes-long stability under sustained load on a 7.0 kernel. The probe below ran a short insert burst only.
+
 ## Evidence
 
 The test was GitHub Actions run 39302841645 on this repository, 19 Oct 2026, 18:28 to 18:31 UTC. It ran 9 jobs: `ubuntu-latest`, `ubuntu-24.04` and `ubuntu-22.04`, three replicas each. Each job tried every image tag with each `GLIBC_TUNABLES` setting.
@@ -96,7 +101,7 @@ To check a host whose kernel is in the affected range, run it on a 6.19 to 7.0.1
 ## What it meant for Harbour
 
 - **CI.** Harbour's unit job starts `mongo:8.0` as a service, so it failed whenever a job landed on a 7.0.0 runner. The fix follows the data: `mongo:8.0.32` (production's version) plus `GLIBC_TUNABLES=glibc.pthread.rseq=1` on the service (LIN-3693).
-- **Production.** A read-only check (LIN-3697) found MongoDB 8.0.32 on host kernel 6.12.22, below the affected range, so a restart there would start today. The risk is Railway later moving the service to a host on 6.19 to 7.0.13. LIN-3698 tracks that. The measured guard is the same variable on the MongoDB service, set at a planned redeploy, after a backup.
+- **Production.** A read-only check (LIN-3697) found MongoDB 8.0.32 on host kernel 6.12.22, below the affected range, so a restart there would start today. The risk is Railway later moving the service to a host on 6.19 to 7.0.13. LIN-3698 tracks that. The measured guard is the same variable on the MongoDB service, set at a planned redeploy, after a backup. Its performance warning (above) is a reason to set it only if the host kernel actually moves into the affected range, not ahead of time.
 
 ## Sources
 
