@@ -17,11 +17,7 @@ function swimTokenColor(name, fallback) {
   return (v && v.trim()) || fallback;
 }
 
-// Terminal states are non-actionable; mirrored from lib/tree.js (no shared import in public/).
-var TERMINAL_STATES = ['completed', 'canceled', 'duplicate'];
-function isTerminalState(stateType) {
-  return TERMINAL_STATES.indexOf(stateType) !== -1;
-}
+// isTerminalState comes from public/common.js (loaded first), the one browser home for the terminal set.
 
 // NOTE: Canonical source of truth for state ordering is lib/providers/models.js +
 // state-map.js. This browser copy (terminal-collapse variant, matching
@@ -762,10 +758,10 @@ function applySettingsToUI(settings) {
 }
 
 function stateIndicator(stateType) {
-  if (isTerminalState(stateType)) return '<span class="swim-box-state done status-pill__char status-pill--done">\u2713</span>';
+  if (isTerminalState(stateType)) return '<span class="swim-box-state done status-pill__char status-pill--done">' + (stateType === 'completed' ? '\u2713' : '\u2715') + '</span>';
   switch (stateType) {
     case 'started': return '<span class="swim-box-state in-progress status-pill__char status-pill--in-progress">\u25D0</span>';
-    case 'backlog': return '<span class="swim-box-state backlog status-pill__char status-pill--backlog">\u25CB</span>';
+    case 'backlog': return '<span class="swim-box-state backlog status-pill__char status-pill--backlog">\u25CC</span>';
     default: return '<span class="swim-box-state todo status-pill__char status-pill--todo">\u25CB</span>';
   }
 }

@@ -10,6 +10,9 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
+import { fileURLToPath } from 'node:url';
 import {
   getStateDisplay,
   getStateOrder,
@@ -47,8 +50,8 @@ describe('models.js canonical vocabulary', () => {
 describe('getStateDisplay', () => {
   const expected = {
     completed: { class: 'done', char: '✓', label: 'Completed' },
-    canceled: { class: 'done', char: '✓', label: 'Completed' },
-    duplicate: { class: 'done', char: '✓', label: 'Completed' },
+    canceled: { class: 'done', char: '✕', label: 'Cancelled' },
+    duplicate: { class: 'done', char: '✕', label: 'Cancelled' },
     started: { class: 'in-progress', char: '◐', label: 'In Progress' },
     backlog: { class: 'backlog', char: '◌', label: 'Backlog' },
     unstarted: { class: 'todo', char: '○', label: 'To Do' },
@@ -63,6 +66,8 @@ describe('getStateDisplay', () => {
   test('unknown/undefined falls back to To Do (matches render default)', () => {
     assert.deepEqual(getStateDisplay(undefined), { class: 'todo', char: '○', label: 'To Do' });
     assert.deepEqual(getStateDisplay('mystery'), { class: 'todo', char: '○', label: 'To Do' });
+    assert.deepEqual(getStateDisplay('triage'), { class: 'todo', char: '○', label: 'To Do' });
+    assert.deepEqual(getStateDisplay(null), { class: 'todo', char: '○', label: 'To Do' });
   });
 });
 
@@ -139,5 +144,86 @@ describe('isHiddenState (LIN-769)', () => {
     assert.equal(isHiddenState({ state: {} }), false);
     assert.equal(isHiddenState(undefined), false);
     assert.equal(isHiddenState({ state: { type: 'mystery' } }), false);
+  });
+});
+
+// Step A of LIN-3674: the browser cannot import isTerminalState, so public/common.js
+// mirrors the set once. This loads the real file and pins it to the server predicate
+// (the one parity test, not a standing sweep).
+describe('browser terminal-state predicate (public/common.js)', () => {
+  const src = readFileSync(fileURLToPath(new URL('../../public/common.js', import.meta.url)), 'utf8');
+  const sandbox = { console, document: { addEventListener() {} }, location: { search: '', href: '' } };
+  sandbox.window = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(src, sandbox, { filename: 'common.js' });
+
+  for (const type of ['completed', 'canceled', 'duplicate', 'started', 'unstarted', 'backlog', 'triage', undefined, null]) {
+    test(`agrees with isTerminalState for ${String(type)}`, () => {
+      assert.equal(sandbox.window.isTerminalState(type), isTerminalState(type));
+    });
+  }
+});
+
+// LIN-3674 step B: the context panel hand-matches getStateDisplay. context.js has an
+// existing export (ContextSection.renderSession), so the glyph table is driven through
+// it with the real common.js loaded first (context.js reads window.escapeHtml at load).
+describe('context panel state glyphs (public/context.js)', () => {
+  const load = (file) => readFileSync(fileURLToPath(new URL(`../../public/${file}`, import.meta.url)), 'utf8');
+  const sandbox = { console, document: { addEventListener() {}, querySelector() { return null; } }, location: { search: '', href: '' } };
+  sandbox.window = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(load('common.js'), sandbox, { filename: 'common.js' });
+  vm.runInContext(load('context.js'), sandbox, { filename: 'context.js' });
+
+  const expected = [
+    ['completed', '✓', 'done'],
+    ['canceled', '✕', 'done'],
+    ['duplicate', '✕', 'done'],
+    ['started', '◐', 'in-progress'],
+    ['unstarted', '○', 'todo'],
+    ['backlog', '◌', 'backlog'],
+    ['triage', '○', 'backlog'],
+    [undefined, '○', 'backlog'],
+    [null, '○', 'backlog'],
+  ];
+
+  const html = sandbox.window.ContextSection.renderSession({
+    graph: {
+      tasks: [{
+        identifier: 'S-1',
+        provenance: 'seed',
+        root: { identifier: 'S-1', stateType: 'started' },
+        blockers: expected.map(([stateType], i) => ({ identifier: `B-${i}`, stateType })),
+      }],
+    },
+  });
+
+  for (const [type, char, cls] of expected) {
+    test(`blocker with stateType ${String(type)} draws ${char} (${cls})`, () => {
+      const id = `B-${expected.findIndex(([t]) => t === type)}`;
+      const node = html.split('<a ').find(chunk => chunk.includes(`data-context-nav="${id}"`));
+      const m = /<span class="state ([^ "]+) [^"]*">([^<]*)<\/span>/.exec(node);
+      assert.ok(m, 'state span found');
+      assert.equal(m[1], cls);
+      assert.equal(m[2], char);
+    });
+  }
+});
+
+// LIN-3674: a closed task draws the same everywhere. The class is 'done' for all three
+// terminal types (data-status and the done styling are unchanged); only char/label vary.
+describe('getStateDisplay: closed-but-not-completed', () => {
+  test('only completed is a check; canceled and duplicate are a cross reading Cancelled', () => {
+    assert.equal(getStateDisplay('completed').char, '✓');
+    for (const type of ['canceled', 'duplicate']) {
+      assert.equal(getStateDisplay(type).char, '✕', type);
+      assert.equal(getStateDisplay(type).label, 'Cancelled', type);
+    }
+  });
+
+  test('class stays done for every terminal type', () => {
+    for (const type of ['completed', 'canceled', 'duplicate']) {
+      assert.equal(getStateDisplay(type).class, 'done', type);
+    }
   });
 });
