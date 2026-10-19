@@ -357,6 +357,9 @@ describe('LIN-3341 — Go is one press', () => {
 
     // Reader order: body.error, else body.message, else error.message.
     assert.ok((await refuse(500, { message: 'from message' }, 'thrown')).includes('from message'));
+    const both = await refuse(500, { error: 'from error', message: 'from message' }, 'thrown');
+    assert.ok(both.includes('from error'), 'body.error wins over body.message');
+    assert.ok(!both.includes('from message'));
     assert.ok((await refuse(0, null, 'Failed to fetch')).includes('Failed to fetch'), 'a network error shows the Error message');
 
     // Nothing at all: just the link, no fixed sentence.
