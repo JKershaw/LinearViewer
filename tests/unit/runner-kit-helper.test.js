@@ -1553,6 +1553,20 @@ describe('commands (against a fake Harbour)', () => {
     assert.equal(r.reason, 'cap');
   });
 
+  // LIN-3667: `credential` is the 401 only; a call that failed before any reply is `network` (transient, re-arm).
+  test('wait on a refused connection returns network, with the cause in the message', TIMEOUT, async () => {
+    const refused = Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:1'), { code: 'ECONNREFUSED' }) });
+    const r = await run(['wait'], { waitPollMs: 10, waitHeartbeatMs: 10, waitCapMs: 60, fetchImpl: async () => { throw refused; } });
+    assert.equal(r.reason, 'network');
+    assert.match(r.message, /ECONNREFUSED/);
+  });
+
+  test('wait on a 401 returns credential', TIMEOUT, async () => {
+    const r = await run(['wait'], { waitPollMs: 10, waitHeartbeatMs: 10, waitCapMs: 60, fetchImpl: async () => new Response('{"error":"unauthorized"}', { status: 401 }) });
+    assert.equal(r.reason, 'credential');
+    assert.match(r.message, /rejected \(expired or revoked\)/);
+  });
+
   // LIN-3451: the target gate lives in preConfirmDecision, which wait calls too; a dash item is not work.
   test('wait does not report a dash-target item as work (left queued, target:dash)', TIMEOUT, async () => {
     harbour.state.queue.length = 0;

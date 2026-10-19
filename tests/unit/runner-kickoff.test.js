@@ -122,7 +122,7 @@ describe('N1: the wait reasons match what runner.mjs returns', () => {
   const section = prompt.slice(prompt.indexOf('## 2.'), prompt.indexOf('## 3.'));
 
   test('waitLoop\'s reasons were found', () => {
-    assert.deepEqual([...reasons].sort(), ['abort', 'cap', 'credential', 'error', 'halt', 'stall', 'work']);
+    assert.deepEqual([...reasons].sort(), ['abort', 'cap', 'credential', 'error', 'halt', 'network', 'stall', 'work']);
   });
   test('§2 handles every one', () => {
     for (const r of reasons) assert.match(section, new RegExp(`^- \`${r}\` →`, 'm'), `§2 has no line for reason ${r}`);
@@ -130,12 +130,9 @@ describe('N1: the wait reasons match what runner.mjs returns', () => {
   test('`error` (a 429, a 5xx) re-arms', () => {
     assert.match(section, /^- `error` →[^\n]*re-arm/m);
   });
-  test('`credential` ends the runner only on the kit\'s own "rejected (expired or revoked)" text; anything else re-arms', () => {
-    assert.ok(src.includes('rejected (expired or revoked)'), 'the kit\'s 401 message carries the phrase the prompt keys on');
-    const line = section.split('\n').find((l) => l.startsWith('- `credential` →'));
-    const rest = section.slice(section.indexOf(line));
-    assert.match(rest, /rejected \(expired or revoked\)/);
-    assert.match(rest, /anything else[^\n]*re-arm/i);
+  test('`credential` (the 401) ends the runner; `network` (a failed connect) re-arms', () => {
+    assert.match(section, /^- `credential` →[^\n]*dead[^\n]*\n?[^\n]*end/m);
+    assert.match(section, /^- `network` →[^\n]*re-arm/m);
   });
 });
 

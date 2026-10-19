@@ -96,9 +96,8 @@ first, then act on the `reason` it printed:
 - `abort` → another consumer is polling (§3).
 - `cap` → nothing happened: just re-arm.
 - `error` → Harbour answered the poll with an error (429, 5xx): just re-arm.
-- `credential` → the poll could not be made. Read its `message`. Only a message saying the
-  credential was **rejected (expired or revoked)** means it is dead: tell the person (§7) and end
-  (§8). Anything else (a network failure) is transient: re-arm.
+- `credential` → the credential was rejected (expired or revoked): it is dead. Tell the person (§7) and end (§8).
+- `network` → the poll got no reply (network or TLS failure; `message` has the cause): transient, re-arm.
 
 On every turn, also check `runner status`: a stale `heartbeat` with no `wait` running means the
 poll loop died. Re-arm it.
