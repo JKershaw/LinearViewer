@@ -234,7 +234,7 @@ const STATUS_PILL_GLYPHS = {
   done: '✓',
   'in-progress': '◐',
   todo: '○',
-  backlog: '○',
+  backlog: '◌',
   failed: '✕',
 };
 
