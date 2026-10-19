@@ -26,7 +26,7 @@
  *
  * Run with: node --test tests/unit/openrouter-auth.test.js
  */
-import { test, describe, beforeEach } from 'node:test';
+import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createOpenRouterAuthRoutes } from '../../routes/openrouter-auth.js';
 
@@ -151,6 +151,36 @@ describe('routes/openrouter-auth.js: consent beat (LIN-2412)', () => {
     assert.equal(session.openRouterPendingConsent, undefined, 'declining must leave no pending-consent intent for the callback to find');
     assert.ok(session.openRouterCodeVerifier, 'declining consent must not block connecting the key itself');
     assert.match(res.redirectedTo, /^https:\/\/openrouter\.ai\/auth\?/, 'declining unattended consent still connects OpenRouter — only consent is skipped');
+  });
+
+  // LIN-3692: the callback URL's precedence is OPENROUTER_REDIRECT_URI, then
+  // the public origin (PUBLIC_ORIGIN, else Host-derived).
+  describe('callback_url precedence (LIN-3692)', () => {
+    const KEYS = ['OPENROUTER_REDIRECT_URI', 'PUBLIC_ORIGIN', 'EMAIL_LINK_ORIGIN'];
+    let saved;
+    beforeEach(() => { saved = Object.fromEntries(KEYS.map(k => [k, process.env[k]])); KEYS.forEach(k => delete process.env[k]); });
+    afterEach(() => { for (const k of KEYS) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; } });
+
+    async function callbackUrl() {
+      const handler = getHandler(router, 'post', '/auth/openrouter/begin');
+      const session = makeSession({ workspaces: [WORKSPACE], activeWorkspaceId: WORKSPACE.id, accountId: 'acct-1' });
+      const res = makeRes();
+      await handler({ session, protocol: 'https', get: () => 'evil.example', body: {} }, res);
+      return new URL(res.redirectedTo).searchParams.get('callback_url');
+    }
+
+    test('unset: Host-derived, as before', async () => {
+      assert.equal(await callbackUrl(), 'https://evil.example/auth/openrouter/callback');
+    });
+    test('PUBLIC_ORIGIN pins the callback to one host', async () => {
+      process.env.PUBLIC_ORIGIN = 'https://harbour.cat';
+      assert.equal(await callbackUrl(), 'https://harbour.cat/auth/openrouter/callback');
+    });
+    test('OPENROUTER_REDIRECT_URI still beats PUBLIC_ORIGIN when both are set', async () => {
+      process.env.PUBLIC_ORIGIN = 'https://harbour.cat';
+      process.env.OPENROUTER_REDIRECT_URI = 'https://other.example/cb';
+      assert.equal(await callbackUrl(), 'https://other.example/cb');
+    });
   });
 
   test('POST /auth/openrouter/begin with no active workspace redirects home WITHOUT stashing consent intent', async () => {

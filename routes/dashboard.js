@@ -86,6 +86,7 @@ import {
 } from '../lib/session-summary.js';
 import { hashSession } from '../lib/session-summary-cache.js';
 import { NON_SESSION_TARGETS } from '../lib/dispatch-targets.js';
+import { publicOrigin } from '../lib/public-origin.js';
 
 // A run is summarisable only once it is immutable. agentState is terminal at
 // 'complete'/'error'; until then a summary would snapshot a moving target and
@@ -1552,7 +1553,7 @@ export function createDashboardRoutes({
           urlKey: workspace.urlKey,
           sessionId: runId,
           prompt: proposal.prompt,
-          baseUrl: `${req.protocol}://${req.get('host')}`,
+          baseUrl: publicOrigin(req),
           dispatchedBy,
           ownerCheck: workspaceOwnerCheck,
           workspaceId: workspace.id,

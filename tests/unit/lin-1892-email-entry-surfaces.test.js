@@ -20,7 +20,7 @@ import { renderLandingHero } from '../../lib/components/landing-hero.js';
 import { renderLandingPage } from '../../lib/render-landing.js';
 import { renderNavBar } from '../../lib/components/navbar.js';
 
-const ENV_KEYS = ['NODE_ENV', 'EMAIL_TRANSPORT', 'EMAIL_PROMPT_STEP', 'RESEND_API_KEY', 'EMAIL_FROM', 'EMAIL_LINK_ORIGIN'];
+const ENV_KEYS = ['NODE_ENV', 'EMAIL_TRANSPORT', 'EMAIL_PROMPT_STEP', 'RESEND_API_KEY', 'EMAIL_FROM', 'EMAIL_LINK_ORIGIN', 'PUBLIC_ORIGIN'];
 let saved;
 beforeEach(() => {
   saved = Object.fromEntries(ENV_KEYS.map(k => [k, process.env[k]]));

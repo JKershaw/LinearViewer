@@ -102,6 +102,7 @@ import { sendSSE } from '../lib/sse.js';
 // pretending to be an Express handler. This route is the browser's adapter.
 import { runAgentTurn, FC_MAX_TOKENS } from '../lib/agent-turn.js';
 import { resolveChatCredential, checkFreeTierGate, CHAT_MESSAGE_MAX_LENGTH, freeTierRefusalBlock } from '../lib/chat-request.js';
+import { publicOrigin } from '../lib/public-origin.js';
 
 const MAX_MESSAGE_LENGTH = CHAT_MESSAGE_MAX_LENGTH;
 
@@ -524,7 +525,7 @@ export function createFlightCompanionRoutes({
     }
 
     try {
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const baseUrl = publicOrigin(req);
       const prompt = buildFlightCompanionKickoff({ baseUrl });
       // Read-only: readCurrent ONLY. This route must never be able to write
       // observer state — there is no ensureSeeded/advance call reachable
@@ -742,7 +743,7 @@ export function createFlightCompanionRoutes({
           getProvider: getProviderForWorkspace,
           getScope: getWorkspaceCallScope,
           buildCensusSeedText,
-          baseUrl: `${req.protocol}://${req.get('host')}`,
+          baseUrl: publicOrigin(req),
           dispatchedBy: req.session?.accountId || null,
           // LIN-3383: the reply's send_follow_up (execute mode) is owner-only.
           enqueueGuard: ({ target }) => resolveRunnerOwnerRefusal({
@@ -901,7 +902,7 @@ export function createFlightCompanionRoutes({
           getProvider: getProviderForWorkspace,
           getScope: getWorkspaceCallScope,
           buildCensusSeedText,
-          baseUrl: `${req.protocol}://${req.get('host')}`,
+          baseUrl: publicOrigin(req),
           dispatchedBy: req.session?.accountId || null,
         },
       });
@@ -968,7 +969,7 @@ export function createFlightCompanionRoutes({
     }
 
     try {
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const baseUrl = publicOrigin(req);
       const outcome = await dispatchSessionFollowUp({
         dispatchQueueStore,
         agentStatusStore,

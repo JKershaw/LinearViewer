@@ -16,6 +16,7 @@
  */
 import { Router } from 'express';
 import { buildRunnerKickoff } from '../lib/prompts/runner-kickoff.js';
+import { publicOrigin } from '../lib/public-origin.js';
 
 const PROMPT_ROUTE = '/api/proxy/runner/prompt';
 
@@ -37,7 +38,7 @@ export function createProxyRunnerPromptRoutes({
   const router = Router();
 
   router.get(PROMPT_ROUTE, proxyLimiter, authenticateProxyToken, requireGrant('take'), (req, res) => {
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const baseUrl = publicOrigin(req);
     logEvent(req, PROMPT_ROUTE, 200);
     res.type('text/plain').send(buildPrompt({ baseUrl }));
   });

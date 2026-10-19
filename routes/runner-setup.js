@@ -30,6 +30,7 @@ import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { checkWorkspaceOwner, readOwnerSeamStatus } from '../lib/workspace-owner.js';
 import { buildRunnerKickoff } from '../lib/prompts/runner-kickoff.js';
+import { publicOrigin } from '../lib/public-origin.js';
 
 /**
  * @param {Object} deps
@@ -77,7 +78,7 @@ export function createRunnerSetupRoutes({
     }
 
     try {
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const baseUrl = publicOrigin(req);
       const html = renderRunnerSetupPage(
         { state, urlKey: workspace.urlKey, accountId, prompt: buildPrompt({ baseUrl }), baseUrl },
         {

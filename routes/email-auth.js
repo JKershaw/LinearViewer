@@ -58,6 +58,7 @@ import {
 import { renderAccountHomePage } from '../lib/render-account-home.js';
 import { getProvider } from '../lib/providers/index.js';
 import { APP_CSP } from '../lib/security-headers.js';
+import { publicOrigin } from '../lib/public-origin.js';
 
 const WELL_FORMED_TOKEN = /^[A-Za-z0-9_-]{43}$/;
 
@@ -306,7 +307,7 @@ export function createEmailAuthRoutes({
     if (!linkOrigin && transport.kind === 'resend') {
       throw new Error('a configured link origin is required to send Resend sign-in links');
     }
-    const origin = linkOrigin || `${req.protocol}://${req.get('host')}`;
+    const origin = linkOrigin || publicOrigin(req);
     return `${origin}/auth/email/confirm?t=${token}`;
   }
 

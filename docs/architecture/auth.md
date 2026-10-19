@@ -102,14 +102,15 @@ GET  /account             → Account home for a signed-in account with zero wor
 **Availability** — `lib/email-availability.js` (zero imports) is the one predicate
 behind the transport, the 503s, the landing-hero CTA (threaded as `emailEnabled`) and the
 landing navbar CTA (which calls it directly). `resolveEmailTransportKind(env)`:
-`'resend'` needs `RESEND_API_KEY` + `EMAIL_FROM` + a valid `EMAIL_LINK_ORIGIN`;
+`'resend'` needs `RESEND_API_KEY` + `EMAIL_FROM` + a valid `PUBLIC_ORIGIN` (or its alias `EMAIL_LINK_ORIGIN`);
 `'console'` needs `EMAIL_TRANSPORT=console` and not production; `'capture'` needs
 `EMAIL_TRANSPORT=capture` under `NODE_ENV=test`; anything else is `null` (off).
 `NODE_ENV` only refuses or scopes — it never turns email on. Only this module and
 `lib/email-transport.js` read the email variables; `server.js` takes its startup line and
 refusal warning from it (pinned by `tests/unit/email-import-boundary.test.js`).
 
-**Link origin** — emailed links are built from `EMAIL_LINK_ORIGIN`, never from the
+**Link origin** — emailed links are built from `PUBLIC_ORIGIN` (alias `EMAIL_LINK_ORIGIN`, kept for existing
+deployments; LIN-3692), never from the
 request's `Host`: a forged `Host:` on `/auth/email/send` would otherwise mail a victim a
 genuine token pointing at another host. Resend without it resolves to off; console/capture
 fall back to the request origin (their links reach only the server log / test outbox).

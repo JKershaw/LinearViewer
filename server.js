@@ -189,6 +189,8 @@ import { DISPATCH_DEFAULT_KINDS } from './lib/prompt-templates.js'
 import { validateOpaqueDispatchField, MAX_NAME_LENGTH } from './lib/dispatch-validation.js'
 import { getDeployInfo } from './lib/deploy-info.js'
 import { securityHeaders } from './lib/security-headers.js'
+import { publicOrigin } from './lib/public-origin.js'
+import { hstsHeader, defaultCacheControl } from './lib/response-headers.js'
 
 // =============================================================================
 // Environment Variable Validation
@@ -1038,7 +1040,14 @@ app.use((req, res, next) => {
   next()
 })
 
+// HSTS for https requests in production (LIN-3692, for LIN-3643). After the
+// redirect, so the 301 and /health (above it) never carry it.
+app.use(hstsHeader())
+
 app.use(express.static('public'))
+// Default Cache-Control: private, no-store for any response whose route set
+// none (LIN-3692). After static so assets keep express.static's own header.
+app.use(defaultCacheControl())
 // CSP / frame-ancestors for every HTML response (LIN-3420). After static so
 // assets are untouched, before the session so even early error pages carry it.
 app.use(securityHeaders())
@@ -3869,7 +3878,7 @@ app.get('/workspace/:urlKey/proxy', workspaceFromUrl, (req, res) => {
     openRouterSource,
     workspaces: req.session.workspaces,
     featureFlags,
-    baseUrl: `${req.protocol}://${req.get('host')}`
+    baseUrl: publicOrigin(req)
   });
   res.send(html);
 });

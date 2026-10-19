@@ -99,6 +99,7 @@ import {
 import { PartialWriteError } from '../lib/partial-write-error.js';
 import { tokenValidationOptions } from '../lib/consumer-heartbeat-ingest.js';
 import { badRequest, jsonError, keepaliveError, notFound, workspaceUnavailableEnvelope, classifyUpstreamError } from '../lib/errors.js';
+import { publicOrigin } from '../lib/public-origin.js';
 
 // LIN-1458: which OpenRouter credential source served a request whose token
 // creator's OWN account-keyed read (getWorkspaceOpenRouterKey) came back empty.
@@ -1295,7 +1296,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    */
   router.get('/api/proxy/instructions', authenticateProxyToken, async (req, res) => {
     const scope = req.proxyTokenScope;
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const baseUrl = publicOrigin(req);
 
     let declaredDisplayName = null;
     let isDeclaredLinear = false;

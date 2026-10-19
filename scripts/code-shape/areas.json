@@ -33,7 +33,7 @@
     {
       "name": "Auth, accounts & workspaces",
       "match": [
-        "^routes/(auth|email-auth|github-auth|github-projects-auth|jira-auth|openrouter-auth|provider-auth-routers|account-merge|held-connection)\\.js$|^lib/(account-[^/]*|connection-[^/]*|credential-[^/]*|email-auth|email-availability|email-transport|github-install-flow|held-connection-entry|owner-[^/]*|ownerless-token-policy|pat-session|persist-binding|rejected-credentials|refresh-[^/]*|token-refresh|suspect-credential-refresh|session-store|session-options|user-preferences|workspace|workspace-(?!kpi-stats\\.js)[^/]*|urlkey-holders|wake-credential)\\.js$"
+        "^routes/(auth|email-auth|github-auth|github-projects-auth|jira-auth|openrouter-auth|provider-auth-routers|account-merge|held-connection)\\.js$|^lib/(account-[^/]*|connection-[^/]*|credential-[^/]*|email-auth|email-availability|email-transport|public-origin|github-install-flow|held-connection-entry|owner-[^/]*|ownerless-token-policy|pat-session|persist-binding|rejected-credentials|refresh-[^/]*|token-refresh|suspect-credential-refresh|session-store|session-options|user-preferences|workspace|workspace-(?!kpi-stats\\.js)[^/]*|urlkey-holders|wake-credential)\\.js$"
       ]
     },
     {
@@ -51,7 +51,7 @@
     {
       "name": "Platform & plumbing",
       "match": [
-        "^lib/utils/|^lib/(db-indexes|scheduler|hourly-cleanup|errors|async-errors|sse|http-keepalive|loose-json|deploy-info|feature-defaults|read-horizon|secret-scan|scan-public-pages|partial-write-error|drop-shares-collection|expire-ownerless-dispatch-tokens|kpi-stats|kpi-page|workspace-kpi-stats|milestone-funnel|free-tier-store|plan-fee-config|pricing-conformance-sweep|workflow-config)\\.js$"
+        "^lib/utils/|^lib/(db-indexes|scheduler|hourly-cleanup|errors|async-errors|sse|http-keepalive|loose-json|deploy-info|response-headers|feature-defaults|read-horizon|secret-scan|scan-public-pages|partial-write-error|drop-shares-collection|expire-ownerless-dispatch-tokens|kpi-stats|kpi-page|workspace-kpi-stats|milestone-funnel|free-tier-store|plan-fee-config|pricing-conformance-sweep|workflow-config)\\.js$"
       ]
     },
     {

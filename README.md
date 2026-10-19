@@ -99,16 +99,16 @@ JIRA_REDIRECT_URI=https://yourdomain.com/auth/jira/oauth/callback
 
 Email is an account identity, not a workspace source: a person signs in with an address and lands on their account home (`/account`), where they connect Linear, GitHub, Jira or a local workspace. It is **off by default on every server, whatever `NODE_ENV` is** — until it is configured, the "Continue with email" CTAs are hidden and `/auth/email*` answers 503. The startup log says which mode is active (`Email sign-in: resend|console|capture|off`) and warns about a refused combination.
 
-**Production (Resend)** — all three are required; without a valid `EMAIL_LINK_ORIGIN` the door stays off:
+**Production (Resend)** — all three are required; without a valid `PUBLIC_ORIGIN` (or its alias `EMAIL_LINK_ORIGIN`) the door stays off:
 
 ```
 RESEND_API_KEY=re_...
 EMAIL_FROM=Harbour <sign-in@yourdomain.com>
-EMAIL_LINK_ORIGIN=https://yourdomain.com
+PUBLIC_ORIGIN=https://yourdomain.com
 ```
 
 - `EMAIL_FROM` must be on a domain verified with [Resend](https://resend.com), with SPF, DKIM and DMARC records in DNS.
-- `EMAIL_LINK_ORIGIN` is this server's public origin. Sign-in links are built from it, never from the request's `Host` header, which a direct request can forge to point a victim's link at another host.
+- `PUBLIC_ORIGIN` is this server's public origin (`EMAIL_LINK_ORIGIN` is accepted as an alias for existing deployments). It also pins every other generated absolute URL to one host. Sign-in links are built from it, never from the request's `Host` header, which a direct request can forge to point a victim's link at another host.
 
 **Local development** — `EMAIL_TRANSPORT=console` prints each sign-in link to the server log instead of sending mail. It is refused when `NODE_ENV=production`. (The Playwright server uses `EMAIL_TRANSPORT=capture`, which only works under `NODE_ENV=test`.)
 
