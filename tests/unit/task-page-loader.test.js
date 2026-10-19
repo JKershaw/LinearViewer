@@ -404,6 +404,57 @@ describe('session rows', () => {
     });
   });
 
+  describe('sessionMessage: the [pending] line shows only while parked (LIN-3513)', () => {
+    const parked = { loopId: 'p1', feedback: [{ message: '[pending] waiting on CI' }] };
+    const msgs = (loops) => buildTaskPageModel({ identifier: 'LIN-50', loops, enrichLoop, deriveSessionWaiting, now: NOW }).sessions;
+
+    test('running and parked: shows the line', () => {
+      const [s] = msgs([loop(parked)]);
+      assert.equal(s.state, 'running');
+      assert.equal(s.message, 'waiting on CI');
+    });
+
+    test('running after a resume: hides the line', () => {
+      const [s] = msgs([loop({ ...parked, feedback: [...parked.feedback, { message: '[working] Session resumed.' }] })]);
+      assert.equal(s.state, 'running');
+      assert.equal(s.message, null);
+    });
+
+    test('continued: hides the line, shows the closing line when there is one', () => {
+      const [a] = msgs([loop(parked), done({ loopId: 'f1', followUpTo: 'p1' })]);
+      assert.equal(a.state, 'continued');
+      assert.equal(a.message, null);
+      const [b] = msgs([loop({ ...parked, agentSummary: 'wrapped up' }), done({ loopId: 'f1', followUpTo: 'p1' })]);
+      assert.equal(b.message, 'wrapped up');
+    });
+
+    test('ended (closed): hides the line', () => {
+      const [s] = msgs([loop({ ...parked, bookkeeping: { by: 'close-out' } })]);
+      assert.equal(s.state, 'closed');
+      assert.equal(s.message, null);
+    });
+
+    test('waiting: a [blocked] question after a [pending] line is unchanged', () => {
+      const [s] = msgs([loop({ loopId: 'b1', wakeMarker: 'blocked', waitingMessage: '[blocked] need a key', feedback: [{ message: '[pending] ci' }, { message: '[blocked] need a key' }] })]);
+      assert.equal(s.state, 'waiting');
+      assert.equal(s.message, 'need a key');
+    });
+
+    test('waiting (agentState): keeps a [pending] line as today', () => {
+      const [s] = msgs([loop({ ...parked, agentState: 'waiting' })]);
+      assert.equal(s.state, 'waiting');
+      assert.equal(s.message, 'waiting on CI');
+      assert.equal(sessionMessage(loop(parked), 'waiting'), 'waiting on CI');
+    });
+
+    test('direct: only a running state keeps the line', () => {
+      for (const state of ['queued', 'continued', 'done', 'failed', 'closed', 'cancelled', 'expired', 'aborted']) {
+        assert.equal(sessionMessage(loop(parked), state), null, state);
+      }
+      assert.equal(sessionMessage(loop(parked), 'running'), 'waiting on CI');
+    });
+  });
+
   test('evidence is task-level on the model; no session hosts an evidence slot', () => {
     const model = buildTaskPageModel({
       identifier: 'LIN-50',
