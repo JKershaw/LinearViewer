@@ -39,6 +39,8 @@ import { buildWakeCredentialProvisioner } from '../lib/wake-credential.js';
 import { readHaltForPoll, POLL_HALT_READ_TIMEOUT_MS } from '../lib/poll-halt.js';
 import { getConsumerLastSeenAt } from '../lib/consumer-poll-warning.js';
 import { createHeartbeatIngest } from '../lib/consumer-heartbeat-ingest.js';
+import { isRunnerTarget } from '../lib/runner-owner-gate.js';
+import { SESSION_TARGETS } from '../lib/dispatch-targets.js';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -107,8 +109,13 @@ export function createProxyRunnerRoutes({
         getConsumerLastSeenAt(dispatchTokenStore, req.proxyUrlKey),
         itemsPromise
       ]);
+      // LIN-3622: a runner is only ever advertised what it can run. The filter
+      // lives here, not in `pollAvailable`: routes/dispatch.js (the dispatch-token
+      // poll, the dash consumer's door) shares that method and must keep seeing
+      // `dash`. An absent target counts as `cli` (isRunnerTarget).
+      const runnable = items.filter((i) => isRunnerTarget(i.target));
       logEvent(req, POLL_ROUTE, 200);
-      res.json({ items, ...(halt ? { halt } : {}), otherConsumerLastSeenAt });
+      res.json({ items: runnable, ...(halt ? { halt } : {}), otherConsumerLastSeenAt });
     } catch (err) {
       logEvent(req, POLL_ROUTE, 500);
       console.error('Runner poll error:', err.message);
@@ -142,7 +149,12 @@ export function createProxyRunnerRoutes({
     }
 
     try {
-      const item = await dispatchQueueStore.takeItem(id, req.proxyUrlKey, req.proxyTokenLabel, req.proxyTokenId);
+      const item = await dispatchQueueStore.takeItem(
+        id, req.proxyUrlKey, req.proxyTokenLabel, req.proxyTokenId,
+        // LIN-3622: refuse dash/local inside the atomic delete, so a runner can
+        // neither see nor remove a row it cannot run (404, row stays queued).
+        { targets: SESSION_TARGETS }
+      );
 
       if (!item) {
         logEvent(req, TAKE_ROUTE, 404);
