@@ -1636,6 +1636,7 @@ describe('commands (against a fake Harbour)', () => {
     const same = await run(['recover', '--session', session]);
     assert.ok(same.live.includes(it.id));
     assert.ok(!same.fail.includes(it.id));
+    harbour.state.watch.set(it.id, { id: it.id, status: 'taken' }); // LIN-3675: recover reads the dispatch first
     const fresh = await run(['recover']);
     assert.ok(fresh.fail.includes(it.id));
     const post = harbour.state.feedback.filter((p) => p.itemId === it.id).at(-1);
@@ -1673,6 +1674,89 @@ describe('commands (against a fake Harbour)', () => {
       harbour.state.halt = null;
       await run(['poll']);
     }
+  });
+
+  // LIN-3675: recover and the stop halt read Harbour before a terminal post (Harbour reads
+  // markers last-wins, so a late [failed]/[aborted] would override an earlier [done]).
+  const takeRunning = async () => {
+    const it = harbour.enqueue();
+    await run(['poll']);
+    await run(['take', it.id]);
+    await run(['handoff', it.id, `agent-${it.id.slice(0, 6)}`]);
+    harbour.state.queue.length = 0;
+    return it;
+  };
+  const stopHalt = async () => {
+    harbour.state.halt = { mode: 'stop', setAt: new Date().toISOString(), setBy: OWNER };
+    try { return await run(['poll']); } finally { harbour.state.halt = null; await run(['poll']); }
+  };
+
+  test('LIN-3675: recover on a row whose dispatch is already done posts nothing, settles it and stops its broker', TIMEOUT, async () => {
+    const it = await takeRunning();
+    const socket = ledgerNow().items[it.id].socket;
+    assert.equal(existsSync(socket), true);
+    harbour.state.watch.set(it.id, { id: it.id, status: 'done' });
+    const before = harbour.state.feedback.length;
+    const r = await run(['recover']);
+    assert.ok(r.settled.includes(it.id));
+    assert.ok(!r.fail.includes(it.id));
+    assert.equal(ledgerNow().items[it.id].state, 'done');
+    assert.equal(existsSync(socket), false, 'broker stopped');
+    assert.ok(!harbour.state.feedback.slice(before).some((f) => f.itemId === it.id));
+  });
+
+  test('LIN-3675: recover on an unreadable dispatch defers: no post, the row stays so a later recover retries', TIMEOUT, async () => {
+    const it = await takeRunning();
+    harbour.state.watch.delete(it.id); // the fake answers 404: unreadable
+    const before = harbour.state.feedback.length;
+    const r = await run(['recover']);
+    assert.ok(r.deferred.includes(it.id));
+    assert.ok(!r.fail.includes(it.id));
+    assert.equal(ledgerNow().items[it.id].state, 'running');
+    assert.ok(!harbour.state.feedback.slice(before).some((f) => f.itemId === it.id));
+    harbour.state.watch.set(it.id, { id: it.id, status: 'taken' });
+    const again = await run(['recover']);
+    assert.ok(again.fail.includes(it.id), 'a later recover retries');
+  });
+
+  test('LIN-3675: recover treats skipped as not terminal and fails the row as before', TIMEOUT, async () => {
+    const it = await takeRunning();
+    harbour.state.watch.set(it.id, { id: it.id, status: 'skipped' });
+    const r = await run(['recover']);
+    assert.ok(r.fail.includes(it.id));
+    assert.equal(harbour.state.feedback.filter((f) => f.itemId === it.id).at(-1).body.message, '[failed] runner restarted: subagent lost');
+  });
+
+  test('LIN-3675: a stop halt on a row whose dispatch is already done posts no [aborted] but still stops it', TIMEOUT, async () => {
+    const it = await takeRunning();
+    const socket = ledgerNow().items[it.id].socket;
+    harbour.state.watch.set(it.id, { id: it.id, status: 'done' });
+    const before = harbour.state.feedback.length;
+    const r = await stopHalt();
+    assert.ok(r.stopAgents.includes(`agent-${it.id.slice(0, 6)}`));
+    assert.equal(ledgerNow().items[it.id].state, 'stopped');
+    assert.equal(existsSync(socket), false, 'broker stopped');
+    assert.ok(!harbour.state.feedback.slice(before).some((f) => f.itemId === it.id));
+  });
+
+  test('LIN-3675: a stop halt on an unreadable dispatch still stops the row and posts [aborted]', TIMEOUT, async () => {
+    const it = await takeRunning();
+    harbour.state.watch.delete(it.id);
+    const before = harbour.state.feedback.length;
+    await stopHalt();
+    assert.equal(ledgerNow().items[it.id].state, 'stopped');
+    const posted = harbour.state.feedback.slice(before).filter((f) => f.itemId === it.id);
+    assert.equal(posted.length, 1);
+    assert.match(posted[0].body.message, /^\[aborted\] Cancelled running session/);
+  });
+
+  test('LIN-3675: haltSweep lists a terminal-evidence row as settled, not posted', () => {
+    const ledger = { items: { [K]: { itemId: K, agentId: 'agent-k', rootItemId: K, state: 'running' } } };
+    const sweep = haltSweep({ mode: 'stop' }, ledger, { evidenceFor: () => 'terminal' });
+    assert.deepEqual(sweep.posts, []);
+    assert.deepEqual(sweep.settled, [{ itemId: K }]);
+    assert.deepEqual(sweep.stopAgents, ['agent-k']);
+    assert.equal(sweep.ledger.items[K].state, 'stopped');
   });
 
   test('F2: the watchdog in wait records an old-token stall without posting or throwing', TIMEOUT, async () => {
