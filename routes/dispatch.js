@@ -954,6 +954,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         tokenId: result.tokenId,
         token: result.token, // Plain text - only returned once!
         label: result.label,
+        expiresAt: result.expiresAt, // LIN-3618: ISO string, or null for a token with no expiry
         message: 'Token created. Save this token now - it cannot be retrieved later.'
       });
     } catch (err) {

@@ -217,7 +217,7 @@ only, the 48h `worker` profile), the Proxy page's "read-write + dispatch" Agent 
 owner Autopilot dispatch, feedback autopilot).
 
 The same owner edge also gates the **legacy dispatch-token mint** (LIN-3137 / LIN-2884 J5). A
-legacy dispatch token is a never-expiring take path, so only the workspace owner may mint one:
+legacy dispatch token is a take path (new ones expire after 90 days, LIN-3618; older rows keep working until expired), so only the workspace owner may mint one:
 `POST /workspace/:urlKey/api/dispatch/tokens` reuses the same owner seam and refusal vocabulary —
 `403 GRANT_OWNER_ONLY` (a different account owns it), `409 WORKSPACE_OWNER_UNSET` (no owner edge),
 `503 GRANT_OWNERLESS` (the session has no account), `503 OWNER_CHECK_UNAVAILABLE` (seam unwired,

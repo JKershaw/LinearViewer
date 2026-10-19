@@ -8,8 +8,8 @@ There are three tiers, distinguished by *how a view is discovered and gated*.
 
 ## 1. First-class (always-on)
 
-Stable, generally-useful views. Always present as footer links for every
-authenticated user; no flag, no gate.
+Stable, generally-useful views. Always present in the header view switcher for
+every authenticated user; no flag, no gate.
 
 - **dashboard** (`/`) — the project/issue tree (the root surface)
 - **observation** (`/workspace/:urlKey/observation`) — the autopilot Observation
@@ -18,8 +18,12 @@ authenticated user; no flag, no gate.
 - **swipe** — mobile-first task triage
 - **swim** — dependency swim lanes
 - **settings** — account-owned configuration, cross-device (LIN-1331)
+- **kpis** (`/workspace/:urlKey/kpis`) — this workspace's own counts, last 7 and
+  30 days (LIN-3689). Members only, counts only; the instance-wide public
+  `/kpis` page is a separate surface and is not linked from here.
 
-Wired in `lib/components/footer.js` (`getFooterLinks` base links).
+Wired in `lib/components/view-nav.js` (`getViewNavLinks` base links and
+`FIRST_CLASS_VIEWS`).
 
 ### Retired: the experimental `dashboard` flag/view (LIN-509 → LIN-595)
 
