@@ -806,7 +806,7 @@ function formatHaltStatusHtml(halt) {
   const verb = HALT_MODE_LABELS[mode] || mode.charAt(0).toUpperCase() + mode.slice(1)
   const time = escapeHtml(new Date(halt.setAt).toLocaleString())
   const by = halt.setBy ? ` by ${escapeHtml(halt.setBy)}` : ''
-  return `${verb} requested — ${time}${by}. The runner applies it on its next poll.`
+  return `${escapeHtml(verb)} requested — ${time}${by}. The runner applies it on its next poll.`
 }
 
 function renderHaltStatus(halt) {

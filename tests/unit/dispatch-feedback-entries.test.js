@@ -110,3 +110,19 @@ test('HALT_MODE_LABELS in public/dispatch.js has an entry for every HALT_MODES v
     assert.equal(typeof labels[mode], 'string', `label for halt mode "${mode}"`);
   }
 });
+
+test('LIN-3687: formatHaltStatusHtml labels an unknown mode with its capitalised raw mode, never "Pause"', () => {
+  const labelsStart = DISPATCH_JS_SRC.indexOf('const HALT_MODE_LABELS');
+  const fnStart = DISPATCH_JS_SRC.indexOf('function formatHaltStatusHtml');
+  assert.notEqual(fnStart, -1, 'formatHaltStatusHtml found in public/dispatch.js');
+  const labelsSlice = DISPATCH_JS_SRC.slice(labelsStart, DISPATCH_JS_SRC.indexOf('}', labelsStart) + 1);
+  const fnSlice = DISPATCH_JS_SRC.slice(fnStart, DISPATCH_JS_SRC.indexOf('\n}\n', fnStart) + 3);
+  const sandbox = { escapeHtml: (s) => String(s) };
+  vm.createContext(sandbox);
+  const format = vm.runInContext(`${labelsSlice}\n${fnSlice}\nformatHaltStatusHtml`, sandbox);
+  const html = format({ mode: 'drain', setAt: 0 });
+  assert.ok(html.startsWith('Drain requested'), html);
+  assert.ok(!html.includes('Pause'), html);
+  assert.ok(format({ mode: 'pause', setAt: 0 }).startsWith('Pause requested'));
+  assert.ok(format({ mode: 'stop', setAt: 0 }).startsWith('Stop requested'));
+});

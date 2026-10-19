@@ -123,3 +123,11 @@ test('LIN-3687: public/audit.js backlog glyph matches getStateDisplay', () => {
   assert.ok(m, 'backlog entry found in audit.js STATE_GLYPHS');
   assert.equal(m[1], getStateDisplay('backlog').char);
 });
+
+test('LIN-3687: public/common.js STATUS_PILL_GLYPHS backlog glyph matches getStateDisplay', () => {
+  const src = readFileSync(new URL('../../public/common.js', import.meta.url), 'utf8');
+  const map = src.slice(src.indexOf('const STATUS_PILL_GLYPHS'));
+  const m = map.slice(0, map.indexOf('};')).match(/backlog:\s*'([^']+)'/);
+  assert.ok(m, 'backlog entry found in common.js STATUS_PILL_GLYPHS');
+  assert.equal(m[1], getStateDisplay('backlog').char);
+});
