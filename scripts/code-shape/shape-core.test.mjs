@@ -66,8 +66,11 @@ test('measureShape: per-area rollup, totals, parse failures and unmapped files l
   assert.ok('perFunction' in measureShape({ files, areaMap, detail: true }).files[0]);
 });
 
-// The kit copies the definitions (LIN-3628) rather than importing them from experiments/. While the
-// original exists, the two must not drift.
+// The kit copies the definitions (LIN-3628) rather than importing them from experiments/. The guard is
+// two-sided: a change to either copy fails this test. The original stays a frozen record of the experiment
+// on purpose (it is no-semicolon style, and editing it would alter recorded history), so a deliberate
+// change goes in the kit copy and the original is updated only to match (LIN-3640).
+// While the original exists, the two must not drift.
 const ORIGINAL = fileURLToPath(new URL('../../experiments/rebuild-exp1/kit/lib/shape-core.mjs', import.meta.url));
 test('shape-core.mjs is a byte copy of the experiments original', { skip: !existsSync(ORIGINAL) }, () => {
   assert.equal(readFileSync(new URL('./shape-core.mjs', import.meta.url), 'utf8'), readFileSync(ORIGINAL, 'utf8'));

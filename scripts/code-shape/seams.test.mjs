@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { measureSeams } from './seams.mjs';
+import { makeRepo } from './test-helpers.mjs';
 
 const map = {
   areas: [
@@ -86,4 +89,19 @@ test('output is independent of input order', () => {
   };
   const reversed = Object.fromEntries(Object.entries(files).reverse());
   assert.equal(JSON.stringify(m(files)), JSON.stringify(m(reversed)));
+});
+
+// LIN-3638: the CLI reads the commit through the kit's readCommit, not a reader of its own.
+test('CLI: reads a commit from the object store, non-ASCII paths included, symlinks excluded', () => {
+  const repo = makeRepo();
+  try {
+    repo.commit({ 'lib/run-a.js': "import './render-é.js';", 'lib/render-é.js': '', 'lib/target.js': '' }, '2026-01-01T00:00:00Z');
+    const link = execFileSync('git', ['-C', repo.dir, 'hash-object', '-w', '--stdin'], { input: './target.js', encoding: 'utf8' }).trim();
+    repo.git('update-index', '--add', '--cacheinfo', `120000,${link},lib/link.js`);
+    repo.git('-c', 'commit.gpgsign=false', 'commit', '-q', '-m', 'link');
+    const out = JSON.parse(execFileSync('node', [fileURLToPath(new URL('./seams.mjs', import.meta.url)), repo.dir, 'HEAD'], { encoding: 'utf8' }));
+    assert.equal(out.scope.files, 3);
+    assert.equal(out.scope.unresolvedRelativeImports, 0);
+    assert.match(out.commit, /^[0-9a-f]{40}$/);
+  } finally { repo.cleanup(); }
 });
