@@ -12,17 +12,14 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTaskPageLoader } from '../../lib/task-page-loader.js';
-import { renderTaskPage, renderTaskPullRequest, sessionsLine } from '../../lib/render-task-page.js';
+import { renderTaskPage, renderTaskPullRequest } from '../../lib/render-task-page.js';
 import { renderEvidence } from '../../lib/render-run-evidence.js';
-import { readRunEvidence, closeOutSummaryFor } from '../../lib/run-evidence.js';
-import { deriveCloseOutState } from '../../lib/run-closeout-state.js';
-import { hashContext } from '../../lib/brief-cache.js';
+import { readRunEvidence } from '../../lib/run-evidence.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 
 const NOW = new Date('2026-10-08T21:00:00.000Z');
 const UUID = '11111111-2222-3333-4444-555555555555';
 const PR_URL = 'https://github.com/acme/app/pull/41';
-const OTHER_PR_URL = 'https://github.com/acme/app/pull/99';
 
 const REVIEW = {
   id: 'c-review',
@@ -104,11 +101,16 @@ function makeLoader({ ctx, brief = null, recap = null, events = [], loops = [loo
 const pageText = (html) => html.replace(/<script[\s\S]*?<\/script>/g, '').replace(/<style[\s\S]*?<\/style>/g, '').replace(/<[^>]+>/g, ' ').replace(/&#0?39;|&apos;/g, "'").replace(/\s+/g, ' ');
 const SETTLING_SENTENCE = /The pull request is merged and the close-out is still finishing; it settles these items\./;
 
-async function page(stateType, pr = MERGED_PR) {
-  const { loader, access } = makeLoader({ ctx: ctxFor({ stateType }) });
+async function page(stateType, comments) {
+  const { loader, access } = makeLoader({ ctx: ctxFor({ stateType, comments }) });
   const { model } = await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-51', access });
   return { model, html: renderTaskPage(model, { viewer: 'guest', urlKey: 'ws', now: NOW }) };
 }
+
+const EMPTY_REVIEW = {
+  ...REVIEW,
+  body: '## Review\n\nPR #41\n\n### What CI Did Not Prove\nNone. CI covers the deliverable.\n\n**Verdict: Approve.**',
+};
 
 describe('LIN-3379: merged, not Done yet', () => {
   test('no count, no stamps; says the close-out is still finishing and quotes it', async () => {
@@ -143,5 +145,14 @@ describe('LIN-3379: merged, not Done yet', () => {
     assert.match(text, /\d+ of \d+ checked/);
     assert.match(text, /open at merge/);
     assert.doesNotMatch(text, SETTLING_SENTENCE);
+  });
+
+  test('an empty ledger with a close-out summary does not say "these items"', async () => {
+    const { model } = await page('started', [OPENED, EMPTY_REVIEW, CLOSE_OUT]);
+    assert.equal(model.evidence.ledger.ledger.empty, true);
+    const text = pageText(renderTaskPullRequest(model, '', NOW));
+    assert.match(text, /nothing to check/);
+    assert.match(text, /The pull request is merged and the close-out is still finishing\./);
+    assert.doesNotMatch(text, /settles these items/);
   });
 });
