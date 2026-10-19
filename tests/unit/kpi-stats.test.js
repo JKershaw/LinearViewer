@@ -37,11 +37,16 @@ function createMockCollection(docs = []) {
       if ('$lt' in condition) return value < condition.$lt;
       if ('$lte' in condition) return value <= condition.$lte;
       if ('$in' in condition) return condition.$in.includes(value);
+      // LIN-3620: `$exists` for the activeTokens expiry filter.
+      if ('$exists' in condition) return (value !== undefined) === condition.$exists;
     }
+    // Mongo equality to null also matches an absent field.
+    if (condition === null) return value === null || value === undefined;
     return value === condition;
   };
   const matches = (doc, filter) =>
-    Object.entries(filter || {}).every(([key, condition]) => fieldMatches(doc[key], condition));
+    Object.entries(filter || {}).every(([key, condition]) =>
+      key === '$or' ? condition.some(sub => matches(doc, sub)) : fieldMatches(doc[key], condition));
   return {
     find(filter = {}) {
       return { toArray: async () => docs.filter(doc => matches(doc, filter)) };
@@ -468,6 +473,19 @@ describe('collectKpiStats', () => {
     const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.strictEqual(stats.freeTier.days.length, FREE_TIER_WINDOW_DAYS);
     assert.strictEqual(stats.freeTier.counts[FREE_TIER_WINDOW_DAYS - 2], 6);
+  });
+
+  test('LIN-3620: activeTokens skips expired dispatch tokens, keeps null and absent expiresAt', async () => {
+    const collections = buildCollections({
+      dispatchTokens: createMockCollection([
+        { _id: 'live', expiresAt: new Date(NOW.getTime() + 60000) },
+        { _id: 'expired', expiresAt: new Date(NOW.getTime() - 60000) },
+        { _id: 'null', expiresAt: null },
+        { _id: 'absent' }
+      ])
+    });
+    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    assert.strictEqual(stats.totals.activeTokens, 3);
   });
 
   test('sums cache, token, and local provider counts', async () => {
