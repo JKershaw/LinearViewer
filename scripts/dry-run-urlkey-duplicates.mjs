@@ -19,7 +19,7 @@
  *     key (union-find over shared linked edges: one group is shared, two or
  *     more is a collision).
  *   - SUSPECTED COLLISIONS, ACTOR EVIDENCE ONLY: keys where actor stores
- *     (dispatchedBy, saved chats, task-mode and funnel events, credential
+ *     (dispatchedBy, saved chats, task-mode events, credential
  *     lifecycle events, task-share owner, close-out events, the user-preferences per-workspace maps,
  *     declared-mint owner) name an account
  *     that is not a holder. Labelled evidence; it never changes the holder set.
@@ -78,7 +78,7 @@ export const URLKEY_SOURCES = Object.freeze([
     'foreman-status', 'observation-sessions', 'proxy-events', 'llm-call-log', 'prompt-traces',
     'task-mode-events', 'close-out-events', 'liveness-alarms', 'custom-prompts', 'report-history',
     'task-snapshots', 'task-decisions', 'run-paragraph', 'workspaces', 'task_share_links',
-    'observer-shadow-log', 'saved-chats', 'funnel-events', 'credential-lifecycle-events',
+    'observer-shadow-log', 'saved-chats', 'credential-lifecycle-events',
     'owner-credentials', 'dismissal-suggestions', 'dispatch-presets', 'run-proposals', 'shelved-rulings',
     'ship-biscuit-editions', 'collective-characters', 'collective-presets', 'consumer-heartbeats'
   ].map(collection => ({ collection, shape: 'field', field: 'urlKey' })),
@@ -121,7 +121,6 @@ export const ACTOR_SOURCES = Object.freeze([
   { collection: 'dispatch-history', fields: ['dispatchedBy', 'grantDeclaration.ownerAccountId'] },
   { collection: 'saved-chats', fields: ['accountId'] },
   { collection: 'task-mode-events', fields: ['accountId'] },
-  { collection: 'funnel-events', fields: ['accountId'] },
   { collection: 'credential-lifecycle-events', fields: ['accountId'] },
   { collection: 'task_share_links', fields: ['ownerAccountId'] },
   { collection: 'close-out-events', fields: ['accountId'] },
