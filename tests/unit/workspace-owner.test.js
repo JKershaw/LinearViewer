@@ -27,7 +27,7 @@ import { AccountStore } from '../../lib/account-store.js';
 import { INDEX_SPECS } from '../../lib/db-indexes.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
 import { RUNNER_GRANTS } from '../../lib/proxy-scopes.js';
-import { checkWorkspaceOwner, createWorkspaceOwnerCheck, isOwnerAnswer, readOwnerStatus } from '../../lib/workspace-owner.js';
+import { checkWorkspaceOwner, createWorkspaceOwnerCheck, isOwnerAnswer, readOwnerSeamStatus, readOwnerStatus } from '../../lib/workspace-owner.js';
 
 // ---------------------------------------------------------------------------
 // Fakes for the seam boundary
@@ -458,5 +458,91 @@ describe('LIN-3648 — readOwnerStatus / isOwnerAnswer', () => {
     assert.throws(() => readOwnerStatus(obj), /getter/);
     assert.throws(() => isOwnerAnswer(arr), /getter/);
     assert.equal(readOwnerStatus(fn), 'unavailable');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LIN-3673 — the total entry point: the seam call itself, never throws
+// ---------------------------------------------------------------------------
+
+describe('LIN-3673 — readOwnerSeamStatus', () => {
+  const fnWith = (status) => Object.assign(() => {}, { status });
+  const boom = () => { throw new Error('getter'); };
+  const revoked = () => { const r = Proxy.revocable({}, {}); r.revoke(); return r.proxy; };
+
+  test('the 11 answer kinds read as readOwnerStatus does, with threw false', async () => {
+    const answers = [
+      { status: 'owner' }, { status: 'not-owner' }, { status: 'no-owner' }, { status: 'weird' },
+      {}, [], null, undefined, 5, 'owner', fnWith('owner')
+    ];
+    for (const answer of answers) {
+      const result = await readOwnerSeamStatus(() => answer);
+      assert.deepEqual(result, { status: readOwnerStatus(answer), threw: false, error: undefined });
+    }
+  });
+
+  test('a resolved promise is awaited', async () => {
+    assert.deepEqual(await readOwnerSeamStatus(async () => ({ status: 'owner' })), { status: 'owner', threw: false, error: undefined });
+  });
+
+  test('a sync throw, a rejection and any thrown value read as unavailable and are returned untouched', async () => {
+    const thrown = [new Error('x'), null, undefined, 'str', 7, revoked(), Object.create(null), { get message() { throw new Error('fmt'); } }];
+    for (const value of thrown) {
+      const sync = await readOwnerSeamStatus(() => { throw value; });
+      assert.equal(sync.status, 'unavailable');
+      assert.equal(sync.threw, true);
+      assert.equal(sync.error, value);
+      const rejected = await readOwnerSeamStatus(() => Promise.reject(value));
+      assert.equal(rejected.status, 'unavailable');
+      assert.equal(rejected.threw, true);
+      assert.equal(rejected.error, value);
+    }
+  });
+
+  test('a throwing status getter on an object or array reads as unavailable and carries the getter error', async () => {
+    const obj = Object.defineProperty({}, 'status', { get: boom });
+    const arr = Object.defineProperty([], 'status', { get: boom });
+    for (const answer of [obj, arr]) {
+      const result = await readOwnerSeamStatus(() => answer);
+      assert.equal(result.status, 'unavailable');
+      assert.equal(result.threw, true);
+      assert.match(result.error.message, /getter/);
+    }
+  });
+
+  test('a function carrying status is never read; a revoked Proxy answer reads as unavailable', async () => {
+    let reads = 0;
+    const fn = Object.defineProperty(() => {}, 'status', { get() { reads++; return 'owner'; } });
+    assert.deepEqual(await readOwnerSeamStatus(() => fn), { status: 'unavailable', threw: false, error: undefined });
+    assert.equal(reads, 0);
+    const result = await readOwnerSeamStatus(() => revoked());
+    assert.equal(result.status, 'unavailable');
+    assert.equal(result.threw, true);
+  });
+
+  test('a thenable with a throwing then is a throw', async () => {
+    const then = () => { throw new Error('then'); };
+    const result = await readOwnerSeamStatus(() => ({ then }));
+    assert.equal(result.status, 'unavailable');
+    assert.equal(result.threw, true);
+  });
+
+  test('a non-function thunk is a throw, not a rejection of the entry point', async () => {
+    for (const thunk of [undefined, null, {}, 'x']) {
+      const result = await readOwnerSeamStatus(thunk);
+      assert.equal(result.status, 'unavailable');
+      assert.equal(result.threw, true);
+      assert.ok(result.error instanceof TypeError);
+    }
+  });
+
+  test('the thunk is called exactly once and status is read exactly once', async () => {
+    let calls = 0;
+    let reads = 0;
+    const answer = Object.defineProperty({}, 'status', { get() { reads++; return 'owner'; } });
+    const result = await readOwnerSeamStatus(() => { calls++; return answer; });
+    assert.equal(result.status, 'owner');
+    assert.equal(calls, 1);
+    assert.equal(reads, 1);
   });
 });
