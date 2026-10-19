@@ -41,11 +41,9 @@ export default defineConfig({
     // "no AI configured" 503 path regardless of the developer's local .env.
     // Tests that need an API key set it session-side via
     // /test/set-session?openRouterConnected=true.
-    // PLAN_FEE_MONTHLY_USD is unset for the same reason (LIN-1958 review F1):
-    // tests/e2e/kpis.spec.js asserts the unset-state cash wording, and
-    // server.js loads .env under NODE_ENV=test, so an operator's own
-    // configured plan fee would otherwise leak into the test server and
-    // break that assertion on their machine while CI stayed green.
+    // PLAN_FEE_MONTHLY_USD is unset too, so an operator's own configured plan
+    // fee cannot leak into the test server (server.js loads .env under
+    // NODE_ENV=test). /kpis no longer shows it (LIN-3703); the seam stays.
     // YAP_BASE_URL points at the in-process mock Yap server (routes/test.js) so
     // the Collective live view (poll/say) is exercised without real egress.
     // JIRA_* are PRESENCE-ONLY placeholders (LIN-1887): `isJiraOAuthConfigured`

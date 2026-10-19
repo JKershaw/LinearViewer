@@ -49,7 +49,7 @@ describe('renderKpisPage: frame', () => {
   test('the subtitle discloses the real age of generatedAt', () => {
     const view = toPublicKpis(buildStats());
     const old = renderKpisPage({ ...view, generatedAt: new Date(Date.now() - 3 * 3600 * 1000).toISOString() });
-    assert.match(old, /collected 3 hours ago/);
+    assert.match(old, /collected 3h ago/);
     assert.ok(!/just now/.test(old));
     assert.match(old, /data-testid="kpis-generated"[^>]*data-timestamp=/);
   });
@@ -139,11 +139,11 @@ describe('renderKpisPage: how people get started', () => {
   });
 
   test('a below-floor step is a server-side text row: "fewer than N" from the constant, with data hooks', () => {
-    const html = render({ funnel: buildFunnel({ login: 3 * F, connected: F - 1, firstGo: 0, prOpened: 0, mergeClicked: 0 }) });
+    const html = render({ funnel: buildFunnel({ login: 9137, connected: F - 1, firstGo: 0, prOpened: 0, mergeClicked: 0 }) });
     assert.match(html, new RegExp(`<p class="kpi-chart-empty" data-testid="kpis-hidden" data-hidden="below-floor" data-milestone-step="connected">connected: fewer than ${F}</p>`));
     // And the withheld one says so, without its number.
     assert.match(html, /data-hidden="withheld" data-milestone-step="login">signed up: not shown</);
-    assert.ok(!html.includes(String(3 * F)), 'the withheld count is nowhere in the page');
+    assert.ok(!html.includes('9137'), 'the withheld count is nowhere in the page');
   });
 
   test('the rows sit outside the canvas wrapper the script replaces on an empty chart', () => {
@@ -160,7 +160,7 @@ describe('renderKpisPage: how people get started', () => {
     const low = render({ funnel: buildFunnel({ login: 3 * F }, buildMode(10 * F, [[6 * F, F - 1], [4 * F, 0], [0, 0]])) });
     assert.match(low, /data-mode-rung="copy"[^>]*>.*?data-field="entries"[^>]*data-hidden="withheld"[^>]*>not shown</s);
     assert.match(low, new RegExp(`data-field="notReady"[^>]*data-hidden="below-floor"[^>]*>fewer than ${F}<`));
-    assert.match(low, /data-testid="kpis-mode-total"[^>]*data-hidden="withheld"/);
+    assert.match(low, /data-field="total" data-testid="kpis-hidden" data-hidden="withheld"/);
   });
 
   test('no mode block renders no mode rows', () => {

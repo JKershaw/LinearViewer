@@ -142,7 +142,8 @@ import { renderStyleguide } from './lib/render-styleguide.js'
 import { renderKpisPage } from './lib/render-kpis.js'
 import { createWorkspaceKpisRoutes } from './routes/workspace-kpis.js'
 import { renderTemplatesPage } from './lib/render-templates.js'
-import { collectKpiStats } from './lib/kpi-stats.js'
+import { collectKpiStats, toPublicKpis } from './lib/kpi-stats.js'
+import { createKpiPage } from './lib/kpi-page.js'
 import { renderSettingsPage } from './lib/render-settings.js'
 import { renderPromptsPage } from './lib/render-prompts.js'
 import { renderCustomPromptsPage } from './lib/render-custom-prompts.js'
@@ -187,7 +188,6 @@ import { getFeatureFlags, isValidFeatureKey, isValidWorkspaceFeatureKey, WORKSPA
 import { DISPATCH_DEFAULT_KINDS } from './lib/prompt-templates.js'
 import { validateOpaqueDispatchField, MAX_NAME_LENGTH } from './lib/dispatch-validation.js'
 import { getDeployInfo } from './lib/deploy-info.js'
-import { getPlanFeeConfig } from './lib/plan-fee-config.js'
 import { securityHeaders } from './lib/security-headers.js'
 
 // =============================================================================
@@ -1068,7 +1068,7 @@ if (process.env.NODE_ENV === 'test') {
   // additive, test-only seam so a spec can inject a rejecting aggregate() on
   // the exact two collections /kpis' loaders read, without touching /kpis'
   // own route logic. See routes/test.js's kpis-fail-next-aggregate handler.
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache: (mode) => { kpiCache = mode === 'stale' ? { at: 0, stats: kpiCache.stats } : { at: 0, stats: null } }, workspaceHaltStore, emailTransport: emailTransport?.kind === 'capture' ? emailTransport : null, commentDedupe, decisionStampDedupe, taskModeStore, taskShareCollection: db.collection('task_share_links') }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache: (mode) => kpiPage.reset(mode), workspaceHaltStore, emailTransport: emailTransport?.kind === 'capture' ? emailTransport : null, commentDedupe, decisionStampDedupe, taskModeStore, taskShareCollection: db.collection('task_share_links') }))
 }
 
 // =============================================================================
@@ -2269,22 +2269,12 @@ app.use(createLibraryRouter())
 // KPIs Page (public, no auth required, intentionally unlinked)
 // =============================================================================
 // Instance-wide aggregate stats. collectKpiStats() is the privacy boundary —
-// it returns only counts and app-defined labels, never workspace data.
-//
-// The collection is served stale-while-revalidate behind a single-flight lock:
-// once warmed, the route ALWAYS responds instantly from cache and refreshes in
-// the background, so a slow DB read can never block the request or trip the 30s
-// router timeout (the old behaviour: a >30s read died before it could fill the
-// cache, so every request re-ran the read and timed out — a death spiral). Only
-// a cold cache (process just booted) awaits the first computation. The
-// single-flight lock collapses concurrent refreshes into one DB read.
-const KPI_CACHE_MS = 60 * 1000
-let kpiCache = { at: 0, stats: null }
-let kpiInflight = null
-
-async function refreshKpiStats() {
-  const startedAt = Date.now()
-  const stats = await collectKpiStats({
+// it returns only counts and app-defined labels, never workspace data — and
+// toPublicKpis() cuts that down to what the page draws and applies the
+// small-count floor, so the cache below only ever holds the public view.
+// The cache, single-flight refresh and handler live in lib/kpi-page.js.
+const kpiPage = createKpiPage({
+  collect: async () => toPublicKpis(await collectKpiStats({
     sessions: sessionsCollection,
     userPreferences: userPreferencesCollection,
     workspacePreferences: workspacePreferencesCollection,
@@ -2313,46 +2303,12 @@ async function refreshKpiStats() {
       dispatchQueue: dispatchQueueCollection,
       dispatchHistory: dispatchHistoryCollection
     }
-  })
-  const ms = Date.now() - startedAt
-  if (ms > 5000) console.warn(`KPI stats collection slow: ${ms}ms`)
-  else console.log(`KPI stats collected in ${ms}ms`)
-  kpiCache = { at: Date.now(), stats }
-  return stats
-}
-
-// Single-flight: collapse concurrent (re)fills into one in-flight DB read.
-function refreshKpiStatsOnce() {
-  if (!kpiInflight) {
-    kpiInflight = refreshKpiStats().finally(() => { kpiInflight = null })
-  }
-  return kpiInflight
-}
-
-app.get('/kpis', async (req, res) => {
-  try {
-    const fresh = kpiCache.stats && Date.now() - kpiCache.at <= KPI_CACHE_MS
-    if (!fresh) {
-      if (kpiCache.stats) {
-        // Warm but stale: serve the last good snapshot now, refresh in the
-        // background. Never await — the request must not block on the DB read.
-        refreshKpiStatsOnce().catch(err => console.error('KPI background refresh failed:', err))
-      } else {
-        // Cold cache (fresh boot): nothing to serve yet, so await the first fill.
-        await refreshKpiStatsOnce()
-      }
-    }
-    res.send(renderKpisPage(kpiCache.stats, { deployInfo: getDeployInfo(), planFeeConfig: getPlanFeeConfig() }))
-  } catch (error) {
-    console.error('Failed to render KPIs page:', error)
-    if (kpiCache.stats) {
-      // Degrade to the last good snapshot rather than erroring the whole page.
-      res.send(renderKpisPage(kpiCache.stats, { deployInfo: getDeployInfo(), planFeeConfig: getPlanFeeConfig() }))
-    } else {
-      res.status(500).send(renderErrorPage('Error', 'Could not load instance KPIs. Please try again.'))
-    }
-  }
+  })),
+  render: view => renderKpisPage(view, { deployInfo: getDeployInfo() }),
+  renderError: () => renderErrorPage('Error', 'Could not load instance KPIs. Please try again.')
 })
+
+app.get('/kpis', kpiPage.handler)
 
 // =============================================================================
 // Workspace-Prefixed Routes

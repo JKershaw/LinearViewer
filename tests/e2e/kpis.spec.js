@@ -35,7 +35,7 @@ test.describe('KPIs page', () => {
   test('renders without authentication, as three sections', async ({ page }) => {
     await page.goto('/kpis');
 
-    await expect(page.locator('h2')).toHaveText('Harbour in numbers');
+    await expect(page.locator('main.kpis-content > h2')).toHaveText('Harbour in numbers');
     for (const name of ['outcome', 'activity', 'people']) {
       await expect(page.locator(K.section(name))).toBeVisible();
     }

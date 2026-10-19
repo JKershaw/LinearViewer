@@ -1,4 +1,5 @@
-/* KPIs page (/kpis) — public instance stats dashboard */
+/* Public /kpis page (rebuilt in LIN-3703): three sections, one column.
+   Every colour is a theme token, so dark mode needs no rules of its own. */
 
 .kpis-content {
   max-width: 900px;
@@ -12,19 +13,37 @@
   margin-bottom: var(--space-1);
 }
 
+.kpi-story {
+  font-family: var(--font-content);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin-bottom: var(--space-1);
+}
+
 .kpi-subtitle {
   color: var(--fg-dim);
   font-size: 0.85rem;
   margin-bottom: var(--space-4);
 }
 
-/* Headline outcome number — the page's one ratio, above the volume cards.
-   Chrome comes from `.card`; only the headline's own type scale lives here. */
+/* A story section: its heading, then its figures and charts in a column. */
+.kpi-section {
+  margin-bottom: var(--space-5);
+}
+
+.kpis-content h2.kpi-section-title {
+  font-size: 1.05rem;
+  padding-bottom: var(--space-1);
+  margin-bottom: var(--space-3);
+  border-bottom: 1px solid var(--fg-vdim);
+}
+
+/* The headline ratio. Chrome comes from `.card`; only its type scale is here. */
 .kpi-headline {
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-3);
 }
 
 .kpi-headline-value {
@@ -44,7 +63,6 @@ a.kpi-headline-value:hover {
 .kpi-headline-label {
   font-family: var(--font-content);
   font-size: 0.95rem;
-  color: var(--fg);
 }
 
 .kpi-headline-slices,
@@ -54,121 +72,26 @@ a.kpi-headline-value:hover {
   color: var(--fg-dim);
 }
 
-/* The evidence link's target. Offsets the jump so the chart box's heading is
-   not flush against the viewport edge on arrival. */
+/* The headline link's target: keep its heading off the viewport edge. */
 #kpi-outcome-evidence {
   scroll-margin-top: var(--space-3);
 }
 
-/* Cost-per-terminal-marked-task card (LIN-1958) — a second bespoke headline-
-   style card, sitting above the grid alongside `.kpi-headline` but with its
-   own rules: `.kpi-headline*` stays specific to the outcome headline. The
-   bias/coverage disclosures (`.kpi-cost-shares-goodness`/
-   `.kpi-cost-shares-ignorance`/`.kpi-cost-shares-ignorance-basis`/
-   `.kpi-cost-coverage`) and the `.kpi-cost-usd-lines` are load-bearing
-   content the 2026-08-03 ruling requires alongside the number, not fine
-   print — they get the same legible treatment as
-   `.kpi-headline-slices`/`.kpi-headline-coverage`, never display:none or
-   near-invisible sizing at any breakpoint. LIN-2418 split the former single
-   `.kpi-cost-shares` span in two: the goodness group stays denominated over
-   `issueCount` (named by the sample line above it), while the ignorance
-   group carries its own basis span naming the `lineageBearingCount`
-   denominator it actually uses. LIN-2419 widened `opencodeSummed`/
-   `unknownHarness` to a three-valued (`true|false|'unknown'`) domain, so the
-   two ignorance shares no longer share ONE denominator: `unknownHarnessShare`
-   is still exactly `lineageBearingCount`, but `opencodeSummedShare`'s known
-   population is narrower (a lineage with no declared harness is unknown for
-   that share too). The basis span states `lineageBearingCount` exactly and
-   qualifies the opencode share's narrower basis in words only — publishing
-   its exact count is a deferred follow-up, not a rule change here. */
-.kpi-cost-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  margin-bottom: var(--space-4);
-}
-
-.kpi-cost-value {
-  font-family: var(--font-structural);
-  font-size: 2.2rem;
-  font-weight: 600;
-  line-height: 1.1;
-  color: var(--fg);
-}
-
-.kpi-cost-label {
-  font-family: var(--font-content);
-  font-size: 0.95rem;
-  color: var(--fg);
-}
-
-.kpi-cost-window,
-.kpi-cost-cash,
-.kpi-cost-sample {
-  font-family: var(--font-structural);
-  font-size: 0.78rem;
-  color: var(--fg-dim);
-}
-
-.kpi-cost-shares-goodness,
-.kpi-cost-shares-ignorance,
-.kpi-cost-shares-ignorance-basis,
-.kpi-cost-coverage,
-.kpi-cost-usd-lines {
-  font-family: var(--font-structural);
-  font-size: 0.78rem;
-  color: var(--fg-dim);
-  line-height: 1.5;
-}
-
-/* Weekly-budget burn gauge (LIN-2118) — a third bespoke headline-style card,
-   same posture as `.kpi-cost-card`: an ESTIMATE, so its provenance line
-   (`.kpi-budget-source`) gets the same non-fine-print treatment as the cost
-   card's own bias/coverage disclosures — never display:none or
-   near-invisible sizing at any breakpoint. */
-.kpi-budget-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  margin-bottom: var(--space-4);
-}
-
-.kpi-budget-value {
-  font-family: var(--font-structural);
-  font-size: 2.2rem;
-  font-weight: 600;
-  line-height: 1.1;
-  color: var(--fg);
-}
-
-.kpi-budget-label {
-  font-family: var(--font-content);
-  font-size: 0.95rem;
-  color: var(--fg);
-}
-
-.kpi-budget-source,
-.kpi-budget-rate,
-.kpi-budget-window,
-.kpi-budget-coverage,
-.kpi-budget-calibration {
-  font-family: var(--font-structural);
-  font-size: 0.78rem;
-  color: var(--fg-dim);
-  line-height: 1.5;
-}
-
-/* Stat cards */
+/* Stat cards: two columns on a phone, as many as fit on a desktop. */
 .kpi-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 0.75rem;
-  margin-bottom: var(--space-4);
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
 }
 
-/* Chrome (border/fill/radius/padding) is owned by `.card`; only the
-   stat-block layout lives here. `.card`'s margin-bottom is neutralised so
-   the grid `gap` alone spaces the cards. */
+@media (min-width: 641px) {
+  .kpi-cards {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 0.75rem;
+  }
+}
+
 .kpi-card {
   margin-bottom: 0;
   display: flex;
@@ -178,35 +101,26 @@ a.kpi-headline-value:hover {
 
 .kpi-card-value {
   font-family: var(--font-structural);
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   font-weight: 600;
-  color: var(--fg);
 }
 
-.kpi-card-label {
+.kpi-card-label,
+.kpi-card-basis {
   font-family: var(--font-content);
   color: var(--fg-dim);
   font-size: 0.78rem;
 }
 
+/* A count the floor hides reads as text, in the same place the number would. */
+[data-hidden] {
+  color: var(--fg-dim);
+  font-weight: 400;
+}
+
 /* Chart boxes */
-.kpi-chart-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
-}
-
-/* Chrome (inset fill/radius/padding) is owned by `.section--boxed`; only the
-   grid spacing lives here. The base `.section` margin-bottom is neutralised so
-   the grid `gap` alone spaces the boxes; the wide hero box keeps a margin
-   because it sits above the grid, not inside it. */
 .kpi-chart-box {
-  margin-bottom: 0;
-}
-
-.kpi-chart-wide {
-  margin-bottom: 0.75rem;
+  margin-bottom: var(--space-3);
 }
 
 .kpi-chart-box h3 {
@@ -216,134 +130,62 @@ a.kpi-headline-value:hover {
   color: var(--fg-dim);
   margin-bottom: var(--space-2);
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-2);
+  flex-direction: column;
+  gap: 0.15rem;
 }
 
-/* Range toggle (e.g. 30d / 24h on the hero chart) */
-.kpi-range-toggle {
-  display: inline-flex;
-  gap: var(--space-1);
-}
-
-.kpi-range-btn {
-  font-family: var(--font-structural);
-  font-size: 0.7rem;
-  color: var(--fg-dim);
-  background: none;
-  border: 1px solid var(--fg-vdim);
-  border-radius: var(--radius-sm);
-  padding: 0.05rem 0.45rem;
-  cursor: pointer;
-}
-
-.kpi-range-btn:hover {
-  color: var(--fg);
-}
-
-.kpi-range-btn.is-active {
-  color: var(--fg);
-  border-color: var(--fg-dim);
-  background: var(--bg-muted);
-}
-
-.kpi-tree-glyph {
-  color: var(--fg-vdim);
+.kpi-chart-caption {
+  font-weight: 400;
+  font-size: 0.75rem;
 }
 
 .kpi-chart-canvas {
   position: relative;
-  height: 220px;
+  height: 200px;
 }
 
-.kpi-chart-wide .kpi-chart-canvas {
-  height: 260px;
+@media (min-width: 641px) {
+  .kpi-chart-canvas {
+    height: 240px;
+  }
+}
+
+/* The note that replaces a canvas with nothing to draw. */
+.kpi-chart-canvas + .kpi-chart-empty,
+.kpi-chart-canvas .kpi-chart-empty {
+  height: 100%;
 }
 
 .kpi-chart-empty {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 100%;
   color: var(--fg-dim);
   font-family: var(--font-structural);
   font-size: 0.85rem;
 }
 
-/* Vanity strip */
-.kpi-vanity {
-  margin-top: var(--space-3);
-  color: var(--fg-dim);
+/* Text rows under a chart (no signal, hidden counts): left-aligned lines. */
+p.kpi-chart-empty {
+  justify-content: flex-start;
+  margin: var(--space-1) 0 0;
+}
+
+.kpi-mode {
   font-family: var(--font-structural);
+  font-size: 0.85rem;
+  color: var(--fg-dim);
+}
+
+.kpi-mode-rungs {
+  list-style: none;
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  line-height: 1.6;
+}
+
+.kpi-privacy {
+  color: var(--fg-dim);
   font-size: 0.8rem;
-}
-
-.kpi-vanity strong {
-  color: var(--fg);
-}
-
-@media (max-width: 640px) {
-  .kpis-content {
-    padding: 0.75rem;
-  }
-
-  .kpi-chart-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .kpi-cards {
-    grid-template-columns: repeat(2, 1fr);
-    gap: var(--space-2);
-  }
-
-  .kpi-card-value {
-    font-size: 1.25rem;
-  }
-
-  .kpi-headline-value {
-    font-size: 2rem;
-  }
-
-  .kpi-cost-value {
-    font-size: 1.75rem;
-  }
-
-  /* The four shares (now two goodness + two ignorance, LIN-2418) + two
-     coverage ratios + two USD lines are the ruling's required disclosures,
-     not decoration — they must stay fully legible (never truncated, never
-     nowrap-and-scroll) down to narrow viewports. Normal wrapping at the
-     existing " · " word breaks is enough on its own, but the line-height is
-     opened up here so wrapped lines don't crowd. */
-  .kpi-cost-shares-goodness,
-  .kpi-cost-shares-ignorance,
-  .kpi-cost-shares-ignorance-basis,
-  .kpi-cost-coverage,
-  .kpi-cost-usd-lines {
-    line-height: 1.6;
-  }
-
-  .kpi-budget-value {
-    font-size: 1.75rem;
-  }
-
-  .kpi-budget-source,
-  .kpi-budget-rate,
-  .kpi-budget-window,
-  .kpi-budget-coverage,
-  .kpi-budget-calibration {
-    line-height: 1.6;
-  }
-
-  .kpi-chart-canvas {
-    height: 200px;
-  }
-
-  .kpi-chart-wide .kpi-chart-canvas {
-    height: 220px;
-  }
-
-  .kpi-vanity {
-    line-height: 1.7;
-  }
+  line-height: 1.5;
 }
