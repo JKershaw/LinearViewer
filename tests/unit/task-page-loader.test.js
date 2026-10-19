@@ -582,7 +582,24 @@ describe('buildTaskStages (LIN-3356)', () => {
     assert.deepEqual(stages[0].checkIns.map(c => c.loopId), ['w1', 'abort', 'w2']);
     assert.equal(stages[0].id, 'b1', 'keyed by the first session, stable when an attempt is added');
     assert.equal(stages[0].state, 'done', 'the LAST session decides');
-    assert.equal(stages[0].durationMs, 60 * 60 * 1000, 'first start to last end');
+    assert.equal(stages[0].durationMs, 38 * 60 * 1000, 'LIN-3498: latest attempt start to last end');
+  });
+
+  // LIN-3498: a stage's clock starts with its latest attempt, not its first.
+  test("a stage's startedAt is its latest attempt's takenAt, falling back to dispatchedAt", () => {
+    const [two] = buildTaskStages([
+      sess('b1', 'implementation', 'failed', 0, 10),
+      sess('b2', 'implementation', 'running', 50),
+    ], { trackerType: 'started' });
+    assert.equal(two.startedAt, at(50), 'the second attempt, not the failed first');
+    assert.equal(two.attempts, 2);
+    const untaken = sess('b2', 'implementation', 'queued', 50);
+    untaken.loop = { takenAt: null, dispatchedAt: at(45) };
+    const [fallback] = buildTaskStages([sess('b1', 'implementation', 'failed', 0, 10), untaken], { trackerType: 'started' });
+    assert.equal(fallback.startedAt, at(45), 'dispatchedAt when the latest attempt was never taken');
+    const [one] = buildTaskStages([sess('b1', 'implementation', 'done', 3, 9)], { trackerType: 'completed' });
+    assert.equal(one.startedAt, at(3), 'a single attempt is unchanged');
+    assert.equal(one.durationMs, 6 * 60 * 1000);
   });
 
   test('a trailing check-in folds into the last stage; a running stage has no end or duration', () => {
