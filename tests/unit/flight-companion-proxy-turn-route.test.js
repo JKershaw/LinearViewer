@@ -379,4 +379,44 @@ describe('LIN-2427: who paid for the turn is recorded (LIN-1458 source note)', (
     assert.equal(status, 200);
     assert.ok(!notes.some((n) => n && n.startsWith('openrouter_key_fallback')), `got notes ${JSON.stringify(notes)}`);
   });
+
+  // LIN-3665: the free-tier refusal block chargeFreeTierOrReject already built
+  // reaches the client on the user-initiated 429 (after `reason`); there is no
+  // `error` key on this route. An auto-wake refusal stays a silent 200.
+  const REFUSING_FREE_TIER = {
+    tryUse: async () => ({ allowed: false, reason: 'Free tier hourly limit reached', remaining: 0, limit: 20, resetsAt: '2026-10-18T22:00:00.000Z' }),
+  };
+
+  test('LIN-3665: user-initiated free-tier refusal 429s with the exact body, freeTier after reason', async () => {
+    process.env.OPENROUTER_FREE_TIER_KEY = 'sk-env-free';
+    const { status, body } = await postTurn(
+      { getWorkspaceOpenRouterKey: async () => null, freeTierStore: REFUSING_FREE_TIER, flightCompanionChatClient: neverCalledChatClient() },
+      { message: 'hi' }
+    );
+    assert.equal(status, 429);
+    const parsed = typeof body === 'string' ? JSON.parse(body) : body;
+    assert.deepEqual(parsed, {
+      turnKind: 'user-initiated',
+      spent: false,
+      reason: 'free-tier',
+      freeTier: { used: true, remaining: 0, limit: 20, resetsAt: '2026-10-18T22:00:00.000Z' },
+      text: '',
+      tools: [],
+      proposals: [],
+      usage: null,
+      model: null,
+    });
+    assert.deepEqual(Object.keys(parsed), ['turnKind', 'spent', 'reason', 'freeTier', 'text', 'tools', 'proposals', 'usage', 'model']);
+  });
+
+  test('LIN-3665: an auto-wake free-tier refusal stays a silent 200 with no freeTier key', async () => {
+    process.env.OPENROUTER_FREE_TIER_KEY = 'sk-env-free';
+    const { status, body } = await postTurn(
+      { observerStateStore: fakeObserverStateStore({ census: censusDoc() }), getWorkspaceOpenRouterKey: async () => null, freeTierStore: REFUSING_FREE_TIER, flightCompanionChatClient: neverCalledChatClient() },
+      {}
+    );
+    assert.equal(status, 200);
+    assert.equal(body.reason, 'free-tier');
+    assert.ok(!('freeTier' in body), `got ${JSON.stringify(body)}`);
+  });
 });
