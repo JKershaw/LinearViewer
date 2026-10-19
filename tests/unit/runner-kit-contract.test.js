@@ -32,6 +32,7 @@ import {
 } from '../../lib/runner-kit/runner.mjs';
 import { credentialStore } from '../../lib/runner-kit/broker.mjs';
 import { SESSION_TARGETS as HARBOUR_SESSION_TARGETS } from '../../lib/dispatch-targets.js';
+import { HALT_MODES } from '../../lib/workspace-halt.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const TABLE = JSON.parse(fs.readFileSync(path.join(ROOT, 'lib', 'runner-kit', 'contract.json'), 'utf8'));
@@ -125,6 +126,18 @@ describe('contract table shape', () => {
     assert.ok(diffs.some((c) => /abort row under an unknown halt mode/.test(c)));
     assert.ok(diffs.some((c) => /line posted/.test(c)));
     assert.ok(diffs.some((c) => /decision message/.test(c)));
+  });
+
+  // LIN-3650: adding a mode to HALT_MODES fails here until the table says what each side does with it.
+  test('every HALT_MODES value has halt rows for abort, fresh and follow-up', () => {
+    for (const mode of HALT_MODES) {
+      for (const route of ['abort', 'fresh', 'follow-up']) {
+        assert.ok(
+          TABLE.rows.some((r) => r.area === 'halt' && r.halt?.mode === mode && r.item?.route === route),
+          `contract.json has no halt row for mode '${mode}' on the ${route} route`
+        );
+      }
+    }
   });
 });
 

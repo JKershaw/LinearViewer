@@ -412,10 +412,13 @@ describe('credentialInProseRefusal and preConfirmDecision (LIN-3211: no credenti
 describe('haltAction and haltSweep (Simple Dispatcher\'s halt meaning)', () => {
   const live = ledgerWith([{ itemId: K, agentId: 'agent-k', rootItemId: K, state: 'running' }]);
 
-  test('every HALT_MODES value is handled', () => {
+  // LIN-3650: an unknown mode leaves an abort (`halt:<mode>`), a known one lets it flow,
+  // so a mode added to HALT_MODES fails here until haltAction has a branch for it.
+  test('every HALT_MODES value has an explicit kit branch (aborts flow)', () => {
     for (const mode of HALT_MODES) {
-      const r = haltAction({ mode }, item(), live);
-      assert.ok(['take', 'leave'].includes(r.decision), mode);
+      const r = haltAction({ mode }, item({ abort: true, abortTo: K, prompt: null }), live);
+      assert.equal(r.decision, 'take', `${mode}: abort must be taken`);
+      assert.ok(r.reason.endsWith(':abort-flows'), `${mode}: reason ${r.reason}`);
     }
   });
 
