@@ -790,6 +790,11 @@ function haltDisclosureText() {
   return disclaimerEl ? disclaimerEl.textContent : ''
 }
 
+// LIN-3687 (carries LIN-3684): explicit label per HALT_MODES value (pinned by
+// tests/unit/dispatch-feedback-entries.test.js); unknown modes show the
+// capitalised raw mode rather than silently reading as "Pause".
+const HALT_MODE_LABELS = { pause: 'Pause', stop: 'Stop' }
+
 /**
  * Builds the requested-not-effective status line for a halt object (or the
  * unset state). Never renders "paused"/"stopped", and drops the "by <who>"
@@ -797,7 +802,8 @@ function haltDisclosureText() {
  */
 function formatHaltStatusHtml(halt) {
   if (!halt) return 'No halt requested.'
-  const verb = halt.mode === 'stop' ? 'Stop' : 'Pause'
+  const mode = String(halt.mode)
+  const verb = HALT_MODE_LABELS[mode] || mode.charAt(0).toUpperCase() + mode.slice(1)
   const time = escapeHtml(new Date(halt.setAt).toLocaleString())
   const by = halt.setBy ? ` by ${escapeHtml(halt.setBy)}` : ''
   return `${verb} requested — ${time}${by}. The runner applies it on its next poll.`

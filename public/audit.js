@@ -72,7 +72,7 @@ const STATE_GLYPHS = {
   done: '✓',
   'in-progress': '◐',
   todo: '○',
-  backlog: '○',
+  backlog: '◌',
   failed: '✕',
 };
 

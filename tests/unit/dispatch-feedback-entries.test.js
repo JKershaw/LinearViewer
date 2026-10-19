@@ -19,6 +19,7 @@ import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { HALT_MODES } from '../../lib/workspace-halt.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DISPATCH_JS_SRC = readFileSync(join(__dirname, '../../public/dispatch.js'), 'utf8');
@@ -94,4 +95,18 @@ test('renderFeedbackEntries is unchanged for feedback with no decision-answer en
   assert.ok(html.includes('feedback-list'));
   assert.ok(html.includes('pr opened'));
   assert.ok(html.includes('PR #1'));
+});
+
+// LIN-3687 (carries LIN-3684): every HALT_MODES value needs a label, and an
+// unknown mode must not be silently labelled "Pause".
+test('HALT_MODE_LABELS in public/dispatch.js has an entry for every HALT_MODES value', () => {
+  const start = DISPATCH_JS_SRC.indexOf('const HALT_MODE_LABELS');
+  assert.notEqual(start, -1, 'HALT_MODE_LABELS found in public/dispatch.js');
+  const slice = DISPATCH_JS_SRC.slice(start, DISPATCH_JS_SRC.indexOf('}', start) + 1);
+  const sandbox = {};
+  vm.createContext(sandbox);
+  const labels = vm.runInContext(`${slice}; HALT_MODE_LABELS`, sandbox);
+  for (const mode of HALT_MODES) {
+    assert.equal(typeof labels[mode], 'string', `label for halt mode "${mode}"`);
+  }
 });

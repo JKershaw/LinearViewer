@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { readFileSync } from 'node:fs';
 import { renderStatusPill } from '../../lib/components/status-pill.js';
+import { getStateDisplay } from '../../lib/providers/state-map.js';
 
 test('renders the canonical .status-pill wrapper with a default state glyph + label', () => {
   const html = renderStatusPill({ state: 'done', label: 'done' });
@@ -16,7 +18,7 @@ test('each state adds its color modifier and default glyph', () => {
     'in-progress': '◐',
     done: '✓',
     todo: '○',
-    backlog: '○',
+    backlog: '◌',
     failed: '✕',
   };
   for (const [state, glyph] of Object.entries(glyphs)) {
@@ -65,7 +67,7 @@ test('the bare variant is the box-less tree-row glyph (state modifier + explicit
     attrs: 'data-status="backlog" aria-label="Status: Backlog"',
   });
   assert.match(html, /^<span class="status-pill status-pill--backlog status-pill--bare" data-status="backlog" aria-label="Status: Backlog">/);
-  // Explicit char survives — the backlog glyph is ◌, not the STATE_GLYPHS ○ default.
+  // Explicit char survives (LIN-3687: the STATE_GLYPHS default is now ◌ too).
   assert.match(html, /<span class="status-pill__char">◌<\/span>/);
   assert.doesNotMatch(html, /○/);
 });
@@ -103,4 +105,21 @@ test('char and label are escaped (plain text in, like field)', () => {
 test('className rides alongside .status-pill as a semantic/E2E hook; attrs extend the wrapper', () => {
   const html = renderStatusPill({ state: 'done', label: 'd', className: 'foreman-state', attrs: 'data-state="done"' });
   assert.match(html, /^<span class="status-pill status-pill--done foreman-state" data-state="done">/);
+});
+
+// --- LIN-3687: backlog glyph pins -------------------------------------------
+// STATE_GLYPHS is a literal map (the pill has states outside state-map types),
+// so these pins stop it drifting from getStateDisplay, the one glyph rule.
+
+test('LIN-3687: default backlog pill draws the getStateDisplay backlog glyph', () => {
+  const html = renderStatusPill({ state: 'backlog' });
+  assert.match(html, new RegExp(`<span class="status-pill__char">${getStateDisplay('backlog').char}<\\/span>`));
+});
+
+test('LIN-3687: public/audit.js backlog glyph matches getStateDisplay', () => {
+  const src = readFileSync(new URL('../../public/audit.js', import.meta.url), 'utf8');
+  const map = src.slice(src.indexOf('const STATE_GLYPHS'));
+  const m = map.slice(0, map.indexOf('};')).match(/backlog:\s*'([^']+)'/);
+  assert.ok(m, 'backlog entry found in audit.js STATE_GLYPHS');
+  assert.equal(m[1], getStateDisplay('backlog').char);
 });
