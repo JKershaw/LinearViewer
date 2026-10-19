@@ -152,7 +152,7 @@ describe('source constraints (D6 and the source-scanning censuses)', () => {
 const COLLECTION_CLASSES = {
   'owner-credentials': 'H', 'connections': 'H', 'proxy-tokens': 'H', 'dispatch-tokens': 'H',
   'dispatch-queue': 'B', 'dispatch-history': 'B', 'saved-chats': 'B', 'task-mode-events': 'B',
-  'funnel-events': 'B', 'credential-lifecycle-events': 'B', 'task_share_links': 'B', 'user-preferences': 'B',
+  'credential-lifecycle-events': 'B', 'task_share_links': 'B', 'user-preferences': 'B',
   'sessions': 'B',
   'close-out-events': 'BC', 'foreman-status': 'C', 'llm-call-log': 'C', 'prompt-traces': 'C', 'proxy-events': 'C',
   'observation-sessions': 'C', 'observer-shadow-log': 'C', 'wake_shadow': 'C', 'liveness-alarms': 'C',
