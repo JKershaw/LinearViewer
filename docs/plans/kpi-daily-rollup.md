@@ -32,25 +32,25 @@ Checked at Harbour origin/main `8f39afd8`.
 **Indexes.** Two, each with a `reason` entry in `lib/db-indexes.js` in the build ticket:
 
 - On `kpi-daily-rollup`: unique `{ urlKey: 1, day: 1 }`. It is the idempotence key and also serves the workspace read. The public read groups every row by `day` (decision 9), so it needs no `day` index.
-- On `dispatch-history`: **`{ urlKey: 1, dispatchedAt: 1 }`**. Without it, the job's per-workspace horizon read and the backfill's per-day reads examine the workspace's whole history through the `urlKey` index (see What is true now). With it, every range read and the "oldest record" probe (`sort({ dispatchedAt: 1 }).limit(1)`) are index-bounded. The existing workspace KPI read (`urlKey` plus a residual `dispatchedAt` filter) benefits too, but changing it is out of scope here.
+- On `dispatch-history`: **`{ urlKey: 1, dispatchedAt: 1 }`**. Without it, the backfill's per-day, workspace-scoped reads (and any workspace-scoped horizon read) examine the workspace's whole history through the `urlKey` index (see What is true now). With it, every range read and the "oldest record" probe (`sort({ dispatchedAt: 1 }).limit(1)`) are index-bounded. The existing workspace KPI read (`urlKey` plus a residual `dispatchedAt` filter) benefits too, but changing it is out of scope here.
 
 **Retention.** Kept for life, like the evidence stores; no TTL and no evictor. The 30-day figures stay on the read horizon (out of scope here).
 
-**Field meanings.** `done`/`failed`/`aborted` count lineages whose final status is that status and whose `statusMs` falls on `day`. `dispatches` counts dispatch rows (not lineages, abort rows excluded) whose `dispatchedAt` falls on `day`, the same meaning as `totals.dispatches`.
+**Field meanings.** `done`/`failed`/`aborted` count lineages whose final status is that status and whose `statusMs` falls on `day`. `dispatches` counts dispatch rows (not lineages; abort rows included) whose `dispatchedAt` falls on `day`, the same meaning as `totals.dispatches` (`windowedDispatchDocs.length` in `lib/kpi-stats.js`, which counts every history row in the window). Queue rows are not in `dispatch-history` until they are taken or expire, so the rollup's `dispatches` for today and the most recent days is provisional and settles on the hourly rewrite (decision 2).
 
 ### 2. When the job runs, and when a day is final
 
-**Decision.** A scheduler job `kpi-daily-rollup`, registered with `scheduler.register` beside the existing jobs in `server.js`, `intervalMs` 1 hour, `leaseMs` 10 minutes. Each run reads each workspace **once**, over exactly the horizon the public page reads: `loadDispatchHistory(dispatchHistory, { since: readHorizonStart(now), urlKey })`, so `[readHorizonStart(now), now)`. It groups once with `groupDispatchLineages` and `$set`s **every UTC day inside that horizon** from that one grouping, through the shared function `rollupCountsByDay(rows, { from, to })` (also used by the backfill). Only whole days are written as settled values; today's row is written too but is provisional and the pages never include it in a total. **A day is final when it leaves the 30-day horizon**, not after a fixed number of hours: until then every hourly run rewrites it.
+**Decision.** A scheduler job `kpi-daily-rollup`, registered with `scheduler.register` beside the existing jobs in `server.js`, `intervalMs` 1 hour, `leaseMs` 10 minutes. Each run makes **one** instance-wide read, exactly the one the public page makes: `loadDispatchHistory(dispatchHistory, { since: readHorizonStart(now) })`, so `[readHorizonStart(now), now)`. It partitions the rows by `urlKey`, groups each workspace's rows once with `groupDispatchLineages`, and `$set`s **every UTC day inside that horizon** for that workspace from that one grouping, through the shared function `rollupCountsByDay(rows, { from, to })` (also used by the backfill). Only whole days are written as settled values; today's row is written too but is provisional and the pages never include it in a total. **A day is final when it leaves the 30-day horizon**, not after a fixed number of hours: until then every hourly run rewrites it.
 
-**Reason.** `status`/`statusMs` come from the latest terminal marker across a lineage's rows, and follow-up rows arrive days after the first terminal. A day's count is therefore only settled once no later row can still change it, and the only bound we have on "later rows" is the read horizon the public figures themselves use. Reading the same range with the same grouping and the same `statusMs` rule as the public `daily.done` makes the equality with it hold by construction (decision 4), and it is one bounded read per workspace per run, not several. The scheduler's lease gives the once-per-interval guarantee across instances.
+**Reason.** `status`/`statusMs` come from the latest terminal marker across a lineage's rows, and follow-up rows arrive days after the first terminal. A day's count is therefore only settled once no later row can still change it, and the only bound we have on "later rows" is the read horizon the public figures themselves use. Reading the same range with the same grouping and the same `statusMs` rule as the public `daily.done` makes the equality with it hold by construction (decision 4), and it is one bounded read per run, not one per workspace and not several. Taking the workspaces from the rows read means the job needs no workspace list, so it never runs a lifetime `distinct('urlKey')`. A workspace with no rows in the horizon gets no row, which decision 8 treats as a zero inside the rolled-up range. The scheduler's lease gives the once-per-interval guarantee across instances.
 
 **Frozen day, not frozen at end of day.** A rule that settles day D from rows dispatched up to the end of D is wrong. A lineage that reaches `done` on D and again on D+5 would be counted on D (rows up to end(D)) and again on D+5, but the public `daily.done` counts it once, on D+5. The settle window for D must extend past D.
 
 **Stated limits.**
 
-- A lineage that re-terminates more than 30 days after an earlier terminal is counted twice: once on the earlier day (frozen when it left the horizon) and once on the later day. The public figures cannot see the earlier terminal either, so this is a limit of the horizon, not of the rollup.
+- A lineage whose next terminal is recorded after day D has left the horizon is counted twice: once on D and once on the later day. D freezes at the last run with `readHorizonStart(now) ≤ start(D)`, which is about `start(D) + 30 days`, so this covers a terminal as little as about 29 days after a terminal late on D, and a follow-up row dispatched inside the window that terminates after the freeze. The public figures cannot see the earlier terminal either, so this is a limit of the horizon, not of the rollup.
 - Rows dispatched before the horizon are not read, so a lineage's abort harvested from a row outside the window is missed. The public figures have the same limit; the default is to match them. The build ticket adds a characterization test for it.
-- A run that falls behind (job down for days) leaves days inside the horizon at their last value; the next run corrects every day still inside it. A day that left the horizon while the job was down is repaired by the backfill (decision 5).
+- A run that falls behind (job down for days) leaves days inside the horizon at their last value; the next run corrects every day still inside it. A day that left the horizon while the job was down is repaired by the backfill over just that range, with `--from`/`--to` (decision 5).
 
 ### 3. Idempotence
 
@@ -64,13 +64,13 @@ Checked at Harbour origin/main `8f39afd8`.
 
 **Reason.** One rule, one read range and one grouping for both sources is what makes the total and the trend agree. Counting on the dispatch day instead would shift counts across days. A null `statusMs` has no day to belong to, and guessing one would make the figures differ from the public page.
 
-**History each run reads.** One read per workspace per run over `[readHorizonStart(now), now)`, the 30-day horizon the existing workspace KPI read already uses. It is run once an hour per workspace, and with the `{ urlKey: 1, dispatchedAt: 1 }` index it is bounded by the workspace's last 30 days, not its lifetime. It is not all history.
+**History each run reads.** One instance-wide read per run over `[readHorizonStart(now), now)`, the same call the public page makes, partitioned by `urlKey` in memory. It runs once an hour and is bounded by the last 30 days of dispatch history, not its lifetime. It is not all history. (The per-day backfill reads are workspace-scoped and rely on the `{ urlKey: 1, dispatchedAt: 1 }` index, decision 5.)
 
 **A lineage that terminates twice.** A lineage that reaches `done` on D and again on D+5 is counted **once, on D+5**, because the grouping sees both terminals and `statusMs` is the latest. While D is inside the horizon, D's row is rewritten without it. This is the case the build ticket's equality test must include.
 
 ### 5. Backfill
 
-**Decision.** `scripts/backfill-kpi-daily-rollup.mjs`, an operator script. `--dry-run` is the default; writing needs `--write` and is never the default.
+**Decision.** `scripts/backfill-kpi-daily-rollup.mjs`, an operator script. `--dry-run` is the default; writing needs `--write` and is never the default. Optional `--from YYYY-MM-DD` and `--to YYYY-MM-DD` (UTC days, inclusive) limit the walk to that day range, so a repair after job downtime does not re-walk all history. `--from` defaults to each workspace's oldest record day and `--to` to the day before the job's first whole day; `--from` after `--to` is an error, and a day outside the allowed range is refused rather than clamped.
 
 The backfill must reproduce what the job would have written when day D left the horizon. The job's last write of D is from the last run in which D is wholly inside the horizon, which reads rows dispatched in `[start(D), start(D) + 30 days)`. So the window for D **extends past D**; it does not stop at `end(D)`.
 
@@ -100,7 +100,7 @@ The backfill must reproduce what the job would have written when day D left the 
 
 ### 8. Gap or zeros
 
-**Decision (final).** A missing early period shows as a **gap**, not zeros, with a caption naming the start date ("No data before 3 Mar 2026"). Within the rolled-up range, a day with no row is a true zero (the job writes a row for each workspace day it computed, including all-zero days for workspaces that existed).
+**Decision (final).** A missing early period shows as a **gap**, not zeros, with a caption naming the start date ("No data before 3 Mar 2026"). Within the rolled-up range, a day with no row is a true zero (the job writes a row for each day in the horizon for every workspace that has dispatch rows in the horizon, including all-zero days among them; a workspace with no rows in the horizon gets no row, and reads as zero within the rolled-up range).
 
 **Reason.** Zeros before the start would claim that nothing finished when we simply have no record, and would make the total look flat where it is unknown. A gap with a caption is accurate. This confirms the ticket's default.
 
@@ -138,7 +138,7 @@ One ticket, one PR, after the operator approves this note.
 
 **Files.**
 
-- `lib/kpi-daily-rollup.js` (new): pure `rollupCountsByDay(rows, { from, to })` over `groupDispatchLineages`, shared by the job and the backfill; `runKpiDailyRollup({ ... })` for the job (one horizon read per workspace); the upsert.
+- `lib/kpi-daily-rollup.js` (new): pure `rollupCountsByDay(rows, { from, to })` over `groupDispatchLineages`, shared by the job and the backfill; `runKpiDailyRollup({ ... })` for the job (one instance-wide horizon read per run, partitioned by `urlKey`); the upsert.
 - `lib/kpi-stats.js`: optional `until` in `loadDispatchHistory`/`dispatchHistoryPipeline`; the public rollup `aggregate` (decision 9); new public leaf and its `PUBLIC_LEAF_REGISTRY` entry.
 - `lib/workspace-kpi-stats.js`: the workspace's rollup read.
 - `lib/db-indexes.js`: unique `{ urlKey: 1, day: 1 }` on `kpi-daily-rollup`, and `{ urlKey: 1, dispatchedAt: 1 }` on `dispatch-history`, each with a `reason`.
@@ -154,10 +154,10 @@ One ticket, one PR, after the operator approves this note.
 - **Follow-up terminal:** a lineage that reaches `done` on D and again on D+5 (a follow-up row), and one that is `failed` on D and `done` later, are each counted once, on the later day. A same-day-only seed would pass under the wrong design, so this case is required.
 - Idempotence: running the job twice, and job then backfill, leave one row per `{urlKey, day}` with equal counts.
 - Equality: the last 30 days of the public total equal `sum(daily.done)` on a seeded payload that includes the follow-up-terminal lineages above.
-- Job window: one horizon read per workspace per run, via the same range as the public page.
+- Job window: one instance-wide horizon read per run, the same call as the public page, partitioned by `urlKey`; no `distinct` or other lifetime read.
 - Registry: the new leaf is classified (the existing walk test fails without it); the public payload carries no `urlKey`.
 - Reads pin: the single new entry, and unchanged existing entries.
-- Backfill: default is dry-run and writes nothing; `--write` writes; the oldest record is printed; every query is bounded on both sides and its window extends past D; the backfill output for a day that left the horizon equals the job's last write for it.
+- Backfill: default is dry-run and writes nothing; `--write` writes; `--from`/`--to` limit the walk to that inclusive day range, and `--from` after `--to` fails; the oldest record is printed; every query is bounded on both sides and its window extends past D; the backfill output for a day that left the horizon equals the job's last write for it.
 - Toggle: default rate; switching; `destroy()` leaves no listeners; no toggle without `total`; cost chart has none.
 - Run `npm run test:unit`; leave e2e to CI.
 
