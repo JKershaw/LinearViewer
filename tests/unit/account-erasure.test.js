@@ -1010,11 +1010,16 @@ describe('runbook (LIN-3423)', () => {
     assert.match(map, /\.\.\/runbooks\/account-erasure\.md/);
   });
 
-  test('lib/account-erasure.js lands in the Auth, accounts & workspaces code-shape area, ahead of Other features', () => {
+  test('lib/account-erasure.js lands in the Platform & plumbing code-shape area (an operator data tool, LIN-3708), ahead of Auth and Other features', () => {
     const areas = JSON.parse(readFileSync(join(ROOT, 'scripts/code-shape/areas.json'), 'utf8'));
     const list = areas.areas || areas;
     const hits = list.filter((a) => (a.match || []).some((m) => new RegExp(m).test('lib/account-erasure.js'))).map((a) => a.name);
-    assert.strictEqual(hits[0], 'Auth, accounts & workspaces');
+    assert.strictEqual(hits[0], 'Platform & plumbing');
+    // First match wins: the Auth pattern (account-[^/]*) also matches this file, so Platform must stay ahead of it.
+    assert.ok(hits.includes('Auth, accounts & workspaces'));
+    // lib/public-origin.js stays in Auth: Runs imports it, but Auth does not import Runs because of it.
+    const originHits = list.filter((a) => (a.match || []).some((m) => new RegExp(m).test('lib/public-origin.js'))).map((a) => a.name);
+    assert.strictEqual(originHits[0], 'Auth, accounts & workspaces');
   });
 });
 
