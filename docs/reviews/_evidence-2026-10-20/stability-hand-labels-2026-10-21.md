@@ -7,8 +7,10 @@ Labeller: the report-writing session; one pass, not independently double-labelle
 
 **Result: 52 C of 171 = 30.4%.** Broad title classifier on the same 171: 8 (4.7%).
 
-Prior-window comparison was **not** labelled: 80% of prior-30 landings (312/391) carry a `Merge pull request ... branch-name` subject, which cannot be
-labelled from the subject. See the report's `corrective-vs-additive-ratio` finding.
+Prior-window comparison was **not** labelled in this census. The prior windows' PR titles are available in git (body line 1 of each
+`Merge pull request` landing), so they could be labelled; the comparable prior-window hand-labels are the seed-42 samples carried from the
+LIN-3743 research comment (about 17% / 18% / 20% for baseline / prior-30 / since). This census uses a more liberal rule than those samples, so
+its 30.4% is not comparable with them. See the report's `corrective-vs-additive-ratio` finding (F8).
 
 | label | landing |
 |---|---|

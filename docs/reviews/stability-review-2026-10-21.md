@@ -21,17 +21,20 @@ is a short window. Two open questions are answered explicitly in the headline.
 2. **Method delta 1 (stated): `experiments/` joins the research bucket.** It was born 10-16 (570 files, ≈521k
    lines) and the 10-12 filter does not name it, so left in "src" it would read as ≈533k lines in W42. It was
    empty before 10-16, so prior windows are unchanged.
-3. **Windows.** *Baseline* 05-26..06-25 (358 landings in this run's count). *Prior-30* 09-12..10-12 (391).
+3. **Windows.** *Baseline* 05-26..06-25 (322 landings; the end date is exclusive, committer date). *Prior-30* 09-12..10-12 (391).
    *Since-last-run* 10-12..HEAD (171 by date; **30 of them landed on 10-12 at or before `6be148a8`, the 10-12 report's own HEAD, so `6be148a8..HEAD` is 141**; every "since 10-12" figure here carries that ≈21% overlap and the rates use 9–10 days, not a re-cut). *Rolling-30* 09-21..HEAD (487). **Rolling-30 overlaps prior-30 by 21 days
    and overlaps the 10-12 report's own window**, so it cannot be read as an independent point. Weekly rows use ISO
    weeks by committer date; **W43 is ≈2.5 days and is partial.**
 4. **"Src lines" = lines added in the src bucket**, unless a row says added+deleted. (The 10-12 report's
    "35.8k src lines/wk" is not exactly reproduced under either definition; this run's added-only 7-day blocks are 23.2k and 18.7k. Compare only within this report's own numbers.)
-5. **Method delta 2 (stated): the title classifier is no longer comparable across the 10-12 boundary.**
-   The broad classifier is unchanged, but the *landing form* changed. **312 of 391 (80%) prior-30 landings carry a
-   `Merge pull request … branch-name` subject**, against 155/358 (43%) in the baseline and 1/171 (1%) since
-   10-12. A title classifier on a git subject therefore reads a PR *title* in one window and a *branch slug* in the
-   other. See finding F8. This is the 10-12 report's own "method artefact" warning, one level deeper.
+5. **Corrective classifier: the 10-12 method, applied as written (no method delta).** The 10-12 report's decision 4
+   applies the broad classifier to "the PR title for merge landings, else the subject". The *landing form* differs
+   by window: `Merge pull request … from <branch>` landings are 138/322 (43%) of the baseline, **287/391 (73%) of
+   prior-30** and 1/171 since 10-12 (a further 25 prior-30 landings use `Merge PR #N: <title>`, which already
+   carries the title). Every one of the 287 carries its PR title on body line 1
+   (`git log -1 --format=%b <sha> | head -1`), so the classifier here reads that title, not the branch slug.
+   Read on the raw subject instead, prior-30 would show 15 corrective landings rather than 21, a form artefact
+   of 6 landings. See finding F8.
 6. **SD** is measured in landings with the same method; SD has no stability baseline of its own before 10-12.
 7. **Not re-run by this session (carried from the LIN-3743 research comment, marked "carried" where used):**
    open-ticket counts for the stagnation topics; the seed-42 sample labels; the 17-product-rebuild landing list
@@ -72,7 +75,7 @@ is a short window. Two open questions are answered explicitly in the headline.
   (3580), task-page loader (3590), dispatch entrance (3592 → 3604 → 3611), KPI collector (3591), workspace-API
   router (3596), `/kpis` page (3703), free-tier allowance (3706). The papers programme (Theseus, rebuild ladder,
   rebuild round, "consolidate, then rebuild") landed the same days.
-* **Experiment arms landed on main.** `jira/adf.js`: three consecutive whole-file rewrites (see headline).
+* **Experiment arms landed on main.** `jira/adf.js`: three whole-file rewrites in two days (see headline).
   `lib/dispatch-entrance.js` was *created* at +1642 lines in LIN-3604 and then rewritten +1130/−1038 in LIN-3611
   the same day.
 * **It is convergent in effect.** The hubs shrank: `routes/workspace-api.js` 4,673 → 3,782,
@@ -100,9 +103,13 @@ is a short window. Two open questions are answered explicitly in the headline.
 * **CI median wall time on main** (`gh run list --workflow test.yml`, successful runs, `updatedAt − startedAt`):
   10-11 5.3, 10-12 5.5, 10-16 5.8, 10-17 5.5, 10-18 6.5, 10-19 6.7, **10-20 6.9 min**; the 10-12 report had
   W38 4.1 → W42 5.7. Raw data: `_evidence-2026-10-20/stability-ci-main-runs-2026-10-21.json`.
-  **Caveat:** the daily median rises on the days with the most runs (35 / 43 / 28 runs on 10-18/19/20 against 5–13
-  mid-month). **The 10-19..10-20 points sit inside the MongoDB 8.0 / kernel 6.19+ CI incident (F14)**, whose failed
-  and re-run jobs plausibly inflate both run counts and medians; the series cannot separate suite size, load and incident.
+  **The rise is a step on 10-18, not a drift, and the MongoDB incident (F14) did not cause it.** Splitting the
+  successful runs (1 non-success in 300) at the incident boundaries: before 10-18 median **5.27** min (n = 193);
+  10-18 up to the incident start (10-19 18:15Z) **6.52** (n = 68); inside the incident window (to 20:05Z, #1990)
+  n = **2**; after the fix **6.94** (n = 36). The step predates the incident and persisted after it. Incident
+  failures took about 12 s and are not successes, so they never enter these medians. Load does not explain it
+  either: 10-11 and 10-12 had 34 and 29 runs at 5.3 and 5.5 min. **Cause not identified** (suite growth against a
+  runner-image change); the evidence cannot separate those two.
 * `tests/unit`: 810 → 890 files, 286,764 → 308,964 lines (**+7.7%**) while src JS grew +1.8% (≈180.0k → 183.2k
   by the 10-12 report's src count; this run's `*.js/*.mjs` outside tests/docs/experiments counts 219k at HEAD, a
   different file set, so the two src figures are not mixed).
@@ -114,6 +121,10 @@ is a short window. Two open questions are answered explicitly in the headline.
 * Landings touching `docs/reviews/**`: 3.5/wk (prior-30) → **7.0/wk**. Governance-shaped landings (periodical
   reports, area-map moves, census/seams/code-shape kits, found by title + path): 4.9/wk (5%) → **15.4/wk (13%)**
   (baseline 7.7/wk, 9%). `docs/reviews` lines added: 16.3k/wk → 31.1k/wk.
+* **Title-scan check (close-out).** The governance title scan was re-run reading merge landings by their body-line-1
+  PR title instead of the subject (73% of prior-30 subjects are branch slugs). The prior-30 count moves by +2 of 391
+  landings (a reconstructed scan reads 20 → 22, about 4.7 → 5.1/wk, against the 4.9/wk above); the since-10-12 count is
+  unchanged. The rise is roughly threefold under either reading, so the delta stays **new / rising**.
 * Five "area map" landings in two days (LIN-3708/3716/3720/3729/3730) followed the 10-20 Seams & Tangles run.
   Drift & Coherence has had editions on 10-11, post-batch, 10-12, 10-18 and 10-19.
 * Reading: the governance layer is adding churn of its own and is not yet settling. Not a defect; a rate to watch.
@@ -145,19 +156,25 @@ Touches since 10-12 (landings), lines at HEAD:
 | `lib/render-legal.js` | 7 | — | Terms/Privacy truth pass (LIN-3414/3390/3637/3423). Expected, one-off. |
 | `lib/account-erasure.js` | new (LIN-3423) | — | new; not judged. |
 
-### F8 — `corrective-vs-additive-ratio` · Severity: Low · **method broken, not a trend**
+### F8 — `corrective-vs-additive-ratio` · Severity: Low · **classifier has low recall, not a trend**
 
-* Broad title classifier (10-12 method): baseline **7.8%** (28/358), prior-30 **3.8%** (15/391), since **4.7%**
-  (8/171). On *non-merge-titled* landings only: 13/203 = 6.4%, 7/79 = 8.9%, 7/170 = 4.1%.
-* **These series cannot be compared**: the prior-30 titles are 80% branch slugs (decision 5). The mint lead
-  "≈4% against ≈8.5% before" is a title-style artefact.
-* **Hand-labelled census of all 171 since-10-12 landings: 52 C = 30.4%** (liberal rule, counts security gap-closes
-  and runner/SD agreement fixes; `_evidence-2026-10-20/stability-hand-labels-2026-10-21.md`). Single labeller,
-  one pass. The research comment's seed-42 sample gave ≈20% (carried, not re-run). The 10-point spread between two
-  hand-label passes is itself the uncertainty. **This run could not re-label prior windows from git subjects**, so
-  it does not claim "flat"; it claims *the corrective share is of the order 20–30% when read by behaviour, not 4%*.
-  A trend call needs PR titles from the GitHub API for the merge-subject windows (outside this review's toolset).
-* **SD:** 9 landings, 1 broad-corrective (11%), prior-30 4/34 (11.8%). Unchanged.
+* Broad title classifier (10-12 method, run on PR titles: body line 1 for `Merge pull request` landings, decision 5):
+  baseline **11.2%** (36/322), prior-30 **5.4%** (21/391), since **4.1%** (7/171). Re-run and reproduced at close-out.
+* **The classifier cannot carry the trend, because of its recall.** Agent-written titles now state behaviour ("must
+  not", "no longer", "instead of", "refuse …") instead of saying "fix". Precision since 10-12 is 6 of 7, but a
+  hand-label of all 171 titles finds about 34 fault-correction landings (≈20%), so the classifier catches roughly a
+  fifth of them. The fall from 11.2% to 4.1% is mostly title style, the same kind of artefact the 10-12 report found
+  in the baseline's "0.4%". The mint lead "≈4% against ≈8.5% before" reads that fall as a trend.
+* **Hand-labelled series (carried from the LIN-3743 research comment, not re-run here):** seed-42 samples of n = 60 per
+  window under one rubric give baseline **≈17%**, prior-30 **≈18%**, since 10-12 **≈20%**: roughly flat. This is the
+  comparable measure, and it is a sample.
+* **Hand-labelled census of all 171 since-10-12 landings: 52 C = 30.4%** (`_evidence-2026-10-20/stability-hand-labels-2026-10-21.md`).
+  This run's rule is **liberal** (it counts security gap-closes and runner/SD agreement fixes) and differs from the
+  seed-42 rubric, so 30.4% is **not** comparable with the ≈17–20% series above. Single labeller, one pass. The ten-point
+  gap between the two passes on the same window is the uncertainty on the corrective share. Read by behaviour, the
+  share is of the order 20–30% in this window, not 4%.
+* **SD:** 9 landings, 1 broad-corrective (11%), prior-30 4/34 (11.8%). Unchanged (SD is squash-only in the window, so
+  its subjects are already titles).
 
 ### F9 — `runner-kit-convergence` (LV, NEW) and `lv-sd-contract-coupling` (NEW) · Severity: Low · watch
 
@@ -195,7 +212,7 @@ Re-run of the 10-12 query (src files with ≥ 4 landings in 04-01..06-25, presen
 **10 of 91** (10-12: 14 of 84). Members: `lib/harbour-spawn.js`, `lib/providers/registry.js`, `lib/render-custom-prompts.js`,
 `lib/render-next-run.js`, `public/collective.js`, `public/custom-prompts.css`, `public/next-run.css`,
 `public/next-run.js`, `public/prompts.css`, `public/roadmap.css`. Last touches 06-14..08-06; no landing touched
-them in the window, and the four "recommend/roadmap/next-run/collective/harbour-spawn" areas were not closed or
+them in the window, and the five "recommend/roadmap/next-run/collective/harbour-spawn" areas were not closed or
 parked by this review's evidence. Open-ticket counts (22/17/21/8/6) are carried from the research comment, not re-run.
 
 ### F13 — `true-reverts`, `file-growth-vs-rework`, `proxy-churn-concentration`, `prompt-cluster-coupling`
@@ -209,8 +226,8 @@ parked by this review's evidence. Open-ticket counts (22/17/21/8/6) are carried 
 
 From 10-19 18:15Z the `mongo:8.0` service container refused to start on new-kernel runners, failing "Unit tests" in about
 12 s and blocking `ci-success` on every PR until #1990 (10-19 20:05Z, pin `mongo:8.0.32` + `glibc.pthread.rseq=1`).
-Record: `docs/incidents/2026-10-19-mongodb-kernel-ci.md` (#2021). Rate-altitude relevance: it distorts the F3 CI series and it
-is a reminder that CI-environment change is a source of churn independent of code. Production is unaffected on host
+Record: `docs/incidents/2026-10-19-mongodb-kernel-ci.md` (#2021). Rate-altitude relevance: it does not explain the F3 CI rise
+(the step predates it, see F3), and it is a reminder that CI-environment change is a source of churn independent of code. Production is unaffected on host
 kernel 6.12.22; the latent risk (a host kernel moving into the range) is tracked under LIN-3698. Not otherwise judged here.
 A related smaller change, `package.json` moving `node --test` to `scripts/run-unit-tests.mjs`, was not examined.
 
@@ -230,7 +247,7 @@ in prior-30), test-enforced bookkeeping · **SD halt/auto-pause build-out (LIN-3
   directories:** only `experiments/` is new · **Reversal episodes:** 1 near-miss (`funnel-event-store`, 15 days);
   3 rewrite-in-place triples (adf.js, dispatch-entrance ×2 surfaces) · **LV↔SD pairs:** 4 ·
   **Unbounded:** ticket-label classification, CI time before 10-02 (older runs were not pulled), and corrective
-  share by behaviour for prior windows.
+  share by behaviour for prior windows (only the carried seed-42 samples exist, not a census).
 
 ## Trend Ledger
 
@@ -242,7 +259,7 @@ Severity: none / low / low–med / med / high. Delta vs 2026-10-12: new / unchan
 | `project-velocity-trajectory` | LV | overall shape | low–med | 141/104/98/73* landings; src added 23.2k→18.7k→≈20k/wk (7-day blocks); gross turnover ≈34k/wk, net ≈0 | amplitude settling, composition rewrite-shaped | **unchanged / mixed** |
 | `project-velocity-trajectory` | SD | overall shape | none | 6/6/5/4 landings/wk | converging | unchanged (improving) |
 | `route-boundary-coupling` (S3) | LV | change-coupling | low | W↔S 2.47→3.24 (n=5); hubs shrank | not judgeable at n≤5 | **unchanged** |
-| `test-suite-accretion` | LV | growth shape | low–med | tests +7.7% vs src +1.8%; CI median 5.3→6.9 min in 9 d (load-confounded) | not converging | **worsened** |
+| `test-suite-accretion` | LV | growth shape | low–med | tests +7.7% vs src +1.8%; CI median 5.3→6.9 min in 9 d, a step on 10-18 (5.27→6.52, before the incident; 6.94 after); cause not identified | not converging | **worsened** |
 | `research-eval-programme` | LV | excluded-path churn | **med** | `experiments/` +514k lines; papers+eval +29k; 8.4 research landings/wk | relocated and grew | **worsened (mint "collapsing" corrected)** |
 | `true-reverts` | LV + SD | rework | none | 0 since 10-12 | clean | **improved** |
 | `server-js-growth` (S2) | LV | surface rate | low | 12.9% of landings (16.4%); W43 14/73; 4,657 lines | share down, W43 pace up | **unchanged (slightly worse)** |
@@ -253,7 +270,7 @@ Severity: none / low / low–med / med / high. Delta vs 2026-10-12: new / unchan
 | `prompt-parity-coupling` (S4) | LV | change-coupling | none | resolved 10-12 | n/a | resolved (unchanged) |
 | `prompt-cluster-coupling` | LV | change-coupling | none | 20→3 landings (carried) | settling | improved |
 | `file-growth-vs-rework` | LV | growth shape | low | delete/add 0.80 vs 0.31; net +5.5k in 9 d | consolidation by in-place rewrite | **improved** |
-| `corrective-vs-additive-ratio` | LV | rework | low | title 4.7% not comparable (80% slug titles prior); hand census 30% | method broken | **unchanged (unmeasurable)** |
+| `corrective-vs-additive-ratio` | LV | rework | low | classifier 11.2→5.4→4.1% on PR titles, recall ≈20% so not a trend; hand-labelled ≈17–20% (sample) / 30% (census, liberal rule) | flat by hand-label | **unchanged** |
 | `corrective-vs-additive-ratio` | SD | rework | none | 1/9 since; 4/34 prior-30 | finishing | unchanged |
 | `docs-index-churn` | LV | bookkeeping | none | `source-map.md` 26 touches (48 prior-30) | settling | unchanged |
 | `periodic-loop-two-mechanisms` | LV | surface rate | none | `setInterval` at `server.js:4599`; scheduler untouched | not moving | unchanged |
@@ -265,7 +282,7 @@ Severity: none / low / low–med / med / high. Delta vs 2026-10-12: new / unchan
 
 \* W43 is ≈2.5 days. *Run at LV `f25aa127` / SD `bb1da78`. Next run: re-ground every row against HEAD; the
 questions that carry are (1) does gross src turnover fall back toward the added-line rate, and (2) does CI wall time
-stop rising once load is controlled.*
+stop rising, and what caused the 10-18 step (suite growth or a runner-image change).*
 
 ## Plain-language read for the maintainer
 
@@ -278,10 +295,11 @@ entrance three times in one day). The hubs got smaller, post-rebuild repair is l
 research programme, which has moved its bulk into a new `experiments/` folder (+514k lines in a week).
 
 Converging: the dispatch store and entrance, the proxy files, true reverts, SD (6 → 4 landings a week), and the
-prompt cluster. Not converging: CI time on main (5.3 → 6.9 minutes in nine days, though busy days confound it), the
+prompt cluster. Not converging: CI time on main (5.3 → 6.9 minutes in nine days, a step on 10-18 that the CI incident did not cause), the
 amount of governance work (reviews and area maps are 13% of landings, up from 5%), the LV runner kit, and the KPI
-code after its rebuild. The corrective share of work cannot be trended from git titles any more; read by behaviour
-it is roughly a fifth to a third of landings, not 4%.
+code after its rebuild. The corrective share of work cannot be trended from git titles any more, because the titles
+no longer say "fix"; read by behaviour it is roughly a fifth to a third of landings, not 4%, and a hand-labelled
+sample puts it flat at about 17–20% across the three windows.
 
 Options you might weigh (nothing is filed): decide whether `experiments/` belongs in the product repo at all;
 time-box the rebuild programme to a target list and let the rebuilt areas settle before the next wave; slow the
@@ -296,27 +314,48 @@ roadmap, next-run, collective and harbour-spawn areas. Your call.
 **Tier 2** (fresh-context sub-agent, no memory of the report-writing turn; given the report and both repos).
 **Question:** "What is the largest item in this window that this report missed or misfiled?"
 
-**Reader's answer (condensed from its verbatim reply; figures as it stated them):**
+**Reader's answer, verbatim** (retrieved at close-out from the sub-agent's transcript; the reader worked from an earlier
+draft of this report and a clone without the `_evidence-*` files):
 
-> **Largest item missed or misfiled: the 10-19..10-20 MongoDB 8.0 / Linux kernel 6.19+ CI incident**, documented in
-> `docs/incidents/2026-10-19-mongodb-kernel-ci.md` (6d3b5cfd, #2021). Mitigation #1990 pinned `mongo:8.0.32` with
-> `GLIBC_TUNABLES=glibc.pthread.rseq=1` (`test.yml` +12 lines). The report never mentions it and F3 attributes the 10-18/19/20
-> run counts and rising medians to "runner contention"; failed and re-run jobs from the incident are a likelier cause.
-> It is the only production-risk item in the window (latent: Railway runs 8.0.32). Smaller: `package.json` swapped `node --test`
-> for `scripts/run-unit-tests.mjs`.
+> **(1) Largest item missed or misfiled: the 10-19..10-20 MongoDB 8.0 / Linux kernel 6.19+ CI incident, and F3 misfiles it as runner load.**
+> - The incident is documented in `docs/incidents/2026-10-19-mongodb-kernel-ci.md`, landed as 6d3b5cfd (#2021, 10-20).
+> - Evidence: from 10-19 18:12Z, `mongo:8.0` refused to start on new-kernel runners, failing unit tests in about 12s and blocking every Harbour PR. This is the "CI wall time" window the report charts.
+> - Mitigation was #1990, merged 10-19 ~20:05Z. It pinned `mongo:8.0.32` plus `GLIBC_TUNABLES=glibc.pthread.rseq=1`, and changed `.github/workflows/test.yml` (+12 lines).
+> - It carries a latent production risk: Railway production runs 8.0.32 and would refuse to start if its host kernel moved into the affected range. That risk is tracked as LIN-3698, with an operator production probe (LIN-3697) and a bounty-thread answer.
+> - The report never mentions it. F3 blames "runner contention" for the run counts of 35/43/28 on 10-18/19/20 (and for the 6.7 and 6.9 min medians on 10-19 and 10-20). Re-runs and failed runs from the incident are a likelier cause, so the "load vs suite size" ambiguity is partly explained by something in git.
+> - It is also the only P1/production-risk item in the window. The report's "Not moving" list and Class completeness table don't list it either.
+> - A smaller miss in the same area: `package.json` swapped `node --test` for `scripts/run-unit-tests.mjs`, a CI runner change, which also goes unmentioned.
+> - This is not a larger line-count item than `experiments/`. By operational significance, though, it is the biggest thing the report omits.
 >
-> **Top finding: partly agree.** `experiments/` adds 513,993 lines over 570 files; the top src landings are all design-first
-> rebuilds (603853c5, 1f8010a0, 47d87055). F1 over F2 is a judgement call. Add the CI incident as its own finding.
+> **(2) Top finding: partly agree.**
+> - The data supports F1 and F2 as the dominant movements. `experiments/` adds 513,993 lines across 570 files since 6be148a8. The top src landings are all "rebuild design-first": 603853c5 (4,973 lines), 1f8010a0 (4,941), 47d87055 (3,909), then 2e8cba6e, d2d7d818 and others.
+> - Ranking F1 above F2 is a judgement call. F2 is the larger raw-volume movement and F1 is the larger behavioural shift, so the order is defensible.
+> - I would add the CI incident as a Medium-severity finding of its own, because it is the only item with production exposure.
 >
-> **Numbers:** correct: weekly landings 141/104/98/73; 171 by `--since`; tests/unit 810 → 890 files and 286,764 → 308,964 lines;
-> `experiments/` 570 files, +513,993; funnel-event-store 15 days. **Wrong:** "deleted by LIN-3632" (the deleting commit is `cb470984`,
-> LIN-3500). **Misleading:** "since 10-12 = 171" overlaps the prior run's HEAD (`6be148a8..HEAD` = 141), ≈21% too large;
-> `server.js` 22 by date vs 21 over `6be148a8..HEAD`. Not checkable: evidence files (not in its clone).
+> **(3) Number spot-checks.**
+> - Correct: weekly landings W40 141, W41 104, W42 98, W43 73. Total since 10-12 is 171 by `--since`.
+> - Correct: `tests/unit` 810 → 890 files, 286,764 → 308,964 lines.
+> - Correct: `experiments/` is 570 files and +513,993 lines (reported as +514k).
+> - Correct: `funnel-event-store.js` was added 10-03 (df9b1aae) and deleted 10-18, so 15 days.
+> - Wrong: "deleted 10-18 by LIN-3632". The deleting commit is cb470984, which is LIN-3500 (#1929). LIN-3632 (dca50589, #1989, 10-19) dropped the retired collection and its references. This also means the "1 near-miss, 15 days" attribution points at the wrong ticket.
+> - Wrong or misleading: "Since-last-run 10-12..HEAD (171)". The 10-12 report's own HEAD was 6be148a8 at 10-12 16:10. `6be148a8..HEAD` is 141 first-parent landings, and the other 30 are the same-day 10-12 landings the prior run already counted. Every "since 10-12" figure has a window about 21% too big. Examples: the 52/171 = 30.4% hand-label denominator and 9-day rates.
+> - Slightly off: `server.js` has 22 landings by date but 21 over `6be148a8..HEAD`. This is the same boundary overlap.
+> - Not checkable: the evidence files `_evidence-2026-10-20/*` (CI json, hand-label sheet) are not in this clone, so the 52/171 labels and CI medians could not be verified.
+> - Not checked: lines-deleted figures, lift values and the 17-rebuild list.
 
-**Response (verified against git before accepting):** all three confirmed. The incident is added as F14 and flagged in F3.
-The `funnel-event-store` attribution is corrected to LIN-3500. The window overlap is disclosed in the measurement decisions
-(figures were not re-cut; the 52/171 hand-label census therefore includes 30 landings from before the 10-12 report's HEAD).
-F1 stays the top finding on behaviour, with F2 and F14 recorded as the reader's challenges.
+**Response (verified against git before accepting):** two of the reader's three points were confirmed and one part was
+tested and **not** confirmed.
+
+* **Confirmed:** the `funnel-event-store` deletion is `cb470984` (LIN-3500), corrected in the headline; the
+  "since 10-12 = 171" count overlaps the 10-12 report's HEAD (`6be148a8..HEAD` = 141), disclosed in decision 3; the
+  incident exists and is recorded as F14. The 52/171 hand-label census therefore includes 30 landings from before the
+  10-12 report's HEAD.
+* **Not confirmed:** the reader's claim that the incident's failed and re-run jobs are the likelier cause of the rising CI
+  medians. Tested at close-out on the successful-run series (F3): median 5.27 min before 10-18 (n = 193), **6.52** from
+  10-18 to the incident start (n = 68), n = 2 inside the incident, **6.94** after #1990 (n = 36). The step predates the
+  incident and persisted after the fix, and incident failures (about 12 s, not successes) never enter the medians. The
+  incident is a real finding (F14) but does not explain the F3 rise.
+* F1 stays the top finding on behaviour, with F2 and F14 recorded as the reader's challenges.
 
 Adversarial second-read verdict: DISAGREE
 Differed from top finding: YES
