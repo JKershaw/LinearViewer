@@ -34,6 +34,7 @@ import { buildPromptFilename } from '../lib/prompt-formatters.js';
 import { attachProxyContext, isCodedGrantRefusal, codedGrantRefusalResponse } from '../lib/proxy-preamble.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { isRecommendationEnabled, getRecommendation, getRecommendationStream, getModelDisplayName, streamChat } from '../lib/openrouter.js';
+import { isRetryableRunLimit } from '../lib/plan-allowance.js';
 import { resolveChatCredential, isAiUnavailable, checkFreeTierGate, buildRunGate, isFlagFreeTier, freeTierRefusalBlock } from '../lib/chat-request.js';
 import { getModelCatalog, isFreeModel } from '../lib/openrouter-catalog.js';
 import { resolveRecommendation, armHopSignal } from '../lib/recommend-recurse.js';
@@ -738,7 +739,7 @@ function runLimitRefusal(err) {
   return {
     launched: false,
     code: limit.code,
-    retryable: limit.code === 'RUN_LIMIT_UNVERIFIED',
+    retryable: isRetryableRunLimit(limit.code),
     message: limit.error
   };
 }

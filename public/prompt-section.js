@@ -209,6 +209,22 @@
     return html;
   }
 
+  // The run allowance as the Go button and the run-step rung both read it
+  // (LIN-3706: one copy, was two). Browser code cannot import
+  // lib/plan-allowance.js, so the sentence stays a literal here. `runsUsed` null
+  // means the count was unreadable: no quota is claimed, so nothing is exhausted.
+  function runQuotaView(state) {
+    const quota = state.runQuota;
+    const quotaKnown = !!(quota && quota.runsUsed != null
+      && typeof quota.remaining === 'number' && typeof quota.limit === 'number');
+    return {
+      quota,
+      quotaKnown,
+      runsExhausted: quotaKnown && quota.remaining <= 0,
+      runLimitTitle: 'daily run limit reached \u00b7 resets at midnight UTC'
+    };
+  }
+
   /**
    * LIN-3341: the one-press Go. It is the PRIMARY action on the opened task in
    * EVERY phase (idle, generating, fresh, error) — Go does not need a prompt,
@@ -236,11 +252,7 @@
   function renderGo(opts, state) {
     const g = state.go || { status: 'ready' };
     const ready = goReady(opts);
-    const quota = state.runQuota;
-    const quotaKnown = !!(quota && quota.runsUsed != null
-      && typeof quota.remaining === 'number' && typeof quota.limit === 'number');
-    const runsExhausted = quotaKnown && quota.remaining <= 0;
-    const runLimitTitle = 'daily run limit reached \u00b7 resets at midnight UTC';
+    const { quota, quotaKnown, runsExhausted, runLimitTitle } = runQuotaView(state);
 
     let html = '<div class="opened-task-primary" data-go-slot>';
 
@@ -342,11 +354,7 @@
     // at load. It gates the run-step rung here and Go above (LIN-3239/LIN-3341);
     // copy and ✦ generation are never gated by it. `runsUsed` null means the
     // count was unreadable — nothing to show, and no limit to claim.
-    const quota = state.runQuota;
-    const quotaKnown = !!(quota && quota.runsUsed != null
-      && typeof quota.remaining === 'number' && typeof quota.limit === 'number');
-    const runsExhausted = quotaKnown && quota.remaining <= 0;
-    const runLimitTitle = 'daily run limit reached \u00b7 resets at midnight UTC';
+    const { quota, quotaKnown, runsExhausted, runLimitTitle } = runQuotaView(state);
     const runLimited = (rung, text) => `<button class="opened-task-rung opened-task-rung--setup" data-rung="${rung}" disabled title="${runLimitTitle}">${text} <span class="opened-task-setup">${runLimitTitle}</span></button>`;
     const rungs = [];
     // copy: with no prompt there is nothing to copy, and generating on a press
