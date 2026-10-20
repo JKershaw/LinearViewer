@@ -20,7 +20,7 @@ import { getFeatureFlags } from '../lib/feature-defaults.js';
  * @param {Object} deps
  * @param {Function} deps.workspaceFromUrl
  * @param {Object} deps.collections - dispatchQueue, dispatchHistory, proxyEvents,
- *   agentStatus, reportHistory, customPrompts, closeOutEvents
+ *   agentStatus, reportHistory, customPrompts, closeOutEvents, kpiDailyRollup
  * @param {() => Date} [deps.now]
  */
 export function createWorkspaceKpisRoutes({ workspaceFromUrl, collections, now = () => new Date() }) {

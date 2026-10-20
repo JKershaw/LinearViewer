@@ -253,3 +253,28 @@ p.kpi-chart-empty {
 .kpi-numbers-wrap th {
   font-weight: 600;
 }
+
+/* LIN-3732: the running-total note is hidden until the total view shows it; the
+   flex above would otherwise beat the [hidden] attribute. */
+.kpi-chart-empty[hidden] { display: none; }
+
+/* The rate/total toggle on the tasks-finished chart. */
+.rate-total-toggle {
+  display: flex;
+  gap: var(--space-1, 0.25rem);
+  margin: 0 0 var(--space-2, 0.5rem);
+}
+.rate-total-toggle button {
+  font: inherit;
+  font-size: 0.8rem;
+  padding: var(--space-1, 0.25rem) var(--space-2, 0.5rem);
+  color: var(--fg-dim);
+  background: none;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.rate-total-toggle button[aria-pressed="true"] {
+  color: var(--fg);
+  font-weight: 600;
+}

@@ -90,6 +90,47 @@ test.describe('LIN-3689 — workspace KPIs page (e2e)', () => {
     }
   });
 
+  // LIN-3732: the running total, A's rows only. Seeded 35+ days back (UTC), outside
+  // the daily job's rewrite range, so the job leaves them alone.
+  test.describe('running total', () => {
+    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const daysBack = n => new Date(Date.now() - n * 86400000);
+    const dayKey = n => daysBack(n).toISOString().slice(0, 10);
+    const label = n => `${daysBack(n).getUTCDate()} ${MONTHS[daysBack(n).getUTCMonth()]} ${daysBack(n).getUTCFullYear()}`;
+    const seed = (page, key, n, done) => page.request.get(`/test/seed-kpi-rollup?urlKey=${key}&day=${dayKey(n)}&done=${done}`);
+
+    test.afterEach(async ({ page }) => {
+      for (const key of [keyA, keyB]) await page.request.get(`/test/clear-kpi-rollup?urlKey=${key}`);
+    });
+
+    test('A ignores B, the toggle goes both ways, and clearing A\'s rows shows the empty note', async ({ page }) => {
+      await dispatch(page, keyA, 'implementation', 1);
+      await seed(page, keyA, 40, 2);
+      await seed(page, keyA, 38, 3);
+      await seed(page, keyB, 50, 7);
+
+      await page.goto(`/workspace/${keyA}/kpis`);
+      await expect(page.locator('[data-testid="workspace-kpis-done-since"]')).toContainText(`Tasks done since ${label(40)}: 5`);
+      const data = await page.evaluate(() => window.__WORKSPACE_KPI_DATA__);
+      expect(data.doneTotal.done.slice(0, 3)).toEqual([2, 0, 3]);
+
+      const toggle = page.locator('[data-testid="workspace-kpis-toggle-done-per-day"]');
+      const caption = page.locator('[data-testid="workspace-kpis-total-caption"]');
+      await expect(toggle.locator('button[data-mode="rate"]')).toHaveAttribute('aria-pressed', 'true');
+      await toggle.locator('button[data-mode="total"]').click();
+      await expect(caption).toBeVisible();
+      await expect(workspaceKpis(page).chart('done-per-day')).toBeVisible();
+      await toggle.locator('button[data-mode="rate"]').click();
+      await expect(caption).toBeHidden();
+
+      await page.request.get(`/test/clear-kpi-rollup?urlKey=${keyA}`);
+      await page.goto(`/workspace/${keyA}/kpis`);
+      await expect(page.locator('[data-testid="workspace-kpis-done-since"]')).toHaveCount(0);
+      await page.locator('[data-testid="workspace-kpis-toggle-done-per-day"] button[data-mode="total"]').click();
+      await expect(page.locator('[data-testid="workspace-kpis-total-empty"]')).toBeVisible();
+    });
+  });
+
   // LIN-3711: trend charts. Done and priced lineages cannot be created through
   // the app's dispatch API (a `[done]` marker and a usage entry arrive from the
   // runner), so those series are covered by tests/unit/workspace-kpi-stats.test.js
@@ -128,7 +169,9 @@ test.describe('LIN-3689 — workspace KPIs page (e2e)', () => {
       // The other two have nothing to draw yet: the page script swaps the canvas
       // for a note that fills the same sized box.
       for (const name of ['done-per-day', 'cost']) {
-        const note = workspaceKpis(page).section(name).locator('.kpi-chart-empty');
+        // LIN-3732: done-per-day also holds a hidden total-empty note, so look inside the toggle's view only.
+        const scope = name === 'done-per-day' ? workspaceKpis(page).section(name).locator('[data-testid="workspace-kpis-toggle-done-per-day"]') : workspaceKpis(page).section(name);
+        const note = scope.locator('.kpi-chart-empty');
         await expect(note).toBeVisible();
         const b = await note.boundingBox();
         expect(b.height).toBeGreaterThan(0);

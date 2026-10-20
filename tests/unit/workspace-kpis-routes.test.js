@@ -28,7 +28,8 @@ function freshCollections() {
     agentStatus: db.collection('foreman-status'),
     reportHistory: db.collection('report-history'),
     customPrompts: db.collection('custom-prompts'),
-    closeOutEvents: db.collection('close-out-events')
+    closeOutEvents: db.collection('close-out-events'),
+    kpiDailyRollup: db.collection('kpi-daily-rollup')
   };
 }
 
@@ -97,6 +98,21 @@ describe('GET /workspace/:urlKey/kpis', () => {
     assert.match(res.text, /data-testid="workspace-kpis-card-merge-time"/);
     assert.match(res.text, /median 4h · p90 6h/);
     assert.match(res.text, /n = 3 merges · 30d/);
+  });
+
+  test('LIN-3732: the since line and embedded total come from this workspace\'s rollup rows only', async () => {
+    const collections = freshCollections();
+    await collections.dispatchHistory.insertOne({ urlKey: 'ws-a', status: 'expired', kind: 'implementation', dispatchedAt: new Date('2026-06-09T09:00:00Z') });
+    const day = (urlKey, d, done) => ({ urlKey, day: d, done, failed: 0, aborted: 0, dispatches: 0 });
+    await collections.kpiDailyRollup.insertMany([
+      { _id: 'last-complete-day', through: '2026-06-09' },
+      day('ws-a', '2026-04-02', 2), day('ws-a', '2026-04-04', 3), day('ws-b', '2026-03-01', 50)
+    ]);
+    const res = await get(build(settingTo('ws-a', 'Alpha'), collections), '/workspace/ws-a/kpis');
+    assert.equal(res.status, 200);
+    assert.match(res.text, /data-testid="workspace-kpis-done-since"[^>]*>Tasks done since 2 Apr 2026: 5</);
+    assert.match(res.text, /"doneTotal":\{"since":"2026-04-02","through":"2026-06-09","done":\[2,0,3,/);
+    assert.doesNotMatch(res.text, /1 Mar 2026/);
   });
 
   test('a workspaceFromUrl that ends the response means the handler never runs', async () => {

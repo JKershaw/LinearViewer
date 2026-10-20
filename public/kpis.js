@@ -6,7 +6,8 @@
  * charts for work landed and resolved weekly, tasks finished daily and proxy
  * calls, the dispatch kinds and milestone funnel charts, a sparkline on three
  * stat cards, and the table inside each "Show the numbers" disclosure. A chart
- * with nothing to draw swaps its canvas for a short note.
+ * with nothing to draw swaps its canvas for a short note. The tasks-finished
+ * chart also switches between the daily rate and a running total (LIN-3732).
  *
  * The small-count floor lives on the server. A hidden count arrives here as an
  * object ({ hidden }) rather than a number, and its text row is already in the
@@ -157,20 +158,73 @@
     return [week, done[i], failed[i], aborted[i], outcomes.weeklyResolved[i]];
   }));
 
-  // Tasks finished per day: a rate, counted on the day the agent marked done.
   const dayLabels = phases.days.map(monthDay);
-  charts.draw('done-daily', total(view.daily.done), '○ nothing finished yet', function (canvas, tools) {
-    return {
-      type: 'bar',
-      data: { labels: dayLabels, datasets: [{ data: view.daily.done, backgroundColor: tools.ink.green }] },
-      options: {
-        plugins: { legend: { display: false } },
-        scales: {
-          x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } },
-          y: { beginAtZero: true, grid: { color: tools.ink.grid }, ticks: { precision: 0 } }
-        }
-      }
-    };
+  // Rate view: tasks done per day, counted on the day the agent marked done.
+  // Total view: the running total, a cumulative line of `doneTotal.done` from
+  // `since` (LIN-3732). Each view is drawn fresh into the emptied view element.
+  const doneTotal = view.doneTotal;
+  const byTestId = function (id) {
+    return document.querySelector('[data-testid="' + id + '"]');
+  };
+  const showWhile = function (el) {
+    if (el) el.hidden = false;
+    return function () { if (el) el.hidden = true; };
+  };
+  const drawInto = function (viewEl, amount, note, build) {
+    const wrap = document.createElement('div');
+    wrap.className = 'kpi-chart-canvas';
+    const canvas = document.createElement('canvas');
+    canvas.id = 'chart-done-daily';
+    canvas.dataset.emptyClass = 'kpi-chart-empty';
+    wrap.appendChild(canvas);
+    viewEl.appendChild(wrap);
+    const chart = charts.draw('done-daily', amount, note, build);
+    return function () { if (chart) chart.destroy(); };
+  };
+  const dayAfter = function (dayKey, n) {
+    const at = new Date(dayKey + 'T00:00:00Z');
+    at.setUTCDate(at.getUTCDate() + n);
+    return at.toISOString().slice(0, 10);
+  };
+  const toggleMount = byTestId('kpis-toggle-done-daily');
+  const toggle = charts.rateTotalToggle(toggleMount, {
+    labels: { rate: 'Per day', total: 'Running total' },
+    rate: function (viewEl) {
+      return drawInto(viewEl, total(view.daily.done), '○ nothing finished yet', function (canvas, tools) {
+        return {
+          type: 'bar',
+          data: { labels: dayLabels, datasets: [{ data: view.daily.done, backgroundColor: tools.ink.green }] },
+          options: {
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } },
+              y: { beginAtZero: true, grid: { color: tools.ink.grid }, ticks: { precision: 0 } }
+            }
+          }
+        };
+      });
+    },
+    total: function (viewEl) {
+      if (!doneTotal) return showWhile(byTestId('kpis-total-empty'));
+      const showCaption = showWhile(byTestId('kpis-total-caption'));
+      let sum = 0;
+      const running = doneTotal.done.map(function (n) { sum += n; return sum; });
+      const days = doneTotal.done.map(function (n, i) { return dayAfter(doneTotal.since, i); });
+      const destroyChart = drawInto(viewEl, running.length, '○ no running total yet', function (canvas, tools) {
+        return {
+          type: 'line',
+          data: { labels: days, datasets: [{ data: running, borderColor: tools.ink.green, backgroundColor: tools.ink.green, borderWidth: 2, pointRadius: 0, tension: 0 }] },
+          options: {
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } },
+              y: { beginAtZero: true, grid: { color: tools.ink.grid }, ticks: { precision: 0 } }
+            }
+          }
+        };
+      });
+      return function () { destroyChart(); showCaption(); };
+    }
   });
   numbers('done-daily', ['day', 'finished'], phases.days.map(function (day, i) { return [day, view.daily.done[i]]; }), true);
 

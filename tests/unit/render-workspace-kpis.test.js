@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { renderWorkspaceKpisPage } from '../../lib/render-workspace-kpis.js';
+import { ROLLUP_LOOKBACK_DAYS } from '../../lib/kpi-daily-rollup.js';
 
 const totals = { agentActions: 5, dispatches: 4, autopilotRuns: 1, feedbackNotes: 2 };
 
@@ -17,6 +18,7 @@ const daily = (overrides = {}) => ({
   autopilotRuns: series(0, 1),
   agentActions: series(3),
   done: series(0, 1),
+  doneTotal: { since: '2026-03-03', through: '2026-06-09', done: [4, 0, 2], total: 412 },
   runsByKind: {
     weeks: ['2026-05-14', '2026-05-21', '2026-05-28', '2026-06-04'],
     kinds: [{ label: 'implementation', counts: [1, 0, 2, 0] }, { label: 'other', counts: [0, 1, 0, 0] }]
@@ -99,11 +101,14 @@ test('renders the three trend sections with canvas, disclosure and table each', 
   const html = render(stats());
   for (const name of SECTIONS) {
     assert.ok(has(html, `workspace-kpis-section-${name}`), `section ${name}`);
+    // LIN-3732: the tasks-done canvas is made by the toggle's page function.
+    if (name === 'done-per-day') { assert.ok(has(html, 'workspace-kpis-toggle-done-per-day')); continue; }
     assert.ok(has(html, `workspace-kpis-chart-${name}`), `canvas ${name}`);
     assert.ok(html.includes(`id="chart-${name}"`), `canvas id ${name}`);
     assert.match(html, new RegExp(`<details class="kpi-numbers" data-testid="workspace-kpis-numbers-${name}"><summary>Show the numbers</summary>`));
     assert.match(html, new RegExp(`<table data-testid="workspace-kpis-table-${name}">`));
   }
+  assert.ok(html.includes('id="chart-runs-by-kind"') && html.includes('id="chart-cost"'));
   assert.match(html, /Tasks the agent marked done, by day\./);
   assert.match(html, /not a verified merge/);
 });
@@ -202,4 +207,44 @@ test('merge-time card: the "Harbour saw" note is always there and no NaN or null
     assert.match(html, /only merges Harbour saw on a PR check/);
     assert.equal(/NaN|undefined|>null</.test(html), false);
   }
+});
+
+// LIN-3732: this workspace's running total beside the tasks-done chart.
+const textOf = (html, id) => new RegExp(`data-testid="${id}"[^>]*>([^<]*)<`).exec(html)?.[1];
+
+test('the since line says "done", gives the oldest rolled-up day as D Mon YYYY and the total', () => {
+  const html = render(stats());
+  assert.equal(textOf(html, 'workspace-kpis-done-since'), 'Tasks done since 3 Mar 2026: 412');
+  assert.ok(!/Tasks finished since/.test(html));
+});
+
+test('the caption is hidden, names yesterday and the axis start, says approximate, and pins the lookback', () => {
+  const html = render(stats());
+  assert.match(new RegExp('<p[^>]*hidden[^>]*data-testid="workspace-kpis-total-caption"').exec(html)?.[0] ?? '', /hidden/);
+  const caption = textOf(html, 'workspace-kpis-total-caption');
+  assert.match(caption, /through 9 Jun 2026/);
+  assert.match(caption, /axis starts at 3 Mar 2026/);
+  assert.match(caption, /Approximate/);
+  assert.ok(caption.includes(`more than ${ROLLUP_LOOKBACK_DAYS} days`), 'the 7 is ROLLUP_LOOKBACK_DAYS');
+});
+
+test('null gives no since line and no caption, but the toggle mount and a hidden empty note', () => {
+  const html = render(stats({ daily: daily({ doneTotal: null }) }));
+  assert.equal(has(html, 'workspace-kpis-done-since'), false);
+  assert.equal(has(html, 'workspace-kpis-total-caption'), false);
+  assert.equal(has(html, 'workspace-kpis-toggle-done-per-day'), true);
+  assert.equal(textOf(html, 'workspace-kpis-total-empty'), '○ no running total yet');
+});
+
+test('the toggle is on the tasks-done section only, and no button is server-rendered', () => {
+  const html = render(stats());
+  assert.equal((html.match(/data-testid="workspace-kpis-toggle-/g) || []).length, 1);
+  const section = html.slice(html.indexOf('workspace-kpis-section-done-per-day'), html.indexOf('workspace-kpis-section-runs-by-kind'));
+  assert.ok(section.includes('workspace-kpis-toggle-done-per-day') && !/<button/.test(section));
+});
+
+test('the embedded series carries doneTotal for the script, so the script holds no copy', () => {
+  const html = render(stats());
+  assert.match(html, /__WORKSPACE_KPI_DATA__/);
+  assert.ok(html.includes('"doneTotal":{"since":"2026-03-03"'));
 });

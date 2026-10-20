@@ -120,6 +120,7 @@ export function buildStats({ fullSeries = false, workspaces = 40, funnel = build
     weeklyBudgetGauge: { percentConsumed: 56.3, dayBars: { days: ['2026-06-10'], costUsd: [61.8] } },
     funnel: { dispatched: 20, taken: 15, reported: 12, completed: 9 },
     milestoneFunnel: funnel,
+    doneTotal: { since: '2026-06-07', through: '2026-06-09', done: [2, 0, 3], total: 5 },
     dispatchKinds: [{ label: 'autopilot', count: 4 }, { label: 'research', count: 3 }],
     dispatchKindsOtherCount: 2,
     stepOutcomes: { completed: 5, failed: 1, blocked: 0, other: 2 },

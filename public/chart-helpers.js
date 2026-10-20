@@ -97,18 +97,81 @@
 
   // Draws `build(canvas, tools)` unless there is nothing to show, in which case
   // the canvas is replaced by `note`, in the class the canvas names in
-  // data-empty-class. Server-rendered rows beside the canvas stay.
+  // data-empty-class. Server-rendered rows beside the canvas stay. Returns the
+  // Chart, or null when nothing was drawn (a page that switches views destroys it).
   function draw(name, amount, note, build) {
     const canvas = document.getElementById('chart-' + name);
-    if (!canvas) return;
+    if (!canvas) return null;
     if (!(amount > 0)) {
       const empty = document.createElement('div');
       empty.className = (canvas.dataset && canvas.dataset.emptyClass) || '';
       empty.textContent = note;
       canvas.replaceWith(empty);
-      return;
+      return null;
     }
-    new Chart(canvas, build(canvas, { ink: INK, trailingMean: trailingMean }));
+    return new Chart(canvas, build(canvas, { ink: INK, trailingMean: trailingMean }));
+  }
+
+  // Two buttons that swap one view for another in `mount`. `rate` and `total`
+  // are page functions: each gets the emptied view element, draws into it and
+  // may return a cleanup. Rate is the default; total runs only when chosen. The
+  // mode is not kept: a switch runs the old cleanup, empties the view and draws
+  // the new one, so rate, total, rate works even when rate drew only a note.
+  // Without a `total` function nothing is rendered and the handle is inert.
+  function rateTotalToggle(mount, options) {
+    if (!mount || !options || typeof options.total !== 'function') {
+      return { set: function () {}, destroy: function () {} };
+    }
+    const labels = options.labels || {};
+    const bar = document.createElement('div');
+    bar.className = 'rate-total-toggle';
+    bar.setAttribute('role', 'group');
+    const view = document.createElement('div');
+    const buttons = {};
+    const handlers = {};
+    let cleanup = null;
+
+    function endView() {
+      const run = cleanup;
+      cleanup = null;
+      if (run) run();
+    }
+    function set(mode) {
+      if (mode !== 'rate' && mode !== 'total') return;
+      endView();
+      view.replaceChildren();
+      Object.keys(buttons).forEach(function (key) {
+        buttons[key].setAttribute('aria-pressed', String(key === mode));
+      });
+      const result = (mode === 'total' ? options.total : options.rate)(view);
+      cleanup = typeof result === 'function' ? result : null;
+    }
+
+    ['rate', 'total'].forEach(function (mode) {
+      const button = document.createElement('button');
+      button.setAttribute('type', 'button');
+      button.setAttribute('data-mode', mode);
+      button.setAttribute('aria-pressed', 'false');
+      button.textContent = labels[mode] || mode;
+      handlers[mode] = function () { set(mode); };
+      button.addEventListener('click', handlers[mode]);
+      buttons[mode] = button;
+      bar.appendChild(button);
+    });
+    mount.replaceChildren(bar, view);
+    set(options.initial === 'total' ? 'total' : 'rate');
+
+    return {
+      set: set,
+      destroy: function () {
+        endView();
+        Object.keys(buttons).forEach(function (mode) {
+          buttons[mode].removeEventListener('click', handlers[mode]);
+        });
+        view.replaceChildren();
+        mount.replaceChildren();
+      }
+    };
   }
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -175,5 +238,5 @@
     mount.replaceChildren(table);
   }
 
-  window.HarbourCharts = { draw: draw, sparkline: sparkline, numbersTable: numbersTable };
+  window.HarbourCharts = { draw: draw, sparkline: sparkline, numbersTable: numbersTable, rateTotalToggle: rateTotalToggle };
 })();

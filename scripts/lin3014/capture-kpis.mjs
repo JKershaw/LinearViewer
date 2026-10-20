@@ -26,7 +26,7 @@ const repoRoot = join(here, '..', '..');
 const KPI_STATS_COLLECTION_NAMES = [
   'sessions', 'userPreferences', 'workspacePreferences', 'customPrompts', 'localIssues',
   'dispatchQueue', 'dispatchHistory', 'dispatchTokens', 'proxyTokens', 'proxyEvents',
-  'agentStatus', 'freeTier', 'recapCache', 'briefCache', 'reportHistory'
+  'agentStatus', 'freeTier', 'recapCache', 'briefCache', 'reportHistory', 'kpiDailyRollup'
 ];
 
 /** A stub collection that records the one call collectKpiStats makes to it, never touching a DB. */

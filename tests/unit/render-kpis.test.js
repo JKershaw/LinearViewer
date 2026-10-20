@@ -15,6 +15,7 @@ import { toPublicKpis, PUBLIC_COUNT_FLOOR } from '../../lib/kpi-stats.js';
 import { extractScriptsFromHtml } from '../../lib/scan-public-pages.js';
 import { scanText } from '../../lib/secret-scan.js';
 import { extractEmbeddedData, embeddedDataText } from '../helpers/embedded-data.js';
+import { ROLLUP_LOOKBACK_DAYS } from '../../lib/kpi-daily-rollup.js';
 import { buildStats, buildFunnel, buildMode, buildCost } from '../helpers/public-kpis-fixture.js';
 
 const F = PUBLIC_COUNT_FLOOR;
@@ -74,7 +75,7 @@ describe('renderKpisPage: frame', () => {
 
   test('embeds the public view only: none of the dropped fields reach the page', () => {
     const data = extractEmbeddedData(html, '__KPI_DATA__');
-    assert.deepStrictEqual(Object.keys(data).sort(), ['cost', 'daily', 'dispatchKinds', 'generatedAt', 'milestoneFunnel', 'outcomes', 'phases', 'totals']);
+    assert.deepStrictEqual(Object.keys(data).sort(), ['cost', 'daily', 'dispatchKinds', 'doneTotal', 'generatedAt', 'milestoneFunnel', 'outcomes', 'phases', 'totals']);
     for (const dropped of ['terminalMarkedTaskCost', 'weeklyBudgetGauge', 'topEndpoints', 'hourOfDay', 'vanity', 'activeTokens', 'dbBackend', 'mangodb', 'cash:']) {
       assert.ok(!html.includes(dropped), dropped);
     }
@@ -136,9 +137,12 @@ describe('renderKpisPage: what the agents do', () => {
 
   test('draws the phases and dispatch-kinds charts', () => {
     const html = render();
-    for (const id of ['chart-proxy-phases', 'chart-dispatch-kinds', 'chart-outcome-trend', 'chart-outcome-weekly', 'chart-done-daily']) {
+    for (const id of ['chart-proxy-phases', 'chart-dispatch-kinds', 'chart-outcome-trend', 'chart-outcome-weekly']) {
       assert.match(html, new RegExp(`<canvas id="${id}"[^>]*></canvas>`), id);
     }
+    // LIN-3732: the tasks-finished canvas is made by the toggle's page function, not the server.
+    assert.ok(!html.includes('id="chart-done-daily"'));
+    assert.strictEqual(testid(html, 'kpis-toggle-done-daily').length, 1);
   });
 });
 
@@ -267,7 +271,10 @@ describe('renderKpisPage: trend charts and disclosures (LIN-3710)', () => {
 
   test('outside the disclosure a box shows its title and at most one line of text', () => {
     for (const name of BOXES) {
-      const visible = boxOf(name).replace(/<details[\s\S]*?<\/details>/, '');
+      // LIN-3732: the tasks-finished box alone also carries the running-total
+      // line, caption and empty note; each is a <p> with one of these test ids.
+      const visible = boxOf(name).replace(/<details[\s\S]*?<\/details>/, '')
+        .replace(/<p [^>]*data-testid="kpis-(?:done-since|total-caption|total-empty)">[^<]*<\/p>/g, '');
       const texts = [...visible.matchAll(/<span class="(kpi-chart-caption)?"?[^>]*>([^<]+)<\/span>/g)];
       assert.ok(texts.length >= 1 && texts.length <= 2, `${name}: ${texts.length} spans`);
       assert.ok(!/<p[ >]/.test(visible), `${name} has no paragraph outside the disclosure`);
@@ -298,8 +305,10 @@ describe('renderKpisPage: trend charts and disclosures (LIN-3710)', () => {
     assert.ok(!/kpis-spark-headline|kpis-headline[^>]*>[\s\S]{0,400}kpi-card-spark/.test(html));
   });
 
-  test('no running total and no rate/total toggle on the page', () => {
-    assert.ok(!/running total|cumulative|toggle/i.test(html.replace(/<script[\s\S]*?<\/script>/g, '')));
+  test('only the tasks-finished box has a rate/total toggle, and the server renders no button', () => {
+    assert.strictEqual(testid(html, 'kpis-toggle-[a-z-]+').length, 1);
+    assert.ok(boxOf('done-daily').includes('data-testid="kpis-toggle-done-daily"'));
+    for (const name of BOXES.filter(n => n !== 'done-daily')) assert.ok(!/toggle|running total/i.test(boxOf(name)), name);
     assert.ok(!/<button|role="switch"|type="radio"/.test(html.replace(/<footer[\s\S]*<\/footer>/, '')));
   });
 });
@@ -383,5 +392,45 @@ describe('renderKpisPage: cost per finished task (LIN-3714)', () => {
     for (const [, [label, value]] of Object.entries(SHARES)) assert.ok(!outside.includes(`${label}: ${value}`), label);
     for (const [, [, value]] of Object.entries(SHARES)) assert.ok(!outside.includes(value), value);
     assert.ok(!outside.includes('data-share='));
+  });
+});
+
+// LIN-3732: the running total beside the tasks-finished chart.
+describe('renderKpisPage: tasks finished since (LIN-3732)', () => {
+  const text = (html, id) => new RegExp(`data-testid="${id}"[^>]*>([^<]*)<`).exec(html)?.[1];
+
+  test('the since line gives the oldest rolled-up day as D Mon YYYY (UTC) and the total', () => {
+    const html = render();
+    assert.strictEqual(text(html, 'kpis-done-since'), 'Tasks finished since 7 Jun 2026: 5');
+  });
+
+  test('a four-digit total is grouped and a single-digit day has no zero pad', () => {
+    const html = render({ doneTotal: { since: '2026-03-03', through: '2026-06-09', done: [1], total: 1412 } });
+    assert.strictEqual(text(html, 'kpis-done-since'), 'Tasks finished since 3 Mar 2026: 1,412');
+  });
+
+  test('the caption is hidden, names yesterday and the axis start, says approximate, and pins the lookback', () => {
+    const html = render();
+    const tag = testid(html, 'kpis-total-caption')[0];
+    assert.match(tag, /\bhidden\b/);
+    const caption = text(html, 'kpis-total-caption');
+    assert.match(caption, /through 9 Jun 2026/);
+    assert.match(caption, /axis starts at 7 Jun 2026/);
+    assert.match(caption, /Approximate/);
+    assert.match(caption, /across every workspace/);
+    assert.ok(caption.includes(`more than ${ROLLUP_LOOKBACK_DAYS} days`), 'the 7 is ROLLUP_LOOKBACK_DAYS');
+  });
+
+  test('with no rows there is no since line and no caption, but the toggle mount and a hidden empty note', () => {
+    const html = render({ doneTotal: null }, { doneTotal: null });
+    assert.strictEqual(testid(html, 'kpis-done-since').length, 0);
+    assert.strictEqual(testid(html, 'kpis-total-caption').length, 0);
+    assert.strictEqual(testid(html, 'kpis-toggle-done-daily').length, 1);
+    assert.match(testid(html, 'kpis-total-empty')[0], /\bhidden\b/);
+    assert.strictEqual(text(html, 'kpis-total-empty'), '○ no running total yet');
+  });
+
+  test('the word "launch" is never used for the start', () => {
+    assert.ok(!/launch/i.test(render().replace(/<script[\s\S]*?<\/script>/g, '')));
   });
 });

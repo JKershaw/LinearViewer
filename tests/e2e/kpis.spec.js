@@ -104,7 +104,7 @@ test.describe('KPIs page', () => {
     expect(await page.evaluate(() => typeof window.Chart !== 'undefined')).toBe(true);
 
     const data = await page.evaluate(() => window.__KPI_DATA__);
-    expect(Object.keys(data).sort()).toEqual(['cost', 'daily', 'dispatchKinds', 'generatedAt', 'milestoneFunnel', 'outcomes', 'phases', 'totals']);
+    expect(Object.keys(data).sort()).toEqual(['cost', 'daily', 'dispatchKinds', 'doneTotal', 'generatedAt', 'milestoneFunnel', 'outcomes', 'phases', 'totals']);
     expect(data.phases.days.length).toBe(30);
     // Four whole weeks inside the 30-day window (the oldest partial week would under-fill).
     expect(data.outcomes.weeks.length).toBe(4);
@@ -366,5 +366,58 @@ test.describe('KPIs page — aggregation-failure propagation (LIN-3002)', () => 
     // unbounded-read-masks-the-error bug LIN-3002 exists to fix.
     expect(response.status()).toBe(500);
     expect(await response.text()).toContain('Could not load instance KPIs');
+  });
+});
+
+// LIN-3732: the running total of tasks finished, from seeded kpi-daily-rollup
+// rows. The days sit 58 and 60 days back, outside the daily job's rewrite range,
+// so the job never touches them. /kpis caches for 60s, so the cache is cleared
+// after seeding and after cleanup.
+test.describe('KPIs page — tasks finished since (LIN-3732)', () => {
+  const ROLLUP_KEY = 'kpis-e2e-rollup';
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const daysBack = n => new Date(Date.now() - n * 86400000);
+  const dayKey = n => daysBack(n).toISOString().slice(0, 10);
+  const label = n => `${daysBack(n).getUTCDate()} ${MONTHS[daysBack(n).getUTCMonth()]} ${daysBack(n).getUTCFullYear()}`;
+
+  test.beforeAll(async ({ request }) => {
+    await request.get(`/test/seed-kpi-rollup?urlKey=${ROLLUP_KEY}&day=${dayKey(60)}&done=2`);
+    await request.get(`/test/seed-kpi-rollup?urlKey=${ROLLUP_KEY}&day=${dayKey(58)}&done=3`);
+    await request.get('/test/clear-kpi-cache');
+  });
+
+  test.afterAll(async ({ request }) => {
+    await request.get(`/test/clear-kpi-rollup?urlKey=${ROLLUP_KEY}`);
+    await request.get('/test/clear-kpi-cache');
+  });
+
+  test('shows the since line, defaults to rate, and the toggle goes to the total and back', async ({ page }) => {
+    await page.goto('/kpis');
+    await expect(page.locator('[data-testid="kpis-done-since"]')).toContainText(`Tasks finished since ${label(60)}`);
+
+    const data = await page.evaluate(() => window.__KPI_DATA__);
+    expect(data.doneTotal.done.slice(0, 3)).toEqual([2, 0, 3]);
+    expect(data.doneTotal.since).toBe(dayKey(60));
+    expect(JSON.stringify(data)).not.toContain(ROLLUP_KEY);
+
+    const toggle = page.locator('[data-testid="kpis-toggle-done-daily"]');
+    const rate = toggle.locator('button[data-mode="rate"]');
+    const total = toggle.locator('button[data-mode="total"]');
+    const caption = page.locator('[data-testid="kpis-total-caption"]');
+    const chartType = () => page.evaluate(() => window.Chart.getChart(document.getElementById('chart-done-daily'))?.config.type);
+
+    await expect(rate).toHaveAttribute('aria-pressed', 'true');
+    await expect(caption).toBeHidden();
+    expect(await chartType()).toBe('bar');
+
+    await total.click();
+    await expect(total).toHaveAttribute('aria-pressed', 'true');
+    await expect(caption).toBeVisible();
+    await expect(caption).toContainText(label(60));
+    expect(await chartType()).toBe('line');
+
+    await rate.click();
+    await expect(caption).toBeHidden();
+    expect(await chartType()).toBe('bar');
   });
 });

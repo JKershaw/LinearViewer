@@ -1102,7 +1102,7 @@ if (process.env.NODE_ENV === 'test') {
   // additive, test-only seam so a spec can inject a rejecting aggregate() on
   // the exact two collections /kpis' loaders read, without touching /kpis'
   // own route logic. See routes/test.js's kpis-fail-next-aggregate handler.
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache: (mode) => kpiPage.reset(mode), workspaceHaltStore, emailTransport: emailTransport?.kind === 'capture' ? emailTransport : null, commentDedupe, decisionStampDedupe, taskModeStore, taskShareCollection: db.collection('task_share_links') }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache: (mode) => kpiPage.reset(mode), workspaceHaltStore, emailTransport: emailTransport?.kind === 'capture' ? emailTransport : null, commentDedupe, decisionStampDedupe, taskModeStore, taskShareCollection: db.collection('task_share_links'), kpiDailyRollupCollection }))
 }
 
 // =============================================================================
@@ -2323,7 +2323,8 @@ const kpiPage = createKpiPage({
     freeTier: freeTierCollection,
     recapCache: recapCacheCollection,
     briefCache: briefCacheCollection,
-    reportHistory: reportHistoryCollection
+    reportHistory: reportHistoryCollection,
+    kpiDailyRollup: kpiDailyRollupCollection
   }, {
     dbBackend: process.env.MONGODB_URI ? 'mongodb' : 'mangodb',
     // LIN-2952: the milestone-funnel aggregate's own deps (stores + the dispatch
@@ -2403,7 +2404,7 @@ app.use(createTaskModeRoutes({ taskModeStore, accountStore, workspaceFromUrl }))
 app.use(createMilestoneFunnelRoutes({ taskModeStore, accountStore, accountWorkspaceStore, dispatchQueue: dispatchQueueCollection, dispatchHistory: dispatchHistoryCollection, closeOutEventsStore, workspaceFromUrl }))
 
 // Workspace KPIs page (LIN-3689): one workspace's counts, next to Settings
-app.use(createWorkspaceKpisRoutes({ workspaceFromUrl, collections: { dispatchQueue: dispatchQueueCollection, dispatchHistory: dispatchHistoryCollection, proxyEvents: proxyEventsCollection, agentStatus: agentStatusCollection, reportHistory: reportHistoryCollection, customPrompts: customPromptsCollection, closeOutEvents: db.collection('close-out-events') } }))
+app.use(createWorkspaceKpisRoutes({ workspaceFromUrl, collections: { dispatchQueue: dispatchQueueCollection, dispatchHistory: dispatchHistoryCollection, proxyEvents: proxyEventsCollection, agentStatus: agentStatusCollection, reportHistory: reportHistoryCollection, customPrompts: customPromptsCollection, closeOutEvents: db.collection('close-out-events'), kpiDailyRollup: kpiDailyRollupCollection } }))
 
 // The ONE PR-state store (LIN-3311): the LIN-3251 cache,
 // sliding 36/h GitHub budget and PR-state cache. The dashboard router
