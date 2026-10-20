@@ -413,10 +413,12 @@ describe('collectWorkspaceKpis mergeTime (LIN-3713)', () => {
     const prUrl = 'https://github.com/o/r/pull/77';
     await collections.closeOutEvents.insertMany([
       { ...mergeEvent(A, 'first', 4, { prUrl, at: daysAgo(2) }), by: 'person' },
-      { ...mergeEvent(A, 'second', 4, { prUrl, at: daysAgo(1) }), by: 'close-out' }
+      { ...mergeEvent(A, 'second', 8, { prUrl, at: daysAgo(1) }), by: 'close-out' }
     ]);
     const { mergeTime } = await collectWorkspaceKpis({ collections, urlKey: A, now: NOW });
     assert.equal(mergeTime.n, 1);
+    // the earliest row (4h) wins over the later one (8h)
+    assert.equal(mergeTime.medianHours, 4);
   });
 
   test('no events gives n 0 and nulls, never NaN', async () => {
