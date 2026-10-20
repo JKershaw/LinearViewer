@@ -37,6 +37,10 @@ function recordingCollections({ withAggregate }) {
         calls.push({ collection: name, method: 'find', args: plain(args) });
         return { toArray: async () => [] };
       },
+      findOne: async (...args) => {
+        calls.push({ collection: name, method: 'findOne', args: plain(args) });
+        return null;
+      },
       countDocuments: async (...args) => {
         calls.push({ collection: name, method: 'countDocuments', args: plain(args) });
         return 0;
@@ -583,6 +587,15 @@ const AGGREGATE_SNAPSHOT = [
         }
       ]
     ]
+  },
+  {
+    collection: 'kpiDailyRollup',
+    method: 'findOne',
+    args: [
+      {
+        _id: 'last-complete-day'
+      }
+    ]
   }
 ];
 
@@ -764,6 +777,15 @@ const FIND_SNAPSHOT = [
           day: 1,
           done: 1
         }
+      }
+    ]
+  },
+  {
+    collection: 'kpiDailyRollup',
+    method: 'findOne',
+    args: [
+      {
+        _id: 'last-complete-day'
       }
     ]
   }

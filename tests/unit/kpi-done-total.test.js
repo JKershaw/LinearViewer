@@ -2,15 +2,17 @@
  * LIN-3732 — the running total of tasks finished, read from `kpi-daily-rollup`
  * (part A, LIN-3724) by both KPI collectors, on a real MangoDB.
  *
+ * LIN-3733: `through` is capped at the part A marker, the last completed rollup day.
+ *
  * Run with: node --test tests/unit/kpi-done-total.test.js
  */
 process.env.NODE_ENV = 'test';
 
 import { test, describe, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildDoneTotal, collectKpiStats, loadDoneRollup, toPublicKpis } from '../../lib/kpi-stats.js';
+import { buildDoneTotal, collectKpiStats, loadDoneRollup, loadRollupThrough, toPublicKpis } from '../../lib/kpi-stats.js';
 import { collectWorkspaceKpis } from '../../lib/workspace-kpi-stats.js';
-import { ROLLUP_MARKER_ID } from '../../lib/kpi-daily-rollup.js';
+import { ROLLUP_MARKER_ID, createKpiDailyRollupRun } from '../../lib/kpi-daily-rollup.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 
 const NOW = new Date('2026-06-10T12:00:00.000Z');
@@ -226,5 +228,67 @@ describe('buildDoneTotal (pure)', () => {
   test('only today or later rows, or none: null', () => {
     assert.equal(buildDoneTotal([], at), null);
     assert.equal(buildDoneTotal([{ day: '2026-06-10', done: 1 }], at), null);
+  });
+});
+
+describe('through is capped at the rollup marker (LIN-3733)', () => {
+  const finished = (id, day, time) => ({
+    _id: id, urlKey: A, rootItemId: id, status: 'taken',
+    dispatchedAt: new Date(`${day}T${time}.000Z`),
+    feedback: [{ message: '[done] finished', timestamp: `${day}T${time}.000Z` }]
+  });
+  const tick = (history, iso) => createKpiDailyRollupRun({ dispatchHistory: history, rollup, now: () => Date.parse(iso) })();
+  const read = async iso => buildDoneTotal(await loadDoneRollup(rollup), new Date(iso), await loadRollupThrough(rollup));
+
+  test('the witness: a 00:40Z tick on D-1, read at 00:20Z on D, does not count D-1\'s partial row', async () => {
+    await rollup.createIndex({ urlKey: 1, day: 1 }, { unique: true });
+    const history = db.collection('dispatch-history');
+    await history.insertOne(finished('t-18', '2026-10-18', '09:00:00'));
+    await tick(history, '2026-10-19T00:40:00.000Z');
+    await history.insertMany(Array.from({ length: 10 }, (_, i) => finished(`t-19-${i}`, '2026-10-19', '12:00:00')));
+
+    assert.deepEqual(await read('2026-10-20T00:20:00.000Z'), { since: '2026-10-18', through: '2026-10-18', done: [1], total: 1 });
+    await tick(history, '2026-10-20T00:40:00.000Z');
+    assert.deepEqual(await read('2026-10-20T00:50:00.000Z'), { since: '2026-10-18', through: '2026-10-19', done: [1, 10], total: 11 });
+  });
+
+  test('both collectors honour the marker', async () => {
+    await rollup.insertMany([
+      { _id: ROLLUP_MARKER_ID, through: '2026-06-07' },
+      row(A, '2026-06-06', 2), row(A, '2026-06-07', 3), row(A, '2026-06-08', 0), row(A, '2026-06-09', 1)
+    ]);
+    const expected = { since: '2026-06-06', through: '2026-06-07', done: [2, 3], total: 5 };
+    assert.deepEqual((await publicStats()).doneTotal, expected);
+    assert.deepEqual((await workspaceStats(A)).daily.doneTotal, expected);
+  });
+
+  test('a marker ahead of yesterday cannot extend the total past yesterday', async () => {
+    await rollup.insertMany([{ _id: ROLLUP_MARKER_ID, through: '2026-06-10' }, row(A, '2026-06-09', 1), row(A, '2026-06-10', 5)]);
+    assert.deepEqual((await publicStats()).doneTotal, { since: '2026-06-09', through: '2026-06-09', done: [1], total: 1 });
+  });
+
+  test('marker absent keeps yesterday (the open question)', async () => {
+    await rollup.insertMany([row(A, '2026-06-08', 2), row(A, '2026-06-09', 1)]);
+    assert.equal(await loadRollupThrough(rollup), null);
+    assert.deepEqual((await publicStats()).doneTotal, { since: '2026-06-08', through: '2026-06-09', done: [2, 1], total: 3 });
+  });
+
+  test('a failed marker read falls back to yesterday and logs the class once', async () => {
+    await rollup.insertMany([marker(), row(A, '2026-06-08', 2), row(A, '2026-06-09', 1)]);
+    const throwing = new Proxy(rollup, {
+      get: (target, prop) => (prop === 'findOne'
+        ? () => Promise.reject(new RangeError('secret-detail'))
+        : (typeof target[prop] === 'function' ? target[prop].bind(target) : target[prop]))
+    });
+    publicBag.kpiDailyRollup = throwing;
+    assert.deepEqual((await publicStats()).doneTotal, { since: '2026-06-08', through: '2026-06-09', done: [2, 1], total: 3 });
+    assert.deepEqual(warnings, ['kpi-stats: kpi-daily-rollup marker read failed: RangeError']);
+  });
+
+  test('a malformed marker is ignored; no row on or before the marker gives null', async () => {
+    await rollup.insertOne({ _id: ROLLUP_MARKER_ID, through: 'yesterday' });
+    assert.equal(await loadRollupThrough(rollup), null);
+    assert.equal(buildDoneTotal([{ day: '2026-06-09', done: 4 }], NOW, '2026-06-05'), null);
+    await assert.rejects(() => loadRollupThrough(undefined), TypeError);
   });
 });
