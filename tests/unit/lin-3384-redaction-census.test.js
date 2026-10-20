@@ -152,6 +152,7 @@ const TABLE = {
   'lib/liveness-alarm-sweep.js :: sweepD2': [SRV, 2],
   'lib/observation-sessions-materializer.js :: _collectSessionIssues': [SRV, 7],
   'lib/observation-sessions-materializer.js :: _sessionsTouchingIssue': [SRV, 2],
+  'lib/kpi-daily-rollup.js :: oldestDayOf': [PRJ, 1], // LIN-3724: raw history find projecting `dispatchedAt` only (backfill operator script)
   'lib/pipeline-loops.js :: timed': [SRV, 2],
   'lib/pipeline-loops.js :: redigestHistoryRows': [SRV, 1], // raw historyCollection.find (round-3 N3)
   'lib/recent-runs.js :: read': [SRV, 2],

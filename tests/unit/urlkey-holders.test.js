@@ -161,7 +161,7 @@ const COLLECTION_CLASSES = {
   // Key inside `_id` or a non-`urlKey` field: read by the no-holder count through URLKEY_SOURCES.
   'brief-cache': 'C', 'recap-cache': 'C', 'workspace-preferences': 'C', 'harbour-comments': 'C',
   'observer-state': 'C', 'local-issues': 'C',
-  'consumer-heartbeats': 'C', 'dismissal-suggestions': 'C', 'dispatch-presets': 'C', 'run-proposals': 'C', 'shelved-rulings': 'C',
+  'consumer-heartbeats': 'C', 'kpi-daily-rollup': 'C', 'dismissal-suggestions': 'C', 'dispatch-presets': 'C', 'run-proposals': 'C', 'shelved-rulings': 'C',
   'ship-biscuit-editions': 'C', 'collective-characters': 'C', 'collective-presets': 'C',
   // The only C members NOT read; the report names them (UNENUMERATED_SOURCES) so the count is never read as complete.
   'run-summary-cache': 'C-named', 'session-summary-cache': 'C-named',
