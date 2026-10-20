@@ -209,6 +209,22 @@
     return html;
   }
 
+  // The run allowance as the Go button and the run-step rung both read it
+  // (LIN-3706: one copy, was two). Browser code cannot import
+  // lib/plan-allowance.js, so the sentence stays a literal here. `runsUsed` null
+  // means the count was unreadable: no quota is claimed, so nothing is exhausted.
+  function runQuotaView(state) {
+    const quota = state.runQuota;
+    const quotaKnown = !!(quota && quota.runsUsed != null
+      && typeof quota.remaining === 'number' && typeof quota.limit === 'number');
+    return {
+      quota,
+      quotaKnown,
+      runsExhausted: quotaKnown && quota.remaining <= 0,
+      runLimitTitle: 'daily run limit reached \u00b7 resets at midnight UTC'
+    };
+  }
+
   /**
    * LIN-3341: the one-press Go. It is the PRIMARY action on the opened task in
    * EVERY phase (idle, generating, fresh, error) — Go does not need a prompt,
@@ -229,22 +245,6 @@
    * The run allowance ("N of M runs left today") lives beside Go, so it shows in
    * every phase and is the same account-wide count the run rungs used.
    */
-  // The run allowance as the Go button and the run-step rung both read it
-  // (LIN-3706: one copy, was two). Browser code cannot import
-  // lib/plan-allowance.js, so the sentence stays a literal here. `runsUsed` null
-  // means the count was unreadable: no quota is claimed, so nothing is exhausted.
-  function runQuotaView(state) {
-    const quota = state.runQuota;
-    const quotaKnown = !!(quota && quota.runsUsed != null
-      && typeof quota.remaining === 'number' && typeof quota.limit === 'number');
-    return {
-      quota,
-      quotaKnown,
-      runsExhausted: quotaKnown && quota.remaining <= 0,
-      runLimitTitle: 'daily run limit reached \u00b7 resets at midnight UTC'
-    };
-  }
-
   function goReady(opts) {
     return !!(opts.dispatchEnabled && opts.proxyEnabled && opts.hasAutopilot);
   }
