@@ -135,14 +135,14 @@ test.describe('LIN-3689 — workspace KPIs page (e2e)', () => {
       }
     });
 
-    test('without JavaScript the tables are in the page, the noscript line shows, and nothing errors', async ({ browser, page }) => {
+    test('without JavaScript the tables are in the page, the noscript line shows, and nothing errors', async ({ browser, page, baseURL }) => {
       await dispatch(page, keyA, 'implementation', 2);
-      const context = await browser.newContext({ javaScriptEnabled: false, storageState: await page.context().storageState() });
+      const context = await browser.newContext({ baseURL, javaScriptEnabled: false, storageState: await page.context().storageState() });
       const plain = await context.newPage();
       const errors = [];
       plain.on('pageerror', err => errors.push(err.message));
       try {
-        const res = await plain.goto(new URL(`/workspace/${keyA}/kpis`, page.url()).toString());
+        const res = await plain.goto(`/workspace/${keyA}/kpis`);
         expect(res.status()).toBe(200);
         await expect(plain.locator('[data-testid="workspace-kpis-noscript"]')).toBeVisible();
         for (const name of CHARTS) {
