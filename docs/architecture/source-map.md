@@ -44,7 +44,7 @@ lib/
   linear.js            GraphQL client for Linear API
   linear-fetch.js      Resilient fetch for the Linear GraphQL boundary (retry/timeout)
   bash-tool.js         Safe bash executor with data/code separation (stdin + argv modes)
-  tree.js              Transforms flat issues → nested tree structure (frontier ranking in selectFocusSubtask)
+  tree.js              Transforms flat issues → nested tree structure (re-exports the focus-child picker, now owned by recommendation-facts.js, LIN-3727)
   graph-features.js    Network-free blocking-graph / critical-path primitives (shared by swipe + frontier ranking)
   context-graph.js     Network-free relationship-neighborhood builder for the Context section (blockers/blocked/parent/children/related; LIN-572)
   openrouter.js        OpenRouter API client; recommendations take one path (LIN-3300): one routing call to the stage selector (buildSelectorArgs: formatSelectorView + the trail facts), or the review loop bound in code, then composeRoutedRecommendation assembles the routed stage's prompt with generatePrompt
@@ -161,7 +161,7 @@ lib/
   trashed-signal.js    Trashed-issue (soft-delete) signal detection (LIN-401)
   recommend-recurse.js Server-side recommendation recursion (defer routing)
   recent-runs.js       The task's recent runs for the stage selector (LIN-3300): loadRecentRuns reads the dispatch store's queue and history for one issue, recentRuns keeps the newest five stage runs (stage, finish time, outcome), formatRecentRuns renders them; every routed recommend surface passes them as context.runs
-  recommendation-facts.js  Deterministic, network-free fact assembly: per-node facts (assembleNodeFacts), the selector's trail facts (assembleTrailFacts, condensePlan), the plan-review facts and the review loop bound (reviewLoopExhausted, reviewLoopStop, reviewLoopConverging), and who wrote a comment (isAgentNote, isRuling, isPersonComment)
+  recommendation-facts.js  Deterministic, network-free fact assembly: the focus-child picker (selectFocusSubtask, computeFrontierFacts, compareByIdentifier), per-node facts (assembleNodeFacts), the selector's trail facts (assembleTrailFacts, condensePlan), the plan-review facts and the review loop bound (reviewLoopExhausted, reviewLoopStop, reviewLoopConverging), and who wrote a comment (isAgentNote, isRuling, isPersonComment)
   session-store.js     MongoDB/MangoDB session store
   session-options.js   The express-session options factory, shared by server.js and the real-session email tests (LIN-1892)
   public-origin.js  `publicOrigin(req, {env, safeHost})` (LIN-3692): the one source of every absolute URL's origin: the configured `PUBLIC_ORIGIN` (via `resolveEmailLinkOrigin`) else `req.protocol` + Host; never null; `safeHost` validates Host with a `harbour.cat` fallback (library). Never names the alias variable (Q15)

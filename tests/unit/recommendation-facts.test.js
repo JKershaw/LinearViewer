@@ -11,9 +11,11 @@ import {
   assembleNodeFacts,
   computeFrontierFacts,
   selectFocusSubtask,
+  compareByIdentifier,
   isBlocked,
   isTerminalState
 } from '../../lib/recommendation-facts.js';
+import * as tree from '../../lib/tree.js';
 
 // Small helpers to build child issues with a given state type.
 const child = (identifier, type, extra = {}) => ({ identifier, state: { type }, ...extra });
@@ -24,6 +26,14 @@ describe('recommendation-facts: re-export surface', () => {
     assert.strictEqual(typeof selectFocusSubtask, 'function');
     assert.strictEqual(typeof isBlocked, 'function');
     assert.strictEqual(typeof isTerminalState, 'function');
+  });
+});
+
+describe('recommendation-facts: focus-child picker ownership (LIN-3727)', () => {
+  test('tree.js re-exports the very same picker functions (no duplicate definitions)', () => {
+    assert.strictEqual(tree.selectFocusSubtask, selectFocusSubtask);
+    assert.strictEqual(tree.computeFrontierFacts, computeFrontierFacts);
+    assert.strictEqual(tree.compareByIdentifier, compareByIdentifier);
   });
 });
 
