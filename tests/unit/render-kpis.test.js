@@ -381,6 +381,7 @@ describe('renderKpisPage: cost per finished task (LIN-3714)', () => {
     const html = renderCost();
     const outside = html.replace(/<details[^>]*data-testid="kpis-cost-numbers"[\s\S]*?<\/details>/, '').replace(/<script[\s\S]*?<\/script>/g, '');
     for (const [, [label, value]] of Object.entries(SHARES)) assert.ok(!outside.includes(`${label}: ${value}`), label);
+    for (const [, [, value]] of Object.entries(SHARES)) assert.ok(!outside.includes(value), value);
     assert.ok(!outside.includes('data-share='));
   });
 });
