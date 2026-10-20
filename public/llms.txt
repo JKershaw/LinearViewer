@@ -130,8 +130,11 @@ Both In Progress and Projects sections use the same nested structure:
 - `[data-testid="nav-view-{name}"]` - a view-switcher link by its visible text (e.g. `observation`, `swipe`, `swim`, `settings`, `kpis`, and the flag-gated `roadmap`/`dispatch`/`proxy`); the active view renders as a `<strong class="nav-view-current">` instead of an `<a>`. First-class views always show; power-user views only with their per-user flag; experimental views appear in the `⋯ more` overflow group when their own flag is on (same gated-inclusion policy as power-user views, not Settings-only)
 
 ### Workspace KPIs page (`/workspace/:urlKey/kpis`)
-One workspace's counts, last 7 and 30 UTC days; nothing instance-wide. Reads only the session's own workspace (a workspace the session lacks gets the 404 page, no session redirects to `/`).
-- `[data-testid="workspace-kpis-section-{activity|funnel|kinds|stored}"]` - the four sections
+One workspace's counts, last 7 and 30 UTC days, plus 30-day trend charts as rates (LIN-3711); nothing instance-wide. Reads only the session's own workspace (a workspace the session lacks gets the 404 page, no session redirects to `/`).
+- `[data-testid="workspace-kpis-section-{activity|done-per-day|runs-by-kind|cost|funnel|kinds|stored}"]` - the sections (the three trend sections are hidden by the empty line)
+- `[data-testid="workspace-kpis-spark-{dispatches|autopilot-runs|agent-actions}"]` - 30-day sparkline on those three activity cards (none on feedback notes); an inline SVG once the page script has run
+- `[data-testid="workspace-kpis-chart-{done-per-day|runs-by-kind|cost}"]` - the chart canvas (`id="chart-{name}"`); replaced by a short note when there is nothing to draw. done-per-day: tasks the agent marked done per day (its marker, not a verified merge). runs-by-kind: dispatches per 7-day week, top 3 kinds plus other, stacked. cost: API-equivalent cost per day by the day each task started, "priced N of M tasks"
+- `[data-testid="workspace-kpis-numbers-{name}"]` - the closed "Show the numbers" `<details>` of each chart; `workspace-kpis-table-{name}` is its table, rendered on the server so it works without JavaScript. `workspace-kpis-noscript` says charts need JavaScript
 - `[data-testid="workspace-kpis-card-{dispatches|autopilot-runs|agent-actions|feedback-notes}"]` - activity cards; values at `workspace-kpis-value-{card}-7d` and `-30d`
 - `[data-testid="workspace-kpis-funnel-{dispatched|taken|reported|completed}"]`, `workspace-kpis-median-wait` (minutes, `-` when unknown) - the 30-day funnel
 - `[data-testid="workspace-kpis-kind-row"]` - one row per dispatch kind (top 8)
