@@ -184,7 +184,7 @@ export async function resolveTurnModelOverride(rawModel, { loadCatalog } = {}) {
  * resolved model and the two observer-state documents the GET handler reads
  * (never a write, matching this route's existing read-only contract). Pure —
  * no I/O of its own — and exported for direct unit testing, the same pattern
- * `buildCensusSeedText` above follows.
+ * `buildCensusSeedText` (lib/flight-companion-census-seed.js) follows.
  *
  * `lastCheckInAt` reads `companionDoc.state.lastTurnAt` (`companion:v1:<urlKey>`,
  * `lib/flight-companion-gate.js`'s `COMPANION_SEED_STATE`/`buildTurnRecords`

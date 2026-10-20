@@ -27,7 +27,8 @@ function freshCollections() {
     proxyEvents: db.collection('proxy-events'),
     agentStatus: db.collection('foreman-status'),
     reportHistory: db.collection('report-history'),
-    customPrompts: db.collection('custom-prompts')
+    customPrompts: db.collection('custom-prompts'),
+    closeOutEvents: db.collection('close-out-events')
   };
 }
 
@@ -79,6 +80,23 @@ describe('GET /workspace/:urlKey/kpis', () => {
     assert.match(res.text, /data-testid="workspace-kpis-section-activity"/);
     assert.match(res.text, /data-testid="workspace-kpis-value-dispatches-30d">1</);
     assert.match(res.text, /<title>Alpha - KPIs<\/title>/);
+  });
+
+  test('LIN-3713: the page shows the merge-time card from this workspace\'s seeded events', async () => {
+    const collections = freshCollections();
+    const merged = new Date('2026-06-09T12:00:00Z');
+    // the page's empty branch (no dispatches or agent actions) hides the funnel, so give it one dispatch
+    await collections.dispatchHistory.insertOne({ urlKey: 'ws-a', status: 'expired', kind: 'implementation', dispatchedAt: merged });
+    await collections.closeOutEvents.insertMany([2, 4, 6].map(h => ({
+      _id: `e${h}`, urlKey: 'ws-a', by: 'person', merged: true, prUrl: `https://github.com/o/r/pull/${h}`, at: merged,
+      prMergedAt: merged, prOpenedAt: new Date(merged.getTime() - h * 3600000)
+    })));
+    await collections.closeOutEvents.insertOne({ _id: 'other', urlKey: 'ws-b', by: 'person', merged: true, prUrl: 'https://github.com/o/r/pull/99', at: merged, prMergedAt: merged, prOpenedAt: new Date(merged.getTime() - 900 * 3600000) });
+    const res = await get(build(settingTo('ws-a', 'Alpha'), collections), '/workspace/ws-a/kpis');
+    assert.equal(res.status, 200);
+    assert.match(res.text, /data-testid="workspace-kpis-card-merge-time"/);
+    assert.match(res.text, /median 4h · p90 6h/);
+    assert.match(res.text, /n = 3 merges · 30d/);
   });
 
   test('a workspaceFromUrl that ends the response means the handler never runs', async () => {

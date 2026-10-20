@@ -60,8 +60,8 @@
  * test uses for exactly this "does the real call site pass the right deps"
  * question) and §A.7's census-seed verbatim guarantee, tested by directly
  * importing the one pure helper the route exports for this reason,
- * `buildCensusSeedText` (see its own doc comment in routes/flight-companion.js
- * for why it — and only it — is exported).
+ * `buildCensusSeedText` (see its own doc comment in lib/flight-companion-census-seed.js
+ * for why it is exported; routes/flight-companion.js re-exports it).
  */
 process.env.NODE_ENV = 'test';
 
@@ -1408,10 +1408,10 @@ describe('Flight Companion turn endpoint (LIN-2432 §A.7) — deterministic cens
     // what keeps lib/prompts/ free of any routes/ import. Both halves are pinned:
     // the call site passes the rendered seed...
     // LIN-2631 moved this pin with the code: the seed render and the builder
-    // call both live in the core now. `buildCensusSeedText` itself deliberately
-    // stays in the route (it is coupled to the census read and to
-    // buildCompanionSnapshot) and is injected, which is what keeps lib/ free of
-    // a routes/ import.
+    // call both live in the core now. `buildCensusSeedText` itself lives in
+    // lib/flight-companion-census-seed.js (coupled to the census read and to
+    // buildCompanionSnapshot; LIN-3717 moved it) and is still injected into the core (it was
+    // injected while it lived in routes/).
     assert.match(CORE_SRC, /buildFlightCompanionMessages\(\{[^}]*censusSeedText:\s*buildCensusSeedText\(currentCensusDoc\)/s);
     // ...and the user-initiated branch reads the doc fresh (auto-wake already
     // populated currentCensusDoc via the gate, above). LIN-2622's boot branch

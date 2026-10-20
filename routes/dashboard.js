@@ -2753,8 +2753,9 @@ export function createDashboardRoutes({
   //       in-flight child — a named, accepted proxy, surfaced as live:true +
   //       statusLineSource:'latest-completed-child', not misrepresented as live.
 
-  // Terminal checks are module-scoped + exported (sessionIsTerminal, loopIsTerminal)
-  // so the background precompute shares the exact same gate (LIN-632).
+  // Terminal checks (sessionIsTerminal, loopIsTerminal) live in lib/run-loop-state.js
+  // (LIN-3717) and are imported here, so the background precompute shares the exact
+  // same gate (LIN-632).
 
   // The cheap live proxy for an in-progress session's status line. Deterministic:
   // never an LLM call (the cost contract). Bug 2 (LIN-608): a freshly-started
