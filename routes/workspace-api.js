@@ -3561,7 +3561,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
   // because re-deriving `by` (a press row stored after the merge) would flip it,
   // and `by` is part of the idempotency key, so a second merged event and a
   // second Done write would follow. Without an events store there is no event.
-  async function mergedEventFor({ workspace, accountId, issueIdentifier, pr, headSha, openItems }) {
+  async function mergedEventFor({ workspace, accountId, issueIdentifier, pr, headSha, openItems, prOpenedAt, prMergedAt }) {
     if (!closeOutEventsStore) return null;
     const { urlKey } = workspace;
     const stored = await closeOutEventsStore.findMergedByPr({ urlKey, prUrl: pr.url });
@@ -3580,6 +3580,10 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       headSha,
       merged: true,
       openItems,
+      // LIN-3713: the forge's own times, written on this first sighting only
+      // (the `stored` return above means a repeat check never rewrites them).
+      prOpenedAt,
+      prMergedAt,
     });
   }
 
@@ -3592,7 +3596,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     for (const [index, pr] of prUrls.entries()) {
       const status = prStatuses[index];
       if (status?.readable !== true || status.merged !== true) continue;
-      const event = await mergedEventFor({ workspace, accountId, issueIdentifier, pr, headSha: statusHeadSha(status), openItems });
+      const event = await mergedEventFor({ workspace, accountId, issueIdentifier, pr, headSha: statusHeadSha(status), openItems, prOpenedAt: status.created_at, prMergedAt: status.merged_at });
       if (!event) continue;
       recorded.push({ id: event._id, by: event.by, prUrl: event.prUrl, headSha: event.headSha });
       if (!first.mergedEvent) first = { mergedEvent: event, mergedPrIndex: index };

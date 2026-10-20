@@ -36,7 +36,8 @@ beforeEach(() => {
     proxyEvents: db.collection('proxy-events'),
     agentStatus: db.collection('foreman-status'),
     reportHistory: db.collection('report-history'),
-    customPrompts: db.collection('custom-prompts')
+    customPrompts: db.collection('custom-prompts'),
+    closeOutEvents: db.collection('close-out-events')
   };
 });
 
@@ -356,5 +357,83 @@ describe('collectWorkspaceKpis daily series (LIN-3711)', () => {
     const { daily } = await run(A);
     assert.equal(sum(daily.done), 0);
     assert.deepEqual(daily.cost, { perDay: new Array(30).fill(0), pricedCount: 0, lineageCount: 1 });
+  });
+});
+
+describe('collectWorkspaceKpis mergeTime (LIN-3713)', () => {
+  const HOUR = 3600000;
+  // One merged close-out event whose forge times are `hours` apart, merged `mergedDaysAgo` days ago.
+  const mergeEvent = (urlKey, id, hours, { mergedDaysAgo = 1, merged = true, opened = undefined, at = daysAgo(0), prUrl = `https://github.com/o/r/pull/${id}` } = {}) => {
+    const prMergedAt = daysAgo(mergedDaysAgo);
+    return {
+      _id: `${urlKey}-${id}`, urlKey, by: 'person', prUrl, merged, issueIdentifier: 'SECRET-1', at,
+      prMergedAt,
+      prOpenedAt: opened === undefined ? new Date(prMergedAt.getTime() - hours * HOUR) : opened
+    };
+  };
+
+  test('median and p90 of the hours between opened and merged (odd n)', async () => {
+    await collections.closeOutEvents.insertMany([1, 2, 3, 4, 10].map((h, i) => mergeEvent(A, i, h)));
+    const { mergeTime } = await collectWorkspaceKpis({ collections, urlKey: A, now: NOW });
+    assert.deepEqual(mergeTime, { n: 5, medianHours: 3, p90Hours: 10 });
+  });
+
+  test('even n averages the middle two; hours round to one decimal', async () => {
+    await collections.closeOutEvents.insertMany([1, 2, 3, 4].map((h, i) => mergeEvent(A, i, h)));
+    const { mergeTime } = await collectWorkspaceKpis({ collections, urlKey: A, now: NOW });
+    assert.deepEqual(mergeTime, { n: 4, medianHours: 2.5, p90Hours: 4 });
+  });
+
+  test('two workspaces do not mix', async () => {
+    await collections.closeOutEvents.insertMany([
+      ...[1, 1, 1].map((h, i) => mergeEvent(A, i, h)),
+      ...[100, 200, 300, 400].map((h, i) => mergeEvent(B, i, h))
+    ]);
+    const a = await collectWorkspaceKpis({ collections, urlKey: A, now: NOW });
+    assert.deepEqual(a.mergeTime, { n: 3, medianHours: 1, p90Hours: 1 });
+    assert.equal(JSON.stringify(a).includes(B), false);
+    assert.equal(JSON.stringify(a.mergeTime).includes('github.com'), false, 'durations only, no PR urls');
+  });
+
+  test('outside 30 days, without a time, merged before opened and unmerged rows are left out; zero is kept', async () => {
+    await collections.closeOutEvents.insertMany([
+      mergeEvent(A, 'keep', 2),
+      mergeEvent(A, 'zero', 0),
+      mergeEvent(A, 'old', 5, { mergedDaysAgo: 45 }),
+      mergeEvent(A, 'no-open', 5, { opened: null }),
+      mergeEvent(A, 'backwards', -3),
+      mergeEvent(A, 'press', 5, { merged: false }),
+      { _id: 'legacy', urlKey: A, by: 'person', prUrl: 'https://github.com/o/r/pull/9', merged: true, at: daysAgo(1) }
+    ]);
+    const { mergeTime } = await collectWorkspaceKpis({ collections, urlKey: A, now: NOW });
+    assert.deepEqual(mergeTime, { n: 2, medianHours: 1, p90Hours: 2 });
+  });
+
+  test('a PR with two merged rows counts once', async () => {
+    const prUrl = 'https://github.com/o/r/pull/77';
+    await collections.closeOutEvents.insertMany([
+      { ...mergeEvent(A, 'first', 4, { prUrl, at: daysAgo(2) }), by: 'person' },
+      { ...mergeEvent(A, 'second', 8, { prUrl, at: daysAgo(1) }), by: 'close-out' }
+    ]);
+    const { mergeTime } = await collectWorkspaceKpis({ collections, urlKey: A, now: NOW });
+    assert.equal(mergeTime.n, 1);
+    // the earliest row (4h) wins over the later one (8h)
+    assert.equal(mergeTime.medianHours, 4);
+  });
+
+  test('no events gives n 0 and nulls, never NaN', async () => {
+    const { mergeTime } = await collectWorkspaceKpis({ collections, urlKey: A, now: NOW });
+    assert.deepEqual(mergeTime, { n: 0, medianHours: null, p90Hours: null });
+  });
+
+  test('the read is filtered on urlKey and merged in the query; a bag without closeOutEvents throws', async () => {
+    const events = spied(collections.closeOutEvents);
+    await collectWorkspaceKpis({ collections: { ...collections, closeOutEvents: events }, urlKey: A, now: NOW });
+    const [filter] = events.__calls.find[0];
+    assert.equal(filter.urlKey, A);
+    assert.equal(filter.merged, true);
+    assert.ok(filter.prMergedAt.$gte instanceof Date);
+    const { closeOutEvents: _omitted, ...without } = collections;
+    await assert.rejects(() => collectWorkspaceKpis({ collections: without, urlKey: A, now: NOW }), TypeError);
   });
 });

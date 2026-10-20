@@ -174,3 +174,32 @@ test('escalation-kpis.css carries the chart height, empty-note, sparkline and nu
   for (const rule of ['.kpi-chart-empty', '.kpi-card-spark', '.kpi-numbers-wrap']) assert.ok(css.includes(rule), rule);
   assert.match(css, /\.kpi-numbers-wrap\s*\{[^}]*overflow-x:\s*auto/);
 });
+
+// LIN-3713: time to merge, from the forge's own PR times
+const withMerge = mergeTime => render(stats({ mergeTime }));
+
+test('merge-time card: median and p90 with the n line from 3 merges', () => {
+  const html = withMerge({ n: 5, medianHours: 3, p90Hours: 10.5 });
+  assert.ok(has(html, 'workspace-kpis-card-merge-time'));
+  assert.match(html, /median 3h · p90 10\.5h/);
+  assert.match(html, /n = 5 merges · 30d/);
+  assert.equal(html.includes('too few merges'), false);
+});
+
+test('merge-time card: under 3 reads too few merges, with the n line, at n = 2 and n = 0', () => {
+  for (const mergeTime of [{ n: 2, medianHours: 1, p90Hours: 2 }, { n: 0, medianHours: null, p90Hours: null }]) {
+    const html = withMerge(mergeTime);
+    assert.match(html, /○ too few merges with forge times/);
+    assert.match(html, new RegExp(`n = ${mergeTime.n} merges · 30d`));
+    assert.equal(/median \d/.test(html), false);
+  }
+});
+
+test('merge-time card: the "Harbour saw" note is always there and no NaN or null text appears', () => {
+  for (const mergeTime of [{ n: 4, medianHours: 1, p90Hours: 2 }, { n: 0, medianHours: null, p90Hours: null }, undefined]) {
+    const html = withMerge(mergeTime);
+    assert.ok(has(html, 'workspace-kpis-merge-time-note'));
+    assert.match(html, /only merges Harbour saw on a PR check/);
+    assert.equal(/NaN|undefined|>null</.test(html), false);
+  }
+});

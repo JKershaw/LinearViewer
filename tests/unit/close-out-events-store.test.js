@@ -93,8 +93,10 @@ describe('CloseOutEventsStore.record', () => {
     const doc = await store.record(personMerge());
     const [stored] = await db.collection('close-out-events').find({}).toArray();
     assert.deepStrictEqual(Object.keys(stored).sort(), [
-      '_id', 'accountId', 'at', 'by', 'dispatchId', 'doneAt', 'doneError', 'headSha', 'issueId', 'issueIdentifier', 'merged', 'openItems', 'prUrl', 'urlKey'
+      '_id', 'accountId', 'at', 'by', 'dispatchId', 'doneAt', 'doneError', 'headSha', 'issueId', 'issueIdentifier', 'merged', 'openItems', 'prMergedAt', 'prOpenedAt', 'prUrl', 'urlKey'
     ]);
+    assert.strictEqual(stored.prOpenedAt, null);
+    assert.strictEqual(stored.prMergedAt, null);
     assert.strictEqual(stored._id, doc._id);
     assert.strictEqual(stored.by, 'person');
     assert.strictEqual(stored.dispatchId, null);
@@ -103,6 +105,33 @@ describe('CloseOutEventsStore.record', () => {
     assert.strictEqual(stored.merged, true);
     assert.deepStrictEqual(stored.openItems, { inside: 1, outside: 2, unknown: 0, total: 3 });
     assert.ok(new Date(stored.at).getTime() >= before);
+  });
+
+  test('LIN-3713: records the forge times as Dates (from ISO strings or Dates) and shape() returns ISO', async () => {
+    const doc = await store.record(personMerge({ prOpenedAt: '2026-06-01T08:00:00Z', prMergedAt: new Date('2026-06-01T10:30:00Z') }));
+    const [stored] = await db.collection('close-out-events').find({}).toArray();
+    assert.ok(new Date(stored.prOpenedAt).getTime() === Date.parse('2026-06-01T08:00:00Z'));
+    assert.ok(new Date(stored.prMergedAt).getTime() === Date.parse('2026-06-01T10:30:00Z'));
+    assert.ok(doc.prOpenedAt instanceof Date);
+    const read = await store.findMergedByPr({ urlKey: 'ws', prUrl: PR_URL });
+    assert.strictEqual(read.prOpenedAt, '2026-06-01T08:00:00.000Z');
+    assert.strictEqual(read.prMergedAt, '2026-06-01T10:30:00.000Z');
+    assert.ok(read.at, '`at` keeps its meaning: when Harbour observed the merge');
+  });
+
+  test('LIN-3713: a bad forge time rejects the whole event; an old event with neither field reads null', async () => {
+    for (const bad of ['garbage', NaN, 12345, {}, new Date('nope')]) {
+      assert.strictEqual(validateCloseOutEvent(personMerge({ prOpenedAt: bad })), 'prOpenedAt must be a valid date', String(bad));
+      assert.strictEqual(validateCloseOutEvent(personMerge({ prMergedAt: bad })), 'prMergedAt must be a valid date', String(bad));
+      assert.strictEqual(await store.record(personMerge({ prMergedAt: bad })), null);
+    }
+    assert.strictEqual(validateCloseOutEvent(personMerge({ prOpenedAt: null, prMergedAt: undefined })), null);
+    await db.collection('close-out-events').insertOne({
+      _id: 'old', urlKey: 'ws', issueIdentifier: 'LIN-1', by: 'person', prUrl: PR_URL, headSha: 'a', merged: true, openItems: {}, at: new Date()
+    });
+    const old = await store.findMergedByPr({ urlKey: 'ws', prUrl: PR_URL });
+    assert.strictEqual(old.prOpenedAt, null);
+    assert.strictEqual(old.prMergedAt, null);
   });
 
   test('records a press with its dispatchId', async () => {

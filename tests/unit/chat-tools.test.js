@@ -1849,6 +1849,9 @@ describe('get_pr_status', () => {
       head: { ref: 'feature-x', sha: 'abc1234abc1234abc1234abc1234abc1234abcd' },
       base: { ref: 'main' },
       mergeable: true,
+      // LIN-3713: the forge's PR times ride along (null when the body has none)
+      created_at: null,
+      merged_at: null,
       ref: 'abc1234abc1234abc1234abc1234abc1234abcd',
       checks: [
         { name: 'unit', conclusion: 'success' },
