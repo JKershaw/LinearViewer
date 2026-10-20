@@ -12,7 +12,7 @@ import { sweepOneWorkspace } from '../../lib/liveness-alarm-sweep.js';
 import { buildTaskPageModel } from '../../lib/task-page-loader.js';
 import { renderTaskTrack } from '../../lib/render-task-page.js';
 import { enrichLoop, isTerminalLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
-import { deriveFollowUpDispatch } from '../../lib/chat-tools.js';
+import { deriveFollowUpDispatch } from '../../lib/follow-up-dispatch.js';
 import { runStatusMeta, renderStepFace } from '../../lib/render-run-steps.js';
 import { buildRunView } from '../../lib/run-view.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
