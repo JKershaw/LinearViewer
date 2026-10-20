@@ -1,0 +1,94 @@
+{
+ "lv-1012": {
+  "sha": "1ef562ce",
+  "totals": {
+   "files": 429,
+   "codeLines": 95364,
+   "commentLines": 71627,
+   "blankLines": 12913,
+   "functions": 8192,
+   "unitsOver10": 756,
+   "decisionPoints": 28006,
+   "worstFunctionByCodeLines": {
+    "file": "routes/workspace-api.js",
+    "name": "createWorkspaceApiRoutes",
+    "codeLines": 2650,
+    "spanLines": 4364,
+    "startLine": 310
+   },
+   "maxNesting": 7
+  },
+  "span200": 103,
+  "cyc50": 21,
+  "cyc30": 93
+ },
+ "lv-head": {
+  "sha": "9b2955cc",
+  "totals": {
+   "files": 459,
+   "codeLines": 97121,
+   "commentLines": 72635,
+   "blankLines": 13348,
+   "functions": 9249,
+   "unitsOver10": 752,
+   "decisionPoints": 28252,
+   "worstFunctionByCodeLines": {
+    "file": "routes/workspace-api.js",
+    "name": "createWorkspaceApiRoutes",
+    "codeLines": 1535,
+    "spanLines": 2950,
+    "startLine": 833
+   },
+   "maxNesting": 7
+  },
+  "span200": 90,
+  "cyc50": 10,
+  "cyc30": 76
+ },
+ "sd-1012": {
+  "sha": "0d54b974",
+  "totals": {
+   "files": 52,
+   "codeLines": 12570,
+   "commentLines": 9255,
+   "blankLines": 1446,
+   "functions": 1030,
+   "unitsOver10": 134,
+   "decisionPoints": 4751,
+   "worstFunctionByCodeLines": {
+    "file": "opencode-runner.js",
+    "name": "runOpenCode",
+    "codeLines": 452,
+    "spanLines": 768,
+    "startLine": 1076
+   },
+   "maxNesting": 6
+  },
+  "span200": 9,
+  "cyc50": 11,
+  "cyc30": 28
+ },
+ "sd-head": {
+  "sha": "bb1da78e",
+  "totals": {
+   "files": 55,
+   "codeLines": 13159,
+   "commentLines": 9504,
+   "blankLines": 1511,
+   "functions": 1091,
+   "unitsOver10": 139,
+   "decisionPoints": 4970,
+   "worstFunctionByCodeLines": {
+    "file": "opencode-runner.js",
+    "name": "runOpenCode",
+    "codeLines": 452,
+    "spanLines": 768,
+    "startLine": 1076
+   },
+   "maxNesting": 6
+  },
+  "span200": 9,
+  "cyc50": 11,
+  "cyc30": 28
+ }
+}

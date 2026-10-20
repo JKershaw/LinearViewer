@@ -1,0 +1,606 @@
+{
+ "sha": "0d54b974",
+ "note": "top-level units ranked by inclusive decision points: sum(cyclomatic-1) over the unit and every function nested in it; inclCond is the same sum with cyclomaticConditionsOnly. cyc/cond are the unit own rows. Source: scripts/code-shape/shape.mjs --functions",
+ "units": [
+  {
+   "file": "opencode-runner.js",
+   "name": "runOpenCode",
+   "line": 1076,
+   "span": 768,
+   "cyc": 132,
+   "cond": 116,
+   "incl": 181,
+   "inclCond": 165
+  },
+  {
+   "file": "reapers.js",
+   "name": "runStallFailsafe",
+   "line": 1680,
+   "span": 950,
+   "cyc": 99,
+   "cond": 86,
+   "incl": 162,
+   "inclCond": 136
+  },
+  {
+   "file": "dispatcher.js",
+   "name": "processPolledItem",
+   "line": 676,
+   "span": 793,
+   "cyc": 110,
+   "cond": 88,
+   "incl": 113,
+   "inclCond": 91
+  },
+  {
+   "file": "dispatcher.js",
+   "name": "runOnce",
+   "line": 1580,
+   "span": 500,
+   "cyc": 82,
+   "cond": 71,
+   "incl": 112,
+   "inclCond": 94
+  },
+  {
+   "file": "hook.js",
+   "name": "main",
+   "line": 1572,
+   "span": 608,
+   "cyc": 90,
+   "cond": 67,
+   "incl": 111,
+   "inclCond": 82
+  },
+  {
+   "file": "scripts/floor-report.mjs",
+   "name": "main",
+   "line": 116,
+   "span": 131,
+   "cyc": 41,
+   "cond": 35,
+   "incl": 75,
+   "inclCond": 48
+  },
+  {
+   "file": "reapers.js",
+   "name": "runOpenCodeCompletionCheck",
+   "line": 2939,
+   "span": 127,
+   "cyc": 42,
+   "cond": 37,
+   "incl": 59,
+   "inclCond": 54
+  },
+  {
+   "file": "e2e-smoke.js",
+   "name": "runFailsafeOnce",
+   "line": 763,
+   "span": 117,
+   "cyc": 53,
+   "cond": 44,
+   "incl": 57,
+   "inclCond": 48
+  },
+  {
+   "file": "reapers.js",
+   "name": "runHeartbeats",
+   "line": 176,
+   "span": 202,
+   "cyc": 46,
+   "cond": 36,
+   "incl": 57,
+   "inclCond": 46
+  },
+  {
+   "file": "heartbeat.js",
+   "name": "resolveAsyncWait",
+   "line": 196,
+   "span": 94,
+   "cyc": 57,
+   "cond": 50,
+   "incl": 56,
+   "inclCond": 49
+  },
+  {
+   "file": "e2e-smoke.js",
+   "name": "runOpenCodeHoldOnce",
+   "line": 1455,
+   "span": 146,
+   "cyc": 55,
+   "cond": 48,
+   "incl": 55,
+   "inclCond": 48
+  },
+  {
+   "file": "e2e-smoke.js",
+   "name": "runResumeOnce",
+   "line": 417,
+   "span": 113,
+   "cyc": 52,
+   "cond": 41,
+   "incl": 53,
+   "inclCond": 42
+  },
+  {
+   "file": "e2e-smoke.js",
+   "name": "runShutdownOnce",
+   "line": 1808,
+   "span": 106,
+   "cyc": 50,
+   "cond": 44,
+   "incl": 51,
+   "inclCond": 45
+  },
+  {
+   "file": "hook.js",
+   "name": "decideHookActionInner",
+   "line": 1173,
+   "span": 363,
+   "cyc": 50,
+   "cond": 40,
+   "incl": 50,
+   "inclCond": 40
+  },
+  {
+   "file": "opencode-runner.js",
+   "name": "holdForOpenCodeFollowUp",
+   "line": 803,
+   "span": 218,
+   "cyc": 41,
+   "cond": 40,
+   "incl": 47,
+   "inclCond": 44
+  },
+  {
+   "file": "e2e-smoke.js",
+   "name": "runOpenCodeResumeOnce",
+   "line": 1615,
+   "span": 90,
+   "cyc": 46,
+   "cond": 37,
+   "incl": 46,
+   "inclCond": 37
+  },
+  {
+   "file": "reapers.js",
+   "name": "runOpenCodeHeartbeats",
+   "line": 2701,
+   "span": 106,
+   "cyc": 45,
+   "cond": 27,
+   "incl": 46,
+   "inclCond": 28
+  },
+  {
+   "file": "reapers.js",
+   "name": "runFastFailWatchdog",
+   "line": 669,
+   "span": 145,
+   "cyc": 32,
+   "cond": 27,
+   "incl": 44,
+   "inclCond": 35
+  },
+  {
+   "file": "e2e-smoke.js",
+   "name": "runOpenCodeHeartbeatOnce",
+   "line": 974,
+   "span": 74,
+   "cyc": 40,
+   "cond": 35,
+   "incl": 42,
+   "inclCond": 36
+  },
+  {
+   "file": "signal-guard.js",
+   "name": "signalPid",
+   "line": 231,
+   "span": 50,
+   "cyc": 43,
+   "cond": 18,
+   "incl": 42,
+   "inclCond": 17
+  },
+  {
+   "file": "e2e-smoke.js",
+   "name": "runSentinelOnce",
+   "line": 634,
+   "span": 79,
+   "cyc": 37,
+   "cond": 32,
+   "incl": 41,
+   "inclCond": 36
+  },
+  {
+   "file": "e2e-smoke.js",
+   "name": "runOpenCodeTelemetryOnce",
+   "line": 1346,
+   "span": 91,
+   "cyc": 37,
+   "cond": 32,
+   "incl": 40,
+   "inclCond": 34
+  },
+  {
+   "file": "e2e-smoke.js",
+   "name": "runHoldOnce",
+   "line": 312,
+   "span": 85,
+   "cyc": 37,
+   "cond": 31,
+   "incl": 38,
+   "inclCond": 32
+  },
+  {
+   "file": "e2e-smoke.js",
+   "name": "runOpenCodeOnce",
+   "line": 1053,
+   "span": 74,
+   "cyc": 35,
+   "cond": 30,
+   "incl": 37,
+   "inclCond": 31
+  },
+  {
+   "file": "feedback.js",
+   "name": "sendFeedback",
+   "line": 94,
+   "span": 88,
+   "cyc": 28,
+   "cond": 27,
+   "incl": 34,
+   "inclCond": 29
+  },
+  {
+   "file": "e2e-smoke.js",
+   "name": "runOnce",
+   "line": 198,
+   "span": 88,
+   "cyc": 31,
+   "cond": 26,
+   "incl": 31,
+   "inclCond": 26
+  },
+  {
+   "file": "heartbeat.js",
+   "name": "tickSession",
+   "line": 369,
+   "span": 73,
+   "cyc": 31,
+   "cond": 9,
+   "incl": 30,
+   "inclCond": 8
+  },
+  {
+   "file": "reapers.js",
+   "name": "cleanupCompletedSessions",
+   "line": 3096,
+   "span": 102,
+   "cyc": 20,
+   "cond": 20,
+   "incl": 30,
+   "inclCond": 30
+  },
+  {
+   "file": "terminal-driver.js",
+   "name": "itermDriver.launch",
+   "line": 594,
+   "span": 127,
+   "cyc": 28,
+   "cond": 26,
+   "incl": 30,
+   "inclCond": 28
+  },
+  {
+   "file": "e2e-smoke.js",
+   "name": "runOpenCodeAbortOnce",
+   "line": 1174,
+   "span": 70,
+   "cyc": 30,
+   "cond": 27,
+   "incl": 29,
+   "inclCond": 26
+  },
+  {
+   "file": "dispatcher.js",
+   "name": "main",
+   "line": 2081,
+   "span": 164,
+   "cyc": 23,
+   "cond": 23,
+   "incl": 22,
+   "inclCond": 22
+  },
+  {
+   "file": "e2e-smoke.js",
+   "name": "parseArgs",
+   "line": 1962,
+   "span": 50,
+   "cyc": 23,
+   "cond": 22,
+   "incl": 22,
+   "inclCond": 21
+  },
+  {
+   "file": "harbour-token-mcp-server.js",
+   "name": "forwardProxyRequest",
+   "line": 184,
+   "span": 73,
+   "cyc": 23,
+   "cond": 20,
+   "incl": 22,
+   "inclCond": 19
+  },
+  {
+   "file": "transcript.js",
+   "name": "describeToolUse",
+   "line": 99,
+   "span": 15,
+   "cyc": 22,
+   "cond": 10,
+   "incl": 21,
+   "inclCond": 9
+  },
+  {
+   "file": "experiments/lin-3270-signal-guard-witness.js",
+   "name": "main",
+   "line": 40,
+   "span": 46,
+   "cyc": 20,
+   "cond": 14,
+   "incl": 20,
+   "inclCond": 13
+  },
+  {
+   "file": "transcript.js",
+   "name": "walkUsage",
+   "line": 297,
+   "span": 43,
+   "cyc": 21,
+   "cond": 18,
+   "incl": 20,
+   "inclCond": 17
+  },
+  {
+   "file": "reapers.js",
+   "name": "findSilentStartCandidates",
+   "line": 617,
+   "span": 32,
+   "cyc": 6,
+   "cond": 4,
+   "incl": 19,
+   "inclCond": 15
+  },
+  {
+   "file": "reapers.js",
+   "name": "findStalledExecuting",
+   "line": 945,
+   "span": 34,
+   "cyc": 20,
+   "cond": 12,
+   "incl": 19,
+   "inclCond": 11
+  },
+  {
+   "file": "dispatcher.js",
+   "name": "applyAbortEffects",
+   "line": 559,
+   "span": 87,
+   "cyc": 19,
+   "cond": 15,
+   "incl": 18,
+   "inclCond": 14
+  },
+  {
+   "file": "experiments/lin-3270-going-down-witness.js",
+   "name": "main",
+   "line": 62,
+   "span": 70,
+   "cyc": 17,
+   "cond": 16,
+   "incl": 18,
+   "inclCond": 17
+  },
+  {
+   "file": "links.js",
+   "name": "reportFromUrls",
+   "line": 187,
+   "span": 45,
+   "cyc": 18,
+   "cond": 15,
+   "incl": 18,
+   "inclCond": 14
+  },
+  {
+   "file": "opencode-liveness.js",
+   "name": "readOpenCodeLiveness",
+   "line": 219,
+   "span": 89,
+   "cyc": 19,
+   "cond": 15,
+   "incl": 18,
+   "inclCond": 14
+  },
+  {
+   "file": "opencode-runner.js",
+   "name": "extractErrorText",
+   "line": 163,
+   "span": 26,
+   "cyc": 19,
+   "cond": 17,
+   "incl": 18,
+   "inclCond": 16
+  },
+  {
+   "file": "opencode-runner.js",
+   "name": "readSessionProgress",
+   "line": 716,
+   "span": 17,
+   "cyc": 17,
+   "cond": 12,
+   "incl": 18,
+   "inclCond": 11
+  },
+  {
+   "file": "reapers.js",
+   "name": "reapPendingWindowCloses",
+   "line": 3481,
+   "span": 36,
+   "cyc": 14,
+   "cond": 14,
+   "incl": 18,
+   "inclCond": 17
+  },
+  {
+   "file": "terminal-driver.js",
+   "name": "buildLaunchMetric",
+   "line": 400,
+   "span": 28,
+   "cyc": 19,
+   "cond": 5,
+   "incl": 18,
+   "inclCond": 4
+  },
+  {
+   "file": "e2e-smoke.js",
+   "name": "readOpenCodeMessages",
+   "line": 1292,
+   "span": 20,
+   "cyc": 14,
+   "cond": 8,
+   "incl": 17,
+   "inclCond": 7
+  },
+  {
+   "file": "hook.js",
+   "name": "parseWithdrawBlocks",
+   "line": 689,
+   "span": 33,
+   "cyc": 18,
+   "cond": 18,
+   "incl": 17,
+   "inclCond": 17
+  },
+  {
+   "file": "reapers.js",
+   "name": "reapDoneSessionWindows",
+   "line": 3653,
+   "span": 32,
+   "cyc": 13,
+   "cond": 13,
+   "incl": 17,
+   "inclCond": 17
+  },
+  {
+   "file": "signal-guard.js",
+   "name": "inspectRecordedPid",
+   "line": 210,
+   "span": 17,
+   "cyc": 18,
+   "cond": 18,
+   "incl": 17,
+   "inclCond": 17
+  },
+  {
+   "file": "config.js",
+   "name": "gitLaunchProbe",
+   "line": 441,
+   "span": 45,
+   "cyc": 17,
+   "cond": 11,
+   "incl": 16,
+   "inclCond": 10
+  },
+  {
+   "file": "duplicate-launch.js",
+   "name": "detectDuplicateLaunch",
+   "line": 42,
+   "span": 35,
+   "cyc": 17,
+   "cond": 14,
+   "incl": 16,
+   "inclCond": 13
+  },
+  {
+   "file": "experiments/chrome-extension/service-worker.js",
+   "name": "pollForPrompts",
+   "line": 166,
+   "span": 96,
+   "cyc": 17,
+   "cond": 17,
+   "incl": 16,
+   "inclCond": 16
+  },
+  {
+   "file": "harbour-token-mcp-server.js",
+   "name": "handleRpc",
+   "line": 306,
+   "span": 28,
+   "cyc": 16,
+   "cond": 13,
+   "incl": 16,
+   "inclCond": 13
+  },
+  {
+   "file": "opencode-runner.js",
+   "name": "pollSessionIdle",
+   "line": 754,
+   "span": 15,
+   "cyc": 17,
+   "cond": 17,
+   "incl": 16,
+   "inclCond": 16
+  },
+  {
+   "file": "reapers.js",
+   "name": "findExhaustedRefires",
+   "line": 1256,
+   "span": 28,
+   "cyc": 17,
+   "cond": 12,
+   "incl": 16,
+   "inclCond": 11
+  },
+  {
+   "file": "reapers.js",
+   "name": "refireSentinelOverResume",
+   "line": 1487,
+   "span": 72,
+   "cyc": 16,
+   "cond": 15,
+   "incl": 16,
+   "inclCond": 15
+  },
+  {
+   "file": "reapers.js",
+   "name": "resumeOpenCodeOverNativeId",
+   "line": 1602,
+   "span": 52,
+   "cyc": 15,
+   "cond": 13,
+   "incl": 16,
+   "inclCond": 13
+  },
+  {
+   "file": "resources.js",
+   "name": "walkSubtree",
+   "line": 158,
+   "span": 32,
+   "cyc": 17,
+   "cond": 16,
+   "incl": 16,
+   "inclCond": 15
+  },
+  {
+   "file": "executors.js",
+   "name": "buildClaudeCommand",
+   "line": 427,
+   "span": 87,
+   "cyc": 16,
+   "cond": 16,
+   "incl": 15,
+   "inclCond": 15
+  }
+ ]
+}

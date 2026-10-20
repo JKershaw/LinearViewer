@@ -1,0 +1,606 @@
+{
+ "sha": "9b2955cc",
+ "note": "top-level units ranked by inclusive decision points: sum(cyclomatic-1) over the unit and every function nested in it; inclCond is the same sum with cyclomaticConditionsOnly. cyc/cond are the unit own rows. Source: scripts/code-shape/shape.mjs --functions",
+ "units": [
+  {
+   "file": "routes/dashboard.js",
+   "name": "createDashboardRoutes",
+   "line": 507,
+   "span": 2533,
+   "cyc": 29,
+   "cond": 23,
+   "incl": 467,
+   "inclCond": 328
+  },
+  {
+   "file": "public/flight-companion.js",
+   "name": "<module>/λ@47",
+   "line": 47,
+   "span": 2158,
+   "cyc": 15,
+   "cond": 13,
+   "incl": 447,
+   "inclCond": 375
+  },
+  {
+   "file": "routes/workspace-api.js",
+   "name": "createWorkspaceApiRoutes",
+   "line": 833,
+   "span": 2950,
+   "cyc": 12,
+   "cond": 12,
+   "incl": 417,
+   "inclCond": 341
+  },
+  {
+   "file": "public/ship.js",
+   "name": "<module>/λ@11",
+   "line": 11,
+   "span": 1849,
+   "cyc": 4,
+   "cond": 4,
+   "incl": 370,
+   "inclCond": 323
+  },
+  {
+   "file": "routes/test.js",
+   "name": "createTestRoutes",
+   "line": 62,
+   "span": 1887,
+   "cyc": 7,
+   "cond": 7,
+   "incl": 364,
+   "inclCond": 250
+  },
+  {
+   "file": "public/prompt-section.js",
+   "name": "<module>/λ@12",
+   "line": 12,
+   "span": 1468,
+   "cyc": 1,
+   "cond": 1,
+   "incl": 338,
+   "inclCond": 260
+  },
+  {
+   "file": "public/live-console.js",
+   "name": "<module>/λ@21",
+   "line": 21,
+   "span": 1394,
+   "cyc": 9,
+   "cond": 6,
+   "incl": 308,
+   "inclCond": 242
+  },
+  {
+   "file": "routes/proxy-compute.js",
+   "name": "createComputeRoutes",
+   "line": 67,
+   "span": 1531,
+   "cyc": 1,
+   "cond": 1,
+   "incl": 221,
+   "inclCond": 167
+  },
+  {
+   "file": "public/task-page.js",
+   "name": "<module>/λ@33",
+   "line": 33,
+   "span": 643,
+   "cyc": 5,
+   "cond": 5,
+   "incl": 175,
+   "inclCond": 141
+  },
+  {
+   "file": "public/chat.js",
+   "name": "<module>/λ@22",
+   "line": 22,
+   "span": 711,
+   "cyc": 1,
+   "cond": 1,
+   "incl": 174,
+   "inclCond": 144
+  },
+  {
+   "file": "routes/dispatch.js",
+   "name": "createDispatchRoutes",
+   "line": 263,
+   "span": 1200,
+   "cyc": 14,
+   "cond": 14,
+   "incl": 174,
+   "inclCond": 144
+  },
+  {
+   "file": "public/session.js",
+   "name": "<module>/λ@15",
+   "line": 15,
+   "span": 608,
+   "cyc": 3,
+   "cond": 3,
+   "incl": 170,
+   "inclCond": 127
+  },
+  {
+   "file": "lib/chat-tools.js",
+   "name": "createChatToolCatalog",
+   "line": 1299,
+   "span": 723,
+   "cyc": 35,
+   "cond": 31,
+   "incl": 154,
+   "inclCond": 122
+  },
+  {
+   "file": "public/roadmap.js",
+   "name": "<module>/λ@19",
+   "line": 19,
+   "span": 757,
+   "cyc": 2,
+   "cond": 2,
+   "incl": 154,
+   "inclCond": 113
+  },
+  {
+   "file": "routes/proxy-writes.js",
+   "name": "createProxyWriteRoutes",
+   "line": 129,
+   "span": 619,
+   "cyc": 3,
+   "cond": 3,
+   "incl": 150,
+   "inclCond": 137
+  },
+  {
+   "file": "lib/runner-kit/runner.mjs",
+   "name": "runCommand",
+   "line": 901,
+   "span": 309,
+   "cyc": 132,
+   "cond": 94,
+   "incl": 142,
+   "inclCond": 99
+  },
+  {
+   "file": "routes/email-auth.js",
+   "name": "createEmailAuthRoutes",
+   "line": 128,
+   "span": 508,
+   "cyc": 7,
+   "cond": 7,
+   "incl": 129,
+   "inclCond": 105
+  },
+  {
+   "file": "public/proxy.js",
+   "name": "<module>/λ@9",
+   "line": 9,
+   "span": 689,
+   "cyc": 11,
+   "cond": 10,
+   "incl": 125,
+   "inclCond": 99
+  },
+  {
+   "file": "routes/proxy.js",
+   "name": "createProxyRoutes",
+   "line": 489,
+   "span": 1126,
+   "cyc": 19,
+   "cond": 19,
+   "incl": 124,
+   "inclCond": 95
+  },
+  {
+   "file": "routes/workspace-api-roadmap.js",
+   "name": "createRoadmapRoutes",
+   "line": 65,
+   "span": 809,
+   "cyc": 1,
+   "cond": 1,
+   "incl": 122,
+   "inclCond": 96
+  },
+  {
+   "file": "lib/github-install-flow.js",
+   "name": "createGitHubInstallFlowRoutes",
+   "line": 180,
+   "span": 970,
+   "cyc": 2,
+   "cond": 2,
+   "incl": 118,
+   "inclCond": 108
+  },
+  {
+   "file": "public/next-run.js",
+   "name": "<module>/λ@37",
+   "line": 37,
+   "span": 547,
+   "cyc": 9,
+   "cond": 7,
+   "incl": 110,
+   "inclCond": 77
+  },
+  {
+   "file": "public/ship-journey.js",
+   "name": "<module>/λ@64",
+   "line": 64,
+   "span": 613,
+   "cyc": 23,
+   "cond": 17,
+   "incl": 103,
+   "inclCond": 91
+  },
+  {
+   "file": "routes/collective.js",
+   "name": "createCollectiveRoutes",
+   "line": 82,
+   "span": 560,
+   "cyc": 2,
+   "cond": 2,
+   "incl": 102,
+   "inclCond": 66
+  },
+  {
+   "file": "public/scan.js",
+   "name": "<module>/λ@54",
+   "line": 54,
+   "span": 469,
+   "cyc": 1,
+   "cond": 1,
+   "incl": 101,
+   "inclCond": 78
+  },
+  {
+   "file": "routes/jira-auth.js",
+   "name": "createJiraAuthRoutes",
+   "line": 124,
+   "span": 887,
+   "cyc": 2,
+   "cond": 2,
+   "incl": 99,
+   "inclCond": 86
+  },
+  {
+   "file": "public/task-chat.js",
+   "name": "<module>/λ@9",
+   "line": 9,
+   "span": 450,
+   "cyc": 15,
+   "cond": 10,
+   "incl": 97,
+   "inclCond": 72
+  },
+  {
+   "file": "lib/observation-sessions-materializer.js",
+   "name": "createObservationMaterializer",
+   "line": 58,
+   "span": 374,
+   "cyc": 5,
+   "cond": 5,
+   "incl": 96,
+   "inclCond": 81
+  },
+  {
+   "file": "lib/providers/jira/client.js",
+   "name": "createJiraClient",
+   "line": 97,
+   "span": 353,
+   "cyc": 10,
+   "cond": 5,
+   "incl": 93,
+   "inclCond": 72
+  },
+  {
+   "file": "lib/connection-credential.js",
+   "name": "createConnectionAccess",
+   "line": 532,
+   "span": 456,
+   "cyc": 4,
+   "cond": 4,
+   "incl": 91,
+   "inclCond": 81
+  },
+  {
+   "file": "public/common.js",
+   "name": "<module>/λ@896",
+   "line": 896,
+   "span": 493,
+   "cyc": 1,
+   "cond": 1,
+   "incl": 86,
+   "inclCond": 64
+  },
+  {
+   "file": "routes/held-connection.js",
+   "name": "createHeldConnectionRoutes",
+   "line": 116,
+   "span": 345,
+   "cyc": 7,
+   "cond": 7,
+   "incl": 83,
+   "inclCond": 67
+  },
+  {
+   "file": "public/context.js",
+   "name": "<module>/λ@21",
+   "line": 21,
+   "span": 322,
+   "cyc": 1,
+   "cond": 1,
+   "incl": 82,
+   "inclCond": 59
+  },
+  {
+   "file": "public/feedback-widget.js",
+   "name": "<module>/λ@28",
+   "line": 28,
+   "span": 506,
+   "cyc": 2,
+   "cond": 2,
+   "incl": 79,
+   "inclCond": 59
+  },
+  {
+   "file": "routes/task-chat.js",
+   "name": "createTaskChatRoutes",
+   "line": 242,
+   "span": 464,
+   "cyc": 3,
+   "cond": 3,
+   "incl": 79,
+   "inclCond": 70
+  },
+  {
+   "file": "public/close-out.js",
+   "name": "<module>/λ@23",
+   "line": 23,
+   "span": 269,
+   "cyc": 5,
+   "cond": 5,
+   "incl": 75,
+   "inclCond": 56
+  },
+  {
+   "file": "public/common.js",
+   "name": "<module>/λ@1949",
+   "line": 1949,
+   "span": 373,
+   "cyc": 1,
+   "cond": 1,
+   "incl": 73,
+   "inclCond": 53
+  },
+  {
+   "file": "lib/agent-turn.js",
+   "name": "runAgentTurn",
+   "line": 176,
+   "span": 406,
+   "cyc": 60,
+   "cond": 57,
+   "incl": 71,
+   "inclCond": 68
+  },
+  {
+   "file": "routes/proxy-reads.js",
+   "name": "createReadRoutes",
+   "line": 72,
+   "span": 540,
+   "cyc": 2,
+   "cond": 2,
+   "incl": 71,
+   "inclCond": 53
+  },
+  {
+   "file": "lib/unanswered-decisions.js",
+   "name": "collectUnansweredDecisions",
+   "line": 450,
+   "span": 269,
+   "cyc": 63,
+   "cond": 44,
+   "incl": 69,
+   "inclCond": 47
+  },
+  {
+   "file": "public/app.js",
+   "name": "init",
+   "line": 647,
+   "span": 355,
+   "cyc": 4,
+   "cond": 4,
+   "incl": 64,
+   "inclCond": 63
+  },
+  {
+   "file": "lib/providers/jira/fake-client.js",
+   "name": "createFakeJiraClient",
+   "line": 56,
+   "span": 215,
+   "cyc": 11,
+   "cond": 4,
+   "incl": 62,
+   "inclCond": 31
+  },
+  {
+   "file": "routes/flight-companion.js",
+   "name": "createFlightCompanionRoutes",
+   "line": 370,
+   "span": 500,
+   "cyc": 6,
+   "cond": 6,
+   "incl": 61,
+   "inclCond": 54
+  },
+  {
+   "file": "lib/ci-wake-sweep.js",
+   "name": "sweepOneWorkspace",
+   "line": 271,
+   "span": 142,
+   "cyc": 52,
+   "cond": 42,
+   "incl": 60,
+   "inclCond": 47
+  },
+  {
+   "file": "lib/terminal-marked-task-cost.js",
+   "name": "computeTerminalMarkedTaskCost",
+   "line": 215,
+   "span": 475,
+   "cyc": 57,
+   "cond": 55,
+   "incl": 60,
+   "inclCond": 58
+  },
+  {
+   "file": "lib/dispatch-store.js",
+   "name": "addFeedback",
+   "line": 2336,
+   "span": 399,
+   "cyc": 60,
+   "cond": 48,
+   "incl": 59,
+   "inclCond": 47
+  },
+  {
+   "file": "lib/next-run.js",
+   "name": "formatNextRunContext",
+   "line": 294,
+   "span": 124,
+   "cyc": 57,
+   "cond": 44,
+   "incl": 59,
+   "inclCond": 43
+  },
+  {
+   "file": "routes/proxy-dispatch.js",
+   "name": "createDispatchRoutes",
+   "line": 239,
+   "span": 512,
+   "cyc": 4,
+   "cond": 4,
+   "incl": 59,
+   "inclCond": 40
+  },
+  {
+   "file": "lib/context-graph.js",
+   "name": "buildContextGraph",
+   "line": 71,
+   "span": 147,
+   "cyc": 35,
+   "cond": 26,
+   "incl": 58,
+   "inclCond": 43
+  },
+  {
+   "file": "lib/ship-biscuit.js",
+   "name": "buildEditionModel",
+   "line": 343,
+   "span": 117,
+   "cyc": 52,
+   "cond": 49,
+   "incl": 58,
+   "inclCond": 51
+  },
+  {
+   "file": "public/ship-biscuit.js",
+   "name": "<module>/λ@17",
+   "line": 17,
+   "span": 198,
+   "cyc": 7,
+   "cond": 5,
+   "incl": 58,
+   "inclCond": 37
+  },
+  {
+   "file": "public/swim.js",
+   "name": "drawBlockingConnectors",
+   "line": 1655,
+   "span": 375,
+   "cyc": 32,
+   "cond": 31,
+   "incl": 58,
+   "inclCond": 56
+  },
+  {
+   "file": "public/swim.js",
+   "name": "drawBlockingConnectorsVertical",
+   "line": 2041,
+   "span": 375,
+   "cyc": 32,
+   "cond": 31,
+   "incl": 58,
+   "inclCond": 56
+  },
+  {
+   "file": "public/question-cards.js",
+   "name": "<module>/λ@13",
+   "line": 13,
+   "span": 300,
+   "cyc": 4,
+   "cond": 4,
+   "incl": 57,
+   "inclCond": 40
+  },
+  {
+   "file": "lib/task-page-loader.js",
+   "name": "createTaskPageLoader",
+   "line": 784,
+   "span": 210,
+   "cyc": 14,
+   "cond": 14,
+   "incl": 56,
+   "inclCond": 49
+  },
+  {
+   "file": "public/dispatch.js",
+   "name": "initDispatchPagePrompt",
+   "line": 349,
+   "span": 264,
+   "cyc": 12,
+   "cond": 8,
+   "incl": 54,
+   "inclCond": 42
+  },
+  {
+   "file": "public/swipe.js",
+   "name": "renderCard",
+   "line": 211,
+   "span": 320,
+   "cyc": 45,
+   "cond": 36,
+   "incl": 52,
+   "inclCond": 39
+  },
+  {
+   "file": "routes/task-share.js",
+   "name": "createTaskShareRoutes",
+   "line": 102,
+   "span": 249,
+   "cyc": 7,
+   "cond": 7,
+   "incl": 52,
+   "inclCond": 47
+  },
+  {
+   "file": "lib/plan-review-round-trips.js",
+   "name": "computePlanReviewRoundTrips",
+   "line": 569,
+   "span": 223,
+   "cyc": 48,
+   "cond": 41,
+   "incl": 51,
+   "inclCond": 41
+  },
+  {
+   "file": "routes/auth.js",
+   "name": "createAuthRoutes",
+   "line": 39,
+   "span": 497,
+   "cyc": 1,
+   "cond": 1,
+   "incl": 51,
+   "inclCond": 37
+  }
+ ]
+}
