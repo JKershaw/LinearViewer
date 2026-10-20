@@ -46,7 +46,7 @@ import { badRequest, jsonError } from '../lib/errors.js';
 import { getLoopsForWorkspace } from '../lib/pipeline-loops.js';
 import { collectUnansweredDecisions } from '../lib/unanswered-decisions.js';
 import { attachStandingSuggestions } from '../lib/dismissal-suggestions-store.js';
-import { enrichLoop, isTerminalLoop } from './dashboard.js';
+import { enrichLoop, isTerminalLoop } from '../lib/run-loop-state.js';
 
 const MAX_REASON_LENGTH = 500;
 
