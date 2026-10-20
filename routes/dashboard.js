@@ -57,8 +57,7 @@ import { readRunEvidence, buildRunEvidence } from '../lib/run-evidence.js';
 import { createPrStateStore, resolveRunPrRef } from '../lib/pr-state-store.js';
 import { resolvePrReadToken } from '../lib/github-pr-status.js';
 import { prStateCopy } from '../lib/pr-state-copy.js';
-import { resolveRunVariant, listRows } from '../lib/run-closeout-state.js';
-import { stopAtFromRows } from '../lib/task-run-facts.js';
+import { readTaskRunFacts } from '../lib/task-run-facts.js';
 import { buildSessionContextGraph } from '../lib/context-graph.js';
 import { findWakeEvent, isWaitingWakeMarker } from '../lib/dispatch-terminal.js';
 // LIN-3717: the loop/session terminal checks live in lib/run-loop-state.js (Runs &
@@ -1654,26 +1653,11 @@ export function createDashboardRoutes({
    * @returns {Promise<{stopAt: ('pr'|null), variant: ('standard'|'stepper'|'unknown')}>}
    */
   async function readRunFacts(store, urlKey, issueIdentifier) {
-    const defaults = { stopAt: null, variant: 'unknown' };
-    if (!store || !urlKey || !issueIdentifier) return defaults;
-    try {
-      const rows = [];
-      const live = await Promise.resolve(store.listItems(urlKey, { issueIdentifier })).catch(() => []);
-      rows.push(...listRows(live));
-      const hist = await Promise.resolve(store.listHistory(urlKey, { issueIdentifier })).catch(() => null);
-      rows.push(...listRows(hist));
-      const stopAt = stopAtFromRows(rows);
-      const kickoff = rows.find(row => row && row.kind === 'autopilot') || null;
-      // The row's own persisted `variant` is the authoritative source (never
-      // `promptName` — a real stepper kickoff is named `Autopilot (LIN-NNNN)`).
-      // Fail closed: a missing/unknown/non-autopilot row is `unknown`, so N2's
-      // promise is shown only for a positively-standard run.
-      const variant = resolveRunVariant(kickoff);
-      return { stopAt, variant };
-    } catch (err) {
-      console.error('Session page run-facts read failed:', err.message);
-      return defaults;
-    }
+    // LIN-3725: the same read as the task page, so the two agree on `stopAt`
+    // (own rows first, then the sessionId hop to the parent run row). The hop
+    // lifts `stopAt` only: `variant` stays the seed issue's own kickoff row.
+    // (`await` keeps this frame on the async stack for the test's facts-read probe.)
+    return await readTaskRunFacts({ store, urlKey, issueIdentifier, hopVariant: false });
   }
 
   // Retired experimental dashboard (LIN-509) → 302 to the first-class page.

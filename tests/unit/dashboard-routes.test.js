@@ -6522,9 +6522,10 @@ describe('GET /api/run/:runId/pr-state (LIN-3251, C1)', () => {
 });
 
 // LIN-3722: the run page's `stopAt` fact is the shared `stopAtFromRows` rule over
-// the seed issue's own rows, with NO sessionId hop and NO store-method guard.
-// Expected values were captured on the base commit (before the extraction), so
-// this table passes before and after.
+// the seed issue's own rows. LIN-3725: it now also follows the sessionId hop and
+// skips a missing store method, via `readTaskRunFacts`. The row table below was
+// captured on the base commit (before the extraction); only the missing-method
+// row changed (defaults -> skipped).
 describe('GET /observation/session/:sessionId — run-facts stopAt (LIN-3722)', () => {
   const PR = { kind: 'autopilot', stopAt: 'pr' };
   const cases = [
@@ -6544,10 +6545,10 @@ describe('GET /observation/session/:sessionId — run-facts stopAt (LIN-3722)', 
     ['history null, no pr', { live: [], history: null }, null],
     ['rejecting listItems, pr in history', { liveThrows: true, history: [PR] }, 'pr'],
     ['rejecting listItems, nothing else', { liveThrows: true, history: [] }, null],
-    ['store without listItems (defaults)', { noListItems: true, history: [PR] }, null],
+    ['store without listItems is skipped, history still read', { noListItems: true, history: [PR] }, 'pr'],
   ];
 
-  async function stopAtSeen({ live = [], history = [], liveThrows = false, noListItems = false }) {
+  async function stopAtSeen({ live = [], history = [], hops = {}, liveThrows = false, noListItems = false }) {
     const base = makeStores({ 'ws-a': {
       live: [], history: [autopilotHistoryItem('sess-rf', 'LIN-900')], agentStatus: [agentStatusDone('sess-rf', 'LIN-900')]
     } });
@@ -6564,15 +6565,18 @@ describe('GET /observation/session/:sessionId — run-facts stopAt (LIN-3722)', 
         if (!isFactsRead(opts)) return base.dispatchQueueStore.listHistory(urlKey, opts);
         return history;
       },
+      async getItemStatus(urlKey, id) {
+        return hops[id] || base.dispatchQueueStore.getItemStatus?.(urlKey, id) || null;
+      },
     };
     if (noListItems) {
-      // readRunFacts calls store.listItems unguarded: for the facts read only, throw
-      // synchronously the TypeError that calling a missing method raises.
+      // LIN-3725: the facts read now skips a missing store method (the task page's
+      // guard), so hide `listItems` from the facts read only; the session
+      // point-read still needs it.
       const real = dispatchQueueStore.listItems;
-      dispatchQueueStore.listItems = (urlKey, opts) => {
-        if (isFactsRead(opts)) throw new TypeError('store.listItems is not a function');
-        return real(urlKey, opts);
-      };
+      Object.defineProperty(dispatchQueueStore, 'listItems', {
+        get() { return isFactsRead() ? undefined : real; },
+      });
     }
     const seen = [];
     const router = createDashboardRoutes({
@@ -6607,7 +6611,19 @@ describe('GET /observation/session/:sessionId — run-facts stopAt (LIN-3722)', 
     });
   }
 
-  test('no sessionId hop: worker rows alone never lift the run page to pr (open divergence from the task page)', async () => {
-    assert.equal(await stopAtSeen({ live: [{ sessionId: 'sess-rf', kind: 'implementation' }] }), null);
+  // LIN-3725: the run page follows the sessionId hop, as the task page does. The
+  // worker row names the parent run row, which carries `stopAt: 'pr'`.
+  test('sessionId hop: worker rows alone lift the run page to pr via the parent run row', async () => {
+    assert.equal(await stopAtSeen({
+      live: [{ sessionId: 'sess-rf', kind: 'implementation' }],
+      hops: { 'sess-rf': { kind: 'autopilot', stopAt: 'pr' } },
+    }), 'pr');
+  });
+
+  test('sessionId hop: a parent without stopAt pr leaves the run page null', async () => {
+    assert.equal(await stopAtSeen({
+      live: [{ sessionId: 'sess-rf', kind: 'implementation' }],
+      hops: { 'sess-rf': { kind: 'autopilot', stopAt: 'merge' } },
+    }), null);
   });
 });

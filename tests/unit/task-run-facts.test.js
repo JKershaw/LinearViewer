@@ -139,3 +139,24 @@ describe('readTaskRunFacts: stopAt over the same row table as the run page', () 
     });
   }
 });
+
+// LIN-3725: the run page calls with `hopVariant: false`: the hop lifts stopAt only.
+describe('readTaskRunFacts: hopVariant false (the run page)', () => {
+  const hops = { 'run-1': { kind: 'autopilot', stopAt: 'pr', variant: 'standard' } };
+  const queue = [{ kind: 'implementation', sessionId: 'run-1' }];
+  test('stopAt hops, variant stays unknown', async () => {
+    assert.deepEqual(
+      await readTaskRunFacts({ store: store({ queue, hops }), urlKey: 'ws', issueIdentifier: 'LIN-50', hopVariant: false }),
+      { stopAt: 'pr', variant: 'unknown' });
+  });
+  test('default still hops the variant too', async () => {
+    assert.deepEqual(
+      await readTaskRunFacts({ store: store({ queue, hops }), urlKey: 'ws', issueIdentifier: 'LIN-50' }),
+      { stopAt: 'pr', variant: 'standard' });
+  });
+  test('no hop read when own rows already carry stopAt', async () => {
+    const s = store({ queue: [{ kind: 'autopilot', stopAt: 'pr', variant: 'standard', sessionId: 'run-1' }] });
+    s.getItemStatus = async () => { throw new Error('should not hop'); };
+    assert.equal((await readTaskRunFacts({ store: s, urlKey: 'ws', issueIdentifier: 'LIN-50', hopVariant: false })).stopAt, 'pr');
+  });
+});
