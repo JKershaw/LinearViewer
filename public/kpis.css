@@ -221,6 +221,12 @@ p.kpi-chart-empty {
   line-height: 1.5;
 }
 
+.kpi-cost-shares {
+  margin: var(--space-1) 0 0;
+  padding-left: 1.2rem;
+  line-height: 1.5;
+}
+
 .kpi-numbers-wrap {
   overflow-x: auto;
   margin-top: var(--space-2);

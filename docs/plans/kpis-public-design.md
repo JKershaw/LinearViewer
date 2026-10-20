@@ -22,7 +22,7 @@ Source of every "today" row: `lib/render-kpis.js` (538 lines), `public/kpis.js` 
 | `noindex`, unlinked | kept | No change to linking; see "Out of scope". |
 | Whole stats object as `__KPI_DATA__` | changed | Only the `toPublicKpis` view is embedded. |
 | Headline outcome rate (+ done/failed/aborted slices, resolved of total) | kept | `dispatchOutcomes`. Counts of dispatch lineages, not people: not floored. Evidence link to the weekly chart kept. |
-| Cost per terminal-marked task card | **dropped** | The cash headline is always "—" (`resolveCashHeadline`, :125-129), and the card carries sixteen disclosures a stranger cannot use. Not published, builder kept. |
+| Cost per terminal-marked task card | **changed** (LIN-3714) | Was dropped in LIN-3703. Now one figure, "Cost per finished task" (API-equivalent, last 30 days), with its caveats in a closed "Show the numbers" fold. The cash figure and the other dollar and count lines stay out. See "Cost per finished task (LIN-3714)". |
 | Weekly budget burn gauge + chart | **dropped** | An estimate of the operator's own subscription window; an operator figure, not a public one. |
 | Stat card: workspaces (+ basis) | kept | `totals.workspaces`. The nearest public "how many people" figure (no `dispatchedBy`, :412-414). **Floored** (leaf, no group). Basis string kept as an app-defined label. |
 | Stat card: users | **dropped** | Counts the same people as the signed-up step; dropping it removes a group relation. |
@@ -69,6 +69,7 @@ Every numeric leaf of the public payload:
 | `totals.{agentActions,dispatches,autopilotRuns}` | not floored | Many events per workspace; an event count does not describe a person. |
 | `phases.{orienting,deciding,acting,watching,reporting}[]` | not floored | Per-day proxy-call tallies, many per run. |
 | `dispatchKinds[].count` | not floored | Dispatch rows per app-defined kind. |
+| `cost.{windowDays,perTaskUsd,tasks}`, `cost.shares.{attributableLineageShare,captureRateShare,pricedLineageShare,closeOutLineageShare,evidenceLinkedShare,opencodeSummedShare,unknownHarnessShare}` | not floored | LIN-3714. An average or ratio over dispatch lineages or tasks across every workspace; not a count of people. Small-sample rule instead of a leaf floor: `tasks` below `PUBLIC_COUNT_FLOOR` publishes `cost: null`. |
 | `totals.workspaces` | **floored** (leaf) | Counts workspaces, the nearest thing to people. No usable relation to another published figure, so no group. |
 | `milestoneFunnel.steps.{login,connected,firstGo,prOpened,mergeClicked}.count` | **floored**, group `steps` | People who signed up in the window and reached each step. |
 | `milestoneFunnel.mode.total` | **floored**, group `mode` | Task-mode entries (an account, workspace, issue triple) in the window. |
@@ -91,7 +92,7 @@ A viewer can watch a visible count (at least the floor) move by one, at most onc
 
 ## Layout
 
-One column. `max-width: 900px` content, `var(--space-*)` gutters, no horizontal overflow at 390px (the cards wrap in a two-column grid, charts get a fixed-height box). All colours come from the theme tokens the script already reads (`--green`, `--blue`, `--fg-dim`, ...), so dark parity needs no second palette. Section headings are `h3` inside `section[data-testid="kpis-section-<name>"]`. Hidden rows use the existing `kpi-chart-empty` look. Test ids: `kpis-headline`, `kpis-section-{outcome,activity,people}`, `kpis-card-<name>`, `kpis-chart-<name>`, `kpis-hidden`, `kpis-generated`, `kpis-privacy`; LIN-3710 adds `kpis-spark-<card>`, `kpis-numbers-<chart>` (the closed "Show the numbers" `details`) and `kpis-numbers-table-<chart>`; selectors in `SELECTORS.publicKpis`.
+One column. `max-width: 900px` content, `var(--space-*)` gutters, no horizontal overflow at 390px (the cards wrap in a two-column grid, charts get a fixed-height box). All colours come from the theme tokens the script already reads (`--green`, `--blue`, `--fg-dim`, ...), so dark parity needs no second palette. Section headings are `h3` inside `section[data-testid="kpis-section-<name>"]`. Hidden rows use the existing `kpi-chart-empty` look. Test ids: `kpis-headline`, `kpis-section-{outcome,activity,people}`, `kpis-card-<name>`, `kpis-chart-<name>`, `kpis-hidden`, `kpis-generated`, `kpis-privacy`; LIN-3714 adds `kpis-cost`, `kpis-cost-value` and `kpis-cost-numbers`; LIN-3710 adds `kpis-spark-<card>`, `kpis-numbers-<chart>` (the closed "Show the numbers" `details`) and `kpis-numbers-table-<chart>`; selectors in `SELECTORS.publicKpis`.
 
 ## Route and cache
 
@@ -118,11 +119,23 @@ Unchanged and passing: `kpi-stats-reads-pin.test.js`, `workspace-kpi-stats.test.
 | stat-card basis span (LIN-2325) | kept for the workspaces card. |
 | proxy-phase 30d/24h range toggle; proxy responses and top endpoints toggles; range-aware "+N more"; `renderChartBox` caption guards; "titles the newly-windowed charts"; work-funnel lower-bound caption | **dropped**: the 24h views, endpoint chart and work funnel are not on the page. |
 | vanity strip; queue-to-take latency formatting; omit empty vanity | **dropped**: the footer line is gone. |
-| cost-per-terminal-marked-task card (all 40 tests, :453-912) and weekly-budget gauge (:913-999) | **dropped** with the cards (builders and their own tests stay). |
+| cost-per-terminal-marked-task card (all 40 tests, :453-912) and weekly-budget gauge (:913-999) | **dropped** with the cards (builders and their own tests stay). The cost card came back in LIN-3714 as a single figure with a fold; the old label pins (`terminal-marked`, `cash:`) are now asserted absent. |
 
 New unit tests: `tests/unit/kpi-public-floor.test.js` (floor, registry walk, recovery grid, structural walk), `tests/unit/kpi-page.test.js` (the four cache behaviours and the throwing renderer, red on the old catch), the page-source and offline scan witness in `render-kpis.test.js`, and a privacy-line test in `render-legal.test.js`. Scratch mutations for each are recorded in the PR (change the constant, drop the pass, drop the group rule).
 
 `tests/e2e/kpis.spec.js`: the `KPIs page` describe is rewritten (render without auth, headline link, charts or empty notes, no mobile overflow, footer and unlinked, no raw below-floor value); the LIN-3002 describe stays. Range-toggle specs are dropped with the toggles; cost-card and gauge specs are dropped with the cards.
+
+## Cost per finished task (LIN-3714)
+
+On 20 Oct the operator recommended: label the figure "Cost per finished task" (API-equivalent, last 30 days); move the coverage and bias shares into a "Show the numbers" fold under it, still published but not beside it; keep the cash figure out. John, 20 Oct: "I agree with your recommendation." He agreed to the operator's recommendation; those words are the operator's, not his.
+
+This supersedes the 2026-08-03 ruling on two points only: the label ("cost per terminal-marked task") and the placement (shares "beside the number"). The rest stands, including that "verified" and its synonyms never appear in the builder's name, exports or field names, and that the builder's maths is unchanged.
+
+- **Figure.** `toPublicKpis` adds `cost: { windowDays, perTaskUsd, tasks, shares }`, picked by name from `stats.terminalMarkedTaskCost` (never spread). `perTaskUsd` is `pricedTicketCostUsd / pricedTicketCount` to 2dp, `null` (shown "—", never $0) when nothing is priced. `tasks` is `pricedTicketCount`.
+- **Small sample.** When `tasks` is below `PUBLIC_COUNT_FLOOR`, the view publishes `cost: null` and the page shows "—" with no fold, so an average never stands for one or two tasks.
+- **Fold.** A closed `<details>` "Show the numbers" holds the tasks averaged and seven shares, each labelled with its base: coverage, of all runs (`attributableLineageShare`, `captureRateShare`, `pricedLineageShare`, the last "of runs that reported usage"), and bias, of finished tasks (`closeOutLineageShare`, `evidenceLinkedShare`, `opencodeSummedShare` "known runner only", `unknownHarnessShare`). Shares are formatted "—" for null, "<1%" for a nonzero share that rounds to 0. They appear nowhere outside the fold.
+- **Not published.** Cash, `unknownLaneUsd`, `inFlightUsd`, `overheadUsd`, marker occupancy, `ticketsPerPricedLane`, `issueCount`, `unpriced`, `laneLandedCount`: a reader can use none, and the dollar lines would publish total spend. If shown later, the old wording rules apply (`inFlightUsd` is "unresolved", `overheadUsd` is "resolved overhead", `pricedLineageShare` is never "capture coverage").
+- **Privacy line.** The line and `/privacy` still say "totals and counts only"; a dollar average and percentages go slightly past that. Left as is; noted as an open question in the PR.
 
 ## Commit order
 
@@ -134,7 +147,7 @@ Then, in scratch: replay (old `collectKpiStats` against `toPublicKpis`), verbati
 
 ## Out of scope
 
-The in-app page and any admin dashboard; rebuilding `kpi-stats.js` internals; new reads, metrics, or per-workspace or per-person numbers; the live site scan; an operator surface for the dropped cost card and budget gauge (default: none in this PR); linking the page from anywhere (default: no; `noindex` stays).
+The in-app page and any admin dashboard; rebuilding `kpi-stats.js` internals; new reads, metrics, or per-workspace or per-person numbers; the live site scan; an operator surface for the cash figure and budget gauge (default: none in this PR); linking the page from anywhere (default: no; `noindex` stays).
 
 ## Divergences from the approved plan
 

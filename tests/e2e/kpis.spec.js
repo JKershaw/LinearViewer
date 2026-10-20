@@ -104,7 +104,7 @@ test.describe('KPIs page', () => {
     expect(await page.evaluate(() => typeof window.Chart !== 'undefined')).toBe(true);
 
     const data = await page.evaluate(() => window.__KPI_DATA__);
-    expect(Object.keys(data).sort()).toEqual(['daily', 'dispatchKinds', 'generatedAt', 'milestoneFunnel', 'outcomes', 'phases', 'totals']);
+    expect(Object.keys(data).sort()).toEqual(['cost', 'daily', 'dispatchKinds', 'generatedAt', 'milestoneFunnel', 'outcomes', 'phases', 'totals']);
     expect(data.phases.days.length).toBe(30);
     // Four whole weeks inside the 30-day window (the oldest partial week would under-fill).
     expect(data.outcomes.weeks.length).toBe(4);
@@ -223,6 +223,46 @@ test.describe('KPIs page — trend charts from a seeded payload (LIN-3710)', () 
     for (const name of DISCLOSURES) await page.locator(K.numbers(name)).locator('summary').click();
     await page.waitForTimeout(300);
     await expectNoClippedOverflow(page, { wraps: true });
+  });
+});
+
+// LIN-3714: the cost-per-finished-task figure and its closed fold, from the
+// same seeded payload (cost = $100 over 8 tasks).
+test.describe('KPIs page — cost per finished task (LIN-3714)', () => {
+  test.beforeEach(async ({ page }) => {
+    const html = renderKpisPage(toPublicKpis(buildStats({ fullSeries: true })));
+    await page.route('**/kpis', route => route.fulfill({ status: 200, contentType: 'text/html', body: html }));
+  });
+
+  test('shows the figure, its label and caption, and keeps the cash and spend lines out', async ({ page }) => {
+    await page.goto('/kpis');
+    await expect(page.locator(K.costValue)).toHaveText('$12.50');
+    await expect(page.locator(K.cost)).toContainText('Cost per finished task');
+    await expect(page.locator(K.cost)).toContainText('API-equivalent · last 30 days');
+    await expect(page.locator(K.cost)).toContainText('A task counts as finished when its agent marked it done.');
+    await expect(page.locator('main')).not.toContainText('cash:');
+    await expect(page.locator('main')).not.toContainText('terminal-marked');
+  });
+
+  test('the fold is closed, then opens on click to the task count and the seven shares', async ({ page }) => {
+    await page.goto('/kpis');
+    const fold = page.locator(K.costNumbers);
+    await expect(fold).not.toHaveAttribute('open', '');
+    await expect(fold.locator('li').first()).toBeHidden();
+    await fold.locator('summary').click();
+    await expect(fold).toContainText('Averaged over 8 finished tasks');
+    await expect(fold.locator('li')).toHaveCount(7);
+    await expect(fold.locator('li').first()).toBeVisible();
+  });
+
+  test('no horizontal overflow at 390px with the fold open', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/kpis');
+    await page.locator(K.costNumbers).locator('summary').click();
+    await page.waitForTimeout(300);
+    await expectNoClippedOverflow(page);
+    const over = await page.evaluate(sel => { const el = document.querySelector(sel); return el.scrollWidth - el.clientWidth; }, K.cost);
+    expect(over).toBeLessThanOrEqual(0);
   });
 });
 
