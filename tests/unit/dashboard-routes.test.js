@@ -6520,3 +6520,94 @@ describe('GET /api/run/:runId/pr-state (LIN-3251, C1)', () => {
     assert.equal(counts.github, 4);
   });
 });
+
+// LIN-3722: the run page's `stopAt` fact is the shared `stopAtFromRows` rule over
+// the seed issue's own rows, with NO sessionId hop and NO store-method guard.
+// Expected values were captured on the base commit (before the extraction), so
+// this table passes before and after.
+describe('GET /observation/session/:sessionId — run-facts stopAt (LIN-3722)', () => {
+  const PR = { kind: 'autopilot', stopAt: 'pr' };
+  const cases = [
+    ['pr row', { live: [PR] }, 'pr'],
+    ['merge row', { live: [{ stopAt: 'merge' }] }, null],
+    ['null stopAt', { live: [{ stopAt: null }] }, null],
+    ['undefined stopAt', { live: [{}] }, null],
+    ['no rows', { live: [] }, null],
+    ['falsy rows among a pr row', { live: [null, undefined, false, 0, PR] }, 'pr'],
+    ['falsy rows only', { live: [null, undefined, false, 0] }, null],
+    ['pr first', { live: [PR, { stopAt: 'merge' }] }, 'pr'],
+    ['pr last', { live: [{ stopAt: 'merge' }, PR] }, 'pr'],
+    ['pr in history only', { live: [], history: [PR] }, 'pr'],
+    ['pr in queue only', { live: [PR], history: [] }, 'pr'],
+    ['history as { items }', { live: [], history: { items: [PR] } }, 'pr'],
+    ['history as null', { live: [PR], history: null }, 'pr'],
+    ['history null, no pr', { live: [], history: null }, null],
+    ['rejecting listItems, pr in history', { liveThrows: true, history: [PR] }, 'pr'],
+    ['rejecting listItems, nothing else', { liveThrows: true, history: [] }, null],
+    ['store without listItems (defaults)', { noListItems: true, history: [PR] }, null],
+  ];
+
+  async function stopAtSeen({ live = [], history = [], liveThrows = false, noListItems = false }) {
+    const base = makeStores({ 'ws-a': {
+      live: [], history: [autopilotHistoryItem('sess-rf', 'LIN-900')], agentStatus: [agentStatusDone('sess-rf', 'LIN-900')]
+    } });
+    // The session point-read passes the same options, so tell the facts read apart
+    // by its caller.
+    const isFactsRead = () => /readRunFacts/.test(new Error().stack);
+    const dispatchQueueStore = {
+      async listItems(urlKey, opts) {
+        if (!isFactsRead(opts)) return base.dispatchQueueStore.listItems(urlKey, opts);
+        if (liveThrows) throw new Error('boom');
+        return live;
+      },
+      async listHistory(urlKey, opts) {
+        if (!isFactsRead(opts)) return base.dispatchQueueStore.listHistory(urlKey, opts);
+        return history;
+      },
+    };
+    if (noListItems) {
+      // readRunFacts calls store.listItems unguarded: for the facts read only, throw
+      // synchronously the TypeError that calling a missing method raises.
+      const real = dispatchQueueStore.listItems;
+      dispatchQueueStore.listItems = (urlKey, opts) => {
+        if (isFactsRead(opts)) throw new TypeError('store.listItems is not a function');
+        return real(urlKey, opts);
+      };
+    }
+    const seen = [];
+    const router = createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore, agentStatusStore: base.agentStatusStore,
+      observationSessionsStore: null,
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      readRunEvidence: async args => { seen.push(args); return null; },
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      fetchWorkspaceIssues: async () => [],
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({})
+    });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/observation/session/:sessionId');
+    const { req, res } = makeReqRes({
+      session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
+      workspace: { urlKey: 'ws-a' },
+      params: { sessionId: 'sess-rf' }
+    });
+    await handler(req, res, err => { throw err; });
+    assert.equal(res.statusCode, 200);
+    assert.equal(seen.length, 1, 'the evidence reader was handed the run facts once');
+    return seen[0].stopAt;
+  }
+
+  for (const [name, input, expected] of cases) {
+    test(`stopAt for ${name} is ${expected}`, async () => {
+      assert.equal(await stopAtSeen(input), expected);
+    });
+  }
+
+  test('no sessionId hop: worker rows alone never lift the run page to pr (open divergence from the task page)', async () => {
+    assert.equal(await stopAtSeen({ live: [{ sessionId: 'sess-rf', kind: 'implementation' }] }), null);
+  });
+});

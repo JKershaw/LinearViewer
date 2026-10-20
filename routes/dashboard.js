@@ -58,6 +58,7 @@ import { createPrStateStore, resolveRunPrRef } from '../lib/pr-state-store.js';
 import { resolvePrReadToken } from '../lib/github-pr-status.js';
 import { prStateCopy } from '../lib/pr-state-copy.js';
 import { resolveRunVariant, listRows } from '../lib/run-closeout-state.js';
+import { stopAtFromRows } from '../lib/task-run-facts.js';
 import { buildSessionContextGraph } from '../lib/context-graph.js';
 import { findWakeEvent, isWaitingWakeMarker } from '../lib/dispatch-terminal.js';
 // LIN-3717: the loop/session terminal checks live in lib/run-loop-state.js (Runs &
@@ -1661,7 +1662,7 @@ export function createDashboardRoutes({
       rows.push(...listRows(live));
       const hist = await Promise.resolve(store.listHistory(urlKey, { issueIdentifier })).catch(() => null);
       rows.push(...listRows(hist));
-      const stopAt = rows.some(row => row && row.stopAt === 'pr') ? 'pr' : null;
+      const stopAt = stopAtFromRows(rows);
       const kickoff = rows.find(row => row && row.kind === 'autopilot') || null;
       // The row's own persisted `variant` is the authoritative source (never
       // `promptName` — a real stepper kickoff is named `Autopilot (LIN-NNNN)`).
