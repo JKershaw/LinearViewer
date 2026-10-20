@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId } from '../fixtures/local-harness.js';
+import { expectNoClippedOverflow } from '../helpers.js';
 
 // LIN-3330: a task share link, end to end. The owner mints a link from the task
 // page; a fresh SIGNED-OUT browser context opens it at 360px and sees the same
@@ -92,8 +93,7 @@ test.describe('Task share link (LIN-3330)', () => {
     await expect(guest.locator('[data-testid="task-share-create"]')).toHaveCount(0);
     await expect(guest.locator('[data-testid="task-page-back"]')).toBeVisible();
 
-    const { scroll, client } = await guest.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
-    expect(scroll, `guest page scrolls sideways: ${scroll} > ${client}`).toBeLessThanOrEqual(client);
+    await expectNoClippedOverflow(guest);
     await guestCtx.close();
 
     // The owner sees the link listed (id, no token), then revokes it.

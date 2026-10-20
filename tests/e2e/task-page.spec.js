@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId } from '../fixtures/local-harness.js';
+import { expectNoClippedOverflow } from '../helpers.js';
 import { defaultJiraSeed, JIRA_SITE } from '../fixtures/jira-harness.js';
 
 // LIN-3329: the task page, owner view
@@ -94,10 +95,8 @@ async function postFeedback(page, token, itemId, message) {
   expect(fb.status(), `feedback failed: ${await fb.text()}`).toBe(200);
 }
 
-async function noHorizontalScroll(page) {
-  const { scroll, client } = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
-  expect(scroll, `page scrolls sideways: ${scroll} > ${client}`).toBeLessThanOrEqual(client);
-}
+// html/body are overflow-x: clip, so the document-root width reads 0 (LIN-3715).
+const noHorizontalScroll = page => expectNoClippedOverflow(page);
 
 const step = (page, kind) => page.locator(`[data-testid="task-page-stage"][data-kind="${kind}"]`);
 const head = (page, kind) => step(page, kind).locator('[data-testid="task-page-stage-head"]');

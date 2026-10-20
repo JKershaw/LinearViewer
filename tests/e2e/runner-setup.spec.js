@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { seedLocalWorkspace, workspaceApiLocalSeed } from '../fixtures/local-harness.js';
+import { expectNoClippedOverflow } from '../helpers.js';
 
 /**
  * LIN-3098 S4 — the runner setup page, `/workspace/:urlKey/runner`, on a
@@ -182,7 +183,6 @@ test.describe('runner setup page (LIN-3098 S4, phone)', () => {
     await page.goto(`/workspace/${urlKey}/runner`);
     await page.getByTestId('runner-setup-mint').tap();
     await expect(page.getByTestId('runner-setup-output')).toHaveValue(/## Your runner credential/);
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-    expect(overflow).toBeLessThanOrEqual(0);
+    await expectNoClippedOverflow(page);
   });
 });

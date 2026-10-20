@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { seedLocalWorkspace } from '../fixtures/local-harness.js';
-import { nav, workspaceKpis } from '../helpers.js';
+import { nav, workspaceKpis, expectNoClippedOverflow } from '../helpers.js';
 
 /**
  * LIN-3689 — the in-Harbour workspace KPIs page, GET /workspace/:urlKey/kpis.
@@ -139,19 +139,8 @@ test.describe('LIN-3689 — workspace KPIs page (e2e)', () => {
     const CHARTS = ['done-per-day', 'runs-by-kind', 'cost'];
 
     // html and body are `overflow-x: clip` (public/style.css), so the document
-    // never reports spill: measure the boxes themselves, as tests/e2e/kpis.spec.js does.
-    async function expectNoClippedOverflow(page) {
-      const m = await page.evaluate(() => ({
-        body: document.body.scrollWidth - document.body.clientWidth,
-        root: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-        boxes: [...document.querySelectorAll('[data-testid^="workspace-kpis-section-"], [data-testid^="workspace-kpis-card-"]')]
-          .map(el => ({ id: el.dataset.testid, over: el.scrollWidth - el.clientWidth }))
-          .filter(b => b.over > 0),
-      }));
-      expect(m.body).toBeLessThanOrEqual(0);
-      expect(m.root).toBeLessThanOrEqual(0);
-      expect(m.boxes).toEqual([]);
-    }
+    // never reports spill: measure the boxes themselves (tests/helpers.js).
+    const expectNoSpill = page => expectNoClippedOverflow(page, { boxes: '[data-testid^="workspace-kpis-section-"], [data-testid^="workspace-kpis-card-"]' });
 
     test('with JavaScript every canvas or its empty note has size, and the sparklines draw', async ({ page }) => {
       await dispatch(page, keyA, 'implementation', 2);
@@ -207,7 +196,7 @@ test.describe('LIN-3689 — workspace KPIs page (e2e)', () => {
         await page.goto(`/workspace/${keyA}/kpis`);
         if (theme === 'dark') await page.evaluate(() => document.documentElement.classList.add('theme-dark'));
         for (const name of CHARTS) await workspaceKpis(page).numbers(name).locator('summary').click();
-        await expectNoClippedOverflow(page);
+        await expectNoSpill(page);
         // A table is wider than a phone: its wrapper scrolls instead of the page.
         const wrap = await page.locator('.kpi-numbers-wrap').first().evaluate(el => getComputedStyle(el).overflowX);
         expect(wrap).toBe('auto');
