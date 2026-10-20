@@ -1,7 +1,7 @@
 # Incident — Railway pauses new builds; a merged change waits to deploy
 
 **Date:** 2026-10-20
-**Duration:** Railway paused new builds from about 17:03Z (status incident [JUA1PC5H](https://status.railway.com/incident/JUA1PC5H), "New builds are temporarily paused"). It was still paused at 18:00Z.
+**Duration:** Railway paused new builds from about 17:03Z (status incident [JUA1PC5H](https://status.railway.com/incident/JUA1PC5H), "New builds are temporarily paused"). It was still paused at 19:37Z.
 **Severity:** Low. harbour.cat stayed up and kept serving its running deployment (`1259e49c`). The only effect was a delayed deploy.
 **Status:** Open, waiting on Railway. Close this when `b815a930` or later is live and the LIN-3732 post-deploy check has passed.
 
@@ -23,6 +23,8 @@ John found the cause on Railway's status page. Railway had paused new builds for
 | 17:46 | Operator: footer still `1259e49`, 37 minutes after the merge; asked John to look at Railway. |
 | ~17:50 | John linked the Railway status incident. |
 | 18:35 | Operator re-check: still paused. Railway's update now says paused deploys must be re-triggered after builds resume. |
+| 19:10 | Railway: builds still paused for all workspaces; they will come back in stages. |
+| 19:37 | Operator re-check: still paused; production still serves `1259e49c`. |
 
 ## What it taught
 
