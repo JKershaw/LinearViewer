@@ -7,36 +7,16 @@
  * hydrated from an embedded payload; counts below the floor render as text.
  */
 import { test, expect } from '@playwright/test';
-import { SELECTORS } from '../helpers.js';
+import { SELECTORS, expectNoClippedOverflow } from '../helpers.js';
 import { renderKpisPage } from '../../lib/render-kpis.js';
 import { toPublicKpis } from '../../lib/kpi-stats.js';
 import { buildStats } from '../helpers/public-kpis-fixture.js';
 
 const K = SELECTORS.publicKpis;
 
-// LIN-3710: `documentElement.scrollWidth - clientWidth` always reads 0 on this
-// site — html and body are `overflow-x: clip` (public/style.css, LIN-1068), so
-// content that spills past the viewport is cut off, not scrolled, and the
-// document never reports it (same trap as LIN-2830;
-// session-decision-layout.spec.js documents the idiom). Measure the boxes
-// themselves: nothing inside a chart box or card may be wider than its box.
-// `wraps` asserts the table wrappers really scroll (overflow-x: auto), which
-// is what keeps a wide table inside its box.
-async function expectNoClippedOverflow(page, { wraps = false } = {}) {
-  const m = await page.evaluate(({ boxes, wrapSel }) => ({
-    body: document.body.scrollWidth - document.body.clientWidth,
-    boxes: [...document.querySelectorAll(boxes)]
-      .map(el => ({ id: el.dataset.testid, over: el.scrollWidth - el.clientWidth }))
-      .filter(b => b.over > 0),
-    wraps: [...document.querySelectorAll(wrapSel)].map(el => getComputedStyle(el).overflowX),
-  }), { boxes: '[data-testid^="kpis-chart-"], [data-testid^="kpis-card-"]', wrapSel: '.kpi-numbers-wrap' });
-  expect(m.body).toBeLessThanOrEqual(0);
-  expect(m.boxes).toEqual([]);
-  if (wraps) {
-    expect(m.wraps.length).toBeGreaterThan(0);
-    for (const overflowX of m.wraps) expect(overflowX).toBe('auto');
-  }
-}
+// LIN-3710: nothing inside a chart box or card may be wider than its box, and
+// the table wrappers really scroll (overflow-x: auto); see expectNoClippedOverflow.
+const KPI_OVERFLOW = { boxes: '[data-testid^="kpis-chart-"], [data-testid^="kpis-card-"]', wrapSel: '.kpi-numbers-wrap' };
 
 // LIN-1846: /kpis is the only spec that ever requests /kpis, and the route
 // caches its instance-wide stats process-wide for 60s (server.js KPI_CACHE_MS)
@@ -148,7 +128,7 @@ test.describe('KPIs page', () => {
     await page.goto('/kpis');
     await page.waitForTimeout(300); // let charts lay out
 
-    await expectNoClippedOverflow(page);
+    await expectNoClippedOverflow(page, KPI_OVERFLOW);
 
     // The cards stay visible
     await expect(page.locator(K.card('workspaces'))).toBeVisible();
@@ -222,7 +202,7 @@ test.describe('KPIs page — trend charts from a seeded payload (LIN-3710)', () 
     await page.goto('/kpis');
     for (const name of DISCLOSURES) await page.locator(K.numbers(name)).locator('summary').click();
     await page.waitForTimeout(300);
-    await expectNoClippedOverflow(page, { wraps: true });
+    await expectNoClippedOverflow(page, { ...KPI_OVERFLOW, wraps: true });
   });
 });
 
@@ -260,7 +240,7 @@ test.describe('KPIs page — cost per finished task (LIN-3714)', () => {
     await page.goto('/kpis');
     await page.locator(K.costNumbers).locator('summary').click();
     await page.waitForTimeout(300);
-    await expectNoClippedOverflow(page);
+    await expectNoClippedOverflow(page, KPI_OVERFLOW);
     const over = await page.evaluate(sel => { const el = document.querySelector(sel); return el.scrollWidth - el.clientWidth; }, K.cost);
     expect(over).toBeLessThanOrEqual(0);
   });

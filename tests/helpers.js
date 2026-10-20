@@ -27,6 +27,8 @@
  * urlKey a session helper hands back, never off a hard-coded literal.
  */
 
+import { expect } from '@playwright/test'
+
 /**
  * Default workspace urlKey for the Linear test-token session path
  * (`/test/set-session`). The local-provider harness uses its own
@@ -136,6 +138,48 @@ export const SELECTORS = {
     stop: '[data-testid="dispatch-halt-stop"]',
     resume: '[data-testid="dispatch-halt-resume"]',
   },
+}
+
+/**
+ * LIN-3715: assert a page has no horizontal overflow that `overflow-x: clip`
+ * would hide. html and body are `overflow-x: clip` site-wide (public/style.css,
+ * LIN-1068), so `document.documentElement.scrollWidth - clientWidth` reads 0
+ * whatever the page does (same trap as LIN-2830, LIN-3710) — never use it as a
+ * witness. This measures rendered geometry instead:
+ *   - `body.scrollWidth <= body.clientWidth` (body still reports its content width);
+ *   - no element sits past the viewport's right edge unless an ancestor below
+ *     body scrolls or clips it (a contained box is allowed to be wide inside);
+ *   - `boxes`: each matching element has `scrollWidth <= clientWidth`;
+ *   - `wrapSel` + `wraps`: each matching wrapper exists and scrolls
+ *     (`overflow-x: auto`), which is what keeps a wide table inside its box.
+ */
+export async function expectNoClippedOverflow(page, { boxes = '', wrapSel = '', wraps = false } = {}) {
+  const m = await page.evaluate(({ boxes, wrapSel }) => {
+    const vw = document.documentElement.clientWidth;
+    const contains = el => {
+      for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+        if (/auto|scroll|hidden|clip/.test(getComputedStyle(p).overflowX)) return true;
+      }
+      return false;
+    };
+    return {
+      body: document.body.scrollWidth - document.body.clientWidth,
+      spill: [...document.body.querySelectorAll('*')]
+        .filter(el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.right > vw + 1 && !contains(el); })
+        .map(el => `${el.dataset.testid || el.id || el.tagName.toLowerCase() + '.' + el.className}@${Math.round(el.getBoundingClientRect().right)}>${vw}`),
+      boxes: boxes ? [...document.querySelectorAll(boxes)]
+        .map(el => ({ id: el.dataset.testid, over: el.scrollWidth - el.clientWidth }))
+        .filter(b => b.over > 0) : [],
+      wraps: wrapSel ? [...document.querySelectorAll(wrapSel)].map(el => getComputedStyle(el).overflowX) : [],
+    };
+  }, { boxes, wrapSel });
+  expect(m.body, 'body is wider than its box').toBeLessThanOrEqual(0);
+  expect(m.spill, 'elements spill past the viewport').toEqual([]);
+  expect(m.boxes).toEqual([]);
+  if (wraps) {
+    expect(m.wraps.length).toBeGreaterThan(0);
+    for (const overflowX of m.wraps) expect(overflowX).toBe('auto');
+  }
 }
 
 /**
