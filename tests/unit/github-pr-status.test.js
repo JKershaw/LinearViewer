@@ -83,12 +83,33 @@ describe('readPrStatusFailOpen', () => {
       head: { ref: 'feature-x', sha: SHA },
       base: { ref: 'main' },
       mergeable: true,
+      // LIN-3713: a PR body without the forge times reads as null/null
+      created_at: null,
+      merged_at: null,
       ref: SHA,
       checks: [
         { name: 'unit', conclusion: 'success' },
         { name: 'ci-success', conclusion: 'success' },
       ],
     });
+  });
+
+  test('LIN-3713: created_at and merged_at come through from the PR', async () => {
+    const responses = {
+      ...SUCCESS_RESPONSES,
+      [`/repos/${REPO}/pulls/42`]: {
+        status: 200,
+        body: {
+          state: 'closed', merged: true, mergeable: null,
+          created_at: '2026-06-01T08:00:00Z', merged_at: '2026-06-01T10:30:00Z',
+          head: { ref: 'feature-x', sha: SHA }, base: { ref: 'main' },
+        },
+      },
+    };
+    const result = await fetchPrStatus(makeFakeFetch(responses), { repo: REPO, number: 42, sha: SHA });
+    assert.strictEqual(result.created_at, '2026-06-01T08:00:00Z');
+    assert.strictEqual(result.merged_at, '2026-06-01T10:30:00Z');
+    assert.strictEqual(result.merged, true);
   });
 
   test('a thrown read (403 rate limit) yields state unknown instead of throwing', async () => {

@@ -41,8 +41,8 @@ function fakeProvider({ comments = [] } = {}) {
 function openStatus(number, sha = 'aaaaaaa', over = {}) {
   return { readable: true, repo: 'acme/widget', number, state: 'open', merged: false, head: { ref: 'f', sha }, ref: sha, checks: [], ...over };
 }
-function mergedStatus(number, sha = 'aaaaaaa') {
-  return { readable: true, repo: 'acme/widget', number, state: 'closed', merged: true, head: { ref: 'f', sha }, ref: sha, checks: [] };
+function mergedStatus(number, sha = 'aaaaaaa', times = {}) {
+  return { readable: true, repo: 'acme/widget', number, state: 'closed', merged: true, head: { ref: 'f', sha }, ref: sha, checks: [], ...times };
 }
 function unknownStatus(number) {
   return { readable: false, repo: 'acme/widget', number, state: 'unknown', reason: 'stub' };
@@ -253,6 +253,37 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
     const res = await check(built);
     assert.equal(res.jsonBody.done, false);
     assert.equal(built.calls.markDone, 0);
+  });
+
+  test('LIN-3713: a merge stores the forge times, not `at`; a repeat check does not rewrite them', async () => {
+    const times = { created_at: '2026-06-01T08:00:00Z', merged_at: '2026-06-01T10:30:00Z' };
+    let status = mergedStatus(41, 'aaaaaaa', times);
+    const built = makeRouter({
+      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')],
+      readPrStatus: async () => status,
+    });
+    await check(built);
+    const [first] = await rows(built.collection);
+    assert.equal(new Date(first.prOpenedAt).toISOString(), '2026-06-01T08:00:00.000Z');
+    assert.equal(new Date(first.prMergedAt).toISOString(), '2026-06-01T10:30:00.000Z');
+    assert.notEqual(new Date(first.at).getTime(), new Date(first.prMergedAt).getTime(), '`at` is when Harbour saw it');
+    // The forge reports different times on a later read: first sighting wins.
+    status = mergedStatus(41, 'aaaaaaa', { created_at: '2026-06-02T00:00:00Z', merged_at: '2026-06-02T01:00:00Z' });
+    await check(built);
+    const stored = await rows(built.collection);
+    assert.equal(stored.length, 1);
+    assert.equal(new Date(stored[0].prMergedAt).toISOString(), '2026-06-01T10:30:00.000Z');
+  });
+
+  test('LIN-3713: a merge whose status carries no forge times stores nulls', async () => {
+    const built = makeRouter({
+      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')],
+      statuses: { 41: mergedStatus(41) },
+    });
+    await check(built);
+    const [stored] = await rows(built.collection);
+    assert.strictEqual(stored.prOpenedAt, null);
+    assert.strictEqual(stored.prMergedAt, null);
   });
 
   test('idempotency: a repeated check writes no second event', async () => {

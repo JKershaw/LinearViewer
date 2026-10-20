@@ -137,6 +137,7 @@ One workspace's counts, last 7 and 30 UTC days, plus 30-day trend charts as rate
 - `[data-testid="workspace-kpis-numbers-{name}"]` - the closed "Show the numbers" `<details>` of each chart; `workspace-kpis-table-{name}` is its table, rendered on the server so it works without JavaScript. `workspace-kpis-noscript` says charts need JavaScript
 - `[data-testid="workspace-kpis-card-{dispatches|autopilot-runs|agent-actions|feedback-notes}"]` - activity cards; values at `workspace-kpis-value-{card}-7d` and `-30d`
 - `[data-testid="workspace-kpis-funnel-{dispatched|taken|reported|completed}"]`, `workspace-kpis-median-wait` (minutes, `-` when unknown) - the 30-day funnel
+- `[data-testid="workspace-kpis-card-merge-time"]` - "median Xh · p90 Yh" and "n = N merges · 30d" from the forge's own PR opened/merged times; under 3 merges it reads "too few merges with forge times". `workspace-kpis-merge-time-note` says it counts only merges Harbour saw on a PR check
 - `[data-testid="workspace-kpis-kind-row"]` - one row per dispatch kind (top 8)
 - `[data-testid="workspace-kpis-card-{custom-prompts|roadmap-reports}"]` - stored counts
 - `[data-testid="workspace-kpis-empty"]` - replaces activity, funnel and kinds when there were no dispatches or agent actions in 30 days
