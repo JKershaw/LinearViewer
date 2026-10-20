@@ -20,7 +20,7 @@ import { renderPage, renderDetailsContent } from '../../lib/render.js';
 import { orderIssuesForSwipe } from '../../lib/render-swipe.js';
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, nodeKey, PERIODICALS_PROJECT_ID } from '../../lib/tree.js';
 import { starterSeed } from '../../lib/starter-seed.js';
-import { testMockPeriodicalsTree } from '../../lib/sample-data/mock-data.js';
+import { testMockPeriodicalsTree } from '../fixtures/periodicals-tree.js';
 
 const URL_KEY = 'ws';
 
