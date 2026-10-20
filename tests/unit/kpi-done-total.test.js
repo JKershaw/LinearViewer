@@ -103,8 +103,13 @@ describe('public: the instance sum by day (LIN-3732)', () => {
       assert.equal((await publicStats()).doneTotal, null, 'only the marker, today and a later day: no rows');
     });
 
+    test(`loadDoneRollup returns no rows for the marker alone (${label} path)`, async () => {
+      await rollup.insertMany([marker()]);
+      assert.deepEqual(await loadDoneRollup(wrap(rollup)), []);
+    });
+
     test(`a row whose day is not YYYY-MM-DD is ignored (${label} path)`, async () => {
-      await rollup.insertMany([row(A, '2026-06-08', 2), row(A, 'yesterday', 50), row(A, '2026-6-9', 50), row(A, '2026-06-09T00:00', 50)]);
+      await rollup.insertMany([row(A, '2026-06-08', 2), row(A, '2026-05-1', 50), row(A, 'yesterday', 50), row(A, '2026-6-9', 50), row(A, '2026-06-09T00:00', 50)]);
       publicBag.kpiDailyRollup = wrap(rollup);
       assert.deepEqual((await publicStats()).doneTotal, { since: '2026-06-08', through: '2026-06-09', done: [2, 0], total: 2 });
     });
@@ -166,7 +171,7 @@ describe('workspace: filtered to its own urlKey (LIN-3732)', () => {
 
   test('a bag without kpiDailyRollup throws a TypeError', async () => {
     const { kpiDailyRollup: _omitted, ...without } = workspaceBag;
-    await assert.rejects(() => collectWorkspaceKpis({ collections: without, urlKey: A, now: NOW }), TypeError);
+    await assert.rejects(() => collectWorkspaceKpis({ collections: without, urlKey: A, now: NOW }), { name: 'TypeError', message: /collectWorkspaceKpis/ });
   });
 });
 
