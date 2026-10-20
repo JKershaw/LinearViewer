@@ -405,19 +405,24 @@ test.describe('KPIs page — tasks finished since (LIN-3732)', () => {
     const total = toggle.locator('button[data-mode="total"]');
     const caption = page.locator('[data-testid="kpis-total-caption"]');
     const chartType = () => page.evaluate(() => window.Chart.getChart(document.getElementById('chart-done-daily'))?.config.type);
+    // Nothing finished in the 30-day window here, so the rate view is its "nothing yet" note, not a chart.
+    const rateNote = toggle.locator('.kpi-chart-empty');
 
     await expect(rate).toHaveAttribute('aria-pressed', 'true');
     await expect(caption).toBeHidden();
-    expect(await chartType()).toBe('bar');
+    await expect(rateNote).toContainText('nothing finished yet');
+    expect(await chartType()).toBeUndefined();
 
     await total.click();
     await expect(total).toHaveAttribute('aria-pressed', 'true');
     await expect(caption).toBeVisible();
     await expect(caption).toContainText(label(60));
+    await expect(rateNote).toHaveCount(0);
     expect(await chartType()).toBe('line');
 
     await rate.click();
     await expect(caption).toBeHidden();
-    expect(await chartType()).toBe('bar');
+    await expect(rateNote).toContainText('nothing finished yet');
+    expect(await chartType()).toBeUndefined();
   });
 });
