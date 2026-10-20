@@ -107,9 +107,9 @@ describe('INVENTORY completeness (Done-when 5)', () => {
     assert.deepStrictEqual(missingFrom(without), ['workspace-halt']);
   });
 
-  test('the universe is the 51 names the plan bounded (funnel-events retired by LIN-3632 is not in it)', () => {
+  test('the universe is the 52 names the plan bounded (funnel-events retired by LIN-3632 is not in it)', () => {
     const universe = collectionUniverse();
-    assert.strictEqual(universe.size, 51);
+    assert.strictEqual(universe.size, 52);
     assert.ok(!universe.has('funnel-events'));
     assert.ok(!INVENTORY.some((r) => r.collection === 'funnel-events'), 'LIN-3632: no lib module may name the retired collection');
   });

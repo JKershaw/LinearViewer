@@ -80,6 +80,7 @@ import { getSeenModels } from './lib/unpriced-models.js' // LIN-3094: models who
 import { LivenessAlarmStore } from './lib/liveness-alarm-store.js'
 import { createLivenessAlarmSweepRun } from './lib/liveness-alarm-sweep.js'
 import { createCiWakeSweepRun, createTickWorkspaceResolver } from './lib/ci-wake-sweep.js'
+import { createKpiDailyRollupRun } from './lib/kpi-daily-rollup.js'
 import { SessionSummaryCacheStore } from './lib/session-summary-cache.js'
 import { RunParagraphStore } from './lib/run-paragraph-store.js'
 import { createRunParagraphPrecompute } from './lib/run-paragraph-hook.js'
@@ -372,6 +373,7 @@ localProvider.configure({ store: localStore })
 const dispatchQueueCollection = db.collection('dispatch-queue')
 const dispatchTokensCollection = db.collection('dispatch-tokens')
 const dispatchHistoryCollection = db.collection('dispatch-history')
+const kpiDailyRollupCollection = db.collection('kpi-daily-rollup')
 // LIN-3257 (M1 shadow): additive, optional storage for the wake-shadow verdict,
 // per-day tally and per-edge prior. Nothing on the delivery path reads it — the
 // write is best-effort and the proxy reads are read-only. Absent ⇒ no-op.
@@ -996,6 +998,22 @@ scheduler.register({
 // Same discipline as the sweeps above: not awaited, with a purpose-written catch.
 }).catch((err) => {
   console.error(`[ci-wake-sweep] scheduler.register failed — the sweep will NOT run this boot: ${err.message}`)
+})
+
+// KPI daily rollup (LIN-3724, design LIN-3712): the scheduler is interval-only,
+// so this ticks hourly and the job gates on a marker doc to make ONE full
+// dispatch-history scan per UTC day (lib/kpi-daily-rollup.js). No
+// `{ dispatchedAt: 1 }` index is added for it (see ROLLUP_HISTORY_INDEX).
+const KPI_DAILY_ROLLUP_INTERVAL_MS = 60 * 60 * 1000
+const KPI_DAILY_ROLLUP_LEASE_MS = 10 * 60 * 1000
+scheduler.register({
+  name: 'kpi-daily-rollup',
+  intervalMs: KPI_DAILY_ROLLUP_INTERVAL_MS,
+  leaseMs: KPI_DAILY_ROLLUP_LEASE_MS,
+  run: createKpiDailyRollupRun({ dispatchHistory: dispatchHistoryCollection, rollup: kpiDailyRollupCollection })
+// Same discipline as the sweeps above: not awaited, with a purpose-written catch.
+}).catch((err) => {
+  console.error(`[kpi-daily-rollup] scheduler.register failed — the rollup will NOT run this boot: ${err.message}`)
 })
 
 // =============================================================================

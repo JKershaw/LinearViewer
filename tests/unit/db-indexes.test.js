@@ -562,3 +562,19 @@ describe('db-indexes', () => {
     assert.deepStrictEqual(ttlCollections, ['email-magic-links']);
   });
 });
+
+describe('KPI daily rollup indexes (LIN-3724)', () => {
+  test('the rollup collection has a unique { urlKey, day } spec', () => {
+    const spec = INDEX_SPECS.find(s => s.collection === 'kpi-daily-rollup');
+    assert.ok(spec, 'kpi-daily-rollup spec present');
+    assert.deepStrictEqual(spec.keySpec, { urlKey: 1, day: 1 });
+    assert.strictEqual(spec.options.unique, true);
+    assert.ok(spec.reason);
+  });
+
+  test('boot carries no { urlKey, dispatchedAt } or { dispatchedAt } index on dispatch-history', () => {
+    const onHistory = INDEX_SPECS.filter(s => s.collection === 'dispatch-history').map(s => JSON.stringify(s.keySpec));
+    assert.ok(!onHistory.includes(JSON.stringify({ urlKey: 1, dispatchedAt: 1 })), 'the history index is a runbook step, not boot');
+    assert.ok(!onHistory.includes(JSON.stringify({ dispatchedAt: 1 })));
+  });
+});
