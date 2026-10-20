@@ -10,7 +10,8 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { createChatToolCatalog, CHAT_TOOL_SCHEMAS, CHAT_TOOL_SCOPE_TIERS, CHAT_TOOL_RESULT_BUDGETS, FOLLOW_UP_TOOL_SCHEMA, REMEMBER_TOOL_SCHEMA, PLAYBOOK_MAX_CHARS, deriveFollowUpDispatch, projectActiveSession } from '../../lib/chat-tools.js';
+import { createChatToolCatalog, CHAT_TOOL_SCHEMAS, CHAT_TOOL_SCOPE_TIERS, CHAT_TOOL_RESULT_BUDGETS, FOLLOW_UP_TOOL_SCHEMA, REMEMBER_TOOL_SCHEMA, PLAYBOOK_MAX_CHARS, projectActiveSession } from '../../lib/chat-tools.js';
+import { deriveFollowUpDispatch } from '../../lib/follow-up-dispatch.js';
 import { TOOL_RESULT_MAX_CHARS } from '../../lib/openrouter.js';
 import { hashContext } from '../../lib/recap-cache.js';
 import { snapshotFromContext } from '../../lib/task-snapshot-store.js';

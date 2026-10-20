@@ -197,6 +197,30 @@ describe('LIN-3254 — run-scoped task-chat turn (mockAi branch)', () => {
     assert.strictEqual(stores.addItemCalls.length, 0, 'run-scoped chat dispatches nothing');
   });
 
+  test('a run-scoped turn on a dash session persists one proposal with a null step and does not fail', async () => {
+    // deriveFollowUpDispatch throws for a dash anchor; persistProposal swallows
+    // it and records stepLoopId null (the third catcher mapping).
+    const stores = makeSessionStores({ sessionId: RUN_ID, target: 'dash' });
+    const runProposalsStore = fakeRunProposalsStore();
+    const app = buildTaskChatApp({
+      workspace: mockWorkspace(),
+      ...makeRouteDeps(stores),
+      runProposalsStore,
+    });
+
+    const { status, text } = await withServer(app, ({ post }) =>
+      post(`/workspace/${URL_KEY}/api/task-chat/TEST-1`, {
+        question: 'please follow up on this',
+        runId: RUN_ID,
+      }));
+
+    assert.strictEqual(status, 200);
+    assert.strictEqual(runProposalsStore.created.length, 1, 'exactly one proposal persisted');
+    assert.strictEqual(runProposalsStore.created[0].stepLoopId, null, 'no lineage tail for a dash anchor');
+    assert.ok(text.includes('"phase":"proposed"'), 'the turn still reports a proposed result');
+    assert.strictEqual(stores.addItemCalls.length, 0, 'run-scoped chat dispatches nothing');
+  });
+
   test('a non-run follow-up behaves as today — queued, no proposal, no run-scoped frame', async () => {
     const stores = makeSessionStores();
     const runProposalsStore = fakeRunProposalsStore();
