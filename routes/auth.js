@@ -17,6 +17,7 @@ import { convertToConnectionBacked, bindingShapeAt, CONNECTION_RETRY_TITLE, CONN
 import { calculateExpiresAt } from '../lib/token-refresh.js'
 import { applyUserPreferencesToSession, setThemeCookie } from '../lib/user-preferences.js'
 import { establishAccount } from '../lib/account-session.js'
+import { recordWorkspace } from '../lib/workspace-registry.js'
 import { evictWorkspaceTokenPair } from '../lib/workspace-token-cache.js'
 import { respondToAccountConflict, reproofUrlForAccount } from '../lib/account-conflict.js'
 
@@ -31,10 +32,11 @@ import { respondToAccountConflict, reproofUrlForAccount } from '../lib/account-c
  * @param {import('../lib/account-workspace-store.js').AccountWorkspaceStore} options.accountWorkspaceStore - LIN-1329: bind the account to the workspace.
  * @param {(key: string) => void} [options.evictWorkspaceToken] - LIN-1507: evicts a resolved-token cache entry by its pre-computed key (see `workspaceTokenCacheKey`). Called at /logout for every workspace the session referenced, before the session is destroyed.
  * @param {import('../lib/owner-credential-store.js').OwnerCredentialStore} [options.ownerCredentialStore] - LIN-1523: durable owner-credential store. Linear-only; other providers' auth routers receive this option too (shared mount loop) but ignore it.
+ * @param {import('../lib/workspace-store.js').WorkspaceStore} [options.workspaceStore] - LIN-3700: write-only urlKey registry. No default: absent is a logged skip.
  * @param {function(Object): Promise<Object>} [options.resolveWorkspaceUrlKey] - LIN-3382: the one urlKey resolver (lib/workspace-urlkey.js). NO default: the callback fails closed (503 retry page, nothing written) without it.
  * @returns {Router} Express router
  */
-export function createAuthRoutes({ userPreferencesStore, provider, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, connectionStore, resolveWorkspaceUrlKey }) {
+export function createAuthRoutes({ userPreferencesStore, provider, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, connectionStore, resolveWorkspaceUrlKey, workspaceStore }) {
   const router = Router()
 
   const OAUTH_ENV_VARS = ['LINEAR_CLIENT_ID', 'LINEAR_CLIENT_SECRET', 'LINEAR_REDIRECT_URI'];
@@ -299,6 +301,9 @@ export function createAuthRoutes({ userPreferencesStore, provider, accountStore,
           return respondToAccountConflict({ req, res, established, workspace, refreshToken: data.refresh_token, mode: 'add-source', returnUrlKey, identityLabel: 'Linear', reauthUrl: await reproofUrlForAccount(accountStore, req.session.accountId, '/auth/linear'), provider: 'linear' })
         }
 
+        // LIN-3700: record {urlKey -> id, provider} in the registry, best-effort and write-only, straight after the refusal blocks and before the bind is persisted (see lib/workspace-registry.js).
+        await recordWorkspace(workspaceStore, workspace)
+
         // LIN-3124 PR3 (D2a phase B): a new Linear binding becomes
         // connection-backed here, after the limit-check + establishAccount
         // refusals above, on the session-resident workspace. A re-link of a
@@ -429,6 +434,9 @@ export function createAuthRoutes({ userPreferencesStore, provider, accountStore,
               req.session.workspaces = workspacesBeforeLogin
               return await respondToAccountConflict({ req, res, established, workspace, refreshToken: data.refresh_token, mode: 'new', returnUrlKey: workspace.urlKey, identityLabel: 'Linear', reauthUrl: await reproofUrlForAccount(accountStore, req.session.accountId, '/auth/linear'), provider: 'linear' })
             }
+
+            // LIN-3700: record {urlKey -> id, provider} in the registry, best-effort and write-only, straight after the refusal blocks and before the bind is persisted (see lib/workspace-registry.js).
+            await recordWorkspace(workspaceStore, workspace)
 
             // LIN-3124 PR3 (D2a phase B): see the add-source arm above.
             const conversion = await convertToConnectionBacked({

@@ -36,6 +36,7 @@ import crypto from 'node:crypto'
 import { Router } from 'express'
 import { renderErrorPage, renderWorkspaceLimitPage, renderGitHubRepoSelectPage, renderGitHubProjectSelectPage } from '../lib/render-pages.js'
 import { getProvider } from '../lib/providers/registry.js'
+import { recordWorkspace } from '../lib/workspace-registry.js'
 import { getWorkspaceByUrlKey, upsertWorkspace, sameKindSourceBound, oneSourcePerKindMessage } from '../lib/workspace.js'
 import { persistBinding } from '../lib/persist-binding.js'
 import { TOKEN_REFRESH_BUFFER_MS } from '../lib/workspace-token-resolver.js'
@@ -100,6 +101,7 @@ function renderHeldState(res, { provider, heldEntry, title, message, status = 20
  * @param {(name: string) => Object|undefined} [deps.resolveProvider] - registry lookup (injectable for tests)
  * @param {Object} [deps.connectionStore] - injected store instance (held-mode `persistBinding` passthrough + C2 referent compensation)
  * @param {Object} [deps.accountWorkspaceStore] - injected edge writer (F8 owner edge; no import)
+ * @param {import('../lib/workspace-store.js').WorkspaceStore} [deps.workspaceStore] - LIN-3700: write-only urlKey registry.
  * @param {Function} [deps.listAuthorizedAccountConnections] - injected C1 reader (connectionStore bound in server.js)
  * @param {Function} [deps.heldConnectionCredentials] - injected seam reader for a held row's credentials (button: `lib/connection-credential.js`)
  * @param {Function} [deps.connectionBackedWritesEnabled] - D11 predicate (read per request)
@@ -115,6 +117,8 @@ export function createHeldConnectionRoutes({
   resolveProvider = getProvider,
   connectionStore,
   accountWorkspaceStore,
+  // LIN-3700: write-only urlKey registry store. No default: absent is a logged skip.
+  workspaceStore,
   listAuthorizedAccountConnections,
   heldConnectionCredentials,
   connectionBackedWritesEnabled = () => true,
@@ -373,6 +377,11 @@ export function createHeldConnectionRoutes({
       req.session.workspaces = snapshot
       return retryPage(res)
     }
+
+    // LIN-3700: registry write (best-effort, write-only; lib/workspace-registry.js).
+    // After the owner check above (that path undoes the bind, so it must leave
+    // no row), before the success marker.
+    await recordWorkspace(workspaceStore, container)
 
     req.session.providerAdded = { provider: surface.providerOkKey, scope }
     delete req.session.heldEntry

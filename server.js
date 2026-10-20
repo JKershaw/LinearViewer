@@ -638,9 +638,12 @@ const accountStore = new AccountStore({ collection: accountsCollection })
 const accountMergeEventsCollection = db.collection('account-merge-events')
 const accountMergeLogStore = new AccountMergeLogStore({ collection: accountMergeEventsCollection })
 
-// Durable workspaces (LIN-1328, Phase B). `workspaceStore` itself stays INERT —
-// deliberately passed to NO route factory and no session read site — until
-// LIN-1330 (Phase D) moves reads off the session `workspaces` blob onto it.
+// Durable workspaces (LIN-1328, Phase B). `workspaceStore` is a WRITE-ONLY urlKey
+// registry (LIN-3700, step 1 of LIN-3394): the bind sites record
+// `{id, urlKey, provider}` through `recordWorkspace` (lib/workspace-registry.js),
+// and it reaches each of them explicitly, no default. It is still passed to NO
+// session read site — LIN-1330 (Phase D) moves reads off the session
+// `workspaces` blob onto it.
 // `accountWorkspaceStore` (the account↔workspace membership edge) is DIFFERENT:
 // LIN-1329 (Phase C) wires every sign-in path to bind the account to the
 // session workspace's existing id via `establishAccount`, independent of
@@ -1129,7 +1132,7 @@ const resolveWorkspaceUrlKey = createWorkspaceUrlKeyResolver({
   findAccountByIdentity: (provider, scope) => accountStore.findAccountByIdentity(provider, scope)
 })
 
-app.use(createEnsurePATSession({ accountStore, accountWorkspaceStore, resolveWorkspaceUrlKey }));
+app.use(createEnsurePATSession({ accountStore, accountWorkspaceStore, resolveWorkspaceUrlKey, workspaceStore }));
 
 // =============================================================================
 // Token Refresh Middleware
@@ -1485,7 +1488,7 @@ app.use((req, res, next) => {
 const listAuthorizedAccountConnectionsFor = createAuthorizedAccountConnectionReader({ connectionStore })
 
 for (const provider of getAllProviders()) {
-  const authRouter = createProviderAuthRouter(provider, { userPreferencesStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, accountMergeLogStore, connectionStore, listAuthorizedAccountConnections: listAuthorizedAccountConnectionsFor, connectionBackedWritesEnabled, resolveWorkspaceUrlKey })
+  const authRouter = createProviderAuthRouter(provider, { userPreferencesStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, accountMergeLogStore, connectionStore, listAuthorizedAccountConnections: listAuthorizedAccountConnectionsFor, connectionBackedWritesEnabled, resolveWorkspaceUrlKey, workspaceStore })
   if (authRouter) app.use(authRouter)
 }
 // LIN-2304: the merge confirm/decline routes are shared across every
@@ -1493,10 +1496,10 @@ for (const provider of getAllProviders()) {
 // per-provider (every provider router mounts at root too, so a per-provider
 // registration of these same paths would be shadowed by whichever router
 // mounts first).
-app.use(createAccountMergeRoutes({ accountStore, accountWorkspaceStore, ownerCredentialStore, accountMergeLogStore, userPreferencesStore, connectionStore }))
+app.use(createAccountMergeRoutes({ accountStore, accountWorkspaceStore, ownerCredentialStore, accountMergeLogStore, userPreferencesStore, connectionStore, workspaceStore }))
 // LIN-1892 S2: the email magic-link door. Every route 503s when emailTransport is null.
 app.use(createEmailAuthRoutes({ accountStore, accountWorkspaceStore, userPreferencesStore, magicLinkStore, transport: emailTransport, linkOrigin: emailLinkOrigin, promptStep: resolvePromptStepMode(process.env) }))
-app.use(createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, connectionStore, resolveWorkspaceUrlKey, revokeWorkspaceArtifacts: (args) => workspaceRemovalRevoker.revoke(args) }))
+app.use(createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, connectionStore, resolveWorkspaceUrlKey, workspaceStore, revokeWorkspaceArtifacts: (args) => workspaceRemovalRevoker.revoke(args) }))
 app.use(createOpenRouterAuthRoutes({ userPreferencesStore }))
 // Note: Dispatch routes mounted after workspaceFromUrl middleware is defined
 
@@ -2533,6 +2536,7 @@ app.use(createHeldConnectionRoutes({
   convertToConnectionBacked,
   resolveCanonicalAccountId: (id) => accountStore.resolveCanonicalAccountId(id),
   resolveWorkspaceUrlKey,
+  workspaceStore,
   connectionRetry: { title: CONNECTION_RETRY_TITLE, message: CONNECTION_RETRY_MESSAGE },
 }))
 

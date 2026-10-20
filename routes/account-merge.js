@@ -11,6 +11,7 @@ import { upsertWorkspace, saveSession, persistOwnerCredential, getBindingCredent
 import { writeConnection } from '../lib/connection-store.js'
 import { onAccountMerged } from '../lib/connection-lifecycle.js'
 import { convertToConnectionBacked, bindingShapeAt, CONNECTION_RETRY_TITLE, CONNECTION_RETRY_MESSAGE } from '../lib/connection-credential.js'
+import { recordWorkspace } from '../lib/workspace-registry.js';
 import { isFreshlyAuthenticated, MERGE_CONFIRM_FRESH_AUTH_WINDOW_MS } from '../lib/account-session.js'
 import { applyUserPreferencesToSession } from '../lib/user-preferences.js'
 
@@ -42,9 +43,10 @@ const MERGE_FAILURE_COPY = {
  * @param {import('../lib/owner-credential-store.js').OwnerCredentialStore} [options.ownerCredentialStore]
  * @param {import('../lib/account-merge-log.js').AccountMergeLogStore} [options.accountMergeLogStore]
  * @param {Object} [options.userPreferencesStore] - LIN-2304: the confirm-completion step is now uniform across every provider (including Linear), so it needs the same preferences rehydration every non-conflict success path already performs.
+ * @param {import('../lib/workspace-store.js').WorkspaceStore} [options.workspaceStore] - LIN-3700: write-only urlKey registry. `pending.workspace` carries tokens: it reaches nothing but `recordWorkspace`, which hands the store only `{id, urlKey, provider}`.
  * @returns {Router}
  */
-export function createAccountMergeRoutes({ accountStore, accountWorkspaceStore, ownerCredentialStore, accountMergeLogStore, userPreferencesStore, connectionStore }) {
+export function createAccountMergeRoutes({ accountStore, accountWorkspaceStore, ownerCredentialStore, accountMergeLogStore, userPreferencesStore, connectionStore, workspaceStore }) {
   const router = Router()
 
   /**
@@ -148,6 +150,9 @@ export function createAccountMergeRoutes({ accountStore, accountWorkspaceStore, 
         return res.status(400).send(html)
       }
       await accountWorkspaceStore.bindAccountToWorkspace(canonicalAccountId, pending.workspace.id)
+      // LIN-3700: registry write (best-effort, write-only; lib/workspace-registry.js).
+      // Only inside `hasWorkspace` (a null-workspace merge binds nothing).
+      await recordWorkspace(workspaceStore, pending.workspace)
 
       // LIN-3127: additive, write-only Connection dual-write (best-effort) for
       // EVERY provider — deliberately NOT gated on pending.refreshToken (that

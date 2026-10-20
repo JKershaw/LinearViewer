@@ -267,4 +267,132 @@ describe('workspace-store', () => {
     assert.strictEqual(result.workspace.prefs.theme, 'dark');
     assert.ok(!('prefs.theme' in result.workspace), 'must not carry a literal dotted-path key');
   });
+
+  // LIN-3700: the urlKey registry (registerWorkspace), one row per urlKey.
+  describe('registerWorkspace (LIN-3700)', () => {
+    const SIX = ['_id', 'createdAt', 'id', 'provider', 'updatedAt', 'urlKey'];
+    const key = () => `reg-${randomUUID().slice(0, 8)}`;
+
+    test('stores exactly {_id, id, urlKey, provider, createdAt, updatedAt}, _id = urlKey', async () => {
+      const store = freshStore();
+      const urlKey = key();
+      const result = await store.registerWorkspace({ id: 'w-1', urlKey, provider: 'github' });
+      assert.deepStrictEqual(result, { ok: true, created: true, idChanged: false });
+      const doc = await store.collection.findOne({ _id: urlKey });
+      assert.deepStrictEqual(Object.keys(doc).sort(), SIX);
+      assert.strictEqual(doc.id, 'w-1');
+      assert.strictEqual(doc.urlKey, urlKey);
+      assert.strictEqual(doc.provider, 'github');
+    });
+
+    test('an object carrying bindings, accessToken and a canary stores only the six fields', async () => {
+      const store = freshStore();
+      const canary = `CANARY-${randomUUID()}`; // built at run time, never a literal in source
+      const urlKey = key();
+      const workspace = {
+        id: 'w-2', urlKey, provider: 'jira', accessToken: canary, refreshToken: canary,
+        bindings: [{ provider: 'jira', scope: 'site', credentials: { token: canary } }]
+      };
+      const result = await store.registerWorkspace(workspace);
+      assert.strictEqual(result.ok, true);
+      const doc = await store.collection.findOne({ _id: urlKey });
+      assert.deepStrictEqual(Object.keys(doc).sort(), SIX);
+      assert.ok(!JSON.stringify(doc).includes(canary));
+    });
+
+    test('the same key and id again keeps createdAt and moves updatedAt', async () => {
+      const store = freshStore();
+      const urlKey = key();
+      await store.registerWorkspace({ id: 'w-3', urlKey, provider: 'linear' });
+      const first = await store.collection.findOne({ _id: urlKey });
+      await new Promise(r => setTimeout(r, 5));
+      const again = await store.registerWorkspace({ id: 'w-3', urlKey, provider: 'linear' });
+      assert.deepStrictEqual(again, { ok: true, created: false, idChanged: false });
+      const second = await store.collection.findOne({ _id: urlKey });
+      assert.deepStrictEqual(second.createdAt, first.createdAt);
+      assert.ok(second.updatedAt > first.updatedAt);
+    });
+
+    test('key K with id A then id B leaves one row: id B, provider B, createdAt kept, idChanged true', async () => {
+      const store = freshStore();
+      const urlKey = key();
+      await store.registerWorkspace({ id: 'A', urlKey, provider: 'github' });
+      const first = await store.collection.findOne({ _id: urlKey });
+      const result = await store.registerWorkspace({ id: 'B', urlKey, provider: 'jira' });
+      assert.deepStrictEqual(result, { ok: true, created: false, idChanged: true });
+      assert.strictEqual(await store.collection.countDocuments({ urlKey }), 1);
+      const doc = await store.collection.findOne({ _id: urlKey });
+      assert.strictEqual(doc.id, 'B');
+      assert.strictEqual(doc.provider, 'jira');
+      assert.deepStrictEqual(doc.createdAt, first.createdAt);
+    });
+
+    test('two concurrent first registers of one key give one created:true and no throw', async () => {
+      const store = freshStore();
+      const urlKey = key();
+      const results = await Promise.all([
+        store.registerWorkspace({ id: 'A', urlKey, provider: 'github' }),
+        store.registerWorkspace({ id: 'B', urlKey, provider: 'github' })
+      ]);
+      assert.ok(results.every(r => r.ok));
+      assert.strictEqual(results.filter(r => r.created).length, 1);
+      assert.strictEqual(await store.collection.countDocuments({ urlKey }), 1);
+    });
+
+    test('a duplicate-key error from the losing upsert is retried once, not thrown', async () => {
+      const calls = [];
+      const store = new WorkspaceStore({
+        collection: {
+          findOneAndUpdate: async (...args) => {
+            calls.push(args);
+            if (calls.length === 1) throw Object.assign(new Error('E11000 duplicate key'), { code: 11000 });
+            return { _id: 'dup-key', id: 'A' };
+          }
+        }
+      });
+      const result = await store.registerWorkspace({ id: 'B', urlKey: 'dup-key', provider: 'github' });
+      assert.deepStrictEqual(result, { ok: true, created: false, idChanged: true });
+      assert.strictEqual(calls.length, 2);
+    });
+
+    test('any other store error propagates (the registry helper swallows it, not the store)', async () => {
+      const store = new WorkspaceStore({ collection: { findOneAndUpdate: async () => { throw new Error('boom'); } } });
+      await assert.rejects(store.registerWorkspace({ id: 'A', urlKey: 'k', provider: 'github' }), /boom/);
+    });
+
+    test('each invalid input is refused with its reason and writes nothing', async () => {
+      const store = freshStore();
+      const bad = [
+        [{ id: '', urlKey: 'ok', provider: 'github' }, 'invalid-id'],
+        [{ id: 42, urlKey: 'ok', provider: 'github' }, 'invalid-id'],
+        [{ id: 'w', urlKey: 'Has-Upper', provider: 'github' }, 'invalid-urlkey'],
+        [{ id: 'w', urlKey: 'has space', provider: 'github' }, 'invalid-urlkey'],
+        [{ id: 'w', urlKey: 'x'.repeat(51), provider: 'github' }, 'invalid-urlkey'],
+        [{ id: 'w', urlKey: undefined, provider: 'github' }, 'invalid-urlkey'],
+        [{ id: 'w', urlKey: 'ok', provider: 'email' }, 'invalid-provider'],
+        [{ id: 'w', urlKey: 'ok', provider: undefined }, 'invalid-provider']
+      ];
+      for (const [input, reason] of bad) {
+        assert.deepStrictEqual(await store.registerWorkspace(input), { ok: false, reason }, JSON.stringify(input));
+      }
+      assert.strictEqual(await store.collection.countDocuments({}), 0);
+    });
+
+    test('every accepted provider kind registers', async () => {
+      const store = freshStore();
+      for (const provider of ['linear', 'github', 'github-projects', 'jira', 'local']) {
+        const result = await store.registerWorkspace({ id: `w-${provider}`, urlKey: `k-${provider}`, provider });
+        assert.strictEqual(result.ok, true, provider);
+      }
+    });
+
+    test('createWorkspace is unchanged: it still keys on workspace.id and stores the whole workspace', async () => {
+      const store = freshStore();
+      const ws = sampleWorkspace();
+      const result = await store.createWorkspace(ws);
+      assert.strictEqual(result.ok, true);
+      const doc = await store.collection.findOne({ _id: ws.id });
+      assert.deepStrictEqual(doc.bindings, ws.bindings);
+    });
+  });
 });
