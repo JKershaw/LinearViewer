@@ -6548,7 +6548,7 @@ describe('GET /observation/session/:sessionId — run-facts stopAt (LIN-3722)', 
     ['store without listItems is skipped, history still read', { noListItems: true, history: [PR] }, 'pr'],
   ];
 
-  async function stopAtSeen({ live = [], history = [], hops = {}, liveThrows = false, noListItems = false }) {
+  async function factsSeen({ live = [], history = [], hops = {}, liveThrows = false, noListItems = false }) {
     const base = makeStores({ 'ws-a': {
       live: [], history: [autopilotHistoryItem('sess-rf', 'LIN-900')], agentStatus: [agentStatusDone('sess-rf', 'LIN-900')]
     } });
@@ -6602,7 +6602,11 @@ describe('GET /observation/session/:sessionId — run-facts stopAt (LIN-3722)', 
     await handler(req, res, err => { throw err; });
     assert.equal(res.statusCode, 200);
     assert.equal(seen.length, 1, 'the evidence reader was handed the run facts once');
-    return seen[0].stopAt;
+    return seen[0];
+  }
+
+  async function stopAtSeen(input) {
+    return (await factsSeen(input)).stopAt;
   }
 
   for (const [name, input, expected] of cases) {
@@ -6625,5 +6629,17 @@ describe('GET /observation/session/:sessionId — run-facts stopAt (LIN-3722)', 
       live: [{ sessionId: 'sess-rf', kind: 'implementation' }],
       hops: { 'sess-rf': { kind: 'autopilot', stopAt: 'merge' } },
     }), null);
+  });
+
+  // LIN-3725: the hop lifts `stopAt` only. `variant` stays the seed issue's own
+  // kickoff row, so a parent that says `standard` must not leak onto the run page
+  // (the call site passes `hopVariant: false`).
+  test('sessionId hop: lifts stopAt but variant stays unknown', async () => {
+    const facts = await factsSeen({
+      live: [{ sessionId: 'sess-rf', kind: 'implementation' }],
+      hops: { 'sess-rf': { kind: 'autopilot', stopAt: 'pr', variant: 'standard' } },
+    });
+    assert.equal(facts.stopAt, 'pr');
+    assert.equal(facts.variant, 'unknown');
   });
 });

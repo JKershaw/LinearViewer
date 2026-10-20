@@ -1303,9 +1303,10 @@ export function createDashboardRoutes({
       // of the session page, guarded to the ONE seam LIN-2948 will lift out.
       // Skipped when the reader is not wired (tests, and any deployment without
       // the module), and fail-open: a read error renders no evidence rather than
-      // a broken page. The run's `stopAt`/variant come off its own dispatch row
-      // (P1a/P1b): a standard run's box carries the seam-guard promise, a
-      // stepped run's does not (N2).
+      // a broken page. The run's `stopAt` comes off the seed issue's rows, then
+      // the sessionId hop to the parent run row (LIN-3725); its variant comes off
+      // the seed issue's own kickoff row only (P1a/P1b): a standard run's box
+      // carries the seam-guard promise, a stepped run's does not (N2).
       //
       // `runFacts` (a dispatch-row read) and `runnerReady` (a session feature
       // flag) are owner inputs read here and handed to the external half.
@@ -1642,7 +1643,8 @@ export function createDashboardRoutes({
 
   /**
    * The run's boundary facts for the close-out box, off its own dispatch row(s)
-   * (LIN-3248). `stopAt: 'pr'` is P1a's run fact; the run variant is the row's
+   * (LIN-3248), then the sessionId hop for `stopAt` (LIN-3725). `stopAt: 'pr'`
+   * is P1a's run fact; the run variant is the row's
    * own persisted `variant` field (`resolveRunVariant`, never `promptName`), so
    * N2's copy can be chosen at render time. Fail-open to the safe defaults:
    * no stop, `unknown` variant (the promise stays closed), never a broken page.
