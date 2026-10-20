@@ -3055,8 +3055,9 @@ app.use(createTaskCreateRoutes({ workspaceFromUrl, getOpenRouterSource, getDeplo
 // Mount the task page (LIN-3329) — one page per task, owner view: status, every
 // session oldest-first, brief/recap, details. A drill-down, no feature flag.
 // MUST mount after createTaskCreateRoutes: ISSUE_ID_REGEX accepts `new`, so
-// `/task/:identifier` would otherwise swallow `/task/new`. `enrichLoop` and
-// `deriveSessionWaiting` are injected (a lib/ loader must not import a route).
+// `/task/:identifier` would otherwise swallow `/task/new`.
+// `deriveSessionWaiting` is injected (a lib/ loader must not import a route),
+// and `enrichLoop` (lib/run-loop-state.js) beside it.
 const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore, agentStatusStore, briefCacheStore, recapCacheStore, readRunEvidence, prStateStore, installationTokenFor, closeOutEventsStore, enrichLoop, deriveSessionWaiting, deriveSessionDecisions })
 app.use(createTaskPageRoutes({
   workspaceFromUrl,

@@ -789,7 +789,7 @@ describe('workspace isolation and loop shaping', () => {
   });
 
   test('rows are ENRICHED — disposition and canReply are resolved, not left undefined', async () => {
-    // The enrichLoop export from routes/dashboard.js is justified as
+    // The enrichLoop export from lib/run-loop-state.js is justified as
     // load-bearing; without it `agentState` is missing and resolveDisposition
     // silently downgrades, so a live mid-turn ruling would report as repliable.
     // Dropping the enrichment previously left the whole suite green.
