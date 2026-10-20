@@ -189,3 +189,61 @@ p.kpi-chart-empty {
   font-size: 0.8rem;
   line-height: 1.5;
 }
+
+/* Sparkline under a stat card's figure (LIN-3710): inline SVG, tokens only. */
+.kpi-card-spark {
+  display: block;
+  margin-top: var(--space-1);
+  line-height: 0;
+}
+
+.kpi-card-spark svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+/* "Show the numbers" under a chart: notes, then the table in a wrapper that
+   scrolls on its own so the page never does. */
+.kpi-numbers {
+  margin-top: var(--space-2);
+  font-family: var(--font-structural);
+  font-size: 0.8rem;
+  color: var(--fg-dim);
+}
+
+.kpi-numbers summary {
+  cursor: pointer;
+}
+
+.kpi-numbers-note {
+  margin: var(--space-1) 0 0;
+  line-height: 1.5;
+}
+
+.kpi-numbers-wrap {
+  overflow-x: auto;
+  margin-top: var(--space-2);
+}
+
+.kpi-numbers-wrap table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.kpi-numbers-wrap th,
+.kpi-numbers-wrap td {
+  padding: 0.15rem var(--space-2);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.kpi-numbers-wrap th:first-child,
+.kpi-numbers-wrap td:first-child {
+  text-align: left;
+  padding-left: 0;
+}
+
+.kpi-numbers-wrap th {
+  font-weight: 600;
+}
