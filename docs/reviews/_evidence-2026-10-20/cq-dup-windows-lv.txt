@@ -40,7 +40,7 @@ looseB 1ef562ce: 70 pairs
 3 lib/collective-characters-store.js <> lib/dispatch-presets-store.js 96/111
 3 lib/observer-pass.js <> lib/observer-sweep.js 502/625
 3 routes/collective.js <> routes/passage-planner.js 132/48
-strict origin/main: 36 pairs
+strict 9b2955cc: 36 pairs
 22 routes/proxy-compute.js <> routes/task-chat.js 115/67
 8 lib/llm-call-log.js <> lib/proxy-events.js 105/535
 8 public/kpis.js <> public/workspace-kpis.js 166/38
@@ -61,7 +61,7 @@ strict origin/main: 36 pairs
 1 lib/chat-tools.js <> lib/follow-up-dispatch.js 1882/247
 1 lib/close-out-events-store.js <> lib/task-mode-store.js 376/337
 1 lib/collective-presets-store.js <> lib/dispatch-presets-store.js 131/161
-looseB origin/main: 68 pairs
+looseB 9b2955cc: 68 pairs
 23 routes/proxy-compute.js <> routes/task-chat.js 115/67
 20 public/kpis.js <> public/workspace-kpis.js 166/38
 16 lib/report-history-store.js <> lib/ship-biscuit-history-store.js 274/219
