@@ -1,9 +1,9 @@
 # Incident — Railway pauses new builds; a merged change waits to deploy
 
 **Date:** 2026-10-20
-**Duration:** Railway paused new builds from about 17:03Z (status incident [JUA1PC5H](https://status.railway.com/incident/JUA1PC5H), "New builds are temporarily paused"). It was still paused at 19:37Z.
+**Duration:** Railway paused new builds from about 17:03Z (status incident [JUA1PC5H](https://status.railway.com/incident/JUA1PC5H), "New builds are temporarily paused"). Builds resumed in stages, and Railway resolved the incident at 20:56Z.
 **Severity:** Low. harbour.cat stayed up and kept serving its running deployment (`1259e49c`). The only effect was a delayed deploy.
-**Status:** Open, waiting on Railway. Close this when `b815a930` or later is live and the LIN-3732 post-deploy check has passed.
+**Status:** Resolved. Railway resolved its incident at 20:56Z. Paused deploys were not queued, so merging this record to main re-triggered the deploy of `b815a930` and later. LIN-3732's post-deploy check of `/kpis` follows that deploy and is recorded on the ticket.
 
 ## What happened
 
@@ -25,9 +25,13 @@ John found the cause on Railway's status page. Railway had paused new builds for
 | 18:35 | Operator re-check: still paused. Railway's update now says paused deploys must be re-triggered after builds resume. |
 | 19:10 | Railway: builds still paused for all workspaces; they will come back in stages. |
 | 19:37 | Operator re-check: still paused; production still serves `1259e49c`. |
+| ~20:5x | Railway: builds enabled for Enterprise, Pro, then Hobby workspaces, then all. |
+| 20:56 | Railway: resolved. Deploys triggered during the pause "were not queued during the pause and will not start on their own". |
+| 21:10 | Operator: production still on `1259e49c`. This record is merged to main to re-trigger the deploy. |
 
 ## What it taught
 
 - **The deploy footer is the right first signal.** The close-out's habit of checking that production serves the merged commit caught this. Without it, the ticket would have been closed against code that was not live.
 - **Check the platform status page before the deploy logs.** A deploy that has not appeared on a quiet day may be a platform pause, not a failed build.
+- **After a platform pause, re-trigger.** Railway did not queue pushes made during the pause. The deploy of an already-merged commit needs a fresh push or a manual redeploy.
 - **A held close-out is the right state.** The work is merged and the ticket stays open until production shows it, as here. It is not a problem to fix.
