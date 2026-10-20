@@ -89,4 +89,86 @@ test.describe('LIN-3689 — workspace KPIs page (e2e)', () => {
       await anonymous.dispose();
     }
   });
+
+  // LIN-3711: trend charts. Done and priced lineages cannot be created through
+  // the app's dispatch API (a `[done]` marker and a usage entry arrive from the
+  // runner), so those series are covered by tests/unit/workspace-kpi-stats.test.js
+  // and these tests check the page shape on dispatch-only data.
+  test.describe('trend charts', () => {
+    const CHARTS = ['done-per-day', 'runs-by-kind', 'cost'];
+
+    // html and body are `overflow-x: clip` (public/style.css), so the document
+    // never reports spill: measure the boxes themselves, as tests/e2e/kpis.spec.js does.
+    async function expectNoClippedOverflow(page) {
+      const m = await page.evaluate(() => ({
+        body: document.body.scrollWidth - document.body.clientWidth,
+        root: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        boxes: [...document.querySelectorAll('[data-testid^="workspace-kpis-section-"], [data-testid^="workspace-kpis-card-"]')]
+          .map(el => ({ id: el.dataset.testid, over: el.scrollWidth - el.clientWidth }))
+          .filter(b => b.over > 0),
+      }));
+      expect(m.body).toBeLessThanOrEqual(0);
+      expect(m.root).toBeLessThanOrEqual(0);
+      expect(m.boxes).toEqual([]);
+    }
+
+    test('with JavaScript every canvas or its empty note has size, and the sparklines draw', async ({ page }) => {
+      await dispatch(page, keyA, 'implementation', 2);
+      await page.goto(`/workspace/${keyA}/kpis`);
+      for (const name of CHARTS) await expect(workspaceKpis(page).section(name)).toBeVisible();
+      await expect(workspaceKpis(page).spark('dispatches').locator('svg')).toBeVisible();
+      await expect(workspaceKpis(page).spark('autopilot-runs').locator('svg')).toBeVisible();
+      await expect(workspaceKpis(page).spark('agent-actions').locator('svg')).toBeVisible();
+      await expect(page.locator('[data-testid="workspace-kpis-spark-feedback-notes"]')).toHaveCount(0);
+
+      // runs-by-kind has data (two dispatches), so its canvas stays and is drawn.
+      const box = await workspaceKpis(page).chart('runs-by-kind').boundingBox();
+      expect(box.width).toBeGreaterThan(0);
+      expect(box.height).toBeGreaterThan(0);
+      // The other two have nothing to draw yet: the page script swaps the canvas
+      // for a note that fills the same sized box.
+      for (const name of ['done-per-day', 'cost']) {
+        const note = workspaceKpis(page).section(name).locator('.kpi-chart-empty');
+        await expect(note).toBeVisible();
+        const b = await note.boundingBox();
+        expect(b.height).toBeGreaterThan(0);
+      }
+    });
+
+    test('without JavaScript the tables are in the page, the noscript line shows, and nothing errors', async ({ browser, page, baseURL }) => {
+      await dispatch(page, keyA, 'implementation', 2);
+      const context = await browser.newContext({ baseURL, javaScriptEnabled: false, storageState: await page.context().storageState() });
+      const plain = await context.newPage();
+      const errors = [];
+      plain.on('pageerror', err => errors.push(err.message));
+      try {
+        const res = await plain.goto(`/workspace/${keyA}/kpis`);
+        expect(res.status()).toBe(200);
+        await expect(plain.locator('[data-testid="workspace-kpis-noscript"]')).toBeVisible();
+        for (const name of CHARTS) {
+          await plain.locator(`[data-testid="workspace-kpis-numbers-${name}"] summary`).click();
+          const rows = plain.locator(`[data-testid="workspace-kpis-table-${name}"] tbody tr`);
+          expect(await rows.count()).toBeGreaterThan(0);
+          await expect(plain.locator(`[data-testid="workspace-kpis-table-${name}"]`)).toBeVisible();
+        }
+        expect(errors).toEqual([]);
+      } finally {
+        await context.close();
+      }
+    });
+
+    for (const theme of ['light', 'dark']) {
+      test(`at 390px nothing spills sideways (${theme})`, async ({ page }) => {
+        await dispatch(page, keyA, 'implementation', 2);
+        await page.setViewportSize({ width: 390, height: 800 });
+        await page.goto(`/workspace/${keyA}/kpis`);
+        if (theme === 'dark') await page.evaluate(() => document.documentElement.classList.add('theme-dark'));
+        for (const name of CHARTS) await workspaceKpis(page).numbers(name).locator('summary').click();
+        await expectNoClippedOverflow(page);
+        // A table is wider than a phone: its wrapper scrolls instead of the page.
+        const wrap = await page.locator('.kpi-numbers-wrap').first().evaluate(el => getComputedStyle(el).overflowX);
+        expect(wrap).toBe('auto');
+      });
+    }
+  });
 });

@@ -52,3 +52,57 @@
 .kpi-card-sub { color: var(--muted); font-size: 0.82rem; }
 
 .kpi-generated-at { color: var(--fg-dim); font-size: 0.78rem; margin-top: 1rem; }
+
+/* Workspace KPIs trend charts (LIN-3711). These rules are copied from
+   public/kpis.css on purpose: the workspace page does not load /kpis.css, and a
+   canvas with no height rule collapses (the helper turns off maintainAspectRatio). */
+.workspace-kpis-section { min-width: 0; margin-bottom: var(--space-3, 1rem); }
+
+.kpi-chart-caption {
+  font-size: 0.8rem;
+  color: var(--fg-dim);
+  margin: 0 0 var(--space-2, 0.5rem);
+}
+
+.kpi-chart-canvas {
+  position: relative;
+  min-width: 0;
+  height: 200px;
+}
+@media (min-width: 641px) {
+  .kpi-chart-canvas { height: 240px; }
+}
+
+/* The note that replaces a canvas with nothing to draw. */
+.kpi-chart-canvas + .kpi-chart-empty,
+.kpi-chart-canvas .kpi-chart-empty { height: 100%; }
+.kpi-chart-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg-dim);
+  font-family: var(--font-structural);
+  font-size: 0.85rem;
+}
+
+/* Sparkline under a stat card's figure: inline SVG, tokens only. */
+.kpi-card-spark { display: block; margin-top: var(--space-1, 0.25rem); line-height: 0; }
+.kpi-card-spark svg { display: block; max-width: 100%; height: auto; }
+
+/* "Show the numbers": notes, then a table in a wrapper that scrolls on its own
+   so the page never does. */
+.kpi-numbers {
+  margin-top: var(--space-2, 0.5rem);
+  font-family: var(--font-structural);
+  font-size: 0.8rem;
+  color: var(--fg-dim);
+}
+.kpi-numbers summary { cursor: pointer; }
+.kpi-numbers-note { margin: var(--space-1, 0.25rem) 0 0; line-height: 1.5; }
+.kpi-numbers-wrap { overflow-x: auto; margin-top: var(--space-2, 0.5rem); }
+.kpi-numbers-wrap table { border-collapse: collapse; width: 100%; }
+.kpi-numbers-wrap th,
+.kpi-numbers-wrap td { padding: 0.15rem var(--space-2, 0.5rem); text-align: right; white-space: nowrap; }
+.kpi-numbers-wrap th:first-child,
+.kpi-numbers-wrap td:first-child { text-align: left; padding-left: 0; }
+.kpi-numbers-wrap th { font-weight: 600; }

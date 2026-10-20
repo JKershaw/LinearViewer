@@ -2,17 +2,35 @@
  * LIN-3689 — the workspace KPIs page renderer.
  * Run with: node --test tests/unit/render-workspace-kpis.test.js
  */
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { renderWorkspaceKpisPage } from '../../lib/render-workspace-kpis.js';
 
 const totals = { agentActions: 5, dispatches: 4, autopilotRuns: 1, feedbackNotes: 2 };
 
+const DAYS = Array.from({ length: 30 }, (_, i) => `2026-05-${String(12 + i).padStart(2, '0')}`).map(d => (d > '2026-05-31' ? `2026-06-${String(Number(d.slice(8)) - 31).padStart(2, '0')}` : d));
+const series = (...nonZero) => DAYS.map((_, i) => nonZero[i] ?? 0);
+const daily = (overrides = {}) => ({
+  days: DAYS,
+  dispatches: series(1, 2),
+  autopilotRuns: series(0, 1),
+  agentActions: series(3),
+  done: series(0, 1),
+  runsByKind: {
+    weeks: ['2026-05-14', '2026-05-21', '2026-05-28', '2026-06-04'],
+    kinds: [{ label: 'implementation', counts: [1, 0, 2, 0] }, { label: 'other', counts: [0, 1, 0, 0] }]
+  },
+  cost: { perDay: series(0, 0.5), pricedCount: 1, lineageCount: 3 },
+  ...overrides
+});
+
 const stats = (overrides = {}) => ({
   generatedAt: '2026-06-10T12:00:00.000Z',
   activity: { last7: { ...totals, dispatches: 3 }, last30: totals },
   funnel: { dispatched: 4, taken: 2, reported: 2, completed: 1, medianWaitMinutes: 10 },
   kinds: [{ label: 'implementation', count: 3 }, { label: 'autopilot', count: 1 }],
+  daily: daily(),
   stored: { customPrompts: 2, roadmapReports: 1, roadmapReportsCap: 20 },
   empty: false,
   ...overrides
@@ -72,4 +90,87 @@ test('names the workspace in the title and carries no cross-workspace content', 
   const html = render(stats());
   assert.match(html, /<title>Acme - KPIs<\/title>/);
   assert.match(html, /This workspace, last 7 and 30 days/);
+});
+
+// LIN-3711: trend charts.
+const SECTIONS = ['done-per-day', 'runs-by-kind', 'cost'];
+
+test('renders the three trend sections with canvas, disclosure and table each', () => {
+  const html = render(stats());
+  for (const name of SECTIONS) {
+    assert.ok(has(html, `workspace-kpis-section-${name}`), `section ${name}`);
+    assert.ok(has(html, `workspace-kpis-chart-${name}`), `canvas ${name}`);
+    assert.ok(html.includes(`id="chart-${name}"`), `canvas id ${name}`);
+    assert.match(html, new RegExp(`<details class="kpi-numbers" data-testid="workspace-kpis-numbers-${name}"><summary>Show the numbers</summary>`));
+    assert.match(html, new RegExp(`<table data-testid="workspace-kpis-table-${name}">`));
+  }
+  assert.match(html, /Tasks the agent marked done, by day\./);
+  assert.match(html, /not a verified merge/);
+});
+
+test('the three activity cards get a sparkline and feedback notes does not', () => {
+  const html = render(stats());
+  for (const card of ['dispatches', 'autopilot-runs', 'agent-actions']) assert.ok(has(html, `workspace-kpis-spark-${card}`), card);
+  assert.equal(has(html, 'workspace-kpis-spark-feedback-notes'), false);
+});
+
+test('the tables hold the series: today is marked, weeks are labelled, a total column sums the kinds', () => {
+  const html = render(stats());
+  const table = name => new RegExp(`data-testid="workspace-kpis-table-${name}">([\\s\\S]*?)</table>`).exec(html)[1];
+  assert.match(table('done-per-day'), /2026-06-10 · today, so far<\/td><td>0<\/td>/);
+  assert.match(table('done-per-day'), /<td>2026-05-13<\/td><td>1<\/td>/);
+  assert.match(table('runs-by-kind'), /<th>week starting<\/th><th>implementation<\/th><th>other<\/th><th>total<\/th>/);
+  assert.match(table('runs-by-kind'), /<td>2026-05-21<\/td><td>0<\/td><td>1<\/td><td>1<\/td>/);
+  assert.match(table('cost'), /<td>2026-05-13<\/td><td>\$0\.50<\/td>/);
+});
+
+test('cost: API-equivalent wording, priced N of M tasks, no priced tasks is never $0', () => {
+  const html = render(stats());
+  assert.match(html, /<h2>API-equivalent cost<\/h2>/);
+  assert.match(html, /priced 1 of 3 tasks/);
+  assert.match(html, /not a bill/);
+
+  const none = render(stats({ daily: daily({ cost: { perDay: series(), pricedCount: 0, lineageCount: 2 } }) }));
+  assert.match(none, /no priced tasks yet/);
+  assert.doesNotMatch(none, /\$0\.00/);
+
+  const tiny = render(stats({ daily: daily({ cost: { perDay: series(0.001), pricedCount: 1, lineageCount: 1 } }) }));
+  assert.match(tiny, /<td>&lt;\$0\.01<\/td>/);
+});
+
+test('a noscript line says charts need JavaScript', () => {
+  const html = render(stats());
+  assert.match(html, /<noscript><p[^>]*data-testid="workspace-kpis-noscript">Charts need JavaScript/);
+});
+
+test('scripts load Chart.js, the shared helper and the page script before common and app', () => {
+  const html = render(stats());
+  const order = ['/chart.umd.min.js', '/chart-helpers.js', '/workspace-kpis.js', '/common.js', '/app.js'].map(src => html.indexOf(`src="${src}"`));
+  assert.ok(order.every(i => i > -1), 'all five present');
+  assert.deepEqual([...order].sort((a, b) => a - b), order);
+  assert.equal(html.includes('/kpis.css'), false, 'the public stylesheet is not loaded');
+  assert.match(html, /<script type="application\/json" data-global="__WORKSPACE_KPI_DATA__">/);
+});
+
+test('a hostile kind is escaped in the table and cannot break out of the embedded JSON', () => {
+  const evil = '</script><b>x</b>';
+  const html = render(stats({ daily: daily({ runsByKind: { weeks: ['2026-05-14'], kinds: [{ label: evil, counts: [1] }] } }) }));
+  assert.equal(html.includes(evil), false);
+  assert.match(html, /&lt;\/script&gt;&lt;b&gt;x&lt;\/b&gt;/);
+  const embedded = /data-global="__WORKSPACE_KPI_DATA__">([\s\S]*?)<\/script>/.exec(html)[1];
+  assert.equal(JSON.parse(embedded).runsByKind.kinds[0].label, evil);
+});
+
+test('the empty state hides the trend sections and embeds no data', () => {
+  const html = render(stats({ empty: true }));
+  for (const name of SECTIONS) assert.equal(has(html, `workspace-kpis-section-${name}`), false, name);
+  assert.equal(html.includes('__WORKSPACE_KPI_DATA__'), false);
+});
+
+test('escalation-kpis.css carries the chart height, empty-note, sparkline and numbers rules', () => {
+  const css = readFileSync(new URL('../../public/escalation-kpis.css', import.meta.url), 'utf8');
+  assert.match(css, /\.kpi-chart-canvas\s*\{[^}]*height:\s*200px/);
+  assert.match(css, /@media \(min-width: 641px\)\s*\{\s*\.kpi-chart-canvas\s*\{\s*height:\s*240px/);
+  for (const rule of ['.kpi-chart-empty', '.kpi-card-spark', '.kpi-numbers-wrap']) assert.ok(css.includes(rule), rule);
+  assert.match(css, /\.kpi-numbers-wrap\s*\{[^}]*overflow-x:\s*auto/);
 });

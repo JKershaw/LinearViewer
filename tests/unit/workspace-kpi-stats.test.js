@@ -13,7 +13,7 @@ process.env.NODE_ENV = 'test';
 import { test, describe, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { collectWorkspaceKpis } from '../../lib/workspace-kpi-stats.js';
-import { loadDispatchHistory, loadProxyBins } from '../../lib/kpi-stats.js';
+import { buildDispatchByDay, loadDispatchHistory, loadProxyBins, tallyLabels, windowsAt } from '../../lib/kpi-stats.js';
 import { MAX_REPORTS_PER_WORKSPACE } from '../../lib/report-history-store.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 
@@ -214,5 +214,147 @@ describe('the find fallback (a collection without aggregate) filters on urlKey t
     await loadDispatchHistory(history, { since: daysAgo(30) });
     assert.equal('urlKey' in proxy.__calls.find[0][0], false);
     assert.equal('urlKey' in history.__calls.find[0][0], false);
+  });
+});
+
+// LIN-3711: the per-day series behind the trend charts.
+const sum = values => values.reduce((total, n) => total + n, 0);
+const at = (n, hour = 9) => daysAgo(n, hour).toISOString();
+const usage = costUsd => ({ kind: 'usage', message: `[usage] ${JSON.stringify({ harness: 'claude-code', costUsd })}`, timestamp: at(0) });
+const lineageRow = (urlKey, id, { kind = 'implementation', started, done = null, skipped = false, cost = null }) => ({
+  _id: id,
+  rootItemId: id,
+  urlKey,
+  kind,
+  harness: 'claude-code',
+  status: 'taken',
+  issueIdentifier: `SECRET-${id}`,
+  dispatchedAt: daysAgo(started),
+  feedback: [
+    ...(cost === null ? [] : [usage(cost)]),
+    ...(done === null ? [] : [{ message: '[done] prompt-text-canary', timestamp: at(done) }]),
+    ...(skipped ? [{ message: '[skipped] human', timestamp: at(started) }] : [])
+  ]
+});
+
+async function seedTrends(urlKey) {
+  await collections.dispatchHistory.insertMany([
+    lineageRow(urlKey, 'a-slow', { started: 3, done: 1, cost: 1.5 }), // started day -3, done day -1
+    lineageRow(urlKey, 'a-quick', { started: 0, done: 0, cost: 0.25 }),
+    lineageRow(urlKey, 'a-unpriced', { kind: 'review', started: 3, done: 3 }),
+    lineageRow(urlKey, 'a-skipped', { started: 3, skipped: true, cost: 99 }),
+    lineageRow(urlKey, 'a-auto', { kind: 'autopilot', started: 10 }),
+    lineageRow(urlKey, 'a-old-1', { kind: 'only-in-uncovered-days', started: 29 }),
+    lineageRow(urlKey, 'a-old-2', { kind: 'only-in-uncovered-days', started: 28 }),
+    lineageRow(urlKey, 'a-wk0', { kind: 'review', started: 27 })
+  ]);
+  await collections.agentStatus.insertMany([
+    { urlKey, dispatchId: 'a-slow', status: 'completed', timestamp: daysAgo(2) },
+    { urlKey, dispatchId: 'a-slow', status: 'completed', timestamp: daysAgo(2) }
+  ]);
+  await collections.proxyEvents.insertMany([
+    { urlKey, method: 'GET', endpoint: '/api/proxy/issues/LIN-1', status: 200, timestamp: daysAgo(2) }
+  ]);
+}
+
+describe('collectWorkspaceKpis daily series (LIN-3711)', () => {
+  test('each daily series sums to its 30d card total, on one 30-day axis', async () => {
+    await seedTrends(A);
+    const stats = await run(A);
+    const { daily } = stats;
+    assert.equal(daily.days.length, 30);
+    for (const key of ['dispatches', 'autopilotRuns', 'agentActions', 'done']) assert.equal(daily[key].length, 30, key);
+    assert.equal(sum(daily.dispatches), stats.activity.last30.dispatches);
+    assert.equal(sum(daily.autopilotRuns), stats.activity.last30.autopilotRuns);
+    assert.equal(sum(daily.agentActions), stats.activity.last30.agentActions);
+    assert.equal(daily.agentActions[27], 3, 'one proxy call plus two agent-status reports, two days ago');
+  });
+
+  test('done is counted on the day of the done marker, not the start; unfinished work is not done', async () => {
+    await seedTrends(A);
+    const { daily } = await run(A);
+    assert.equal(daily.done[28], 1, 'a-slow started 3 days ago, done yesterday');
+    assert.equal(daily.done[29], 1, 'a-quick done today');
+    assert.equal(daily.done[26], 1, 'a-unpriced done 3 days ago');
+    assert.equal(sum(daily.done), 3);
+  });
+
+  test('runs by kind: four 7-day weeks, top 3 kinds plus other, the two oldest days in no week', async () => {
+    await seedTrends(A);
+    const { runsByKind } = (await run(A)).daily;
+    assert.deepEqual(runsByKind.weeks, ['2026-05-14', '2026-05-21', '2026-05-28', '2026-06-04']);
+    assert.ok(runsByKind.kinds.every(({ counts }) => counts.length === 4));
+    const labels = runsByKind.kinds.map(({ label }) => label);
+    assert.ok(!labels.includes('only-in-uncovered-days'), 'a kind seen only in the uncovered days takes no legend slot');
+    assert.deepEqual(labels, ['implementation', 'review', 'autopilot']);
+    assert.equal(sum(runsByKind.kinds.map(({ counts }) => sum(counts))), 6, '8 dispatches minus the 2 oldest days');
+    assert.deepEqual(runsByKind.kinds.find(({ label }) => label === 'review').counts, [1, 0, 0, 1], 'review: day -27 (week 1) and day -3 (week 4)');
+  });
+
+  test('more than 3 kinds fold into other; the limit parameter defaults to the public 5', async () => {
+    await collections.dispatchHistory.insertMany(['k1', 'k2', 'k3', 'k4', 'k1', 'k2', 'k1'].map((kind, i) => lineageRow(A, `m${i}`, { kind, started: 2 })));
+    const { runsByKind } = (await run(A)).daily;
+    assert.deepEqual(runsByKind.kinds.map(({ label }) => label), ['k1', 'k2', 'k3', 'other']);
+    assert.equal(sum(runsByKind.kinds.find(({ label }) => label === 'other').counts), 1);
+
+    const windows = windowsAt(NOW);
+    const docs = ['k1', 'k2', 'k3', 'k4', 'k5', 'k6', 'k7'].map(kind => ({ kind, dispatchedAt: daysAgo(2) }));
+    const tally = tallyLabels(docs, 'kind');
+    assert.deepEqual(buildDispatchByDay(docs, tally, windows), buildDispatchByDay(docs, tally, windows, 5));
+    assert.equal(buildDispatchByDay(docs, tally, windows).kinds.length, 6, 'five kinds plus other');
+    assert.equal(buildDispatchByDay(docs, tally, windows, 3).kinds.length, 4, 'three kinds plus other');
+  });
+
+  test('cost: by the start day, unpriced never $0, skipped excluded, priced N of M', async () => {
+    await seedTrends(A);
+    await collections.dispatchHistory.insertOne({ ...lineageRow(A, 'a-now', { started: 0, cost: 0.5 }), dispatchedAt: NOW });
+    const { cost } = (await run(A)).daily;
+    assert.equal(cost.perDay.length, 30);
+    assert.equal(cost.perDay[26], 1.5, 'a-slow started 3 days ago');
+    assert.equal(cost.perDay[29], 0.75, 'a-quick plus a-now: a dispatch stamped exactly now is not dropped');
+    assert.equal(sum(cost.perDay), 2.25, 'the skipped lineage cost 99 and is left out');
+    assert.equal(cost.pricedCount, 3);
+    assert.equal(cost.lineageCount, 8, '9 lineages less the skipped one');
+  });
+
+  test('cost buckets on the UTC day: 23:59Z and 00:00Z land on different days', async () => {
+    const lateYesterday = new Date(Date.UTC(2026, 5, 9, 23, 59));
+    const midnight = new Date(Date.UTC(2026, 5, 10, 0, 0));
+    const rows = [['late', lateYesterday, 2], ['mid', midnight, 3]].map(([id, dispatchedAt, cost]) => ({
+      ...lineageRow(A, id, { started: 1, cost }), dispatchedAt
+    }));
+    await collections.dispatchHistory.insertMany(rows);
+    const { cost } = (await run(A)).daily;
+    assert.equal(cost.perDay[28], 2);
+    assert.equal(cost.perDay[29], 3);
+  });
+
+  test('workspace B moves nothing in A, and no B identifier, issue or prompt text appears in A', async () => {
+    await seedTrends(A);
+    const before = (await run(A)).daily;
+    await collections.dispatchHistory.insertMany([
+      lineageRow(B, 'b-1', { kind: 'b-only-kind', started: 2, done: 1, cost: 40 }),
+      lineageRow(B, 'b-2', { kind: 'b-only-kind', started: 1, done: 0, cost: 2 })
+    ]);
+    await collections.agentStatus.insertOne({ urlKey: B, dispatchId: 'b-1', status: 'completed', timestamp: daysAgo(1) });
+    await collections.proxyEvents.insertOne({ urlKey: B, method: 'GET', endpoint: '/api/proxy/issues/LIN-9', status: 200, timestamp: daysAgo(1) });
+    assert.deepEqual((await run(A)).daily, before);
+
+    const json = JSON.stringify(before);
+    assert.doesNotMatch(json, new RegExp(B));
+    assert.doesNotMatch(json, /b-only-kind/);
+    assert.doesNotMatch(json, /SECRET-/);
+    assert.doesNotMatch(json, /prompt-text-canary/);
+
+    const b = (await run(B)).daily;
+    assert.equal(sum(b.cost.perDay), 42);
+    assert.equal(sum(b.done), 2);
+  });
+
+  test('a workspace with no trend data gets zero-filled series, not missing ones', async () => {
+    await seedWorkspace(A, { queued: 1 });
+    const { daily } = await run(A);
+    assert.equal(sum(daily.done), 0);
+    assert.deepEqual(daily.cost, { perDay: new Array(30).fill(0), pricedCount: 0, lineageCount: 1 });
   });
 });

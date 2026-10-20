@@ -106,6 +106,13 @@ export const SELECTORS = {
     section: (name) => `[data-testid="workspace-kpis-section-${name}"]`,
     card: (name) => `[data-testid="workspace-kpis-card-${name}"]`,
     empty: '[data-testid="workspace-kpis-empty"]',
+    /** Trend charts (LIN-3711): name is done-per-day | runs-by-kind | cost. */
+    chart: (name) => `[data-testid="workspace-kpis-chart-${name}"]`,
+    numbers: (name) => `[data-testid="workspace-kpis-numbers-${name}"]`,
+    table: (name) => `[data-testid="workspace-kpis-table-${name}"]`,
+    /** Card sparkline: dispatches | autopilot-runs | agent-actions. */
+    spark: (card) => `[data-testid="workspace-kpis-spark-${card}"]`,
+    noscript: '[data-testid="workspace-kpis-noscript"]',
   },
   /** Public /kpis page (LIN-3703): section, card, chart and hidden-row test ids. */
   publicKpis: {
@@ -157,6 +164,10 @@ export function workspaceKpis(page) {
     /** Text of a card's windowed value, e.g. value('dispatches', '30d'). */
     value: (card, window) => page.locator(`[data-testid="workspace-kpis-value-${card}-${window}"]`),
     kindRows: () => page.locator('[data-testid="workspace-kpis-kind-row"]'),
+    chart: (name) => page.locator(SELECTORS.workspaceKpis.chart(name)),
+    numbers: (name) => page.locator(SELECTORS.workspaceKpis.numbers(name)),
+    table: (name) => page.locator(SELECTORS.workspaceKpis.table(name)),
+    spark: (card) => page.locator(SELECTORS.workspaceKpis.spark(card)),
   }
 }
 
