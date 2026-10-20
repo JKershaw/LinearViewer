@@ -284,6 +284,13 @@ describe('the daily job', () => {
     assert.equal(aggregates, 3);
   });
 
+  test('the marker\'s `through` is taken at tick start: a run that crosses midnight is not marked complete for the day it did not see', async () => {
+    const times = [Date.parse('2026-10-20T23:59:59.000Z')];
+    const crossing = () => (times.length ? times.shift() : Date.parse('2026-10-21T00:00:30.000Z'));
+    await createKpiDailyRollupRun({ dispatchHistory: history, rollup, now: crossing })();
+    assert.equal((await rollup.findOne({ _id: ROLLUP_MARKER_ID })).through, '2026-10-19');
+  });
+
   test('one aggregate per run, whatever the number of workspaces', async () => {
     await history.insertMany(['ws-a', 'ws-b', 'ws-c'].map((urlKey) => row({ urlKey, day: '2026-10-12', terminal: ['done', at('2026-10-12')] })));
     let aggregates = 0;

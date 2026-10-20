@@ -16,7 +16,7 @@ import {
   runBackfill, createKpiDailyRollupRun, ROLLUP_HISTORY_INDEX, ROLLUP_LOOKBACK_DAYS, BackfillError,
   dayStartMs, addDays, firstRollupDay
 } from '../../lib/kpi-daily-rollup.js';
-import { main } from '../../scripts/backfill-kpi-daily-rollup.mjs';
+import { main, parseArgs, exitCodeOf } from '../../scripts/backfill-kpi-daily-rollup.mjs';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const NOW = Date.parse('2026-10-20T13:00:00.000Z'); // first in-horizon day: 2026-09-21
@@ -237,6 +237,57 @@ describe('runBackfill', () => {
   });
 });
 
+describe('the production-shaped job write vs the backfill (Done-when 4, plan Finding 1)', () => {
+  const D = '2026-08-10';
+  // The job's last in-horizon tick for D: first tick after midnight of D+29, where firstRollupDay is still D.
+  const lastTick = dayStartMs(addDays(D, 29)) + 60 * 60 * 1000;
+  const backfillNow = dayStartMs(addDays(D, 1)) + 30 * DAY_MS;
+  const keyed = (rows) => Object.fromEntries(rows.map((r) => [r.urlKey, r]));
+
+  const seedLineages = () => history.insertMany([
+    row({ day: addDays(D, -40) }),
+    row({ urlKey: 'ws-b', day: addDays(D, -20) }),
+    row({ root: 'P1', day: addDays(D, -2), terminal: ['done', at(addDays(D, -2))] }),
+    row({ root: 'P2', day: D, time: '09:00:00', terminal: ['failed', at(D, '10:00:00')] }),
+    row({ urlKey: 'ws-b', root: 'P3', day: D, terminal: ['aborted', at(D, '18:00:00')] })
+  ]);
+
+  async function jobThenBackfill(afterJob = async () => {}) {
+    assert.equal(firstRollupDay(lastTick), D, 'the tick is D\'s last in-horizon run');
+    await createKpiDailyRollupRun({ dispatchHistory: history, rollup, now: () => lastTick })();
+    const jobRows = (await rollupRows()).filter((r) => r.day === D);
+    await afterJob();
+    const bfDb = harness.freshDb();
+    await bfDb.collection('dispatch-history').createIndex(ROLLUP_HISTORY_INDEX);
+    await bfDb.collection('dispatch-history').insertMany(await history.find({}).toArray());
+    await runBackfill({ db: bfDb, now: backfillNow, write: true, from: D, to: D, logger: quiet });
+    const bfRows = (await bfDb.collection('kpi-daily-rollup').find({}).toArray()).map(({ _id, ...r }) => r).filter((r) => r.day === D);
+    return { jobRows, bfRows };
+  }
+
+  test('(a) no row dispatched after the job\'s last tick: the two are equal', async () => {
+    await seedLineages();
+    const { jobRows, bfRows } = await jobThenBackfill();
+    assert.ok(jobRows.length > 0);
+    assert.deepEqual(keyed(bfRows), keyed(jobRows));
+  });
+
+  test('(b) a follow-up of a D lineage dispatched in the final hour of the window, with a later terminal: they differ only on that lineage', async () => {
+    await seedLineages();
+    // Dispatched at start(D)+30d-1h: after the job's last tick, inside the backfill's window. It moves P2 from failed on D to done on D+29.
+    const late = addDays(D, 29);
+    const { jobRows, bfRows } = await jobThenBackfill(() => history.insertOne(row({ root: 'P2', day: late, time: '23:00:00', terminal: ['done', at(late, '23:30:00')] })));
+    const job = keyed(jobRows);
+    const bf = keyed(bfRows);
+    assert.deepEqual(bf['ws-b'], job['ws-b'], 'a workspace with no late row agrees');
+    assert.equal(job['ws-a'].failed, 1, 'the job never saw the late follow-up');
+    assert.equal(bf['ws-a']?.failed ?? 0, 0, 'the backfill sees it and moves the lineage off D');
+    const { failed: _jf, ...jobRest } = job['ws-a'];
+    const { failed: _bf, ...bfRest } = bf['ws-a'] ?? { urlKey: 'ws-a', day: D, done: 0, aborted: 0, dispatches: 0 };
+    assert.deepEqual(bfRest, jobRest, 'only the failed count differs (the late row\'s own dispatch is on D+29)');
+  });
+});
+
 describe('scripts/backfill-kpi-daily-rollup.mjs', () => {
   test('exit 2 when neither MONGODB_URI nor HARBOUR_DATA_DIR is set', async () => {
     const lines = [];
@@ -263,5 +314,21 @@ describe('scripts/backfill-kpi-daily-rollup.mjs', () => {
 
   test('unknown arguments are refused', async () => {
     await assert.rejects(main(['--drop-everything'], { HARBOUR_DATA_DIR: tmpdir() }), /unknown argument/);
+  });
+
+  test('argument errors are BackfillErrors carrying their message: unknown is 1, a valueless --from/--to is the range refusal 4', () => {
+    assert.throws(() => parseArgs(['--drop-everything']), (err) => err instanceof BackfillError && err.code === 1 && /unknown argument --drop-everything/.test(err.message));
+    for (const argv of [['--from'], ['--to'], ['--from', '--write'], ['--write', '--to']]) {
+      assert.throws(() => parseArgs(argv), (err) => err instanceof BackfillError && err.code === 4 && /needs a YYYY-MM-DD value/.test(err.message), argv.join(' '));
+    }
+    assert.deepEqual(parseArgs(['--write', '--from', '2026-07-05', '--to', '2026-07-15']), { write: true, planOnly: false, from: '2026-07-05', to: '2026-07-15' });
+  });
+
+  test('the exit code comes from a BackfillError only: a driver error with an integer code (2, 4, 13) exits 1', () => {
+    assert.equal(exitCodeOf(new BackfillError('index missing: see runbook', 3)), 3);
+    assert.equal(exitCodeOf(new BackfillError('refused', 4)), 4);
+    for (const code of [2, 4, 13, 18]) assert.equal(exitCodeOf(Object.assign(new Error('driver'), { code })), 1, `driver code ${code}`);
+    assert.equal(exitCodeOf(new Error('plain')), 1);
+    assert.equal(exitCodeOf(undefined), 1);
   });
 });
