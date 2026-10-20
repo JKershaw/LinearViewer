@@ -23,7 +23,7 @@
 
 import { MongoClient } from 'mongodb'
 import { MangoClient } from '@jkershaw/mangodb'
-import { runBackfill, EXIT_NO_DATABASE } from '../lib/kpi-daily-rollup.js'
+import { runBackfill, BackfillError, EXIT_NO_DATABASE, EXIT_BAD_RANGE } from '../lib/kpi-daily-rollup.js'
 
 export function parseArgs(argv) {
   const opts = { write: false, planOnly: false }
@@ -31,9 +31,11 @@ export function parseArgs(argv) {
     const arg = argv[i]
     if (arg === '--write') opts.write = true
     else if (arg === '--plan-only') opts.planOnly = true
-    else if (arg === '--from') opts.from = argv[++i]
-    else if (arg === '--to') opts.to = argv[++i]
-    else throw Object.assign(new Error(`unknown argument ${arg}`), { code: 1 })
+    else if (arg === '--from' || arg === '--to') {
+      const value = argv[++i]
+      if (value === undefined || value.startsWith('--')) throw new BackfillError(`${arg} needs a YYYY-MM-DD value`, EXIT_BAD_RANGE)
+      opts[arg.slice(2)] = value
+    } else throw new BackfillError(`unknown argument ${arg}`, 1)
   }
   return opts
 }
@@ -55,10 +57,13 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
   }
 }
 
+/** Only our own refusals carry a meaningful code: a driver error's integer `code` (2 BadValue, 13 Unauthorized, ...) must not read as this script's 2 or 4. */
+export const exitCodeOf = (err) => (err?.name === 'BackfillError' ? err.code : 1)
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   main().then(code => { process.exitCode = code }).catch(err => {
     // The error's class/message only for our own refusals: a driver error's message could carry connection details.
     console.error(`[backfill] failed: ${err?.name === 'BackfillError' ? err.message : (err?.code ?? err?.name ?? 'error')}`)
-    process.exitCode = Number.isInteger(err?.code) ? err.code : 1
+    process.exitCode = exitCodeOf(err)
   })
 }
