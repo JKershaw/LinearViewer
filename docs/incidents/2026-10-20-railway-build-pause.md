@@ -9,7 +9,7 @@
 
 LIN-3732 (KPI daily rollup, part B: running totals and a rate/total toggle on both KPI pages) merged as PR #2020 (`b815a930`) at 17:09:46Z. Today's earlier merges had gone live within minutes. This one had not appeared 37 minutes later: the harbour.cat footer still showed `1259e49`. The pipeline's close-out for LIN-3732 parked, because its post-deploy check of `/kpis` could not run against the old build.
 
-John found the cause on Railway's status page. Railway had paused new builds for every workspace while it fixed a build problem. Running services were unaffected, and builds triggered during the pause stay queued until builds resume.
+John found the cause on Railway's status page. Railway had paused new builds for every workspace while it fixed a build problem. Running services were unaffected. Railway first said that builds triggered during the pause would stay queued. A later edit to its 17:18Z update said instead that deploys triggered during the pause "will need to be triggered again once we resume builds". So `b815a930` will not deploy by itself; it needs a fresh deploy trigger after builds resume. A later push to main is enough.
 
 ## Timeline (UTC, 20 Oct)
 
@@ -22,6 +22,7 @@ John found the cause on Railway's status page. Railway had paused new builds for
 | 17:29 | LIN-3732 close-out: merged, but production still serves `1259e49c`; post-deploy check deferred. |
 | 17:46 | Operator: footer still `1259e49`, 37 minutes after the merge; asked John to look at Railway. |
 | ~17:50 | John linked the Railway status incident. |
+| 18:35 | Operator re-check: still paused. Railway's update now says paused deploys must be re-triggered after builds resume. |
 
 ## What it taught
 
