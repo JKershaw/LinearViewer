@@ -135,7 +135,6 @@ const TABLE = {
   'routes/dashboard.js :: computeWorkspaceEffortReadout': [SRV, 2],
   'routes/dashboard.js :: loadRunForSummary': [SRV, 1],
   'routes/dashboard.js :: pointReadSession': [SRV, 3],
-  'routes/dashboard.js :: readRunFacts': [SRV, 2],
   // routes — explicit allow-list / projection
   'routes/proxy-dispatch.js :: /api/proxy/dispatch': [PRJ, 3],
   'routes/proxy-dispatch.js :: /api/proxy/dispatch/:id': [PRJ, 1],

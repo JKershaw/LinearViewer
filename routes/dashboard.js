@@ -57,8 +57,7 @@ import { readRunEvidence, buildRunEvidence } from '../lib/run-evidence.js';
 import { createPrStateStore, resolveRunPrRef } from '../lib/pr-state-store.js';
 import { resolvePrReadToken } from '../lib/github-pr-status.js';
 import { prStateCopy } from '../lib/pr-state-copy.js';
-import { resolveRunVariant, listRows } from '../lib/run-closeout-state.js';
-import { stopAtFromRows } from '../lib/task-run-facts.js';
+import { readTaskRunFacts } from '../lib/task-run-facts.js';
 import { buildSessionContextGraph } from '../lib/context-graph.js';
 import { findWakeEvent, isWaitingWakeMarker } from '../lib/dispatch-terminal.js';
 // LIN-3717: the loop/session terminal checks live in lib/run-loop-state.js (Runs &
@@ -1304,9 +1303,10 @@ export function createDashboardRoutes({
       // of the session page, guarded to the ONE seam LIN-2948 will lift out.
       // Skipped when the reader is not wired (tests, and any deployment without
       // the module), and fail-open: a read error renders no evidence rather than
-      // a broken page. The run's `stopAt`/variant come off its own dispatch row
-      // (P1a/P1b): a standard run's box carries the seam-guard promise, a
-      // stepped run's does not (N2).
+      // a broken page. The run's `stopAt` comes off the seed issue's rows, then
+      // the sessionId hop to the parent run row (LIN-3725); its variant comes off
+      // the seed issue's own kickoff row only (P1a/P1b): a standard run's box
+      // carries the seam-guard promise, a stepped run's does not (N2).
       //
       // `runFacts` (a dispatch-row read) and `runnerReady` (a session feature
       // flag) are owner inputs read here and handed to the external half.
@@ -1643,7 +1643,8 @@ export function createDashboardRoutes({
 
   /**
    * The run's boundary facts for the close-out box, off its own dispatch row(s)
-   * (LIN-3248). `stopAt: 'pr'` is P1a's run fact; the run variant is the row's
+   * (LIN-3248), then the sessionId hop for `stopAt` (LIN-3725). `stopAt: 'pr'`
+   * is P1a's run fact; the run variant is the row's
    * own persisted `variant` field (`resolveRunVariant`, never `promptName`), so
    * N2's copy can be chosen at render time. Fail-open to the safe defaults:
    * no stop, `unknown` variant (the promise stays closed), never a broken page.
@@ -1654,26 +1655,11 @@ export function createDashboardRoutes({
    * @returns {Promise<{stopAt: ('pr'|null), variant: ('standard'|'stepper'|'unknown')}>}
    */
   async function readRunFacts(store, urlKey, issueIdentifier) {
-    const defaults = { stopAt: null, variant: 'unknown' };
-    if (!store || !urlKey || !issueIdentifier) return defaults;
-    try {
-      const rows = [];
-      const live = await Promise.resolve(store.listItems(urlKey, { issueIdentifier })).catch(() => []);
-      rows.push(...listRows(live));
-      const hist = await Promise.resolve(store.listHistory(urlKey, { issueIdentifier })).catch(() => null);
-      rows.push(...listRows(hist));
-      const stopAt = stopAtFromRows(rows);
-      const kickoff = rows.find(row => row && row.kind === 'autopilot') || null;
-      // The row's own persisted `variant` is the authoritative source (never
-      // `promptName` — a real stepper kickoff is named `Autopilot (LIN-NNNN)`).
-      // Fail closed: a missing/unknown/non-autopilot row is `unknown`, so N2's
-      // promise is shown only for a positively-standard run.
-      const variant = resolveRunVariant(kickoff);
-      return { stopAt, variant };
-    } catch (err) {
-      console.error('Session page run-facts read failed:', err.message);
-      return defaults;
-    }
+    // LIN-3725: the same read as the task page, so the two agree on `stopAt`
+    // (own rows first, then the sessionId hop to the parent run row). The hop
+    // lifts `stopAt` only: `variant` stays the seed issue's own kickoff row.
+    // (`await` keeps this frame on the async stack for the test's facts-read probe.)
+    return await readTaskRunFacts({ store, urlKey, issueIdentifier, hopVariant: false });
   }
 
   // Retired experimental dashboard (LIN-509) → 302 to the first-class page.
