@@ -79,7 +79,8 @@ def is_prod(path):
 # ---------------------------------------------------------------------------------------------
 TWINS = [
     dict(anchors=[('lib/chat-tools.js', r'loop-local mirror of routes/dashboard\.js')],
-         partners=[('lib/run-loop-state.js', r'function isTerminalLoop\(')]),
+         partners=[('routes/dashboard.js', r'function isTerminalLoop\(')],
+         note='partner as of the pinned snapshots; moved to lib/run-loop-state.js after 2026-10 (LIN-3717)'),
     dict(anchors=[('lib/connection-credential.js', r'runConnectionRefresh. CASes it first')],
          partners=[('lib/connection-store.js', r'async mirrorCredentialIfToken\('),
                    ('lib/connection-credential.js', r'async function runConnectionRefresh\(')],

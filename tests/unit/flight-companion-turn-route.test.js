@@ -1410,8 +1410,8 @@ describe('Flight Companion turn endpoint (LIN-2432 §A.7) — deterministic cens
     // LIN-2631 moved this pin with the code: the seed render and the builder
     // call both live in the core now. `buildCensusSeedText` itself lives in
     // lib/flight-companion-census-seed.js (coupled to the census read and to
-    // buildCompanionSnapshot; LIN-3717 moved it) and is injected, which is what keeps lib/ free of
-    // a routes/ import.
+    // buildCompanionSnapshot; LIN-3717 moved it) and is still injected into the core (it was
+    // injected while it lived in routes/).
     assert.match(CORE_SRC, /buildFlightCompanionMessages\(\{[^}]*censusSeedText:\s*buildCensusSeedText\(currentCensusDoc\)/s);
     // ...and the user-initiated branch reads the doc fresh (auto-wake already
     // populated currentCensusDoc via the gate, above). LIN-2622's boot branch
