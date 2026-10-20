@@ -10,7 +10,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readTaskRunFacts, RUN_FACT_DEFAULTS } from '../../lib/task-run-facts.js';
+import { readTaskRunFacts, stopAtFromRows, RUN_FACT_DEFAULTS } from '../../lib/task-run-facts.js';
 
 function store({ queue = [], history = [], hops = {}, throws = false } = {}) {
   return {
@@ -70,4 +70,72 @@ describe('readTaskRunFacts: fail closed', () => {
     assert.deepEqual(await readTaskRunFacts({}), { ...RUN_FACT_DEFAULTS });
     assert.deepEqual(await readTaskRunFacts({ store: store(), urlKey: 'ws' }), { ...RUN_FACT_DEFAULTS });
   });
+});
+
+// LIN-3722: the one aggregation shared with the run page (routes/dashboard.js).
+describe('stopAtFromRows', () => {
+  const PR = { stopAt: 'pr' };
+  const table = [
+    ['a pr row', [PR], 'pr'],
+    ['merge', [{ stopAt: 'merge' }], null],
+    ['null', [{ stopAt: null }], null],
+    ['undefined', [{}], null],
+    ['no rows', [], null],
+    ['truthy non-pr values', [{ stopAt: true }, { stopAt: 'PR' }, { stopAt: 1 }], null],
+    ['falsy entries among a pr row', [null, undefined, false, 0, PR], 'pr'],
+    ['falsy entries only', [null, undefined, false, 0], null],
+    ['pr first', [PR, { stopAt: 'merge' }], 'pr'],
+    ['pr last', [{ stopAt: 'merge' }, PR], 'pr'],
+  ];
+  for (const [name, rows, expected] of table) {
+    test(`${name} -> ${expected}`, () => assert.equal(stopAtFromRows(rows), expected));
+  }
+});
+
+describe('readTaskRunFacts: stopAt over the same row table as the run page', () => {
+  const PR = { stopAt: 'pr' };
+  const ask = s => readTaskRunFacts({ store: s, urlKey: 'ws', issueIdentifier: 'LIN-50' });
+  const rowCases = [
+    ['pr in queue only', { queue: [PR] }, 'pr'],
+    ['pr in history only', { history: [PR] }, 'pr'],
+    ['merge', { queue: [{ stopAt: 'merge' }] }, null],
+    ['null and undefined', { queue: [{ stopAt: null }, {}] }, null],
+    ['falsy entries among a pr row', { queue: [null, undefined, false, 0, PR] }, 'pr'],
+    ['no rows', {}, null],
+  ];
+  for (const [name, input, expected] of rowCases) {
+    test(`${name} -> ${expected}`, async () => assert.equal((await ask(store(input))).stopAt, expected));
+  }
+
+  test('history as a bare array, as { items } and as null', async () => {
+    const base = store({ queue: [PR] });
+    assert.equal((await ask({ ...base, listHistory: async () => [PR] })).stopAt, 'pr');
+    assert.equal((await ask({ ...base, listHistory: async () => ({ items: [PR] }) })).stopAt, 'pr');
+    assert.equal((await ask({ ...base, listHistory: async () => null })).stopAt, 'pr');
+  });
+
+  test('a rejecting listItems still reads history', async () => {
+    const s = { ...store({ history: [PR] }), listItems: async () => { throw new Error('boom'); } };
+    assert.equal((await ask(s)).stopAt, 'pr');
+  });
+
+  test('a store without listItems is skipped, not fatal (differs from the run page)', async () => {
+    const s = store({ history: [PR] });
+    delete s.listItems;
+    assert.equal((await ask(s)).stopAt, 'pr');
+  });
+
+  // The hop: the task page lifts stopAt from the parent run row, the run page does not.
+  const hopCases = [
+    ['parent pr', { stopAt: 'pr' }, 'pr'],
+    ['parent null', { stopAt: null }, null],
+    ['parent merge', { stopAt: 'merge' }, null],
+    ['no parent row', undefined, null],
+  ];
+  for (const [name, parent, expected] of hopCases) {
+    test(`hop: ${name} -> ${expected}`, async () => {
+      const s = store({ queue: [{ kind: 'implementation', sessionId: 'sess-1' }], hops: parent ? { 'sess-1': parent } : {} });
+      assert.equal((await ask(s)).stopAt, expected);
+    });
+  }
 });
