@@ -16,6 +16,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as dashboard from '../../routes/dashboard.js';
 import * as flightCompanion from '../../routes/flight-companion.js';
+import * as runLoopState from '../../lib/run-loop-state.js';
+import * as censusSeed from '../../lib/flight-companion-census-seed.js';
+
 // [name, input loop, expected enrichLoop(loop), expected isTerminalLoop(loop)]
 const LOOP_ROWS = [
   ['agentState complete', {
@@ -399,32 +402,74 @@ const CENSUS_ROWS = [
     'CURRENT CENSUS (authoritative — these numbers are ground truth; narrate them, never recompute or restate them differently):\n  working: 0\n  silent: 0\n  blocked: 0\n  terminal: 0\n  queued: 0\n  resolved: 0\n  unknown: 0\n  attention items: 0\n  census revision: r9\nVOCABULARY: these lanes count dispatch loops (runs) — not sessions (one session spans several loops) and not tasks. "silent" and "terminal" include historical bookkeeping. "blocked" means parked waiting on a human: alive, not dead.']
 ];
 
+// The route files and the new lib modules expose the same bindings: the three
+// formerly exported names keep resolving through routes/dashboard.js (server.js
+// and routes/task-chat.js import them there), and the route re-exports the seed.
+test('route exports are the lib exports (identity, not copies)', () => {
+  assert.strictEqual(dashboard.enrichLoop, runLoopState.enrichLoop);
+  assert.strictEqual(dashboard.isTerminalLoop, runLoopState.isTerminalLoop);
+  assert.strictEqual(dashboard.sessionIsTerminal, runLoopState.sessionIsTerminal);
+  assert.strictEqual(flightCompanion.buildCensusSeedText, censusSeed.buildCensusSeedText);
+});
+
+test('run-loop-state exports exactly the seven moved names', () => {
+  assert.deepStrictEqual(Object.keys(runLoopState).sort(), [
+    'MARKER_TO_AGENT_STATE',
+    'TERMINAL_AGENT_STATES',
+    'effectiveAgentState',
+    'enrichLoop',
+    'isTerminalLoop',
+    'loopIsTerminal',
+    'sessionIsTerminal'
+  ]);
+});
+
+test('the moved constants equal their literals', () => {
+  assert.deepStrictEqual([...runLoopState.TERMINAL_AGENT_STATES], ['complete', 'error']);
+  assert.deepStrictEqual(runLoopState.MARKER_TO_AGENT_STATE, {
+    done: 'complete',
+    failed: 'error',
+    aborted: 'error',
+    skipped: 'complete'
+  });
+});
+
 test('enrichLoop / isTerminalLoop match the captured literals, row by row', async (t) => {
   for (const [name, loop, enriched, terminal] of LOOP_ROWS) {
     await t.test(name, () => {
       const before = structuredClone(loop);
-      const out = dashboard.enrichLoop(loop);
+      const out = runLoopState.enrichLoop(loop);
       assert.deepStrictEqual(out, enriched);
       assert.notStrictEqual(out, loop, 'enrichLoop returns a copy');
       assert.deepStrictEqual(loop, before, 'the stored record is never mutated');
-      assert.strictEqual(dashboard.isTerminalLoop(loop), terminal);
+      assert.strictEqual(runLoopState.isTerminalLoop(loop), terminal);
+      // The formerly private helpers, reached directly now that they are exported.
+      assert.strictEqual(runLoopState.effectiveAgentState(loop), enriched.agentState);
+      assert.strictEqual(runLoopState.loopIsTerminal(loop), runLoopState.isTerminalLoop(enriched));
     });
   }
 });
 
+test('effectiveAgentState: a missing loop is running', () => {
+  assert.strictEqual(runLoopState.effectiveAgentState(null), 'running');
+  assert.strictEqual(runLoopState.effectiveAgentState(undefined), 'running');
+});
+
 test('isTerminalLoop: a missing loop is not terminal', () => {
-  assert.strictEqual(dashboard.isTerminalLoop(null), false);
-  assert.strictEqual(dashboard.isTerminalLoop(undefined), false);
+  assert.strictEqual(runLoopState.isTerminalLoop(null), false);
+  assert.strictEqual(runLoopState.isTerminalLoop(undefined), false);
 });
 
 test('enrichLoop(null) throws TypeError today (the move must not soften it)', () => {
+  assert.throws(() => runLoopState.enrichLoop(null), TypeError);
+  assert.throws(() => runLoopState.enrichLoop(undefined), TypeError);
   assert.throws(() => dashboard.enrichLoop(null), TypeError);
-  assert.throws(() => dashboard.enrichLoop(undefined), TypeError);
 });
 
 test('sessionIsTerminal matches the captured literals, row by row', async (t) => {
   for (const [name, session, expected] of SESSION_ROWS) {
     await t.test(name, () => {
+      assert.strictEqual(runLoopState.sessionIsTerminal(session), expected);
       assert.strictEqual(dashboard.sessionIsTerminal(session), expected);
     });
   }
@@ -433,6 +478,7 @@ test('sessionIsTerminal matches the captured literals, row by row', async (t) =>
 test('buildCensusSeedText matches the captured literals, row by row', async (t) => {
   for (const [name, doc, expected] of CENSUS_ROWS) {
     await t.test(name, () => {
+      assert.strictEqual(censusSeed.buildCensusSeedText(doc), expected);
       assert.strictEqual(flightCompanion.buildCensusSeedText(doc), expected);
     });
   }
