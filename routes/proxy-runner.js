@@ -35,6 +35,7 @@
 import { Router } from 'express';
 import { badRequest, jsonError, notFound } from '../lib/errors.js';
 import { validateFeedbackBody } from '../lib/dispatch-feedback-validation.js';
+import { UUID_REGEX } from '../lib/dispatch-validation.js';
 import { buildWakeCredentialProvisioner } from '../lib/wake-credential.js';
 import { readHaltForPoll, POLL_HALT_READ_TIMEOUT_MS } from '../lib/poll-halt.js';
 import { getConsumerLastSeenAt } from '../lib/consumer-poll-warning.js';
@@ -42,8 +43,6 @@ import { createHeartbeatIngest } from '../lib/consumer-heartbeat-ingest.js';
 import { isRunnerTarget } from '../lib/runner-owner-gate.js';
 import { SESSION_TARGETS } from '../lib/dispatch-targets.js';
 import { publicOrigin } from '../lib/public-origin.js';
-
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const POLL_ROUTE = '/api/proxy/runner/poll';
 const TAKE_ROUTE = '/api/proxy/runner/take/:id';
