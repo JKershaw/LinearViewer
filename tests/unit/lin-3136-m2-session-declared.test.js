@@ -34,7 +34,7 @@ import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
 import { renderPage } from '../../lib/render.js';
 import { PERIODICAL_AUTOPILOT_TAIL } from '../../lib/periodicals.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
-import { testMockPeriodicalsTree } from '../../lib/sample-data/mock-data.js';
+import { testMockPeriodicalsTree } from '../fixtures/periodicals-tree.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OWNER = 'account-A';
