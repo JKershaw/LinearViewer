@@ -6,6 +6,7 @@ import { Router } from 'express'
 import { randomUUID } from 'node:crypto'
 import { removeWorkspace, upsertWorkspace, saveSession, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, linkProvider } from '../lib/workspace.js'
 import { establishAccount, clearUnresolvableAccountSession } from '../lib/account-session.js'
+import { recordWorkspace } from '../lib/workspace-registry.js'
 import { evictWorkspaceTokenPair } from '../lib/workspace-token-cache.js'
 import { releaseConnectionCredential } from '../lib/connection-lifecycle.js'
 import { resolveKeyOrRespond } from '../lib/workspace-urlkey.js'
@@ -20,11 +21,12 @@ import { starterSeed } from '../lib/starter-seed.js'
  * @param {import('../lib/account-workspace-store.js').AccountWorkspaceStore} [deps.accountWorkspaceStore] - LIN-1329: bind the account to the workspace.
  * @param {(key: string) => void} [deps.evictWorkspaceToken] - LIN-1507: evicts a resolved-token cache entry by its pre-computed key (see `workspaceTokenCacheKey`).
  * @param {import('../lib/owner-credential-store.js').OwnerCredentialStore} [deps.ownerCredentialStore] - LIN-1523: durable owner-credential store. Deleted alongside the LIN-1507 cache eviction on disconnect — a cache is not a grant, but a disconnected workspace's durable credential must not outlive the disconnect either.
+ * @param {import('../lib/workspace-store.js').WorkspaceStore} [deps.workspaceStore] - LIN-3700: write-only urlKey registry. No default: absent is a logged skip.
  * @param {function(Object): Promise<Object>} [deps.resolveWorkspaceUrlKey] - LIN-3382: the one urlKey resolver (lib/workspace-urlkey.js). NO default: `POST /workspace/new` fails closed (503 retry page, nothing written) without it.
  * @param {function({urlKey: string, workspaceId: string, accountId: string}): Promise<Object>} [deps.revokeWorkspaceArtifacts] - LIN-3421: `createWorkspaceRemovalRevoker(...).revoke`. Revokes the removing account's own proxy tokens, dispatch tokens and `/t/` links for the key, beside each `deleteAll`. Absent = nothing extra revoked (like `ownerCredentialStore`).
  * @returns {Router} Express router
  */
-export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, connectionStore, resolveWorkspaceUrlKey, revokeWorkspaceArtifacts } = {}) {
+export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, connectionStore, resolveWorkspaceUrlKey, revokeWorkspaceArtifacts, workspaceStore } = {}) {
   const router = Router()
 
   /**
@@ -90,6 +92,10 @@ export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspa
       if (!established.conflict) clearUnresolvableAccountSession(req.session)
       return res.status(500).send(renderErrorPage('Server Error', 'Could not set up your workspace account. Please try again.'))
     }
+
+    // LIN-3700: registry write (best-effort, write-only; lib/workspace-registry.js).
+    // Before the local seed below, after the establishAccount refusal above.
+    await recordWorkspace(workspaceStore, workspace)
 
     if (localStore) {
       await localStore.seed(urlKey, starterSeed(urlKey))

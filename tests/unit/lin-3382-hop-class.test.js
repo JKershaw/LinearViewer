@@ -269,4 +269,25 @@ describe('server.js wiring (source pin; complements the behavioural hops above)'
     assert.match(server, /createWorkspaceRoutes\(\{[^}]*\bresolveWorkspaceUrlKey\b[^}]*\}\)/, 'createWorkspaceRoutes');
     assert.match(server, /createHeldConnectionRoutes\(\{[\s\S]*?\bresolveWorkspaceUrlKey,[\s\S]*?\}\)\)/, 'createHeldConnectionRoutes');
   });
+
+  // LIN-3700: the registry store reaches every site the same way the resolver does, explicitly and with no default.
+  test('workspaceStore reaches the PAT middleware and all three bind-arm mounts, and the merge routes', () => {
+    assert.match(server, /createEnsurePATSession\(\{[^}]*\bworkspaceStore\b[^}]*\}\)/);
+    assert.match(server, /createProviderAuthRouter\(provider, \{[^}]*\bworkspaceStore\b[^}]*\}\)/, 'the provider auth loop');
+    assert.match(server, /createWorkspaceRoutes\(\{[^}]*\bworkspaceStore\b[^}]*\}\)/, 'createWorkspaceRoutes');
+    assert.match(server, /createHeldConnectionRoutes\(\{[\s\S]*?\bworkspaceStore,[\s\S]*?\}\)\)/, 'createHeldConnectionRoutes');
+    assert.match(server, /createAccountMergeRoutes\(\{[^}]*\bworkspaceStore\b[^}]*\}\)/, 'createAccountMergeRoutes (it never got the resolver)');
+  });
+
+  test('the store is built before the PAT middleware mounts', () => {
+    assert.ok(server.indexOf('new WorkspaceStore(') > 0 && server.indexOf('new WorkspaceStore(') < server.indexOf('createEnsurePATSession({'));
+  });
+
+  test('the GitHub and GitHub Projects routers forward workspaceStore to the shared install flow', () => {
+    for (const file of ['routes/github-auth.js', 'routes/github-projects-auth.js']) {
+      const text = fs.readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8');
+      assert.match(text, /createGitHub\w*AuthRoutes\(\{[^}]*\bworkspaceStore\b[^}]*\} = \{\}\)/, `${file} accepts it`);
+      assert.match(text, /createGitHubInstallFlowRoutes\(\{[\s\S]*?\n\s+workspaceStore,/, `${file} forwards it`);
+    }
+  });
 });

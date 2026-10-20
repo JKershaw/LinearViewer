@@ -250,3 +250,9 @@ It prints a summary, then JSON:
 
 It uses only `find`/`countDocuments`, and never prints a session id, token or identity
 credential.
+
+### urlKey registry (LIN-3700)
+
+Every path that binds an account to a workspace also records `{id, urlKey, provider}` in the `workspaces` collection, one row per urlKey (`_id` = urlKey), through `recordWorkspace` (`lib/workspace-registry.js`). It is step 1 of LIN-3394: write-only, best-effort and after success, so it can never change a bind, session or redirect, and no read, backfill or unique index uses it yet. The 13 sites are the `establishAccount` calls with a workspace id, plus the held-new owner edge (recorded only after the owner check) and the merge-confirm bind (only when a workspace is pending; `pending.workspace` carries tokens and reaches nothing but `recordWorkspace`). Email sign-in (a null workspace; email is an identity, never a provider), held add-source, the owner backfill and `routes/test.js` do not record.
+
+Contract for the later steps: two ids binding one key (legacy Jira teammates) leave the last binder's `id`; a Linear rename makes a new row and leaves the old one; `provider` is the active provider at the last bind (informational; at five sites the write precedes `linkProvider`, so a legacy providerless workspace reads `linear`). Removing a workspace deletes nothing, so its row keeps the dead id until the key is re-bound, with one exception: a Full account erasure of an Alone workspace deletes the row, because `lib/account-erasure.js` lists `workspaces` as workspace-scoped by `urlKey`.

@@ -61,6 +61,7 @@ import {
   oneSourcePerKindMessage,
 } from '../lib/workspace.js'
 import { establishAccount, clearUnresolvableAccountSession } from '../lib/account-session.js'
+import { recordWorkspace } from '../lib/workspace-registry.js'
 import { respondToAccountConflict, reproofUrlForAccount } from '../lib/account-conflict.js'
 import { writeConnection } from '../lib/connection-store.js'
 import { isConnectionBacked } from '../lib/connection-binding.js'
@@ -116,10 +117,11 @@ export function normalizeJiraSite(site) {
  * @param {import('../lib/account-store.js').AccountStore} [options.accountStore] - LIN-1329: find-or-create the durable account for the signing-in Jira identity.
  * @param {import('../lib/account-workspace-store.js').AccountWorkspaceStore} [options.accountWorkspaceStore] - LIN-1329: bind the account to the workspace.
  * @param {Object} [options.userPreferencesStore] - LIN-1890 N1: rehydrates durable preferences onto the regenerated session of a `mode: 'new'` Jira login, mirroring routes/github-auth.js. `server.js`'s auth-mount loop has always passed this and the router wiring has always spread it through — this router simply dropped it on the floor until the bootstrap needed it.
+ * @param {import('../lib/workspace-store.js').WorkspaceStore} [options.workspaceStore] - LIN-3700: write-only urlKey registry. No default: absent is a logged skip.
  * @param {function(Object): Promise<Object>} [options.resolveWorkspaceUrlKey] - LIN-3382: the one urlKey resolver (lib/workspace-urlkey.js). NO default: the fresh-container arm fails closed (503 retry page, nothing written, carried refresh token dropped) without it.
  * @returns {import('express').Router}
  */
-export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceStore, ownerCredentialStore, userPreferencesStore, connectionStore, resolveWorkspaceUrlKey } = {}) {
+export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceStore, ownerCredentialStore, userPreferencesStore, connectionStore, resolveWorkspaceUrlKey, workspaceStore } = {}) {
   const router = Router()
 
   const notConfigured = (res) => res.status(503).send(renderErrorPage(
@@ -302,6 +304,9 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
         action: 'Go to homepage', actionUrl: '/'
       }))
     }
+
+    // LIN-3700: record {urlKey -> id, provider} in the registry, best-effort and write-only, straight after the refusal blocks and before the bind is persisted (see lib/workspace-registry.js).
+    await recordWorkspace(workspaceStore, workspace)
 
     // linkProvider (lib/workspace.js) is the single seam: it writes
     // `credentials` into the (provider, scope) BINDING (the durable source of
@@ -661,6 +666,9 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
       }))
     }
 
+    // LIN-3700: record {urlKey -> id, provider} in the registry, best-effort and write-only, straight after the refusal blocks and before the bind is persisted (see lib/workspace-registry.js).
+    await recordWorkspace(workspaceStore, workspace)
+
     // LIN-1887 Step 5. Three things are load-bearing here:
     //
     //  * `tokenExpiresAt` is REAL, derived from `expires_in`. The
@@ -848,6 +856,9 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
           action: 'Go to homepage', actionUrl: '/'
         }))
       }
+      // LIN-3700: record {urlKey -> id, provider} in the registry, best-effort and write-only, straight after the refusal blocks and before the bind is persisted (see lib/workspace-registry.js).
+      await recordWorkspace(workspaceStore, existing)
+
       const priorBinding = bindingShapeAt(existing, 'jira', site.url)
       linkProvider(existing, 'jira', site.url, credentials)
       req.session.activeWorkspaceId = existing.id
@@ -948,6 +959,9 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
                   identityLabel: 'Jira', reauthUrl: await reproofUrlForAccount(accountStore, req.session.accountId, '/auth/jira/oauth?mode=new'), provider: 'jira'
                 })
               }
+
+              // LIN-3700: record {urlKey -> id, provider} in the registry, best-effort and write-only, straight after the refusal blocks and before the bind is persisted (see lib/workspace-registry.js).
+              await recordWorkspace(workspaceStore, workspace)
 
               // Strictly after established.accountId is populated (LIN-1353 S9).
               if (userPreferencesStore) {
