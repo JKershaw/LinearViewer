@@ -30,7 +30,10 @@ Source of every "today" row: `lib/render-kpis.js` (538 lines), `public/kpis.js` 
 | Stat cards: agent actions, autopilot runs, prompts dispatched (30d) | kept | `totals.agentActions`, `autopilotRuns`, `dispatches`. Event counts across all workspaces: not floored (see registry). |
 | Stat cards: feedback notes, ai summaries, roadmap reports, custom prompts, agent tokens | **dropped** | Housekeeping counts; tokens are per-person credentials. |
 | Chart: proxy calls by phase (30d/24h) | changed | Kept 30d as "what agents do" (`proxyCategories`); 24h view dropped (activity pattern, no story). |
-| Chart: work landed weekly | kept | `dispatchOutcomes.weeks/weeklyRate/weeklyResolved`. Not floored. |
+| Chart: work landed weekly | kept | `dispatchOutcomes.weeks/weeklyRate/weeklyResolved`. Not floored. LIN-3710: drawn as a line (null weeks are gaps). |
+| Charts: work resolved weekly (`outcome-weekly`), tasks finished daily (`done-daily`) | added (LIN-3710) | Stacked done / failed / aborted by start week; bars of `daily.done` per day. Rates only: running totals and the rate/total toggle wait for the daily rollup tickets. |
+| Sparklines on the agent actions, prompts dispatched and autopilot runs cards | added (LIN-3710) | 30 daily points from `daily.*` and the sum of `phases`. None on workspaces or the headline. |
+| Chart: proxy calls (`proxy-phases`) | changed (LIN-3710) | Same stacked bars, now with a 7-day average line (23 points: none for the first six days or for today). |
 | Chart: dispatched work by kind (daily stacked) | dropped | The kind bar says the same thing with a fifth of the payload. |
 | Chart: dispatch kinds | kept | `dispatchKinds` (label + count). Not floored. "+N more" caption dropped with `dispatchKindsOtherCount`. |
 | Chart: work funnel (dispatched, taken, reported, completed) | dropped | Lower bounds that need a caveat; the headline already answers "does it land". `funnel.*IsLowerBound` go with it. |
@@ -61,6 +64,7 @@ Every numeric leaf of the public payload:
 
 | Path | Class | Why |
 |---|---|---|
+| `outcomes.weeklyFailed[]`, `outcomes.weeklyAborted[]`, `daily.{dispatches,autopilotRuns,done}[]` | not floored | LIN-3710. Run or lineage counts across every workspace; not tied to a person. A nonzero `phases` day already shows a run happened that day. A week's done is `weeklyResolved - weeklyFailed - weeklyAborted`; there is no `weeklyDone` leaf. `daily` has no `days` of its own: it uses `phases.days`. |
 | `outcomes.{total,resolved,done,failed,aborted}`, `outcomes.weeklyResolved[]`, `outcomes.rate`, `outcomes.weeklyRate[]`, `outcomes.windowDays` | not floored | Dispatch lineages over 30 days across every workspace; not tied to a person, and the rate and window are not counts. |
 | `totals.{agentActions,dispatches,autopilotRuns}` | not floored | Many events per workspace; an event count does not describe a person. |
 | `phases.{orienting,deciding,acting,watching,reporting}[]` | not floored | Per-day proxy-call tallies, many per run. |
@@ -87,7 +91,7 @@ A viewer can watch a visible count (at least the floor) move by one, at most onc
 
 ## Layout
 
-One column. `max-width: 900px` content, `var(--space-*)` gutters, no horizontal overflow at 390px (the cards wrap in a two-column grid, charts get a fixed-height box). All colours come from the theme tokens the script already reads (`--green`, `--blue`, `--fg-dim`, ...), so dark parity needs no second palette. Section headings are `h3` inside `section[data-testid="kpis-section-<name>"]`. Hidden rows use the existing `kpi-chart-empty` look. Test ids: `kpis-headline`, `kpis-section-{outcome,activity,people}`, `kpis-card-<name>`, `kpis-chart-<name>`, `kpis-hidden`, `kpis-generated`, `kpis-privacy`; selectors in `SELECTORS.publicKpis`.
+One column. `max-width: 900px` content, `var(--space-*)` gutters, no horizontal overflow at 390px (the cards wrap in a two-column grid, charts get a fixed-height box). All colours come from the theme tokens the script already reads (`--green`, `--blue`, `--fg-dim`, ...), so dark parity needs no second palette. Section headings are `h3` inside `section[data-testid="kpis-section-<name>"]`. Hidden rows use the existing `kpi-chart-empty` look. Test ids: `kpis-headline`, `kpis-section-{outcome,activity,people}`, `kpis-card-<name>`, `kpis-chart-<name>`, `kpis-hidden`, `kpis-generated`, `kpis-privacy`; LIN-3710 adds `kpis-spark-<card>`, `kpis-numbers-<chart>` (the closed "Show the numbers" `details`) and `kpis-numbers-table-<chart>`; selectors in `SELECTORS.publicKpis`.
 
 ## Route and cache
 

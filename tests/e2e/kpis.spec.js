@@ -8,8 +8,35 @@
  */
 import { test, expect } from '@playwright/test';
 import { SELECTORS } from '../helpers.js';
+import { renderKpisPage } from '../../lib/render-kpis.js';
+import { toPublicKpis } from '../../lib/kpi-stats.js';
+import { buildStats } from '../helpers/public-kpis-fixture.js';
 
 const K = SELECTORS.publicKpis;
+
+// LIN-3710: `documentElement.scrollWidth - clientWidth` always reads 0 on this
+// site — html and body are `overflow-x: clip` (public/style.css, LIN-1068), so
+// content that spills past the viewport is cut off, not scrolled, and the
+// document never reports it (same trap as LIN-2830;
+// session-decision-layout.spec.js documents the idiom). Measure the boxes
+// themselves: nothing inside a chart box or card may be wider than its box.
+// `wraps` asserts the table wrappers really scroll (overflow-x: auto), which
+// is what keeps a wide table inside its box.
+async function expectNoClippedOverflow(page, { wraps = false } = {}) {
+  const m = await page.evaluate(({ boxes, wrapSel }) => ({
+    body: document.body.scrollWidth - document.body.clientWidth,
+    boxes: [...document.querySelectorAll(boxes)]
+      .map(el => ({ id: el.dataset.testid, over: el.scrollWidth - el.clientWidth }))
+      .filter(b => b.over > 0),
+    wraps: [...document.querySelectorAll(wrapSel)].map(el => getComputedStyle(el).overflowX),
+  }), { boxes: '[data-testid^="kpis-chart-"], [data-testid^="kpis-card-"]', wrapSel: '.kpi-numbers-wrap' });
+  expect(m.body).toBeLessThanOrEqual(0);
+  expect(m.boxes).toEqual([]);
+  if (wraps) {
+    expect(m.wraps.length).toBeGreaterThan(0);
+    for (const overflowX of m.wraps) expect(overflowX).toBe('auto');
+  }
+}
 
 // LIN-1846: /kpis is the only spec that ever requests /kpis, and the route
 // caches its instance-wide stats process-wide for 60s (server.js KPI_CACHE_MS)
@@ -77,7 +104,7 @@ test.describe('KPIs page', () => {
     expect(await page.evaluate(() => typeof window.Chart !== 'undefined')).toBe(true);
 
     const data = await page.evaluate(() => window.__KPI_DATA__);
-    expect(Object.keys(data).sort()).toEqual(['dispatchKinds', 'generatedAt', 'milestoneFunnel', 'outcomes', 'phases', 'totals']);
+    expect(Object.keys(data).sort()).toEqual(['daily', 'dispatchKinds', 'generatedAt', 'milestoneFunnel', 'outcomes', 'phases', 'totals']);
     expect(data.phases.days.length).toBe(30);
     // Four whole weeks inside the 30-day window (the oldest partial week would under-fill).
     expect(data.outcomes.weeks.length).toBe(4);
@@ -93,7 +120,7 @@ test.describe('KPIs page', () => {
 
     // Each chart box ends up with either a live canvas or a note — never an empty hole.
     const boxes = page.locator('[data-testid^="kpis-chart-"]');
-    await expect(boxes).toHaveCount(4);
+    await expect(boxes).toHaveCount(6);
     const count = await boxes.count();
     for (let i = 0; i < count; i++) {
       expect(await boxes.nth(i).locator('canvas, .kpi-chart-empty').count()).toBeGreaterThan(0);
@@ -121,10 +148,7 @@ test.describe('KPIs page', () => {
     await page.goto('/kpis');
     await page.waitForTimeout(300); // let charts lay out
 
-    const overflow = await page.evaluate(() =>
-      document.documentElement.scrollWidth - document.documentElement.clientWidth
-    );
-    expect(overflow).toBeLessThanOrEqual(0);
+    await expectNoClippedOverflow(page);
 
     // The cards stay visible
     await expect(page.locator(K.card('workspaces'))).toBeVisible();
@@ -139,6 +163,66 @@ test.describe('KPIs page', () => {
     // The page is intentionally unlinked: the landing page must not point to it
     await page.goto('/');
     await expect(page.locator('a[href="/kpis"]')).toHaveCount(0);
+  });
+});
+
+// LIN-3710: the trend charts, sparklines and disclosures, drawn from a seeded
+// 30-day payload. The page is built from the fixture with the real renderer and
+// served in place of /kpis, so the numbers are known and nothing is cached.
+test.describe('KPIs page — trend charts from a seeded payload (LIN-3710)', () => {
+  const view = toPublicKpis(buildStats({ fullSeries: true }));
+  const DISCLOSURES = ['outcome-trend', 'outcome-weekly', 'done-daily', 'proxy-phases'];
+
+  test.beforeEach(async ({ page }) => {
+    const html = renderKpisPage(view);
+    await page.route('**/kpis', route => route.fulfill({ status: 200, contentType: 'text/html', body: html }));
+  });
+
+  test('every chart canvas has a live chart and the 7-day line has 23 points', async ({ page }) => {
+    await page.goto('/kpis');
+    for (const name of ['outcome-trend', 'outcome-weekly', 'done-daily', 'proxy-phases']) {
+      const live = await page.evaluate(id => Boolean(window.Chart.getChart(document.getElementById(id))), `chart-${name}`);
+      expect(live, name).toBe(true);
+    }
+    const line = await page.evaluate(() => {
+      const chart = window.Chart.getChart(document.getElementById('chart-proxy-phases'));
+      return chart.data.datasets.find(d => d.type === 'line').data;
+    });
+    expect(line).toHaveLength(30);
+    expect(line.filter(v => v !== null)).toHaveLength(23);
+    const trend = await page.evaluate(() => window.Chart.getChart(document.getElementById('chart-outcome-trend')).config.type);
+    expect(trend).toBe('line');
+  });
+
+  test('three cards carry a 30-point sparkline and workspaces carries none', async ({ page }) => {
+    await page.goto('/kpis');
+    for (const name of ['agent-actions', 'dispatches', 'autopilot-runs']) {
+      const svg = page.locator(`${K.spark(name)} svg`);
+      await expect(svg).toHaveAttribute('role', 'img');
+      await expect(svg).toHaveAttribute('data-points', '30');
+    }
+    await expect(page.locator(K.spark('workspaces'))).toHaveCount(0);
+    await expect(page.locator(`${K.headline} svg`)).toHaveCount(0);
+  });
+
+  test('each disclosure is closed, then opens to a table with the right rows', async ({ page }) => {
+    await page.goto('/kpis');
+    const rows = { 'outcome-trend': 4, 'outcome-weekly': 4, 'done-daily': 30, 'proxy-phases': 30 };
+    for (const name of DISCLOSURES) {
+      const details = page.locator(K.numbers(name));
+      await expect(details).not.toHaveAttribute('open', '');
+      await details.locator('summary').click();
+      await expect(details.locator('tbody tr')).toHaveCount(rows[name]);
+    }
+    await expect(page.locator(`${K.numbers('done-daily')} tbody tr`).last()).toContainText('today, so far');
+  });
+
+  test('no horizontal scroll at 390px with every disclosure open', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/kpis');
+    for (const name of DISCLOSURES) await page.locator(K.numbers(name)).locator('summary').click();
+    await page.waitForTimeout(300);
+    await expectNoClippedOverflow(page, { wraps: true });
   });
 });
 

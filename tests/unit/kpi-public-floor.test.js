@@ -187,6 +187,29 @@ describe('toPublicKpis: no raw below-floor value survives', () => {
     for (const path of registered) assert.ok(seen.has(path), `registry entry never emitted: ${path}`);
   });
 
+  // LIN-3710
+  test('the five trend-chart leaves are registered open, and weeklyDone is not a leaf', () => {
+    const paths = ['outcomes.weeklyFailed[]', 'outcomes.weeklyAborted[]', 'daily.dispatches[]', 'daily.autopilotRuns[]', 'daily.done[]'];
+    for (const path of paths) {
+      assert.strictEqual(PUBLIC_LEAF_REGISTRY.find(e => e.path === path)?.kind, 'open', path);
+    }
+    assert.ok(!PUBLIC_LEAF_REGISTRY.some(e => e.path.includes('weeklyDone')));
+    assert.ok(!JSON.stringify(toPublicKpis(buildStats())).includes('weeklyDone'));
+  });
+
+  test('every daily array has one point per phases day, and a week\'s done is derivable', () => {
+    for (const stats of [buildStats(), buildStats({ fullSeries: true })]) {
+      const view = toPublicKpis(stats);
+      for (const [name, series] of Object.entries(view.daily)) {
+        assert.strictEqual(series.length, view.phases.days.length, name);
+      }
+      assert.ok(!('days' in view.daily));
+      view.outcomes.weeklyResolved.forEach((resolved, i) => {
+        assert.ok(resolved - view.outcomes.weeklyFailed[i] - view.outcomes.weeklyAborted[i] >= 0);
+      });
+    }
+  });
+
   test('the registry classes every entry and names the group of each floored one', () => {
     for (const entry of PUBLIC_LEAF_REGISTRY) {
       assert.ok(entry.kind === 'open' || entry.kind === 'floored', entry.path);
@@ -236,7 +259,7 @@ describe('toPublicKpis: the view is only what the page draws', () => {
   const view = toPublicKpis(buildStats());
 
   test('top-level keys', () => {
-    assert.deepStrictEqual(Object.keys(view).sort(), ['dispatchKinds', 'generatedAt', 'milestoneFunnel', 'outcomes', 'phases', 'totals']);
+    assert.deepStrictEqual(Object.keys(view).sort(), ['daily', 'dispatchKinds', 'generatedAt', 'milestoneFunnel', 'outcomes', 'phases', 'totals']);
   });
 
   test('operator-only and undrawn fields are not published', () => {

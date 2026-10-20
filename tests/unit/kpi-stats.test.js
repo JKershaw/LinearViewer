@@ -1812,3 +1812,74 @@ describe('LIN-2952 — milestoneFunnel aggregate key', () => {
     );
   });
 });
+
+// LIN-3710: per-week failed/aborted and the per-day series behind the public
+// trend charts.
+describe('collectKpiStats — weekly slices and daily series (LIN-3710)', () => {
+  async function collect(history, queue = []) {
+    return collectKpiStats(buildCollections({
+      dispatchHistory: createMockCollection(history),
+      dispatchQueue: createMockCollection(queue)
+    }), { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+  }
+  const row = (id, started, feedback, extra = {}) =>
+    ({ _id: id, rootItemId: id, status: 'taken', dispatchedAt: daysAgo(started), feedback, ...extra });
+  const lastDay = 29;
+
+  test('weeklyFailed and weeklyAborted bucket on the start week and sum with done to weeklyResolved', async () => {
+    const { dispatchOutcomes: o } = await collect([
+      row('a-done', 1, [marker('[done] ok', 0)]),
+      row('a-failed', 2, [marker('[failed] no', 1)]),
+      row('a-target', 3, [], {}),
+      { _id: 'a-abort', rootItemId: 'a-abort', abort: true, abortTo: 'a-target', status: 'taken', dispatchedAt: daysAgo(3), feedback: [marker('[aborted] cancel', 2)] },
+      // started 20d ago, finished late: stays in its start week (index 1)
+      row('b-failed', 20, [marker('[failed] slow', 19)])
+    ]);
+    assert.deepStrictEqual(o.weeklyFailed, [0, 1, 0, 1]);
+    assert.deepStrictEqual(o.weeklyAborted, [0, 0, 0, 1]);
+    assert.deepStrictEqual(o.weeklyResolved, [0, 1, 0, 3]);
+    o.weeklyResolved.forEach((resolved, i) => {
+      assert.ok(resolved - o.weeklyFailed[i] - o.weeklyAborted[i] >= 0, `week ${i} done is derivable`);
+    });
+    assert.strictEqual(o.weeklyResolved[3] - o.weeklyFailed[3] - o.weeklyAborted[3], 1, 'the one done lineage');
+  });
+
+  test('daily.done counts a done lineage on the day of its terminal marker, not its start', async () => {
+    const { daily } = await collect([
+      row('d1', 25, [marker('[done] slow', 1)]),
+      row('d2', 3, [marker('[done] quick', 0)]),
+      row('d3', 3, [marker('[done] quick too', 0)])
+    ]);
+    assert.strictEqual(daily.done.length, 30);
+    assert.strictEqual(daily.done[lastDay - 1], 1, 'finished yesterday');
+    assert.strictEqual(daily.done[lastDay], 2, 'finished today');
+    assert.strictEqual(daily.done.reduce((a, b) => a + b, 0), 3);
+  });
+
+  test('daily.done leaves out failed, skipped, aborted, unresolved and null-statusMs lineages', async () => {
+    const { daily } = await collect([
+      row('e-failed', 3, [marker('[failed] x', 1)]),
+      row('e-skipped', 3, [marker('[skipped] human', 1)]),
+      row('e-target', 3, []),
+      { _id: 'e-abort', rootItemId: 'e-abort', abort: true, abortTo: 'e-target', status: 'taken', dispatchedAt: daysAgo(3), feedback: [marker('[aborted] cancel', 1)] },
+      row('e-open', 3, []),
+      row('e-notime', 3, [{ message: '[done] no timestamp' }]),
+      row('e-ok', 3, [marker('[done] counted', 1)])
+    ]);
+    assert.strictEqual(daily.done.reduce((a, b) => a + b, 0), 1);
+  });
+
+  test('daily dispatch and autopilot series are 30 points that sum to the totals', async () => {
+    const stats = await collect(
+      [row('s1', 2, [], { kind: 'autopilot' }), row('s2', 2, [], { kind: 'research' }), row('s3', 0, [], { kind: 'autopilot' })],
+      [{ _id: 'q1', kind: 'autopilot', dispatchedAt: daysAgo(1) }]
+    );
+    const { daily, totals } = stats;
+    assert.strictEqual(daily.dispatches.length, 30);
+    assert.strictEqual(daily.autopilotRuns.length, 30);
+    assert.strictEqual(daily.dispatches.reduce((a, b) => a + b, 0), totals.dispatches);
+    assert.strictEqual(daily.autopilotRuns.reduce((a, b) => a + b, 0), totals.autopilotRuns);
+    assert.strictEqual(totals.dispatches, 4);
+    assert.strictEqual(daily.autopilotRuns[lastDay - 2] + daily.autopilotRuns[lastDay - 1] + daily.autopilotRuns[lastDay], 3);
+  });
+});

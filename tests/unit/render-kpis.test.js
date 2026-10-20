@@ -6,6 +6,9 @@
  * Run with: node --test tests/unit/render-kpis.test.js
  */
 import { test, describe } from 'node:test';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import assert from 'node:assert';
 import { renderKpisPage } from '../../lib/render-kpis.js';
 import { toPublicKpis, PUBLIC_COUNT_FLOOR } from '../../lib/kpi-stats.js';
@@ -33,6 +36,21 @@ describe('renderKpisPage: frame', () => {
     assert.match(html, /\/kpis\.js/);
   });
 
+  test('loads the shared chart helper before the page script, as plain scripts', () => {
+    const order = ['chart.umd.min.js', 'chart-helpers.js', '/kpis.js'].map(name => html.indexOf(`src="/${name.replace(/^\//, '')}"`));
+    assert.ok(order.every(i => i > 0), String(order));
+    assert.deepStrictEqual([...order].sort((a, b) => a - b), order);
+    assert.ok(!/<script[^>]*type="module"/.test(html));
+  });
+
+  test('carries the hidden-leaf wording on <main>, once, from the server constant', () => {
+    const attr = /<main[^>]*data-hidden-text="([^"]*)"/.exec(html)?.[1];
+    assert.ok(attr);
+    const text = JSON.parse(attr.replaceAll('&quot;', '"'));
+    assert.deepStrictEqual(text, { 'below-floor': `fewer than ${F}`, withheld: 'not shown' });
+    assert.ok(!readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../public/kpis.js'), 'utf8').includes('fewer than'), 'the script has no second copy');
+  });
+
   test('is not linked to anything: no nav link points at /kpis', () => {
     assert.ok(!/href="\/kpis"/.test(html));
   });
@@ -56,7 +74,7 @@ describe('renderKpisPage: frame', () => {
 
   test('embeds the public view only: none of the dropped fields reach the page', () => {
     const data = extractEmbeddedData(html, '__KPI_DATA__');
-    assert.deepStrictEqual(Object.keys(data).sort(), ['dispatchKinds', 'generatedAt', 'milestoneFunnel', 'outcomes', 'phases', 'totals']);
+    assert.deepStrictEqual(Object.keys(data).sort(), ['daily', 'dispatchKinds', 'generatedAt', 'milestoneFunnel', 'outcomes', 'phases', 'totals']);
     for (const dropped of ['terminalMarkedTaskCost', 'weeklyBudgetGauge', 'topEndpoints', 'hourOfDay', 'vanity', 'activeTokens', 'dbBackend', 'mangodb', 'cash:']) {
       assert.ok(!html.includes(dropped), dropped);
     }
@@ -118,8 +136,8 @@ describe('renderKpisPage: what the agents do', () => {
 
   test('draws the phases and dispatch-kinds charts', () => {
     const html = render();
-    for (const id of ['chart-proxy-phases', 'chart-dispatch-kinds', 'chart-outcome-trend']) {
-      assert.match(html, new RegExp(`<canvas id="${id}"></canvas>`), id);
+    for (const id of ['chart-proxy-phases', 'chart-dispatch-kinds', 'chart-outcome-trend', 'chart-outcome-weekly', 'chart-done-daily']) {
+      assert.match(html, new RegExp(`<canvas id="${id}"[^>]*></canvas>`), id);
     }
   });
 });
@@ -219,5 +237,69 @@ describe('renderKpisPage: the small-count floor in the page source', () => {
       ...scanText(html, { filePath: 'kpis.html' })
     ];
     assert.deepStrictEqual(findings, []);
+  });
+});
+
+// LIN-3710: the trend charts, sparklines and "Show the numbers" disclosures.
+describe('renderKpisPage: trend charts and disclosures (LIN-3710)', () => {
+  const html = render();
+  const BOXES = ['outcome-trend', 'outcome-weekly', 'done-daily', 'proxy-phases'];
+  const boxOf = name => {
+    const start = html.indexOf(`data-testid="kpis-chart-${name}"`);
+    return html.slice(start, html.indexOf('</section>', start));
+  };
+
+  test('there are six chart boxes: four changed or new, two untouched', () => {
+    assert.strictEqual(testid(html, 'kpis-chart-[a-z-]+').length, 6);
+    for (const name of [...BOXES, 'dispatch-kinds', 'milestone-funnel']) assert.ok(boxOf(name), name);
+  });
+
+  test('every new or changed box has a closed "Show the numbers" disclosure with notes and a table mount', () => {
+    for (const name of BOXES) {
+      const box = boxOf(name);
+      assert.match(box, new RegExp(`<details class="kpi-numbers" data-testid="kpis-numbers-${name}"><summary>Show the numbers</summary>`), name);
+      assert.ok(!/<details[^>]*\bopen\b/.test(box), `${name} is closed by default`);
+      assert.match(box, /<p class="kpi-numbers-note">/, name);
+      assert.match(box, new RegExp(`data-testid="kpis-numbers-table-${name}"`), name);
+    }
+    assert.ok(!/kpis-numbers-dispatch-kinds|kpis-numbers-milestone-funnel/.test(html), 'untouched boxes get none');
+  });
+
+  test('outside the disclosure a box shows its title and at most one line of text', () => {
+    for (const name of BOXES) {
+      const visible = boxOf(name).replace(/<details[\s\S]*?<\/details>/, '');
+      const texts = [...visible.matchAll(/<span class="(kpi-chart-caption)?"?[^>]*>([^<]+)<\/span>/g)];
+      assert.ok(texts.length >= 1 && texts.length <= 2, `${name}: ${texts.length} spans`);
+      assert.ok(!/<p[ >]/.test(visible), `${name} has no paragraph outside the disclosure`);
+    }
+  });
+
+  test('the weekly chart says "by start week", and the daily one says what a finish is', () => {
+    assert.match(boxOf('outcome-weekly'), /by start week/);
+    assert.match(boxOf('done-daily'), /Show the numbers[\s\S]*marked it \[done\][\s\S]*not on a verified merge/);
+    assert.match(boxOf('done-daily'), /no marker time[\s\S]*not counted/);
+  });
+
+  test('the headline anchor stays on the section wrapper of the line chart', () => {
+    const tag = /<section[^>]*data-testid="kpis-chart-outcome-trend"[^>]*>/.exec(html)?.[0] || '';
+    assert.match(tag, /id="kpi-outcome-evidence"/);
+  });
+
+  test('proxy-phases is titled "proxy calls"', () => {
+    assert.match(boxOf('proxy-phases'), /<span>proxy calls<\/span>/);
+  });
+
+  test('sparklines mount on the three named cards and not on workspaces', () => {
+    for (const name of ['agent-actions', 'dispatches', 'autopilot-runs']) {
+      assert.strictEqual(testid(html, `kpis-spark-${name}`).length, 1, name);
+    }
+    assert.match(html, /data-testid="kpis-spark-agent-actions" data-label="proxy calls per day"/);
+    assert.ok(!/kpis-spark-workspaces/.test(html));
+    assert.ok(!/kpis-spark-headline|kpis-headline[^>]*>[\s\S]{0,400}kpi-card-spark/.test(html));
+  });
+
+  test('no running total and no rate/total toggle on the page', () => {
+    assert.ok(!/running total|cumulative|toggle/i.test(html.replace(/<script[\s\S]*?<\/script>/g, '')));
+    assert.ok(!/<button|role="switch"|type="radio"/.test(html.replace(/<footer[\s\S]*<\/footer>/, '')));
   });
 });

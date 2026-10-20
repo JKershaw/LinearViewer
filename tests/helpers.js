@@ -113,6 +113,8 @@ export const SELECTORS = {
     section: (name) => `[data-testid="kpis-section-${name}"]`,
     card: (name) => `[data-testid="kpis-card-${name}"]`,
     chart: (name) => `[data-testid="kpis-chart-${name}"]`,
+    spark: (name) => `[data-testid="kpis-spark-${name}"]`,
+    numbers: (name) => `[data-testid="kpis-numbers-${name}"]`,
     hidden: '[data-testid="kpis-hidden"]',
     privacy: '[data-testid="kpis-privacy"]',
   },

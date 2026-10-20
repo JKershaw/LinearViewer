@@ -31,8 +31,14 @@ export function buildMode(total, rungs) {
   };
 }
 
-export function buildStats({ workspaces = 40, funnel = buildFunnel({ login: 30, connected: 20, firstGo: 12, prOpened: 8, mergeClicked: null }, buildMode(36, [[20, 6], [10, 0], [6, 0]])), ...overrides } = {}) {
+export function buildStats({ fullSeries = false, workspaces = 40, funnel = buildFunnel({ login: 30, connected: 20, firstGo: 12, prOpened: 8, mergeClicked: null }, buildMode(36, [[20, 6], [10, 0], [6, 0]])), ...overrides } = {}) {
   const phase = values => [...values];
+  // `fullSeries` swaps the two-day axis for 30 days ending 2026-06-10, with a
+  // gap-free but varied count per day, so charts have something to draw.
+  const days = fullSeries
+    ? Array.from({ length: 30 }, (_, i) => new Date(Date.UTC(2026, 5, 10) - (29 - i) * 86400000).toISOString().slice(0, 10))
+    : ['2026-06-09', '2026-06-10'];
+  const series = (base, step = 1) => days.map((_, i) => base + ((i * step) % 7));
   return {
     generatedAt: '2026-06-10T12:00:00.000Z',
     totals: {
@@ -53,8 +59,13 @@ export function buildStats({ workspaces = 40, funnel = buildFunnel({ login: 30, 
       activeTokens: 6
     },
     proxyCategories: {
-      days: ['2026-06-09', '2026-06-10'],
-      ...Object.fromEntries(PROXY_PHASES.map((p, i) => [p, phase([10 + i, 20 + i])]))
+      days,
+      ...Object.fromEntries(PROXY_PHASES.map((p, i) => [p, fullSeries ? phase(series(10 + i, i + 1)) : phase([10 + i, 20 + i])]))
+    },
+    daily: {
+      dispatches: fullSeries ? series(1) : [1, 2],
+      autopilotRuns: fullSeries ? series(0, 2) : [0, 1],
+      done: fullSeries ? series(0, 3) : [1, 0]
     },
     proxyCategoriesHourly: { hours: ['2026-06-10T11'], orienting: [3], deciding: [1], acting: [0], watching: [2], reporting: [1] },
     dispatchByDay: { days: ['2026-06-09'], kinds: [{ label: 'autopilot', counts: [1] }] },
@@ -68,7 +79,9 @@ export function buildStats({ workspaces = 40, funnel = buildFunnel({ login: 30, 
       rate: 0.872,
       weeks: ['2026-05-13', '2026-05-20', '2026-05-27', '2026-06-03'],
       weeklyRate: [0.5, null, 1, 0.875],
-      weeklyResolved: [2, 0, 3, 8]
+      weeklyResolved: [2, 0, 3, 8],
+      weeklyFailed: [1, 0, 0, 1],
+      weeklyAborted: [0, 0, 0, 1]
     },
     terminalMarkedTaskCost: { windowDays: 30, issueCount: 10, costUsd: 176.4 },
     weeklyBudgetGauge: { percentConsumed: 56.3, dayBars: { days: ['2026-06-10'], costUsd: [61.8] } },
