@@ -1,0 +1,77 @@
+{
+ "areas": [
+  {
+   "name": "Front end: browser code",
+   "match": [
+    "^public/"
+   ]
+  },
+  {
+   "name": "Front end: server-rendered pages",
+   "match": [
+    "^lib/(render[^/]*|components/.*|tree|ship-layout|swim-graph|swim-lanes|timeline-zoom|parse-landing|mask-secrets-in-html|task-page-href|question-card|security-headers|ship-journey)\\.js$"
+   ]
+  },
+  {
+   "name": "Agent API (proxy)",
+   "match": [
+    "^routes/proxy[^/]*\\.js$|^lib/proxy-(?!fetch\\.js$|preamble\\.js$)[^/]*\\.js$|^lib/(require-grant|harbour-feedback-tokens|dispatch-tokens|settings-proxy-default)\\.js$"
+   ]
+  },
+  {
+   "name": "Runs & dispatch",
+   "match": [
+    "^routes/(dispatch|live-console|runner-kit|runner-setup)\\.js$|^lib/runner-kit/|^lib/(dispatch-[^/]*|pipeline-loops|run-[^/]*|wake-[^/]*|digest-feedback|lineage-closure|loop-supersede|follow-up-dispatch|ci-wake-sweep|follow-on-ratio|observation-[^/]*|observer-[^/]*|liveness-[^/]*|completion-signals|agent-status-store|unanswered-decisions|task-decisions-store|shelved-rulings-store|dismissal-suggestions-store|close-out-events-store|ticket-close-closer|plan-review-round-trips|poll-halt|workspace-halt|queue-config|session-summary[^/]*|session-telemetry|session-materializer-precompute|sessions-feed-cache|sessions-view|recent-runs|task-run-facts|close-out-readiness|task-cost|terminal-marked-task-cost|transcript-spend|weekly-budget|wall-clock-summary|harbour-spawn|runner-owner-gate|consumer-poll-warning|consumer-heartbeat[^/]*|effort-readout|escalation-kpis|task-stack|task-page-loader|task-mode-store|task-snapshot-store|task-done-cache|live-console|periodical-runs|periodical-report-gate|refresh-on-resolve-gate|superseded-selection|owner-mint-refusals)\\.js$",
+    "^lib/proxy-preamble\\.js$"
+   ]
+  },
+  {
+   "name": "LLM & prompts",
+   "match": [
+    "^lib/prompts/|^lib/(openrouter(?!-key-resolver\\.js$)[^/]*|prompt-[^/]*|stage-router|recommend[^/]*|recommendation-[^/]*|chat-[^/]*|agent-turn|bash-tool|llm-call-log|model-pricing|should-mock-ai|brief[^/]*|recap[^/]*|collective-[^/]*|yap-client|next-run|north-star-resolver|scan|scan-fingerprint|audit|roadmap|context-graph|graph-features|library|library-metadata|custom-prompts-store|saved-chat-store|file-pointer|feedback-title|action-kind|flight-companion-gate|flight-companion-census-seed|harbour-comments-store|report-history-store|ship-biscuit|ship-biscuit-history-store|periodicals)\\.js$"
+   ]
+  },
+  {
+   "name": "Reports & operator tools",
+   "match": [
+    "^lib/(kpi-stats|workspace-kpi-stats|kpi-daily-rollup|milestone-funnel|account-erasure|pricing-conformance-sweep|scan-public-pages)\\.js$"
+   ]
+  },
+  {
+   "name": "Platform & plumbing",
+   "match": [
+    "^lib/utils/|^lib/(db-indexes|scheduler|hourly-cleanup|errors|proxy-fetch|async-errors|sse|http-keepalive|loose-json|deploy-info|response-headers|feature-defaults|read-horizon|secret-scan|partial-write-error|drop-shares-collection|expire-ownerless-dispatch-tokens|kpi-page|free-tier-store|plan-allowance|plan-fee-config|workflow-config|unpriced-models)\\.js$"
+   ]
+  },
+  {
+   "name": "Auth, accounts & workspaces",
+   "match": [
+    "^routes/(auth|email-auth|github-auth|github-projects-auth|jira-auth|openrouter-auth|provider-auth-routers|account-merge|held-connection)\\.js$|^lib/(account-[^/]*|connection-[^/]*|credential-[^/]*|email-auth|email-availability|email-transport|public-origin|github-install-flow|held-connection-entry|owner-[^/]*|ownerless-token-policy|pat-session|guest-task-path|openrouter-key-resolver|persist-binding|rejected-credentials|refresh-[^/]*|token-refresh|suspect-credential-refresh|session-store|session-options|user-preferences|workspace|workspace-(?!kpi-stats\\.js)[^/]*|urlkey-holders|wake-credential|session-row-live|task-share-access|task-share-store)\\.js$"
+   ]
+  },
+  {
+   "name": "Providers (Linear, GitHub, Jira, local)",
+   "match": [
+    "^lib/providers/|^lib/sample-data/|^lib/(linear|linear-fetch|local-store|starter-seed|issue-write-validation|description-edit|github-pr-files|github-pr-status|pr-state-copy|pr-state-store|attachment-upload|task-attachments|trashed-signal)\\.js$"
+   ]
+  },
+  {
+   "name": "Wiring (server.js)",
+   "match": [
+    "^server\\.js$"
+   ]
+  },
+  {
+   "name": "Web routes (pages & workspace API)",
+   "match": [
+    "^routes/"
+   ]
+  },
+  {
+   "name": "Other features",
+   "match": [
+    "^lib/"
+   ]
+  }
+ ]
+}
