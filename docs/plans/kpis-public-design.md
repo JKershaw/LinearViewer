@@ -54,7 +54,7 @@ Source of every "today" row: `lib/render-kpis.js` (538 lines), `public/kpis.js` 
 
 `collectKpiStats` keeps all its reads and builders; "dropped" means not published. One new collection read, LIN-3732: `kpi-daily-rollup` (the instance sum of finished tasks by UTC day, by `$group`, else `find` summed in JS), appended last in `readSources`; a failed read gives `doneTotal: null` and every other figure renders. Before that, no new read (the page once ran past the 30s router limit, :239-247).
 
-`doneTotal` (LIN-3732) is a new top-level key `{ since, through, done[], total }`, not a `daily` member, because every `daily` array must match `phases.days` in length. `since` is the oldest rolled-up day, never "launch"; `through` is yesterday (UTC); missing days are zero. It is approximate: part A looks back `ROLLUP_LOOKBACK_DAYS` days, so a task whose last run was dispatched earlier than that before it finished can be missed, and the page says so.
+`doneTotal` (LIN-3732) is a new top-level key `{ since, through, done[], total }`, not a `daily` member, because every `daily` array must match `phases.days` in length. `since` is the oldest rolled-up day, never "launch"; `through` is the last completed rollup day (LIN-3733): the earlier of yesterday (UTC) and the part A marker's `through`, so yesterday's stale post-midnight row is not counted before the job's first tick (marker absent: yesterday, an open question); missing days are zero. It is approximate: part A looks back `ROLLUP_LOOKBACK_DAYS` days, so a task whose last run was dispatched earlier than that before it finished can be missed, and the page says so.
 
 ## Public payload and floor registry
 
