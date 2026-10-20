@@ -9,7 +9,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { toPublicKpis, PUBLIC_COUNT_FLOOR, PUBLIC_LEAF_REGISTRY } from '../../lib/kpi-stats.js';
-import { buildStats, buildFunnel, buildMode, STEP_KEYS } from '../helpers/public-kpis-fixture.js';
+import { buildStats, buildFunnel, buildMode, buildCost, STEP_KEYS } from '../helpers/public-kpis-fixture.js';
 
 const F = PUBLIC_COUNT_FLOOR;
 const GRID = Array.from({ length: F + 3 }, (_, v) => v); // 0 .. F+2
@@ -259,7 +259,7 @@ describe('toPublicKpis: the view is only what the page draws', () => {
   const view = toPublicKpis(buildStats());
 
   test('top-level keys', () => {
-    assert.deepStrictEqual(Object.keys(view).sort(), ['daily', 'dispatchKinds', 'generatedAt', 'milestoneFunnel', 'outcomes', 'phases', 'totals']);
+    assert.deepStrictEqual(Object.keys(view).sort(), ['cost', 'daily', 'dispatchKinds', 'generatedAt', 'milestoneFunnel', 'outcomes', 'phases', 'totals']);
   });
 
   test('operator-only and undrawn fields are not published', () => {
@@ -281,5 +281,58 @@ describe('toPublicKpis: the view is only what the page draws', () => {
     assert.deepStrictEqual(view.totals.agentActions, 1234);
     assert.deepStrictEqual(view.dispatchKinds, [{ label: 'autopilot', count: 4 }, { label: 'research', count: 3 }]);
     assert.deepStrictEqual(view.phases.orienting, [10, 20]);
+  });
+});
+
+// LIN-3714: the cost-per-finished-task block.
+describe('toPublicKpis: cost (LIN-3714)', () => {
+  const costOf = overrides => toPublicKpis(buildStats({ terminalMarkedTaskCost: buildCost(overrides) })).cost;
+
+  test('holds only the picked keys, even if the stats carry cash, unresolved and issue counts', () => {
+    const cost = costOf({ cashUsd: 12.34, inFlightUsd: 5.67, issueCount: 99 });
+    assert.deepStrictEqual(Object.keys(cost), ['windowDays', 'perTaskUsd', 'tasks', 'shares']);
+    assert.deepStrictEqual(Object.keys(cost.shares).sort(), [
+      'attributableLineageShare', 'captureRateShare', 'closeOutLineageShare', 'evidenceLinkedShare',
+      'opencodeSummedShare', 'pricedLineageShare', 'unknownHarnessShare'
+    ]);
+    const text = JSON.stringify(toPublicKpis(buildStats({ terminalMarkedTaskCost: buildCost({ cashUsd: 12.34, inFlightUsd: 5.67, issueCount: 99 }) })));
+    for (const dropped of ['cashUsd', 'inFlightUsd', 'overheadUsd', 'unknownLaneUsd', 'issueCount', 'unpriced', 'laneLandedCount', 'noLineageCount', 'markerOccupancyShare', 'markerOccupiedLineages', 'ticketsPerPricedLane', 'costUsd', 'pricedTicketCostUsd', '12.34', '5.67']) {
+      assert.ok(!text.includes(dropped), dropped);
+    }
+  });
+
+  test('divides pricedTicketCostUsd (not costUsd) by pricedTicketCount, to 2 decimals', () => {
+    assert.strictEqual(costOf({ pricedTicketCostUsd: 100, pricedTicketCount: 8, costUsd: 999 }).perTaskUsd, 12.5);
+    assert.strictEqual(costOf({ pricedTicketCostUsd: 10, pricedTicketCount: 6 }).perTaskUsd, 1.67);
+    assert.strictEqual(costOf({ pricedTicketCostUsd: 100 }).tasks, 8);
+    assert.strictEqual(costOf().windowDays, 30);
+  });
+
+  test('perTaskUsd is null, never 0, when nothing is priced', () => {
+    assert.strictEqual(costOf({ pricedTicketCostUsd: null }).perTaskUsd, null);
+  });
+
+  test('the small-sample rule: tasks at floor-1 publishes cost null, at the floor a figure', () => {
+    for (const tasks of [0, 1, F - 1]) assert.strictEqual(costOf({ pricedTicketCount: tasks }), null, `tasks=${tasks}`);
+    assert.strictEqual(F, 5);
+    assert.strictEqual(costOf({ pricedTicketCount: 4 }), null);
+    assert.strictEqual(costOf({ pricedTicketCount: 5, pricedTicketCostUsd: 10 }).perTaskUsd, 2);
+  });
+
+  test('no terminal-marked-task-cost in the stats publishes cost null', () => {
+    assert.strictEqual(toPublicKpis(buildStats({ terminalMarkedTaskCost: undefined })).cost, null);
+  });
+
+  test('every cost leaf is registered open, and the reason says it is not a count of people', () => {
+    const entries = PUBLIC_LEAF_REGISTRY.filter(e => e.path.startsWith('cost.'));
+    assert.strictEqual(entries.length, 3 + 7);
+    for (const entry of entries) {
+      assert.strictEqual(entry.kind, 'open', entry.path);
+      assert.match(entry.why, /average or ratio .* not a count of people/);
+    }
+  });
+
+  test('the builder name, exports and emitted fields never use the reserved wording', () => {
+    assert.ok(!/verif/i.test(JSON.stringify(costOf())));
   });
 });

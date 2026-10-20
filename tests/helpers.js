@@ -115,6 +115,10 @@ export const SELECTORS = {
     chart: (name) => `[data-testid="kpis-chart-${name}"]`,
     spark: (name) => `[data-testid="kpis-spark-${name}"]`,
     numbers: (name) => `[data-testid="kpis-numbers-${name}"]`,
+    /** LIN-3714: the cost-per-finished-task figure, its value and its fold. */
+    cost: '[data-testid="kpis-cost"]',
+    costValue: '[data-testid="kpis-cost-value"]',
+    costNumbers: '[data-testid="kpis-cost-numbers"]',
     hidden: '[data-testid="kpis-hidden"]',
     privacy: '[data-testid="kpis-privacy"]',
   },

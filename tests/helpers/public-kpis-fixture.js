@@ -31,6 +31,39 @@ export function buildMode(total, rungs) {
   };
 }
 
+/**
+ * A `computeTerminalMarkedTaskCost` output (LIN-3714): the fields the public
+ * `cost` block picks, plus the ones it must NOT pass on (cash, unresolved,
+ * overhead, counts of issues), so a leak shows up as a failing test.
+ */
+export function buildCost(overrides = {}) {
+  return {
+    windowDays: 30,
+    issueCount: 12,
+    costUsd: 176.4,
+    cashUsd: 99.99,
+    unknownLaneUsd: 3.21,
+    unpriced: 2,
+    laneLandedCount: 1,
+    noLineageCount: 1,
+    markerOccupiedLineages: 9,
+    markerOccupancyShare: 0.75,
+    pricedTicketCount: 8,
+    ticketsPerPricedLane: 1.5,
+    pricedTicketCostUsd: 100,
+    inFlightUsd: 4.56,
+    overheadUsd: 7.89,
+    closeOutLineageShare: 0.9,
+    evidenceLinkedShare: 0.5,
+    opencodeSummedShare: 0.25,
+    unknownHarnessShare: 0.1,
+    pricedLineageShare: 0.8,
+    attributableLineageShare: 0.6,
+    captureRateShare: 0.4,
+    ...overrides
+  };
+}
+
 export function buildStats({ fullSeries = false, workspaces = 40, funnel = buildFunnel({ login: 30, connected: 20, firstGo: 12, prOpened: 8, mergeClicked: null }, buildMode(36, [[20, 6], [10, 0], [6, 0]])), ...overrides } = {}) {
   const phase = values => [...values];
   // `fullSeries` swaps the two-day axis for 30 days ending 2026-06-10, with a
@@ -83,7 +116,7 @@ export function buildStats({ fullSeries = false, workspaces = 40, funnel = build
       weeklyFailed: [1, 0, 0, 1],
       weeklyAborted: [0, 0, 0, 1]
     },
-    terminalMarkedTaskCost: { windowDays: 30, issueCount: 10, costUsd: 176.4 },
+    terminalMarkedTaskCost: buildCost(),
     weeklyBudgetGauge: { percentConsumed: 56.3, dayBars: { days: ['2026-06-10'], costUsd: [61.8] } },
     funnel: { dispatched: 20, taken: 15, reported: 12, completed: 9 },
     milestoneFunnel: funnel,
