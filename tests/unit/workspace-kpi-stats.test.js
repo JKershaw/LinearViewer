@@ -307,13 +307,14 @@ describe('collectWorkspaceKpis daily series (LIN-3711)', () => {
 
   test('cost: by the start day, unpriced never $0, skipped excluded, priced N of M', async () => {
     await seedTrends(A);
+    await collections.dispatchHistory.insertOne({ ...lineageRow(A, 'a-now', { started: 0, cost: 0.5 }), dispatchedAt: NOW });
     const { cost } = (await run(A)).daily;
     assert.equal(cost.perDay.length, 30);
     assert.equal(cost.perDay[26], 1.5, 'a-slow started 3 days ago');
-    assert.equal(cost.perDay[29], 0.25, 'a-quick started today (a dispatch inside the final day is not dropped)');
-    assert.equal(sum(cost.perDay), 1.75, 'the skipped lineage cost 99 and is left out');
-    assert.equal(cost.pricedCount, 2);
-    assert.equal(cost.lineageCount, 7, '8 lineages less the skipped one');
+    assert.equal(cost.perDay[29], 0.75, 'a-quick plus a-now: a dispatch stamped exactly now is not dropped');
+    assert.equal(sum(cost.perDay), 2.25, 'the skipped lineage cost 99 and is left out');
+    assert.equal(cost.pricedCount, 3);
+    assert.equal(cost.lineageCount, 8, '9 lineages less the skipped one');
   });
 
   test('cost buckets on the UTC day: 23:59Z and 00:00Z land on different days', async () => {
