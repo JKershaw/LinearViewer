@@ -35,6 +35,7 @@ import { provisionResumeCredential, isStructuralGrantRefusal } from '../lib/prox
 import { BOOTSTRAP_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
 import { READ_WRITE } from '../lib/proxy-scopes.js';
 import { validateFeedbackBody } from '../lib/dispatch-feedback-validation.js';
+import { UUID_REGEX } from '../lib/dispatch-validation.js';
 import { buildWakeCredentialProvisioner } from '../lib/wake-credential.js';
 import { readHaltForPoll, projectHaltForPoll, POLL_HALT_READ_TIMEOUT_MS } from '../lib/poll-halt.js';
 import { ownerlessCompatEnabled } from '../lib/ownerless-token-policy.js';
@@ -120,8 +121,6 @@ const tokenCreationLimiter = rateLimit({
   // Skip rate limiting in test mode
   skip: () => process.env.NODE_ENV === 'test'
 });
-
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Input length limits to prevent MongoDB errors (16MB document limit). The
 // prompt/identifier caps for the POST /dispatch payload now live in
