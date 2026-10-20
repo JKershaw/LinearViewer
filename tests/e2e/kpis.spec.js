@@ -353,6 +353,12 @@ test.describe('KPIs page — aggregation-failure propagation (LIN-3002)', () => 
 // rows. The days sit 58 and 60 days back, outside the daily job's rewrite range,
 // so the job never touches them. /kpis caches for 60s, so the cache is cleared
 // after seeding and after cleanup.
+//
+// LIN-3739: /kpis is instance-wide, so only what this file seeded is asserted.
+// The since line and doneTotal hold because no other spec seeds rollup rows 58+
+// days back (workspace-kpis.spec.js stops at 50). The 30-day rate view does not:
+// daily.done counts `[done]` lineages from every workspace on the server, and
+// task-page.spec.js marks tasks done while this file runs on another worker.
 test.describe('KPIs page — tasks finished since (LIN-3732)', () => {
   const ROLLUP_KEY = 'kpis-e2e-rollup';
   const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -385,13 +391,20 @@ test.describe('KPIs page — tasks finished since (LIN-3732)', () => {
     const total = toggle.locator('button[data-mode="total"]');
     const caption = page.locator('[data-testid="kpis-total-caption"]');
     const chartType = () => page.evaluate(() => window.Chart.getChart(document.getElementById('chart-done-daily'))?.config.type);
-    // Nothing finished in the 30-day window here, so the rate view is its "nothing yet" note, not a chart.
     const rateNote = toggle.locator('.kpi-chart-empty');
+    // LIN-3739: the rate view is a bar chart if anything on the server finished in
+    // the 30-day window, else its "nothing yet" note. Read which off the payload
+    // this page drew from; the note itself is pinned by the seeded block below.
+    const finished = data.daily.done.some(n => n > 0);
+    const expectRateView = async () => {
+      if (finished) await expect(rateNote).toHaveCount(0);
+      else await expect(rateNote).toContainText('nothing finished yet');
+      expect(await chartType()).toBe(finished ? 'bar' : undefined);
+    };
 
     await expect(rate).toHaveAttribute('aria-pressed', 'true');
     await expect(caption).toBeHidden();
-    await expect(rateNote).toContainText('nothing finished yet');
-    expect(await chartType()).toBeUndefined();
+    await expectRateView();
 
     await total.click();
     await expect(total).toHaveAttribute('aria-pressed', 'true');
@@ -401,6 +414,39 @@ test.describe('KPIs page — tasks finished since (LIN-3732)', () => {
     expect(await chartType()).toBe('line');
 
     await rate.click();
+    await expect(caption).toBeHidden();
+    await expectRateView();
+  });
+});
+
+// LIN-3739: the rate view with nothing finished in the 30-day window, which the
+// live /kpis cannot promise while other specs run. Served from the seeded payload
+// with daily.done zeroed, so the note and the toggle around it are always witnessed.
+test.describe('KPIs page — tasks finished, none in the window (LIN-3739)', () => {
+  test.beforeEach(async ({ page }) => {
+    const stats = buildStats({ fullSeries: true });
+    stats.daily.done = stats.daily.done.map(() => 0);
+    const html = renderKpisPage(toPublicKpis(stats));
+    await page.route('**/kpis', route => route.fulfill({ status: 200, contentType: 'text/html', body: html }));
+  });
+
+  test('the rate view is the "nothing finished yet" note, and the total view still draws', async ({ page }) => {
+    await page.goto('/kpis');
+    const toggle = page.locator('[data-testid="kpis-toggle-done-daily"]');
+    const rateNote = toggle.locator('.kpi-chart-empty');
+    const caption = page.locator('[data-testid="kpis-total-caption"]');
+    const chartType = () => page.evaluate(() => window.Chart.getChart(document.getElementById('chart-done-daily'))?.config.type);
+
+    await expect(toggle.locator('button[data-mode="rate"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(rateNote).toContainText('nothing finished yet');
+    expect(await chartType()).toBeUndefined();
+
+    await toggle.locator('button[data-mode="total"]').click();
+    await expect(caption).toContainText('7 Jun 2026');
+    await expect(rateNote).toHaveCount(0);
+    expect(await chartType()).toBe('line');
+
+    await toggle.locator('button[data-mode="rate"]').click();
     await expect(caption).toBeHidden();
     await expect(rateNote).toContainText('nothing finished yet');
     expect(await chartType()).toBeUndefined();
