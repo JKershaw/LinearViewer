@@ -7,7 +7,7 @@ Review-only: no code, config, guide or doc edits beyond this report and `docs/re
 ## 0. What was measured
 
 - **Commits:** HEAD `6d3b5cfd52d1f354c8eea09ccbbc1ded9081d93a` (`origin/main`, unchanged since mint; nothing landed on the cited paths since the ticket was created) and baseline `6597d6e059fda7d15ada99b29dcc47842f734c98`.
-- **Tool:** `scripts/code-shape/seams.mjs . <commit> <guide>` at HEAD, run **four times** (code × guide). Raw JSON in `docs/reviews/_evidence-2026-10-20/seams-{baseline,head}-code-{baseline,head}-guide.json`; the two guides are copied beside them (`areas-guide-*.json`, byte copies of `areas.json` at each commit).
+- **Tool:** `scripts/code-shape/seams.mjs . <commit> <guide>` at HEAD, run **four times** (code × guide). Raw JSON in `docs/reviews/_evidence-2026-10-20/seams-{baseline,head}-code-{baseline,head}-guide.json`; the two guides are copied beside them (`areas-guide-*.json`, byte copies of `areas.json` at each commit). A fifth, diagnostic run (F4) uses the HEAD guide with `lib/proxy-preamble.js` mapped to Runs & dispatch: `seams-head-code-head-guide-preamble-in-runs.json` with its guide `areas-guide-head-6d3b5cfd-preamble-in-runs.json`.
 - **Scope at HEAD:** 459 files (+31 added, −1 deleted since baseline); 0 parse failures; 4 unresolved relative imports (all `routes/test.js:13,19,25,32` → `tests/fixtures/*-harness.js`, unchanged, Drift's to own); 0 non-literal dynamic imports; 0 unmapped files.
 - **Tool check (third source of difference?):** No. HEAD's tool with the baseline guide at `6597d6e0` is deep-equal to `docs/reviews/_evidence-2026-10-13/seams-committed-guide.json` (429 files, 4 unresolved, 897 links, 19 pairs, group of 9; only `areaMapSource` differs). LIN-3638 did not move any figure.
 - **Direction rule:** re-confirmed **0 `lib/` → `routes/` imports** (grep of `lib/` for imports reaching `routes/` returns nothing; the tool agrees).
@@ -47,7 +47,7 @@ Severity as at baseline. Delta vocabulary: new / unchanged / improved / worsened
 - LLM↔Providers moved 5/2 → 12/1 purely from right-way LLM→Providers imports of `providers/state-map.js` (see hubs); the single back edge is the `openrouter` caps.
 
 ### F4 (Medium, **new**) — Runs → Agent API through `proxy-preamble` (Agent API↔Runs 44/7 → 42/9)
-Nine Runs→Agent API back edges, two new from LIN-3604 (`dispatch-entrance → proxy-preamble`, `→ proxy-graphql-errors`); other importers `dispatch-factory`, `follow-up-dispatch`, `wake-credential`, `routes/dispatch.js` (3), `consumer-poll-warning`. `lib/proxy-preamble.js` is the shared "Workspace API access" prompt-preamble builder (its own header: extracted so non-proxy dispatch seams append the same block); it has 8 importers across three areas, but lives in the Agent API area. The dependency points *up* from the run/dispatch layer into the API surface only because of where one prompt builder sits. This is a different knot from F1/F3 and should not be folded into the Providers work. Also `chat-tools → proxy-preamble` and `prompts/runner-kickoff → proxy-scopes` (LLM→Agent API, unchanged).
+Nine Runs→Agent API back edges, two new from LIN-3604 (`dispatch-entrance → proxy-preamble`, `→ proxy-graphql-errors`); other importers `dispatch-factory`, `follow-up-dispatch`, `wake-credential`, `routes/dispatch.js` (3), `consumer-poll-warning`. `lib/proxy-preamble.js` is not mainly a prompt builder. It is 822 lines, most of it the dispatch credential/grant provisioning surface (`provisionBootstrapToken`, `provisionResumeCredential`, `attachProxyContext`, the grant-refusal taxonomy); only `buildProxyContextPreamble` is prompt text. Its Runs importers take `provisionResumeCredential`, `isStructuralGrantRefusal`, `shouldUseMcpTokenField` and `applyDefaultDispatchHarness`, and the file itself imports `proxy-tokens.js` and `proxy-scopes.js` (Agent API). It has 8 importers across three areas. So F4 is "Runs consumes the Agent API's token/grant machinery", not a prompt builder misplaced. **Simulated move** (`lib/proxy-preamble.js` mapped to Runs & dispatch in a copy of the HEAD guide, measured at `6d3b5cfd`; evidence `seams-head-code-head-guide-preamble-in-runs.json`): Agent API↔Runs goes 42/9 → 42/6 and the pair count stays 11, so the move reduces back edges but does **not** open the pair. The remaining Runs→Agent API edges are `proxy-preamble → proxy-scopes`/`proxy-tokens` (both created by the move itself), `routes/dispatch.js → proxy-scopes`/`proxy-tokens`, `dispatch-entrance → proxy-graphql-errors` and `consumer-poll-warning → proxy-scopes`. This is a different knot from F1/F3 and should not be folded into the Providers work. Also `chat-tools → proxy-preamble` and `prompts/runner-kickoff → proxy-scopes` (LLM→Agent API, unchanged).
 
 ### F5 (Medium, **improved**) — Routes used as libraries
 LIN-3717 removed the `dashboard`/`flight-companion` imports from `flight-companion`, `proxy-flight-companion`, `proxy-rulings`. Still present (unchanged): `task-chat → dashboard`, `workspace-api → dashboard` (`settleWithConcurrency`), `workspace-api → proxy` (`commentDedupe`), `{dashboard,flight-companion} → dispatch` (`dispatchQueueLimiter`), `test → dashboard`. Agent API↔Web routes resolved (§1).
@@ -84,14 +84,14 @@ Fan-in from several areas (HEAD guide): `utils/html.js` 56, `errors.js` 43, `uti
 | Auth, accounts & workspaces (61) | `workspace.js` 27, `public-origin` 15, `workspace-preferences` 14 | medium | Auth↔pages 12/15 unchanged (pages call auth helpers, auth flows render pages) |
 | Providers (36) | `state-map` 22, `registry` 19, `models` 11: a clear front door | highest | F3 upward reaches (4 edges + `tree.js` ×3 + `token-refresh`) |
 | Platform & plumbing (25) | `utils/html` 56, `errors` 43, `utils/time` 38 | high | healthy; `kpi-stats`/`milestone-funnel` mislabel resolved by guide |
-| Reports & operator tools (7, **new**) | `kpi-stats` 3 | high (small) | new area from baseline §7 |
+| Reports & operator tools (7, **new**) | `kpi-stats` 3 | high (small) | new area from baseline §7; in the knot group via Reports→Auth (5) → Pages (12) → Reports (2) |
 | Web routes (22) | one entry file each (`dashboard`, `flight-companion`, …) | medium | F5 improved |
 | Other features (0) | — | n/a | emptied by LIN-3720; catch-all `^lib/` should be retired (§6) |
 | Wiring (1) | it is the root | n/a | F6, F8 |
 
 ## 5. Tool blind spots (what it could not read)
 
-4 unresolved imports (`routes/test.js` → `tests/fixtures/*`, by construction); `public/` globals and `scripts:` strings; `server.js` scheduler wiring (tool reports edges, not timing); dead-import phantom links (F7); the **guide itself** (areas assigned by regex over paths, so one stale catch-all moved the pair count by +6 in §1). **Simple Dispatcher:** still out of remit — `JKershaw/simple-dispatcher` is flat CommonJS (33 `require(` and 0 `import` in `dispatcher.js`), the tool reads ES `import` only. Still a tool gap with no ticket; no tool built.
+4 unresolved imports (`routes/test.js` → `tests/fixtures/*`, by construction); `public/` globals and `scripts:` strings; `server.js` scheduler wiring (tool reports edges, not timing); dead-import phantom links (F7); the **guide itself** (areas assigned by regex over paths, so a stale catch-all manufactured 4 pairs in §1, net +1 against the 3 that code movement resolved). **Simple Dispatcher:** still out of remit — `JKershaw/simple-dispatcher` is flat CommonJS (33 `require(` and 0 `import` in `dispatcher.js`), the tool reads ES `import` only. Still a tool gap with no ticket; no tool built.
 
 ## 6. Guide edits since baseline vs guide proposals (kept apart from code)
 
@@ -99,13 +99,13 @@ Adopted since baseline (all baseline §7 proposals 1-3 and 6; LIN-3708, 3716, 37
 
 ## 7. Existing tickets and follow-ups
 
-- **LIN-3553** — stale: superseded by **LIN-3728** (Done). Comment to be posted; no mint.
-- **LIN-3554** — valid, unchanged (F2). **LIN-2600** — open (F7). **LIN-3555** — valid but insufficient: add the `proxy-wire` caveat (F3).
+- **LIN-3553** — stale: superseded by **LIN-3728** (Done). Commented; no mint.
+- **LIN-3554** — valid, unchanged (F2). **LIN-2600** — open (F7). **LIN-3555** — valid but insufficient: `proxy-wire` caveat added by comment (F3).
 - Seam work that moved knots (credited as code movement): LIN-3600, 3606, 3612, 3717, 3727, 3728; LIN-3604 is the one landing that worsened a knot (F1, F4).
 - **Follow-ups minted (≤3, one move each, duplicates searched first; none duplicates 3553/3554/3555/2600):**
-  - **F-D:** move `stableStringify` and `hashContext` from `lib/recap-cache.js` down to plumbing (`lib/utils/`) so `observer-state-store` and `task-page-loader` stop importing the LLM area. Removes 2 of the Runs→LLM back edges.
-  - **F-E:** move `collectIssueAttachments` out of `lib/proxy-wire.js` to a provider-neutral module so `providers/linear` stops importing the Agent API area (completes what LIN-3555 starts).
-  - **F-F:** move `lib/proxy-preamble.js` out of the Agent API area to Runs & dispatch (or plumbing), so 8 Runs/LLM/route importers stop pointing up into the API surface.
+  - **F-D (LIN-3736):** move `stableStringify` and `hashContext` from `lib/recap-cache.js` down to plumbing (`lib/utils/`) so `observer-state-store` and `task-page-loader` stop importing the LLM area. Removes 2 of the Runs→LLM back edges.
+  - **F-E (LIN-3737):** move `collectIssueAttachments` out of `lib/proxy-wire.js` to a provider-neutral module so `providers/linear` stops importing the Agent API area (completes what LIN-3555 starts).
+  - **F-F (LIN-3738):** move `lib/proxy-preamble.js` (the dispatch credential/grant provisioning surface, plus the preamble text) out of the Agent API area to Runs & dispatch, so the Runs/LLM/route importers stop pointing up for it. It takes Agent API↔Runs back edges 9 → 6 and does **not** open the pair (simulated in F4); the rest sit in `proxy-scopes`/`proxy-tokens`/`proxy-graphql-errors`.
 
 ## 8. Adversarial Second-Read
 
@@ -154,3 +154,5 @@ area:web-routes                            | medium         | improved
 area:other-features                        | n/a            | resolved (emptied; catch-all to retire)
 area:wiring-server.js                      | n/a            | unchanged
 ```
+
+Stable-name mapping: `knot:providers->upward(openrouter,ref-resolver,proxy-wire)` = baseline `knot:providers->upward(openrouter,ref-resolver)`. F-numbers shifted because F4 is new: baseline F4→F5, F5→F6, F6→F7, F7→F8.
