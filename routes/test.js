@@ -59,7 +59,7 @@ import { primePrStateCache, clearPrStateCache, prStateUpstreamFetchCount } from 
  * @param {Object|null} [options.taskModeStore] - Task-mode event store (LIN-2942), for /test/clear-task-mode-events
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, emailTransport = null, commentDedupe = null, decisionStampDedupe = null, taskModeStore = null, taskShareCollection = null }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, emailTransport = null, commentDedupe = null, decisionStampDedupe = null, taskModeStore = null, taskShareCollection = null, kpiDailyRollupCollection = null }) {
   const router = Router();
 
   // ── Connection-backed fixture variants (LIN-3124 PR3 checkpoint F, T27) ────
@@ -536,6 +536,40 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     try {
       if (!taskShareCollection) return res.status(500).json({ error: 'taskShareCollection not wired' })
       await taskShareCollection.deleteMany({ urlKey: req.query.urlKey || 'test-workspace' })
+      res.send('ok')
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+
+  // LIN-3732 e2e: one `kpi-daily-rollup` row, in part A's shape, for the
+  // running-total specs. ?urlKey&day=YYYY-MM-DD&done=N.
+  router.get('/test/seed-kpi-rollup', async (req, res) => {
+    try {
+      if (!kpiDailyRollupCollection) return res.status(500).json({ error: 'kpiDailyRollupCollection not wired' })
+      const { urlKey, day } = req.query
+      const done = Number(req.query.done)
+      if (!urlKey || !/^\d{4}-\d{2}-\d{2}$/.test(day || '') || !Number.isInteger(done) || done < 0) {
+        return res.status(400).json({ error: 'urlKey, day (YYYY-MM-DD) and done (a count) are required' })
+      }
+      await kpiDailyRollupCollection.updateOne(
+        { urlKey, day },
+        { $set: { done, failed: 0, aborted: 0, dispatches: 0 } },
+        { upsert: true }
+      )
+      res.send('ok')
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+
+  // Clears one workspace's rollup rows only; the part A marker doc and other
+  // workspaces' rows stay.
+  router.get('/test/clear-kpi-rollup', async (req, res) => {
+    try {
+      if (!kpiDailyRollupCollection) return res.status(500).json({ error: 'kpiDailyRollupCollection not wired' })
+      if (!req.query.urlKey) return res.status(400).json({ error: 'urlKey is required' })
+      await kpiDailyRollupCollection.deleteMany({ urlKey: req.query.urlKey })
       res.send('ok')
     } catch (err) {
       res.status(500).json({ error: err.message })

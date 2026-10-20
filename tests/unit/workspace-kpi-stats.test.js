@@ -37,7 +37,8 @@ beforeEach(() => {
     agentStatus: db.collection('foreman-status'),
     reportHistory: db.collection('report-history'),
     customPrompts: db.collection('custom-prompts'),
-    closeOutEvents: db.collection('close-out-events')
+    closeOutEvents: db.collection('close-out-events'),
+    kpiDailyRollup: db.collection('kpi-daily-rollup')
   };
 });
 

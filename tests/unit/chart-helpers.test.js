@@ -33,6 +33,9 @@ class FakeElement {
   appendChild(child) { this.children.push(child); return child; }
   replaceChildren(...kids) { this.children = kids; }
   replaceWith(other) { this.replacedBy = other; }
+  addEventListener(type, fn) { (this.listeners ||= []).push({ type, fn }); }
+  removeEventListener(type, fn) { this.listeners = (this.listeners || []).filter(l => l.type !== type || l.fn !== fn); }
+  click() { for (const l of [...(this.listeners || [])]) if (l.type === 'click') l.fn(); }
 }
 
 function load({ canvases = {}, withChart = true } = {}) {
@@ -59,9 +62,9 @@ function load({ canvases = {}, withChart = true } = {}) {
 const cells = row => row.children.map(td => td.textContent);
 
 describe('chart-helpers.js: the surface', () => {
-  test('exposes exactly draw, sparkline and numbersTable', () => {
+  test('exposes exactly draw, sparkline, numbersTable and rateTotalToggle', () => {
     const { api } = load();
-    assert.deepStrictEqual(Object.keys(api).sort(), ['draw', 'numbersTable', 'sparkline']);
+    assert.deepStrictEqual(Object.keys(api).sort(), ['draw', 'numbersTable', 'rateTotalToggle', 'sparkline']);
     for (const fn of Object.values(api)) assert.strictEqual(typeof fn, 'function');
   });
 
@@ -238,5 +241,85 @@ describe('chart-helpers.js: numbersTable', () => {
     assert.strictEqual(mount.children.length, 1);
     assert.strictEqual(mount.children[0].children[0].children.length, 1, 'a header row');
     assert.strictEqual(mount.children[0].children[1].children.length, 0, 'and no body rows');
+  });
+});
+
+describe('chart-helpers.js: draw returns the chart', () => {
+  test('the Chart when drawn, null for an empty or missing canvas', () => {
+    const canvas = new FakeElement('canvas');
+    const empty = new FakeElement('canvas');
+    const { api, charts } = load({ canvases: { 'chart-x': canvas, 'chart-e': empty } });
+    assert.ok(api.draw('x', 3, 'n', () => ({ type: 'bar' })));
+    assert.strictEqual(charts.length, 1);
+    assert.strictEqual(api.draw('e', 0, 'n', () => ({})), null);
+    assert.strictEqual(api.draw('missing', 3, 'n', () => ({})), null);
+  });
+});
+
+describe('chart-helpers.js: rateTotalToggle (LIN-3732)', () => {
+  const buttonsOf = mount => mount.children[0].children;
+  function setup(makeOptions = () => ({})) {
+    const mount = new FakeElement('div');
+    const log = [];
+    const { api } = load();
+    const handle = api.rateTotalToggle(mount, {
+      labels: { rate: 'Rate', total: 'Total' },
+      rate: view => { log.push('rate'); view.drawn = 'rate'; return () => log.push('end-rate'); },
+      total: view => { log.push('total'); view.drawn = 'total'; return () => log.push('end-total'); },
+      ...makeOptions(log)
+    });
+    return { mount, log, handle };
+  }
+
+  test('draws rate first, with two labelled buttons carrying data-mode and aria-pressed', () => {
+    const { mount, log } = setup();
+    assert.deepStrictEqual(log, ['rate']);
+    const [rate, total] = buttonsOf(mount);
+    assert.deepStrictEqual([rate.textContent, total.textContent], ['Rate', 'Total']);
+    assert.deepStrictEqual([rate.attrs['data-mode'], total.attrs['data-mode']], ['rate', 'total']);
+    assert.deepStrictEqual([rate.attrs['aria-pressed'], total.attrs['aria-pressed']], ['true', 'false']);
+  });
+
+  test('total draws only when chosen; a switch runs the old cleanup once and empties the view', () => {
+    const { mount, log } = setup();
+    const view = mount.children[1];
+    view.children = [{ stale: true }];
+    buttonsOf(mount)[1].click();
+    assert.deepStrictEqual(log, ['rate', 'end-rate', 'total']);
+    assert.deepStrictEqual(view.children, [], 'emptied before the page function ran');
+    assert.strictEqual(buttonsOf(mount)[1].attrs['aria-pressed'], 'true');
+    buttonsOf(mount)[0].click();
+    assert.deepStrictEqual(log, ['rate', 'end-rate', 'total', 'end-total', 'rate']);
+  });
+
+  test('rate, total, rate works when rate drew only a note (no cleanup returned)', () => {
+    const { mount, log } = setup(log => ({ rate: () => { log.push('rate'); } }));
+    buttonsOf(mount)[1].click();
+    buttonsOf(mount)[0].click();
+    assert.deepStrictEqual(log, ['rate', 'total', 'end-total', 'rate']);
+  });
+
+  test('destroy() runs the last cleanup and leaves no listeners, buttons or view', () => {
+    const { mount, log, handle } = setup();
+    const buttons = [...buttonsOf(mount)];
+    handle.destroy();
+    assert.deepStrictEqual(log, ['rate', 'end-rate']);
+    assert.deepStrictEqual(mount.children, []);
+    for (const button of buttons) assert.deepStrictEqual(button.listeners, []);
+  });
+
+  test('set(mode) switches without a click; an unknown mode is ignored', () => {
+    const { log, handle } = setup();
+    handle.set('total');
+    handle.set('nonsense');
+    assert.deepStrictEqual(log, ['rate', 'end-rate', 'total']);
+  });
+
+  test('without a total function nothing is rendered and the handle is inert', () => {
+    const mount = new FakeElement('div');
+    const { api } = load();
+    const handle = api.rateTotalToggle(mount, { rate: () => assert.fail('must not run'), labels: {} });
+    assert.deepStrictEqual(mount.children, []);
+    assert.doesNotThrow(() => { handle.set('total'); handle.destroy(); });
   });
 });

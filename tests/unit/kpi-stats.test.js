@@ -87,6 +87,7 @@ function buildCollections(overrides = {}) {
     recapCache: empty(),
     briefCache: empty(),
     reportHistory: empty(),
+    kpiDailyRollup: empty(),
     ...overrides
   };
 }
@@ -1282,7 +1283,7 @@ describe('collectKpiStats (aggregation path, real MangoDB)', () => {
       'sessions', 'userPreferences', 'workspacePreferences', 'customPrompts',
       'localIssues', 'dispatchQueue', 'dispatchHistory', 'dispatchTokens',
       'proxyTokens', 'proxyEvents', 'agentStatus', 'freeTier', 'recapCache',
-      'briefCache', 'reportHistory'
+      'briefCache', 'reportHistory', 'kpiDailyRollup'
     ];
     const collections = {};
     for (const name of names) {

@@ -17,7 +17,7 @@ const NOW = new Date('2026-06-10T12:00:00.000Z');
 const NAMES = [
   'sessions', 'userPreferences', 'workspacePreferences', 'customPrompts', 'localIssues',
   'dispatchQueue', 'dispatchHistory', 'dispatchTokens', 'proxyTokens', 'proxyEvents',
-  'agentStatus', 'freeTier', 'recapCache', 'briefCache', 'reportHistory'
+  'agentStatus', 'freeTier', 'recapCache', 'briefCache', 'reportHistory', 'kpiDailyRollup'
 ];
 
 // Dates and regexes are not JSON; render them as strings so deepStrictEqual
@@ -567,6 +567,22 @@ const AGGREGATE_SNAPSHOT = [
     args: [
       {}
     ]
+  },
+  {
+    collection: 'kpiDailyRollup',
+    method: 'aggregate',
+    args: [
+      [
+        {
+          $group: {
+            _id: '$day',
+            done: {
+              $sum: '$done'
+            }
+          }
+        }
+      ]
+    ]
   }
 ];
 
@@ -735,6 +751,20 @@ const FIND_SNAPSHOT = [
     method: 'find',
     args: [
       {}
+    ]
+  },
+  {
+    collection: 'kpiDailyRollup',
+    method: 'find',
+    args: [
+      {},
+      {
+        projection: {
+          _id: 0,
+          day: 1,
+          done: 1
+        }
+      }
     ]
   }
 ];

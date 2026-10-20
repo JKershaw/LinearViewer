@@ -259,7 +259,27 @@ describe('toPublicKpis: the view is only what the page draws', () => {
   const view = toPublicKpis(buildStats());
 
   test('top-level keys', () => {
-    assert.deepStrictEqual(Object.keys(view).sort(), ['cost', 'daily', 'dispatchKinds', 'generatedAt', 'milestoneFunnel', 'outcomes', 'phases', 'totals']);
+    assert.deepStrictEqual(Object.keys(view).sort(), ['cost', 'daily', 'dispatchKinds', 'doneTotal', 'generatedAt', 'milestoneFunnel', 'outcomes', 'phases', 'totals']);
+  });
+
+  test('doneTotal is a new top-level key that copies four fields, and null stays null', () => {
+    assert.deepStrictEqual(view.doneTotal, { since: '2026-06-07', through: '2026-06-09', done: [2, 0, 3], total: 5 });
+    assert.strictEqual(toPublicKpis(buildStats({ doneTotal: null })).doneTotal, null);
+    assert.strictEqual(toPublicKpis(buildStats({ doneTotal: undefined })).doneTotal, null);
+  });
+
+  test('doneTotal publishes no workspace key, even one seeded into the stats', () => {
+    const seeded = buildStats({ doneTotal: { since: '2026-06-07', through: '2026-06-09', done: [2, 0, 3], total: 5, urlKey: 'ws-secret', byWorkspace: { 'ws-secret': 5 } } });
+    const text = JSON.stringify(toPublicKpis(seeded));
+    assert.ok(!text.includes('ws-secret') && !text.includes('urlKey') && !text.includes('byWorkspace'));
+  });
+
+  test('doneTotal.done[] and doneTotal.total are registered open, each with a why', () => {
+    for (const path of ['doneTotal.done[]', 'doneTotal.total']) {
+      const entry = PUBLIC_LEAF_REGISTRY.find(e => e.path === path);
+      assert.strictEqual(entry?.kind, 'open', path);
+      assert.match(entry.why, /not tied to a person/, path);
+    }
   });
 
   test('operator-only and undrawn fields are not published', () => {

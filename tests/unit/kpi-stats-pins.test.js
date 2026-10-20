@@ -26,7 +26,7 @@ async function freeTierOf(freeTierDocs) {
   const names = [
     'sessions', 'userPreferences', 'workspacePreferences', 'customPrompts', 'localIssues',
     'dispatchQueue', 'dispatchHistory', 'dispatchTokens', 'proxyTokens', 'proxyEvents',
-    'agentStatus', 'recapCache', 'briefCache', 'reportHistory'
+    'agentStatus', 'recapCache', 'briefCache', 'reportHistory', 'kpiDailyRollup'
   ];
   const collections = Object.fromEntries(names.map(name => [name, mockCollection()]));
   collections.freeTier = mockCollection(freeTierDocs);

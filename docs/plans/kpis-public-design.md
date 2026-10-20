@@ -31,7 +31,7 @@ Source of every "today" row: `lib/render-kpis.js` (538 lines), `public/kpis.js` 
 | Stat cards: feedback notes, ai summaries, roadmap reports, custom prompts, agent tokens | **dropped** | Housekeeping counts; tokens are per-person credentials. |
 | Chart: proxy calls by phase (30d/24h) | changed | Kept 30d as "what agents do" (`proxyCategories`); 24h view dropped (activity pattern, no story). |
 | Chart: work landed weekly | kept | `dispatchOutcomes.weeks/weeklyRate/weeklyResolved`. Not floored. LIN-3710: drawn as a line (null weeks are gaps). |
-| Charts: work resolved weekly (`outcome-weekly`), tasks finished daily (`done-daily`) | added (LIN-3710) | Stacked done / failed / aborted by start week; bars of `daily.done` per day. Rates only: running totals and the rate/total toggle wait for the daily rollup tickets. |
+| Charts: work resolved weekly (`outcome-weekly`), tasks finished daily (`done-daily`) | added (LIN-3710) | Stacked done / failed / aborted by start week; bars of `daily.done` per day. Rates by default. LIN-3732: `done-daily` alone also has a rate/total toggle and a "Tasks finished since <date>" line, from the new top-level `doneTotal` (below); the other charts stay rates only. |
 | Sparklines on the agent actions, prompts dispatched and autopilot runs cards | added (LIN-3710) | 30 daily points from `daily.*` and the sum of `phases`. None on workspaces or the headline. |
 | Chart: proxy calls (`proxy-phases`) | changed (LIN-3710) | Same stacked bars, now with a 7-day average line (23 points: none for the first six days or for today). |
 | Chart: dispatched work by kind (daily stacked) | dropped | The kind bar says the same thing with a fifth of the payload. |
@@ -52,7 +52,9 @@ Source of every "today" row: `lib/render-kpis.js` (538 lines), `public/kpis.js` 
 | `milestoneFunnel.*.coverage` strings | kept for steps | App-defined labels; they are the text of a `no-signal` row. `mode.coverage` dropped. |
 | `funnel.*IsLowerBound`, `workspacesBasis`, `roadmapReportsBasis` | dropped / kept | `workspacesBasis` kept (it qualifies the workspaces card); the others go with their cards. |
 
-`collectKpiStats` keeps all its reads and builders; "dropped" means not published. No new collection read (the page once ran past the 30s router limit, :239-247).
+`collectKpiStats` keeps all its reads and builders; "dropped" means not published. One new collection read, LIN-3732: `kpi-daily-rollup` (the instance sum of finished tasks by UTC day, by `$group`, else `find` summed in JS), appended last in `readSources`; a failed read gives `doneTotal: null` and every other figure renders. Before that, no new read (the page once ran past the 30s router limit, :239-247).
+
+`doneTotal` (LIN-3732) is a new top-level key `{ since, through, done[], total }`, not a `daily` member, because every `daily` array must match `phases.days` in length. `since` is the oldest rolled-up day, never "launch"; `through` is yesterday (UTC); missing days are zero. It is approximate: part A looks back `ROLLUP_LOOKBACK_DAYS` days, so a task whose last run was dispatched earlier than that before it finished can be missed, and the page says so.
 
 ## Public payload and floor registry
 
@@ -65,6 +67,7 @@ Every numeric leaf of the public payload:
 | Path | Class | Why |
 |---|---|---|
 | `outcomes.weeklyFailed[]`, `outcomes.weeklyAborted[]`, `daily.{dispatches,autopilotRuns,done}[]` | not floored | LIN-3710. Run or lineage counts across every workspace; not tied to a person. A nonzero `phases` day already shows a run happened that day. A week's done is `weeklyResolved - weeklyFailed - weeklyAborted`; there is no `weeklyDone` leaf. `daily` has no `days` of its own: it uses `phases.days`. |
+| `doneTotal.done[]`, `doneTotal.total` | not floored | LIN-3732. A count of finished tasks across every workspace, not tied to a person; the earliest days may be one workspace's figure. No `urlKey` is published. |
 | `outcomes.{total,resolved,done,failed,aborted}`, `outcomes.weeklyResolved[]`, `outcomes.rate`, `outcomes.weeklyRate[]`, `outcomes.windowDays` | not floored | Dispatch lineages over 30 days across every workspace; not tied to a person, and the rate and window are not counts. |
 | `totals.{agentActions,dispatches,autopilotRuns}` | not floored | Many events per workspace; an event count does not describe a person. |
 | `phases.{orienting,deciding,acting,watching,reporting}[]` | not floored | Per-day proxy-call tallies, many per run. |
