@@ -1,0 +1,9 @@
+{
+  "note": "status probes on :3199 (GitHub App env as :3002 twin); 503/400 bind bodies that no seam can produce are interception states",
+  "probes": {
+    "unknownProvider": 404,
+    "noHeldEntry": 400,
+    "linear": 404,
+    "bindNoEntry": 400
+  }
+}

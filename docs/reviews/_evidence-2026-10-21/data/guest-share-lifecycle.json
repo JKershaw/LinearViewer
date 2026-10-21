@@ -1,0 +1,27 @@
+{
+  "seed": 200,
+  "mint": {
+    "status": 201,
+    "pathShape": true
+  },
+  "listed": {
+    "count": 1,
+    "tokenInList": false
+  },
+  "view": {
+    "status": 200,
+    "referrerPolicy": "no-referrer",
+    "cacheControl": "private, no-store",
+    "robots": "noindex"
+  },
+  "revoke": {
+    "status": 200
+  },
+  "afterRevoke": 404,
+  "neverIssued": 404,
+  "retiredS": 404,
+  "synthetic": [
+    "state-guest-share-503",
+    "state-guest-share-404 (body re-render; the live 404 is guest-share-revoked-404)"
+  ]
+}

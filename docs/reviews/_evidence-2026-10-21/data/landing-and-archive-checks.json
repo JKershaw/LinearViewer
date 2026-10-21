@@ -1,0 +1,207 @@
+{
+  "landing": {
+    "390": {
+      "doors": [
+        {
+          "href": "/auth/linear",
+          "text": "Log in with Linear",
+          "className": "landing-cta landing-cta-linear",
+          "background": "rgb(13, 148, 136)",
+          "color": "rgb(4, 35, 31)",
+          "border": "rgba(0, 0, 0, 0)",
+          "fontWeight": "500",
+          "rect": {
+            "x": 44,
+            "y": 242,
+            "w": 288,
+            "h": 53
+          }
+        },
+        {
+          "href": "/auth/github",
+          "text": "Continue with GitHub",
+          "className": "landing-cta landing-cta-github",
+          "background": "rgba(0, 0, 0, 0)",
+          "color": "rgb(13, 148, 136)",
+          "border": "rgb(13, 148, 136)",
+          "fontWeight": "400",
+          "rect": {
+            "x": 44,
+            "y": 307,
+            "w": 288,
+            "h": 53
+          }
+        },
+        {
+          "href": "/auth/jira/oauth?mode=new",
+          "text": "Continue with Jira",
+          "className": "landing-cta landing-cta-jira",
+          "background": "rgba(0, 0, 0, 0)",
+          "color": "rgb(13, 148, 136)",
+          "border": "rgb(13, 148, 136)",
+          "fontWeight": "400",
+          "rect": {
+            "x": 44,
+            "y": 372,
+            "w": 288,
+            "h": 53
+          }
+        },
+        {
+          "href": "/auth/email",
+          "text": "Continue with email",
+          "className": "landing-cta landing-cta-email",
+          "background": "rgba(0, 0, 0, 0)",
+          "color": "rgb(13, 148, 136)",
+          "border": "rgb(13, 148, 136)",
+          "fontWeight": "400",
+          "rect": {
+            "x": 44,
+            "y": 437,
+            "w": 288,
+            "h": 53
+          }
+        }
+      ],
+      "distinctBackgrounds": [
+        "rgb(13, 148, 136)",
+        "rgba(0, 0, 0, 0)"
+      ],
+      "buttonsAndLinksAboveFold": 5
+    },
+    "1400": {
+      "doors": [
+        {
+          "href": "/auth/linear",
+          "text": "Log in with Linear",
+          "className": "landing-cta landing-cta-linear",
+          "background": "rgb(13, 148, 136)",
+          "color": "rgb(4, 35, 31)",
+          "border": "rgba(0, 0, 0, 0)",
+          "fontWeight": "500",
+          "rect": {
+            "x": 269,
+            "y": 280,
+            "w": 192,
+            "h": 53
+          }
+        },
+        {
+          "href": "/auth/github",
+          "text": "Continue with GitHub",
+          "className": "landing-cta landing-cta-github",
+          "background": "rgba(0, 0, 0, 0)",
+          "color": "rgb(13, 148, 136)",
+          "border": "rgb(13, 148, 136)",
+          "fontWeight": "400",
+          "rect": {
+            "x": 473,
+            "y": 280,
+            "w": 219,
+            "h": 53
+          }
+        },
+        {
+          "href": "/auth/jira/oauth?mode=new",
+          "text": "Continue with Jira",
+          "className": "landing-cta landing-cta-jira",
+          "background": "rgba(0, 0, 0, 0)",
+          "color": "rgb(13, 148, 136)",
+          "border": "rgb(13, 148, 136)",
+          "fontWeight": "400",
+          "rect": {
+            "x": 704,
+            "y": 280,
+            "w": 194,
+            "h": 53
+          }
+        },
+        {
+          "href": "/auth/email",
+          "text": "Continue with email",
+          "className": "landing-cta landing-cta-email",
+          "background": "rgba(0, 0, 0, 0)",
+          "color": "rgb(13, 148, 136)",
+          "border": "rgb(13, 148, 136)",
+          "fontWeight": "400",
+          "rect": {
+            "x": 909,
+            "y": 280,
+            "w": 206,
+            "h": 53
+          }
+        }
+      ],
+      "distinctBackgrounds": [
+        "rgb(13, 148, 136)",
+        "rgba(0, 0, 0, 0)"
+      ],
+      "buttonsAndLinksAboveFold": 5
+    }
+  },
+  "archives": {
+    "1": {
+      "inlineHasPrefersColorSchemeDark": true,
+      "linkedCssHasIt": false,
+      "linkedCss": [],
+      "bodyClass": null,
+      "colorSchemeMeta": true
+    },
+    "2": {
+      "inlineHasPrefersColorSchemeDark": true,
+      "linkedCssHasIt": false,
+      "linkedCss": [],
+      "bodyClass": null,
+      "colorSchemeMeta": true
+    },
+    "3": {
+      "inlineHasPrefersColorSchemeDark": true,
+      "linkedCssHasIt": false,
+      "linkedCss": [],
+      "bodyClass": null,
+      "colorSchemeMeta": true
+    },
+    "4": {
+      "inlineHasPrefersColorSchemeDark": true,
+      "linkedCssHasIt": false,
+      "linkedCss": [],
+      "bodyClass": null,
+      "colorSchemeMeta": true
+    },
+    "5": {
+      "inlineHasPrefersColorSchemeDark": true,
+      "linkedCssHasIt": false,
+      "linkedCss": [],
+      "bodyClass": null,
+      "colorSchemeMeta": true
+    },
+    "6": {
+      "inlineHasPrefersColorSchemeDark": true,
+      "linkedCssHasIt": false,
+      "linkedCss": [],
+      "bodyClass": null,
+      "colorSchemeMeta": true
+    },
+    "7": {
+      "inlineHasPrefersColorSchemeDark": true,
+      "linkedCssHasIt": false,
+      "linkedCss": [],
+      "bodyClass": null,
+      "colorSchemeMeta": true
+    },
+    "8": {
+      "inlineHasPrefersColorSchemeDark": true,
+      "linkedCssHasIt": false,
+      "linkedCss": [],
+      "bodyClass": null,
+      "colorSchemeMeta": true
+    },
+    "9": {
+      "inlineHasPrefersColorSchemeDark": true,
+      "linkedCssHasIt": false,
+      "linkedCss": [],
+      "bodyClass": null,
+      "colorSchemeMeta": true
+    }
+  }
+}
