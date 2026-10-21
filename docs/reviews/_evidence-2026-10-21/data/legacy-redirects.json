@@ -1,0 +1,29 @@
+{
+  "note": "cold (no session) hops; app-session hops are beat 3",
+  "hops": [
+    {
+      "id": "legacy-audit",
+      "path": "/audit",
+      "status": 302,
+      "location": "/",
+      "finalUrl": "/",
+      "finalStatus": 200
+    },
+    {
+      "id": "legacy-settings",
+      "path": "/settings",
+      "status": 302,
+      "location": "/",
+      "finalUrl": "/",
+      "finalStatus": 200
+    },
+    {
+      "id": "legacy-prompts",
+      "path": "/prompts",
+      "status": 302,
+      "location": "/",
+      "finalUrl": "/",
+      "finalStatus": 200
+    }
+  ]
+}

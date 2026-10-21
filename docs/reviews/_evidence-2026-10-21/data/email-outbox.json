@@ -1,0 +1,12 @@
+{
+  "sendStatus": 200,
+  "outboxStatus": 200,
+  "subject": "Your Harbour sign-in link",
+  "htmlBytes": 215,
+  "textBytes": 191,
+  "hasHtml": true,
+  "htmlHasInlineStyles": false,
+  "htmlHasAlt": 0,
+  "note": "the token in the body is redacted before commit",
+  "text": "Sign in to Harbour:\n\nhttp://localhost:3199/auth/email/confirm?t=<token>\n\nThis link works once, for 15 minutes. If you didn't ask for it, ignore this email."
+}

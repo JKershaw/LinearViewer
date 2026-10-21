@@ -1,0 +1,30 @@
+{
+  "pressed": [
+    [
+      "rate",
+      "false"
+    ],
+    [
+      "total",
+      "true"
+    ]
+  ],
+  "captionHidden": false,
+  "chartType": "line",
+  "since": "Tasks finished since 22 Aug 2026: 5",
+  "datasetStyle": [
+    {
+      "borderDash": null,
+      "pointStyle": null,
+      "type": "line"
+    }
+  ],
+  "chartTypesAll": [
+    {
+      "id": "chart-done-daily",
+      "type": "line",
+      "datasets": 1,
+      "legend": false
+    }
+  ]
+}
