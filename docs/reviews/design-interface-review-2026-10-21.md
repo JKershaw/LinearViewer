@@ -2,7 +2,7 @@
 
 Rendered-product review of the 1,156-commit window `6e8bf424..0b4bd287` (2026-09-26 to 2026-10-21). Grounded on `main` @ `0b4bd287`; no file under `lib/`, `routes/`, `public/` or `server.js` has changed since (re-checked in beat 4). Evidence: `docs/reviews/_evidence-2026-10-21/` (paths below are relative to it). Every finding cites a fresh render from this run; colour figures come from JSON (`census.json`, `remeasure/*.json`), not from the PNGs, which are palette-quantised. Review-only: no product code, CSS, config, test or doc under review was changed.
 
-Report written in beat 5 (LIN-3752). The `## Adversarial Second-Read` section at the end is a placeholder for beat 6 (LIN-3753).
+Report written in beat 5 (LIN-3752). Beat 6 (LIN-3753) added the `## Adversarial Second-Read` section and findings 29–30 from it.
 
 ## 1. Summary
 
@@ -46,6 +46,8 @@ Severity: **S1** content unreachable or unusable; **S2** AA contrast failure on 
 | 26 | S4 | **Library prose rhythm:** a paragraph after a bullet list sits flush under the last bullet and reads as a list continuation; inline `code` wraps mid-path. | `library-paper-*-1400px.png` | recorded |
 | 27 | S4 | **390px nav scroller starts mid-strip** so the first item can read "sks"; Live Console preset buttons are 12px / 24px tall (A16). | beat 3/4 notes | recorded |
 | 28 | S4 | **A22 stands.** The Collective status dot has no state colour in any of three states (text is the same `rgb(102,102,102)`, 5.74:1). | beat 3 notes | recorded |
+| 29 | S3 | **Unnamed form controls on Settings and Proxy** (added after the second-read). Settings: 2 `label` failures (`input.dispatch-preset-name-input` ×2) and 5 `select-name` failures (`select.model-select`, 4× `select.harness-select`); Proxy: 1 `select-name` (`select.proxy-scope-select`). This is the cause of Settings' 0.87, the lowest authenticated score, and is structural, not contrast; no open ticket covers it. | `authenticated/lighthouse-settings.json`, `authenticated/lighthouse-proxy.json` | recorded, **unminted: the three-mint cap was reached**; first candidate for the next run's mints |
+| 30 | S3 | **`/swipe` disables pinch-zoom.** The viewport meta carries `user-scalable=no` (`lib/render-swipe.js:596`), failing Lighthouse `meta-viewport` (0.92) and WCAG 1.4.4 on a public page. | `lighthouse/swipe-public.json` | recorded, **unminted: cap reached**; first candidate for the next run's mints |
 
 Not findings (checked, clean): guest share lifecycle (mint 201, guest 200 with `no-referrer`/`no-store`/`noindex`, revoke 200, then 404 on the same URL, a never-issued token and `/s/…`; `data/guest-share-lifecycle.json`); Library sweep totals (0 non-200, 0 images without alt, 0 broken images, 0 `<title>` missing, 0 composited contrast groups under 4.5:1 on all 104 documents at 390, `data/library-sweep.json`); LIN-3351 SVG figures render correctly in dark (`library-paper-svg-dark-*.png`); legacy redirects `/audit`, `/prompts`, `/settings` land on `/` for a cold visitor (`data/legacy-redirects.json`); live harbour.cat matches local on all 28 routes by status and `<title>` (`data/live-comparison.json`).
 
@@ -83,7 +85,7 @@ Verdict: **ships** = no objective defect, **ships with debt** = AA or structure 
 | Task page (`/workspace/:k/task/:id`), 9 states | ships with debt | all states render and settle (B1′ does not loop); merge button 3.74:1; evidence line run-together; layout gap on waiting |
 | Workspace KPIs | ships with debt | window/label candidate (row 14); Lighthouse 0.96 |
 | Runner setup | ships with debt | `--green` text 3.08:1 (LIN-3123) |
-| Rebuilt: tree, swipe, swim, settings, roadmap, proxy, dispatch, flight companion, live console, ship's biscuit, observation, session | ships with debt | system consumed; inherited LIN-3119/3123 members; settings Lighthouse 0.87; focus indicator on every stop |
+| Rebuilt: tree, swipe, swim, settings, roadmap, proxy, dispatch, flight companion, live console, ship's biscuit, observation, session | ships with debt | system consumed; inherited LIN-3119/3123 members; settings Lighthouse 0.87, caused by unnamed controls (finding 29, unowned); swipe blocks pinch-zoom (finding 30, unowned); focus indicator on every stop |
 | Legacy redirects | ships | coherent for cold and signed-in |
 | Merge consent / reauth (non-Linear) | ships with debt (synthetic) | provider copy correct; touching buttons; no live seam (LIN-3760) |
 
@@ -174,7 +176,31 @@ Twenty-two report figures (library, census, re-measure, Lighthouse and PNG-count
 
 ## Adversarial Second-Read
 
-_Placeholder for beat 6 (LIN-3753). Tier, the question, the reader's full answer, and the three-field verdict (verdict, differed from top finding, disposition) go here._
+**Tier:** 2 (fresh-context sub-agent, given only this report and the evidence path, not the author's verdict).
+
+**Question:** "What is the largest item in this window that this report missed or misfiled?"
+
+**Reader's answer (full):**
+
+> The report's largest miss is that it files unlabeled form controls on Settings and Proxy as a Lighthouse aside, not as a finding with a ticket.
+>
+> Spot-checks that held up: the library clipping figures match `remeasure/library-table-clip.json` (`/library/which-rules-pay` table right edge 1,086px at 390 and 320, `scrolledX` 0, root and body `overflow-x: clip`); `remeasure/report-figure-check.json` passes all 22 checks; the Lighthouse scores for settings (0.87), proxy (0.91) and swipe (0.92) match the stored audits. The reader did not recompute contrast ratios from the PNGs or census.
+>
+> 1. Unlabeled form controls on Settings and Proxy are not a finding. Finding 13 lists `label`, `select-name` and `font-size` only in a parenthetical. `authenticated/lighthouse-settings.json` has 2 `label` failures (`input.dispatch-preset-name-input` ×2) and 5 `select-name` failures (`select.model-select`, 4× `select.harness-select`); `authenticated/lighthouse-proxy.json` has 1 `select-name` (`select.proxy-scope-select`). Unnamed controls on a primary authenticated surface are a structural defect no ticketed family covers, yet section 4 rates both surfaces "ships with debt" as inherited LIN-3119/3123 members.
+> 2. Swipe disables pinch-zoom. `lighthouse/swipe-public.json` fails `meta-viewport` because the viewport meta contains `user-scalable=no`; `lib/render-swipe.js` is the only file that sets it. WCAG 1.4.4, objective; mentioned only as "(`meta-viewport`)".
+> 3. Smaller: beat 2 says 74 of 104 library documents overflow at 390 while the report says 70 have tables past the viewport; the other 4 are not explained.
+>
+> Finding 1 (library table clipping, S1) is well supported and should stay #1.
+>
+> Adversarial second-read verdict: DISAGREE
+> Differed from top finding: YES
+> Recommended disposition: escalated
+
+**Author's check of the reader's claims:** items 1 and 2 re-verified against the evidence JSON and `lib/render-swipe.js:596` (label 2, select-name 5 / 1, `user-scalable=no`). Item 3 is left as a carried note: the 4-document gap is not itemised in the evidence.
+
+**Adversarial second-read verdict: DISAGREE** · **Differed from top finding: YES** · **Disposition: fixed in place**
+
+Reason for the disposition: the report was amended here (findings 29 and 30 added; section 4's "ships with debt" for Settings and Proxy now also carries finding 29). The reader suggested escalating, but the follow-up cap of three was already used, so nothing more can be minted this run; the two items are named as the next run's first mint candidates instead.
 
 ---
 
