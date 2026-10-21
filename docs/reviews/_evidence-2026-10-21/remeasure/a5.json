@@ -1,0 +1,235 @@
+{
+  "base": "http://localhost:3199",
+  "head": "b901efab",
+  "question": "mono used for prose (>=12 words in a monospace element)",
+  "rows": [
+    {
+      "name": "landing",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "library",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "guest-404",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "email-signin",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "kpis-public",
+      "monoProseCount": 9,
+      "examples": [
+        "\"JetBrains Mono\", \"S 12.8px \"Landed rate is done ÷ (done + failed + aborted) fo\"",
+        "\"JetBrains Mono\", \"S 12.8px \"A week with nothing resolved has no rate, so the l\"",
+        "\"JetBrains Mono\", \"S 12.8px \"Each task counts once, in the week it started, wit\""
+      ]
+    },
+    {
+      "name": "ship-public",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "swim-public",
+      "monoProseCount": 8,
+      "examples": [
+        "\"JetBrains Mono\", \"S 11.5px \"AI made writing code cheap—it didn't make knowing \"",
+        "\"JetBrains Mono\", \"S 11.5px \"Explore the backlog as a collapsible tree, one tas\"",
+        "\"JetBrains Mono\", \"S 11.5px \"Watch your agent runs live as they pick up work, r\""
+      ]
+    },
+    {
+      "name": "swipe-public",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "templates",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "styleguide",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "terms",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "privacy",
+      "monoProseCount": 15,
+      "examples": [
+        "\"JetBrains Mono\", \"S 16px \"The text of the tasks you work on: titles, descrip\"",
+        "\"JetBrains Mono\", \"S 16px \"The prompts Harbour writes for you and the AI’s fu\"",
+        "\"JetBrains Mono\", \"S 16px \"The history of each run: the prompt, the agent’s p\""
+      ]
+    },
+    {
+      "name": "ws-tree",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "ws/settings",
+      "monoProseCount": 1,
+      "examples": [
+        "\"JetBrains Mono\", \"S 16px \"This model is used for all LLM calls in this works\""
+      ]
+    },
+    {
+      "name": "ws/dispatch",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "ws/proxy",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "ws/roadmap",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "ws/kpis",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "ws/runner",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "ws/ship",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "ws/swim",
+      "monoProseCount": 2,
+      "examples": [
+        "\"JetBrains Mono\", \"S 11.5px \"Extract auth logic into separate service for bette\"",
+        "\"JetBrains Mono\", \"S 11.5px \"Implement cursor-based pagination for the user lis\""
+      ]
+    },
+    {
+      "name": "ws/swipe",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "ws/audit",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "ws/prompts",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "ws/collective",
+      "monoProseCount": 1,
+      "examples": [
+        "\"JetBrains Mono\", \"S 13.6px \"⚗ Experimental — dispatches full Claude Code sessi\""
+      ]
+    },
+    {
+      "name": "ws/observation",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "ws/live-console",
+      "monoProseCount": 1,
+      "examples": [
+        "\"JetBrains Mono\", \"S 13.12px \"○ all quiet — agents will appear here the moment t\""
+      ]
+    },
+    {
+      "name": "ws/next-run",
+      "monoProseCount": 2,
+      "examples": [
+        "\"JetBrains Mono\", \"S 13.6px \"⚗ Experimental — generate grounded goal options fo\"",
+        "\"JetBrains Mono\", \"S 13.6px \"○ click \"generate suggestions\" to get grounded goa\""
+      ]
+    },
+    {
+      "name": "ws/ship-biscuit",
+      "monoProseCount": 1,
+      "examples": [
+        "\"JetBrains Mono\", \"S 16px \"○ no edition yet — press \"run the presses\" to gene\""
+      ]
+    },
+    {
+      "name": "ws/flight-companion",
+      "monoProseCount": 3,
+      "examples": [
+        "\"JetBrains Mono\", \"S 16px \"○ the companion checks in periodically while this \"",
+        "\"JetBrains Mono\", \"S 16px \"Say something in the chat above, or just leave the\"",
+        "\"JetBrains Mono\", \"S 16px \"When it proposes a follow-up, Approve to queue it \""
+      ]
+    },
+    {
+      "name": "ws/passage-planner",
+      "monoProseCount": 1,
+      "examples": [
+        "\"JetBrains Mono\", \"S 16px \"Work through orientation, sizing, and proposal tog\""
+      ]
+    }
+  ],
+  "summary": {
+    "pagesWithMonoProse": [
+      "kpis-public:9",
+      "swim-public:8",
+      "privacy:15",
+      "ws/settings:1",
+      "ws/swim:2",
+      "ws/collective:1",
+      "ws/live-console:1",
+      "ws/next-run:2",
+      "ws/ship-biscuit:1",
+      "ws/flight-companion:3",
+      "ws/passage-planner:1"
+    ]
+  },
+  "named": {
+    "dispatch .guide-halt-note": {
+      "sel": ".guide-halt-note",
+      "fontFamily": "\"JetBrains Mono\", \"SF Mono\", \"Fira Code\"",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "words": 31,
+      "sectionTitle": {
+        "text": "Integration Guide",
+        "fontSize": "16px",
+        "fontFamily": "Inter, -apple-system, \"system-"
+      }
+    },
+    "settings .model-workspace-note": {
+      "sel": ".model-workspace-note",
+      "fontFamily": "\"JetBrains Mono\", \"SF Mono\", \"Fira Code\"",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "words": 14,
+      "sectionTitle": {
+        "text": "AI Model",
+        "fontSize": "16px",
+        "fontFamily": "Inter, -apple-system, \"system-"
+      }
+    }
+  }
+}

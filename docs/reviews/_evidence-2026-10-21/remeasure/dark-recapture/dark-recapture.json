@@ -1,0 +1,77 @@
+{
+  "note": "cookie-dark recapture, theme-dark asserted in the same read",
+  "rows": [
+    {
+      "name": "ship-public",
+      "path": "/ship",
+      "status": 200,
+      "htmlClass": "theme-dark",
+      "bodyBg": "rgb(22, 24, 29)",
+      "title": "Ship",
+      "themeAssertionPassed": true
+    },
+    {
+      "name": "swim-public",
+      "path": "/swim",
+      "status": 200,
+      "htmlClass": "theme-dark",
+      "bodyBg": "rgb(22, 24, 29)",
+      "title": "Swim - Lanes",
+      "themeAssertionPassed": true
+    },
+    {
+      "name": "swipe-public",
+      "path": "/swipe/LV-2",
+      "status": 200,
+      "htmlClass": "theme-dark",
+      "bodyBg": "rgb(22, 24, 29)",
+      "title": "Swipe - LV-2 The control plane for your coding agents",
+      "themeAssertionPassed": true
+    },
+    {
+      "name": "email-signin-real",
+      "path": "/auth/email",
+      "status": 200,
+      "htmlClass": "theme-dark",
+      "bodyBg": "rgb(22, 24, 29)",
+      "title": "Sign in with email - Harbour",
+      "themeAssertionPassed": true
+    },
+    {
+      "name": "email-confirm-real",
+      "path": "/auth/email/confirm",
+      "status": 410,
+      "htmlClass": "theme-dark",
+      "bodyBg": "rgb(22, 24, 29)",
+      "title": "Link expired - Harbour",
+      "themeAssertionPassed": true
+    },
+    {
+      "name": "held-404",
+      "path": "/connect/nope/held",
+      "status": 404,
+      "htmlClass": "theme-dark",
+      "bodyBg": "rgb(22, 24, 29)",
+      "title": "Not Found - Projects",
+      "themeAssertionPassed": true
+    },
+    {
+      "name": "held-expired",
+      "path": "/connect/github/held",
+      "status": 400,
+      "htmlClass": "theme-dark",
+      "bodyBg": "rgb(22, 24, 29)",
+      "title": "Session Expired - Projects",
+      "themeAssertionPassed": true
+    },
+    {
+      "name": "library-404",
+      "path": "/library/no-such-document",
+      "status": 404,
+      "htmlClass": "theme-dark",
+      "bodyBg": "rgb(22, 24, 29)",
+      "title": "Page not found - Projects",
+      "themeAssertionPassed": true
+    }
+  ]
+}

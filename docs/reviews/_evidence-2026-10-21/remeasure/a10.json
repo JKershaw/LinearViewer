@@ -1,0 +1,81 @@
+{
+  "id": "a10",
+  "base": "http://localhost:3199",
+  "head": "b901efab",
+  "question": "internal ticket ids in user copy",
+  "rows": [
+    {
+      "name": "library",
+      "ids": [
+        "LIN-1301",
+        "LIN-2925",
+        "LIN-1811"
+      ]
+    },
+    {
+      "name": "ship-public",
+      "ids": [
+        "LV-10",
+        "LV-11",
+        "LV-12",
+        "LV-13",
+        "LV-14",
+        "LV-15",
+        "LV-16",
+        "LV-17"
+      ]
+    },
+    {
+      "name": "swim-public",
+      "ids": [
+        "LV-10",
+        "LV-11",
+        "LV-12",
+        "LV-13",
+        "LV-14",
+        "LV-15",
+        "LV-16",
+        "LV-17"
+      ]
+    },
+    {
+      "name": "styleguide",
+      "ids": [
+        "LIN-785",
+        "LIN-461",
+        "LIN-462",
+        "LIN-463",
+        "LIN-468",
+        "LIN-465",
+        "LIN-782",
+        "LIN-850",
+        "LIN-466",
+        "LIN-786",
+        "LIN-783"
+      ]
+    },
+    {
+      "name": "ws/proxy",
+      "ids": [
+        "LIN-123"
+      ]
+    },
+    {
+      "name": "ws/passage-planner",
+      "ids": [
+        "LIN-1849",
+        "LIN-1857"
+      ]
+    }
+  ],
+  "summary": {
+    "pages": [
+      "library: LIN-1301,LIN-2925,LIN-1811",
+      "ship-public: LV-10,LV-11,LV-12,LV-13,LV-14,LV-15,LV-16,LV-17",
+      "swim-public: LV-10,LV-11,LV-12,LV-13,LV-14,LV-15,LV-16,LV-17",
+      "styleguide: LIN-785,LIN-461,LIN-462,LIN-463,LIN-468,LIN-465,LIN-782,LIN-850,LIN-466,LIN-786,LIN-783",
+      "ws/proxy: LIN-123",
+      "ws/passage-planner: LIN-1849,LIN-1857"
+    ]
+  }
+}

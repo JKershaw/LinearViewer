@@ -43,7 +43,7 @@ export const RENDERERS = {
   renderEmailSendRefusedPage: () => email.renderEmailSendRefusedPage(),
   renderEmailUnavailablePage: () => email.renderEmailUnavailablePage(),
   // other
-  renderAccountHomePage: () => renderAccountHomePage({ emails: [{ address: 'you@example.com' }] }),
+  renderAccountHomePage: () => renderAccountHomePage({ emails: ['you@example.com'] }),
   renderTaskNotFoundPage: () => renderTaskNotFoundPage({ identifier: 'TEST-999', urlKey: 'test-workspace' }),
 };
 

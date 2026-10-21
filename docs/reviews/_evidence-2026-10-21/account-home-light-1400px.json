@@ -121,5 +121,10 @@
     "JetBrains Mono 400",
     "JetBrains Mono 500",
     "JetBrains Mono 600"
-  ]
+  ],
+  "correction": {
+    "by": "LIN-3751",
+    "note": "Re-rendered with emails as string[] (production shape). Original PNG showed \"Signed in as [object Object]\" from a beat-1 synthetic input error, not a product defect. Measurements below are from the original render; the text node is the only difference.",
+    "whoAfter": "Signed in as you@example.com"
+  }
 }

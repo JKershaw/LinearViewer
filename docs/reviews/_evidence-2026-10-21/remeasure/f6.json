@@ -1,0 +1,1450 @@
+{
+  "id": "f6",
+  "base": "http://localhost:3199",
+  "head": "b901efab",
+  "question": "archive sign-offs at 2.94:1?",
+  "census": "census.json",
+  "rows": [
+    {
+      "id": "archive-1",
+      "theme": "light",
+      "element": "p.mast-rule",
+      "ratio": 2.94,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "LinearViewer/Harbour ─── 4 Jan 2026 ├─────────────"
+      ]
+    },
+    {
+      "id": "archive-1",
+      "theme": "light",
+      "element": "p.stat-note",
+      "ratio": 2.94,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "All figures reproducible from the repositories at "
+      ]
+    },
+    {
+      "id": "archive-1",
+      "theme": "light",
+      "element": "span.chip.ev",
+      "ratio": 2.94,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "4d1cb366",
+        "a82b8758 · LIN-550",
+        "a82b8758"
+      ]
+    },
+    {
+      "id": "archive-1",
+      "theme": "light",
+      "element": "div.g-num",
+      "ratio": 2.94,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "I",
+        "II",
+        "III"
+      ]
+    },
+    {
+      "id": "archive-1",
+      "theme": "light",
+      "element": "span.r-ev",
+      "ratio": 2.94,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "LIN-213, 216–221 → LIN-415/486",
+        "LIN-289–293",
+        "LIN-350s · LIN-653–663"
+      ]
+    },
+    {
+      "id": "archive-1",
+      "theme": "light",
+      "element": "p.sig",
+      "ratio": 2.94,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "THE HARBOUR ARCHIVE · compiled by Claude for John "
+      ]
+    },
+    {
+      "id": "archive-1",
+      "theme": "light",
+      "element": "p.fig-eyebrow",
+      "ratio": 3.07,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(255,254,251)",
+      "samples": [
+        "Fig. A · Overview",
+        "Fig. B · Centerpiece",
+        "Fig. C"
+      ]
+    },
+    {
+      "id": "archive-1",
+      "theme": "light",
+      "element": "div.specimen-label",
+      "ratio": 3.07,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(255,254,251)",
+      "samples": [
+        "Specimen · the founding commit",
+        "Specimen · LIN-5, complete text",
+        "Specimen · the birth commit"
+      ]
+    },
+    {
+      "id": "archive-1",
+      "theme": "light",
+      "element": "p.ex-label",
+      "ratio": 3.07,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(255,254,251)",
+      "samples": [
+        "Central exhibit · The Collective session of 12 Jun",
+        "Parting exhibit · the operating manual, final sect"
+      ]
+    },
+    {
+      "id": "archive-1",
+      "theme": "light",
+      "element": "p.fig-foot",
+      "ratio": 3.07,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(255,254,251)",
+      "samples": [
+        "July's raw \"human-only\" count (84) is an artifact "
+      ]
+    },
+    {
+      "id": "archive-1",
+      "theme": "light",
+      "element": "span.chip.repo-d",
+      "ratio": 3.82,
+      "color": "rgb(187, 95, 16)",
+      "bg": "rgb(248,237,224)",
+      "samples": [
+        "dispatcher",
+        "dispatcher",
+        "dispatcher"
+      ]
+    },
+    {
+      "id": "archive-1",
+      "theme": "light",
+      "element": "span.chip.repo-h",
+      "ratio": 4.49,
+      "color": "rgb(11, 111, 184)",
+      "bg": "rgb(227,238,248)",
+      "samples": [
+        "Harbour",
+        "Harbour",
+        "Harbour"
+      ]
+    },
+    {
+      "id": "archive-1",
+      "theme": "dark",
+      "element": "p.fig-eyebrow",
+      "ratio": 3.52,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(27,33,42)",
+      "samples": [
+        "Fig. A · Overview",
+        "Fig. B · Centerpiece",
+        "Fig. C"
+      ]
+    },
+    {
+      "id": "archive-1",
+      "theme": "dark",
+      "element": "div.specimen-label",
+      "ratio": 3.52,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(27,33,42)",
+      "samples": [
+        "Specimen · the founding commit",
+        "Specimen · LIN-5, complete text",
+        "Specimen · the birth commit"
+      ]
+    },
+    {
+      "id": "archive-1",
+      "theme": "dark",
+      "element": "p.ex-label",
+      "ratio": 3.52,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(27,33,42)",
+      "samples": [
+        "Central exhibit · The Collective session of 12 Jun",
+        "Parting exhibit · the operating manual, final sect"
+      ]
+    },
+    {
+      "id": "archive-1",
+      "theme": "dark",
+      "element": "p.fig-foot",
+      "ratio": 3.52,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(27,33,42)",
+      "samples": [
+        "July's raw \"human-only\" count (84) is an artifact "
+      ]
+    },
+    {
+      "id": "archive-1",
+      "theme": "dark",
+      "element": "p.mast-rule",
+      "ratio": 3.87,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(20,24,30)",
+      "samples": [
+        "LinearViewer/Harbour ─── 4 Jan 2026 ├─────────────"
+      ]
+    },
+    {
+      "id": "archive-1",
+      "theme": "dark",
+      "element": "p.stat-note",
+      "ratio": 3.87,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(20,24,30)",
+      "samples": [
+        "All figures reproducible from the repositories at "
+      ]
+    },
+    {
+      "id": "archive-1",
+      "theme": "dark",
+      "element": "span.chip.ev",
+      "ratio": 3.87,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(20,24,30)",
+      "samples": [
+        "4d1cb366",
+        "a82b8758 · LIN-550",
+        "a82b8758"
+      ]
+    },
+    {
+      "id": "archive-1",
+      "theme": "dark",
+      "element": "span.r-ev",
+      "ratio": 3.87,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(20,24,30)",
+      "samples": [
+        "LIN-213, 216–221 → LIN-415/486",
+        "LIN-289–293",
+        "LIN-350s · LIN-653–663"
+      ]
+    },
+    {
+      "id": "archive-1",
+      "theme": "dark",
+      "element": "p.sig",
+      "ratio": 3.87,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(20,24,30)",
+      "samples": [
+        "THE HARBOUR ARCHIVE · compiled by Claude for John "
+      ]
+    },
+    {
+      "id": "archive-1",
+      "theme": "dark",
+      "element": "span.chip.repo-h",
+      "ratio": 4.48,
+      "color": "rgb(63, 150, 221)",
+      "bg": "rgb(29,44,59)",
+      "samples": [
+        "Harbour",
+        "Harbour",
+        "Harbour"
+      ]
+    },
+    {
+      "id": "archive-2",
+      "theme": "light",
+      "element": "p.mast-rule",
+      "ratio": 2.94,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "LinearViewer/Harbour ─── 4 Jan 2026 ├─────────────"
+      ]
+    },
+    {
+      "id": "archive-2",
+      "theme": "light",
+      "element": "p.stat-note",
+      "ratio": 2.94,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "All figures reproducible from the repositories at "
+      ]
+    },
+    {
+      "id": "archive-2",
+      "theme": "light",
+      "element": "span.chip.ev",
+      "ratio": 2.94,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "4d1cb366",
+        "a82b8758 · LIN-550",
+        "a82b8758"
+      ]
+    },
+    {
+      "id": "archive-2",
+      "theme": "light",
+      "element": "span.chip.rd",
+      "ratio": 2.94,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "curator's reading",
+        "curator's reading",
+        "curator's reading"
+      ]
+    },
+    {
+      "id": "archive-2",
+      "theme": "light",
+      "element": "div.g-num",
+      "ratio": 2.94,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "I",
+        "II",
+        "III"
+      ]
+    },
+    {
+      "id": "archive-2",
+      "theme": "light",
+      "element": "span.r-ev",
+      "ratio": 2.94,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "LIN-213, 216–221 → LIN-415/486",
+        "LIN-289–293",
+        "LIN-350s · LIN-653–663"
+      ]
+    },
+    {
+      "id": "archive-2",
+      "theme": "light",
+      "element": "p.sig",
+      "ratio": 2.94,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "THE HARBOUR ARCHIVE · compiled by Claude for John "
+      ]
+    },
+    {
+      "id": "archive-2",
+      "theme": "light",
+      "element": "p.fig-eyebrow",
+      "ratio": 3.07,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(255,254,251)",
+      "samples": [
+        "Fig. A · Overview",
+        "Fig. B · Centerpiece",
+        "Fig. C"
+      ]
+    },
+    {
+      "id": "archive-2",
+      "theme": "light",
+      "element": "div.specimen-label",
+      "ratio": 3.07,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(255,254,251)",
+      "samples": [
+        "Specimen · the founding commit",
+        "Specimen · LIN-5, complete text",
+        "Specimen · the birth commit"
+      ]
+    },
+    {
+      "id": "archive-2",
+      "theme": "light",
+      "element": "p.ex-label",
+      "ratio": 3.07,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(255,254,251)",
+      "samples": [
+        "Central exhibit · The Collective session of 12 Jun",
+        "Parting exhibit · the operating manual, final sect"
+      ]
+    },
+    {
+      "id": "archive-2",
+      "theme": "light",
+      "element": "p.fig-foot",
+      "ratio": 3.07,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(255,254,251)",
+      "samples": [
+        "One rule, applied to every month: a commit counts ",
+        "The result cuts both ways, and both edges are repo"
+      ]
+    },
+    {
+      "id": "archive-2",
+      "theme": "light",
+      "element": "i",
+      "ratio": 3.07,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(255,254,251)",
+      "samples": [
+        "\"Thread {fetchImpl, now} test seams through remint",
+        "rate"
+      ]
+    },
+    {
+      "id": "archive-2",
+      "theme": "light",
+      "element": "span.chip.repo-d",
+      "ratio": 3.82,
+      "color": "rgb(187, 95, 16)",
+      "bg": "rgb(248,237,224)",
+      "samples": [
+        "dispatcher",
+        "dispatcher",
+        "dispatcher"
+      ]
+    },
+    {
+      "id": "archive-2",
+      "theme": "light",
+      "element": "span.chip.repo-h",
+      "ratio": 4.49,
+      "color": "rgb(11, 111, 184)",
+      "bg": "rgb(227,238,248)",
+      "samples": [
+        "Harbour",
+        "Harbour",
+        "Harbour"
+      ]
+    },
+    {
+      "id": "archive-2",
+      "theme": "dark",
+      "element": "p.fig-eyebrow",
+      "ratio": 3.52,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(27,33,42)",
+      "samples": [
+        "Fig. A · Overview",
+        "Fig. B · Centerpiece",
+        "Fig. C"
+      ]
+    },
+    {
+      "id": "archive-2",
+      "theme": "dark",
+      "element": "div.specimen-label",
+      "ratio": 3.52,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(27,33,42)",
+      "samples": [
+        "Specimen · the founding commit",
+        "Specimen · LIN-5, complete text",
+        "Specimen · the birth commit"
+      ]
+    },
+    {
+      "id": "archive-2",
+      "theme": "dark",
+      "element": "p.ex-label",
+      "ratio": 3.52,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(27,33,42)",
+      "samples": [
+        "Central exhibit · The Collective session of 12 Jun",
+        "Parting exhibit · the operating manual, final sect"
+      ]
+    },
+    {
+      "id": "archive-2",
+      "theme": "dark",
+      "element": "p.fig-foot",
+      "ratio": 3.52,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(27,33,42)",
+      "samples": [
+        "One rule, applied to every month: a commit counts ",
+        "The result cuts both ways, and both edges are repo"
+      ]
+    },
+    {
+      "id": "archive-2",
+      "theme": "dark",
+      "element": "i",
+      "ratio": 3.52,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(27,33,42)",
+      "samples": [
+        "\"Thread {fetchImpl, now} test seams through remint",
+        "rate"
+      ]
+    },
+    {
+      "id": "archive-2",
+      "theme": "dark",
+      "element": "p.mast-rule",
+      "ratio": 3.87,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(20,24,30)",
+      "samples": [
+        "LinearViewer/Harbour ─── 4 Jan 2026 ├─────────────"
+      ]
+    },
+    {
+      "id": "archive-2",
+      "theme": "dark",
+      "element": "p.stat-note",
+      "ratio": 3.87,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(20,24,30)",
+      "samples": [
+        "All figures reproducible from the repositories at "
+      ]
+    },
+    {
+      "id": "archive-2",
+      "theme": "dark",
+      "element": "span.chip.ev",
+      "ratio": 3.87,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(20,24,30)",
+      "samples": [
+        "4d1cb366",
+        "a82b8758 · LIN-550",
+        "a82b8758"
+      ]
+    },
+    {
+      "id": "archive-2",
+      "theme": "dark",
+      "element": "span.chip.rd",
+      "ratio": 3.87,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(20,24,30)",
+      "samples": [
+        "curator's reading",
+        "curator's reading",
+        "curator's reading"
+      ]
+    },
+    {
+      "id": "archive-2",
+      "theme": "dark",
+      "element": "span.r-ev",
+      "ratio": 3.87,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(20,24,30)",
+      "samples": [
+        "LIN-213, 216–221 → LIN-415/486",
+        "LIN-289–293",
+        "LIN-350s · LIN-653–663"
+      ]
+    },
+    {
+      "id": "archive-2",
+      "theme": "dark",
+      "element": "p.sig",
+      "ratio": 3.87,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(20,24,30)",
+      "samples": [
+        "THE HARBOUR ARCHIVE · compiled by Claude for John "
+      ]
+    },
+    {
+      "id": "archive-2",
+      "theme": "dark",
+      "element": "span.chip.repo-h",
+      "ratio": 4.48,
+      "color": "rgb(63, 150, 221)",
+      "bg": "rgb(29,44,59)",
+      "samples": [
+        "Harbour",
+        "Harbour",
+        "Harbour"
+      ]
+    },
+    {
+      "id": "archive-3",
+      "theme": "light",
+      "element": "span.branch",
+      "ratio": 1.6,
+      "color": "rgb(195, 200, 205)",
+      "bg": "rgb(248,249,250)",
+      "samples": [
+        "├─",
+        "├─",
+        "├─"
+      ]
+    },
+    {
+      "id": "archive-3",
+      "theme": "light",
+      "element": "span.glyph",
+      "ratio": 1.82,
+      "color": "rgb(187, 187, 187)",
+      "bg": "rgb(248,249,250)",
+      "samples": [
+        "✓",
+        "✓"
+      ]
+    },
+    {
+      "id": "archive-3",
+      "theme": "light",
+      "element": "span.glyph",
+      "ratio": 3.13,
+      "color": "rgb(22, 163, 74)",
+      "bg": "rgb(248,249,250)",
+      "samples": [
+        "◐",
+        "◐",
+        "◐"
+      ]
+    },
+    {
+      "id": "archive-3",
+      "theme": "light",
+      "element": "span.glyph",
+      "ratio": 3.86,
+      "color": "rgb(154, 122, 0)",
+      "bg": "rgb(248,249,250)",
+      "samples": [
+        "○",
+        "○",
+        "○"
+      ]
+    },
+    {
+      "id": "archive-3",
+      "theme": "dark",
+      "element": "span.branch",
+      "ratio": 1.62,
+      "color": "rgb(61, 68, 80)",
+      "bg": "rgb(31,34,42)",
+      "samples": [
+        "├─",
+        "├─",
+        "├─"
+      ]
+    },
+    {
+      "id": "archive-3",
+      "theme": "dark",
+      "element": "span.glyph",
+      "ratio": 2.63,
+      "color": "rgb(92, 99, 112)",
+      "bg": "rgb(31,34,42)",
+      "samples": [
+        "✓",
+        "✓"
+      ]
+    },
+    {
+      "id": "archive-4",
+      "theme": "light",
+      "element": "p.mast-rule",
+      "ratio": 2.94,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "Gallery VII–VIII ─── 28 Jul 2026 ├──────────┤ 23 A"
+      ]
+    },
+    {
+      "id": "archive-4",
+      "theme": "light",
+      "element": "div.g-num",
+      "ratio": 2.94,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "VII",
+        "VIII",
+        "§"
+      ]
+    },
+    {
+      "id": "archive-4",
+      "theme": "light",
+      "element": "span.chip.ev",
+      "ratio": 2.94,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "LIN-1721",
+        "flight-companion-session-2026-08-02.md",
+        "LIN-1841 · 1842 · 1843 · 1844"
+      ]
+    },
+    {
+      "id": "archive-4",
+      "theme": "light",
+      "element": "span.chip.rd",
+      "ratio": 2.94,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "curator's reading",
+        "curator's reading",
+        "same-day history"
+      ]
+    },
+    {
+      "id": "archive-4",
+      "theme": "light",
+      "element": "p.sig",
+      "ratio": 2.94,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "THE HARBOUR ARCHIVE · THE AUGUST WING · compiled b"
+      ]
+    },
+    {
+      "id": "archive-4",
+      "theme": "light",
+      "element": "p.ex-label",
+      "ratio": 3.07,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(255,254,251)",
+      "samples": [
+        "The story so far — for readers arriving at this wi",
+        "Provenance, first",
+        "The unredeemed ledger, restated · 23 August"
+      ]
+    },
+    {
+      "id": "archive-4",
+      "theme": "light",
+      "element": "span.chip.rd",
+      "ratio": 3.07,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(255,254,251)",
+      "samples": [
+        "orientation — the evidence starts below",
+        "curator's readings marked with this dashed chip"
+      ]
+    },
+    {
+      "id": "archive-4",
+      "theme": "light",
+      "element": "span.chip.ev",
+      "ratio": 3.07,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(255,254,251)",
+      "samples": [
+        "git log · unshallowed",
+        "/kpis 2026-08-23T14:54Z",
+        "LIN-5 · verified 23 Aug"
+      ]
+    },
+    {
+      "id": "archive-4",
+      "theme": "light",
+      "element": "div.specimen-label",
+      "ratio": 3.07,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(255,254,251)",
+      "samples": [
+        "Specimen · the chronicle's cast list, first entry",
+        "Specimen · the ticket's own words (LIN-2114) on th",
+        "Specimen · the guest's closing line"
+      ]
+    },
+    {
+      "id": "archive-4",
+      "theme": "light",
+      "element": "p.fig-eyebrow",
+      "ratio": 3.07,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(255,254,251)",
+      "samples": [
+        "Fig. F · The instruments, continued",
+        "Fig. G · The new instrument"
+      ]
+    },
+    {
+      "id": "archive-4",
+      "theme": "light",
+      "element": "p.fig-foot",
+      "ratio": 3.07,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(255,254,251)",
+      "samples": [
+        "Rule: author date, true UTC-midnight month boundar",
+        "Source: the public instrument page's 30-day outcom"
+      ]
+    },
+    {
+      "id": "archive-4",
+      "theme": "light",
+      "element": "span",
+      "ratio": 3.07,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(255,254,251)",
+      "samples": [
+        "TZ=UTC git log --date=format-local:'%Y-%m'",
+        "/kpis"
+      ]
+    },
+    {
+      "id": "archive-4",
+      "theme": "light",
+      "element": "em",
+      "ratio": 3.07,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(255,254,251)",
+      "samples": [
+        "not"
+      ]
+    },
+    {
+      "id": "archive-4",
+      "theme": "light",
+      "element": "span.chip.repo-d",
+      "ratio": 3.82,
+      "color": "rgb(187, 95, 16)",
+      "bg": "rgb(248,237,224)",
+      "samples": [
+        "dispatcher",
+        "dispatcher"
+      ]
+    },
+    {
+      "id": "archive-4",
+      "theme": "light",
+      "element": "span.chip.repo-h",
+      "ratio": 4.49,
+      "color": "rgb(11, 111, 184)",
+      "bg": "rgb(227,238,248)",
+      "samples": [
+        "doctrine",
+        "doctrine",
+        "Harbour"
+      ]
+    },
+    {
+      "id": "archive-4",
+      "theme": "dark",
+      "element": "p.ex-label",
+      "ratio": 3.52,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(27,33,42)",
+      "samples": [
+        "The story so far — for readers arriving at this wi",
+        "Provenance, first",
+        "The unredeemed ledger, restated · 23 August"
+      ]
+    },
+    {
+      "id": "archive-4",
+      "theme": "dark",
+      "element": "span.chip.rd",
+      "ratio": 3.52,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(27,33,42)",
+      "samples": [
+        "orientation — the evidence starts below",
+        "curator's readings marked with this dashed chip"
+      ]
+    },
+    {
+      "id": "archive-4",
+      "theme": "dark",
+      "element": "span.chip.ev",
+      "ratio": 3.52,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(27,33,42)",
+      "samples": [
+        "git log · unshallowed",
+        "/kpis 2026-08-23T14:54Z",
+        "LIN-5 · verified 23 Aug"
+      ]
+    },
+    {
+      "id": "archive-4",
+      "theme": "dark",
+      "element": "div.specimen-label",
+      "ratio": 3.52,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(27,33,42)",
+      "samples": [
+        "Specimen · the chronicle's cast list, first entry",
+        "Specimen · the ticket's own words (LIN-2114) on th",
+        "Specimen · the guest's closing line"
+      ]
+    },
+    {
+      "id": "archive-4",
+      "theme": "dark",
+      "element": "p.fig-eyebrow",
+      "ratio": 3.52,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(27,33,42)",
+      "samples": [
+        "Fig. F · The instruments, continued",
+        "Fig. G · The new instrument"
+      ]
+    },
+    {
+      "id": "archive-4",
+      "theme": "dark",
+      "element": "p.fig-foot",
+      "ratio": 3.52,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(27,33,42)",
+      "samples": [
+        "Rule: author date, true UTC-midnight month boundar",
+        "Source: the public instrument page's 30-day outcom"
+      ]
+    },
+    {
+      "id": "archive-4",
+      "theme": "dark",
+      "element": "span",
+      "ratio": 3.52,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(27,33,42)",
+      "samples": [
+        "TZ=UTC git log --date=format-local:'%Y-%m'",
+        "/kpis"
+      ]
+    },
+    {
+      "id": "archive-4",
+      "theme": "dark",
+      "element": "em",
+      "ratio": 3.52,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(27,33,42)",
+      "samples": [
+        "not"
+      ]
+    },
+    {
+      "id": "archive-4",
+      "theme": "dark",
+      "element": "p.mast-rule",
+      "ratio": 3.87,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(20,24,30)",
+      "samples": [
+        "Gallery VII–VIII ─── 28 Jul 2026 ├──────────┤ 23 A"
+      ]
+    },
+    {
+      "id": "archive-4",
+      "theme": "dark",
+      "element": "span.chip.ev",
+      "ratio": 3.87,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(20,24,30)",
+      "samples": [
+        "LIN-1721",
+        "flight-companion-session-2026-08-02.md",
+        "LIN-1841 · 1842 · 1843 · 1844"
+      ]
+    },
+    {
+      "id": "archive-4",
+      "theme": "dark",
+      "element": "span.chip.rd",
+      "ratio": 3.87,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(20,24,30)",
+      "samples": [
+        "curator's reading",
+        "curator's reading",
+        "same-day history"
+      ]
+    },
+    {
+      "id": "archive-4",
+      "theme": "dark",
+      "element": "p.sig",
+      "ratio": 3.87,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(20,24,30)",
+      "samples": [
+        "THE HARBOUR ARCHIVE · THE AUGUST WING · compiled b"
+      ]
+    },
+    {
+      "id": "archive-4",
+      "theme": "dark",
+      "element": "span.chip.repo-h",
+      "ratio": 4.48,
+      "color": "rgb(63, 150, 221)",
+      "bg": "rgb(29,44,59)",
+      "samples": [
+        "doctrine",
+        "doctrine",
+        "Harbour"
+      ]
+    },
+    {
+      "id": "archive-5",
+      "theme": "light",
+      "element": "span.num",
+      "ratio": 2.94,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "Part one",
+        "Part two",
+        "Part three"
+      ]
+    },
+    {
+      "id": "archive-5",
+      "theme": "light",
+      "element": "p.foot",
+      "ratio": 2.94,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "Harbour Archive · document 5 · filed 2026-09-05 · "
+      ]
+    },
+    {
+      "id": "archive-5",
+      "theme": "light",
+      "element": "span.lever",
+      "ratio": 4.19,
+      "color": "rgb(187, 95, 16)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "Lever one · uptime",
+        "Lever two · context",
+        "Lever three · price"
+      ]
+    },
+    {
+      "id": "archive-5",
+      "theme": "dark",
+      "element": "span.num",
+      "ratio": 3.87,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(20,24,30)",
+      "samples": [
+        "Part one",
+        "Part two",
+        "Part three"
+      ]
+    },
+    {
+      "id": "archive-5",
+      "theme": "dark",
+      "element": "p.foot",
+      "ratio": 3.87,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(20,24,30)",
+      "samples": [
+        "Harbour Archive · document 5 · filed 2026-09-05 · "
+      ]
+    },
+    {
+      "id": "archive-6",
+      "theme": "light",
+      "element": "span.glyph",
+      "ratio": 3.74,
+      "color": "rgb(13, 148, 136)",
+      "bg": "rgb(255,255,255)",
+      "samples": [
+        "├─",
+        "├─",
+        "├─"
+      ]
+    },
+    {
+      "id": "archive-7",
+      "theme": "light",
+      "element": "span.sep",
+      "ratio": 2.94,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "·",
+        "·",
+        "·"
+      ]
+    },
+    {
+      "id": "archive-7",
+      "theme": "light",
+      "element": "dt",
+      "ratio": 2.94,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "Version",
+        "Authors",
+        "Status"
+      ]
+    },
+    {
+      "id": "archive-7",
+      "theme": "light",
+      "element": "p.foot",
+      "ratio": 2.94,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "Harbour Archive · document 7 · filed 2026-09-22 · "
+      ]
+    },
+    {
+      "id": "archive-7",
+      "theme": "light",
+      "element": "span.num.sec",
+      "ratio": 4.19,
+      "color": "rgb(187, 95, 16)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "1",
+        "2",
+        "3"
+      ]
+    },
+    {
+      "id": "archive-7",
+      "theme": "light",
+      "element": "span.num",
+      "ratio": 4.19,
+      "color": "rgb(187, 95, 16)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "Sources",
+        "Beyond",
+        "Next"
+      ]
+    },
+    {
+      "id": "archive-7",
+      "theme": "light",
+      "element": "span.rn",
+      "ratio": 4.19,
+      "color": "rgb(187, 95, 16)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "1",
+        "2",
+        "3"
+      ]
+    },
+    {
+      "id": "archive-7",
+      "theme": "light",
+      "element": "code",
+      "ratio": 4.46,
+      "color": "rgb(11, 111, 184)",
+      "bg": "rgb(238,236,229)",
+      "samples": [
+        "proposals.md",
+        "developer-adoption-ladder.md",
+        "what-lowers-the-verification-cost.md"
+      ]
+    },
+    {
+      "id": "archive-7",
+      "theme": "light",
+      "element": "a",
+      "ratio": 4.49,
+      "color": "rgb(11, 111, 184)",
+      "bg": "rgb(227,238,248)",
+      "samples": [
+        "1",
+        "2",
+        "3"
+      ]
+    },
+    {
+      "id": "archive-7",
+      "theme": "dark",
+      "element": "span.sep",
+      "ratio": 3.87,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(20,24,30)",
+      "samples": [
+        "·",
+        "·",
+        "·"
+      ]
+    },
+    {
+      "id": "archive-7",
+      "theme": "dark",
+      "element": "dt",
+      "ratio": 3.87,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(20,24,30)",
+      "samples": [
+        "Version",
+        "Authors",
+        "Status"
+      ]
+    },
+    {
+      "id": "archive-7",
+      "theme": "dark",
+      "element": "p.foot",
+      "ratio": 3.87,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(20,24,30)",
+      "samples": [
+        "Harbour Archive · document 7 · filed 2026-09-22 · "
+      ]
+    },
+    {
+      "id": "archive-8",
+      "theme": "light",
+      "element": "span.when",
+      "ratio": 2.94,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "28–29 September",
+        "The curve",
+        "Who wakes whom"
+      ]
+    },
+    {
+      "id": "archive-8",
+      "theme": "light",
+      "element": "s",
+      "ratio": 2.94,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "2.0×",
+        "9.0",
+        "19%"
+      ]
+    },
+    {
+      "id": "archive-8",
+      "theme": "light",
+      "element": "p.foot",
+      "ratio": 2.94,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "Harbour Archive · document 8 · filed 2026-10-01 · "
+      ]
+    },
+    {
+      "id": "archive-8",
+      "theme": "light",
+      "element": "td.v.up",
+      "ratio": 4.19,
+      "color": "rgb(187, 95, 16)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "2.5×"
+      ]
+    },
+    {
+      "id": "archive-8",
+      "theme": "dark",
+      "element": "span.when",
+      "ratio": 3.87,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(20,24,30)",
+      "samples": [
+        "28–29 September",
+        "The curve",
+        "Who wakes whom"
+      ]
+    },
+    {
+      "id": "archive-8",
+      "theme": "dark",
+      "element": "s",
+      "ratio": 3.87,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(20,24,30)",
+      "samples": [
+        "2.0×",
+        "9.0",
+        "19%"
+      ]
+    },
+    {
+      "id": "archive-8",
+      "theme": "dark",
+      "element": "p.foot",
+      "ratio": 3.87,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(20,24,30)",
+      "samples": [
+        "Harbour Archive · document 8 · filed 2026-10-01 · "
+      ]
+    },
+    {
+      "id": "archive-9",
+      "theme": "light",
+      "element": "span.when",
+      "ratio": 2.94,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "26 September",
+        "29 September – 1 October",
+        "2–3 October"
+      ]
+    },
+    {
+      "id": "archive-9",
+      "theme": "light",
+      "element": "p.foot",
+      "ratio": 2.94,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "Harbour Archive · document 9 · filed 2026-10-10 · "
+      ]
+    },
+    {
+      "id": "archive-9",
+      "theme": "light",
+      "element": "span.d",
+      "ratio": 3.07,
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(255,254,251)",
+      "samples": [
+        "30 Sep",
+        "1 Oct",
+        "3 Oct"
+      ]
+    },
+    {
+      "id": "archive-9",
+      "theme": "light",
+      "element": "b",
+      "ratio": 4.19,
+      "color": "rgb(187, 95, 16)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "Keep",
+        "Keep",
+        "Keep"
+      ]
+    },
+    {
+      "id": "archive-9",
+      "theme": "light",
+      "element": "span.n",
+      "ratio": 4.19,
+      "color": "rgb(187, 95, 16)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "1",
+        "2",
+        "3"
+      ]
+    },
+    {
+      "id": "archive-9",
+      "theme": "dark",
+      "element": "span.d",
+      "ratio": 3.52,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(27,33,42)",
+      "samples": [
+        "30 Sep",
+        "1 Oct",
+        "3 Oct"
+      ]
+    },
+    {
+      "id": "archive-9",
+      "theme": "dark",
+      "element": "span.when",
+      "ratio": 3.87,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(20,24,30)",
+      "samples": [
+        "26 September",
+        "29 September – 1 October",
+        "2–3 October"
+      ]
+    },
+    {
+      "id": "archive-9",
+      "theme": "dark",
+      "element": "p.foot",
+      "ratio": 3.87,
+      "color": "rgb(109, 118, 130)",
+      "bg": "rgb(20,24,30)",
+      "samples": [
+        "Harbour Archive · document 9 · filed 2026-10-10 · "
+      ]
+    },
+    {
+      "id": "archive-999",
+      "theme": "light",
+      "element": "a.login-button",
+      "ratio": 3.74,
+      "color": "rgb(255, 255, 255)",
+      "bg": "rgb(13,148,136)",
+      "samples": [
+        "Go back"
+      ]
+    }
+  ],
+  "summary": {
+    "signOffRows": [
+      "archive-1 light p.sig 2.94:1",
+      "archive-1 light p.fig-foot 3.07:1",
+      "archive-1 dark p.fig-foot 3.52:1",
+      "archive-1 dark p.sig 3.87:1",
+      "archive-2 light p.sig 2.94:1",
+      "archive-2 light p.fig-foot 3.07:1",
+      "archive-2 dark p.fig-foot 3.52:1",
+      "archive-2 dark p.sig 3.87:1",
+      "archive-4 light p.sig 2.94:1",
+      "archive-4 light p.fig-foot 3.07:1",
+      "archive-4 dark p.fig-foot 3.52:1",
+      "archive-4 dark p.sig 3.87:1",
+      "archive-5 light p.foot 2.94:1",
+      "archive-5 dark p.foot 3.87:1",
+      "archive-7 light p.foot 2.94:1",
+      "archive-7 dark p.foot 3.87:1",
+      "archive-8 light p.foot 2.94:1",
+      "archive-8 dark p.foot 3.87:1",
+      "archive-9 light p.foot 2.94:1",
+      "archive-9 dark p.foot 3.87:1"
+    ],
+    "anyGroupBelow": 115
+  }
+}

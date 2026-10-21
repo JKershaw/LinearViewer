@@ -1,0 +1,196 @@
+{
+  "id": "a1",
+  "base": "http://localhost:3199",
+  "head": "b901efab",
+  "question": "title drift: \"- Projects\" suffix and bare titles",
+  "titles": [
+    {
+      "name": "landing",
+      "status": 200,
+      "title": "Harbour — keep human intent in command of AI execution"
+    },
+    {
+      "name": "library",
+      "status": 200,
+      "title": "Library - Harbour"
+    },
+    {
+      "name": "guest-404",
+      "status": 404,
+      "title": "Not Found - Projects"
+    },
+    {
+      "name": "email-signin",
+      "status": 200,
+      "title": "Sign in with email - Harbour"
+    },
+    {
+      "name": "kpis-public",
+      "status": 200,
+      "title": "KPIs - Harbour"
+    },
+    {
+      "name": "ship-public",
+      "status": 200,
+      "title": "Ship"
+    },
+    {
+      "name": "swim-public",
+      "status": 200,
+      "title": "Swim - Lanes"
+    },
+    {
+      "name": "swipe-public",
+      "status": 200,
+      "title": "Swipe - LV-2 The control plane for your coding agents"
+    },
+    {
+      "name": "templates",
+      "status": 200,
+      "title": "Templates - Harbour"
+    },
+    {
+      "name": "styleguide",
+      "status": 200,
+      "title": "Style Guide - Harbour"
+    },
+    {
+      "name": "terms",
+      "status": 200,
+      "title": "Terms of Service - Harbour"
+    },
+    {
+      "name": "privacy",
+      "status": 200,
+      "title": "Privacy Policy - Harbour"
+    },
+    {
+      "name": "ws-tree",
+      "status": 200,
+      "title": "Test Workspace - Projects"
+    },
+    {
+      "name": "ws/settings",
+      "status": 200,
+      "title": "Test Workspace - Settings"
+    },
+    {
+      "name": "ws/dispatch",
+      "status": 200,
+      "title": "Test Workspace - Dispatch"
+    },
+    {
+      "name": "ws/proxy",
+      "status": 200,
+      "title": "Test Workspace - Proxy"
+    },
+    {
+      "name": "ws/roadmap",
+      "status": 200,
+      "title": "Roadmap - Test Workspace"
+    },
+    {
+      "name": "ws/kpis",
+      "status": 200,
+      "title": "Test Workspace - KPIs"
+    },
+    {
+      "name": "ws/runner",
+      "status": 200,
+      "title": "Run on my machine"
+    },
+    {
+      "name": "ws/ship",
+      "status": 200,
+      "title": "Ship"
+    },
+    {
+      "name": "ws/swim",
+      "status": 200,
+      "title": "Swim - Lanes"
+    },
+    {
+      "name": "ws/swipe",
+      "status": 200,
+      "title": "Swipe - TEST-13 Login fails with special characters in password"
+    },
+    {
+      "name": "ws/audit",
+      "status": 200,
+      "title": "Test Workspace - Operator Dashboard"
+    },
+    {
+      "name": "ws/prompts",
+      "status": 200,
+      "title": "Test Workspace - Prompts"
+    },
+    {
+      "name": "ws/collective",
+      "status": 200,
+      "title": "Collective - Experimental"
+    },
+    {
+      "name": "ws/observation",
+      "status": 200,
+      "title": "Observation"
+    },
+    {
+      "name": "ws/live-console",
+      "status": 200,
+      "title": "Live Console - Experimental"
+    },
+    {
+      "name": "ws/next-run",
+      "status": 200,
+      "title": "Suggested Next Run - Experimental"
+    },
+    {
+      "name": "ws/ship-biscuit",
+      "status": 200,
+      "title": "The Ship's Biscuit - Experimental"
+    },
+    {
+      "name": "ws/flight-companion",
+      "status": 200,
+      "title": "Flight Companion - Experimental"
+    },
+    {
+      "name": "ws/passage-planner",
+      "status": 200,
+      "title": "Passage Planner - Experimental"
+    }
+  ],
+  "summary": {
+    "endsWithProjects": [
+      "guest-404",
+      "ws-tree"
+    ],
+    "bareOrSuffixless": [
+      "landing: Harbour — keep human intent in command of AI execution",
+      "ship-public: Ship",
+      "ws/runner: Run on my machine",
+      "ws/ship: Ship",
+      "ws/observation: Observation"
+    ],
+    "guest404": {
+      "name": "guest-404",
+      "path": "/t/not-a-token",
+      "width": 1400,
+      "status": 404,
+      "title": "Not Found - Projects",
+      "finalPath": "/t/not-a-token",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      },
+      "brandMarks": 1,
+      "nav": [],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    }
+  }
+}

@@ -1,0 +1,1796 @@
+{
+  "id": "a-items-routes",
+  "base": "http://localhost:3199",
+  "head": "b901efab",
+  "question": "A1 title drift, A4 nav order, A5 mono prose, A10 internal ids, A13/A14 wordmark at 390",
+  "rows": [
+    {
+      "name": "landing",
+      "path": "/",
+      "width": 1400,
+      "status": 200,
+      "title": "Harbour — keep human intent in command of AI execution",
+      "finalPath": "/",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 0,
+      "shellH1": {
+        "text": "harbour.cat",
+        "font": "\"JetBrains Mono\", \"SF Mono\", \"",
+        "px": "44px"
+      },
+      "brandMarks": 0,
+      "nav": [],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "landing",
+      "path": "/",
+      "width": 390,
+      "status": 200,
+      "title": "Harbour — keep human intent in command of AI execution",
+      "finalPath": "/",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 0,
+      "shellH1": {
+        "text": "harbour.cat",
+        "font": "\"JetBrains Mono\", \"SF Mono\", \"",
+        "px": "36px"
+      },
+      "brandMarks": 0,
+      "nav": [],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "library",
+      "path": "/library",
+      "width": 1400,
+      "status": 200,
+      "title": "Library - Harbour",
+      "finalPath": "/library",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      },
+      "brandMarks": 1,
+      "nav": [],
+      "ticketIds": [
+        "LIN-1301",
+        "LIN-2925",
+        "LIN-1811"
+      ],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "library",
+      "path": "/library",
+      "width": 390,
+      "status": 200,
+      "title": "Library - Harbour",
+      "finalPath": "/library",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      },
+      "brandMarks": 1,
+      "nav": [],
+      "ticketIds": [
+        "LIN-1301",
+        "LIN-2925",
+        "LIN-1811"
+      ],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "guest-404",
+      "path": "/t/not-a-token",
+      "width": 1400,
+      "status": 404,
+      "title": "Not Found - Projects",
+      "finalPath": "/t/not-a-token",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      },
+      "brandMarks": 1,
+      "nav": [],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "guest-404",
+      "path": "/t/not-a-token",
+      "width": 390,
+      "status": 404,
+      "title": "Not Found - Projects",
+      "finalPath": "/t/not-a-token",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      },
+      "brandMarks": 1,
+      "nav": [],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "email-signin",
+      "path": "/auth/email",
+      "width": 1400,
+      "status": 200,
+      "title": "Sign in with email - Harbour",
+      "finalPath": "/auth/email",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      },
+      "brandMarks": 1,
+      "nav": [],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "email-signin",
+      "path": "/auth/email",
+      "width": 390,
+      "status": 200,
+      "title": "Sign in with email - Harbour",
+      "finalPath": "/auth/email",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      },
+      "brandMarks": 1,
+      "nav": [],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "kpis-public",
+      "path": "/kpis",
+      "width": 1400,
+      "status": 200,
+      "title": "KPIs - Harbour",
+      "finalPath": "/kpis",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      },
+      "brandMarks": 1,
+      "nav": [],
+      "ticketIds": [],
+      "monoProse": [
+        "\"JetBrains Mono\", \"S 12.8px \"Landed rate is done ÷ (done + failed + aborted) fo\"",
+        "\"JetBrains Mono\", \"S 12.8px \"A week with nothing resolved has no rate, so the l\"",
+        "\"JetBrains Mono\", \"S 12.8px \"Each task counts once, in the week it started, wit\""
+      ],
+      "monoProseCount": 9
+    },
+    {
+      "name": "kpis-public",
+      "path": "/kpis",
+      "width": 390,
+      "status": 200,
+      "title": "KPIs - Harbour",
+      "finalPath": "/kpis",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      },
+      "brandMarks": 1,
+      "nav": [],
+      "ticketIds": [],
+      "monoProse": [
+        "\"JetBrains Mono\", \"S 12.8px \"Landed rate is done ÷ (done + failed + aborted) fo\"",
+        "\"JetBrains Mono\", \"S 12.8px \"A week with nothing resolved has no rate, so the l\"",
+        "\"JetBrains Mono\", \"S 12.8px \"Each task counts once, in the week it started, wit\""
+      ],
+      "monoProseCount": 9
+    },
+    {
+      "name": "ship-public",
+      "path": "/ship",
+      "width": 1400,
+      "status": 200,
+      "title": "Ship",
+      "finalPath": "/ship",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 0,
+      "shellH1": null,
+      "brandMarks": 0,
+      "nav": [
+        "← projects",
+        "Sign in →",
+        "GitHub →",
+        "Jira →",
+        "Email →"
+      ],
+      "ticketIds": [
+        "LV-10",
+        "LV-11",
+        "LV-12",
+        "LV-13",
+        "LV-14",
+        "LV-15",
+        "LV-16",
+        "LV-17"
+      ],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "ship-public",
+      "path": "/ship",
+      "width": 390,
+      "status": 200,
+      "title": "Ship",
+      "finalPath": "/ship",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 0,
+      "shellH1": null,
+      "brandMarks": 0,
+      "nav": [
+        "← projects",
+        "Sign in →",
+        "GitHub →",
+        "Jira →",
+        "Email →"
+      ],
+      "ticketIds": [
+        "LV-10",
+        "LV-11",
+        "LV-12",
+        "LV-13",
+        "LV-14",
+        "LV-15",
+        "LV-16",
+        "LV-17"
+      ],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "swim-public",
+      "path": "/swim",
+      "width": 1400,
+      "status": 200,
+      "title": "Swim - Lanes",
+      "finalPath": "/swim",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 0,
+      "shellH1": {
+        "text": "Swim",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      },
+      "brandMarks": 0,
+      "nav": [
+        "← projects",
+        "Sign in →",
+        "GitHub →",
+        "Jira →",
+        "Email →"
+      ],
+      "ticketIds": [
+        "LV-10",
+        "LV-11",
+        "LV-12",
+        "LV-13",
+        "LV-14",
+        "LV-15",
+        "LV-16",
+        "LV-17"
+      ],
+      "monoProse": [
+        "\"JetBrains Mono\", \"S 11.5px \"AI made writing code cheap—it didn't make knowing \"",
+        "\"JetBrains Mono\", \"S 11.5px \"Explore the backlog as a collapsible tree, one tas\"",
+        "\"JetBrains Mono\", \"S 11.5px \"Watch your agent runs live as they pick up work, r\""
+      ],
+      "monoProseCount": 8
+    },
+    {
+      "name": "swim-public",
+      "path": "/swim",
+      "width": 390,
+      "status": 200,
+      "title": "Swim - Lanes",
+      "finalPath": "/swim",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 0,
+      "shellH1": {
+        "text": "Swim",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      },
+      "brandMarks": 0,
+      "nav": [
+        "← projects",
+        "Sign in →",
+        "GitHub →",
+        "Jira →",
+        "Email →"
+      ],
+      "ticketIds": [
+        "LV-10",
+        "LV-11",
+        "LV-12",
+        "LV-13",
+        "LV-14",
+        "LV-15",
+        "LV-16",
+        "LV-17"
+      ],
+      "monoProse": [
+        "\"JetBrains Mono\", \"S 11.5px \"AI made writing code cheap—it didn't make knowing \"",
+        "\"JetBrains Mono\", \"S 11.5px \"Explore the backlog as a collapsible tree, one tas\"",
+        "\"JetBrains Mono\", \"S 11.5px \"Watch your agent runs live as they pick up work, r\""
+      ],
+      "monoProseCount": 8
+    },
+    {
+      "name": "swipe-public",
+      "path": "/swipe",
+      "width": 1400,
+      "status": 200,
+      "title": "Swipe - LV-2 The control plane for your coding agents",
+      "finalPath": "/swipe/LV-2",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 0,
+      "shellH1": {
+        "text": "Swipe",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "26px"
+      },
+      "brandMarks": 0,
+      "nav": [
+        "← projects",
+        "Sign in →",
+        "GitHub →",
+        "Jira →",
+        "Email →"
+      ],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "swipe-public",
+      "path": "/swipe",
+      "width": 390,
+      "status": 200,
+      "title": "Swipe - LV-2 The control plane for your coding agents",
+      "finalPath": "/swipe/LV-2",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 0,
+      "shellH1": {
+        "text": "Swipe",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      },
+      "brandMarks": 0,
+      "nav": [
+        "← projects",
+        "Sign in →",
+        "GitHub →",
+        "Jira →",
+        "Email →"
+      ],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "templates",
+      "path": "/templates",
+      "width": 1400,
+      "status": 200,
+      "title": "Templates - Harbour",
+      "finalPath": "/templates",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      },
+      "brandMarks": 1,
+      "nav": [],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "templates",
+      "path": "/templates",
+      "width": 390,
+      "status": 200,
+      "title": "Templates - Harbour",
+      "finalPath": "/templates",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      },
+      "brandMarks": 1,
+      "nav": [],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "styleguide",
+      "path": "/styleguide",
+      "width": 1400,
+      "status": 200,
+      "title": "Style Guide - Harbour",
+      "finalPath": "/styleguide",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      },
+      "brandMarks": 1,
+      "nav": [],
+      "ticketIds": [
+        "LIN-785",
+        "LIN-461",
+        "LIN-462",
+        "LIN-463",
+        "LIN-468",
+        "LIN-465",
+        "LIN-782",
+        "LIN-850",
+        "LIN-466",
+        "LIN-786",
+        "LIN-783"
+      ],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "styleguide",
+      "path": "/styleguide",
+      "width": 390,
+      "status": 200,
+      "title": "Style Guide - Harbour",
+      "finalPath": "/styleguide",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      },
+      "brandMarks": 1,
+      "nav": [],
+      "ticketIds": [
+        "LIN-785",
+        "LIN-461",
+        "LIN-462",
+        "LIN-463",
+        "LIN-468",
+        "LIN-465",
+        "LIN-782",
+        "LIN-850",
+        "LIN-466",
+        "LIN-786",
+        "LIN-783"
+      ],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "terms",
+      "path": "/terms",
+      "width": 1400,
+      "status": 200,
+      "title": "Terms of Service - Harbour",
+      "finalPath": "/terms",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      },
+      "brandMarks": 1,
+      "nav": [],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "terms",
+      "path": "/terms",
+      "width": 390,
+      "status": 200,
+      "title": "Terms of Service - Harbour",
+      "finalPath": "/terms",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      },
+      "brandMarks": 1,
+      "nav": [],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "privacy",
+      "path": "/privacy",
+      "width": 1400,
+      "status": 200,
+      "title": "Privacy Policy - Harbour",
+      "finalPath": "/privacy",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      },
+      "brandMarks": 1,
+      "nav": [],
+      "ticketIds": [],
+      "monoProse": [
+        "\"JetBrains Mono\", \"S 16px \"The text of the tasks you work on: titles, descrip\"",
+        "\"JetBrains Mono\", \"S 16px \"The prompts Harbour writes for you and the AI’s fu\"",
+        "\"JetBrains Mono\", \"S 16px \"The history of each run: the prompt, the agent’s p\""
+      ],
+      "monoProseCount": 15
+    },
+    {
+      "name": "privacy",
+      "path": "/privacy",
+      "width": 390,
+      "status": 200,
+      "title": "Privacy Policy - Harbour",
+      "finalPath": "/privacy",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      },
+      "brandMarks": 1,
+      "nav": [],
+      "ticketIds": [],
+      "monoProse": [
+        "\"JetBrains Mono\", \"S 13px \"The text of the tasks you work on: titles, descrip\"",
+        "\"JetBrains Mono\", \"S 13px \"The prompts Harbour writes for you and the AI’s fu\"",
+        "\"JetBrains Mono\", \"S 13px \"The history of each run: the prompt, the agent’s p\""
+      ],
+      "monoProseCount": 15
+    },
+    {
+      "name": "ws-tree",
+      "path": "/workspace/test-workspace/",
+      "width": 1400,
+      "status": 200,
+      "title": "Test Workspace - Projects",
+      "finalPath": "/workspace/test-workspace/",
+      "wordmarkVisible": 1,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "Test Workspace",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "harbour.cat",
+        "search",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "kpis",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey",
+        "roadmap",
+        "dispatch"
+      ],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "ws-tree",
+      "path": "/workspace/test-workspace/",
+      "width": 390,
+      "status": 200,
+      "title": "Test Workspace - Projects",
+      "finalPath": "/workspace/test-workspace/",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "Test Workspace",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "search",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "kpis"
+      ],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "ws/settings",
+      "path": "/workspace/test-workspace/settings/",
+      "width": 1400,
+      "status": 200,
+      "title": "Test Workspace - Settings",
+      "finalPath": "/workspace/test-workspace/settings/",
+      "wordmarkVisible": 1,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "Settings",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "harbour.cat",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "kpis",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey",
+        "roadmap",
+        "dispatch"
+      ],
+      "ticketIds": [],
+      "monoProse": [
+        "\"JetBrains Mono\", \"S 16px \"This model is used for all LLM calls in this works\""
+      ],
+      "monoProseCount": 1
+    },
+    {
+      "name": "ws/settings",
+      "path": "/workspace/test-workspace/settings/",
+      "width": 390,
+      "status": 200,
+      "title": "Test Workspace - Settings",
+      "finalPath": "/workspace/test-workspace/settings/",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "Settings",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "kpis"
+      ],
+      "ticketIds": [],
+      "monoProse": [
+        "\"JetBrains Mono\", \"S 13px \"This model is used for all LLM calls in this works\""
+      ],
+      "monoProseCount": 1
+    },
+    {
+      "name": "ws/dispatch",
+      "path": "/workspace/test-workspace/dispatch/",
+      "width": 1400,
+      "status": 200,
+      "title": "Test Workspace - Dispatch",
+      "finalPath": "/workspace/test-workspace/dispatch/",
+      "wordmarkVisible": 1,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "Dispatch",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "harbour.cat",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "kpis",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey",
+        "roadmap"
+      ],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "ws/dispatch",
+      "path": "/workspace/test-workspace/dispatch/",
+      "width": 390,
+      "status": 200,
+      "title": "Test Workspace - Dispatch",
+      "finalPath": "/workspace/test-workspace/dispatch/",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "Dispatch",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "kpis"
+      ],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "ws/proxy",
+      "path": "/workspace/test-workspace/proxy/",
+      "width": 1400,
+      "status": 200,
+      "title": "Test Workspace - Proxy",
+      "finalPath": "/workspace/test-workspace/proxy/",
+      "wordmarkVisible": 1,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "Proxy",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "harbour.cat",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "kpis",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey",
+        "roadmap"
+      ],
+      "ticketIds": [
+        "LIN-123"
+      ],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "ws/proxy",
+      "path": "/workspace/test-workspace/proxy/",
+      "width": 390,
+      "status": 200,
+      "title": "Test Workspace - Proxy",
+      "finalPath": "/workspace/test-workspace/proxy/",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "Proxy",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "kpis"
+      ],
+      "ticketIds": [
+        "LIN-123"
+      ],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "ws/roadmap",
+      "path": "/workspace/test-workspace/roadmap/",
+      "width": 1400,
+      "status": 200,
+      "title": "Roadmap - Test Workspace",
+      "finalPath": "/workspace/test-workspace/roadmap/",
+      "wordmarkVisible": 1,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "Roadmap",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "22.4px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "harbour.cat",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "kpis",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey",
+        "dispatch"
+      ],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "ws/roadmap",
+      "path": "/workspace/test-workspace/roadmap/",
+      "width": 390,
+      "status": 200,
+      "title": "Roadmap - Test Workspace",
+      "finalPath": "/workspace/test-workspace/roadmap/",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "Roadmap",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "18.2px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "kpis"
+      ],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "ws/kpis",
+      "path": "/workspace/test-workspace/kpis/",
+      "width": 1400,
+      "status": 200,
+      "title": "Test Workspace - KPIs",
+      "finalPath": "/workspace/test-workspace/kpis/",
+      "wordmarkVisible": 1,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "KPIs",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "harbour.cat",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey",
+        "roadmap",
+        "dispatch"
+      ],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "ws/kpis",
+      "path": "/workspace/test-workspace/kpis/",
+      "width": 390,
+      "status": 200,
+      "title": "Test Workspace - KPIs",
+      "finalPath": "/workspace/test-workspace/kpis/",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "KPIs",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings"
+      ],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "ws/runner",
+      "path": "/workspace/test-workspace/runner/",
+      "width": 1400,
+      "status": 200,
+      "title": "Run on my machine",
+      "finalPath": "/workspace/test-workspace/runner/",
+      "wordmarkVisible": 1,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "Run on my machine",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "harbour.cat",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "kpis",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey",
+        "roadmap",
+        "dispatch",
+        "proxy"
+      ],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "ws/runner",
+      "path": "/workspace/test-workspace/runner/",
+      "width": 390,
+      "status": 200,
+      "title": "Run on my machine",
+      "finalPath": "/workspace/test-workspace/runner/",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "Run on my machine",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "kpis"
+      ],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "ws/ship",
+      "path": "/workspace/test-workspace/ship/",
+      "width": 1400,
+      "status": 200,
+      "title": "Ship",
+      "finalPath": "/workspace/test-workspace/ship/",
+      "wordmarkVisible": 1,
+      "wordmarkInDom": 1,
+      "shellH1": null,
+      "brandMarks": 2,
+      "nav": [
+        "harbour.cat",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "kpis",
+        "live console",
+        "ship journey",
+        "roadmap",
+        "dispatch",
+        "proxy",
+        "collective",
+        "task chat",
+        "next run",
+        "flight companion"
+      ],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "ws/ship",
+      "path": "/workspace/test-workspace/ship/",
+      "width": 390,
+      "status": 200,
+      "title": "Ship",
+      "finalPath": "/workspace/test-workspace/ship/",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 1,
+      "shellH1": null,
+      "brandMarks": 2,
+      "nav": [
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "kpis"
+      ],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "ws/swim",
+      "path": "/workspace/test-workspace/swim/",
+      "width": 1400,
+      "status": 200,
+      "title": "Swim - Lanes",
+      "finalPath": "/workspace/test-workspace/swim/",
+      "wordmarkVisible": 1,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "Swim",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "harbour.cat",
+        "tasks",
+        "swipe",
+        "observation",
+        "settings",
+        "kpis",
+        "live console",
+        "ship journey",
+        "roadmap",
+        "dispatch",
+        "proxy",
+        "collective",
+        "task chat",
+        "ship",
+        "next run",
+        "flight companion"
+      ],
+      "ticketIds": [],
+      "monoProse": [
+        "\"JetBrains Mono\", \"S 11.5px \"Extract auth logic into separate service for bette\"",
+        "\"JetBrains Mono\", \"S 11.5px \"Implement cursor-based pagination for the user lis\""
+      ],
+      "monoProseCount": 2
+    },
+    {
+      "name": "ws/swim",
+      "path": "/workspace/test-workspace/swim/",
+      "width": 390,
+      "status": 200,
+      "title": "Swim - Lanes",
+      "finalPath": "/workspace/test-workspace/swim/",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "Swim",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "tasks",
+        "swipe",
+        "observation",
+        "settings",
+        "kpis"
+      ],
+      "ticketIds": [],
+      "monoProse": [
+        "\"JetBrains Mono\", \"S 11.5px \"Extract auth logic into separate service for bette\"",
+        "\"JetBrains Mono\", \"S 11.5px \"Implement cursor-based pagination for the user lis\""
+      ],
+      "monoProseCount": 2
+    },
+    {
+      "name": "ws/swipe",
+      "path": "/workspace/test-workspace/swipe/",
+      "width": 1400,
+      "status": 200,
+      "title": "Swipe - TEST-13 Login fails with special characters in password",
+      "finalPath": "/workspace/test-workspace/swipe/TEST-13",
+      "wordmarkVisible": 1,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "Swipe",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "26px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "harbour.cat",
+        "tasks",
+        "swim",
+        "observation",
+        "settings",
+        "kpis",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey",
+        "roadmap",
+        "dispatch"
+      ],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "ws/swipe",
+      "path": "/workspace/test-workspace/swipe/",
+      "width": 390,
+      "status": 200,
+      "title": "Swipe - TEST-13 Login fails with special characters in password",
+      "finalPath": "/workspace/test-workspace/swipe/TEST-13",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "Swipe",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "tasks",
+        "swim",
+        "observation",
+        "settings",
+        "kpis"
+      ],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "ws/audit",
+      "path": "/workspace/test-workspace/audit/",
+      "width": 1400,
+      "status": 200,
+      "title": "Test Workspace - Operator Dashboard",
+      "finalPath": "/workspace/test-workspace/audit/",
+      "wordmarkVisible": 1,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "Operator Dashboard",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "harbour.cat",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "kpis",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey",
+        "roadmap",
+        "dispatch",
+        "proxy"
+      ],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "ws/audit",
+      "path": "/workspace/test-workspace/audit/",
+      "width": 390,
+      "status": 200,
+      "title": "Test Workspace - Operator Dashboard",
+      "finalPath": "/workspace/test-workspace/audit/",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "Operator Dashboard",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "kpis"
+      ],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "ws/prompts",
+      "path": "/workspace/test-workspace/prompts/",
+      "width": 1400,
+      "status": 200,
+      "title": "Test Workspace - Prompts",
+      "finalPath": "/workspace/test-workspace/prompts/",
+      "wordmarkVisible": 1,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "Prompts",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "harbour.cat",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "kpis",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey",
+        "roadmap",
+        "dispatch",
+        "proxy"
+      ],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "ws/prompts",
+      "path": "/workspace/test-workspace/prompts/",
+      "width": 390,
+      "status": 200,
+      "title": "Test Workspace - Prompts",
+      "finalPath": "/workspace/test-workspace/prompts/",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "Prompts",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "kpis"
+      ],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "ws/collective",
+      "path": "/workspace/test-workspace/collective/",
+      "width": 1400,
+      "status": 200,
+      "title": "Collective - Experimental",
+      "finalPath": "/workspace/test-workspace/collective/",
+      "wordmarkVisible": 1,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "Collective",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "harbour.cat",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "kpis",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey",
+        "roadmap"
+      ],
+      "ticketIds": [],
+      "monoProse": [
+        "\"JetBrains Mono\", \"S 13.6px \"⚗ Experimental — dispatches full Claude Code sessi\""
+      ],
+      "monoProseCount": 1
+    },
+    {
+      "name": "ws/collective",
+      "path": "/workspace/test-workspace/collective/",
+      "width": 390,
+      "status": 200,
+      "title": "Collective - Experimental",
+      "finalPath": "/workspace/test-workspace/collective/",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "Collective",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "kpis"
+      ],
+      "ticketIds": [],
+      "monoProse": [
+        "\"JetBrains Mono\", \"S 11.05px \"⚗ Experimental — dispatches full Claude Code sessi\""
+      ],
+      "monoProseCount": 1
+    },
+    {
+      "name": "ws/observation",
+      "path": "/workspace/test-workspace/observation/",
+      "width": 1400,
+      "status": 200,
+      "title": "Observation",
+      "finalPath": "/workspace/test-workspace/observation/",
+      "wordmarkVisible": 1,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "Observation ● live",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "22.4px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "harbour.cat",
+        "tasks",
+        "swipe",
+        "swim",
+        "settings",
+        "kpis",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey",
+        "roadmap",
+        "dispatch"
+      ],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "ws/observation",
+      "path": "/workspace/test-workspace/observation/",
+      "width": 390,
+      "status": 200,
+      "title": "Observation",
+      "finalPath": "/workspace/test-workspace/observation/",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "Observation ● live",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "22.4px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "tasks",
+        "swipe",
+        "swim",
+        "settings",
+        "kpis"
+      ],
+      "ticketIds": [],
+      "monoProse": [],
+      "monoProseCount": 0
+    },
+    {
+      "name": "ws/live-console",
+      "path": "/workspace/test-workspace/live-console/",
+      "width": 1400,
+      "status": 200,
+      "title": "Live Console - Experimental",
+      "finalPath": "/workspace/test-workspace/live-console/",
+      "wordmarkVisible": 1,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "Live Console",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "harbour.cat",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "kpis",
+        "flight companion",
+        "passage planner",
+        "ship's biscuit",
+        "ship journey"
+      ],
+      "ticketIds": [],
+      "monoProse": [
+        "\"JetBrains Mono\", \"S 13.12px \"○ all quiet — agents will appear here the moment t\""
+      ],
+      "monoProseCount": 1
+    },
+    {
+      "name": "ws/live-console",
+      "path": "/workspace/test-workspace/live-console/",
+      "width": 390,
+      "status": 200,
+      "title": "Live Console - Experimental",
+      "finalPath": "/workspace/test-workspace/live-console/",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "Live Console",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "kpis"
+      ],
+      "ticketIds": [],
+      "monoProse": [
+        "\"JetBrains Mono\", \"S 13.12px \"○ all quiet — agents will appear here the moment t\""
+      ],
+      "monoProseCount": 1
+    },
+    {
+      "name": "ws/next-run",
+      "path": "/workspace/test-workspace/next-run/",
+      "width": 1400,
+      "status": 200,
+      "title": "Suggested Next Run - Experimental",
+      "finalPath": "/workspace/test-workspace/next-run/",
+      "wordmarkVisible": 1,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "Suggested Next Run",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "harbour.cat",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "kpis",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey",
+        "roadmap"
+      ],
+      "ticketIds": [],
+      "monoProse": [
+        "\"JetBrains Mono\", \"S 13.6px \"⚗ Experimental — generate grounded goal options fo\"",
+        "\"JetBrains Mono\", \"S 13.6px \"○ click \"generate suggestions\" to get grounded goa\""
+      ],
+      "monoProseCount": 2
+    },
+    {
+      "name": "ws/next-run",
+      "path": "/workspace/test-workspace/next-run/",
+      "width": 390,
+      "status": 200,
+      "title": "Suggested Next Run - Experimental",
+      "finalPath": "/workspace/test-workspace/next-run/",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "Suggested Next Run",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "kpis"
+      ],
+      "ticketIds": [],
+      "monoProse": [
+        "\"JetBrains Mono\", \"S 11.05px \"⚗ Experimental — generate grounded goal options fo\"",
+        "\"JetBrains Mono\", \"S 11.05px \"○ click \"generate suggestions\" to get grounded goa\""
+      ],
+      "monoProseCount": 2
+    },
+    {
+      "name": "ws/ship-biscuit",
+      "path": "/workspace/test-workspace/ship-biscuit/",
+      "width": 1400,
+      "status": 200,
+      "title": "The Ship's Biscuit - Experimental",
+      "finalPath": "/workspace/test-workspace/ship-biscuit/",
+      "wordmarkVisible": 1,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "The Ship's Biscuit",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "harbour.cat",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "kpis",
+        "flight companion",
+        "passage planner",
+        "live console",
+        "ship journey"
+      ],
+      "ticketIds": [],
+      "monoProse": [
+        "\"JetBrains Mono\", \"S 16px \"○ no edition yet — press \"run the presses\" to gene\""
+      ],
+      "monoProseCount": 1
+    },
+    {
+      "name": "ws/ship-biscuit",
+      "path": "/workspace/test-workspace/ship-biscuit/",
+      "width": 390,
+      "status": 200,
+      "title": "The Ship's Biscuit - Experimental",
+      "finalPath": "/workspace/test-workspace/ship-biscuit/",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "The Ship's Biscuit",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "kpis"
+      ],
+      "ticketIds": [],
+      "monoProse": [
+        "\"JetBrains Mono\", \"S 13px \"○ no edition yet — press \"run the presses\" to gene\""
+      ],
+      "monoProseCount": 1
+    },
+    {
+      "name": "ws/flight-companion",
+      "path": "/workspace/test-workspace/flight-companion/",
+      "width": 1400,
+      "status": 200,
+      "title": "Flight Companion - Experimental",
+      "finalPath": "/workspace/test-workspace/flight-companion/",
+      "wordmarkVisible": 1,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "Flight Companion",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "harbour.cat",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "kpis",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey"
+      ],
+      "ticketIds": [],
+      "monoProse": [
+        "\"JetBrains Mono\", \"S 16px \"○ the companion checks in periodically while this \"",
+        "\"JetBrains Mono\", \"S 16px \"Say something in the chat above, or just leave the\"",
+        "\"JetBrains Mono\", \"S 16px \"When it proposes a follow-up, Approve to queue it \""
+      ],
+      "monoProseCount": 3
+    },
+    {
+      "name": "ws/flight-companion",
+      "path": "/workspace/test-workspace/flight-companion/",
+      "width": 390,
+      "status": 200,
+      "title": "Flight Companion - Experimental",
+      "finalPath": "/workspace/test-workspace/flight-companion/",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "Flight Companion",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "kpis"
+      ],
+      "ticketIds": [],
+      "monoProse": [
+        "\"JetBrains Mono\", \"S 13px \"○ the companion checks in periodically while this \"",
+        "\"JetBrains Mono\", \"S 13px \"Say something in the chat above, or just leave the\"",
+        "\"JetBrains Mono\", \"S 13px \"When it proposes a follow-up, Approve to queue it \""
+      ],
+      "monoProseCount": 3
+    },
+    {
+      "name": "ws/passage-planner",
+      "path": "/workspace/test-workspace/passage-planner/",
+      "width": 1400,
+      "status": 200,
+      "title": "Passage Planner - Experimental",
+      "finalPath": "/workspace/test-workspace/passage-planner/",
+      "wordmarkVisible": 1,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "Passage Planner",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "harbour.cat",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "kpis",
+        "flight companion",
+        "ship's biscuit",
+        "live console",
+        "ship journey"
+      ],
+      "ticketIds": [
+        "LIN-1849",
+        "LIN-1857"
+      ],
+      "monoProse": [
+        "\"JetBrains Mono\", \"S 16px \"Work through orientation, sizing, and proposal tog\""
+      ],
+      "monoProseCount": 1
+    },
+    {
+      "name": "ws/passage-planner",
+      "path": "/workspace/test-workspace/passage-planner/",
+      "width": 390,
+      "status": 200,
+      "title": "Passage Planner - Experimental",
+      "finalPath": "/workspace/test-workspace/passage-planner/",
+      "wordmarkVisible": 0,
+      "wordmarkInDom": 1,
+      "shellH1": {
+        "text": "Passage Planner",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      },
+      "brandMarks": 2,
+      "nav": [
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "kpis"
+      ],
+      "ticketIds": [
+        "LIN-1849",
+        "LIN-1857"
+      ],
+      "monoProse": [
+        "\"JetBrains Mono\", \"S 13px \"Work through orientation, sizing, and proposal tog\""
+      ],
+      "monoProseCount": 1
+    }
+  ]
+}
