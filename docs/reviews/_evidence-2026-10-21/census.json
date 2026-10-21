@@ -15,53 +15,6 @@
       "class": "page-get",
       "status": "excluded:oauth-hop-no-own-body"
     },
-    "email-signin": {
-      "id": "email-signin",
-      "class": "page-get",
-      "method": "route",
-      "isNew": true,
-      "themes": {
-        "light": {
-          "httpStatus": 200,
-          "finalUrl": "/auth/email",
-          "themeAssertion": {
-            "mode": "media",
-            "expected": "no theme-dark",
-            "actual": "",
-            "passed": true
-          },
-          "sampled": 5,
-          "groups": [
-            {
-              "element": "button.login-button",
-              "color": "rgb(255, 255, 255)",
-              "bg": "rgb(13,148,136)",
-              "ratio": 3.74,
-              "need": 4.5,
-              "fontSize": "16px",
-              "fontWeight": "400",
-              "count": 1,
-              "samples": [
-                "Email me a sign-in link"
-              ]
-            }
-          ]
-        },
-        "dark": {
-          "httpStatus": 200,
-          "finalUrl": "/auth/email",
-          "themeAssertion": {
-            "mode": "media-emulated (labelled)",
-            "htmlClass": "theme-dark",
-            "bodyBg": "rgb(22, 24, 29)",
-            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
-          },
-          "sampled": 5,
-          "groups": []
-        }
-      },
-      "status": "measured"
-    },
     "email-confirm": {
       "id": "email-confirm",
       "class": "page-get",
@@ -97,6 +50,53 @@
         "dark": {
           "httpStatus": 410,
           "finalUrl": "/auth/email/confirm",
+          "themeAssertion": {
+            "mode": "media-emulated (labelled)",
+            "htmlClass": "theme-dark",
+            "bodyBg": "rgb(22, 24, 29)",
+            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
+          },
+          "sampled": 5,
+          "groups": []
+        }
+      },
+      "status": "measured"
+    },
+    "email-signin": {
+      "id": "email-signin",
+      "class": "page-get",
+      "method": "route",
+      "isNew": true,
+      "themes": {
+        "light": {
+          "httpStatus": 200,
+          "finalUrl": "/auth/email",
+          "themeAssertion": {
+            "mode": "media",
+            "expected": "no theme-dark",
+            "actual": "",
+            "passed": true
+          },
+          "sampled": 5,
+          "groups": [
+            {
+              "element": "button.login-button",
+              "color": "rgb(255, 255, 255)",
+              "bg": "rgb(13,148,136)",
+              "ratio": 3.74,
+              "need": 4.5,
+              "fontSize": "16px",
+              "fontWeight": "400",
+              "count": 1,
+              "samples": [
+                "Email me a sign-in link"
+              ]
+            }
+          ]
+        },
+        "dark": {
+          "httpStatus": 200,
+          "finalUrl": "/auth/email",
           "themeAssertion": {
             "mode": "media-emulated (labelled)",
             "htmlClass": "theme-dark",
@@ -549,7 +549,7 @@
           "groups": []
         }
       },
-      "status": "measured"
+      "status": "measured:redirected→/"
     },
     "auth-jira-oauth": {
       "id": "auth-jira-oauth",
@@ -575,53 +575,6 @@
       "id": "openrouter-callback",
       "class": "page-get",
       "status": "excluded:oauth-hop-no-own-body"
-    },
-    "auth-jira-form": {
-      "id": "auth-jira-form",
-      "class": "page-get",
-      "method": "route",
-      "isNew": false,
-      "themes": {
-        "light": {
-          "httpStatus": 400,
-          "finalUrl": "/auth/jira",
-          "themeAssertion": {
-            "mode": "media",
-            "expected": "no theme-dark",
-            "actual": "",
-            "passed": true
-          },
-          "sampled": 4,
-          "groups": [
-            {
-              "element": "a.login-button",
-              "color": "rgb(255, 255, 255)",
-              "bg": "rgb(13,148,136)",
-              "ratio": 3.74,
-              "need": 4.5,
-              "fontSize": "16px",
-              "fontWeight": "400",
-              "count": 1,
-              "samples": [
-                "Go to homepage"
-              ]
-            }
-          ]
-        },
-        "dark": {
-          "httpStatus": 400,
-          "finalUrl": "/auth/jira",
-          "themeAssertion": {
-            "mode": "media-emulated (labelled)",
-            "htmlClass": "theme-dark",
-            "bodyBg": "rgb(22, 24, 29)",
-            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
-          },
-          "sampled": 4,
-          "groups": []
-        }
-      },
-      "status": "measured"
     },
     "held-connection": {
       "id": "held-connection",
@@ -670,231 +623,52 @@
       },
       "status": "measured"
     },
-    "email-register": {
-      "id": "email-register",
+    "auth-jira-form": {
+      "id": "auth-jira-form",
       "class": "page-get",
       "method": "route",
-      "isNew": true,
+      "isNew": false,
       "themes": {
         "light": {
-          "httpStatus": 200,
-          "finalUrl": "/",
+          "httpStatus": 400,
+          "finalUrl": "/auth/jira",
           "themeAssertion": {
             "mode": "media",
             "expected": "no theme-dark",
             "actual": "",
             "passed": true
           },
-          "sampled": 162,
+          "sampled": 4,
           "groups": [
             {
-              "element": "span.status-pill__char",
-              "color": "rgb(212, 166, 0)",
-              "bg": "rgb(255,255,255)",
-              "ratio": 2.27,
-              "need": 4.5,
-              "fontSize": "14.4px",
-              "fontWeight": "400",
-              "count": 2,
-              "samples": [
-                "◐",
-                "◐"
-              ]
-            },
-            {
-              "element": "span.status-pill__label",
-              "color": "rgb(22, 163, 74)",
-              "bg": "rgb(247,247,247)",
-              "ratio": 3.08,
-              "need": 4.5,
-              "fontSize": "13.6px",
-              "fontWeight": "400",
-              "count": 1,
-              "samples": [
-                "done"
-              ]
-            },
-            {
-              "element": "span.status-pill__char",
-              "color": "rgb(22, 163, 74)",
-              "bg": "rgb(255,255,255)",
-              "ratio": 3.3,
-              "need": 4.5,
-              "fontSize": "14.4px",
-              "fontWeight": "400",
-              "count": 2,
-              "samples": [
-                "✓",
-                "✓"
-              ]
-            },
-            {
-              "element": "span.lx-step__n",
-              "color": "rgb(13, 148, 136)",
-              "bg": "rgb(248,249,250)",
-              "ratio": 3.55,
-              "need": 4.5,
-              "fontSize": "12.8px",
-              "fontWeight": "400",
-              "count": 4,
-              "samples": [
-                "01",
-                "02",
-                "03"
-              ]
-            },
-            {
-              "element": "span.lx-c-key",
-              "color": "rgb(13, 148, 136)",
-              "bg": "rgb(248,249,250)",
-              "ratio": 3.55,
-              "need": 4.5,
-              "fontSize": "13.12px",
-              "fontWeight": "400",
-              "count": 1,
-              "samples": [
-                "git log --since=2026-06-30"
-              ]
-            },
-            {
-              "element": "p.lx-eyebrow.lx-eyebrow--os",
-              "color": "rgb(13, 148, 136)",
-              "bg": "rgb(248,249,250)",
-              "ratio": 3.55,
-              "need": 4.5,
-              "fontSize": "11.52px",
-              "fontWeight": "400",
-              "count": 1,
-              "samples": [
-                "the workstation"
-              ]
-            },
-            {
-              "element": "a.landing-cta.landing-cta-github",
-              "color": "rgb(13, 148, 136)",
-              "bg": "rgb(255,255,255)",
-              "ratio": 3.74,
-              "need": 4.5,
-              "fontSize": "16.8px",
-              "fontWeight": "400",
-              "count": 1,
-              "samples": [
-                "Continue with GitHub"
-              ]
-            },
-            {
-              "element": "a.landing-cta.landing-cta-jira",
-              "color": "rgb(13, 148, 136)",
-              "bg": "rgb(255,255,255)",
-              "ratio": 3.74,
-              "need": 4.5,
-              "fontSize": "16.8px",
-              "fontWeight": "400",
-              "count": 1,
-              "samples": [
-                "Continue with Jira"
-              ]
-            },
-            {
-              "element": "a.landing-cta.landing-cta-email",
-              "color": "rgb(13, 148, 136)",
-              "bg": "rgb(255,255,255)",
-              "ratio": 3.74,
-              "need": 4.5,
-              "fontSize": "16.8px",
-              "fontWeight": "400",
-              "count": 1,
-              "samples": [
-                "Continue with email"
-              ]
-            },
-            {
-              "element": "span.lx-run__label",
-              "color": "rgb(255, 255, 255)",
-              "bg": "rgb(13,148,136)",
-              "ratio": 3.74,
-              "need": 4.5,
-              "fontSize": "10.56px",
-              "fontWeight": "400",
-              "count": 6,
-              "samples": [
-                "research",
-                "plan",
-                "research"
-              ]
-            },
-            {
-              "element": "a.lx-os__cta",
+              "element": "a.login-button",
               "color": "rgb(255, 255, 255)",
               "bg": "rgb(13,148,136)",
               "ratio": 3.74,
               "need": 4.5,
               "fontSize": "16px",
-              "fontWeight": "500",
-              "count": 1,
-              "samples": [
-                "Open Harbour OS →"
-              ]
-            },
-            {
-              "element": "span.lx-c-key",
-              "color": "rgb(13, 148, 136)",
-              "bg": "rgb(255,255,255)",
-              "ratio": 3.74,
-              "need": 4.5,
-              "fontSize": "13.12px",
               "fontWeight": "400",
-              "count": 3,
-              "samples": [
-                "$",
-                "◐",
-                "$"
-              ]
-            },
-            {
-              "element": "a.landing-cta.landing-cta-linear",
-              "color": "rgb(4, 35, 31)",
-              "bg": "rgb(13,148,136)",
-              "ratio": 4.43,
-              "need": 4.5,
-              "fontSize": "16.8px",
-              "fontWeight": "500",
               "count": 1,
               "samples": [
-                "Log in with Linear"
+                "Go to homepage"
               ]
             }
           ]
         },
         "dark": {
-          "httpStatus": 200,
-          "finalUrl": "/",
+          "httpStatus": 400,
+          "finalUrl": "/auth/jira",
           "themeAssertion": {
             "mode": "media-emulated (labelled)",
             "htmlClass": "theme-dark",
             "bodyBg": "rgb(22, 24, 29)",
             "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
           },
-          "sampled": 162,
+          "sampled": 4,
           "groups": []
         }
       },
       "status": "measured"
-    },
-    "library-paper": {
-      "id": "library-paper",
-      "class": "page-get",
-      "status": "excluded:covered-by-expansion:library-doc:*"
-    },
-    "library-doc": {
-      "id": "library-doc",
-      "class": "page-get",
-      "status": "excluded:covered-by-expansion:library-doc:*"
-    },
-    "logout": {
-      "id": "logout",
-      "class": "page-get",
-      "status": "excluded:oauth-hop-no-own-body"
     },
     "email-reproof": {
       "id": "email-reproof",
@@ -1105,7 +879,233 @@
           "groups": []
         }
       },
-      "status": "measured"
+      "status": "measured:redirected→/"
+    },
+    "library-paper": {
+      "id": "library-paper",
+      "class": "page-get",
+      "status": "excluded:covered-by-expansion:library-doc:*"
+    },
+    "library-doc": {
+      "id": "library-doc",
+      "class": "page-get",
+      "status": "excluded:covered-by-expansion:library-doc:*"
+    },
+    "logout": {
+      "id": "logout",
+      "class": "page-get",
+      "status": "excluded:oauth-hop-no-own-body"
+    },
+    "email-register": {
+      "id": "email-register",
+      "class": "page-get",
+      "method": "route",
+      "isNew": true,
+      "themes": {
+        "light": {
+          "httpStatus": 200,
+          "finalUrl": "/",
+          "themeAssertion": {
+            "mode": "media",
+            "expected": "no theme-dark",
+            "actual": "",
+            "passed": true
+          },
+          "sampled": 162,
+          "groups": [
+            {
+              "element": "span.status-pill__char",
+              "color": "rgb(212, 166, 0)",
+              "bg": "rgb(255,255,255)",
+              "ratio": 2.27,
+              "need": 4.5,
+              "fontSize": "14.4px",
+              "fontWeight": "400",
+              "count": 2,
+              "samples": [
+                "◐",
+                "◐"
+              ]
+            },
+            {
+              "element": "span.status-pill__label",
+              "color": "rgb(22, 163, 74)",
+              "bg": "rgb(247,247,247)",
+              "ratio": 3.08,
+              "need": 4.5,
+              "fontSize": "13.6px",
+              "fontWeight": "400",
+              "count": 1,
+              "samples": [
+                "done"
+              ]
+            },
+            {
+              "element": "span.status-pill__char",
+              "color": "rgb(22, 163, 74)",
+              "bg": "rgb(255,255,255)",
+              "ratio": 3.3,
+              "need": 4.5,
+              "fontSize": "14.4px",
+              "fontWeight": "400",
+              "count": 2,
+              "samples": [
+                "✓",
+                "✓"
+              ]
+            },
+            {
+              "element": "span.lx-step__n",
+              "color": "rgb(13, 148, 136)",
+              "bg": "rgb(248,249,250)",
+              "ratio": 3.55,
+              "need": 4.5,
+              "fontSize": "12.8px",
+              "fontWeight": "400",
+              "count": 4,
+              "samples": [
+                "01",
+                "02",
+                "03"
+              ]
+            },
+            {
+              "element": "span.lx-c-key",
+              "color": "rgb(13, 148, 136)",
+              "bg": "rgb(248,249,250)",
+              "ratio": 3.55,
+              "need": 4.5,
+              "fontSize": "13.12px",
+              "fontWeight": "400",
+              "count": 1,
+              "samples": [
+                "git log --since=2026-06-30"
+              ]
+            },
+            {
+              "element": "p.lx-eyebrow.lx-eyebrow--os",
+              "color": "rgb(13, 148, 136)",
+              "bg": "rgb(248,249,250)",
+              "ratio": 3.55,
+              "need": 4.5,
+              "fontSize": "11.52px",
+              "fontWeight": "400",
+              "count": 1,
+              "samples": [
+                "the workstation"
+              ]
+            },
+            {
+              "element": "a.landing-cta.landing-cta-github",
+              "color": "rgb(13, 148, 136)",
+              "bg": "rgb(255,255,255)",
+              "ratio": 3.74,
+              "need": 4.5,
+              "fontSize": "16.8px",
+              "fontWeight": "400",
+              "count": 1,
+              "samples": [
+                "Continue with GitHub"
+              ]
+            },
+            {
+              "element": "a.landing-cta.landing-cta-jira",
+              "color": "rgb(13, 148, 136)",
+              "bg": "rgb(255,255,255)",
+              "ratio": 3.74,
+              "need": 4.5,
+              "fontSize": "16.8px",
+              "fontWeight": "400",
+              "count": 1,
+              "samples": [
+                "Continue with Jira"
+              ]
+            },
+            {
+              "element": "a.landing-cta.landing-cta-email",
+              "color": "rgb(13, 148, 136)",
+              "bg": "rgb(255,255,255)",
+              "ratio": 3.74,
+              "need": 4.5,
+              "fontSize": "16.8px",
+              "fontWeight": "400",
+              "count": 1,
+              "samples": [
+                "Continue with email"
+              ]
+            },
+            {
+              "element": "span.lx-run__label",
+              "color": "rgb(255, 255, 255)",
+              "bg": "rgb(13,148,136)",
+              "ratio": 3.74,
+              "need": 4.5,
+              "fontSize": "10.56px",
+              "fontWeight": "400",
+              "count": 6,
+              "samples": [
+                "research",
+                "plan",
+                "research"
+              ]
+            },
+            {
+              "element": "a.lx-os__cta",
+              "color": "rgb(255, 255, 255)",
+              "bg": "rgb(13,148,136)",
+              "ratio": 3.74,
+              "need": 4.5,
+              "fontSize": "16px",
+              "fontWeight": "500",
+              "count": 1,
+              "samples": [
+                "Open Harbour OS →"
+              ]
+            },
+            {
+              "element": "span.lx-c-key",
+              "color": "rgb(13, 148, 136)",
+              "bg": "rgb(255,255,255)",
+              "ratio": 3.74,
+              "need": 4.5,
+              "fontSize": "13.12px",
+              "fontWeight": "400",
+              "count": 3,
+              "samples": [
+                "$",
+                "◐",
+                "$"
+              ]
+            },
+            {
+              "element": "a.landing-cta.landing-cta-linear",
+              "color": "rgb(4, 35, 31)",
+              "bg": "rgb(13,148,136)",
+              "ratio": 4.43,
+              "need": 4.5,
+              "fontSize": "16.8px",
+              "fontWeight": "500",
+              "count": 1,
+              "samples": [
+                "Log in with Linear"
+              ]
+            }
+          ]
+        },
+        "dark": {
+          "httpStatus": 200,
+          "finalUrl": "/",
+          "themeAssertion": {
+            "mode": "media-emulated (labelled)",
+            "htmlClass": "theme-dark",
+            "bodyBg": "rgb(22, 24, 29)",
+            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
+          },
+          "sampled": 162,
+          "groups": []
+        }
+      },
+      "status": "measured:redirected→/"
     },
     "legacy-prompts": {
       "id": "legacy-prompts",
@@ -1116,53 +1116,6 @@
       "id": "legacy-settings",
       "class": "page-get",
       "status": "excluded:legacy-redirect-measured-at-destination"
-    },
-    "library-index": {
-      "id": "library-index",
-      "class": "page-get",
-      "method": "route",
-      "isNew": true,
-      "themes": {
-        "light": {
-          "httpStatus": 200,
-          "finalUrl": "/library",
-          "themeAssertion": {
-            "mode": "media",
-            "expected": "no theme-dark",
-            "actual": "",
-            "passed": true
-          },
-          "sampled": 281,
-          "groups": [
-            {
-              "element": "button",
-              "color": "rgb(255, 255, 255)",
-              "bg": "rgb(13,148,136)",
-              "ratio": 3.74,
-              "need": 4.5,
-              "fontSize": "16px",
-              "fontWeight": "400",
-              "count": 1,
-              "samples": [
-                "Search"
-              ]
-            }
-          ]
-        },
-        "dark": {
-          "httpStatus": 200,
-          "finalUrl": "/library",
-          "themeAssertion": {
-            "mode": "media-emulated (labelled)",
-            "htmlClass": "theme-dark",
-            "bodyBg": "rgb(22, 24, 29)",
-            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
-          },
-          "sampled": 281,
-          "groups": []
-        }
-      },
-      "status": "measured"
     },
     "privacy": {
       "id": "privacy",
@@ -1244,6 +1197,53 @@
       },
       "status": "measured"
     },
+    "library-index": {
+      "id": "library-index",
+      "class": "page-get",
+      "method": "route",
+      "isNew": true,
+      "themes": {
+        "light": {
+          "httpStatus": 200,
+          "finalUrl": "/library",
+          "themeAssertion": {
+            "mode": "media",
+            "expected": "no theme-dark",
+            "actual": "",
+            "passed": true
+          },
+          "sampled": 281,
+          "groups": [
+            {
+              "element": "button",
+              "color": "rgb(255, 255, 255)",
+              "bg": "rgb(13,148,136)",
+              "ratio": 3.74,
+              "need": 4.5,
+              "fontSize": "16px",
+              "fontWeight": "400",
+              "count": 1,
+              "samples": [
+                "Search"
+              ]
+            }
+          ]
+        },
+        "dark": {
+          "httpStatus": 200,
+          "finalUrl": "/library",
+          "themeAssertion": {
+            "mode": "media-emulated (labelled)",
+            "htmlClass": "theme-dark",
+            "bodyBg": "rgb(22, 24, 29)",
+            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
+          },
+          "sampled": 281,
+          "groups": []
+        }
+      },
+      "status": "measured"
+    },
     "kpis-public": {
       "id": "kpis-public",
       "class": "page-get",
@@ -1259,7 +1259,7 @@
             "actual": "",
             "passed": true
           },
-          "sampled": 424,
+          "sampled": 425,
           "groups": []
         },
         "dark": {
@@ -1333,54 +1333,6 @@
             "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
           },
           "sampled": 4,
-          "groups": []
-        }
-      },
-      "status": "measured"
-    },
-    "swim-public": {
-      "id": "swim-public",
-      "class": "page-get",
-      "method": "route",
-      "isNew": false,
-      "themes": {
-        "light": {
-          "httpStatus": 200,
-          "finalUrl": "/swim",
-          "themeAssertion": {
-            "mode": "media",
-            "expected": "no theme-dark",
-            "actual": "",
-            "passed": true
-          },
-          "sampled": 107,
-          "groups": [
-            {
-              "element": "span.swim-fc-prio.p3",
-              "color": "rgb(212, 166, 0)",
-              "bg": "rgb(255,255,255)",
-              "ratio": 2.27,
-              "need": 4.5,
-              "fontSize": "11px",
-              "fontWeight": "700",
-              "count": 2,
-              "samples": [
-                "Medium",
-                "Medium"
-              ]
-            }
-          ]
-        },
-        "dark": {
-          "httpStatus": 200,
-          "finalUrl": "/swim",
-          "themeAssertion": {
-            "mode": "media-emulated (labelled)",
-            "htmlClass": "theme-dark",
-            "bodyBg": "rgb(22, 24, 29)",
-            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
-          },
-          "sampled": 107,
           "groups": []
         }
       },
@@ -1636,6 +1588,54 @@
       },
       "status": "measured"
     },
+    "swim-public": {
+      "id": "swim-public",
+      "class": "page-get",
+      "method": "route",
+      "isNew": false,
+      "themes": {
+        "light": {
+          "httpStatus": 200,
+          "finalUrl": "/swim",
+          "themeAssertion": {
+            "mode": "media",
+            "expected": "no theme-dark",
+            "actual": "",
+            "passed": true
+          },
+          "sampled": 107,
+          "groups": [
+            {
+              "element": "span.swim-fc-prio.p3",
+              "color": "rgb(212, 166, 0)",
+              "bg": "rgb(255,255,255)",
+              "ratio": 2.27,
+              "need": 4.5,
+              "fontSize": "11px",
+              "fontWeight": "700",
+              "count": 2,
+              "samples": [
+                "Medium",
+                "Medium"
+              ]
+            }
+          ]
+        },
+        "dark": {
+          "httpStatus": 200,
+          "finalUrl": "/swim",
+          "themeAssertion": {
+            "mode": "media-emulated (labelled)",
+            "htmlClass": "theme-dark",
+            "bodyBg": "rgb(22, 24, 29)",
+            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
+          },
+          "sampled": 107,
+          "groups": []
+        }
+      },
+      "status": "measured"
+    },
     "terms": {
       "id": "terms",
       "class": "page-get",
@@ -1868,6 +1868,54 @@
       },
       "status": "measured"
     },
+    "ws-effort-readout": {
+      "id": "ws-effort-readout",
+      "class": "page-get",
+      "method": "route",
+      "isNew": false,
+      "themes": {
+        "light": {
+          "httpStatus": 200,
+          "finalUrl": "/workspace/test-workspace/effort-readout",
+          "themeAssertion": {
+            "mode": "cookie",
+            "expected": "no theme-dark",
+            "actual": "",
+            "passed": true
+          },
+          "sampled": 47,
+          "groups": [
+            {
+              "element": "span.wordmark-accent",
+              "color": "rgb(13, 148, 136)",
+              "bg": "rgb(255,255,255)",
+              "ratio": 3.74,
+              "need": 4.5,
+              "fontSize": "16px",
+              "fontWeight": "600",
+              "count": 2,
+              "samples": [
+                ".cat",
+                ".cat"
+              ]
+            }
+          ]
+        },
+        "dark": {
+          "httpStatus": 200,
+          "finalUrl": "/workspace/test-workspace/effort-readout",
+          "themeAssertion": {
+            "mode": "cookie",
+            "expected": "theme-dark",
+            "actual": "theme-dark",
+            "passed": true
+          },
+          "sampled": 47,
+          "groups": []
+        }
+      },
+      "status": "measured"
+    },
     "ws-dashboard": {
       "id": "ws-dashboard",
       "class": "page-get",
@@ -1924,54 +1972,6 @@
             "passed": true
           },
           "sampled": 46,
-          "groups": []
-        }
-      },
-      "status": "measured"
-    },
-    "ws-effort-readout": {
-      "id": "ws-effort-readout",
-      "class": "page-get",
-      "method": "route",
-      "isNew": false,
-      "themes": {
-        "light": {
-          "httpStatus": 200,
-          "finalUrl": "/workspace/test-workspace/effort-readout",
-          "themeAssertion": {
-            "mode": "cookie",
-            "expected": "no theme-dark",
-            "actual": "",
-            "passed": true
-          },
-          "sampled": 47,
-          "groups": [
-            {
-              "element": "span.wordmark-accent",
-              "color": "rgb(13, 148, 136)",
-              "bg": "rgb(255,255,255)",
-              "ratio": 3.74,
-              "need": 4.5,
-              "fontSize": "16px",
-              "fontWeight": "600",
-              "count": 2,
-              "samples": [
-                ".cat",
-                ".cat"
-              ]
-            }
-          ]
-        },
-        "dark": {
-          "httpStatus": 200,
-          "finalUrl": "/workspace/test-workspace/effort-readout",
-          "themeAssertion": {
-            "mode": "cookie",
-            "expected": "theme-dark",
-            "actual": "theme-dark",
-            "passed": true
-          },
-          "sampled": 47,
           "groups": []
         }
       },
@@ -2040,7 +2040,7 @@
             "actual": "",
             "passed": true
           },
-          "sampled": 60,
+          "sampled": 59,
           "groups": [
             {
               "element": "button.action-btn.save.fc-start-btn",
@@ -2094,7 +2094,7 @@
             "actual": "theme-dark",
             "passed": true
           },
-          "sampled": 60,
+          "sampled": 59,
           "groups": []
         }
       },
@@ -2878,6 +2878,69 @@
       },
       "status": "measured"
     },
+    "ws-roadmap": {
+      "id": "ws-roadmap",
+      "class": "page-get",
+      "method": "route",
+      "isNew": false,
+      "themes": {
+        "light": {
+          "httpStatus": 200,
+          "finalUrl": "/workspace/test-workspace/roadmap",
+          "themeAssertion": {
+            "mode": "cookie",
+            "expected": "no theme-dark",
+            "actual": "",
+            "passed": true
+          },
+          "sampled": 129,
+          "groups": [
+            {
+              "element": "span.status-pill__char",
+              "color": "rgb(22, 163, 74)",
+              "bg": "rgb(255,255,255)",
+              "ratio": 3.3,
+              "need": 4.5,
+              "fontSize": "14.4px",
+              "fontWeight": "600",
+              "count": 8,
+              "samples": [
+                "✓",
+                "✓",
+                "✓"
+              ]
+            },
+            {
+              "element": "span.wordmark-accent",
+              "color": "rgb(13, 148, 136)",
+              "bg": "rgb(255,255,255)",
+              "ratio": 3.74,
+              "need": 4.5,
+              "fontSize": "16px",
+              "fontWeight": "600",
+              "count": 2,
+              "samples": [
+                ".cat",
+                ".cat"
+              ]
+            }
+          ]
+        },
+        "dark": {
+          "httpStatus": 200,
+          "finalUrl": "/workspace/test-workspace/roadmap",
+          "themeAssertion": {
+            "mode": "cookie",
+            "expected": "theme-dark",
+            "actual": "theme-dark",
+            "passed": true
+          },
+          "sampled": 129,
+          "groups": []
+        }
+      },
+      "status": "measured"
+    },
     "ws-proxy": {
       "id": "ws-proxy",
       "class": "page-get",
@@ -2979,69 +3042,6 @@
       },
       "status": "measured"
     },
-    "ws-roadmap": {
-      "id": "ws-roadmap",
-      "class": "page-get",
-      "method": "route",
-      "isNew": false,
-      "themes": {
-        "light": {
-          "httpStatus": 200,
-          "finalUrl": "/workspace/test-workspace/roadmap",
-          "themeAssertion": {
-            "mode": "cookie",
-            "expected": "no theme-dark",
-            "actual": "",
-            "passed": true
-          },
-          "sampled": 129,
-          "groups": [
-            {
-              "element": "span.status-pill__char",
-              "color": "rgb(22, 163, 74)",
-              "bg": "rgb(255,255,255)",
-              "ratio": 3.3,
-              "need": 4.5,
-              "fontSize": "14.4px",
-              "fontWeight": "600",
-              "count": 8,
-              "samples": [
-                "✓",
-                "✓",
-                "✓"
-              ]
-            },
-            {
-              "element": "span.wordmark-accent",
-              "color": "rgb(13, 148, 136)",
-              "bg": "rgb(255,255,255)",
-              "ratio": 3.74,
-              "need": 4.5,
-              "fontSize": "16px",
-              "fontWeight": "600",
-              "count": 2,
-              "samples": [
-                ".cat",
-                ".cat"
-              ]
-            }
-          ]
-        },
-        "dark": {
-          "httpStatus": 200,
-          "finalUrl": "/workspace/test-workspace/roadmap",
-          "themeAssertion": {
-            "mode": "cookie",
-            "expected": "theme-dark",
-            "actual": "theme-dark",
-            "passed": true
-          },
-          "sampled": 129,
-          "groups": []
-        }
-      },
-      "status": "measured"
-    },
     "ws-runner": {
       "id": "ws-runner",
       "class": "page-get",
@@ -3114,6 +3114,82 @@
               ]
             }
           ]
+        }
+      },
+      "status": "measured"
+    },
+    "ws-ship": {
+      "id": "ws-ship",
+      "class": "page-get",
+      "method": "route",
+      "isNew": false,
+      "themes": {
+        "light": {
+          "httpStatus": 200,
+          "finalUrl": "/workspace/test-workspace/ship",
+          "themeAssertion": {
+            "mode": "cookie",
+            "expected": "no theme-dark",
+            "actual": "",
+            "passed": true
+          },
+          "sampled": 68,
+          "groups": [
+            {
+              "element": "span.swim-box-state.in-progress.status-pill__char.status-pill--in-progress",
+              "color": "rgb(212, 166, 0)",
+              "bg": "rgb(255,255,255)",
+              "ratio": 2.27,
+              "need": 4.5,
+              "fontSize": "13px",
+              "fontWeight": "400",
+              "count": 5,
+              "samples": [
+                "◐",
+                "◐",
+                "◐"
+              ]
+            },
+            {
+              "element": "span.wordmark-accent",
+              "color": "rgb(13, 148, 136)",
+              "bg": "rgb(255,255,255)",
+              "ratio": 3.74,
+              "need": 4.5,
+              "fontSize": "16px",
+              "fontWeight": "600",
+              "count": 2,
+              "samples": [
+                ".cat",
+                ".cat"
+              ]
+            },
+            {
+              "element": "button.ship-mode-btn.active",
+              "color": "rgb(255, 255, 255)",
+              "bg": "rgb(13,148,136)",
+              "ratio": 3.74,
+              "need": 4.5,
+              "fontSize": "11px",
+              "fontWeight": "400",
+              "count": 1,
+              "samples": [
+                "project"
+              ]
+            }
+          ]
+        },
+        "dark": {
+          "httpStatus": 200,
+          "finalUrl": "/workspace/test-workspace/ship",
+          "themeAssertion": {
+            "mode": "cookie",
+            "expected": "theme-dark",
+            "actual": "theme-dark",
+            "passed": true
+          },
+          "sampled": 68,
+          "groups": []
         }
       },
       "status": "measured"
@@ -3302,82 +3378,6 @@
               ]
             }
           ]
-        }
-      },
-      "status": "measured"
-    },
-    "ws-ship": {
-      "id": "ws-ship",
-      "class": "page-get",
-      "method": "route",
-      "isNew": false,
-      "themes": {
-        "light": {
-          "httpStatus": 200,
-          "finalUrl": "/workspace/test-workspace/ship",
-          "themeAssertion": {
-            "mode": "cookie",
-            "expected": "no theme-dark",
-            "actual": "",
-            "passed": true
-          },
-          "sampled": 68,
-          "groups": [
-            {
-              "element": "span.swim-box-state.in-progress.status-pill__char.status-pill--in-progress",
-              "color": "rgb(212, 166, 0)",
-              "bg": "rgb(255,255,255)",
-              "ratio": 2.27,
-              "need": 4.5,
-              "fontSize": "13px",
-              "fontWeight": "400",
-              "count": 5,
-              "samples": [
-                "◐",
-                "◐",
-                "◐"
-              ]
-            },
-            {
-              "element": "span.wordmark-accent",
-              "color": "rgb(13, 148, 136)",
-              "bg": "rgb(255,255,255)",
-              "ratio": 3.74,
-              "need": 4.5,
-              "fontSize": "16px",
-              "fontWeight": "600",
-              "count": 2,
-              "samples": [
-                ".cat",
-                ".cat"
-              ]
-            },
-            {
-              "element": "button.ship-mode-btn.active",
-              "color": "rgb(255, 255, 255)",
-              "bg": "rgb(13,148,136)",
-              "ratio": 3.74,
-              "need": 4.5,
-              "fontSize": "11px",
-              "fontWeight": "400",
-              "count": 1,
-              "samples": [
-                "project"
-              ]
-            }
-          ]
-        },
-        "dark": {
-          "httpStatus": 200,
-          "finalUrl": "/workspace/test-workspace/ship",
-          "themeAssertion": {
-            "mode": "cookie",
-            "expected": "theme-dark",
-            "actual": "theme-dark",
-            "passed": true
-          },
-          "sampled": 68,
-          "groups": []
         }
       },
       "status": "measured"
@@ -3620,6 +3620,67 @@
       },
       "status": "measured"
     },
+    "ws-task-chat": {
+      "id": "ws-task-chat",
+      "class": "page-get",
+      "method": "route",
+      "isNew": false,
+      "themes": {
+        "light": {
+          "httpStatus": 200,
+          "finalUrl": "/workspace/test-workspace/task-chat",
+          "themeAssertion": {
+            "mode": "cookie",
+            "expected": "no theme-dark",
+            "actual": "",
+            "passed": true
+          },
+          "sampled": 42,
+          "groups": [
+            {
+              "element": "button.action-btn.save",
+              "color": "rgb(22, 163, 74)",
+              "bg": "rgb(220,237,227)",
+              "ratio": 2.71,
+              "need": 4.5,
+              "fontSize": "13.6px",
+              "fontWeight": "400",
+              "count": 1,
+              "samples": [
+                "ask"
+              ]
+            },
+            {
+              "element": "span.wordmark-accent",
+              "color": "rgb(13, 148, 136)",
+              "bg": "rgb(255,255,255)",
+              "ratio": 3.74,
+              "need": 4.5,
+              "fontSize": "16px",
+              "fontWeight": "600",
+              "count": 2,
+              "samples": [
+                ".cat",
+                ".cat"
+              ]
+            }
+          ]
+        },
+        "dark": {
+          "httpStatus": 200,
+          "finalUrl": "/workspace/test-workspace/task-chat",
+          "themeAssertion": {
+            "mode": "cookie",
+            "expected": "theme-dark",
+            "actual": "theme-dark",
+            "passed": true
+          },
+          "sampled": 42,
+          "groups": []
+        }
+      },
+      "status": "measured"
+    },
     "ws-swipe": {
       "id": "ws-swipe",
       "class": "page-get",
@@ -3704,67 +3765,6 @@
               ]
             }
           ]
-        }
-      },
-      "status": "measured"
-    },
-    "ws-task-chat": {
-      "id": "ws-task-chat",
-      "class": "page-get",
-      "method": "route",
-      "isNew": false,
-      "themes": {
-        "light": {
-          "httpStatus": 200,
-          "finalUrl": "/workspace/test-workspace/task-chat",
-          "themeAssertion": {
-            "mode": "cookie",
-            "expected": "no theme-dark",
-            "actual": "",
-            "passed": true
-          },
-          "sampled": 42,
-          "groups": [
-            {
-              "element": "button.action-btn.save",
-              "color": "rgb(22, 163, 74)",
-              "bg": "rgb(220,237,227)",
-              "ratio": 2.71,
-              "need": 4.5,
-              "fontSize": "13.6px",
-              "fontWeight": "400",
-              "count": 1,
-              "samples": [
-                "ask"
-              ]
-            },
-            {
-              "element": "span.wordmark-accent",
-              "color": "rgb(13, 148, 136)",
-              "bg": "rgb(255,255,255)",
-              "ratio": 3.74,
-              "need": 4.5,
-              "fontSize": "16px",
-              "fontWeight": "600",
-              "count": 2,
-              "samples": [
-                ".cat",
-                ".cat"
-              ]
-            }
-          ]
-        },
-        "dark": {
-          "httpStatus": 200,
-          "finalUrl": "/workspace/test-workspace/task-chat",
-          "themeAssertion": {
-            "mode": "cookie",
-            "expected": "theme-dark",
-            "actual": "theme-dark",
-            "passed": true
-          },
-          "sampled": 42,
-          "groups": []
         }
       },
       "status": "measured"
@@ -3862,7 +3862,54 @@
           "groups": []
         }
       },
-      "status": "measured"
+      "status": "measured:error-503"
+    },
+    "ws-task-edit": {
+      "id": "ws-task-edit",
+      "class": "page-get",
+      "method": "route",
+      "isNew": false,
+      "themes": {
+        "light": {
+          "httpStatus": 500,
+          "finalUrl": "/workspace/test-workspace/task/123/edit",
+          "themeAssertion": {
+            "mode": "cookie",
+            "expected": "no theme-dark",
+            "actual": "",
+            "passed": true
+          },
+          "sampled": 5,
+          "groups": [
+            {
+              "element": "a.login-button",
+              "color": "rgb(255, 255, 255)",
+              "bg": "rgb(13,148,136)",
+              "ratio": 3.74,
+              "need": 4.5,
+              "fontSize": "16px",
+              "fontWeight": "400",
+              "count": 1,
+              "samples": [
+                "Back to tasks"
+              ]
+            }
+          ]
+        },
+        "dark": {
+          "httpStatus": 500,
+          "finalUrl": "/workspace/test-workspace/task/123/edit",
+          "themeAssertion": {
+            "mode": "cookie",
+            "expected": "theme-dark",
+            "actual": "theme-dark",
+            "passed": true
+          },
+          "sampled": 5,
+          "groups": []
+        }
+      },
+      "status": "measured:error-500"
     },
     "ws-task-new": {
       "id": "ws-task-new",
@@ -3920,53 +3967,6 @@
             "passed": true
           },
           "sampled": 42,
-          "groups": []
-        }
-      },
-      "status": "measured"
-    },
-    "ws-task-edit": {
-      "id": "ws-task-edit",
-      "class": "page-get",
-      "method": "route",
-      "isNew": false,
-      "themes": {
-        "light": {
-          "httpStatus": 500,
-          "finalUrl": "/workspace/test-workspace/task/123/edit",
-          "themeAssertion": {
-            "mode": "cookie",
-            "expected": "no theme-dark",
-            "actual": "",
-            "passed": true
-          },
-          "sampled": 5,
-          "groups": [
-            {
-              "element": "a.login-button",
-              "color": "rgb(255, 255, 255)",
-              "bg": "rgb(13,148,136)",
-              "ratio": 3.74,
-              "need": 4.5,
-              "fontSize": "16px",
-              "fontWeight": "400",
-              "count": 1,
-              "samples": [
-                "Back to tasks"
-              ]
-            }
-          ]
-        },
-        "dark": {
-          "httpStatus": 500,
-          "finalUrl": "/workspace/test-workspace/task/123/edit",
-          "themeAssertion": {
-            "mode": "cookie",
-            "expected": "theme-dark",
-            "actual": "theme-dark",
-            "passed": true
-          },
-          "sampled": 5,
           "groups": []
         }
       },
@@ -4209,7 +4209,7 @@
           "groups": []
         }
       },
-      "status": "measured"
+      "status": "measured:redirected→/workspace/local-workspace/"
     },
     "ws-settings-jira": {
       "id": "ws-settings-jira",
@@ -7679,53 +7679,6 @@
       },
       "status": "measured"
     },
-    "renderer:renderUpstreamAwareErrorPage": {
-      "id": "renderer:renderUpstreamAwareErrorPage",
-      "class": "renderer",
-      "method": "intercept",
-      "isNew": false,
-      "themes": {
-        "light": {
-          "httpStatus": "synthetic",
-          "finalUrl": "(intercepted)",
-          "themeAssertion": {
-            "mode": "media",
-            "expected": "no theme-dark",
-            "actual": "",
-            "passed": true
-          },
-          "sampled": 12,
-          "groups": [
-            {
-              "element": "a.login-button",
-              "color": "rgb(255, 255, 255)",
-              "bg": "rgb(13,148,136)",
-              "ratio": 3.74,
-              "need": 4.5,
-              "fontSize": "16px",
-              "fontWeight": "400",
-              "count": 1,
-              "samples": [
-                "Try again"
-              ]
-            }
-          ]
-        },
-        "dark": {
-          "httpStatus": "synthetic",
-          "finalUrl": "(intercepted)",
-          "themeAssertion": {
-            "mode": "media-emulated (labelled)",
-            "htmlClass": "theme-dark",
-            "bodyBg": "rgb(22, 24, 29)",
-            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
-          },
-          "sampled": 12,
-          "groups": []
-        }
-      },
-      "status": "measured"
-    },
     "renderer:renderWorkspaceLimitPage": {
       "id": "renderer:renderWorkspaceLimitPage",
       "class": "renderer",
@@ -7768,6 +7721,53 @@
             "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
           },
           "sampled": 4,
+          "groups": []
+        }
+      },
+      "status": "measured"
+    },
+    "renderer:renderUpstreamAwareErrorPage": {
+      "id": "renderer:renderUpstreamAwareErrorPage",
+      "class": "renderer",
+      "method": "intercept",
+      "isNew": false,
+      "themes": {
+        "light": {
+          "httpStatus": "synthetic",
+          "finalUrl": "(intercepted)",
+          "themeAssertion": {
+            "mode": "media",
+            "expected": "no theme-dark",
+            "actual": "",
+            "passed": true
+          },
+          "sampled": 12,
+          "groups": [
+            {
+              "element": "a.login-button",
+              "color": "rgb(255, 255, 255)",
+              "bg": "rgb(13,148,136)",
+              "ratio": 3.74,
+              "need": 4.5,
+              "fontSize": "16px",
+              "fontWeight": "400",
+              "count": 1,
+              "samples": [
+                "Try again"
+              ]
+            }
+          ]
+        },
+        "dark": {
+          "httpStatus": "synthetic",
+          "finalUrl": "(intercepted)",
+          "themeAssertion": {
+            "mode": "media-emulated (labelled)",
+            "htmlClass": "theme-dark",
+            "bodyBg": "rgb(22, 24, 29)",
+            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
+          },
+          "sampled": 12,
           "groups": []
         }
       },
@@ -7881,8 +7881,8 @@
       },
       "status": "measured"
     },
-    "state-guest-share-404": {
-      "id": "state-guest-share-404",
+    "state-guest-share-503": {
+      "id": "state-guest-share-503",
       "class": "state",
       "method": "intercept-state",
       "isNew": true,
@@ -7928,8 +7928,8 @@
       },
       "status": "measured"
     },
-    "state-guest-share-503": {
-      "id": "state-guest-share-503",
+    "state-guest-share-404": {
+      "id": "state-guest-share-404",
       "class": "state",
       "method": "intercept-state",
       "isNew": true,
@@ -9101,39 +9101,6 @@
       },
       "status": "measured"
     },
-    "library-doc:never-worked-pile": {
-      "id": "library-doc:never-worked-pile",
-      "class": "library",
-      "method": "route",
-      "isNew": false,
-      "themes": {
-        "light": {
-          "httpStatus": 200,
-          "finalUrl": "/library/never-worked-pile",
-          "themeAssertion": {
-            "mode": "media",
-            "expected": "no theme-dark",
-            "actual": "",
-            "passed": true
-          },
-          "sampled": 59,
-          "groups": []
-        },
-        "dark": {
-          "httpStatus": 200,
-          "finalUrl": "/library/never-worked-pile",
-          "themeAssertion": {
-            "mode": "media-emulated (labelled)",
-            "htmlClass": "theme-dark",
-            "bodyBg": "rgb(22, 24, 29)",
-            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
-          },
-          "sampled": 59,
-          "groups": []
-        }
-      },
-      "status": "measured"
-    },
     "library-doc:model-choice": {
       "id": "library-doc:model-choice",
       "class": "library",
@@ -9167,34 +9134,34 @@
       },
       "status": "measured"
     },
-    "library-doc:paid-where-written-check": {
-      "id": "library-doc:paid-where-written-check",
+    "library-doc:never-worked-pile": {
+      "id": "library-doc:never-worked-pile",
       "class": "library",
       "method": "route",
       "isNew": false,
       "themes": {
         "light": {
           "httpStatus": 200,
-          "finalUrl": "/library/paid-where-written-check",
+          "finalUrl": "/library/never-worked-pile",
           "themeAssertion": {
             "mode": "media",
             "expected": "no theme-dark",
             "actual": "",
             "passed": true
           },
-          "sampled": 244,
+          "sampled": 59,
           "groups": []
         },
         "dark": {
           "httpStatus": 200,
-          "finalUrl": "/library/paid-where-written-check",
+          "finalUrl": "/library/never-worked-pile",
           "themeAssertion": {
             "mode": "media-emulated (labelled)",
             "htmlClass": "theme-dark",
             "bodyBg": "rgb(22, 24, 29)",
             "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
           },
-          "sampled": 244,
+          "sampled": 59,
           "groups": []
         }
       },
@@ -9221,6 +9188,39 @@
         "dark": {
           "httpStatus": 200,
           "finalUrl": "/library/one-job-many-paths",
+          "themeAssertion": {
+            "mode": "media-emulated (labelled)",
+            "htmlClass": "theme-dark",
+            "bodyBg": "rgb(22, 24, 29)",
+            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
+          },
+          "sampled": 244,
+          "groups": []
+        }
+      },
+      "status": "measured"
+    },
+    "library-doc:paid-where-written-check": {
+      "id": "library-doc:paid-where-written-check",
+      "class": "library",
+      "method": "route",
+      "isNew": false,
+      "themes": {
+        "light": {
+          "httpStatus": 200,
+          "finalUrl": "/library/paid-where-written-check",
+          "themeAssertion": {
+            "mode": "media",
+            "expected": "no theme-dark",
+            "actual": "",
+            "passed": true
+          },
+          "sampled": 244,
+          "groups": []
+        },
+        "dark": {
+          "httpStatus": 200,
+          "finalUrl": "/library/paid-where-written-check",
           "themeAssertion": {
             "mode": "media-emulated (labelled)",
             "htmlClass": "theme-dark",
@@ -9398,6 +9398,39 @@
       },
       "status": "measured"
     },
+    "library-doc:rebuild-ladder": {
+      "id": "library-doc:rebuild-ladder",
+      "class": "library",
+      "method": "route",
+      "isNew": false,
+      "themes": {
+        "light": {
+          "httpStatus": 200,
+          "finalUrl": "/library/rebuild-ladder",
+          "themeAssertion": {
+            "mode": "media",
+            "expected": "no theme-dark",
+            "actual": "",
+            "passed": true
+          },
+          "sampled": 246,
+          "groups": []
+        },
+        "dark": {
+          "httpStatus": 200,
+          "finalUrl": "/library/rebuild-ladder",
+          "themeAssertion": {
+            "mode": "media-emulated (labelled)",
+            "htmlClass": "theme-dark",
+            "bodyBg": "rgb(22, 24, 29)",
+            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
+          },
+          "sampled": 246,
+          "groups": []
+        }
+      },
+      "status": "measured"
+    },
     "library-doc:prototype-concepts": {
       "id": "library-doc:prototype-concepts",
       "class": "library",
@@ -9464,34 +9497,34 @@
       },
       "status": "measured"
     },
-    "library-doc:rebuild-ladder": {
-      "id": "library-doc:rebuild-ladder",
+    "library-doc:reliability-baseline": {
+      "id": "library-doc:reliability-baseline",
       "class": "library",
       "method": "route",
       "isNew": false,
       "themes": {
         "light": {
           "httpStatus": 200,
-          "finalUrl": "/library/rebuild-ladder",
+          "finalUrl": "/library/reliability-baseline",
           "themeAssertion": {
             "mode": "media",
             "expected": "no theme-dark",
             "actual": "",
             "passed": true
           },
-          "sampled": 246,
+          "sampled": 211,
           "groups": []
         },
         "dark": {
           "httpStatus": 200,
-          "finalUrl": "/library/rebuild-ladder",
+          "finalUrl": "/library/reliability-baseline",
           "themeAssertion": {
             "mode": "media-emulated (labelled)",
             "htmlClass": "theme-dark",
             "bodyBg": "rgb(22, 24, 29)",
             "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
           },
-          "sampled": 246,
+          "sampled": 211,
           "groups": []
         }
       },
@@ -9525,39 +9558,6 @@
             "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
           },
           "sampled": 212,
-          "groups": []
-        }
-      },
-      "status": "measured"
-    },
-    "library-doc:reliability-baseline": {
-      "id": "library-doc:reliability-baseline",
-      "class": "library",
-      "method": "route",
-      "isNew": false,
-      "themes": {
-        "light": {
-          "httpStatus": 200,
-          "finalUrl": "/library/reliability-baseline",
-          "themeAssertion": {
-            "mode": "media",
-            "expected": "no theme-dark",
-            "actual": "",
-            "passed": true
-          },
-          "sampled": 211,
-          "groups": []
-        },
-        "dark": {
-          "httpStatus": 200,
-          "finalUrl": "/library/reliability-baseline",
-          "themeAssertion": {
-            "mode": "media-emulated (labelled)",
-            "htmlClass": "theme-dark",
-            "bodyBg": "rgb(22, 24, 29)",
-            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
-          },
-          "sampled": 211,
           "groups": []
         }
       },
@@ -9629,39 +9629,6 @@
       },
       "status": "measured"
     },
-    "library-doc:root-task-ratio": {
-      "id": "library-doc:root-task-ratio",
-      "class": "library",
-      "method": "route",
-      "isNew": false,
-      "themes": {
-        "light": {
-          "httpStatus": 200,
-          "finalUrl": "/library/root-task-ratio",
-          "themeAssertion": {
-            "mode": "media",
-            "expected": "no theme-dark",
-            "actual": "",
-            "passed": true
-          },
-          "sampled": 89,
-          "groups": []
-        },
-        "dark": {
-          "httpStatus": 200,
-          "finalUrl": "/library/root-task-ratio",
-          "themeAssertion": {
-            "mode": "media-emulated (labelled)",
-            "htmlClass": "theme-dark",
-            "bodyBg": "rgb(22, 24, 29)",
-            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
-          },
-          "sampled": 89,
-          "groups": []
-        }
-      },
-      "status": "measured"
-    },
     "library-doc:review-loops": {
       "id": "library-doc:review-loops",
       "class": "library",
@@ -9690,6 +9657,39 @@
             "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
           },
           "sampled": 48,
+          "groups": []
+        }
+      },
+      "status": "measured"
+    },
+    "library-doc:root-task-ratio": {
+      "id": "library-doc:root-task-ratio",
+      "class": "library",
+      "method": "route",
+      "isNew": false,
+      "themes": {
+        "light": {
+          "httpStatus": 200,
+          "finalUrl": "/library/root-task-ratio",
+          "themeAssertion": {
+            "mode": "media",
+            "expected": "no theme-dark",
+            "actual": "",
+            "passed": true
+          },
+          "sampled": 89,
+          "groups": []
+        },
+        "dark": {
+          "httpStatus": 200,
+          "finalUrl": "/library/root-task-ratio",
+          "themeAssertion": {
+            "mode": "media-emulated (labelled)",
+            "htmlClass": "theme-dark",
+            "bodyBg": "rgb(22, 24, 29)",
+            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
+          },
+          "sampled": 89,
           "groups": []
         }
       },
@@ -9794,39 +9794,6 @@
       },
       "status": "measured"
     },
-    "library-doc:steady-base-menu": {
-      "id": "library-doc:steady-base-menu",
-      "class": "library",
-      "method": "route",
-      "isNew": false,
-      "themes": {
-        "light": {
-          "httpStatus": 200,
-          "finalUrl": "/library/steady-base-menu",
-          "themeAssertion": {
-            "mode": "media",
-            "expected": "no theme-dark",
-            "actual": "",
-            "passed": true
-          },
-          "sampled": 790,
-          "groups": []
-        },
-        "dark": {
-          "httpStatus": 200,
-          "finalUrl": "/library/steady-base-menu",
-          "themeAssertion": {
-            "mode": "media-emulated (labelled)",
-            "htmlClass": "theme-dark",
-            "bodyBg": "rgb(22, 24, 29)",
-            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
-          },
-          "sampled": 790,
-          "groups": []
-        }
-      },
-      "status": "measured"
-    },
     "library-doc:steady-base": {
       "id": "library-doc:steady-base",
       "class": "library",
@@ -9855,6 +9822,39 @@
             "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
           },
           "sampled": 613,
+          "groups": []
+        }
+      },
+      "status": "measured"
+    },
+    "library-doc:steady-base-menu": {
+      "id": "library-doc:steady-base-menu",
+      "class": "library",
+      "method": "route",
+      "isNew": false,
+      "themes": {
+        "light": {
+          "httpStatus": 200,
+          "finalUrl": "/library/steady-base-menu",
+          "themeAssertion": {
+            "mode": "media",
+            "expected": "no theme-dark",
+            "actual": "",
+            "passed": true
+          },
+          "sampled": 790,
+          "groups": []
+        },
+        "dark": {
+          "httpStatus": 200,
+          "finalUrl": "/library/steady-base-menu",
+          "themeAssertion": {
+            "mode": "media-emulated (labelled)",
+            "htmlClass": "theme-dark",
+            "bodyBg": "rgb(22, 24, 29)",
+            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
+          },
+          "sampled": 790,
           "groups": []
         }
       },
@@ -9926,39 +9926,6 @@
       },
       "status": "measured"
     },
-    "library-doc:survey-check-11": {
-      "id": "library-doc:survey-check-11",
-      "class": "library",
-      "method": "route",
-      "isNew": false,
-      "themes": {
-        "light": {
-          "httpStatus": 200,
-          "finalUrl": "/library/survey-check-11",
-          "themeAssertion": {
-            "mode": "media",
-            "expected": "no theme-dark",
-            "actual": "",
-            "passed": true
-          },
-          "sampled": 494,
-          "groups": []
-        },
-        "dark": {
-          "httpStatus": 200,
-          "finalUrl": "/library/survey-check-11",
-          "themeAssertion": {
-            "mode": "media-emulated (labelled)",
-            "htmlClass": "theme-dark",
-            "bodyBg": "rgb(22, 24, 29)",
-            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
-          },
-          "sampled": 494,
-          "groups": []
-        }
-      },
-      "status": "measured"
-    },
     "library-doc:survey-check-12": {
       "id": "library-doc:survey-check-12",
       "class": "library",
@@ -9987,6 +9954,39 @@
             "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
           },
           "sampled": 426,
+          "groups": []
+        }
+      },
+      "status": "measured"
+    },
+    "library-doc:survey-check-11": {
+      "id": "library-doc:survey-check-11",
+      "class": "library",
+      "method": "route",
+      "isNew": false,
+      "themes": {
+        "light": {
+          "httpStatus": 200,
+          "finalUrl": "/library/survey-check-11",
+          "themeAssertion": {
+            "mode": "media",
+            "expected": "no theme-dark",
+            "actual": "",
+            "passed": true
+          },
+          "sampled": 494,
+          "groups": []
+        },
+        "dark": {
+          "httpStatus": 200,
+          "finalUrl": "/library/survey-check-11",
+          "themeAssertion": {
+            "mode": "media-emulated (labelled)",
+            "htmlClass": "theme-dark",
+            "bodyBg": "rgb(22, 24, 29)",
+            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
+          },
+          "sampled": 494,
           "groups": []
         }
       },
@@ -10157,39 +10157,6 @@
       },
       "status": "measured"
     },
-    "library-doc:survey-check-7": {
-      "id": "library-doc:survey-check-7",
-      "class": "library",
-      "method": "route",
-      "isNew": false,
-      "themes": {
-        "light": {
-          "httpStatus": 200,
-          "finalUrl": "/library/survey-check-7",
-          "themeAssertion": {
-            "mode": "media",
-            "expected": "no theme-dark",
-            "actual": "",
-            "passed": true
-          },
-          "sampled": 368,
-          "groups": []
-        },
-        "dark": {
-          "httpStatus": 200,
-          "finalUrl": "/library/survey-check-7",
-          "themeAssertion": {
-            "mode": "media-emulated (labelled)",
-            "htmlClass": "theme-dark",
-            "bodyBg": "rgb(22, 24, 29)",
-            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
-          },
-          "sampled": 368,
-          "groups": []
-        }
-      },
-      "status": "measured"
-    },
     "library-doc:survey-check-6": {
       "id": "library-doc:survey-check-6",
       "class": "library",
@@ -10218,6 +10185,39 @@
             "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
           },
           "sampled": 365,
+          "groups": []
+        }
+      },
+      "status": "measured"
+    },
+    "library-doc:survey-check-7": {
+      "id": "library-doc:survey-check-7",
+      "class": "library",
+      "method": "route",
+      "isNew": false,
+      "themes": {
+        "light": {
+          "httpStatus": 200,
+          "finalUrl": "/library/survey-check-7",
+          "themeAssertion": {
+            "mode": "media",
+            "expected": "no theme-dark",
+            "actual": "",
+            "passed": true
+          },
+          "sampled": 368,
+          "groups": []
+        },
+        "dark": {
+          "httpStatus": 200,
+          "finalUrl": "/library/survey-check-7",
+          "themeAssertion": {
+            "mode": "media-emulated (labelled)",
+            "htmlClass": "theme-dark",
+            "bodyBg": "rgb(22, 24, 29)",
+            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
+          },
+          "sampled": 368,
           "groups": []
         }
       },
@@ -10289,39 +10289,6 @@
       },
       "status": "measured"
     },
-    "library-doc:tasks-generate-tasks": {
-      "id": "library-doc:tasks-generate-tasks",
-      "class": "library",
-      "method": "route",
-      "isNew": false,
-      "themes": {
-        "light": {
-          "httpStatus": 200,
-          "finalUrl": "/library/tasks-generate-tasks",
-          "themeAssertion": {
-            "mode": "media",
-            "expected": "no theme-dark",
-            "actual": "",
-            "passed": true
-          },
-          "sampled": 78,
-          "groups": []
-        },
-        "dark": {
-          "httpStatus": 200,
-          "finalUrl": "/library/tasks-generate-tasks",
-          "themeAssertion": {
-            "mode": "media-emulated (labelled)",
-            "htmlClass": "theme-dark",
-            "bodyBg": "rgb(22, 24, 29)",
-            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
-          },
-          "sampled": 78,
-          "groups": []
-        }
-      },
-      "status": "measured"
-    },
     "library-doc:survey-check": {
       "id": "library-doc:survey-check",
       "class": "library",
@@ -10355,34 +10322,34 @@
       },
       "status": "measured"
     },
-    "library-doc:test-surplus": {
-      "id": "library-doc:test-surplus",
+    "library-doc:tasks-generate-tasks": {
+      "id": "library-doc:tasks-generate-tasks",
       "class": "library",
       "method": "route",
       "isNew": false,
       "themes": {
         "light": {
           "httpStatus": 200,
-          "finalUrl": "/library/test-surplus",
+          "finalUrl": "/library/tasks-generate-tasks",
           "themeAssertion": {
             "mode": "media",
             "expected": "no theme-dark",
             "actual": "",
             "passed": true
           },
-          "sampled": 637,
+          "sampled": 78,
           "groups": []
         },
         "dark": {
           "httpStatus": 200,
-          "finalUrl": "/library/test-surplus",
+          "finalUrl": "/library/tasks-generate-tasks",
           "themeAssertion": {
             "mode": "media-emulated (labelled)",
             "htmlClass": "theme-dark",
             "bodyBg": "rgb(22, 24, 29)",
             "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
           },
-          "sampled": 637,
+          "sampled": 78,
           "groups": []
         }
       },
@@ -10421,6 +10388,39 @@
       },
       "status": "measured"
     },
+    "library-doc:test-surplus": {
+      "id": "library-doc:test-surplus",
+      "class": "library",
+      "method": "route",
+      "isNew": false,
+      "themes": {
+        "light": {
+          "httpStatus": 200,
+          "finalUrl": "/library/test-surplus",
+          "themeAssertion": {
+            "mode": "media",
+            "expected": "no theme-dark",
+            "actual": "",
+            "passed": true
+          },
+          "sampled": 637,
+          "groups": []
+        },
+        "dark": {
+          "httpStatus": 200,
+          "finalUrl": "/library/test-surplus",
+          "themeAssertion": {
+            "mode": "media-emulated (labelled)",
+            "htmlClass": "theme-dark",
+            "bodyBg": "rgb(22, 24, 29)",
+            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
+          },
+          "sampled": 637,
+          "groups": []
+        }
+      },
+      "status": "measured"
+    },
     "library-doc:the-second-copy": {
       "id": "library-doc:the-second-copy",
       "class": "library",
@@ -10449,6 +10449,39 @@
             "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
           },
           "sampled": 235,
+          "groups": []
+        }
+      },
+      "status": "measured"
+    },
+    "library-doc:theseus": {
+      "id": "library-doc:theseus",
+      "class": "library",
+      "method": "route",
+      "isNew": false,
+      "themes": {
+        "light": {
+          "httpStatus": 200,
+          "finalUrl": "/library/theseus",
+          "themeAssertion": {
+            "mode": "media",
+            "expected": "no theme-dark",
+            "actual": "",
+            "passed": true
+          },
+          "sampled": 386,
+          "groups": []
+        },
+        "dark": {
+          "httpStatus": 200,
+          "finalUrl": "/library/theseus",
+          "themeAssertion": {
+            "mode": "media-emulated (labelled)",
+            "htmlClass": "theme-dark",
+            "bodyBg": "rgb(22, 24, 29)",
+            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
+          },
+          "sampled": 386,
           "groups": []
         }
       },
@@ -10520,34 +10553,34 @@
       },
       "status": "measured"
     },
-    "library-doc:theseus": {
-      "id": "library-doc:theseus",
+    "library-doc:wake-inventory": {
+      "id": "library-doc:wake-inventory",
       "class": "library",
       "method": "route",
       "isNew": false,
       "themes": {
         "light": {
           "httpStatus": 200,
-          "finalUrl": "/library/theseus",
+          "finalUrl": "/library/wake-inventory",
           "themeAssertion": {
             "mode": "media",
             "expected": "no theme-dark",
             "actual": "",
             "passed": true
           },
-          "sampled": 386,
+          "sampled": 590,
           "groups": []
         },
         "dark": {
           "httpStatus": 200,
-          "finalUrl": "/library/theseus",
+          "finalUrl": "/library/wake-inventory",
           "themeAssertion": {
             "mode": "media-emulated (labelled)",
             "htmlClass": "theme-dark",
             "bodyBg": "rgb(22, 24, 29)",
             "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
           },
-          "sampled": 386,
+          "sampled": 590,
           "groups": []
         }
       },
@@ -10586,34 +10619,34 @@
       },
       "status": "measured"
     },
-    "library-doc:wake-inventory": {
-      "id": "library-doc:wake-inventory",
+    "library-doc:what-doubled-the-dispatches": {
+      "id": "library-doc:what-doubled-the-dispatches",
       "class": "library",
       "method": "route",
       "isNew": false,
       "themes": {
         "light": {
           "httpStatus": 200,
-          "finalUrl": "/library/wake-inventory",
+          "finalUrl": "/library/what-doubled-the-dispatches",
           "themeAssertion": {
             "mode": "media",
             "expected": "no theme-dark",
             "actual": "",
             "passed": true
           },
-          "sampled": 590,
+          "sampled": 382,
           "groups": []
         },
         "dark": {
           "httpStatus": 200,
-          "finalUrl": "/library/wake-inventory",
+          "finalUrl": "/library/what-doubled-the-dispatches",
           "themeAssertion": {
             "mode": "media-emulated (labelled)",
             "htmlClass": "theme-dark",
             "bodyBg": "rgb(22, 24, 29)",
             "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
           },
-          "sampled": 590,
+          "sampled": 382,
           "groups": []
         }
       },
@@ -10652,34 +10685,34 @@
       },
       "status": "measured"
     },
-    "library-doc:what-doubled-the-dispatches": {
-      "id": "library-doc:what-doubled-the-dispatches",
+    "library-doc:what-lowers-the-verification-cost": {
+      "id": "library-doc:what-lowers-the-verification-cost",
       "class": "library",
       "method": "route",
       "isNew": false,
       "themes": {
         "light": {
           "httpStatus": 200,
-          "finalUrl": "/library/what-doubled-the-dispatches",
+          "finalUrl": "/library/what-lowers-the-verification-cost",
           "themeAssertion": {
             "mode": "media",
             "expected": "no theme-dark",
             "actual": "",
             "passed": true
           },
-          "sampled": 382,
+          "sampled": 172,
           "groups": []
         },
         "dark": {
           "httpStatus": 200,
-          "finalUrl": "/library/what-doubled-the-dispatches",
+          "finalUrl": "/library/what-lowers-the-verification-cost",
           "themeAssertion": {
             "mode": "media-emulated (labelled)",
             "htmlClass": "theme-dark",
             "bodyBg": "rgb(22, 24, 29)",
             "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
           },
-          "sampled": 382,
+          "sampled": 172,
           "groups": []
         }
       },
@@ -10713,39 +10746,6 @@
             "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
           },
           "sampled": 56,
-          "groups": []
-        }
-      },
-      "status": "measured"
-    },
-    "library-doc:what-lowers-the-verification-cost": {
-      "id": "library-doc:what-lowers-the-verification-cost",
-      "class": "library",
-      "method": "route",
-      "isNew": false,
-      "themes": {
-        "light": {
-          "httpStatus": 200,
-          "finalUrl": "/library/what-lowers-the-verification-cost",
-          "themeAssertion": {
-            "mode": "media",
-            "expected": "no theme-dark",
-            "actual": "",
-            "passed": true
-          },
-          "sampled": 172,
-          "groups": []
-        },
-        "dark": {
-          "httpStatus": 200,
-          "finalUrl": "/library/what-lowers-the-verification-cost",
-          "themeAssertion": {
-            "mode": "media-emulated (labelled)",
-            "htmlClass": "theme-dark",
-            "bodyBg": "rgb(22, 24, 29)",
-            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
-          },
-          "sampled": 172,
           "groups": []
         }
       },
@@ -10817,39 +10817,6 @@
       },
       "status": "measured"
     },
-    "library-doc:what-the-reviews-checked": {
-      "id": "library-doc:what-the-reviews-checked",
-      "class": "library",
-      "method": "route",
-      "isNew": false,
-      "themes": {
-        "light": {
-          "httpStatus": 200,
-          "finalUrl": "/library/what-the-reviews-checked",
-          "themeAssertion": {
-            "mode": "media",
-            "expected": "no theme-dark",
-            "actual": "",
-            "passed": true
-          },
-          "sampled": 145,
-          "groups": []
-        },
-        "dark": {
-          "httpStatus": 200,
-          "finalUrl": "/library/what-the-reviews-checked",
-          "themeAssertion": {
-            "mode": "media-emulated (labelled)",
-            "htmlClass": "theme-dark",
-            "bodyBg": "rgb(22, 24, 29)",
-            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
-          },
-          "sampled": 145,
-          "groups": []
-        }
-      },
-      "status": "measured"
-    },
     "library-doc:what-supervisors-do": {
       "id": "library-doc:what-supervisors-do",
       "class": "library",
@@ -10883,34 +10850,34 @@
       },
       "status": "measured"
     },
-    "library-doc:what-the-selector-needs": {
-      "id": "library-doc:what-the-selector-needs",
+    "library-doc:what-the-reviews-checked": {
+      "id": "library-doc:what-the-reviews-checked",
       "class": "library",
       "method": "route",
       "isNew": false,
       "themes": {
         "light": {
           "httpStatus": 200,
-          "finalUrl": "/library/what-the-selector-needs",
+          "finalUrl": "/library/what-the-reviews-checked",
           "themeAssertion": {
             "mode": "media",
             "expected": "no theme-dark",
             "actual": "",
             "passed": true
           },
-          "sampled": 124,
+          "sampled": 145,
           "groups": []
         },
         "dark": {
           "httpStatus": 200,
-          "finalUrl": "/library/what-the-selector-needs",
+          "finalUrl": "/library/what-the-reviews-checked",
           "themeAssertion": {
             "mode": "media-emulated (labelled)",
             "htmlClass": "theme-dark",
             "bodyBg": "rgb(22, 24, 29)",
             "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
           },
-          "sampled": 124,
+          "sampled": 145,
           "groups": []
         }
       },
@@ -10949,6 +10916,39 @@
       },
       "status": "measured"
     },
+    "library-doc:what-the-selector-needs": {
+      "id": "library-doc:what-the-selector-needs",
+      "class": "library",
+      "method": "route",
+      "isNew": false,
+      "themes": {
+        "light": {
+          "httpStatus": 200,
+          "finalUrl": "/library/what-the-selector-needs",
+          "themeAssertion": {
+            "mode": "media",
+            "expected": "no theme-dark",
+            "actual": "",
+            "passed": true
+          },
+          "sampled": 124,
+          "groups": []
+        },
+        "dark": {
+          "httpStatus": 200,
+          "finalUrl": "/library/what-the-selector-needs",
+          "themeAssertion": {
+            "mode": "media-emulated (labelled)",
+            "htmlClass": "theme-dark",
+            "bodyBg": "rgb(22, 24, 29)",
+            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
+          },
+          "sampled": 124,
+          "groups": []
+        }
+      },
+      "status": "measured"
+    },
     "library-doc:where-judgement-happens": {
       "id": "library-doc:where-judgement-happens",
       "class": "library",
@@ -10977,6 +10977,39 @@
             "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
           },
           "sampled": 360,
+          "groups": []
+        }
+      },
+      "status": "measured"
+    },
+    "library-doc:which-rules-pay": {
+      "id": "library-doc:which-rules-pay",
+      "class": "library",
+      "method": "route",
+      "isNew": false,
+      "themes": {
+        "light": {
+          "httpStatus": 200,
+          "finalUrl": "/library/which-rules-pay",
+          "themeAssertion": {
+            "mode": "media",
+            "expected": "no theme-dark",
+            "actual": "",
+            "passed": true
+          },
+          "sampled": 516,
+          "groups": []
+        },
+        "dark": {
+          "httpStatus": 200,
+          "finalUrl": "/library/which-rules-pay",
+          "themeAssertion": {
+            "mode": "media-emulated (labelled)",
+            "htmlClass": "theme-dark",
+            "bodyBg": "rgb(22, 24, 29)",
+            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
+          },
+          "sampled": 516,
           "groups": []
         }
       },
@@ -11048,34 +11081,34 @@
       },
       "status": "measured"
     },
-    "library-doc:which-rules-pay": {
-      "id": "library-doc:which-rules-pay",
+    "library-doc:why-throughput-halved": {
+      "id": "library-doc:why-throughput-halved",
       "class": "library",
       "method": "route",
       "isNew": false,
       "themes": {
         "light": {
           "httpStatus": 200,
-          "finalUrl": "/library/which-rules-pay",
+          "finalUrl": "/library/why-throughput-halved",
           "themeAssertion": {
             "mode": "media",
             "expected": "no theme-dark",
             "actual": "",
             "passed": true
           },
-          "sampled": 516,
+          "sampled": 148,
           "groups": []
         },
         "dark": {
           "httpStatus": 200,
-          "finalUrl": "/library/which-rules-pay",
+          "finalUrl": "/library/why-throughput-halved",
           "themeAssertion": {
             "mode": "media-emulated (labelled)",
             "htmlClass": "theme-dark",
             "bodyBg": "rgb(22, 24, 29)",
             "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
           },
-          "sampled": 516,
+          "sampled": 148,
           "groups": []
         }
       },
@@ -11109,39 +11142,6 @@
             "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
           },
           "sampled": 36,
-          "groups": []
-        }
-      },
-      "status": "measured"
-    },
-    "library-doc:why-throughput-halved": {
-      "id": "library-doc:why-throughput-halved",
-      "class": "library",
-      "method": "route",
-      "isNew": false,
-      "themes": {
-        "light": {
-          "httpStatus": 200,
-          "finalUrl": "/library/why-throughput-halved",
-          "themeAssertion": {
-            "mode": "media",
-            "expected": "no theme-dark",
-            "actual": "",
-            "passed": true
-          },
-          "sampled": 148,
-          "groups": []
-        },
-        "dark": {
-          "httpStatus": 200,
-          "finalUrl": "/library/why-throughput-halved",
-          "themeAssertion": {
-            "mode": "media-emulated (labelled)",
-            "htmlClass": "theme-dark",
-            "bodyBg": "rgb(22, 24, 29)",
-            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
-          },
-          "sampled": 148,
           "groups": []
         }
       },
@@ -11246,39 +11246,6 @@
       },
       "status": "measured"
     },
-    "library-doc:doc/ladder": {
-      "id": "library-doc:doc/ladder",
-      "class": "library",
-      "method": "route",
-      "isNew": false,
-      "themes": {
-        "light": {
-          "httpStatus": 200,
-          "finalUrl": "/library/doc/ladder",
-          "themeAssertion": {
-            "mode": "media",
-            "expected": "no theme-dark",
-            "actual": "",
-            "passed": true
-          },
-          "sampled": 99,
-          "groups": []
-        },
-        "dark": {
-          "httpStatus": 200,
-          "finalUrl": "/library/doc/ladder",
-          "themeAssertion": {
-            "mode": "media-emulated (labelled)",
-            "htmlClass": "theme-dark",
-            "bodyBg": "rgb(22, 24, 29)",
-            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
-          },
-          "sampled": 99,
-          "groups": []
-        }
-      },
-      "status": "measured"
-    },
     "library-doc:doc/north-star": {
       "id": "library-doc:doc/north-star",
       "class": "library",
@@ -11345,34 +11312,34 @@
       },
       "status": "measured"
     },
-    "library-doc:doc/charter": {
-      "id": "library-doc:doc/charter",
+    "library-doc:doc/ladder": {
+      "id": "library-doc:doc/ladder",
       "class": "library",
       "method": "route",
       "isNew": false,
       "themes": {
         "light": {
           "httpStatus": 200,
-          "finalUrl": "/library/doc/charter",
+          "finalUrl": "/library/doc/ladder",
           "themeAssertion": {
             "mode": "media",
             "expected": "no theme-dark",
             "actual": "",
             "passed": true
           },
-          "sampled": 170,
+          "sampled": 99,
           "groups": []
         },
         "dark": {
           "httpStatus": 200,
-          "finalUrl": "/library/doc/charter",
+          "finalUrl": "/library/doc/ladder",
           "themeAssertion": {
             "mode": "media-emulated (labelled)",
             "htmlClass": "theme-dark",
             "bodyBg": "rgb(22, 24, 29)",
             "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
           },
-          "sampled": 170,
+          "sampled": 99,
           "groups": []
         }
       },
@@ -11411,39 +11378,6 @@
       },
       "status": "measured"
     },
-    "library-doc:doc/autopilot-operating-manual-v2": {
-      "id": "library-doc:doc/autopilot-operating-manual-v2",
-      "class": "library",
-      "method": "route",
-      "isNew": false,
-      "themes": {
-        "light": {
-          "httpStatus": 200,
-          "finalUrl": "/library/doc/autopilot-operating-manual-v2",
-          "themeAssertion": {
-            "mode": "media",
-            "expected": "no theme-dark",
-            "actual": "",
-            "passed": true
-          },
-          "sampled": 127,
-          "groups": []
-        },
-        "dark": {
-          "httpStatus": 200,
-          "finalUrl": "/library/doc/autopilot-operating-manual-v2",
-          "themeAssertion": {
-            "mode": "media-emulated (labelled)",
-            "htmlClass": "theme-dark",
-            "bodyBg": "rgb(22, 24, 29)",
-            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
-          },
-          "sampled": 127,
-          "groups": []
-        }
-      },
-      "status": "measured"
-    },
     "library-doc:doc/autopilot": {
       "id": "library-doc:doc/autopilot",
       "class": "library",
@@ -11472,6 +11406,72 @@
             "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
           },
           "sampled": 403,
+          "groups": []
+        }
+      },
+      "status": "measured"
+    },
+    "library-doc:doc/charter": {
+      "id": "library-doc:doc/charter",
+      "class": "library",
+      "method": "route",
+      "isNew": false,
+      "themes": {
+        "light": {
+          "httpStatus": 200,
+          "finalUrl": "/library/doc/charter",
+          "themeAssertion": {
+            "mode": "media",
+            "expected": "no theme-dark",
+            "actual": "",
+            "passed": true
+          },
+          "sampled": 170,
+          "groups": []
+        },
+        "dark": {
+          "httpStatus": 200,
+          "finalUrl": "/library/doc/charter",
+          "themeAssertion": {
+            "mode": "media-emulated (labelled)",
+            "htmlClass": "theme-dark",
+            "bodyBg": "rgb(22, 24, 29)",
+            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
+          },
+          "sampled": 170,
+          "groups": []
+        }
+      },
+      "status": "measured"
+    },
+    "library-doc:doc/autopilot-operating-manual-v2": {
+      "id": "library-doc:doc/autopilot-operating-manual-v2",
+      "class": "library",
+      "method": "route",
+      "isNew": false,
+      "themes": {
+        "light": {
+          "httpStatus": 200,
+          "finalUrl": "/library/doc/autopilot-operating-manual-v2",
+          "themeAssertion": {
+            "mode": "media",
+            "expected": "no theme-dark",
+            "actual": "",
+            "passed": true
+          },
+          "sampled": 127,
+          "groups": []
+        },
+        "dark": {
+          "httpStatus": 200,
+          "finalUrl": "/library/doc/autopilot-operating-manual-v2",
+          "themeAssertion": {
+            "mode": "media-emulated (labelled)",
+            "htmlClass": "theme-dark",
+            "bodyBg": "rgb(22, 24, 29)",
+            "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
+          },
+          "sampled": 127,
           "groups": []
         }
       },
@@ -11510,34 +11510,34 @@
       },
       "status": "measured"
     },
-    "library-doc:doc/collective-session-2026-06-12": {
-      "id": "library-doc:doc/collective-session-2026-06-12",
+    "library-doc:doc/flight-companion-session-2026-08-02": {
+      "id": "library-doc:doc/flight-companion-session-2026-08-02",
       "class": "library",
       "method": "route",
       "isNew": false,
       "themes": {
         "light": {
           "httpStatus": 200,
-          "finalUrl": "/library/doc/collective-session-2026-06-12",
+          "finalUrl": "/library/doc/flight-companion-session-2026-08-02",
           "themeAssertion": {
             "mode": "media",
             "expected": "no theme-dark",
             "actual": "",
             "passed": true
           },
-          "sampled": 441,
+          "sampled": 97,
           "groups": []
         },
         "dark": {
           "httpStatus": 200,
-          "finalUrl": "/library/doc/collective-session-2026-06-12",
+          "finalUrl": "/library/doc/flight-companion-session-2026-08-02",
           "themeAssertion": {
             "mode": "media-emulated (labelled)",
             "htmlClass": "theme-dark",
             "bodyBg": "rgb(22, 24, 29)",
             "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
           },
-          "sampled": 441,
+          "sampled": 97,
           "groups": []
         }
       },
@@ -11576,34 +11576,34 @@
       },
       "status": "measured"
     },
-    "library-doc:doc/flight-companion-session-2026-08-02": {
-      "id": "library-doc:doc/flight-companion-session-2026-08-02",
+    "library-doc:doc/collective-session-2026-06-12": {
+      "id": "library-doc:doc/collective-session-2026-06-12",
       "class": "library",
       "method": "route",
       "isNew": false,
       "themes": {
         "light": {
           "httpStatus": 200,
-          "finalUrl": "/library/doc/flight-companion-session-2026-08-02",
+          "finalUrl": "/library/doc/collective-session-2026-06-12",
           "themeAssertion": {
             "mode": "media",
             "expected": "no theme-dark",
             "actual": "",
             "passed": true
           },
-          "sampled": 97,
+          "sampled": 441,
           "groups": []
         },
         "dark": {
           "httpStatus": 200,
-          "finalUrl": "/library/doc/flight-companion-session-2026-08-02",
+          "finalUrl": "/library/doc/collective-session-2026-06-12",
           "themeAssertion": {
             "mode": "media-emulated (labelled)",
             "htmlClass": "theme-dark",
             "bodyBg": "rgb(22, 24, 29)",
             "note": "standalone document / intercepted renderer; honours prefers-color-scheme or the cookie, not guaranteed to change"
           },
-          "sampled": 97,
+          "sampled": 441,
           "groups": []
         }
       },
@@ -11645,7 +11645,15 @@
   },
   "coverage": {
     "registryIds": 249,
-    "measured": 201,
+    "measured": 195,
+    "measuredUnexpectedOutcome": [
+      "account=measured:redirected→/",
+      "email-reproof=measured:redirected→/",
+      "email-register=measured:redirected→/",
+      "ws-task-page=measured:error-503",
+      "ws-task-edit=measured:error-500",
+      "ws-roadmap-local=measured:redirected→/workspace/local-workspace/"
+    ],
     "excluded": 48,
     "unlisted": [],
     "notMeasuredOrExcluded": [],

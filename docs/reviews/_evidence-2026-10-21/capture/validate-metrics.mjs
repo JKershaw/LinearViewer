@@ -20,7 +20,7 @@ import { chromium } from 'playwright';
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { OVERFLOW_JS, CENSUS_SAMPLER_JS, PARSE_COLOR_JS, COMPOSITE_JS } from './metrics.mjs';
+import { OVERFLOW_JS, CLIP_JS, CENSUS_SAMPLER_JS, PARSE_COLOR_JS, COMPOSITE_JS } from './metrics.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const EVID = path.resolve(__dirname, '..');
@@ -30,20 +30,59 @@ const results = {};
 const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
 
 // ---- M1 ---------------------------------------------------------------------------
+// Review F1/F2: the detector under test is the code capture.mjs SHIPS, not a copy. DOM_JS is
+// pulled out of capture.mjs's source and evaluated (it interpolates OVERFLOW_JS from metrics.mjs);
+// CLIP_JS is the string capture.mjs imports. A mutation check then swaps the body-limited walk
+// for the old walk-to-<html> version and requires the fixtures to go red.
 {
+  const captureSrc = await readFile(path.join(__dirname, 'capture.mjs'), 'utf8');
+  const domBody = /const DOM_JS = `([\s\S]*?)`;\n/.exec(captureSrc)[1];
+  const buildDom = (ov) => new Function('OVERFLOW_JS', 'return `' + domBody + '`')(ov);
+  const domJs = buildDom(OVERFLOW_JS);
+  // the old (rejected) walk: climbs past <body> to <html>, where overflow-x: clip counts as containment
+  const toHtml = (src) => src.replace('p !== document.body', 'p');
+  const mutatedOverflow = toHtml(OVERFLOW_JS);
+  const mutatedClip = CLIP_JS.replace('a !== document.body', 'a');
+  if (mutatedOverflow === OVERFLOW_JS || mutatedClip === CLIP_JS) throw new Error('M1 mutation did not apply');
+  const mutatedDom = buildDom(mutatedOverflow);
+
   const ctx = await browser.newContext({ viewport: { width: 390, height: 800 } });
   const page = await ctx.newPage();
   const fixture = (inner) => `<style>html,body{margin:0;overflow-x:clip}#clip{overflow-x:auto;width:300px}</style>${inner}`;
-  await page.setContent(fixture('<div data-testid="injected-2000" style="width:2000px;height:20px;background:red"></div>'));
+  const FIX = {
+    injected2000: '<div data-testid="injected-2000" style="width:2000px;height:20px;background:red"></div>',
+    nested900: '<main><section><div data-testid="nested-900" style="width:900px;height:20px;background:red"></div></section></main>',
+    translateX: '<div data-testid="shifted" style="width:100px;height:20px;transform:translateX(500px)"></div>',
+    contained: '<div id="clip"><div data-testid="wide-in-scroller" style="width:500px;height:20px;background:blue"></div></div>',
+    truncated: '<p data-testid="trunc" style="width:500px;margin:0;white-space:nowrap;font:14px monospace">' + 'x'.repeat(200) + '</p>',
+  };
+  const run = async (js, html) => { await page.setContent(fixture(html)); return page.evaluate(js); };
+  const flagged = async (js, html, get) => get(await run(js, html));
+  const domOver = r => r.overflow.overflows;
+
+  await page.setContent(fixture(FIX.injected2000));
   const oldMetric = await page.evaluate(() => { const de = document.documentElement; return de.scrollWidth > de.clientWidth; });
-  const injected = await page.evaluate(OVERFLOW_JS);
-  await page.setContent(fixture('<div id="clip"><div data-testid="wide-in-scroller" style="width:500px;height:20px;background:blue"></div></div>'));
-  const contained = await page.evaluate(OVERFLOW_JS);
+  const shipped = {}, mutated = {};
+  for (const k of ['injected2000', 'nested900', 'translateX']) {
+    shipped[k] = await flagged(domJs, FIX[k], domOver);
+    mutated[k] = await flagged(mutatedDom, FIX[k], domOver);
+  }
+  const shippedContained = await flagged(domJs, FIX.contained, domOver);
+  const shippedSpill = (await run(domJs, FIX.injected2000)).overflow.offenders;
+  const clipShipped = (await run(CLIP_JS, FIX.truncated)).length > 0;
+  const clipMutated = (await run(mutatedClip, FIX.truncated)).length > 0;
+  const geometry = await run(OVERFLOW_JS, FIX.injected2000);
   results.M1 = {
-    oldMetricFlagsInjected2000px: oldMetric, geometryFlagsInjected2000px: injected.overflows, geometrySpill: injected.spill,
-    geometryIgnoresContainedWide: !contained.overflows,
-    passed: oldMetric === false && injected.overflows === true && injected.spill.some(s => s.startsWith('injected-2000')) && !contained.overflows,
-    note: 'oldMetric false = the 09-26 check is vacuous under overflow-x: clip (LIN-3715); geometry rule flags the same page.',
+    oldMetricFlagsInjected2000px: oldMetric,
+    captureDomJsFlags: shipped, captureDomJsIgnoresContainedWide: !shippedContained, captureDomJsSpill: shippedSpill,
+    captureClipJsFlagsTruncatedText: clipShipped,
+    mutation_walkToHtml: { domJsFlags: mutated, clipJsFlagsTruncatedText: clipMutated },
+    sharedGeometryFlagsInjected2000px: geometry.overflows,
+    passed: oldMetric === false
+      && shipped.injected2000 && shipped.nested900 && shipped.translateX && !shippedContained
+      && shippedSpill.some(s => s.startsWith('injected-2000')) && clipShipped
+      && !mutated.injected2000 && !mutated.nested900 && !mutated.translateX && !clipMutated,
+    note: 'oldMetric false = the 09-26 check is vacuous under overflow-x: clip (LIN-3715). Detector = capture.mjs DOM_JS/CLIP_JS as shipped; mutation_walkToHtml is the rejected walk-to-<html> variant and must read all-false (it is what the PR shipped).',
   };
   await ctx.close();
 }
@@ -97,7 +136,10 @@ const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '
   results.M4 = {
     saveLight: save.map(g => g.ratio), haltDark: halt.map(g => ({ el: g.element, ratio: g.ratio })), inProgressLight: prog.map(g => ({ el: g.element, ratio: g.ratio })),
     coverage: census.coverage,
-    passed: save.length > 0 && save.every(g => near(g.ratio, 2.71)) && halt.length === 3 && halt.every(g => near(g.ratio, 1.35)) && prog.length > 0 && prog.every(g => near(g.ratio, 2.27)) && census.coverage.passed === true,
+    // F3: bounced/errored pages must not read as plain `measured`
+    labels: Object.fromEntries(['account', 'email-register', 'email-reproof', 'ws-roadmap-local', 'ws-task-page', 'ws-task-edit', 'swipe-public', 'ws-dashboard'].map(id => [id, census.entries[id]?.status])),
+    passed: ['account', 'email-register', 'email-reproof'].every(id => /^measured:redirected/.test(census.entries[id]?.status)) && census.entries['ws-task-page']?.status === 'measured:error-503' && census.entries['swipe-public']?.status === 'measured' && census.entries['ws-dashboard']?.status === 'measured'
+      && save.length > 0 && save.every(g => near(g.ratio, 2.71)) && halt.length === 3 && halt.every(g => near(g.ratio, 1.35)) && prog.length > 0 && prog.every(g => near(g.ratio, 2.27)) && census.coverage.passed === true,
   };
 }
 

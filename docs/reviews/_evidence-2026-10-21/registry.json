@@ -140,7 +140,10 @@
       "class": "page-get",
       "route": "/auth/email/confirm",
       "isNew": true,
-      "method": "route"
+      "method": "route",
+      "expect": {
+        "status": 410
+      }
     },
     {
       "id": "email-register",
@@ -220,7 +223,10 @@
       "class": "page-get",
       "route": "/auth/jira",
       "isNew": false,
-      "method": "route"
+      "method": "route",
+      "expect": {
+        "status": 400
+      }
     },
     {
       "id": "auth-jira-oauth",
@@ -288,7 +294,10 @@
       "class": "page-get",
       "route": "/connect/:provider/held",
       "isNew": true,
-      "method": "route"
+      "method": "route",
+      "expect": {
+        "status": 400
+      }
     },
     {
       "id": "kpis-public",
@@ -435,7 +444,10 @@
       "class": "page-get",
       "route": "/swipe/:identifier?",
       "isNew": false,
-      "method": "route"
+      "method": "route",
+      "expect": {
+        "finalPathPrefix": "/swipe/"
+      }
     },
     {
       "id": "guest-share",
@@ -448,7 +460,10 @@
       "class": "page-get",
       "route": "/t/:token",
       "isNew": true,
-      "method": "route"
+      "method": "route",
+      "expect": {
+        "status": 404
+      }
     },
     {
       "id": "templates",
@@ -518,7 +533,10 @@
       "class": "page-get",
       "route": "/workspace/:urlKey/dashboard",
       "isNew": false,
-      "method": "route"
+      "method": "route",
+      "expect": {
+        "finalPath": "/workspace/test-workspace/observation"
+      }
     },
     {
       "id": "ws-dispatch",
@@ -621,7 +639,10 @@
       "class": "page-get",
       "route": "/workspace/:urlKey/observation/session/:sessionId",
       "isNew": false,
-      "method": "route"
+      "method": "route",
+      "expect": {
+        "status": 404
+      }
     },
     {
       "id": "ws-passage-planner",
@@ -757,7 +778,10 @@
       "class": "page-get",
       "route": "/workspace/:urlKey/swipe/:identifier?",
       "isNew": false,
-      "method": "route"
+      "method": "route",
+      "expect": {
+        "finalPathPrefix": "/workspace/test-workspace/swipe/"
+      }
     },
     {
       "id": "ws-task-chat",
@@ -778,7 +802,7 @@
       "theme": "cookie",
       "path": "/workspace/test-workspace/task/TEST-1",
       "isNew": true,
-      "note": "default seed renders the not-found/empty state; populated states are beat 3",
+      "note": "default seed renders the 503 \"Task unavailable — could not read this task from the tracker\" page (tracker read fails), not an empty/not-found state; a populated 200 state is beat 3",
       "class": "page-get",
       "route": "/workspace/:urlKey/task/:identifier",
       "method": "route"
@@ -963,7 +987,10 @@
       "standalone": true,
       "path": "/archive/999",
       "method": "route",
-      "note": "404 body via renderErrorPage"
+      "note": "404 body via renderErrorPage",
+      "expect": {
+        "status": 404
+      }
     },
     {
       "id": "renderer:renderAccountHomePage",

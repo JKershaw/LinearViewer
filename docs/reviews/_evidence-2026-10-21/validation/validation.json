@@ -3,13 +3,27 @@
   "results": {
     "M1": {
       "oldMetricFlagsInjected2000px": false,
-      "geometryFlagsInjected2000px": true,
-      "geometrySpill": [
+      "captureDomJsFlags": {
+        "injected2000": true,
+        "nested900": true,
+        "translateX": true
+      },
+      "captureDomJsIgnoresContainedWide": true,
+      "captureDomJsSpill": [
         "injected-2000@2000>390"
       ],
-      "geometryIgnoresContainedWide": true,
+      "captureClipJsFlagsTruncatedText": true,
+      "mutation_walkToHtml": {
+        "domJsFlags": {
+          "injected2000": false,
+          "nested900": false,
+          "translateX": false
+        },
+        "clipJsFlagsTruncatedText": false
+      },
+      "sharedGeometryFlagsInjected2000px": true,
       "passed": true,
-      "note": "oldMetric false = the 09-26 check is vacuous under overflow-x: clip (LIN-3715); geometry rule flags the same page."
+      "note": "oldMetric false = the 09-26 check is vacuous under overflow-x: clip (LIN-3715). Detector = capture.mjs DOM_JS/CLIP_JS as shipped; mutation_walkToHtml is the rejected walk-to-<html> variant and must read all-false (it is what the PR shipped)."
     },
     "M2": {
       "localCtas": [
@@ -86,12 +100,30 @@
       ],
       "coverage": {
         "registryIds": 249,
-        "measured": 201,
+        "measured": 195,
+        "measuredUnexpectedOutcome": [
+          "account=measured:redirected→/",
+          "email-reproof=measured:redirected→/",
+          "email-register=measured:redirected→/",
+          "ws-task-page=measured:error-503",
+          "ws-task-edit=measured:error-500",
+          "ws-roadmap-local=measured:redirected→/workspace/local-workspace/"
+        ],
         "excluded": 48,
         "unlisted": [],
         "notMeasuredOrExcluded": [],
         "orphanCensusIds": [],
         "passed": true
+      },
+      "labels": {
+        "account": "measured:redirected→/",
+        "email-register": "measured:redirected→/",
+        "email-reproof": "measured:redirected→/",
+        "ws-roadmap-local": "measured:redirected→/workspace/local-workspace/",
+        "ws-task-page": "measured:error-503",
+        "ws-task-edit": "measured:error-500",
+        "swipe-public": "measured",
+        "ws-dashboard": "measured"
       },
       "passed": true
     },
