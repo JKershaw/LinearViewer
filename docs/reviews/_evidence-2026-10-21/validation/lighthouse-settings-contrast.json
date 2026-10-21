@@ -1,0 +1,92 @@
+{
+ "note": "Lighthouse 12.8.2 accessibility, authenticated (Cookie via --extra-headers from /test/set-session), light, mobile default emulation, :3199. color-contrast audit only, items trimmed to selector + explanation. Cross-check for M3.",
+ "url": "http://localhost:3199/workspace/test-workspace/settings",
+ "accessibilityScore": 0.91,
+ "items": [
+  {
+   "selector": "div.tree > div.node > div.line > a.action-btn",
+   "snippet": "<a href=\"/auth/openrouter\" class=\"action-btn connect\">",
+   "explanation": "Fix any of the following:   Element has insufficient color contrast of 4.09 (foreground color: #2563eb, background color: #dee5f6, font size: 8.0pt (10.71px), font weight: normal). Expected contrast ratio of 4.5:1"
+  },
+  {
+   "selector": "div.line > form.settings-form > button.toggle-btn > span.toggle-state",
+   "snippet": "<span class=\"toggle-state\">",
+   "explanation": "Fix any of the following:   Element has insufficient color contrast of 3.29 (foreground color: #16a34a, background color: #ffffff, font size: 10.2pt (13.6px), font weight: normal). Expected contrast ratio of 4.5:1"
+  },
+  {
+   "selector": "div.line > form.settings-form > button.toggle-btn > span.toggle-state",
+   "snippet": "<span class=\"toggle-state\">",
+   "explanation": "Fix any of the following:   Element has insufficient color contrast of 3.29 (foreground color: #16a34a, background color: #ffffff, font size: 10.2pt (13.6px), font weight: normal). Expected contrast ratio of 4.5:1"
+  },
+  {
+   "selector": "div.line > form.settings-form > button.toggle-btn > span.toggle-state",
+   "snippet": "<span class=\"toggle-state\">",
+   "explanation": "Fix any of the following:   Element has insufficient color contrast of 3.29 (foreground color: #16a34a, background color: #ffffff, font size: 10.2pt (13.6px), font weight: normal). Expected contrast ratio of 4.5:1"
+  },
+  {
+   "selector": "div.tree > div.node > div.line > span.feature-note",
+   "snippet": "<span class=\"feature-note\">",
+   "explanation": "Fix any of the following:   Element has insufficient color contrast of 2.11 (foreground color: #d4a600, background color: #f7f7f7, font size: 9.6pt (12.8px), font weight: normal). Expected contrast ratio of 4.5:1"
+  },
+  {
+   "selector": "div.line > form.settings-form > button.toggle-btn > span.toggle-state",
+   "snippet": "<span class=\"toggle-state\">",
+   "explanation": "Fix any of the following:   Element has insufficient color contrast of 3.29 (foreground color: #16a34a, background color: #ffffff, font size: 10.2pt (13.6px), font weight: normal). Expected contrast ratio of 4.5:1"
+  },
+  {
+   "selector": "div.tree > div.node > div.line > a.action-btn",
+   "snippet": "<a href=\"/logout\" class=\"action-btn logout\" data-testid=\"settings-logout\">",
+   "explanation": "Fix any of the following:   Element has insufficient color contrast of 4.4 (foreground color: #cc0000, background color: #f2d9d9, font size: 8.0pt (10.71px), font weight: normal). Expected contrast ratio of 4.5:1"
+  },
+  {
+   "selector": "div.node > div.line > form.settings-form > button.action-btn",
+   "snippet": "<button type=\"submit\" class=\"action-btn save\">",
+   "explanation": "Fix any of the following:   Element has insufficient color contrast of 2.7 (foreground color: #16a34a, background color: #dcede2, font size: 8.0pt (10.71px), font weight: normal). Expected contrast ratio of 4.5:1"
+  },
+  {
+   "selector": "div.tree > form.settings-form > div.ai-overrides-submit > button.action-btn",
+   "snippet": "<button type=\"submit\" class=\"action-btn save\">",
+   "explanation": "Fix any of the following:   Element has insufficient color contrast of 2.7 (foreground color: #16a34a, background color: #dcede2, font size: 8.9pt (11.9px), font weight: normal). Expected contrast ratio of 4.5:1"
+  },
+  {
+   "selector": "section.section > form.settings-form > div.dispatch-defaults-submit > button.action-btn",
+   "snippet": "<button type=\"submit\" class=\"action-btn save\">",
+   "explanation": "Fix any of the following:   Element has insufficient color contrast of 2.7 (foreground color: #16a34a, background color: #dcede2, font size: 8.9pt (11.9px), font weight: normal). Expected contrast ratio of 4.5:1"
+  },
+  {
+   "selector": "section.section > section#dispatch-presets > div.dispatch-preset-create-submit > button.action-btn",
+   "snippet": "<button type=\"button\" class=\"action-btn save dispatch-preset-create-btn\">",
+   "explanation": "Fix any of the following:   Element has insufficient color contrast of 2.7 (foreground color: #16a34a, background color: #dcede2, font size: 8.9pt (11.9px), font weight: normal). Expected contrast ratio of 4.5:1"
+  },
+  {
+   "selector": "div.node > div.line > form.settings-form > button.action-btn",
+   "snippet": "<button type=\"submit\" class=\"action-btn provider-add-btn\" data-testid=\"settings-provider-add-btn\">",
+   "explanation": "Fix any of the following:   Element has insufficient color contrast of 3.07 (foreground color: #16a34a, background color: #f7f7f7, font size: 8.0pt (10.71px), font weight: normal). Expected contrast ratio of 4.5:1"
+  },
+  {
+   "selector": "div.node > div.line > form.settings-form > button.action-btn",
+   "snippet": "<button type=\"submit\" class=\"action-btn provider-add-btn\" data-testid=\"settings-provider-add-btn\">",
+   "explanation": "Fix any of the following:   Element has insufficient color contrast of 3.07 (foreground color: #16a34a, background color: #f7f7f7, font size: 8.0pt (10.71px), font weight: normal). Expected contrast ratio of 4.5:1"
+  },
+  {
+   "selector": "div.node > div.line > form.settings-form > button.action-btn",
+   "snippet": "<button type=\"submit\" class=\"action-btn provider-add-btn\" data-testid=\"settings-provider-add-btn\">",
+   "explanation": "Fix any of the following:   Element has insufficient color contrast of 3.07 (foreground color: #16a34a, background color: #f7f7f7, font size: 8.0pt (10.71px), font weight: normal). Expected contrast ratio of 4.5:1"
+  },
+  {
+   "selector": "div.node > div.line > form.settings-form > button.action-btn",
+   "snippet": "<button type=\"submit\" class=\"action-btn provider-add-btn\" data-testid=\"settings-provider-add-btn-jira-basic\">",
+   "explanation": "Fix any of the following:   Element has insufficient color contrast of 3.07 (foreground color: #16a34a, background color: #f7f7f7, font size: 8.0pt (10.71px), font weight: normal). Expected contrast ratio of 4.5:1"
+  },
+  {
+   "selector": "div.node > div.line > form.settings-form > button.action-btn",
+   "snippet": "<button type=\"submit\" class=\"action-btn provider-add-btn\" data-testid=\"settings-provider-add-btn-jira-oauth\">",
+   "explanation": "Fix any of the following:   Element has insufficient color contrast of 3.07 (foreground color: #16a34a, background color: #f7f7f7, font size: 8.0pt (10.71px), font weight: normal). Expected contrast ratio of 4.5:1"
+  },
+  {
+   "selector": "footer.page-footer > div.footer-brand > span.wordmark > span.wordmark-accent",
+   "snippet": "<span class=\"wordmark-accent\" aria-hidden=\"true\">",
+   "explanation": "Fix any of the following:   Element has insufficient color contrast of 3.74 (foreground color: #0d9488, background color: #ffffff, font size: 8.5pt (11.305px), font weight: normal). Expected contrast ratio of 4.5:1"
+  }
+ ]
+}
