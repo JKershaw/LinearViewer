@@ -44,7 +44,7 @@ const checks = [
   ['guest-share 404 Lighthouse accessibility', 0.89, lh('guest-share')],
   ['email-signin Lighthouse accessibility', 0.9, lh('email-signin')],
   ['kpis-public Lighthouse accessibility', 1, lh('kpis-public')],
-  ['kept PNG count', 690, countPngs(root)],
+  ['kept PNG count (after the merge trim)', 51, countPngs(root)],
   ['visual-pass.md PNG lines', 690, readFileSync(new URL('visual-pass.md', root), 'utf8').split('\n').filter(l => /^- `.*\.png`/.test(l)).length],
 ].map(([name, expected, actual]) => ({ name, expected, actual, ok: expected === actual }));
 

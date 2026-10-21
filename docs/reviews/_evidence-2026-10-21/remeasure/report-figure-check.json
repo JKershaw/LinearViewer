@@ -121,9 +121,9 @@
       "ok": true
     },
     {
-      "name": "kept PNG count",
-      "expected": 690,
-      "actual": 690,
+      "name": "kept PNG count (after the merge trim)",
+      "expected": 51,
+      "actual": 51,
       "ok": true
     },
     {
