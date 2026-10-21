@@ -1,0 +1,43 @@
+{
+  "id": "a3",
+  "base": "http://localhost:3199",
+  "head": "b901efab",
+  "question": "Stop styled like Pause and Resume?",
+  "buttons": [
+    {
+      "text": "Pause",
+      "cls": "action-btn halt-pause",
+      "testid": "dispatch-halt-pause",
+      "color": "rgb(0, 0, 0)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "rgb(0, 0, 0)",
+      "fontWeight": "400"
+    },
+    {
+      "text": "Stop",
+      "cls": "action-btn halt-stop",
+      "testid": "dispatch-halt-stop",
+      "color": "rgb(0, 0, 0)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "rgb(0, 0, 0)",
+      "fontWeight": "400"
+    },
+    {
+      "text": "Resume",
+      "cls": "action-btn halt-resume",
+      "testid": "dispatch-halt-resume",
+      "color": "rgb(0, 0, 0)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "rgb(0, 0, 0)",
+      "fontWeight": "400"
+    }
+  ],
+  "summary": {
+    "found": [
+      "Pause",
+      "Stop",
+      "Resume"
+    ],
+    "identicalStyle": true
+  }
+}

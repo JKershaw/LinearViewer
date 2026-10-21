@@ -1,0 +1,47 @@
+{
+  "id": "lin-3121-f5",
+  "base": "http://localhost:3199",
+  "head": "b901efab",
+  "question": "upstream prose contradicts its own diagnostic (3121); \"Linear\" hardcoded for every backend (F5)?",
+  "cases": {
+    "state-upstream-429": {
+      "title": "Trouble Reaching Linear - Projects",
+      "h": "Harbour",
+      "message": "We couldn't reach Linear's API just now — the connection closed before it responded. This is usually temporary; try again in a moment.",
+      "diagnostic": "Reason Linear rate-limited the request; it should recover shortly. Type upstream · retryable Code LINEAR_RATE_LIMITED Time 2026-10-21T00:00:00.000Z"
+    },
+    "state-upstream-5xx": {
+      "title": "Trouble Reaching Linear - Projects",
+      "h": "Harbour",
+      "message": "We couldn't reach Linear's API just now — the connection closed before it responded. This is usually temporary; try again in a moment.",
+      "diagnostic": "Reason Linear returned a 502 server error. Type upstream · retryable Code LINEAR_UPSTREAM_5XX Time 2026-10-21T00:00:00.000Z"
+    },
+    "state-upstream-auth": {
+      "title": "Re-authentication Needed - Projects",
+      "h": "Harbour",
+      "message": "Linear rejected your session as unauthenticated — your sign-in has expired or been revoked. Log out and sign in again to continue.",
+      "diagnostic": "Reason Linear rejected the request as unauthenticated. Type auth Code LINEAR_AUTH Time 2026-10-21T00:00:00.000Z"
+    },
+    "state-upstream-internal": {
+      "title": "Something Went Wrong - Projects",
+      "h": "Harbour",
+      "message": "Something went wrong. Please try again.",
+      "diagnostic": "Reason An unexpected error occurred while preparing the page. Type internal Code INTERNAL_ERROR Time 2026-10-21T00:00:00.000Z"
+    }
+  },
+  "sourceLines": [
+    "686:  // An auth failure (Linear rejected the token as unauthenticated — 401/403)",
+    "695:      'Linear rejected your session as unauthenticated — your sign-in has expired or been revoked. Log out and sign in again to continue.',",
+    "705:  const title = isUpstream ? 'Trouble Reaching Linear' : 'Something Went Wrong';",
+    "707:    ? \"We couldn't reach Linear's API just now — the connection closed before it responded. This is usually temporary; try again in a moment.\""
+  ],
+  "sourceExcerpt": "  // again, so the action ALWAYS points at /logout here, overriding whatever the\n  // caller passed (which would loop straight back into the same auth error).\n  if (classified.category === 'auth') {\n    return renderErrorPage(\n      'Re-authentication Needed',\n      'Linear rejected your session as unauthenticated — your sign-in has expired or been revoked. Log out and sign in again to continue.',\n      {\n        action: 'Log out and sign in again',\n        actionUrl: '/logout',\n        diagnostic: { ...classified, time }\n      }\n    );\n  }\n\n  const isUpstream = classified.category === 'upstream';\n  const title = isUpstream ? 'Trouble Reaching Linear' : 'Something Went Wrong';\n  const message = isUpstream\n    ? \"We couldn't reach Linear's API just now — the connection closed before it responded. This is usually temporary; try again in a moment.\"\n    : defaultMessage;\n\n  return renderErrorPage(title, message, {\n    action,\n    actionUrl,\n",
+  "commitsTouchingFileSinceGrounding": [],
+  "summary": {
+    "prose429": "We couldn't reach Linear's API just now — the connection closed before it responded. This is usually temporary; try again in a moment.",
+    "diagnostic429": "Reason Linear rate-limited the request; it should recover shortly. Type upstream · retryable Code LINEAR_RATE_LIMITED Time 2026-10-21T00:00:00.000Z",
+    "prose5xx": "We couldn't reach Linear's API just now — the connection closed before it responded. This is usually temporary; try again in a moment.",
+    "diagnostic5xx": "Reason Linear returned a 502 server error. Type upstream · retryable Code LINEAR_UPSTREAM_5XX Time 2026-10-21T00:00:00.000Z",
+    "linearInTitleForNonLinearBackend": false
+  }
+}

@@ -1,0 +1,749 @@
+{
+  "id": "lin-3123",
+  "base": "http://localhost:3199",
+  "head": "b901efab",
+  "question": "light: --yellow/--green/--amber fill tokens used as text below AA?",
+  "censusSource": "census.json (light, 1400, own-background composited)",
+  "censusHits": [
+    {
+      "id": "account",
+      "token": "--yellow",
+      "element": "span.status-pill__char",
+      "ratio": 2.27,
+      "samples": [
+        "◐",
+        "◐"
+      ]
+    },
+    {
+      "id": "account",
+      "token": "--green",
+      "element": "span.status-pill__label",
+      "ratio": 3.08,
+      "samples": [
+        "done"
+      ]
+    },
+    {
+      "id": "account",
+      "token": "--green",
+      "element": "span.status-pill__char",
+      "ratio": 3.3,
+      "samples": [
+        "✓",
+        "✓"
+      ]
+    },
+    {
+      "id": "landing",
+      "token": "--yellow",
+      "element": "span.status-pill__char",
+      "ratio": 2.27,
+      "samples": [
+        "◐",
+        "◐"
+      ]
+    },
+    {
+      "id": "landing",
+      "token": "--green",
+      "element": "span.status-pill__label",
+      "ratio": 3.08,
+      "samples": [
+        "done"
+      ]
+    },
+    {
+      "id": "landing",
+      "token": "--green",
+      "element": "span.status-pill__char",
+      "ratio": 3.3,
+      "samples": [
+        "✓",
+        "✓"
+      ]
+    },
+    {
+      "id": "email-reproof",
+      "token": "--yellow",
+      "element": "span.status-pill__char",
+      "ratio": 2.27,
+      "samples": [
+        "◐",
+        "◐"
+      ]
+    },
+    {
+      "id": "email-reproof",
+      "token": "--green",
+      "element": "span.status-pill__label",
+      "ratio": 3.08,
+      "samples": [
+        "done"
+      ]
+    },
+    {
+      "id": "email-reproof",
+      "token": "--green",
+      "element": "span.status-pill__char",
+      "ratio": 3.3,
+      "samples": [
+        "✓",
+        "✓"
+      ]
+    },
+    {
+      "id": "email-register",
+      "token": "--yellow",
+      "element": "span.status-pill__char",
+      "ratio": 2.27,
+      "samples": [
+        "◐",
+        "◐"
+      ]
+    },
+    {
+      "id": "email-register",
+      "token": "--green",
+      "element": "span.status-pill__label",
+      "ratio": 3.08,
+      "samples": [
+        "done"
+      ]
+    },
+    {
+      "id": "email-register",
+      "token": "--green",
+      "element": "span.status-pill__char",
+      "ratio": 3.3,
+      "samples": [
+        "✓",
+        "✓"
+      ]
+    },
+    {
+      "id": "styleguide",
+      "token": "--yellow",
+      "element": "span.status-pill__char",
+      "ratio": 2.12,
+      "samples": [
+        "◐",
+        "◐",
+        "◐"
+      ]
+    },
+    {
+      "id": "styleguide",
+      "token": "--yellow",
+      "element": "span.status-pill__label",
+      "ratio": 2.12,
+      "samples": [
+        "in progress",
+        "in progress"
+      ]
+    },
+    {
+      "id": "styleguide",
+      "token": "--yellow",
+      "element": "span.sg-glyph",
+      "ratio": 2.27,
+      "samples": [
+        "◐",
+        "◐"
+      ]
+    },
+    {
+      "id": "styleguide",
+      "token": "--yellow",
+      "element": "span.status-pill__char",
+      "ratio": 2.27,
+      "samples": [
+        "◐"
+      ]
+    },
+    {
+      "id": "styleguide",
+      "token": "--green",
+      "element": "button.action-btn.save",
+      "ratio": 2.89,
+      "samples": [
+        "save",
+        "save"
+      ]
+    },
+    {
+      "id": "styleguide",
+      "token": "--green",
+      "element": "span.status-pill__char",
+      "ratio": 3.08,
+      "samples": [
+        "✓",
+        "✓",
+        "✓"
+      ]
+    },
+    {
+      "id": "styleguide",
+      "token": "--green",
+      "element": "span.status-pill__label",
+      "ratio": 3.08,
+      "samples": [
+        "done",
+        "done",
+        "done"
+      ]
+    },
+    {
+      "id": "styleguide",
+      "token": "--green",
+      "element": "span.sg-glyph",
+      "ratio": 3.3,
+      "samples": [
+        "✓",
+        "✓"
+      ]
+    },
+    {
+      "id": "styleguide",
+      "token": "--green",
+      "element": "span.status-pill__char",
+      "ratio": 3.3,
+      "samples": [
+        "✓"
+      ]
+    },
+    {
+      "id": "swim-public",
+      "token": "--yellow",
+      "element": "span.swim-fc-prio.p3",
+      "ratio": 2.27,
+      "samples": [
+        "Medium",
+        "Medium"
+      ]
+    },
+    {
+      "id": "ws-tree",
+      "token": "--yellow",
+      "element": "div.in-progress-header",
+      "ratio": 2.27,
+      "samples": [
+        "▼ In Progress"
+      ]
+    },
+    {
+      "id": "ws-tree",
+      "token": "--yellow",
+      "element": "span.status-pill__char",
+      "ratio": 2.27,
+      "samples": [
+        "◐",
+        "◐",
+        "◐"
+      ]
+    },
+    {
+      "id": "ws-dashboard",
+      "token": "--green",
+      "element": "span.obs-poll-status",
+      "ratio": 3.3,
+      "samples": [
+        "● live"
+      ]
+    },
+    {
+      "id": "ws-flight-companion",
+      "token": "--green",
+      "element": "button.action-btn.save.fc-start-btn",
+      "ratio": 2.71,
+      "samples": [
+        "start"
+      ]
+    },
+    {
+      "id": "ws-flight-companion",
+      "token": "--green",
+      "element": "button.action-btn.save",
+      "ratio": 2.71,
+      "samples": [
+        "send",
+        "copy prompt"
+      ]
+    },
+    {
+      "id": "ws-next-run",
+      "token": "--amber",
+      "element": "p.next-run-warning",
+      "ratio": 1.68,
+      "samples": [
+        "⚠ AI is not configured on the server (connect Open"
+      ]
+    },
+    {
+      "id": "ws-next-run",
+      "token": "--amber",
+      "element": "code",
+      "ratio": 1.68,
+      "samples": [
+        "OPENROUTER_API_KEY"
+      ]
+    },
+    {
+      "id": "ws-next-run",
+      "token": "--green",
+      "element": "button.action-btn.save",
+      "ratio": 2.71,
+      "samples": [
+        "generate suggestions"
+      ]
+    },
+    {
+      "id": "ws-observation",
+      "token": "--green",
+      "element": "span.obs-poll-status",
+      "ratio": 3.3,
+      "samples": [
+        "● live"
+      ]
+    },
+    {
+      "id": "ws-collective",
+      "token": "--green",
+      "element": "button.action-btn.save",
+      "ratio": 2.71,
+      "samples": [
+        "start discussion",
+        "say"
+      ]
+    },
+    {
+      "id": "ws-passage-planner",
+      "token": "--green",
+      "element": "button.action-btn.save",
+      "ratio": 2.71,
+      "samples": [
+        "copy prompt"
+      ]
+    },
+    {
+      "id": "ws-dispatch",
+      "token": "--green",
+      "element": "button.action-btn.save.dispatch-toggle",
+      "ratio": 2.71,
+      "samples": [
+        "Dispatch ▾"
+      ]
+    },
+    {
+      "id": "ws-dispatch",
+      "token": "--green",
+      "element": "button.action-btn.save",
+      "ratio": 2.71,
+      "samples": [
+        "generate"
+      ]
+    },
+    {
+      "id": "ws-prompts-custom",
+      "token": "--green",
+      "element": "button.action-btn.save.custom-prompt-new-btn",
+      "ratio": 2.89,
+      "samples": [
+        "+ new prompt"
+      ]
+    },
+    {
+      "id": "ws-proxy",
+      "token": "--green",
+      "element": "button.action-btn.save",
+      "ratio": 2.71,
+      "samples": [
+        "generate"
+      ]
+    },
+    {
+      "id": "ws-proxy",
+      "token": "--green",
+      "element": "button.action-btn.save",
+      "ratio": 2.75,
+      "samples": [
+        "generate & copy"
+      ]
+    },
+    {
+      "id": "ws-roadmap",
+      "token": "--green",
+      "element": "span.status-pill__char",
+      "ratio": 3.3,
+      "samples": [
+        "✓",
+        "✓",
+        "✓"
+      ]
+    },
+    {
+      "id": "ws-runner",
+      "token": "--green",
+      "element": "button.action-btn.save.runner-setup-btn",
+      "ratio": 2.71,
+      "samples": [
+        "create runner prompt"
+      ]
+    },
+    {
+      "id": "ws-ship",
+      "token": "--yellow",
+      "element": "span.swim-box-state.in-progress.status-pill__char.status-pill--in-progress",
+      "ratio": 2.27,
+      "samples": [
+        "◐",
+        "◐",
+        "◐"
+      ]
+    },
+    {
+      "id": "ws-ship-biscuit",
+      "token": "--amber",
+      "element": "p.ship-biscuit-warning",
+      "ratio": 1.68,
+      "samples": [
+        "⚠ AI is not configured on the server (connect Open"
+      ]
+    },
+    {
+      "id": "ws-ship-biscuit",
+      "token": "--amber",
+      "element": "code",
+      "ratio": 1.68,
+      "samples": [
+        "OPENROUTER_API_KEY"
+      ]
+    },
+    {
+      "id": "ws-ship-biscuit",
+      "token": "--green",
+      "element": "button.action-btn.save",
+      "ratio": 2.71,
+      "samples": [
+        "run the presses"
+      ]
+    },
+    {
+      "id": "ws-settings",
+      "token": "--yellow",
+      "element": "span.feature-note",
+      "ratio": 2.12,
+      "samples": [
+        "Recommended — the agent reaches the tracker throug"
+      ]
+    },
+    {
+      "id": "ws-settings",
+      "token": "--green",
+      "element": "button.action-btn.save",
+      "ratio": 2.71,
+      "samples": [
+        "save",
+        "save model overrides",
+        "save dispatch defaults"
+      ]
+    },
+    {
+      "id": "ws-settings",
+      "token": "--green",
+      "element": "button.action-btn.save.dispatch-preset-create-btn",
+      "ratio": 2.71,
+      "samples": [
+        "save preset"
+      ]
+    },
+    {
+      "id": "ws-settings",
+      "token": "--green",
+      "element": "button.action-btn.provider-add-btn",
+      "ratio": 3.08,
+      "samples": [
+        "add",
+        "add",
+        "add"
+      ]
+    },
+    {
+      "id": "ws-settings",
+      "token": "--green",
+      "element": "span.toggle-state",
+      "ratio": 3.3,
+      "samples": [
+        "● on",
+        "● on",
+        "● on"
+      ]
+    },
+    {
+      "id": "ws-swim",
+      "token": "--yellow",
+      "element": "span.swim-box-state.in-progress.status-pill__char.status-pill--in-progress",
+      "ratio": 2.15,
+      "samples": [
+        "◐"
+      ]
+    },
+    {
+      "id": "ws-swim",
+      "token": "--yellow",
+      "element": "span.swim-fc-prio.p3",
+      "ratio": 2.15,
+      "samples": [
+        "Medium"
+      ]
+    },
+    {
+      "id": "ws-swim",
+      "token": "--yellow",
+      "element": "span.swim-box-state.in-progress.status-pill__char.status-pill--in-progress",
+      "ratio": 2.27,
+      "samples": [
+        "◐",
+        "◐",
+        "◐"
+      ]
+    },
+    {
+      "id": "ws-swim",
+      "token": "--yellow",
+      "element": "span.swim-fc-prio.p3",
+      "ratio": 2.27,
+      "samples": [
+        "Medium",
+        "Medium"
+      ]
+    },
+    {
+      "id": "ws-task-chat",
+      "token": "--green",
+      "element": "button.action-btn.save",
+      "ratio": 2.71,
+      "samples": [
+        "ask"
+      ]
+    },
+    {
+      "id": "ws-tree-ghp",
+      "token": "--yellow",
+      "element": "div.in-progress-header",
+      "ratio": 2.27,
+      "samples": [
+        "▼ In Progress"
+      ]
+    },
+    {
+      "id": "ws-tree-ghp",
+      "token": "--yellow",
+      "element": "span.status-pill__char",
+      "ratio": 2.27,
+      "samples": [
+        "◐",
+        "◐"
+      ]
+    },
+    {
+      "id": "ws-tree-jira",
+      "token": "--yellow",
+      "element": "div.in-progress-header",
+      "ratio": 2.27,
+      "samples": [
+        "▼ In Progress"
+      ]
+    },
+    {
+      "id": "ws-tree-jira",
+      "token": "--yellow",
+      "element": "span.status-pill__char",
+      "ratio": 2.27,
+      "samples": [
+        "◐",
+        "◐"
+      ]
+    },
+    {
+      "id": "ws-roadmap-local",
+      "token": "--yellow",
+      "element": "div.in-progress-header",
+      "ratio": 2.27,
+      "samples": [
+        "▼ In Progress"
+      ]
+    },
+    {
+      "id": "ws-roadmap-local",
+      "token": "--yellow",
+      "element": "span.status-pill__char",
+      "ratio": 2.27,
+      "samples": [
+        "◐",
+        "◐",
+        "◐"
+      ]
+    },
+    {
+      "id": "ws-roadmap-local",
+      "token": "--green",
+      "element": "div.recent-activity-header",
+      "ratio": 3.3,
+      "samples": [
+        "▶ Recent activity"
+      ]
+    },
+    {
+      "id": "ws-settings-jira",
+      "token": "--yellow",
+      "element": "span.feature-note",
+      "ratio": 2.12,
+      "samples": [
+        "Recommended — the agent reaches the tracker throug"
+      ]
+    },
+    {
+      "id": "ws-settings-jira",
+      "token": "--green",
+      "element": "button.action-btn.save",
+      "ratio": 2.71,
+      "samples": [
+        "save",
+        "save model overrides",
+        "save dispatch defaults"
+      ]
+    },
+    {
+      "id": "ws-settings-jira",
+      "token": "--green",
+      "element": "button.action-btn.save.dispatch-preset-create-btn",
+      "ratio": 2.71,
+      "samples": [
+        "save preset"
+      ]
+    },
+    {
+      "id": "ws-settings-jira",
+      "token": "--green",
+      "element": "span.provider-active",
+      "ratio": 3.08,
+      "samples": [
+        "●"
+      ]
+    },
+    {
+      "id": "ws-settings-jira",
+      "token": "--green",
+      "element": "button.action-btn.provider-add-btn",
+      "ratio": 3.08,
+      "samples": [
+        "add",
+        "add",
+        "add"
+      ]
+    },
+    {
+      "id": "ws-settings-jira",
+      "token": "--green",
+      "element": "span.toggle-state",
+      "ratio": 3.3,
+      "samples": [
+        "● on",
+        "● on",
+        "● on"
+      ]
+    },
+    {
+      "id": "archive-3",
+      "token": "--green",
+      "element": "span.glyph",
+      "ratio": 3.13,
+      "samples": [
+        "◐",
+        "◐",
+        "◐"
+      ]
+    }
+  ],
+  "treeInProgress": [
+    {
+      "tag": "div",
+      "cls": "in-progress-header",
+      "text": "▼ In Progress",
+      "color": "rgb(212, 166, 0)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 2.27,
+      "fontSize": "16px",
+      "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+    },
+    {
+      "tag": "span",
+      "cls": "status-pill status-pill--in-progress status-pill--bare",
+      "text": "◐",
+      "color": "rgb(212, 166, 0)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 2.27,
+      "fontSize": "14.4px",
+      "fontFamily": "\"JetBrains Mono\", \"SF Mono\", \"Fira Code\", Consolas, monospac"
+    },
+    {
+      "tag": "span",
+      "cls": "status-pill__char",
+      "text": "◐",
+      "color": "rgb(212, 166, 0)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 2.27,
+      "fontSize": "14.4px",
+      "fontFamily": "\"JetBrains Mono\", \"SF Mono\", \"Fira Code\", Consolas, monospac"
+    },
+    {
+      "tag": "span",
+      "cls": "status-pill status-pill--in-progress status-pill--bare",
+      "text": "◐",
+      "color": "rgb(212, 166, 0)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 2.27,
+      "fontSize": "14.4px",
+      "fontFamily": "\"JetBrains Mono\", \"SF Mono\", \"Fira Code\", Consolas, monospac"
+    }
+  ],
+  "runnerCss": "  border: 1px solid var(--border-strong);\n  border-radius: var(--radius-sm);\n}\n\n.runner-setup-feedback {\n  font-family: var(--font-structural);\n  color: var(--green);\n}\n\n.runner-setup-output {\n  display: block;\n",
+  "runnerMintedLightGroups": [
+    {
+      "element": "button.action-btn.runner-setup-btn.save",
+      "color": "rgb(22, 163, 74)",
+      "bg": "rgb(198,229,209)",
+      "ratio": 2.44,
+      "need": 4.5,
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "count": 1,
+      "samples": [
+        "copy"
+      ]
+    },
+    {
+      "element": "span.runner-setup-feedback",
+      "color": "rgb(22, 163, 74)",
+      "bg": "rgb(247,247,247)",
+      "ratio": 3.08,
+      "need": 4.5,
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "count": 1,
+      "samples": [
+        "copied ✓"
+      ]
+    }
+  ],
+  "summary": {
+    "pagesWithFillTokenAsText": 28,
+    "treeInProgressRatio": 2.27,
+    "byToken": {
+      "--yellow": 24,
+      "--green": 40,
+      "--amber": 4
+    }
+  }
+}

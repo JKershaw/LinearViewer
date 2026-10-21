@@ -1,0 +1,179 @@
+{
+  "id": "a4",
+  "base": "http://localhost:3199",
+  "head": "b901efab",
+  "question": "per-page nav order",
+  "distinctOrders": {
+    "\u2190 projects | Sign in \u2192 | GitHub \u2192 | Jira \u2192 | Email \u2192": [
+      "ship-public",
+      "swim-public",
+      "swipe-public"
+    ],
+    "harbour.cat | search | swipe | swim | observation | settings | kpis | passage planner | ship's biscuit | live console | ship journey | roadmap | dispatch": [
+      "ws-tree"
+    ],
+    "harbour.cat | tasks | swipe | swim | observation | kpis | passage planner | ship's biscuit | live console | ship journey | roadmap | dispatch": [
+      "ws/settings"
+    ],
+    "harbour.cat | tasks | swipe | swim | observation | settings | kpis | passage planner | ship's biscuit | live console | ship journey | roadmap": [
+      "ws/dispatch",
+      "ws/proxy",
+      "ws/collective",
+      "ws/next-run"
+    ],
+    "harbour.cat | tasks | swipe | swim | observation | settings | kpis | passage planner | ship's biscuit | live console | ship journey | dispatch": [
+      "ws/roadmap"
+    ],
+    "harbour.cat | tasks | swipe | swim | observation | settings | passage planner | ship's biscuit | live console | ship journey | roadmap | dispatch": [
+      "ws/kpis"
+    ],
+    "harbour.cat | tasks | swipe | swim | observation | settings | kpis | passage planner | ship's biscuit | live console | ship journey | roadmap | dispatch | proxy": [
+      "ws/runner",
+      "ws/audit",
+      "ws/prompts"
+    ],
+    "harbour.cat | tasks | swipe | swim | observation | settings | kpis | live console | ship journey | roadmap | dispatch | proxy | collective | task chat | next run | flight companion": [
+      "ws/ship"
+    ],
+    "harbour.cat | tasks | swipe | observation | settings | kpis | live console | ship journey | roadmap | dispatch | proxy | collective | task chat | ship | next run | flight companion": [
+      "ws/swim"
+    ],
+    "harbour.cat | tasks | swim | observation | settings | kpis | passage planner | ship's biscuit | live console | ship journey | roadmap | dispatch": [
+      "ws/swipe"
+    ],
+    "harbour.cat | tasks | swipe | swim | settings | kpis | passage planner | ship's biscuit | live console | ship journey | roadmap | dispatch": [
+      "ws/observation"
+    ],
+    "harbour.cat | tasks | swipe | swim | observation | settings | kpis | flight companion | passage planner | ship's biscuit | ship journey": [
+      "ws/live-console"
+    ],
+    "harbour.cat | tasks | swipe | swim | observation | settings | kpis | flight companion | passage planner | live console | ship journey": [
+      "ws/ship-biscuit"
+    ],
+    "harbour.cat | tasks | swipe | swim | observation | settings | kpis | passage planner | ship's biscuit | live console | ship journey": [
+      "ws/flight-companion"
+    ],
+    "harbour.cat | tasks | swipe | swim | observation | settings | kpis | flight companion | ship's biscuit | live console | ship journey": [
+      "ws/passage-planner"
+    ]
+  },
+  "summary": {
+    "distinctOrderCount": 15,
+    "note": "distinctOrderCount is inflated by the active page omitting its own link; pairwiseInversions compares only items present on both pages.",
+    "workspacePagesCompared": 19,
+    "pairwiseInversionCount": 10,
+    "stillReproduces": true
+  },
+  "pairwiseInversions": [
+    {
+      "pages": [
+        "ws/ship",
+        "ws/live-console"
+      ],
+      "items": [
+        "ship journey",
+        "flight companion"
+      ],
+      "orderOnFirst": "ship journey<flight companion"
+    },
+    {
+      "pages": [
+        "ws/ship",
+        "ws/ship-biscuit"
+      ],
+      "items": [
+        "live console",
+        "flight companion"
+      ],
+      "orderOnFirst": "live console<flight companion"
+    },
+    {
+      "pages": [
+        "ws/ship",
+        "ws/ship-biscuit"
+      ],
+      "items": [
+        "ship journey",
+        "flight companion"
+      ],
+      "orderOnFirst": "ship journey<flight companion"
+    },
+    {
+      "pages": [
+        "ws/ship",
+        "ws/passage-planner"
+      ],
+      "items": [
+        "live console",
+        "flight companion"
+      ],
+      "orderOnFirst": "live console<flight companion"
+    },
+    {
+      "pages": [
+        "ws/ship",
+        "ws/passage-planner"
+      ],
+      "items": [
+        "ship journey",
+        "flight companion"
+      ],
+      "orderOnFirst": "ship journey<flight companion"
+    },
+    {
+      "pages": [
+        "ws/swim",
+        "ws/live-console"
+      ],
+      "items": [
+        "ship journey",
+        "flight companion"
+      ],
+      "orderOnFirst": "ship journey<flight companion"
+    },
+    {
+      "pages": [
+        "ws/swim",
+        "ws/ship-biscuit"
+      ],
+      "items": [
+        "live console",
+        "flight companion"
+      ],
+      "orderOnFirst": "live console<flight companion"
+    },
+    {
+      "pages": [
+        "ws/swim",
+        "ws/ship-biscuit"
+      ],
+      "items": [
+        "ship journey",
+        "flight companion"
+      ],
+      "orderOnFirst": "ship journey<flight companion"
+    },
+    {
+      "pages": [
+        "ws/swim",
+        "ws/passage-planner"
+      ],
+      "items": [
+        "live console",
+        "flight companion"
+      ],
+      "orderOnFirst": "live console<flight companion"
+    },
+    {
+      "pages": [
+        "ws/swim",
+        "ws/passage-planner"
+      ],
+      "items": [
+        "ship journey",
+        "flight companion"
+      ],
+      "orderOnFirst": "ship journey<flight companion"
+    }
+  ]
+}

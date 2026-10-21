@@ -1,0 +1,795 @@
+{
+  "id": "a13-a14",
+  "base": "http://localhost:3199",
+  "head": "b901efab",
+  "question": "wordmark missing at 390; two brand marks",
+  "rows": [
+    {
+      "name": "landing",
+      "width": 1400,
+      "status": 200,
+      "wordmarkInDom": 0,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "harbour.cat",
+        "font": "\"JetBrains Mono\", \"SF Mono\", \"",
+        "px": "44px"
+      }
+    },
+    {
+      "name": "landing",
+      "width": 390,
+      "status": 200,
+      "wordmarkInDom": 0,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "harbour.cat",
+        "font": "\"JetBrains Mono\", \"SF Mono\", \"",
+        "px": "36px"
+      }
+    },
+    {
+      "name": "library",
+      "width": 1400,
+      "status": 200,
+      "wordmarkInDom": 0,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      }
+    },
+    {
+      "name": "library",
+      "width": 390,
+      "status": 200,
+      "wordmarkInDom": 0,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      }
+    },
+    {
+      "name": "guest-404",
+      "width": 1400,
+      "status": 404,
+      "wordmarkInDom": 0,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      }
+    },
+    {
+      "name": "guest-404",
+      "width": 390,
+      "status": 404,
+      "wordmarkInDom": 0,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      }
+    },
+    {
+      "name": "email-signin",
+      "width": 1400,
+      "status": 200,
+      "wordmarkInDom": 0,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      }
+    },
+    {
+      "name": "email-signin",
+      "width": 390,
+      "status": 200,
+      "wordmarkInDom": 0,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      }
+    },
+    {
+      "name": "kpis-public",
+      "width": 1400,
+      "status": 200,
+      "wordmarkInDom": 0,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      }
+    },
+    {
+      "name": "kpis-public",
+      "width": 390,
+      "status": 200,
+      "wordmarkInDom": 0,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      }
+    },
+    {
+      "name": "ship-public",
+      "width": 1400,
+      "status": 200,
+      "wordmarkInDom": 0,
+      "wordmarkVisible": 0,
+      "shellH1": null
+    },
+    {
+      "name": "ship-public",
+      "width": 390,
+      "status": 200,
+      "wordmarkInDom": 0,
+      "wordmarkVisible": 0,
+      "shellH1": null
+    },
+    {
+      "name": "swim-public",
+      "width": 1400,
+      "status": 200,
+      "wordmarkInDom": 0,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Swim",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      }
+    },
+    {
+      "name": "swim-public",
+      "width": 390,
+      "status": 200,
+      "wordmarkInDom": 0,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Swim",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      }
+    },
+    {
+      "name": "swipe-public",
+      "width": 1400,
+      "status": 200,
+      "wordmarkInDom": 0,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Swipe",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "26px"
+      }
+    },
+    {
+      "name": "swipe-public",
+      "width": 390,
+      "status": 200,
+      "wordmarkInDom": 0,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Swipe",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      }
+    },
+    {
+      "name": "templates",
+      "width": 1400,
+      "status": 200,
+      "wordmarkInDom": 0,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      }
+    },
+    {
+      "name": "templates",
+      "width": 390,
+      "status": 200,
+      "wordmarkInDom": 0,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      }
+    },
+    {
+      "name": "styleguide",
+      "width": 1400,
+      "status": 200,
+      "wordmarkInDom": 0,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      }
+    },
+    {
+      "name": "styleguide",
+      "width": 390,
+      "status": 200,
+      "wordmarkInDom": 0,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      }
+    },
+    {
+      "name": "terms",
+      "width": 1400,
+      "status": 200,
+      "wordmarkInDom": 0,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      }
+    },
+    {
+      "name": "terms",
+      "width": 390,
+      "status": 200,
+      "wordmarkInDom": 0,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      }
+    },
+    {
+      "name": "privacy",
+      "width": 1400,
+      "status": 200,
+      "wordmarkInDom": 0,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      }
+    },
+    {
+      "name": "privacy",
+      "width": 390,
+      "status": 200,
+      "wordmarkInDom": 0,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Harbour",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      }
+    },
+    {
+      "name": "ws-tree",
+      "width": 1400,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 1,
+      "shellH1": {
+        "text": "Test Workspace",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      }
+    },
+    {
+      "name": "ws-tree",
+      "width": 390,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Test Workspace",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      }
+    },
+    {
+      "name": "ws/settings",
+      "width": 1400,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 1,
+      "shellH1": {
+        "text": "Settings",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      }
+    },
+    {
+      "name": "ws/settings",
+      "width": 390,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Settings",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      }
+    },
+    {
+      "name": "ws/dispatch",
+      "width": 1400,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 1,
+      "shellH1": {
+        "text": "Dispatch",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      }
+    },
+    {
+      "name": "ws/dispatch",
+      "width": 390,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Dispatch",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      }
+    },
+    {
+      "name": "ws/proxy",
+      "width": 1400,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 1,
+      "shellH1": {
+        "text": "Proxy",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      }
+    },
+    {
+      "name": "ws/proxy",
+      "width": 390,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Proxy",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      }
+    },
+    {
+      "name": "ws/roadmap",
+      "width": 1400,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 1,
+      "shellH1": {
+        "text": "Roadmap",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "22.4px"
+      }
+    },
+    {
+      "name": "ws/roadmap",
+      "width": 390,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Roadmap",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "18.2px"
+      }
+    },
+    {
+      "name": "ws/kpis",
+      "width": 1400,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 1,
+      "shellH1": {
+        "text": "KPIs",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      }
+    },
+    {
+      "name": "ws/kpis",
+      "width": 390,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "KPIs",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      }
+    },
+    {
+      "name": "ws/runner",
+      "width": 1400,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 1,
+      "shellH1": {
+        "text": "Run on my machine",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      }
+    },
+    {
+      "name": "ws/runner",
+      "width": 390,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Run on my machine",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      }
+    },
+    {
+      "name": "ws/ship",
+      "width": 1400,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 1,
+      "shellH1": null
+    },
+    {
+      "name": "ws/ship",
+      "width": 390,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 0,
+      "shellH1": null
+    },
+    {
+      "name": "ws/swim",
+      "width": 1400,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 1,
+      "shellH1": {
+        "text": "Swim",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      }
+    },
+    {
+      "name": "ws/swim",
+      "width": 390,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Swim",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      }
+    },
+    {
+      "name": "ws/swipe",
+      "width": 1400,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 1,
+      "shellH1": {
+        "text": "Swipe",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "26px"
+      }
+    },
+    {
+      "name": "ws/swipe",
+      "width": 390,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Swipe",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      }
+    },
+    {
+      "name": "ws/audit",
+      "width": 1400,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 1,
+      "shellH1": {
+        "text": "Operator Dashboard",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      }
+    },
+    {
+      "name": "ws/audit",
+      "width": 390,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Operator Dashboard",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      }
+    },
+    {
+      "name": "ws/prompts",
+      "width": 1400,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 1,
+      "shellH1": {
+        "text": "Prompts",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      }
+    },
+    {
+      "name": "ws/prompts",
+      "width": 390,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Prompts",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      }
+    },
+    {
+      "name": "ws/collective",
+      "width": 1400,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 1,
+      "shellH1": {
+        "text": "Collective",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      }
+    },
+    {
+      "name": "ws/collective",
+      "width": 390,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Collective",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      }
+    },
+    {
+      "name": "ws/observation",
+      "width": 1400,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 1,
+      "shellH1": {
+        "text": "Observation ● live",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "22.4px"
+      }
+    },
+    {
+      "name": "ws/observation",
+      "width": 390,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Observation ● live",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "22.4px"
+      }
+    },
+    {
+      "name": "ws/live-console",
+      "width": 1400,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 1,
+      "shellH1": {
+        "text": "Live Console",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      }
+    },
+    {
+      "name": "ws/live-console",
+      "width": 390,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Live Console",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      }
+    },
+    {
+      "name": "ws/next-run",
+      "width": 1400,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 1,
+      "shellH1": {
+        "text": "Suggested Next Run",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      }
+    },
+    {
+      "name": "ws/next-run",
+      "width": 390,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Suggested Next Run",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      }
+    },
+    {
+      "name": "ws/ship-biscuit",
+      "width": 1400,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 1,
+      "shellH1": {
+        "text": "The Ship's Biscuit",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      }
+    },
+    {
+      "name": "ws/ship-biscuit",
+      "width": 390,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "The Ship's Biscuit",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      }
+    },
+    {
+      "name": "ws/flight-companion",
+      "width": 1400,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 1,
+      "shellH1": {
+        "text": "Flight Companion",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      }
+    },
+    {
+      "name": "ws/flight-companion",
+      "width": 390,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Flight Companion",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      }
+    },
+    {
+      "name": "ws/passage-planner",
+      "width": 1400,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 1,
+      "shellH1": {
+        "text": "Passage Planner",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "32px"
+      }
+    },
+    {
+      "name": "ws/passage-planner",
+      "width": 390,
+      "status": 200,
+      "wordmarkInDom": 1,
+      "wordmarkVisible": 0,
+      "shellH1": {
+        "text": "Passage Planner",
+        "font": "Inter, -apple-system, \"system-",
+        "px": "19.2px"
+      }
+    }
+  ],
+  "summary": {
+    "navWordmarkVisibleAt1400": [
+      "ws-tree",
+      "ws/settings",
+      "ws/dispatch",
+      "ws/proxy",
+      "ws/roadmap",
+      "ws/kpis",
+      "ws/runner",
+      "ws/ship",
+      "ws/swim",
+      "ws/swipe",
+      "ws/audit",
+      "ws/prompts",
+      "ws/collective",
+      "ws/observation",
+      "ws/live-console",
+      "ws/next-run",
+      "ws/ship-biscuit",
+      "ws/flight-companion",
+      "ws/passage-planner"
+    ],
+    "navWordmarkInDomButNotVisibleAt390": [
+      "ws-tree",
+      "ws/settings",
+      "ws/dispatch",
+      "ws/proxy",
+      "ws/roadmap",
+      "ws/kpis",
+      "ws/runner",
+      "ws/ship",
+      "ws/swim",
+      "ws/swipe",
+      "ws/audit",
+      "ws/prompts",
+      "ws/collective",
+      "ws/observation",
+      "ws/live-console",
+      "ws/next-run",
+      "ws/ship-biscuit",
+      "ws/flight-companion",
+      "ws/passage-planner"
+    ],
+    "navWordmarkVisibleAt390": [],
+    "pagesWithoutNavWordmark1400": [
+      "landing: h1=harbour.cat / \"JetBrains Mono\", \"SF Mono\", \"",
+      "library: h1=Harbour / Inter, -apple-system, \"system-",
+      "guest-404: h1=Harbour / Inter, -apple-system, \"system-",
+      "email-signin: h1=Harbour / Inter, -apple-system, \"system-",
+      "kpis-public: h1=Harbour / Inter, -apple-system, \"system-",
+      "ship-public: h1=none",
+      "swim-public: h1=Swim / Inter, -apple-system, \"system-",
+      "swipe-public: h1=Swipe / Inter, -apple-system, \"system-",
+      "templates: h1=Harbour / Inter, -apple-system, \"system-",
+      "styleguide: h1=Harbour / Inter, -apple-system, \"system-",
+      "terms: h1=Harbour / Inter, -apple-system, \"system-",
+      "privacy: h1=Harbour / Inter, -apple-system, \"system-"
+    ]
+  }
+}

@@ -1,0 +1,609 @@
+{
+  "id": "lin-3119",
+  "base": "http://localhost:3199",
+  "head": "b901efab",
+  "question": "dark theme: bare .action-btn / a.settings-action / a.stat-link / UA-blue links below AA?",
+  "rows": {
+    "dispatch": {
+      "status": 200,
+      "htmlClass": "theme-dark",
+      "themeAssertion": true,
+      "actionBtn": [
+        {
+          "tag": "button",
+          "cls": "action-btn save dispatch-toggle",
+          "text": "Dispatch ▾",
+          "color": "rgb(46, 230, 95)",
+          "bg": "rgb(35,59,47)",
+          "ratio": 7.25,
+          "fontSize": "12.24px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "button",
+          "cls": "action-btn dispatch-load-autopilot",
+          "text": "load Autopilot",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "fontSize": "12.24px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "button",
+          "cls": "action-btn dispatch-load-autopilot",
+          "text": "load Autopilot · stepped",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "fontSize": "12.24px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "button",
+          "cls": "action-btn dispatch-continue-until-stopped",
+          "text": "continue until stopped",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "fontSize": "12.24px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "button",
+          "cls": "action-btn save dispatch-prompt-send",
+          "text": "cli",
+          "color": "rgb(46, 230, 95)",
+          "bg": "rgb(35,59,47)",
+          "ratio": 7.25,
+          "fontSize": "12.24px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "button",
+          "cls": "action-btn save dispatch-prompt-send",
+          "text": "web",
+          "color": "rgb(46, 230, 95)",
+          "bg": "rgb(35,59,47)",
+          "ratio": 7.25,
+          "fontSize": "12.24px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "button",
+          "cls": "action-btn save dispatch-prompt-send",
+          "text": "dash",
+          "color": "rgb(46, 230, 95)",
+          "bg": "rgb(35,59,47)",
+          "ratio": 7.25,
+          "fontSize": "12.24px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "button",
+          "cls": "action-btn save dispatch-prompt-send",
+          "text": "harbour",
+          "color": "rgb(46, 230, 95)",
+          "bg": "rgb(35,59,47)",
+          "ratio": 7.25,
+          "fontSize": "12.24px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "button",
+          "cls": "action-btn halt-pause",
+          "text": "Pause",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "fontSize": "13.6px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "button",
+          "cls": "action-btn halt-stop",
+          "text": "Stop",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "fontSize": "13.6px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "button",
+          "cls": "action-btn halt-resume",
+          "text": "Resume",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "fontSize": "13.6px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "button",
+          "cls": "action-btn save",
+          "text": "generate",
+          "color": "rgb(46, 230, 95)",
+          "bg": "rgb(35,59,47)",
+          "ratio": 7.25,
+          "fontSize": "12.24px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "button",
+          "cls": "action-btn history-refresh",
+          "text": "refresh",
+          "color": "rgb(154, 160, 166)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 5.89,
+          "fontSize": "13.6px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        }
+      ],
+      "settingsAction": [
+        {
+          "tag": "a",
+          "cls": "settings-action dispatch-preset-create-link",
+          "text": "create a preset →",
+          "color": "rgb(0, 0, 238)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.65,
+          "fontSize": "12.24px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        }
+      ],
+      "statLink": [],
+      "namedLinks": [
+        {
+          "tag": "a",
+          "cls": "settings-action dispatch-preset-create-link",
+          "text": "create a preset →",
+          "color": "rgb(0, 0, 238)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.65,
+          "fontSize": "12.24px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "a",
+          "cls": "",
+          "text": "set up a runner ›",
+          "color": "rgb(0, 0, 238)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.65,
+          "fontSize": "16px",
+          "fontFamily": "\"JetBrains Mono\", \"SF Mono\", \"Fira Code\", Consolas, monospac"
+        }
+      ]
+    },
+    "settings": {
+      "status": 200,
+      "htmlClass": "theme-dark",
+      "themeAssertion": true,
+      "actionBtn": [
+        {
+          "tag": "a",
+          "cls": "action-btn connect",
+          "text": "connect",
+          "color": "rgb(110, 168, 254)",
+          "bg": "rgb(43,51,66)",
+          "ratio": 5.25,
+          "fontSize": "12.24px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "a",
+          "cls": "action-btn logout",
+          "text": "logout",
+          "color": "rgb(255, 107, 107)",
+          "bg": "rgb(60,44,48)",
+          "ratio": 4.74,
+          "fontSize": "12.24px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "button",
+          "cls": "action-btn save",
+          "text": "save",
+          "color": "rgb(46, 230, 95)",
+          "bg": "rgb(35,59,47)",
+          "ratio": 7.25,
+          "fontSize": "12.24px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "button",
+          "cls": "action-btn save",
+          "text": "save model overrides",
+          "color": "rgb(46, 230, 95)",
+          "bg": "rgb(35,59,47)",
+          "ratio": 7.25,
+          "fontSize": "13.6px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "button",
+          "cls": "action-btn save",
+          "text": "save dispatch defaults",
+          "color": "rgb(46, 230, 95)",
+          "bg": "rgb(35,59,47)",
+          "ratio": 7.25,
+          "fontSize": "13.6px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "button",
+          "cls": "action-btn save dispatch-preset-create-btn",
+          "text": "save preset",
+          "color": "rgb(46, 230, 95)",
+          "bg": "rgb(35,59,47)",
+          "ratio": 7.25,
+          "fontSize": "13.6px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "button",
+          "cls": "action-btn",
+          "text": "make active",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "fontSize": "12.24px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "button",
+          "cls": "action-btn",
+          "text": "refresh / test",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "fontSize": "12.24px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "button",
+          "cls": "action-btn provider-remove-btn",
+          "text": "remove",
+          "color": "rgb(255, 107, 107)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 5.6,
+          "fontSize": "12.24px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "button",
+          "cls": "action-btn provider-add-btn",
+          "text": "add",
+          "color": "rgb(46, 230, 95)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 9.33,
+          "fontSize": "12.24px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "button",
+          "cls": "action-btn provider-add-btn",
+          "text": "add",
+          "color": "rgb(46, 230, 95)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 9.33,
+          "fontSize": "12.24px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "a",
+          "cls": "action-btn provider-add-new-workspace",
+          "text": "as a new workspace",
+          "color": "rgb(0, 0, 238)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.65,
+          "fontSize": "12.24px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "button",
+          "cls": "action-btn provider-add-btn",
+          "text": "add",
+          "color": "rgb(46, 230, 95)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 9.33,
+          "fontSize": "12.24px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "button",
+          "cls": "action-btn provider-add-btn",
+          "text": "API token",
+          "color": "rgb(46, 230, 95)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 9.33,
+          "fontSize": "12.24px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "button",
+          "cls": "action-btn provider-add-btn",
+          "text": "OAuth",
+          "color": "rgb(46, 230, 95)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 9.33,
+          "fontSize": "12.24px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        }
+      ],
+      "settingsAction": [
+        {
+          "tag": "a",
+          "cls": "settings-action",
+          "text": "open the discussion page",
+          "color": "rgb(0, 0, 238)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.65,
+          "fontSize": "14.4px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "a",
+          "cls": "settings-action",
+          "text": "open the task chat page",
+          "color": "rgb(0, 0, 238)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.65,
+          "fontSize": "14.4px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "a",
+          "cls": "settings-action",
+          "text": "open the radial view",
+          "color": "rgb(0, 0, 238)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.65,
+          "fontSize": "14.4px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "a",
+          "cls": "settings-action",
+          "text": "open the next-run suggester",
+          "color": "rgb(0, 0, 238)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.65,
+          "fontSize": "14.4px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "a",
+          "cls": "settings-action",
+          "text": "open the flight companion",
+          "color": "rgb(0, 0, 238)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.65,
+          "fontSize": "14.4px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "a",
+          "cls": "settings-action",
+          "text": "open the passage planner",
+          "color": "rgb(0, 0, 238)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.65,
+          "fontSize": "14.4px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "a",
+          "cls": "settings-action",
+          "text": "open The Ship's Biscuit",
+          "color": "rgb(0, 0, 238)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.65,
+          "fontSize": "14.4px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "a",
+          "cls": "settings-action",
+          "text": "open the live console",
+          "color": "rgb(0, 0, 238)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.65,
+          "fontSize": "14.4px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "a",
+          "cls": "settings-action",
+          "text": "open the ship journey",
+          "color": "rgb(0, 0, 238)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.65,
+          "fontSize": "14.4px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "a",
+          "cls": "settings-action",
+          "text": "Add email →",
+          "color": "rgb(0, 0, 238)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.65,
+          "fontSize": "14.4px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "a",
+          "cls": "settings-action",
+          "text": "catalog",
+          "color": "rgb(0, 0, 238)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.65,
+          "fontSize": "14.4px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "a",
+          "cls": "settings-action",
+          "text": "custom prompts",
+          "color": "rgb(0, 0, 238)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.65,
+          "fontSize": "14.4px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "a",
+          "cls": "settings-action",
+          "text": "operator dashboard",
+          "color": "rgb(0, 0, 238)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.65,
+          "fontSize": "14.4px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        }
+      ],
+      "statLink": [],
+      "namedLinks": []
+    },
+    "runner": {
+      "status": 200,
+      "htmlClass": "theme-dark",
+      "themeAssertion": true,
+      "actionBtn": [
+        {
+          "tag": "button",
+          "cls": "action-btn save runner-setup-btn",
+          "text": "create runner prompt",
+          "color": "rgb(46, 230, 95)",
+          "bg": "rgb(35,59,47)",
+          "ratio": 7.25,
+          "fontSize": "16px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "button",
+          "cls": "action-btn runner-setup-btn",
+          "text": "copy",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "fontSize": "16px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        }
+      ],
+      "settingsAction": [],
+      "statLink": [],
+      "namedLinks": []
+    },
+    "proxy": {
+      "status": 200,
+      "htmlClass": "theme-dark",
+      "themeAssertion": true,
+      "actionBtn": [
+        {
+          "tag": "button",
+          "cls": "action-btn save",
+          "text": "generate & copy",
+          "color": "rgb(46, 230, 95)",
+          "bg": "rgb(33,58,48)",
+          "ratio": 7.36,
+          "fontSize": "13.6px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "button",
+          "cls": "action-btn save",
+          "text": "generate",
+          "color": "rgb(46, 230, 95)",
+          "bg": "rgb(35,59,47)",
+          "ratio": 7.25,
+          "fontSize": "12.24px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "button",
+          "cls": "action-btn proxy-events-refresh",
+          "text": "refresh",
+          "color": "rgb(154, 160, 166)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 5.89,
+          "fontSize": "13.6px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "button",
+          "cls": "action-btn proxy-events-prev",
+          "text": "prev",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "fontSize": "11.56px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "button",
+          "cls": "action-btn proxy-events-next",
+          "text": "next",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "fontSize": "11.56px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        }
+      ],
+      "settingsAction": [],
+      "statLink": [],
+      "namedLinks": []
+    }
+  },
+  "actionBtnRuleLines": [
+    [
+      11,
+      ".action-btn {"
+    ],
+    [
+      24,
+      ".action-btn.save {"
+    ],
+    [
+      29,
+      ".action-btn.save:hover {"
+    ],
+    [
+      34,
+      ".action-btn.connect {"
+    ],
+    [
+      39,
+      ".action-btn.connect:hover {"
+    ],
+    [
+      44,
+      ".action-btn.disconnect,"
+    ]
+  ],
+  "summary": {
+    "elementsBelow4_5": 28,
+    "worst": {
+      "tag": "button",
+      "cls": "action-btn dispatch-load-autopilot",
+      "text": "load Autopilot",
+      "color": "rgb(0, 0, 0)",
+      "bg": "rgb(34,36,40)",
+      "ratio": 1.35,
+      "fontSize": "12.24px",
+      "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+    },
+    "namedLinksFound": {
+      "dispatch": [
+        "create a preset → rgb(0, 0, 238) 1.65:1",
+        "set up a runner › rgb(0, 0, 238) 1.65:1"
+      ],
+      "settings": [],
+      "runner": [],
+      "proxy": []
+    }
+  }
+}

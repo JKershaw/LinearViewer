@@ -1,0 +1,655 @@
+{
+ "note": "Dark cells captured by prefers-color-scheme emulation only (no theme cookie). themeAssertion.passed was vacuous for these: htmlClass lacks theme-dark. avgRGB is the 1x1 downsample of the PNG. renderedDark = mean<100.",
+ "cells": [
+  {
+   "file": "account-cold-dark-1400px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    27,
+    33,
+    38
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "account-cold-dark-390px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    28,
+    42,
+    46
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "archive-1-dark-1400px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    27,
+    31,
+    38
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "archive-1-dark-320px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    29,
+    33,
+    40
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "archive-1-dark-390px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    28,
+    32,
+    39
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "archive-2-dark-1400px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    27,
+    32,
+    38
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "archive-2-dark-320px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    29,
+    34,
+    40
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "archive-2-dark-390px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    28,
+    32,
+    39
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "archive-3-dark-1400px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    29,
+    31,
+    37
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "archive-3-dark-320px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    36,
+    38,
+    43
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "archive-3-dark-390px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    37,
+    39,
+    45
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "archive-4-dark-1400px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    26,
+    30,
+    36
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "archive-4-dark-320px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    32,
+    36,
+    42
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "archive-4-dark-390px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    30,
+    34,
+    40
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "archive-5-dark-1400px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    26,
+    30,
+    37
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "archive-5-dark-320px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    30,
+    34,
+    40
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "archive-5-dark-390px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    31,
+    35,
+    41
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "archive-6-dark-1400px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    29,
+    31,
+    36
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "archive-6-dark-320px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    36,
+    38,
+    43
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "archive-6-dark-390px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    34,
+    36,
+    41
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "archive-7-dark-1400px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    28,
+    32,
+    38
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "archive-7-dark-320px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    34,
+    38,
+    43
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "archive-7-dark-390px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    35,
+    39,
+    44
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "archive-8-dark-1400px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    28,
+    32,
+    38
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "archive-8-dark-320px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    34,
+    39,
+    45
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "archive-8-dark-390px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    35,
+    39,
+    45
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "archive-9-dark-1400px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    28,
+    31,
+    37
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "archive-9-dark-320px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    33,
+    37,
+    43
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "archive-9-dark-390px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    30,
+    35,
+    41
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "email-confirm-real-dark-1400px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    253,
+    254,
+    254
+   ],
+   "renderedDark": false
+  },
+  {
+   "file": "email-confirm-real-dark-390px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    247,
+    250,
+    250
+   ],
+   "renderedDark": false
+  },
+  {
+   "file": "email-register-real-dark-1400px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    27,
+    33,
+    38
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "email-register-real-dark-390px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    28,
+    42,
+    46
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "email-reproof-real-dark-1400px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    27,
+    33,
+    38
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "email-reproof-real-dark-390px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    28,
+    42,
+    46
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "email-signin-real-dark-1400px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    253,
+    254,
+    254
+   ],
+   "renderedDark": false
+  },
+  {
+   "file": "email-signin-real-dark-320px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    242,
+    248,
+    247
+   ],
+   "renderedDark": false
+  },
+  {
+   "file": "email-signin-real-dark-390px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    246,
+    250,
+    249
+   ],
+   "renderedDark": false
+  },
+  {
+   "file": "held-404-dark-1400px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    253,
+    254,
+    254
+   ],
+   "renderedDark": false
+  },
+  {
+   "file": "held-404-dark-390px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    248,
+    251,
+    251
+   ],
+   "renderedDark": false
+  },
+  {
+   "file": "held-expired-dark-1400px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    253,
+    254,
+    254
+   ],
+   "renderedDark": false
+  },
+  {
+   "file": "held-expired-dark-390px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    248,
+    251,
+    251
+   ],
+   "renderedDark": false
+  },
+  {
+   "file": "landing-dark-1400px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    27,
+    33,
+    38
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "landing-dark-320px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    28,
+    46,
+    49
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "landing-dark-390px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    28,
+    42,
+    46
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "library-404-dark-1400px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    254,
+    254,
+    254
+   ],
+   "renderedDark": false
+  },
+  {
+   "file": "library-404-dark-390px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    250,
+    252,
+    252
+   ],
+   "renderedDark": false
+  },
+  {
+   "file": "library-doc-listed-dark-1400px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    30,
+    33,
+    38
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "library-doc-listed-dark-390px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    31,
+    34,
+    39
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "library-index-dark-1400px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    27,
+    31,
+    35
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "library-index-dark-320px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    34,
+    40,
+    45
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "library-index-dark-390px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    33,
+    38,
+    42
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "library-paper-figures-dark-1400px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    33,
+    35,
+    40
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "library-paper-figures-dark-390px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    40,
+    42,
+    47
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "library-paper-svg-dark-1400px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    31,
+    34,
+    39
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "library-paper-svg-dark-390px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    39,
+    41,
+    45
+   ],
+   "renderedDark": true
+  },
+  {
+   "file": "ship-public-dark-1400px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    254,
+    254,
+    254
+   ],
+   "renderedDark": false
+  },
+  {
+   "file": "ship-public-dark-320px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    252,
+    253,
+    253
+   ],
+   "renderedDark": false
+  },
+  {
+   "file": "ship-public-dark-390px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    253,
+    254,
+    253
+   ],
+   "renderedDark": false
+  },
+  {
+   "file": "swim-public-dark-1400px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    251,
+    251,
+    251
+   ],
+   "renderedDark": false
+  },
+  {
+   "file": "swim-public-dark-320px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    248,
+    248,
+    248
+   ],
+   "renderedDark": false
+  },
+  {
+   "file": "swim-public-dark-390px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    248,
+    248,
+    248
+   ],
+   "renderedDark": false
+  },
+  {
+   "file": "swipe-public-dark-1400px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    253,
+    253,
+    253
+   ],
+   "renderedDark": false
+  },
+  {
+   "file": "swipe-public-dark-320px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    249,
+    249,
+    249
+   ],
+   "renderedDark": false
+  },
+  {
+   "file": "swipe-public-dark-390px.png",
+   "htmlClass": "",
+   "avgRGB": [
+    251,
+    251,
+    251
+   ],
+   "renderedDark": false
+  }
+ ]
+}

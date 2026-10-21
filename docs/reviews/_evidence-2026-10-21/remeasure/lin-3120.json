@@ -1,0 +1,34 @@
+{
+  "id": "lin-3120",
+  "base": "http://localhost:3199",
+  "head": "b901efab",
+  "question": "/ship and /workspace/:k/ship: zero headings, bare title?",
+  "rows": {
+    "ship-public": {
+      "title": "Ship",
+      "headings": [],
+      "ariaLabelled": 8,
+      "landmarkMain": 1,
+      "status": 200,
+      "finalPath": "/ship"
+    },
+    "ship-workspace": {
+      "title": "Ship",
+      "headings": [],
+      "ariaLabelled": 22,
+      "landmarkMain": 1,
+      "status": 200,
+      "finalPath": "/workspace/test-workspace/ship"
+    }
+  },
+  "summary": {
+    "ship-public": {
+      "headingCount": 0,
+      "title": "Ship"
+    },
+    "ship-workspace": {
+      "headingCount": 0,
+      "title": "Ship"
+    }
+  }
+}

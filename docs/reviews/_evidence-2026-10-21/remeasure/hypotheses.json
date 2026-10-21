@@ -1,0 +1,65 @@
+{
+  "id": "hypotheses",
+  "base": "http://localhost:3199",
+  "head": "b901efab",
+  "guest404": {
+    "title": "Not Found - Projects",
+    "headings": [
+      "H1:Harbour",
+      "H2:Not Found"
+    ],
+    "body": "Harbour Not Found This page does not exist. Go back",
+    "links": [
+      "A:Go back->/"
+    ],
+    "status": 404
+  },
+  "library": {
+    "/library": {
+      "title": "Library - Harbour",
+      "h1": [
+        "Harbour"
+      ],
+      "status": 200
+    },
+    "/library/drawing-the-ship": {
+      "title": "Drawing the ship - Harbour Library",
+      "h1": [
+        "Harbour",
+        "Drawing the ship"
+      ],
+      "status": 200
+    },
+    "/library/doc/charter": {
+      "title": "The Harbour Charter — v0.2 (draft) - Harbour Library",
+      "h1": [
+        "Harbour",
+        "The Harbour Charter — v0.2 (draft)"
+      ],
+      "status": 200
+    }
+  },
+  "integrationGuideDark": [
+    {
+      "text": "A poll response may also carry a top-level halt key when an operator has requested a halt ",
+      "fontFamily": "\"JetBrains Mono\", \"SF Mono\", \"Fira Code\"",
+      "fontSize": "16px",
+      "fontWeight": "400"
+    }
+  ],
+  "summary": {
+    "guest404Title": "Not Found - Projects",
+    "guest404LinksOnly": [
+      "A:Go back->/"
+    ],
+    "guest404Status": 404,
+    "libraryH1Counts": {
+      "/library": 1,
+      "/library/drawing-the-ship": 2,
+      "/library/doc/charter": 2
+    },
+    "integrationGuideMono": [
+      "\"JetBrains Mono\", \"SF Mono\", \"Fira Code\" 16px 400"
+    ]
+  }
+}
