@@ -38,7 +38,7 @@ Evidence: `docs/reviews/_evidence-2026-10-21/authenticated/` (PNG + JSON per cel
 
 ### Measurements worth a beat-4 look (not verdicts)
 
-* **Runner `--green` text (`public/runner-setup.css:76`)**: after mint + copy, "copied ✓" is `rgb(22,163,74)` on white = **3.3:1** (<4.5:1).
+* **Runner `--green` text (`public/runner-setup.css:76`)**: after mint + copy, "copied ✓" is `rgb(22,163,74)` on `rgb(247,247,247)` = **3.08:1** (<4.5:1).
 * **Primary merge button** `button.rev-closeout-press` (light task page, PR-ready): **3.74:1**; `span.wordmark-accent` reads 3.74:1 on every light page.
 * **Settings under Jira, dark**: `a.settings-action` ×4 at **1.65:1**, `button.action-btn` 1.35:1 (theme-dark asserted).
 * **A22 (Collective status dot)**: driven. The poll status text is `rgb(102,102,102)` (5.74:1) in all three states ("● live", "● disconnected" via browser offline emulation, "Yap not configured" via a synthetic 503): **no state colour**, so A22 stands.
@@ -63,5 +63,6 @@ Evidence: `docs/reviews/_evidence-2026-10-21/authenticated/` (PNG + JSON per cel
 * Account-merge confirm: only the Linear-only live seam; non-Linear copies stay un-rendered (09-26 §7.1, carried to beat 4).
 * Email family focus walks use the production renderers via interception (synthetic), not live states; live email pages are beat 2.
 * Lighthouse: six surfaces, light only, mobile emulation; intercepted renderers are not reachable (covered by the M4 census).
+* Evidence budget: the evidence directory is **18,662,720 bytes (about 18.7 MB; 17.8 MiB)** in git, over the plan's ~10 MB budget (last run: 8.1 MB). Cause: about 270 beat-3 cells at 1400/390 × light/dark, kept so beat 4 can image-read every kept PNG. The six `authenticated/lighthouse-*.json` were trimmed from full reports (2.13 MB) to metadata, category scores and per-audit scores, with details only for audits scoring below 1 (0.43 MB), which cut the directory by 1.70 MB from 20,365,493 bytes. Lighthouse screenshots, timing and passing-audit details are not kept.
 * Full-page PNGs of the sticky nav bar render it mid-page (a full-page capture artifact, not a layout defect); PNGs are palette-quantised.
 * Contrast sampler limits (background-image, pseudo-elements, non-ancestor layers) carry over from beat 1.
