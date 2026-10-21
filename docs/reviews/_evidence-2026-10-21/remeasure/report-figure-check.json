@@ -1,0 +1,137 @@
+{
+  "checks": [
+    {
+      "name": "census registry ids",
+      "expected": 249,
+      "actual": 249,
+      "ok": true
+    },
+    {
+      "name": "census measured ids",
+      "expected": 201,
+      "actual": 201,
+      "ok": true
+    },
+    {
+      "name": "census excluded ids",
+      "expected": 48,
+      "actual": 48,
+      "ok": true
+    },
+    {
+      "name": "library documents swept",
+      "expected": 104,
+      "actual": 104,
+      "ok": true
+    },
+    {
+      "name": "library documents overflowing at 390",
+      "expected": 74,
+      "actual": 74,
+      "ok": true
+    },
+    {
+      "name": "library documents with a table past the viewport",
+      "expected": 70,
+      "actual": 70,
+      "ok": true
+    },
+    {
+      "name": "library widest table right edge (which-rules-pay)",
+      "expected": 1086,
+      "actual": 1086,
+      "ok": true
+    },
+    {
+      "name": "library witness: widest table at 320",
+      "expected": 1086,
+      "actual": 1086,
+      "ok": true
+    },
+    {
+      "name": "library witness: scrollX after scrollTo(9999)",
+      "expected": 0,
+      "actual": 0,
+      "ok": true
+    },
+    {
+      "name": "library documents rendering two h1",
+      "expected": 104,
+      "actual": 104,
+      "ok": true
+    },
+    {
+      "name": "dark button.action-btn lowest ratio",
+      "expected": 1.35,
+      "actual": 1.35,
+      "ok": true
+    },
+    {
+      "name": "white-on-teal a.login-button lowest ratio (light)",
+      "expected": 3.74,
+      "actual": 3.74,
+      "ok": true
+    },
+    {
+      "name": "ids carrying span.wordmark-accent (light)",
+      "expected": 33,
+      "actual": 33,
+      "ok": true
+    },
+    {
+      "name": "landing Linear door ratio",
+      "expected": 4.43,
+      "actual": 4.43,
+      "ok": true
+    },
+    {
+      "name": "archive p.sig light",
+      "expected": 2.94,
+      "actual": 2.94,
+      "ok": true
+    },
+    {
+      "name": "archive p.foot dark",
+      "expected": 3.87,
+      "actual": 3.87,
+      "ok": true
+    },
+    {
+      "name": "UA-blue link on dark (jira form)",
+      "expected": 1.89,
+      "actual": 1.89,
+      "ok": true
+    },
+    {
+      "name": "guest-share 404 Lighthouse accessibility",
+      "expected": 0.89,
+      "actual": 0.89,
+      "ok": true
+    },
+    {
+      "name": "email-signin Lighthouse accessibility",
+      "expected": 0.9,
+      "actual": 0.9,
+      "ok": true
+    },
+    {
+      "name": "kpis-public Lighthouse accessibility",
+      "expected": 1,
+      "actual": 1,
+      "ok": true
+    },
+    {
+      "name": "kept PNG count",
+      "expected": 690,
+      "actual": 690,
+      "ok": true
+    },
+    {
+      "name": "visual-pass.md PNG lines",
+      "expected": 690,
+      "actual": 690,
+      "ok": true
+    }
+  ],
+  "passed": true
+}

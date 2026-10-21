@@ -1,0 +1,83 @@
+{
+  "base": "http://localhost:3199",
+  "rows": [
+    {
+      "slug": "/library/which-rules-pay",
+      "width": 390,
+      "viewport": 390,
+      "tables": 2,
+      "tableLeft": 36,
+      "tableRight": 1086,
+      "maxCellRight": 1086,
+      "scrolledX": 0,
+      "rootOverflowX": "clip",
+      "bodyOverflowX": "clip",
+      "containingScroller": null
+    },
+    {
+      "slug": "/library/coherence-as-it-grows",
+      "width": 390,
+      "viewport": 390,
+      "tables": 7,
+      "tableLeft": 36,
+      "tableRight": 674,
+      "maxCellRight": 673,
+      "scrolledX": 0,
+      "rootOverflowX": "clip",
+      "bodyOverflowX": "clip",
+      "containingScroller": null
+    },
+    {
+      "slug": "/library/between-the-sessions-check",
+      "width": 390,
+      "viewport": 390,
+      "tables": 2,
+      "tableLeft": 36,
+      "tableRight": 400,
+      "maxCellRight": 399,
+      "scrolledX": 0,
+      "rootOverflowX": "clip",
+      "bodyOverflowX": "clip",
+      "containingScroller": null
+    },
+    {
+      "slug": "/library/which-rules-pay",
+      "width": 320,
+      "viewport": 320,
+      "tables": 2,
+      "tableLeft": 36,
+      "tableRight": 1086,
+      "maxCellRight": 1086,
+      "scrolledX": 0,
+      "rootOverflowX": "clip",
+      "bodyOverflowX": "clip",
+      "containingScroller": null
+    },
+    {
+      "slug": "/library/coherence-as-it-grows",
+      "width": 320,
+      "viewport": 320,
+      "tables": 7,
+      "tableLeft": 36,
+      "tableRight": 674,
+      "maxCellRight": 673,
+      "scrolledX": 0,
+      "rootOverflowX": "clip",
+      "bodyOverflowX": "clip",
+      "containingScroller": null
+    },
+    {
+      "slug": "/library/between-the-sessions-check",
+      "width": 320,
+      "viewport": 320,
+      "tables": 2,
+      "tableLeft": 36,
+      "tableRight": 400,
+      "maxCellRight": 399,
+      "scrolledX": 0,
+      "rootOverflowX": "clip",
+      "bodyOverflowX": "clip",
+      "containingScroller": null
+    }
+  ]
+}
