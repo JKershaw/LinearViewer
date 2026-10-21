@@ -1,0 +1,80 @@
+{
+  "key": "ws-task-chat|empty|dark|390",
+  "registryId": "ws-task-chat",
+  "state": "empty",
+  "theme": "dark",
+  "viewport": 390,
+  "path": "/workspace/test-workspace/task-chat",
+  "populated": false,
+  "note": "no seed seam beyond /test/clear-saved-chats (beat-1 grep): default state only — named limit",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/task-chat",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "theme-dark",
+    "title": "Task Chat - Experimental",
+    "h1": "Task Chat",
+    "headings": {
+      "h1": 1,
+      "h2": 3
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "roadmap",
+      "dispatch",
+      "proxy",
+      "collective",
+      "ship",
+      "next run",
+      "flight companion",
+      "passage planner",
+      "ship's biscuit",
+      "live console",
+      "ship journey"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: dark",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 782
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 35,
+    "belowThreshold": []
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

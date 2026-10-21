@@ -1,0 +1,69 @@
+{
+  "key": "ws-tree-github|default|dark|1400",
+  "registryId": "ws-tree-github",
+  "state": "default",
+  "theme": "dark",
+  "viewport": 1400,
+  "path": "/workspace/github-workspace/",
+  "populated": null,
+  "note": "provider twin via /test/set-github-session",
+  "httpStatus": 200,
+  "finalPath": "/workspace/github-workspace/",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "theme-dark",
+    "title": "GitHub Workspace - Projects",
+    "h1": "GitHub Workspace",
+    "headings": {
+      "h1": 1
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "search",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "proxy"
+    ],
+    "footerLinks": [
+      "reset",
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: dark",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": true,
+    "bodyText": 395
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 37,
+    "belowThreshold": []
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

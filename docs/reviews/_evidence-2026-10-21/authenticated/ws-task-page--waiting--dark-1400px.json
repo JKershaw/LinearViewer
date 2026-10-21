@@ -1,0 +1,83 @@
+{
+  "key": "ws-task-page|waiting|dark|1400",
+  "registryId": "ws-task-page",
+  "state": "waiting",
+  "theme": "dark",
+  "viewport": 1400,
+  "path": "/workspace/local-workspace/task/LOCAL-TP3",
+  "populated": true,
+  "note": "local-provider seed (owner); waiting",
+  "httpStatus": 200,
+  "finalPath": "/workspace/local-workspace/task/LOCAL-TP3",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "theme-dark",
+    "title": "LOCAL-TP3 — A task waiting on an answer",
+    "h1": "LOCAL-TP3 A task waiting on an answer",
+    "headings": {
+      "h1": 1,
+      "h2": 2
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "search",
+      "0 waiting on you",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "dispatch",
+      "proxy"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: dark",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 913
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 73,
+    "belowThreshold": []
+  },
+  "extra": {
+    "dataStatus": "waiting",
+    "mergeReady": "false",
+    "title": "A task waiting on an answer",
+    "sentence": "which API key should the build use?",
+    "stageCount": 2,
+    "prLead": null,
+    "closeoutState": null,
+    "hasPress": false,
+    "ownerWidgets": true,
+    "notFound": false
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

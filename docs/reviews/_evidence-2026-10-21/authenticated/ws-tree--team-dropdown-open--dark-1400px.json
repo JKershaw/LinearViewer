@@ -1,0 +1,115 @@
+{
+  "key": "ws-tree|team-dropdown-open|dark|1400",
+  "registryId": "ws-tree",
+  "state": "team-dropdown-open",
+  "theme": "dark",
+  "viewport": 1400,
+  "path": "/workspace/test-workspace/",
+  "populated": null,
+  "note": "team selector opened",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "theme-dark",
+    "title": "Test Workspace - Projects",
+    "h1": "Test Workspace",
+    "headings": {
+      "h1": 1
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "search",
+      "0 waiting on you",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "passage planner",
+      "ship's biscuit",
+      "live console",
+      "ship journey",
+      "roadmap",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "next run",
+      "flight companion"
+    ],
+    "footerLinks": [
+      "reset",
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: dark",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": true,
+    "hasAssigneeSelector": true,
+    "bodyText": 1223
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 112,
+    "belowThreshold": [
+      {
+        "element": "span.option-prefix",
+        "color": "rgb(44, 49, 58)",
+        "bg": "rgb(31,34,42)",
+        "ratio": 1.22,
+        "need": 4.5,
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "count": 3,
+        "samples": [
+          "├─",
+          "├─",
+          "└─"
+        ]
+      }
+    ]
+  },
+  "extra": {
+    "toggleExists": true,
+    "expanded": "true",
+    "panelExists": true,
+    "panelVisible": true,
+    "panelBox": {
+      "x": 177,
+      "y": 141,
+      "w": 307,
+      "h": 95,
+      "clippedRight": false
+    },
+    "options": [
+      "● all",
+      "○ Design",
+      "○ Engineering"
+    ]
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

@@ -1,0 +1,110 @@
+{
+  "key": "ws-roadmap|empty|light|390",
+  "registryId": "ws-roadmap",
+  "state": "empty",
+  "theme": "light",
+  "viewport": 390,
+  "path": "/workspace/test-workspace/roadmap",
+  "populated": false,
+  "note": "default seed (empty) state",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/roadmap",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "no theme-dark",
+    "actual": "",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "",
+    "title": "Roadmap - Test Workspace",
+    "h1": "Roadmap",
+    "headings": {
+      "h1": 1,
+      "h3": 4,
+      "h2": 1
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "next run",
+      "flight companion",
+      "passage planner",
+      "ship's biscuit",
+      "live console",
+      "ship journey"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: light",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": true,
+    "hasAssigneeSelector": false,
+    "bodyText": 857
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 122,
+    "belowThreshold": [
+      {
+        "element": "span.status-pill__char",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.3,
+        "need": 4.5,
+        "fontSize": "11.7px",
+        "fontWeight": "600",
+        "count": 8,
+        "samples": [
+          "✓",
+          "✓",
+          "✓"
+        ]
+      },
+      {
+        "element": "span.wordmark-accent",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.74,
+        "need": 4.5,
+        "fontSize": "10.4975px",
+        "fontWeight": "600",
+        "count": 1,
+        "samples": [
+          ".cat"
+        ]
+      }
+    ]
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

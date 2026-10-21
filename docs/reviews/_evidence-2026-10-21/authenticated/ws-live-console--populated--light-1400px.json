@@ -1,0 +1,219 @@
+{
+  "key": "ws-live-console|populated|light|1400",
+  "registryId": "ws-live-console",
+  "state": "populated",
+  "theme": "light",
+  "viewport": 1400,
+  "path": "/workspace/test-workspace/live-console",
+  "populated": true,
+  "note": "seed-agent-status ×5 + seed-proxy-event ×5 + 3 dispatch sessions; extra = A16 computed font-size read on the pulse/timeline preset buttons",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/live-console",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "no theme-dark",
+    "actual": "",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "",
+    "title": "Live Console - Experimental",
+    "h1": "Live Console",
+    "headings": {
+      "h1": 1
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "flight companion",
+      "passage planner",
+      "ship's biscuit",
+      "ship journey",
+      "roadmap",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "next run"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: light",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 1506
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 101,
+    "belowThreshold": [
+      {
+        "element": "span.lc-event-glyph",
+        "color": "rgb(255, 178, 36)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 1.8,
+        "need": 4.5,
+        "fontSize": "12.8px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "◐"
+        ]
+      },
+      {
+        "element": "span.lc-timeline-bar-label",
+        "color": "rgb(255, 255, 255)",
+        "bg": "rgb(22,163,74)",
+        "ratio": 3.3,
+        "need": 4.5,
+        "fontSize": "10.4px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "LIN-1003 — implementation"
+        ]
+      },
+      {
+        "element": "span.lc-event-glyph",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.3,
+        "need": 4.5,
+        "fontSize": "12.8px",
+        "fontWeight": "400",
+        "count": 3,
+        "samples": [
+          "✓",
+          "✓",
+          "✓"
+        ]
+      },
+      {
+        "element": "span.wordmark-accent",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.74,
+        "need": 4.5,
+        "fontSize": "16px",
+        "fontWeight": "600",
+        "count": 2,
+        "samples": [
+          ".cat",
+          ".cat"
+        ]
+      },
+      {
+        "element": "span.lc-section-mark",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.74,
+        "need": 4.5,
+        "fontSize": "11.52px",
+        "fontWeight": "400",
+        "count": 3,
+        "samples": [
+          "▤",
+          "◐",
+          "≡"
+        ]
+      }
+    ]
+  },
+  "extra": {
+    "[data-testid^=\"live-console-pulse-preset-\"]": [
+      {
+        "testid": "live-console-pulse-preset-3m",
+        "fontSize": "12px",
+        "fontFamily": "\"JetBrains Mono\", \"SF Mono\", \"Fira Code\"",
+        "fontWeight": "400",
+        "color": "rgb(15, 118, 110)",
+        "h": 24,
+        "w": 37
+      },
+      {
+        "testid": "live-console-pulse-preset-15m",
+        "fontSize": "12px",
+        "fontFamily": "\"JetBrains Mono\", \"SF Mono\", \"Fira Code\"",
+        "fontWeight": "400",
+        "color": "rgb(26, 26, 26)",
+        "h": 24,
+        "w": 44
+      },
+      {
+        "testid": "live-console-pulse-preset-1h",
+        "fontSize": "12px",
+        "fontFamily": "\"JetBrains Mono\", \"SF Mono\", \"Fira Code\"",
+        "fontWeight": "400",
+        "color": "rgb(26, 26, 26)",
+        "h": 24,
+        "w": 37
+      },
+      {
+        "testid": "live-console-pulse-preset-6h",
+        "fontSize": "12px",
+        "fontFamily": "\"JetBrains Mono\", \"SF Mono\", \"Fira Code\"",
+        "fontWeight": "400",
+        "color": "rgb(26, 26, 26)",
+        "h": 24,
+        "w": 37
+      }
+    ],
+    "[data-testid^=\"live-console-timeline-preset-\"]": [
+      {
+        "testid": "live-console-timeline-preset-fit",
+        "fontSize": "12px",
+        "fontFamily": "\"JetBrains Mono\", \"SF Mono\", \"Fira Code\"",
+        "fontWeight": "400",
+        "color": "rgb(15, 118, 110)",
+        "h": 24,
+        "w": 44
+      },
+      {
+        "testid": "live-console-timeline-preset-1h",
+        "fontSize": "12px",
+        "fontFamily": "\"JetBrains Mono\", \"SF Mono\", \"Fira Code\"",
+        "fontWeight": "400",
+        "color": "rgb(26, 26, 26)",
+        "h": 24,
+        "w": 37
+      },
+      {
+        "testid": "live-console-timeline-preset-24h",
+        "fontSize": "12px",
+        "fontFamily": "\"JetBrains Mono\", \"SF Mono\", \"Fira Code\"",
+        "fontWeight": "400",
+        "color": "rgb(26, 26, 26)",
+        "h": 24,
+        "w": 44
+      }
+    ]
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

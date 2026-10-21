@@ -1,0 +1,80 @@
+{
+  "key": "ws-flight-companion|populated|dark|390",
+  "registryId": "ws-flight-companion",
+  "state": "populated",
+  "theme": "dark",
+  "viewport": 390,
+  "path": "/workspace/test-workspace/flight-companion",
+  "populated": true,
+  "note": "set-flight-companion-playbook; a live turn is NOT driven (named limit)",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/flight-companion",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "theme-dark",
+    "title": "Flight Companion - Experimental",
+    "h1": "Flight Companion",
+    "headings": {
+      "h1": 1,
+      "h2": 3
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "roadmap",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "next run",
+      "passage planner",
+      "ship's biscuit",
+      "live console",
+      "ship journey"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: dark",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 611
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 54,
+    "belowThreshold": []
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

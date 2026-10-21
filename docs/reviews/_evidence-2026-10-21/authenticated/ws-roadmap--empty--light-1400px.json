@@ -1,0 +1,111 @@
+{
+  "key": "ws-roadmap|empty|light|1400",
+  "registryId": "ws-roadmap",
+  "state": "empty",
+  "theme": "light",
+  "viewport": 1400,
+  "path": "/workspace/test-workspace/roadmap",
+  "populated": false,
+  "note": "default seed (empty) state",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/roadmap",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "no theme-dark",
+    "actual": "",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "",
+    "title": "Roadmap - Test Workspace",
+    "h1": "Roadmap",
+    "headings": {
+      "h1": 1,
+      "h3": 4,
+      "h2": 1
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "passage planner",
+      "ship's biscuit",
+      "live console",
+      "ship journey",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "next run",
+      "flight companion"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: light",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": true,
+    "hasAssigneeSelector": false,
+    "bodyText": 935
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 129,
+    "belowThreshold": [
+      {
+        "element": "span.status-pill__char",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.3,
+        "need": 4.5,
+        "fontSize": "14.4px",
+        "fontWeight": "600",
+        "count": 8,
+        "samples": [
+          "✓",
+          "✓",
+          "✓"
+        ]
+      },
+      {
+        "element": "span.wordmark-accent",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.74,
+        "need": 4.5,
+        "fontSize": "16px",
+        "fontWeight": "600",
+        "count": 2,
+        "samples": [
+          ".cat",
+          ".cat"
+        ]
+      }
+    ]
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

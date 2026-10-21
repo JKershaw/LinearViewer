@@ -1,0 +1,121 @@
+{
+  "key": "ws-flight-companion|populated|light|390",
+  "registryId": "ws-flight-companion",
+  "state": "populated",
+  "theme": "light",
+  "viewport": 390,
+  "path": "/workspace/test-workspace/flight-companion",
+  "populated": true,
+  "note": "set-flight-companion-playbook; a live turn is NOT driven (named limit)",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/flight-companion",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "no theme-dark",
+    "actual": "",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "",
+    "title": "Flight Companion - Experimental",
+    "h1": "Flight Companion",
+    "headings": {
+      "h1": 1,
+      "h2": 3
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "roadmap",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "next run",
+      "passage planner",
+      "ship's biscuit",
+      "live console",
+      "ship journey"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: light",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 612
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 54,
+    "belowThreshold": [
+      {
+        "element": "button.action-btn.save.fc-start-btn",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(220,237,227)",
+        "ratio": 2.71,
+        "need": 4.5,
+        "fontSize": "11.05px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "start"
+        ]
+      },
+      {
+        "element": "button.action-btn.save",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(220,237,227)",
+        "ratio": 2.71,
+        "need": 4.5,
+        "fontSize": "11.05px",
+        "fontWeight": "400",
+        "count": 2,
+        "samples": [
+          "send",
+          "copy prompt"
+        ]
+      },
+      {
+        "element": "span.wordmark-accent",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.74,
+        "need": 4.5,
+        "fontSize": "10.4975px",
+        "fontWeight": "600",
+        "count": 1,
+        "samples": [
+          ".cat"
+        ]
+      }
+    ]
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

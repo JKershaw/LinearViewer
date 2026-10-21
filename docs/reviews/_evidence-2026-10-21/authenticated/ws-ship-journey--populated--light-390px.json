@@ -1,0 +1,82 @@
+{
+  "key": "ws-ship-journey|populated|light|390",
+  "registryId": "ws-ship-journey",
+  "state": "populated",
+  "theme": "light",
+  "viewport": 390,
+  "path": "/workspace/local-workspace/ship-journey",
+  "populated": true,
+  "note": "local-provider workspace: 6 completed issues + seed-report-history ×2 (north-star change between runs; run window spans every completion, so coverage reads 6 of 6)",
+  "httpStatus": 200,
+  "finalPath": "/workspace/local-workspace/ship-journey",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "no theme-dark",
+    "actual": "",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "",
+    "title": "Ship Journey - Experimental",
+    "h1": "Ship Journey",
+    "headings": {
+      "h1": 1
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "proxy"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: light",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 512
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 29,
+    "belowThreshold": [
+      {
+        "element": "span.wordmark-accent",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.74,
+        "need": 4.5,
+        "fontSize": "10.4975px",
+        "fontWeight": "600",
+        "count": 1,
+        "samples": [
+          ".cat"
+        ]
+      }
+    ]
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

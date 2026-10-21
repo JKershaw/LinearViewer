@@ -1,0 +1,110 @@
+{
+  "key": "ws-settings-jira|default|dark|390",
+  "registryId": "ws-settings-jira",
+  "state": "default",
+  "theme": "dark",
+  "viewport": 390,
+  "path": "/workspace/jira-workspace/settings",
+  "populated": null,
+  "note": "provider twin via /test/set-jira-session",
+  "httpStatus": 200,
+  "finalPath": "/workspace/jira-workspace/settings",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "theme-dark",
+    "title": "Jira Workspace - Settings",
+    "h1": "Settings",
+    "headings": {
+      "h1": 1,
+      "h2": 12
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "kpis",
+      "proxy"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: dark",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 17791
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 221,
+    "belowThreshold": [
+      {
+        "element": "button.action-btn",
+        "color": "rgb(0, 0, 0)",
+        "bg": "rgb(34,36,40)",
+        "ratio": 1.35,
+        "need": 4.5,
+        "fontSize": "9.945px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "refresh / test"
+        ]
+      },
+      {
+        "element": "a.settings-action",
+        "color": "rgb(0, 0, 238)",
+        "bg": "rgb(34,36,40)",
+        "ratio": 1.65,
+        "need": 4.5,
+        "fontSize": "11.7px",
+        "fontWeight": "400",
+        "count": 4,
+        "samples": [
+          "Add email →",
+          "catalog",
+          "custom prompts"
+        ]
+      },
+      {
+        "element": "a.action-btn.provider-add-new-workspace",
+        "color": "rgb(0, 0, 238)",
+        "bg": "rgb(34,36,40)",
+        "ratio": 1.65,
+        "need": 4.5,
+        "fontSize": "9.945px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "as a new workspace"
+        ]
+      }
+    ]
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

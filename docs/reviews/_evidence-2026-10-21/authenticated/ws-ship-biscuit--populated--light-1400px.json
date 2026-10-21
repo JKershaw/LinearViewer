@@ -1,0 +1,163 @@
+{
+  "key": "ws-ship-biscuit|populated|light|1400",
+  "registryId": "ws-ship-biscuit",
+  "state": "populated",
+  "theme": "light",
+  "viewport": 1400,
+  "path": "/workspace/test-workspace/ship-biscuit",
+  "populated": true,
+  "note": "seed-agent-status ×5 then one deterministic edition generated (POST .../api/ship-biscuit/generate, window=week)",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/ship-biscuit",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "no theme-dark",
+    "actual": "",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "",
+    "title": "The Ship's Biscuit - Experimental",
+    "h1": "The Ship's Biscuit",
+    "headings": {
+      "h1": 1,
+      "h2": 3,
+      "h3": 1
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "flight companion",
+      "passage planner",
+      "live console",
+      "ship journey",
+      "roadmap",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "next run"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: light",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 1593
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 64,
+    "belowThreshold": [
+      {
+        "element": "p.ship-biscuit-warning",
+        "color": "rgb(255, 178, 36)",
+        "bg": "rgb(247,247,247)",
+        "ratio": 1.68,
+        "need": 4.5,
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "⚠ AI is not configured on the server (connect Open"
+        ]
+      },
+      {
+        "element": "code",
+        "color": "rgb(255, 178, 36)",
+        "bg": "rgb(247,247,247)",
+        "ratio": 1.68,
+        "need": 4.5,
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "OPENROUTER_API_KEY"
+        ]
+      },
+      {
+        "element": "button.action-btn.save",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(220,237,227)",
+        "ratio": 2.71,
+        "need": 4.5,
+        "fontSize": "13.6px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "run the presses"
+        ]
+      },
+      {
+        "element": "h3.ship-biscuit-column-title",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(247,247,247)",
+        "ratio": 3.5,
+        "need": 4.5,
+        "fontSize": "12.8px",
+        "fontWeight": "600",
+        "count": 1,
+        "samples": [
+          "The Wire"
+        ]
+      },
+      {
+        "element": "span.ship-biscuit-section",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(247,247,247)",
+        "ratio": 3.5,
+        "need": 4.5,
+        "fontSize": "11.52px",
+        "fontWeight": "400",
+        "count": 5,
+        "samples": [
+          "Deep Dive",
+          "Deep Dive",
+          "Deep Dive"
+        ]
+      },
+      {
+        "element": "span.wordmark-accent",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.74,
+        "need": 4.5,
+        "fontSize": "16px",
+        "fontWeight": "600",
+        "count": 2,
+        "samples": [
+          ".cat",
+          ".cat"
+        ]
+      }
+    ]
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

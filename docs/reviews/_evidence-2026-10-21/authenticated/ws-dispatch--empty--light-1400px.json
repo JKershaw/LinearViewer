@@ -1,0 +1,135 @@
+{
+  "key": "ws-dispatch|empty|light|1400",
+  "registryId": "ws-dispatch",
+  "state": "empty",
+  "theme": "light",
+  "viewport": 1400,
+  "path": "/workspace/test-workspace/dispatch",
+  "populated": false,
+  "note": "default seed (empty) state",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/dispatch",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "no theme-dark",
+    "actual": "",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "",
+    "title": "Test Workspace - Dispatch",
+    "h1": "Dispatch",
+    "headings": {
+      "h1": 1,
+      "h2": 6
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "passage planner",
+      "ship's biscuit",
+      "live console",
+      "ship journey",
+      "roadmap",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "next run",
+      "flight companion"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: light",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 1986
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 80,
+    "belowThreshold": [
+      {
+        "element": "button.action-btn.save.dispatch-toggle",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(220,237,227)",
+        "ratio": 2.71,
+        "need": 4.5,
+        "fontSize": "12.24px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "Dispatch ▾"
+        ]
+      },
+      {
+        "element": "button.action-btn.save",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(220,237,227)",
+        "ratio": 2.71,
+        "need": 4.5,
+        "fontSize": "12.24px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "generate"
+        ]
+      },
+      {
+        "element": "span.wordmark-accent",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.74,
+        "need": 4.5,
+        "fontSize": "16px",
+        "fontWeight": "600",
+        "count": 2,
+        "samples": [
+          ".cat",
+          ".cat"
+        ]
+      },
+      {
+        "element": "button.action-btn.token-revoke",
+        "color": "rgb(204, 0, 0)",
+        "bg": "rgb(236,211,211)",
+        "ratio": 4.16,
+        "need": 4.5,
+        "fontSize": "13.6px",
+        "fontWeight": "400",
+        "count": 2,
+        "samples": [
+          "revoke",
+          "revoke"
+        ]
+      }
+    ]
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

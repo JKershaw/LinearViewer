@@ -1,0 +1,70 @@
+{
+  "key": "ws-roadmap-local|default|dark|1400",
+  "registryId": "ws-roadmap-local",
+  "state": "default",
+  "theme": "dark",
+  "viewport": 1400,
+  "path": "/workspace/local-workspace/roadmap",
+  "populated": null,
+  "note": "roadmap under the local provider (the census's GET seed redirected; the POST seed with features.roadmap renders)",
+  "httpStatus": 200,
+  "finalPath": "/workspace/local-workspace/roadmap",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "theme-dark",
+    "title": "Roadmap - Local",
+    "h1": "Roadmap",
+    "headings": {
+      "h1": 1,
+      "h2": 1,
+      "h3": 1
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "proxy"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: dark",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 331
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 45,
+    "belowThreshold": []
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

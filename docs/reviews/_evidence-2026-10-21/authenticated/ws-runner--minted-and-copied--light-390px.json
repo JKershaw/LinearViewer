@@ -1,0 +1,130 @@
+{
+  "key": "ws-runner|minted-and-copied|light|390",
+  "registryId": "ws-runner",
+  "state": "minted-and-copied",
+  "theme": "light",
+  "viewport": 390,
+  "path": "/workspace/test-workspace/runner",
+  "populated": null,
+  "note": "mint then copy pressed (clipboard granted) so .runner-setup-feedback \"copied ✓\" (color: var(--green), runner-setup.css:76) is on screen",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/runner",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "no theme-dark",
+    "actual": "",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "",
+    "title": "Run on my machine",
+    "h1": "Run on my machine",
+    "headings": {
+      "h1": 1,
+      "h2": 4
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "roadmap",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "next run",
+      "flight companion",
+      "passage planner",
+      "ship's biscuit",
+      "live console",
+      "ship journey"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: light",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 2101
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 55,
+    "belowThreshold": [
+      {
+        "element": "button.action-btn.runner-setup-btn.save",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(198,229,209)",
+        "ratio": 2.44,
+        "need": 4.5,
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "copy"
+        ]
+      },
+      {
+        "element": "span.runner-setup-feedback",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(247,247,247)",
+        "ratio": 3.08,
+        "need": 4.5,
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "copied ✓"
+        ]
+      },
+      {
+        "element": "span.wordmark-accent",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.74,
+        "need": 4.5,
+        "fontSize": "10.4975px",
+        "fontWeight": "600",
+        "count": 1,
+        "samples": [
+          ".cat"
+        ]
+      }
+    ]
+  },
+  "extra": {
+    "feedbackEl": true,
+    "feedbackText": "copied ✓",
+    "feedbackHidden": false,
+    "feedbackColor": "rgb(22, 163, 74)",
+    "feedbackBg": "rgb(255,255,255)",
+    "feedbackRatio": 3.3,
+    "greenToken": "#16a34a"
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

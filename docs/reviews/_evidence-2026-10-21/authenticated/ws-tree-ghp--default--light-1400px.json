@@ -1,0 +1,111 @@
+{
+  "key": "ws-tree-ghp|default|light|1400",
+  "registryId": "ws-tree-ghp",
+  "state": "default",
+  "theme": "light",
+  "viewport": 1400,
+  "path": "/workspace/github-projects-workspace/",
+  "populated": null,
+  "note": "provider twin via /test/set-github-projects-session",
+  "httpStatus": 200,
+  "finalPath": "/workspace/github-projects-workspace/",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "no theme-dark",
+    "actual": "",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "",
+    "title": "GitHub Projects Workspace - Projects",
+    "h1": "GitHub Projects Workspace",
+    "headings": {
+      "h1": 1
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "search",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "proxy"
+    ],
+    "footerLinks": [
+      "reset",
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: light",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": true,
+    "bodyText": 477
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 46,
+    "belowThreshold": [
+      {
+        "element": "div.in-progress-header",
+        "color": "rgb(212, 166, 0)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 2.27,
+        "need": 4.5,
+        "fontSize": "16px",
+        "fontWeight": "600",
+        "count": 1,
+        "samples": [
+          "▼ In Progress"
+        ]
+      },
+      {
+        "element": "span.status-pill__char",
+        "color": "rgb(212, 166, 0)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 2.27,
+        "need": 4.5,
+        "fontSize": "14.4px",
+        "fontWeight": "400",
+        "count": 2,
+        "samples": [
+          "◐",
+          "◐"
+        ]
+      },
+      {
+        "element": "span.wordmark-accent",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.74,
+        "need": 4.5,
+        "fontSize": "16px",
+        "fontWeight": "600",
+        "count": 2,
+        "samples": [
+          ".cat",
+          ".cat"
+        ]
+      }
+    ]
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

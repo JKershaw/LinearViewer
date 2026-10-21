@@ -1,0 +1,80 @@
+{
+  "key": "ws-observation-session|populated|dark|390",
+  "registryId": "ws-observation-session",
+  "state": "populated",
+  "theme": "dark",
+  "viewport": 390,
+  "path": "/workspace/test-workspace/observation/session/73e1897f-576e-4cc7-a33e-6576ffb096a5",
+  "populated": true,
+  "note": "session 73e1897f-576e-4cc7-a33e-6576ffb096a5: anchor + worker with a transcript (take + feedback), plus seed-agent-status and seed-proxy-event",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/observation/session/73e1897f-576e-4cc7-a33e-6576ffb096a5",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "theme-dark",
+    "title": "Session · LIN-1003 — Session-page seed",
+    "h1": "Session-page seed Run 73e1897f",
+    "headings": {
+      "h1": 1,
+      "h2": 2
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "settings",
+      "kpis",
+      "roadmap",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "next run",
+      "flight companion",
+      "passage planner",
+      "ship's biscuit",
+      "live console",
+      "ship journey"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: dark",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 997
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 78,
+    "belowThreshold": []
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

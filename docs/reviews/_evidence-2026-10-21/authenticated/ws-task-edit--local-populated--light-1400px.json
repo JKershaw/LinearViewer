@@ -1,0 +1,112 @@
+{
+  "key": "ws-task-edit|local-populated|light|1400",
+  "registryId": "ws-task-edit",
+  "state": "local-populated",
+  "theme": "light",
+  "viewport": 1400,
+  "path": "/workspace/local-workspace/task/local-workspace--te-issue/edit",
+  "populated": true,
+  "note": "local-provider issue (the default Linear-mock seed 500s because the mock cannot read the task: measured:error-500 in the census)",
+  "httpStatus": 200,
+  "finalPath": "/workspace/local-workspace/task/local-workspace--te-issue/edit",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "no theme-dark",
+    "actual": "",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "",
+    "title": "Edit · A task to edit",
+    "h1": "LOCAL-TE1 A task to edit",
+    "headings": {
+      "h1": 1,
+      "h2": 1
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "search",
+      "0 waiting on you",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "dispatch",
+      "proxy"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: light",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 513
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 38,
+    "belowThreshold": [
+      {
+        "element": "button.task-edit-tab",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(226,242,241)",
+        "ratio": 3.25,
+        "need": 4.5,
+        "fontSize": "12.8px",
+        "fontWeight": "600",
+        "count": 1,
+        "samples": [
+          "Write"
+        ]
+      },
+      {
+        "element": "button.task-edit-submit",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(226,242,241)",
+        "ratio": 3.25,
+        "need": 4.5,
+        "fontSize": "15.2px",
+        "fontWeight": "600",
+        "count": 1,
+        "samples": [
+          "Save changes"
+        ]
+      },
+      {
+        "element": "span.wordmark-accent",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.74,
+        "need": 4.5,
+        "fontSize": "16px",
+        "fontWeight": "600",
+        "count": 2,
+        "samples": [
+          ".cat",
+          ".cat"
+        ]
+      }
+    ]
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

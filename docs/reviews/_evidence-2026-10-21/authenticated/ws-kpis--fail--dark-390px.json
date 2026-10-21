@@ -1,0 +1,62 @@
+{
+  "key": "ws-kpis|fail|dark|390",
+  "registryId": "ws-kpis",
+  "state": "fail",
+  "theme": "dark",
+  "viewport": 390,
+  "path": "/workspace/local-workspace/kpis",
+  "populated": false,
+  "note": "the next dispatch-history aggregate() rejects once (/test/kpis-fail-next-aggregate), armed before every cell: the page's fail state",
+  "httpStatus": 500,
+  "finalPath": "/workspace/local-workspace/kpis",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "expected": {
+    "status": 500
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "theme-dark",
+    "title": "Something Went Wrong - Projects",
+    "h1": "Harbour",
+    "headings": {
+      "h1": 1,
+      "h2": 1
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 0,
+    "footerCount": 0,
+    "navLinks": [],
+    "footerLinks": [],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 69
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 4,
+    "belowThreshold": []
+  },
+  "extra": {
+    "data": null,
+    "empty": false,
+    "sections": [],
+    "pressed": [],
+    "captionVisible": null,
+    "emptyNoteVisible": null,
+    "canvases": []
+  },
+  "consoleErrors": [],
+  "failedRequests": [
+    "500 /workspace/local-workspace/kpis"
+  ]
+}

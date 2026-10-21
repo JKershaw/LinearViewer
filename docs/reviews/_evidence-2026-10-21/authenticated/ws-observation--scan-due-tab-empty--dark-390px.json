@@ -1,0 +1,84 @@
+{
+  "key": "ws-observation|scan-due-tab-empty|dark|390",
+  "registryId": "ws-observation",
+  "state": "scan-due-tab-empty",
+  "theme": "dark",
+  "viewport": 390,
+  "path": "/workspace/test-workspace/observation",
+  "populated": false,
+  "note": "Scan-due tab clicked; no seed seam for a due scan (only /test/clear-task-decisions + read-backs) — empty state, named limit",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/observation",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "theme-dark",
+    "title": "Observation",
+    "h1": "Observation ● live",
+    "headings": {
+      "h1": 1,
+      "h2": 5
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "settings",
+      "kpis",
+      "roadmap",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "next run",
+      "flight companion",
+      "passage planner",
+      "ship's biscuit",
+      "live console",
+      "ship journey"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: dark",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 952
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 33,
+    "belowThreshold": []
+  },
+  "extra": {
+    "dueSectionVisible": true,
+    "text": "SCAN-DUE Due-check results come from a provider-content fingerprint comparison, not an LLM judgement — it can only tell you a task's scanned content changed, never whether the change matters. It is a "
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

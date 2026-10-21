@@ -1,0 +1,73 @@
+{
+  "key": "ws-task-page|signed-out|dark|390",
+  "registryId": "ws-task-page",
+  "state": "signed-out",
+  "theme": "dark",
+  "viewport": 390,
+  "path": "/workspace/local-workspace/task/LOCAL-TP1",
+  "populated": false,
+  "note": "local-provider seed (no owner session); signed-out",
+  "httpStatus": 200,
+  "finalPath": "/",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "expected": {
+    "status": 200,
+    "finalPath": "/"
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "theme-dark",
+    "title": "Harbour — keep human intent in command of AI execution",
+    "h1": "harbour.cat",
+    "headings": {
+      "h1": 1,
+      "h2": 9,
+      "h3": 4
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [],
+    "footerLinks": [
+      "swipe",
+      "swim",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library"
+    ],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 5104
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 162,
+    "belowThreshold": []
+  },
+  "extra": {
+    "dataStatus": null,
+    "mergeReady": null,
+    "title": null,
+    "sentence": null,
+    "stageCount": 0,
+    "prLead": null,
+    "closeoutState": null,
+    "hasPress": false,
+    "ownerWidgets": false,
+    "notFound": false
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

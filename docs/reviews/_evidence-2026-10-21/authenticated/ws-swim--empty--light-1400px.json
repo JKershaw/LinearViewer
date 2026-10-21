@@ -1,0 +1,149 @@
+{
+  "key": "ws-swim|empty|light|1400",
+  "registryId": "ws-swim",
+  "state": "empty",
+  "theme": "light",
+  "viewport": 1400,
+  "path": "/workspace/test-workspace/swim",
+  "populated": false,
+  "note": "default seed (empty) state",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/swim",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "no theme-dark",
+    "actual": "",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "",
+    "title": "Swim - Lanes",
+    "h1": "Swim",
+    "headings": {
+      "h1": 1
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "observation",
+      "settings",
+      "kpis",
+      "live console",
+      "ship journey",
+      "roadmap",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "next run",
+      "flight companion",
+      "passage planner",
+      "ship's biscuit"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: light",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": true,
+    "hasAssigneeSelector": false,
+    "bodyText": 1712
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 126,
+    "belowThreshold": [
+      {
+        "element": "span.swim-box-state.in-progress.status-pill__char.status-pill--in-progress",
+        "color": "rgb(212, 166, 0)",
+        "bg": "rgb(248,249,250)",
+        "ratio": 2.15,
+        "need": 4.5,
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "◐"
+        ]
+      },
+      {
+        "element": "span.swim-fc-prio.p3",
+        "color": "rgb(212, 166, 0)",
+        "bg": "rgb(248,249,250)",
+        "ratio": 2.15,
+        "need": 4.5,
+        "fontSize": "11px",
+        "fontWeight": "700",
+        "count": 1,
+        "samples": [
+          "Medium"
+        ]
+      },
+      {
+        "element": "span.swim-box-state.in-progress.status-pill__char.status-pill--in-progress",
+        "color": "rgb(212, 166, 0)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 2.27,
+        "need": 4.5,
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "count": 4,
+        "samples": [
+          "◐",
+          "◐",
+          "◐"
+        ]
+      },
+      {
+        "element": "span.swim-fc-prio.p3",
+        "color": "rgb(212, 166, 0)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 2.27,
+        "need": 4.5,
+        "fontSize": "11px",
+        "fontWeight": "700",
+        "count": 2,
+        "samples": [
+          "Medium",
+          "Medium"
+        ]
+      },
+      {
+        "element": "span.wordmark-accent",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.74,
+        "need": 4.5,
+        "fontSize": "16px",
+        "fontWeight": "600",
+        "count": 2,
+        "samples": [
+          ".cat",
+          ".cat"
+        ]
+      }
+    ]
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

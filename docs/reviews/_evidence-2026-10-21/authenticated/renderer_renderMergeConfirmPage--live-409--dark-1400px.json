@@ -1,0 +1,53 @@
+{
+  "key": "renderer:renderMergeConfirmPage|live-409|dark|1400",
+  "registryId": "renderer:renderMergeConfirmPage",
+  "state": "live-409",
+  "theme": "dark",
+  "viewport": 1400,
+  "path": "/test/set-merge-conflict-session",
+  "populated": null,
+  "note": "real production render through /test/set-merge-conflict-session (provider hardcoded to linear); GitHub/Jira copies remain un-rendered — carried named limit",
+  "httpStatus": 409,
+  "finalPath": "/test/set-merge-conflict-session",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "expected": {
+    "status": 409
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "theme-dark",
+    "title": "Confirm account merge - Projects",
+    "h1": "Harbour",
+    "headings": {
+      "h1": 1,
+      "h2": 1
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 0,
+    "footerCount": 0,
+    "navLinks": [],
+    "footerLinks": [],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 243
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 5,
+    "belowThreshold": []
+  },
+  "consoleErrors": [],
+  "failedRequests": [
+    "409 /test/set-merge-conflict-session"
+  ]
+}

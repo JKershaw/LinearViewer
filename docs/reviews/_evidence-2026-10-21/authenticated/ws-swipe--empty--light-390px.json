@@ -1,0 +1,120 @@
+{
+  "key": "ws-swipe|empty|light|390",
+  "registryId": "ws-swipe",
+  "state": "empty",
+  "theme": "light",
+  "viewport": 390,
+  "path": "/workspace/test-workspace/swipe",
+  "populated": false,
+  "note": "default seed (empty) state",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/swipe/TEST-13",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "no theme-dark",
+    "actual": "",
+    "passed": true
+  },
+  "expected": {
+    "status": 200,
+    "finalPathPrefix": "/workspace/test-workspace/swipe/"
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "",
+    "title": "Swipe - TEST-13 Login fails with special characters in password",
+    "h1": "Swipe",
+    "headings": {
+      "h1": 1
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "roadmap",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "next run",
+      "flight companion",
+      "passage planner",
+      "ship's biscuit",
+      "live console",
+      "ship journey"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: light",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": true,
+    "hasAssigneeSelector": false,
+    "bodyText": 663
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 62,
+    "belowThreshold": [
+      {
+        "element": "button.swipe-arrow.swipe-arrow-left",
+        "color": "rgb(238, 238, 238)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 1.16,
+        "need": 4.5,
+        "fontSize": "12px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "←"
+        ]
+      },
+      {
+        "element": "span.swipe-accordion-toggle",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(248,249,250)",
+        "ratio": 3.55,
+        "need": 4.5,
+        "fontSize": "9px",
+        "fontWeight": "600",
+        "count": 1,
+        "samples": [
+          "▶"
+        ]
+      },
+      {
+        "element": "span.wordmark-accent",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.74,
+        "need": 4.5,
+        "fontSize": "10.4975px",
+        "fontWeight": "600",
+        "count": 1,
+        "samples": [
+          ".cat"
+        ]
+      }
+    ]
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

@@ -1,0 +1,117 @@
+{
+  "key": "ws-runner|default|light|390",
+  "registryId": "ws-runner",
+  "state": "default",
+  "theme": "light",
+  "viewport": 390,
+  "path": "/workspace/test-workspace/runner",
+  "populated": null,
+  "note": "default render",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/runner",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "no theme-dark",
+    "actual": "",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "",
+    "title": "Run on my machine",
+    "h1": "Run on my machine",
+    "headings": {
+      "h1": 1,
+      "h2": 4
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "roadmap",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "next run",
+      "flight companion",
+      "passage planner",
+      "ship's biscuit",
+      "live console",
+      "ship journey"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: light",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 2091
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 53,
+    "belowThreshold": [
+      {
+        "element": "button.action-btn.save.runner-setup-btn",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(220,237,227)",
+        "ratio": 2.71,
+        "need": 4.5,
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "create runner prompt"
+        ]
+      },
+      {
+        "element": "span.wordmark-accent",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.74,
+        "need": 4.5,
+        "fontSize": "10.4975px",
+        "fontWeight": "600",
+        "count": 1,
+        "samples": [
+          ".cat"
+        ]
+      }
+    ]
+  },
+  "extra": {
+    "feedbackEl": true,
+    "feedbackText": "",
+    "feedbackHidden": false,
+    "feedbackColor": "rgb(22, 163, 74)",
+    "feedbackBg": "rgb(255,255,255)",
+    "feedbackRatio": 3.3,
+    "greenToken": "#16a34a"
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

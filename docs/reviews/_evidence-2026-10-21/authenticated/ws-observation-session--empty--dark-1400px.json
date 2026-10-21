@@ -1,0 +1,82 @@
+{
+  "key": "ws-observation-session|empty|dark|1400",
+  "registryId": "ws-observation-session",
+  "state": "empty",
+  "theme": "dark",
+  "viewport": 1400,
+  "path": "/workspace/test-workspace/observation/session/none",
+  "populated": false,
+  "note": "unknown session id: the page's own 404 (the populated session is captured separately)",
+  "httpStatus": 404,
+  "finalPath": "/workspace/test-workspace/observation/session/none",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "expected": {
+    "status": 404
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "theme-dark",
+    "title": "Session not found",
+    "h1": "Session not found",
+    "headings": {
+      "h1": 1,
+      "h2": 1
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "settings",
+      "kpis",
+      "roadmap",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "next run",
+      "flight companion",
+      "passage planner",
+      "ship's biscuit",
+      "live console",
+      "ship journey"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: light",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 420
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 39,
+    "belowThreshold": []
+  },
+  "consoleErrors": [],
+  "failedRequests": [
+    "404 /workspace/test-workspace/observation/session/none"
+  ]
+}

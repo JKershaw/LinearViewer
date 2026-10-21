@@ -1,0 +1,98 @@
+{
+  "key": "ws-task-page|merged-done|dark|390",
+  "registryId": "ws-task-page",
+  "state": "merged-done",
+  "theme": "dark",
+  "viewport": 390,
+  "path": "/workspace/local-workspace/task/LOCAL-TP1",
+  "populated": true,
+  "note": "local-provider seed (owner); merged-done",
+  "httpStatus": 200,
+  "finalPath": "/workspace/local-workspace/task/LOCAL-TP1",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "theme-dark",
+    "title": "LOCAL-TP1 — A finished task with a merged PR",
+    "h1": "LOCAL-TP1 A finished task with a merged PR",
+    "headings": {
+      "h1": 1,
+      "h2": 4,
+      "h3": 1
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "search",
+      "0 waiting on you",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "dispatch",
+      "proxy"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: dark",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 1178
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 106,
+    "belowThreshold": [
+      {
+        "element": "a",
+        "color": "rgb(0, 0, 238)",
+        "bg": "rgb(31,34,42)",
+        "ratio": 1.69,
+        "need": 4.5,
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "https://github.com/acme/app/pull/490587"
+        ]
+      }
+    ]
+  },
+  "extra": {
+    "dataStatus": "done",
+    "mergeReady": "false",
+    "title": "A finished task with a merged PR",
+    "sentence": "Finished.",
+    "stageCount": 1,
+    "prLead": "PR #490587 was merged by hand.",
+    "closeoutState": "merged",
+    "hasPress": false,
+    "ownerWidgets": true,
+    "notFound": false
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}
