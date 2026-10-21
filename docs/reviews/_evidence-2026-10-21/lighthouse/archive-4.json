@@ -1,0 +1,48 @@
+{
+ "id": "archive-4",
+ "url": "/archive/4",
+ "lighthouseVersion": "12.8.2",
+ "fetchTime": "2026-10-21T02:46:11.904Z",
+ "finalUrl": "/archive/4",
+ "runtimeError": null,
+ "scores": {
+  "performance": 1,
+  "accessibility": 1,
+  "best-practices": 1,
+  "seo": 1
+ },
+ "metrics": {
+  "first-contentful-paint": 972.59125,
+  "largest-contentful-paint": 972.59125,
+  "cumulative-layout-shift": 0,
+  "total-blocking-time": 0
+ },
+ "failing": [
+  {
+   "id": "unminified-css",
+   "score": 0.5,
+   "title": "Minify CSS",
+   "items": [
+    {
+     "url": ":root {\n  --paper: #faf9f6;\n  --card: #fffefb;\n  --ink: #1c2430;\n  --muted: #5c6672;\n  --faint: #8b…"
+    }
+   ]
+  },
+  {
+   "id": "uses-text-compression",
+   "score": 0,
+   "title": "Enable text compression",
+   "items": [
+    {
+     "url": "http://localhost:3199/archive/4"
+    }
+   ]
+  },
+  {
+   "id": "document-latency-insight",
+   "score": 0.5,
+   "title": "Document request latency",
+   "items": []
+  }
+ ]
+}

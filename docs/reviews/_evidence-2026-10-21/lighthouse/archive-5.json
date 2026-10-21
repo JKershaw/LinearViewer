@@ -1,0 +1,87 @@
+{
+ "id": "archive-5",
+ "url": "/archive/5",
+ "lighthouseVersion": "12.8.2",
+ "fetchTime": "2026-10-21T02:46:22.309Z",
+ "finalUrl": "/archive/5",
+ "runtimeError": null,
+ "scores": {
+  "performance": 0.98,
+  "accessibility": 0.93,
+  "best-practices": 1,
+  "seo": 1
+ },
+ "metrics": {
+  "first-contentful-paint": 1802.6844,
+  "largest-contentful-paint": 1802.6844,
+  "cumulative-layout-shift": 0,
+  "total-blocking-time": 0
+ },
+ "failing": [
+  {
+   "id": "first-contentful-paint",
+   "score": 0.89,
+   "title": "First Contentful Paint",
+   "items": []
+  },
+  {
+   "id": "largest-contentful-paint",
+   "score": 0.98,
+   "title": "Largest Contentful Paint",
+   "items": []
+  },
+  {
+   "id": "color-contrast",
+   "score": 0,
+   "title": "Background and foreground colors do not have a sufficient contrast ratio.",
+   "items": [
+    {
+     "selector": "main.wrap > section > h2 > span.num",
+     "snippet": "<span class=\"num\">",
+     "explanation": "Fix any of the following:\n  Element has insufficient color contrast of 2.94 (foreground color: #8b93a0, background color: #faf9f6, font size: 10.7pt (14.3px), f"
+    },
+    {
+     "selector": "main.wrap > section > h2 > span.num",
+     "snippet": "<span class=\"num\">",
+     "explanation": "Fix any of the following:\n  Element has insufficient color contrast of 2.94 (foreground color: #8b93a0, background color: #faf9f6, font size: 10.7pt (14.3px), f"
+    },
+    {
+     "selector": "main.wrap > section > h3 > span.lever",
+     "snippet": "<span class=\"lever\">",
+     "explanation": "Fix any of the following:\n  Element has insufficient color contrast of 4.19 (foreground color: #bb5f10, background color: #faf9f6, font size: 9.0pt (12px), font"
+    },
+    {
+     "selector": "main.wrap > section > h3 > span.lever",
+     "snippet": "<span class=\"lever\">",
+     "explanation": "Fix any of the following:\n  Element has insufficient color contrast of 4.19 (foreground color: #bb5f10, background color: #faf9f6, font size: 9.0pt (12px), font"
+    }
+   ]
+  },
+  {
+   "id": "uses-text-compression",
+   "score": 0,
+   "title": "Enable text compression",
+   "items": [
+    {
+     "url": "http://localhost:3199/archive/5"
+    }
+   ]
+  },
+  {
+   "id": "document-latency-insight",
+   "score": 0.5,
+   "title": "Document request latency",
+   "items": []
+  },
+  {
+   "id": "network-dependency-tree-insight",
+   "score": 0,
+   "title": "Network dependency tree",
+   "items": [
+    {},
+    {},
+    {}
+   ]
+  }
+ ]
+}

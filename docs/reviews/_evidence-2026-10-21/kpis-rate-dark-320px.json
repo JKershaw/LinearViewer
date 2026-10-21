@@ -1,0 +1,121 @@
+{
+  "surface": "kpis-rate",
+  "label": "/kpis seeded rollup — rate (default) toggle state",
+  "kind": "cold",
+  "theme": "dark",
+  "persisted": false,
+  "status": 200,
+  "url": "http://localhost:3199/kpis",
+  "viewport": {
+    "width": 320,
+    "height": 720
+  },
+  "expectedTheme": "dark",
+  "darkMode": "cookie",
+  "themeAssertion": {
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "title": "KPIs - Harbour",
+  "headings": {
+    "h1": 1,
+    "h2": 4,
+    "h3": 6,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 11,
+    "a11y": {
+      "roleHeading": 11,
+      "levels": {
+        "h1": 1,
+        "h2": 4,
+        "h3": 6,
+        "h4": 0,
+        "h5": 0,
+        "h6": 0
+      }
+    }
+  },
+  "htmlClass": "theme-dark",
+  "overflow": {
+    "scrollWidth": 305,
+    "clientWidth": 320,
+    "innerWidth": 320,
+    "bodyOver": 0,
+    "overflows": false,
+    "offenders": []
+  },
+  "footerCount": 1,
+  "mainCount": 1,
+  "linksIntoProduct": {
+    "total": 6,
+    "toRoot": 1,
+    "toWorkspace": 0,
+    "toAppNav": 4,
+    "sample": [
+      "/",
+      "/privacy",
+      "/privacy",
+      "/terms",
+      "/templates",
+      "/library"
+    ]
+  },
+  "contrast": [
+    {
+      "selector": "body",
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22,24,29)",
+      "ratio": 14.23,
+      "text": "Harbour\n  \n  \n    Harbour in numbers\n   "
+    },
+    {
+      "selector": "p",
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22,24,29)",
+      "ratio": 14.23,
+      "text": "Harbour hands tickets to AI agents. Here"
+    },
+    {
+      "selector": "a",
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22,24,29)",
+      "ratio": 14.23,
+      "text": "Harbour"
+    },
+    {
+      "selector": "button",
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(34,36,40)",
+      "ratio": 12.45,
+      "text": "Per day"
+    }
+  ],
+  "clip": [],
+  "navFoot": {
+    "navLinks": [],
+    "footerLinks": [
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library"
+    ],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "hasNavFeedback": false,
+    "footerHasColophon": false
+  },
+  "fonts": [
+    "Inter 400",
+    "Inter 500",
+    "Inter 600",
+    "Inter 700",
+    "JetBrains Mono 400",
+    "JetBrains Mono 500",
+    "JetBrains Mono 600"
+  ]
+}

@@ -1,0 +1,86 @@
+{
+ "id": "archive-3",
+ "url": "/archive/3",
+ "lighthouseVersion": "12.8.2",
+ "fetchTime": "2026-10-21T02:46:00.298Z",
+ "finalUrl": "/archive/3",
+ "runtimeError": null,
+ "scores": {
+  "performance": 0.98,
+  "accessibility": 1,
+  "best-practices": 1,
+  "seo": 1
+ },
+ "metrics": {
+  "first-contentful-paint": 1802.0708370049952,
+  "largest-contentful-paint": 1802.0708370049952,
+  "cumulative-layout-shift": 0,
+  "total-blocking-time": 0
+ },
+ "failing": [
+  {
+   "id": "first-contentful-paint",
+   "score": 0.89,
+   "title": "First Contentful Paint",
+   "items": []
+  },
+  {
+   "id": "largest-contentful-paint",
+   "score": 0.98,
+   "title": "Largest Contentful Paint",
+   "items": []
+  },
+  {
+   "id": "unminified-css",
+   "score": 0.5,
+   "title": "Minify CSS",
+   "items": [
+    {
+     "url": "@font-face{font-family:'Inter';font-style:normal;font-weight:400;font-display:swap; … } …"
+    }
+   ]
+  },
+  {
+   "id": "uses-text-compression",
+   "score": 0,
+   "title": "Enable text compression",
+   "items": [
+    {
+     "url": "http://localhost:3199/archive/3"
+    }
+   ]
+  },
+  {
+   "id": "dom-size",
+   "score": 0.5,
+   "title": "Avoid an excessive DOM size",
+   "items": [
+    {},
+    {
+     "selector": "svg.tg > defs > marker#tgArrow > path.tg-arrow",
+     "snippet": "<path d=\"M0,1 L7,4 L0,7\" class=\"tg-arrow\">"
+    },
+    {
+     "selector": "div.wrap > section#shape > div.tg-wrap > svg.tg",
+     "snippet": "<svg class=\"tg\" viewBox=\"0 0 980 618\" width=\"100%\" height=\"618\" role=\"img\" aria-"
+    }
+   ]
+  },
+  {
+   "id": "document-latency-insight",
+   "score": 0.5,
+   "title": "Document request latency",
+   "items": []
+  },
+  {
+   "id": "network-dependency-tree-insight",
+   "score": 0,
+   "title": "Network dependency tree",
+   "items": [
+    {},
+    {},
+    {}
+   ]
+  }
+ ]
+}

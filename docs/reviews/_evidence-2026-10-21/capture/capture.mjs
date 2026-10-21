@@ -75,7 +75,7 @@ const cold = [
   { key: 'kpis', path: '/kpis', label: 'Public KPIs', settleMs: 800 }
 ].map(s => ({ kind: 'cold', ...s }));
 
-const archive = [1, 2, 3, 4, 5, 6, 7].map(n => ({
+const archive = [1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => ({
   key: `archive-${n}`, kind: 'cold', path: `/archive/${n}`,
   label: `Archive #${n}`, darkMode: 'media', uncertain: true
 }));
@@ -320,8 +320,9 @@ async function measure(page, { expectedTheme, viewport, darkMode }) {
   };
 }
 
-async function captureOne(browser, surface, theme, viewport) {
+export async function captureOne(browser, surface, theme, viewport) {
   const opts = { viewport };
+  if (surface.extraContext) Object.assign(opts, surface.extraContext);
   const darkMode = surface.darkMode || 'cookie';
   if (darkMode === 'media') opts.colorScheme = theme;
 
@@ -332,6 +333,9 @@ async function captureOne(browser, surface, theme, viewport) {
   }
 
   const page = await ctx.newPage();
+  // LIN-3749 (beat 2): optional per-surface hooks. `pre` runs before navigation (request
+  // interception, cookies), `post` after the settle and before measuring (toggle clicks).
+  if (surface.pre) await surface.pre(page, ctx);
 
   let status = null;
   if (surface.seed) {
@@ -352,6 +356,7 @@ async function captureOne(browser, surface, theme, viewport) {
   status = r ? r.status() : (surface.kind === 'intercept' ? 200 : null);
 
   await page.waitForTimeout(surface.settleMs || 300);
+  if (surface.post) { await surface.post(page); await page.waitForTimeout(300); }
 
   const m = await measure(page, { expectedTheme: theme, viewport, darkMode });
 
@@ -373,12 +378,12 @@ async function captureOne(browser, surface, theme, viewport) {
   return { ok: true, surface, theme, viewport, name, record: { surface: surface.key, status, title: m.title, overflow: m.overflow, headings: m.headings } };
 }
 
-async function upsertManifest(entries) {
+export async function upsertManifest(entries) {
   let existing = {};
   try { existing = JSON.parse(await readFile(MANIFEST_PATH, 'utf8')); } catch (e) { existing = {}; }
   for (const e of entries) {
     const k = `${e.surface}--${e.theme}--${e.viewport}px`;
-    existing[k] = { surface: e.surface, theme: e.theme, viewport: e.viewport, ok: e.ok, ...(e.reason ? { reason: e.reason } : {}) };
+    existing[k] = { surface: e.surface, theme: e.theme, viewport: e.viewport, ok: e.ok, ...(e.registryId ? { registryId: e.registryId } : {}), ...(e.evidence ? { evidence: e.evidence } : {}), ...(e.reason ? { reason: e.reason } : {}) };
   }
   await writeFile(MANIFEST_PATH, JSON.stringify(existing, null, 2));
 }
@@ -444,4 +449,4 @@ async function main() {
   process.exit(failed.length ? 1 : 0);
 }
 
-main().catch(e => { console.error(e); process.exit(1); });
+if (process.argv[1] === fileURLToPath(import.meta.url)) main().catch(e => { console.error(e); process.exit(1); });

@@ -1,0 +1,204 @@
+{
+ "id": "swim-public",
+ "url": "/swim",
+ "lighthouseVersion": "12.8.2",
+ "fetchTime": "2026-10-21T02:47:36.683Z",
+ "finalUrl": "/swim",
+ "runtimeError": null,
+ "scores": {
+  "performance": 0.79,
+  "accessibility": 1,
+  "best-practices": 0.96,
+  "seo": 0.91
+ },
+ "metrics": {
+  "first-contentful-paint": 3903.20535,
+  "largest-contentful-paint": 3903.20535,
+  "cumulative-layout-shift": 0,
+  "total-blocking-time": 0
+ },
+ "failing": [
+  {
+   "id": "first-contentful-paint",
+   "score": 0.25,
+   "title": "First Contentful Paint",
+   "items": []
+  },
+  {
+   "id": "largest-contentful-paint",
+   "score": 0.52,
+   "title": "Largest Contentful Paint",
+   "items": []
+  },
+  {
+   "id": "speed-index",
+   "score": 0.82,
+   "title": "Speed Index",
+   "items": []
+  },
+  {
+   "id": "interactive",
+   "score": 0.88,
+   "title": "Time to Interactive",
+   "items": []
+  },
+  {
+   "id": "largest-contentful-paint-element",
+   "score": 0,
+   "title": "Largest Contentful Paint element",
+   "items": [
+    {},
+    {}
+   ]
+  },
+  {
+   "id": "render-blocking-resources",
+   "score": 0,
+   "title": "Eliminate render-blocking resources",
+   "items": [
+    {
+     "url": "http://localhost:3199/swim.js",
+     "wastedMs": 2251
+    },
+    {
+     "url": "http://localhost:3199/common.js",
+     "wastedMs": 3151
+    },
+    {
+     "url": "http://localhost:3199/swim.css",
+     "wastedMs": 901
+    },
+    {
+     "url": "http://localhost:3199/style.css",
+     "wastedMs": 2251
+    }
+   ]
+  },
+  {
+   "id": "unminified-css",
+   "score": 0,
+   "title": "Minify CSS",
+   "items": [
+    {
+     "url": "http://localhost:3199/style.css"
+    },
+    {
+     "url": "http://localhost:3199/swim.css"
+    }
+   ]
+  },
+  {
+   "id": "unminified-javascript",
+   "score": 0,
+   "title": "Minify JavaScript",
+   "items": [
+    {
+     "url": "http://localhost:3199/common.js"
+    },
+    {
+     "url": "http://localhost:3199/swim.js"
+    }
+   ]
+  },
+  {
+   "id": "unused-css-rules",
+   "score": 0,
+   "title": "Reduce unused CSS",
+   "items": [
+    {
+     "url": "http://localhost:3199/style.css"
+    },
+    {
+     "url": "http://localhost:3199/swim.css"
+    }
+   ]
+  },
+  {
+   "id": "unused-javascript",
+   "score": 0,
+   "title": "Reduce unused JavaScript",
+   "items": [
+    {
+     "url": "http://localhost:3199/swim.js"
+    },
+    {
+     "url": "http://localhost:3199/common.js"
+    }
+   ]
+  },
+  {
+   "id": "uses-text-compression",
+   "score": 0,
+   "title": "Enable text compression",
+   "items": [
+    {
+     "url": "http://localhost:3199/common.js"
+    },
+    {
+     "url": "http://localhost:3199/style.css"
+    },
+    {
+     "url": "http://localhost:3199/swim.js"
+    },
+    {
+     "url": "http://localhost:3199/swim.css"
+    }
+   ]
+  },
+  {
+   "id": "meta-description",
+   "score": 0,
+   "title": "Document does not have a meta description",
+   "items": []
+  },
+  {
+   "id": "font-size",
+   "score": 0,
+   "title": "Document doesn't use legible font sizes",
+   "items": [
+    {},
+    {},
+    {}
+   ]
+  },
+  {
+   "id": "document-latency-insight",
+   "score": 0.5,
+   "title": "Document request latency",
+   "items": []
+  },
+  {
+   "id": "network-dependency-tree-insight",
+   "score": 0,
+   "title": "Network dependency tree",
+   "items": [
+    {},
+    {},
+    {}
+   ]
+  },
+  {
+   "id": "render-blocking-insight",
+   "score": 0,
+   "title": "Render blocking requests",
+   "items": [
+    {
+     "url": "http://localhost:3199/swim.js",
+     "wastedMs": 2251
+    },
+    {
+     "url": "http://localhost:3199/common.js",
+     "wastedMs": 3151
+    },
+    {
+     "url": "http://localhost:3199/swim.css",
+     "wastedMs": 901
+    },
+    {
+     "url": "http://localhost:3199/style.css",
+     "wastedMs": 2251
+    }
+   ]
+  }
+ ]
+}

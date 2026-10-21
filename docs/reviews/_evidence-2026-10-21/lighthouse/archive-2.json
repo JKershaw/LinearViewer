@@ -1,0 +1,107 @@
+{
+ "id": "archive-2",
+ "url": "/archive/2",
+ "lighthouseVersion": "12.8.2",
+ "fetchTime": "2026-10-21T02:45:49.822Z",
+ "finalUrl": "/archive/2",
+ "runtimeError": null,
+ "scores": {
+  "performance": 1,
+  "accessibility": 0.96,
+  "best-practices": 1,
+  "seo": 1
+ },
+ "metrics": {
+  "first-contentful-paint": 1165.161371878598,
+  "largest-contentful-paint": 1165.161371878598,
+  "cumulative-layout-shift": 0,
+  "total-blocking-time": 0
+ },
+ "failing": [
+  {
+   "id": "first-contentful-paint",
+   "score": 0.99,
+   "title": "First Contentful Paint",
+   "items": []
+  },
+  {
+   "id": "color-contrast",
+   "score": 0,
+   "title": "Background and foreground colors do not have a sufficient contrast ratio.",
+   "items": [
+    {
+     "selector": "body > header.masthead > div.wrap > p.mast-rule",
+     "snippet": "<p class=\"mast-rule\">",
+     "explanation": "Fix any of the following:\n  Element has insufficient color contrast of 2.94 (foreground color: #8b93a0, background color: #faf9f6, font size: 9.8pt (13px), font"
+    },
+    {
+     "selector": "body > div.wrap > p.stat-note",
+     "snippet": "<p class=\"stat-note\">",
+     "explanation": "Fix any of the following:\n  Element has insufficient color contrast of 2.94 (foreground color: #8b93a0, background color: #faf9f6, font size: 9.8pt (13px), font"
+    },
+    {
+     "selector": "body > div.wrap > p.stat-note > span.chip",
+     "snippet": "<span class=\"chip ev\">",
+     "explanation": "Fix any of the following:\n  Element has insufficient color contrast of 2.94 (foreground color: #8b93a0, background color: #faf9f6, font size: 8.3pt (11px), font"
+    },
+    {
+     "selector": "div.wrap > footer.colophon > p > span.chip",
+     "snippet": "<span class=\"chip ev\">",
+     "explanation": "Fix any of the following:\n  Element has insufficient color contrast of 2.94 (foreground color: #8b93a0, background color: #faf9f6, font size: 8.3pt (11px), font"
+    }
+   ]
+  },
+  {
+   "id": "unminified-css",
+   "score": 0.5,
+   "title": "Minify CSS",
+   "items": [
+    {
+     "url": ":root {\n  --paper: #faf9f6;\n  --card: #fffefb;\n  --ink: #1c2430;\n  --muted: #5c6672;\n  --faint: #8b…"
+    }
+   ]
+  },
+  {
+   "id": "unminified-javascript",
+   "score": 0.5,
+   "title": "Minify JavaScript",
+   "items": [
+    {
+     "url": "inline: \n(function () {\n  'use strict';\n\n  /* -…"
+    }
+   ]
+  },
+  {
+   "id": "uses-text-compression",
+   "score": 0,
+   "title": "Enable text compression",
+   "items": [
+    {
+     "url": "http://localhost:3199/archive/2"
+    }
+   ]
+  },
+  {
+   "id": "dom-size",
+   "score": 0.5,
+   "title": "Avoid an excessive DOM size",
+   "items": [
+    {},
+    {
+     "selector": "table > tbody > tr > th",
+     "snippet": "<th>"
+    },
+    {
+     "selector": "section.cabinet > figure.figure > div#chartB > svg",
+     "snippet": "<svg viewBox=\"0 0 760 300\" role=\"img\" aria-label=\"Bar chart comparing all monthl"
+    }
+   ]
+  },
+  {
+   "id": "document-latency-insight",
+   "score": 0.5,
+   "title": "Document request latency",
+   "items": []
+  }
+ ]
+}
