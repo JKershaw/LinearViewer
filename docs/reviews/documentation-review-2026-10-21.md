@@ -57,8 +57,8 @@
 | Ticket | State | At HEAD | Action |
 | -- | -- | -- | -- |
 | LIN-3074 (H13 halt copy) | Backlog | **fixed**: 0 non-test hits; test sites now assert the old wording is gone (`tests/e2e/dispatch-halt.spec.js:128`, `render-dispatch-exec-controls.test.js:43,52-53`, `runner-kickoff.test.js:109-110`) | recommend close |
-| LIN-3599 | Open | **fixed**: `auth.md:178-179` | recommend close |
-| LIN-2629 | Open | resolved in doc (`proxy-integration.md:1261-1263`) | recommend close |
+| LIN-3599 | Backlog | **fixed**: `auth.md:178-179` | recommend close |
+| LIN-2629 | Backlog | resolved in doc (`proxy-integration.md:1261-1263`) | recommend close |
 | LIN-687, LIN-1233 | Backlog | fixed/superseded; third recommendation | recommend close |
 | LIN-2392 | Done | confirmed (`content/landing.md:13,18`, guard `prompt-templates.test.js:227`) | none |
 | LIN-2390, 2391, 3115, 3116, 3117, 1856, 2656, 3594 (line moved to `:115`; `groupDispatchLineages` is at `lib/dispatch-lineage.js:158`), 3510, 3636 | open | see findings above | comment measurements |
@@ -115,7 +115,7 @@ Stale Linear ticket text cited by docs (LIN-3616, LIN-3475, LIN-3624): class unb
 
 **Tier used:** Tier 2 (fresh-context sub-agent; Tier 1 unavailable, token lacks the `dispatch` grant).
 **Question:** What is the largest item in this window that this report missed or misfiled?
-**Reader's answer (condensed):** No item larger than #1 found. Best miss: LIN-3622 made runner poll/take serve only `cli`/`web` targets (`routes/proxy-runner.js:116,156`, `lib/dispatch-targets.js:29`) while catalog `lib/proxy-instructions.js:942-943` and `docs/proxy-integration.md:263` state no restriction; MED/LOW, belongs under finding #5 (LIN-2390). Agrees #1 is the top finding (checked `lib/render-prompts.js:107`, `docs/executive-summary.md:28`, `lib/plan-review-round-trips.js:27`; did not independently check the "8 sites" count). Spot-checks #2, #3, #4 hold. Notes #2 is arguably over-ranked against #5. LIN-3199's SUMMARIZING removal is handled in SD docs, not drift.
+**Reader's answer (condensed; the Tier-2 sub-agent's verbatim text was not retained):** No item larger than #1 found. Best miss: LIN-3622 made runner poll/take serve only `cli`/`web` targets (`routes/proxy-runner.js:116,156`, `lib/dispatch-targets.js:29`) while catalog `lib/proxy-instructions.js:942-943` and `docs/proxy-integration.md:263` state no restriction; MED/LOW, belongs under finding #5 (LIN-2390). Agrees #1 is the top finding (checked `lib/render-prompts.js:107`, `docs/executive-summary.md:28`, `lib/plan-review-round-trips.js:27`; did not independently check the "8 sites" count). Spot-checks #2, #3, #4 hold. Notes #2 is arguably over-ranked against #5. LIN-3199's SUMMARIZING removal is handled in SD docs, not drift.
 
 Adversarial second-read verdict: AGREE
 Differed from top finding: YES
