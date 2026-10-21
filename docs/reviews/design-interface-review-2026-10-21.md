@@ -4,6 +4,8 @@ Rendered-product review of the 1,156-commit window `6e8bf424..0b4bd287` (2026-09
 
 Report written in beat 5 (LIN-3752). Beat 6 (LIN-3753) added the `## Adversarial Second-Read` section and findings 29–30 from it.
 
+At merge the evidence PNGs were trimmed to the 51 the report cites by name or pattern plus the `live-*` set (the evidence directory went from about 22 MB to about 7 MB); every JSON file, `visual-pass.md`, the census, registry and capture scripts are kept. A cited render other than those 51 can be regenerated with `capture/`.
+
 ## 1. Summary
 
 * **Nothing from the last run was fixed.** LIN-3119, LIN-3120, LIN-3121 and LIN-3123 all still reproduce on fresh renders, as do the unminted F4, F5, F6 and advisories A1, A3, A4, A5, A10, A13, A14 (section 3). Product files are byte-identical to the grounding commit, so this is expected rather than a regression.
