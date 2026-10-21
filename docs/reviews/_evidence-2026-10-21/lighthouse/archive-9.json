@@ -1,0 +1,114 @@
+{
+ "id": "archive-9",
+ "url": "/archive/9",
+ "lighthouseVersion": "12.8.2",
+ "fetchTime": "2026-10-21T02:47:05.172Z",
+ "finalUrl": "/archive/9",
+ "runtimeError": null,
+ "scores": {
+  "performance": 0.99,
+  "accessibility": 0.95,
+  "best-practices": 1,
+  "seo": 1
+ },
+ "metrics": {
+  "first-contentful-paint": 1652.2752,
+  "largest-contentful-paint": 1652.2752,
+  "cumulative-layout-shift": 0.000740001444960414,
+  "total-blocking-time": 0
+ },
+ "failing": [
+  {
+   "id": "first-contentful-paint",
+   "score": 0.93,
+   "title": "First Contentful Paint",
+   "items": []
+  },
+  {
+   "id": "largest-contentful-paint",
+   "score": 0.99,
+   "title": "Largest Contentful Paint",
+   "items": []
+  },
+  {
+   "id": "aria-allowed-role",
+   "score": 0,
+   "title": "Uses ARIA roles on incompatible elements",
+   "items": [
+    {
+     "selector": "body > article.wrap > figure.hero",
+     "snippet": "<figure class=\"hero\" role=\"img\" aria-label=\"Horizontal bars: by late September, ",
+     "explanation": "Fix any of the following:\n  ARIA role img is not allowed for given element"
+    },
+    {
+     "selector": "body > article.wrap > figure",
+     "snippet": "<figure role=\"img\" aria-label=\"Weekly stacked bars of correct, complete changes ",
+     "explanation": "Fix any of the following:\n  ARIA role img is not allowed for given element"
+    },
+    {
+     "selector": "body > article.wrap > figure",
+     "snippet": "<figure role=\"img\" aria-label=\"Stacked bars: supervision took 28% of weighted to",
+     "explanation": "Fix any of the following:\n  ARIA role img is not allowed for given element"
+    },
+    {
+     "selector": "body > article.wrap > figure",
+     "snippet": "<figure role=\"img\" aria-label=\"Paired bars before and after the turn: the prompt",
+     "explanation": "Fix any of the following:\n  ARIA role img is not allowed for given element"
+    }
+   ]
+  },
+  {
+   "id": "color-contrast",
+   "score": 0,
+   "title": "Background and foreground colors do not have a sufficient contrast ratio.",
+   "items": [
+    {
+     "selector": "body > article.wrap > h2 > span.when",
+     "snippet": "<span class=\"when\">",
+     "explanation": "Fix any of the following:\n  Element has insufficient color contrast of 2.94 (foreground color: #8b93a0, background color: #faf9f6, font size: 9.0pt (12px), font"
+    },
+    {
+     "selector": "body > article.wrap > h2 > span.when",
+     "snippet": "<span class=\"when\">",
+     "explanation": "Fix any of the following:\n  Element has insufficient color contrast of 2.94 (foreground color: #8b93a0, background color: #faf9f6, font size: 9.0pt (12px), font"
+    },
+    {
+     "selector": "body > article.wrap > p.keep > b",
+     "snippet": "<b>",
+     "explanation": "Fix any of the following:\n  Element has insufficient color contrast of 4.19 (foreground color: #bb5f10, background color: #faf9f6, font size: 8.3pt (11px), font"
+    },
+    {
+     "selector": "body > article.wrap > h2 > span.when",
+     "snippet": "<span class=\"when\">",
+     "explanation": "Fix any of the following:\n  Element has insufficient color contrast of 2.94 (foreground color: #8b93a0, background color: #faf9f6, font size: 9.0pt (12px), font"
+    }
+   ]
+  },
+  {
+   "id": "uses-text-compression",
+   "score": 0,
+   "title": "Enable text compression",
+   "items": [
+    {
+     "url": "http://localhost:3199/archive/9"
+    }
+   ]
+  },
+  {
+   "id": "document-latency-insight",
+   "score": 0.5,
+   "title": "Document request latency",
+   "items": []
+  },
+  {
+   "id": "network-dependency-tree-insight",
+   "score": 0,
+   "title": "Network dependency tree",
+   "items": [
+    {},
+    {},
+    {}
+   ]
+  }
+ ]
+}

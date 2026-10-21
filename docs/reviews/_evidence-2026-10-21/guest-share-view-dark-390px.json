@@ -1,0 +1,138 @@
+{
+  "surface": "guest-share-view",
+  "label": "Guest share /t/:token — live view (minted)",
+  "kind": "cold",
+  "theme": "dark",
+  "persisted": false,
+  "status": 200,
+  "url": "http://localhost:3199/t/Y-mhqgBGk5GL2BV7niGkOxL-X24HaCANw7960PAHMVc",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "expectedTheme": "dark",
+  "darkMode": "cookie",
+  "themeAssertion": {
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "title": "LOCAL-SHARE1 — A shared task",
+  "headings": {
+    "h1": 1,
+    "h2": 2,
+    "h3": 0,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 3,
+    "a11y": {
+      "roleHeading": 3,
+      "levels": {
+        "h1": 1,
+        "h2": 2,
+        "h3": 0,
+        "h4": 0,
+        "h5": 0,
+        "h6": 0
+      }
+    }
+  },
+  "htmlClass": "theme-dark",
+  "overflow": {
+    "scrollWidth": 375,
+    "clientWidth": 390,
+    "innerWidth": 390,
+    "bodyOver": 0,
+    "overflows": false,
+    "offenders": []
+  },
+  "footerCount": 1,
+  "mainCount": 1,
+  "linksIntoProduct": {
+    "total": 12,
+    "toRoot": 0,
+    "toWorkspace": 8,
+    "toAppNav": 3,
+    "sample": [
+      "/workspace/beat2-share/",
+      "/workspace/beat2-share/swipe",
+      "/workspace/beat2-share/swim",
+      "/workspace/beat2-share/observation",
+      "/workspace/beat2-share/settings",
+      "/workspace/beat2-share/kpis",
+      "/workspace/beat2-share/",
+      "/workspace/beat2-share/settings",
+      "/privacy",
+      "/terms",
+      "/templates",
+      "/library"
+    ]
+  },
+  "contrast": [
+    {
+      "selector": "body",
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22,24,29)",
+      "ratio": 14.23,
+      "text": "harbour.cat\n        \n        \n        \n "
+    },
+    {
+      "selector": "p",
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22,24,29)",
+      "ratio": 14.23,
+      "text": "No sessions yet."
+    },
+    {
+      "selector": "a",
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22,24,29)",
+      "ratio": 14.23,
+      "text": "harbour.cat"
+    },
+    {
+      "selector": ".nav-action",
+      "color": "rgb(154, 160, 166)",
+      "bg": "rgb(22,24,29)",
+      "ratio": 6.73,
+      "text": "search"
+    }
+  ],
+  "clip": [],
+  "navFoot": {
+    "navLinks": [
+      "harbour.cat",
+      "search",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: dark",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "hasNavFeedback": false,
+    "footerHasColophon": false
+  },
+  "fonts": [
+    "Inter 400",
+    "Inter 500",
+    "Inter 600",
+    "Inter 700",
+    "JetBrains Mono 400",
+    "JetBrains Mono 500",
+    "JetBrains Mono 600"
+  ]
+}

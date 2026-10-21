@@ -1,0 +1,123 @@
+{
+  "surface": "account-cold",
+  "label": "/account signed-out (redirect)",
+  "kind": "cold",
+  "theme": "dark",
+  "persisted": false,
+  "status": 200,
+  "url": "http://localhost:3199/",
+  "viewport": {
+    "width": 1400,
+    "height": 1000
+  },
+  "expectedTheme": "dark",
+  "darkMode": "media",
+  "themeAssertion": {
+    "expected": "media-emulated (prefers-color-scheme: dark)",
+    "actual": "",
+    "passed": true,
+    "note": "media dark, not cookie"
+  },
+  "title": "Harbour — keep human intent in command of AI execution",
+  "headings": {
+    "h1": 1,
+    "h2": 9,
+    "h3": 4,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 14,
+    "a11y": {
+      "roleHeading": 14,
+      "levels": {
+        "h1": 1,
+        "h2": 9,
+        "h3": 4,
+        "h4": 0,
+        "h5": 0,
+        "h6": 0
+      }
+    }
+  },
+  "htmlClass": "",
+  "overflow": {
+    "scrollWidth": 1385,
+    "clientWidth": 1400,
+    "innerWidth": 1400,
+    "bodyOver": 0,
+    "overflows": false,
+    "offenders": []
+  },
+  "footerCount": 1,
+  "mainCount": 1,
+  "linksIntoProduct": {
+    "total": 18,
+    "toRoot": 0,
+    "toWorkspace": 0,
+    "toAppNav": 9,
+    "sample": [
+      "/auth/linear",
+      "/auth/github",
+      "/auth/jira/oauth?mode=new",
+      "/auth/email",
+      "/archive/2",
+      "/library/doc/the-folded-loop",
+      "/library/doc/ladder",
+      "/library/writing-length",
+      "/library/review-loops",
+      "/library/learning-while-the-tools-change",
+      "/library",
+      "/archive/2"
+    ]
+  },
+  "contrast": [
+    {
+      "selector": "body",
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22,24,29)",
+      "ratio": 14.23,
+      "text": "harbour.cat\n    Keep human intent in com"
+    },
+    {
+      "selector": "p",
+      "color": "rgb(154, 160, 166)",
+      "bg": "rgb(22,24,29)",
+      "ratio": 6.73,
+      "text": "Keep human intent in command of AI execu"
+    },
+    {
+      "selector": "a",
+      "color": "rgb(4, 35, 31)",
+      "bg": "rgb(45,212,191)",
+      "ratio": 8.92,
+      "text": "Log in with Linear"
+    }
+  ],
+  "clip": [],
+  "navFoot": {
+    "navLinks": [],
+    "footerLinks": [
+      "swipe",
+      "swim",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library"
+    ],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "hasNavFeedback": false,
+    "footerHasColophon": false
+  },
+  "fonts": [
+    "Inter 400",
+    "Inter 500",
+    "Inter 600",
+    "Inter 700",
+    "JetBrains Mono 400",
+    "JetBrains Mono 500",
+    "JetBrains Mono 600"
+  ]
+}

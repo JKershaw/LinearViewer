@@ -1,0 +1,122 @@
+{
+  "surface": "library-paper-svg",
+  "label": "Library paper — SVG figures (LIN-3351 dark recheck)",
+  "kind": "cold",
+  "theme": "light",
+  "persisted": false,
+  "status": 200,
+  "url": "http://localhost:3199/library/theseus-method",
+  "viewport": {
+    "width": 1400,
+    "height": 1000
+  },
+  "expectedTheme": "light",
+  "darkMode": "media",
+  "themeAssertion": {
+    "expected": "media-emulated (prefers-color-scheme: dark)",
+    "actual": "",
+    "passed": true,
+    "note": "media dark, not cookie"
+  },
+  "title": "The Theseus Method - Harbour Library",
+  "headings": {
+    "h1": 2,
+    "h2": 9,
+    "h3": 8,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 19,
+    "a11y": {
+      "roleHeading": 19,
+      "levels": {
+        "h1": 2,
+        "h2": 9,
+        "h3": 8,
+        "h4": 0,
+        "h5": 0,
+        "h6": 0
+      }
+    }
+  },
+  "htmlClass": "",
+  "overflow": {
+    "scrollWidth": 1385,
+    "clientWidth": 1400,
+    "innerWidth": 1400,
+    "bodyOver": 0,
+    "overflows": false,
+    "offenders": []
+  },
+  "footerCount": 1,
+  "mainCount": 1,
+  "linksIntoProduct": {
+    "total": 36,
+    "toRoot": 1,
+    "toWorkspace": 0,
+    "toAppNav": 3,
+    "sample": [
+      "/",
+      "/library",
+      "/library/doc/theseus-method-long",
+      "/library/theseus-method.md",
+      "/library/doc/theseus-method-long",
+      "/library/doc/v1",
+      "/library/doc/autopilot",
+      "/library/growth-atlas",
+      "/library/coherence-as-it-grows",
+      "/library/rebuild-round",
+      "/library/drawing-the-ship",
+      "/library/theseus"
+    ]
+  },
+  "contrast": [
+    {
+      "selector": "body",
+      "color": "rgb(26, 26, 26)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 17.4,
+      "text": "Harbour\n  \n\n    ← Library\n    \n      \n  "
+    },
+    {
+      "selector": "p",
+      "color": "rgb(102, 102, 102)",
+      "bg": "rgb(248,249,250)",
+      "ratio": 5.45,
+      "text": "Linked from The Theseus Method: the long"
+    },
+    {
+      "selector": "a",
+      "color": "rgb(26, 26, 26)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 17.4,
+      "text": "Harbour"
+    }
+  ],
+  "clip": [],
+  "navFoot": {
+    "navLinks": [
+      "← Library"
+    ],
+    "footerLinks": [
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates"
+    ],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "hasNavFeedback": false,
+    "footerHasColophon": false
+  },
+  "fonts": [
+    "Inter 400",
+    "Inter 500",
+    "Inter 600",
+    "Inter 700",
+    "JetBrains Mono 400",
+    "JetBrains Mono 500",
+    "JetBrains Mono 600"
+  ]
+}

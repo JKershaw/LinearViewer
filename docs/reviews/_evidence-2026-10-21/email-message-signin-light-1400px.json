@@ -1,0 +1,93 @@
+{
+  "surface": "email-message-signin",
+  "label": "Sent sign-in email body (real send, capture transport) rendered in a page; email HTML is not themed, light only",
+  "kind": "intercept",
+  "theme": "light",
+  "persisted": false,
+  "status": 200,
+  "url": "http://localhost:3199/__intercept__",
+  "viewport": {
+    "width": 1400,
+    "height": 1000
+  },
+  "expectedTheme": "light",
+  "darkMode": "cookie",
+  "themeAssertion": {
+    "expected": "(no theme-dark)",
+    "actual": "",
+    "passed": true
+  },
+  "title": "",
+  "headings": {
+    "h1": 0,
+    "h2": 0,
+    "h3": 0,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 0,
+    "a11y": {
+      "roleHeading": 0,
+      "levels": {
+        "h1": 0,
+        "h2": 0,
+        "h3": 0,
+        "h4": 0,
+        "h5": 0,
+        "h6": 0
+      }
+    }
+  },
+  "htmlClass": "",
+  "overflow": {
+    "scrollWidth": 1400,
+    "clientWidth": 1400,
+    "innerWidth": 1400,
+    "bodyOver": 0,
+    "overflows": false,
+    "offenders": []
+  },
+  "footerCount": 0,
+  "mainCount": 0,
+  "linksIntoProduct": {
+    "total": 0,
+    "toRoot": 0,
+    "toWorkspace": 0,
+    "toAppNav": 0,
+    "sample": []
+  },
+  "contrast": [
+    {
+      "selector": "body",
+      "color": "rgb(0, 0, 0)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 21,
+      "text": "Sign in to HarbourThis link works once, "
+    },
+    {
+      "selector": "p",
+      "color": "rgb(0, 0, 0)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 21,
+      "text": "Sign in to Harbour"
+    },
+    {
+      "selector": "a",
+      "color": "rgb(0, 0, 238)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 9.4,
+      "text": "Sign in to Harbour"
+    }
+  ],
+  "clip": [],
+  "navFoot": {
+    "navLinks": [],
+    "footerLinks": [],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "hasNavFeedback": false,
+    "footerHasColophon": false
+  },
+  "fonts": []
+}

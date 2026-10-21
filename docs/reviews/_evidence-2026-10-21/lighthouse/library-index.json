@@ -1,0 +1,158 @@
+{
+ "id": "library-index",
+ "url": "/library",
+ "lighthouseVersion": "12.8.2",
+ "fetchTime": "2026-10-21T02:47:58.098Z",
+ "finalUrl": "/library",
+ "runtimeError": null,
+ "scores": {
+  "performance": 0.92,
+  "accessibility": 0.96,
+  "best-practices": 1,
+  "seo": 0.92
+ },
+ "metrics": {
+  "first-contentful-paint": 2552.857506556083,
+  "largest-contentful-paint": 2702.857506556083,
+  "cumulative-layout-shift": 0.00011063946824711405,
+  "total-blocking-time": 0
+ },
+ "failing": [
+  {
+   "id": "first-contentful-paint",
+   "score": 0.65,
+   "title": "First Contentful Paint",
+   "items": []
+  },
+  {
+   "id": "largest-contentful-paint",
+   "score": 0.85,
+   "title": "Largest Contentful Paint",
+   "items": []
+  },
+  {
+   "id": "speed-index",
+   "score": 0.97,
+   "title": "Speed Index",
+   "items": []
+  },
+  {
+   "id": "interactive",
+   "score": 0.97,
+   "title": "Time to Interactive",
+   "items": []
+  },
+  {
+   "id": "largest-contentful-paint-element",
+   "score": 0,
+   "title": "Largest Contentful Paint element",
+   "items": [
+    {},
+    {}
+   ]
+  },
+  {
+   "id": "color-contrast",
+   "score": 0,
+   "title": "Background and foreground colors do not have a sufficient contrast ratio.",
+   "items": [
+    {
+     "selector": "body.is-landing > main.library > form.library-search > button",
+     "snippet": "<button type=\"submit\" data-testid=\"library-search-submit\">",
+     "explanation": "Fix any of the following:\n  Element has insufficient color contrast of 3.74 (foreground color: #ffffff, background color: #0d9488, font size: 10.5pt (14px), fon"
+    }
+   ]
+  },
+  {
+   "id": "render-blocking-resources",
+   "score": 0,
+   "title": "Eliminate render-blocking resources",
+   "items": [
+    {
+     "url": "http://localhost:3199/library.css",
+     "wastedMs": 301
+    },
+    {
+     "url": "http://localhost:3199/style.css",
+     "wastedMs": 901
+    }
+   ]
+  },
+  {
+   "id": "unminified-css",
+   "score": 0,
+   "title": "Minify CSS",
+   "items": [
+    {
+     "url": "http://localhost:3199/style.css"
+    },
+    {
+     "url": "http://localhost:3199/library.css"
+    }
+   ]
+  },
+  {
+   "id": "unused-css-rules",
+   "score": 0,
+   "title": "Reduce unused CSS",
+   "items": [
+    {
+     "url": "http://localhost:3199/style.css"
+    }
+   ]
+  },
+  {
+   "id": "uses-text-compression",
+   "score": 0,
+   "title": "Enable text compression",
+   "items": [
+    {
+     "url": "http://localhost:3199/style.css"
+    },
+    {
+     "url": "http://localhost:3199/library"
+    },
+    {
+     "url": "http://localhost:3199/library.css"
+    }
+   ]
+  },
+  {
+   "id": "robots-txt",
+   "score": 0,
+   "title": "robots.txt is not valid",
+   "items": []
+  },
+  {
+   "id": "document-latency-insight",
+   "score": 0.5,
+   "title": "Document request latency",
+   "items": []
+  },
+  {
+   "id": "network-dependency-tree-insight",
+   "score": 0,
+   "title": "Network dependency tree",
+   "items": [
+    {},
+    {},
+    {}
+   ]
+  },
+  {
+   "id": "render-blocking-insight",
+   "score": 0,
+   "title": "Render blocking requests",
+   "items": [
+    {
+     "url": "http://localhost:3199/library.css",
+     "wastedMs": 301
+    },
+    {
+     "url": "http://localhost:3199/style.css",
+     "wastedMs": 901
+    }
+   ]
+  }
+ ]
+}

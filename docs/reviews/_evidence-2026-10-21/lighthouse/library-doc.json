@@ -1,0 +1,173 @@
+{
+ "id": "library-doc",
+ "url": "/library/doc/autopilot-operating-manual-v2",
+ "lighthouseVersion": "12.8.2",
+ "fetchTime": "2026-10-21T02:48:20.042Z",
+ "finalUrl": "/library/doc/autopilot-operating-manual-v2",
+ "runtimeError": null,
+ "scores": {
+  "performance": 0.88,
+  "accessibility": 1,
+  "best-practices": 1,
+  "seo": 0.92
+ },
+ "metrics": {
+  "first-contentful-paint": 2402.2398,
+  "largest-contentful-paint": 2552.2398,
+  "cumulative-layout-shift": 0.1461903762293057,
+  "total-blocking-time": 0
+ },
+ "failing": [
+  {
+   "id": "first-contentful-paint",
+   "score": 0.71,
+   "title": "First Contentful Paint",
+   "items": []
+  },
+  {
+   "id": "largest-contentful-paint",
+   "score": 0.88,
+   "title": "Largest Contentful Paint",
+   "items": []
+  },
+  {
+   "id": "speed-index",
+   "score": 0.98,
+   "title": "Speed Index",
+   "items": []
+  },
+  {
+   "id": "cumulative-layout-shift",
+   "score": 0.77,
+   "title": "Cumulative Layout Shift",
+   "items": [
+    {}
+   ]
+  },
+  {
+   "id": "interactive",
+   "score": 0.98,
+   "title": "Time to Interactive",
+   "items": []
+  },
+  {
+   "id": "largest-contentful-paint-element",
+   "score": 0,
+   "title": "Largest Contentful Paint element",
+   "items": [
+    {},
+    {}
+   ]
+  },
+  {
+   "id": "layout-shifts",
+   "score": 0,
+   "title": "Avoid large layout shifts",
+   "items": [
+    {
+     "selector": "article.library-doc > div.library-doc__body > blockquote > p",
+     "snippet": "<p>"
+    }
+   ]
+  },
+  {
+   "id": "render-blocking-resources",
+   "score": 0,
+   "title": "Eliminate render-blocking resources",
+   "items": [
+    {
+     "url": "http://localhost:3199/style.css",
+     "wastedMs": 901
+    },
+    {
+     "url": "http://localhost:3199/library.css",
+     "wastedMs": 301
+    }
+   ]
+  },
+  {
+   "id": "unminified-css",
+   "score": 0,
+   "title": "Minify CSS",
+   "items": [
+    {
+     "url": "http://localhost:3199/style.css"
+    },
+    {
+     "url": "http://localhost:3199/library.css"
+    }
+   ]
+  },
+  {
+   "id": "unused-css-rules",
+   "score": 0,
+   "title": "Reduce unused CSS",
+   "items": [
+    {
+     "url": "http://localhost:3199/style.css"
+    }
+   ]
+  },
+  {
+   "id": "uses-text-compression",
+   "score": 0,
+   "title": "Enable text compression",
+   "items": [
+    {
+     "url": "http://localhost:3199/style.css"
+    },
+    {
+     "url": "http://localhost:3199/library/doc/autopilot-operating-manual-v2"
+    },
+    {
+     "url": "http://localhost:3199/library.css"
+    }
+   ]
+  },
+  {
+   "id": "robots-txt",
+   "score": 0,
+   "title": "robots.txt is not valid",
+   "items": []
+  },
+  {
+   "id": "cls-culprits-insight",
+   "score": 0,
+   "title": "Layout shift culprits",
+   "items": [
+    {}
+   ]
+  },
+  {
+   "id": "document-latency-insight",
+   "score": 0.5,
+   "title": "Document request latency",
+   "items": []
+  },
+  {
+   "id": "network-dependency-tree-insight",
+   "score": 0,
+   "title": "Network dependency tree",
+   "items": [
+    {},
+    {},
+    {}
+   ]
+  },
+  {
+   "id": "render-blocking-insight",
+   "score": 0,
+   "title": "Render blocking requests",
+   "items": [
+    {
+     "url": "http://localhost:3199/style.css",
+     "wastedMs": 901
+    },
+    {
+     "url": "http://localhost:3199/library.css",
+     "wastedMs": 301
+    }
+   ]
+  }
+ ]
+}
