@@ -24,7 +24,7 @@ import { chromium } from 'playwright';
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PARSE_COLOR_JS } from './metrics.mjs';
+import { PARSE_COLOR_JS, OVERFLOW_JS, CLIP_JS } from './metrics.mjs';
 
 import {
   renderMergeConfirmPage,
@@ -227,56 +227,13 @@ const CONTRAST_JS = `
   })()
 `;
 
-const CLIP_JS = `
-  (() => {
-    const innerWidth = window.innerWidth;
-    const out = [];
-    // text truncation: element scrollWidth > clientWidth with no scroll container, or ellipsis
-    for(const el of document.querySelectorAll('p,span,a,button,td,th,li,h1,h2,h3,h4,h5,h6,label,strong')){
-      const cs = getComputedStyle(el);
-      const clippedByParent = (() => { let a=el.parentElement; while(a){ const o=getComputedStyle(a).overflowX; if(/(auto|scroll|hidden|clip)/.test(o)) return true; a=a.parentElement; } return false; })();
-      if((el.scrollWidth > el.clientWidth + 1 && !clippedByParent) || cs.textOverflow === 'ellipsis'){
-        const r = el.getBoundingClientRect();
-        if(r.right < innerWidth + 1) continue; // not a viewport exceedance — skip pure box truncation noise
-        out.push({ tag: el.tagName.toLowerCase(), cls: (el.className&&typeof el.className==='string')?el.className.slice(0,40):'', text:(el.textContent||'').trim().slice(0,50), scrollWidth: el.scrollWidth, clientWidth: el.clientWidth, right: Math.round(r.right) });
-      }
-    }
-    return out.slice(0, 20);
-  })()
-`;
-
-const NAVFOOT_JS = `
-  (() => {
-    const pick = (sel) => Array.from(document.querySelectorAll(sel)).map(e => (e.textContent||'').trim()).filter(Boolean);
-    const navLinks = pick('nav a').slice(0, 40);
-    const footerLinks = pick('footer a, footer button').slice(0, 40);
-    const footerText = Array.from(document.querySelectorAll('footer')).map(f=>f.textContent.trim()).join(' ');
-    return {
-      navLinks: [...new Set(navLinks)],
-      footerLinks: [...new Set(footerLinks)],
-      hasThemeToggle: !!document.querySelector('[data-testid="footer-theme-toggle"]'),
-      hasTeamSelector: !!document.querySelector('[data-selector="team"]'),
-      hasAssigneeSelector: !!document.querySelector('[data-selector="assignee"]'),
-      hasNavFeedback: !!document.querySelector('[data-testid="nav-feedback-trigger"]'),
-      footerHasColophon: /colophon|provenance/i.test(footerText)
-    };
-  })()
-`;
-
 const DOM_JS = `
   (() => {
     const de = document.documentElement;
     const counts = { h1:0,h2:0,h3:0,h4:0,h5:0,h6:0 };
     document.querySelectorAll('h1,h2,h3,h4,h5,h6').forEach(h=>{ counts[h.tagName.toLowerCase()] += 1; });
-    const offenders = [];
+    const geo = ${OVERFLOW_JS}; // M1: the shared body-limited geometry rule (metrics.mjs), not a local copy
     const innerWidth = window.innerWidth;
-    for(const el of document.querySelectorAll('*')){
-      const r = el.getBoundingClientRect();
-      if(r.right <= innerWidth + 1) continue;
-      let clipped=false, a=el.parentElement;
-      while(a){ const cs=getComputedStyle(a); if(/(auto|scroll|hidden|clip)/.test(cs.overflowX)){clipped=true;break;} a=a.parentElement; }
-      if(!clipped) offenders.push({ sel:(el.id?('#'+el.id):(el.className&&typeof el.className==='string'?el.tagName.toLowerCase()+'.'+el.className.trim().split(/\\s+/).join('.'):el.tagName.toLowerCase())), tag:el.tagName.toLowerCase(), right:Math.round(r.right), width:Math.round(r.width) });
-    }
     const links=[];
     document.querySelectorAll('a[href]').forEach(a=>{ const h=a.getAttribute('href')||''; if(!h.startsWith('/'))return; if(/\\.(css|js|png|svg|jpg|jpeg|gif|webp|woff2?|ico|map)(\\?|$)/.test(h))return; links.push(h); });
     return {
@@ -286,7 +243,7 @@ const DOM_JS = `
       // M1 (LIN-3748): geometry rule from tests/helpers.js expectNoClippedOverflow. The old
       // de.scrollWidth > de.clientWidth is vacuous under LIN-3715 (overflow-x: clip).
       // scrollWidth/clientWidth stay as informational fields only.
-      overflow: { scrollWidth: de.scrollWidth, clientWidth: de.clientWidth, innerWidth, bodyOver: document.body.scrollWidth - document.body.clientWidth, overflows: (document.body.scrollWidth - document.body.clientWidth) > 0 || offenders.length > 0, offenders: offenders.slice(0,25) },
+      overflow: { scrollWidth: de.scrollWidth, clientWidth: de.clientWidth, innerWidth, bodyOver: geo.bodyOver, overflows: geo.overflows, offenders: geo.spill },
       footerCount: document.querySelectorAll('footer').length,
       mainCount: document.querySelectorAll('main, [role="main"]').length,
       linksIntoProduct: {

@@ -28,7 +28,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.resolve(__dirname, '..');
 const PRIOR = '6e8bf424';
 const git = (...a) => execFileSync('git', a, { encoding: 'utf8', maxBuffer: 64 << 20, stdio: ['ignore', 'pipe', 'ignore'] });
-const GROUND = git('rev-parse', '--short=8', 'HEAD').trim();
+// grounding commit = where this branch left origin/main (the branch only adds evidence files, so HEAD would name the checkpoint, not the code surveyed)
+const GROUND = git('merge-base', 'HEAD', 'origin/main').trim().slice(0, 8);
 
 // ---- seeds -----------------------------------------------------------------
 const FEATURES = encodeURIComponent(JSON.stringify({
@@ -131,7 +132,7 @@ const CURATED = {
   '/workspace/:urlKey/task-chat': R('ws-task-chat', 'page', { path: `${W}/task-chat`, experimental: 'task-chat' }),
   '/workspace/:urlKey/task/new': R('ws-task-new', 'page', { path: `${W}/task/new` }),
   '/workspace/:urlKey/task/:issueId/edit': R('ws-task-edit', 'page', { path: `${W}/task/123/edit` }),
-  '/workspace/:urlKey/task/:identifier': R('ws-task-page', 'page', { path: `${W}/task/TEST-1`, isNew: true, note: 'default seed renders the not-found/empty state; populated states are beat 3' }),
+  '/workspace/:urlKey/task/:identifier': R('ws-task-page', 'page', { path: `${W}/task/TEST-1`, isNew: true, note: 'default seed renders the 503 "Task unavailable — could not read this task from the tracker" page (tracker read fails), not an empty/not-found state; a populated 200 state is beat 3' }),
   '/workspace/:urlKey/kpis': R('ws-kpis', 'page', { path: `${W}/kpis`, isNew: true }),
   '/workspace/:urlKey/runner': R('ws-runner', 'page', { path: `${W}/runner`, isNew: true }),
 };
@@ -240,6 +241,16 @@ const seams = {
   'task-chat': { matches: probe(/chat/i), verdict: probe(/seed.*chat|chat.*seed/i).length ? 'found' : 'none: only /test/clear-saved-chats (no seed); empty/default state only (named limit)' },
   'scan-due': { matches: probe(/scan|decision|due/i), verdict: probe(/seed.*(scan|decision|due)/i).length ? 'found' : 'none: only /test/clear-task-decisions + read-back /test/task-decisions (no seed for a due scan); Scan-due tab renders its empty state (named limit)' },
 };
+// F3 (LIN-3748 review): intended outcomes. census.mjs labels any entry whose final status/path
+// differs from this (default: 200 at its own path) measured:redirected->... / measured:error-<n>,
+// so a page that bounced elsewhere or errored is never counted as the surface it names.
+const EXPECT = {
+  'email-confirm': { status: 410 }, 'auth-jira-form': { status: 400 }, 'held-connection': { status: 400 },
+  'guest-share': { status: 404 }, 'ws-observation-session': { status: 404 }, 'archive-999': { status: 404 },
+  'swipe-public': { finalPathPrefix: '/swipe/' }, 'ws-swipe': { finalPathPrefix: `${W}/swipe/` },
+  'ws-dashboard': { finalPath: `${W}/observation` },
+};
+for (const e of entries) if (EXPECT[e.id]) e.expect = EXPECT[e.id];
 const registry = { generatedFrom: { head: GROUND, priorReview: PRIOR }, baseline, counts, differences, seams, entries };
 writeFileSync(path.join(OUT, 'registry.json'), JSON.stringify(registry, null, 2));
 console.log(JSON.stringify({ counts, differences }, null, 1));

@@ -77,6 +77,26 @@ async function sweepPage(page, entry, theme, status, finalUrl) {
   return { httpStatus: status, finalUrl, themeAssertion: assertion, sampled: sweep.sampled, groups: sweep.groups };
 }
 
+// F3 (LIN-3748 review): a page counts as plain `measured` only if it reached what the registry
+// says it should (entry.expect, default: HTTP 200 at its own path). Otherwise the label says what
+// was really swept, so a redirect to `/` or an error page is never counted as the named surface.
+// Intercepted entries are synthetic 200s and keep `measured`.
+function outcomeLabel(entry, themes) {
+  if (entry.method === 'intercept' || entry.method === 'intercept-state') return 'measured';
+  const want = { status: 200, ...(entry.expect || {}) };
+  const own = (entry.path || '').split('?')[0];
+  for (const t of ['light', 'dark']) {
+    const { httpStatus, finalUrl } = themes[t];
+    const finalPath = finalUrl.split('?')[0];
+    const pathOk = want.finalPath ? finalPath === want.finalPath
+      : want.finalPathPrefix ? finalPath.startsWith(want.finalPathPrefix)
+      : finalPath.replace(/\/$/, '') === own.replace(/\/$/, '');
+    if (!pathOk) return `measured:redirected→${finalPath}`;
+    if (httpStatus !== want.status) return `measured:error-${httpStatus}`;
+  }
+  return 'measured';
+}
+
 async function measure(browser, entry) {
   const res = { id: entry.id, class: entry.class, method: entry.method, isNew: !!entry.isNew, themes: {} };
   for (const theme of ['light', 'dark']) {
@@ -100,7 +120,7 @@ async function measure(browser, entry) {
       }
     } finally { await ctx.close(); }
   }
-  res.status = 'measured';
+  res.status = outcomeLabel(entry, res.themes);
   return res;
 }
 
@@ -133,11 +153,12 @@ await browser.close();
 // ---- coverage assertion --------------------------------------------------------
 const listed = new Set(Object.keys(census.entries));
 const unlisted = expectedIds.filter(id => !listed.has(id));
-const badStatus = Object.values(census.entries).filter(e => !(e.status === 'measured' || e.status.startsWith('excluded:')));
+const badStatus = Object.values(census.entries).filter(e => !(e.status.startsWith('measured') || e.status.startsWith('excluded:')));
 const orphan = [...listed].filter(id => !expectedIds.includes(id));
 census.coverage = {
   registryIds: expectedIds.length,
   measured: Object.values(census.entries).filter(e => e.status === 'measured').length,
+  measuredUnexpectedOutcome: Object.values(census.entries).filter(e => e.status.startsWith('measured:')).map(e => `${e.id}=${e.status}`),
   excluded: Object.values(census.entries).filter(e => e.status.startsWith('excluded:')).length,
   unlisted, notMeasuredOrExcluded: badStatus.map(e => `${e.id}=${e.status}`), orphanCensusIds: orphan,
   passed: !ONLY && unlisted.length === 0 && badStatus.length === 0 && orphan.length === 0,

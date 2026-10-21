@@ -94,3 +94,22 @@ for (const el of document.querySelectorAll('body *')) {
 }
 return { sampled, groups: [...groups.values()].sort((a, b) => a.ratio - b.ratio) };
 })()`;
+
+// Truncation check shared by capture.mjs (F2, LIN-3748 review): same body-limited ancestor walk
+// as OVERFLOW_JS. Walking to <html> counts the root `overflow-x: clip` (LIN-3715) as containment,
+// so the scrollWidth > clientWidth branch could never fire.
+export const CLIP_JS = String.raw`(() => {
+  const innerWidth = window.innerWidth;
+  const out = [];
+  for (const el of document.querySelectorAll('p,span,a,button,td,th,li,h1,h2,h3,h4,h5,h6,label,strong')) {
+    const cs = getComputedStyle(el);
+    let clippedByParent = false;
+    for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) { if (/(auto|scroll|hidden|clip)/.test(getComputedStyle(a).overflowX)) { clippedByParent = true; break; } }
+    if ((el.scrollWidth > el.clientWidth + 1 && !clippedByParent) || cs.textOverflow === 'ellipsis') {
+      const r = el.getBoundingClientRect();
+      if (r.right < innerWidth + 1) continue; // not a viewport exceedance - skip pure box truncation noise
+      out.push({ tag: el.tagName.toLowerCase(), cls: (el.className && typeof el.className === 'string') ? el.className.slice(0, 40) : '', text: (el.textContent || '').trim().slice(0, 50), scrollWidth: el.scrollWidth, clientWidth: el.clientWidth, right: Math.round(r.right) });
+    }
+  }
+  return out.slice(0, 20);
+})()`;
