@@ -139,6 +139,13 @@
         "h3": 20
       },
       "passed": true
+    },
+    "C2": {
+      "exit": 0,
+      "attempted": 4,
+      "ok": 4,
+      "failed": 0,
+      "passed": true
     }
   }
 }

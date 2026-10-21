@@ -227,6 +227,24 @@ const CONTRAST_JS = `
   })()
 `;
 
+const NAVFOOT_JS = `
+  (() => {
+    const pick = (sel) => Array.from(document.querySelectorAll(sel)).map(e => (e.textContent||'').trim()).filter(Boolean);
+    const navLinks = pick('nav a').slice(0, 40);
+    const footerLinks = pick('footer a, footer button').slice(0, 40);
+    const footerText = Array.from(document.querySelectorAll('footer')).map(f=>f.textContent.trim()).join(' ');
+    return {
+      navLinks: [...new Set(navLinks)],
+      footerLinks: [...new Set(footerLinks)],
+      hasThemeToggle: !!document.querySelector('[data-testid="footer-theme-toggle"]'),
+      hasTeamSelector: !!document.querySelector('[data-selector="team"]'),
+      hasAssigneeSelector: !!document.querySelector('[data-selector="assignee"]'),
+      hasNavFeedback: !!document.querySelector('[data-testid="nav-feedback-trigger"]'),
+      footerHasColophon: /colophon|provenance/i.test(footerText)
+    };
+  })()
+`;
+
 const DOM_JS = `
   (() => {
     const de = document.documentElement;

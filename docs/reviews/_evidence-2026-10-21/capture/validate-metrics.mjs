@@ -19,6 +19,9 @@
 import { chromium } from 'playwright';
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import os from 'node:os';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { OVERFLOW_JS, CLIP_JS, CENSUS_SAMPLER_JS, PARSE_COLOR_JS, COMPOSITE_JS } from './metrics.mjs';
 
@@ -151,6 +154,17 @@ const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '
   const a11y = {};
   for (let l = 1; l <= 6; l++) { const n = await page.getByRole('heading', { level: l }).count(); if (n) a11y['h' + l] = n; }
   results.C = { dom, a11y, passed: JSON.stringify(Object.entries(dom).sort()) === JSON.stringify(Object.entries(a11y).sort()) };
+}
+
+// ---- C2 (capture.mjs end-to-end smoke) ------------------------------------------------
+// Review F4: M1 above evaluates DOM_JS alone, so a deleted helper constant that measure() still
+// calls (NAVFOOT_JS) passed validation while every real capture failed. Run the shipped module.
+{
+  const out = await mkdtemp(path.join(os.tmpdir(), 'capture-smoke-'));
+  const r = spawnSync(process.execPath, [path.join(__dirname, 'capture.mjs'), 'privacy'], { env: { ...process.env, BASE_URL: BASE, OUT_DIR: out }, encoding: 'utf8', timeout: 180000 });
+  const m = /attempted=(\d+) ok=(\d+) failed=(\d+)/.exec(r.stdout || '');
+  await rm(out, { recursive: true, force: true });
+  results.C2 = { exit: r.status, attempted: m && +m[1], ok: m && +m[2], failed: m && +m[3], passed: !!m && r.status === 0 && +m[1] > 0 && +m[3] === 0 && +m[2] === +m[1] };
 }
 
 await browser.close();
