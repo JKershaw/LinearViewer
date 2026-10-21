@@ -1,0 +1,112 @@
+{
+  "passed": true,
+  "results": {
+    "M1": {
+      "oldMetricFlagsInjected2000px": false,
+      "geometryFlagsInjected2000px": true,
+      "geometrySpill": [
+        "injected-2000@2000>390"
+      ],
+      "geometryIgnoresContainedWide": true,
+      "passed": true,
+      "note": "oldMetric false = the 09-26 check is vacuous under overflow-x: clip (LIN-3715); geometry rule flags the same page."
+    },
+    "M2": {
+      "localCtas": [
+        "landing-cta-email",
+        "landing-cta-github",
+        "landing-cta-jira",
+        "landing-cta-linear"
+      ],
+      "expected": [
+        "landing-cta-email",
+        "landing-cta-github",
+        "landing-cta-jira",
+        "landing-cta-linear"
+      ],
+      "live": {
+        "reachable": true,
+        "status": 200,
+        "ctas": [
+          "landing-cta-email",
+          "landing-cta-github",
+          "landing-cta-jira",
+          "landing-cta-linear"
+        ]
+      },
+      "passed": true
+    },
+    "M3": {
+      "rawBg": "color(srgb 0.0862745 0.639216 0.290196 / 0.12)",
+      "color": "rgb(22, 163, 74)",
+      "composited": 2.71,
+      "ownBgIgnored": 3.3,
+      "effBg": [
+        220,
+        237,
+        227
+      ],
+      "lighthouseSaveButtons": [
+        2.7,
+        2.7,
+        2.7,
+        2.7
+      ],
+      "lighthouseVersion": "12.8.2",
+      "passed": true
+    },
+    "M4": {
+      "saveLight": [
+        2.71,
+        2.71
+      ],
+      "haltDark": [
+        {
+          "el": "button.action-btn.halt-pause",
+          "ratio": 1.35
+        },
+        {
+          "el": "button.action-btn.halt-stop",
+          "ratio": 1.35
+        },
+        {
+          "el": "button.action-btn.halt-resume",
+          "ratio": 1.35
+        }
+      ],
+      "inProgressLight": [
+        {
+          "el": "div.in-progress-header",
+          "ratio": 2.27
+        },
+        {
+          "el": "span.status-pill__char",
+          "ratio": 2.27
+        }
+      ],
+      "coverage": {
+        "registryIds": 249,
+        "measured": 201,
+        "excluded": 48,
+        "unlisted": [],
+        "notMeasuredOrExcluded": [],
+        "orphanCensusIds": [],
+        "passed": true
+      },
+      "passed": true
+    },
+    "C": {
+      "dom": {
+        "h1": 3,
+        "h2": 3,
+        "h3": 20
+      },
+      "a11y": {
+        "h1": 3,
+        "h2": 3,
+        "h3": 20
+      },
+      "passed": true
+    }
+  }
+}

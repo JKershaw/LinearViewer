@@ -1,0 +1,1600 @@
+{
+  "generatedFrom": {
+    "head": "0b4bd287",
+    "priorReview": "6e8bf424"
+  },
+  "baseline": {
+    "pageGets": 53,
+    "carried": 40,
+    "new": 13,
+    "archives": 9,
+    "experimentalViews": 9,
+    "renderPageRenderers": 59,
+    "emailRenderers": 13
+  },
+  "counts": {
+    "routeHandlersFound": 64,
+    "routeHandlersAtPrior": 51,
+    "routeHandlersNew": 13,
+    "pageGetDestinations": 53,
+    "pageGetDestinationsCarried": 40,
+    "pageGetRenderingHtml": 49,
+    "pageGetLegacyRedirects": 3,
+    "pageGetOauthHops": 11,
+    "archives": 9,
+    "archive404": 1,
+    "experimentalViews": 9,
+    "renderPageRenderers": 59,
+    "emailRenderers": 13,
+    "interceptedRenderers": 27,
+    "interceptedStates": 8,
+    "entries": 146
+  },
+  "differences": [],
+  "seams": {
+    "effort-readout": {
+      "matches": [],
+      "verdict": "none: empty state only (named limit)"
+    },
+    "task-chat": {
+      "matches": [
+        {
+          "line": 1200,
+          "verb": "get",
+          "route": "/test/clear-saved-chats"
+        }
+      ],
+      "verdict": "none: only /test/clear-saved-chats (no seed); empty/default state only (named limit)"
+    },
+    "scan-due": {
+      "matches": [
+        {
+          "line": 1150,
+          "verb": "get",
+          "route": "/test/clear-task-decisions"
+        },
+        {
+          "line": 1174,
+          "verb": "get",
+          "route": "/test/task-decisions"
+        },
+        {
+          "line": 1189,
+          "verb": "get",
+          "route": "/test/task-decisions-count"
+        }
+      ],
+      "verdict": "none: only /test/clear-task-decisions + read-back /test/task-decisions (no seed for a due scan); Scan-due tab renders its empty state (named limit)"
+    }
+  },
+  "entries": [
+    {
+      "id": "landing",
+      "kind": "page",
+      "seed": "none",
+      "theme": "media",
+      "path": "/",
+      "standalone": true,
+      "class": "page-get",
+      "route": "/",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "account",
+      "kind": "page",
+      "seed": "none",
+      "theme": "media",
+      "path": "/account",
+      "standalone": true,
+      "note": "signed-out: expect redirect; signed-in via /test/session-account is beat 2",
+      "class": "page-get",
+      "route": "/account",
+      "isNew": true,
+      "method": "route"
+    },
+    {
+      "id": "legacy-audit",
+      "kind": "hop",
+      "seed": "app",
+      "theme": "cookie",
+      "legacy": true,
+      "path": "/audit",
+      "note": "legacy redirect",
+      "class": "page-get",
+      "route": "/audit",
+      "isNew": false,
+      "method": "hop"
+    },
+    {
+      "id": "auth-callback",
+      "kind": "hop",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/auth/callback",
+      "class": "page-get",
+      "route": "/auth/callback",
+      "isNew": false,
+      "method": "hop"
+    },
+    {
+      "id": "email-signin",
+      "kind": "page",
+      "seed": "none",
+      "theme": "media",
+      "path": "/auth/email",
+      "standalone": true,
+      "class": "page-get",
+      "route": "/auth/email",
+      "isNew": true,
+      "method": "route"
+    },
+    {
+      "id": "email-confirm",
+      "kind": "page",
+      "seed": "none",
+      "theme": "media",
+      "path": "/auth/email/confirm",
+      "standalone": true,
+      "note": "no token: renders the expired/invalid body",
+      "class": "page-get",
+      "route": "/auth/email/confirm",
+      "isNew": true,
+      "method": "route"
+    },
+    {
+      "id": "email-register",
+      "kind": "page",
+      "seed": "none",
+      "theme": "media",
+      "path": "/auth/email/register",
+      "standalone": true,
+      "class": "page-get",
+      "route": "/auth/email/register",
+      "isNew": true,
+      "method": "route"
+    },
+    {
+      "id": "email-reproof",
+      "kind": "page",
+      "seed": "none",
+      "theme": "media",
+      "path": "/auth/email/reproof",
+      "standalone": true,
+      "class": "page-get",
+      "route": "/auth/email/reproof",
+      "isNew": true,
+      "method": "route"
+    },
+    {
+      "id": "auth-github",
+      "kind": "hop",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/auth/github",
+      "class": "page-get",
+      "route": "/auth/github",
+      "isNew": false,
+      "method": "hop"
+    },
+    {
+      "id": "auth-github-projects",
+      "kind": "hop",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/auth/github-projects",
+      "class": "page-get",
+      "route": "/auth/github-projects",
+      "isNew": false,
+      "method": "hop"
+    },
+    {
+      "id": "auth-github-projects-callback",
+      "kind": "hop",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/auth/github-projects/callback",
+      "class": "page-get",
+      "route": "/auth/github-projects/callback",
+      "isNew": false,
+      "method": "hop"
+    },
+    {
+      "id": "auth-github-callback",
+      "kind": "hop",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/auth/github/callback",
+      "class": "page-get",
+      "route": "/auth/github/callback",
+      "isNew": false,
+      "method": "hop"
+    },
+    {
+      "id": "auth-jira-form",
+      "kind": "page",
+      "seed": "none",
+      "theme": "media",
+      "path": "/auth/jira",
+      "standalone": true,
+      "class": "page-get",
+      "route": "/auth/jira",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "auth-jira-oauth",
+      "kind": "hop",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/auth/jira/oauth",
+      "class": "page-get",
+      "route": "/auth/jira/oauth",
+      "isNew": false,
+      "method": "hop"
+    },
+    {
+      "id": "auth-jira-oauth-callback",
+      "kind": "hop",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/auth/jira/oauth/callback",
+      "class": "page-get",
+      "route": "/auth/jira/oauth/callback",
+      "isNew": false,
+      "method": "hop"
+    },
+    {
+      "id": "auth-linear",
+      "kind": "hop",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/auth/linear",
+      "class": "page-get",
+      "route": "/auth/linear",
+      "isNew": false,
+      "method": "hop"
+    },
+    {
+      "id": "openrouter-consent",
+      "kind": "hop",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/auth/openrouter",
+      "class": "page-get",
+      "route": "/auth/openrouter",
+      "isNew": false,
+      "method": "hop"
+    },
+    {
+      "id": "openrouter-callback",
+      "kind": "hop",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/auth/openrouter/callback",
+      "class": "page-get",
+      "route": "/auth/openrouter/callback",
+      "isNew": false,
+      "method": "hop"
+    },
+    {
+      "id": "held-connection",
+      "kind": "page",
+      "seed": "none",
+      "theme": "media",
+      "path": "/connect/github/held",
+      "standalone": true,
+      "note": "no heldEntry: session-expired body",
+      "class": "page-get",
+      "route": "/connect/:provider/held",
+      "isNew": true,
+      "method": "route"
+    },
+    {
+      "id": "kpis-public",
+      "kind": "page",
+      "seed": "none",
+      "theme": "media",
+      "path": "/kpis",
+      "standalone": true,
+      "isNew": true,
+      "class": "page-get",
+      "route": "/kpis",
+      "method": "route"
+    },
+    {
+      "id": "library-index",
+      "kind": "page",
+      "seed": "none",
+      "theme": "media",
+      "path": "/library",
+      "standalone": true,
+      "class": "page-get",
+      "route": "/library",
+      "isNew": true,
+      "method": "route"
+    },
+    {
+      "id": "library-paper",
+      "kind": "page",
+      "seed": "none",
+      "theme": "media",
+      "path": "/library/@paper",
+      "standalone": true,
+      "expand": "library",
+      "class": "page-get",
+      "route": "/library/:slug",
+      "isNew": true,
+      "method": "route"
+    },
+    {
+      "id": "library-doc",
+      "kind": "page",
+      "seed": "none",
+      "theme": "media",
+      "path": "/library/doc/@doc",
+      "standalone": true,
+      "expand": "library",
+      "class": "page-get",
+      "route": "/library/doc/:slug",
+      "isNew": true,
+      "method": "route"
+    },
+    {
+      "id": "logout",
+      "kind": "hop",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/logout",
+      "class": "page-get",
+      "route": "/logout",
+      "isNew": false,
+      "method": "hop"
+    },
+    {
+      "id": "privacy",
+      "kind": "page",
+      "seed": "none",
+      "theme": "media",
+      "path": "/privacy",
+      "standalone": true,
+      "class": "page-get",
+      "route": "/privacy",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "legacy-prompts",
+      "kind": "hop",
+      "seed": "app",
+      "theme": "cookie",
+      "legacy": true,
+      "path": "/prompts",
+      "note": "legacy redirect",
+      "class": "page-get",
+      "route": "/prompts",
+      "isNew": false,
+      "method": "hop"
+    },
+    {
+      "id": "legacy-settings",
+      "kind": "hop",
+      "seed": "app",
+      "theme": "cookie",
+      "legacy": true,
+      "path": "/settings",
+      "note": "legacy redirect",
+      "class": "page-get",
+      "route": "/settings",
+      "isNew": false,
+      "method": "hop"
+    },
+    {
+      "id": "ship-public",
+      "kind": "page",
+      "seed": "none",
+      "theme": "media",
+      "path": "/ship",
+      "standalone": true,
+      "class": "page-get",
+      "route": "/ship",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "styleguide",
+      "kind": "page",
+      "seed": "none",
+      "theme": "media",
+      "path": "/styleguide",
+      "standalone": true,
+      "class": "page-get",
+      "route": "/styleguide",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "swim-public",
+      "kind": "page",
+      "seed": "none",
+      "theme": "media",
+      "path": "/swim",
+      "standalone": true,
+      "class": "page-get",
+      "route": "/swim",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "swipe-public",
+      "kind": "page",
+      "seed": "none",
+      "theme": "media",
+      "path": "/swipe",
+      "standalone": true,
+      "class": "page-get",
+      "route": "/swipe/:identifier?",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "guest-share",
+      "kind": "page",
+      "seed": "none",
+      "theme": "media",
+      "path": "/t/not-a-real-token",
+      "note": "unknown-token 404 body; live mint/revoke states are beat 2",
+      "standalone": true,
+      "class": "page-get",
+      "route": "/t/:token",
+      "isNew": true,
+      "method": "route"
+    },
+    {
+      "id": "templates",
+      "kind": "page",
+      "seed": "none",
+      "theme": "media",
+      "path": "/templates",
+      "standalone": true,
+      "class": "page-get",
+      "route": "/templates",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "terms",
+      "kind": "page",
+      "seed": "none",
+      "theme": "media",
+      "path": "/terms",
+      "standalone": true,
+      "class": "page-get",
+      "route": "/terms",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "ws-tree",
+      "kind": "page",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/workspace/test-workspace/",
+      "class": "page-get",
+      "route": "/workspace/:urlKey/",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "ws-audit",
+      "kind": "page",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/workspace/test-workspace/audit",
+      "class": "page-get",
+      "route": "/workspace/:urlKey/audit",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "ws-collective",
+      "kind": "page",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/workspace/test-workspace/collective",
+      "settleMs": 4000,
+      "experimental": "collective",
+      "class": "page-get",
+      "route": "/workspace/:urlKey/collective",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "ws-dashboard",
+      "kind": "page",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/workspace/test-workspace/dashboard",
+      "class": "page-get",
+      "route": "/workspace/:urlKey/dashboard",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "ws-dispatch",
+      "kind": "page",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/workspace/test-workspace/dispatch",
+      "settleMs": 4000,
+      "class": "page-get",
+      "route": "/workspace/:urlKey/dispatch",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "ws-effort-readout",
+      "kind": "page",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/workspace/test-workspace/effort-readout",
+      "class": "page-get",
+      "route": "/workspace/:urlKey/effort-readout",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "ws-escalation-kpis",
+      "kind": "page",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/workspace/test-workspace/escalation-kpis",
+      "class": "page-get",
+      "route": "/workspace/:urlKey/escalation-kpis",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "ws-flight-companion",
+      "kind": "page",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/workspace/test-workspace/flight-companion",
+      "experimental": "flight-companion",
+      "class": "page-get",
+      "route": "/workspace/:urlKey/flight-companion",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "ws-kpis",
+      "kind": "page",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/workspace/test-workspace/kpis",
+      "isNew": true,
+      "class": "page-get",
+      "route": "/workspace/:urlKey/kpis",
+      "method": "route"
+    },
+    {
+      "id": "ws-live-console",
+      "kind": "page",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/workspace/test-workspace/live-console",
+      "experimental": "live-console",
+      "class": "page-get",
+      "route": "/workspace/:urlKey/live-console",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "ws-next-run",
+      "kind": "page",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/workspace/test-workspace/next-run",
+      "experimental": "next-run",
+      "class": "page-get",
+      "route": "/workspace/:urlKey/next-run",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "ws-observation",
+      "kind": "page",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/workspace/test-workspace/observation",
+      "class": "page-get",
+      "route": "/workspace/:urlKey/observation",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "ws-observation-session",
+      "kind": "page",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/workspace/test-workspace/observation/session/none",
+      "class": "page-get",
+      "route": "/workspace/:urlKey/observation/session/:sessionId",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "ws-passage-planner",
+      "kind": "page",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/workspace/test-workspace/passage-planner",
+      "experimental": "passage-planner",
+      "class": "page-get",
+      "route": "/workspace/:urlKey/passage-planner",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "ws-prompts",
+      "kind": "page",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/workspace/test-workspace/prompts",
+      "class": "page-get",
+      "route": "/workspace/:urlKey/prompts",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "ws-prompts-custom",
+      "kind": "page",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/workspace/test-workspace/prompts/custom",
+      "class": "page-get",
+      "route": "/workspace/:urlKey/prompts/custom",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "ws-proxy",
+      "kind": "page",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/workspace/test-workspace/proxy",
+      "class": "page-get",
+      "route": "/workspace/:urlKey/proxy",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "ws-roadmap",
+      "kind": "page",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/workspace/test-workspace/roadmap",
+      "class": "page-get",
+      "route": "/workspace/:urlKey/roadmap",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "ws-runner",
+      "kind": "page",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/workspace/test-workspace/runner",
+      "isNew": true,
+      "class": "page-get",
+      "route": "/workspace/:urlKey/runner",
+      "method": "route"
+    },
+    {
+      "id": "ws-settings",
+      "kind": "page",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/workspace/test-workspace/settings",
+      "class": "page-get",
+      "route": "/workspace/:urlKey/settings",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "ws-ship",
+      "kind": "page",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/workspace/test-workspace/ship",
+      "experimental": "ship",
+      "class": "page-get",
+      "route": "/workspace/:urlKey/ship",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "ws-ship-biscuit",
+      "kind": "page",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/workspace/test-workspace/ship-biscuit",
+      "experimental": "ship-biscuit",
+      "class": "page-get",
+      "route": "/workspace/:urlKey/ship-biscuit",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "ws-ship-journey",
+      "kind": "page",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/workspace/test-workspace/ship-journey",
+      "experimental": "ship-journey",
+      "class": "page-get",
+      "route": "/workspace/:urlKey/ship-journey",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "ws-swim",
+      "kind": "page",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/workspace/test-workspace/swim",
+      "class": "page-get",
+      "route": "/workspace/:urlKey/swim",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "ws-swipe",
+      "kind": "page",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/workspace/test-workspace/swipe",
+      "class": "page-get",
+      "route": "/workspace/:urlKey/swipe/:identifier?",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "ws-task-chat",
+      "kind": "page",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/workspace/test-workspace/task-chat",
+      "experimental": "task-chat",
+      "class": "page-get",
+      "route": "/workspace/:urlKey/task-chat",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "ws-task-page",
+      "kind": "page",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/workspace/test-workspace/task/TEST-1",
+      "isNew": true,
+      "note": "default seed renders the not-found/empty state; populated states are beat 3",
+      "class": "page-get",
+      "route": "/workspace/:urlKey/task/:identifier",
+      "method": "route"
+    },
+    {
+      "id": "ws-task-edit",
+      "kind": "page",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/workspace/test-workspace/task/123/edit",
+      "class": "page-get",
+      "route": "/workspace/:urlKey/task/:issueId/edit",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "ws-task-new",
+      "kind": "page",
+      "seed": "app",
+      "theme": "cookie",
+      "path": "/workspace/test-workspace/task/new",
+      "class": "page-get",
+      "route": "/workspace/:urlKey/task/new",
+      "isNew": false,
+      "method": "route"
+    },
+    {
+      "id": "ws-tree-github",
+      "class": "provider-twin",
+      "kind": "page",
+      "seed": "github",
+      "theme": "cookie",
+      "path": "/workspace/github-workspace/",
+      "method": "route",
+      "isNew": false
+    },
+    {
+      "id": "ws-tree-ghp",
+      "class": "provider-twin",
+      "kind": "page",
+      "seed": "ghp",
+      "theme": "cookie",
+      "path": "/workspace/github-projects-workspace/",
+      "method": "route",
+      "isNew": false
+    },
+    {
+      "id": "ws-tree-jira",
+      "class": "provider-twin",
+      "kind": "page",
+      "seed": "jira",
+      "theme": "cookie",
+      "path": "/workspace/jira-workspace/",
+      "method": "route",
+      "isNew": false
+    },
+    {
+      "id": "ws-settings-jira",
+      "class": "provider-twin",
+      "kind": "page",
+      "seed": "jira",
+      "theme": "cookie",
+      "path": "/workspace/jira-workspace/settings",
+      "method": "route",
+      "isNew": false
+    },
+    {
+      "id": "ws-roadmap-local",
+      "class": "provider-twin",
+      "kind": "page",
+      "seed": "local",
+      "theme": "cookie",
+      "path": "/workspace/local-workspace/roadmap",
+      "method": "route",
+      "isNew": false
+    },
+    {
+      "id": "archive-1",
+      "class": "archive",
+      "kind": "page",
+      "seed": "none",
+      "theme": "media",
+      "standalone": true,
+      "path": "/archive/1",
+      "method": "route",
+      "isNew": false
+    },
+    {
+      "id": "archive-2",
+      "class": "archive",
+      "kind": "page",
+      "seed": "none",
+      "theme": "media",
+      "standalone": true,
+      "path": "/archive/2",
+      "method": "route",
+      "isNew": false
+    },
+    {
+      "id": "archive-3",
+      "class": "archive",
+      "kind": "page",
+      "seed": "none",
+      "theme": "media",
+      "standalone": true,
+      "path": "/archive/3",
+      "method": "route",
+      "isNew": false
+    },
+    {
+      "id": "archive-4",
+      "class": "archive",
+      "kind": "page",
+      "seed": "none",
+      "theme": "media",
+      "standalone": true,
+      "path": "/archive/4",
+      "method": "route",
+      "isNew": false
+    },
+    {
+      "id": "archive-5",
+      "class": "archive",
+      "kind": "page",
+      "seed": "none",
+      "theme": "media",
+      "standalone": true,
+      "path": "/archive/5",
+      "method": "route",
+      "isNew": false
+    },
+    {
+      "id": "archive-6",
+      "class": "archive",
+      "kind": "page",
+      "seed": "none",
+      "theme": "media",
+      "standalone": true,
+      "path": "/archive/6",
+      "method": "route",
+      "isNew": false
+    },
+    {
+      "id": "archive-7",
+      "class": "archive",
+      "kind": "page",
+      "seed": "none",
+      "theme": "media",
+      "standalone": true,
+      "path": "/archive/7",
+      "method": "route",
+      "isNew": false
+    },
+    {
+      "id": "archive-8",
+      "class": "archive",
+      "kind": "page",
+      "seed": "none",
+      "theme": "media",
+      "standalone": true,
+      "path": "/archive/8",
+      "method": "route",
+      "isNew": true
+    },
+    {
+      "id": "archive-9",
+      "class": "archive",
+      "kind": "page",
+      "seed": "none",
+      "theme": "media",
+      "standalone": true,
+      "path": "/archive/9",
+      "method": "route",
+      "isNew": true
+    },
+    {
+      "id": "archive-999",
+      "class": "archive",
+      "kind": "page",
+      "seed": "none",
+      "theme": "media",
+      "standalone": true,
+      "path": "/archive/999",
+      "method": "route",
+      "note": "404 body via renderErrorPage"
+    },
+    {
+      "id": "renderer:renderAccountHomePage",
+      "file": "lib/render-account-home.js",
+      "class": "renderer",
+      "renderer": "renderAccountHomePage",
+      "isNew": true,
+      "kind": "page",
+      "method": "intercept",
+      "theme": "cookie",
+      "standalone": true
+    },
+    {
+      "id": "renderer:renderAuditPage",
+      "file": "lib/render-audit.js",
+      "class": "renderer",
+      "renderer": "renderAuditPage",
+      "isNew": false,
+      "method": "excluded:covered-by-route:ws-audit"
+    },
+    {
+      "id": "renderer:renderCollectivePage",
+      "file": "lib/render-collective.js",
+      "class": "renderer",
+      "renderer": "renderCollectivePage",
+      "isNew": false,
+      "method": "excluded:covered-by-route:ws-collective"
+    },
+    {
+      "id": "renderer:renderCustomPromptsPage",
+      "file": "lib/render-custom-prompts.js",
+      "class": "renderer",
+      "renderer": "renderCustomPromptsPage",
+      "isNew": false,
+      "method": "excluded:covered-by-route:ws-prompts-custom"
+    },
+    {
+      "id": "renderer:renderDispatchPage",
+      "file": "lib/render-dispatch.js",
+      "class": "renderer",
+      "renderer": "renderDispatchPage",
+      "isNew": false,
+      "method": "excluded:covered-by-route:ws-dispatch"
+    },
+    {
+      "id": "renderer:renderEffortReadoutPage",
+      "file": "lib/render-effort-readout.js",
+      "class": "renderer",
+      "renderer": "renderEffortReadoutPage",
+      "isNew": false,
+      "method": "excluded:covered-by-route:ws-effort-readout"
+    },
+    {
+      "id": "renderer:renderEmailCheckInboxPage",
+      "file": "lib/render-email-auth.js",
+      "class": "renderer",
+      "renderer": "renderEmailCheckInboxPage",
+      "isNew": true,
+      "kind": "page",
+      "method": "intercept",
+      "theme": "cookie",
+      "standalone": true
+    },
+    {
+      "id": "renderer:renderEmailConfirmPage",
+      "file": "lib/render-email-auth.js",
+      "class": "renderer",
+      "renderer": "renderEmailConfirmPage",
+      "isNew": true,
+      "kind": "page",
+      "method": "intercept",
+      "theme": "cookie",
+      "standalone": true
+    },
+    {
+      "id": "renderer:renderEmailConfirmRefusedPage",
+      "file": "lib/render-email-auth.js",
+      "class": "renderer",
+      "renderer": "renderEmailConfirmRefusedPage",
+      "isNew": true,
+      "kind": "page",
+      "method": "intercept",
+      "theme": "cookie",
+      "standalone": true
+    },
+    {
+      "id": "renderer:renderEmailConfirmSignedInRefusedPage",
+      "file": "lib/render-email-auth.js",
+      "class": "renderer",
+      "renderer": "renderEmailConfirmSignedInRefusedPage",
+      "isNew": true,
+      "kind": "page",
+      "method": "intercept",
+      "theme": "cookie",
+      "standalone": true
+    },
+    {
+      "id": "renderer:renderEmailLinkConfirmPage",
+      "file": "lib/render-email-auth.js",
+      "class": "renderer",
+      "renderer": "renderEmailLinkConfirmPage",
+      "isNew": true,
+      "kind": "page",
+      "method": "intercept",
+      "theme": "cookie",
+      "standalone": true
+    },
+    {
+      "id": "renderer:renderEmailLinkExpiredPage",
+      "file": "lib/render-email-auth.js",
+      "class": "renderer",
+      "renderer": "renderEmailLinkExpiredPage",
+      "isNew": true,
+      "kind": "page",
+      "method": "intercept",
+      "theme": "cookie",
+      "standalone": true
+    },
+    {
+      "id": "renderer:renderEmailLinkWrongBrowserPage",
+      "file": "lib/render-email-auth.js",
+      "class": "renderer",
+      "renderer": "renderEmailLinkWrongBrowserPage",
+      "isNew": true,
+      "kind": "page",
+      "method": "intercept",
+      "theme": "cookie",
+      "standalone": true
+    },
+    {
+      "id": "renderer:renderEmailRegisterPage",
+      "file": "lib/render-email-auth.js",
+      "class": "renderer",
+      "renderer": "renderEmailRegisterPage",
+      "isNew": true,
+      "kind": "page",
+      "method": "intercept",
+      "theme": "cookie",
+      "standalone": true
+    },
+    {
+      "id": "renderer:renderEmailReproofPage",
+      "file": "lib/render-email-auth.js",
+      "class": "renderer",
+      "renderer": "renderEmailReproofPage",
+      "isNew": true,
+      "kind": "page",
+      "method": "intercept",
+      "theme": "cookie",
+      "standalone": true
+    },
+    {
+      "id": "renderer:renderEmailSendRefusedPage",
+      "file": "lib/render-email-auth.js",
+      "class": "renderer",
+      "renderer": "renderEmailSendRefusedPage",
+      "isNew": true,
+      "kind": "page",
+      "method": "intercept",
+      "theme": "cookie",
+      "standalone": true
+    },
+    {
+      "id": "renderer:renderEmailSignedInPage",
+      "file": "lib/render-email-auth.js",
+      "class": "renderer",
+      "renderer": "renderEmailSignedInPage",
+      "isNew": true,
+      "kind": "page",
+      "method": "intercept",
+      "theme": "cookie",
+      "standalone": true
+    },
+    {
+      "id": "renderer:renderEmailSignInPage",
+      "file": "lib/render-email-auth.js",
+      "class": "renderer",
+      "renderer": "renderEmailSignInPage",
+      "isNew": true,
+      "kind": "page",
+      "method": "intercept",
+      "theme": "cookie",
+      "standalone": true
+    },
+    {
+      "id": "renderer:renderEmailUnavailablePage",
+      "file": "lib/render-email-auth.js",
+      "class": "renderer",
+      "renderer": "renderEmailUnavailablePage",
+      "isNew": true,
+      "kind": "page",
+      "method": "intercept",
+      "theme": "cookie",
+      "standalone": true
+    },
+    {
+      "id": "renderer:renderErrorPage",
+      "file": "lib/render-pages.js",
+      "class": "renderer",
+      "renderer": "renderErrorPage",
+      "isNew": false,
+      "kind": "page",
+      "method": "intercept",
+      "theme": "cookie",
+      "standalone": true
+    },
+    {
+      "id": "renderer:renderEscalationKpisPage",
+      "file": "lib/render-escalation-kpis.js",
+      "class": "renderer",
+      "renderer": "renderEscalationKpisPage",
+      "isNew": false,
+      "method": "excluded:covered-by-route:ws-escalation-kpis"
+    },
+    {
+      "id": "renderer:renderFlightCompanionPage",
+      "file": "lib/render-flight-companion.js",
+      "class": "renderer",
+      "renderer": "renderFlightCompanionPage",
+      "isNew": false,
+      "method": "excluded:covered-by-route:ws-flight-companion"
+    },
+    {
+      "id": "renderer:renderGitHubProjectSelectPage",
+      "file": "lib/render-pages.js",
+      "class": "renderer",
+      "renderer": "renderGitHubProjectSelectPage",
+      "isNew": false,
+      "kind": "page",
+      "method": "intercept",
+      "theme": "cookie",
+      "standalone": true
+    },
+    {
+      "id": "renderer:renderGitHubRepoSelectPage",
+      "file": "lib/render-pages.js",
+      "class": "renderer",
+      "renderer": "renderGitHubRepoSelectPage",
+      "isNew": false,
+      "kind": "page",
+      "method": "intercept",
+      "theme": "cookie",
+      "standalone": true
+    },
+    {
+      "id": "renderer:renderJiraSiteSelectPage",
+      "file": "lib/render-pages.js",
+      "class": "renderer",
+      "renderer": "renderJiraSiteSelectPage",
+      "isNew": false,
+      "kind": "page",
+      "method": "intercept",
+      "theme": "cookie",
+      "standalone": true
+    },
+    {
+      "id": "renderer:renderKpisPage",
+      "file": "lib/render-kpis.js",
+      "class": "renderer",
+      "renderer": "renderKpisPage",
+      "isNew": false,
+      "method": "excluded:covered-by-route:kpis-public"
+    },
+    {
+      "id": "renderer:renderLandingPage",
+      "file": "lib/render-landing.js",
+      "class": "renderer",
+      "renderer": "renderLandingPage",
+      "isNew": false,
+      "method": "excluded:covered-by-route:landing"
+    },
+    {
+      "id": "renderer:renderLiveConsolePage",
+      "file": "lib/render-live-console.js",
+      "class": "renderer",
+      "renderer": "renderLiveConsolePage",
+      "isNew": false,
+      "method": "excluded:covered-by-route:ws-live-console"
+    },
+    {
+      "id": "renderer:renderLoginPage",
+      "file": "lib/render-pages.js",
+      "class": "renderer",
+      "renderer": "renderLoginPage",
+      "isNew": false,
+      "kind": "page",
+      "method": "intercept",
+      "theme": "cookie",
+      "standalone": true
+    },
+    {
+      "id": "renderer:renderMergeConfirmPage",
+      "file": "lib/render-pages.js",
+      "class": "renderer",
+      "renderer": "renderMergeConfirmPage",
+      "isNew": false,
+      "kind": "page",
+      "method": "intercept",
+      "theme": "cookie",
+      "standalone": true
+    },
+    {
+      "id": "renderer:renderMergeReauthRequiredPage",
+      "file": "lib/render-pages.js",
+      "class": "renderer",
+      "renderer": "renderMergeReauthRequiredPage",
+      "isNew": false,
+      "kind": "page",
+      "method": "intercept",
+      "theme": "cookie",
+      "standalone": true
+    },
+    {
+      "id": "renderer:renderNextRunPage",
+      "file": "lib/render-next-run.js",
+      "class": "renderer",
+      "renderer": "renderNextRunPage",
+      "isNew": false,
+      "method": "excluded:covered-by-route:ws-next-run"
+    },
+    {
+      "id": "renderer:renderObservationPage",
+      "file": "lib/render-observation.js",
+      "class": "renderer",
+      "renderer": "renderObservationPage",
+      "isNew": false,
+      "method": "excluded:covered-by-route:ws-observation"
+    },
+    {
+      "id": "renderer:renderOpenRouterConsentPage",
+      "file": "lib/render-pages.js",
+      "class": "renderer",
+      "renderer": "renderOpenRouterConsentPage",
+      "isNew": false,
+      "kind": "page",
+      "method": "intercept",
+      "theme": "cookie",
+      "standalone": true
+    },
+    {
+      "id": "renderer:lib/components/page.js#renderPage",
+      "file": "lib/components/page.js",
+      "class": "renderer",
+      "renderer": "renderPage",
+      "isNew": false,
+      "method": "excluded:covered-by-route:ws-tree"
+    },
+    {
+      "id": "renderer:lib/render.js#renderPage",
+      "file": "lib/render.js",
+      "class": "renderer",
+      "renderer": "renderPage",
+      "isNew": false,
+      "method": "excluded:covered-by-route:ws-tree"
+    },
+    {
+      "id": "renderer:renderPassagePlannerPage",
+      "file": "lib/render-passage-planner.js",
+      "class": "renderer",
+      "renderer": "renderPassagePlannerPage",
+      "isNew": false,
+      "method": "excluded:covered-by-route:ws-passage-planner"
+    },
+    {
+      "id": "renderer:renderPromptsPage",
+      "file": "lib/render-prompts.js",
+      "class": "renderer",
+      "renderer": "renderPromptsPage",
+      "isNew": false,
+      "method": "excluded:covered-by-route:ws-prompts"
+    },
+    {
+      "id": "renderer:renderProxyPage",
+      "file": "lib/render-proxy.js",
+      "class": "renderer",
+      "renderer": "renderProxyPage",
+      "isNew": false,
+      "method": "excluded:covered-by-route:ws-proxy"
+    },
+    {
+      "id": "renderer:renderRoadmapPage",
+      "file": "lib/render-roadmap.js",
+      "class": "renderer",
+      "renderer": "renderRoadmapPage",
+      "isNew": false,
+      "method": "excluded:covered-by-route:ws-roadmap"
+    },
+    {
+      "id": "renderer:renderRunnerSetupPage",
+      "file": "lib/render-runner-setup.js",
+      "class": "renderer",
+      "renderer": "renderRunnerSetupPage",
+      "isNew": true,
+      "method": "excluded:covered-by-route:ws-runner"
+    },
+    {
+      "id": "renderer:renderServiceUnavailablePage",
+      "file": "lib/render-pages.js",
+      "class": "renderer",
+      "renderer": "renderServiceUnavailablePage",
+      "isNew": true,
+      "kind": "page",
+      "method": "intercept",
+      "theme": "cookie",
+      "standalone": true
+    },
+    {
+      "id": "renderer:renderSessionPage",
+      "file": "lib/render-session.js",
+      "class": "renderer",
+      "renderer": "renderSessionPage",
+      "isNew": false,
+      "method": "excluded:covered-by-route:ws-observation-session"
+    },
+    {
+      "id": "renderer:renderSettingsPage",
+      "file": "lib/render-settings.js",
+      "class": "renderer",
+      "renderer": "renderSettingsPage",
+      "isNew": false,
+      "method": "excluded:covered-by-route:ws-settings"
+    },
+    {
+      "id": "renderer:renderShipBiscuitPage",
+      "file": "lib/render-ship-biscuit.js",
+      "class": "renderer",
+      "renderer": "renderShipBiscuitPage",
+      "isNew": false,
+      "method": "excluded:covered-by-route:ws-ship-biscuit"
+    },
+    {
+      "id": "renderer:renderShipJourneyPage",
+      "file": "lib/render-ship-journey.js",
+      "class": "renderer",
+      "renderer": "renderShipJourneyPage",
+      "isNew": false,
+      "method": "excluded:covered-by-route:ws-ship-journey"
+    },
+    {
+      "id": "renderer:renderShipPage",
+      "file": "lib/render-ship.js",
+      "class": "renderer",
+      "renderer": "renderShipPage",
+      "isNew": false,
+      "method": "excluded:covered-by-route:ws-ship"
+    },
+    {
+      "id": "renderer:renderSwimPage",
+      "file": "lib/render-swim.js",
+      "class": "renderer",
+      "renderer": "renderSwimPage",
+      "isNew": false,
+      "method": "excluded:covered-by-route:ws-swim"
+    },
+    {
+      "id": "renderer:renderSwipePage",
+      "file": "lib/render-swipe.js",
+      "class": "renderer",
+      "renderer": "renderSwipePage",
+      "isNew": false,
+      "method": "excluded:covered-by-route:ws-swipe"
+    },
+    {
+      "id": "renderer:renderTaskChatPage",
+      "file": "lib/render-task-chat.js",
+      "class": "renderer",
+      "renderer": "renderTaskChatPage",
+      "isNew": false,
+      "method": "excluded:covered-by-route:ws-task-chat"
+    },
+    {
+      "id": "renderer:renderTaskCreatePage",
+      "file": "lib/render-task-create.js",
+      "class": "renderer",
+      "renderer": "renderTaskCreatePage",
+      "isNew": false,
+      "method": "excluded:covered-by-route:ws-task-new"
+    },
+    {
+      "id": "renderer:renderTaskEditPage",
+      "file": "lib/render-task-edit.js",
+      "class": "renderer",
+      "renderer": "renderTaskEditPage",
+      "isNew": false,
+      "method": "excluded:covered-by-route:ws-task-edit"
+    },
+    {
+      "id": "renderer:renderTaskNotFoundPage",
+      "file": "lib/render-task-page.js",
+      "class": "renderer",
+      "renderer": "renderTaskNotFoundPage",
+      "isNew": true,
+      "kind": "page",
+      "method": "intercept",
+      "theme": "cookie",
+      "standalone": true
+    },
+    {
+      "id": "renderer:renderTaskPage",
+      "file": "lib/render-task-page.js",
+      "class": "renderer",
+      "renderer": "renderTaskPage",
+      "isNew": true,
+      "method": "excluded:covered-by-route:ws-task-page"
+    },
+    {
+      "id": "renderer:renderTemplatesPage",
+      "file": "lib/render-templates.js",
+      "class": "renderer",
+      "renderer": "renderTemplatesPage",
+      "isNew": false,
+      "method": "excluded:covered-by-route:templates"
+    },
+    {
+      "id": "renderer:renderUpstreamAwareErrorPage",
+      "file": "lib/render-pages.js",
+      "class": "renderer",
+      "renderer": "renderUpstreamAwareErrorPage",
+      "isNew": false,
+      "kind": "page",
+      "method": "intercept",
+      "theme": "cookie",
+      "standalone": true
+    },
+    {
+      "id": "renderer:renderWorkspaceKpisPage",
+      "file": "lib/render-workspace-kpis.js",
+      "class": "renderer",
+      "renderer": "renderWorkspaceKpisPage",
+      "isNew": true,
+      "method": "excluded:covered-by-route:ws-kpis"
+    },
+    {
+      "id": "renderer:renderWorkspaceLimitPage",
+      "file": "lib/render-pages.js",
+      "class": "renderer",
+      "renderer": "renderWorkspaceLimitPage",
+      "isNew": true,
+      "kind": "page",
+      "method": "intercept",
+      "theme": "cookie",
+      "standalone": true
+    },
+    {
+      "id": "renderer:renderWorkspaceNotFoundPage",
+      "file": "lib/render-pages.js",
+      "class": "renderer",
+      "renderer": "renderWorkspaceNotFoundPage",
+      "isNew": false,
+      "kind": "page",
+      "method": "intercept",
+      "theme": "cookie",
+      "standalone": true
+    },
+    {
+      "id": "state-held-connection-503-retry",
+      "class": "state",
+      "kind": "page",
+      "method": "intercept-state",
+      "theme": "cookie",
+      "standalone": true,
+      "isNew": true
+    },
+    {
+      "id": "state-guest-share-404",
+      "class": "state",
+      "kind": "page",
+      "method": "intercept-state",
+      "theme": "cookie",
+      "standalone": true,
+      "isNew": true
+    },
+    {
+      "id": "state-guest-share-503",
+      "class": "state",
+      "kind": "page",
+      "method": "intercept-state",
+      "theme": "cookie",
+      "standalone": true,
+      "isNew": true
+    },
+    {
+      "id": "state-library-404",
+      "class": "state",
+      "kind": "page",
+      "method": "intercept-state",
+      "theme": "cookie",
+      "standalone": true,
+      "isNew": true
+    },
+    {
+      "id": "state-upstream-429",
+      "class": "state",
+      "kind": "page",
+      "method": "intercept-state",
+      "theme": "cookie",
+      "standalone": true,
+      "isNew": true
+    },
+    {
+      "id": "state-upstream-5xx",
+      "class": "state",
+      "kind": "page",
+      "method": "intercept-state",
+      "theme": "cookie",
+      "standalone": true,
+      "isNew": true
+    },
+    {
+      "id": "state-upstream-auth",
+      "class": "state",
+      "kind": "page",
+      "method": "intercept-state",
+      "theme": "cookie",
+      "standalone": true,
+      "isNew": true
+    },
+    {
+      "id": "state-upstream-internal",
+      "class": "state",
+      "kind": "page",
+      "method": "intercept-state",
+      "theme": "cookie",
+      "standalone": true,
+      "isNew": true
+    },
+    {
+      "id": "library-doc:*",
+      "class": "library",
+      "method": "expand:library-catalog",
+      "note": "every catalog slug is swept at census time and listed per-slug in census.json"
+    }
+  ]
+}
