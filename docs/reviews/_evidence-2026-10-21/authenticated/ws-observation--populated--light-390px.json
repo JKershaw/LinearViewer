@@ -1,0 +1,133 @@
+{
+  "key": "ws-observation|populated|light|390",
+  "registryId": "ws-observation",
+  "state": "populated",
+  "theme": "light",
+  "viewport": 390,
+  "path": "/workspace/test-workspace/observation",
+  "populated": true,
+  "note": "3 dispatch sessions (done / blocked / running) + seed-agent-status ×5",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/observation",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "no theme-dark",
+    "actual": "",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "",
+    "title": "Observation",
+    "h1": "Observation ● live",
+    "headings": {
+      "h1": 1,
+      "h2": 5
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "settings",
+      "kpis",
+      "roadmap",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "next run",
+      "flight companion",
+      "passage planner",
+      "ship's biscuit",
+      "live console",
+      "ship journey"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: light",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 746
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 67,
+    "belowThreshold": [
+      {
+        "element": "span.obs-summary-line.obs-summary-waiting",
+        "color": "rgb(255, 178, 36)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 1.8,
+        "need": 4.5,
+        "fontSize": "13.44px",
+        "fontWeight": "600",
+        "count": 1,
+        "samples": [
+          "◐ waiting on you — [blocked] need your decision on"
+        ]
+      },
+      {
+        "element": "a.obs-summary-reply",
+        "color": "rgb(255, 178, 36)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 1.8,
+        "need": 4.5,
+        "fontSize": "13.44px",
+        "fontWeight": "600",
+        "count": 1,
+        "samples": [
+          "reply →"
+        ]
+      },
+      {
+        "element": "span.obs-poll-status",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.3,
+        "need": 4.5,
+        "fontSize": "12.8px",
+        "fontWeight": "600",
+        "count": 1,
+        "samples": [
+          "● live"
+        ]
+      },
+      {
+        "element": "span.wordmark-accent",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.74,
+        "need": 4.5,
+        "fontSize": "10.4975px",
+        "fontWeight": "600",
+        "count": 1,
+        "samples": [
+          ".cat"
+        ]
+      }
+    ]
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

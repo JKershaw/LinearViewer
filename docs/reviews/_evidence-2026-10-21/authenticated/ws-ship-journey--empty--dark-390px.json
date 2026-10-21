@@ -1,0 +1,79 @@
+{
+  "key": "ws-ship-journey|empty|dark|390",
+  "registryId": "ws-ship-journey",
+  "state": "empty",
+  "theme": "dark",
+  "viewport": 390,
+  "path": "/workspace/test-workspace/ship-journey",
+  "populated": false,
+  "note": "default seed (empty) state",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/ship-journey",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "theme-dark",
+    "title": "Ship Journey - Experimental",
+    "h1": "Ship Journey",
+    "headings": {
+      "h1": 1
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "roadmap",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "next run",
+      "flight companion",
+      "passage planner",
+      "ship's biscuit",
+      "live console"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: dark",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 537
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 27,
+    "belowThreshold": []
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

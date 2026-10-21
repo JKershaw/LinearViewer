@@ -1,0 +1,418 @@
+{
+  "key": "ws-settings|model-picker-focus|dark|390",
+  "registryId": "ws-settings",
+  "state": "model-picker-focus",
+  "theme": "dark",
+  "viewport": 390,
+  "path": "/workspace/test-workspace/settings",
+  "populated": null,
+  "note": "model-picker <select> focused; native popup list is not rendered in headless captures (named limit) — option sets and computed styles are in the JSON",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/settings",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "theme-dark",
+    "title": "Test Workspace - Settings",
+    "h1": "Settings",
+    "headings": {
+      "h1": 1,
+      "h2": 12
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "kpis",
+      "roadmap",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "next run",
+      "flight companion",
+      "passage planner",
+      "ship's biscuit",
+      "live console",
+      "ship journey"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: dark",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 7072
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 266,
+    "belowThreshold": [
+      {
+        "element": "button.action-btn.dispatch-preset-delete-btn",
+        "color": "rgb(0, 0, 0)",
+        "bg": "rgb(34,36,40)",
+        "ratio": 1.35,
+        "need": 4.5,
+        "fontSize": "9.945px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "delete"
+        ]
+      },
+      {
+        "element": "button.action-btn",
+        "color": "rgb(0, 0, 0)",
+        "bg": "rgb(34,36,40)",
+        "ratio": 1.35,
+        "need": 4.5,
+        "fontSize": "9.945px",
+        "fontWeight": "400",
+        "count": 2,
+        "samples": [
+          "make active",
+          "refresh / test"
+        ]
+      },
+      {
+        "element": "a.settings-action",
+        "color": "rgb(0, 0, 238)",
+        "bg": "rgb(34,36,40)",
+        "ratio": 1.65,
+        "need": 4.5,
+        "fontSize": "11.7px",
+        "fontWeight": "400",
+        "count": 13,
+        "samples": [
+          "open the discussion page",
+          "open the task chat page",
+          "open the radial view"
+        ]
+      },
+      {
+        "element": "a.settings-action.dispatch-preset-use-link",
+        "color": "rgb(0, 0, 238)",
+        "bg": "rgb(34,36,40)",
+        "ratio": 1.65,
+        "need": 4.5,
+        "fontSize": "11.7px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "use on Dispatch →"
+        ]
+      },
+      {
+        "element": "a.action-btn.provider-add-new-workspace",
+        "color": "rgb(0, 0, 238)",
+        "bg": "rgb(34,36,40)",
+        "ratio": 1.65,
+        "need": 4.5,
+        "fontSize": "9.945px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "as a new workspace"
+        ]
+      }
+    ]
+  },
+  "extra": [
+    {
+      "cls": "model-select",
+      "name": "modelId",
+      "options": [
+        "GPT-5.4 Mini",
+        "Claude Sonnet 4.6",
+        "Claude Opus 4.8",
+        "GPT-5.5",
+        "GPT-5.5 Pro",
+        "Claude Sonnet 5",
+        "Claude Opus 5",
+        "Claude Fable 5",
+        "Claude Haiku 4.5",
+        "GPT-5.6 Sol"
+      ],
+      "fontSize": "10.53px",
+      "h": 25,
+      "w": 300,
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22, 24, 29)",
+      "focused": true
+    },
+    {
+      "cls": "ai-override-select",
+      "name": "byKind__recommend__model",
+      "options": [
+        "— inherit",
+        "GPT-5.4 Mini",
+        "Claude Sonnet 4.6",
+        "Claude Opus 4.8",
+        "GPT-5.5",
+        "GPT-5.5 Pro",
+        "Claude Sonnet 5",
+        "Claude Opus 5",
+        "Claude Fable 5",
+        "Claude Haiku 4.5",
+        "GPT-5.6 Sol"
+      ],
+      "fontSize": "10.53px",
+      "h": 25,
+      "w": 280,
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22, 24, 29)",
+      "focused": false
+    },
+    {
+      "cls": "ai-override-select",
+      "name": "byKind__recap__model",
+      "options": [
+        "— inherit",
+        "GPT-5.4 Mini",
+        "Claude Sonnet 4.6",
+        "Claude Opus 4.8",
+        "GPT-5.5",
+        "GPT-5.5 Pro",
+        "Claude Sonnet 5",
+        "Claude Opus 5",
+        "Claude Fable 5",
+        "Claude Haiku 4.5",
+        "GPT-5.6 Sol"
+      ],
+      "fontSize": "10.53px",
+      "h": 25,
+      "w": 280,
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22, 24, 29)",
+      "focused": false
+    },
+    {
+      "cls": "ai-override-select",
+      "name": "byKind__brief__model",
+      "options": [
+        "— inherit",
+        "GPT-5.4 Mini",
+        "Claude Sonnet 4.6",
+        "Claude Opus 4.8",
+        "GPT-5.5",
+        "GPT-5.5 Pro",
+        "Claude Sonnet 5",
+        "Claude Opus 5",
+        "Claude Fable 5",
+        "Claude Haiku 4.5",
+        "GPT-5.6 Sol"
+      ],
+      "fontSize": "10.53px",
+      "h": 25,
+      "w": 280,
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22, 24, 29)",
+      "focused": false
+    },
+    {
+      "cls": "ai-override-select",
+      "name": "byKind__scan__model",
+      "options": [
+        "— inherit",
+        "GPT-5.4 Mini",
+        "Claude Sonnet 4.6",
+        "Claude Opus 4.8",
+        "GPT-5.5",
+        "GPT-5.5 Pro",
+        "Claude Sonnet 5",
+        "Claude Opus 5",
+        "Claude Fable 5",
+        "Claude Haiku 4.5",
+        "GPT-5.6 Sol"
+      ],
+      "fontSize": "10.53px",
+      "h": 25,
+      "w": 280,
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22, 24, 29)",
+      "focused": false
+    },
+    {
+      "cls": "ai-override-select",
+      "name": "byKind__run-summary__model",
+      "options": [
+        "— inherit",
+        "GPT-5.4 Mini",
+        "Claude Sonnet 4.6",
+        "Claude Opus 4.8",
+        "GPT-5.5",
+        "GPT-5.5 Pro",
+        "Claude Sonnet 5",
+        "Claude Opus 5",
+        "Claude Fable 5",
+        "Claude Haiku 4.5",
+        "GPT-5.6 Sol"
+      ],
+      "fontSize": "10.53px",
+      "h": 25,
+      "w": 280,
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22, 24, 29)",
+      "focused": false
+    },
+    {
+      "cls": "ai-override-select",
+      "name": "byKind__session-summary__model",
+      "options": [
+        "— inherit",
+        "GPT-5.4 Mini",
+        "Claude Sonnet 4.6",
+        "Claude Opus 4.8",
+        "GPT-5.5",
+        "GPT-5.5 Pro",
+        "Claude Sonnet 5",
+        "Claude Opus 5",
+        "Claude Fable 5",
+        "Claude Haiku 4.5",
+        "GPT-5.6 Sol"
+      ],
+      "fontSize": "10.53px",
+      "h": 25,
+      "w": 280,
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22, 24, 29)",
+      "focused": false
+    },
+    {
+      "cls": "ai-override-select",
+      "name": "byKind__next-run__model",
+      "options": [
+        "— inherit",
+        "GPT-5.4 Mini",
+        "Claude Sonnet 4.6",
+        "Claude Opus 4.8",
+        "GPT-5.5",
+        "GPT-5.5 Pro",
+        "Claude Sonnet 5",
+        "Claude Opus 5",
+        "Claude Fable 5",
+        "Claude Haiku 4.5",
+        "GPT-5.6 Sol"
+      ],
+      "fontSize": "10.53px",
+      "h": 25,
+      "w": 280,
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22, 24, 29)",
+      "focused": false
+    },
+    {
+      "cls": "ai-override-select",
+      "name": "byKind__flight-companion__model",
+      "options": [
+        "— inherit",
+        "GPT-5.4 Mini",
+        "Claude Sonnet 4.6",
+        "Claude Opus 4.8",
+        "GPT-5.5",
+        "GPT-5.5 Pro",
+        "Claude Sonnet 5",
+        "Claude Opus 5",
+        "Claude Fable 5",
+        "Claude Haiku 4.5",
+        "GPT-5.6 Sol"
+      ],
+      "fontSize": "10.53px",
+      "h": 25,
+      "w": 280,
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22, 24, 29)",
+      "focused": false
+    },
+    {
+      "cls": "ai-override-select",
+      "name": "byKind__ship-biscuit__model",
+      "options": [
+        "— inherit",
+        "GPT-5.4 Mini",
+        "Claude Sonnet 4.6",
+        "Claude Opus 4.8",
+        "GPT-5.5",
+        "GPT-5.5 Pro",
+        "Claude Sonnet 5",
+        "Claude Opus 5",
+        "Claude Fable 5",
+        "Claude Haiku 4.5",
+        "GPT-5.6 Sol"
+      ],
+      "fontSize": "10.53px",
+      "h": 25,
+      "w": 280,
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22, 24, 29)",
+      "focused": false
+    },
+    {
+      "cls": "ai-override-select",
+      "name": "byKind__task-chat__model",
+      "options": [
+        "— inherit",
+        "GPT-5.4 Mini",
+        "Claude Sonnet 4.6",
+        "Claude Opus 4.8",
+        "GPT-5.5",
+        "GPT-5.5 Pro",
+        "Claude Sonnet 5",
+        "Claude Opus 5",
+        "Claude Fable 5",
+        "Claude Haiku 4.5",
+        "GPT-5.6 Sol"
+      ],
+      "fontSize": "10.53px",
+      "h": 25,
+      "w": 280,
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22, 24, 29)",
+      "focused": false
+    },
+    {
+      "cls": "harness-select",
+      "name": "defaultHarnessSelect",
+      "options": [
+        "—",
+        "claude-code",
+        "opencode"
+      ],
+      "fontSize": "10.53px",
+      "h": 25,
+      "w": 300,
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22, 24, 29)",
+      "focused": false
+    }
+  ],
+  "consoleErrors": [],
+  "failedRequests": []
+}

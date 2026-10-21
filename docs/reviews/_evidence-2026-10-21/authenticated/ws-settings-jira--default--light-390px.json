@@ -1,0 +1,192 @@
+{
+  "key": "ws-settings-jira|default|light|390",
+  "registryId": "ws-settings-jira",
+  "state": "default",
+  "theme": "light",
+  "viewport": 390,
+  "path": "/workspace/jira-workspace/settings",
+  "populated": null,
+  "note": "provider twin via /test/set-jira-session",
+  "httpStatus": 200,
+  "finalPath": "/workspace/jira-workspace/settings",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "no theme-dark",
+    "actual": "",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "",
+    "title": "Jira Workspace - Settings",
+    "h1": "Settings",
+    "headings": {
+      "h1": 1,
+      "h2": 12
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "kpis",
+      "proxy"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: light",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 17792
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 221,
+    "belowThreshold": [
+      {
+        "element": "span.feature-note",
+        "color": "rgb(212, 166, 0)",
+        "bg": "rgb(247,247,247)",
+        "ratio": 2.12,
+        "need": 4.5,
+        "fontSize": "12.8px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "Recommended — the agent reaches the tracker throug"
+        ]
+      },
+      {
+        "element": "button.action-btn.save",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(220,237,227)",
+        "ratio": 2.71,
+        "need": 4.5,
+        "fontSize": "9.945px",
+        "fontWeight": "400",
+        "count": 3,
+        "samples": [
+          "save",
+          "save model overrides",
+          "save dispatch defaults"
+        ]
+      },
+      {
+        "element": "button.action-btn.save.dispatch-preset-create-btn",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(220,237,227)",
+        "ratio": 2.71,
+        "need": 4.5,
+        "fontSize": "11.05px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "save preset"
+        ]
+      },
+      {
+        "element": "span.provider-active",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(247,247,247)",
+        "ratio": 3.08,
+        "need": 4.5,
+        "fontSize": "11.7px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "●"
+        ]
+      },
+      {
+        "element": "button.action-btn.provider-add-btn",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(247,247,247)",
+        "ratio": 3.08,
+        "need": 4.5,
+        "fontSize": "9.945px",
+        "fontWeight": "400",
+        "count": 5,
+        "samples": [
+          "add",
+          "add",
+          "add"
+        ]
+      },
+      {
+        "element": "span.toggle-state",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.3,
+        "need": 4.5,
+        "fontSize": "13.6px",
+        "fontWeight": "400",
+        "count": 4,
+        "samples": [
+          "● on",
+          "● on",
+          "● on"
+        ]
+      },
+      {
+        "element": "span.wordmark-accent",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.74,
+        "need": 4.5,
+        "fontSize": "10.4975px",
+        "fontWeight": "600",
+        "count": 1,
+        "samples": [
+          ".cat"
+        ]
+      },
+      {
+        "element": "a.action-btn.connect",
+        "color": "rgb(37, 99, 235)",
+        "bg": "rgb(222,230,246)",
+        "ratio": 4.12,
+        "need": 4.5,
+        "fontSize": "9.945px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "connect"
+        ]
+      },
+      {
+        "element": "a.action-btn.logout",
+        "color": "rgb(204, 0, 0)",
+        "bg": "rgb(242,218,218)",
+        "ratio": 4.43,
+        "need": 4.5,
+        "fontSize": "9.945px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "logout"
+        ]
+      }
+    ]
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

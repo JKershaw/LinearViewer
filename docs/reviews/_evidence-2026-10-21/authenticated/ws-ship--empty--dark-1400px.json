@@ -1,0 +1,77 @@
+{
+  "key": "ws-ship|empty|dark|1400",
+  "registryId": "ws-ship",
+  "state": "empty",
+  "theme": "dark",
+  "viewport": 1400,
+  "path": "/workspace/test-workspace/ship",
+  "populated": false,
+  "note": "default seed (empty) state",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/ship",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "theme-dark",
+    "title": "Ship",
+    "h1": null,
+    "headings": {},
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "live console",
+      "ship journey",
+      "roadmap",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "next run",
+      "flight companion",
+      "passage planner",
+      "ship's biscuit"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: dark",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": true,
+    "hasAssigneeSelector": false,
+    "bodyText": 713
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 68,
+    "belowThreshold": []
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

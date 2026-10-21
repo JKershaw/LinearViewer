@@ -1,0 +1,81 @@
+{
+  "key": "ws-kpis|empty|dark|390",
+  "registryId": "ws-kpis",
+  "state": "empty",
+  "theme": "dark",
+  "viewport": 390,
+  "path": "/workspace/local-workspace/kpis",
+  "populated": false,
+  "note": "local-provider workspace, no dispatches, no rollup rows",
+  "httpStatus": 200,
+  "finalPath": "/workspace/local-workspace/kpis",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "theme-dark",
+    "title": "Local Workspace - KPIs",
+    "h1": "KPIs",
+    "headings": {
+      "h1": 1,
+      "h2": 1
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "dispatch",
+      "proxy"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: dark",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 385
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 32,
+    "belowThreshold": []
+  },
+  "extra": {
+    "data": null,
+    "empty": true,
+    "sections": [
+      "workspace-kpis-section-stored"
+    ],
+    "pressed": [],
+    "captionVisible": null,
+    "emptyNoteVisible": null,
+    "canvases": []
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

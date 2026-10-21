@@ -1,0 +1,108 @@
+{
+  "key": "ws-prompts-custom|empty|light|1400",
+  "registryId": "ws-prompts-custom",
+  "state": "empty",
+  "theme": "light",
+  "viewport": 1400,
+  "path": "/workspace/test-workspace/prompts/custom",
+  "populated": false,
+  "note": "default seed (empty) state",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/prompts/custom",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "no theme-dark",
+    "actual": "",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "",
+    "title": "Test Workspace - Custom Prompts",
+    "h1": "Custom Prompts",
+    "headings": {
+      "h1": 1
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "passage planner",
+      "ship's biscuit",
+      "live console",
+      "ship journey",
+      "roadmap",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "next run",
+      "flight companion"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: light",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 452
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 37,
+    "belowThreshold": [
+      {
+        "element": "button.action-btn.save.custom-prompt-new-btn",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(227,244,233)",
+        "ratio": 2.89,
+        "need": 4.5,
+        "fontSize": "13.6px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "+ new prompt"
+        ]
+      },
+      {
+        "element": "span.wordmark-accent",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.74,
+        "need": 4.5,
+        "fontSize": "16px",
+        "fontWeight": "600",
+        "count": 2,
+        "samples": [
+          ".cat",
+          ".cat"
+        ]
+      }
+    ]
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

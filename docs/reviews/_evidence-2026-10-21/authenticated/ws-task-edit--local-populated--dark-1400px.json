@@ -1,0 +1,71 @@
+{
+  "key": "ws-task-edit|local-populated|dark|1400",
+  "registryId": "ws-task-edit",
+  "state": "local-populated",
+  "theme": "dark",
+  "viewport": 1400,
+  "path": "/workspace/local-workspace/task/local-workspace--te-issue/edit",
+  "populated": true,
+  "note": "local-provider issue (the default Linear-mock seed 500s because the mock cannot read the task: measured:error-500 in the census)",
+  "httpStatus": 200,
+  "finalPath": "/workspace/local-workspace/task/local-workspace--te-issue/edit",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "theme-dark",
+    "title": "Edit · A task to edit",
+    "h1": "LOCAL-TE1 A task to edit",
+    "headings": {
+      "h1": 1,
+      "h2": 1
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "search",
+      "0 waiting on you",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "dispatch",
+      "proxy"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: dark",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 512
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 38,
+    "belowThreshold": []
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

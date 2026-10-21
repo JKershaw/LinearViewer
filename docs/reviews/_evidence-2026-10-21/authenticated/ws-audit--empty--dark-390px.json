@@ -1,0 +1,94 @@
+{
+  "key": "ws-audit|empty|dark|390",
+  "registryId": "ws-audit",
+  "state": "empty",
+  "theme": "dark",
+  "viewport": 390,
+  "path": "/workspace/test-workspace/audit",
+  "populated": false,
+  "note": "default seed (empty) state",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/audit",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "theme-dark",
+    "title": "Test Workspace - Operator Dashboard",
+    "h1": "Operator Dashboard",
+    "headings": {
+      "h1": 1
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "roadmap",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "next run",
+      "flight companion",
+      "passage planner",
+      "ship's biscuit",
+      "live console",
+      "ship journey"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: dark",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 276
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 26,
+    "belowThreshold": [
+      {
+        "element": "button.audit-button",
+        "color": "rgb(255, 255, 255)",
+        "bg": "rgb(110,168,254)",
+        "ratio": 2.42,
+        "need": 4.5,
+        "fontSize": "11.7px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "Run Audit"
+        ]
+      }
+    ]
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

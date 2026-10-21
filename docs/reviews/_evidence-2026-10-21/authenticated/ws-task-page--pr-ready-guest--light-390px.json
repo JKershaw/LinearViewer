@@ -1,0 +1,95 @@
+{
+  "key": "ws-task-page|pr-ready-guest|light|390",
+  "registryId": "ws-task-page",
+  "state": "pr-ready-guest",
+  "theme": "light",
+  "viewport": 390,
+  "path": "/t/VV73XlnRXlNRHIOY4HWYyK1M2t8bqw-ox7h1GTphD6s",
+  "populated": true,
+  "note": "local-provider seed (no owner session); pr-ready-guest",
+  "httpStatus": 200,
+  "finalPath": "/t/VV73XlnRXlNRHIOY4HWYyK1M2t8bqw-ox7h1GTphD6s",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "no theme-dark",
+    "actual": "",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "",
+    "title": "LOCAL-TP1 — A task with an approved PR",
+    "h1": "LOCAL-TP1 A task with an approved PR",
+    "headings": {
+      "h1": 1,
+      "h2": 4,
+      "h3": 1
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "search",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: light",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 1079
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 109,
+    "belowThreshold": [
+      {
+        "element": "span.wordmark-accent",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.74,
+        "need": 4.5,
+        "fontSize": "10.4975px",
+        "fontWeight": "600",
+        "count": 1,
+        "samples": [
+          ".cat"
+        ]
+      }
+    ]
+  },
+  "extra": {
+    "dataStatus": "idle",
+    "mergeReady": "false",
+    "title": "A task with an approved PR",
+    "sentence": "No session running. Last: Kick-off done 21 Oct, 02:59 UTC.",
+    "stageCount": 1,
+    "prLead": "PR #490587 is approved and ready to merge.",
+    "closeoutState": null,
+    "hasPress": false,
+    "ownerWidgets": false,
+    "notFound": false
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

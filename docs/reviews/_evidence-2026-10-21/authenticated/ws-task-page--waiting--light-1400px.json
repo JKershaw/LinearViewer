@@ -1,0 +1,98 @@
+{
+  "key": "ws-task-page|waiting|light|1400",
+  "registryId": "ws-task-page",
+  "state": "waiting",
+  "theme": "light",
+  "viewport": 1400,
+  "path": "/workspace/local-workspace/task/LOCAL-TP3",
+  "populated": true,
+  "note": "local-provider seed (owner); waiting",
+  "httpStatus": 200,
+  "finalPath": "/workspace/local-workspace/task/LOCAL-TP3",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "no theme-dark",
+    "actual": "",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "",
+    "title": "LOCAL-TP3 — A task waiting on an answer",
+    "h1": "LOCAL-TP3 A task waiting on an answer",
+    "headings": {
+      "h1": 1,
+      "h2": 2
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "search",
+      "0 waiting on you",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "dispatch",
+      "proxy"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: light",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 914
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 73,
+    "belowThreshold": [
+      {
+        "element": "span.wordmark-accent",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.74,
+        "need": 4.5,
+        "fontSize": "16px",
+        "fontWeight": "600",
+        "count": 2,
+        "samples": [
+          ".cat",
+          ".cat"
+        ]
+      }
+    ]
+  },
+  "extra": {
+    "dataStatus": "waiting",
+    "mergeReady": "false",
+    "title": "A task waiting on an answer",
+    "sentence": "which API key should the build use?",
+    "stageCount": 2,
+    "prLead": null,
+    "closeoutState": null,
+    "hasPress": false,
+    "ownerWidgets": true,
+    "notFound": false
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

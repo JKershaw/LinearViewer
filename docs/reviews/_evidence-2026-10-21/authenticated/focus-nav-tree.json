@@ -1,0 +1,2552 @@
+{
+  "registryId": "ws-tree",
+  "state": "nav-keyboard",
+  "target": "nav-tree",
+  "note": "Tab walk from top of document; light 1400 and dark 390; theme asserted in the same read",
+  "logs": {
+    "light-1400": {
+      "httpStatus": 200,
+      "htmlClass": "",
+      "themeAssertion": {
+        "expected": "no theme-dark",
+        "actual": "",
+        "passed": true
+      },
+      "verdict": {
+        "stops": 48,
+        "withoutIndicator": [],
+        "notFocusVisible": [],
+        "offscreen": 0,
+        "zeroSize": [],
+        "positiveTabindex": [],
+        "cycled": false,
+        "leftDocument": true
+      },
+      "stops": [
+        {
+          "i": 1,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "nav-brand",
+          "id": null,
+          "name": "Harbour home",
+          "href": "/workspace/test-workspace/",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 149,
+            "y": 40,
+            "w": 107,
+            "h": 26
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 2,
+          "tag": "button",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": "workspace-toggle",
+          "name": "Test Workspace",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 369,
+            "y": 44,
+            "w": 110,
+            "h": 17
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 3,
+          "tag": "button",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": "team-toggle",
+          "name": "all",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 540,
+            "y": 44,
+            "w": 15,
+            "h": 17
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 4,
+          "tag": "button",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": "assignee-toggle",
+          "name": "all",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 644,
+            "y": 44,
+            "w": 15,
+            "h": 17
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 5,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "search",
+          "href": "#",
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 1112,
+            "y": 41,
+            "w": 46,
+            "h": 23
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 6,
+          "tag": "button",
+          "role": null,
+          "type": "button",
+          "testid": "nav-feedback-trigger",
+          "id": null,
+          "name": "Give feedback",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 1173,
+            "y": 44,
+            "w": 64,
+            "h": 17
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 7,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "nav-view-swipe",
+          "id": null,
+          "name": "swipe",
+          "href": "/workspace/test-workspace/swipe",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 218,
+            "y": 83,
+            "w": 40,
+            "h": 33
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 8,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "nav-view-swim",
+          "id": null,
+          "name": "swim",
+          "href": "/workspace/test-workspace/swim",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 277,
+            "y": 83,
+            "w": 36,
+            "h": 33
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 9,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "nav-view-observation",
+          "id": null,
+          "name": "observation",
+          "href": "/workspace/test-workspace/observation",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 332,
+            "y": 83,
+            "w": 81,
+            "h": 33
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 10,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "nav-view-settings",
+          "id": null,
+          "name": "settings",
+          "href": "/workspace/test-workspace/settings",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 432,
+            "y": 83,
+            "w": 54,
+            "h": 33
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 11,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "nav-view-kpis",
+          "id": null,
+          "name": "kpis",
+          "href": "/workspace/test-workspace/kpis",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 505,
+            "y": 83,
+            "w": 28,
+            "h": 33
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 12,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "nav-view-passage-planner",
+          "id": null,
+          "name": "passage planner",
+          "href": "/workspace/test-workspace/passage-planner",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 552,
+            "y": 83,
+            "w": 113,
+            "h": 33
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 13,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "nav-view-ship-biscuit",
+          "id": null,
+          "name": "ship's biscuit",
+          "href": "/workspace/test-workspace/ship-biscuit",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 684,
+            "y": 83,
+            "w": 89,
+            "h": 33
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 14,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "nav-view-live-console",
+          "id": null,
+          "name": "live console",
+          "href": "/workspace/test-workspace/live-console",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 792,
+            "y": 83,
+            "w": 81,
+            "h": 33
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 15,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "nav-view-ship-journey",
+          "id": null,
+          "name": "ship journey",
+          "href": "/workspace/test-workspace/ship-journey",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 892,
+            "y": 83,
+            "w": 83,
+            "h": 33
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 16,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "nav-view-roadmap",
+          "id": null,
+          "name": "roadmap",
+          "href": "/workspace/test-workspace/roadmap",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 995,
+            "y": 83,
+            "w": 60,
+            "h": 33
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 17,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "nav-view-dispatch",
+          "id": null,
+          "name": "dispatch",
+          "href": "/workspace/test-workspace/dispatch",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 1074,
+            "y": 83,
+            "w": 58,
+            "h": 33
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 18,
+          "tag": "button",
+          "role": null,
+          "type": "button",
+          "testid": "nav-more-toggle",
+          "id": null,
+          "name": "⋯ more",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 1152,
+            "y": 85,
+            "w": 43,
+            "h": 29
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 19,
+          "tag": "div",
+          "role": "button",
+          "type": null,
+          "testid": "issue-line",
+          "id": null,
+          "name": "◐ Blocked on external API access (Project Alpha) ▶",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(37, 99, 235)",
+            "offset": "-2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 173,
+            "y": 265,
+            "w": 1064,
+            "h": 38
+          },
+          "inViewport": true,
+          "tabindex": "0"
+        },
+        {
+          "i": 20,
+          "tag": "div",
+          "role": "button",
+          "type": null,
+          "testid": "issue-line",
+          "id": null,
+          "name": "◐ Parent task in progress (Project Alpha) ▶",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(37, 99, 235)",
+            "offset": "-2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 173,
+            "y": 303,
+            "w": 1064,
+            "h": 38
+          },
+          "inViewport": true,
+          "tabindex": "0"
+        },
+        {
+          "i": 21,
+          "tag": "div",
+          "role": "button",
+          "type": null,
+          "testid": "issue-line",
+          "id": null,
+          "name": "◐ Add pagination to user list (Project Alpha) ▶",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(37, 99, 235)",
+            "offset": "-2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 173,
+            "y": 341,
+            "w": 1064,
+            "h": 38
+          },
+          "inViewport": true,
+          "tabindex": "0"
+        },
+        {
+          "i": 22,
+          "tag": "div",
+          "role": "button",
+          "type": null,
+          "testid": "issue-line",
+          "id": null,
+          "name": "◐ Refactor authentication module (Project Alpha) ▶",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(37, 99, 235)",
+            "offset": "-2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 173,
+            "y": 379,
+            "w": 1064,
+            "h": 38
+          },
+          "inViewport": true,
+          "tabindex": "0"
+        },
+        {
+          "i": 23,
+          "tag": "div",
+          "role": "button",
+          "type": null,
+          "testid": "issue-line",
+          "id": null,
+          "name": "◐ Beta task in progress (Project Beta) ▶",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(37, 99, 235)",
+            "offset": "-2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 173,
+            "y": 416,
+            "w": 1064,
+            "h": 38
+          },
+          "inViewport": true,
+          "tabindex": "0"
+        },
+        {
+          "i": 24,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "View in Linear →",
+          "href": "https://linear.app/test/project/proj-alpha",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 179,
+            "y": 566,
+            "w": 100,
+            "h": 20
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 25,
+          "tag": "div",
+          "role": "button",
+          "type": null,
+          "testid": "issue-line",
+          "id": null,
+          "name": "◐ Blocked on external API access ▶",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(37, 99, 235)",
+            "offset": "-2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 173,
+            "y": 600,
+            "w": 1064,
+            "h": 38
+          },
+          "inViewport": true,
+          "tabindex": "0"
+        },
+        {
+          "i": 26,
+          "tag": "div",
+          "role": "button",
+          "type": null,
+          "testid": "issue-line",
+          "id": null,
+          "name": "◐ Parent task in progress ▶",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(37, 99, 235)",
+            "offset": "-2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 173,
+            "y": 638,
+            "w": 1064,
+            "h": 38
+          },
+          "inViewport": true,
+          "tabindex": "0"
+        },
+        {
+          "i": 27,
+          "tag": "div",
+          "role": "button",
+          "type": null,
+          "testid": "issue-line",
+          "id": null,
+          "name": "◐ Add pagination to user list ▶",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(37, 99, 235)",
+            "offset": "-2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 173,
+            "y": 675,
+            "w": 1064,
+            "h": 38
+          },
+          "inViewport": true,
+          "tabindex": "0"
+        },
+        {
+          "i": 28,
+          "tag": "div",
+          "role": "button",
+          "type": null,
+          "testid": "issue-line",
+          "id": null,
+          "name": "◐ Refactor authentication module ▶",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(37, 99, 235)",
+            "offset": "-2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 173,
+            "y": 713,
+            "w": 1064,
+            "h": 38
+          },
+          "inViewport": true,
+          "tabindex": "0"
+        },
+        {
+          "i": 29,
+          "tag": "div",
+          "role": "button",
+          "type": null,
+          "testid": "issue-line",
+          "id": null,
+          "name": "○ Login fails with special characters in password ▶",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(37, 99, 235)",
+            "offset": "-2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 173,
+            "y": 751,
+            "w": 1064,
+            "h": 38
+          },
+          "inViewport": true,
+          "tabindex": "0"
+        },
+        {
+          "i": 30,
+          "tag": "div",
+          "role": "button",
+          "type": null,
+          "testid": "issue-line",
+          "id": null,
+          "name": "◌ Task needing preparation ▶",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(37, 99, 235)",
+            "offset": "-2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 173,
+            "y": 789,
+            "w": 1064,
+            "h": 38
+          },
+          "inViewport": true,
+          "tabindex": "0"
+        },
+        {
+          "i": 31,
+          "tag": "div",
+          "role": "button",
+          "type": null,
+          "testid": "issue-line",
+          "id": null,
+          "name": "◌ Cross-project parent container ▶",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(37, 99, 235)",
+            "offset": "-2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 173,
+            "y": 826,
+            "w": 1064,
+            "h": 38
+          },
+          "inViewport": true,
+          "tabindex": "0"
+        },
+        {
+          "i": 32,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "create-task-trigger",
+          "id": null,
+          "name": "+ Add task",
+          "href": "/workspace/test-workspace/task/new?projectId=proj-alpha",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 173,
+            "y": 873,
+            "w": 65,
+            "h": 20
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 33,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "View in Linear →",
+          "href": "https://linear.app/test/project/proj-beta",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 179,
+            "y": 980,
+            "w": 100,
+            "h": 20
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 34,
+          "tag": "div",
+          "role": "button",
+          "type": null,
+          "testid": "issue-line",
+          "id": null,
+          "name": "◐ Beta task in progress ▶",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(37, 99, 235)",
+            "offset": "-2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 173,
+            "y": 963,
+            "w": 1064,
+            "h": 38
+          },
+          "inViewport": true,
+          "tabindex": "0"
+        },
+        {
+          "i": 35,
+          "tag": "div",
+          "role": "button",
+          "type": null,
+          "testid": "issue-line",
+          "id": null,
+          "name": "◌ Beta todo task ▶",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(37, 99, 235)",
+            "offset": "-2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 173,
+            "y": 962,
+            "w": 1064,
+            "h": 38
+          },
+          "inViewport": true,
+          "tabindex": "0"
+        },
+        {
+          "i": 36,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "create-task-trigger",
+          "id": null,
+          "name": "+ Add task",
+          "href": "/workspace/test-workspace/task/new?projectId=proj-beta",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 173,
+            "y": 980,
+            "w": 65,
+            "h": 20
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 37,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "View in Linear →",
+          "href": "https://linear.app/test/project/proj-gamma",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 179,
+            "y": 718,
+            "w": 100,
+            "h": 20
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 38,
+          "tag": "div",
+          "role": "button",
+          "type": null,
+          "testid": "issue-line",
+          "id": null,
+          "name": "◌ Cross-project child in gamma project ▶",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(37, 99, 235)",
+            "offset": "-2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 173,
+            "y": 752,
+            "w": 1064,
+            "h": 38
+          },
+          "inViewport": true,
+          "tabindex": "0"
+        },
+        {
+          "i": 39,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "create-task-trigger",
+          "id": null,
+          "name": "+ Add task",
+          "href": "/workspace/test-workspace/task/new?projectId=proj-gamma",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 173,
+            "y": 798,
+            "w": 65,
+            "h": 20
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 40,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "reset",
+          "href": "#",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 676,
+            "y": 891,
+            "w": 32,
+            "h": 16
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 41,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "footer-ai-status",
+          "id": null,
+          "name": "ai: ○",
+          "href": "/workspace/test-workspace/settings",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 248,
+            "y": 920,
+            "w": 37,
+            "h": 16
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 42,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "github.com/JKershaw/LinearViewer",
+          "href": "https://github.com/JKershaw/LinearViewer",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 417,
+            "y": 920,
+            "w": 235,
+            "h": 16
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 43,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "privacy",
+          "href": "/privacy",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 674,
+            "y": 920,
+            "w": 51,
+            "h": 16
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 44,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "terms",
+          "href": "/terms",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 748,
+            "y": 920,
+            "w": 37,
+            "h": 16
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 45,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "templates",
+          "href": "/templates",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 806,
+            "y": 920,
+            "w": 66,
+            "h": 16
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 46,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "library",
+          "href": "/library",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 895,
+            "y": 920,
+            "w": 51,
+            "h": 16
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 47,
+          "tag": "a",
+          "role": "switch",
+          "type": null,
+          "testid": "footer-theme-toggle",
+          "id": null,
+          "name": "theme: light",
+          "href": "#",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 968,
+            "y": 920,
+            "w": 88,
+            "h": 16
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 48,
+          "tag": "a",
+          "role": "switch",
+          "type": null,
+          "testid": "footer-feedback-toggle",
+          "id": null,
+          "name": "feedback",
+          "href": "#",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 1078,
+            "y": 920,
+            "w": 59,
+            "h": 16
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 49,
+          "body": true
+        }
+      ],
+      "png": "authenticated/focus-nav-tree--light-1400px.png"
+    },
+    "dark-390": {
+      "httpStatus": 200,
+      "htmlClass": "theme-dark",
+      "themeAssertion": {
+        "expected": "theme-dark",
+        "actual": "theme-dark",
+        "passed": true
+      },
+      "verdict": {
+        "stops": 41,
+        "withoutIndicator": [],
+        "notFocusVisible": [],
+        "offscreen": 0,
+        "zeroSize": [],
+        "positiveTabindex": [],
+        "cycled": false,
+        "leftDocument": true
+      },
+      "stops": [
+        {
+          "i": 1,
+          "tag": "button",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": "workspace-toggle",
+          "name": "Test Workspace",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 71,
+            "y": 35,
+            "w": 59,
+            "h": 14
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 2,
+          "tag": "button",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": "team-toggle",
+          "name": "all",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 165,
+            "y": 35,
+            "w": 12,
+            "h": 14
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 3,
+          "tag": "button",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": "assignee-toggle",
+          "name": "all",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 232,
+            "y": 35,
+            "w": 12,
+            "h": 14
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 4,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "search",
+          "href": "#",
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 266,
+            "y": 32,
+            "w": 38,
+            "h": 19
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 5,
+          "tag": "button",
+          "role": null,
+          "type": "button",
+          "testid": "nav-feedback-trigger",
+          "id": null,
+          "name": "Give feedback",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 311,
+            "y": 34,
+            "w": 52,
+            "h": 14
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 6,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "nav-view-swipe",
+          "id": null,
+          "name": "swipe",
+          "href": "/workspace/test-workspace/swipe",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 61,
+            "y": 81,
+            "w": 33,
+            "h": 44
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 7,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "nav-view-swim",
+          "id": null,
+          "name": "swim",
+          "href": "/workspace/test-workspace/swim",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 101,
+            "y": 81,
+            "w": 29,
+            "h": 44
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 8,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "nav-view-observation",
+          "id": null,
+          "name": "observation",
+          "href": "/workspace/test-workspace/observation",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 138,
+            "y": 81,
+            "w": 65,
+            "h": 44
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 9,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "nav-view-settings",
+          "id": null,
+          "name": "settings",
+          "href": "/workspace/test-workspace/settings",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 211,
+            "y": 81,
+            "w": 44,
+            "h": 44
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 10,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "nav-view-kpis",
+          "id": null,
+          "name": "kpis",
+          "href": "/workspace/test-workspace/kpis",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 263,
+            "y": 81,
+            "w": 23,
+            "h": 44
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 11,
+          "tag": "button",
+          "role": null,
+          "type": "button",
+          "testid": "nav-more-toggle",
+          "id": null,
+          "name": "⋯ more",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 293,
+            "y": 81,
+            "w": 24,
+            "h": 44
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 12,
+          "tag": "div",
+          "role": "button",
+          "type": null,
+          "testid": "issue-line",
+          "id": null,
+          "name": "◐ Blocked on external API access (Project Alpha) ▶",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "-2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 32,
+            "y": 234,
+            "w": 332,
+            "h": 48
+          },
+          "inViewport": true,
+          "tabindex": "0"
+        },
+        {
+          "i": 13,
+          "tag": "div",
+          "role": "button",
+          "type": null,
+          "testid": "issue-line",
+          "id": null,
+          "name": "◐ Parent task in progress (Project Alpha) ▶",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "-2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 32,
+            "y": 282,
+            "w": 332,
+            "h": 48
+          },
+          "inViewport": true,
+          "tabindex": "0"
+        },
+        {
+          "i": 14,
+          "tag": "div",
+          "role": "button",
+          "type": null,
+          "testid": "issue-line",
+          "id": null,
+          "name": "◐ Add pagination to user list (Project Alpha) ▶",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "-2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 32,
+            "y": 330,
+            "w": 332,
+            "h": 48
+          },
+          "inViewport": true,
+          "tabindex": "0"
+        },
+        {
+          "i": 15,
+          "tag": "div",
+          "role": "button",
+          "type": null,
+          "testid": "issue-line",
+          "id": null,
+          "name": "◐ Refactor authentication module (Project Alpha) ▶",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "-2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 32,
+            "y": 378,
+            "w": 332,
+            "h": 48
+          },
+          "inViewport": true,
+          "tabindex": "0"
+        },
+        {
+          "i": 16,
+          "tag": "div",
+          "role": "button",
+          "type": null,
+          "testid": "issue-line",
+          "id": null,
+          "name": "◐ Beta task in progress (Project Beta) ▶",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "-2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 32,
+            "y": 427,
+            "w": 332,
+            "h": 48
+          },
+          "inViewport": true,
+          "tabindex": "0"
+        },
+        {
+          "i": 17,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "View in Linear →",
+          "href": "https://linear.app/test/project/proj-alpha",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 37,
+            "y": 566,
+            "w": 82,
+            "h": 17
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 18,
+          "tag": "div",
+          "role": "button",
+          "type": null,
+          "testid": "issue-line",
+          "id": null,
+          "name": "◐ Blocked on external API access ▶",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "-2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 32,
+            "y": 595,
+            "w": 332,
+            "h": 30
+          },
+          "inViewport": true,
+          "tabindex": "0"
+        },
+        {
+          "i": 19,
+          "tag": "div",
+          "role": "button",
+          "type": null,
+          "testid": "issue-line",
+          "id": null,
+          "name": "◐ Parent task in progress ▶",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "-2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 32,
+            "y": 625,
+            "w": 332,
+            "h": 30
+          },
+          "inViewport": true,
+          "tabindex": "0"
+        },
+        {
+          "i": 20,
+          "tag": "div",
+          "role": "button",
+          "type": null,
+          "testid": "issue-line",
+          "id": null,
+          "name": "◐ Add pagination to user list ▶",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "-2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 32,
+            "y": 654,
+            "w": 332,
+            "h": 30
+          },
+          "inViewport": true,
+          "tabindex": "0"
+        },
+        {
+          "i": 21,
+          "tag": "div",
+          "role": "button",
+          "type": null,
+          "testid": "issue-line",
+          "id": null,
+          "name": "◐ Refactor authentication module ▶",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "-2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 32,
+            "y": 684,
+            "w": 332,
+            "h": 30
+          },
+          "inViewport": true,
+          "tabindex": "0"
+        },
+        {
+          "i": 22,
+          "tag": "div",
+          "role": "button",
+          "type": null,
+          "testid": "issue-line",
+          "id": null,
+          "name": "○ Login fails with special characters in password ▶",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "-2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 32,
+            "y": 713,
+            "w": 332,
+            "h": 30
+          },
+          "inViewport": true,
+          "tabindex": "0"
+        },
+        {
+          "i": 23,
+          "tag": "div",
+          "role": "button",
+          "type": null,
+          "testid": "issue-line",
+          "id": null,
+          "name": "◌ Task needing preparation ▶",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "-2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 32,
+            "y": 743,
+            "w": 332,
+            "h": 30
+          },
+          "inViewport": true,
+          "tabindex": "0"
+        },
+        {
+          "i": 24,
+          "tag": "div",
+          "role": "button",
+          "type": null,
+          "testid": "issue-line",
+          "id": null,
+          "name": "◌ Cross-project parent container ▶",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "-2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 32,
+            "y": 773,
+            "w": 332,
+            "h": 30
+          },
+          "inViewport": true,
+          "tabindex": "0"
+        },
+        {
+          "i": 25,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "create-task-trigger",
+          "id": null,
+          "name": "+ Add task",
+          "href": "/workspace/test-workspace/task/new?projectId=proj-alpha",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 32,
+            "y": 811,
+            "w": 53,
+            "h": 17
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 26,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "View in Linear →",
+          "href": "https://linear.app/test/project/proj-beta",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 37,
+            "y": 447,
+            "w": 82,
+            "h": 17
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 27,
+          "tag": "div",
+          "role": "button",
+          "type": null,
+          "testid": "issue-line",
+          "id": null,
+          "name": "◐ Beta task in progress ▶",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "-2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 32,
+            "y": 476,
+            "w": 332,
+            "h": 30
+          },
+          "inViewport": true,
+          "tabindex": "0"
+        },
+        {
+          "i": 28,
+          "tag": "div",
+          "role": "button",
+          "type": null,
+          "testid": "issue-line",
+          "id": null,
+          "name": "◌ Beta todo task ▶",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "-2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 32,
+            "y": 505,
+            "w": 332,
+            "h": 30
+          },
+          "inViewport": true,
+          "tabindex": "0"
+        },
+        {
+          "i": 29,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "create-task-trigger",
+          "id": null,
+          "name": "+ Add task",
+          "href": "/workspace/test-workspace/task/new?projectId=proj-beta",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 32,
+            "y": 544,
+            "w": 53,
+            "h": 17
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 30,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "View in Linear →",
+          "href": "https://linear.app/test/project/proj-gamma",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 37,
+            "y": 692,
+            "w": 82,
+            "h": 17
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 31,
+          "tag": "div",
+          "role": "button",
+          "type": null,
+          "testid": "issue-line",
+          "id": null,
+          "name": "◌ Cross-project child in gamma project ▶",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "-2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 32,
+            "y": 721,
+            "w": 332,
+            "h": 30
+          },
+          "inViewport": true,
+          "tabindex": "0"
+        },
+        {
+          "i": 32,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "create-task-trigger",
+          "id": null,
+          "name": "+ Add task",
+          "href": "/workspace/test-workspace/task/new?projectId=proj-gamma",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 32,
+            "y": 760,
+            "w": 53,
+            "h": 17
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 33,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "reset",
+          "href": "#",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 174,
+            "y": 826,
+            "w": 26,
+            "h": 14
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 34,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "footer-ai-status",
+          "id": null,
+          "name": "ai: ○",
+          "href": "/workspace/test-workspace/settings",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 17,
+            "y": 760,
+            "w": 30,
+            "h": 13
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 35,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "github.com/JKershaw/LinearViewer",
+          "href": "https://github.com/JKershaw/LinearViewer",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 155,
+            "y": 760,
+            "w": 191,
+            "h": 13
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 36,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "privacy",
+          "href": "/privacy",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 29,
+            "y": 776,
+            "w": 42,
+            "h": 13
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 37,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "terms",
+          "href": "/terms",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 89,
+            "y": 776,
+            "w": 30,
+            "h": 13
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 38,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "templates",
+          "href": "/templates",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 137,
+            "y": 776,
+            "w": 54,
+            "h": 13
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 39,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "library",
+          "href": "/library",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 208,
+            "y": 776,
+            "w": 42,
+            "h": 13
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 40,
+          "tag": "a",
+          "role": "switch",
+          "type": null,
+          "testid": "footer-theme-toggle",
+          "id": null,
+          "name": "theme: dark",
+          "href": "#",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 268,
+            "y": 776,
+            "w": 66,
+            "h": 13
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 41,
+          "tag": "a",
+          "role": "switch",
+          "type": null,
+          "testid": "footer-feedback-toggle",
+          "id": null,
+          "name": "feedback",
+          "href": "#",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 164,
+            "y": 792,
+            "w": 48,
+            "h": 13
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 42,
+          "body": true
+        }
+      ],
+      "png": null
+    }
+  }
+}

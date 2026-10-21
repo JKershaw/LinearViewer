@@ -1,0 +1,117 @@
+{
+  "key": "ws-collective|disconnected-offline|light|390",
+  "registryId": "ws-collective",
+  "state": "disconnected-offline",
+  "theme": "light",
+  "viewport": 390,
+  "path": "/workspace/test-workspace/collective",
+  "populated": null,
+  "note": "A22: browser context flipped offline after load (Playwright setOffline, client-side network emulation — not a product seam), next poll fails -> \"● disconnected\"",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/collective",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "no theme-dark",
+    "actual": "",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "",
+    "title": "Collective - Experimental",
+    "h1": "Collective",
+    "headings": {
+      "h1": 1,
+      "h2": 2
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "roadmap",
+      "dispatch",
+      "proxy",
+      "task chat",
+      "ship",
+      "next run",
+      "flight companion",
+      "passage planner",
+      "ship's biscuit",
+      "live console",
+      "ship journey"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: light",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 1594
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 75,
+    "belowThreshold": [
+      {
+        "element": "button.action-btn.save",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(220,237,227)",
+        "ratio": 2.71,
+        "need": 4.5,
+        "fontSize": "11.05px",
+        "fontWeight": "400",
+        "count": 2,
+        "samples": [
+          "start discussion",
+          "say"
+        ]
+      },
+      {
+        "element": "span.wordmark-accent",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.74,
+        "need": 4.5,
+        "fontSize": "10.4975px",
+        "fontWeight": "600",
+        "count": 1,
+        "samples": [
+          ".cat"
+        ]
+      }
+    ]
+  },
+  "extra": {
+    "present": true,
+    "text": "● disconnected",
+    "color": "rgb(102, 102, 102)",
+    "bg": "rgb(255,255,255)",
+    "ratio": 5.74,
+    "className": "collective-poll-status",
+    "fontSize": "11.05px"
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

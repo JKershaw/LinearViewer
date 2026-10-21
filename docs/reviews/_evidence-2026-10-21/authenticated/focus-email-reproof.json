@@ -1,0 +1,172 @@
+{
+  "registryId": "renderer:renderEmailReproofPage",
+  "state": "intercepted-synthetic",
+  "target": "email-reproof",
+  "note": "Tab walk from top of document; light 1400 and dark 390; theme asserted in the same read",
+  "logs": {
+    "light-1400": {
+      "httpStatus": 200,
+      "htmlClass": "",
+      "themeAssertion": {
+        "expected": "no theme-dark",
+        "actual": "",
+        "passed": true
+      },
+      "verdict": {
+        "stops": 2,
+        "withoutIndicator": [],
+        "notFocusVisible": [],
+        "offscreen": 0,
+        "zeroSize": [],
+        "positiveTabindex": [],
+        "cycled": false,
+        "leftDocument": true
+      },
+      "stops": [
+        {
+          "i": 1,
+          "tag": "button",
+          "role": null,
+          "type": "submit",
+          "testid": "email-reproof-submit",
+          "id": null,
+          "name": "Email me a sign-in link",
+          "href": null,
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 583,
+            "y": 270,
+            "w": 219,
+            "h": 46
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 2,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "Back to your account",
+          "href": "/account",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 149,
+            "y": 332,
+            "w": 1088,
+            "h": 23
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 3,
+          "body": true
+        }
+      ],
+      "png": "authenticated/focus-email-reproof--light-1400px.png"
+    },
+    "dark-390": {
+      "httpStatus": 200,
+      "htmlClass": "theme-dark",
+      "themeAssertion": {
+        "expected": "theme-dark",
+        "actual": "theme-dark",
+        "passed": true
+      },
+      "verdict": {
+        "stops": 2,
+        "withoutIndicator": [],
+        "notFocusVisible": [],
+        "offscreen": 0,
+        "zeroSize": [],
+        "positiveTabindex": [],
+        "cycled": false,
+        "leftDocument": true
+      },
+      "stops": [
+        {
+          "i": 1,
+          "tag": "button",
+          "role": null,
+          "type": "submit",
+          "testid": "email-reproof-submit",
+          "id": null,
+          "name": "Email me a sign-in link",
+          "href": null,
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 78,
+            "y": 262,
+            "w": 219,
+            "h": 46
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 2,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "Back to your account",
+          "href": "/account",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 12,
+            "y": 324,
+            "w": 351,
+            "h": 19
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 3,
+          "body": true
+        }
+      ],
+      "png": null
+    }
+  }
+}

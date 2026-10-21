@@ -1,0 +1,69 @@
+{
+  "key": "ws-tree-jira|default|dark|1400",
+  "registryId": "ws-tree-jira",
+  "state": "default",
+  "theme": "dark",
+  "viewport": 1400,
+  "path": "/workspace/jira-workspace/",
+  "populated": null,
+  "note": "provider twin via /test/set-jira-session",
+  "httpStatus": 200,
+  "finalPath": "/workspace/jira-workspace/",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "theme-dark",
+    "title": "Jira Workspace - Projects",
+    "h1": "Jira Workspace",
+    "headings": {
+      "h1": 1
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "search",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "proxy"
+    ],
+    "footerLinks": [
+      "reset",
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: dark",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": true,
+    "hasAssigneeSelector": true,
+    "bodyText": 531
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 52,
+    "belowThreshold": []
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

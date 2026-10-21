@@ -1,0 +1,172 @@
+{
+  "registryId": "renderer:renderMergeConfirmPage",
+  "state": "live-409",
+  "target": "merge-confirm-live-409",
+  "note": "Tab walk from top of document; light 1400 and dark 390; theme asserted in the same read",
+  "logs": {
+    "light-1400": {
+      "httpStatus": 409,
+      "htmlClass": "",
+      "themeAssertion": {
+        "expected": "no theme-dark",
+        "actual": "",
+        "passed": true
+      },
+      "verdict": {
+        "stops": 2,
+        "withoutIndicator": [],
+        "notFocusVisible": [],
+        "offscreen": 0,
+        "zeroSize": [],
+        "positiveTabindex": [],
+        "cycled": false,
+        "leftDocument": true
+      },
+      "stops": [
+        {
+          "i": 1,
+          "tag": "button",
+          "role": null,
+          "type": "submit",
+          "testid": "merge-confirm-submit",
+          "id": null,
+          "name": "Yes, merge these accounts",
+          "href": null,
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 565,
+            "y": 267,
+            "w": 255,
+            "h": 46
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 2,
+          "tag": "button",
+          "role": null,
+          "type": "submit",
+          "testid": "merge-decline-submit",
+          "id": null,
+          "name": "No, keep them separate",
+          "href": null,
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 577,
+            "y": 313,
+            "w": 231,
+            "h": 46
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 3,
+          "body": true
+        }
+      ],
+      "png": "authenticated/focus-merge-confirm-live-409--light-1400px.png"
+    },
+    "dark-390": {
+      "httpStatus": 409,
+      "htmlClass": "theme-dark",
+      "themeAssertion": {
+        "expected": "theme-dark",
+        "actual": "theme-dark",
+        "passed": true
+      },
+      "verdict": {
+        "stops": 2,
+        "withoutIndicator": [],
+        "notFocusVisible": [],
+        "offscreen": 0,
+        "zeroSize": [],
+        "positiveTabindex": [],
+        "cycled": false,
+        "leftDocument": true
+      },
+      "stops": [
+        {
+          "i": 1,
+          "tag": "button",
+          "role": null,
+          "type": "submit",
+          "testid": "merge-confirm-submit",
+          "id": null,
+          "name": "Yes, merge these accounts",
+          "href": null,
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 60,
+            "y": 257,
+            "w": 255,
+            "h": 46
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 2,
+          "tag": "button",
+          "role": null,
+          "type": "submit",
+          "testid": "merge-decline-submit",
+          "id": null,
+          "name": "No, keep them separate",
+          "href": null,
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 72,
+            "y": 303,
+            "w": 231,
+            "h": 46
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 3,
+          "body": true
+        }
+      ],
+      "png": null
+    }
+  }
+}

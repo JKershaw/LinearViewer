@@ -1,0 +1,150 @@
+{
+  "key": "ws-tree|nav-more-expanded|light|390",
+  "registryId": "ws-tree",
+  "state": "nav-more-expanded",
+  "theme": "light",
+  "viewport": 390,
+  "path": "/workspace/test-workspace/",
+  "populated": null,
+  "note": "⋯ more expander opened",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "no theme-dark",
+    "actual": "",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "",
+    "title": "Test Workspace - Projects",
+    "h1": "Test Workspace",
+    "headings": {
+      "h1": 1
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "search",
+      "0 waiting on you",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "roadmap",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "next run",
+      "flight companion",
+      "passage planner",
+      "ship's biscuit",
+      "live console",
+      "ship journey"
+    ],
+    "footerLinks": [
+      "reset",
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: light",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": true,
+    "hasAssigneeSelector": true,
+    "bodyText": 1232
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 107,
+    "belowThreshold": [
+      {
+        "element": "div.in-progress-header",
+        "color": "rgb(212, 166, 0)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 2.27,
+        "need": 4.5,
+        "fontSize": "13px",
+        "fontWeight": "600",
+        "count": 1,
+        "samples": [
+          "▼ In Progress"
+        ]
+      },
+      {
+        "element": "span.status-pill__char",
+        "color": "rgb(212, 166, 0)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 2.27,
+        "need": 4.5,
+        "fontSize": "11.7px",
+        "fontWeight": "400",
+        "count": 10,
+        "samples": [
+          "◐",
+          "◐",
+          "◐"
+        ]
+      },
+      {
+        "element": "span.wordmark-accent",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.74,
+        "need": 4.5,
+        "fontSize": "10.4975px",
+        "fontWeight": "600",
+        "count": 1,
+        "samples": [
+          ".cat"
+        ]
+      }
+    ]
+  },
+  "extra": {
+    "toggleExists": true,
+    "expanded": "true",
+    "panelExists": true,
+    "panelVisible": true,
+    "panelBox": {
+      "x": 12,
+      "y": 131,
+      "w": 351,
+      "h": 590,
+      "clippedRight": false
+    },
+    "options": [
+      "roadmap",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "next run",
+      "flight companion",
+      "passage planner",
+      "ship's biscuit",
+      "live console",
+      "ship journey"
+    ]
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

@@ -1,0 +1,108 @@
+{
+  "key": "ws-task-new|empty|light|390",
+  "registryId": "ws-task-new",
+  "state": "empty",
+  "theme": "light",
+  "viewport": 390,
+  "path": "/workspace/test-workspace/task/new",
+  "populated": false,
+  "note": "default seed (empty) state",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/task/new",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "no theme-dark",
+    "actual": "",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "",
+    "title": "New task",
+    "h1": "New task",
+    "headings": {
+      "h1": 1,
+      "h2": 1
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "search",
+      "0 waiting on you",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "roadmap",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "next run",
+      "flight companion",
+      "passage planner",
+      "ship's biscuit",
+      "live console",
+      "ship journey"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: light",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 347
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 34,
+    "belowThreshold": [
+      {
+        "element": "button.task-create-submit",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(226,242,241)",
+        "ratio": 3.25,
+        "need": 4.5,
+        "fontSize": "15.2px",
+        "fontWeight": "600",
+        "count": 1,
+        "samples": [
+          "Create task"
+        ]
+      },
+      {
+        "element": "span.wordmark-accent",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.74,
+        "need": 4.5,
+        "fontSize": "10.4975px",
+        "fontWeight": "600",
+        "count": 1,
+        "samples": [
+          ".cat"
+        ]
+      }
+    ]
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

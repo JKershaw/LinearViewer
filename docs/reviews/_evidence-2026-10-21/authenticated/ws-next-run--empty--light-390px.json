@@ -1,0 +1,133 @@
+{
+  "key": "ws-next-run|empty|light|390",
+  "registryId": "ws-next-run",
+  "state": "empty",
+  "theme": "light",
+  "viewport": 390,
+  "path": "/workspace/test-workspace/next-run",
+  "populated": false,
+  "note": "default seed (empty) state",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/next-run",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "no theme-dark",
+    "actual": "",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "",
+    "title": "Suggested Next Run - Experimental",
+    "h1": "Suggested Next Run",
+    "headings": {
+      "h1": 1,
+      "h2": 3
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "roadmap",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "flight companion",
+      "passage planner",
+      "ship's biscuit",
+      "live console",
+      "ship journey"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: light",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 776
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 38,
+    "belowThreshold": [
+      {
+        "element": "p.next-run-warning",
+        "color": "rgb(255, 178, 36)",
+        "bg": "rgb(247,247,247)",
+        "ratio": 1.68,
+        "need": 4.5,
+        "fontSize": "11.05px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "⚠ AI is not configured on the server (connect Open"
+        ]
+      },
+      {
+        "element": "code",
+        "color": "rgb(255, 178, 36)",
+        "bg": "rgb(247,247,247)",
+        "ratio": 1.68,
+        "need": 4.5,
+        "fontSize": "11.05px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "OPENROUTER_API_KEY"
+        ]
+      },
+      {
+        "element": "button.action-btn.save",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(220,237,227)",
+        "ratio": 2.71,
+        "need": 4.5,
+        "fontSize": "11.05px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "generate suggestions"
+        ]
+      },
+      {
+        "element": "span.wordmark-accent",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.74,
+        "need": 4.5,
+        "fontSize": "10.4975px",
+        "fontWeight": "600",
+        "count": 1,
+        "samples": [
+          ".cat"
+        ]
+      }
+    ]
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

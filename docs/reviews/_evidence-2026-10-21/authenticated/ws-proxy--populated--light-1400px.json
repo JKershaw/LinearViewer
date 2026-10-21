@@ -1,0 +1,136 @@
+{
+  "key": "ws-proxy|populated|light|1400",
+  "registryId": "ws-proxy",
+  "state": "populated",
+  "theme": "light",
+  "viewport": 1400,
+  "path": "/workspace/test-workspace/proxy",
+  "populated": true,
+  "note": "seed-proxy-event ×5; the Event Log disclosure (#proxy-events-collapsible, closed by default) opened",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/proxy",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "no theme-dark",
+    "actual": "",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "",
+    "title": "Test Workspace - Proxy",
+    "h1": "Proxy",
+    "headings": {
+      "h1": 1,
+      "h2": 6
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "passage planner",
+      "ship's biscuit",
+      "live console",
+      "ship journey",
+      "roadmap",
+      "dispatch",
+      "collective",
+      "task chat",
+      "ship",
+      "next run",
+      "flight companion"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: light",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 2576
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 123,
+    "belowThreshold": [
+      {
+        "element": "button.action-btn.save",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(220,237,227)",
+        "ratio": 2.71,
+        "need": 4.5,
+        "fontSize": "12.24px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "generate"
+        ]
+      },
+      {
+        "element": "button.action-btn.save",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(221,239,229)",
+        "ratio": 2.75,
+        "need": 4.5,
+        "fontSize": "13.6px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "generate & copy"
+        ]
+      },
+      {
+        "element": "span.status-pill__label",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(240,240,240)",
+        "ratio": 2.89,
+        "need": 4.5,
+        "fontSize": "11.56px",
+        "fontWeight": "400",
+        "count": 3,
+        "samples": [
+          "201",
+          "200",
+          "200"
+        ]
+      },
+      {
+        "element": "span.wordmark-accent",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.74,
+        "need": 4.5,
+        "fontSize": "16px",
+        "fontWeight": "600",
+        "count": 2,
+        "samples": [
+          ".cat",
+          ".cat"
+        ]
+      }
+    ]
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

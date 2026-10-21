@@ -1,0 +1,162 @@
+{
+  "key": "ws-live-console|populated|dark|1400",
+  "registryId": "ws-live-console",
+  "state": "populated",
+  "theme": "dark",
+  "viewport": 1400,
+  "path": "/workspace/test-workspace/live-console",
+  "populated": true,
+  "note": "seed-agent-status ×5 + seed-proxy-event ×5 + 3 dispatch sessions; extra = A16 computed font-size read on the pulse/timeline preset buttons",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/live-console",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "theme-dark",
+    "title": "Live Console - Experimental",
+    "h1": "Live Console",
+    "headings": {
+      "h1": 1
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "flight companion",
+      "passage planner",
+      "ship's biscuit",
+      "ship journey",
+      "roadmap",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "next run"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: dark",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 1505
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 101,
+    "belowThreshold": [
+      {
+        "element": "span.lc-timeline-bar-label",
+        "color": "rgb(255, 255, 255)",
+        "bg": "rgb(46,230,95)",
+        "ratio": 1.67,
+        "need": 4.5,
+        "fontSize": "10.4px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "LIN-1003 — implementation"
+        ]
+      }
+    ]
+  },
+  "extra": {
+    "[data-testid^=\"live-console-pulse-preset-\"]": [
+      {
+        "testid": "live-console-pulse-preset-3m",
+        "fontSize": "12px",
+        "fontFamily": "\"JetBrains Mono\", \"SF Mono\", \"Fira Code\"",
+        "fontWeight": "400",
+        "color": "rgb(45, 212, 191)",
+        "h": 24,
+        "w": 37
+      },
+      {
+        "testid": "live-console-pulse-preset-15m",
+        "fontSize": "12px",
+        "fontFamily": "\"JetBrains Mono\", \"SF Mono\", \"Fira Code\"",
+        "fontWeight": "400",
+        "color": "rgb(230, 230, 230)",
+        "h": 24,
+        "w": 44
+      },
+      {
+        "testid": "live-console-pulse-preset-1h",
+        "fontSize": "12px",
+        "fontFamily": "\"JetBrains Mono\", \"SF Mono\", \"Fira Code\"",
+        "fontWeight": "400",
+        "color": "rgb(230, 230, 230)",
+        "h": 24,
+        "w": 37
+      },
+      {
+        "testid": "live-console-pulse-preset-6h",
+        "fontSize": "12px",
+        "fontFamily": "\"JetBrains Mono\", \"SF Mono\", \"Fira Code\"",
+        "fontWeight": "400",
+        "color": "rgb(230, 230, 230)",
+        "h": 24,
+        "w": 37
+      }
+    ],
+    "[data-testid^=\"live-console-timeline-preset-\"]": [
+      {
+        "testid": "live-console-timeline-preset-fit",
+        "fontSize": "12px",
+        "fontFamily": "\"JetBrains Mono\", \"SF Mono\", \"Fira Code\"",
+        "fontWeight": "400",
+        "color": "rgb(45, 212, 191)",
+        "h": 24,
+        "w": 44
+      },
+      {
+        "testid": "live-console-timeline-preset-1h",
+        "fontSize": "12px",
+        "fontFamily": "\"JetBrains Mono\", \"SF Mono\", \"Fira Code\"",
+        "fontWeight": "400",
+        "color": "rgb(230, 230, 230)",
+        "h": 24,
+        "w": 37
+      },
+      {
+        "testid": "live-console-timeline-preset-24h",
+        "fontSize": "12px",
+        "fontFamily": "\"JetBrains Mono\", \"SF Mono\", \"Fira Code\"",
+        "fontWeight": "400",
+        "color": "rgb(230, 230, 230)",
+        "h": 24,
+        "w": 44
+      }
+    ]
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

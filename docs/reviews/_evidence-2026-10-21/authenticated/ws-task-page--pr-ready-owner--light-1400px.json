@@ -1,0 +1,112 @@
+{
+  "key": "ws-task-page|pr-ready-owner|light|1400",
+  "registryId": "ws-task-page",
+  "state": "pr-ready-owner",
+  "theme": "light",
+  "viewport": 1400,
+  "path": "/workspace/local-workspace/task/LOCAL-TP1",
+  "populated": true,
+  "note": "local-provider seed (owner); pr-ready-owner",
+  "httpStatus": 200,
+  "finalPath": "/workspace/local-workspace/task/LOCAL-TP1",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "no theme-dark",
+    "actual": "",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "",
+    "title": "LOCAL-TP1 — A task with an approved PR",
+    "h1": "LOCAL-TP1 A task with an approved PR",
+    "headings": {
+      "h1": 1,
+      "h2": 4,
+      "h3": 1
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "search",
+      "0 waiting on you",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "dispatch",
+      "proxy"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: light",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 1506
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 121,
+    "belowThreshold": [
+      {
+        "element": "span.wordmark-accent",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.74,
+        "need": 4.5,
+        "fontSize": "16px",
+        "fontWeight": "600",
+        "count": 2,
+        "samples": [
+          ".cat",
+          ".cat"
+        ]
+      },
+      {
+        "element": "button.rev-closeout-press",
+        "color": "rgb(255, 255, 255)",
+        "bg": "rgb(13,148,136)",
+        "ratio": 3.74,
+        "need": 4.5,
+        "fontSize": "16px",
+        "fontWeight": "600",
+        "count": 1,
+        "samples": [
+          "Merge PR #490587"
+        ]
+      }
+    ]
+  },
+  "extra": {
+    "dataStatus": "waiting",
+    "mergeReady": "true",
+    "title": "A task with an approved PR",
+    "sentence": "Approved. PR #490587 is ready to merge.",
+    "stageCount": 1,
+    "prLead": "PR #490587 is approved and ready to merge.",
+    "closeoutState": "ready",
+    "hasPress": true,
+    "ownerWidgets": true,
+    "notFound": false
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

@@ -1,0 +1,1572 @@
+{
+  "registryId": "ws-task-page",
+  "state": "running",
+  "target": "task-page-running",
+  "note": "Tab walk from top of document; light 1400 and dark 390; theme asserted in the same read",
+  "logs": {
+    "light-1400": {
+      "httpStatus": 200,
+      "htmlClass": "",
+      "themeAssertion": {
+        "expected": "no theme-dark",
+        "actual": "",
+        "passed": true
+      },
+      "verdict": {
+        "stops": 28,
+        "withoutIndicator": [],
+        "notFocusVisible": [],
+        "offscreen": 0,
+        "zeroSize": [],
+        "positiveTabindex": [],
+        "cycled": false,
+        "leftDocument": true
+      },
+      "stops": [
+        {
+          "i": 1,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "nav-brand",
+          "id": null,
+          "name": "Harbour home",
+          "href": "/workspace/local-workspace/",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 149,
+            "y": 40,
+            "w": 107,
+            "h": 26
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 2,
+          "tag": "button",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": "workspace-toggle",
+          "name": "Local Workspace",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 369,
+            "y": 44,
+            "w": 118,
+            "h": 17
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 3,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "search",
+          "href": "#",
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 1190,
+            "y": 41,
+            "w": 46,
+            "h": 23
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 4,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "nav-view-swipe",
+          "id": null,
+          "name": "swipe",
+          "href": "/workspace/local-workspace/swipe",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 218,
+            "y": 83,
+            "w": 40,
+            "h": 33
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 5,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "nav-view-swim",
+          "id": null,
+          "name": "swim",
+          "href": "/workspace/local-workspace/swim",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 277,
+            "y": 83,
+            "w": 36,
+            "h": 33
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 6,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "nav-view-observation",
+          "id": null,
+          "name": "observation",
+          "href": "/workspace/local-workspace/observation",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 332,
+            "y": 83,
+            "w": 81,
+            "h": 33
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 7,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "nav-view-settings",
+          "id": null,
+          "name": "settings",
+          "href": "/workspace/local-workspace/settings",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 432,
+            "y": 83,
+            "w": 54,
+            "h": 33
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 8,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "nav-view-kpis",
+          "id": null,
+          "name": "kpis",
+          "href": "/workspace/local-workspace/kpis",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 505,
+            "y": 83,
+            "w": 28,
+            "h": 33
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 9,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "nav-view-dispatch",
+          "id": null,
+          "name": "dispatch",
+          "href": "/workspace/local-workspace/dispatch",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 552,
+            "y": 83,
+            "w": 58,
+            "h": 33
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 10,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "nav-view-proxy",
+          "id": null,
+          "name": "proxy",
+          "href": "/workspace/local-workspace/proxy",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 629,
+            "y": 83,
+            "w": 38,
+            "h": 33
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 11,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "task-page-back",
+          "id": null,
+          "name": "← back to tasks",
+          "href": "/workspace/local-workspace/",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 165,
+            "y": 145,
+            "w": 1056,
+            "h": 22
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 12,
+          "tag": "button",
+          "role": null,
+          "type": "button",
+          "testid": "task-page-stage-head",
+          "id": null,
+          "name": "Plan done started 1s ago · took 0s",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 165,
+            "y": 357,
+            "w": 635,
+            "h": 85
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 13,
+          "tag": "button",
+          "role": null,
+          "type": "button",
+          "testid": "task-page-stage-head",
+          "id": null,
+          "name": "Build running started 1s ago · running 1s",
+          "href": null,
+          "expanded": "true",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 165,
+            "y": 450,
+            "w": 635,
+            "h": 85
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 14,
+          "tag": "summary",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "The checks and the review ledger",
+          "href": null,
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 166,
+            "y": 963,
+            "w": 633,
+            "h": 38
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 15,
+          "tag": "button",
+          "role": null,
+          "type": "button",
+          "testid": null,
+          "id": null,
+          "name": "✦ generate",
+          "href": null,
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 1122,
+            "y": 362,
+            "w": 86,
+            "h": 22
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 16,
+          "tag": "button",
+          "role": null,
+          "type": "button",
+          "testid": null,
+          "id": null,
+          "name": "✦ generate",
+          "href": null,
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 1122,
+            "y": 484,
+            "w": 86,
+            "h": 22
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 17,
+          "tag": "summary",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "Description",
+          "href": null,
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 166,
+            "y": 958,
+            "w": 1054,
+            "h": 42
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 18,
+          "tag": "summary",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "Comments (1)",
+          "href": null,
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 166,
+            "y": 958,
+            "w": 1054,
+            "h": 42
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 19,
+          "tag": "summary",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "Task details — ids, times, counts, subtasks and related task",
+          "href": null,
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 166,
+            "y": 959,
+            "w": 1054,
+            "h": 42
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 20,
+          "tag": "button",
+          "role": null,
+          "type": "button",
+          "testid": "task-share-create",
+          "id": null,
+          "name": "Create share link",
+          "href": null,
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 284,
+            "y": 973,
+            "w": 123,
+            "h": 27
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 21,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "footer-ai-status",
+          "id": null,
+          "name": "ai: ○",
+          "href": "/workspace/local-workspace/settings",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 303,
+            "y": 920,
+            "w": 37,
+            "h": 16
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 22,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "github.com/JKershaw/LinearViewer",
+          "href": "https://github.com/JKershaw/LinearViewer",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 362,
+            "y": 920,
+            "w": 235,
+            "h": 16
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 23,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "privacy",
+          "href": "/privacy",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 619,
+            "y": 920,
+            "w": 51,
+            "h": 16
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 24,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "terms",
+          "href": "/terms",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 692,
+            "y": 920,
+            "w": 37,
+            "h": 16
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 25,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "templates",
+          "href": "/templates",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 751,
+            "y": 920,
+            "w": 66,
+            "h": 16
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 26,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "library",
+          "href": "/library",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 839,
+            "y": 920,
+            "w": 51,
+            "h": 16
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 27,
+          "tag": "a",
+          "role": "switch",
+          "type": null,
+          "testid": "footer-theme-toggle",
+          "id": null,
+          "name": "theme: light",
+          "href": "#",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 913,
+            "y": 920,
+            "w": 88,
+            "h": 16
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 28,
+          "tag": "a",
+          "role": "switch",
+          "type": null,
+          "testid": "footer-feedback-toggle",
+          "id": null,
+          "name": "feedback",
+          "href": "#",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(13, 110, 253)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 1023,
+            "y": 920,
+            "w": 59,
+            "h": 16
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 29,
+          "body": true
+        }
+      ],
+      "png": "authenticated/focus-task-page-running--light-1400px.png"
+    },
+    "dark-390": {
+      "httpStatus": 200,
+      "htmlClass": "theme-dark",
+      "themeAssertion": {
+        "expected": "theme-dark",
+        "actual": "theme-dark",
+        "passed": true
+      },
+      "verdict": {
+        "stops": 26,
+        "withoutIndicator": [],
+        "notFocusVisible": [],
+        "offscreen": 0,
+        "zeroSize": [],
+        "positiveTabindex": [],
+        "cycled": false,
+        "leftDocument": true
+      },
+      "stops": [
+        {
+          "i": 1,
+          "tag": "button",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": "workspace-toggle",
+          "name": "Local Workspace",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 71,
+            "y": 35,
+            "w": 59,
+            "h": 14
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 2,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "search",
+          "href": "#",
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 326,
+            "y": 32,
+            "w": 38,
+            "h": 19
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 3,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "nav-view-swipe",
+          "id": null,
+          "name": "swipe",
+          "href": "/workspace/local-workspace/swipe",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 61,
+            "y": 81,
+            "w": 33,
+            "h": 44
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 4,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "nav-view-swim",
+          "id": null,
+          "name": "swim",
+          "href": "/workspace/local-workspace/swim",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 101,
+            "y": 81,
+            "w": 29,
+            "h": 44
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 5,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "nav-view-observation",
+          "id": null,
+          "name": "observation",
+          "href": "/workspace/local-workspace/observation",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 138,
+            "y": 81,
+            "w": 65,
+            "h": 44
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 6,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "nav-view-settings",
+          "id": null,
+          "name": "settings",
+          "href": "/workspace/local-workspace/settings",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 211,
+            "y": 81,
+            "w": 44,
+            "h": 44
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 7,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "nav-view-kpis",
+          "id": null,
+          "name": "kpis",
+          "href": "/workspace/local-workspace/kpis",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 263,
+            "y": 81,
+            "w": 23,
+            "h": 44
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 8,
+          "tag": "button",
+          "role": null,
+          "type": "button",
+          "testid": "nav-more-toggle",
+          "id": null,
+          "name": "⋯ more",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 293,
+            "y": 81,
+            "w": 24,
+            "h": 44
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 9,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "task-page-back",
+          "id": null,
+          "name": "← back to tasks",
+          "href": "/workspace/local-workspace/",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 24,
+            "y": 154,
+            "w": 101,
+            "h": 22
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 10,
+          "tag": "button",
+          "role": null,
+          "type": "button",
+          "testid": "task-page-stage-head",
+          "id": null,
+          "name": "Plan done started 3s ago · took 0s",
+          "href": null,
+          "expanded": "false",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 24,
+            "y": 432,
+            "w": 327,
+            "h": 106
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 11,
+          "tag": "button",
+          "role": null,
+          "type": "button",
+          "testid": "task-page-stage-head",
+          "id": null,
+          "name": "Build running started 3s ago · running 3s",
+          "href": null,
+          "expanded": "true",
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 24,
+            "y": 546,
+            "w": 327,
+            "h": 106
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 12,
+          "tag": "summary",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "The checks and the review ledger",
+          "href": null,
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 25,
+            "y": 465,
+            "w": 325,
+            "h": 38
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 13,
+          "tag": "button",
+          "role": null,
+          "type": "button",
+          "testid": null,
+          "id": null,
+          "name": "✦ generate",
+          "href": null,
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 264,
+            "y": 597,
+            "w": 74,
+            "h": 19
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 14,
+          "tag": "button",
+          "role": null,
+          "type": "button",
+          "testid": null,
+          "id": null,
+          "name": "✦ generate",
+          "href": null,
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 264,
+            "y": 705,
+            "w": 74,
+            "h": 19
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 15,
+          "tag": "summary",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "Description",
+          "href": null,
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 25,
+            "y": 807,
+            "w": 325,
+            "h": 37
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 16,
+          "tag": "summary",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "Comments (1)",
+          "href": null,
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 25,
+            "y": 807,
+            "w": 325,
+            "h": 37
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 17,
+          "tag": "summary",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "Task details — ids, times, counts, subtasks and related task",
+          "href": null,
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 25,
+            "y": 787,
+            "w": 325,
+            "h": 58
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 18,
+          "tag": "button",
+          "role": null,
+          "type": "button",
+          "testid": "task-share-create",
+          "id": null,
+          "name": "Create share link",
+          "href": null,
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 122,
+            "y": 817,
+            "w": 123,
+            "h": 27
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 19,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": "footer-ai-status",
+          "id": null,
+          "name": "ai: ○",
+          "href": "/workspace/local-workspace/settings",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 15,
+            "y": 776,
+            "w": 30,
+            "h": 13
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 20,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "github.com/JKershaw/LinearViewer",
+          "href": "https://github.com/JKershaw/LinearViewer",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 62,
+            "y": 776,
+            "w": 191,
+            "h": 13
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 21,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "privacy",
+          "href": "/privacy",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 271,
+            "y": 776,
+            "w": 42,
+            "h": 13
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 22,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "terms",
+          "href": "/terms",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 331,
+            "y": 776,
+            "w": 30,
+            "h": 13
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 23,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "templates",
+          "href": "/templates",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 62,
+            "y": 792,
+            "w": 54,
+            "h": 13
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 24,
+          "tag": "a",
+          "role": null,
+          "type": null,
+          "testid": null,
+          "id": null,
+          "name": "library",
+          "href": "/library",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 134,
+            "y": 792,
+            "w": 42,
+            "h": 13
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 25,
+          "tag": "a",
+          "role": "switch",
+          "type": null,
+          "testid": "footer-theme-toggle",
+          "id": null,
+          "name": "theme: dark",
+          "href": "#",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 193,
+            "y": 792,
+            "w": 66,
+            "h": 13
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 26,
+          "tag": "a",
+          "role": "switch",
+          "type": null,
+          "testid": "footer-feedback-toggle",
+          "id": null,
+          "name": "feedback",
+          "href": "#",
+          "expanded": null,
+          "focusVisible": true,
+          "outline": {
+            "style": "solid",
+            "width": "2px",
+            "color": "rgb(110, 168, 254)",
+            "offset": "2px"
+          },
+          "boxShadow": null,
+          "indicator": true,
+          "box": {
+            "x": 277,
+            "y": 792,
+            "w": 48,
+            "h": 13
+          },
+          "inViewport": true,
+          "tabindex": null
+        },
+        {
+          "i": 27,
+          "body": true
+        }
+      ],
+      "png": null
+    }
+  }
+}

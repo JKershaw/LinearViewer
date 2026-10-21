@@ -1,0 +1,123 @@
+{
+  "key": "ws-kpis|populated-rate|light|1400",
+  "registryId": "ws-kpis",
+  "state": "populated-rate",
+  "theme": "light",
+  "viewport": 1400,
+  "path": "/workspace/local-workspace/kpis",
+  "populated": true,
+  "note": "3 dispatches + 6 seed-kpi-rollup rows; done-per-day in its default (rate) toggle state",
+  "httpStatus": 200,
+  "finalPath": "/workspace/local-workspace/kpis",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "no theme-dark",
+    "actual": "",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "",
+    "title": "Local Workspace - KPIs",
+    "h1": "KPIs",
+    "headings": {
+      "h1": 1,
+      "h2": 7
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "dispatch",
+      "proxy"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: light",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 1176
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 243,
+    "belowThreshold": [
+      {
+        "element": "span.wordmark-accent",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.74,
+        "need": 4.5,
+        "fontSize": "16px",
+        "fontWeight": "600",
+        "count": 2,
+        "samples": [
+          ".cat",
+          ".cat"
+        ]
+      }
+    ]
+  },
+  "extra": {
+    "data": {
+      "doneTotal": {
+        "since": "2026-09-11",
+        "through": "2026-10-20",
+        "done": [
+          2,
+          0,
+          3,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    "empty": false,
+    "sections": [
+      "workspace-kpis-section-activity",
+      "workspace-kpis-section-done-per-day",
+      "workspace-kpis-section-runs-by-kind",
+      "workspace-kpis-section-cost",
+      "workspace-kpis-section-funnel",
+      "workspace-kpis-section-kinds",
+      "workspace-kpis-section-stored"
+    ],
+    "pressed": [
+      "rate:true",
+      "total:false"
+    ],
+    "captionVisible": false,
+    "emptyNoteVisible": false,
+    "canvases": [
+      {
+        "w": 1088,
+        "h": 240
+      }
+    ]
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

@@ -1,0 +1,105 @@
+{
+  "key": "ws-runner|default|dark|1400",
+  "registryId": "ws-runner",
+  "state": "default",
+  "theme": "dark",
+  "viewport": 1400,
+  "path": "/workspace/test-workspace/runner",
+  "populated": null,
+  "note": "default render",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/runner",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "theme-dark",
+    "title": "Run on my machine",
+    "h1": "Run on my machine",
+    "headings": {
+      "h1": 1,
+      "h2": 4
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "passage planner",
+      "ship's biscuit",
+      "live console",
+      "ship journey",
+      "roadmap",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "next run",
+      "flight companion"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: dark",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 2182
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 62,
+    "belowThreshold": [
+      {
+        "element": "a",
+        "color": "rgb(0, 0, 238)",
+        "bg": "rgb(34,36,40)",
+        "ratio": 1.65,
+        "need": 4.5,
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "count": 2,
+        "samples": [
+          "Runner credentials",
+          "witness runbook"
+        ]
+      }
+    ]
+  },
+  "extra": {
+    "feedbackEl": true,
+    "feedbackText": "",
+    "feedbackHidden": false,
+    "feedbackColor": "rgb(46, 230, 95)",
+    "feedbackBg": "rgb(22,24,29)",
+    "feedbackRatio": 10.66,
+    "greenToken": "#2ee65f"
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

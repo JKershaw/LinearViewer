@@ -1,0 +1,133 @@
+{
+  "key": "ws-ship-biscuit|empty|light|390",
+  "registryId": "ws-ship-biscuit",
+  "state": "empty",
+  "theme": "light",
+  "viewport": 390,
+  "path": "/workspace/test-workspace/ship-biscuit",
+  "populated": false,
+  "note": "default seed (empty) state",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/ship-biscuit",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "no theme-dark",
+    "actual": "",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "",
+    "title": "The Ship's Biscuit - Experimental",
+    "h1": "The Ship's Biscuit",
+    "headings": {
+      "h1": 1,
+      "h2": 2
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "roadmap",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "next run",
+      "flight companion",
+      "passage planner",
+      "live console",
+      "ship journey"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library",
+      "theme: light",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 767
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 33,
+    "belowThreshold": [
+      {
+        "element": "p.ship-biscuit-warning",
+        "color": "rgb(255, 178, 36)",
+        "bg": "rgb(247,247,247)",
+        "ratio": 1.68,
+        "need": 4.5,
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "⚠ AI is not configured on the server (connect Open"
+        ]
+      },
+      {
+        "element": "code",
+        "color": "rgb(255, 178, 36)",
+        "bg": "rgb(247,247,247)",
+        "ratio": 1.68,
+        "need": 4.5,
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "OPENROUTER_API_KEY"
+        ]
+      },
+      {
+        "element": "button.action-btn.save",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(220,237,227)",
+        "ratio": 2.71,
+        "need": 4.5,
+        "fontSize": "11.05px",
+        "fontWeight": "400",
+        "count": 1,
+        "samples": [
+          "run the presses"
+        ]
+      },
+      {
+        "element": "span.wordmark-accent",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.74,
+        "need": 4.5,
+        "fontSize": "10.4975px",
+        "fontWeight": "600",
+        "count": 1,
+        "samples": [
+          ".cat"
+        ]
+      }
+    ]
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}
