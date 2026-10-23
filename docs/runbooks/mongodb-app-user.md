@@ -199,7 +199,8 @@ indexes fail.
 `HARBOUR_CAT_MONGO_URL` template would fail step 3's deploy at `await dbClient.connect()`
 (`server.js:283`, unguarded), with no healthcheck to hold the old deployment
 (`harbour-degraded.md`, `[unbuilt: LIN-1756]`); a reference that **renders empty** fails silently
-onto file storage (5b). Either way the outage lasts until the rollback runs, so roll back first.
+onto file storage (5b); a URL whose password did not carry over from step 2(a) fails loudly at
+connect. Either way the outage lasts until the rollback runs, so roll back first.
 Mitigations: the template is copied from this note, not typed; it parses offline with the repo's
 `mongodb` driver on fake values (user, `authSource`, database and host as intended; note this check
 accepts an empty *password*, and does not cover an empty render); 1b has proven the user; step 5 and
@@ -216,7 +217,10 @@ redeploys. Rotate with a **new dated user** instead:
 3. Update the variables on MongoDB-harbour as in step 2: PASSWORD with `--stdin --skip-deploys`, then
    USER and URL in one call without `--skip-deploys`, so the variables never name a user that does
    not exist yet.
-4. `railway redeploy -s harbour-cat`, so harbour-cat picks up the new credential.
+4. Deploy harbour-cat so it picks up the new credential. `railway redeploy` may reuse the old
+   configuration snapshot (see step 2), so step 5's 5b must name the new user. If it still names the
+   old one, do not run step 6: deploy harbour-cat again as a fresh deployment (dashboard "Deploy
+   Latest Commit", the route recorded in the incident doc) and re-check 5b.
 5. Verify as in step 5.
 6. Only then `dropUser` the old one.
 
@@ -235,8 +239,11 @@ in one place.
 
 - John must approve and run the cutover; this PR cannot close it out.
 - Whether a `--skip-deploys` variable set resolves for a referencing service without redeploying
-  MongoDB-harbour. Left open: nothing above depends on it, and it is why a rotation could not skip
-  the MongoDB-harbour deploy. Not established, so nothing here claims it "resolves by construction".
+  MongoDB-harbour. Left open. Step 2 depends on a narrower form of it: (b)'s deploy must carry the
+  password (a) set with `--skip-deploys`. If it does not, `HARBOUR_CAT_MONGO_URL` renders with an
+  empty password and step 3's deploy fails at `await dbClient.connect()`: roll back first. It is also
+  why a rotation could not skip the MongoDB-harbour deploy. Not established, so nothing here claims
+  it "resolves by construction".
 - Whether sealing `HARBOUR_CAT_MONGO_PASSWORD` is safe.
 - `lin3014_read` may still exist in production. Drop it (and delete
   `~/.harbour/secrets/lin3014_read.*`) or rotate it: undecided. Its only route, the public proxy, is gone.
