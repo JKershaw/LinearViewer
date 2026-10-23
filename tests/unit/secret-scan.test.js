@@ -257,6 +257,10 @@ describe('LIN-3780 Railway-incident secret types', () => {
     'AAAA pem': '-----BEGIN RSA PRIVATE KEY-----\n' + 'A'.repeat(200),
     'armor-only pem concat': "'-----BEGIN RSA PRIVATE KEY-----' + 'A'.repeat(1000)",
     'bare header': '-----BEGIN RSA PRIVATE KEY-----',
+    // Without the `body === match` guard these headers (which pass the length check on their own) match.
+    'bare encrypted header': '-----BEGIN ENCRYPTED PRIVATE KEY-----',
+    'bare openssh header': '-----BEGIN OPENSSH PRIVATE KEY-----',
+    'bare pgp header': '-----BEGIN PGP PRIVATE KEY BLOCK-----',
     'JS token assignment': "FOO_TOKEN = 'abcdefghijklmnop1234567890XYZ'",
     'blank dotenv followed by key': 'LINEAR_CLIENT_SECRET=\nOTHER_API_KEY=\n',
     'identifier-like re_': 're_split_lines_helper_fn',
@@ -273,6 +277,28 @@ describe('LIN-3780 Railway-incident secret types', () => {
     const t0 = Date.now();
     findSecretMatches(big);
     assert.ok(Date.now() - t0 < 2000, `took ${Date.now() - t0}ms`);
+  });
+  test('Proc-Type/DEK-Info lines then a non-base64 tail complete quickly (no ReDoS)', () => {
+    const head = '-----BEGIN RSA PRIVATE KEY-----\n';
+    const hostile = head + ('Proc-Type:' + 'A'.repeat(20) + '\n').repeat(8) + '!';
+    const t0 = Date.now();
+    findSecretMatches(hostile);
+    assert.ok(Date.now() - t0 < 100, `took ${Date.now() - t0}ms`);
+    const bigHostile = head + ('DEK-Info:' + 'A'.repeat(20) + '\n').repeat(400) + '\n!';
+    const t1 = Date.now();
+    findSecretMatches(bigHostile);
+    assert.ok(Date.now() - t1 < 100, `took ${Date.now() - t1}ms`);
+  });
+  test('truncated encrypted PEM with Proc-Type/DEK-Info headers still matches', () => {
+    const [header, ...rest] = F.truncatedPrivateKey.split('\n');
+    const pem = header + '\nProc-Type: 4,ENCRYPTED\nDEK-Info: AES-128-CBC,0123456789ABCDEF0123456789ABCDEF\n\n' + rest.join('\n');
+    assert.ok(findSecretMatches(pem).some(m => m.ruleId === 'private-key-block-truncated'));
+  });
+  test('mongo password that merely starts with a placeholder word is still masked', () => {
+    for (const pw of ['adminZx9Qm4Tk7Wp2Rv8', 'testQk7Zp2Lw9Rv8Bn5']) {
+      const uri = ['mongodb://', 'svc:', pw, '@host/db'].join('');
+      assert.ok(findSecretMatches(uri).some(m => m.ruleId === 'mongodb-uri-credentials'), uri);
+    }
   });
   test('long mongodb-like input completes quickly', () => {
     const big = 'mongodb://' + 'a:'.repeat(100000);
