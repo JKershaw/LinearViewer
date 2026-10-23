@@ -232,8 +232,8 @@ call-list test. The last 30 CI runs are green; CI runs only `npm test`, not `tes
 
 | ID | Covers | Scope (behavioral) |
 |---|---|---|
-| F1 | R1 + R2 | Make the retry-rescued Dispatch API and collective fan-out failures diagnosable, then fix at the cause: print `dispatched` (seat `error`/`code`) in the `every(d => d.ok)` assertions; identify which earlier spec leaves a queue item in the worker partition; the fix must leave the existing assertions on item count, DELETE and `target` intact and green with `--retries=0`. |
-| F2 | R3 | Make the CI real-Mongo suite's execution assertable: fail the CI unit job if `MONGODB_TEST_URI` is set and the real-Mongo suites did not run (or if CI runs without the URI). Must demonstrably fail when the env line is removed. |
+| F1 = LIN-3798 | R1 + R2 | Make the retry-rescued Dispatch API and collective fan-out failures diagnosable, then fix at the cause: print `dispatched` (seat `error`/`code`) in the `every(d => d.ok)` assertions; identify which earlier spec leaves a queue item in the worker partition; the fix must leave the existing assertions on item count, DELETE and `target` intact and green with `--retries=0`. |
+| F2 = LIN-3799 | R3 | Make the CI real-Mongo suite's execution assertable: fail the CI unit job if `MONGODB_TEST_URI` is set and the real-Mongo suites did not run (or if CI runs without the URI). Must demonstrably fail when the env line is removed. |
 
 Cited rather than minted: **LIN-690** (C1: add M3 and M5 as acceptance tests), **LIN-2061** (C3),
 **LIN-1879** (C5). Decision for a human: cancel **LIN-691** (C6) and delete the dead methods.
