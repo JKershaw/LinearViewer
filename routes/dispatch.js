@@ -22,7 +22,7 @@
 
 import { Router } from 'express';
 import { createHeartbeatIngest, tokenValidationOptions } from '../lib/consumer-heartbeat-ingest.js';
-import { badRequest, jsonError, notFound, unauthorized, serviceUnavailable } from '../lib/errors.js';
+import { badRequest, jsonError, notFound, unauthorized, serviceUnavailable, replyStoreFault } from '../lib/errors.js';
 import rateLimit from 'express-rate-limit';
 import fs from 'fs';
 import path from 'path';
@@ -138,8 +138,10 @@ const MAX_RECENT_PROMPTS = 10;
 const MAX_CUSTOM_PROMPT_LENGTH = 10000;
 
 // A failed handler answers 500 with a fixed message and logs why; nothing else of the
-// error leaves the server.
+// error leaves the server. LIN-3805: a dispatch store fault is the exception: it answers
+// the retryable 503 envelope (never 404 / empty 200 / a final 5xx the runner gives up on).
 function reportFailure(res, label, err, message) {
+  if (replyStoreFault(res, err)) return res;
   console.error(label, err.message);
   return jsonError(res, 500, message);
 }
@@ -1252,8 +1254,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       try {
         // urlKey from the dispatch token, never the body.
         lookup = await dispatchQueueStore.getGrantDeclaration(req.dispatchUrlKey, itemId);
-      } catch {
+      } catch (err) {
         // The store already logged the fault (ids only). Never a fallback mint.
+        if (replyStoreFault(res, err)) return;
         return serviceUnavailable.json(res, 'Could not read the item\'s grant declaration; retry');
       }
 
@@ -1281,12 +1284,16 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
         // B2 (session binding): this caller took the row and it is still live on
         // its own feedback — the addFeedback ownership precedent, as a read.
-        // getItemStatus swallows read faults into null, so a fault refuses here.
+        // LIN-3805: getItemStatus returns null only for a genuinely absent row and throws
+        // a DispatchStoreFault on a read fault. A fault is a retryable 503 (still fails
+        // closed: nothing is minted), never the final 403 `status-unreadable` the runner
+        // would give up on; any other error is a bug and is rethrown to the global 500.
         let row = null;
         try {
           row = await dispatchQueueStore.getItemStatus(req.dispatchUrlKey, itemId);
-        } catch {
-          row = null;
+        } catch (err) {
+          if (replyStoreFault(res, err)) return;
+          throw err;
         }
         if (!row) return refuse('status-unreadable');
         if (row.status === 'expired' || row.status === 'cancelled') return refuse('terminal');
@@ -1321,6 +1328,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
           if (isStructuralGrantRefusal(err)) {
             return jsonError(res, err.status, err.message, { code: err.code, retryable: false });
           }
+          if (replyStoreFault(res, err)) return;
           console.error('Broker-token declared re-mint failed:', err?.code || err?.message);
           if (err?.code === 'OWNER_CHECK_UNAVAILABLE' || err?.proxyAttachFailed) {
             return serviceUnavailable.json(res, 'Could not re-mint the declared broker token; retry');

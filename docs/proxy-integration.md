@@ -2706,6 +2706,7 @@ Read scope is enough. `state` defaults to `open`; `limit` defaults to 200 (max 1
 | 502 | `Failed to ...` | Upstream write was rejected (the create/update did not land) |
 | 503 | `Workspace not available` | Workspace access token expired or unavailable |
 | 503 | `Token check unavailable` (`code: PROXY_TOKEN_STORE_UNAVAILABLE`, `retryable: true`) | Harbour's token store failed while checking your bearer (LIN-3699), so it could not say whether the token is good. **Back off and retry the same token**; nothing to re-authenticate. Distinct from `Workspace not available` above. On `POST /token` only a pre-consume failure is a 503; once the bootstrap is spent the answer is the 401 |
+| 503 | `Dispatch store unavailable` (`code: DISPATCH_STORE_UNAVAILABLE`, `category: upstream`, `retryable: true`) | Harbour's dispatch store failed while serving a dispatch/runner route (LIN-3805): runner `poll`/`take`/`feedback`, the dispatch list, the `GET /dispatch/:id` watch and `/:id/prompt` reads, and the enqueue routes' own store reads and writes. **Back off and retry the same request.** It is never a `404` (so a `404` on these routes now means the item is genuinely absent), never a `401`, and never an empty `200` queue or history. On the `?wait=` long-poll, once its keepalive has flushed, it arrives as `200` with `statusCode: 503` in the body. A `take` that hits it leaves the item queued. |
 | 504 | `...timed out` | Upstream provider request timed out or was aborted (mapped from a `TimeoutError`/`AbortError`) |
 
 ## Building a Consumer

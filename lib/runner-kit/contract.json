@@ -428,6 +428,62 @@
       "sd": "5xx",
       "kit": "error",
       "difference": "LIN-3699: same reply, each side's own vocabulary. SD counts a retryable 5xx toward host-wide auto-pause and never latches; the kit's wait returns reason `error` (re-arm), and `login` says Harbour could not check the bootstrap."
+    },
+    {
+      "area": "store",
+      "case": "poll: dispatch store fault",
+      "halt": null,
+      "item": {
+        "surface": "poll",
+        "status": 503,
+        "code": "DISPATCH_STORE_UNAVAILABLE",
+        "retryable": true
+      },
+      "sd": "5xx",
+      "kit": "error",
+      "difference": "LIN-3805: the same 503 DISPATCH_STORE_UNAVAILABLE reply (retryable:true), each side's own vocabulary. SD's classifier (halt.js) puts a 5xx without `retryable:false` in its retryable bucket and counts it toward auto-pause; the kit's wait returns reason `error`."
+    },
+    {
+      "area": "store",
+      "case": "take: dispatch store fault",
+      "halt": null,
+      "item": {
+        "surface": "take",
+        "status": 503,
+        "code": "DISPATCH_STORE_UNAVAILABLE",
+        "retryable": true
+      },
+      "sd": "claim-null",
+      "kit": "retry",
+      "difference": "LIN-3805: the same 503 DISPATCH_STORE_UNAVAILABLE reply (retryable:true), each side's own vocabulary. SD's claim() returns null for every non-ok status (queue.js), the same outcome as a 404, and the item is picked up again on a later poll because the row was restored to the queue; the kit's take throws a message that says to retry."
+    },
+    {
+      "area": "store",
+      "case": "feedback: dispatch store fault",
+      "halt": null,
+      "item": {
+        "surface": "feedback",
+        "status": 503,
+        "code": "DISPATCH_STORE_UNAVAILABLE",
+        "retryable": true
+      },
+      "sd": "retried",
+      "kit": "retry",
+      "difference": "LIN-3805: the same 503 DISPATCH_STORE_UNAVAILABLE reply (retryable:true), each side's own vocabulary. SD retries 408/429/5xx within its budget (feedback.js isRetryableResult); the kit's post throws a message that says to retry."
+    },
+    {
+      "area": "store",
+      "case": "status: dispatch store fault",
+      "halt": null,
+      "item": {
+        "surface": "status",
+        "status": 503,
+        "code": "DISPATCH_STORE_UNAVAILABLE",
+        "retryable": true
+      },
+      "sd": "not read",
+      "kit": "unreadable",
+      "difference": "LIN-3805: the same 503 DISPATCH_STORE_UNAVAILABLE reply (retryable:true), each side's own vocabulary. The kit reads GET /api/proxy/dispatch/:id for settled evidence (LIN-3676): a 503 is `unreadable` (defer, post nothing), unlike a 404 which is `gone`. SD does not read it."
     }
   ]
 }

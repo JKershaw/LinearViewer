@@ -24,6 +24,7 @@
  *    exists to close, reproduced inside the fix if either allowlist entry
  *    were missed.
  */
+import { DispatchStoreFault } from '../../lib/errors.js';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
@@ -120,12 +121,15 @@ describe('LIN-1698 Phase 1 — failed-but-present: an addItem throw during mint 
       return originalAddItem(urlKey, item);
     };
 
-    // Pre-LIN-1698 (unchanged) contract: an addItem throw during enqueue
-    // propagates to addFeedback's outer catch, which swallows it and returns
-    // null — this is W1 from the ticket's own forensics. Phase 1 does not
-    // change this control flow; it only makes the witness durable across it.
-    const res = await store.addFeedback(child._id, URL_KEY, { message: '[done] shipped' }, 'token-a');
-    assert.equal(res, null);
+    // An addItem throw during enqueue propagates to addFeedback's outer catch. Pre-
+    // LIN-3805 that swallowed it and returned null (the 404 of W1 in the ticket's own
+    // forensics); it is now a DispatchStoreFault flagged `writeLanded` (the $push had
+    // already landed), answered 503. Phase 1 does not change the witness control flow;
+    // it only makes the witness durable across it.
+    await assert.rejects(
+      store.addFeedback(child._id, URL_KEY, { message: '[done] shipped' }, 'token-a'),
+      (err) => err instanceof DispatchStoreFault && err.writeLanded === true
+    );
     assert.ok(errMock.mock.calls.length >= 1, 'the failure is logged via the existing outer catch');
 
     const edge = historyCollection._docs.find(d => d._id === child._id);
@@ -150,7 +154,7 @@ describe('LIN-1698 Phase 1 — failed-but-present: an addItem throw during mint 
       if (item.kind === 'wake') throw new Error('boom-enqueue-failure');
       return originalAddItem(urlKey, item);
     };
-    await store.addFeedback(child._id, URL_KEY, { message: '[done] shipped' }, 'token-a');
+    await store.addFeedback(child._id, URL_KEY, { message: '[done] shipped' }, 'token-a').catch(() => {});
 
     // Restore normal addItem and re-report the SAME terminal beat item.
     store.addItem = originalAddItem;
