@@ -18,6 +18,28 @@ deliverable is the verified execution trace. No repository code changed.
 
 ## Production route
 
+> **Changed on 2026-10-23 (Railway security incident; see
+> `docs/incidents/2026-10-22-railway-security-disclosure.md`).** MongoDB-harbour no longer has
+> a public endpoint, and `MONGO_PUBLIC_URL` has been removed, so the `railway run … MONGO_PUBLIC_URL`
+> route described below **no longer works**. Read production through `railway ssh` into the
+> database container instead, running `mongosh` against localhost with the container's own
+> credentials:
+>
+> ```sh
+> railway ssh -p fc7abe0d-2c3b-403d-88a3-d61c470729a7 -e production -s MongoDB-harbour -- \
+>   'mongosh --quiet "mongodb://$MONGOUSER:$MONGOPASSWORD@localhost:27017/?authSource=admin" --eval "<js>"'
+> ```
+>
+> - Pass the remote command as **one single-quoted string**, so the variables expand inside the
+>   container and never locally.
+> - For a longer script, base64 it into that string, decode it to `/dev/shm`, run it with `--file`,
+>   then delete it.
+> - A `railway ssh` shell's environment is not the service's environment: Railway's ssh session
+>   adds its own tokens. Read a service's configuration with `railway variables`, not `env`.
+>
+> The rest of this section is the original 2026-10 trace, kept as history.
+
+
 The host's linked Railway CLI is authenticated (John Kershaw). This fresh
 dispatch checkout is not link-stateful, so the project/environment were pinned
 explicitly — the **same service, environment, and credential path** as the

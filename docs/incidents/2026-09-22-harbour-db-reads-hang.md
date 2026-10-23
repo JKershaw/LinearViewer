@@ -1,5 +1,12 @@
 # Incident — harbour.cat database-backed reads hang on a degraded cross-region link
 
+> **Correction (2026-10-23).** This record credits moving MongoDB-harbour into the app's EU
+> region with resolving the incident. That move had not taken effect: on 2026-10-23 the database
+> was still in a US region while harbour-cat ran in EU West. It was only moved to EU West that day,
+> during the Railway security incident (`docs/incidents/2026-10-22-railway-security-disclosure.md`).
+> So the hang ended for some other reason, and the region-move conclusion below should not be
+> relied on.
+
 **Date:** 2026-09-22
 **Duration:** onset ~19:15Z, recovering by ~19:47–19:52Z (LIN-2993 comments `825a549b`,
 `9e91955a`), structurally resolved by 20:16:41Z after MongoDB-harbour moved to the app's
