@@ -86,7 +86,9 @@ describe('archive muted text tier meets AA', () => {
         const failures = [];
         for (const r of rules) {
           const fg = tokens[r.token];
-          if (!MUTED_TIER.has(r.token) || !fg) continue; // not a plain hex token in this file (e.g. rgba, or defined elsewhere)
+          // Chip rules are measured whatever their token (LIN-3762 names repo-h/repo-d), so a chip
+          // pointed back at --blue/--amber cannot slip past the MUTED_TIER list.
+          if ((!MUTED_TIER.has(r.token) && !/\.chip\b/.test(r.selector)) || !fg) continue; // not a plain hex token in this file (e.g. rgba, or defined elsewhere)
           const surfaces = [...bgs];
           if (r.bgToken && tokens[r.bgToken]) surfaces.push(tokens[r.bgToken]);
           for (const bg of surfaces) {
