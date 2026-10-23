@@ -43,7 +43,7 @@ function faultyCollection() {
         if (f) {
           if (typeof f === 'number') fail[prop] = f - 1;
           // find() is synchronous in the driver: the fault surfaces at the cursor.
-          if (prop === 'find') return { toArray: () => Promise.reject(BOOM) };
+          if (prop === 'find') { const c = { sort: () => c, skip: () => c, limit: () => c, toArray: () => Promise.reject(BOOM) }; return c; }
           return Promise.reject(BOOM);
         }
         return value.apply(target, args);
@@ -97,18 +97,20 @@ describe('store reads: absence stays the sentinel, a fault throws', () => {
     try {
       queue.fail.find = true;
       await assert.rejects(store.listItems(URL_KEY), isFault('listItems'));
-      await assert.rejects(store.pollAvailable(URL_KEY), isFault('listItems'));
+      await assert.rejects(store.pollAvailable(URL_KEY), isFault('listItemsWithPrompt'));
+      // LIN-3812: countItems is a countDocuments, not a find + length.
+      queue.fail.countDocuments = true;
       await assert.rejects(store.countItems(URL_KEY), isFault('countItems'));
     } finally { q.mock.restore(); }
   });
 
   test('listHistory: an empty history is an empty page, a fault throws', async () => {
     const { store, history } = makeStore();
-    assert.deepEqual(await store.listHistory(URL_KEY), { items: [], total: 0 });
+    assert.deepEqual(await store.listHistory(URL_KEY, { limit: 100 }), { items: [], total: 0 });
     const q = quiet();
     try {
       history.fail.find = true;
-      await assert.rejects(store.listHistory(URL_KEY), isFault('listHistory'));
+      await assert.rejects(store.listHistory(URL_KEY, { limit: 100 }), isFault('listHistory'));
     } finally { q.mock.restore(); }
   });
 
@@ -407,7 +409,7 @@ describe('dispatch router (token lane and session lane)', () => {
           ['take', 'POST', `/api/dispatch/take/${ID}`, auth, undefined, queue, 'findOneAndDelete'],
           ['feedback', 'POST', `/api/dispatch/feedback/${ID}`, auth, { message: 'm' }, history, 'findOneAndUpdate'],
           ['list', 'GET', `/workspace/${URL_KEY}/api/dispatch`, {}, undefined, queue, 'find'],
-          ['count', 'GET', `/workspace/${URL_KEY}/api/dispatch/count`, {}, undefined, queue, 'find'],
+          ['count', 'GET', `/workspace/${URL_KEY}/api/dispatch/count`, {}, undefined, queue, 'countDocuments'],
           ['history', 'GET', `/workspace/${URL_KEY}/api/dispatch/history`, {}, undefined, history, 'find'],
           ['delete', 'DELETE', `/workspace/${URL_KEY}/api/dispatch/${ID}`, {}, undefined, queue, 'findOne'],
           ['trim', 'PATCH', `/workspace/${URL_KEY}/api/dispatch/${ID}/trim`, {}, { maxTasks: 1 }, queue, 'findOne']
@@ -430,11 +432,11 @@ describe('dispatch router (token lane and session lane)', () => {
     try {
       await serve(app, async (base) => {
         // A real absent row after a declared record keeps today's refusals.
-        const realStatus = store.getItemStatus.bind(store);
-        store.getItemStatus = async () => { throw new DispatchStoreFault('getItemStatus', BOOM); };
+        const realStatus = store.getItemFeedback.bind(store);
+        store.getItemFeedback = async () => { throw new DispatchStoreFault('getItemFeedback', BOOM); };
         const res = await sendJson(base, 'POST', '/api/dispatch/broker-token', auth, { itemId: item._id });
         await assertEnvelope(res, 'broker-token');
-        store.getItemStatus = realStatus;
+        store.getItemFeedback = realStatus;
         store.getGrantDeclaration = async () => { throw new DispatchStoreFault('getGrantDeclaration', BOOM); };
         await assertEnvelope(await sendJson(base, 'POST', '/api/dispatch/broker-token', auth, { itemId: item._id }), 'broker-token declaration');
       });
@@ -606,16 +608,16 @@ describe('proxy runner and proxy dispatch routes', () => {
     try {
       await serve(app, async (base) => {
         // Before the flush: the first read succeeds, the held re-check faults, the keepalive has not flushed.
-        const real = store.getItemStatus.bind(store);
+        const real = store.getItemFeedback.bind(store);
         let reads = 0;
-        store.getItemStatus = async (...args) => {
-          if (++reads >= 2) throw new DispatchStoreFault('getItemStatus', BOOM);
+        store.getItemFeedback = async (...args) => {
+          if (++reads >= 2) throw new DispatchStoreFault('getItemFeedback', BOOM);
           return real(...args);
         };
         const res = await sendJson(base, 'GET', `/api/proxy/dispatch/${item._id}?wait=5`, auth);
         assert.equal(res.status, 503, 'a real 503 while the headers are still uncommitted');
         await assertEnvelope(res, 'watch pre-flush');
-        store.getItemStatus = real;
+        store.getItemFeedback = real;
       });
     } finally { q.mock.restore(); }
   });
@@ -629,9 +631,9 @@ describe('proxy runner and proxy dispatch routes', () => {
     const { store, app, auth } = await setup();
     const item = await store.addItem(URL_KEY, { prompt: 'p' });
     await store.takeItem(item._id, URL_KEY, TOKEN);
-    const real = store.getItemStatus.bind(store);
+    const real = store.getItemFeedback.bind(store);
     let reads = 0;
-    store.getItemStatus = async (...args) => {
+    store.getItemFeedback = async (...args) => {
       if (++reads >= 2) throw error;
       return real(...args);
     };
@@ -645,7 +647,7 @@ describe('proxy runner and proxy dispatch routes', () => {
   }
 
   test('watch long-poll: a store fault on the SECOND read after the flush is 200 with statusCode:503 and the envelope', async () => {
-    const { res, body } = await watchSecondReadThrows(new DispatchStoreFault('getItemStatus', BOOM));
+    const { res, body } = await watchSecondReadThrows(new DispatchStoreFault('getItemFeedback', BOOM));
     assert.equal(res.status, 200, 'the headers were committed at the flush');
     assert.equal(body.statusCode, 503);
     assert.equal(body.code, 'DISPATCH_STORE_UNAVAILABLE');

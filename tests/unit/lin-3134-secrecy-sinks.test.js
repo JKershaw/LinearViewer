@@ -349,7 +349,7 @@ describe('F2 (7) read-path sinks', () => {
   test('history: getItemStatus, listHistory, the history route, watch/prompt, stampBookkeeping', async () => {
     assertClean('getItemStatus history', await world.store.getItemStatus(URL_KEY, world.factoryId));
     assertClean('getItemStatus history (refusal row)', await world.store.getItemStatus(URL_KEY, world.refusalId));
-    const history = await world.store.listHistory(URL_KEY, {});
+    const history = await world.store.listHistory(URL_KEY, { limit: 100 });
     assert.ok(history.items.some(i => i.id === world.factoryId), 'the declared row is in history');
     assertClean('listHistory', history);
     const route = await callApp(sessionApp(), 'get', '/workspace/acme/api/dispatch/history');

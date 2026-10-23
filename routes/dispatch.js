@@ -134,6 +134,7 @@ const MAX_NAME_LENGTH = 1000;          // Names/labels/titles
 const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
 
 // Maximum recent / favourite custom prompts handling (the favourites cap is the store's).
+const DISPATCH_HISTORY_DEFAULT_LIMIT = 20;  // LIN-3812: server default page for the history list
 const MAX_RECENT_PROMPTS = 10;
 const MAX_CUSTOM_PROMPT_LENGTH = 10000;
 
@@ -513,7 +514,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const { workspace } = req;
 
     try {
-      const items = await dispatchQueueStore.listItems(workspace.urlKey);
+      // The queue row renders `firstPromptLine(item.prompt)`: the one list that keeps the prompt (LIN-3812).
+      const items = await dispatchQueueStore.listItemsWithPrompt(workspace.urlKey);
       // Consumer poll-recency warning (LIN-2885), derived fresh against the
       // current clock from the LIVE poll recency (LIN-3367: read once per
       // request, not per row; queued rows only) — same helper the proxy
@@ -582,10 +584,14 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const { workspace } = req;
 
     try {
-      const limit = req.query.limit ? Math.min(Math.max(parseInt(req.query.limit, 10), 1), 100) : undefined;
+      // LIN-3812: the client never sends `limit` (public/dispatch.js pages by offset/total),
+      // so the unbounded default read the workspace's whole lifetime history with prompts.
+      // Server default 20, max 100; the page renders prompt + feedback, so the bodies read.
+      const requested = parseInt(req.query.limit, 10);
+      const limit = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 100) : DISPATCH_HISTORY_DEFAULT_LIMIT;
       const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
 
-      const result = await dispatchQueueStore.listHistory(workspace.urlKey, { limit, offset });
+      const result = await dispatchQueueStore.listHistoryWithBodies(workspace.urlKey, { limit, offset });
       // LIN-3384: mask prose-mode bootstrap lines in non-owned prompts.
       res.json({ ...result, items: redactSessionItems(result.items, req.session?.accountId || null) });
     } catch (err) {
@@ -1290,7 +1296,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         // would give up on; any other error is a bug and is rethrown to the global 500.
         let row = null;
         try {
-          row = await dispatchQueueStore.getItemStatus(req.dispatchUrlKey, itemId);
+          row = await dispatchQueueStore.getItemFeedback(req.dispatchUrlKey, itemId);
         } catch (err) {
           if (replyStoreFault(res, err)) return;
           throw err;

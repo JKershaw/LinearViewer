@@ -142,9 +142,17 @@ export function createMockCollection() {
       return { ...removed };
     },
 
-    async findOne(query) {
+    async findOne(query, options = {}) {
       const found = docs.find(d => matches(d, query));
-      return found ? { ...found } : null;
+      if (!found) return null;
+      const copy = { ...found };
+      // Same exclusion-only projection `find()` honours below (LIN-3812: the
+      // store's lean point reads pass `{ prompt: 0, feedback: 0 }`).
+      const projection = options && options.projection;
+      if (projection) {
+        for (const k of Object.keys(projection)) if (projection[k] === 0) delete copy[k];
+      }
+      return copy;
     },
 
     find(query, options = {}) {

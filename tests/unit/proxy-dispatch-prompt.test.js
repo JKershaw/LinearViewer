@@ -5,7 +5,7 @@
  *
  * The watch twin (GET .../:id) deliberately omits `prompt`; this targeted
  * single-item read adds it back. Covered here: the prompt is returned, the
- * lookup is workspace-scoped (req.proxyUrlKey is threaded into getItemStatus),
+ * lookup is workspace-scoped (req.proxyUrlKey is threaded into getItemPrompt),
  * an unknown id 404s, and a missing dispatch store 503s.
  *
  * Set NODE_ENV before importing the routes so the test-mode short-circuit and
@@ -65,7 +65,7 @@ describe('LIN-1128 — GET /api/proxy/dispatch/:id/prompt', () => {
   test('returns the canonical prompt plus confirmation metadata', async () => {
     const captured = {};
     const store = {
-      getItemStatus: async (urlKey, id) => {
+      getItemPrompt: async (urlKey, id) => {
         captured.urlKey = urlKey;
         captured.id = id;
         return {
@@ -101,14 +101,14 @@ describe('LIN-1128 — GET /api/proxy/dispatch/:id/prompt', () => {
   });
 
   test('unknown id 404s', async () => {
-    const store = { getItemStatus: async () => null };
+    const store = { getItemPrompt: async () => null };
     const app = buildApp({ store });
     const res = await call(app, `/api/proxy/dispatch/${ITEM_ID}/prompt`);
     assert.equal(res.status, 404, `expected 404, got ${res.status}: ${JSON.stringify(res.body)}`);
   });
 
   test('a malformed id is rejected with 400', async () => {
-    const store = { getItemStatus: async () => { throw new Error('should not be called'); } };
+    const store = { getItemPrompt: async () => { throw new Error('should not be called'); } };
     const app = buildApp({ store });
     const res = await call(app, '/api/proxy/dispatch/bad%00id/prompt');
     assert.equal(res.status, 400, `expected 400, got ${res.status}: ${JSON.stringify(res.body)}`);

@@ -594,7 +594,7 @@ export function createDispatchRoutes({
       // reads `feedback` to derive terminal status, so it's the one caller
       // that opts into the (indexed-query-plus-merge) group feedback read —
       // see getItemStatus's includeGroupFeedback doc (LIN-1461).
-      const item = await dispatchQueueStore.getItemStatus(req.proxyUrlKey, id, { includeGroupFeedback: true });
+      const item = await dispatchQueueStore.getItemFeedback(req.proxyUrlKey, id, { includeGroupFeedback: true });
       if (!item) {
         logEvent(req, '/api/proxy/dispatch/:id', 404);
         return notFound.json(res, 'Dispatch item not found');
@@ -647,7 +647,7 @@ export function createDispatchRoutes({
           }
           // LIN-3805: a fault here is NOT swallowed into "unchanged snapshot" (a hidden
           // sibling `[done]` would read as still running); it propagates to the catch.
-          const next = await dispatchQueueStore.getItemStatus(req.proxyUrlKey, id, { includeGroupFeedback: true });
+          const next = await dispatchQueueStore.getItemFeedback(req.proxyUrlKey, id, { includeGroupFeedback: true });
           if (!next) break; // item genuinely expired mid-wait; return last known snapshot
           current = next;
           if (dispatchWatchChanged(baseline, current)) { reason = 'change'; break; }
@@ -695,7 +695,7 @@ export function createDispatchRoutes({
     if (isBadDispatchId(id)) return reject400(req, res, '/api/proxy/dispatch/:id/prompt', 'Invalid dispatch id');
 
     try {
-      const item = await dispatchQueueStore.getItemStatus(req.proxyUrlKey, id);
+      const item = await dispatchQueueStore.getItemPrompt(req.proxyUrlKey, id);
       if (!item) {
         logEvent(req, '/api/proxy/dispatch/:id/prompt', 404);
         return notFound.json(res, 'Dispatch item not found');

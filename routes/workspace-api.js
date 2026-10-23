@@ -2025,7 +2025,8 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     try {
       const loops = await getLoopsForIssue(workspace.urlKey, identifier, {
         dispatchStore: dispatchQueueStore,
-        agentStatusStore
+        agentStatusStore,
+        noPrompt: true // toSessionView never reads promptText (LIN-3812)
       });
       // getLoopsForIssue returns oldest-first; reverse for newest-first display.
       const sessions = loops.map(toSessionView).reverse();

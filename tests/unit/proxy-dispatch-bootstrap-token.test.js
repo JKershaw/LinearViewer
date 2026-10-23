@@ -64,6 +64,8 @@ function buildApp(captured, { workspaceHarnessDefault = null, itemForWatch = nul
         return { _id: 'disp-1', dispatchedAt: '2026-06-28T00:00:00.000Z', ...item };
       },
       getItemStatus: async () => itemForWatch,
+      getItemFeedback: async () => itemForWatch,
+      getItemPrompt: async () => itemForWatch,
       listItems: async () => (itemForWatch ? [itemForWatch] : []),
       listHistory: async () => ({ items: [], total: 0 })
     },

@@ -93,6 +93,7 @@ function buildApp({ statusItem, queued = [], history = [] } = {}) {
     briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore: {
       getItemStatus: async () => statusItem,
+      getItemFeedback: async () => statusItem,
       listItems: async () => queued,
       // listHistory returns { items } — not a bare array (dispatch-store.js).
       listHistory: async () => ({ items: history }),

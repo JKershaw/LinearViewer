@@ -88,7 +88,7 @@ test('followUpTo is carried into history (watch + history list)', async () => {
   const status = await store.getItemStatus('acme', created._id);
   assert.equal(status.followUpTo, followUpTo);
 
-  const { items } = await store.listHistory('acme');
+  const { items } = await store.listHistory('acme', { limit: 100 });
   assert.equal(items.length, 1);
   assert.equal(items[0].followUpTo, followUpTo);
 });

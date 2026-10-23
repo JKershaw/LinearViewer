@@ -34,6 +34,8 @@ import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 
 const URL_KEY = 'acme';
 const CUTOFF = new Date('2026-08-14T00:00:00.000Z');
+// LIN-3812: an unbounded history read is refused; the diagnostic reads here carry a window that admits every seeded row.
+const SINCE_ALL = new Date('2026-01-01T00:00:00.000Z');
 const OLD = new Date('2026-08-01T00:00:00.000Z');
 const NEW = new Date('2026-08-15T00:00:00.000Z');
 
@@ -108,7 +110,7 @@ describe('listHistory { status, silentSince } (real MangoDB tmpdir, LIN-2079 S7)
   test('selects silent, empty-feedback and absent-feedback taken rows; excludes a live lineage and a non-taken row', async () => {
     const { store } = await seed();
 
-    const { items, total } = await store.listHistory(URL_KEY, { status: 'taken', silentSince: CUTOFF });
+    const { items, total } = await store.listHistory(URL_KEY, { status: 'taken', silentSince: CUTOFF, since: SINCE_ALL });
     const ids = items.map(i => i.id).sort();
 
     assert.deepEqual(ids, ['a-silent', 'b-empty', 'c-absent'],
@@ -119,7 +121,7 @@ describe('listHistory { status, silentSince } (real MangoDB tmpdir, LIN-2079 S7)
   test('a taken row with a beat NEWER than the cutoff is excluded even though its resolvedAt is old', async () => {
     const { store } = await seed();
 
-    const { items } = await store.listHistory(URL_KEY, { status: 'taken', silentSince: CUTOFF });
+    const { items } = await store.listHistory(URL_KEY, { status: 'taken', silentSince: CUTOFF, since: SINCE_ALL });
 
     assert.ok(!items.some(i => i.id === 'd-alive'),
       'the whole point of keying on activity rather than claim time — a healthy lineage must not be selected');
@@ -128,7 +130,7 @@ describe('listHistory { status, silentSince } (real MangoDB tmpdir, LIN-2079 S7)
   test('the status and silence clauses ride INTO the query (pushdown), not a JS filter afterwards', async () => {
     const { store, queries } = await seed();
 
-    await store.listHistory(URL_KEY, { status: 'taken', silentSince: CUTOFF });
+    await store.listHistory(URL_KEY, { status: 'taken', silentSince: CUTOFF, since: SINCE_ALL });
 
     assert.ok(queries.length >= 1);
     const query = queries[0];
@@ -152,7 +154,7 @@ describe('listHistory { status, silentSince } (real MangoDB tmpdir, LIN-2079 S7)
   test('omitting both options leaves them out of the query and returns every row (existing callers unchanged)', async () => {
     const { store, queries } = await seed();
 
-    const { items, total } = await store.listHistory(URL_KEY);
+    const { items, total } = await store.listHistory(URL_KEY, { limit: 100 });
 
     assert.equal(total, 5);
     assert.equal(items.length, 5);
@@ -163,7 +165,7 @@ describe('listHistory { status, silentSince } (real MangoDB tmpdir, LIN-2079 S7)
   test('status alone selects by stored status with no silence bound', async () => {
     const { store } = await seed();
 
-    const { items } = await store.listHistory(URL_KEY, { status: 'taken' });
+    const { items } = await store.listHistory(URL_KEY, { status: 'taken', since: SINCE_ALL });
 
     assert.deepEqual(items.map(i => i.id).sort(), ['a-silent', 'b-empty', 'c-absent', 'd-alive']);
   });
@@ -171,7 +173,7 @@ describe('listHistory { status, silentSince } (real MangoDB tmpdir, LIN-2079 S7)
   test('silentSince alone spans every status', async () => {
     const { store } = await seed();
 
-    const { items } = await store.listHistory(URL_KEY, { silentSince: CUTOFF });
+    const { items } = await store.listHistory(URL_KEY, { silentSince: CUTOFF, since: SINCE_ALL });
 
     assert.deepEqual(items.map(i => i.id).sort(), ['a-silent', 'b-empty', 'c-absent', 'e-cancelled']);
   });

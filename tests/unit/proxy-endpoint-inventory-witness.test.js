@@ -66,6 +66,8 @@ function makeDispatchStore() {
     listItems: async () => [],
     listHistory: async () => ({ items: [], total: 0 }),
     getItemStatus: async () => null,
+    getItemFeedback: async () => null,
+    getItemPrompt: async () => null,
     // LIN-3257: the shadow read is a no-op on a store with no shadow
     // collection — an empty, well-formed summary.
     getWakeShadowTally: async () => ({ days: [], totals: { minted: 0, wouldSkip: 0, share: 0, byReason: {} } }),
@@ -464,13 +466,13 @@ const ROWS = [
   },
   {
     group: 'I', method: 'GET', url: '/api/proxy/dispatch/d1', expect: 404,
-    note: 'getItemStatus() → null (:6625)',
+    note: 'getItemFeedback() → null (:6625)',
     expectBody: { error: 'Dispatch item not found' },
     run: () => call(buildApp({ dispatchQueueStore: makeDispatchStore() }), 'GET', '/api/proxy/dispatch/d1'),
   },
   {
     group: 'I', method: 'GET', url: '/api/proxy/dispatch/d1/prompt', expect: 404,
-    note: 'getItemStatus() → null (:6727)',
+    note: 'getItemPrompt() → null (:6727)',
     expectBody: { error: 'Dispatch item not found' },
     run: () => call(buildApp({ dispatchQueueStore: makeDispatchStore() }), 'GET', '/api/proxy/dispatch/d1/prompt'),
   },

@@ -59,7 +59,7 @@ const LIVE = [...walk('routes'), ...walk('lib')].map(file => ({ file, src: readF
 // only dispatch-store receivers, so unrelated stores' `collection.find` are not
 // swept in; `historyCollection` is unique to the dispatch store.
 const SITE = new RegExp([
-  String.raw`\.\s*(listItems|getItemStatus|listHistory|trimSessionBudget|pollAvailable|takeItem)\s*\(`,
+  String.raw`\.\s*(listItemsWithPrompt|listItems|getItemStatus|getItemPrompt|getItemFeedback|listHistoryWithBodies|listHistory|trimSessionBudget|pollAvailable|takeItem)\s*\(`,
   String.raw`\b(_formatItem|_formatHistoryItem)\s*\(`,
   String.raw`\bhistoryCollection\s*\.\s*(?:find|findOne|aggregate)\s*\(`,
   String.raw`\b(?:dispatchStore|dispatchQueueStore)\s*\.\s*(?:collection|historyCollection)\s*\.\s*(?:find|findOne|aggregate)\s*\(`
@@ -152,8 +152,10 @@ const TABLE = {
   'lib/observation-sessions-materializer.js :: _collectSessionIssues': [SRV, 7],
   'lib/observation-sessions-materializer.js :: _sessionsTouchingIssue': [SRV, 2],
   'lib/kpi-daily-rollup.js :: oldestDayOf': [PRJ, 1], // LIN-3724: raw history find projecting `dispatchedAt` only (backfill operator script)
-  'lib/pipeline-loops.js :: timed': [SRV, 2],
-  'lib/pipeline-loops.js :: redigestHistoryRows': [SRV, 1], // raw historyCollection.find (round-3 N3)
+  // LIN-3812: the loop builders' reads (lean default or the named whole-document pair); the digest
+  // self-heal's raw historyCollection.find moved into the store with it
+  'lib/pipeline-loops.js :: _readLive': [SRV, 2],
+  'lib/pipeline-loops.js :: _readHistory': [SRV, 2],
   'lib/recent-runs.js :: read': [SRV, 2],
   'lib/task-run-facts.js :: readTaskRunFacts': [SRV, 3]
 };
@@ -165,7 +167,7 @@ const E_ROUTE_FILES = new Set(['routes/dispatch.js', 'routes/proxy-dispatch.js',
 const E_LIB_FILE = 'lib/dispatch-entrance.js';
 // The reader kinds the entrances use today. Each must still occur somewhere in E;
 // a kind that is not here (a direct formatter call, a raw collection read) fails.
-const E_READER_KINDS = ['listItems', 'getItemStatus', 'listHistory', 'trimSessionBudget', 'pollAvailable', 'takeItem'];
+const E_READER_KINDS = ['listItems', 'listItemsWithPrompt', 'getItemStatus', 'getItemPrompt', 'getItemFeedback', 'listHistory', 'listHistoryWithBodies', 'trimSessionBudget', 'pollAvailable', 'takeItem'];
 
 /** Violations of the table against a set of `{file, src}`; [] means clean. */
 function check(files, table = TABLE) {

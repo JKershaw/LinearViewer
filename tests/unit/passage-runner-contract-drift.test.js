@@ -139,11 +139,11 @@ describe('assertion 1+2 (LIN-1870-F4): the sessionId asymmetry, both sides pinne
   test('formatDispatchWatch includes sessionId, scoped to its own function body', async () => {
     const row = { id: SAMPLE_UUID, status: 'queued', promptName: 'Prompt', kind: 'custom', target: 'cli', sessionId: 'sess-watch', dispatchedAt: '2026-10-17T00:00:00.000Z', feedback: [] };
     const deps = BASE_DEPS();
-    deps.dispatchQueueStore = { ...deps.dispatchQueueStore, getItemStatus: async () => ({ ...row }) };
+    deps.dispatchQueueStore = { ...deps.dispatchQueueStore, getItemFeedback: async () => ({ ...row }) };
     const res = await request(appAround(createProxyRoutes(deps)), 'GET', `/api/proxy/dispatch/${SAMPLE_UUID}`, { headers: { Authorization: 'Bearer anything' } });
     assert.equal(res.status, 200, res.text);
     assert.equal(res.body.sessionId, 'sess-watch');
-    const noSession = await request(appAround(createProxyRoutes({ ...deps, dispatchQueueStore: { ...deps.dispatchQueueStore, getItemStatus: async () => ({ ...row, sessionId: undefined }) } })),
+    const noSession = await request(appAround(createProxyRoutes({ ...deps, dispatchQueueStore: { ...deps.dispatchQueueStore, getItemFeedback: async () => ({ ...row, sessionId: undefined }) } })),
       'GET', `/api/proxy/dispatch/${SAMPLE_UUID}`, { headers: { Authorization: 'Bearer anything' } });
     assert.ok('sessionId' in noSession.body && noSession.body.sessionId === null, 'the key is present even with no session (null)');
   });

@@ -28,6 +28,9 @@ function projectionHistoryCollection(docs) {
   return {
     find(query) {
       return {
+        sort() { return this; },
+        skip() { return this; },
+        limit() { return this; },
         async toArray() {
           return docs.filter(d => d.urlKey === query.urlKey).map(d => ({ ...d }));
         }
@@ -62,6 +65,10 @@ function projectedHistoryCollection(docs) {
     find(query, options = {}) {
       const inner = base.find(query);
       return {
+        // LIN-3812: the store sorts in the query now (the in-JS sort is gone).
+        sort() { return this; },
+        skip() { return this; },
+        limit() { return this; },
         async toArray() {
           return applyProjection(await inner.toArray(), options.projection);
         }
@@ -131,7 +138,7 @@ describe('file-pointer-read — loadPilotRows sees history (P7)', () => {
       collection: createMockCollection(),
       historyCollection: projectedHistoryCollection([historyDoc()])
     });
-    const { items } = await store.listHistory('acme', { projection: { prompt: 1 } });
+    const { items } = await store.listHistory('acme', { since: new Date(0), projection: { prompt: 1 } });
     assert.equal(items.length, 1);
     assert.equal(items[0].kind, 'custom', 'inclusion projection collapses kind');
     assert.equal(items[0].issueIdentifier, undefined);

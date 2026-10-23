@@ -89,7 +89,9 @@ test('listHistory pushes issueIdentifier into the query and returns only that is
 
   const result = await store.listHistory('acme', { issueIdentifier: 'LIN-1' });
 
-  assert.equal(historyQueries.length, 1);
+  // LIN-3812: the lean read self-heals rows whose digest is null (a fresh archive) with an
+  // `_id $in` re-read; the scoped query itself is still exactly one.
+  assert.equal(historyQueries.filter(q => !q._id).length, 1);
   assert.equal(historyQueries[0].issueIdentifier, 'LIN-1');
   assert.equal(result.total, 1);
   assert.equal(result.items.length, 1);
@@ -104,9 +106,9 @@ test('listHistory without an issueIdentifier returns the whole workspace history
   await store.removeItem('acme', b._id);
   historyQueries.length = 0;
 
-  const result = await store.listHistory('acme');
+  const result = await store.listHistory('acme', { limit: 100 });
 
-  assert.equal(historyQueries.length, 1);
+  assert.equal(historyQueries.filter(q => !q._id).length, 1);
   assert.ok(!('issueIdentifier' in historyQueries[0]));
   assert.equal(result.total, 2);
 });
@@ -131,7 +133,7 @@ test('listHistory pushes a since window into the query and excludes older rows',
   const since = new Date('2026-05-24T00:00:00.000Z');
   const result = await store.listHistory('acme', { since });
 
-  assert.equal(history.queries.length, 1);
+  assert.equal(history.queries.filter(q => !q._id).length, 1);
   assert.deepEqual(history.queries[0].dispatchedAt, { $gte: since },
     'the since window must ride into the query so a real DB filters server-side');
   assert.equal(result.total, 1, 'only the in-window row is materialised');

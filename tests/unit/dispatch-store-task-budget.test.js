@@ -88,7 +88,7 @@ describe('maxTasks field threading (LIN-1751)', () => {
     const status = await store.getItemStatus('acme', created._id);
     assert.strictEqual(status.maxTasks, null);
 
-    const { items } = await store.listHistory('acme');
+    const { items } = await store.listHistory('acme', { limit: 100 });
     assert.strictEqual(items[0].maxTasks, null);
   });
 
@@ -106,7 +106,7 @@ describe('maxTasks field threading (LIN-1751)', () => {
     assert.equal(status.status, 'taken', 'sanity: resolved via the history branch, not the active queue');
     assert.equal(status.maxTasks, 25, 'a missing field here makes the budget guard silently stop enforcing');
 
-    const { items } = await store.listHistory('acme');
+    const { items } = await store.listHistory('acme', { limit: 100 });
     assert.equal(items.length, 1);
     assert.equal(items[0].maxTasks, 25);
   });

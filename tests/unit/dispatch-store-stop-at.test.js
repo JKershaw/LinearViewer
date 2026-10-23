@@ -63,7 +63,7 @@ describe('stopAt field threading (LIN-3245)', () => {
     assert.equal(archived.status, 'taken', 'sanity: resolved via the history branch, not the active queue');
     assert.equal(archived.stopAt, 'pr', 'a missing field here makes the dispatch seam silently stop enforcing on every archived run');
 
-    const { items } = await store.listHistory('acme');
+    const { items } = await store.listHistory('acme', { limit: 100 });
     assert.equal(items.length, 1);
     assert.equal(items[0].stopAt, 'pr');
   });
@@ -82,7 +82,7 @@ describe('stopAt field threading (LIN-3245)', () => {
     const archived = await store.getItemStatus('acme', created._id);
     assert.strictEqual(archived.stopAt, null);
 
-    const { items } = await store.listHistory('acme');
+    const { items } = await store.listHistory('acme', { limit: 100 });
     assert.strictEqual(items[0].stopAt, null);
   });
 });

@@ -115,8 +115,8 @@ function makeWorld() {
     world.spy.lookup.push(args);
     return realLookup(...args);
   };
-  const realStatus = store.getItemStatus.bind(store);
-  store.getItemStatus = async (...args) => {
+  const realStatus = store.getItemFeedback.bind(store);
+  store.getItemFeedback = async (...args) => {
     world.spy.status.push(args);
     return realStatus(...args);
   };
@@ -690,20 +690,20 @@ describe('13 — history-only rows', () => {
 });
 
 describe('14 — B2: an unreadable status fails closed', () => {
-  test('getItemStatus returns null (miss or swallowed fault) -> 403, no mint', async () => {
+  test('getItemFeedback returns null (miss or swallowed fault) -> 403, no mint', async () => {
     const world = makeWorld();
     const id = await seedTaken(world);
-    world.store.getItemStatus = async (...args) => { world.spy.status.push(args); return null; };
+    world.store.getItemFeedback = async (...args) => { world.spy.status.push(args); return null; };
     resetSpy(world);
     const { result: res } = await captureLogs(() => call(buildApp(world), 'owner-token', { itemId: id }));
     assertCallerRefused(res, world, 'status unreadable');
     assert.equal(world.spy.status.length, 1, 'the status read ran');
   });
 
-  test('getItemStatus store fault -> retryable 503 (LIN-3805), never the final 403, nothing minted', async () => {
+  test('getItemFeedback store fault -> retryable 503 (LIN-3805), never the final 403, nothing minted', async () => {
     const world = makeWorld();
     const id = await seedTaken(world);
-    world.store.getItemStatus = async () => { throw new DispatchStoreFault('getItemStatus', new Error('mongo down')); };
+    world.store.getItemFeedback = async () => { throw new DispatchStoreFault('getItemFeedback', new Error('mongo down')); };
     resetSpy(world);
     const { result: res } = await captureLogs(() => call(buildApp(world), 'owner-token', { itemId: id }));
     assert.equal(res.status, 503, JSON.stringify(res.body));
@@ -726,7 +726,7 @@ describe('9-14 — one generic refusal body, the reason only in the server log',
     for (const [reason, token, opts] of cases) {
       const world = makeWorld();
       const id = await seedTaken(world, opts.patch ? { patch: opts.patch } : {});
-      if (opts.unreadable) world.store.getItemStatus = async () => null;
+      if (opts.unreadable) world.store.getItemFeedback = async () => null;
       const { result: res, lines } = await captureLogs(() => call(buildApp(world), token, { itemId: id }));
       assert.equal(res.status, 403, `${reason}: ${JSON.stringify(res.body)}`);
       bodies.push(res.body);

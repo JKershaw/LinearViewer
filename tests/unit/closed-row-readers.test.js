@@ -47,8 +47,8 @@ describe('LIN-3364 readers honour the stamp', () => {
       const read = [];
       await sweepOneWorkspace('acme', NOW.getTime(), {
         dispatchStore: {
-          listItems: async (_u, { rootItemId }) => { read.push(rootItemId); return []; },
-          listHistory: async (_u, { rootItemId }) => { read.push(rootItemId); return { items: [] }; }
+          listItemsWithPrompt: async (_u, { rootItemId }) => { read.push(rootItemId); return []; },
+          listHistoryWithBodies: async (_u, { rootItemId }) => { read.push(rootItemId); return { items: [] }; }
         },
         agentStatusStore: {}, dispatchTokenStore: {},
         alarmStore: { list: async () => [], open: async () => {}, clear: async () => {} },

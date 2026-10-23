@@ -112,7 +112,7 @@ describe('LIN-3258 negative capability: the guarded sweep can act on nothing', (
       history: (await historyColl.find({ urlKey }).toArray()).length
     };
 
-    const dispatchStore = forbiddenProxy(realDispatchStore, ['listItems', 'listHistory', 'listObservedWorkspaceKeys'], 'dispatchStore');
+    const dispatchStore = forbiddenProxy(realDispatchStore, ['listItems', 'listItemsWithPrompt', 'listHistory', 'listHistoryWithBodies', 'listObservedWorkspaceKeys'], 'dispatchStore');
     const alarmStore = forbiddenProxy(realAlarmStore, ['open', 'clear', 'markMiss', 'getById', 'list', 'listOpenWorkspaceKeys'], 'alarmStore');
     const agentStatusStore = forbiddenProxy({}, [], 'agentStatusStore');
 

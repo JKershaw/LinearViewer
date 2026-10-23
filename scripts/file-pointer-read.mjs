@@ -32,6 +32,7 @@ import { pathToFileURL } from 'node:url';
 import { MongoClient } from 'mongodb';
 import { MangoClient } from '@jkershaw/mangodb';
 import { DispatchQueueStore } from '../lib/dispatch-store.js';
+import { readHorizonStart } from '../lib/read-horizon.js';
 import { FILE_POINTER_MARKER, RACE_SUSPECT_WINDOW_MS, classifyPilotRows } from '../lib/file-pointer.js';
 
 export function parseArgs(argv) {
@@ -98,8 +99,11 @@ export function mergePilotRows({ liveItems = [], historyItems = [] } = {}) {
  */
 export async function loadPilotRows(store, urlKey) {
   const [history, live] = await Promise.all([
-    store.listHistory(urlKey, { projection: { feedback: 0 } }),
-    store.listItems(urlKey)
+    // LIN-3812: history is lifetime-retained and an unbounded read is refused, so the
+    // pilot read carries the shared 30-day read horizon (the same window every other
+    // history reader uses). The prompt carries the pointer marker, so both reads keep it.
+    store.listHistory(urlKey, { since: readHorizonStart(Date.now()), projection: { feedback: 0 } }),
+    store.listItemsWithPrompt(urlKey)
   ]);
   const liveItems = Array.isArray(live) ? live : [];
   const historyItems = Array.isArray(history?.items)

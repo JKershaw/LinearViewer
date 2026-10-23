@@ -158,8 +158,9 @@ async function makeWorld({ proxyTokenStore: tokenStoreOverride } = {}) {
 
   // Session discovery for approve-follow-up / send_follow_up (the only
   // synthetic seam): one finished session whose tail is the parent row.
-  dispatchStore.listItems = async () => [];
-  dispatchStore.listHistory = async () => {
+  // LIN-3812: the non-lean session build reads the named whole-document methods.
+  dispatchStore.listItems = dispatchStore.listItemsWithPrompt = async () => [];
+  dispatchStore.listHistory = dispatchStore.listHistoryWithBodies = async () => {
     const items = withFreshDigests(world.sessionRows);
     return { items, total: items.length };
   };

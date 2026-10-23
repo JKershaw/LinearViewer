@@ -3429,10 +3429,15 @@ describe('pass-4 — review-ledger discharge (LIN-2617)', () => {
       dispatchQueueStore: {
         ...base.dispatchQueueStore,
         async listHistory(urlKey, options) {
-          // `lean` sets `projection: { prompt: 0 }` at the query
-          // (lib/pipeline-loops.js:1309) so a real DB never transfers 30 days of
-          // prompt text — the LIN-623 read the LIN-608 OOM is blamed on.
-          leanFlags.push(options?.projection?.prompt);
+          // LIN-3812: lean is the store's DEFAULT read (it drops `prompt` and `feedback` at the
+          // query, so a real DB never transfers 30 days of prompt text — the LIN-623 read the
+          // LIN-608 OOM is blamed on). A lean build asks for it by passing NO projection and
+          // calling the plain `listHistory`; the whole-document read is `listHistoryWithBodies`.
+          leanFlags.push(options?.projection === undefined);
+          return base.dispatchQueueStore.listHistory(urlKey, options);
+        },
+        async listHistoryWithBodies(urlKey, options) {
+          leanFlags.push('bodies');
           return base.dispatchQueueStore.listHistory(urlKey, options);
         },
       },
@@ -3445,8 +3450,8 @@ describe('pass-4 — review-ledger discharge (LIN-2617)', () => {
     });
     await executeTool({ name: 'list_pending_decisions', arguments: {} });
     assert.strictEqual(leanFlags.length, 2, 'the loop read for the predicate, and the session read for the index');
-    // BOTH reads project prompt away — the index read has no use for it at all.
-    assert.deepStrictEqual(leanFlags, [0, 0], 'neither read drags prompt text along');
+    // BOTH reads are the lean default — the index read has no use for the prompt at all.
+    assert.deepStrictEqual(leanFlags, [true, true], 'neither read drags prompt text along');
   });
 });
 
