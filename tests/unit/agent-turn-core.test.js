@@ -894,27 +894,23 @@ describe('LIN-2625: playbook memory', () => {
     assert.strictEqual(store.state.companion.notes, 'fresh playbook written mid-flight');
   });
 
-  test('an auto-wake turn that itself calls remember commits ITS OWN buffered value, not the fresh read', async () => {
-    const capture = {};
-    const store = fakeStore({ census: censusDoc('hash-new2') });
-    await runAgentTurn({
-      workspace: WORKSPACE, turnKind: 'auto-wake', apiKey: 'sk-test',
-      onEvent: () => {},
-      deps: {
-        ...baseDeps(store, {
-          async streamChat(_m, _o, onEvent) { onEvent('done', {}); },
-          async streamChatWithTools(_m, _o, onEvent) {
-            capture.args.onRemember('buffered playbook from this very turn');
-            // A stray concurrent write must NOT win over this turn's own buffer.
-            store.state.companion = { ...store.state.companion, notes: 'some other fresh value' };
-            onEvent('done', {});
-          },
-        }),
-        createToolCatalog: catalogCapturing(capture),
-      },
+  // LIN-3779: machine-driven turns (no human message) never get `remember`.
+  for (const turnKind of ['auto-wake', 'boot']) {
+    test(`LIN-3779: a ${turnKind} turn never enables the remember tool — no onRemember, playbookEnabled: false`, async () => {
+      const capture = {};
+      const store = fakeStore({ census: censusDoc('hash-new2') });
+      await runAgentTurn({
+        workspace: WORKSPACE, turnKind, apiKey: 'sk-test',
+        onEvent: () => {},
+        deps: {
+          ...baseDeps(store, scriptedClient([['done', {}]])),
+          createToolCatalog: catalogCapturing(capture),
+        },
+      });
+      assert.strictEqual(capture.args.playbookEnabled, false);
+      assert.strictEqual(capture.args.onRemember, undefined);
     });
-    assert.strictEqual(store.state.companion.notes, 'buffered playbook from this very turn');
-  });
+  }
 
   test('allowPlaybookWrite: false (the proxy shape) never enables the remember tool — no onRemember, playbookEnabled: false', async () => {
     const capture = {};
