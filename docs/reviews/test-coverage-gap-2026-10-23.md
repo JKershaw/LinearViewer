@@ -67,8 +67,9 @@ runs from 2026-10-19 to 10-23 gave 192 success and 8 failure, with one `run_atte
 logs were read from 120 green runs (60 recent, plus 12 from each of five earlier windows back to
 2026-09-20). The only per-test signal the logs carry is the `list` reporter's `N flaky` block, the `✘`
 first attempt and the first-attempt error; `test-results/` is uploaded only `if: failure()`
-(`.github/workflows/test.yml:116-118`), so nothing finer exists. 43 of 120 green runs (33% of the 60
-recent ones) carried at least one retry-rescued test, against 80% in the LIN-3168 census.
+(`.github/workflows/test.yml:116-118`), so nothing finer exists. 20 of the 60 recent green runs (33%),
+and 43 of all 120 sampled (36%), carried at least one retry-rescued test, against 80% in the LIN-3168
+census.
 
 **Hermetic arms.** No vacuous-pass path found: `guardSockets` observes the connect and passes it
 through (`tests/fixtures/network-guard.js:163-167`), and the proxy arm counts a connect to a dead
