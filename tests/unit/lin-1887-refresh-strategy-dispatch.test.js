@@ -13,7 +13,7 @@
  * Both dispatches are sliced out of the REAL server.js and executed in a
  * `node:vm` context (server.js is not import-safe in a unit test — it connects
  * to Mongo and listens at module load). The strategy table, `removeWorkspace`
- * and `renderServiceUnavailablePage` are the REAL implementations; only I/O boundaries are
+ * and `renderSourceErrorPage` are the REAL implementations; only I/O boundaries are
  * faked. This is the same harness convention as
  * `lin-1885-jira-401-workspace-preservation.test.js` and
  * `lin-1503-github-family-401-remint-behaviour.test.js`.
@@ -26,7 +26,8 @@ import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 
 import { removeWorkspace, normalizeProvider, getWorkspaceTokenExpiry } from '../../lib/workspace.js';
-import { renderServiceUnavailablePage } from '../../lib/render-pages.js';
+import { renderSourceErrorPage } from '../../lib/render-pages.js';
+import { errorReference } from '../../lib/errors.js';
 import { REFRESH_STRATEGY, refreshDeclarationFor, refreshStrategyFor, relinkNotice } from '../../lib/refresh-strategy.js';
 import { TokenRefreshError } from '../../lib/token-refresh.js';
 import { fingerprintCredential } from '../../lib/credential-diagnostics.js';
@@ -76,7 +77,7 @@ function makeContext({ workspace, extraWorkspaces = [], durableRecord = null, ca
     relinkNotice,
     normalizeProvider,
     removeWorkspace,
-    renderServiceUnavailablePage,
+    renderSourceErrorPage, errorReference,
     isDefinitiveRevocation: () => definitiveRevocation,
     isTransientRefreshFailure: (e) => e instanceof TokenRefreshError && e.code !== 'EXPIRED',
 
@@ -159,14 +160,14 @@ function makeContext({ workspace, extraWorkspaces = [], durableRecord = null, ca
     getProvider: () => ({ entryCta: { isConfigured: () => true } }),
     Date,
     process: { env: {} },
-    console: { log() {}, warn() {}, error() {} },
+    console: { log() {}, warn() {}, error: (...a) => { calls.errorLogs.push(a); } },
     __session: session,
   });
 }
 
 function freshCalls() {
   return {
-    renderErrorPage: [], refreshCalls: [], exchangesUsed: [], durableGets: [], durableDeletes: [],
+    errorLogs: [], renderErrorPage: [], refreshCalls: [], exchangesUsed: [], durableGets: [], durableDeletes: [],
     durableDeleteAlls: [], revokes: [], evictions: [], remint: 0, save: 0, evictAll: 0, tokenRefreshAndRetry: 0,
     sessionDestroyed: false, nextCalled: false,
   };
@@ -642,5 +643,82 @@ describe('LIN-1887 Step 10 — the refresh monitor keys on a stable log string',
     }
     assert.equal(warnings.length, 1, 'the refusal must be observable, not a silent null');
     assert.match(warnings[0], /labelled jira in the linear partition/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LIN-3775 — the 503 exits name the source and carry the log line's reference
+// ---------------------------------------------------------------------------
+
+describe('LIN-3775 — ensureValidToken (1380) and handleUnauthorizedError (2210) 503 pages', () => {
+  const refOf = (calls, prefix) => {
+    const log = calls.errorLogs.find((a) => String(a[0]).startsWith(prefix));
+    assert.ok(log, `expected a console.error starting "${prefix}"`);
+    const ref = String(log.at(-1)).match(/^\[ref ([0-9a-f]{8})\]$/)?.[1];
+    assert.ok(ref, 'the last console.error argument is [ref <8 hex>]');
+    return ref;
+  };
+
+  async function reactiveWith(workspace, handleTokenRefreshAndRetry) {
+    const calls = freshCalls();
+    const ctx = makeContext({ workspace, durableRecord: { refreshToken: 'RT', provider: workspace.provider }, calls });
+    ctx.handleTokenRefreshAndRetry = handleTokenRefreshAndRetry;
+    const res = { statusCode: 200, body: null, status(c) { this.statusCode = c; return this; }, send(p) { this.body = p; return this; } };
+    const fn = vm.runInContext([
+      handleWorkspaceRemovalSrc(),
+      handleUnauthorizedErrorSrc(),
+      sliceBetween('const REFRESH_EXCHANGES = {', '\n/**\n * Render the non-destructive'),
+      sliceBetween('function sendRelinkNotice(workspace, res) {', '\n/**\n * Middleware to ensure access token is valid'),
+      'handleUnauthorizedError',
+    ].join('\n'), ctx);
+    await fn(workspace, ctx.__session, 'team-1', { selectedAssignee: 'all', resolvedAssigneeName: null }, null, res);
+    return { calls, res };
+  }
+
+  test('1380: a NETWORK refresh blip is a 503 naming Linear, no reconnect, same ref on page and log', async () => {
+    const { calls, res } = await runProactive({
+      workspace: expired({ provider: 'linear', name: 'Acme WS' }),
+      refreshResult: () => { throw new TokenRefreshError('upstream 503', 'NETWORK'); },
+    });
+    assert.equal(res.statusCode, 503);
+    assert.match(res.body, /Linear \(Acme WS\)/);
+    assert.doesNotMatch(res.body, /[Rr]econnect|Go to settings/);
+    assert.ok(res.body.includes(refOf(calls, 'Token refresh failed for workspace')));
+  });
+
+  test('2210: a refresh failure is a 503 that never offers reconnect, ref matches the log', async () => {
+    const { calls, res } = await reactiveWith({ id: 'w-x', urlKey: 'acme', provider: 'linear', name: 'Acme WS' },
+      async () => { throw new TokenRefreshError('upstream', 'NETWORK'); });
+    assert.equal(res.statusCode, 503);
+    assert.doesNotMatch(res.body, /[Rr]econnect|Go to settings/);
+    assert.ok(res.body.includes(refOf(calls, 'Token refresh failed after 401')));
+  });
+
+  test('2210: a render-time auth failure on the active source offers the relink target', async () => {
+    const workspace = { id: 'w-x', urlKey: 'acme', provider: 'linear', name: 'Acme WS', activeBinding: { provider: 'linear', scope: 'org-1' } };
+    const tag = { provider: 'linear', scope: 'org-1', connectionId: 'c' };
+    const { calls, res } = await reactiveWith(workspace,
+      async () => { throw Object.assign(new Error('Bad credentials'), { status: 401, binding: tag }); });
+    assert.equal(res.statusCode, 503);
+    assert.match(res.body, /HTTP 401/);
+    assert.match(res.body, /Linear \(Acme WS\)/);
+    assert.ok(res.body.includes(refOf(calls, 'Token refresh failed after 401')));
+    assert.match(res.body, /[Rr]econnect/);
+  });
+
+  test('2210: a render-time plain Error is "internal" with no reconnect', async () => {
+    const { res } = await reactiveWith({ id: 'w-x', urlKey: 'acme', provider: 'linear', name: 'Acme WS' },
+      async () => { throw new Error('boom'); });
+    assert.equal(res.statusCode, 503);
+    assert.doesNotMatch(res.body, /[Rr]econnect|Go to settings/);
+  });
+
+  test('2210: a tagged legacy secondary GitHub 401 names GitHub and offers settings', async () => {
+    const workspace = { id: 'w-x', urlKey: 'acme', provider: 'linear', name: 'Acme WS', activeBinding: { provider: 'linear', scope: 'org-1' } };
+    const tag = { provider: 'github', scope: 'o/r', connectionId: null };
+    const { res } = await reactiveWith(workspace,
+      async () => { throw Object.assign(new Error('Bad credentials'), { status: 401, binding: tag }); });
+    assert.match(res.body, /GitHub Issues \(o\/r\)/);
+    assert.match(res.body, /href="\/workspace\/acme\/settings"/);
   });
 });

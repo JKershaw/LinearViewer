@@ -27,12 +27,13 @@ import vm from 'node:vm';
 import { createSecondaryBindingRemint } from '../../lib/connection-secondary-remint.js';
 import { rehydrateBindingAfterRefresh } from '../../lib/connection-credential.js';
 import { setBindingCredential, activeConnectionBackedBinding } from '../../lib/connection-binding.js';
-import { REFRESH_STRATEGY, refreshDeclarationFor } from '../../lib/refresh-strategy.js';
+import { REFRESH_STRATEGY, refreshDeclarationFor, relinkNotice } from '../../lib/refresh-strategy.js';
 import { normalizeProvider } from '../../lib/workspace.js';
 import { renderPage } from '../../lib/render.js';
 import { orderIssuesForSwipe } from '../../lib/render-swipe.js';
 import { nodeKey } from '../../lib/tree.js';
-import { renderServiceUnavailablePage } from '../../lib/render-pages.js';
+import { renderSourceErrorPage } from '../../lib/render-pages.js';
+import { errorReference } from '../../lib/errors.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
@@ -65,7 +66,7 @@ function makeWorkspace({ ghHydrated = true, ghProvider = 'github', ghConnectionI
  * @param {boolean} [o.remintFails]
  */
 function harness({ degraded = [], remintFails = false, fetchThrows = null } = {}) {
-  const calls = { githubRemint: [], linearRefresh: [], linearExchange: 0, fetch: [], removal: 0, saveSession: 0, durableRead: 0 };
+  const calls = { errorLogs: [], githubRemint: [], linearRefresh: [], linearExchange: 0, fetch: [], removal: 0, saveSession: 0, durableRead: 0 };
   const res = {
     statusCode: 200, body: null,
     status(code) { this.statusCode = code; return this; },
@@ -82,9 +83,9 @@ function harness({ degraded = [], remintFails = false, fetchThrows = null } = {}
     logger: { error: () => {} },
   });
   const context = vm.createContext({
-    process, console: { ...console, error: () => {}, log: () => {} },
+    process, console: { ...console, error: (...a) => { calls.errorLogs.push(a); }, log: () => {} },
     REFRESH_STRATEGY, refreshDeclarationFor, normalizeProvider,
-    renderPage, orderIssuesForSwipe, nodeKey, renderServiceUnavailablePage,
+    renderPage, orderIssuesForSwipe, nodeKey, renderSourceErrorPage, errorReference, relinkNotice,
     secondaryRemint,
     activeConnectionIdForWorkspace: (ws) => activeConnectionBackedBinding(ws)?.connectionId ?? null,
     customPromptsStore: { list: async () => [] },
@@ -181,6 +182,31 @@ describe('LIN-3774 handleUnauthorizedError — tagged secondary 401', () => {
     // The arm ends here: it never falls through to the active-binding ladder after its own 503.
     assert.equal(calls.linearRefresh.length, 0);
     assert.equal(calls.durableRead, 0);
+  });
+
+  // LIN-3775 exit 1991: the 503 names the failing source, the status, and carries the
+  // same reference as the log line. A 502 from the secondary GitHub source never offers reconnect.
+  test('LIN-3775: the render-failure 503 names the source and status, with the log line\'s reference', async () => {
+    const fetchThrows = Object.assign(new Error('GitHub 502 upstream body'), { status: 502, binding: GH_TAG });
+    const { calls, res, run } = harness({ fetchThrows });
+    await run(makeWorkspace(), authError(GH_TAG));
+    assert.equal(res.statusCode, 503);
+    assert.match(res.body, /GitHub Issues \(JKershaw\/LinearViewer\)/);
+    assert.match(res.body, /HTTP 502/);
+    assert.doesNotMatch(res.body, /[Rr]econnect|Go to settings|try again later/);
+    const log = calls.errorLogs.find((a) => String(a[0]).startsWith('Post-secondary-remint dashboard render failed'));
+    const ref = String(log.at(-1)).match(/^\[ref ([0-9a-f]{8})\]$/)?.[1];
+    assert.ok(ref, 'the last console.error argument is [ref <8 hex>]');
+    assert.ok(res.body.includes(ref), 'the same reference is on the page');
+  });
+
+  test('LIN-3775: a secondary GitHub 401 that survives the re-mint offers settings, not the active relink', async () => {
+    const fetchThrows = Object.assign(new Error('Bad credentials'), { status: 401, binding: GH_TAG });
+    const { res, run } = harness({ fetchThrows });
+    await run(makeWorkspace(), authError(GH_TAG));
+    assert.equal(res.statusCode, 503);
+    assert.match(res.body, /href="\/workspace\/lv\/settings"/);
+    assert.match(res.body, /Go to settings/);
   });
 });
 

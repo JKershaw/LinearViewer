@@ -19,7 +19,7 @@
 // the real source of the GitHub-family branch and of handleWorkspaceRemoval by
 // the same pinned markers the census tests already depend on, then EXECUTES that
 // real source in a vm context with the collaborators injected. removeWorkspace
-// and renderServiceUnavailablePage are the real implementations, imported normally — only
+// and renderSourceErrorPage are the real implementations, imported normally — only
 // the I/O boundaries (re-mint, session save, render, durable store) are faked, so
 // a fault can be injected at each one.
 //
@@ -43,7 +43,8 @@ import vm from 'node:vm';
 
 import { removeWorkspace, normalizeProvider } from '../../lib/workspace.js';
 import { REFRESH_STRATEGY, refreshDeclarationFor, relinkNotice } from '../../lib/refresh-strategy.js';
-import { renderServiceUnavailablePage } from '../../lib/render-pages.js';
+import { renderSourceErrorPage } from '../../lib/render-pages.js';
+import { errorReference } from '../../lib/errors.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
@@ -116,6 +117,7 @@ async function runGitHubFamilyBranch({
   extraWorkspaces = []
 } = {}) {
   const calls = {
+    errorLogs: [],
     remint: 0,
     save: 0,
     render: 0,
@@ -162,7 +164,7 @@ async function runGitHubFamilyBranch({
       return res.status(401).send(`<error:${notice.title}>`);
     },
     removeWorkspace,
-    renderServiceUnavailablePage,
+    renderSourceErrorPage, errorReference,
 
     // Faked I/O boundaries, each independently injectable.
     remintActiveCredential: async (...args) => { calls.remint++; return remint(...args); },
@@ -202,7 +204,7 @@ async function runGitHubFamilyBranch({
     // a reason unrelated to what they test.
     getProvider: () => ({ entryCta: { isConfigured: () => true } }),
     process: { env: {} },
-    console: { log() {}, error() {} }
+    console: { log() {}, error: (...a) => { calls.errorLogs.push(a); } }
   });
 
   const script = [
@@ -248,6 +250,21 @@ async function runGitHubFamilyBranch({
 }
 
 describe('LIN-1503 close-out: GitHub-family 401 branch, executed (ledger rows 3-6)', () => {
+  // LIN-3775 exit 2113: the 503 names the source and status, never offers reconnect for a 5xx,
+  // and the page's reference is the last console.error argument.
+  test('LIN-3775: a post-remint render failure 503 names the source and carries the log line\'s reference', async () => {
+    const renderFailure = Object.assign(new Error('GitHub 502 raw body'), { status: 502 });
+    const { calls, res } = await runGitHubFamilyBranch({ render: async () => { throw renderFailure; } });
+    assert.equal(res.statusCode, 503);
+    assert.match(res.body, /GitHub/);
+    assert.match(res.body, /HTTP 502/);
+    assert.doesNotMatch(res.body, /[Rr]econnect|try again later/);
+    const log = calls.errorLogs.find((a) => String(a[0]).startsWith('Post-remint dashboard render failed'));
+    const ref = String(log.at(-1)).match(/^\[ref ([0-9a-f]{8})\]$/)?.[1];
+    assert.ok(ref, 'the last console.error argument is [ref <8 hex>]');
+    assert.ok(res.body.includes(ref), 'the same reference is on the page');
+  });
+
   // Ledger row 3 + row 4 — the plan review's F1 finding, the single behavior
   // that finding existed to protect, and the only proof that `await` routes.
   test('row 3/4: a post-remint render failure returns a retryable 503 and PRESERVES the workspace', async () => {
@@ -272,7 +289,7 @@ describe('LIN-1503 close-out: GitHub-family 401 branch, executed (ledger rows 3-
     assert.equal(session.activeWorkspaceId, 'ws-github', 'the workspace must still be the active one');
     assert.equal(calls.sessionDestroyed, false, 'the session must not be destroyed');
 
-    // And the failure is retryable, not terminal — real renderServiceUnavailablePage.
+    // And the failure is retryable, not terminal — real renderSourceErrorPage.
     assert.equal(res.statusCode, 503, 'a post-remint render failure must surface as a retryable 503');
     assert.notEqual(result, undefined, 'the branch must return the 503 response, not fall through to the Linear arm');
   });

@@ -107,8 +107,8 @@ import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActi
 import { isHiddenState } from './lib/providers/state-map.js'
 import { buildPeriodicalNodes } from './lib/periodicals.js'
 import { renderPage, renderErrorPage, renderUpstreamAwareErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
-import { isAuthError, clientErrorStatus, clientErrorMessage, badRequest, jsonError, serverError, unauthorized } from './lib/errors.js'
-import { renderServiceUnavailablePage } from './lib/render-pages.js'
+import { isAuthError, errorReference, clientErrorStatus, clientErrorMessage, badRequest, jsonError, serverError, unauthorized } from './lib/errors.js'
+import { renderSourceErrorPage } from './lib/render-pages.js'
 import { renderLandingPage } from './lib/render-landing.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken, isDefinitiveRevocation, isTransientRefreshFailure } from './lib/token-refresh.js'
@@ -1368,7 +1368,10 @@ async function ensureValidToken(req, res, next) {
     console.log(`Token refreshed for workspace ${workspace.id} (provider=${provider})`)
     next()
   } catch (error) {
-    console.error(`Token refresh failed for workspace ${workspace.id}:`, error)
+    const ref = errorReference()
+    console.error(`Token refresh failed for workspace ${workspace.id}:`, error, `[ref ${ref}]`)
+    // LIN-3775: the ref is minted first in the catch (only a failure mints one) and
+    // is both the last console.error argument and the error page's Reference row.
 
     // LIN-1545 (S1): a TRANSIENT refresh blip (a Linear 5xx / network drop /
     // malformed response → TokenRefreshError NETWORK/INVALID/UNKNOWN) must NOT
@@ -1377,7 +1380,7 @@ async function ensureValidToken(req, res, next) {
     // WORKSPACE_NOT_CONNECTED off one blip. Fail only THIS request, retryably,
     // and leave the credential, the workspace, and the session untouched.
     if (isTransientRefreshFailure(error)) {
-      return res.status(503).send(renderServiceUnavailablePage())
+      return res.status(503).send(renderSourceErrorPage(error, workspace, { ref, relink: relinkNotice }))
     }
 
     // LIN-1887 Step 1: a failed refresh may only tear the workspace down for a
@@ -1987,8 +1990,9 @@ async function handleUnauthorizedError(workspace, session, teamId, assigneeState
     try {
       return await renderDashboardAfterRefresh(workspace, session, teamId, assigneeState, openRouterSource, res);
     } catch (renderError) {
-      console.error('Post-secondary-remint dashboard render failed (workspace preserved):', renderError);
-      return res.status(503).send(renderServiceUnavailablePage());
+      const ref = errorReference();
+      console.error('Post-secondary-remint dashboard render failed (workspace preserved):', renderError, `[ref ${ref}]`);
+      return res.status(503).send(renderSourceErrorPage(renderError, workspace, { ref, relink: relinkNotice }));
     }
   }
 
@@ -2109,8 +2113,9 @@ async function handleUnauthorizedError(workspace, session, teamId, assigneeState
       // fail only this request, retryably.
       return await renderDashboardAfterRefresh(workspace, session, teamId, assigneeState, openRouterSource, res);
     } catch (renderError) {
-      console.error('Post-remint dashboard render failed (workspace preserved):', renderError);
-      return res.status(503).send(renderServiceUnavailablePage());
+      const ref = errorReference();
+      console.error('Post-remint dashboard render failed (workspace preserved):', renderError, `[ref ${ref}]`);
+      return res.status(503).send(renderSourceErrorPage(renderError, workspace, { ref, relink: relinkNotice }));
     }
   }
 
@@ -2149,7 +2154,8 @@ async function handleUnauthorizedError(workspace, session, teamId, assigneeState
       // Review blocker 2: the retry render below uses the refreshed token.
       rehydrateAfterRefresh(workspace, refreshed);
     } catch (refreshError) {
-      console.error('Connection refresh failed after 401:', refreshError);
+      const ref = errorReference();
+      console.error('Connection refresh failed after 401:', refreshError, `[ref ${ref}]`);
       if (isDefinitiveRevocation(refreshError)) {
         await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider, scope: workspace.activeBinding.scope, mode: 'revoke', evict: evictReferentFor(session.accountId) });
       }
@@ -2157,13 +2163,14 @@ async function handleUnauthorizedError(workspace, session, teamId, assigneeState
       if (isDefinitiveRevocation(refreshError)) {
         return handleWorkspaceRemoval(session, workspace.id, res, true);
       }
-      return res.status(503).send(renderServiceUnavailablePage());
+      return res.status(503).send(renderSourceErrorPage(refreshError, workspace, { ref, relink: relinkNotice }));
     }
     try {
       return await renderDashboardAfterRefresh(workspace, session, teamId, assigneeState, openRouterSource, res);
     } catch (renderError) {
-      console.error('Post-connection-refresh dashboard render failed (workspace preserved):', renderError);
-      return res.status(503).send(renderServiceUnavailablePage());
+      const ref = errorReference();
+      console.error('Post-connection-refresh dashboard render failed (workspace preserved):', renderError, `[ref ${ref}]`);
+      return res.status(503).send(renderSourceErrorPage(renderError, workspace, { ref, relink: relinkNotice }));
     }
   }
 
@@ -2177,7 +2184,8 @@ async function handleUnauthorizedError(workspace, session, teamId, assigneeState
       // the non-destructive response below (it has no durable record), unchanged.
       return await handleTokenRefreshAndRetry(workspace, session, teamId, assigneeState, openRouterSource, res, { provider, exchange });
     } catch (refreshError) {
-      console.error('Token refresh failed after 401:', refreshError);
+      const ref = errorReference();
+      console.error('Token refresh failed after 401:', refreshError, `[ref ${ref}]`);
       // Step 7's invariant, enforced by the declaration rather than by a
       // provider name: a failed refresh may only tear the workspace down for a
       // provider that declares it. A failed Jira refresh degrades to the same
@@ -2207,7 +2215,7 @@ async function handleUnauthorizedError(workspace, session, teamId, assigneeState
       if (isDefinitiveRevocation(refreshError)) {
         return handleWorkspaceRemoval(session, workspace.id, res, true);
       }
-      return res.status(503).send(renderServiceUnavailablePage());
+      return res.status(503).send(renderSourceErrorPage(refreshError, workspace, { ref, relink: relinkNotice }));
     }
   }
 

@@ -35,8 +35,9 @@ import * as seam from '../../lib/connection-credential.js';
 import * as bindingModule from '../../lib/connection-binding.js';
 import * as ws from '../../lib/workspace.js';
 import { releaseConnectionCredential } from '../../lib/connection-lifecycle.js';
-import { REFRESH_STRATEGY, refreshDeclarationFor } from '../../lib/refresh-strategy.js';
-import { renderServiceUnavailablePage } from '../../lib/render-pages.js';
+import { REFRESH_STRATEGY, refreshDeclarationFor, relinkNotice } from '../../lib/refresh-strategy.js';
+import { renderSourceErrorPage } from '../../lib/render-pages.js';
+import { errorReference } from '../../lib/errors.js';
 import { isDefinitiveRevocation, isTransientRefreshFailure, TokenRefreshError } from '../../lib/token-refresh.js';
 import { TOKEN_REFRESH_BUFFER_MS, selectOwnerSessionRow } from '../../lib/workspace-token-resolver.js';
 import { fingerprintCredential } from '../../lib/credential-diagnostics.js';
@@ -161,7 +162,7 @@ describe('LIN-3124 PR3 review fixes (verdict 71b71694)', () => {
       getProviderForWorkspace: () => ({}),
       refreshOwnerCredential: async () => { calls.legacyRefresh = (calls.legacyRefresh || 0) + 1; return null; },
       saveSession: async () => {},
-      renderServiceUnavailablePage,
+      renderSourceErrorPage, errorReference, relinkNotice,
       renderErrorPage: (title) => `<${title}>`,
       sendRelinkNotice: (_w, res) => { calls.relink = true; return res.status(401).send('relink'); },
       handleWorkspaceRemoval: async (_session, id, res, deleteDurable) => { calls.removal = { id, deleteDurable }; return res.status(302).send('removed'); },
@@ -373,6 +374,42 @@ describe('LIN-3124 PR3 review fixes (verdict 71b71694)', () => {
       await runSliced(serverContext(s, calls, { connectionAccess: access }), 'handleUnauthorizedError')(workspace, session, null, null, null, res);
       assert.equal(res.statusCode, 503);
       assert.ok(await s.connectionStore.readConnectionById(connectionId));
+    });
+
+    // LIN-3775 exits 2160 (refresh failure) and 2166 (render failure after the refresh).
+    test('LIN-3775: the transient 503 names the source and its ref matches the log line', async () => {
+      const s = stores();
+      const { session, workspace } = await connectionBackedSession(s);
+      const access = connectionAccessFor(s, async () => { throw new TokenRefreshError('blip', 'NETWORK'); });
+      const errorLogs = [];
+      const res = makeRes();
+      await runSliced(serverContext(s, {}, { connectionAccess: access, console: { log() {}, warn() {}, error: (...a) => errorLogs.push(a) } }), 'handleUnauthorizedError')(workspace, session, null, null, null, res);
+      assert.equal(res.statusCode, 503);
+      assert.doesNotMatch(String(res.body), /[Rr]econnect|try again later/);
+      const log = errorLogs.find((a) => String(a[0]).startsWith('Connection refresh failed after 401'));
+      const ref = String(log.at(-1)).match(/^\[ref ([0-9a-f]{8})\]$/)?.[1];
+      assert.ok(ref, 'the last console.error argument is [ref <8 hex>]');
+      assert.ok(String(res.body).includes(ref), 'the same reference is on the page');
+    });
+
+    test('LIN-3775: a render failure after the connection refresh is a 503 naming the source and status', async () => {
+      const s = stores();
+      const { session, workspace } = await connectionBackedSession(s);
+      const access = connectionAccessFor(s, async () => ({ token: 'fresh', expiresAt: Date.now() + 3_600_000 }));
+      const errorLogs = [];
+      const res = makeRes();
+      const renderError = Object.assign(new Error('upstream 502 raw body'), { status: 502 });
+      const ctx = serverContext(s, {}, {
+        connectionAccess: access, console: { log() {}, warn() {}, error: (...a) => errorLogs.push(a) },
+        renderDashboardAfterRefresh: async () => { throw renderError; },
+      });
+      await runSliced(ctx, 'handleUnauthorizedError')(workspace, session, null, null, null, res);
+      assert.equal(res.statusCode, 503);
+      assert.match(String(res.body), /HTTP 502/);
+      assert.doesNotMatch(String(res.body), /[Rr]econnect|raw body/);
+      const log = errorLogs.find((a) => String(a[0]).startsWith('Post-connection-refresh dashboard render failed'));
+      const ref = String(log.at(-1)).match(/^\[ref ([0-9a-f]{8})\]$/)?.[1];
+      assert.ok(ref && String(res.body).includes(ref), 'same reference on page and log');
     });
 
     test('the headless arm keeps its non-throwing contract (a revoked Connection is a miss, not a throw)', async () => {
