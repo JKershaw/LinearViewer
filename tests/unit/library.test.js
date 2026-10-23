@@ -502,4 +502,24 @@ describe('figure dark-mode theme (LIN-3351)', () => {
     assert.match(css, /\.theme-dark \.library-doc__body img\[src\$="\/steady-base-menu\/menu-size-vs-risk\.svg"\]\s*\{\s*filter:\s*brightness\(0\.85\)/);
     assert.match(css, /body\.is-landing \.library-doc__body img\[src\$="\/steady-base-menu\/menu-size-vs-risk\.svg"\]\s*\{\s*filter:\s*brightness\(0\.85\)/);
   });
+
+  // LIN-3761 — wide tables need their own scroll box (root is overflow-x: clip).
+  test('every rendered table sits inside a scroll wrapper, across the catalog', () => {
+    let tables = 0;
+    for (const doc of catalog.docs ?? catalog) {
+      const html = doc.html ?? '';
+      const n = (html.match(/<table[\s>]/g) || []).length;
+      const w = (html.match(/<div class="library-doc__table-wrap"[^>]*><table[\s>]/g) || []).length;
+      assert.equal(w, n, `${doc.slug}: ${n} tables, ${w} wrapped`);
+      tables += n;
+    }
+    assert.ok(tables > 0, 'catalog has tables to check');
+  });
+
+  test('library.css scrolls the table wrapper and wraps long unbroken runs with break-word, not anywhere', () => {
+    const css = readFileSync(join(import.meta.dirname, '..', '..', 'public', 'library.css'), 'utf8');
+    assert.match(css, /\.library-doc__table-wrap\s*\{[^}]*overflow-x:\s*auto/);
+    assert.match(css, /\.library-doc__body\s*\{[^}]*overflow-wrap:\s*break-word;/);
+    assert.doesNotMatch(css, /overflow-wrap:\s*anywhere/);
+  });
 });

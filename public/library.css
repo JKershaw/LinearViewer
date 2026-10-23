@@ -224,8 +224,14 @@
   margin: 0;
 }
 
+/* LIN-3761: long unbroken runs (links, inline code, bold hashes) wrap instead
+   of pushing past the viewport (root is overflow-x: clip, LIN-1068).
+   `break-word`, not `anywhere`: `anywhere` lowers min-content width, so table
+   cells would shrink and break mid-word instead of the table scrolling in its
+   wrapper. `pre` scrolls on its own and keeps its white-space. */
 .library-doc__body {
   font-size: 1.05em;
+  overflow-wrap: break-word;
 }
 
 .library-doc__body h2,
@@ -324,10 +330,21 @@
   color: var(--muted);
 }
 
+/* LIN-3761: scroll box for wide tables; the table keeps width: 100% inside. */
+.library-doc__table-wrap {
+  overflow-x: auto;
+  margin: var(--space-4) 0;
+}
+
+.library-doc__table-wrap:focus-visible {
+  outline: 2px solid var(--brand-dim);
+  outline-offset: 2px;
+}
+
 .library-doc__body table {
   width: 100%;
   border-collapse: collapse;
-  margin: var(--space-4) 0;
+  margin: 0;
   font-size: 0.95em;
 }
 
