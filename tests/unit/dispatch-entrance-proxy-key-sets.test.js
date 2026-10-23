@@ -55,6 +55,7 @@ function appFor(row) {
     getItemStatus: async () => ({ ...row }),
     // LIN-3812: the watch reads the feedback shape, /prompt the prompt shape.
     getItemFeedback: async () => ({ ...row }),
+    getItemWatchToken: async () => 'token',
     getItemPrompt: async () => ({ ...row })
   };
   return appAround(createProxyRoutes(deps));

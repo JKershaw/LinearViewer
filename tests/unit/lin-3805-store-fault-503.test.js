@@ -608,16 +608,16 @@ describe('proxy runner and proxy dispatch routes', () => {
     try {
       await serve(app, async (base) => {
         // Before the flush: the first read succeeds, the held re-check faults, the keepalive has not flushed.
-        const real = store.getItemFeedback.bind(store);
+        const real = store.getItemWatchToken.bind(store);
         let reads = 0;
-        store.getItemFeedback = async (...args) => {
-          if (++reads >= 2) throw new DispatchStoreFault('getItemFeedback', BOOM);
+        store.getItemWatchToken = async (...args) => {
+          if (++reads >= 2) throw new DispatchStoreFault('getItemWatchToken', BOOM);
           return real(...args);
         };
         const res = await sendJson(base, 'GET', `/api/proxy/dispatch/${item._id}?wait=5`, auth);
         assert.equal(res.status, 503, 'a real 503 while the headers are still uncommitted');
         await assertEnvelope(res, 'watch pre-flush');
-        store.getItemFeedback = real;
+        store.getItemWatchToken = real;
       });
     } finally { q.mock.restore(); }
   });
@@ -631,9 +631,9 @@ describe('proxy runner and proxy dispatch routes', () => {
     const { store, app, auth } = await setup();
     const item = await store.addItem(URL_KEY, { prompt: 'p' });
     await store.takeItem(item._id, URL_KEY, TOKEN);
-    const real = store.getItemFeedback.bind(store);
+    const real = store.getItemWatchToken.bind(store);
     let reads = 0;
-    store.getItemFeedback = async (...args) => {
+    store.getItemWatchToken = async (...args) => {
       if (++reads >= 2) throw error;
       return real(...args);
     };
@@ -647,7 +647,7 @@ describe('proxy runner and proxy dispatch routes', () => {
   }
 
   test('watch long-poll: a store fault on the SECOND read after the flush is 200 with statusCode:503 and the envelope', async () => {
-    const { res, body } = await watchSecondReadThrows(new DispatchStoreFault('getItemFeedback', BOOM));
+    const { res, body } = await watchSecondReadThrows(new DispatchStoreFault('getItemWatchToken', BOOM));
     assert.equal(res.status, 200, 'the headers were committed at the flush');
     assert.equal(body.statusCode, 503);
     assert.equal(body.code, 'DISPATCH_STORE_UNAVAILABLE');

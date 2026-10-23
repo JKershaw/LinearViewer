@@ -590,10 +590,12 @@ export function createDispatchRoutes({
     // would throw ERR_HEADERS_SENT.
     let keepalive = null;
     try {
-      // This watch/poll seam is the one caller of getItemStatus that actually
-      // reads `feedback` to derive terminal status, so it's the one caller
-      // that opts into the (indexed-query-plus-merge) group feedback read —
-      // see getItemStatus's includeGroupFeedback doc (LIN-1461).
+      // This watch/poll seam reads `feedback` to derive terminal status, so it's the one
+      // caller that opts into the (indexed-query-plus-merge) group feedback read —
+      // see getItemFeedback's includeGroupFeedback doc (LIN-1461).
+      // LIN-3812: the change token is read BEFORE the body, so a change landing between the
+      // two reads moves the token off the body's baseline and is re-checked, never missed.
+      let watchToken = waitSeconds > 0 ? await dispatchQueueStore.getItemWatchToken(req.proxyUrlKey, id) : null;
       const item = await dispatchQueueStore.getItemFeedback(req.proxyUrlKey, id, { includeGroupFeedback: true });
       if (!item) {
         logEvent(req, '/api/proxy/dispatch/:id', 404);
@@ -647,6 +649,11 @@ export function createDispatchRoutes({
           }
           // LIN-3805: a fault here is NOT swallowed into "unchanged snapshot" (a hidden
           // sibling `[done]` would read as still running); it propagates to the catch.
+          // LIN-3812: scalars only per tick; the whole document plus lineage feedback is re-read
+          // only when the token moved. The re-read body (not the token) decides 'change'.
+          const nextToken = await dispatchQueueStore.getItemWatchToken(req.proxyUrlKey, id);
+          if (nextToken === watchToken) continue;
+          watchToken = nextToken;
           const next = await dispatchQueueStore.getItemFeedback(req.proxyUrlKey, id, { includeGroupFeedback: true });
           if (!next) break; // item genuinely expired mid-wait; return last known snapshot
           current = next;
