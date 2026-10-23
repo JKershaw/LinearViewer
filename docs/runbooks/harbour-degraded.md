@@ -89,15 +89,13 @@ there is no code-level guard preventing a write command.
   user (`docs/runbooks/mongodb-app-user.md`, LIN-3772) cannot run `currentOp` or
   `serverStatus`. Pass the remote command as **one single-quoted string** so the variables
   expand in the container, never locally; no interactive shell, no other remote commands.
-  Write the query to a script file under `/dev/shm` in the container, run it with `--file`,
-  not `--eval`, then delete it:
+  The query reaches the container base64-encoded, is decoded to a script file under
+  `/dev/shm`, run with `--file`, not `--eval`, then deleted:
 
   ```sh
+  # the base64 below is: printjson(db.currentOp({active:true, secs_running:{$gt:5}}))
   railway ssh -p fc7abe0d-2c3b-403d-88a3-d61c470729a7 -e production -s MongoDB-harbour -- \
-    'cat > /dev/shm/ro.js <<"EOF"
-  printjson(db.currentOp({active:true, secs_running:{$gt:5}}))
-  EOF
-  mongosh --quiet "mongodb://$MONGOUSER:$MONGOPASSWORD@localhost:27017/?authSource=admin" --file /dev/shm/ro.js; rm -f /dev/shm/ro.js'
+    'echo cHJpbnRqc29uKGRiLmN1cnJlbnRPcCh7YWN0aXZlOnRydWUsIHNlY3NfcnVubmluZzp7JGd0OjV9fSkpCg== | base64 -d > /dev/shm/ro.js; mongosh --quiet "mongodb://$MONGOUSER:$MONGOPASSWORD@localhost:27017/?authSource=admin" --file /dev/shm/ro.js; rm -f /dev/shm/ro.js'
   ```
 
   Keep the script under `/dev/shm` in the container, never the linked checkout: that checkout
@@ -105,11 +103,15 @@ there is no code-level guard preventing a write command.
   `73dd0ead`).
 
   Both parts of this form matter: the single quotes keep `$MONGOUSER` / `$MONGOPASSWORD`
-  from expanding locally, and the quoted heredoc keeps the query's own `$` operators
-  (`$gt`, `$gte`) out of any shell's expansion, since they'd otherwise be stripped the
-  same way `--eval "…"` would strip them. The earlier `railway run` form of this read
+  from expanding locally, and the base64 script written to a file and run with `--file`
+  keeps the query's own `$` operators (`$gt`, `$gte`) out of any shell's expansion, since
+  they'd otherwise be stripped the same way `--eval "…"` would strip them. To read another
+  query, base64 it locally (`printf '%s\n' '<js>' | base64 | tr -d '\n'`) and put the result in
+  the same place; do not put a multi-line script inside the quotes (whether `railway ssh`
+  passes newlines through intact is unchecked). This is the base64-to-`/dev/shm` form recorded in
+  `docs/operator-execution.md`. The earlier `railway run` quoted-heredoc form of this read
   (LIN-3001 reviews `a531d11f` and `f2d755d1`; investigator session `46c06407`) used the
-  public proxy and is retired; the heredoc/`--file` discipline carries over unchanged.
+  public proxy and is retired; the `--file` discipline carries over unchanged.
 
   Restricted to: `db.currentOp({active:true, secs_running:{$gt:5}})`,
   `db.serverStatus()` (connections, globalLock, WiredTiger cache, opcounters), and
@@ -125,7 +127,7 @@ there is no code-level guard preventing a write command.
   and a 30-day `dispatchedAt` window, `prompt` excluded) executed in 29 ms on the server
   but returned a 32 MB payload (LIN-2993 comment `8b2bcfa4`). Its `dispatchedAt` filter
   also uses a `$` operator (`$gte`), so write it into a script file the same way — the
-  quoted-heredoc `--file` form above, not `--eval`. **Select the database explicitly:**
+  base64 `--file` form above, not `--eval`. **Select the database explicitly:**
   as with `db.stats()` above, the connection lands on mongosh's default `test`
   database, where `dispatch-history` doesn't exist — the query still runs and returns
   0 documents instead of erroring, which reads as a healthy empty result rather than a
@@ -143,10 +145,10 @@ there is no code-level guard preventing a write command.
   `243ce77e`, `8b2bcfa4`). The investigator's own history-read `find` went one step
   further than that request, and is included here because it's the read that actually
   discriminated the cause. The relaxation is bounded to these specific reads; it does not
-  extend to any other `railway run` or `railway ssh` use.
+  extend to any other `railway ssh` use: no interactive shell, no remote command other than that single-quoted `mongosh` read, no file writes except the `/dev/shm` script that is deleted afterwards, no process control. This route is root in the database container, so that restriction is the only control; there is no code-level guard.
 
-**Forbidden:** restart, redeploy, rollback, scale, variable changes, `railway variables`
-output, DB writes, index builds, `railway up`, any other `railway run` or `railway ssh` invocation,
+**Forbidden:** restart, redeploy, rollback, scale, variable changes, `railway variables` /
+`railway variable list` output in any form (plain, `-k/--kv`, `--json`: all print raw values), DB writes, index builds, `railway up`, any `railway ssh` other than that read, any `railway run` against MongoDB-harbour (it no longer reaches the database),
 printing secrets or connection strings, opening PRs or making edits. Minimise probes
 against harbour.cat itself. End with a **Findings** comment on the incident ticket.
 

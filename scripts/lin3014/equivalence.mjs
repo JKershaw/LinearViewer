@@ -18,6 +18,9 @@
  * loopback replay target (scripts/lin3014/lib/guard.mjs). Does not run
  * against production in beat 2 — see LIN-3014 beat 3.
  *
+ * `lin3014_read`'s only route, the public proxy, is gone since 23 Oct; see the open
+ * question on that user in docs/runbooks/mongodb-app-user.md.
+ *
  * Usage:
  *   LIN3014_MONGO_URI=mongodb://... node scripts/lin3014/equivalence.mjs --url-key linearviewer
  *   node scripts/lin3014/equivalence.mjs --url-key linearviewer --local (local replay mongod, no role check)
