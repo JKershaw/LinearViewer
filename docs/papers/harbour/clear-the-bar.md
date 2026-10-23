@@ -230,8 +230,6 @@ as the models keep moving.
   about the window that Anthropic does not confirm.
 - **No public benchmark measures planning or judging,** the two bars the cheap models failed
   in Harbour.
-- **The plan tier is inferred.** That the fleet's plan is Max 20x comes from the archive's
-  "about £45 a week", not from the account.
 - **Every price and offer here is one day's reading.**
 
 The essay's claim is the direction, not the size. The size is what the next fifty tickets
@@ -326,5 +324,5 @@ paper cites, not from OpenAI.
   Opus-judged and Sonnet-built controls. This is the test of section 4.
 - Make the capability ledger a query: a verdict field and a request count on every worker
   session.
-- Ask, as a question for John and not a study: is the fleet's plan Max 20x, and should its
-  API credit be claimed for an opencode lane?
+- A question for John, not a study: should the Max 20x plan's API credit be claimed for an
+  opencode lane?

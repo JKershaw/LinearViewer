@@ -66,8 +66,8 @@ autopilot lineage reaches a ticket's cost only when it was dispatched against th
 `lib/weekly-budget.js` calibrated 27 points of the window to $1,070.58 of API-equivalent
 spend on 14 August. That was during the +50% promotion that ran to 13 September. Limits
 since 14 September are +25% over the pre-promotion baseline, so a full window is now worth
-about $3,300 a week at list rates. The archive puts the plan at about £45 a week (Archive
-#5), which matches Max 20x at $200 a month, about $46 a week. That is a multiple of about
+about $3,300 a week at list rates. The plan is Max 20x (John, 23 October), at $200 a month,
+about $46 a week. That is a multiple of about
 72. Inside the window, a reference session on Sonnet 5.5 costs an 83rd of a dollar. By the
 token, the cheapest model Harbour has seen build gets 73 sessions to the dollar (DeepSeek V4
 Flash 0731, at $0.014 a session). Its October successor, DeepSeek V4.1 Flash 1017, gets 21,
@@ -136,8 +136,7 @@ one of them.**
   the sanctioned route for a third-party harness. At list price the credit is about 760
   Haiku 5.5 reference sessions a month at the long-context price, or 3,800 at the base
   price: 25–125 a day, against the fleet's 109 sessions a day in October. No Harbour lane
-  spends it today. It is available if the fleet's plan is Max 20x, as the archive's £45 a
-  week implies.
+  spends it today. The fleet's plan is Max 20x, so the credit is available to claim.
 - **Open-weight builders by the token.** DeepSeek V4.1 Flash 1017 is the 17 October build of
   the model Harbour's ledger saw implement small, hour-long and thin tickets. It scores 31.8
   on Terminal-Bench 4.0 (the September build: 19.7) and 87.7 on Vibe Code (84.7). It costs
@@ -260,8 +259,7 @@ internal half), then `scripts/survey-capacity-analyse.mjs`, which writes
   draws in proportion to API price. If Haiku draws more than its price share, the re-tiering
   gain is smaller. The direction for Sonnet is unknown.
 - **The window's dollar value** rests on one calibration day in August and a stated, not
-  measured, change of limits. The plan tier is inferred from the archive's £45 a week, not
-  read.
+  measured, change of limits.
 - **The October read sees only Done tickets with a lineage.** It undercounts supervision,
   which runs against parents and epics, so judging's share is a floor.
 - **Benchmarks are not Harbour's bar.** Terminal-Bench 4.0 ranks the models Harbour has seen
