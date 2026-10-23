@@ -165,4 +165,29 @@ describe('the long-poll holds on the token, not on full re-reads', () => {
     assert.equal(out.reason, 'timeout');
     assert.equal(bodyReads, 1);
   });
+
+  test('N10: a QUEUED item taken mid-wait returns change (the CLI\'s main watch case), and the token reads the queue first', async () => {
+    const store = makeStore();
+    const queued = await store.addItem(URLKEY, { prompt: 'waiting for a runner' });
+    const app = appFor(store);
+    setTimeout(() => { store.takeItem(queued._id, URLKEY, TOKEN); }, 1200);
+    const out = await watch(app, queued._id, 6);
+    assert.equal(out.reason, 'change', 'the hold ended on the take, not on the timeout');
+    assert.equal(out.status, 'taken');
+  });
+
+  test('N10: a row that is genuinely absent ends the hold at once (the not-found break is kept)', async () => {
+    const app = appFor(makeStore());
+    const started = Date.now();
+    const server = app.listen(0, '127.0.0.1');
+    await new Promise(r => server.once('listening', r));
+    try {
+      const res = await fetch(`http://127.0.0.1:${server.address().port}/api/proxy/dispatch/nope?wait=6`, { headers: { Authorization: 'Bearer anything' } });
+      assert.equal(res.status, 404);
+    } finally {
+      server.closeAllConnections();
+      await new Promise(r => server.close(r));
+    }
+    assert.ok(Date.now() - started < 3000);
+  });
 });

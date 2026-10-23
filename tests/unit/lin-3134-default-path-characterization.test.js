@@ -91,7 +91,8 @@ const ARCHIVE_HISTORY_DOC_KEYS = [
   '_id', 'abort', 'abortTo', 'cascade', 'consumerLastSeenAt', 'dispatchedAt',
   'dispatchedBy', 'effort', 'feedbackDigest', 'feedbackVersion', 'followUpTo',
   'force', 'harness', 'issueId', 'issueIdentifier',
-  'issueTitle', 'issueUrl', 'kind', 'maxTasks', 'model',
+  'issueTitle', 'issueUrl', 'kind', 'lineageBasis', 'lineageCompletedAt',
+  'lineageFeedbackCount', 'lineageStatus', 'lineageStatusBasis', 'maxTasks', 'model',
   'periodicalId', 'presetConfig', 'presetName', 'producingItemAttempt',
   'producingItemId', 'prompt', 'promptName', 'queueIfBusy', 'repo', 'resolvedAt',
   'rootItemId', 'sessionGroupId', 'sessionId', 'status', 'stopAt',
@@ -389,7 +390,9 @@ function buildRouteApp({ itemForWatch = null, itemsForList = null } = {}) {
       getItemFeedback: async () => itemForWatch,
       getItemPrompt: async () => itemForWatch,
       listItems: async () => (itemsForList || []),
-      listHistory: async () => ({ items: [], total: 0 })
+      listHistory: async () => ({ items: [], total: 0 }),
+      listHistoryLineageRows: async () => ({ items: [], total: 0 }),
+      ensureLineageStatus: async () => {}
     },
     workspaceFromUrl: (req, res, next) => next(),
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
@@ -470,7 +473,9 @@ describe('S0 — POST /api/proxy/dispatch createToken arguments', () => {
         getItemFeedback: async () => null,
         getItemPrompt: async () => null,
         listItems: async () => [],
-        listHistory: async () => ({ items: [], total: 0 })
+        listHistory: async () => ({ items: [], total: 0 }),
+        listHistoryLineageRows: async () => ({ items: [], total: 0 }),
+        ensureLineageStatus: async () => {}
       },
       workspaceFromUrl: (req, res, next) => { bodyHook?.(req); next(); },
       workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
@@ -600,6 +605,8 @@ describe('S0 — projection source bodies are spread-free and token-free', () =>
       dispatchQueueStore: {
         listItems: async () => [{ ...row }],
         listHistory: async () => ({ items: [], total: 0 }),
+        listHistoryLineageRows: async () => ({ items: [], total: 0 }),
+        ensureLineageStatus: async () => {},
         getItemStatus: async () => ({ ...row }),
         getItemFeedback: async () => ({ ...row })
       }

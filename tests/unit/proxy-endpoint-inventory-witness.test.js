@@ -65,6 +65,8 @@ function makeDispatchStore() {
   return {
     listItems: async () => [],
     listHistory: async () => ({ items: [], total: 0 }),
+    listHistoryLineageRows: async () => ({ items: [], total: 0 }),
+    ensureLineageStatus: async () => {},
     getItemStatus: async () => null,
     getItemFeedback: async () => null,
     getItemPrompt: async () => null,
@@ -461,7 +463,7 @@ const ROWS = [
   },
   {
     group: 'I', method: 'GET', url: '/api/proxy/dispatch', expect: 200,
-    note: 'listItems + listHistory, empty result (:6387)',
+    note: 'listItems + listHistoryLineageRows, empty result (:6387)',
     run: () => call(buildApp({ dispatchQueueStore: makeDispatchStore() }), 'GET', '/api/proxy/dispatch'),
   },
   {

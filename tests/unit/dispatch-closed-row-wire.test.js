@@ -143,8 +143,12 @@ async function dispatchTaken(store, message) {
   if (message) await store.addFeedback(doc._id, URLKEY, { message, rootItemId: doc._id }, TOKEN);
   return doc;
 }
-const stamp = (store, id, bookkeeping = STAMP) =>
-  store.historyCollection.updateOne({ _id: id, urlKey: URLKEY }, { $set: { bookkeeping } });
+// A stamp written straight to the collection (a fossil pass with a custom `at`), then the
+// closer's persisted-lineage step: every real stamp writer runs `_persistClosed` (LIN-3812).
+const stamp = async (store, id, bookkeeping = STAMP) => {
+  await store.historyCollection.updateOne({ _id: id, urlKey: URLKEY }, { $set: { bookkeeping } });
+  await store._persistClosed(URLKEY, [id]);
+};
 
 describe('LIN-3364 wire: proxy list + :id watch', () => {
   test('list and detail report status closed with closedAt/closedReason (including a fossil stamp → operator)', async () => {

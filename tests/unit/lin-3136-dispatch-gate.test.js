@@ -68,7 +68,9 @@ function gatedApp({ scope, grants }) {
       expandCascadeAborts: async () => { spy.cascade++; return { items: [] }; },
       getItemStatus: async () => { spy.reads++; return { _id: 'disp-1', status: 'queued', urlKey: ACME, kind: 'implementation', feedback: [] }; },
       getItemFeedback: async () => { spy.reads++; return { _id: 'disp-1', status: 'queued', urlKey: ACME, kind: 'implementation', feedback: [] }; },
-      listItems: async () => { spy.reads++; return []; }
+      listItems: async () => { spy.reads++; return []; },
+      listHistoryLineageRows: async () => { spy.reads++; return { items: [], total: 0 }; },
+      ensureLineageStatus: async () => {}
     }
   });
   return { app, spy };

@@ -18,18 +18,18 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
+import { seededStore } from '../fixtures/dispatch-list-store.js';
 
 const ABORT_TS = '2026-06-22T12:00:00.000Z';
 const DONE_TS = '2026-06-22T12:00:00.000Z';
 const EARLIER_ABORT_TS = '2026-06-22T11:30:00.000Z';
 
-// Build an app whose dispatch store returns the given live (queued) + history
-// rows. LIN-1470: the stubs are OPTIONS-AWARE (honour `rootItemId.$in`,
-// `projection`, `limit`) rather than zero-arg — the list endpoint now issues
-// a SECOND, differently-shaped `listHistory` call (the lineage batch query),
-// and a stub that returns the identical fixture set regardless of options
-// would pass these tests accidentally, proving nothing about that query.
-function buildApp({ queued = [], history = [] } = {}) {
+// Build an app over a REAL store seeded with the given live (queued) + history rows
+// (tests/fixtures/dispatch-list-store.js). LIN-3812: the abort attribution is derived
+// when the row's lineage fields are persisted (lib/dispatch-lineage-status.js), not on
+// the list read, so these cases run through the store's real derivation.
+async function buildApp({ queued = [], history = [] } = {}) {
+  const store = await seededStore({ queued, history });
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
@@ -43,21 +43,7 @@ function buildApp({ queued = [], history = [] } = {}) {
     agentStatusStore: {},
     recapCacheStore: { get: async () => null, set: async () => {} },
     briefCacheStore: { get: async () => null, set: async () => {} },
-    dispatchQueueStore: {
-      listItems: async () => queued,
-      listHistory: async (urlKey, opts = {}) => {
-        // LIN-1494: mirror the real store's shape — `total` is the exact
-        // pre-slice matching count returned beside the capped `items`.
-        if (opts.rootItemId && opts.rootItemId.$in) {
-          const anchors = opts.rootItemId.$in;
-          const matching = history.filter(r => anchors.includes(r.rootItemId));
-          const items = opts.limit ? matching.slice(0, opts.limit) : matching;
-          return { items, total: matching.length };
-        }
-        const items = opts.limit ? history.slice(0, opts.limit) : history;
-        return { items, total: history.length };
-      }
-    },
+    dispatchQueueStore: store,
     workspaceFromUrl: (req, res, next) => next(),
     freeTierStore: { tryUse: async () => ({ allowed: true }) }
   }));
@@ -115,7 +101,7 @@ function abortRow(overrides = {}) {
 
 describe('LIN-1261 F2 — proxy dispatch list attributes an abort to its target', () => {
   test('an aborted TARGET (heartbeat-only) is reported terminal `aborted` with the abort completedAt', async () => {
-    const app = buildApp({ history: [targetRow(), abortRow()] });
+    const app = await buildApp({ history: [targetRow(), abortRow()] });
     const { status, body } = await get(app, '/api/proxy/dispatch');
     assert.equal(status, 200);
     const target = body.items.find(i => i.id === 'tgt-1');
@@ -134,7 +120,7 @@ describe('LIN-1261 F2 — proxy dispatch list attributes an abort to its target'
       feedback: [{ message: '[aborted] Cancelled', timestamp: EARLIER_ABORT_TS }],
       resolvedAt: EARLIER_ABORT_TS
     });
-    const app = buildApp({ history: [doneTarget, earlierAbort] });
+    const app = await buildApp({ history: [doneTarget, earlierAbort] });
     const { status, body } = await get(app, '/api/proxy/dispatch');
     assert.equal(status, 200);
     const target = body.items.find(i => i.id === 'tgt-1');
@@ -143,7 +129,7 @@ describe('LIN-1261 F2 — proxy dispatch list attributes an abort to its target'
   });
 
   test('a target with no matching abort is unaffected', async () => {
-    const app = buildApp({ history: [targetRow({ id: 'other', status: 'taken', feedback: [] })] });
+    const app = await buildApp({ history: [targetRow({ id: 'other', status: 'taken', feedback: [] })] });
     const { status, body } = await get(app, '/api/proxy/dispatch');
     assert.equal(status, 200);
     const target = body.items.find(i => i.id === 'other');

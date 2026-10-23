@@ -44,6 +44,10 @@ export function createMockCollection() {
       if ('$in' in condition) {
         return Array.isArray(condition.$in) && condition.$in.includes(value);
       }
+      // $nin (LIN-3812): the complement of $in; an absent field is "not in".
+      if ('$nin' in condition) {
+        return Array.isArray(condition.$nin) && !condition.$nin.includes(value);
+      }
       // $ne: value !== condition — absent-field semantics matter here
       // (LIN-1343's terminalWakeEnqueued was absent-or-true, never false), so
       // `undefined !== true` correctly matches an absent field. For an
@@ -55,6 +59,9 @@ export function createMockCollection() {
         return value !== condition.$ne;
       }
     }
+    // `null` matches a null OR ABSENT field, as in Mongo/MangoDB (LIN-3812: the
+    // lineage fields' "not yet derived" marker and `rootItemId: null` filters).
+    if (condition === null) return value === null || value === undefined;
     return value === condition;
   };
 
@@ -235,6 +242,15 @@ export function createMockCollection() {
       const after = applyUpdate(before, update);
       docs[idx] = after;
       return { ...(opts.returnDocument === 'before' ? before : after) };
+    },
+
+    // updateMany (LIN-3812): the same operators as updateOne, applied to every match.
+    async updateMany(query, update) {
+      let matchedCount = 0;
+      for (let i = 0; i < docs.length; i++) {
+        if (matches(docs[i], query)) { docs[i] = applyUpdate(docs[i], update); matchedCount++; }
+      }
+      return { matchedCount, modifiedCount: matchedCount };
     },
 
     async deleteOne(query) {

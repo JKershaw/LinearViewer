@@ -98,6 +98,12 @@ function buildApp({ statusItem, queued = [], history = [] } = {}) {
       // listHistory returns { items } — not a bare array (dispatch-store.js).
       listHistory: async () => ({ items: history }),
       listHistoryByRootItemIds: async () => [],
+      // LIN-3812: the list reads each row's persisted lineage fields through the store.
+      ensureLineageStatus: async () => {},
+      listHistoryLineageRows: async () => ({
+        items: history.map(i => ({ ...i, lineage: { status: null, completedAt: null, feedbackCount: 0 } })),
+        total: history.length
+      }),
     },
     workspaceFromUrl: (req, res, next) => next(),
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },

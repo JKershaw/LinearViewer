@@ -59,7 +59,7 @@ const LIVE = [...walk('routes'), ...walk('lib')].map(file => ({ file, src: readF
 // only dispatch-store receivers, so unrelated stores' `collection.find` are not
 // swept in; `historyCollection` is unique to the dispatch store.
 const SITE = new RegExp([
-  String.raw`\.\s*(listItemsWithPrompt|listItems|getItemStatus|getItemPrompt|getItemFeedback|listHistoryWithBodies|listHistory|trimSessionBudget|pollAvailable|takeItem)\s*\(`,
+  String.raw`\.\s*(listItemsWithPrompt|listItems|getItemStatus|getItemPrompt|getItemFeedback|listHistoryWithBodies|listHistoryLineageRows|listHistory|trimSessionBudget|pollAvailable|takeItem)\s*\(`,
   String.raw`\b(_formatItem|_formatHistoryItem)\s*\(`,
   String.raw`\bhistoryCollection\s*\.\s*(?:find|findOne|aggregate)\s*\(`,
   String.raw`\b(?:dispatchStore|dispatchQueueStore)\s*\.\s*(?:collection|historyCollection)\s*\.\s*(?:find|findOne|aggregate)\s*\(`
@@ -167,7 +167,7 @@ const E_ROUTE_FILES = new Set(['routes/dispatch.js', 'routes/proxy-dispatch.js',
 const E_LIB_FILE = 'lib/dispatch-entrance.js';
 // The reader kinds the entrances use today. Each must still occur somewhere in E;
 // a kind that is not here (a direct formatter call, a raw collection read) fails.
-const E_READER_KINDS = ['listItems', 'listItemsWithPrompt', 'getItemStatus', 'getItemPrompt', 'getItemFeedback', 'listHistory', 'listHistoryWithBodies', 'trimSessionBudget', 'pollAvailable', 'takeItem'];
+const E_READER_KINDS = ['listItems', 'listItemsWithPrompt', 'getItemStatus', 'getItemPrompt', 'getItemFeedback', 'listHistoryLineageRows', 'listHistoryWithBodies', 'trimSessionBudget', 'pollAvailable', 'takeItem'];
 
 /** Violations of the table against a set of `{file, src}`; [] means clean. */
 function check(files, table = TABLE) {

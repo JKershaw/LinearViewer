@@ -160,3 +160,30 @@ describe('file-pointer-read — loadPilotRows sees history (P7)', () => {
     assert.equal(classifyPilotRows(rows).totals.eligible, 1);
   });
 });
+
+describe('file-pointer-read — the pilot history read is bounded by `since` (LIN-3812)', () => {
+  const NOW = Date.parse('2026-10-24T00:00:00.000Z');
+  async function sinceOf(opts) {
+    const queries = [];
+    const history = projectedHistoryCollection([historyDoc()]);
+    const find = history.find.bind(history);
+    history.find = (query, ...rest) => { queries.push(query); return find(query, ...rest); };
+    const store = new DispatchQueueStore({ collection: createMockCollection(), historyCollection: history });
+    await loadPilotRows(store, 'acme', { now: NOW, ...opts });
+    return queries.find(q => q.dispatchedAt).dispatchedAt.$gte;
+  }
+
+  test('defaults to the shared 30-day read horizon', async () => {
+    assert.equal((await sinceOf({})).toISOString(), '2026-09-24T00:00:00.000Z');
+  });
+
+  test('--since-days widens the window explicitly, instead of a silent lifetime read', async () => {
+    assert.equal((await sinceOf({ sinceDays: 90 })).toISOString(), '2026-07-26T00:00:00.000Z');
+  });
+
+  test('parseArgs carries --since-days', async () => {
+    const { parseArgs } = await import('../../scripts/file-pointer-read.mjs');
+    assert.equal(parseArgs([]).sinceDays, 30);
+    assert.equal(parseArgs(['--since-days', '90']).sinceDays, 90);
+  });
+});

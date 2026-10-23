@@ -67,7 +67,9 @@ function buildApp(captured, { workspaceHarnessDefault = null, itemForWatch = nul
       getItemFeedback: async () => itemForWatch,
       getItemPrompt: async () => itemForWatch,
       listItems: async () => (itemForWatch ? [itemForWatch] : []),
-      listHistory: async () => ({ items: [], total: 0 })
+      listHistory: async () => ({ items: [], total: 0 }),
+      listHistoryLineageRows: async () => ({ items: [], total: 0 }),
+      ensureLineageStatus: async () => {}
     },
     workspaceFromUrl: (req, res, next) => next(),
     workspacePreferencesStore: {
