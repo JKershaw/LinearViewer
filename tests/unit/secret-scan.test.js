@@ -250,6 +250,18 @@ describe('LIN-3780 Railway-incident secret types', () => {
     assert.ok(findSecretMatches(F.resendBareKey).some(m => m.ruleId === 'resend-api-key'));
   });
 
+  // LIN-3794: ATCTT3 access tokens share the ATATT3 body shape and are reported under the same rule id.
+  test('ATCTT3 access token is detected as atlassian-api-token', () => {
+    const hits = findSecretMatches(F.atlassianAccessToken).filter(m => m.ruleId === 'atlassian-api-token');
+    assert.equal(hits.length, 1);
+  });
+  test('ATCTT3 below the length floor is not detected', () => {
+    assert.deepEqual(findSecretMatches('ATCTT3' + 'xFfGN0aB3d'), []);
+  });
+  test('ATCTX3 (wrong prefix) is not detected', () => {
+    assert.deepEqual(findSecretMatches(F.atlassianAccessToken.replace('ATCTT3', 'ATCTX3')), []);
+  });
+
   const negatives = {
     'placeholder mongo password': 'mongodb://admin:password@localhost:27017/db',
     'shell-expanded mongo': 'mongodb://$MONGOUSER:$MONGOPASSWORD@host/db',
