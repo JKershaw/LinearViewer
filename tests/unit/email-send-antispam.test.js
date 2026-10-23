@@ -130,6 +130,23 @@ describe('24h per-address cap', () => {
   });
 });
 
+describe('volume alarm fails open', () => {
+  // LIN-3789: the alarm is a log line, not a gate. If counting the hour's sends
+  // throws, the link is still sent and only the error name is logged.
+  test('a failing volume count never blocks the send', async () => {
+    const errs = [];
+    const orig = console.error;
+    console.error = (...a) => { errs.push(a.join(' ')); };
+    const harness = await startEmailAuthHarness({ alarmPerHour: 1 });
+    try {
+      harness.stores.magicLinkStore.recentCount = async () => { throw new TypeError('boom'); };
+      await harness.browser().requestLink('x@x.io');
+      assert.ok(harness.transport.lastMessageTo('x@x.io'));
+      assert.deepStrictEqual(errs, ['[email-auth] send volume check failed: TypeError']);
+    } finally { console.error = orig; await harness.close(); }
+  });
+});
+
 describe('per-IP limiter', () => {
   test('stays a 429 on refusal and logs the reason without any address', async () => {
     const warn = captureWarnings();
