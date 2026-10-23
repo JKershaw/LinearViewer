@@ -17,6 +17,7 @@ import {
   redactSecret,
   isAllowlistedFixturePath,
   scanText,
+  findSecretMatches,
   scanFile,
   scanDirectory,
   SECRET_RULES,
@@ -222,6 +223,62 @@ const dummy = "placeholder";
         fs.unlinkSync(tempFile);
       }
     }
+  });
+});
+
+describe('LIN-3780 Railway-incident secret types', () => {
+  const F = FIXTURE_SECRETS;
+  const positives = {
+    'resend-api-key': F.resendApiKey,
+    'atlassian-api-token': F.atlassianApiToken,
+    'atlassian-oauth-secret': F.atlassianOauthSecret,
+    'mongodb-uri-credentials': F.mongodbUri,
+    'github-client-secret': F.githubClientSecret,
+    'linear-client-secret': F.linearClientSecret,
+    'github-refresh-token': F.githubRefreshToken,
+    'private-key-block': F.encryptedPrivateKey,
+    'private-key-block-truncated': F.truncatedPrivateKey,
+    'env-style-secret': F.envStyleSecret,
+  };
+  for (const [id, text] of Object.entries(positives)) {
+    test(`detects ${id}`, () => {
+      const ids = findSecretMatches(text).map(m => m.ruleId);
+      assert.ok(ids.includes(id), `${id} not in ${ids}`);
+    });
+  }
+  test('bare resend form is detected', () => {
+    assert.ok(findSecretMatches(F.resendBareKey).some(m => m.ruleId === 'resend-api-key'));
+  });
+
+  const negatives = {
+    'placeholder mongo password': 'mongodb://admin:password@localhost:27017/db',
+    'shell-expanded mongo': 'mongodb://$MONGOUSER:$MONGOPASSWORD@host/db',
+    'braced shell mongo': 'mongodb+srv://${U}:${P}@host/db',
+    'AAAA pem': '-----BEGIN RSA PRIVATE KEY-----\n' + 'A'.repeat(200),
+    'armor-only pem concat': "'-----BEGIN RSA PRIVATE KEY-----' + 'A'.repeat(1000)",
+    'bare header': '-----BEGIN RSA PRIVATE KEY-----',
+    'JS token assignment': "FOO_TOKEN = 'abcdefghijklmnop1234567890XYZ'",
+    'blank dotenv followed by key': 'LINEAR_CLIENT_SECRET=\nOTHER_API_KEY=\n',
+    'identifier-like re_': 're_split_lines_helper_fn',
+    'env ref': 'SERVICE_API_KEY=${SERVICE_API_KEY_VALUE_FROM_VAULT}',
+  };
+  for (const [name, text] of Object.entries(negatives)) {
+    test(`does not flag: ${name}`, () => {
+      assert.deepEqual(findSecretMatches(text).map(m => m.ruleId), []);
+    });
+  }
+
+  test('long repeated BEGIN input completes quickly', () => {
+    const big = '-----BEGIN RSA PRIVATE KEY-----\n'.repeat(6500);
+    const t0 = Date.now();
+    findSecretMatches(big);
+    assert.ok(Date.now() - t0 < 2000, `took ${Date.now() - t0}ms`);
+  });
+  test('long mongodb-like input completes quickly', () => {
+    const big = 'mongodb://' + 'a:'.repeat(100000);
+    const t0 = Date.now();
+    findSecretMatches(big);
+    assert.ok(Date.now() - t0 < 2000, `took ${Date.now() - t0}ms`);
   });
 });
 

@@ -29,7 +29,38 @@ const BY_RULE = {
   'bearer-auth-token': `Authorization: Bearer ${F.bearerToken.slice(0, 33)}`,
   'harbour-bootstrap-token': `bootstrap_token = "${F.bootstrapToken}"`,
   'generic-secret-assignment': `api_key = "${F.genericSecretValue}"`,
+  // LIN-3780
+  'resend-api-key': F.resendApiKey,
+  'atlassian-api-token': F.atlassianApiToken,
+  'atlassian-oauth-secret': F.atlassianOauthSecret,
+  'mongodb-uri-credentials': F.mongodbUri,
+  'github-client-secret': F.githubClientSecret,
+  'linear-client-secret': F.linearClientSecret,
+  'github-refresh-token': F.githubRefreshToken,
+  'private-key-block-truncated': F.truncatedPrivateKey,
+  'env-style-secret': F.envStyleSecret,
 };
+
+describe('LIN-3780 Railway-incident secret types on public pages', () => {
+  const extra = {
+    'resend bare': F.resendBareKey,
+    'encrypted PEM': F.encryptedPrivateKey,
+    'truncated PEM': F.truncatedPrivateKey,
+  };
+  for (const [name, text] of [...Object.entries(BY_RULE).slice(-9), ...Object.entries(extra)]) {
+    test(`${name}: masked in <p>, <pre> and an attribute`, () => {
+      for (const html of [`<p>${escapeHtml(text)}</p>`, `<pre>${escapeHtml(text)}</pre>`, `<a title="${escapeHtml(text)}">x</a>`]) {
+        const r = maskSecretsInHtml(html);
+        assert.ok(r.html.includes(MASK), html);
+        assert.ok(r.hits.length > 0, html);
+        assert.equal(findSecretMatches(r.html.replace(/<[^>]+>/g, '')).length, 0, html);
+      }
+    });
+  }
+  test('a Mongo URI is masked without a Bearer context', () => {
+    assert.ok(maskSecretsInHtml(`<p>${escapeHtml(F.mongodbUri)}</p>`).html.includes(MASK));
+  });
+});
 
 describe('maskSecretsInHtml', () => {
   test('every SECRET_RULES id has a fixture, and each is masked (enumeration guard)', () => {

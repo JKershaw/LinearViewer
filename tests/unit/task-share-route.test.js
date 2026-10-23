@@ -460,6 +460,24 @@ describe('render-time secret masking (LIN-3389)', () => {
     }
   });
 
+  test('Railway-incident types (Resend key, Mongo URI) are masked and logged by rule id only (LIN-3780)', async () => {
+    const { base, close } = await build({
+      store: withRecord(),
+      loader: fakeLoader({ loadTaskPage: async () => ({ model: secretModel(`${F.resendApiKey} ${F.mongodbUri}`) }) }),
+    });
+    try {
+      await withLogs(async (lines) => {
+        const res = await get(base, `/t/${TOKEN}`);
+        assert.equal(res.status, 200);
+        assert.ok(res.text.includes('[redacted]'));
+        assert.ok(!res.text.includes(F.resendApiKey) && !res.text.includes('Zx9Qm4Tk7Wp2Rv8Bn5'));
+        const log = lines.join('\n');
+        assert.ok(log.includes('resend-api-key') && log.includes('mongodb-uri-credentials'), log);
+        assert.ok(!log.includes(F.resendApiKey) && !log.includes('Zx9Qm4Tk7Wp2Rv8Bn5'));
+      });
+    } finally { await close(); }
+  });
+
   test('secrets in an agent (stage-session) message and a ledger row are masked', async () => {
     const startedAt = NOW.toISOString();
     const model = {
