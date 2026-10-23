@@ -12,7 +12,7 @@
  * the shared sanitisation chain.
  *
  * public/common.js is a browser script (not an ES module), so it's
- * vm-sandboxed with the REAL vendored public/marked.min.js alongside it —
+ * vm-sandboxed with the REAL marked served at /marked.min.js (node_modules, LIN-3787) alongside it —
  * this is what lets the assertions below check real `<pre>`/`<code>`/
  * `<strong>` markup rather than a hand-rolled approximation of marked's
  * behaviour. DOMPurify is stubbed as an identity pass-through: real
@@ -31,10 +31,11 @@ import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { vendorAssetPath } from '../../lib/vendor-assets.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const COMMON_SRC = readFileSync(join(__dirname, '../../public/common.js'), 'utf8');
-const MARKED_SRC = readFileSync(join(__dirname, '../../public/marked.min.js'), 'utf8');
+const MARKED_SRC = readFileSync(vendorAssetPath('/marked.min.js'), 'utf8');
 
 const WHOLE_FENCE = '```js\nconst a = 1; // # not a heading\n**not bold**\n```';
 

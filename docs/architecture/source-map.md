@@ -258,9 +258,8 @@ public/
   common-actions.css   Shared action/button styles
   feedback-widget.js / feedback-widget.css  Floating feedback widget (save/triage/autopilot actions; wired via render-settings.js + footer.js; LIN-635/704/918)
   llms.txt             AI agent guidance (DOM selectors, navigation patterns)
-  marked.min.js        Vendored Markdown renderer
-  purify.min.js        Vendored DOMPurify (HTML sanitizer)
-  chart.umd.min.js     Vendored Chart.js (used by /kpis)
+  (marked.min.js, purify.min.js, chart.umd.min.js are no longer files here:
+   lib/vendor-assets.js serves them from node_modules at the same URLs, LIN-3787)
   audit.css / audit.js          Operator dashboard
   chart-helpers.js              Shared chart script (LIN-3710), a classic script loaded before the page script: `HarbourCharts.draw / sparkline / numbersTable`, colour tokens and Chart.js defaults. Names no page; the 7-day mean reaches the page through `draw`'s `build(canvas, tools)`. LIN-3732: `draw` returns the Chart (or null), and `rateTotalToggle(mount, { rate, total, labels, initial })` swaps two page-drawn views, keeping no mode.
   kpis.css / kpis.js            Public /kpis instance stats page (wiring over chart-helpers.js). LIN-3732: the tasks-finished chart's rate/total toggle.

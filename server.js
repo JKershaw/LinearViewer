@@ -194,6 +194,7 @@ import { getDeployInfo } from './lib/deploy-info.js'
 import { securityHeaders } from './lib/security-headers.js'
 import { publicOrigin } from './lib/public-origin.js'
 import { hstsHeader, defaultCacheControl } from './lib/response-headers.js'
+import { createVendorAssetsRouter } from './lib/vendor-assets.js'
 
 // =============================================================================
 // Environment Variable Validation
@@ -1070,6 +1071,9 @@ app.use((req, res, next) => {
 // redirect, so the 301 and /health (above it) never carry it.
 app.use(hstsHeader())
 
+// Browser libs from node_modules at their old URLs (LIN-3787). Immediately
+// before static so they keep its cache headers and skip defaultCacheControl().
+app.use(createVendorAssetsRouter())
 app.use(express.static('public'))
 // Default Cache-Control: private, no-store for any response whose route set
 // none (LIN-3692). After static so assets keep express.static's own header.
