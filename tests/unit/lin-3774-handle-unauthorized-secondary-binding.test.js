@@ -178,6 +178,22 @@ describe('LIN-3774 handleUnauthorizedError — tagged secondary 401', () => {
     await run(makeWorkspace(), authError(GH_TAG));
     assert.equal(res.statusCode, 503);
     assert.equal(calls.removal, 0);
+    // The arm ends here: it never falls through to the active-binding ladder after its own 503.
+    assert.equal(calls.linearRefresh.length, 0);
+    assert.equal(calls.durableRead, 0);
+  });
+});
+
+describe('LIN-3774 handleUnauthorizedError — active-binding 401 reaches the degraded retry', () => {
+  test('an untagged 401 refreshes Linear, does not re-mint the secondary, and renders the degraded dashboard rather than the 503', async () => {
+    // Plan-review N1: on this path the secondary is not re-minted reactively before it degrades.
+    const { calls, res, run } = harness({ degraded: [{ provider: 'github', scope: 'JKershaw/LinearViewer' }] });
+    await run(makeWorkspace(), authError());
+    assert.equal(calls.linearRefresh.length, 1);
+    assert.equal(calls.githubRemint.length, 0);
+    assert.equal(calls.fetch[0][4].degradeSecondary, true);
+    assert.equal(res.statusCode, 200);
+    assert.match(res.body, /dashboard-source-notice/);
   });
 });
 
