@@ -35,7 +35,41 @@ import { respondToAccountConflict } from '../lib/account-conflict.js';
 import { convertToConnectionBacked, isConnectionBacked } from '../lib/connection-credential.js';
 import { primeFailOpenPrStatus, clearFailOpenPrStatus } from '../lib/github-pr-status.js';
 import { primePrStateCache, clearPrStateCache, prStateUpstreamFetchCount } from './dashboard.js';
+import { setLinearFetchImpl } from '../lib/linear-fetch.js';
 
+// LIN-3798: the e2e server's Linear transport. `/test/set-session` workspaces carry
+// the fake `test-token`, and any Linear read the mock short-circuits miss (the
+// dispatch referent guard, lib/dispatch-referent-guard.js, on every dispatch that
+// names an issue) sent it to api.linear.app, which answers it unauthenticated. That
+// round trip is a live call from the tests, and its latency kept a test's enqueue in
+// flight past the next test's /test/clear-dispatch-queue, so the stray row landed in
+// the cleared partition. This answers `test-token` in-process with the same 401, so
+// every caller sees what it saw before, with no network. Other tokens pass through.
+// The unit suite's equivalent is tests/fixtures/hermetic-linear.js (LIN-1880).
+const LINEAR_UNAUTHENTICATED_BODY = JSON.stringify({
+  errors: [{
+    message: 'Authentication required, not authenticated',
+    extensions: { type: 'authentication error', code: 'AUTHENTICATION_ERROR', userError: true }
+  }]
+});
+
+export function installTestTokenLinearTransport({ setImpl = setLinearFetchImpl, passThrough = (url, options) => globalThis.fetch(url, options) } = {}) {
+  setImpl(async (url, options = {}) => {
+    if (new Headers(options.headers).get('authorization') === 'test-token') {
+      return new Response(LINEAR_UNAUTHENTICATED_BODY, { status: 401, headers: { 'content-type': 'application/json' } });
+    }
+    return passThrough(url, options);
+  });
+}
+
+// A stable UUID-shaped id derived from a urlKey (sha1, version/variant bits set).
+// Shared by /test/set-local-session (LIN-3383) and /test/set-session (LIN-3798):
+// the workspace id keys the owner edge, so each partition's urlKey needs its own.
+// The hash prefix stays `local-workspace:` so existing local ids are unchanged.
+const uuidForUrlKey = (key) => {
+  const h = crypto.createHash('sha1').update(`local-workspace:${key}`).digest('hex');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-5${h.slice(13, 16)}-a${h.slice(17, 20)}-${h.slice(20, 32)}`;
+};
 
 /**
  * Create test routes with required dependencies.
@@ -203,13 +237,25 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     // Test UUIDs (valid format for workspace validation)
     const TEST_UUID_1 = '11111111-1111-1111-1111-111111111111'
     const TEST_UUID_2 = '22222222-2222-2222-2222-222222222222'
+    // LIN-3798: the workspace id keys the owner edge (/test/set-workspace-ownership,
+    // the LIN-3383 owner-only enqueue gate), so a per-worker urlKey gets its OWN
+    // deterministic id, as /test/set-local-session already does. One shared id let a
+    // spec that seeds 'foreign' on its worker's key take ownership from every other
+    // worker for that window, and a parallel collective fan-out came back
+    // RUNNER_OWNER_ONLY. A fixed default key keeps its fixed id.
+    const workspaceIdFor = (fixedId, urlKey, defaultUrlKey) =>
+      urlKey === defaultUrlKey ? fixedId : uuidForUrlKey(urlKey)
 
     let workspaces
     if (maxWorkspaces) {
       // Create 10 workspaces (at the limit) with valid UUIDs
       workspaces = Array.from({ length: 10 }, (_, i) =>
         createWorkspace(
-          `${i}${i}${i}${i}${i}${i}${i}${i}-${i}${i}${i}${i}-${i}${i}${i}${i}-${i}${i}${i}${i}-${i}${i}${i}${i}${i}${i}${i}${i}${i}${i}${i}${i}`,
+          workspaceIdFor(
+            `${i}${i}${i}${i}${i}${i}${i}${i}-${i}${i}${i}${i}-${i}${i}${i}${i}-${i}${i}${i}${i}-${i}${i}${i}${i}${i}${i}${i}${i}${i}${i}${i}${i}`,
+            `workspace-${i}${workerSuffix}`,
+            `workspace-${i}`
+          ),
           `Workspace ${i}`,
           `workspace-${i}${workerSuffix}`
         )
@@ -217,14 +263,15 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     } else if (multiWorkspace) {
       // Create 2 workspaces for switching tests. The first uses the per-worker
       // key verbatim; the second inherits the same worker suffix (LIN-628).
+      const secondUrlKey = `second-workspace${workerSuffix}`
       workspaces = [
-        createWorkspace(TEST_UUID_1, 'Test Workspace', singleUrlKey),
-        createWorkspace(TEST_UUID_2, 'Second Workspace', `second-workspace${workerSuffix}`)
+        createWorkspace(workspaceIdFor(TEST_UUID_1, singleUrlKey, 'test-workspace'), 'Test Workspace', singleUrlKey),
+        createWorkspace(workspaceIdFor(TEST_UUID_2, secondUrlKey, 'second-workspace'), 'Second Workspace', secondUrlKey)
       ]
     } else {
       // Default: single workspace (urlKey is per-worker-aware; LIN-625 S1)
       workspaces = [
-        createWorkspace(TEST_UUID_1, 'Test Workspace', singleUrlKey)
+        createWorkspace(workspaceIdFor(TEST_UUID_1, singleUrlKey, 'test-workspace'), 'Test Workspace', singleUrlKey)
       ]
     }
 
@@ -1344,11 +1391,6 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   // ---------------------------------------------------------------------------
   const LOCAL_WS_URL_KEY = LOCAL_WORKSPACE_URL_KEY;
   const LOCAL_WS_UUID = '33333333-3333-3333-3333-333333333333';
-  // A stable UUID-shaped id derived from a urlKey (sha1, version/variant bits set).
-  const uuidForUrlKey = (key) => {
-    const h = crypto.createHash('sha1').update(`local-workspace:${key}`).digest('hex');
-    return `${h.slice(0, 8)}-${h.slice(8, 12)}-5${h.slice(13, 16)}-a${h.slice(17, 20)}-${h.slice(20, 32)}`;
-  };
 
   // Seed the local store and establish a `provider: 'local'` session.
   //

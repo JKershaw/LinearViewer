@@ -20,6 +20,9 @@ import { LOCAL_WORKSPACE_URL_KEY, seedLocalWorkspace } from './local-harness.js'
 
 export { expect };
 
+// Upper bound on the teardown wait for a page's unanswered writes (LIN-3798).
+const PENDING_WRITE_DRAIN_MS = 5000;
+
 export const test = base.extend({
   // ── Per-worker urlKey seam (LIN-625 S1) ──────────────────────────────────
   // The SINGLE producer of each per-worker key `${base}-w${parallelIndex}`,
@@ -69,6 +72,27 @@ export const test = base.extend({
       route.fulfill({ status: 200, contentType: 'application/json', body: '{"count":0}' })
     );
 
+    // LIN-3798: a test that ends on `waitForRequest` (or on a click whose response
+    // it never reads) left its POST still being handled when the next test's
+    // beforeEach ran /test/clear-dispatch-queue, so the row landed in the freshly
+    // cleared partition ('Dispatch API': 2 items for 1, 1 left after DELETE, target
+    // cli for web). Before the page closes, wait for every write this page sent to
+    // be answered, so a test's side effects finish inside that test. Reads are not
+    // waited on (polls never settle); the cap bounds a write a spec holds open with
+    // its own page.route gate.
+    const pendingWrites = [];
+    page.on('request', (request) => {
+      if (request.method() === 'GET' || request.method() === 'HEAD') return;
+      pendingWrites.push(request.response().catch(() => null));
+    });
+
     await use(page);
+
+    let cap;
+    await Promise.race([
+      Promise.allSettled(pendingWrites),
+      new Promise((resolve) => { cap = setTimeout(resolve, PENDING_WRITE_DRAIN_MS); }),
+    ]);
+    clearTimeout(cap);
   },
 });

@@ -24,6 +24,12 @@ test.beforeEach(({ workerUrlKey }) => {
 
 const featuresParam = (obj) => `features=${encodeURIComponent(JSON.stringify(obj))}`;
 
+// LIN-3798: a seat that did not launch carries `ok:false` plus its `error`/`code`
+// (owner refusal vs the catch-all 'dispatch failed', routes/collective.js). A bare
+// `every(d => d.ok)` discards both, so a partial fan-out read as an unexplained
+// flake; this message puts every seat's outcome in the failure output.
+const seatOutcomes = (dispatched) => `dispatched seats: ${JSON.stringify(dispatched)}`;
+
 test.describe('Collective Page (experimental)', () => {
   test.describe('Feature Flag Gating', () => {
     test('redirects to settings when the flag is off', async ({ page }) => {
@@ -159,7 +165,7 @@ test.describe('Collective Page (experimental)', () => {
       const body = await res.json();
       expect(body.channel).toBe('#Collective');
       expect(body.dispatched).toHaveLength(2);
-      expect(body.dispatched.every(d => d.ok)).toBe(true);
+      expect(body.dispatched.every(d => d.ok), seatOutcomes(body.dispatched)).toBe(true);
       // Distinct, legible nicks derived from workspace names.
       const nicks = body.dispatched.map(d => d.nick);
       expect(new Set(nicks).size).toBe(2);
@@ -208,7 +214,7 @@ test.describe('Collective Page (experimental)', () => {
       expect(res.status()).toBe(201);
       const body = await res.json();
       expect(body.dispatched.length).toBeGreaterThanOrEqual(1);
-      expect(body.dispatched.every(d => d.ok)).toBe(true);
+      expect(body.dispatched.every(d => d.ok), seatOutcomes(body.dispatched)).toBe(true);
     });
 
     test('rejects a character bound to an unconnected workspace', async ({ page }) => {
@@ -287,7 +293,7 @@ test.describe('Collective Page (experimental)', () => {
       expect(res.status()).toBe(201);
       const body = await res.json();
       expect(body.dispatched).toHaveLength(4);
-      expect(body.dispatched.every(d => d.ok)).toBe(true);
+      expect(body.dispatched.every(d => d.ok), seatOutcomes(body.dispatched)).toBe(true);
 
       // The facilitator-ordering fix (LIN-1050 beat 3): every seat shares the
       // SAME repo, so /start's "first matching entry wins" rule only produces
