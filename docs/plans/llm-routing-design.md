@@ -224,8 +224,8 @@ Each can be added later without changing the model above:
 
 1. **Six groups as placed?** Recommend yes.
 2. **Who may write over the proxy?** Recommend owner tokens only.
-3. **Per-dispatch presets.** Keep `presetId` working as today, or retire it in favour of table presets? Recommend keeping it for now.
-4. **D1 now, ahead of the queue?** It is small, it fixes a defect, and it makes the autopilot trial readable. Recommend yes, as its own ticket.
+3. **Per-dispatch presets.** Keep `presetId` working as today, or retire it in favour of table presets? **Open.** John, 23 October: "that's a specific area we're prototyping next, along with the expandable task section on the home page." The answer comes from that prototype. Until then, `presetId` keeps working as today.
+4. **D1 now, ahead of the queue?** **Answered, 23 October: yes, D1 first,** as its own ticket, not waiting on LIN-3757.
 
 ## Breakdown (filed when LIN-3757 has chosen its direction)
 
