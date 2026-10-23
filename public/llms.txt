@@ -89,6 +89,7 @@ Both In Progress and Projects sections use the same nested structure:
 - `[data-testid="issue-line"]` - stable task-row hook (on .line; pair with `[data-id]` for a specific issue)
 - `[data-testid="issue-source"]` - per-task source flag, e.g. `data-source="github"` (present only in a multi-provider workspace; absent for single-source/Linear-only)
 - `[data-testid="dashboard-source-notice"]` - notice that a secondary source (e.g. `data-source="github"`) failed to load after one re-mint; the rest of the board still renders (absent when every source loaded)
+- `[data-testid="error-detail-source"]` / `[data-testid="error-detail-reference"]` - rows in the 503 error page's detail block when a data source fails (LIN-3775): which source failed (e.g. `GitHub Issues (owner/repo)`) and an 8-hex reference that matches the `[ref ...]` on the server log line. A `Code` row reads `HTTP <status>` when the source answered. Only a credential rejection offers a reconnect or settings link; absent on the generic 503 page
 - `[data-testid="project"][data-project-name="{name}"]` - project card by name (`[data-testid="project-header"]` on its header)
 - `[data-identifier="{LIN-123}"]` - task by Linear identifier (on .line element)
 - `[data-status="todo|in-progress|done"]` - filter by status

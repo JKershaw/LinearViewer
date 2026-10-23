@@ -169,7 +169,7 @@ describe('LIN-1518 — removeWorkspace( census (the "session survives" half of t
 
   test('ensureValidToken evicts before its remaining>0 branch, so BOTH arms are covered', () => {
     const source = read('server.js');
-    const catchIdx = source.indexOf('} catch (error) {\n    console.error(`Token refresh failed for workspace');
+    const catchIdx = source.indexOf('} catch (error) {\n    const ref = errorReference()\n    console.error(`Token refresh failed for workspace');
     assert.notEqual(catchIdx, -1, 'expected to find ensureValidToken\'s catch block in server.js');
     const nextFnIdx = source.indexOf('\n// Apply middleware to all routes except auth and logout', catchIdx);
     assert.notEqual(nextFnIdx, -1, 'expected to find the end of ensureValidToken');

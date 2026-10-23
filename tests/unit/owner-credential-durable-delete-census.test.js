@@ -212,7 +212,7 @@ describe('LIN-1524 close-out Finding #1 — source assertions for the 2 non-inje
   // regression guard available for them.
   test('ensureValidToken\'s catch block calls ownerCredentialStore.delete( before its session.destroy(', () => {
     const source = read('server.js');
-    const catchIdx = source.indexOf('} catch (error) {\n    console.error(`Token refresh failed for workspace');
+    const catchIdx = source.indexOf('} catch (error) {\n    const ref = errorReference()\n    console.error(`Token refresh failed for workspace');
     assert.notEqual(catchIdx, -1, 'expected to find ensureValidToken\'s catch block in server.js');
 
     const nextFnIdx = source.indexOf('\n// Apply middleware to all routes except auth and logout', catchIdx);
@@ -265,19 +265,19 @@ describe('LIN-1545 — durable delete narrowed to definitive revocation at both 
 
   test('S1: ensureValidToken\'s catch returns a transient 503 before the guarded delete, and gates the delete on definitive revocation', () => {
     const source = read('server.js');
-    const catchIdx = source.indexOf('} catch (error) {\n    console.error(`Token refresh failed for workspace');
+    const catchIdx = source.indexOf('} catch (error) {\n    const ref = errorReference()\n    console.error(`Token refresh failed for workspace');
     assert.notEqual(catchIdx, -1, 'expected to find ensureValidToken\'s catch block in server.js');
     const nextFnIdx = source.indexOf('\n// Apply middleware to all routes except auth and logout', catchIdx);
     assert.notEqual(nextFnIdx, -1, 'expected to find the end of ensureValidToken');
     const catchBody = source.slice(catchIdx, nextFnIdx);
 
     const transientIdx = catchBody.indexOf('isTransientRefreshFailure(');
-    const serviceUnavailableIdx = catchBody.indexOf('renderServiceUnavailablePage');
+    const serviceUnavailableIdx = catchBody.indexOf('renderSourceErrorPage');
     const definitiveIdx = catchBody.indexOf('isDefinitiveRevocation(');
     const deleteIdx = catchBody.indexOf('ownerCredentialStore.delete(');  // per-partition: the routed provider (LIN-1887 N2)
 
     assert.notEqual(transientIdx, -1, 'expected an isTransientRefreshFailure( branch in ensureValidToken\'s catch');
-    assert.notEqual(serviceUnavailableIdx, -1, 'expected a renderServiceUnavailablePage (retryable 503) response for the transient path');
+    assert.notEqual(serviceUnavailableIdx, -1, 'expected a renderSourceErrorPage (retryable 503) response for the transient path');
     assert.notEqual(definitiveIdx, -1, 'expected an isDefinitiveRevocation( guard around the durable delete');
     assert.notEqual(deleteIdx, -1, 'expected the ownerCredentialStore.delete( call to still exist (census site)');
     assert.ok(
@@ -318,10 +318,10 @@ describe('LIN-1545 — durable delete narrowed to definitive revocation at both 
 
     const definitiveIdx = catchBody.indexOf('isDefinitiveRevocation(refreshError)');
     const removalIdx = catchBody.indexOf('handleWorkspaceRemoval(session, workspace.id, res, true)');
-    const serviceUnavailableIdx = catchBody.indexOf('renderServiceUnavailablePage');
+    const serviceUnavailableIdx = catchBody.indexOf('renderSourceErrorPage');
     assert.notEqual(definitiveIdx, -1, 'expected the removal to be gated on isDefinitiveRevocation(refreshError)');
     assert.notEqual(removalIdx, -1, 'expected a definitive-only handleWorkspaceRemoval(..., true) call in the catch');
-    assert.notEqual(serviceUnavailableIdx, -1, 'expected a renderServiceUnavailablePage (retryable 503) fall-through for transient failures');
+    assert.notEqual(serviceUnavailableIdx, -1, 'expected a renderSourceErrorPage (retryable 503) fall-through for transient failures');
     assert.ok(
       definitiveIdx < removalIdx && removalIdx < serviceUnavailableIdx,
       'the catch must delete+remove on definitive revocation, then fall through to the transient 503'
