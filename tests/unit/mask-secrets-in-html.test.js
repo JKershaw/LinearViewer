@@ -311,6 +311,18 @@ describe('LIN-3818 truncated PEM followed by trailing text in the same text node
       assert.ok(Date.now() - t0 < 2000, `took ${Date.now() - t0}ms`);
     }
   });
+  test('trailing path containing a placeholder word does not suppress masking (PR3-B1)', () => {
+    const path = 'from /var/lib/placeholder/keys/deploy/rsa';
+    const lines = t.split('\n');
+    for (const html of [
+      `<pre>${escapeHtml(t + '\nloaded ' + path)}</pre>`,
+      `<p>${lines.map(escapeHtml).join('<br>')}<br>${escapeHtml(path)}</p>`,
+    ]) {
+      const r = maskSecretsInHtml(html);
+      assert.ok(r.hits.includes('private-key-block-truncated'), html.slice(0, 80));
+      assert.ok(!r.html.includes('MIIEow') && !r.html.includes('QRSTUVWXYZ0123'), r.html);
+    }
+  });
   test('<br>-split key with same-node trailing text, plain and escaped <br>, is masked', () => {
     const lines = t.split('\n');
     for (const html of [

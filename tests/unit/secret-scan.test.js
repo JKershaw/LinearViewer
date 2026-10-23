@@ -416,10 +416,26 @@ describe('LIN-3818 truncated PEM followed by trailing text', () => {
     assert.equal(trunc(PBEGIN + '\n/var/lib/placeholder/keys/deploy/rsa\nmore').length, 0);
   });
   test('placeholder-shaped words after the first token never suppress the hit', () => {
-    for (const word of ['placeholder', 'example', 'xxxxxxxx', 'your_key_here', 'changeme', 'dummy']) {
-      for (const tail of ['\n' + word, ' ' + word + ' tail', '\nsee /srv/' + word + '/keys/id', '\nlast line ' + word]) {
+    for (const word of ['placeholder', 'XXXXXXXX', 'yourkey', 'mykey', 'exampletoken', 'dummysecret']) {
+      for (const tail of ['\n' + word, ' ' + word + ' tail', '\nsee /a/b/' + word + '/c/d/e/f/g/h/i/j/k/l/m', '\nlast line ' + word]) {
         assert.equal(trunc(HEAD + KEY + tail).length, 1, JSON.stringify(tail));
       }
+    }
+  });
+  // PR3-B1: trailing text that itself forms a 32+ [A-Za-z0-9+/=] run containing a placeholder word must
+  // not suppress the hit. Only the first key-shaped token of the body is the placeholder subject, so
+  // these go red if the subject is widened back to every 32+ run of the body.
+  test('trailing 32+ runs containing a placeholder word never suppress the hit (PR3-B1)', () => {
+    for (const tail of [
+      '\nloaded from /var/lib/placeholder/keys/deploy/rsa\n',
+      '\ncopied to /srv/app/config/yourkey/production now',
+      '\n/var/lib/placeholder/keys/deploy/rsa',
+      '\nbacked up under /home/ops/mykey/archive/2026/october ok\n',
+      '\nx+placeholder+yyyyyyyyyyyyyyyyyyyyyyyy=z',
+      '\nbacked up under /home/ops/someother/archive/2026/october ok\n', // control: no placeholder word
+    ]) {
+      assert.equal(trunc(HEAD + KEY + tail).length, 1, JSON.stringify(tail));
+      assert.ok(scanText(HEAD + KEY + tail).some(f => f.ruleId === 'private-key-block-truncated'), JSON.stringify(tail));
     }
   });
   test('wrapped keys: 32/64 columns masked with and without trailing text; narrow wraps keep base behaviour', () => {
