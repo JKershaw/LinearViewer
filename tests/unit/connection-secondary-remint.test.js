@@ -22,16 +22,33 @@ const NOW = 1_800_000_000_000;
 const ACCT = 'acct-1';
 const GH_CONN = `${ACCT}::github::142745078`;
 const LIN_CONN = `${ACCT}::linear::org-1`;
+const JIRA_CONN = `${ACCT}::jira::x`;
 
 function rig({ remintThrows = false, remintNull = false } = {}) {
-  const counts = { githubRemint: 0, linearExchange: 0 };
+  const counts = { githubRemint: 0, linearExchange: 0, jiraExchange: 0 };
+  // LIN-3790: every call into the injected refreshConnectionForWorkspace.
+  const calls = [];
   const rows = {
     [GH_CONN]: { _id: GH_CONN, provider: 'github', unitId: '142745078', credentials: { installationId: '142745078', token: 'stale-row' }, referents: [] },
     [LIN_CONN]: { _id: LIN_CONN, provider: 'linear', unitId: 'org-1', credentials: { token: 'lin' }, referents: [] },
+    [JIRA_CONN]: { _id: JIRA_CONN, provider: 'jira', unitId: 'x', credentials: { token: 'jira' }, referents: [] },
   };
   const connectionStore = {
     readConnectionById: async (id) => rows[id] ?? null,
     updateCredentials: async (id, patch) => { rows[id].credentials = { ...rows[id].credentials, ...patch }; },
+  };
+  // LIN-3790: a durable owner record for the Jira Connection, so a refresh-token-kind
+  // secondary renews through the real runConnectionRefresh.
+  const owner = { [JIRA_CONN]: { provider: 'jira', scope: 'x', token: 'jira', refreshToken: 'rt-1', tokenExpiresAt: NOW - 1000 } };
+  const ownerCredentialStore = {
+    getByConnection: async (id) => owner[id] ?? null,
+    markSpendIntentByConnection: async () => {},
+    clearSpendIntentByConnection: async () => {},
+    putIfRefreshTokenByConnection: async (id, attempted, record) => {
+      if (owner[id]?.refreshToken !== attempted) return false;
+      owner[id] = record;
+      return true;
+    },
   };
   const resolveProvider = () => ({
     refreshCredential: async () => {
@@ -43,16 +60,19 @@ function rig({ remintThrows = false, remintNull = false } = {}) {
   });
   const refreshConnection = createConnectionRefresher({
     connectionStore,
-    ownerCredentialStore: { getByConnection: async () => null },
+    ownerCredentialStore,
     resolveProvider,
     refreshAccessToken: async () => { counts.linearExchange++; return {}; },
+    resolveExchange: (provider) => (provider === 'jira'
+      ? async () => { counts.jiraExchange++; return { access_token: 'fresh-jira', refresh_token: 'rt-2', expires_in: 3600 }; }
+      : null),
     now: () => NOW,
     evict: () => {},
     lifecycleEventStore: { recordEvent: async () => {} },
   });
   const access = createConnectionAccess({
     connectionStore,
-    ownerCredentialStore: { getByConnection: async () => null },
+    ownerCredentialStore,
     refreshConnection,
     resolveCanonicalAccountId: async (id) => id,
     selectOwnerSessionRow: () => null,
@@ -64,12 +84,15 @@ function rig({ remintThrows = false, remintNull = false } = {}) {
     now: () => NOW,
   });
   const seam = createSecondaryBindingRemint({
-    refreshConnectionForWorkspace: (...args) => access.refreshConnectionForWorkspace(...args),
+    refreshConnectionForWorkspace: (connection, ...rest) => {
+      calls.push({ connection });
+      return access.refreshConnectionForWorkspace(connection, ...rest);
+    },
     applyRefreshed: rehydrateBindingAfterRefresh,
     now: () => NOW,
     logger: { error: () => {} },
   });
-  return { counts, rows, seam };
+  return { counts, rows, seam, calls };
 }
 
 /** A Linear-primary workspace with a secondary GitHub binding, hydrated like a request. */
@@ -82,24 +105,64 @@ function workspace({ ghExpiry = NOW - 1000, hydrated = true, ghExtra = {}, bindi
   return { id: 'org-1', urlKey: 'linearviewer', provider: 'linear', activeBinding: { provider: 'linear', scope: 'org-1' }, bindings: [linear, github] };
 }
 
-describe('LIN-3774 isSecondaryRemintable', () => {
-  test('a hydrated, connection-backed GitHub binding that is not active is in scope', () => {
+describe('LIN-3774 / LIN-3790 isSecondaryRenewable', () => {
+  test('a hydrated, connection-backed GitHub binding that is not active is renewable', () => {
     const { seam } = rig();
     const ws = workspace();
-    assert.equal(seam.isSecondaryRemintable(ws, ws.bindings[1]), true);
+    assert.equal(seam.isSecondaryRenewable(ws, ws.bindings[1]), true);
   });
 
-  test('the active binding, a legacy binding, a refresh-token kind and an unhydrated binding are out', () => {
+  test('LIN-3790: a hydrated connection-backed refresh-token kind (Jira, Linear) that is not active is renewable', () => {
     const { seam } = rig();
     const ws = workspace();
-    assert.equal(seam.isSecondaryRemintable(ws, ws.bindings[0]), false, 'active (and refresh-token kind)');
-    assert.equal(seam.isSecondaryRemintable(ws, { provider: 'github', scope: 'o/r', credentials: { token: 't' } }), false, 'legacy');
     const jira = { provider: 'jira', scope: 'https://x.atlassian.net', connectionId: `${ACCT}::jira::x` };
-    setBindingCredential(jira, { token: 't' });
-    assert.equal(seam.isSecondaryRemintable(ws, jira), false, 'refresh-token kind');
+    setBindingCredential(jira, { token: 't', tokenExpiresAt: NOW - 1 });
+    assert.equal(seam.isSecondaryRenewable(ws, jira), true, 'jira');
+    const gh = { provider: 'github', scope: 'o/r', connectionId: GH_CONN };
+    setBindingCredential(gh, { token: 't' });
+    const lin = { provider: 'linear', scope: 'org-2', connectionId: `${ACCT}::linear::org-2` };
+    setBindingCredential(lin, { token: 't' });
+    const ghPrimary = { id: 'w', provider: 'github', activeBinding: { provider: 'github', scope: 'o/r' }, bindings: [gh, lin] };
+    assert.equal(seam.isSecondaryRenewable(ghPrimary, lin), true, 'linear under a github primary');
+  });
+
+  test('the active binding, a legacy binding and an unhydrated binding are not renewable', () => {
+    const { seam } = rig();
+    const ws = workspace();
+    assert.equal(seam.isSecondaryRenewable(ws, ws.bindings[0]), false, 'active');
+    assert.equal(seam.isSecondaryRenewable(ws, { provider: 'github', scope: 'o/r', credentials: { token: 't' } }), false, 'legacy');
+    assert.equal(seam.isSecondaryRenewable(ws, { provider: 'jira', scope: 'https://x', credentials: { token: 't' } }), false, 'legacy jira');
     const unhydrated = workspace({ hydrated: false });
-    assert.equal(seam.isSecondaryRemintable(unhydrated, unhydrated.bindings[1]), false, 'unhydrated');
-    assert.equal(seam.isSecondaryRemintable(ws, null), false);
+    assert.equal(seam.isSecondaryRenewable(unhydrated, unhydrated.bindings[1]), false, 'unhydrated');
+    assert.equal(seam.isSecondaryRenewable(ws, null), false);
+  });
+});
+
+describe('LIN-3790 isSecondaryBinding', () => {
+  test('any connection-backed non-active binding is a secondary, hydrated or not; the active one is not', () => {
+    const { seam } = rig();
+    const ws = workspace();
+    assert.equal(seam.isSecondaryBinding(ws, ws.bindings[1]), true);
+    assert.equal(seam.isSecondaryBinding(ws, ws.bindings[0]), false, 'active');
+    const unhydrated = workspace({ hydrated: false });
+    assert.equal(seam.isSecondaryBinding(unhydrated, unhydrated.bindings[1]), true, 'unhydrated');
+  });
+
+  test('a legacy binding of another kind than the primary is a secondary', () => {
+    const { seam } = rig();
+    const ws = { id: 'w', provider: 'linear', bindings: [] };
+    for (const provider of ['github', 'github-projects', 'jira']) {
+      assert.equal(seam.isSecondaryBinding(ws, { provider, scope: 's', credentials: { token: 't' } }), true, provider);
+    }
+  });
+
+  test('a legacy binding of the PRIMARY kind is not a secondary, including when workspace.provider is undefined', () => {
+    const { seam } = rig();
+    const legacyLinear = { provider: 'linear', scope: 'org-1', credentials: { token: 'lin' } };
+    assert.equal(seam.isSecondaryBinding({ id: 'w', provider: 'linear', bindings: [legacyLinear] }, legacyLinear), false);
+    // isActiveBinding would call this binding "not active" (un-normalised provider compare).
+    assert.equal(seam.isSecondaryBinding({ id: 'w', bindings: [legacyLinear] }, legacyLinear), false, 'undefined provider normalises to linear');
+    assert.equal(seam.isSecondaryBinding({ id: 'w' }, null), false);
   });
 });
 
@@ -165,6 +228,32 @@ describe('LIN-3774 ensureFresh (proactive)', () => {
     assert.equal(counts.githubRemint, 0);
   });
 
+  test('LIN-3790: an expired connection-backed Jira OAuth secondary is renewed once via refreshConnectionForWorkspace, not re-minted as GitHub', async () => {
+    const { seam, counts, calls } = rig();
+    const ws = workspace();
+    const jira = { provider: 'jira', scope: 'https://x.atlassian.net', connectionId: `${ACCT}::jira::x` };
+    setBindingCredential(jira, { token: 'stale-jira', tokenExpiresAt: NOW - 1000 });
+    ws.bindings.push(jira);
+    assert.equal(await seam.ensureFresh(ws, jira, ACCT), true);
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls[0].connection, { _id: JIRA_CONN, provider: 'jira' });
+    assert.equal(counts.jiraExchange, 1);
+    assert.equal(counts.githubRemint, 0);
+    assert.equal(counts.linearExchange, 0);
+    assert.equal(readBindingCredential(jira).token, 'fresh-jira');
+    assert.equal(readBindingCredential(ws.bindings[0]).token, 'lin-token', 'the active binding is untouched');
+  });
+
+  test('LIN-3790: an expired legacy secondary is never touched by ensureFresh', async () => {
+    const { seam, calls } = rig();
+    const ws = workspace();
+    const legacy = { provider: 'github', scope: 'o/r', credentials: { token: 'stale', tokenExpiresAt: NOW - 1000 } };
+    ws.bindings.push(legacy);
+    assert.equal(await seam.ensureFresh(ws, legacy, ACCT), false);
+    assert.equal(await seam.remint(ws, legacy, ACCT), false);
+    assert.equal(calls.length, 0);
+  });
+
   test('ensureFreshAll re-mints every stale secondary and nothing else', async () => {
     const { seam, counts } = rig();
     const ws = workspace();
@@ -219,15 +308,17 @@ describe('LIN-3774 bindingForError', () => {
     assert.equal(seam.bindingForError(ws, { binding: tag }), ws.bindings[1]);
   });
 
-  test('null for no tag, the active binding, a connectionId mismatch, and an unhydrated binding', () => {
+  test('null for no tag, the active binding and a connectionId mismatch; an unhydrated secondary resolves (LIN-3790)', () => {
     const { seam } = rig();
     const ws = workspace();
     assert.equal(seam.bindingForError(ws, new Error('x')), null);
     assert.equal(seam.bindingForError(ws, null), null);
     assert.equal(seam.bindingForError(ws, { binding: { provider: 'linear', scope: 'org-1', connectionId: LIN_CONN } }), null);
     assert.equal(seam.bindingForError(ws, { binding: { provider: 'github', scope: 'JKershaw/LinearViewer', connectionId: 'other' } }), null);
+    // LIN-3790: an unhydrated secondary is still a SECONDARY (it degrades, renewal
+    // is a no-op), so it resolves; it used to be null and took the active ladder.
     const unhydrated = workspace({ hydrated: false });
-    assert.equal(seam.bindingForError(unhydrated, { binding: { provider: 'github', scope: 'JKershaw/LinearViewer', connectionId: GH_CONN } }), null);
+    assert.equal(seam.bindingForError(unhydrated, { binding: { provider: 'github', scope: 'JKershaw/LinearViewer', connectionId: GH_CONN } }), unhydrated.bindings[1]);
   });
 });
 
