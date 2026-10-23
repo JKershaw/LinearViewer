@@ -397,7 +397,7 @@
         "code": "DISPATCH_TOKEN_STORE_UNAVAILABLE",
         "retryable": true
       },
-      "sd": "retryable-error",
+      "sd": "5xx",
       "kit": "error",
       "difference": "LIN-3699: same reply, each side's own vocabulary. SD counts a retryable 5xx toward host-wide auto-pause and never latches; the kit's wait returns reason `error` (re-arm), and `login` says Harbour could not check the bootstrap."
     },
@@ -411,7 +411,7 @@
         "code": "PROXY_TOKEN_STORE_UNAVAILABLE",
         "retryable": true
       },
-      "sd": "retryable-error",
+      "sd": "5xx",
       "kit": "error",
       "difference": "LIN-3699: same reply, each side's own vocabulary. SD counts a retryable 5xx toward host-wide auto-pause and never latches; the kit's wait returns reason `error` (re-arm), and `login` says Harbour could not check the bootstrap."
     },
@@ -425,7 +425,7 @@
         "code": "PROXY_TOKEN_STORE_UNAVAILABLE",
         "retryable": true
       },
-      "sd": "retryable-error",
+      "sd": "5xx",
       "kit": "error",
       "difference": "LIN-3699: same reply, each side's own vocabulary. SD counts a retryable 5xx toward host-wide auto-pause and never latches; the kit's wait returns reason `error` (re-arm), and `login` says Harbour could not check the bootstrap."
     }
