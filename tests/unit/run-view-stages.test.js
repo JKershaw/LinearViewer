@@ -8,8 +8,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { SPINE, USUAL_STAGES, STAGE_LABELS } from '../../lib/run-view.js';
-import { STEP_KIND_WORDS } from '../../lib/render-run-steps.js';
+import { SPINE, USUAL_STAGES, STAGE_LABELS, STEP_KIND_WORDS } from '../../lib/run-view.js';
 import { DISPATCH_KINDS } from '../../lib/prompt-templates.js';
 
 describe('run-view: stage vocabulary (LIN-3328)', () => {
