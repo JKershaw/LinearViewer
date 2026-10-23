@@ -38,3 +38,12 @@ test('research and design skip guards do not accept a filer-written fix as prep'
   assert.doesNotMatch(design.route.whenNot, /the ticket or comments already committed/);
   assert.match(design.route.whenNot, /research write-up or approved plan/);
 });
+
+test('Seams & Tangles puts the move under the Unvalidated idea heading', () => {
+  const seams = PERIODICALS.find(p => p.title === 'Seams & Tangles');
+  assert.ok(seams, 'Seams & Tangles periodical exists');
+  const bullet = seams.generatePrompt().split('\n').find(l => l.includes('Shape each follow-up as one move'));
+  assert.ok(bullet, 'bullet present');
+  assert.match(bullet, /Unvalidated idea/);
+  assert.doesNotMatch(bullet, /names a single move/);
+});
