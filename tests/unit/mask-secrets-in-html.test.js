@@ -150,3 +150,53 @@ describe('findSecretMatches vs scanText', () => {
     assert.equal(findSecretMatches(t).length, 2);
   });
 });
+
+describe('LIN-3796 PEM split across <br>-separated text', () => {
+  const lines = F.privateKey.split('\n');
+  const leaks = (html) => findSecretMatches(html.replace(/<[^>]+>/g, '\n')).length;
+
+  for (const br of ['<br>', '<br/>', '<br />', '<BR>', '<br class="x">']) {
+    test(`served ${br} between PEM lines is masked, tags kept`, () => {
+      const html = `<p>${lines.join(br)}</p>`;
+      const r = maskSecretsInHtml(html);
+      assert.ok(r.hits.includes('private-key-block'));
+      assert.equal(leaks(r.html), 0);
+      assert.ok(!r.html.includes('MIIEow'));
+      assert.equal(r.html.split(br).length, html.split(br).length);
+    });
+  }
+
+  test('markdown-source <br> (escaped to &lt;br&gt;) is masked', () => {
+    const html = `<p>${escapeHtml(lines.join('<br>'))}</p><pre>${escapeHtml(lines.join('<br />'))}</pre>`;
+    const r = maskSecretsInHtml(html);
+    assert.ok(r.hits.includes('private-key-block'));
+    assert.ok(!r.html.includes('MIIEow'));
+  });
+
+  test('other markup between lines still keeps segments separate', () => {
+    const html = `<p>${lines.join('<b>x</b>')}</p>`;
+    assert.equal(maskSecretsInHtml(html).html, html);
+  });
+
+  test('clean <br> pages are byte-identical', () => {
+    const html = '<p>hello world, line one<br>second line of prose<br />third &lt;br&gt; line</p>';
+    assert.equal(maskSecretsInHtml(html).html, html);
+  });
+
+  test('idempotent', () => {
+    const once = maskSecretsInHtml(`<p>${lines.join('<br>')}</p>`).html;
+    assert.equal(maskSecretsInHtml(once).html, once);
+  });
+
+  test('hostile inputs stay fast: truncated PEM and many <br>s', () => {
+    for (const html of [
+      `<p>-----BEGIN RSA PRIVATE KEY-----${'<br>QUJDREVGRw=='.repeat(20000)}</p>`,
+      `<p>${'<br>'.repeat(100000)}</p>`,
+      `<p>${escapeHtml('-----BEGIN RSA PRIVATE KEY-----' + '<br>AAAA'.repeat(20000))}</p>`,
+    ]) {
+      const t = Date.now();
+      maskSecretsInHtml(html);
+      assert.ok(Date.now() - t < 2000, `took ${Date.now() - t}ms`);
+    }
+  });
+});
