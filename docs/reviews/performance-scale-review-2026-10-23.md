@@ -47,6 +47,8 @@ tooling was added. Ceiling framing below.
 ### 1. `stack-provider-fetch-linear-in-issues` — HIGH
 - [R] prod `/api/proxy/stack` **7.06–9.36 s, median 8.33 s** (12 samples) at **3,755 issues**: 16 serial
   250-issue Linear pages × about 0.54 s.
+- [R] review re-sample at HEAD, 3 samples: 8.68 / 9.24 / 10.33 s (121.6 KB, `limit=20`). Taken by the
+  LIN-3814 review stage, not re-run here; it agrees with the research median.
 - Linear in issue count: about 30 s at about 13k issues (**extrapolation**, not measured), roughly a year
   out at the observed growth.
 - Ceiling: 30 s design budget. Headroom today about 3.6×.
@@ -83,6 +85,17 @@ tooling was added. Ceiling framing below.
   stage's sparse generator, which measured [R] 4.3 ms / 436 ms / 2.86 s at 1k / 10k / 20k. The cost is
   dominated by reach-bitset size, so it depends heavily on edge locality. Both are real; neither is prod.
   Chain at 10k agrees with the research ([R] 7.3 s).
+- [R] page-level symptom of C1+C2 at scale, local seeded workspace, local MangoDB (research stage; not
+  re-run here), N = 1k / 10k / 20k / 50k:
+
+  | surface | 1k | 10k | 20k | 50k | scaling |
+  | -- | -- | -- | -- | -- | -- |
+  | dashboard | 31 ms | 408 ms | 1.28 s | 9.18 s (82 MB) | ~N^2.15 |
+  | swipe | 83 ms | 421 ms | 1.35 s | 8.90 s | ~N^2.06 |
+  | `/api/proxy/stack` compute alone (no network) | 19 ms | 311 ms | 1.06 s | 8.73 s | ~N^2.3 |
+
+  These are the measured page symptoms of this finding and bear on #1: at 50k the compute alone is
+  already 8.73 s before any provider fetch. Not prod; prod N is 3.7k.
 - Prior: LIN-1038 (2026-07-05, `8aa4a2b`) 6.5 ms @1k, 745 ms @10k: same class, same super-linear lineage.
   This is **not** a regression claim; the generators differ.
 - Consumers: `task-stack.js:150`, `render-swipe.js:496`, `recommendation-facts.js:168` (reached via
@@ -114,7 +127,8 @@ tooling was added. Ceiling framing below.
 - `buildForest` — [M] **1.5 ms / 7.0 ms / 32.6 ms at 1k / 10k / 50k**, linear. Confirms LIN-1038 and
   [R] 18 ms @10k.
 - [R] KPI aggregates: linear, 1.1 s at 100k rows; prod `/kpis` 0.05–0.82 s.
-- [R] roadmap, next-run, journey, swim, recommendation-input: no concern.
+- [R] roadmap, next-run, journey, swim, recommendation-input: no concern. Swim, ship, roadmap, journey
+  and context stayed linear (at most 1.42 s at N = 50k, local).
 - [R] every Mongo-backed prod proxy read 0.04–0.86 s. This is the post-EU-West baseline. **Topology
   delta, not a code delta:** MongoDB moved to EU West on 2026-10-23 (LIN-2993 incident correction); no
   code change explains the improvement over the incident figures.
@@ -135,6 +149,29 @@ slow dependency holding requests for minutes) stays here as a measured symptom; 
 and Observability (LIN-1041) are unregistered; fix homes are LIN-2997/2998/2999. `MULTI_REQUEST_TIMEOUT_MS`
 is 50 s, above the 30 s budget (comment on LIN-2997).
 
+## Provider and datastore call cost
+
+Measured symptoms only; nothing is minted from this section.
+
+- Each tracker page load and each `/stack` call does 1 projects request plus 16 serial 250-issue Linear
+  pages at about 0.54 s each [R, prod, 3,755 issues]. This is the same cost as finding #1.
+- The run-page 60 s PR poll does an uncached `fetchIssueComments` (`routes/dashboard.js:1377`; home
+  LIN-3274).
+- Request fan-out [R, local]: the dashboard fires 13 XHRs in its first 10 s, about 10 of them the 1 s
+  queue badge (1–2 ms each, clean); the dispatch page fires 24.
+- Every request also pays the session-store read, `ensureValidToken` and `ensureFreshAll`.
+- LLM call latency is not measured here; the existing instrument is the LIN-2605 Settings read-out
+  (`latency (feature × model)`). See Open items.
+
+## Stale leads
+
+- `docs/runbooks/harbour-degraded.md:170` ("p99 latency capped at ~30 s: Railway's own edge cap"): read off
+  a metrics-graph cap, not a measured request cut-off. Refuted as a total-duration cap by the 45 s prod
+  long-poll above.
+- `lib/http-keepalive.js:1-31`: Heroku H12/H15 framing (30 s first byte, 20 s first-byte target, 15 s
+  heartbeat). Production is on Railway (LIN-1108); the code and its comments still describe Heroku.
+- Both are tracked under LIN-1758 (does Railway impose a ceiling), where the 45 s witness is recorded.
+
 ## Over-engineering check
 
 No micro-optimisation is proposed. `buildForest`, KPIs and the bounded history reads are linear and cheap
@@ -146,6 +183,12 @@ at the N this project reaches and should be left alone.
 - Prod issue-relation density, prod lifetime history depth, prod LLM latencies (LIN-2605 read-out).
 - Jira ≥2,000-issue path; the file-storage session V8 string-length ceiling.
 - Whether Railway enforces a 30 s first-byte ceiling.
+- Sweeps and the runner poll, **not timed**. Liveness-alarm (every 10 min) and ci-wake (every 5 min) walk
+  every observed workspace sequentially (`lib/liveness-alarm-sweep.js:75-96`,
+  `lib/ci-wake-sweep.js:212-223`); observer-sweep is round-robin, one workspace per minute;
+  `listObservedWorkspaceKeys` is a 30-day `distinct` (`lib/dispatch-store.js:1985`). There is no seam
+  short of running the scheduler at scale. Also not timed: the runner's `/api/dispatch/poll`, every 5 s
+  per workspace (simple-dispatcher `queue.js:67`), which needs a take grant.
 
 ## Follow-ups
 
