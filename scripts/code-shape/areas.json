@@ -15,7 +15,7 @@
     {
       "name": "Agent API (proxy)",
       "match": [
-        "^routes/proxy[^/]*\\.js$|^lib/proxy-(?!fetch\\.js$)[^/]*\\.js$|^lib/(require-grant|harbour-feedback-tokens|dispatch-tokens|settings-proxy-default)\\.js$"
+        "^routes/proxy[^/]*\\.js$|^lib/proxy-(?!fetch\\.js$)[^/]*\\.js$|^lib/(require-grant|harbour-feedback-tokens|harbour-token-format|dispatch-tokens|settings-proxy-default)\\.js$"
       ]
     },
     {

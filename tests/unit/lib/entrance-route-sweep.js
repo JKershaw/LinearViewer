@@ -69,14 +69,14 @@ export function sampleUrl(path, values = {}) {
 }
 
 /**
- * A runtime-built bootstrap-token canary: `HB` plus 41 base64url characters.
+ * A runtime-built bootstrap-token canary: `hbp_` plus 43 base64url characters (LIN-3795: the minted shape).
  * Never write a token-shaped literal in a test; the `harbour-bootstrap-token`
  * rule in lib/secret-scan.js is part of the `secret-scan` CI job.
  */
 export function makeCanary() {
-  const body = randomBytes(31).toString('base64url').slice(0, 41);
-  const canary = `HB${body}`;
-  if (canary.length !== 43 || !BASE64URL.test(canary)) throw new Error('canary shape');
+  const body = randomBytes(32).toString('base64url');
+  const canary = `${'hb'}p_${body}`;
+  if (canary.length !== 47 || !BASE64URL.test(canary)) throw new Error('canary shape');
   return canary;
 }
 

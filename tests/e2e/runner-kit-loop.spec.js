@@ -257,7 +257,7 @@ test.describe('runner kit local loop (LIN-3098 S2)', () => {
  * fills `claude-code`, the item takes the MCP branch, and the witness passes on
  * HEAD for the wrong reason. The stored harness is asserted null first.
  */
-const EXCHANGE_LINE_RE = /curl -X POST -H "Authorization: Bearer ([A-Za-z0-9_-]{43})" \S+\/api\/proxy\/token/;
+const EXCHANGE_LINE_RE = /curl -X POST -H "Authorization: Bearer ((?:hbp_)?[A-Za-z0-9_-]{43})" \S+\/api\/proxy\/token/;
 
 async function enqueueViaSession(page, data) {
   const res = await page.request.post(`/workspace/${urlKey}/api/dispatch`, {

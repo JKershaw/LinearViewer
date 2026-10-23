@@ -289,7 +289,7 @@ describe('pollDecision (order: other consumer, harness, attribution, halt, token
 // tested against what Harbour actually writes rather than a copy of it.
 describe('credentialInProseRefusal and preConfirmDecision (LIN-3211: no credential in prose)', () => {
   const BASE_URL = 'http://localhost:3001';
-  const TOKEN_LINE_RE = /curl -X POST -H "Authorization: Bearer ([A-Za-z0-9_-]{43})" \S+\/api\/proxy\/token/;
+  const TOKEN_LINE_RE = /curl -X POST -H "Authorization: Bearer ((?:hbp_)?[A-Za-z0-9_-]{43})" \S+\/api\/proxy\/token/;
   let dbDir, client, tokens;
   const f = {};
 
@@ -329,9 +329,9 @@ describe('credentialInProseRefusal and preConfirmDecision (LIN-3211: no credenti
     assert.ok(!f.mcp.prompt.includes(f.mcp.bootstrapToken));
     assert.doesNotMatch(f.mcp.prompt, /api\/proxy\/token/);
     assert.match(f.collective, TOKEN_LINE_RE);
-    // A real bootstrap is randomBytes(32).toString('base64url'): 43 characters, no prefix (lib/proxy-tokens.js:208–209).
+    // A real bootstrap is hbp_ + randomBytes(32).toString('base64url') (LIN-3795; lib/harbour-token-format.js).
     for (const t of [f.prose.prompt.match(TOKEN_LINE_RE)[1], f.mcp.bootstrapToken, f.collectiveToken, f.clientToken]) {
-      assert.match(t, /^[A-Za-z0-9_-]{43}$/);
+      assert.match(t, /^hbp_[A-Za-z0-9_-]{43}$/);
     }
   });
 
