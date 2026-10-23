@@ -73,6 +73,28 @@ function kitOutcome(row) {
   return 'claimed';
 }
 
+// LIN-3699: what the kit's `wait` makes of an auth reply, in the contract's vocabulary: the
+// reason it returns is its own (`credential` = the 401, `error` = any other non-200). Driven
+// through a real login-shaped state dir and an injected fetch, so no socket is opened.
+async function kitAuthOutcome(row) {
+  const home = fs.mkdtempSync(path.join(fs.existsSync('/tmp') ? '/tmp' : os.tmpdir(), 'rkc-auth-'));
+  try {
+    const dir = path.join(home, 'acme');
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    credentialStore({ file: path.join(dir, 'runner.token') }).set('runner-working-token');
+    fs.writeFileSync(path.join(dir, 'runner.json'), JSON.stringify({
+      baseUrl: 'http://127.0.0.1:1', urlKey: 'acme', ownerAccountId: OWNER,
+      expiresAt: new Date(Date.now() + 20 * 3600_000).toISOString()
+    }));
+    const { status, code, retryable } = row.item;
+    const fetchImpl = async () => new Response(JSON.stringify({ error: 'x', code, retryable }), { status });
+    const out = await runCommand(['wait', '--url-key', 'acme'], {
+      home, now: () => Date.now(), fetchImpl, waitPollMs: 10, waitHeartbeatMs: 10, waitCapMs: 60
+    });
+    return out.reason;
+  } finally { fs.rmSync(home, { recursive: true, force: true }); }
+}
+
 const isDir = (repo) => (dir) => repo === 'found' && dir === path.join(ROOT_DIR, 'found');
 
 function kitFor(row) {
@@ -100,6 +122,8 @@ function kitFor(row) {
         return 'error';
       }
     }
+    case 'auth':
+      return kitAuthOutcome(row);
     case 'heartbeat':
       return 'not sent (the runner-kit producer, POST /api/proxy/runner/heartbeat, is a follow-up)';
     default:
@@ -143,8 +167,8 @@ describe('contract table shape', () => {
 
 describe('the kit follows the contract table', () => {
   for (const row of TABLE.rows) {
-    test(`${row.area}: ${row.case}`, () => {
-      assert.equal(kitFor(row), row.kit);
+    test(`${row.area}: ${row.case}`, async () => {
+      assert.equal(await kitFor(row), row.kit);
     });
   }
 });

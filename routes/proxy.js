@@ -531,6 +531,12 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   // has to decide which remedy applies (the LIN-1985 gap).
   const PROXY_TOKEN_REJECTED_EXTRA = { code: 'PROXY_TOKEN_INVALID', category: 'auth', retryable: false, stage: STAGE_PROXY_TOKEN };
 
+  // LIN-3699: a store failure while checking the bearer. Deliberately carries NO
+  // `stage`: `stage: 'proxy-token'` means "re-issue your token", the opposite of
+  // this retryable upstream fault. A store fault is category `upstream`,
+  // `retryable:true`, HTTP 503 (the same shape as WORKSPACE_STORE_UNAVAILABLE).
+  const PROXY_TOKEN_STORE_UNAVAILABLE_EXTRA = { code: 'PROXY_TOKEN_STORE_UNAVAILABLE', category: 'upstream', retryable: true };
+
   async function authenticateProxyToken(req, res, next) {
     const authHeader = req.headers.authorization;
 
@@ -603,8 +609,10 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       req.proxyWorkspaceId = result.workspaceId || null;
       next();
     } catch (err) {
+      // LIN-3699: reachable now that the store rethrows a failure instead of
+      // answering null (which was the 401 `retryable:false` above).
       console.error('Proxy token validation error:', err.message);
-      return jsonError(res, 500, 'Authentication error');
+      return jsonError(res, 503, 'Token check unavailable', PROXY_TOKEN_STORE_UNAVAILABLE_EXTRA);
     }
   }
 
@@ -1326,7 +1334,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
 
   // Group C token-exchange (LIN-679 Stage 2 / LIN-2535): extracted to
   // routes/proxy-token-exchange.js, mounted at its original position.
-  router.use(createTokenExchangeRoutes({ proxyTokenStore, proxyEventStore, proxyLimiter, PROXY_TOKEN_REJECTED_EXTRA }));
+  router.use(createTokenExchangeRoutes({ proxyTokenStore, proxyEventStore, proxyLimiter, PROXY_TOKEN_REJECTED_EXTRA, PROXY_TOKEN_STORE_UNAVAILABLE_EXTRA }));
 
   // Group D reads (LIN-679 Stage 3a / LIN-2536): extracted to
   // routes/proxy-reads.js, mounted at its original position.

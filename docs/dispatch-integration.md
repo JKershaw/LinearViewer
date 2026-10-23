@@ -1064,9 +1064,10 @@ This is the same vocabulary the Pipeline view uses for a Loop's `stage`.
 
 | Status | Error | Description |
 |--------|-------|-------------|
-| 401 | `Missing or invalid Authorization header` | No Bearer token provided |
-| 401 | `Empty token` | Token value is empty |
-| 401 | `Invalid or expired token` | Token doesn't exist or was revoked |
+| 401 | `Missing or invalid Authorization header` | No Bearer token provided. `code: "DISPATCH_TOKEN_INVALID"`, `retryable: false` |
+| 401 | `Empty token` | Token value is empty. `code: "DISPATCH_TOKEN_INVALID"`, `retryable: false` |
+| 401 | `Invalid or expired token` | Token doesn't exist, expired (tokens minted since LIN-3618 last 90 days) or was revoked. `code: "DISPATCH_TOKEN_INVALID"`, `retryable: false`: the credential is dead, mint a new one |
+| 503 | `Token check unavailable` | Harbour could not reach its token store, so it could not tell whether the token is good (LIN-3699). `code: "DISPATCH_TOKEN_STORE_UNAVAILABLE"`, `category: "upstream"`, `retryable: true`: **not** a rejection; back off and retry with the same token |
 | 400 | `Invalid item ID format` | Item ID is not a valid UUID |
 | 404 | `Item not found or already taken` | Item doesn't exist, expired, or was claimed |
 | 404 | `Item not found or feedback not allowed` | Item doesn't exist, not taken, or wrong token |
@@ -1198,6 +1199,8 @@ done
 2. **Handle 404 gracefully** - A 404 on `take` means the item was already claimed. This is expected in multi-consumer setups.
 
 3. **Implement exponential backoff** - If you receive repeated errors, back off to avoid overwhelming the server.
+
+   **Tell a `401` from a `503` on every authenticated route (LIN-3699).** A `401` with `code: "DISPATCH_TOKEN_INVALID"` and `retryable: false` means the token itself was rejected (unknown, expired, revoked): stop polling and mint a new token, since retrying cannot help. A `503` with `code: "DISPATCH_TOKEN_STORE_UNAVAILABLE"` and `retryable: true` means Harbour's token store failed while checking it: the token may be perfectly good, so keep it and retry with backoff. Do not treat a `503` as a dead credential.
 
 4. **Log the item ID** - Always log the item ID when processing for debugging and auditing.
 

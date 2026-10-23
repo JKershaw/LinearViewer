@@ -267,6 +267,18 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
   // Consumer API Authentication Middleware
   // =========================================================================
 
+  // LIN-3699: the structured-error-envelope fields for the two things dispatch
+  // auth can answer. A REJECTED credential (missing, empty, unknown or expired)
+  // is a 401 the consumer must not retry: simple-dispatcher latches it dead on
+  // `retryable:false` (queue.js). A STORE failure while checking it is a 503 that
+  // heals on its own and must never carry `retryable:false`, or one database
+  // blip would latch every workspace. Mirrors PROXY_TOKEN_INVALID in
+  // routes/proxy.js; a store fault is category `upstream`, `retryable:true`.
+  const DISPATCH_TOKEN_REJECTED_EXTRA = { code: 'DISPATCH_TOKEN_INVALID', category: 'auth', retryable: false };
+  const DISPATCH_TOKEN_STORE_UNAVAILABLE_EXTRA = { code: 'DISPATCH_TOKEN_STORE_UNAVAILABLE', category: 'upstream', retryable: true };
+  const rejectDispatchToken = (res, message) =>
+    jsonError(res, 401, message, { ...DISPATCH_TOKEN_REJECTED_EXTRA, detail: message });
+
   /**
    * Middleware for token-based authentication (consumer API).
    * Expects: Authorization: Bearer <token>
@@ -276,20 +288,20 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const authHeader = req.headers.authorization;
 
     if (!authHeader?.startsWith('Bearer ')) {
-      return unauthorized.json(res, 'Missing or invalid Authorization header');
+      return rejectDispatchToken(res, 'Missing or invalid Authorization header');
     }
 
     const token = authHeader.slice(7);
 
     if (!token) {
-      return unauthorized.json(res, 'Empty token');
+      return rejectDispatchToken(res, 'Empty token');
     }
 
     try {
       const result = await dispatchTokenStore.validateToken(token, tokenValidationOptions(req));
 
       if (!result) {
-        return unauthorized.json(res, 'Invalid or expired token');
+        return rejectDispatchToken(res, 'Invalid or expired token');
       }
 
       req.dispatchUrlKey = result.urlKey;
@@ -301,8 +313,10 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       req.dispatchTokenOwner = result.createdBy ?? null;
       next();
     } catch (err) {
+      // LIN-3699: reachable now that the store rethrows a failure instead of
+      // answering null. A 503 the consumer retries, never a 401 or a 500.
       console.error('Token validation error:', err.message);
-      return jsonError(res, 500, 'Authentication error');
+      return jsonError(res, 503, 'Token check unavailable', { ...DISPATCH_TOKEN_STORE_UNAVAILABLE_EXTRA, detail: 'The token store could not be reached; retry shortly' });
     }
   }
 
@@ -320,11 +334,11 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
   async function authenticateFeedbackToken(req, res, next) {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
-      return unauthorized.json(res, 'Missing or invalid Authorization header');
+      return rejectDispatchToken(res, 'Missing or invalid Authorization header');
     }
     const token = authHeader.slice(7);
     if (!token) {
-      return unauthorized.json(res, 'Empty token');
+      return rejectDispatchToken(res, 'Empty token');
     }
 
     if (harbourFeedbackTokenStore) {
