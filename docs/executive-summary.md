@@ -46,11 +46,7 @@ Formatting helpers in `lib/prompt-formatters.js` produce consistent sections acr
 
 #### AI recommendations (routing)
 
-Since LIN-3300 this is the one path for every recommendation: an LLM (via OpenRouter) picks the stage, and that stage's handwritten template assembles the prompt. The LLM receives a **routing prompt** (`lib/stage-router.js`) that encodes a decision tree:
-
-1. Does the task need preparation/research?
-2. Are there blockers or bugs?
-3. Is planning needed, or is it ready for implementation?
+Since LIN-3300 this is the one path for every recommendation: an LLM (via OpenRouter) picks the stage, and that stage's handwritten template assembles the prompt. The LLM receives a **routing prompt** (`lib/stage-router.js`) that encodes numbered rules taken in order, first match decides (`SELECTOR_RULES`): a person's word, landed work, blocked, subtasks, a bug, knowledge (research/spike/scoping), shape (design), plan (plan → plan-review → implementation/breakdown).
 
 The routing prompt (the stage selector) lists every recommendable stage as it describes itself (its purpose, and its `route`: when, when not, what it requires) beside the rules for choosing, so the LLM can select the most appropriate one; it writes no prompt.
 
