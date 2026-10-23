@@ -1,0 +1,945 @@
+{
+ "generatedFrom": {
+  "catalogAccessed": "2026-10-23",
+  "proxyRead": "2026-10-23",
+  "benchmarksAccessed": "2026-10-23"
+ },
+ "referenceSession": {
+  "cacheRead": 1840000,
+  "cacheWrite": 120000,
+  "input": 40000,
+  "output": 30000,
+  "sonnet55": 0.864,
+  "octoberMedianSonnetImplementation": 0.92
+ },
+ "october": {
+  "tickets": 291,
+  "ticketsWithLineage": 271,
+  "lineages": 1647,
+  "firstDispatch": "2026-10-08T14:13:30.690Z",
+  "lastDispatch": "2026-10-23T17:43:33.937Z",
+  "totalUsd": 2709.04,
+  "medianTicketUsd": 7.23,
+  "appCallsUsd": 54.32,
+  "byModel": {
+   "claude-opus-5-5": 1808.42,
+   "claude-sonnet-5-5": 900.68,
+   "not stated": 0,
+   "~deepseek/deepseek-flash-latest": 0.29
+  },
+  "stages": [
+   {
+    "kind": "implementation",
+    "model": "claude-sonnet-5-5",
+    "sessions": 280,
+    "usd": 503.3,
+    "share": 0.1858,
+    "medianUsd": 0.92
+   },
+   {
+    "kind": "autopilot",
+    "model": "claude-opus-5-5",
+    "sessions": 234,
+    "usd": 492.8,
+    "share": 0.1819,
+    "medianUsd": 1.55
+   },
+   {
+    "kind": "review",
+    "model": "claude-opus-5-5",
+    "sessions": 286,
+    "usd": 381.75,
+    "share": 0.1409,
+    "medianUsd": 1.16
+   },
+   {
+    "kind": "plan-review",
+    "model": "claude-opus-5-5",
+    "sessions": 185,
+    "usd": 337.43,
+    "share": 0.1246,
+    "medianUsd": 1.69
+   },
+   {
+    "kind": "research",
+    "model": "claude-opus-5-5",
+    "sessions": 68,
+    "usd": 289.36,
+    "share": 0.1068,
+    "medianUsd": 3.54
+   },
+   {
+    "kind": "close-out",
+    "model": "claude-sonnet-5-5",
+    "sessions": 275,
+    "usd": 216.6,
+    "share": 0.08,
+    "medianUsd": 0.64
+   },
+   {
+    "kind": "wake",
+    "model": "claude-opus-5-5",
+    "sessions": 14,
+    "usd": 182.86,
+    "share": 0.0675,
+    "medianUsd": 9.94
+   },
+   {
+    "kind": "plan",
+    "model": "claude-sonnet-5-5",
+    "sessions": 217,
+    "usd": 180.4,
+    "share": 0.0666,
+    "medianUsd": 0.68
+   },
+   {
+    "kind": "bug",
+    "model": "claude-opus-5-5",
+    "sessions": 8,
+    "usd": 26.74,
+    "share": 0.0099,
+    "medianUsd": 2.58
+   },
+   {
+    "kind": "implementation",
+    "model": "claude-opus-5-5",
+    "sessions": 6,
+    "usd": 23.48,
+    "share": 0.0087,
+    "medianUsd": 1.95
+   },
+   {
+    "kind": "blocked",
+    "model": "claude-opus-5-5",
+    "sessions": 19,
+    "usd": 23.35,
+    "share": 0.0086,
+    "medianUsd": 1.09
+   },
+   {
+    "kind": "close-out",
+    "model": "claude-opus-5-5",
+    "sessions": 5,
+    "usd": 15.45,
+    "share": 0.0057,
+    "medianUsd": 2.29
+   },
+   {
+    "kind": "custom",
+    "model": "claude-opus-5-5",
+    "sessions": 5,
+    "usd": 12.11,
+    "share": 0.0045,
+    "medianUsd": 2.13
+   },
+   {
+    "kind": "design",
+    "model": "claude-opus-5-5",
+    "sessions": 5,
+    "usd": 9.28,
+    "share": 0.0034,
+    "medianUsd": 1.74
+   },
+   {
+    "kind": "retrospective-audit",
+    "model": "claude-opus-5-5",
+    "sessions": 4,
+    "usd": 7.09,
+    "share": 0.0026,
+    "medianUsd": 1.69
+   },
+   {
+    "kind": "spike",
+    "model": "claude-opus-5-5",
+    "sessions": 1,
+    "usd": 3.09,
+    "share": 0.0011,
+    "medianUsd": 3.09
+   },
+   {
+    "kind": "breakdown",
+    "model": "claude-opus-5-5",
+    "sessions": 3,
+    "usd": 2.58,
+    "share": 0.001,
+    "medianUsd": 1
+   },
+   {
+    "kind": "scoping",
+    "model": "claude-opus-5-5",
+    "sessions": 1,
+    "usd": 0.91,
+    "share": 0.0003,
+    "medianUsd": 0.91
+   },
+   {
+    "kind": "implementation",
+    "model": "~deepseek/deepseek-flash-latest",
+    "sessions": 1,
+    "usd": 0.23,
+    "share": 0.0001,
+    "medianUsd": 0.23
+   },
+   {
+    "kind": "triage",
+    "model": "claude-sonnet-5-5",
+    "sessions": 1,
+    "usd": 0.19,
+    "share": 0.0001,
+    "medianUsd": 0.19
+   },
+   {
+    "kind": "close-out",
+    "model": "~deepseek/deepseek-flash-latest",
+    "sessions": 1,
+    "usd": 0.06,
+    "share": 0,
+    "medianUsd": 0.06
+   },
+   {
+    "kind": "close-out",
+    "model": "not stated",
+    "sessions": 4,
+    "usd": 0,
+    "share": 0,
+    "medianUsd": 0
+   },
+   {
+    "kind": "breakdown",
+    "model": "not stated",
+    "sessions": 1,
+    "usd": 0,
+    "share": 0,
+    "medianUsd": 0
+   },
+   {
+    "kind": "custom",
+    "model": "not stated",
+    "sessions": 3,
+    "usd": 0,
+    "share": 0,
+    "medianUsd": 0
+   },
+   {
+    "kind": "blocked",
+    "model": "not stated",
+    "sessions": 2,
+    "usd": 0,
+    "share": 0,
+    "medianUsd": 0
+   },
+   {
+    "kind": "implementation",
+    "model": "not stated",
+    "sessions": 4,
+    "usd": 0,
+    "share": 0,
+    "medianUsd": 0
+   },
+   {
+    "kind": "autopilot",
+    "model": "not stated",
+    "sessions": 1,
+    "usd": 0,
+    "share": 0,
+    "medianUsd": 0
+   },
+   {
+    "kind": "wake",
+    "model": "not stated",
+    "sessions": 11,
+    "usd": 0,
+    "share": 0,
+    "medianUsd": 0
+   },
+   {
+    "kind": "plan",
+    "model": "not stated",
+    "sessions": 1,
+    "usd": 0,
+    "share": 0,
+    "medianUsd": 0
+   },
+   {
+    "kind": "plan-review",
+    "model": "not stated",
+    "sessions": 1,
+    "usd": 0,
+    "share": 0,
+    "medianUsd": 0
+   }
+  ]
+ },
+ "backlog": {
+  "total": 3758,
+  "byStateType": {
+   "backlog": 982,
+   "started": 5,
+   "completed": 2230,
+   "unstarted": 287,
+   "canceled": 218,
+   "duplicate": 36
+  },
+  "open": 1274
+ },
+ "candidates": [
+  {
+   "id": "anthropic/claude-opus-5",
+   "label": "Opus 5",
+   "harbour": "judge",
+   "family": "claude",
+   "inPerM": 5,
+   "outPerM": 25,
+   "session": {
+    "base": 2.62,
+    "long": null
+   },
+   "tb4": 53.53,
+   "vibe": 88.4,
+   "aaCodingAgent": null
+  },
+  {
+   "id": "anthropic/claude-sonnet-5",
+   "label": "Sonnet 5",
+   "harbour": "builder",
+   "family": "claude",
+   "inPerM": 2,
+   "outPerM": 10,
+   "session": {
+    "base": 1.048,
+    "long": null
+   },
+   "tb4": 10.61,
+   "vibe": 81.33,
+   "aaCodingAgent": null
+  },
+  {
+   "id": "deepseek/deepseek-v4.1-flash",
+   "label": "DeepSeek V4.1 Flash (Sept)",
+   "harbour": "small",
+   "family": "open",
+   "inPerM": 0.3,
+   "outPerM": 1.2,
+   "session": {
+    "base": 0.095,
+    "long": null
+   },
+   "tb4": 19.7,
+   "vibe": 84.74,
+   "aaCodingAgent": null
+  },
+  {
+   "id": "deepseek/deepseek-v4-flash-0731",
+   "label": "DeepSeek V4 Flash 0731",
+   "harbour": "small",
+   "family": "open",
+   "inPerM": 0.0444,
+   "outPerM": 0.1333,
+   "session": {
+    "base": 0.0137,
+    "long": null
+   },
+   "tb4": 18.69,
+   "vibe": 74.74,
+   "aaCodingAgent": null
+  },
+  {
+   "id": "z-ai/glm-5.3",
+   "label": "GLM-5.3",
+   "harbour": "small",
+   "family": "open",
+   "inPerM": 0.079,
+   "outPerM": 1.4,
+   "session": {
+    "base": 0.1982,
+    "long": null
+   },
+   "tb4": 38.89,
+   "vibe": 78.13,
+   "aaCodingAgent": null
+  },
+  {
+   "id": "google/gemini-3.8-flash",
+   "label": "Gemini 3.8 Flash",
+   "harbour": "small",
+   "family": "closed",
+   "inPerM": 0.825,
+   "outPerM": 4.125,
+   "session": {
+    "base": 0.3136,
+    "long": null
+   },
+   "tb4": 19.7,
+   "vibe": 78.65,
+   "aaCodingAgent": null
+  },
+  {
+   "id": "openai/gpt-oss-120b",
+   "label": "gpt-oss-120b",
+   "harbour": "none",
+   "family": "open",
+   "inPerM": 0.15,
+   "outPerM": 0.6,
+   "session": {
+    "base": 0.18,
+    "long": null
+   },
+   "tb4": null,
+   "vibe": null,
+   "aaCodingAgent": null
+  },
+  {
+   "id": "anthropic/claude-opus-5.5",
+   "label": "Opus 5.5",
+   "harbour": null,
+   "family": "claude",
+   "inPerM": 4,
+   "outPerM": 20,
+   "session": {
+    "base": 1.728,
+    "long": null
+   },
+   "tb4": 65.15,
+   "vibe": 90.29,
+   "aaCodingAgent": null
+  },
+  {
+   "id": "anthropic/claude-sonnet-5.5",
+   "label": "Sonnet 5.5",
+   "harbour": null,
+   "family": "claude",
+   "inPerM": 2,
+   "outPerM": 10,
+   "session": {
+    "base": 0.864,
+    "long": null
+   },
+   "tb4": 64.14,
+   "vibe": 92.39,
+   "aaCodingAgent": null
+  },
+  {
+   "id": "anthropic/claude-haiku-5.5",
+   "label": "Haiku 5.5",
+   "harbour": null,
+   "family": "claude",
+   "inPerM": 0.1,
+   "outPerM": 0.5,
+   "session": {
+    "base": 0.0524,
+    "long": 0.262
+   },
+   "tb4": 36.36,
+   "vibe": 90.44,
+   "aaCodingAgent": null
+  },
+  {
+   "id": "anthropic/claude-fable-5.1",
+   "label": "Fable 5.1",
+   "harbour": null,
+   "family": "claude",
+   "inPerM": 10,
+   "outPerM": 50,
+   "session": {
+    "base": 3.86,
+    "long": null
+   },
+   "tb4": 58.08,
+   "vibe": 90.26,
+   "aaCodingAgent": null
+  },
+  {
+   "id": "openai/gpt-6-astra",
+   "label": "GPT-6 Astra",
+   "harbour": null,
+   "family": "closed",
+   "inPerM": 10,
+   "outPerM": 50,
+   "session": {
+    "base": 5.24,
+    "long": 9.73
+   },
+   "tb4": 59.6,
+   "vibe": 89.59,
+   "aaCodingAgent": null
+  },
+  {
+   "id": "openai/gpt-6.1-sol",
+   "label": "GPT-6.1 Sol",
+   "harbour": null,
+   "family": "closed",
+   "inPerM": 2,
+   "outPerM": 10,
+   "session": {
+    "base": 0.864,
+    "long": 1.578
+   },
+   "tb4": 55.05,
+   "vibe": 88.93,
+   "aaCodingAgent": null
+  },
+  {
+   "id": "openai/gpt-6-luna",
+   "label": "GPT-6 Luna",
+   "harbour": null,
+   "family": "closed",
+   "inPerM": 0.1,
+   "outPerM": 0.5,
+   "session": {
+    "base": 0.0524,
+    "long": 0.0973
+   },
+   "tb4": 13.64,
+   "vibe": 81.65,
+   "aaCodingAgent": null
+  },
+  {
+   "id": "google/gemini-4-argon",
+   "label": "Gemini 4 Argon",
+   "harbour": null,
+   "family": "closed",
+   "inPerM": 2,
+   "outPerM": 10,
+   "session": {
+    "base": 0.5865,
+    "long": null
+   },
+   "tb4": 57.58,
+   "vibe": 91.91,
+   "aaCodingAgent": null
+  },
+  {
+   "id": "deepseek/deepseek-v4.1-flash-1017",
+   "label": "DeepSeek V4.1 Flash 1017",
+   "harbour": null,
+   "family": "open",
+   "inPerM": 0.15,
+   "outPerM": 0.6,
+   "session": {
+    "base": 0.0475,
+    "long": null
+   },
+   "tb4": 31.82,
+   "vibe": 87.73,
+   "aaCodingAgent": null
+  },
+  {
+   "id": "z-ai/glm-5.3-flash",
+   "label": "GLM-5.3 Flash",
+   "harbour": null,
+   "family": "open",
+   "inPerM": 0.15,
+   "outPerM": 0.5,
+   "session": {
+    "base": 0.0942,
+    "long": null
+   },
+   "tb4": 37.37,
+   "vibe": 30.76,
+   "aaCodingAgent": null
+  },
+  {
+   "id": "minimax/minimax-m3.1-flash",
+   "label": "MiniMax M3.1 Flash",
+   "harbour": null,
+   "family": "open",
+   "inPerM": 0.15,
+   "outPerM": 0.6,
+   "session": {
+    "base": 0.0696,
+    "long": null
+   },
+   "tb4": 25.25,
+   "vibe": 73.94,
+   "aaCodingAgent": null
+  },
+  {
+   "id": "xiaomi/mimo-v2.6-pro",
+   "label": "MiMo V2.6 Pro",
+   "harbour": null,
+   "family": "open",
+   "inPerM": 0.435,
+   "outPerM": 0.87,
+   "session": {
+    "base": 0.1023,
+    "long": null
+   },
+   "tb4": 31.31,
+   "vibe": 85.22,
+   "aaCodingAgent": null
+  },
+  {
+   "id": "xiaomi/mimo-v2.6-flash",
+   "label": "MiMo V2.6 Flash",
+   "harbour": null,
+   "family": "open",
+   "inPerM": 0.14,
+   "outPerM": 0.28,
+   "session": {
+    "base": 0.036,
+    "long": null
+   },
+   "tb4": 24.24,
+   "vibe": 78.96,
+   "aaCodingAgent": null
+  },
+  {
+   "id": "qwen/qwen3.8-max-0902",
+   "label": "Qwen 3.8 Max",
+   "harbour": null,
+   "family": "closed",
+   "inPerM": 2,
+   "outPerM": 6,
+   "session": {
+    "base": 0.96,
+    "long": null
+   },
+   "tb4": 38.89,
+   "vibe": 77.14,
+   "aaCodingAgent": null
+  },
+  {
+   "id": "moonshotai/kimi-k3",
+   "label": "Kimi K3",
+   "harbour": null,
+   "family": "open",
+   "inPerM": 0.239,
+   "outPerM": 10.8,
+   "session": {
+    "base": 0.7486,
+    "long": null
+   },
+   "tb4": 17.17,
+   "vibe": 84.97,
+   "aaCodingAgent": null
+  },
+  {
+   "id": "x-ai/grok-4.7",
+   "label": "Grok 4.7",
+   "harbour": null,
+   "family": "closed",
+   "inPerM": 2,
+   "outPerM": 6,
+   "session": {
+    "base": 1.42,
+    "long": 2.84
+   },
+   "tb4": 28.79,
+   "vibe": 86.17,
+   "aaCodingAgent": null
+  },
+  {
+   "id": "stepfun/step-5-preview",
+   "label": "Step 5 Preview",
+   "harbour": null,
+   "family": "closed",
+   "inPerM": 1,
+   "outPerM": 2.7,
+   "session": {
+    "base": 0.425,
+    "long": null
+   },
+   "tb4": 31.82,
+   "vibe": 70.4,
+   "aaCodingAgent": null
+  },
+  {
+   "id": "thinkingmachines/inkling",
+   "label": "Inkling",
+   "harbour": null,
+   "family": "closed",
+   "inPerM": 1,
+   "outPerM": 4.05,
+   "session": {
+    "base": 0.5943,
+    "long": null
+   },
+   "tb4": 0.51,
+   "vibe": null,
+   "aaCodingAgent": null,
+   "tb4Note": "Vals Terminal-Bench 4.0 board, 2026-10-22"
+  }
+ ],
+ "freeModels": [
+  {
+   "id": "cohere/north-mini-code:free",
+   "context": 256000,
+   "tools": true,
+   "expires": null,
+   "provider": "Cohere",
+   "uptime1d": 100,
+   "uptime30m": 100
+  },
+  {
+   "id": "dots-studio/dots-3-note-preview:free",
+   "context": 512000,
+   "tools": true,
+   "expires": "2026-12-31",
+   "provider": "AtlasCloud",
+   "uptime1d": 100,
+   "uptime30m": 100
+  },
+  {
+   "id": "google/gemma-4-26b-a4b-it:free",
+   "context": 262144,
+   "tools": true,
+   "expires": null,
+   "provider": "Google AI Studio",
+   "uptime1d": 100,
+   "uptime30m": null
+  },
+  {
+   "id": "google/gemma-4-31b-it:free",
+   "context": 262144,
+   "tools": true,
+   "expires": null,
+   "provider": "Google AI Studio",
+   "uptime1d": 100,
+   "uptime30m": null
+  },
+  {
+   "id": "liquid/lfm-2.5-2.6b:free",
+   "context": 65536,
+   "tools": true,
+   "expires": null,
+   "provider": "Liquid",
+   "uptime1d": 7.99,
+   "uptime30m": 0
+  },
+  {
+   "id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+   "context": 256000,
+   "tools": true,
+   "expires": null,
+   "provider": "Nvidia",
+   "uptime1d": 11.74,
+   "uptime30m": 3.33
+  },
+  {
+   "id": "nvidia/nemotron-3-super-120b-a12b:free",
+   "context": 262144,
+   "tools": true,
+   "expires": null,
+   "provider": "Nvidia",
+   "uptime1d": 0,
+   "uptime30m": 0
+  },
+  {
+   "id": "nvidia/nemotron-3-ultra-550b-a55b:free",
+   "context": 1000000,
+   "tools": true,
+   "expires": null,
+   "provider": "Nvidia",
+   "uptime1d": 99.31,
+   "uptime30m": 100
+  },
+  {
+   "id": "nvidia/nemotron-3.5-content-safety:free",
+   "context": 128000,
+   "tools": false,
+   "expires": null,
+   "provider": "Nvidia",
+   "uptime1d": 93.46,
+   "uptime30m": 100
+  },
+  {
+   "id": "nvidia/nemotron-3.5-lightning:free",
+   "context": 1000000,
+   "tools": true,
+   "expires": null,
+   "provider": "Nvidia",
+   "uptime1d": 100,
+   "uptime30m": 100
+  },
+  {
+   "id": "nvidia/nemotron-3.5-super-vl:free",
+   "context": 1000000,
+   "tools": true,
+   "expires": null,
+   "provider": "Nvidia",
+   "uptime1d": 88.06,
+   "uptime30m": 90
+  },
+  {
+   "id": "poolside/laguna-s-2.1:free",
+   "context": 262144,
+   "tools": true,
+   "expires": "2026-10-31",
+   "provider": "Poolside",
+   "uptime1d": 100,
+   "uptime30m": 100
+  },
+  {
+   "id": "poolside/laguna-xs-2.1:free",
+   "context": 262144,
+   "tools": true,
+   "expires": "2026-10-31",
+   "provider": "Poolside",
+   "uptime1d": 99.65,
+   "uptime30m": 100
+  },
+  {
+   "id": "recursive/flint-v1.0:free",
+   "context": 262144,
+   "tools": true,
+   "expires": null,
+   "provider": "Recursive",
+   "uptime1d": 100,
+   "uptime30m": 100
+  },
+  {
+   "id": "thinkingmachines/inkling-small:free",
+   "context": 1048576,
+   "tools": true,
+   "expires": null,
+   "provider": "Thinking Machines",
+   "uptime1d": 100,
+   "uptime30m": 100
+  },
+  {
+   "id": "thinkingmachines/inkling:free",
+   "context": 1048576,
+   "tools": true,
+   "expires": null,
+   "provider": "Thinking Machines",
+   "uptime1d": 100,
+   "uptime30m": 100
+  },
+  {
+   "id": "xingchen-agi/xing4.0-29b-a4b:free",
+   "context": 262144,
+   "tools": true,
+   "expires": null,
+   "provider": "Phala",
+   "uptime1d": 98.61,
+   "uptime30m": 90
+  }
+ ],
+ "freeLimits": {
+  "requestsPerMinute": 20,
+  "requestsPerDayUnder10Credits": 50,
+  "requestsPerDayWith10Credits": 1000,
+  "source": "https://openrouter.ai/docs/api-reference/limits"
+ },
+ "freeLane": {
+  "sessionsPerDay": [
+   6.67,
+   16.67
+  ],
+  "fleetSessionsPerDay": 108.74
+ },
+ "subscription": {
+  "usdPerPoint": 39.65,
+  "windowUsdAtCalibration": 3965.11,
+  "windowUsdNow": 3304.26,
+  "planUsdPerWeek": 46.15,
+  "leverage": 71.59
+ },
+ "routes": [
+  {
+   "route": "Claude Max 20x, inside the weekly window (Sonnet 5.5)",
+   "kind": "subscription",
+   "perDollar": 82.86,
+   "note": "calibrated window; assumes the window draws in proportion to API price"
+  },
+  {
+   "route": "Claude Max 20x, inside the weekly window (Haiku 5.5)",
+   "kind": "subscription",
+   "perDollar": 1366.26,
+   "note": "as above; Haiku 5.5 untried in Harbour"
+  },
+  {
+   "route": "Z.ai GLM Coding Plan Pro (GLM-5.3), $80",
+   "kind": "subscription",
+   "perDollar": 7.74,
+   "perDollarHigh": 15.48,
+   "note": "vendor estimate 290–580M tokens a week at a 95% cache hit"
+  },
+  {
+   "route": "GitHub Copilot Max, $100 (Sonnet 5.5 at API rates)",
+   "kind": "subscription",
+   "perDollar": 2.31,
+   "note": "$200 of credits at API rates for $100"
+  },
+  {
+   "route": "OpenRouter: DeepSeek V4 Flash 0731",
+   "kind": "api",
+   "perDollar": 72.99
+  },
+  {
+   "route": "OpenRouter: DeepSeek V4.1 Flash 1017",
+   "kind": "api",
+   "perDollar": 21.05
+  },
+  {
+   "route": "OpenRouter: GLM-5.3 Flash",
+   "kind": "api",
+   "perDollar": 10.62
+  },
+  {
+   "route": "OpenRouter: Claude Haiku 5.5",
+   "kind": "api",
+   "perDollar": 19.08
+  },
+  {
+   "route": "OpenRouter: GPT-6 Luna",
+   "kind": "api",
+   "perDollar": 19.08
+  },
+  {
+   "route": "OpenRouter: GPT-6.1 Sol",
+   "kind": "api",
+   "perDollar": 1.16
+  },
+  {
+   "route": "OpenRouter: Claude Sonnet 5.5",
+   "kind": "api",
+   "perDollar": 1.16
+  },
+  {
+   "route": "OpenRouter: Claude Opus 5.5",
+   "kind": "api",
+   "perDollar": 0.58
+  }
+ ],
+ "scenarios": [
+  {
+   "name": "Today: Opus 5.5 judges, Sonnet 5.5 builds",
+   "usd": 2709.04,
+   "capacity": 1
+  },
+  {
+   "name": "Judging stages to Sonnet 5.5",
+   "usd": 1824.38,
+   "capacity": 1.48
+  },
+  {
+   "name": "Building stages to Haiku 5.5 (short-context price)",
+   "usd": 1863.17,
+   "capacity": 1.45
+  },
+  {
+   "name": "Building stages to Haiku 5.5 (long-context price)",
+   "usd": 2081.62,
+   "capacity": 1.3
+  },
+  {
+   "name": "Both: Sonnet 5.5 judges, Haiku 5.5 builds (short)",
+   "usd": 978.5,
+   "capacity": 2.77
+  },
+  {
+   "name": "Both: Sonnet 5.5 judges, Haiku 5.5 builds (long)",
+   "usd": 1196.95,
+   "capacity": 2.26
+  }
+ ],
+ "offWindow": {
+  "buildingStagesUsd": 900.49,
+  "buildingStagesShare": 0.3324,
+  "onDeepSeekFlash1017Usd": 49.51,
+  "onGlm53FlashUsd": 98.18,
+  "onDeepSeekFlash0731Usd": 14.28,
+  "days": 15.15
+ }
+}
