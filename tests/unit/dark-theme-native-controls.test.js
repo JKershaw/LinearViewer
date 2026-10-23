@@ -47,7 +47,8 @@ function contrast(a, b) {
 test('dark paths declare color-scheme: dark', () => {
   assert.match(rule('.theme-dark'), /color-scheme:\s*dark/);
   const landing = CSS.slice(CSS.indexOf('@media (prefers-color-scheme: dark) {\n  body.is-landing {'));
-  assert.match(landing.slice(0, landing.indexOf('}')), /color-scheme:\s*dark/);
+  // Slice from the rule, not the @media header: the header itself contains "dark".
+  assert.match(landing.slice(landing.indexOf('body.is-landing {'), landing.indexOf('}')), /color-scheme:\s*dark/);
 });
 
 test('shared control rule is token-only and carries no layout', () => {
