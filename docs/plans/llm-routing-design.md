@@ -1,25 +1,46 @@
 # Every LLM use, classed and routed from one place (LIN-3820)
 
-Status: design note, for John's ruling. Docs only. The build is a set of child tickets filed after the ruling (listed at the end).
-Covers both repositories: Harbour (`JKershaw/LinearViewer`) and `JKershaw/simple-dispatcher` (SD).
-Checked at Harbour origin/main `040a3e76` and SD origin/main `1798790`, the ticket's own anchors. Nothing in the files the ticket cites has changed since it was written.
-Out of scope: which model goes where (`docs/papers/harbour/cheaper-capacity.md` Next), and setting up the Max API credit lane (LIN-3821).
+Status: design note, version 2, after John's direction on 23 October. Docs only. Version 1 (the policy-and-resolver design, "shape B") is in git history. John dismissed its ruling and asked for something simpler.
+Queued behind the UI overhaul: build after LIN-3757 (UI overhaul, step 1) has chosen its direction. The page described here must follow that direction.
+Covers both repositories: Harbour (`JKershaw/LinearViewer`) and `JKershaw/simple-dispatcher` (SD). Facts checked at Harbour `040a3e76` and SD `1798790`.
+Out of scope: which model goes where (`docs/papers/harbour/cheaper-capacity.md`, Next), and setting up the Max API credit lane (LIN-3821).
 
 ## Why
 
-John, 23 Oct: "Right now the settings are awkward, and my gut feeling is there's a much easier way to handle this … we can also categorise and class each use of an llm in both Harbour and agents. There's a clean mental model (which scales)."
+John, 23 October:
 
-The awkwardness has one cause. **Routes are chosen per code path, not per kind of thinking, and in three places that do not know about each other.** So every move the paper recommends ("judging to Sonnet 5.5, building to Haiku 5.5") is many edits across two settings sections and a host file, with nothing recorded and nothing checked. Five symptoms come from that one cause:
+- "Right now the settings are awkward, and my gut feeling is there's a much easier way to handle this."
+- "It feels like over time specific models will start to specialise, so we need this system to be simple to maintain, granular, but also allow simple presets/grouping."
+- "It should also be clear which are agents, which are the smaller calls in Harbour. I think groups and individual overrides could be nice."
 
-1. **No shared vocabulary.** App calls are keyed by ten operation names, of which the call log uses some and not others. Agent sessions are keyed by 18 prompt kinds, of which about six run (`prompt-kinds.md`). A wake, a follow-up and a Collective run have no key of their own.
-2. **Three resolvers.** `resolveAiOperationModel` for app calls, the `dispatch-factory` precedence list for sessions, and SD's own `workspaces.json` fill. Two are hand-mirrored lists ("Nothing automated catches this", `lib/render-settings.js:124-137`).
-3. **Nothing checks a route when it is set.** Harness, model and effort are opaque strings (`lib/workspace-preferences.js:327`, `lib/dispatch-validation.js:71-84`). A bad pair is found when SD refuses the launch.
-4. **Nothing records why.** Who set a value, when, from what, and why are not kept anywhere.
-5. **The record of what ran cannot be grouped by kind of thinking.** The evidence exists (`/cost`, `llm-call-log`), but it is keyed by the same scattered names, and some calls are not named at all.
+The awkwardness has one cause: **models are chosen per code path, in three places that do not know about each other.** Those places are the app-call overrides, the per-kind dispatch defaults and presets, and SD's `workspaces.json`. Nothing checks a choice when it is made, and nothing records why it was made.
 
-A good outcome: John moves "judging" to a new route in one edit with a reason. The next dispatch uses the new route. The call log and the cost endpoint show what that class costs and how often its work passes. An agent can read all of this, ask what route a use would get, and propose a change.
+A good outcome:
 
-## What is true now
+- John can see every job an LLM does, what it costs, and which model does it.
+- He can move one job, or a whole group, to another model in one edit with a reason.
+- The next run uses the new model.
+- An agent can read the same table and change it the same way, with the same record.
+
+## What changed from version 1
+
+Version 1 built a policy engine: versioned policies, a multi-step resolver with a trace, lanes as data, experiments, a proposals queue, and a week of shadow resolution. It came to about sixteen tickets. John asked for the simple version. Because specific models will come to specialise per job, the per-job setting is the real thing. Groups are a convenience for setting many jobs at once.
+
+Kept from version 1:
+
+- the six groups and where each use sits;
+- the stock-take of today's code (below);
+- the five defects found while taking stock (D1–D5).
+
+Dropped, and listed under Deferred:
+
+- lanes as data;
+- experiments as a feature;
+- the proposals queue;
+- policy versions and the resolver trace;
+- shadow mode.
+
+## What is true now (unchanged from version 1)
 
 Every claim below was read at the anchors. Lines are Harbour unless marked SD.
 
@@ -50,300 +71,168 @@ There are 25 call sites. All go through four functions in `lib/openrouter.js` (`
 - **What comes back.** `[usage]` carries `harness, model, effort, lane, costUsd` as actually used (SD `hook.js:359-378`, `opencode-runner.js:589-604`). It is sent only when `SD_WORKER_USAGE_RELAY` is on, which is off by default (SD `config.js:1269-1271`). `/cost` builds `workerSessions` from it (`lib/task-cost.js:85-186`). A lineage is priced at the last model seen.
 - **Lanes are implicit.** claude-code reports `subscription`, or `api` if any `ANTHROPIC_*` variable is set (SD `hook.js:846-849`). opencode reports `openrouter`. App calls use the session key, the workspace key, the env key or the free-tier key (`lib/chat-request.js:172-177`). Nothing names a lane as a choice.
 
-### Pieces to reuse
-
-- **The proposal Apply/Decline pattern:** `lib/run-proposals-store.js` (durable, no TTL), surfaced like rulings through the operator decision queue (`lib/unanswered-decisions.js`).
-- **The grants vocabulary:** `lib/proxy-scopes.js:26` (`GRANTS = ['take','dispatch']`, closed and server-assigned) and `lib/require-grant.js`.
-- **The window estimate:** `lib/weekly-budget.js`.
-- **The pricing table and its conformance sweep:** `lib/model-pricing.js`, `pricing-conformance-sweep`. The sweep already fetches the OpenRouter catalogue.
-- **The SD host heartbeat** (SD `host-heartbeat.js`, LIN-1952), which already reports host facts to Harbour.
-- **The capability ledger's absent-entry rule** (`docs/papers/harbour/capability-ledger-method.md:51-57`), which exists only as prose.
-
 ## The model
 
-The ticket's four nouns and two records hold up. I keep them and change three things: a sixth class, routes that are partial below the class, and a rule that keeps the judge of an experiment fixed.
+**Job.** A job is one named use of an LLM: a kind of agent session (review, implementation, autopilot…) or a Harbour call (recommend, brief, recap…). Every job sits on one of two **surfaces**:
 
-**The vocabulary is code. The choices are data.** A use exists because a line of code calls a model, so the list of uses, and the class each one starts in, live in code beside that call, guarded by a census test. Routes, overrides, lanes, experiments and their log are per-workspace data, changed in the UI or over the proxy, and they take effect on the next call.
+- **agent sessions:** long sessions the runner launches;
+- **Harbour calls:** short calls Harbour makes itself, through OpenRouter.
 
-### Use
-
-A use is a named place an LLM is called. Its id has the form `<surface>.<name>`, with `surface` either `app` (Harbour calls OpenRouter) or `agent` (a session SD launches). Uses are as fine-grained as the code can tell apart. Each registry entry carries:
+Each job carries a short plain-language description of what it does, and belongs to one group. The list of jobs lives in code beside the code that calls the model. A census test fails if a call site or a dispatch kind has no job.
 
-- its default class;
-- its legacy keys (`opKind`, call-log `feature`, dispatch `kind`), so existing history maps onto uses without a backfill;
-- a one-line description.
+**Group.** Six groups, each a kind of thinking:
 
-**A wake is not a use.** It continues the session it wakes, so it carries that session's use and route. This is true today for warm wakes and becomes true for cold ones with D1 below.
+| Group | Does |
+|---|---|
+| Judge | decides whether work is right |
+| Plan | works out how, and what is true |
+| Make | writes the change |
+| Steer | decides what happens next, supervises |
+| Sort | classifies or picks something small |
+| Tell | summarises for a person |
 
-### Class
+Placements:
 
-A class is the kind of thinking a use needs. It is where "the cheapest model that clears this task's bar" gets decided (`clear-the-bar.md`). I propose **six classes**: John's five, plus **Plan**.
-
-| Class | The question it answers | Why it is its own class |
-|---|---|---|
-| **Judge** | Is this work right? | The ledger's high bar. The instrument every other outcome is measured with. |
-| **Plan** | How should this be done, and what is true? | The ledger: cheap models build to standard but their plans "went round plan-review twice". Planning's bar is the judge's, not the builder's. |
-| **Make** | Produce the change. | The bar a Flash-level model has cleared. |
-| **Steer** | What happens next? Supervise. | An error here costs a whole wrong session, or a wrong order of sessions. |
-| **Sort** | Classify, route or extract something small. | An error is cheap and gets corrected downstream. |
-| **Tell** | Summarise for a person. | A person reads the output. No action follows from it unchecked. |
+- **Agent sessions:**
+  - Judge: review, plan-review, retrospective-audit, retro.
+  - Plan: plan, research, design, scoping, breakdown, spike, look-into, context.
+  - Make: implementation, bug, close-out.
+  - Steer: autopilot, blocked, periodical, custom.
+  - Sort: triage.
+- **Harbour calls:**
+  - Steer: recommend, next-run, task-chat, flight-companion.
+  - Sort: scan, scan-retire.
+  - Tell: brief, recap, run-summary, session-summary, run-paragraph, ship-biscuit, roadmap (and its orientation and chat), feedback-title, observer-pass.
 
-Plan is the one change to John's set. Without it, "move Make to Haiku" would also move plan, research and design. The ledger's evidence points the other way for those three. If John would rather keep five classes and see whether the data separates them, nothing else in this design changes. A class split later is a registry edit, and the witness test (Migration) keeps every route where it was until someone moves one on purpose.
+Version 1 gives the reasons for the borderline ones: stage selection is Steer; close-out is Make; the observer pass is Tell while it only reports; `custom` is Steer.
 
-### Every existing use, placed
+**Setting.** What a job runs on:
 
-Borderline uses are marked †, with the reason.
+- **Agent sessions:** where it runs (the harness: Claude Code, on the Claude subscription, or opencode, on OpenRouter or the API credit), the model, and the effort (Claude Code only; opencode never receives effort).
+- **Harbour calls:** only the model.
 
-**App** (all on the OpenRouter lanes):
+**Group default.** Each group has one setting per surface it has jobs on. A job with no setting of its own follows its group, field by field. So a job can have its own model and still take its group's effort.
 
-| Use | Today's key | Class |
-|---|---|---|
-| `app.recommend` (stage selection) | `recommend` | **Steer** † |
-| `app.next-run` | `next-run` | Steer |
-| `app.task-chat` | `task-chat` | Steer |
-| `app.flight-companion` (turn, boot, proxy) | `flight-companion` | Steer |
-| `app.scan` | `scan` | Sort |
-| `app.scan-retire` | `scan` (log: `scan-retire`) | Sort |
-| `app.feedback-title` | none | Tell |
-| `app.recap` | `recap` | Tell |
-| `app.brief` | `brief` | Tell |
-| `app.run-summary` | `run-summary` | Tell |
-| `app.session-summary` (on demand and precompute) | `session-summary` / hard-coded | Tell |
-| `app.run-paragraph` | hard-coded | Tell |
-| `app.ship-biscuit` | `ship-biscuit` | Tell |
-| `app.roadmap` (six layers) | workspace model | Tell |
-| `app.roadmap-orientation` | workspace model | Tell |
-| `app.roadmap-chat` | workspace model | Tell |
-| `app.observer-pass` | workspace model | Tell † |
-
-**Agent:**
-
-| Use | Today's kind | Class |
-|---|---|---|
-| `agent.review`, `agent.plan-review`, `agent.retrospective-audit` | same | Judge |
-| `agent.retro` | `retro` | Judge |
-| `agent.plan`, `agent.research`, `agent.design`, `agent.scoping`, `agent.breakdown`, `agent.spike`, `agent.look-into`, `agent.context` | same | Plan |
-| `agent.implementation`, `agent.bug` | same | Make |
-| `agent.close-out` | `close-out` | **Make** † |
-| `agent.autopilot`, `agent.blocked`, `agent.periodical` | same | Steer |
-| `agent.triage` | `triage` | Sort |
-| `agent.custom` (custom prompts, Collective, follow-ups) | `custom` | Steer † |
-| (`defer` is resolved away before dispatch, so it is never a session) | | |
+**Presets.** A preset is a named snapshot of the whole table: every group default and every job's own setting. Applying one is a single logged change. Saving the current table as a preset is one action. Examples: "All Opus (safe)", "Lean", "Credit lane".
 
-- † **Stage selection is Steer, not Sort.** It decides which session runs next. A wrong pick costs a whole session, and the prompt system makes it the one path for every recommendation. Sort is for picks whose errors are cheap.
-- † **Close-out is Make, not Judge.** Its template is "finish approved work: make the fixes review asked for, merge, … set Done". The judging is done before it starts. Its risk is a false Done claim, which is a matter for granularity by occurrence, not for its class.
-- † **The observer pass is Tell** while it is report-only (`lib/observer-pass.js:13-21`). It becomes Steer if `observerAuthority` ever gets an acting branch.
-- † **`custom` is Steer** because its callers are mostly supervisors and their follow-ups. The fix at the cause is for those callers to say which use they are (Proxy). After that, `custom` means only "a prompt John wrote by hand".
+**Change log.** Every change records:
 
-### Route
+- who made it, and how (the page or the proxy);
+- when;
+- what changed, from what to what;
+- why: a reason is required.
 
-A route is what serves a call: `{ lane, harness?, model, effort? }`.
+Undo is a new entry that restores the earlier value. The 23 October move of autopilot from Opus 5.5 to Sonnet 5.5 is entered first, with its original time and actor (see the comment on LIN-3820).
 
-- **Lane: who pays, under what limits.** Lanes are data: `claude-subscription`, `anthropic-api`, `openrouter-paid`, `openrouter-free`, and later LIN-3821's BYOK lane. A lane record holds its id, payer, kind of limit, which surface and harness can use it, a **credential reference** (a name such as `sd:anthropic-api`, never a secret), and what happens when it runs out. At switch-over the lane is derived exactly as today: claude-code → subscription, opencode → `openrouter-paid`, app → whichever key the request already carries. It only becomes a real choice when SD holds more than one credential per harness (LIN-3821).
-- **Harness (agent only):** `claude-code` or `opencode`. The runner kit counts as a harness variant for validation, because it has its own limits.
-- **Model:** an id in the lane's catalogue. `null` keeps its meaning today: "the harness's own default".
-- **Effort:** `low…max` or `null`.
+**How a run gets its setting.** The order is short:
 
-**A route is checked when it is set.** A write is refused, and nothing is stored, unless all of these hold:
+1. Fields given explicitly on the dispatch.
+2. The job's own setting.
+3. Its group default.
 
-- the lane exists;
-- the harness can use the lane;
-- the model is in the lane's catalogue (the claude-code families, or the OpenRouter catalogue Harbour already fetches);
-- the effort is a known level, and the harness applies it (opencode and the runner kit do not, so a set effort there is refused rather than silently dropped).
+Two rules stay as today:
 
-Two cases warn instead of refusing: a model with no price row (its sessions would price as unknown and leave cost per class blind) and a lane with no credential on any live host.
+- the free-tier clamp on Harbour calls is checked first;
+- a resume keeps its session's harness.
 
-The harness facts come from **SD's heartbeat**. SD publishes its harnesses, their model families, whether each applies effort, and which lanes it holds a credential for (as booleans only). That replaces the two hand-mirrored lists with one contract, owned by the side that launches.
+The dispatch row is stamped with the result and the job, as it is today with the model, harness and effort. SD keeps launching from the stamped row and holds the credentials.
 
-### Policy
+**Wakes** are not jobs. A wake continues the session it wakes, on that session's setting. Fix D1 makes that true for cold resumes, which today run without `--model`.
 
-A policy is per workspace, versioned, and the single source of truth for both surfaces:
+**Checks when a value is set.** A choice that cannot run is not offered, rather than refused at launch:
 
-```
-{ urlKey, version,
-  classes:   { judge: { app: Route, agent: Route }, plan: {…}, … },
-  uses:      { 'agent.review': PartialRoute, … },     // overrides
-  lanes:     { 'openrouter-paid': { whenOut: 'wait' | { reroute: laneId } }, … },
-  experiments: [ Experiment ] }
-```
+- Claude Code offers Claude models;
+- opencode offers the OpenRouter catalogue Harbour already fetches;
+- effort is not offered for opencode.
 
-- **A class has one route per surface.** App calls cannot run on a harness, and model ids differ between the two. So "move Judge" can be one edit to two cells, or to one. Most classes live on one surface: Tell is all app; Judge, Plan and Make are all agent; Steer and Sort span both.
-- **Routes are complete at class level and may be partial below it.** A use override or a preset can set only `model`, and the rest falls through. This is what presets do today, and LIN-1694's rule still holds: a row scoped to another harness cannot donate its model. The merged result is what validation checks, for every use the change can reach.
-- **Presets stay as a narrower scope**, re-keyed from kinds to uses and classes. They keep their snapshot semantics.
+One list of what each harness can run replaces the two hand-mirrored ones.
 
-**Resolution order.** One function, `resolveRoute({ urlKey, use, issue?, preset?, anchor?, fields? })`, for both surfaces. Each step either decides the route or passes to the next:
+## The settings page
 
-1. **Free-tier clamp** (app surface): the first line, as today. Fail-closed: a free-tier request gets the curated free model whatever the policy says.
-2. **Explicit per-dispatch fields**, recorded as `decidedBy: 'dispatch'`.
-3. **The selected preset**, by use, then by class.
-4. **The anchor's preset snapshot.** Then, for harness only, the anchor's own harness: a resume never switches engines.
-5. **An active experiment** covering this use or class.
-6. **The workspace use override.**
-7. **The workspace class route.**
-8. **An unregistered use** gets the **strongest route** on its surface. That is the highest-priced route the policy currently assigns there, not counting experiment arms, priced by `lib/model-pricing.js`. It is the ledger's absent-entry rule in code. It needs no extra setting, it follows the policy as the policy moves, and the settings page shows which route it is. The census test makes this a guard, not a path: every call site and kind is registered, so the step fires only for code that skipped registration.
+The page is **Settings › Models**, the first sub-page of Settings. This section describes what it does and why, not how it looks. Build it with the shell, tokens and shared components Harbour already has (`lib/components/`, the settings page's existing patterns), and in the direction LIN-3757 chooses.
 
-The function returns the route and a **trace**: the step that decided each field. The trace serves the dry run and fills the stamp's `decidedBy`.
+John saw a clickable prototype of this page on 23 October and called it "the benchmark for UI UX standard I want for Harbour". He also said an agent given code or screenshots "may be over specific". So the prototype is deliberately not attached. Its lessons are the principles below.
 
-**Snapshot semantics.** The dispatch row is stamped with the resolved route, the use, the class, the `policyVersion` and the trace, when it is created. Later policy changes never touch a queued or running row. A change "takes effect on the next dispatch" because that is when resolution runs.
+**Principles (the bar):**
 
-**When a lane runs out**, the lane's `whenOut` decides. The default is `wait`: the dispatch queues, and the page says why. `{ reroute: laneId }` must be set explicitly, is logged like any change, and is stamped on every rerouted call. Nothing spends money silently. Signals that a lane is out:
+1. **Readability over style.** Plain words, generous spacing, one row per job, and a one-line description saying what each job does.
+2. **Rank by what matters.** Jobs are ordered by spend, biggest first. Each row shows its spend, a bar for its share, and the typical cost of one run. The long tail folds behind "show".
+3. **Summary before detail.** The two surfaces are separate views, each headed with its run count and spend, so agent sessions and Harbour calls are never confused.
+4. **Say where every value comes from.** Each row's model and effort reads either "from Make" (following the group) or "set here", with a one-click way back to the group.
+5. **Decide in context.** Changing a job opens a panel with what is needed to decide:
+   - the job's numbers;
+   - where it runs;
+   - "follow the group" as the default;
+   - a short list of sensible models, each with its price for a typical run and whether Harbour has run it for this job;
+   - a search over every model the chosen harness can run;
+   - effort.
+6. **Make wrong choices impossible, not refused.** Picking an OpenRouter-only model switches the harness to opencode, and the effort control disappears there.
+7. **Stage, explain, undo.** Edits collect as pending changes, saved together with one reason. The log offers undo.
+8. **Works on a phone.** Rows stack, and the change panel becomes a full-screen sheet.
 
-- the window estimate (`lib/weekly-budget.js`) and Claude's usage-limit refusals;
-- OpenRouter's credit endpoint and 402 responses;
-- the free tier's daily count;
-- John marking a lane out by hand. This is always available, and it is the only signal for the API credit until LIN-3821 finds one.
+**Views:**
 
-**Experiments** are policy entries, so starting and stopping one are logged changes:
+- agent sessions;
+- Harbour calls;
+- group defaults, showing how many jobs each group reaches and how many are set individually;
+- presets;
+- the change log;
+- a filter for jobs set individually.
 
-```
-{ id, scope: { use } | { class }, surface,
-  arms: [Route, Route], assign: 'by-ticket',
-  stop: { until?: date, count?: n }, question: '…', measure: 'first-pass approval' | … }
-```
+**Numbers come from what Harbour already records.** The cost endpoint gives agent sessions, and the call log gives Harbour calls. They cover a recent window; the default length is the builder's call. A job with no runs in the window shows as such. It is never left out.
 
-- **`by-ticket`:** the arm is a hash of the root issue, so a ticket's whole lineage runs in one arm.
-- **Stamps:** each call carries its `experimentId` and `arm`.
-- **Results:** the experiment page shows its question and, per arm, cost, rounds and first-pass approval. It also counts in-scope dispatches that a preset or an explicit field pinned elsewhere, so an experiment cannot be starved without anyone seeing.
-- **The judge is held fixed.** An experiment on the Judge class cannot start while another experiment that Judge measures is running, unless John overrides with a reason. Otherwise the instrument moves under the measurement (`capability-ledger-method.md`: "The judge is fixed, and routing never changes it"). Each outcome also records the judge's route, so comparisons can be made with the judge held fixed.
+## Over the proxy
 
-### Record: every call is stamped
+An agent can do what the page does:
 
-| Field | App call (`llm-call-log`) | Agent session (dispatch row → `/cost`) |
-|---|---|---|
-| use, class | new | new (from kind via registry until stamped) |
-| route requested | new (`requestedModel`, `lane`) | exists (`model, harness, effort`), plus `lane` |
-| route served | `model` exists | `[usage]` exists |
-| `policyVersion`, `decidedBy` | new | new |
-| `experimentId`, `arm` | new | new |
-| cost, tokens, duration | exist | exist |
-| outcome | `status: ok / error / aborted` (failures are logged from now on) | verdict, rounds, first-pass approval (C11) |
+- **Read:** jobs, groups, each job's effective setting and where it comes from, presets, and the log.
+- **Change:** a job, a group, or apply a preset. Each change takes a reason.
 
-Rows written before the stamps map onto uses through the registry's legacy keys. Cost per class therefore works on history from day one, as far back as the evidence stores go. When the requested route and the served route differ (Claude ignoring a model, or a provider substituting one), the session page shows it.
+Writes are logged with the token's attribution. The recommendation is that only the workspace owner's tokens may write (question 2). Endpoint names and shapes are the builder's call. They follow the proxy's existing conventions and are documented in the proxy instructions.
 
-### Record: every policy change is logged
+## Migration: the switch changes nothing
 
-`llm-policy-log` is append-only, with one entry per change:
+At switch-over, every job resolves exactly as it does today:
 
-```
-{ urlKey, version, at, actor: { accountId, via: 'ui' | 'proxy', tokenId? },
-  path: 'classes.judge.agent', from, to, reason, refs: [url | ticket], proposalId? }
-```
+- each `dispatchDefaults.byKind` row becomes that job's own setting, partial fields kept partial;
+- each `aiModelOverrides.byKind` entry does the same for the matching Harbour call;
+- every group default takes today's workspace-wide value.
 
-- **A reason is required.** An empty reason is refused.
-- **Writes check the version they read.** Each write carries `baseVersion`, and a stale one is refused, so two edits cannot interleave silently.
-- **A revert is a new entry** that swaps `from` and `to`, with its own reason. It is one press on the log.
-- **Preset changes** go into the same log under `path: 'presets.<id>…'`.
+The witness is a generated test over every job and a matrix of stored preferences, comparing old and new answers. Existing dispatch presets keep working per dispatch (question 3).
 
-### Proposals and who may apply
+## Deliberate fixes, each its own ticket
 
-Agents propose and John applies. A proposal reuses the run-proposals shape (durable, no TTL, `proposed | applied | declined`): `{ change, reason, evidence: [queries or links] }`. It appears in the operator decision queue with Apply and Decline, as rulings do. Apply writes the change to the log with the agent's reason and `proposalId`. A `readWrite` token can propose. **Applying needs the workspace owner's session.** I recommend no new grant for now. If John later wants agents to start bounded experiments themselves, that is a third entry in the closed `GRANTS` list (`policy`), assigned by the server and refused by default, the same way `dispatch` was added (LIN-3136).
+These change behaviour, so each is named as an intended difference in the witness test.
 
-### The surfaces
+- **D1. Cold resumes and stall re-fires run without `--model`** (SD `reapers.js:1695-1698`, `dispatcher.js:945-949`). Stamp wake rows with their session's setting, and have SD use it. This bears on reading the 23 October autopilot move: check the `[usage]` model on wake sessions before comparing that week.
+- **D2. The session-summary precompute and the run paragraph skip the free-tier clamp.**
+- **D3. Effort is silently dropped** on opencode and the runner kit, and the runner kit cannot map `fable`.
+- **D4. The proxy instructions say `/dispatch` interposes no default harness.** The code does (`lib/proxy-instructions.js:790`).
+- **D5. Subagent tokens in SD sessions are probably not counted,** and a lineage that changes model is priced at its last model.
 
-**Harbour UI.** One Settings page, "Models", replaces the per-operation AI model overrides section and the dispatch-defaults rows:
+## Deferred from version 1
 
-- **Classes table.** Each class shows its route per surface and, for this week, calls or sessions, spend, share of the window, and first-pass approval where a judge exists. A row opens to its uses, their overrides, and each use's own volume and spend.
-- **Edits.** Moving a class is one edit plus a reason. Reverting is one press on the log.
-- **Lane strip.** Window used (estimate), API credit (manual until LIN-3821), OpenRouter credit, free requests used today, and what each lane does when it runs out.
-- **Experiments.** Start, stop, and results against the question.
-- **Log** and **strongest route** shown on the page.
+Each can be added later without changing the model above:
 
-Presets keep their own section, re-keyed to uses and classes.
-
-**Proxy** (reads need only a token; a proposal needs `readWrite`):
-
-- `GET /api/proxy/llm/uses | classes | lanes | policy | policy/log`
-- `POST /api/proxy/llm/resolve`: the dry run. Body `{ use, issueIdentifier?, presetId?, fields? }`; returns the route plus the trace.
-- `GET /api/proxy/llm/outcomes?class=&use=&model=&since=`
-- `POST /api/proxy/llm/proposals`
-- **`/dispatch` and recommend-and-dispatch take `use` or `class`.** Follow-ups inherit their anchor's use. Collective and chat follow-ups declare theirs. The proxy instructions tell agents to dispatch by use or class and never to name a model in prompt text. The explicit `model` field stays, for John, and is stamped `decidedBy: 'dispatch'` so pins are visible.
-
-**SD:**
-
-- **It follows the stamp.** A row that carries `policyVersion` launches on exactly its route. `workspaces.json` defaults fill only unstamped (legacy) rows, with a warning. The production file sets none of these fields today, so this changes nothing at switch-over.
-- **It keeps the credentials.** It maps lane id → credential (a host login, an env var injected for that one session, opencode's `auth.json`). It refuses a lane it holds no credential for with a terminal `[failed]` naming the lane. It never substitutes another lane.
-- **It publishes the capability manifest** in its heartbeat.
-- **It echoes `use` and the lane it actually used** in `[usage]`.
-
-## Shapes considered
-
-### A. Label and log over today's stores
-
-Add `use` and `class` stamps to the call log and the dispatch rows. Add a "class" grouping to the two existing settings sections, where editing a class writes the same value into every row it groups. Add an audit log to both stores.
-
-- **Cost to build:** small, about three tickets. **Risk:** low, because no resolver changes.
-- **Cost to live with:** high. Three resolvers and two hand-mirrored lists stay. A class is a UI fiction: a later edit to one row breaks it silently. Validation, audit and the proxy surface each have to be built twice. Lanes and experiments have nowhere to live.
-- **Fit:** fails "one source of truth" and "a new use, model or lane is data". It treats the symptom, the hard edits, not the cause, the split.
-
-### B. One policy, one resolver, today's stores folded in (recommended)
-
-As described above. The registry is code, and the policy and its log are data in Harbour. The two resolvers become one. The workspace tiers of `aiModelOverrides` and `dispatchDefaults` are compiled into policy version 1. Presets become a narrower scope of the same policy. SD follows the stamp.
-
-- **Cost to build:** medium to large, about eleven tickets, but the first two are useful under any shape.
-- **Cost to live with:** low. One place to read, write, check, audit and expose. A new use is a registry line, and a new model or lane is data.
-- **Risk:** the switch-over. That is covered by shadow resolution and the witness test (Migration).
-- **Fit:** reuses the proposals store, the decision queue, the grants vocabulary, the pricing table, the window estimate and the heartbeat. It keeps the LIN-1694 row rule and preset snapshot semantics.
-
-### C. Policy as a committed file
-
-Keep the policy in the repo (`config/llm-policy.json`), so a change is a PR, the log is git history, a revert is `git revert`, and an agent's proposal is a PR.
-
-- **Cost to build:** smallest for the audit and proposal parts, because they come free.
-- **Cost to live with:** high, in a different way. A change takes effect on deploy, not on the next dispatch. Harbour is multi-workspace and has free-tier users, so a repo file is one policy for everyone, or a file per workspace in public source. "One edit in Harbour's UI" becomes a PR.
-- **Fit:** the half worth keeping, a vocabulary in code guarded by a census test, is already in B.
-
-### Recommendation
-
-**B.** It is the only shape that removes the cause: three resolvers keyed by code path. Every "for John" and "for agents" behaviour then falls out of one store, as John's words expect. A treats the symptom, and C fits a single-tenant tool, which Harbour is not.
-
-**What would change my mind:**
-
-- If John wants the two step-down trials from `cheaper-capacity.md` running before B lands, do C1–C2 first (shape-agnostic) and run the trials as today's preset edits. B's experiments then take over the next round.
-- If Harbour were one workspace with no free tier and John were content to change routes by PR, C is cheaper.
-- If the classes do not survive contact with the data (cost and outcome per class flat across Plan and Make, say), merge them. That is a registry edit. Nothing else in B depends on the class count.
-
-## Migration: the switch-over changes nothing
-
-1. **Compile.** `compileLegacyPolicy(prefs, presets)` builds policy version 1 for each workspace with no policy:
-   - **App:** every class's app route is the workspace model (`prefs.modelId || DEFAULT_MODEL`), on the lane the request's key implies. Each `aiModelOverrides.byKind` entry becomes a use override. `app.session-summary` precompute and `app.run-paragraph` get a use override pinned to `DEFAULT_MODEL`, which is what their hard-coding does today. The free-tier clamp stays step 1.
-   - **Agent:** every class's agent route is the workspace-wide `dispatchDefaults` row, including its blanks (blank harness → the interpose, blank model → the harness default). Each `byKind` row becomes a use override, with partial fields kept partial. Presets are re-keyed from kinds to uses.
-   - The compile is written to the log as version 1, actor `system`, reason "LIN-3820 switch-over: compiled from dispatchDefaults and aiModelOverrides". So John's first real edit has a "from" to revert to. Changes made before the log exists are entered by hand ahead of version 1, with their original date and actor. The first such change is John's move of the autopilot default from Opus 5.5 to Sonnet 5.5 on 23 October, about 18:40Z (the comment on LIN-3820).
-2. **Witness test.** For every registered use, crossed with a matrix of fixture preferences (none, workspace-only, `byKind`, partial rows, rows scoped to other harnesses, presets, anchors with and without `presetConfig`, explicit fields, free tier on and off), the old resolver and `resolveRoute` return the same `{harness, model, effort}` and app model. The matrix is generated, not hand-listed. Any registry change, such as a class split or a use moved, must keep this test green, which forces a compensating override in the same change.
-3. **Shadow.** Production resolves both ways for a week, serves the old answer, and logs any disagreement with its inputs. Switch-over waits for zero disagreements.
-4. **Switch.** Serve `resolveRoute`. The old fields become read-only, and settings writes go to the policy. The old fields are deleted one release later.
-
-**What the switch-over deliberately does not fix.** These were found while taking stock. Each changes behaviour, so each is its own ticket after the switch-over, where the witness test can name it as an intended difference:
-
-- **D1. Cold resumes and stall re-fires run without `--model`.** Stamp wake rows with the parent session's route, and have SD use it. This restores the snapshot invariant for wakes. It also bears on reading John's 23 October autopilot move: only warm wakes are sure to have followed it. A cold-resumed wake ran on Claude Code's own default, so the `[usage]` model per wake should be checked before the week's comparison is read.
-- **D2. The two precompute calls skip the free-tier clamp.** Bring them under step 1.
-- **D3. Effort is silently dropped** on opencode and the runner kit, and the runner kit cannot map `fable`. Validation refuses these routes from C5 on. D3 cleans up existing rows.
-- **D4. `lib/proxy-instructions.js:790` says the proxy `/dispatch` interposes no default harness.** The code does interpose one. Correct the text.
-- **D5. Subagent tokens in SD sessions are probably not counted,** and a lineage that changes model is priced at the last model. Check, then fix or state the limit.
+- **Lanes as data:** who pays, limits, what happens when one runs out.
+- **Experiments as a feature.** Until then, a trial is a preset applied for a while and read on the page.
+- **The proposals queue.** Until then, an agent comments on a ticket, or writes over the proxy with an owner token.
+- **Routing by the size or risk of a change.**
+- **Subagents as jobs.**
 
 ## Questions for John
 
-1. **Classes.** Six (adding Plan) or your five? And the four † placements: stage selection is Steer, close-out is Make, the observer pass is Tell, `custom` is Steer. *Recommend: six, as placed.*
-2. **Granularity by occurrence** (a docs-only review against a data-path review). *Recommend: a later design.* `resolveRoute` already takes the issue, so adding "facets" later changes no signatures. This design adds no facets, so the switch-over stays provable.
-3. **Wakes.** *Recommend: no wake route.* A wake carries its session's use and route, which D1 makes true for cold resumes too. A wake route only means something if wakes become fresh sessions (`held-or-fresh.md`). If they do, a fresh wake becomes its own use (`agent.wake`, Steer) and needs no new mechanism.
-4. **Subagents.** *Recommend: out of scope for this design.* Their tokens belong to their session's use, and D5 checks that they are counted. If they come in, each subagent role becomes a use.
-5. **Who may apply a change.** *Recommend: the owner only.* Agents propose, John applies with one press. A `policy` grant can come later, scoped to starting experiments.
-6. **Strongest route.** *Recommend: computed* as the highest-priced route the policy uses on that surface. The alternative is a value John sets.
+1. **Six groups as placed?** Recommend yes.
+2. **Who may write over the proxy?** Recommend owner tokens only.
+3. **Per-dispatch presets.** Keep `presetId` working as today, or retire it in favour of table presets? Recommend keeping it for now.
+4. **D1 now, ahead of the queue?** It is small, it fixes a defect, and it makes the autopilot trial readable. Recommend yes, as its own ticket.
 
-## Breakdown (filed as child tickets after the ruling)
-
-C1 and C2 are useful under any shape and can start first.
+## Breakdown (filed when LIN-3757 has chosen its direction)
 
 | # | Ticket | Repos | Done when |
 |---|---|---|---|
-| C1 | Use registry, census test, legacy-key map. Name the four unnamed call sites | LV | Every call site and kind is registered; the test fails on an unregistered one |
-| C2 | Stamp every call: call-log fields, failed and aborted calls logged, log-before-parse; dispatch row fields; `/cost` exposes them | LV, SD (`use` echo) | Every LLM call and session carries its use and class |
-| C3 | Policy store, log, `compileLegacyPolicy`, `resolveRoute` with trace; witness test; shadow mode | LV | The witness test is green; shadow is logging disagreements |
-| C4 | Switch-over; old fields read-only, then removed | LV | Zero shadow disagreements for a week, then served |
-| C5 | Route validation; capability manifest in the SD heartbeat | LV, SD | A bad route is refused at set time; the hand-mirrored lists are gone |
-| C6 | SD follows the stamp; lane → credential map; refuses a missing credential | SD | A stamped row launches on exactly its route |
-| C7 | Settings "Models" page: classes, uses, cost per class, log with revert, strongest route | LV | One edit moves a class, with a reason, effective on the next dispatch |
-| C8 | Proxy: read endpoints, dry run, outcomes, proposals into the decision queue; dispatch by use or class | LV | An agent can read the policy, dry-run a resolution and propose a change |
-| C9 | Experiments | LV | Start, stop and results against the question; the judge-fixed rule enforced |
-| C10 | Lane status and `whenOut` | LV, SD | Each lane shows its state and its stated behaviour when out |
-| C11 | Verdict field on review and plan-review, joined to the judged session | LV, SD | First-pass approval per class and model is a query |
-| D1–D5 | The deliberate fixes above | both | Each named as an intended difference in the witness test |
+| 1 | Jobs: the registry with group and description; census test; name the four call sites the call log misses | LV | Every call site and dispatch kind is a job; the test fails on one that is not |
+| 2 | One settings store: job settings, group defaults, presets, change log; both surfaces resolve from it; migration and witness test | LV | The witness test is green and the old settings are read-only |
+| 3 | Proxy: read and write, with reasons and log | LV | An agent can read the table and change a job or group, and the log shows it |
+| 4 | Settings › Models page, to the principles above and LIN-3757's direction | LV | John can move a job or a group in one edit with a reason, on desktop and phone |
+| D1–D5 | The fixes above (D1 may go first) | both | Each named as an intended difference in the witness test |
