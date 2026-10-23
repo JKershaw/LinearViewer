@@ -131,7 +131,7 @@ import { createProxyRoutes, commentDedupe } from './routes/proxy.js'
 import { createProxyDefaultRoute } from './lib/settings-proxy-default.js'
 import { createMilestoneFunnelRoutes } from './routes/milestone-funnel.js'
 import { createRunnerKitRoutes } from './routes/runner-kit.js'
-import { createTestRoutes } from './routes/test.js'
+import { createTestRoutes, installTestTokenLinearTransport } from './routes/test.js'
 import { createWorkspaceApiRoutes, decisionStampDedupe } from './routes/workspace-api.js'
 import { shouldMockAi } from './lib/should-mock-ai.js'
 import { getModelCatalog, CATALOG_CACHE_TTL_MS } from './lib/openrouter-catalog.js'
@@ -1099,6 +1099,8 @@ app.use(createHydrationMiddleware({
 // Test Mode Setup
 // =============================================================================
 if (process.env.NODE_ENV === 'test') {
+  // LIN-3798: the fake `test-token` never leaves the process (routes/test.js).
+  installTestTokenLinearTransport()
   // dispatchHistoryCollection/proxyEventsCollection/resetKpiCache (LIN-3002):
   // additive, test-only seam so a spec can inject a rejecting aggregate() on
   // the exact two collections /kpis' loaders read, without touching /kpis'

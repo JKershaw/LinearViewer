@@ -571,6 +571,12 @@ test.describe('Dispatch Queue', () => {
   });
 });
 
+// LIN-3798: these assertions read the worker's whole queue partition, so a stray
+// row (an earlier test's write landing after the clear) and a real double-enqueue,
+// DELETE no-op or dropped target fail the same way. Print every row on failure so
+// the CI log says which it was.
+const queueItems = (items) => `queue items: ${JSON.stringify(items.map(({ id, promptName, target, harness, issueIdentifier, dispatchedAt }) => ({ id, promptName, target, harness, issueIdentifier, dispatchedAt })))}`;
+
 test.describe('Dispatch API', () => {
   test.beforeEach(async ({ page }) => {
     // Clear dispatch queue before each test
@@ -618,7 +624,7 @@ test.describe('Dispatch API', () => {
 
     const data = await response.json();
     expect(data.items).toBeDefined();
-    expect(data.items.length).toBe(1);
+    expect(data.items.length, queueItems(data.items)).toBe(1);
     expect(data.items[0].prompt).toBe('Test prompt');
   });
 
@@ -638,7 +644,7 @@ test.describe('Dispatch API', () => {
     // Verify it's gone
     const listResponse = await request.get(`${API_PREFIX}/api/dispatch`);
     const listData = await listResponse.json();
-    expect(listData.items.length).toBe(0);
+    expect(listData.items.length, queueItems(listData.items)).toBe(0);
   });
 
   test('POST /api/dispatch with target=web stores target correctly', async ({ request }) => {
@@ -661,7 +667,7 @@ test.describe('Dispatch API', () => {
     // Verify via list endpoint
     const listResponse = await request.get(`${API_PREFIX}/api/dispatch`);
     const listData = await listResponse.json();
-    expect(listData.items[0].target).toBe('web');
+    expect(listData.items[0].target, queueItems(listData.items)).toBe('web');
   });
 
   test('POST /api/dispatch with target=dash stores target correctly', async ({ request }) => {
@@ -684,7 +690,7 @@ test.describe('Dispatch API', () => {
     // Verify via list endpoint
     const listResponse = await request.get(`${API_PREFIX}/api/dispatch`);
     const listData = await listResponse.json();
-    expect(listData.items[0].target).toBe('dash');
+    expect(listData.items[0].target, queueItems(listData.items)).toBe('dash');
   });
 
   test('POST /api/dispatch without target defaults to cli', async ({ request }) => {
@@ -705,7 +711,7 @@ test.describe('Dispatch API', () => {
     // Verify via list endpoint
     const listResponse = await request.get(`${API_PREFIX}/api/dispatch`);
     const listData = await listResponse.json();
-    expect(listData.items[0].target).toBe('cli');
+    expect(listData.items[0].target, queueItems(listData.items)).toBe('cli');
   });
 
   test('POST /api/dispatch with invalid target returns 400', async ({ request }) => {
