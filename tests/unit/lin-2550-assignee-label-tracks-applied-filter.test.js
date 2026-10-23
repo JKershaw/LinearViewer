@@ -261,6 +261,6 @@ describe('LIN-2550 — fetchAndPrepareProjects reports what it applied', () => {
   });
 
   test('appliedAssigneeName is returned to the caller', () => {
-    assert.match(SRC, /return \{ trees,[^}]*appliedAssigneeName \};/, 'expected appliedAssigneeName on fetchAndPrepareProjects\'s return — the route cannot correct a label it is never told about');
+    assert.match(SRC, /return \{ trees,[^}]*appliedAssigneeName(, degradedSources)? \};/, 'expected appliedAssigneeName on fetchAndPrepareProjects\'s return — the route cannot correct a label it is never told about');
   });
 });

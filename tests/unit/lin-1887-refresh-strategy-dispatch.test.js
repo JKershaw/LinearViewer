@@ -50,7 +50,7 @@ const ensureValidTokenSrc = () => sliceBetween(
 );
 
 const handleUnauthorizedErrorSrc = () => sliceBetween(
-  'async function handleUnauthorizedError(workspace, session, teamId, assigneeState, openRouterSource, res) {',
+  'async function handleUnauthorizedError(workspace, session, teamId, assigneeState, openRouterSource, res, error = null) {',
   '\n/**\n * Home page'
 );
 

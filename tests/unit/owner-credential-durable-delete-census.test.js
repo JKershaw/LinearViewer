@@ -306,7 +306,7 @@ describe('LIN-1545 — durable delete narrowed to definitive revocation at both 
 
   test('S2: handleUnauthorizedError deletes+removes only on definitive revocation, else returns a transient 503', () => {
     const source = read('server.js');
-    const startIdx = source.indexOf('async function handleUnauthorizedError(workspace, session, teamId, assigneeState, openRouterSource, res) {');
+    const startIdx = source.indexOf('async function handleUnauthorizedError(workspace, session, teamId, assigneeState, openRouterSource, res, error = null) {');
     assert.notEqual(startIdx, -1, 'expected to find handleUnauthorizedError in server.js');
     const endIdx = source.indexOf('\n/**\n * Home page', startIdx);
     assert.notEqual(endIdx, -1, 'expected to find the end of handleUnauthorizedError');

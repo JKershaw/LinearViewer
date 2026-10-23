@@ -40,7 +40,7 @@ function sliceFunction(name, signatureLine) {
 describe('LIN-2525 — fetchAndPrepareProjects assignee filtering wiring', () => {
   const body = sliceFunction(
     'fetchAndPrepareProjects',
-    'async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = null, urlKey = null, { slim = false, assigneeName = null } = {}) {'
+    'async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = null, urlKey = null, { slim = false, assigneeName = null, accountId = null, degradeSecondary = false } = {}) {'
   );
 
   test('nodeKey and expandToTreeContext are imported from lib/tree.js, never reimplemented', () => {
@@ -85,6 +85,6 @@ describe('LIN-2525 — fetchAndPrepareProjects assignee filtering wiring', () =>
     // LIN-2550 appended `appliedAssigneeName` — the filter this call actually
     // applied (null when an unmatched name degraded to unfiltered), which the
     // dashboard routes label the selector off.
-    assert.match(body, /return \{ trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId: resolvedTeamId, periodicalsEnabled, showSource, truncated, availableAssignees, appliedAssigneeName \};/);
+    assert.match(body, /return \{ trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId: resolvedTeamId, periodicalsEnabled, showSource, truncated, availableAssignees, appliedAssigneeName, degradedSources \};/);
   });
 });

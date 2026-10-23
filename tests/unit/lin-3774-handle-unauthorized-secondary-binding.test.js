@@ -1,0 +1,235 @@
+/**
+ * LIN-3774: handleUnauthorizedError's secondary-binding arm.
+ *
+ * A 401 that fetchAndPrepareProjects tagged (`error.binding`) as coming from a
+ * SECONDARY connection-backed GitHub-family binding re-mints THAT binding only,
+ * then re-renders the dashboard with `degradeSecondary` — it does not rotate the
+ * Linear refresh token (the active-binding ladder) and does not 503.
+ *
+ * All five routes (dashboard, swipe, swim, ship, roadmap) reach this handler with
+ * the same arguments and the handler's retry always renders the dashboard
+ * (LIN-2526), so swim/ship/swipe/roadmap show the dashboard with the notice on a
+ * secondary 401, where they used to get the 503 page.
+ *
+ * server.js is not import-safe: the real source of renderDashboardAfterRefresh and
+ * handleUnauthorizedError is sliced into a vm context (as lin-1503-*-behaviour).
+ * The freshness seam is the REAL module over a counting re-mint; the Linear
+ * exchange is a counting stub.
+ *
+ * Run: node --test tests/unit/lin-3774-handle-unauthorized-secondary-binding.test.js
+ */
+import { test, describe } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+import vm from 'node:vm';
+import { createSecondaryBindingRemint } from '../../lib/connection-secondary-remint.js';
+import { rehydrateBindingAfterRefresh } from '../../lib/connection-credential.js';
+import { setBindingCredential, activeConnectionBackedBinding } from '../../lib/connection-binding.js';
+import { REFRESH_STRATEGY, refreshDeclarationFor } from '../../lib/refresh-strategy.js';
+import { normalizeProvider } from '../../lib/workspace.js';
+import { renderPage } from '../../lib/render.js';
+import { orderIssuesForSwipe } from '../../lib/render-swipe.js';
+import { nodeKey } from '../../lib/tree.js';
+import { renderServiceUnavailablePage } from '../../lib/render-pages.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
+const NOW = 1_800_000_000_000;
+
+function slice(startMarker, endMarker) {
+  const startIdx = SERVER_SRC.indexOf(startMarker);
+  assert.notEqual(startIdx, -1, `expected ${startMarker.slice(0, 50)} in server.js`);
+  const endIdx = SERVER_SRC.indexOf(endMarker, startIdx);
+  assert.notEqual(endIdx, -1, `expected end marker ${endMarker.slice(0, 40)}`);
+  return SERVER_SRC.slice(startIdx, endIdx);
+}
+const RENDER_SRC = slice('async function renderDashboardAfterRefresh(', '\n/**\n * Handles 401 Unauthorized');
+const HANDLER_SRC = slice('async function handleUnauthorizedError(', '\n/**\n * Home page');
+
+const authError = (binding) => Object.assign(new Error('Bad credentials'), { status: 401, ...(binding ? { binding } : {}) });
+const GH_TAG = { provider: 'github', scope: 'JKershaw/LinearViewer', connectionId: 'a::github::1' };
+
+function makeWorkspace({ ghHydrated = true, ghProvider = 'github', ghConnectionId = 'a::github::1' } = {}) {
+  const linear = { provider: 'linear', scope: 'org-1', connectionId: 'a::linear::org-1' };
+  const github = { provider: ghProvider, scope: 'JKershaw/LinearViewer', connectionId: ghConnectionId };
+  setBindingCredential(linear, { token: 'lin-token', tokenExpiresAt: NOW + 3_600_000 });
+  if (ghHydrated) setBindingCredential(github, { token: 'stale-gh', tokenExpiresAt: NOW - 1000 });
+  return { id: 'org-1', urlKey: 'lv', provider: 'linear', activeBinding: { provider: 'linear', scope: 'org-1' }, bindings: [linear, github] };
+}
+
+/**
+ * @param {Object} o
+ * @param {Object} [o.fetchResult] - what the (faked) fetchAndPrepareProjects resolves for the retry render
+ * @param {boolean} [o.remintFails]
+ */
+function harness({ degraded = [], remintFails = false, fetchThrows = null } = {}) {
+  const calls = { githubRemint: [], linearRefresh: [], linearExchange: 0, fetch: [], removal: 0, saveSession: 0, durableRead: 0 };
+  const res = {
+    statusCode: 200, body: null,
+    status(code) { this.statusCode = code; return this; },
+    send(body) { this.body = body; return this; },
+  };
+  const secondaryRemint = createSecondaryBindingRemint({
+    refreshConnectionForWorkspace: async (connection, accountId, urlKey) => {
+      calls.githubRemint.push({ connection, accountId, urlKey });
+      if (remintFails) throw new Error('JWT rejected');
+      return { token: 'fresh-gh', expiresAt: NOW + 3_600_000 };
+    },
+    applyRefreshed: rehydrateBindingAfterRefresh,
+    now: () => NOW,
+    logger: { error: () => {} },
+  });
+  const context = vm.createContext({
+    process, console: { ...console, error: () => {}, log: () => {} },
+    REFRESH_STRATEGY, refreshDeclarationFor, normalizeProvider,
+    renderPage, orderIssuesForSwipe, nodeKey, renderServiceUnavailablePage,
+    secondaryRemint,
+    activeConnectionIdForWorkspace: (ws) => activeConnectionBackedBinding(ws)?.connectionId ?? null,
+    customPromptsStore: { list: async () => [] },
+    getDeployInfo: () => ({}),
+    getProviderForWorkspace: () => ({ supports: () => false }),
+    getFeatureFlags: () => ({}),
+    fetchAndPrepareProjects: async (...args) => {
+      calls.fetch.push(args);
+      if (fetchThrows) throw fetchThrows;
+      return { trees: [], inProgressTrees: [], recentActivityTrees: [], organizationName: 'Acme', teams: [], selectedTeamId: null, showSource: true, truncated: false, availableAssignees: [], appliedAssigneeName: null, degradedSources: degraded };
+    },
+    // The active-binding ladder, spied: a connection-backed Linear workspace refreshes via its Connection.
+    connectionAccess: {
+      refreshConnectionForWorkspace: async (connection) => {
+        calls.linearRefresh.push(connection);
+        calls.linearExchange++;
+        return { token: 'new-lin', expiresAt: NOW + 3_600_000 };
+      },
+    },
+    rehydrateAfterRefresh: () => true,
+    refreshExchangeFor: () => async () => ({}),
+    ownerCredentialStore: { get: async () => { calls.durableRead++; return null; }, delete: async () => {} },
+    saveSession: async () => { calls.saveSession++; },
+    handleWorkspaceRemoval: async () => { calls.removal++; return 'removed'; },
+    sendRelinkNotice: () => 'relink',
+    isDefinitiveRevocation: () => false,
+    releaseConnectionCredential: async () => {},
+    evictReferentFor: () => () => {},
+    connectionStore: {},
+    evictAllWorkspaceTokens: () => {},
+    evictWorkspaceToken: () => {},
+  });
+  vm.runInContext(`${RENDER_SRC}\n${HANDLER_SRC}`, context);
+  return { calls, res, run: (workspace, error, routeShape = {}) => vm.runInContext('handleUnauthorizedError', context)(
+    workspace,
+    { accountId: 'a', workspaces: [workspace] },
+    routeShape.teamId ?? null,
+    routeShape.assigneeState ?? { selectedAssignee: 'all', resolvedAssigneeName: null },
+    null, res, error,
+  ) };
+}
+
+describe('LIN-3774 handleUnauthorizedError — tagged secondary 401', () => {
+  test('re-mints that connection only, spends no Linear refresh, and renders the dashboard flagged degradeSecondary', async () => {
+    const { calls, res, run } = harness();
+    await run(makeWorkspace(), authError(GH_TAG));
+    assert.equal(calls.githubRemint.length, 1);
+    assert.deepEqual(JSON.parse(JSON.stringify(calls.githubRemint[0].connection)), { _id: 'a::github::1', provider: 'github' });
+    assert.equal(calls.linearExchange, 0, 'a GitHub 401 must not spend a Linear refresh');
+    assert.equal(calls.linearRefresh.length, 0);
+    assert.equal(calls.durableRead, 0);
+    assert.equal(calls.removal, 0);
+    assert.equal(calls.saveSession, 0);
+    assert.equal(calls.fetch.length, 1, 'one retry render');
+    assert.equal(calls.fetch[0][4].degradeSecondary, true);
+    assert.equal(calls.fetch[0][4].accountId, 'a');
+    assert.equal(res.statusCode, 200);
+  });
+
+  test('a secondary that still fails renders the DASHBOARD with the source notice, not the 503 — for every route caller shape', async () => {
+    // dashboard / swipe / swim / ship / roadmap all call the handler with these same arguments;
+    // the retry is always the dashboard (LIN-2526). Each route's team/assignee state flows through.
+    const shapes = [
+      { route: 'dashboard', teamId: null },
+      { route: 'swipe', teamId: 't-swipe' },
+      { route: 'swim', teamId: 't-swim' },
+      { route: 'ship', teamId: 't-ship' },
+      { route: 'roadmap', teamId: 't-roadmap' },
+    ];
+    for (const shape of shapes) {
+      const { calls, res, run } = harness({ degraded: [{ provider: 'github', scope: 'JKershaw/LinearViewer' }] });
+      await run(makeWorkspace(), authError(GH_TAG), shape);
+      assert.equal(res.statusCode, 200, shape.route);
+      assert.match(res.body, /data-testid="dashboard-source-notice"/, shape.route);
+      assert.match(res.body, /JKershaw\/LinearViewer/, shape.route);
+      assert.equal(calls.fetch[0][1], shape.teamId, `${shape.route}: the route's own team reaches the retry`);
+    }
+  });
+
+  test('a failed re-mint still retries once (degrading), and does not remove the workspace', async () => {
+    const { calls, res, run } = harness({ remintFails: true, degraded: [{ provider: 'github', scope: 'JKershaw/LinearViewer' }] });
+    await run(makeWorkspace(), authError(GH_TAG));
+    assert.equal(calls.githubRemint.length, 1);
+    assert.equal(calls.fetch.length, 1);
+    assert.equal(calls.removal, 0);
+    assert.match(res.body, /dashboard-source-notice/);
+  });
+
+  test('a render failure after the re-mint is the existing retryable 503, and the workspace is preserved', async () => {
+    const { calls, res, run } = harness({ fetchThrows: new Error('GitHub 502') });
+    await run(makeWorkspace(), authError(GH_TAG));
+    assert.equal(res.statusCode, 503);
+    assert.equal(calls.removal, 0);
+  });
+});
+
+describe('LIN-3774 handleUnauthorizedError — everything else keeps today\'s ladder', () => {
+  async function ladder(error, workspace = makeWorkspace()) {
+    const h = harness();
+    await h.run(workspace, error);
+    return h;
+  }
+
+  test('an untagged error and a call with no error argument take the active-binding ladder and never touch the seam', async () => {
+    for (const error of [authError(), undefined, null]) {
+      const { calls } = await ladder(error);
+      assert.equal(calls.githubRemint.length, 0);
+      assert.equal(calls.linearRefresh.length, 1, 'the Linear Connection is refreshed, as today');
+      assert.equal(calls.fetch.length, 1);
+    }
+  });
+
+  test('an ACTIVE-tagged error takes the ladder', async () => {
+    const { calls } = await ladder(authError({ provider: 'linear', scope: 'org-1', connectionId: 'a::linear::org-1' }));
+    assert.equal(calls.githubRemint.length, 0);
+    assert.equal(calls.linearRefresh.length, 1);
+  });
+
+  test('legacy-tagged, refresh-token-kind-tagged and unhydrated-tagged errors take the ladder', async () => {
+    const cases = [
+      [makeWorkspace({ ghConnectionId: undefined }), { provider: 'github', scope: 'JKershaw/LinearViewer', connectionId: undefined }],
+      [makeWorkspace({ ghProvider: 'jira' }), { provider: 'jira', scope: 'JKershaw/LinearViewer', connectionId: 'a::github::1' }],
+      [makeWorkspace({ ghHydrated: false }), GH_TAG],
+    ];
+    for (const [workspace, tag] of cases) {
+      const { calls } = await ladder(authError(tag), workspace);
+      assert.equal(calls.githubRemint.length, 0, JSON.stringify(tag));
+      assert.equal(calls.linearRefresh.length, 1, JSON.stringify(tag));
+    }
+  });
+});
+
+describe('LIN-3774 handleUnauthorizedError — call-site pins', () => {
+  test('all five routes pass the caught error into the handler', () => {
+    const calls = [...SERVER_SRC.matchAll(/return handleUnauthorizedError\(([^)]*)\)/g)].map(m => m[1]);
+    assert.equal(calls.length, 5);
+    for (const c of calls) assert.match(c, /openRouterSource, res, error$/, c);
+  });
+
+  test('the secondary arm is guarded on error?.binding and sits right after the PAT arm, before the strategy ladder', () => {
+    const body = HANDLER_SRC;
+    const guard = body.indexOf('error?.binding ? secondaryRemint.bindingForError(workspace, error) : null');
+    assert.notEqual(guard, -1);
+    assert.ok(guard > body.indexOf('workspace.isPAT'));
+    assert.ok(guard < body.indexOf('refreshDeclarationFor(workspace)'));
+    assert.ok(guard < body.indexOf('ownerCredentialStore.get('));
+  });
+});
