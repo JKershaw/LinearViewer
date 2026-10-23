@@ -8,6 +8,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
 import express from 'express';
 import { createTaskShareRoutes } from '../../routes/task-share.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
@@ -15,6 +16,7 @@ import { TaskShareStore } from '../../lib/task-share-store.js';
 import { FIXTURE_SECRETS as F } from '../fixtures/secret-scan-fixtures.js';
 import { renderTaskPage, contextSignature, renderTaskContext } from '../../lib/render-task-page.js';
 import { escapeHtml } from '../../lib/utils/html.js';
+import { mintHarbourToken } from '../../lib/harbour-token-format.js';
 
 const NOW = new Date('2026-10-08T12:00:00.000Z');
 const TOKEN = 'A'.repeat(43);
@@ -504,6 +506,39 @@ describe('render-time secret masking (LIN-3389)', () => {
         assert.ok((res.text.match(/\[redacted\]/g) || []).length >= 2, 'agent message and ledger row both redacted');
         assert.ok(!res.text.includes(F.githubPat), 'agent message secret reached the body');
         assert.ok(!res.text.includes(F.awsAccessKey), 'ledger row secret reached the body');
+      });
+    } finally { await close(); }
+  });
+
+  test('a minted Harbour token planted bare in description, comment and brief is masked on the rendered page (LIN-3795)', async () => {
+    for (const kind of ['proxy', 'dispatch', 'feedback']) {
+      const minted = mintHarbourToken(kind);
+      const { base, close } = await build({
+        store: withRecord(),
+        loader: fakeLoader({ loadTaskPage: async () => ({ model: secretModel(minted) }) }),
+      });
+      try {
+        await withLogs(async () => {
+          const res = await get(base, `/t/${TOKEN}`);
+          assert.equal(res.status, 200);
+          assert.ok(!res.text.includes(minted), `${kind} token reached the body`);
+          assert.ok(!res.text.includes(minted.slice(-4)), `${kind} token tail reached the body`);
+          assert.ok((res.text.match(/\[redacted\]/g) || []).length >= 3, 'description, comment and brief');
+        });
+      } finally { await close(); }
+    }
+  });
+
+  test('a share token that starts hb?_ keeps its own data-state-url (LIN-3795)', async () => {
+    const shareToken = 'hbd_' + randomBytes(32).toString('base64url').slice(0, 39);
+    assert.equal(shareToken.length, 43);
+    const { base, close } = await build({ store: withRecord() });
+    try {
+      await withLogs(async () => {
+        const res = await get(base, `/t/${shareToken}`);
+        assert.equal(res.status, 200);
+        assert.ok(res.text.includes(`data-state-url="/t/${shareToken}/state"`),
+          'masking the share token would break the page polling its own state');
       });
     } finally { await close(); }
   });

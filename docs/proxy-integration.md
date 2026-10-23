@@ -71,7 +71,7 @@ Response:
 ```json
 {
   "tokenId": "uuid",
-  "token": "base64url-encoded-token",
+  "token": "hbp_<43 base64url chars>",   // LIN-3795: new proxy tokens are hbp_-prefixed (dispatch hbd_, feedback hbf_); older tokens are unprefixed 43 chars and stay valid
   "label": "My Agent",
   "scope": "readWrite",
   "singleUse": false,

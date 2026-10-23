@@ -62,7 +62,7 @@ Response:
 ```json
 {
   "tokenId": "uuid",
-  "token": "base64url-encoded-token",
+  "token": "hbd_<43 base64url chars>",   // LIN-3795: new tokens are prefixed (hbd_ dispatch, hbp_ proxy); older tokens are unprefixed 43 chars and stay valid
   "label": "My Consumer",
   "expiresAt": "2027-01-17T12:00:00.000Z",
   "message": "Token created. Save this token now - it cannot be retrieved later."
@@ -300,7 +300,7 @@ other bootstrap (see the Workspace API Proxy integration guide).
 **Success Response (201):**
 ```json
 {
-  "token": "base64url-encoded-bootstrap-token",
+  "token": "hbp_<43 base64url chars>",   // LIN-3795: prefixed bootstrap; legacy unprefixed 43-char bootstraps still work
   "expiresAt": "2024-01-17T10:30:00.000Z"
 }
 ```

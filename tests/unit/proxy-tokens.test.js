@@ -721,3 +721,25 @@ describe('ProxyTokenStore.validateToken touch option (LIN-3647)', () => {
     assert.equal(await store.validateToken(token, { touch: false }), null);
   });
 });
+
+describe('LIN-3795 — proxy tokens carry the hbp_ prefix; unprefixed rows still validate', () => {
+  test('createToken mints hbp_ + 43 base64url chars, and it validates', async () => {
+    const store = new ProxyTokenStore({ collection: createMockCollection() });
+    const { token } = await store.createToken('workspace-1', { label: 'x' });
+    assert.match(token, /^hbp_[A-Za-z0-9_-]{43}$/);
+    assert.ok(await store.validateToken(token));
+  });
+
+  test('a pre-LIN-3795 unprefixed row still validates', async () => {
+    const store = new ProxyTokenStore({ collection: createMockCollection() });
+    const fresh = await store.createToken('workspace-1', { label: 'fresh' });
+    const row = await store.collection.findOne({ _id: fresh.tokenId });
+    const legacy = crypto.randomBytes(32).toString('base64url');
+    await store.collection.insertOne({
+      ...row, _id: 'legacy-row', tokenHash: store._hashToken(legacy), label: 'legacy'
+    });
+    const validated = await store.validateToken(legacy);
+    assert.ok(validated, 'unprefixed token must still authenticate');
+    assert.strictEqual(validated.label, 'legacy');
+  });
+});

@@ -129,9 +129,9 @@ describe('LIN-3601 redaction canary sweep — session routes (routes/dispatch.js
   const routes = enumerateRoutes(sessionWorld({ canary, accountId: OWNER, target: 'cli' }).router);
   const keyOf = (r) => `${r.method} ${r.path}`;
 
-  test('the canary is the 43-character HB shape the mask recognises, built at run time', () => {
-    assert.equal(canary.length, 43);
-    assert.match(canary, /^HB[A-Za-z0-9_-]{41}$/);
+  test('the canary is the prefixed 47-character shape the mask recognises, built at run time', () => {
+    assert.equal(canary.length, 47);
+    assert.match(canary, /^hbp_[A-Za-z0-9_-]{43}$/);
   });
 
   test('enumerates exactly 27 session routes', () => {

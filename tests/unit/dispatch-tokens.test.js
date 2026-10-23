@@ -11,6 +11,7 @@ process.env.NODE_ENV = 'test';
 
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
 import { DispatchTokenStore } from '../../lib/dispatch-tokens.js';
 
 function createMockCollection() {
@@ -130,5 +131,30 @@ describe('LIN-3647 — DispatchTokenStore.validateToken touch option', () => {
   test('touch: false still rejects unknown tokens', async () => {
     const store = new DispatchTokenStore({ collection: createMockCollection() });
     assert.equal(await store.validateToken('nope', { touch: false }), null);
+  });
+});
+
+describe('LIN-3795 — dispatch tokens carry the hbd_ prefix; unprefixed rows still validate', () => {
+  let store;
+  beforeEach(() => {
+    store = new DispatchTokenStore({ collection: createMockCollection() });
+  });
+
+  test('createToken mints hbd_ + 43 base64url chars, and it validates', async () => {
+    const { token } = await store.createToken('acme', 'x');
+    assert.match(token, /^hbd_[A-Za-z0-9_-]{43}$/);
+    assert.ok(await store.validateToken(token));
+  });
+
+  test('a pre-LIN-3795 unprefixed row still validates', async () => {
+    const fresh = await store.createToken('acme', 'fresh');
+    const row = await store.collection.findOne({ _id: fresh.tokenId });
+    const legacy = randomBytes(32).toString('base64url');
+    await store.collection.insertOne({
+      ...row, _id: 'legacy-row', tokenHash: store._hashToken(legacy), label: 'legacy'
+    });
+    const validated = await store.validateToken(legacy);
+    assert.ok(validated, 'unprefixed token must still authenticate');
+    assert.equal(validated.label, 'legacy');
   });
 });

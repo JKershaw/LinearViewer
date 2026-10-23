@@ -20,7 +20,7 @@ import {
   isItemOwner, maskBootstrapTokens, redactSessionItem, REDACTED_TOKEN_PLACEHOLDER
 } from '../../lib/dispatch-session-redaction.js';
 
-const TOKEN = 'HBq7Zk2mXv9RtLw4NpYc8DsEaGh1JfUoB3VnMiK6xQe'; // 43 chars, HB-prefixed
+const TOKEN = 'HBq7Zk2mXv9RtLw4NpYc8DsEaGh1JfUoB3VnMiK6xQe'; // 43 chars, legacy unprefixed (the context branches still mask it; LIN-3795 dropped the dead HB branch)
 const OTHER_TOKEN = 'k3J9xQ2mZpL7vRtYw4NcB8DsEaGh1HfUoVnMiK6xQeA'; // 43 chars, bare
 assert.equal(TOKEN.length, 43);
 assert.equal(OTHER_TOKEN.length, 43);
