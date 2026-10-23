@@ -31,6 +31,11 @@ import { createHash, randomBytes } from 'node:crypto';
 import {
   normalizeEmail,
   EMAIL_SEND_THROTTLE_MAX,
+  EMAIL_SEND_DAILY_MAX,
+  EMAIL_SEND_DAILY_WINDOW_MS,
+  EMAIL_SEND_GLOBAL_MAX,
+  EMAIL_SEND_MIN_FORM_MS,
+  sendNonceAgeMs,
   mintConfirmNonce,
   verifyAndClearConfirmNonce,
   mintSendNonce,
@@ -54,6 +59,7 @@ import {
   renderEmailConfirmRefusedPage,
   renderEmailSendRefusedPage,
   renderEmailUnavailablePage,
+  HONEYPOT_FIELD,
 } from '../lib/render-email-auth.js';
 import { renderAccountHomePage } from '../lib/render-account-home.js';
 import { getProvider } from '../lib/providers/index.js';
@@ -87,10 +93,19 @@ export function createEmailSendLimiter({ skip = () => process.env.NODE_ENV === '
     standardHeaders: true,
     legacyHeaders: false,
     message: 'Too many sign-in emails requested, please try again later',
+    // LIN-3771: still a 429, now with the refusal reason logged (never the address).
+    handler: (req, res, next, options) => {
+      console.warn('[email-auth] send refused: per-ip-limit');
+      res.status(options.statusCode).send(options.message);
+    },
     skip,
   });
 }
 export const emailSendLimiter = createEmailSendLimiter();
+
+// The minimum form-to-POST time is skipped under NODE_ENV=test, the same shape
+// as the per-IP limiter above, so e2e sends that fill the form instantly pass.
+const defaultMinFormMs = () => (process.env.NODE_ENV === 'test' ? 0 : EMAIL_SEND_MIN_FORM_MS);
 
 // The confirm page must not be framed (a framed page could be clicked
 // through), cached, or leak its `?t=` URL in a Referer.
@@ -122,6 +137,8 @@ function sha256Hex(value) {
  * @param {string|null} [options.linkOrigin] - canonical origin for links in emails (required for a Resend transport); null = the request's own (console/capture only)
  * @param {'on'|'off'|'opt-in'} [options.promptStep='off'] - the S3 provider-user prompt gate (lib/email-availability.js resolvePromptStepMode); the middleware is installed only when transport exists and this isn't 'off'
  * @param {Function} [options.sendLimiter] - defaults to the module-scope per-IP limiter
+ * @param {number} [options.minFormMs] - least ms between the form's GET and its send POST (LIN-3771); 0 under NODE_ENV=test
+ * @param {number} [options.globalSendMax] - sends allowed per rolling hour across all addresses (LIN-3771)
  * @param {() => number} [options.now] - clock for nonce ages (tests)
  * @returns {Router}
  */
@@ -134,6 +151,8 @@ export function createEmailAuthRoutes({
   linkOrigin = null,
   promptStep = 'off',
   sendLimiter = emailSendLimiter,
+  minFormMs = defaultMinFormMs(),
+  globalSendMax = EMAIL_SEND_GLOBAL_MAX,
   now = Date.now,
 }) {
   const router = Router();
@@ -396,6 +415,11 @@ export function createEmailAuthRoutes({
     res.send(renderEmailReproofPage({ email, nonce }));
   });
 
+  function silentRefusal(res, reason) {
+    console.warn(`[email-auth] send refused: ${reason}`);
+    return res.send(renderEmailCheckInboxPage());
+  }
+
   router.post('/auth/email/send', sendLimiter, async (req, res) => {
     if (!transport) return unavailable(res);
     const body = req.body || {};
@@ -407,6 +431,14 @@ export function createEmailAuthRoutes({
     if (!verifySendNonce(req.session, body.nonce, now())) {
       return res.status(403).send(renderEmailSendRefusedPage());
     }
+
+    // LIN-3771: bot checks, after the nonce (so a cross-site POST still gets the
+    // 403 and plants nothing) and before anything else. A refusal is the same
+    // check-inbox page a real send gets: no mail, nothing stored, no session
+    // save, and only the reason logged (never the address).
+    if (typeof body[HONEYPOT_FIELD] === 'string' && body[HONEYPOT_FIELD] !== '') return silentRefusal(res, 'honeypot');
+    const formAge = sendNonceAgeMs(req.session, now());
+    if (formAge !== null && formAge < minFormMs) return silentRefusal(res, 'too-fast');
 
     const mode = body.mode === 'link' ? 'link' : (body.mode === 'reproof' ? 'reproof' : 'signin');
     // S3 link mode and S3-4 re-proof: a token may only be minted by a session
@@ -455,7 +487,14 @@ export function createEmailAuthRoutes({
     if (mode === 'link') req.session.emailLinkNext = next;
 
     try {
-      if (await magicLinkStore.recentCountForEmail(emailNorm) < EMAIL_SEND_THROTTLE_MAX) {
+      // Refusals are silent (the check-inbox page below) and log the reason only.
+      let refusal = null;
+      if (await magicLinkStore.recentCountForEmail(emailNorm) >= EMAIL_SEND_THROTTLE_MAX) refusal = 'recipient-throttle';
+      else if (await magicLinkStore.recentCountForEmail(emailNorm, EMAIL_SEND_DAILY_WINDOW_MS) >= EMAIL_SEND_DAILY_MAX) refusal = 'recipient-daily-cap';
+      else if (await magicLinkStore.recentCount() >= globalSendMax) refusal = 'global-ceiling';
+      if (refusal) {
+        console.warn(`[email-auth] send refused: ${refusal}`);
+      } else {
         const { token } = await magicLinkStore.issue({
           emailNorm,
           mode: issueMode,
