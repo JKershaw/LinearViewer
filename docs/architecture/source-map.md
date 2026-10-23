@@ -46,6 +46,7 @@ lib/
   bash-tool.js         Safe bash executor with data/code separation (stdin + argv modes)
   tree.js              Transforms flat issues → nested tree structure (re-exports the focus-child picker, now owned by recommendation-facts.js, LIN-3727)
   graph-features.js    Network-free blocking-graph / critical-path primitives (shared by swipe + frontier ranking)
+  task-order.js        Task ordering for swipe, swim, `/stack` and roadmap: flattenTrees, sortIssuesForSwipe, applyBlockingOrder, clusterByParent, buildWhy (LIN-3554; area Task model)
   context-graph.js     Network-free relationship-neighborhood builder for the Context section (blockers/blocked/parent/children/related; LIN-572)
   openrouter.js        OpenRouter API client; recommendations take one path (LIN-3300): one routing call to the stage selector (buildSelectorArgs: formatSelectorView + the trail facts), or the review loop bound in code, then composeRoutedRecommendation assembles the routed stage's prompt with generatePrompt
   openrouter-catalog.js  Live OpenRouter model catalog (LIN-1111): in-process TTL-cached wrapper over GET /api/v1/models, mocked in tests via the same `shouldMockAi` predicate that gates the AI recommendation mock; supplements (never replaces) the static DISPATCH_MODEL_SUGGESTIONS datalists in public/common.js + lib/render-settings.js, consumed server-side by Settings and client-side via GET /workspace/:urlKey/api/openrouter/models (routes/workspace-api.js) — one shared source of truth for both surfaces

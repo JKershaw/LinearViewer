@@ -61,6 +61,7 @@ import { isDanglingReferent, ISSUE_NOT_FOUND_CODE, DANGLING_REFERENT_MESSAGE } f
 // capability gate (provider.supports -> 422) is now a real runtime path, not
 // only a test-injected one. The lib/linear.js shim stays the frozen back-compat
 // surface for the dashboard fetchers only.
+import '../lib/providers/index.js'; // side effect: registers github, github-projects, jira (LIN-3554: task-stack no longer reaches the barrel via render-swipe)
 import '../lib/providers/linear/index.js'; // side effect: self-registers the Linear provider into the registry
 import { localProvider } from '../lib/providers/local/index.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';

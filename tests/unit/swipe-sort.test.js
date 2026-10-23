@@ -5,7 +5,10 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { sortIssuesForSwipe, applyBlockingOrder, clusterByParent, buildFilterGroups, flattenTrees, computeGraphFeatures, computeOffPageBlockers, buildWhy, isBoostableBug } from '../../lib/render-swipe.js';
+import { buildFilterGroups } from '../../lib/render-swipe.js';
+import { sortIssuesForSwipe, applyBlockingOrder, clusterByParent, flattenTrees, buildWhy, isBoostableBug } from '../../lib/task-order.js';
+import { computeOffPageBlockers } from '../../lib/task-stack.js';
+import { computeGraphFeatures } from '../../lib/graph-features.js';
 
 // =============================================================================
 // Test Helpers
