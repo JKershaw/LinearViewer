@@ -61,6 +61,24 @@ describe('describeSourceFailure', () => {
     assert.equal(describeSourceFailure(new Error('x'), ghWs).isActiveSource, true);
   });
 
+  test('activeness on a legacy workspace with no marker and two same-provider bindings (C2)', () => {
+    const legacy = {
+      provider: 'linear', urlKey: 'acme', name: 'Acme Linear', accessToken: 'A',
+      bindings: [
+        { provider: 'linear', scope: 'org-1', credentials: { token: 'A' } },
+        { provider: 'linear', scope: 'org-OTHER', credentials: { token: 'B' } },
+      ],
+    };
+    const other = describeSourceFailure(tagged(401, 'linear', 'org-OTHER'), legacy);
+    assert.equal(other.isActiveSource, false);
+    assert.equal(other.where, '');
+    const primary = describeSourceFailure(tagged(401, 'linear', 'org-1'), legacy);
+    assert.equal(primary.isActiveSource, true);
+    assert.equal(primary.where, 'Acme Linear');
+    // no binding found for the tag ⇒ not active
+    assert.equal(describeSourceFailure(tagged(401, 'linear', 'org-GONE'), legacy).isActiveSource, false);
+  });
+
   test('errorReference is 8 lowercase hex and varies', () => {
     assert.match(errorReference(), /^[0-9a-f]{8}$/);
     assert.notEqual(errorReference(), errorReference());
@@ -87,6 +105,16 @@ describe('renderSourceErrorPage', () => {
     const secondary = html(tagged(401, 'github', 'o/other'), linWs);
     assert.match(secondary, /href="\/workspace\/acme\/settings"/);
     assert.match(secondary, /Go to settings/);
+  });
+
+  test('auth on the ACTIVE Jira source offers relinkNotice\'s /auth/jira target, not settings (M3 witness)', () => {
+    const jiraWs = { provider: 'jira', urlKey: 'acme', name: 'Acme Jira', activeBinding: { provider: 'jira', scope: 'https://a.atlassian.net' } };
+    const expected = relinkNotice(jiraWs).actionUrl;
+    assert.match(expected, /^\/auth\/jira/);
+    const out = html(tagged(401, 'jira', 'https://a.atlassian.net'), jiraWs);
+    assert.ok(out.includes(`href="${expected.replace(/&/g, '&amp;')}"`), 'button links to relinkNotice target');
+    assert.doesNotMatch(out, /href="\/workspace\/acme\/settings"/);
+    assert.doesNotMatch(out, /Go to settings/);
   });
 
   const neverReconnect = [
@@ -136,5 +164,18 @@ describe('renderErrorPage diagnostic block stays byte-identical without the new 
     assert.doesNotMatch(out, /data-testid="error-detail/);
     assert.doesNotMatch(out, />Source<|>Reference</);
     assert.match(out, /Reason<\/span> <span class="error-detail-value">d/);
+  });
+
+  // Captured from renderErrorPage at base c93f8792 (LIN-3775 close-out). The
+  // container is compared, not the whole document, so unrelated shell changes
+  // (head, footer) don't trip it; every byte of the diagnostic block is inside.
+  const BASE_CONTAINER = '<div class="error-container">\n    <h2 class="error-title">T</h2>\n    <p class="error-message">M</p>\n    <div class="error-details" role="note">\n      <div class="error-detail-row"><span class="error-detail-key">Reason</span> <span class="error-detail-value">d</span></div>\n      <div class="error-detail-row"><span class="error-detail-key">Type</span> <span class="error-detail-value">upstream · retryable</span></div>\n      <div class="error-detail-row"><span class="error-detail-key">Code</span> <span class="error-detail-value">C</span></div>\n      <div class="error-detail-row"><span class="error-detail-key">Time</span> <span class="error-detail-value">T0</span></div>\n    </div>\n    <a href="/" class="login-button">Go back</a>\n    \n  </div>';
+
+  test('four-key output is byte-identical to the base render (exact assertion)', () => {
+    const out = renderErrorPage('T', 'M', { diagnostic: { detail: 'd', category: 'upstream', retryable: true, code: 'C', time: 'T0' } });
+    const start = out.indexOf('<div class="error-container">');
+    const end = out.indexOf('\n</body>');
+    assert.ok(start >= 0 && end > start);
+    assert.equal(out.slice(start, end), BASE_CONTAINER);
   });
 });
