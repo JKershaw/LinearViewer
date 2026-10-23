@@ -9,6 +9,8 @@
 // (ruling `16c2be3e`) — never root.
 //
 //   railway run -s MongoDB-harbour -- sh -c 'mongosh "$LIN3014_MONGO_URI" --quiet --file "$0"' measure.js
+//   (That form reached the then-public proxy; since 23 Oct the database has no public
+//   endpoint, so reach it through `railway ssh` instead, docs/operator-execution.md.)
 //
 // Set NO_DOC_EGRESS=1 to fall back to counters-only mode: per-document sizes
 // are computed server-side via $bsonSize inside the aggregation, so no

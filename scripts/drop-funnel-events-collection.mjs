@@ -21,8 +21,10 @@
  * operator runs it against production through the Railway route recorded in
  * docs/operator-execution.md (LIN-3204), from the checkout holding this file,
  * with the flag INSIDE the quoted sh -c string:
- *   railway run -p <project> -e production -s MongoDB-harbour -- \
- *     sh -c 'MONGODB_URI="$MONGO_PUBLIC_URL" node scripts/drop-funnel-events-collection.mjs [--drop]'
+ *   (The `railway run … MONGO_PUBLIC_URL` form used here before 23 Oct no longer works:
+ *   the public endpoint is gone. Run it from a host with a root MONGODB_URI reachable
+ *   via `railway ssh`; see the banner in docs/operator-execution.md. It needs root, not
+ *   the app's readWrite user, because dropping a collection is an operator action.)
  *
  * Uses the same MONGODB_URI / HARBOUR_DATA_DIR convention as server.js.
  */

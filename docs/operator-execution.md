@@ -37,6 +37,10 @@ deliverable is the verified execution trace. No repository code changed.
 > - A `railway ssh` shell's environment is not the service's environment: Railway's ssh session
 >   adds its own tokens. Read a service's configuration with `railway variables`, not `env`.
 >
+> - `railway ssh` as root is the **operator** route. harbour-cat itself is to move to its own
+>   `readWrite@linear-viewer` user (planned, not yet cut over; `docs/runbooks/mongodb-app-user.md`).
+>   The root credential stays for operator use only.
+>
 > The rest of this section is the original 2026-10 trace, kept as history.
 
 

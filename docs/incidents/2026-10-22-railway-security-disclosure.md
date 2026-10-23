@@ -155,11 +155,11 @@ The bot started at 16:47Z on 20 Oct, inside Railway's attack window (see "Follow
 ## Lessons
 
 - **Backups.** Harbour's database had no scheduled backups. Daily backups have been on since 23 Oct.
-- **The app connected to MongoDB as root.** Give it its own `readWrite` user on `linear-viewer` (follow-up ticket).
+- **The app connected to MongoDB as root.** Give it its own `readWrite` user on `linear-viewer`: design and production steps are in `docs/runbooks/mongodb-app-user.md` (LIN-3772); the cutover is pending John's approval.
 - **Public database endpoints widen exposure.** The operator's production route needed one, and an unused, empty MongoDB had been reachable since March. Both are now gone; the route is `railway ssh` (`docs/operator-execution.md`).
 - **The 22 Sep incident record was wrong.** It credited a region move that had not taken effect; the database was still in a US region on 23 Oct. Verify an infrastructure change on the platform itself before crediting it with a fix. The record now carries a correction.
 - **Rotation can depend on the platform's build pipeline.** It needed builds, which were paused for most tiers on 22 Oct. On 23 Oct it hit a Railway-side KMS error, which "Deploy Latest Commit" got around.
-- **A `railway ssh` shell's environment is not the service's environment.** Read variables with `railway variables`.
+- **A `railway ssh` shell's environment is not the service's environment.** Do not inspect secrets with `railway variable list`: it prints raw values (`docs/runbooks/mongodb-app-user.md`).
 - **There's no clean way to take Harbour offline on purpose.** → LIN-3770 (maintenance mode, switchable without a build).
 - **The operator stalled overnight on a wrong guess.** It assumed a usage limit before reading the parked runs' reports. Read the last reports before guessing a cause.
 
