@@ -134,7 +134,7 @@ const TABLE = {
   'routes/proxy-kickoff.js :: parentRun': [SRV, 1],
   'routes/dashboard.js :: computeWorkspaceEffortReadout': [SRV, 2],
   'routes/dashboard.js :: loadRunForSummary': [SRV, 1],
-  'routes/dashboard.js :: pointReadSession': [SRV, 3],
+  'lib/dispatch-session-read.js :: pointReadSession': [SRV, 3], // LIN-3812: lifted from routes/dashboard.js
   // routes — explicit allow-list / projection
   'routes/proxy-dispatch.js :: /api/proxy/dispatch': [PRJ, 3],
   'routes/proxy-dispatch.js :: /api/proxy/dispatch/:id': [PRJ, 1],

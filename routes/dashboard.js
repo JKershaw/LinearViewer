@@ -46,6 +46,7 @@ import { dispatchQueueLimiter } from './dispatch.js';
 import { renderObservationPage as renderObservationPageImpl } from '../lib/render-observation.js';
 import { renderSessionPage } from '../lib/render-session.js';
 import { buildRunView } from '../lib/run-view.js';
+import { pointReadSession as pointReadSessionFor, readSessionById } from '../lib/dispatch-session-read.js';
 import { getLoopsForWorkspace, getLoopsForIssue, getSessionsForWorkspace, getSessionsForIssues, deriveIssueGraph, resolvedDecisionEvents, firstRaisedAt } from '../lib/pipeline-loops.js';
 import { computeEscalationKpis } from '../lib/escalation-kpis.js';
 import { renderEscalationKpisPage } from '../lib/render-escalation-kpis.js';
@@ -1694,64 +1695,16 @@ export function createDashboardRoutes({
    * @returns {Promise<Object|null>} the non-lean session, or null if not found
    */
   async function loadSessionWithTranscript(urlKey, sessionId) {
-    const hit = await pointReadSession(urlKey, sessionId);
-    if (hit) return hit;
-    // Fallback: historical inference-grouped or no-issue session → full read.
-    const sessions = await getSessionsForWorkspace(urlKey, loopDeps);
-    return sessions.find(s => String(s.sessionId) === String(sessionId)) || null;
+    // Point read, then (historical inference-grouped or no-issue session) the full read.
+    return readSessionById(urlKey, sessionId, loopDeps);
   }
 
   /**
-   * Issue-scoped point-read of ONE session by id — steps 1–2 of
-   * loadSessionWithTranscript, WITHOUT the whole-workspace fallback (LIN-1022).
-   *
-   * Extracted so every reconstruct-by-sessionId handler (the per-session page,
-   * session-summary, session-context) shares the one cheap path and each decides
-   * for itself whether to pay the whole-workspace read on a point-read miss. It
-   * returns the NON-lean session (feedback[] intact) built by getSessionsForIssues
-   * — byte-identical to the whole-workspace build, restricted to the issues — or
-   * null when issue-scoping can't produce the session.
-   *
-   * @param {string} urlKey
-   * @param {string} sessionId
-   * @returns {Promise<Object|null>}
+   * Issue-scoped point-read of ONE session by id (LIN-1022): the shared path now
+   * lives in lib/dispatch-session-read.js (LIN-3812); this binds the dashboard's deps.
    */
-  async function pointReadSession(urlKey, sessionId) {
-    const ids = new Set();
-    // The root/orchestrator dispatch (id===sessionId) carries no self-referential
-    // `sessionId`, so the sessionId-scoped reads below won't surface it — fetch its
-    // own `issueIdentifier` (the seed) directly. Defensive: a store without
-    // getItemStatus (test fakes) just contributes nothing here.
-    const root = typeof dispatchQueueStore.getItemStatus === 'function'
-      ? await Promise.resolve(dispatchQueueStore.getItemStatus(urlKey, sessionId)).catch(() => null)
-      : null;
-    // LIN-2934 (S6): a GENERAL (goal-only) autopilot anchor's own row carries no
-    // `issueIdentifier`, so it can never land in `ids` and is otherwise invisible
-    // to getSessionsForIssues' per-issue queries — same anchor-aware construction
-    // the materializer's `_collectSessionIssues`/`anchorsOut` already use (see
-    // getSessionsForIssues' own `extraItems` doc). Without this, this point-read
-    // path silently built the OLD orphan (anchor-less) session shape the feed no
-    // longer serves.
-    let anchorExtraItem = null;
-    if (root?.issueIdentifier) {
-      ids.add(root.issueIdentifier);
-    } else if (root && root.kind === 'autopilot') {
-      anchorExtraItem = root;
-    }
-    const projection = { issueIdentifier: 1 };
-    const [live, hist] = await Promise.all([
-      Promise.resolve(dispatchQueueStore.listItems(urlKey, { sessionId, projection })).catch(() => []),
-      Promise.resolve(dispatchQueueStore.listHistory(urlKey, { sessionId, projection })).catch(() => ({ items: [] }))
-    ]);
-    for (const r of (Array.isArray(live) ? live : [])) if (r?.issueIdentifier) ids.add(r.issueIdentifier);
-    for (const r of (hist?.items || [])) if (r?.issueIdentifier) ids.add(r.issueIdentifier);
-
-    if (!ids.size && !anchorExtraItem) return null;
-    const rebuilt = await getSessionsForIssues(urlKey, loopDeps, [...ids], {
-      lean: false,
-      extraItems: anchorExtraItem ? [anchorExtraItem] : []
-    });
-    return rebuilt.find(s => String(s.sessionId) === String(sessionId)) || null;
+  function pointReadSession(urlKey, sessionId) {
+    return pointReadSessionFor(urlKey, sessionId, loopDeps);
   }
 
   /**

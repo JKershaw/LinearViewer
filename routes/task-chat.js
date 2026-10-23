@@ -25,7 +25,7 @@ import { createChatToolCatalog } from '../lib/chat-tools.js';
 import { deriveFollowUpDispatch } from '../lib/follow-up-dispatch.js';
 import { runAgentTurn } from '../lib/agent-turn.js';
 import { resolveRunnerOwnerRefusal } from '../lib/runner-owner-gate.js';
-import { getSessionsForWorkspace } from '../lib/pipeline-loops.js';
+import { readSessionById } from '../lib/dispatch-session-read.js';
 import { isTerminalState } from '../lib/providers/state-map.js';
 import { UUID_REGEX } from '../lib/dispatch-validation.js';
 import { sessionIsTerminal, enrichLoop } from './dashboard.js';
@@ -484,8 +484,8 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
         return serviceUnavailable.json(res, 'Run-scoped chat is not configured for this workspace');
       }
       try {
-        const sessions = await getSessionsForWorkspace(workspace.urlKey, { dispatchStore: dispatchQueueStore, agentStatusStore });
-        if (!sessions.some(s => s.sessionId === rawRunId)) {
+        const found = await readSessionById(workspace.urlKey, rawRunId, { dispatchStore: dispatchQueueStore, agentStatusStore });
+        if (!found) {
           return notFound.json(res, `Run ${rawRunId} not found in this workspace`);
         }
       } catch (error) {
@@ -498,8 +498,7 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
     // the lineage tail the follow-up would land on. A store rejection (e.g. a
     // secret-scan hit) throws and surfaces as a tool-error breadcrumb in chat.
     const persistProposal = async (proposal) => {
-      const sessions = await getSessionsForWorkspace(workspace.urlKey, { dispatchStore: dispatchQueueStore, agentStatusStore });
-      const session = sessions.find(s => s.sessionId === proposal.sessionId);
+      const session = await readSessionById(workspace.urlKey, proposal.sessionId, { dispatchStore: dispatchQueueStore, agentStatusStore });
       if (!session) throw new Error(`Session ${proposal.sessionId} not found`);
       let stepLoopId = null;
       try { ({ followUpTo: stepLoopId } = deriveFollowUpDispatch(session)); } catch { stepLoopId = null; }
