@@ -17,7 +17,7 @@
 /* Layout: edition 8's reading column, log strip and chart classes, plus a findings
    list, an essays shelf and a threads ledger. */
 :root {
-  --paper: #faf9f6; --card: #fffefb; --ink: #1c2430; --muted: #5c6672; --faint: #8b93a0;
+  --paper: #faf9f6; --card: #fffefb; --ink: #1c2430; --muted: #5c6672; --faint: #8b93a0; --faint-ink: #66707c;
   --line: #e4e1d8; --line-soft: #eeece5;
   --blue: #0b6fb8; --blue-soft: #e3eef8; --amber: #bb5f10; --amber-soft: #f8ede0;
   --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
@@ -26,12 +26,12 @@
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --paper: #14181e; --card: #1b212a; --ink: #e8e6e1; --muted: #9aa3ae; --faint: #6d7682;
+  --paper: #14181e; --card: #1b212a; --ink: #e8e6e1; --muted: #9aa3ae; --faint: #6d7682; --faint-ink: #8a94a0;
   --line: #2a323d; --line-soft: #232a34;
   --blue: #3f96dd; --blue-soft: #1d2c3b; --amber: #cf7f2e; --amber-soft: #33281c;
   color-scheme: dark; } }
 :root[data-theme="dark"] {
-  --paper: #14181e; --card: #1b212a; --ink: #e8e6e1; --muted: #9aa3ae; --faint: #6d7682;
+  --paper: #14181e; --card: #1b212a; --ink: #e8e6e1; --muted: #9aa3ae; --faint: #6d7682; --faint-ink: #8a94a0;
   --line: #2a323d; --line-soft: #232a34;
   --blue: #3f96dd; --blue-soft: #1d2c3b; --amber: #cf7f2e; --amber-soft: #33281c;
   color-scheme: dark; }
@@ -43,7 +43,7 @@ h1 { font-family: var(--serif); font-weight: 600; font-size: clamp(2.2rem, 6vw, 
 .deck { font-size: 1.2rem; color: var(--muted); margin: 0 0 20px; text-wrap: balance; }
 .byline { font-family: var(--sans); font-size: 13px; color: var(--muted); }
 h2 { font-family: var(--sans); font-weight: 600; font-size: 1.05rem; letter-spacing: .01em; margin: 56px 0 4px; text-wrap: balance; }
-h2 .when { display: block; font-family: var(--mono); font-weight: 400; font-size: 12px; color: var(--faint); letter-spacing: .06em; text-transform: uppercase; margin-bottom: 6px; }
+h2 .when { display: block; font-family: var(--mono); font-weight: 400; font-size: 12px; color: var(--faint-ink); letter-spacing: .06em; text-transform: uppercase; margin-bottom: 6px; }
 p { margin: 0 0 1em; }
 .num { font-family: var(--mono); font-size: .86em; }
 .keep { font-family: var(--sans); font-size: 15px; line-height: 1.5; border-top: 1px solid var(--line); padding-top: 10px; margin: 18px 0 0; color: var(--ink); }
@@ -122,7 +122,7 @@ figure.hero { margin-top: 32px; }
 .ledger th { text-align: left; font-weight: 600; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--line); padding: 6px 10px 6px 0; }
 .ledger td { border-bottom: 1px solid var(--line-soft); padding: 9px 10px 9px 0; vertical-align: top; }
 .ledger td.v { font-family: var(--mono); font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.ledger s { color: var(--faint); text-decoration-thickness: 1px; }
+.ledger s { color: var(--faint-ink); text-decoration-thickness: 1px; }
 .ledger .up { color: var(--amber); } .ledger .dn { color: var(--blue); }
 
 .takeaways { margin: 40px 0 0; padding: 22px 22px 8px; background: var(--card); border: 1px solid var(--line); border-radius: 6px; }
@@ -139,7 +139,7 @@ figure.hero { margin-top: 32px; }
 .colophon li { margin-bottom: 2px; }
 .colophon code { font-family: var(--mono); font-size: 12px; }
 a { color: var(--blue); }
-.foot { font-family: var(--mono); font-size: 11px; color: var(--faint); margin-top: 28px; }
+.foot { font-family: var(--mono); font-size: 11px; color: var(--faint-ink); margin-top: 28px; }
 a:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 
 /* edition 9 */
@@ -149,7 +149,7 @@ a:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .takeaways > p { font-family: var(--sans); font-size: 15.5px; line-height: 1.5; }
 .shelf { list-style: none; padding: 0; margin: 14px 0 20px; display: grid; gap: 10px; }
 .shelf li { font-family: var(--sans); font-size: 15px; line-height: 1.45; padding: 10px 14px; background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--blue); border-radius: 4px; }
-.shelf .d { font-family: var(--mono); font-size: 11px; color: var(--faint); margin-left: 6px; }
+.shelf .d { font-family: var(--mono); font-size: 11px; color: var(--faint-ink); margin-left: 6px; }
 .shelf a { font-weight: 600; text-decoration: none; }
 .shelf a:hover { text-decoration: underline; }
 .thoughts { font-family: var(--sans); font-size: 15.5px; line-height: 1.5; padding-left: 1.2em; margin: 12px 0 18px; display: grid; gap: 8px; }
