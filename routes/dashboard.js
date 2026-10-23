@@ -39,7 +39,7 @@
  */
 
 import { Router, json } from 'express';
-import { badRequest, jsonError, keepaliveError, notFound, serverError, serviceUnavailable, classifyUpstreamError, isAuthError } from '../lib/errors.js';
+import { badRequest, jsonError, keepaliveError, notFound, serverError, serviceUnavailable, classifyUpstreamError, isAuthError, replyStoreFault } from '../lib/errors.js';
 import { resolveRunnerOwnerRefusal, sendRunnerRefusal } from '../lib/runner-owner-gate.js';
 import { dispatchSessionFollowUp } from '../lib/follow-up-dispatch.js';
 import { dispatchQueueLimiter } from './dispatch.js';
@@ -2065,6 +2065,7 @@ export function createDashboardRoutes({
       res.json({ success: true });
     } catch (error) {
       console.error('Ruling dismiss error:', error);
+      if (replyStoreFault(res, error)) return;
       jsonError(res, 500, 'Failed to dismiss ruling');
     }
   });
@@ -2099,6 +2100,7 @@ export function createDashboardRoutes({
       res.json({ success: true });
     } catch (error) {
       console.error('Ruling withdrawal-reverse error:', error);
+      if (replyStoreFault(res, error)) return;
       jsonError(res, 500, 'Failed to reverse withdrawal');
     }
   });

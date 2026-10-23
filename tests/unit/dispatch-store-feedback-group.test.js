@@ -47,6 +47,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { deriveTerminalStatus } from '../../lib/dispatch-terminal.js';
+import { DispatchStoreFault } from '../../lib/errors.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 
 function makeStore() {
@@ -191,7 +192,7 @@ describe('getItemStatus merges feedback across a session-group, scoped to rootIt
     assert.equal(deriveTerminalStatus(statusB.feedback), 'done');
   });
 
-  test('a rejecting sibling query falls back to the item\'s own feedback, never throws', async () => {
+  test('a rejecting sibling query throws a DispatchStoreFault, never degrades to own-only feedback (LIN-3805)', async () => {
     const store = makeStore();
     const urlKey = 'acme';
 
@@ -217,10 +218,12 @@ describe('getItemStatus merges feedback across a session-group, scoped to rootIt
       return originalFind(query, opts);
     };
 
-    const status = await store.getItemStatus(urlKey, original._id, { includeGroupFeedback: true });
-
-    assert.equal(status.feedback.length, 1, 'falls back to the item\'s own feedback on a query error');
-    assert.equal(status.feedback[0].message, 'own beat');
+    // LIN-3805: own-only feedback would read a hidden sibling `[done]` as "still
+    // running"; the fault surfaces so the route answers a retryable 503.
+    await assert.rejects(
+      store.getItemStatus(urlKey, original._id, { includeGroupFeedback: true }),
+      (err) => err instanceof DispatchStoreFault && err.operation === '_collectGroupFeedback'
+    );
   });
 
   test('equal/valid timestamps sort deterministically; an unverifiable SIBLING entry is excluded (LIN-1480 forward-only fail-closed), while an unverifiable OWN entry always survives', async () => {

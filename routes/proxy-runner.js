@@ -33,7 +33,7 @@
  * lib/poll-halt.js) rather than forking the dispatch route's logic.
  */
 import { Router } from 'express';
-import { badRequest, jsonError, notFound } from '../lib/errors.js';
+import { badRequest, jsonError, notFound, replyStoreFault } from '../lib/errors.js';
 import { validateFeedbackBody } from '../lib/dispatch-feedback-validation.js';
 import { UUID_REGEX } from '../lib/dispatch-validation.js';
 import { buildWakeCredentialProvisioner } from '../lib/wake-credential.js';
@@ -117,6 +117,8 @@ export function createProxyRunnerRoutes({
       logEvent(req, POLL_ROUTE, 200);
       res.json({ items: runnable, ...(halt ? { halt } : {}), otherConsumerLastSeenAt });
     } catch (err) {
+      // LIN-3805: a store fault is a retryable 503, never the final 500/404 answers.
+      if (replyStoreFault(res, err, { logEvent: (status) => logEvent(req, POLL_ROUTE, status) })) return;
       logEvent(req, POLL_ROUTE, 500);
       console.error('Runner poll error:', err.message);
       jsonError(res, 500, 'Failed to poll dispatch queue');
@@ -164,6 +166,8 @@ export function createProxyRunnerRoutes({
       logEvent(req, TAKE_ROUTE, 200);
       res.json({ item, dispatchId: item.id });
     } catch (err) {
+      // LIN-3805: a store fault is a retryable 503, never the final 500/404 answers.
+      if (replyStoreFault(res, err, { logEvent: (status) => logEvent(req, TAKE_ROUTE, status) })) return;
       logEvent(req, TAKE_ROUTE, 500);
       console.error('Runner take error:', err.message);
       jsonError(res, 500, 'Failed to take item');
@@ -227,6 +231,8 @@ export function createProxyRunnerRoutes({
       logEvent(req, FEEDBACK_ROUTE, 200);
       res.json(result);
     } catch (err) {
+      // LIN-3805: a store fault is a retryable 503, never the final 500/404 answers.
+      if (replyStoreFault(res, err, { logEvent: (status) => logEvent(req, FEEDBACK_ROUTE, status) })) return;
       logEvent(req, FEEDBACK_ROUTE, 500);
       console.error('Runner feedback error:', err.message);
       jsonError(res, 500, 'Failed to post feedback');

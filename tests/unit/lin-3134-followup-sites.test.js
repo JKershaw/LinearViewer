@@ -453,6 +453,18 @@ const TRANSIENT = {
   }
 };
 
+// LIN-3805: a declaration READ fault (the store throws a DispatchStoreFault, which the helper
+// wraps as OWNER_CHECK_UNAVAILABLE with the fault as `cause`) answers the lane's uniform
+// DISPATCH_STORE_UNAVAILABLE envelope on the proxy and session lanes; the owner-check fault
+// (no store involved) keeps the tabled text above. The other families are unchanged.
+const storeEnvelope = (out) => {
+  assert.equal(out.status, 503);
+  assert.equal(out.body.code, 'DISPATCH_STORE_UNAVAILABLE');
+  assert.equal(out.body.category, 'upstream');
+  assert.equal(out.body.retryable, true);
+};
+const TRANSIENT_READ = { ...TRANSIENT, proxy: storeEnvelope, session: storeEnvelope };
+
 // `message` is the refusal's own message, relayed as-is: a mint refusal's by
 // default, or a local pre-mint refusal's (`declared resume record is unusable`).
 function structural(code, status, message = `Grant bootstrap mint refused: ${code}`) {
@@ -517,7 +529,7 @@ for (const branch of BRANCHES) {
       const parentId = await seedParent(world, { record: RECORD });
       world.lookupFault = true;
       const out = await branch.run(world, parentId);
-      TRANSIENT[branch.family](out);
+      TRANSIENT_READ[branch.family](out);
       assertNothingEnqueued(world, out);
       assert.equal(world.spy.grant.length, 0, 'a failed read never reaches the mint');
     });
@@ -640,7 +652,7 @@ describe('N3 — a thrown history re-read (parent row not yet visible) is transi
       world.sessionRows[0].id = missingParent;
       world.lookupFault = 'reread';
       const out = await branch.run(world, missingParent);
-      TRANSIENT[branch.family](out);
+      TRANSIENT_READ[branch.family](out);
       assertNothingEnqueued(world, out);
       assert.ok(world.lookupCalls.some(c => c.itemId === missingParent), 'the lookup ran');
     });

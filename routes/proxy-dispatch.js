@@ -10,7 +10,7 @@
  */
 import { Router } from 'express';
 import { armKeepalive } from '../lib/http-keepalive.js';
-import { jsonError, notFound } from '../lib/errors.js';
+import { jsonError, keepaliveError, notFound, replyStoreFault } from '../lib/errors.js';
 import { MAX_NAME_LENGTH, DANGEROUS_CHARS_REGEX } from '../lib/issue-write-validation.js';
 import { deriveCompletedAt, deriveWireStatus, deriveWireTerminal, closedProjection, feedbackWithHarvestedAbort, harvestAbortedTargets, mergeLineageFeedback } from '../lib/dispatch-terminal.js';
 import { buildQueuedPollWarning, getConsumerLastSeenAt } from '../lib/consumer-poll-warning.js';
@@ -549,6 +549,8 @@ export function createDispatchRoutes({
       const total = statusFilter ? filtered.length : queued.length + historyTotal;
       res.json({ items, total, truncated: historyTotal > history.items.length });
     } catch (err) {
+      // LIN-3805: a store fault is a retryable 503, never a final 500.
+      if (replyStoreFault(res, err, { logEvent: (status) => logEvent(req, '/api/proxy/dispatch', status) })) return;
       logEvent(req, '/api/proxy/dispatch', 500);
       console.error('Proxy dispatch list error:', err.message);
       jsonError(res, 500, 'Failed to list dispatch items');
@@ -583,6 +585,10 @@ export function createDispatchRoutes({
       DISPATCH_WAIT_MAX_S
     );
 
+    // LIN-3805 / LIN-3465: hoisted so the catch below replies through the keepalive once
+    // it is armed; after its first flush the headers are committed and `res.status()`
+    // would throw ERR_HEADERS_SENT.
+    let keepalive = null;
     try {
       // This watch/poll seam is the one caller of getItemStatus that actually
       // reads `feedback` to derive terminal status, so it's the one caller
@@ -625,7 +631,7 @@ export function createDispatchRoutes({
         // baseline is this first (non-terminal) read, so a change that already
         // landed is reflected in the baseline AND in whatever we ultimately
         // return — the caller never loses data, only an early return.
-        const keepalive = armKeepalive(res);
+        keepalive = armKeepalive(res);
         const baseline = {
           status: deriveWireTerminal(current) || current.status,
           feedbackLength: (current.feedback || []).length
@@ -639,8 +645,10 @@ export function createDispatchRoutes({
             keepalive.stop();
             return; // client gave up
           }
+          // LIN-3805: a fault here is NOT swallowed into "unchanged snapshot" (a hidden
+          // sibling `[done]` would read as still running); it propagates to the catch.
           const next = await dispatchQueueStore.getItemStatus(req.proxyUrlKey, id, { includeGroupFeedback: true });
-          if (!next) break; // item expired mid-wait; return last known snapshot
+          if (!next) break; // item genuinely expired mid-wait; return last known snapshot
           current = next;
           if (dispatchWatchChanged(baseline, current)) { reason = 'change'; break; }
         }
@@ -651,8 +659,10 @@ export function createDispatchRoutes({
       logEvent(req, '/api/proxy/dispatch/:id', 200);
       res.json(formatDispatchWatch(current, null, wakeShadow, await liveSeen(current)));
     } catch (err) {
+      if (replyStoreFault(res, err, { keepalive, logEvent: (status) => logEvent(req, '/api/proxy/dispatch/:id', status) })) return;
       logEvent(req, '/api/proxy/dispatch/:id', 500);
       console.error('Proxy dispatch watch error:', err.message);
+      if (keepalive) return keepaliveError(keepalive, 500, 'Failed to read dispatch item');
       jsonError(res, 500, 'Failed to read dispatch item');
     }
   });
@@ -706,6 +716,7 @@ export function createDispatchRoutes({
         dispatchedAt: item.dispatchedAt
       });
     } catch (err) {
+      if (replyStoreFault(res, err, { logEvent: (status) => logEvent(req, '/api/proxy/dispatch/:id/prompt', status) })) return;
       logEvent(req, '/api/proxy/dispatch/:id/prompt', 500);
       console.error('Proxy dispatch prompt read error:', err.message);
       jsonError(res, 500, 'Failed to read dispatch prompt');

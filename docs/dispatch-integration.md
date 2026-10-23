@@ -1068,9 +1068,10 @@ This is the same vocabulary the Pipeline view uses for a Loop's `stage`.
 | 401 | `Empty token` | Token value is empty. `code: "DISPATCH_TOKEN_INVALID"`, `retryable: false` |
 | 401 | `Invalid or expired token` | Token doesn't exist, expired (tokens minted since LIN-3618 last 90 days) or was revoked. `code: "DISPATCH_TOKEN_INVALID"`, `retryable: false`: the credential is dead, mint a new one |
 | 503 | `Token check unavailable` | Harbour could not reach its token store, so it could not tell whether the token is good (LIN-3699). `code: "DISPATCH_TOKEN_STORE_UNAVAILABLE"`, `category: "upstream"`, `retryable: true`: **not** a rejection; back off and retry with the same token |
+| 503 | `Dispatch store unavailable` | Harbour's dispatch store (its database) failed while serving the request: poll, take, feedback, delete, trim, history, count, the status read and the broker-token re-mint all answer it (LIN-3805). `code: "DISPATCH_STORE_UNAVAILABLE"`, `category: "upstream"`, `retryable: true`: **not** "item gone", **not** an auth failure and **not** an empty queue; back off and retry the same request. A `take` that hits it leaves the item queued (an archive fault puts the claimed row back), so the retry can still claim it. On a long-poll that has already sent its keepalive headers the reply is `200` with `statusCode: 503` in the body, the documented keepalive form |
 | 400 | `Invalid item ID format` | Item ID is not a valid UUID |
-| 404 | `Item not found or already taken` | Item doesn't exist, expired, or was claimed |
-| 404 | `Item not found or feedback not allowed` | Item doesn't exist, not taken, or wrong token |
+| 404 | `Item not found or already taken` | Item genuinely doesn't exist, expired, or was claimed (never a store fault, which is the `503` above) |
+| 404 | `Item not found or feedback not allowed` | Item genuinely doesn't exist, not taken, or wrong token (never a store fault) |
 | 429 | `Too many feedback requests` | Rate limit exceeded (~100/min) |
 | 500 | `Failed to poll dispatch queue` | Server error |
 
@@ -1196,7 +1197,7 @@ done
 
 1. **Always use `take` for processing** - Don't process items based on `poll` results alone; another consumer may claim them first.
 
-2. **Handle 404 gracefully** - A 404 on `take` means the item was already claimed. This is expected in multi-consumer setups.
+2. **Handle 404 gracefully** - A 404 on `take` means the item was already claimed. This is expected in multi-consumer setups. A `503` with `code: "DISPATCH_STORE_UNAVAILABLE"` is different: Harbour's own store failed, nothing is known about the item, and the request is safe to retry (LIN-3805). Do not treat a `4xx` other than `408`/`429` as final for a store fault: the store never answers one. A retried feedback post whose first attempt already landed may add a duplicate entry (retry-safety is a separate follow-up).
 
 3. **Implement exponential backoff** - If you receive repeated errors, back off to avoid overwhelming the server.
 

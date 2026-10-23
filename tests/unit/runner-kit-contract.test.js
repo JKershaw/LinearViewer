@@ -28,6 +28,7 @@ import {
   resolveRepo,
   capFeedbackMessage,
   runCommand,
+  dispatchEvidence,
   SESSION_TARGETS
 } from '../../lib/runner-kit/runner.mjs';
 import { credentialStore } from '../../lib/runner-kit/broker.mjs';
@@ -95,6 +96,29 @@ async function kitAuthOutcome(row) {
   } finally { fs.rmSync(home, { recursive: true, force: true }); }
 }
 
+// LIN-3805: what the kit does with a 503 DISPATCH_STORE_UNAVAILABLE on each lane surface, in the
+// contract's vocabulary: `error` (wait's reason), `retry` (the thrown message tells the caller
+// to retry, never "already taken, or gone"), `unreadable` (the settled-evidence read defers).
+async function kitStoreOutcome(row) {
+  const { surface, status, code, retryable } = row.item;
+  if (surface === 'poll') return kitAuthOutcome(row);
+  if (surface === 'status') return dispatchEvidence({ status, json: { error: 'x', code, retryable } });
+  const fresh = { ...itemFor({ route: 'fresh' }), repo: 'no-such-repo-dir' };
+  const s = setup(fresh);
+  try {
+    const reply503 = () => ({ status, ok: false, json: async () => ({ error: 'x', code, retryable }) });
+    const fetchImpl = async (url, init) => {
+      if (surface === 'take' || url.includes('/runner/feedback/')) return reply503();
+      return s.fetchImpl(url, init);
+    };
+    let message = null;
+    await runCommand(['take', fresh.id, '--url-key', 'acme'], { home: s.home, cwd: ROOT, fetchImpl, now: () => Date.now() })
+      .catch((err) => { message = err.message; });
+    if (message === null) return 'no error';
+    return /retry/.test(message) && !/already taken, or gone/.test(message) ? 'retry' : `unexpected: ${message}`;
+  } finally { s.cleanup(); }
+}
+
 const isDir = (repo) => (dir) => repo === 'found' && dir === path.join(ROOT_DIR, 'found');
 
 function kitFor(row) {
@@ -124,6 +148,8 @@ function kitFor(row) {
     }
     case 'auth':
       return kitAuthOutcome(row);
+    case 'store':
+      return kitStoreOutcome(row);
     case 'heartbeat':
       return 'not sent (the runner-kit producer, POST /api/proxy/runner/heartbeat, is a follow-up)';
     default:

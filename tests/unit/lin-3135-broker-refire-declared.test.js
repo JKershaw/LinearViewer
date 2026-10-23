@@ -29,6 +29,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import express from 'express';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
+import { DispatchStoreFault } from '../../lib/errors.js';
 import { ProxyTokenStore, BOOTSTRAP_TOKEN_TTL_SECONDS } from '../../lib/proxy-tokens.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
@@ -699,13 +700,15 @@ describe('14 — B2: an unreadable status fails closed', () => {
     assert.equal(world.spy.status.length, 1, 'the status read ran');
   });
 
-  test('getItemStatus throws -> refused, nothing minted', async () => {
+  test('getItemStatus store fault -> retryable 503 (LIN-3805), never the final 403, nothing minted', async () => {
     const world = makeWorld();
     const id = await seedTaken(world);
-    world.store.getItemStatus = async () => { throw new Error('mongo down'); };
+    world.store.getItemStatus = async () => { throw new DispatchStoreFault('getItemStatus', new Error('mongo down')); };
     resetSpy(world);
     const { result: res } = await captureLogs(() => call(buildApp(world), 'owner-token', { itemId: id }));
-    assert.ok(res.status === 403 || res.status === 503, JSON.stringify(res.body));
+    assert.equal(res.status, 503, JSON.stringify(res.body));
+    assert.equal(res.body.code, 'DISPATCH_STORE_UNAVAILABLE');
+    assert.equal(res.body.retryable, true);
     assert.equal('token' in (res.body || {}), false);
     assertNoMintAttempt(world, 'status throws');
   });

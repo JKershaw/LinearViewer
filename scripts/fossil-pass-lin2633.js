@@ -575,14 +575,23 @@ export async function runFossilPass({
     if (!execute) continue;
 
     for (const row of selection.eligible) {
-      const result = await dispatchStore.stampBookkeeping(urlKey, row.loopId, { by, reason: STAMP_REASON });
+      // LIN-3805: `stampBookkeeping` now THROWS a DispatchStoreFault on a store
+      // fault. Fold it into the not-ok shape so the re-read below classifies it as
+      // `write-error` and the run carries on with the later rows and workspaces.
+      let result;
+      try {
+        result = await dispatchStore.stampBookkeeping(urlKey, row.loopId, { by, reason: STAMP_REASON });
+      } catch (err) {
+        log(`[fossil-pass] ${urlKey}: stamp FAILED for ${row.loopId} (${err?.message || err})`);
+        result = { ok: false, reason: 'store-fault' };
+      }
       const ok = result.ok === true;
-      // F4 (LIN-2653 close-out): `stampBookkeeping`'s catch collapses a genuine
-      // write error into the SAME `{ok:false, reason:'not-found'}` shape as an
-      // ordinary "already stamped, or no longer taken" filter miss — correct
-      // for the store's own never-throws contract (lib/dispatch-store.js:
-      // ~1353-1370), but a report that renders every `!ok` row as "benign
-      // refusal" would misreport a transient write failure as expected during
+      // F4 (LIN-2653 close-out): a genuine write error used to collapse into the
+      // SAME `{ok:false, reason:'not-found'}` shape as an ordinary "already
+      // stamped, or no longer taken" filter miss; since LIN-3805 the store throws
+      // a `DispatchStoreFault` instead (caught above and folded to `store-fault`).
+      // Either way a report that renders every `!ok` row as "benign refusal"
+      // would misreport a transient write failure as expected during
       // `--execute`. Distinguish downstream, without touching the store: a
       // row selected as eligible was `taken` with `bookkeeping: null` at
       // selection time, so if a fresh read finds it STILL matches that same

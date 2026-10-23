@@ -142,14 +142,22 @@ export async function runLineageBackfill({
     if (!execute) continue;
 
     for (const g of groupWrites(result.writable)) {
-      const r = await dispatchStore.closeLineageRows(urlKey, g.currentRoot, {
-        beforeDispatchedAt: new Date(g.beforeDispatchedMs),
-        takenBefore: new Date(g.eventAtMs),
-        kinds: g.reason === 'handed-on' ? ['wake'] : undefined,
-        ids: g.ids,
-        reason: g.reason,
-        by: actor
-      });
+      // LIN-3805: closeLineageRows throws a DispatchStoreFault on a store fault (it used to
+      // return { ok: false }). Keep "skip, retry next run": the group is recorded not-ok.
+      let r;
+      try {
+        r = await dispatchStore.closeLineageRows(urlKey, g.currentRoot, {
+          beforeDispatchedAt: new Date(g.beforeDispatchedMs),
+          takenBefore: new Date(g.eventAtMs),
+          kinds: g.reason === 'handed-on' ? ['wake'] : undefined,
+          ids: g.ids,
+          reason: g.reason,
+          by: actor
+        });
+      } catch (err) {
+        log(`[lineage-backfill] ${urlKey}: close FAILED (${err?.message || err}); skipping this group, the next run retries it`);
+        r = { ok: false, closedIds: [] };
+      }
       for (const id of g.ids) {
         stamped.push({ urlKey, id, reason: g.reason, ok: r.ok && r.closedIds.includes(id) });
       }
