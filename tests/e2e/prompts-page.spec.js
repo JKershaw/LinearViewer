@@ -122,12 +122,12 @@ test.describe('Prompts Page', () => {
       await expect(promptDetails.locator('.prompt-text')).toBeVisible();
     });
 
-    test('shows meta-prompt section', async ({ page, localWorkerUrlKey }) => {
+    test('shows the stage-router section', async ({ page, localWorkerUrlKey }) => {
       await page.goto(`/workspace/${localWorkerUrlKey}/prompts`);
 
-      // Should show meta-prompt section
+      // Should show the stage-router section (class name kept as a stable hook)
       await expect(page.locator('.meta-prompt-section')).toBeVisible();
-      await expect(page.locator('.meta-prompt-section .section-header')).toContainText('Meta-Prompt');
+      await expect(page.locator('.meta-prompt-section .section-header')).toContainText('Stage Router');
     });
 
     test('has header nav with view links', async ({ page, localWorkerUrlKey }) => {

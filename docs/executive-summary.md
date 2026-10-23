@@ -25,11 +25,11 @@ Linear projects and issues are fetched via GraphQL and rendered as a nested tree
 
 Each issue node is expandable: clicking reveals description, metadata (assignee, estimate, due date, labels), and — critically — **prompt action buttons**.
 
-### 2. AI Prompt System (Two Independent Paths)
+### 2. AI Prompt System (One Path)
 
 This is the system most relevant to the planned follow-on prompts feature.
 
-#### Path A: Handwritten Templates
+#### Stage templates (handwritten)
 
 14 deterministic templates defined in `lib/prompt-template-defs.js`, invoked via `lib/prompt-templates.js`:
 
@@ -44,9 +44,9 @@ Each template receives rich context from Linear (parent task, siblings, children
 
 Formatting helpers in `lib/prompt-formatters.js` produce consistent sections across templates: git workflow instructions, self-review checklists, CI/CD checks, subtask summaries.
 
-#### Path B: AI Recommendations (routing)
+#### AI recommendations (routing)
 
-Since LIN-3300 this is the one path for every recommendation: an LLM (via OpenRouter) picks the stage, and Path A's template for that stage assembles the prompt. The LLM receives a **routing prompt** (`lib/stage-router.js`) that encodes a decision tree:
+Since LIN-3300 this is the one path for every recommendation: an LLM (via OpenRouter) picks the stage, and that stage's handwritten template assembles the prompt. The LLM receives a **routing prompt** (`lib/stage-router.js`) that encodes a decision tree:
 
 1. Does the task need preparation/research?
 2. Are there blockers or bugs?
@@ -58,13 +58,13 @@ The routing prompt (the stage selector) lists every recommendable stage as it de
 
 **Delivery**: Non-streaming (`/api/recommend/:issueId`) or SSE streaming (`/api/recommend/:issueId/stream`) with a `StreamingSectionParser` that streams the `## Reasoning` section live across chunk splits; the assembled prompt follows as one delta.
 
-#### How Both Paths Surface in the UI
+#### How this surfaces in the UI
 
 When a user expands an issue, `renderDetails()` in `lib/render.js` produces:
 
 - **Prompt buttons row**: AI suggest + default prompts + custom prompts + "more" overflow
 - **Prompt container**: displays the generated prompt with copy, dispatch (cli/web/dash), and proxy toggle actions
-- **Recommendation container**: streams AI reasoning + prompt in real-time
+- **Recommendation container**: streams the AI reasoning in real time, then the assembled prompt
 
 ### 3. Dispatch System (Queue + Consumer Pattern)
 
@@ -205,7 +205,7 @@ Any addition should respect:
 
 1. **No frameworks, no build step** — vanilla JS, ES modules, server-rendered HTML
 2. **CLI aesthetic** — monospace font, box-drawing characters, minimal color palette
-3. **Two prompt paths must stay in sync** — changes to prompt behavior must update both handwritten templates and the AI meta-prompt
+3. **One prompt path** — the AI only routes (`lib/stage-router.js`); code assembles the stage prompt from the handwritten templates, so a change to prompt behavior lands in the template (or the router rules) once
 4. **Workspace isolation** — all data is scoped by workspace URL key
 5. **Security model** — session auth for users, bearer tokens for consumers, hashed storage for secrets
 6. **Feature gating** — new capabilities behind toggles, off by default for disruptive features
