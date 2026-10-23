@@ -132,8 +132,8 @@ Tests that pin today's prose and will need to follow the rewrite (`tests/unit/pr
 `'Present your findings to the user'`, absence of `'Add findings as a comment'`,
 `'Do not write them back to Linear'`, `'in-flight'`/`'in-progress'`, `'risk'`,
 `'git log --grep=TEST-R1'`, `'Downstream'`, `'## Goal'`, `'hindsight'`, `'Lessons'`; and the
-absence of `'reorient'`/`**retro**` in the meta-prompt hints. Size ceiling
-`retro: 4114` bytes (`tests/unit/prompt-size-budget.test.js:80`).
+absence of `'reorient'`/`**retro**` in the meta-prompt hints (the meta-prompt is gone; the router lists stages from their own descriptions). Size ceiling
+`retro: 4265` bytes (`tests/unit/prompt-size-budget.test.js`, was 4114 when written).
 
 The **dispatch preamble** (heartbeats, `DECISION:` blocks parsed by `parseDecision` in
 `lib/session-telemetry.js:674`) is added by the dispatch layer to every dispatched prompt. It is
@@ -285,7 +285,7 @@ Tests pinning today's prose (`tests/unit/prompt-templates.test.js:2435-2560`):
 `/Add findings as a comment/i`; meta: exactly one `**Retrospective-audit prompts** must`, and
 `/audit the claims/i`, `/audit test integrity/i`, `/ownership orphans/i` in it. Several of these
 pin exactly the rules the ideal changes (filing), so they will have to move with the new prose.
-Size ceiling `'retrospective-audit': 4161` (`prompt-size-budget.test.js:79`).
+Size ceiling `'retrospective-audit': 4619` (`prompt-size-budget.test.js`, was 4161 when written).
 
 ### 4. Rules that tie scope to the ticket
 

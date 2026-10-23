@@ -167,33 +167,34 @@ node scripts/audit-prompts.js <template-key>
 # Compare before/after scores
 ```
 
-## Auditing the Meta-Prompt
+## Auditing the Stage Router
 
-The meta-prompt (`lib/prompts/meta-prompt-template.js`) requires special attention:
+The routing prompt (`buildRouterPrompt` in `lib/stage-router.js`, LIN-3300) chooses the stage; it writes no prompt. Code then assembles that stage's prompt from the handwritten template, so the template audit above covers the prompt the agent reads. The router needs its own check:
 
-### Additional Criteria for Meta-Prompt
+### Additional Criteria for the Router
 
 | Criterion | What to Check |
 |-----------|---------------|
-| Decision Tree Logic | Is the sequential workflow correct? |
-| Completion Signal Usage | Are signals referenced appropriately? |
-| Template References | Do aiHints match actual templates? |
-| Edge Case Handling | Are ambiguous situations covered? |
+| Rule Order | Do the numbered "How to choose" rules (`SELECTOR_RULES`) take the right case first? |
+| Rules vs Stage Descriptions | Does each rule only relate stages? When a stage applies belongs to the stage's own description (`route`), said once |
+| Facts | Does the ticket view and the trail facts (`lib/recommendation-facts.js`) carry what each rule reads? |
+| Reply Contract | Does `routeStage` parse every reply form the prompt allows, and refuse out-of-list kinds? |
 
-### Meta-Prompt Specific Checks
+### Router Specific Checks
 
-1. **Decision Tree Correctness**
-   - Does Step 1 (preparation) correctly identify unready tasks?
-   - Does Step 2 (blockers/bugs) correctly identify work issues?
-   - Does Step 3 (implementation) correctly gate on readiness?
+1. **Stage List**
+   - Does every selectable stage appear with its own description (`formatStageOptions`)?
+   - Do the stage descriptions match what the templates actually do?
 
-2. **Consistency with Templates**
-   - Does "Comments vs Description" guidance match template behavior?
-   - Do label management rules match template expectations?
+2. **Rules**
+   - Does each rule carry its reason, and does its ticket reference in the source comment still hold?
+   - Do the rules contradict a stage description?
 
 3. **Output Format**
-   - Is the Reasoning/Prompt format clearly specified?
-   - Are examples consistent with what templates generate?
+   - Is the `## Reasoning` reply format clearly specified?
+   - Is a stray `## Prompt` section dropped rather than used?
+
+The rendered routing prompt for sample data is on the Prompts page (Stage Router section) and in `scripts/eval/meta-prompt.baseline.txt` (file name kept from before LIN-3300).
 
 ## Quick Reference
 

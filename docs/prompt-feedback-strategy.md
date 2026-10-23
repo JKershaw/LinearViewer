@@ -95,7 +95,7 @@ When sufficient flagged sessions accumulate, aggregate and answer:
 
 When evidence supports a change:
 
-- Update meta-prompt decision tree
+- Update the stage-router rules (`SELECTOR_RULES`)
 - Refine individual prompt templates
 - Add new completion signals
 - Document changes with rationale
@@ -135,7 +135,7 @@ For each identified gap:
 [What change would prevent this]
 
 **Prompt affected:**
-[Which template or meta-prompt section]
+[Which template or stage-router rule]
 
 **Status:** Identified | Tested | Implemented | Validated
 ```
@@ -204,7 +204,7 @@ Add new checks (risk assessment, smallest increment, etc.) only when evidence sh
 
 | File | Purpose |
 |------|---------|
-| `lib/prompts/meta-prompt-template.js` | Decision tree for prompt selection |
+| `lib/stage-router.js` | Stage selection: the routing prompt and its rules |
 | `lib/prompt-templates.js` | Individual prompt templates |
 | `lib/completion-signals.js` | Completion signal definitions |
 | `lib/workflow-config.js` | Label definitions |
