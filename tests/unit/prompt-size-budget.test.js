@@ -67,7 +67,7 @@ import { buildRunnerKickoff } from '../../lib/prompts/runner-kickoff.js';
  * "worker templates". LIN-3292: the stage contract joins them, its 3481 bytes paid by
  * lowering the other three to their size after its format asks left the templates. */
 export const TEMPLATES_SOURCE_CEILINGS = {
-  'lib/prompt-template-defs.js': 109931, // LIN-3615: -11 (109942), Check 5's pin-conversion rule and review's move-witness bullet paid by four unpinned cuts. Earlier: // LIN-3614: -1 (109943), the three close-out/review rules paid by cuts; net of the three touched ceilings is -2. Earlier: // LIN-3378: +16 net, retrospective-audit's whenNot names merged-and-approved but not Done (+72), paid by blocked's, context's and recap's route text (-56)
+  'lib/prompt-template-defs.js': 110586, // LIN-3279: +655 (109931), FOLLOW_UP_SHAPE once plus research/design whenNot wording; why the text cannot be code or a test: the shape of a filed ticket and the skip-guard wording are judgment the agent reads, and no schema can validate them. Earlier: // LIN-3615: -11 (109942), Check 5's pin-conversion rule and review's move-witness bullet paid by four unpinned cuts. Earlier: // LIN-3614: -1 (109943), the three close-out/review rules paid by cuts; net of the three touched ceilings is -2. Earlier: // LIN-3378: +16 net, retrospective-audit's whenNot names merged-and-approved but not Done (+72), paid by blocked's, context's and recap's route text (-56)
   'lib/prompt-templates.js': 19970, // LIN-3612: +15, the isTerminalState import path now names providers/state-map.js (code, not prompt text; no template byte added). Earlier: // LIN-3378: +20, defer's whenNot names plan-review (+36), its requires tightened (-16)
   'lib/prompt-formatters.js': 50224, // LIN-3299: +34, the hypothesis sentence covers a proposed solution or limit
   'lib/prompt-contract.js': 3656, // LIN-3651: +232 (3424), the `Blocking findings: <n>` contract line and its reader row; it cannot be code, the count is the reviewer's judgement of its own findings and five trails show no common label to parse. Earlier: // LIN-3300: at 3424 since the one-path recommendation change
@@ -99,8 +99,8 @@ export const TEMPLATES_RENDERED_CEILINGS = {
   'plan-review': 7989, // LIN-3651: +133 (7856), the `Blocking findings: <n>` line on Request Changes; not code, the count is the reviewer's own judgement and no label is common across the trails. Earlier: // LIN-3615: -99 (7955), the pin-conversion rule (+209) paid by cutting Verdict's restated opening, Completion's restated record line and the planner-owns-the-edit clause.
   implementation: 7937, // LIN-3300: at 7937 since the stage rules only the meta-prompt carried moved into their templates
   review: 15165, // LIN-3615: +88 (15077), the source-reading-test-is-no-witness bullet, paid by retiring the 'Code is ready for production' checklist item and by plan-review's cuts. Earlier: // LIN-3614: -521 (15598), unverifiable claims go in the ledger as not run; paid by cutting the repeated class-vs-ledger sentence, Completion's CI restatement and the Outside wording close-out restates. Earlier: // LIN-3326: -3297, the risk lanes and the authoring bound leave review
-  'close-out': 11379, // LIN-3614: +520 (10859), an unasked live or post-deploy check is recorded as not run and the close goes ahead; stale citations are fixes; Triage states the outsider standard. Earlier: // LIN-3326: -7893, close-out finishes the work: no authoring bound, no hard gate, one statement of each floor
-  'retrospective-audit': 4427, // LIN-3299: at 4427 since Scope and Authority on every path
+  'close-out': 11571, // LIN-3279: +192 (11379), FOLLOW_UP_SHAPE rendered. Earlier: // LIN-3614: +520 (10859), an unasked live or post-deploy check is recorded as not run and the close goes ahead; stale citations are fixes; Triage states the outsider standard. Earlier: // LIN-3326: -7893, close-out finishes the work: no authoring bound, no hard gate, one statement of each floor
+  'retrospective-audit': 4619, // LIN-3279: +192 (4427), FOLLOW_UP_SHAPE rendered. Earlier: // LIN-3299: at 4427 since Scope and Authority on every path
   retro: 4265, // LIN-3299: at 4265 since Scope and Authority on every path
 };
 
@@ -118,7 +118,7 @@ export const STAGE_ROUTER_SOURCE_CEILING = 8069; // LIN-3378: -46, Why clauses o
  * selector sends 9555. It also catches growth in the stage options and the facts code
  * renders (lib/recommendation-facts.js), which no source ceiling covers.
  */
-export const ROUTER_PROMPT_RENDERED_CEILING = 9545; // LIN-3378: -10 net of b and g
+export const ROUTER_PROMPT_RENDERED_CEILING = 9701; // LIN-3279: +156 (9545), research and design whenNot say a filer's own fix is not completed prep. Earlier: // LIN-3378: -10 net of b and g
 
 /**
  * Every stage's Scope and Authority lines, source bytes (lib/prompts/stage-intent.js).
@@ -150,7 +150,7 @@ export const RUNNER_PROMPT_RENDERED_CEILING = 15953; // LIN-3669: +164 (15789), 
  * LIN-3326 lowered it again (364994 -> 342621): close-out and review shed the authoring
  * bound and the pre-merge risk gates (-22455), less close-out's Scope and Authority line (+82).
  */
-export const FROZEN_TOTAL_BYTES = 343285; // LIN-3669: +328 (342957), runner prompt source +164 and rendered +164. Earlier: // LIN-3651: +365 (342592), contract source +232 and plan-review rendered +133. Earlier: // LIN-3612: +15 (342577), prompt-templates.js import path. Earlier: // LIN-3615: -22 (342599), net of plan-review -99, review +88, defs -11. Earlier: // LIN-3614: -2 (342601), net of review -521, close-out +520, defs -1. Earlier: // LIN-3378: -20 (342621)
+export const FROZEN_TOTAL_BYTES = 344480; // LIN-3279: +1195 (343285), defs +655, close-out +192, retrospective-audit +192, router +156. Earlier: // LIN-3669: +328 (342957), runner prompt source +164 and rendered +164. Earlier: // LIN-3651: +365 (342592), contract source +232 and plan-review rendered +133. Earlier: // LIN-3612: +15 (342577), prompt-templates.js import path. Earlier: // LIN-3615: -22 (342599), net of plan-review -99, review +88, defs -11. Earlier: // LIN-3614: -2 (342601), net of review -521, close-out +520, defs -1. Earlier: // LIN-3378: -20 (342621)
 
 const BASE_URL = 'https://harbour.example';
 
