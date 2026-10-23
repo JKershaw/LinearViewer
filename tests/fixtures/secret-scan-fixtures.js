@@ -34,6 +34,8 @@ export const FIXTURE_SECRETS = {
   resendApiKey: ['re_', 'Xk3mP9qR', '_', 'T7vW2yZ4bD6fH8jK0nM1pQ3s'].join(''),
   resendBareKey: ['re_', 'Xk3mP9qRT7vW2yZ4bD6fH8jK0nM1pQ3s'].join(''),
   atlassianApiToken: ['ATATT3', 'xFfGF0aB3dE5gH7jK9mN1pQ3sT5vW7yZ9bD1fH3xYz0aB3dE5gH7jK9mN1pQ3sT5=A1B2C3D4'].join(''),
+  // LIN-3794: ATCTT3 access tokens (Bitbucket workspace/project/repo, org-admin keys); synthetic body.
+  atlassianAccessToken: ['ATCTT3', 'xFfGN0aB3dE5gH7jK9mN1pQ3sT5vW7yZ9bD1fH3xYz0aB3dE5gH7jK9mN1pQ3sT5=A1B2C3D4'].join(''),
   atlassianOauthSecret: ['ATOA', 'aB3dE5gH7jK9mN1pQ3sT5vW7yZ9bD1fH3xYz0'].join(''),
   mongodbUri: ['mongodb+srv://', 'appuser', ':', 'Zx9Qm4Tk7Wp2Rv8Bn5', '@cluster0.example.net/app'].join(''),
   githubClientSecret: ['github_client_secret = "', '0123456789abcdef0123456789abcdef01234567', '"'].join(''),
