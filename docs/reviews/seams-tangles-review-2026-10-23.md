@@ -52,7 +52,7 @@ Ledger names are those of 10-20 §2 / §9.
 Same edges: `providers/{github,jira}/index.js → proxy-ref-resolver` (LIN-3555), `providers/linear/index.js → proxy-wire` (LIN-3737), `→ openrouter`, `providers/{jira,linear,local}/index.js → tree.js`, `providers/jira/oauth.js → token-refresh`. None landed.
 
 ### F4 (Medium, **unchanged**) — Runs → Agent API through `proxy-preamble`
-Nine importer files outside Agent API's own use; same list as 10-20. The LIN-3604 apportioning shows its two "new" edges came with −12 Agent API→Runs, so they are a by-product of a good move rather than drift. LIN-3738 stands, not landed.
+Nine importer files across four areas; same list as 10-20. The LIN-3604 apportioning shows its two "new" edges came with −12 Agent API→Runs, so they are a by-product of a good move rather than drift. LIN-3738 stands, not landed.
 
 ### F5 (Medium, **unchanged**) — routes used as libraries
 `task-chat`/`test`/`workspace-api → dashboard`, `workspace-api → proxy`, `dashboard`/`flight-companion → dispatch`. Router-of-routers (`proxy.js` → sub-routers, `provider-auth-routers.js`, `workspace-api`) is composition, not a finding.
@@ -78,11 +78,11 @@ Unchanged except `errors.js` (above). Watch list unchanged: `providers/state-map
 
 ## 4. Ways in and rebuild readiness (changes first)
 
-No area's readiness changed. Changes of note: **Platform** gains `vendor-assets.js` (a new way in for browser libs, same URLs; it `statSync`s the three `node_modules` files at boot, `lib/vendor-assets.js:48`, so a missing package now fails startup — a single boot-time failure point, not an import edge); **Auth** gains `connection-secondary-remint.js` (imports Auth only, wired from `server.js`); **Agent API** gains `harbour-token-format.js` (imported by Agent API files only). `lib/dispatch-entrance.js` is imported by `routes/dispatch.js`, `routes/proxy-dispatch.js` and `routes/proxy-kickoff.js` (and `lib/dispatch-factory.js`): it is the front door for dispatch *entrance* decisions, not for the Runs area, and it makes many outgoing edges (F1/F4). Readiness grades are as in 10-20 §9 below.
+No area's readiness changed. Changes of note: **Platform** gains `vendor-assets.js` (a new way in for browser libs, same URLs; it `statSync`s the three `node_modules` files at boot, `lib/vendor-assets.js:48`, so a missing package now fails startup — a single boot-time failure point, not an import edge); **Auth** gains `connection-secondary-remint.js` (imports Auth only, wired from `server.js`); **Agent API** gains `harbour-token-format.js` (imported by Agent API files only). `lib/dispatch-entrance.js` is imported by `routes/dispatch.js`, `routes/proxy-dispatch.js` and `routes/proxy-kickoff.js`: it is the front door for dispatch *entrance* decisions, not for the Runs area, and it makes many outgoing edges (F1/F4). Readiness grades are as in 10-20 §9 below.
 
 ## 5. Tool blind spots (what it could not read)
 
-4 unresolved imports (all `routes/test.js` fixtures); browser globals and `scripts:` wiring in `public/`; 14 `scheduler.register` jobs in `server.js` (timing, not imports); text contracts with no import edge; Simple Dispatcher (CommonJS). No parse failures, no dynamic imports, no unmapped files.
+4 unresolved imports (all `routes/test.js` fixtures); browser globals and `scripts:` wiring in `public/`; 7 `scheduler.register` jobs in `server.js` (timing, not imports); text contracts with no import edge; Simple Dispatcher (CommonJS). No parse failures, no dynamic imports, no unmapped files.
 
 ## 6. Guide edits since 10-20 vs guide proposals (kept apart from code)
 
