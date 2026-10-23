@@ -24,7 +24,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
 
 function getHandleUnauthorizedErrorBody() {
-  const startMarker = 'async function handleUnauthorizedError(workspace, session, teamId, assigneeState, openRouterSource, res) {';
+  const startMarker = 'async function handleUnauthorizedError(workspace, session, teamId, assigneeState, openRouterSource, res, error = null) {';
   const startIdx = SERVER_SRC.indexOf(startMarker);
   assert.notEqual(startIdx, -1, 'expected to find handleUnauthorizedError in server.js');
   const endIdx = SERVER_SRC.indexOf('\n/**\n * Home page', startIdx);

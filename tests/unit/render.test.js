@@ -863,6 +863,32 @@ describe('capability-aware rendering (LIN-177 S3)', () => {
     assert.ok(!defaultRender.includes('truncation-notice'), 'notice suppressed by default (truncated omitted)');
   });
 
+  test('source notice names each degraded source, escapes it, and an empty or absent list is byte-identical (LIN-3774)', () => {
+    const opts = { isLanding: false, urlKey: 'ws', workspaces: [{ id: 'w1', name: 'WS', urlKey: 'ws' }] };
+    const baseline = renderPage([], [], [], 'Test', opts);
+
+    const degraded = renderPage([], [], [], 'Test', { ...opts, degradedSources: [{ provider: 'github', scope: 'JKershaw/LinearViewer' }] });
+    assert.ok(degraded.includes('data-testid="dashboard-source-notice"'), 'notice present');
+    assert.ok(degraded.includes('data-source="github"'));
+    assert.ok(degraded.includes('reconnect GitHub Issues in Settings'), 'display name in both places');
+    assert.ok(!degraded.includes('reconnect github in Settings'), 'raw key not used as the label');
+    assert.ok(degraded.includes('GitHub Issues (JKershaw/LinearViewer) did not load, so its tasks are missing.'), 'says what failed');
+    assert.ok(degraded.includes('The rest of this board is up to date.'), 'says what still works');
+    assert.ok(degraded.includes('Reload to try again'), 'says what the reader can do');
+    assert.ok(!degraded.includes('issues could not be loaded'), 'the truncation copy is not reused');
+
+    const escaped = renderPage([], [], [], 'Test', { ...opts, degradedSources: [{ provider: 'github', scope: '<img src=x onerror=alert(1)>' }] });
+    assert.ok(!escaped.includes('<img src=x'), 'scope is escaped');
+    assert.ok(escaped.includes('&lt;img src=x'));
+
+    const two = renderPage([], [], [], 'Test', { ...opts, degradedSources: [{ provider: 'github', scope: 'a/b' }, { provider: 'github-projects', scope: 'c/d' }] });
+    assert.equal(two.split('data-testid="dashboard-source-notice"').length - 1, 2, 'one notice per degraded source');
+
+    assert.equal(renderPage([], [], [], 'Test', { ...opts, degradedSources: [] }), baseline, 'empty list: byte-identical');
+    assert.equal(renderPage([], [], [], 'Test', { ...opts, degradedSources: undefined }), baseline, 'undefined list: byte-identical');
+    assert.ok(!baseline.includes('dashboard-source-notice'));
+  });
+
   test('legacy/Linear workspace renders byte-identically (back-compat)', () => {
     // No `provider` field on the workspace → resolves the Linear provider, whose
     // ui keeps all affordances on and displayName 'Linear'. Page-level affordances

@@ -95,7 +95,7 @@ describe('LIN-2521 — resolveTeamSelection is the sole req.query.team read site
   });
 
   test('each of the five routes forwards its OWN resolved teamId into handleUnauthorizedError (never a shared/global one)', () => {
-    const calls = [...SERVER_SRC.matchAll(/return handleUnauthorizedError\(workspace, req\.session, teamId, assigneeState, openRouterSource, res\);/g)];
+    const calls = [...SERVER_SRC.matchAll(/return handleUnauthorizedError\(workspace, req\.session, teamId, assigneeState, openRouterSource, res, error\);/g)];
     assert.equal(calls.length, 5, `expected 5 handleUnauthorizedError call sites carrying the route-local teamId, found ${calls.length}`);
   });
 });
@@ -113,19 +113,19 @@ describe('LIN-2521 — the refresh-retry chain threads teamId through, never re-
     const body = sliceFunction('renderDashboardAfterRefresh',
       'async function renderDashboardAfterRefresh(workspace, session, teamId, assigneeState, openRouterSource, res) {');
     assert.doesNotMatch(body, /req\.query/, 'must never read req.query directly — it has no req in scope');
-    assert.match(body, /fetchAndPrepareProjects\(workspace, teamId, null, workspace\.urlKey, \{ slim: true, assigneeName: assigneeState\.resolvedAssigneeName \}\)/,
+    assert.match(body, /fetchAndPrepareProjects\(workspace, teamId, null, workspace\.urlKey, \{ slim: true, assigneeName: assigneeState\.resolvedAssigneeName, accountId: session\.accountId, degradeSecondary: true \}\)/,
       'must pass the received teamId into fetchAndPrepareProjects');
     // The destructure that captures selectedTeamId/teams off that same call.
     // LIN-2550 added `appliedAssigneeName` to the same destructure — the
     // refresh tail needs it to label the assignee selector off the filter the
     // render actually applied, exactly as the primary route does.
-    assert.match(body, /const \{ trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated, availableAssignees, appliedAssigneeName \} = await fetchAndPrepareProjects/);
+    assert.match(body, /const \{ trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated, availableAssignees, appliedAssigneeName, degradedSources \} = await fetchAndPrepareProjects/);
     assert.match(body, /teams,\s*\n\s*selectedTeamId,/, 'renderPage must receive teams/selectedTeamId from the SAME resolved fetch, proving the 401-refresh re-render preserves them');
   });
 
   test('handleUnauthorizedError accepts teamId and forwards it unchanged to both renderDashboardAfterRefresh and handleTokenRefreshAndRetry, never re-reading req.query', () => {
     const body = sliceFunction('handleUnauthorizedError',
-      'async function handleUnauthorizedError(workspace, session, teamId, assigneeState, openRouterSource, res) {');
+      'async function handleUnauthorizedError(workspace, session, teamId, assigneeState, openRouterSource, res, error = null) {');
     assert.doesNotMatch(body, /req\.query/, 'must never read req.query directly — it has no req in scope');
     assert.match(body, /return await renderDashboardAfterRefresh\(workspace, session, teamId, assigneeState, openRouterSource, res\);/);
     assert.match(body, /return await handleTokenRefreshAndRetry\(workspace, session, teamId, assigneeState, openRouterSource, res, \{ provider, exchange \}\);/);

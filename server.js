@@ -63,9 +63,10 @@ import { AccountWorkspaceStore } from './lib/account-workspace-store.js'
 import { createWorkspaceOwnerCheck } from './lib/workspace-owner.js'
 import { OwnerCredentialStore } from './lib/owner-credential-store.js'
 import { ConnectionStore } from './lib/connection-store.js'
-import { sanitizeSessionForPersist, createHydrationMiddleware, createConnectionRefresher, createConnectionAccess, createSweepConnectionDataLoader, rehydrateAfterRefresh, createAuthorizedAccountConnectionReader, createInstallationTokenResolver, createReferentHolderReader, heldConnectionCredentials, connectionBackedWritesEnabled, convertToConnectionBacked, CONNECTION_RETRY_TITLE, CONNECTION_RETRY_MESSAGE } from './lib/connection-credential.js'
+import { sanitizeSessionForPersist, createHydrationMiddleware, createConnectionRefresher, createConnectionAccess, createSweepConnectionDataLoader, rehydrateAfterRefresh, rehydrateBindingAfterRefresh, createAuthorizedAccountConnectionReader, createInstallationTokenResolver, createReferentHolderReader, heldConnectionCredentials, connectionBackedWritesEnabled, convertToConnectionBacked, CONNECTION_RETRY_TITLE, CONNECTION_RETRY_MESSAGE } from './lib/connection-credential.js'
 import { createUrlKeyHolderFinder } from './lib/urlkey-holders.js'
 import { createWorkspaceUrlKeyResolver } from './lib/workspace-urlkey.js'
+import { createSecondaryBindingRemint } from './lib/connection-secondary-remint.js'
 import { isConnectionBacked, activeBindingIsConnectionBacked, activeConnectionBackedBinding, readWorkspaceCredential } from './lib/connection-binding.js'
 import { releaseConnectionCredential } from './lib/connection-lifecycle.js'
 import { withHeldMarker } from './lib/held-connection-entry.js'
@@ -1487,6 +1488,28 @@ app.use((req, res, next) => {
   ensureValidToken(req, res, next);
 });
 
+// LIN-3774: bring every secondary connection-backed GitHub-family token of the
+// workspace this request NAMES up to date before any route reads it. The
+// dashboard re-mints in fetchAndPrepareProjects, but the task page, task edit and
+// chat, brief/scan, the issue PATCH, the settings refresh button and dispatch all
+// read a secondary credential through the session side-table and would otherwise
+// send an installation token that expired an hour after the last re-mint. Runs
+// after hydration and ensureValidToken (which fill/refresh the side-table) and
+// before any route mount. Never blocks or fails the request: a failed re-mint
+// leaves the token as it was and the reactive path takes over. No-op (an
+// in-memory expiry compare) unless a secondary token is inside the buffer.
+app.use('/workspace/:urlKey', async (req, res, next) => {
+  try {
+    const workspace = getWorkspaceByUrlKey(req.session, req.params.urlKey)
+    if (workspace && req.session?.accountId) {
+      await secondaryRemint.ensureFreshAll(workspace, req.session.accountId)
+    }
+  } catch (error) {
+    console.error('Secondary binding freshness step failed (continuing):', error)
+  }
+  next()
+})
+
 // =============================================================================
 // Route Mounting
 // =============================================================================
@@ -1539,7 +1562,7 @@ app.use(createOpenRouterAuthRoutes({ userPreferencesStore }))
  * @param {string|null} teamId - Optional team ID to filter issues by
  * @returns {Promise<{trees, inProgressTrees, organizationName, teams, selectedTeamId, appliedAssigneeName}>} Prepared data for rendering. `appliedAssigneeName` is the assignee filter that was actually APPLIED to `trees` — null whenever no filter was requested, or a requested one matched nothing and degraded to unfiltered (LIN-2550).
  */
-async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = null, urlKey = null, { slim = false, assigneeName = null } = {}) {
+async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = null, urlKey = null, { slim = false, assigneeName = null, accountId = null, degradeSecondary = false } = {}) {
   // Fan out across ALL of the workspace's provider bindings and merge the
   // results, rather than resolving a single provider (LIN-544). A legacy/Linear
   // workspace has exactly one synthesized binding here, so the merge is a no-op
@@ -1566,55 +1589,87 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
   // list (F1). Resolving only once, on the primary iteration, costs no extra
   // round trip: every binding already fetches its own team list this loop.
   let resolvedTeamId = teamId;
+  // LIN-3774: sources left out because a secondary binding still failed after a
+  // re-mint, reported as `{ provider, scope }` for the dashboard notice.
+  const degradedSources = [];
+  // Org metadata and the team ref come from the first binding that loads — the
+  // first binding whenever nothing degrades, so a healthy workspace is unchanged.
+  let metadataTaken = false;
 
   for (let i = 0; i < bindings.length; i++) {
     const binding = bindings[i];
-    const isPrimary = i === 0;
-    const provider = getProvider(binding.provider);
-    // LIN-3124 PR3 (D15): read through the binding accessor so a
-    // connection-backed binding's credential (the per-request side-table) is
-    // served too. Legacy returns the same `binding.credentials` object, so this
-    // is byte-identical for every legacy binding.
-    const bindingToken = getBindingCredentials(binding)?.token;
-    // The per-call read scope: the bare token for Linear/local (byte-identical),
-    // or a { token, repo } credential for a GitHub App binding so the provider
-    // builds a request-time client from the installation token (LIN-713) — the
-    // boot client is never configured in production. Renamed from `bindingScope`
-    // (LIN-3240): the string `bindingScope` is now the row STAMP (`binding.scope`),
-    // a selection key only — never a credential.
-    const bindingCallScope = getBindingCallScope(binding);
-    // Use mock data in test mode to avoid hitting the provider API
-    const isTestMode = process.env.NODE_ENV === 'test' && bindingToken === 'test-token';
+    const isPrimary = !metadataTaken;
+    // LIN-3774: re-mint a secondary connection-backed token that is near expiry
+    // BEFORE the provider call below reads it (no-op for every other binding).
+    await secondaryRemint.ensureFresh(workspace, binding, accountId);
+    try {
+      const provider = getProvider(binding.provider);
+      // LIN-3124 PR3 (D15): read through the binding accessor so a
+      // connection-backed binding's credential (the per-request side-table) is
+      // served too. Legacy returns the same `binding.credentials` object, so this
+      // is byte-identical for every legacy binding.
+      const bindingToken = getBindingCredentials(binding)?.token;
+      // The per-call read scope: the bare token for Linear/local (byte-identical),
+      // or a { token, repo } credential for a GitHub App binding so the provider
+      // builds a request-time client from the installation token (LIN-713) — the
+      // boot client is never configured in production. Renamed from `bindingScope`
+      // (LIN-3240): the string `bindingScope` is now the row STAMP (`binding.scope`),
+      // a selection key only — never a credential.
+      const bindingCallScope = getBindingCallScope(binding);
+      // Use mock data in test mode to avoid hitting the provider API
+      const isTestMode = process.env.NODE_ENV === 'test' && bindingToken === 'test-token';
 
-    // Fetch teams (primary binding only)
-    const bindingTeams = isTestMode
-      ? testMockTeams
-      : await provider.fetchTeams(bindingCallScope);
+      // Fetch teams (primary binding only)
+      const bindingTeams = isTestMode
+        ? testMockTeams
+        : await provider.fetchTeams(bindingCallScope);
 
-    if (isPrimary) {
-      resolvedTeamId = matchTeamId(bindingTeams, teamId);
+      let bindingTeamId = resolvedTeamId;
+      if (isPrimary) {
+        bindingTeamId = matchTeamId(bindingTeams, teamId);
+      }
+
+      // Fetch projects and issues (filtered by team if specified).
+      // `slim` (LIN-442) is the homepage's description-trim: it only reaches the
+      // dashboard + its token-refresh retry, never swim/ship/swipe, which keep the
+      // full query.
+      let { organizationName: orgName, projects, issues, truncated: bindingTruncated } = isTestMode
+        ? (mockOverride || testMockData)
+        : await provider.fetchProjects(bindingCallScope, bindingTeamId, { slim });
+
+      // In test mode, manually filter issues by team
+      if (isTestMode && bindingTeamId) {
+        issues = issues.filter(i => i.team?.id === bindingTeamId);
+      }
+
+      if (isPrimary) {
+        resolvedTeamId = bindingTeamId;
+        teams = bindingTeams;
+        organizationName = orgName;
+        metadataTaken = true;
+      }
+      mergedProjects.push(...projects);
+      mergedIssues.push(...issues);
+      truncated = truncated || !!bindingTruncated;
+    } catch (error) {
+      // LIN-3774: tag the failure with its binding so handleUnauthorizedError can
+      // re-mint THAT binding (and not spend the active binding's refresh) and
+      // LIN-3775's error pages can name the source. Every binding is tagged,
+      // the active one included; only the handler's scope check decides routing.
+      if (error && typeof error === 'object') {
+        try { error.binding = { provider: binding.provider, scope: binding.scope, connectionId: binding.connectionId }; } catch { /* frozen error: stays untagged */ }
+      }
+      // Degrade instead of failing the page: only on the retry pass (which exists
+      // only because of a 401 and has already re-minted), and only for an in-scope
+      // secondary. The first pass always rethrows, so a non-auth failure fails the
+      // page as it does today.
+      if (degradeSecondary && secondaryRemint.isSecondaryRemintable(workspace, binding)) {
+        console.error(`Secondary ${binding.provider} source (${binding.scope}) failed after re-mint; rendering without it:`, error);
+        degradedSources.push({ provider: binding.provider, scope: binding.scope });
+        continue;
+      }
+      throw error;
     }
-
-    // Fetch projects and issues (filtered by team if specified).
-    // `slim` (LIN-442) is the homepage's description-trim: it only reaches the
-    // dashboard + its token-refresh retry, never swim/ship/swipe, which keep the
-    // full query.
-    let { organizationName: orgName, projects, issues, truncated: bindingTruncated } = isTestMode
-      ? (mockOverride || testMockData)
-      : await provider.fetchProjects(bindingCallScope, resolvedTeamId, { slim });
-
-    // In test mode, manually filter issues by team
-    if (isTestMode && resolvedTeamId) {
-      issues = issues.filter(i => i.team?.id === resolvedTeamId);
-    }
-
-    if (isPrimary) {
-      teams = bindingTeams;
-      organizationName = orgName;
-    }
-    mergedProjects.push(...projects);
-    mergedIssues.push(...issues);
-    truncated = truncated || !!bindingTruncated;
   }
 
   // Multi-source workspace → render a per-task source badge (suppressed for a
@@ -1729,7 +1784,7 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
       return { project: { ...project, collapsed }, incomplete, completed, completedCount };
     });
 
-  return { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId: resolvedTeamId, periodicalsEnabled, showSource, truncated, availableAssignees, appliedAssigneeName };
+  return { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId: resolvedTeamId, periodicalsEnabled, showSource, truncated, availableAssignees, appliedAssigneeName, degradedSources };
 }
 
 /**
@@ -1855,7 +1910,7 @@ async function renderDashboardAfterRefresh(workspace, session, teamId, assigneeS
   const provider = getProviderForWorkspace(workspace);
   // Pass urlKey so the periodicals group renders consistently after a token
   // refresh, matching the primary dashboard route (LIN-341).
-  const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated, availableAssignees, appliedAssigneeName } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true, assigneeName: assigneeState.resolvedAssigneeName });
+  const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated, availableAssignees, appliedAssigneeName, degradedSources } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true, assigneeName: assigneeState.resolvedAssigneeName, accountId: session.accountId, degradeSecondary: true });
   // LIN-2944 P1 F3: the deck's front card, over the SAME already-fetched trees —
   // `orderIssuesForSwipe` is pure and adds no provider call.
   // LIN-2944 P3 (addendum 18): the top task is the first NON-seed card; when only
@@ -1880,6 +1935,8 @@ async function renderDashboardAfterRefresh(workspace, session, teamId, assigneeS
     customPrompts,
     showSource,
     truncated,
+    // LIN-3774: `?? []` because the lin-2006/lin-2550 vm stubs return no list.
+    degradedSources: degradedSources ?? [],
     topTaskId: homeTopTask ? nodeKey(homeTopTask) : null,
     topTaskWhy: homeTopTask ? homeTopTask.why : [],
     topTaskOnboarding: seedOnlyHome,
@@ -1891,7 +1948,7 @@ async function renderDashboardAfterRefresh(workspace, session, teamId, assigneeS
 /**
  * Handles 401 Unauthorized errors from the Linear API.
  */
-async function handleUnauthorizedError(workspace, session, teamId, assigneeState, openRouterSource, res) {
+async function handleUnauthorizedError(workspace, session, teamId, assigneeState, openRouterSource, res, error = null) {
   // PAT tokens cannot be refreshed — show a clear error
   if (workspace.isPAT) {
     const html = renderErrorPage('Access Token Invalid',
@@ -1913,6 +1970,26 @@ async function handleUnauthorizedError(workspace, session, teamId, assigneeState
     evictAllWorkspaceTokens(evictWorkspaceToken, session.workspaces, session.accountId);
     session.destroy(() => res.status(401).send(html));
     return;
+  }
+
+  // LIN-3774: a tagged failure from a SECONDARY connection-backed GitHub-family
+  // binding (a Linear-primary workspace's GitHub source) re-mints THAT binding
+  // only — it is not evidence the active binding's credential is bad, so the
+  // ladder below (a Linear refresh-token rotation, the owner credential store,
+  // workspace removal) is skipped. Guarded on `error?.binding` so a caller that
+  // passes no error never touches the seam. The retry always renders the
+  // dashboard (LIN-2526, all five routes) with `degradeSecondary`, so a source
+  // that is still dead shows the notice instead of a 503. Untagged, active,
+  // legacy, refresh-token-kind and unhydrated-tagged errors fall through.
+  const failedSecondary = error?.binding ? secondaryRemint.bindingForError(workspace, error) : null;
+  if (failedSecondary) {
+    await secondaryRemint.remint(workspace, failedSecondary, session.accountId);
+    try {
+      return await renderDashboardAfterRefresh(workspace, session, teamId, assigneeState, openRouterSource, res);
+    } catch (renderError) {
+      console.error('Post-secondary-remint dashboard render failed (workspace preserved):', renderError);
+      return res.status(503).send(renderServiceUnavailablePage());
+    }
   }
 
   // LIN-1885: a Jira API-token credential is a static, user-supplied secret
@@ -2602,6 +2679,16 @@ const connectionAccess = createConnectionAccess({
   bufferMs: TOKEN_REFRESH_BUFFER_MS,
 });
 
+// LIN-3774: re-mint for a SECONDARY (non-active) connection-backed GitHub-family
+// binding — proactively before it is read (fetchAndPrepareProjects and the
+// /workspace/:urlKey freshness step) and reactively after a tagged 401
+// (handleUnauthorizedError). The re-mint is the same connectionAccess seam the
+// active-binding arms use; the write-back is per binding.
+const secondaryRemint = createSecondaryBindingRemint({
+  refreshConnectionForWorkspace: (...args) => connectionAccess.refreshConnectionForWorkspace(...args),
+  applyRefreshed: rehydrateBindingAfterRefresh,
+});
+
 // CLOSED GAP (LIN-1885 research → fixed by LIN-1891). This resolver used to
 // return a BARE token string regardless of provider, so the headless proxy/
 // dispatch lane could not authenticate any provider whose credential is not a
@@ -3261,7 +3348,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       customPrompts = (await customPromptsStore.list(workspace.urlKey)).map(p => ({ id: p.id, name: p.name }));
     } catch (e) { /* non-fatal */ }
 
-    const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated, availableAssignees, appliedAssigneeName } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true, assigneeName: assigneeState.resolvedAssigneeName });
+    const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated, availableAssignees, appliedAssigneeName } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true, assigneeName: assigneeState.resolvedAssigneeName, accountId: req.session.accountId });
     const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h));
     // LIN-2944 P1 F3: the deck's front card, over the SAME already-fetched trees —
     // `orderIssuesForSwipe` is pure and adds no provider call. With `?assignee=`,
@@ -3300,7 +3387,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
 
     // Handle 401 Unauthorized - attempt refresh or remove workspace
     if (isAuthError(error)) {
-      return handleUnauthorizedError(workspace, req.session, teamId, assigneeState, openRouterSource, res);
+      return handleUnauthorizedError(workspace, req.session, teamId, assigneeState, openRouterSource, res, error);
     }
 
     // Generic error - show a classified, self-diagnosing error page so an
@@ -3348,7 +3435,7 @@ app.get('/workspace/:urlKey/swipe/:identifier?', workspaceFromUrl, async (req, r
     // are non-critical — a store hiccup must never break the page, so fall back
     // to an empty map.
     const [{ trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId }, allLoops] = await Promise.all([
-      fetchAndPrepareProjects(workspace, teamId),
+      fetchAndPrepareProjects(workspace, teamId, null, null, { accountId: req.session.accountId }),
       getLoopsForWorkspace(workspace.urlKey, { dispatchStore: dispatchQueueStore, agentStatusStore, lean: true }).catch(() => [])
     ]);
     const sessionCounts = buildSessionCounts(allLoops);
@@ -3375,7 +3462,7 @@ app.get('/workspace/:urlKey/swipe/:identifier?', workspaceFromUrl, async (req, r
     console.error('Swipe page error:', error);
 
     if (isAuthError(error)) {
-      return handleUnauthorizedError(workspace, req.session, teamId, assigneeState, openRouterSource, res);
+      return handleUnauthorizedError(workspace, req.session, teamId, assigneeState, openRouterSource, res, error);
     }
 
     const html = renderUpstreamAwareErrorPage(error, {
@@ -3406,7 +3493,7 @@ app.get('/workspace/:urlKey/swim', workspaceFromUrl, async (req, res) => {
   try {
     // Use swim sample data if session flag is set (for E2E tests/screenshots)
     const mockOverride = req.session.swimSample ? swimSampleData : null;
-    const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace, teamId, mockOverride);
+    const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace, teamId, mockOverride, null, { accountId: req.session.accountId });
     const html = renderSwimPage(
       { projectTrees: trees, inProgressTrees, recentActivityTrees, organizationName },
       {
@@ -3424,7 +3511,7 @@ app.get('/workspace/:urlKey/swim', workspaceFromUrl, async (req, res) => {
     console.error('Swim page error:', error);
 
     if (isAuthError(error)) {
-      return handleUnauthorizedError(workspace, req.session, teamId, assigneeState, openRouterSource, res);
+      return handleUnauthorizedError(workspace, req.session, teamId, assigneeState, openRouterSource, res, error);
     }
 
     const html = renderUpstreamAwareErrorPage(error, {
@@ -3466,7 +3553,7 @@ app.get('/workspace/:urlKey/ship', workspaceFromUrl, async (req, res) => {
       : req.session.swimSample ? swimSampleData
       : null;
     const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId } =
-      await fetchAndPrepareProjects(workspace, teamId, mockOverride);
+      await fetchAndPrepareProjects(workspace, teamId, mockOverride, null, { accountId: req.session.accountId });
 
     // Orientation mode (LIN-301): a pure read of the newest saved roadmap report
     // that actually carries bearings (LIN-1228) — no LLM call on the ship side
@@ -3499,7 +3586,7 @@ app.get('/workspace/:urlKey/ship', workspaceFromUrl, async (req, res) => {
     console.error('Ship page error:', error);
 
     if (isAuthError(error)) {
-      return handleUnauthorizedError(workspace, req.session, teamId, assigneeState, openRouterSource, res);
+      return handleUnauthorizedError(workspace, req.session, teamId, assigneeState, openRouterSource, res, error);
     }
 
     const html = renderUpstreamAwareErrorPage(error, {
@@ -3584,7 +3671,7 @@ app.get('/workspace/:urlKey/roadmap', workspaceFromUrl, async (req, res) => {
     console.error('Roadmap page error:', error);
 
     if (isAuthError(error)) {
-      return handleUnauthorizedError(workspace, req.session, teamId, assigneeState, openRouterSource, res);
+      return handleUnauthorizedError(workspace, req.session, teamId, assigneeState, openRouterSource, res, error);
     }
 
     const html = renderUpstreamAwareErrorPage(error, {

@@ -98,7 +98,7 @@ describe('LIN-2526 resolveAssigneeSelection', () => {
 
 describe('LIN-2526 — fetchAndPrepareProjects: a resolved name matching no loaded issue degrades to unfiltered (failure path 3)', () => {
   const body = (() => {
-    const startMarker = "async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = null, urlKey = null, { slim = false, assigneeName = null } = {}) {";
+    const startMarker = "async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = null, urlKey = null, { slim = false, assigneeName = null, accountId = null, degradeSecondary = false } = {}) {";
     const startIdx = SERVER_SRC.indexOf(startMarker);
     assert.notEqual(startIdx, -1);
     const afterStart = startIdx + startMarker.length;
