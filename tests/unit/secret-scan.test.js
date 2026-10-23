@@ -328,3 +328,71 @@ describe('scanDirectory against repository', () => {
     assert.equal(result.totalHits, 0);
   });
 });
+
+describe('LIN-3818 truncated PEM followed by trailing text', () => {
+  const F = FIXTURE_SECRETS;
+  const rule = SECRET_RULES.find(r => r.id === 'private-key-block-truncated');
+  const keyLines = F.truncatedPrivateKey.split('\n');
+  const KEY = keyLines.slice(4).join('\n'); // body lines only
+  const HEAD = '-----BEGIN RSA PRIVATE KEY-----\n';
+  const trunc = (text) => findSecretMatches(text).filter(m => m.ruleId === 'private-key-block-truncated');
+
+  test('keeps exactly one capture group and the /g flag', () => {
+    assert.equal(new RegExp(rule.regex.source + '|').exec('').length - 1, 1);
+    assert.ok(rule.regex.global);
+  });
+  for (const [name, tail] of Object.entries({
+    prose: '\nend of log.',
+    'signature dash line': '\n-- sent from CI',
+    'markup-ish': '\n<b>done</b>',
+    path: '\n/var/log/app/run-proposals-store.json',
+    'placeholder word': '\nthis is a placeholder example',
+    'xxxxxx run': '\nxxxxxxxxxx',
+  })) {
+    test(`trailing text is not a leak: ${name}`, () => {
+      const hits = trunc(HEAD + KEY + tail);
+      assert.equal(hits.length, 1);
+      assert.ok(hits[0].match.includes('QRSTUVWXYZ0123456789'));
+    });
+    test(`scanText reports it: ${name}`, () => {
+      assert.ok(scanText(HEAD + KEY + tail).some(f => f.ruleId === 'private-key-block-truncated'));
+    });
+  }
+  test('single-line key followed by trailing text', () => {
+    assert.equal(trunc(HEAD + keyLines[4] + ' then some words').length, 1);
+  });
+  test('complete block is not also reported as truncated', () => {
+    assert.equal(trunc(F.privateKey).length, 0);
+    assert.equal(trunc(F.encryptedPrivateKey + '\nafter').length, 0);
+  });
+  test('code line / empty body / short body are not matched', () => {
+    assert.equal(trunc(`'-----BEGIN RSA PRIVATE KEY-----' + 'A'.repeat(64)`).length, 0);
+    assert.equal(trunc(HEAD + 'tail').length, 0);
+    assert.equal(trunc(HEAD + 'AAAA\nthe end').length, 0);
+  });
+  test('end-of-input narrow wrap with no key-shaped first token behaves as before', () => {
+    const narrow = HEAD + 'MIIEowIBAAKCAQEA0Y12\n3456abcdefghijklmnopqrst\nuvwxyzABCDEFGHIJKLMNOP';
+    assert.equal(trunc(narrow).length, 1);
+    // placeholder-shaped body at end of input is still suppressed (HEAD behaviour)
+    assert.equal(trunc(HEAD + 'your token placeholder abcdefghijklmnopqrstuvwxyz0123').length, 0);
+  });
+  test('rule alone stays linear on hostile input', () => {
+    const hostile = [
+      '-----BEGIN RSA PRIVATE KEY-----' + 'Proc-Type:A\n'.repeat(8000),
+      '-----BEGIN RSA PRIVATE KEY-----\n'.repeat(6500),
+      ('-----BEGIN RSA PRIVATE KEY-----' + 'A'.repeat(9000) + '!').repeat(200),
+      '-----BEGIN RSA PRIVATE KEY-----' + ('DEK-Info:' + 'A'.repeat(20) + '\n').repeat(8000) + '!',
+    ];
+    for (const h of hostile) {
+      const t0 = Date.now();
+      rule.regex.lastIndex = 0;
+      while (rule.regex.exec(h) !== null) { /* drain */ }
+      assert.ok(Date.now() - t0 < 1000, `rule took ${Date.now() - t0}ms`);
+    }
+  });
+  test('all-rules catastrophic-regression guard', () => {
+    const t0 = Date.now();
+    findSecretMatches(('-----BEGIN RSA PRIVATE KEY-----' + 'Proc-Type:A\n'.repeat(50)).repeat(150));
+    assert.ok(Date.now() - t0 < 3000, `took ${Date.now() - t0}ms`);
+  });
+});

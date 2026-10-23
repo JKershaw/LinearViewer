@@ -212,8 +212,8 @@ describe('LIN-3796 review follow-ups', () => {
   };
   const body = (text) => text.split('\n');
 
-  // Known limit, same as base: a <br>-SPLIT truncated PEM followed by more text is not a
-  // truncated PEM to the end-of-input-anchored rule, and per-line segments hold no PEM.
+  // A <br>-SPLIT truncated PEM followed by more text: masked by the joined scan (LIN-3818 dropped
+  // the end-of-input anchor) and, for the first case, by the per-segment scan as well.
   test('truncated PEM followed by <br>text stays masked (per-segment scan kept)', () => {
     const t = F.truncatedPrivateKey;
     for (const html of [
@@ -283,6 +283,32 @@ describe('LIN-3796 review follow-ups', () => {
       maskSecretsInHtml(html);
       const ms = Number(process.hrtime.bigint() - t) / 1e6;
       assert.ok(ms < 1000, `took ${ms}ms`);
+    }
+  });
+});
+
+describe('LIN-3818 truncated PEM followed by trailing text in the same text node', () => {
+  const t = F.truncatedPrivateKey;
+  const tails = ['\nend of log.', '\n-- sent from CI', '\n/var/log/run-proposals-store.json', '\nthis is a placeholder', ' trailing words'];
+  for (const tail of tails) {
+    test(`masked in <p>, <pre>, attribute: ${JSON.stringify(tail)}`, () => {
+      for (const html of [`<p>${escapeHtml(t + tail)}</p>`, `<pre>${escapeHtml(t + tail)}</pre>`, `<a title="${escapeHtml(t + tail)}">x</a>`]) {
+        const r = maskSecretsInHtml(html);
+        assert.ok(r.hits.includes('private-key-block-truncated'), html.slice(0, 60));
+        assert.ok(!r.html.includes('MIIEow') && !r.html.includes('QRSTUVWXYZ0123'), r.html);
+        assert.equal(maskSecretsInHtml(r.html).html, r.html);
+      }
+    });
+  }
+  test('clean pages stay byte-identical', () => {
+    const html = '<p>The header -----BEGIN RSA PRIVATE KEY----- marks a PEM.</p><pre>ok</pre>';
+    assert.equal(maskSecretsInHtml(html).html, html);
+  });
+  test('hostile truncated-PEM inputs stay fast', () => {
+    for (const text of ['-----BEGIN RSA PRIVATE KEY-----' + 'Proc-Type:A\n'.repeat(8000), ('-----BEGIN RSA PRIVATE KEY-----\n' + 'A'.repeat(100)).repeat(300)]) {
+      const t0 = Date.now();
+      maskSecretsInHtml(`<p>${escapeHtml(text)}</p>`);
+      assert.ok(Date.now() - t0 < 2000, `took ${Date.now() - t0}ms`);
     }
   });
 });
