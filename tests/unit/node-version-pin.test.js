@@ -9,9 +9,10 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { readFileSync, readdirSync, mkdtempSync, mkdirSync, writeFileSync, copyFileSync, chmodSync, rmSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const root = new URL('../../', import.meta.url);
 const read = (p) => readFileSync(new URL(p, root), 'utf8');
@@ -24,11 +25,16 @@ test('.nvmrc is a major-only pin and equals engines.node', () => {
 });
 
 test('pin is not below any runtime dependency Node floor', () => {
-  for (const name of Object.keys(pkg.dependencies || {})) {
-    const dep = JSON.parse(read(`node_modules/${name}/package.json`));
-    const m = /^>=\s*(\d+)/.exec(dep.engines?.node || '');
-    if (m) assert.ok(Number(pin) >= Number(m[1]), `${name} needs >=${m[1]}`);
+  const lock = JSON.parse(read('package-lock.json'));
+  let checked = 0;
+  for (const [name, v] of Object.entries(lock.packages || {})) {
+    if (v.dev || !v.engines?.node) continue;
+    const m = /^>=\s*(\d+)/.exec(v.engines.node);
+    if (!m) continue;
+    checked++;
+    assert.ok(Number(pin) >= Number(m[1]), `${name} needs >=${m[1]}`);
   }
+  assert.ok(checked > 0, 'no runtime Node floors found in package-lock.json');
 });
 
 test('every setup-node step reads .nvmrc, none hard-codes a version', () => {
@@ -47,11 +53,48 @@ test('every setup-node step reads .nvmrc, none hard-codes a version', () => {
   assert.ok(steps >= 4);
 });
 
+// Run a copy of env-check.sh in a temp tree whose .nvmrc we control, with a stub `node`
+// first on PATH, so the script's own reading of .nvmrc is what decides the output.
+function runEnvCheck({ nvmrc, nodeVersion }) {
+  const tmp = mkdtempSync(join(tmpdir(), 'env-check-'));
+  try {
+    mkdirSync(join(tmp, 'scripts'));
+    mkdirSync(join(tmp, 'bin'));
+    copyFileSync(new URL('scripts/env-check.sh', root), join(tmp, 'scripts', 'env-check.sh'));
+    if (nvmrc !== null) writeFileSync(join(tmp, '.nvmrc'), `${nvmrc}\n`);
+    const stub = join(tmp, 'bin', 'node');
+    writeFileSync(stub, `#!/bin/sh\necho v${nodeVersion}\n`);
+    chmodSync(stub, 0o755);
+    const r = spawnSync('bash', [join(tmp, 'scripts', 'env-check.sh')], {
+      cwd: tmpdir(),
+      encoding: 'utf8',
+      env: { ...process.env, PATH: `${join(tmp, 'bin')}:${process.env.PATH}` },
+    });
+    return { out: r.stdout, err: r.stderr };
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
 test('env-check derives its Node requirement from .nvmrc, from any cwd', () => {
-  assert.doesNotMatch(read('scripts/env-check.sh'), /\b20\b/);
-  const out = execFileSync('bash', [new URL('scripts/env-check.sh', root).pathname], {
-    cwd: tmpdir(),
-    encoding: 'utf8',
-  });
-  assert.match(out, new RegExp(`(≥${pin} required|need ≥${pin})`));
+  const old = runEnvCheck({ nvmrc: '99', nodeVersion: '18.0.0' });
+  assert.match(old.out, /need ≥99/);
+  assert.match(old.out, /Install Node\.js 99\+/);
+
+  // A node newer than any pin the script could have copied, still below this .nvmrc.
+  const between = runEnvCheck({ nvmrc: '99', nodeVersion: '50.0.0' });
+  assert.match(between.out, /need ≥99/);
+
+  const ok = runEnvCheck({ nvmrc: '99', nodeVersion: '99.0.0' });
+  assert.match(ok.out, /\(≥99 required\)/);
+  assert.doesNotMatch(ok.out, /Upgrade Node\.js/);
+});
+
+test('env-check without a usable .nvmrc skips the floor check without shell errors', () => {
+  for (const nvmrc of [null, 'lts/*']) {
+    const r = runEnvCheck({ nvmrc, nodeVersion: '18.0.0' });
+    assert.doesNotMatch(r.err, /integer expression/);
+    assert.doesNotMatch(r.out, /Upgrade Node\.js/);
+    assert.match(r.out, /floor not checked/);
+  }
 });
