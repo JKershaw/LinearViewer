@@ -488,7 +488,7 @@ describe('enqueue lanes: an addItem fault is the 503 envelope', () => {
     } finally { q.mock.restore(); }
   });
 
-  test('POST /api/proxy/dispatch and recommend-and-dispatch (relay:false drive)', async () => {
+  test('POST /api/proxy/dispatch and recommend-and-dispatch: an addItem fault inside the arm', async () => {
     const { buildApp } = await import('./lib/proxy-fake-deps.js');
     const parts = makeStore();
     const app = buildApp({
@@ -519,6 +519,36 @@ describe('enqueue lanes: an addItem fault is the 503 envelope', () => {
             await assertEnvelope(await sendJson(base, 'POST', path, auth, { ...body, force: true }), label);
           } finally { parts.queue.fail.insertOne = false; }
         }
+      });
+    } finally { q.mock.restore(); }
+  });
+
+  // The relay:false drive: a fault thrown BEFORE the arm's own try/catch (the free-tier key
+  // read awaited ahead of the keepalive) reaches drive()'s outer catch, whose rule list skips
+  // the lane's relayed rules. Without storeFaultRule on that branch it answers the generic
+  // 500 RECOMMEND_FALLBACK, not the 503 envelope.
+  test('recommend-and-dispatch: a store fault before the arm (relay:false)', async () => {
+    const { buildApp } = await import('./lib/proxy-fake-deps.js');
+    const parts = makeStore();
+    const app = buildApp({
+      dispatchQueueStore: parts.store,
+      workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
+      getWorkspaceOpenRouterKey: async () => { throw new DispatchStoreFault('probe', BOOM); },
+      proxyTokenStore: {
+        validateToken: async () => ({
+          tokenId: 't1', urlKey: URL_KEY, label: 'runner', scope: 'readWrite', createdBy: 'acct-1',
+          grants: ['take', 'dispatch'], workspaceId: 'ws-acme'
+        }),
+        listTokens: async () => [],
+        describeRejectionCause: async () => null
+      }
+    });
+    const q = quiet();
+    try {
+      await serve(app, async (base) => {
+        const res = await sendJson(base, 'POST', '/api/proxy/recommend-and-dispatch', { Authorization: 'Bearer anything' },
+          { issueIdentifier: 'TEST-1', kind: 'implementation', appendProxyContext: false });
+        await assertEnvelope(res, 'recommend pre-arm (relay:false)');
       });
     } finally { q.mock.restore(); }
   });
