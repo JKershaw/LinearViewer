@@ -516,10 +516,10 @@ describe('figure dark-mode theme (LIN-3351)', () => {
     assert.ok(tables > 0, 'catalog has tables to check');
   });
 
-  test('library.css scrolls the table wrapper and wraps inline code/links without touching pre code', () => {
+  test('library.css scrolls the table wrapper and wraps long unbroken runs with break-word, not anywhere', () => {
     const css = readFileSync(join(import.meta.dirname, '..', '..', 'public', 'library.css'), 'utf8');
     assert.match(css, /\.library-doc__table-wrap\s*\{[^}]*overflow-x:\s*auto/);
-    assert.match(css, /\.library-doc__body a,\s*\.library-doc__body :not\(pre\) > code\s*\{\s*overflow-wrap:\s*break-word;/);
+    assert.match(css, /\.library-doc__body\s*\{[^}]*overflow-wrap:\s*break-word;/);
     assert.doesNotMatch(css, /overflow-wrap:\s*anywhere/);
   });
 });
