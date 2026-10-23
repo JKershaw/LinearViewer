@@ -6,7 +6,7 @@
 
 ## Summary
 
-On 2026-10-21, Railway disclosed that an unauthorised third party "may have accessed encrypted environment variables and, for some of them, obtained the decrypted contents". Railway believed the aim was "compromising AI inference providers".
+On 2026-10-21, Railway disclosed that an unauthorised third party "may have accessed encrypted environment variables and, for some of them, obtained the decrypted contents". Railway believed the aim was "compromising AI inference providers". Railway's preliminary report (22 Oct) and a targeted notice on 23 Oct came later; see "Follow-up" below.
 
 Railway's response:
 - notified upstream providers, who revoked keys proactively;
@@ -54,7 +54,12 @@ Harbour runs on Railway, so every secret in its variables was in scope. The work
 
   Production has no `OPENROUTER_API_KEY`. Workspace LLM calls use the OAuth key stored in the database.
 - **MongoDB-harbour:** the root password, plus `MONGO_URL` and `MONGO_PUBLIC_URL`.
-- **Out of scope** (John's decision): yap has no environment variables; Dash stays down; Harbour OS had its keys removed.
+- **Out of scope** (John's decision):
+  - yap has no environment variables.
+  - Dash stays down. Its variables were not rotated, so rotate them before it comes back up.
+  - Harbour OS held GitHub keys. They were deleted from Railway and rotated at GitHub.
+
+These services make up every Railway project in the workspace ("John Kershaw's Projects").
 
 ## Rotation (each step checked against the provider's own documentation)
 
@@ -95,6 +100,58 @@ From 2026-10-20 16:47Z, a bot sent 47 sign-in requests to `POST /auth/email/send
 
 This looks like "subscription bombing", which pushes real people's addresses through many sites' forms. Email sign-in is off with `EMAIL_TRANSPORT=off`; delete the variable to turn it back on. LIN-3771 adds rate limits and a bot check before re-enabling.
 
+The bot started at 16:47Z on 20 Oct, inside Railway's attack window (see "Follow-up"). Nothing links the two: the bot targeted addresses with no account and used no link. It is recorded here so the overlap isn't rediscovered later.
+
+## Follow-up: Railway's preliminary report and the 23 Oct notice
+
+**Railway's preliminary report** ([blog.railway.com/p/preliminary-report-october-security-incident](https://blog.railway.com/p/preliminary-report-october-security-incident), 22 Oct) adds:
+
+- **How:** the attacker escalated privileges through Railway's build infrastructure, then reached its CI credentials. The aim was AI provider keys "to perform distillation attacks".
+- **When:**
+  - The attack window opened at **13:58Z on 20 Oct**, a day before the disclosure.
+  - Encrypted variables were queried, and a subset decrypted, between 07:25Z and 09:18Z on 21 Oct.
+  - Railway confirmed the attacker had no remaining access at **03:32Z on 22 Oct**.
+- **Scope:**
+  - At most 1.85% of workspaces (about 100,000) had variables potentially compromised.
+  - Railway can't tell which variables were decrypted, so it sent every stored key to the providers for revocation.
+- **Railway's own resets:**
+  - every Railway access token and user session;
+  - every Railway GitHub App installation;
+  - all storage-bucket credentials.
+
+  Source-code access is not yet ruled out.
+
+**The 23 Oct notice.** Railway emailed the workspace admin because its variable names matched the attacker's search pattern for AI and cloud keys; `OPENROUTER_FREE_TIER_KEY` is the likely match. Railway "cannot confirm whether or not your secret environment variables were decrypted". The notice is an update to the existing incident, not a new one.
+
+**The new start time doesn't change the misuse finding.** The MongoDB check above covers every authenticated session from 14 Oct, so it already spans the real window.
+
+**Railway's asks, against what was done:**
+
+| Railway's ask | Status |
+|---|---|
+| Rotate sensitive variables | Done 23 Oct for harbour-cat and MongoDB-harbour. Harbour OS GitHub keys deleted and rotated. Dash is down, so rotate its variables before it returns. |
+| Update variables and redeploy dependent services | Done; see "Verified after the deploy". |
+| Remove public network access to databases | Done 22–23 Oct. |
+| Review AI key usage | OpenRouter revoked the keys itself; usage showed nothing untoward. |
+| Review other provider activity | Resend checked by John; nothing unusual. |
+| GitHub audit logs and installed app access | Repository side checked 23 Oct (below). Still to do: the account-level checks below. |
+| Registry logs (Docker Hub etc.) | Not applicable: no service pulls from a private registry. |
+| Recreate CLI and CI credentials, reconnect GitHub | The laptop's `railway` CLI was logged out by Railway's reset, and no CI workflow in either repo uses a Railway token. "Deploy Latest Commit" succeeded on 23 Oct. |
+
+**GitHub, repository-side check (23 Oct).** Covered both repos (`JKershaw/LinearViewer`, `JKershaw/simple-dispatcher`) and every branch, from 13:00Z on 20 Oct onwards.
+
+- **Commits:** every commit is authored by John or Claude.
+- **Pushes to `main`:** every one is a merge of John's own PR. The seven commits committed straight to LinearViewer's `main` on 21 Oct are the rebase-merges of #2029 and #2030; their commit times match those PRs' merge times.
+- **Workflows and dependencies:** no change in the window to `.github/`, `.claude/`, `package.json` or `package-lock.json`.
+- **Actions runs:** every run in simple-dispatcher was triggered by `JKershaw`. LinearViewer has had no `workflow_dispatch` runs since 13 Sep.
+- **Collaborators:** LinearViewer has only `JKershaw`. simple-dispatcher also has `KulchoAI` with write access; confirm it is expected. It has no commits in the window.
+
+**Not visible from the repos (John to check at github.com):**
+
+- **The Harbour GitHub App.** A leaked private key can mint installation tokens for every account that installed the app, not just John's repos. Check the app's installations and its Advanced tab (recent deliveries) for 20–23 Oct.
+- **The account security log** (Settings → Security log), for 20–23 Oct.
+- **Installed GitHub Apps and OAuth apps** (Settings → Applications). The Railway app was reset by Railway.
+
 ## Lessons
 
 - **Backups.** Harbour's database had no scheduled backups. Daily backups have been on since 23 Oct.
@@ -113,4 +170,6 @@ This looks like "subscription bombing", which pushes real people's addresses thr
 - LIN-3770: maintenance mode
 - LIN-3698: production MongoDB kernel drift
 - `docs/incidents/2026-10-19-mongodb-kernel-ci.md`
-- Railway status page, incident "Railway Platform Outage"; Railway's Preliminary Incident Report was due on 23 Oct
+- Railway status page, incident "Railway Platform Outage"
+- Railway's disclosure: https://blog.railway.com/p/security-disclosure-wednesday-october-21st
+- Railway's preliminary report (22 Oct): https://blog.railway.com/p/preliminary-report-october-security-incident
