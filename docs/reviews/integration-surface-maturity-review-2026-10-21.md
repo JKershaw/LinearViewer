@@ -78,7 +78,7 @@ primary shows Y"):
 | E7 | Consumer heartbeat files are all new | `simple-dispatcher/heartbeat.js` predates the window; only `host-heartbeat.js` and `host-heartbeat-sender.js` are new (`4c9fb76`, LIN-1952) |
 | E8 | Stability F9 counts 4 paired contract PRs | 5 (simple-dispatcher `bb1da78` ↔ LinearViewer #1992). C11's shared-LIN-id rule cannot see that pair (#1992's subject is LIN-3618), so the figure is not re-bounded here |
 | E9 | R12: "improved 5 → 4" | **Worsened** (5 → 19, see R12 and `c9-members.md`): research's own "4 persisting + 2 new" is 6 > 5 |
-| E10 | `owner-credential-store.js` has "10 production importers" | One module import, `server.js:64`; the store is **injected** into `lib/connection-credential.js`, `lib/connection-lifecycle.js`, `lib/credential-invariant-sweep.js`, `routes/account-merge.js`, `routes/auth.js` and `routes/workspace.js` and used by method call (`routes/workspace.js:130`, `routes/auth.js:326`). The dual representation (R13) stands; the count does not |
+| E10 | `owner-credential-store.js` has "10 production importers" | One module import, `server.js:64`, and one instance (`server.js:701`). `server.js` **injects** it into at least nine production modules: `lib/connection-credential.js`, `lib/connection-lifecycle.js`, `lib/credential-invariant-sweep.js`, `lib/workspace-token-refresh.js` (`server.js:1347`, `:1818`, `:2799`), `lib/suspect-credential-refresh.js` (`server.js:2894`), `routes/account-merge.js`, `routes/auth.js` (through `routes/provider-auth-routers.js`, `server.js:1509`), `routes/workspace.js` and `routes/workspace-api.js` (`:1738`). It also calls the store directly (`get` at `server.js:1265`, `:2095`, `:2782`). Method-call examples: `routes/workspace.js:130`, `routes/auth.js:326`. The dual representation (R13) stands; the count does not *(count corrected in the LIN-3767 review; the first draft said six injected consumers)* |
 | E11 | Denominator 52 | 51 scored + META (`mod-stage-router` folds, plan decision 1) |
 | E12 | C14 "6 surfaces" | 14 ids (`c14-members.md`); the plan's Arm 1 counts (45 + 22) do not reproduce from its words (54 from the reconstructed regexes) but the 13 named commits stand |
 | E13 | C10 "143 groups" | 137 (53 bare unique, 36 new, 0 unresolved, 3 slash) |
@@ -87,7 +87,7 @@ primary shows Y"):
 
 **Citation re-points.** Of run 3's 137 line-citation groups, content-checked at the pin: **PASS 110 / REVERSED 19 /
 RETIRED 7 / UNRESOLVED 1** (110 / 19 / 4 / 0 = 133 after excluding 4 rule false positives that point at report
-lines, not code). The 19 reversed and 3 real retired claims collapse into the families listed in *Findings*
+lines, not code). The 19 reversed and 4 real retired claims (G2, G3, G56, G86) collapse into the families listed in *Findings*
 (R5, R10, R11, router mounts, R7, R8, R12, `BUILDER_VERSION` 16 → 18). Detail: `citation-repoints.md`.
 
 **Sibling freshness, pinned to a timestamp.** `docs/reviews/` was re-listed at 2026-10-23T09:41Z: **68**
@@ -278,8 +278,9 @@ commits). `CONNECTION_BACKED_WRITES` (default on, creation only) is at `lib/conn
 the legacy `OwnerCredentialStore` still runs alongside, in the same collection, in both key shapes: one module import
 (`server.js:64`), injected into `lib/connection-credential.js:330`, `lib/connection-lifecycle.js:57`,
 `lib/credential-invariant-sweep.js:194`, `routes/account-merge.js:49`, `routes/auth.js:39` (`persistOwnerCredential`
-`:326`) and `routes/workspace.js:29` (`deleteAll` `:130`). (Research said "10 production importers"; the primary shows
-1 import and 6 injected consumers — E10.) A re-score down is not warranted: the seam is the improvement, and the
+`:326`) and `routes/workspace.js:29` (`deleteAll` `:130`), and also into `lib/workspace-token-refresh.js`,
+`lib/suspect-credential-refresh.js` and `routes/workspace-api.js:1738`, with direct `get` calls in `server.js`. (Research said "10 production
+importers"; the primary shows 1 import and at least 9 injected production modules — E10.) A re-score down is not warranted: the seam is the improvement, and the
 dual representation is ticketed (LIN-2150 `Todo`; Drift 2026-10-19 top row `credential-decision-multiplicity`,
 LIN-2150/LIN-2188). Other open tickets, all `Backlog`: LIN-2493 (credential-health blind to a provider-lane
 failure), LIN-2287, LIN-1900, LIN-2609. **A real incident is adjacent**: the 2026-10-23 credential rotation
@@ -811,7 +812,7 @@ and a test keeps it honest. Sixteen sibling reviews have landed since the last r
 since June, so a lot more of this report rests on current evidence than the last one did.
 
 Three things are genuinely new. First, the runner kit now ships from Harbour to people's machines, and the two copies of
-the contract between it and the dispatcher are byte-identical today with nothing in CI that would notice if one drifted
+the contract between it and the dispatcher were byte-identical at the pins with nothing in CI that would notice if one drifted
 (R14). Second, the dispatcher's "I stopped polling this workspace" signal is stored by Harbour and shown nowhere; it was
 the operator, not Harbour, who noticed during the database outage on 23 October (R15). Third, this review keeps rating
 things "done" that real findings then land on: fourteen surfaces this window, three of them still open (R16). The review
