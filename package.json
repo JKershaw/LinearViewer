@@ -2,6 +2,9 @@
   "name": "harbour",
   "version": "1.0.0",
   "type": "module",
+  "engines": {
+    "node": "24"
+  },
   "scripts": {
     "start": "node server.js",
     "test": "node scripts/run-unit-tests.mjs tests/unit/*.test.js scripts/eval/eval-dense.test.mjs scripts/code-shape/*.test.mjs && playwright test",
