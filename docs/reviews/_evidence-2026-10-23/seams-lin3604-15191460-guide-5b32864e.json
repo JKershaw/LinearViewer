@@ -1,0 +1,4027 @@
+{
+  "commit": "15191460da715a3c8c51fa4816a2a60ce9484f14",
+  "areaMapSource": "docs/reviews/_evidence-2026-10-23/areas-5b32864e.json",
+  "scope": {
+    "files": 432,
+    "parseFailures": [],
+    "unresolvedRelativeImports": 4,
+    "nonLiteralDynamicImports": 0,
+    "unmappedFiles": []
+  },
+  "areas": [
+    {
+      "name": "Agent API (proxy)",
+      "files": 29,
+      "internalImports": 44,
+      "entryFiles": [
+        {
+          "path": "lib/dispatch-tokens.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/harbour-feedback-tokens.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/proxy-dedupe.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/proxy-events.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/proxy-preamble.js",
+          "importedFromAreas": [
+            "LLM & prompts",
+            "Runs & dispatch",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 7
+        },
+        {
+          "path": "lib/proxy-ref-resolver.js",
+          "importedFromAreas": [
+            "Providers (Linear, GitHub, Jira, local)",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 3
+        },
+        {
+          "path": "lib/proxy-scopes.js",
+          "importedFromAreas": [
+            "Front end: server-rendered pages",
+            "LLM & prompts",
+            "Runs & dispatch"
+          ],
+          "importers": 4
+        },
+        {
+          "path": "lib/proxy-tokens.js",
+          "importedFromAreas": [
+            "Runs & dispatch",
+            "Wiring (server.js)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/proxy-wire.js",
+          "importedFromAreas": [
+            "Providers (Linear, GitHub, Jira, local)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/settings-proxy-default.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "routes/proxy.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 2
+        }
+      ]
+    },
+    {
+      "name": "Auth, accounts & workspaces",
+      "files": 57,
+      "internalImports": 96,
+      "entryFiles": [
+        {
+          "path": "lib/account-conflict.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/account-group.js",
+          "importedFromAreas": [
+            "LLM & prompts",
+            "Runs & dispatch",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 4
+        },
+        {
+          "path": "lib/account-merge-log.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/account-session.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/account-store.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/account-workspace-store.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/connection-binding.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/connection-credential.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/connection-lifecycle.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/connection-store.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/credential-diagnostics.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Runs & dispatch",
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 5
+        },
+        {
+          "path": "lib/credential-invariant-sweep.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/credential-lifecycle-events.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/credential-state.js",
+          "importedFromAreas": [
+            "Front end: server-rendered pages",
+            "Runs & dispatch",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 5
+        },
+        {
+          "path": "lib/email-auth.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/email-availability.js",
+          "importedFromAreas": [
+            "Front end: server-rendered pages",
+            "Wiring (server.js)"
+          ],
+          "importers": 3
+        },
+        {
+          "path": "lib/email-transport.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/guest-task-path.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/held-connection-entry.js",
+          "importedFromAreas": [
+            "Front end: server-rendered pages",
+            "Wiring (server.js)"
+          ],
+          "importers": 3
+        },
+        {
+          "path": "lib/openrouter-key-resolver.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/owner-backfill.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/owner-credential-store.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/ownerless-token-policy.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Runs & dispatch"
+          ],
+          "importers": 4
+        },
+        {
+          "path": "lib/pat-session.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/refresh-strategy.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/rejected-credentials.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Wiring (server.js)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/session-options.js",
+          "importedFromAreas": [
+            "Front end: server-rendered pages",
+            "Wiring (server.js)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/session-store.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/suspect-credential-refresh.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/task-share-access.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/task-share-store.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/token-refresh.js",
+          "importedFromAreas": [
+            "Providers (Linear, GitHub, Jira, local)",
+            "Wiring (server.js)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/urlkey-holders.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/user-preferences.js",
+          "importedFromAreas": [
+            "Front end: server-rendered pages",
+            "Wiring (server.js)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/workspace-api-mocks.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/workspace-lookup.js",
+          "importedFromAreas": [
+            "Front end: server-rendered pages",
+            "Runs & dispatch",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 9
+        },
+        {
+          "path": "lib/workspace-owner.js",
+          "importedFromAreas": [
+            "Runs & dispatch",
+            "Wiring (server.js)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/workspace-preferences.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Front end: server-rendered pages",
+            "LLM & prompts",
+            "Runs & dispatch",
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 14
+        },
+        {
+          "path": "lib/workspace-store.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/workspace-title-resolver.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/workspace-token-cache.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/workspace-token-refresh.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/workspace-token-resolver.js",
+          "importedFromAreas": [
+            "Runs & dispatch",
+            "Wiring (server.js)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/workspace-urlkey.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/workspace.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "LLM & prompts",
+            "Runs & dispatch",
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 28
+        },
+        {
+          "path": "routes/account-merge.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "routes/email-auth.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "routes/held-connection.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "routes/openrouter-auth.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "routes/provider-auth-routers.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        }
+      ]
+    },
+    {
+      "name": "Front end: browser code",
+      "files": 36,
+      "internalImports": 0,
+      "entryFiles": []
+    },
+    {
+      "name": "Front end: server-rendered pages",
+      "files": 69,
+      "internalImports": 222,
+      "entryFiles": [
+        {
+          "path": "lib/components/page.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/mask-secrets-in-html.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/parse-landing.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-account-home.js",
+          "importedFromAreas": [
+            "Auth, accounts & workspaces"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-audit.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-collective.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-custom-prompts.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-dispatch.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-effort-readout.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-email-auth.js",
+          "importedFromAreas": [
+            "Auth, accounts & workspaces"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-escalation-kpis.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-flight-companion.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-kpis.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-landing.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-legal.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-library.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-live-console.js",
+          "importedFromAreas": [
+            "Runs & dispatch"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-next-run.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-observation.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-pages.js",
+          "importedFromAreas": [
+            "Auth, accounts & workspaces",
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 10
+        },
+        {
+          "path": "lib/render-passage-planner.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-prompts.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-proxy.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-roadmap.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-run-steps.js",
+          "importedFromAreas": [
+            "Runs & dispatch"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-runner-setup.js",
+          "importedFromAreas": [
+            "Runs & dispatch"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-session.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-settings.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-ship-biscuit.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-ship-journey.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-ship.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-styleguide.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-swim.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-swipe.js",
+          "importedFromAreas": [
+            "LLM & prompts",
+            "Runs & dispatch",
+            "Wiring (server.js)"
+          ],
+          "importers": 3
+        },
+        {
+          "path": "lib/render-task-chat.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-task-create.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-task-edit.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render-task-page.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/render-templates.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/render.js",
+          "importedFromAreas": [
+            "Auth, accounts & workspaces",
+            "Runs & dispatch",
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 18
+        },
+        {
+          "path": "lib/ship-journey.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/timeline-zoom.js",
+          "importedFromAreas": [
+            "Runs & dispatch"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/tree.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Auth, accounts & workspaces",
+            "LLM & prompts",
+            "Providers (Linear, GitHub, Jira, local)",
+            "Runs & dispatch",
+            "Wiring (server.js)"
+          ],
+          "importers": 15
+        }
+      ]
+    },
+    {
+      "name": "LLM & prompts",
+      "files": 69,
+      "internalImports": 54,
+      "entryFiles": [
+        {
+          "path": "lib/agent-turn.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 3
+        },
+        {
+          "path": "lib/audit.js",
+          "importedFromAreas": [
+            "Front end: server-rendered pages",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 3
+        },
+        {
+          "path": "lib/brief-cache.js",
+          "importedFromAreas": [
+            "Runs & dispatch",
+            "Wiring (server.js)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/brief.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 3
+        },
+        {
+          "path": "lib/chat-request.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Runs & dispatch",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 13
+        },
+        {
+          "path": "lib/chat-tools.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Runs & dispatch",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 4
+        },
+        {
+          "path": "lib/chat-transcript.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 3
+        },
+        {
+          "path": "lib/collective-characters-store.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/collective-presets-store.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/context-graph.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/custom-prompts-store.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/feedback-title.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/file-pointer.js",
+          "importedFromAreas": [
+            "Runs & dispatch"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/flight-companion-gate.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/graph-features.js",
+          "importedFromAreas": [
+            "Front end: server-rendered pages"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/harbour-comments-store.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/library-metadata.js",
+          "importedFromAreas": [
+            "Front end: server-rendered pages",
+            "Reports & operator tools"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/library.js",
+          "importedFromAreas": [
+            "Front end: server-rendered pages",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/llm-call-log.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/model-pricing.js",
+          "importedFromAreas": [
+            "Reports & operator tools",
+            "Runs & dispatch"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/next-run.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 3
+        },
+        {
+          "path": "lib/north-star-resolver.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 4
+        },
+        {
+          "path": "lib/openrouter-catalog.js",
+          "importedFromAreas": [
+            "Front end: server-rendered pages",
+            "Reports & operator tools",
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 5
+        },
+        {
+          "path": "lib/openrouter.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Auth, accounts & workspaces",
+            "Front end: server-rendered pages",
+            "Providers (Linear, GitHub, Jira, local)",
+            "Runs & dispatch",
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 16
+        },
+        {
+          "path": "lib/periodicals.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Providers (Linear, GitHub, Jira, local)",
+            "Runs & dispatch",
+            "Wiring (server.js)"
+          ],
+          "importers": 7
+        },
+        {
+          "path": "lib/prompt-formatters.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/prompt-templates.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Auth, accounts & workspaces",
+            "Front end: server-rendered pages",
+            "Runs & dispatch",
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 14
+        },
+        {
+          "path": "lib/prompt-trace-store.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/prompts/autopilot-kickoff.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Runs & dispatch",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 4
+        },
+        {
+          "path": "lib/prompts/autopilot-manual.js",
+          "importedFromAreas": [
+            "Agent API (proxy)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/prompts/collective-participant.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/prompts/flight-companion-brief.js",
+          "importedFromAreas": [
+            "Front end: server-rendered pages",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/prompts/flight-companion-kickoff.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/prompts/passage-planner-kickoff.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/prompts/passage-runner-kickoff.js",
+          "importedFromAreas": [
+            "Agent API (proxy)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/prompts/roadmap-chat-template.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/prompts/roadmap-digest-template.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/prompts/roadmap-gap-template.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/prompts/roadmap-narrative-template.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/prompts/roadmap-north-star-template.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/prompts/roadmap-orientation-template.js",
+          "importedFromAreas": [
+            "Front end: server-rendered pages",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/prompts/roadmap-product-template.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/prompts/roadmap-trajectory-template.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/prompts/runner-kickoff.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Runs & dispatch"
+          ],
+          "importers": 3
+        },
+        {
+          "path": "lib/prompts/ship-biscuit-editor.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/prompts/task-chat-template.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/recap-cache.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Runs & dispatch",
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 5
+        },
+        {
+          "path": "lib/recap.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 3
+        },
+        {
+          "path": "lib/recommend-recurse.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 4
+        },
+        {
+          "path": "lib/recommendation-input.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/report-history-store.js",
+          "importedFromAreas": [
+            "Reports & operator tools",
+            "Wiring (server.js)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/roadmap.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 3
+        },
+        {
+          "path": "lib/saved-chat-store.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/scan-fingerprint.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/scan.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/ship-biscuit-history-store.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/ship-biscuit.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/should-mock-ai.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 7
+        },
+        {
+          "path": "lib/yap-client.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 2
+        }
+      ]
+    },
+    {
+      "name": "Other features",
+      "files": 1,
+      "internalImports": 0,
+      "entryFiles": [
+        {
+          "path": "lib/funnel-event-store.js",
+          "importedFromAreas": [
+            "Reports & operator tools",
+            "Wiring (server.js)"
+          ],
+          "importers": 2
+        }
+      ]
+    },
+    {
+      "name": "Platform & plumbing",
+      "files": 20,
+      "internalImports": 0,
+      "entryFiles": [
+        {
+          "path": "lib/async-errors.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/db-indexes.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/deploy-info.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/errors.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Auth, accounts & workspaces",
+            "Front end: server-rendered pages",
+            "Providers (Linear, GitHub, Jira, local)",
+            "Runs & dispatch",
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 42
+        },
+        {
+          "path": "lib/feature-defaults.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Auth, accounts & workspaces",
+            "Front end: server-rendered pages",
+            "Runs & dispatch",
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 22
+        },
+        {
+          "path": "lib/free-tier-store.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/hourly-cleanup.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/http-keepalive.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 7
+        },
+        {
+          "path": "lib/loose-json.js",
+          "importedFromAreas": [
+            "LLM & prompts",
+            "Runs & dispatch"
+          ],
+          "importers": 8
+        },
+        {
+          "path": "lib/partial-write-error.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Providers (Linear, GitHub, Jira, local)",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 3
+        },
+        {
+          "path": "lib/plan-fee-config.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/proxy-fetch.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "LLM & prompts",
+            "Providers (Linear, GitHub, Jira, local)"
+          ],
+          "importers": 6
+        },
+        {
+          "path": "lib/read-horizon.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "LLM & prompts",
+            "Reports & operator tools",
+            "Runs & dispatch"
+          ],
+          "importers": 10
+        },
+        {
+          "path": "lib/scheduler.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/secret-scan.js",
+          "importedFromAreas": [
+            "Front end: server-rendered pages",
+            "Reports & operator tools",
+            "Runs & dispatch"
+          ],
+          "importers": 4
+        },
+        {
+          "path": "lib/sse.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 5
+        },
+        {
+          "path": "lib/utils/html.js",
+          "importedFromAreas": [
+            "Front end: server-rendered pages",
+            "LLM & prompts"
+          ],
+          "importers": 54
+        },
+        {
+          "path": "lib/utils/time.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Auth, accounts & workspaces",
+            "LLM & prompts",
+            "Reports & operator tools",
+            "Runs & dispatch",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 36
+        },
+        {
+          "path": "lib/workflow-config.js",
+          "importedFromAreas": [
+            "Auth, accounts & workspaces",
+            "LLM & prompts",
+            "Runs & dispatch"
+          ],
+          "importers": 4
+        }
+      ]
+    },
+    {
+      "name": "Providers (Linear, GitHub, Jira, local)",
+      "files": 35,
+      "internalImports": 38,
+      "entryFiles": [
+        {
+          "path": "lib/attachment-upload.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/description-edit.js",
+          "importedFromAreas": [
+            "Agent API (proxy)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/github-pr-files.js",
+          "importedFromAreas": [
+            "Runs & dispatch"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/github-pr-status.js",
+          "importedFromAreas": [
+            "LLM & prompts",
+            "Runs & dispatch",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 6
+        },
+        {
+          "path": "lib/issue-write-validation.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 7
+        },
+        {
+          "path": "lib/linear-fetch.js",
+          "importedFromAreas": [
+            "LLM & prompts"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/linear.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/local-store.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/pr-state-copy.js",
+          "importedFromAreas": [
+            "Front end: server-rendered pages",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/pr-state-store.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/providers/github-projects/fake-client.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/providers/github-projects/index.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/providers/github/app-auth.js",
+          "importedFromAreas": [
+            "Auth, accounts & workspaces"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/providers/github/fake-client.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/providers/github/index.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/providers/index.js",
+          "importedFromAreas": [
+            "Auth, accounts & workspaces",
+            "Front end: server-rendered pages",
+            "Wiring (server.js)"
+          ],
+          "importers": 8
+        },
+        {
+          "path": "lib/providers/interface.js",
+          "importedFromAreas": [
+            "Auth, accounts & workspaces"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/providers/jira/fake-client.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/providers/jira/index.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/providers/jira/oauth.js",
+          "importedFromAreas": [
+            "Auth, accounts & workspaces",
+            "Front end: server-rendered pages",
+            "Wiring (server.js)"
+          ],
+          "importers": 3
+        },
+        {
+          "path": "lib/providers/linear/index.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/providers/local/index.js",
+          "importedFromAreas": [
+            "Agent API (proxy)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/providers/models.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Front end: server-rendered pages",
+            "LLM & prompts",
+            "Runs & dispatch"
+          ],
+          "importers": 11
+        },
+        {
+          "path": "lib/providers/registry.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Auth, accounts & workspaces",
+            "Front end: server-rendered pages",
+            "Runs & dispatch",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 19
+        },
+        {
+          "path": "lib/providers/state-map.js",
+          "importedFromAreas": [
+            "Front end: server-rendered pages",
+            "LLM & prompts",
+            "Runs & dispatch",
+            "Wiring (server.js)"
+          ],
+          "importers": 6
+        },
+        {
+          "path": "lib/sample-data/mock-data.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Auth, accounts & workspaces",
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 7
+        },
+        {
+          "path": "lib/sample-data/ship-dense-sample-data.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/sample-data/swim-sample-data.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/starter-seed.js",
+          "importedFromAreas": [
+            "Front end: server-rendered pages",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/task-attachments.js",
+          "importedFromAreas": [
+            "Front end: server-rendered pages"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/trashed-signal.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 3
+        }
+      ]
+    },
+    {
+      "name": "Reports & operator tools",
+      "files": 4,
+      "internalImports": 1,
+      "entryFiles": [
+        {
+          "path": "lib/kpi-stats.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/milestone-funnel.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/pricing-conformance-sweep.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        }
+      ]
+    },
+    {
+      "name": "Runs & dispatch",
+      "files": 90,
+      "internalImports": 126,
+      "entryFiles": [
+        {
+          "path": "lib/agent-status-store.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/close-out-events-store.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/completion-signals.js",
+          "importedFromAreas": [
+            "LLM & prompts"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/consumer-poll-warning.js",
+          "importedFromAreas": [
+            "Agent API (proxy)"
+          ],
+          "importers": 3
+        },
+        {
+          "path": "lib/dismissal-suggestions-store.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 3
+        },
+        {
+          "path": "lib/dispatch-entrance.js",
+          "importedFromAreas": [
+            "Agent API (proxy)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/dispatch-factory.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "LLM & prompts",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 6
+        },
+        {
+          "path": "lib/dispatch-feedback-validation.js",
+          "importedFromAreas": [
+            "Agent API (proxy)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/dispatch-fields.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 3
+        },
+        {
+          "path": "lib/dispatch-lineage.js",
+          "importedFromAreas": [
+            "Reports & operator tools"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/dispatch-presets-store.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/dispatch-referent-guard.js",
+          "importedFromAreas": [
+            "Agent API (proxy)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/dispatch-refusal.js",
+          "importedFromAreas": [
+            "Agent API (proxy)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/dispatch-session-redaction.js",
+          "importedFromAreas": [
+            "Agent API (proxy)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/dispatch-store.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "LLM & prompts",
+            "Reports & operator tools",
+            "Wiring (server.js)"
+          ],
+          "importers": 5
+        },
+        {
+          "path": "lib/dispatch-targets.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "LLM & prompts",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 5
+        },
+        {
+          "path": "lib/dispatch-terminal.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Front end: server-rendered pages",
+            "LLM & prompts",
+            "Reports & operator tools",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 6
+        },
+        {
+          "path": "lib/dispatch-validation.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 6
+        },
+        {
+          "path": "lib/dispatch-wake.js",
+          "importedFromAreas": [
+            "Agent API (proxy)"
+          ],
+          "importers": 3
+        },
+        {
+          "path": "lib/effort-readout.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/escalation-kpis.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/follow-up-dispatch.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/live-console.js",
+          "importedFromAreas": [
+            "LLM & prompts"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/liveness-alarm-store.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/liveness-alarm-sweep.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/loop-supersede.js",
+          "importedFromAreas": [
+            "Front end: server-rendered pages",
+            "LLM & prompts",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 3
+        },
+        {
+          "path": "lib/observation-sessions-materializer.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/observation-sessions-store.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/observer-pass.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/observer-shadow-log.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/observer-state-store.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/observer-sweep.js",
+          "importedFromAreas": [
+            "LLM & prompts",
+            "Wiring (server.js)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/owner-mint-refusals.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 4
+        },
+        {
+          "path": "lib/periodical-report-gate.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "LLM & prompts"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/periodical-runs.js",
+          "importedFromAreas": [
+            "Agent API (proxy)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/pipeline-loops.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "LLM & prompts",
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 6
+        },
+        {
+          "path": "lib/plan-review-round-trips.js",
+          "importedFromAreas": [
+            "LLM & prompts"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/poll-halt.js",
+          "importedFromAreas": [
+            "Agent API (proxy)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/queue-config.js",
+          "importedFromAreas": [
+            "LLM & prompts"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/recent-runs.js",
+          "importedFromAreas": [
+            "LLM & prompts"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/refresh-on-resolve-gate.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/run-closeout-state.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/run-evidence.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 3
+        },
+        {
+          "path": "lib/run-ledger.js",
+          "importedFromAreas": [
+            "LLM & prompts",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 3
+        },
+        {
+          "path": "lib/run-paragraph-hook.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/run-paragraph-store.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/run-proposals-store.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/run-summary-cache.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/run-summary.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/run-view.js",
+          "importedFromAreas": [
+            "Front end: server-rendered pages",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 3
+        },
+        {
+          "path": "lib/runner-kit/broker.mjs",
+          "importedFromAreas": [
+            "LLM & prompts"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/runner-kit/runner.mjs",
+          "importedFromAreas": [
+            "LLM & prompts"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/runner-owner-gate.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 7
+        },
+        {
+          "path": "lib/session-materializer-precompute.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/session-summary-cache.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/session-summary.js",
+          "importedFromAreas": [
+            "LLM & prompts",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/session-telemetry.js",
+          "importedFromAreas": [
+            "LLM & prompts",
+            "Reports & operator tools"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/sessions-feed-cache.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/sessions-view.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/shelved-rulings-store.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/superseded-selection.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/task-cost.js",
+          "importedFromAreas": [
+            "Agent API (proxy)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/task-decisions-store.js",
+          "importedFromAreas": [
+            "LLM & prompts",
+            "Wiring (server.js)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/task-done-cache.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/task-mode-store.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 3
+        },
+        {
+          "path": "lib/task-page-loader.js",
+          "importedFromAreas": [
+            "Front end: server-rendered pages",
+            "Wiring (server.js)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/task-run-facts.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/task-snapshot-store.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Wiring (server.js)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/task-stack.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "LLM & prompts"
+          ],
+          "importers": 3
+        },
+        {
+          "path": "lib/terminal-marked-task-cost.js",
+          "importedFromAreas": [
+            "Reports & operator tools"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/ticket-close-closer.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/unanswered-decisions.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "LLM & prompts",
+            "Web routes (pages & workspace API)"
+          ],
+          "importers": 3
+        },
+        {
+          "path": "lib/wake-credential.js",
+          "importedFromAreas": [
+            "Agent API (proxy)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "lib/weekly-budget.js",
+          "importedFromAreas": [
+            "Front end: server-rendered pages",
+            "Reports & operator tools"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "lib/workspace-halt.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "LLM & prompts",
+            "Wiring (server.js)"
+          ],
+          "importers": 3
+        },
+        {
+          "path": "routes/dispatch.js",
+          "importedFromAreas": [
+            "Web routes (pages & workspace API)",
+            "Wiring (server.js)"
+          ],
+          "importers": 3
+        },
+        {
+          "path": "routes/live-console.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "routes/runner-kit.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "routes/runner-setup.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        }
+      ]
+    },
+    {
+      "name": "Web routes (pages & workspace API)",
+      "files": 21,
+      "internalImports": 6,
+      "entryFiles": [
+        {
+          "path": "routes/collective.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "routes/dashboard.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Wiring (server.js)"
+          ],
+          "importers": 3
+        },
+        {
+          "path": "routes/flight-companion.js",
+          "importedFromAreas": [
+            "Agent API (proxy)",
+            "Wiring (server.js)"
+          ],
+          "importers": 2
+        },
+        {
+          "path": "routes/legacy-redirects.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "routes/library.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "routes/milestone-funnel.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "routes/next-run.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "routes/passage-planner.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "routes/ship-biscuit.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "routes/ship-journey.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "routes/task-chat.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "routes/task-create.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "routes/task-edit.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "routes/task-mode.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "routes/task-page.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "routes/task-share.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "routes/test.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "routes/workspace-api.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        },
+        {
+          "path": "routes/workspace.js",
+          "importedFromAreas": [
+            "Wiring (server.js)"
+          ],
+          "importers": 1
+        }
+      ]
+    },
+    {
+      "name": "Wiring (server.js)",
+      "files": 1,
+      "internalImports": 0,
+      "entryFiles": []
+    }
+  ],
+  "links": [
+    {
+      "from": "Agent API (proxy)",
+      "to": "Auth, accounts & workspaces",
+      "imports": 15
+    },
+    {
+      "from": "Agent API (proxy)",
+      "to": "Front end: server-rendered pages",
+      "imports": 2
+    },
+    {
+      "from": "Agent API (proxy)",
+      "to": "LLM & prompts",
+      "imports": 38
+    },
+    {
+      "from": "Agent API (proxy)",
+      "to": "Platform & plumbing",
+      "imports": 28
+    },
+    {
+      "from": "Agent API (proxy)",
+      "to": "Providers (Linear, GitHub, Jira, local)",
+      "imports": 18
+    },
+    {
+      "from": "Agent API (proxy)",
+      "to": "Runs & dispatch",
+      "imports": 46
+    },
+    {
+      "from": "Agent API (proxy)",
+      "to": "Web routes (pages & workspace API)",
+      "imports": 3
+    },
+    {
+      "from": "Auth, accounts & workspaces",
+      "to": "Front end: server-rendered pages",
+      "imports": 12
+    },
+    {
+      "from": "Auth, accounts & workspaces",
+      "to": "LLM & prompts",
+      "imports": 2
+    },
+    {
+      "from": "Auth, accounts & workspaces",
+      "to": "Platform & plumbing",
+      "imports": 5
+    },
+    {
+      "from": "Auth, accounts & workspaces",
+      "to": "Providers (Linear, GitHub, Jira, local)",
+      "imports": 9
+    },
+    {
+      "from": "Front end: server-rendered pages",
+      "to": "Agent API (proxy)",
+      "imports": 1
+    },
+    {
+      "from": "Front end: server-rendered pages",
+      "to": "Auth, accounts & workspaces",
+      "imports": 15
+    },
+    {
+      "from": "Front end: server-rendered pages",
+      "to": "LLM & prompts",
+      "imports": 16
+    },
+    {
+      "from": "Front end: server-rendered pages",
+      "to": "Platform & plumbing",
+      "imports": 57
+    },
+    {
+      "from": "Front end: server-rendered pages",
+      "to": "Providers (Linear, GitHub, Jira, local)",
+      "imports": 21
+    },
+    {
+      "from": "Front end: server-rendered pages",
+      "to": "Runs & dispatch",
+      "imports": 6
+    },
+    {
+      "from": "LLM & prompts",
+      "to": "Agent API (proxy)",
+      "imports": 2
+    },
+    {
+      "from": "LLM & prompts",
+      "to": "Auth, accounts & workspaces",
+      "imports": 3
+    },
+    {
+      "from": "LLM & prompts",
+      "to": "Front end: server-rendered pages",
+      "imports": 7
+    },
+    {
+      "from": "LLM & prompts",
+      "to": "Platform & plumbing",
+      "imports": 19
+    },
+    {
+      "from": "LLM & prompts",
+      "to": "Providers (Linear, GitHub, Jira, local)",
+      "imports": 5
+    },
+    {
+      "from": "LLM & prompts",
+      "to": "Runs & dispatch",
+      "imports": 25
+    },
+    {
+      "from": "Providers (Linear, GitHub, Jira, local)",
+      "to": "Agent API (proxy)",
+      "imports": 3
+    },
+    {
+      "from": "Providers (Linear, GitHub, Jira, local)",
+      "to": "Auth, accounts & workspaces",
+      "imports": 1
+    },
+    {
+      "from": "Providers (Linear, GitHub, Jira, local)",
+      "to": "Front end: server-rendered pages",
+      "imports": 4
+    },
+    {
+      "from": "Providers (Linear, GitHub, Jira, local)",
+      "to": "LLM & prompts",
+      "imports": 2
+    },
+    {
+      "from": "Providers (Linear, GitHub, Jira, local)",
+      "to": "Platform & plumbing",
+      "imports": 5
+    },
+    {
+      "from": "Reports & operator tools",
+      "to": "LLM & prompts",
+      "imports": 4
+    },
+    {
+      "from": "Reports & operator tools",
+      "to": "Other features",
+      "imports": 1
+    },
+    {
+      "from": "Reports & operator tools",
+      "to": "Platform & plumbing",
+      "imports": 4
+    },
+    {
+      "from": "Reports & operator tools",
+      "to": "Runs & dispatch",
+      "imports": 6
+    },
+    {
+      "from": "Runs & dispatch",
+      "to": "Agent API (proxy)",
+      "imports": 7
+    },
+    {
+      "from": "Runs & dispatch",
+      "to": "Auth, accounts & workspaces",
+      "imports": 17
+    },
+    {
+      "from": "Runs & dispatch",
+      "to": "Front end: server-rendered pages",
+      "imports": 8
+    },
+    {
+      "from": "Runs & dispatch",
+      "to": "LLM & prompts",
+      "imports": 18
+    },
+    {
+      "from": "Runs & dispatch",
+      "to": "Platform & plumbing",
+      "imports": 44
+    },
+    {
+      "from": "Runs & dispatch",
+      "to": "Providers (Linear, GitHub, Jira, local)",
+      "imports": 7
+    },
+    {
+      "from": "Web routes (pages & workspace API)",
+      "to": "Agent API (proxy)",
+      "imports": 5
+    },
+    {
+      "from": "Web routes (pages & workspace API)",
+      "to": "Auth, accounts & workspaces",
+      "imports": 37
+    },
+    {
+      "from": "Web routes (pages & workspace API)",
+      "to": "Front end: server-rendered pages",
+      "imports": 34
+    },
+    {
+      "from": "Web routes (pages & workspace API)",
+      "to": "LLM & prompts",
+      "imports": 63
+    },
+    {
+      "from": "Web routes (pages & workspace API)",
+      "to": "Platform & plumbing",
+      "imports": 37
+    },
+    {
+      "from": "Web routes (pages & workspace API)",
+      "to": "Providers (Linear, GitHub, Jira, local)",
+      "imports": 28
+    },
+    {
+      "from": "Web routes (pages & workspace API)",
+      "to": "Reports & operator tools",
+      "imports": 1
+    },
+    {
+      "from": "Web routes (pages & workspace API)",
+      "to": "Runs & dispatch",
+      "imports": 43
+    },
+    {
+      "from": "Wiring (server.js)",
+      "to": "Agent API (proxy)",
+      "imports": 6
+    },
+    {
+      "from": "Wiring (server.js)",
+      "to": "Auth, accounts & workspaces",
+      "imports": 43
+    },
+    {
+      "from": "Wiring (server.js)",
+      "to": "Front end: server-rendered pages",
+      "imports": 19
+    },
+    {
+      "from": "Wiring (server.js)",
+      "to": "LLM & prompts",
+      "imports": 19
+    },
+    {
+      "from": "Wiring (server.js)",
+      "to": "Other features",
+      "imports": 1
+    },
+    {
+      "from": "Wiring (server.js)",
+      "to": "Platform & plumbing",
+      "imports": 9
+    },
+    {
+      "from": "Wiring (server.js)",
+      "to": "Providers (Linear, GitHub, Jira, local)",
+      "imports": 9
+    },
+    {
+      "from": "Wiring (server.js)",
+      "to": "Reports & operator tools",
+      "imports": 2
+    },
+    {
+      "from": "Wiring (server.js)",
+      "to": "Runs & dispatch",
+      "imports": 37
+    },
+    {
+      "from": "Wiring (server.js)",
+      "to": "Web routes (pages & workspace API)",
+      "imports": 19
+    }
+  ],
+  "knots": {
+    "pairs": [
+      {
+        "a": "Agent API (proxy)",
+        "b": "Front end: server-rendered pages",
+        "aToB": 2,
+        "bToA": 1,
+        "crossings": [
+          {
+            "from": "routes/proxy-compute.js",
+            "to": "lib/tree.js"
+          },
+          {
+            "from": "routes/proxy.js",
+            "to": "lib/tree.js"
+          },
+          {
+            "from": "lib/render-runner-setup.js",
+            "to": "lib/proxy-scopes.js"
+          }
+        ]
+      },
+      {
+        "a": "Agent API (proxy)",
+        "b": "LLM & prompts",
+        "aToB": 38,
+        "bToA": 2,
+        "crossings": [
+          {
+            "from": "routes/proxy-compute.js",
+            "to": "lib/brief.js"
+          },
+          {
+            "from": "routes/proxy-compute.js",
+            "to": "lib/chat-request.js"
+          },
+          {
+            "from": "routes/proxy-compute.js",
+            "to": "lib/next-run.js"
+          },
+          {
+            "from": "routes/proxy-compute.js",
+            "to": "lib/north-star-resolver.js"
+          },
+          {
+            "from": "routes/proxy-compute.js",
+            "to": "lib/periodicals.js"
+          },
+          {
+            "from": "routes/proxy-compute.js",
+            "to": "lib/prompt-formatters.js"
+          },
+          {
+            "from": "routes/proxy-compute.js",
+            "to": "lib/prompt-templates.js"
+          },
+          {
+            "from": "routes/proxy-compute.js",
+            "to": "lib/recap-cache.js"
+          },
+          {
+            "from": "routes/proxy-compute.js",
+            "to": "lib/recap.js"
+          },
+          {
+            "from": "routes/proxy-compute.js",
+            "to": "lib/recommend-recurse.js"
+          },
+          {
+            "from": "routes/proxy-dispatch.js",
+            "to": "lib/chat-request.js"
+          },
+          {
+            "from": "routes/proxy-dispatch.js",
+            "to": "lib/periodicals.js"
+          },
+          {
+            "from": "routes/proxy-dispatch.js",
+            "to": "lib/prompt-templates.js"
+          },
+          {
+            "from": "routes/proxy-dispatch.js",
+            "to": "lib/recommend-recurse.js"
+          },
+          {
+            "from": "routes/proxy-flight-companion.js",
+            "to": "lib/agent-turn.js"
+          },
+          {
+            "from": "routes/proxy-flight-companion.js",
+            "to": "lib/chat-request.js"
+          },
+          {
+            "from": "routes/proxy-flight-companion.js",
+            "to": "lib/chat-tools.js"
+          },
+          {
+            "from": "routes/proxy-flight-companion.js",
+            "to": "lib/chat-transcript.js"
+          },
+          {
+            "from": "routes/proxy-flight-companion.js",
+            "to": "lib/openrouter.js"
+          },
+          {
+            "from": "routes/proxy-kickoff.js",
+            "to": "lib/chat-request.js"
+          },
+          {
+            "from": "routes/proxy-kickoff.js",
+            "to": "lib/prompts/autopilot-kickoff.js"
+          },
+          {
+            "from": "routes/proxy-kickoff.js",
+            "to": "lib/prompts/autopilot-manual.js"
+          },
+          {
+            "from": "routes/proxy-kickoff.js",
+            "to": "lib/prompts/passage-runner-kickoff.js"
+          },
+          {
+            "from": "routes/proxy-runner-prompt.js",
+            "to": "lib/prompts/runner-kickoff.js"
+          },
+          {
+            "from": "routes/proxy.js",
+            "to": "lib/brief.js"
+          },
+          {
+            "from": "routes/proxy.js",
+            "to": "lib/chat-request.js"
+          },
+          {
+            "from": "routes/proxy.js",
+            "to": "lib/next-run.js"
+          },
+          {
+            "from": "routes/proxy.js",
+            "to": "lib/north-star-resolver.js"
+          },
+          {
+            "from": "routes/proxy.js",
+            "to": "lib/openrouter.js"
+          },
+          {
+            "from": "routes/proxy.js",
+            "to": "lib/periodicals.js"
+          },
+          {
+            "from": "routes/proxy.js",
+            "to": "lib/prompt-templates.js"
+          },
+          {
+            "from": "routes/proxy.js",
+            "to": "lib/prompts/autopilot-kickoff.js"
+          },
+          {
+            "from": "routes/proxy.js",
+            "to": "lib/prompts/autopilot-manual.js"
+          },
+          {
+            "from": "routes/proxy.js",
+            "to": "lib/prompts/passage-runner-kickoff.js"
+          },
+          {
+            "from": "routes/proxy.js",
+            "to": "lib/recap-cache.js"
+          },
+          {
+            "from": "routes/proxy.js",
+            "to": "lib/recap.js"
+          },
+          {
+            "from": "routes/proxy.js",
+            "to": "lib/recommend-recurse.js"
+          },
+          {
+            "from": "routes/proxy.js",
+            "to": "lib/recommendation-input.js"
+          },
+          {
+            "from": "lib/chat-tools.js",
+            "to": "lib/proxy-preamble.js"
+          },
+          {
+            "from": "lib/prompts/runner-kickoff.js",
+            "to": "lib/proxy-scopes.js"
+          }
+        ]
+      },
+      {
+        "a": "Agent API (proxy)",
+        "b": "Providers (Linear, GitHub, Jira, local)",
+        "aToB": 18,
+        "bToA": 3,
+        "crossings": [
+          {
+            "from": "lib/proxy-ref-resolver.js",
+            "to": "lib/providers/models.js"
+          },
+          {
+            "from": "lib/proxy-wire.js",
+            "to": "lib/providers/models.js"
+          },
+          {
+            "from": "routes/proxy-agent-status.js",
+            "to": "lib/issue-write-validation.js"
+          },
+          {
+            "from": "routes/proxy-dispatch.js",
+            "to": "lib/issue-write-validation.js"
+          },
+          {
+            "from": "routes/proxy-kickoff.js",
+            "to": "lib/issue-write-validation.js"
+          },
+          {
+            "from": "routes/proxy-reads.js",
+            "to": "lib/trashed-signal.js"
+          },
+          {
+            "from": "routes/proxy-tokens-admin.js",
+            "to": "lib/issue-write-validation.js"
+          },
+          {
+            "from": "routes/proxy-tokens-admin.js",
+            "to": "lib/providers/registry.js"
+          },
+          {
+            "from": "routes/proxy-writes.js",
+            "to": "lib/attachment-upload.js"
+          },
+          {
+            "from": "routes/proxy-writes.js",
+            "to": "lib/description-edit.js"
+          },
+          {
+            "from": "routes/proxy-writes.js",
+            "to": "lib/issue-write-validation.js"
+          },
+          {
+            "from": "routes/proxy-writes.js",
+            "to": "lib/providers/models.js"
+          },
+          {
+            "from": "routes/proxy-writes.js",
+            "to": "lib/trashed-signal.js"
+          },
+          {
+            "from": "routes/proxy.js",
+            "to": "lib/issue-write-validation.js"
+          },
+          {
+            "from": "routes/proxy.js",
+            "to": "lib/providers/linear/index.js"
+          },
+          {
+            "from": "routes/proxy.js",
+            "to": "lib/providers/local/index.js"
+          },
+          {
+            "from": "routes/proxy.js",
+            "to": "lib/providers/registry.js"
+          },
+          {
+            "from": "routes/proxy.js",
+            "to": "lib/sample-data/mock-data.js"
+          },
+          {
+            "from": "lib/providers/github/index.js",
+            "to": "lib/proxy-ref-resolver.js"
+          },
+          {
+            "from": "lib/providers/jira/index.js",
+            "to": "lib/proxy-ref-resolver.js"
+          },
+          {
+            "from": "lib/providers/linear/index.js",
+            "to": "lib/proxy-wire.js"
+          }
+        ]
+      },
+      {
+        "a": "Agent API (proxy)",
+        "b": "Runs & dispatch",
+        "aToB": 46,
+        "bToA": 7,
+        "crossings": [
+          {
+            "from": "lib/proxy-preamble.js",
+            "to": "lib/owner-mint-refusals.js"
+          },
+          {
+            "from": "lib/proxy-tokens.js",
+            "to": "lib/owner-mint-refusals.js"
+          },
+          {
+            "from": "routes/proxy-compute.js",
+            "to": "lib/dispatch-store.js"
+          },
+          {
+            "from": "routes/proxy-compute.js",
+            "to": "lib/periodical-runs.js"
+          },
+          {
+            "from": "routes/proxy-compute.js",
+            "to": "lib/task-cost.js"
+          },
+          {
+            "from": "routes/proxy-compute.js",
+            "to": "lib/task-stack.js"
+          },
+          {
+            "from": "routes/proxy-dispatch.js",
+            "to": "lib/consumer-poll-warning.js"
+          },
+          {
+            "from": "routes/proxy-dispatch.js",
+            "to": "lib/dispatch-entrance.js"
+          },
+          {
+            "from": "routes/proxy-dispatch.js",
+            "to": "lib/dispatch-factory.js"
+          },
+          {
+            "from": "routes/proxy-dispatch.js",
+            "to": "lib/dispatch-fields.js"
+          },
+          {
+            "from": "routes/proxy-dispatch.js",
+            "to": "lib/dispatch-referent-guard.js"
+          },
+          {
+            "from": "routes/proxy-dispatch.js",
+            "to": "lib/dispatch-session-redaction.js"
+          },
+          {
+            "from": "routes/proxy-dispatch.js",
+            "to": "lib/dispatch-targets.js"
+          },
+          {
+            "from": "routes/proxy-dispatch.js",
+            "to": "lib/dispatch-terminal.js"
+          },
+          {
+            "from": "routes/proxy-dispatch.js",
+            "to": "lib/dispatch-validation.js"
+          },
+          {
+            "from": "routes/proxy-dispatch.js",
+            "to": "lib/dispatch-wake.js"
+          },
+          {
+            "from": "routes/proxy-halt.js",
+            "to": "lib/runner-owner-gate.js"
+          },
+          {
+            "from": "routes/proxy-halt.js",
+            "to": "lib/workspace-halt.js"
+          },
+          {
+            "from": "routes/proxy-kickoff.js",
+            "to": "lib/consumer-poll-warning.js"
+          },
+          {
+            "from": "routes/proxy-kickoff.js",
+            "to": "lib/dispatch-entrance.js"
+          },
+          {
+            "from": "routes/proxy-kickoff.js",
+            "to": "lib/dispatch-factory.js"
+          },
+          {
+            "from": "routes/proxy-kickoff.js",
+            "to": "lib/dispatch-fields.js"
+          },
+          {
+            "from": "routes/proxy-kickoff.js",
+            "to": "lib/dispatch-targets.js"
+          },
+          {
+            "from": "routes/proxy-kickoff.js",
+            "to": "lib/dispatch-validation.js"
+          },
+          {
+            "from": "routes/proxy-kickoff.js",
+            "to": "lib/dispatch-wake.js"
+          },
+          {
+            "from": "routes/proxy-rulings.js",
+            "to": "lib/dismissal-suggestions-store.js"
+          },
+          {
+            "from": "routes/proxy-rulings.js",
+            "to": "lib/pipeline-loops.js"
+          },
+          {
+            "from": "routes/proxy-rulings.js",
+            "to": "lib/unanswered-decisions.js"
+          },
+          {
+            "from": "routes/proxy-runner.js",
+            "to": "lib/consumer-poll-warning.js"
+          },
+          {
+            "from": "routes/proxy-runner.js",
+            "to": "lib/dispatch-feedback-validation.js"
+          },
+          {
+            "from": "routes/proxy-runner.js",
+            "to": "lib/poll-halt.js"
+          },
+          {
+            "from": "routes/proxy-runner.js",
+            "to": "lib/wake-credential.js"
+          },
+          {
+            "from": "routes/proxy-tokens-admin.js",
+            "to": "lib/owner-mint-refusals.js"
+          },
+          {
+            "from": "routes/proxy-tokens-admin.js",
+            "to": "lib/runner-owner-gate.js"
+          },
+          {
+            "from": "routes/proxy-writes.js",
+            "to": "lib/periodical-report-gate.js"
+          },
+          {
+            "from": "routes/proxy.js",
+            "to": "lib/dispatch-factory.js"
+          },
+          {
+            "from": "routes/proxy.js",
+            "to": "lib/dispatch-referent-guard.js"
+          },
+          {
+            "from": "routes/proxy.js",
+            "to": "lib/dispatch-refusal.js"
+          },
+          {
+            "from": "routes/proxy.js",
+            "to": "lib/dispatch-store.js"
+          },
+          {
+            "from": "routes/proxy.js",
+            "to": "lib/dispatch-terminal.js"
+          },
+          {
+            "from": "routes/proxy.js",
+            "to": "lib/dispatch-validation.js"
+          },
+          {
+            "from": "routes/proxy.js",
+            "to": "lib/dispatch-wake.js"
+          },
+          {
+            "from": "routes/proxy.js",
+            "to": "lib/periodical-runs.js"
+          },
+          {
+            "from": "routes/proxy.js",
+            "to": "lib/task-cost.js"
+          },
+          {
+            "from": "routes/proxy.js",
+            "to": "lib/task-snapshot-store.js"
+          },
+          {
+            "from": "routes/proxy.js",
+            "to": "lib/task-stack.js"
+          },
+          {
+            "from": "lib/consumer-poll-warning.js",
+            "to": "lib/proxy-scopes.js"
+          },
+          {
+            "from": "lib/dispatch-factory.js",
+            "to": "lib/proxy-preamble.js"
+          },
+          {
+            "from": "lib/follow-up-dispatch.js",
+            "to": "lib/proxy-preamble.js"
+          },
+          {
+            "from": "lib/wake-credential.js",
+            "to": "lib/proxy-preamble.js"
+          },
+          {
+            "from": "routes/dispatch.js",
+            "to": "lib/proxy-preamble.js"
+          },
+          {
+            "from": "routes/dispatch.js",
+            "to": "lib/proxy-scopes.js"
+          },
+          {
+            "from": "routes/dispatch.js",
+            "to": "lib/proxy-tokens.js"
+          }
+        ]
+      },
+      {
+        "a": "Agent API (proxy)",
+        "b": "Web routes (pages & workspace API)",
+        "aToB": 3,
+        "bToA": 5,
+        "crossings": [
+          {
+            "from": "routes/proxy-flight-companion.js",
+            "to": "routes/dashboard.js"
+          },
+          {
+            "from": "routes/proxy-flight-companion.js",
+            "to": "routes/flight-companion.js"
+          },
+          {
+            "from": "routes/proxy-rulings.js",
+            "to": "routes/dashboard.js"
+          },
+          {
+            "from": "routes/collective.js",
+            "to": "lib/proxy-preamble.js"
+          },
+          {
+            "from": "routes/workspace-api.js",
+            "to": "lib/proxy-dedupe.js"
+          },
+          {
+            "from": "routes/workspace-api.js",
+            "to": "lib/proxy-preamble.js"
+          },
+          {
+            "from": "routes/workspace-api.js",
+            "to": "lib/proxy-ref-resolver.js"
+          },
+          {
+            "from": "routes/workspace-api.js",
+            "to": "routes/proxy.js"
+          }
+        ]
+      },
+      {
+        "a": "Auth, accounts & workspaces",
+        "b": "Front end: server-rendered pages",
+        "aToB": 12,
+        "bToA": 15,
+        "crossings": [
+          {
+            "from": "lib/account-conflict.js",
+            "to": "lib/render-pages.js"
+          },
+          {
+            "from": "lib/github-install-flow.js",
+            "to": "lib/render-pages.js"
+          },
+          {
+            "from": "lib/workspace-api-mocks.js",
+            "to": "lib/tree.js"
+          },
+          {
+            "from": "routes/account-merge.js",
+            "to": "lib/render-pages.js"
+          },
+          {
+            "from": "routes/auth.js",
+            "to": "lib/render.js"
+          },
+          {
+            "from": "routes/email-auth.js",
+            "to": "lib/render-account-home.js"
+          },
+          {
+            "from": "routes/email-auth.js",
+            "to": "lib/render-email-auth.js"
+          },
+          {
+            "from": "routes/github-auth.js",
+            "to": "lib/render-pages.js"
+          },
+          {
+            "from": "routes/github-projects-auth.js",
+            "to": "lib/render-pages.js"
+          },
+          {
+            "from": "routes/held-connection.js",
+            "to": "lib/render-pages.js"
+          },
+          {
+            "from": "routes/jira-auth.js",
+            "to": "lib/render-pages.js"
+          },
+          {
+            "from": "routes/openrouter-auth.js",
+            "to": "lib/render.js"
+          },
+          {
+            "from": "lib/components/navbar.js",
+            "to": "lib/email-availability.js"
+          },
+          {
+            "from": "lib/components/navbar.js",
+            "to": "lib/held-connection-entry.js"
+          },
+          {
+            "from": "lib/components/navbar.js",
+            "to": "lib/workspace-lookup.js"
+          },
+          {
+            "from": "lib/render-legal.js",
+            "to": "lib/session-options.js"
+          },
+          {
+            "from": "lib/render-legal.js",
+            "to": "lib/user-preferences.js"
+          },
+          {
+            "from": "lib/render-roadmap.js",
+            "to": "lib/workspace-lookup.js"
+          },
+          {
+            "from": "lib/render-run-steps.js",
+            "to": "lib/credential-state.js"
+          },
+          {
+            "from": "lib/render-session.js",
+            "to": "lib/credential-state.js"
+          },
+          {
+            "from": "lib/render-settings.js",
+            "to": "lib/email-availability.js"
+          },
+          {
+            "from": "lib/render-settings.js",
+            "to": "lib/held-connection-entry.js"
+          },
+          {
+            "from": "lib/render-settings.js",
+            "to": "lib/workspace-preferences.js"
+          },
+          {
+            "from": "lib/render-ship.js",
+            "to": "lib/workspace-lookup.js"
+          },
+          {
+            "from": "lib/render-swim.js",
+            "to": "lib/workspace-lookup.js"
+          },
+          {
+            "from": "lib/render-swipe.js",
+            "to": "lib/workspace-lookup.js"
+          },
+          {
+            "from": "lib/render.js",
+            "to": "lib/workspace-lookup.js"
+          }
+        ]
+      },
+      {
+        "a": "Auth, accounts & workspaces",
+        "b": "LLM & prompts",
+        "aToB": 2,
+        "bToA": 3,
+        "crossings": [
+          {
+            "from": "lib/workspace-preferences.js",
+            "to": "lib/openrouter.js"
+          },
+          {
+            "from": "lib/workspace-preferences.js",
+            "to": "lib/prompt-templates.js"
+          },
+          {
+            "from": "lib/agent-turn.js",
+            "to": "lib/workspace-preferences.js"
+          },
+          {
+            "from": "lib/chat-request.js",
+            "to": "lib/account-group.js"
+          },
+          {
+            "from": "lib/chat-tools.js",
+            "to": "lib/workspace.js"
+          }
+        ]
+      },
+      {
+        "a": "Auth, accounts & workspaces",
+        "b": "Providers (Linear, GitHub, Jira, local)",
+        "aToB": 9,
+        "bToA": 1,
+        "crossings": [
+          {
+            "from": "lib/github-install-flow.js",
+            "to": "lib/providers/github/app-auth.js"
+          },
+          {
+            "from": "lib/pat-session.js",
+            "to": "lib/providers/registry.js"
+          },
+          {
+            "from": "lib/workspace-api-mocks.js",
+            "to": "lib/sample-data/mock-data.js"
+          },
+          {
+            "from": "lib/workspace.js",
+            "to": "lib/providers/registry.js"
+          },
+          {
+            "from": "routes/auth.js",
+            "to": "lib/providers/interface.js"
+          },
+          {
+            "from": "routes/auth.js",
+            "to": "lib/providers/registry.js"
+          },
+          {
+            "from": "routes/email-auth.js",
+            "to": "lib/providers/index.js"
+          },
+          {
+            "from": "routes/held-connection.js",
+            "to": "lib/providers/registry.js"
+          },
+          {
+            "from": "routes/jira-auth.js",
+            "to": "lib/providers/jira/oauth.js"
+          },
+          {
+            "from": "lib/providers/jira/oauth.js",
+            "to": "lib/token-refresh.js"
+          }
+        ]
+      },
+      {
+        "a": "Front end: server-rendered pages",
+        "b": "LLM & prompts",
+        "aToB": 16,
+        "bToA": 7,
+        "crossings": [
+          {
+            "from": "lib/render-flight-companion.js",
+            "to": "lib/prompts/flight-companion-brief.js"
+          },
+          {
+            "from": "lib/render-landing.js",
+            "to": "lib/library-metadata.js"
+          },
+          {
+            "from": "lib/render-landing.js",
+            "to": "lib/openrouter.js"
+          },
+          {
+            "from": "lib/render-library.js",
+            "to": "lib/library.js"
+          },
+          {
+            "from": "lib/render-prompt-opts.js",
+            "to": "lib/prompt-templates.js"
+          },
+          {
+            "from": "lib/render-prompts.js",
+            "to": "lib/audit.js"
+          },
+          {
+            "from": "lib/render-prompts.js",
+            "to": "lib/prompt-templates.js"
+          },
+          {
+            "from": "lib/render-roadmap.js",
+            "to": "lib/openrouter.js"
+          },
+          {
+            "from": "lib/render-settings.js",
+            "to": "lib/openrouter-catalog.js"
+          },
+          {
+            "from": "lib/render-settings.js",
+            "to": "lib/openrouter.js"
+          },
+          {
+            "from": "lib/render-settings.js",
+            "to": "lib/prompt-templates.js"
+          },
+          {
+            "from": "lib/render-swipe.js",
+            "to": "lib/graph-features.js"
+          },
+          {
+            "from": "lib/render-templates.js",
+            "to": "lib/audit.js"
+          },
+          {
+            "from": "lib/render.js",
+            "to": "lib/prompt-templates.js"
+          },
+          {
+            "from": "lib/ship-journey.js",
+            "to": "lib/prompts/roadmap-orientation-template.js"
+          },
+          {
+            "from": "lib/tree.js",
+            "to": "lib/graph-features.js"
+          },
+          {
+            "from": "lib/audit.js",
+            "to": "lib/tree.js"
+          },
+          {
+            "from": "lib/openrouter.js",
+            "to": "lib/tree.js"
+          },
+          {
+            "from": "lib/prompt-templates.js",
+            "to": "lib/tree.js"
+          },
+          {
+            "from": "lib/recommend-recurse.js",
+            "to": "lib/tree.js"
+          },
+          {
+            "from": "lib/recommendation-facts.js",
+            "to": "lib/tree.js"
+          },
+          {
+            "from": "lib/roadmap.js",
+            "to": "lib/render-swipe.js"
+          },
+          {
+            "from": "lib/roadmap.js",
+            "to": "lib/tree.js"
+          }
+        ]
+      },
+      {
+        "a": "Front end: server-rendered pages",
+        "b": "Providers (Linear, GitHub, Jira, local)",
+        "aToB": 21,
+        "bToA": 4,
+        "crossings": [
+          {
+            "from": "lib/components/landing-hero.js",
+            "to": "lib/providers/index.js"
+          },
+          {
+            "from": "lib/components/navbar.js",
+            "to": "lib/providers/index.js"
+          },
+          {
+            "from": "lib/render-account-home.js",
+            "to": "lib/providers/index.js"
+          },
+          {
+            "from": "lib/render-landing.js",
+            "to": "lib/providers/index.js"
+          },
+          {
+            "from": "lib/render-pages.js",
+            "to": "lib/providers/index.js"
+          },
+          {
+            "from": "lib/render-pages.js",
+            "to": "lib/providers/jira/oauth.js"
+          },
+          {
+            "from": "lib/render-session.js",
+            "to": "lib/pr-state-copy.js"
+          },
+          {
+            "from": "lib/render-settings.js",
+            "to": "lib/providers/index.js"
+          },
+          {
+            "from": "lib/render-ship.js",
+            "to": "lib/providers/registry.js"
+          },
+          {
+            "from": "lib/render-swim.js",
+            "to": "lib/providers/registry.js"
+          },
+          {
+            "from": "lib/render-swipe.js",
+            "to": "lib/providers/models.js"
+          },
+          {
+            "from": "lib/render-swipe.js",
+            "to": "lib/providers/registry.js"
+          },
+          {
+            "from": "lib/render-swipe.js",
+            "to": "lib/providers/state-map.js"
+          },
+          {
+            "from": "lib/render-swipe.js",
+            "to": "lib/starter-seed.js"
+          },
+          {
+            "from": "lib/render.js",
+            "to": "lib/providers/models.js"
+          },
+          {
+            "from": "lib/render.js",
+            "to": "lib/providers/registry.js"
+          },
+          {
+            "from": "lib/render.js",
+            "to": "lib/providers/state-map.js"
+          },
+          {
+            "from": "lib/render.js",
+            "to": "lib/task-attachments.js"
+          },
+          {
+            "from": "lib/swim-lanes.js",
+            "to": "lib/providers/models.js"
+          },
+          {
+            "from": "lib/tree.js",
+            "to": "lib/providers/models.js"
+          },
+          {
+            "from": "lib/tree.js",
+            "to": "lib/providers/state-map.js"
+          },
+          {
+            "from": "lib/providers/jira/index.js",
+            "to": "lib/tree.js"
+          },
+          {
+            "from": "lib/providers/linear/index.js",
+            "to": "lib/tree.js"
+          },
+          {
+            "from": "lib/providers/local/index.js",
+            "to": "lib/tree.js"
+          },
+          {
+            "from": "lib/sample-data/mock-data.js",
+            "to": "lib/tree.js"
+          }
+        ]
+      },
+      {
+        "a": "Front end: server-rendered pages",
+        "b": "Runs & dispatch",
+        "aToB": 6,
+        "bToA": 8,
+        "crossings": [
+          {
+            "from": "lib/render-kpis.js",
+            "to": "lib/weekly-budget.js"
+          },
+          {
+            "from": "lib/render-run-steps.js",
+            "to": "lib/dispatch-terminal.js"
+          },
+          {
+            "from": "lib/render-run-steps.js",
+            "to": "lib/run-view.js"
+          },
+          {
+            "from": "lib/render-session.js",
+            "to": "lib/loop-supersede.js"
+          },
+          {
+            "from": "lib/render-session.js",
+            "to": "lib/run-view.js"
+          },
+          {
+            "from": "lib/render-task-page.js",
+            "to": "lib/task-page-loader.js"
+          },
+          {
+            "from": "lib/live-console.js",
+            "to": "lib/timeline-zoom.js"
+          },
+          {
+            "from": "lib/task-page-loader.js",
+            "to": "lib/render-run-steps.js"
+          },
+          {
+            "from": "lib/task-stack.js",
+            "to": "lib/render-swipe.js"
+          },
+          {
+            "from": "lib/task-stack.js",
+            "to": "lib/tree.js"
+          },
+          {
+            "from": "routes/live-console.js",
+            "to": "lib/render-live-console.js"
+          },
+          {
+            "from": "routes/live-console.js",
+            "to": "lib/render.js"
+          },
+          {
+            "from": "routes/runner-setup.js",
+            "to": "lib/render-runner-setup.js"
+          },
+          {
+            "from": "routes/runner-setup.js",
+            "to": "lib/render.js"
+          }
+        ]
+      },
+      {
+        "a": "LLM & prompts",
+        "b": "Providers (Linear, GitHub, Jira, local)",
+        "aToB": 5,
+        "bToA": 2,
+        "crossings": [
+          {
+            "from": "lib/audit.js",
+            "to": "lib/linear-fetch.js"
+          },
+          {
+            "from": "lib/chat-tools.js",
+            "to": "lib/github-pr-status.js"
+          },
+          {
+            "from": "lib/graph-features.js",
+            "to": "lib/providers/state-map.js"
+          },
+          {
+            "from": "lib/prompt-formatters.js",
+            "to": "lib/providers/models.js"
+          },
+          {
+            "from": "lib/prompt-template-defs.js",
+            "to": "lib/providers/models.js"
+          },
+          {
+            "from": "lib/providers/linear/index.js",
+            "to": "lib/openrouter.js"
+          },
+          {
+            "from": "lib/sample-data/mock-data.js",
+            "to": "lib/periodicals.js"
+          }
+        ]
+      },
+      {
+        "a": "LLM & prompts",
+        "b": "Runs & dispatch",
+        "aToB": 25,
+        "bToA": 18,
+        "crossings": [
+          {
+            "from": "lib/audit.js",
+            "to": "lib/completion-signals.js"
+          },
+          {
+            "from": "lib/audit.js",
+            "to": "lib/queue-config.js"
+          },
+          {
+            "from": "lib/chat-tools.js",
+            "to": "lib/dispatch-factory.js"
+          },
+          {
+            "from": "lib/chat-tools.js",
+            "to": "lib/dispatch-targets.js"
+          },
+          {
+            "from": "lib/chat-tools.js",
+            "to": "lib/dispatch-terminal.js"
+          },
+          {
+            "from": "lib/chat-tools.js",
+            "to": "lib/live-console.js"
+          },
+          {
+            "from": "lib/chat-tools.js",
+            "to": "lib/loop-supersede.js"
+          },
+          {
+            "from": "lib/chat-tools.js",
+            "to": "lib/observer-sweep.js"
+          },
+          {
+            "from": "lib/chat-tools.js",
+            "to": "lib/pipeline-loops.js"
+          },
+          {
+            "from": "lib/chat-tools.js",
+            "to": "lib/session-summary.js"
+          },
+          {
+            "from": "lib/chat-tools.js",
+            "to": "lib/task-stack.js"
+          },
+          {
+            "from": "lib/chat-tools.js",
+            "to": "lib/unanswered-decisions.js"
+          },
+          {
+            "from": "lib/openrouter.js",
+            "to": "lib/recent-runs.js"
+          },
+          {
+            "from": "lib/periodicals.js",
+            "to": "lib/periodical-report-gate.js"
+          },
+          {
+            "from": "lib/prompt-formatters.js",
+            "to": "lib/completion-signals.js"
+          },
+          {
+            "from": "lib/prompts/revision-brief.js",
+            "to": "lib/run-ledger.js"
+          },
+          {
+            "from": "lib/prompts/runner-kickoff.js",
+            "to": "lib/dispatch-store.js"
+          },
+          {
+            "from": "lib/prompts/runner-kickoff.js",
+            "to": "lib/runner-kit/broker.mjs"
+          },
+          {
+            "from": "lib/prompts/runner-kickoff.js",
+            "to": "lib/runner-kit/runner.mjs"
+          },
+          {
+            "from": "lib/prompts/runner-kickoff.js",
+            "to": "lib/workspace-halt.js"
+          },
+          {
+            "from": "lib/recommendation-facts.js",
+            "to": "lib/plan-review-round-trips.js"
+          },
+          {
+            "from": "lib/recommendation-facts.js",
+            "to": "lib/run-ledger.js"
+          },
+          {
+            "from": "lib/recommendation-input.js",
+            "to": "lib/recent-runs.js"
+          },
+          {
+            "from": "lib/scan.js",
+            "to": "lib/session-telemetry.js"
+          },
+          {
+            "from": "lib/scan.js",
+            "to": "lib/task-decisions-store.js"
+          },
+          {
+            "from": "lib/dispatch-factory.js",
+            "to": "lib/file-pointer.js"
+          },
+          {
+            "from": "lib/dispatch-factory.js",
+            "to": "lib/prompt-templates.js"
+          },
+          {
+            "from": "lib/dispatch-validation.js",
+            "to": "lib/periodicals.js"
+          },
+          {
+            "from": "lib/dispatch-validation.js",
+            "to": "lib/prompt-templates.js"
+          },
+          {
+            "from": "lib/dispatch-validation.js",
+            "to": "lib/prompts/autopilot-kickoff.js"
+          },
+          {
+            "from": "lib/follow-up-dispatch.js",
+            "to": "lib/chat-tools.js"
+          },
+          {
+            "from": "lib/observer-state-store.js",
+            "to": "lib/recap-cache.js"
+          },
+          {
+            "from": "lib/recent-runs.js",
+            "to": "lib/prompt-templates.js"
+          },
+          {
+            "from": "lib/run-paragraph.js",
+            "to": "lib/openrouter.js"
+          },
+          {
+            "from": "lib/run-summary.js",
+            "to": "lib/openrouter.js"
+          },
+          {
+            "from": "lib/session-summary.js",
+            "to": "lib/openrouter.js"
+          },
+          {
+            "from": "lib/session-telemetry.js",
+            "to": "lib/model-pricing.js"
+          },
+          {
+            "from": "lib/task-page-loader.js",
+            "to": "lib/brief-cache.js"
+          },
+          {
+            "from": "routes/dispatch.js",
+            "to": "lib/chat-request.js"
+          },
+          {
+            "from": "routes/dispatch.js",
+            "to": "lib/periodicals.js"
+          },
+          {
+            "from": "routes/dispatch.js",
+            "to": "lib/prompt-templates.js"
+          },
+          {
+            "from": "routes/runner-kit.js",
+            "to": "lib/prompts/runner-kickoff.js"
+          },
+          {
+            "from": "routes/runner-setup.js",
+            "to": "lib/prompts/runner-kickoff.js"
+          }
+        ]
+      }
+    ],
+    "groups": [
+      [
+        "Agent API (proxy)",
+        "Auth, accounts & workspaces",
+        "Front end: server-rendered pages",
+        "LLM & prompts",
+        "Providers (Linear, GitHub, Jira, local)",
+        "Reports & operator tools",
+        "Runs & dispatch",
+        "Web routes (pages & workspace API)"
+      ]
+    ]
+  }
+}
