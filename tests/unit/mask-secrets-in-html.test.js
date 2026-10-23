@@ -311,4 +311,16 @@ describe('LIN-3818 truncated PEM followed by trailing text in the same text node
       assert.ok(Date.now() - t0 < 2000, `took ${Date.now() - t0}ms`);
     }
   });
+  test('<br>-split key with same-node trailing text, plain and escaped <br>, is masked', () => {
+    const lines = t.split('\n');
+    for (const html of [
+      `<p>${lines.map(escapeHtml).join('<br>')}<br>end of log.</p>`,
+      `<p>${lines.map(escapeHtml).join('<br>')} end of log.</p>`,
+      `<p>${lines.map(escapeHtml).join(escapeHtml('<br>'))}${escapeHtml('<br>end of log.')}</p>`,
+    ]) {
+      const r = maskSecretsInHtml(html);
+      assert.ok(r.hits.includes('private-key-block-truncated'), html.slice(0, 80));
+      assert.ok(!r.html.includes('QRSTUVWXYZ0123'), r.html);
+    }
+  });
 });

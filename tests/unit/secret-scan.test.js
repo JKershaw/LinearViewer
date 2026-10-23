@@ -395,4 +395,65 @@ describe('LIN-3818 truncated PEM followed by trailing text', () => {
     findSecretMatches(('-----BEGIN RSA PRIVATE KEY-----' + 'Proc-Type:A\n'.repeat(50)).repeat(150));
     assert.ok(Date.now() - t0 < 3000, `took ${Date.now() - t0}ms`);
   });
+
+  // Review F1-F4 (LIN-3818).
+  const BEGIN = '-----BEGIN RSA PRIVATE KEY-----';
+  const PBEGIN = '-----BEGIN PRIVATE KEY-----';
+  const SHA = 'a94a8fe5ccb19ba61c4c0873d391e987982fbbd3';
+  test('bare header followed by prose is not a key (F1)', () => {
+    for (const text of [
+      PBEGIN + ' header followed by the body lines and then the footer, always.',
+      BEGIN + '\nProc-Type: 4,ENCRYPTED\nDEK-Info: AES-128-CBC,0123456789ABCDEF0123456789ABCDEF\nthe key is stored elsewhere, see the runbook.',
+      BEGIN + ' this sentence is much longer than thirty-two characters of prose.',
+      PBEGIN + ' see commit ' + SHA + ' for details of the change.',
+    ]) {
+      assert.deepEqual(findSecretMatches(text).filter(m => m.ruleId === 'private-key-block-truncated'), [], text);
+    }
+  });
+  test('first-token residual: SHA-first and path-first bodies are hits, placeholder-first path is not', () => {
+    assert.equal(trunc(PBEGIN + '\n' + SHA + ' is the first token').length, 1);
+    assert.equal(trunc(PBEGIN + '\n/var/lib/somewhere/keys/deploy/rsa_id\nmore').length, 1);
+    assert.equal(trunc(PBEGIN + '\n/var/lib/placeholder/keys/deploy/rsa\nmore').length, 0);
+  });
+  test('placeholder-shaped words after the first token never suppress the hit', () => {
+    for (const word of ['placeholder', 'example', 'xxxxxxxx', 'your_key_here', 'changeme', 'dummy']) {
+      for (const tail of ['\n' + word, ' ' + word + ' tail', '\nsee /srv/' + word + '/keys/id', '\nlast line ' + word]) {
+        assert.equal(trunc(HEAD + KEY + tail).length, 1, JSON.stringify(tail));
+      }
+    }
+  });
+  test('wrapped keys: 32/64 columns masked with and without trailing text; narrow wraps keep base behaviour', () => {
+    const wrap = (n) => 'A1b2C3d4'.repeat(40).match(new RegExp(`.{1,${n}}`, 'g')).join('\n');
+    for (const n of [32, 64]) {
+      for (const tail of ['', '\nend of log.', '\nplaceholder']) {
+        assert.equal(trunc(HEAD + wrap(n) + tail).length, 1, `${n}${JSON.stringify(tail)}`);
+      }
+    }
+    for (const n of [24, 31]) {
+      assert.equal(trunc(HEAD + wrap(n)).length, 1);
+      assert.equal(trunc(HEAD + wrap(n) + '\nend of log.').length, 0);
+    }
+  });
+  test('truncated key followed by a non-private-key END line is still reported (F3)', () => {
+    for (const tail of ['\n-----END CERTIFICATE-----', '\n-----END OF LOG-----']) {
+      assert.equal(trunc(HEAD + KEY + tail).length, 1, tail);
+    }
+    assert.equal(trunc(HEAD + KEY + '\n-----END RSA PRIVATE KEY-----').length, 0);
+    assert.equal(trunc(PBEGIN + '\n' + keyLines[4] + '\n-----END PRIVATE KEY-----').length, 0);
+  });
+  test('rule stays linear on the shapes that were quadratic at HEAD (F2)', () => {
+    const hostile = [
+      (BEGIN + 'Proc-Type:').repeat(8000) + '\n!',
+      BEGIN + ('\nProc-Type:' + BEGIN).repeat(8000) + '\n-----END RSA PRIVATE KEY-----',
+      (BEGIN + 'DEK-Info: AES-128-CBC,' + '0123456789ABCDEF'.repeat(4)).repeat(8000) + '\n!',
+    ];
+    rule.regex.lastIndex = 0;
+    rule.regex.exec(BEGIN + 'A'.repeat(64)); // warm-up
+    for (const h of hostile) {
+      const t0 = Date.now();
+      rule.regex.lastIndex = 0;
+      while (rule.regex.exec(h) !== null) { /* drain */ }
+      assert.ok(Date.now() - t0 < 100, `rule took ${Date.now() - t0}ms`);
+    }
+  });
 });
