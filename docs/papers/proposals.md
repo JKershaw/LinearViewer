@@ -3,6 +3,25 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
+- **Does Sonnet 5.5 judge as Opus 5.5 does, and does Haiku 5.5 build as Sonnet 5.5 does?** `harbour/cheaper-capacity.md`
+  found that the two moves would carry October's work in 36–44% of the weekly window at list prices, and that on
+  Terminal-Bench 4.0 Sonnet 5.5 scores above Opus 5 and Haiku 5.5 at the top of the band where Harbour's builders sit,
+  but neither has run a Harbour ticket and no public benchmark measures planning or review. Route plan-review and
+  review to Sonnet 5.5 on twenty tickets, and implementation and close-out to Haiku 5.5 on twenty small ones, each named
+  as an experiment, against same-sized controls; count send-backs, review rounds, later-found faults and window points
+  used. (Claude, 2026-10-23, for John)
+- **How does the weekly window draw across Claude models?** The same paper's capacity figures all assume the window
+  draws in proportion to API price, which Anthropic does not state. Read the window's percentage before and after a
+  fixed block of Haiku-only and of Sonnet-only sessions, priced from their transcripts, and report points per
+  API-equivalent dollar for each model. (Claude, 2026-10-23)
+- **Can the capability ledger be a query?** The same paper found the cost endpoint already holds model, kind, effort,
+  cost and duration for every worker session; the review verdict is prose and requests per session are not recorded.
+  Add both to the session record, price the missing model rows, and rebuild the ledger's tables from the endpoint for
+  October; report where the query and edition 3's prose disagree. (Claude, 2026-10-23, for John)
+- **What does a month of ChatGPT Plus carry through opencode?** The same paper found GPT-6.1 Sol scores above Opus 5
+  on Terminal-Bench 4.0 and Plus allows 15–160 of its messages per 5 hours, with no published weekly cap. Run it as a
+  shadow reviewer on ten reviewed tickets and record messages used, caps hit and agreement with the Opus verdict.
+  (Claude, 2026-10-23, for John)
 - **Can an agent run the Theseus method from the essay alone, on a codebase it has not seen?** The long version of `harbour/theseus-method.md` (`docs/theseus-method-long.md`) is meant to describe the method well enough to be run. A fresh agent ran the read-only half of one loop on simple-dispatcher from a draft of it and drafted a ticket for its terminal-status vocabulary (`experiments/theseus-method-trial/report.md`). File that ticket through that repository's own review with the replay built first, then let a fresh operator run one full loop (find, own, free the seam, consolidate, rebuild), and report where it stalled, what it asked a person, and whether its replays and measures held. (Claude, 2026-10-17, for John)
 - **Do agent-written tests pin where code sits more than other tests do?** `harbour/consolidate-then-rebuild.md` found 63 pins guarding one entrance and a worker proving a move with a source-text test, and the literature search for `harbour/theseus-method.md` found the failure undocumented: the nearest work shows model-written oracles pinning current behaviour. Classify every test that reads production source as text by who wrote it and when, and report the share that pins location or wording, how often each blocked a later move, and whether new ones keep arriving. (Claude, 2026-10-17, for John)
 - **Does Harbour's process stop growing when it is held to a limit, as its prompts are?** `harbour/flow-and-convergence.md` found that in both records the part held to a limit stays lean and the part only counted or watched grows: Harbour's CLAUDE.md and prompt bytes held under test-enforced caps while its process weight, which "only grows, and fastest at the gates" (`steady-base.md`), has no cap. Give the rest of the process (rules, periodicals, gates, review legs per ticket) a weekly series, a load-bearing test and a cap, and report whether the series turns down and whether verified work per week holds. (Claude, 2026-10-15, for John)

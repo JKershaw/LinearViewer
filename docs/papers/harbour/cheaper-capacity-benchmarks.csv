@@ -1,0 +1,258 @@
+model,vendor,open_weight,benchmark,score,harness,source_url,result_date,independent
+Claude Opus 5.5,Anthropic,no,SWE-bench Multimodal,70.21,"mini-SWE-agent, no internet (Vals)",https://www.vals.ai/benchmarks/swebench-multimodal,2026-10-16,yes
+Claude Opus 5.5,Anthropic,no,Terminal-Bench 2.1,87.64,Terminus 2 (Vals),https://www.vals.ai/benchmarks/terminal-bench-2-1,2026-09-28,yes
+Claude Opus 5.5,Anthropic,no,Terminal-Bench 4.0,65.15,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+Claude Opus 5.5,Anthropic,no,Vibe Code Bench v1.1,90.29,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+Claude Opus 5.5,Anthropic,no,ProgramBench,18.5,mini-SWE-agent via Valkyrie (Vals),https://www.vals.ai/benchmarks/programbench,2026-10-12,yes
+Claude Opus 5.5,Anthropic,no,AA Intelligence Index,58 (max; $5.98/task),AA Intelligence Index (v4.3.x per secondary sources); best listed effort,https://artificialanalysis.ai/leaderboards/models,2026-10-23 (accessed),yes
+Claude Opus 5.5,Anthropic,no,AA Coding Agent Index,"66.0 (Claude Code, max)",AA Coding Agent Index (mirror of AA; agent named in score),https://benchlm.ai/md/benchmarks/aacodingagents.md,2026-10-19 (mirror capture),yes
+Claude Opus 5.5,Anthropic,no,Terminal-Bench 4.0,66.4,"vendor; Opus 5.5 at xhigh, Claude Code-style harness",https://www.anthropic.com/news/claude-opus-5-5,2026-09-22,no
+Claude Sonnet 5.5,Anthropic,no,SWE-bench Multimodal,58.33,"mini-SWE-agent, no internet (Vals)",https://www.vals.ai/benchmarks/swebench-multimodal,2026-10-16,yes
+Claude Sonnet 5.5,Anthropic,no,Terminal-Bench 2.1,83.15,Terminus 2 (Vals),https://www.vals.ai/benchmarks/terminal-bench-2-1,2026-09-28,yes
+Claude Sonnet 5.5,Anthropic,no,Terminal-Bench 4.0,64.14,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+Claude Sonnet 5.5,Anthropic,no,Vibe Code Bench v1.1,92.39,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+Claude Sonnet 5.5,Anthropic,no,ProgramBench,6.5,mini-SWE-agent via Valkyrie (Vals),https://www.vals.ai/benchmarks/programbench,2026-10-12,yes
+Claude Sonnet 5.5,Anthropic,no,AA Intelligence Index,56 (max; $5.46/task),AA Intelligence Index (v4.3.x per secondary sources); best listed effort,https://artificialanalysis.ai/leaderboards/models,2026-10-23 (accessed),yes
+Claude Sonnet 5.5,Anthropic,no,AA Coding Agent Index,"68.4 (Claude Code, max)",AA Coding Agent Index (mirror of AA; agent named in score),https://benchlm.ai/md/benchmarks/aacodingagents.md,2026-10-19 (mirror capture),yes
+Claude Sonnet 5.5,Anthropic,no,Terminal-Bench 4.0,70.6,vendor,https://www.anthropic.com/news/claude-sonnet-5-5,2026-09-28,no
+Claude Haiku 5.5,Anthropic,no,SWE-bench Multimodal,43.96,"mini-SWE-agent, no internet (Vals)",https://www.vals.ai/benchmarks/swebench-multimodal,2026-10-16,yes
+Claude Haiku 5.5,Anthropic,no,Terminal-Bench 4.0,36.36,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+Claude Haiku 5.5,Anthropic,no,Vibe Code Bench v1.1,90.44,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+Claude Haiku 5.5,Anthropic,no,ProgramBench,2.5,mini-SWE-agent via Valkyrie (Vals),https://www.vals.ai/benchmarks/programbench,2026-10-12,yes
+Claude Haiku 5.5,Anthropic,no,AA Intelligence Index,43 (max; $0.21/task),AA Intelligence Index (v4.3.x per secondary sources); best listed effort,https://artificialanalysis.ai/leaderboards/models,2026-10-23 (accessed),yes
+Claude Haiku 5.5,Anthropic,no,AA Coding Agent Index,"41.4 (Claude Code, xhigh)",AA Coding Agent Index (mirror of AA; agent named in score),https://benchlm.ai/md/benchmarks/aacodingagents.md,2026-10-19 (mirror capture),yes
+Claude Haiku 5.5,Anthropic,no,Terminal-Bench 4.0,39.2,vendor (pass@1),https://www.anthropic.com/news/claude-haiku-5-5,2026-10-07,no
+Claude Fable 5.1,Anthropic,no,SWE-bench Multimodal,61.25,"mini-SWE-agent, no internet (Vals)",https://www.vals.ai/benchmarks/swebench-multimodal,2026-10-16,yes
+Claude Fable 5.1,Anthropic,no,Terminal-Bench 2.1,85.02,Terminus 2 (Vals),https://www.vals.ai/benchmarks/terminal-bench-2-1,2026-09-28,yes
+Claude Fable 5.1,Anthropic,no,Terminal-Bench 4.0,58.08,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+Claude Fable 5.1,Anthropic,no,Vibe Code Bench v1.1,90.26,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+Claude Fable 5.1,Anthropic,no,ProgramBench,7.0,mini-SWE-agent via Valkyrie (Vals),https://www.vals.ai/benchmarks/programbench,2026-10-12,yes
+Claude Fable 5.1,Anthropic,no,LiveCodeBench v6,90.52,"LCB v6, Vals run",https://www.vals.ai/benchmarks/lcb,2026-09-01,yes
+Claude Fable 5.1,Anthropic,no,AA Intelligence Index,53 (max; $7.63/task),AA Intelligence Index (v4.3.x per secondary sources); best listed effort,https://artificialanalysis.ai/leaderboards/models,2026-10-23 (accessed),yes
+Claude Fable 5.1,Anthropic,no,AA Coding Agent Index,"62.2 (Claude Code, max, w/ fallback)",AA Coding Agent Index (mirror of AA; agent named in score),https://benchlm.ai/md/benchmarks/aacodingagents.md,2026-10-19 (mirror capture),yes
+Claude Fable 5.1,Anthropic,no,Terminal-Bench 4.0,55.8,"vendor; Opus 5.5 at xhigh, Claude Code-style harness",https://www.anthropic.com/news/claude-opus-5-5,2026-09-22,no
+Claude Opus 5,Anthropic,no,SWE-bench Verified,97.0,mini-SWE-agent (Vals),https://www.vals.ai/benchmarks/swebench,2026-09-01,yes
+Claude Opus 5,Anthropic,no,Terminal-Bench 2.1,84.64,Terminus 2 (Vals),https://www.vals.ai/benchmarks/terminal-bench-2-1,2026-09-28,yes
+Claude Opus 5,Anthropic,no,Terminal-Bench 4.0,53.53,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+Claude Opus 5,Anthropic,no,Vibe Code Bench v1.1,88.4,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+Claude Opus 5,Anthropic,no,ProgramBench,3.0,mini-SWE-agent via Valkyrie (Vals),https://www.vals.ai/benchmarks/programbench,2026-10-12,yes
+Claude Opus 5,Anthropic,no,LiveCodeBench v6,89.03,"LCB v6, Vals run",https://www.vals.ai/benchmarks/lcb,2026-09-01,yes
+Claude Opus 5,Anthropic,no,AA Coding Agent Index,"59.7 (Claude Code, max)",AA Coding Agent Index (mirror of AA; agent named in score),https://benchlm.ai/md/benchmarks/aacodingagents.md,2026-10-19 (mirror capture),yes
+Claude Opus 5,Anthropic,no,Terminal-Bench 4.0,52.3,"vendor; Opus 5.5 at xhigh, Claude Code-style harness",https://www.anthropic.com/news/claude-opus-5-5,2026-09-22,no
+Claude Sonnet 5,Anthropic,no,SWE-bench Verified,79.6,mini-SWE-agent (Vals),https://www.vals.ai/benchmarks/swebench,2026-09-01,yes
+Claude Sonnet 5,Anthropic,no,Terminal-Bench 2.1,74.53,Terminus 2 (Vals),https://www.vals.ai/benchmarks/terminal-bench-2-1,2026-09-28,yes
+Claude Sonnet 5,Anthropic,no,Terminal-Bench 4.0,10.61,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+Claude Sonnet 5,Anthropic,no,Vibe Code Bench v1.1,81.33,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+Claude Sonnet 5,Anthropic,no,ProgramBench,0.0,mini-SWE-agent via Valkyrie (Vals),https://www.vals.ai/benchmarks/programbench,2026-10-12,yes
+Claude Sonnet 5,Anthropic,no,LiveCodeBench v6,82.43,"LCB v6, Vals run",https://www.vals.ai/benchmarks/lcb,2026-09-01,yes
+Claude Sonnet 5,Anthropic,no,Terminal-Bench 4.0,10.3,vendor,https://www.anthropic.com/news/claude-sonnet-5-5,2026-09-28,no
+GPT-6 Astra,OpenAI,no,SWE-bench Multimodal,43.33,"mini-SWE-agent, no internet (Vals)",https://www.vals.ai/benchmarks/swebench-multimodal,2026-10-16,yes
+GPT-6 Astra,OpenAI,no,Terminal-Bench 2.1,87.27,Terminus 2 (Vals),https://www.vals.ai/benchmarks/terminal-bench-2-1,2026-09-28,yes
+GPT-6 Astra,OpenAI,no,Terminal-Bench 4.0,59.6,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+GPT-6 Astra,OpenAI,no,Vibe Code Bench v1.1,89.59,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+GPT-6 Astra,OpenAI,no,ProgramBench,5.5,mini-SWE-agent via Valkyrie (Vals),https://www.vals.ai/benchmarks/programbench,2026-10-12,yes
+GPT-6 Astra,OpenAI,no,AA Intelligence Index,53 (max; $3.26/task),AA Intelligence Index (v4.3.x per secondary sources); best listed effort,https://artificialanalysis.ai/leaderboards/models,2026-10-23 (accessed),yes
+GPT-6 Astra,OpenAI,no,AA Coding Agent Index,"61.6 (Codex, max)",AA Coding Agent Index (mirror of AA; agent named in score),https://benchlm.ai/md/benchmarks/aacodingagents.md,2026-10-19 (mirror capture),yes
+GPT-6 Astra,OpenAI,no,"Terminal-Bench 4.0 (OpenAI-reported, high)",57.9,"vendor; Opus 5.5 at xhigh, Claude Code-style harness",https://www.anthropic.com/news/claude-opus-5-5,2026-09-22,no
+GPT-6.1 Sol,OpenAI,no,SWE-bench Multimodal,43.54,"mini-SWE-agent, no internet (Vals)",https://www.vals.ai/benchmarks/swebench-multimodal,2026-10-16,yes
+GPT-6.1 Sol,OpenAI,no,Terminal-Bench 4.0,55.05,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+GPT-6.1 Sol,OpenAI,no,Vibe Code Bench v1.1,88.93,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+GPT-6.1 Sol,OpenAI,no,ProgramBench,3.0,mini-SWE-agent via Valkyrie (Vals),https://www.vals.ai/benchmarks/programbench,2026-10-12,yes
+GPT-6.1 Sol,OpenAI,no,AA Intelligence Index,52 (max; $0.72/task),AA Intelligence Index (v4.3.x per secondary sources); best listed effort,https://artificialanalysis.ai/leaderboards/models,2026-10-23 (accessed),yes
+GPT-6.1 Sol,OpenAI,no,AA Coding Agent Index,"62.9 (Codex, xhigh)",AA Coding Agent Index (mirror of AA; agent named in score),https://benchlm.ai/md/benchmarks/aacodingagents.md,2026-10-19 (mirror capture),yes
+GPT-6 Sol,OpenAI,no,Terminal-Bench 2.1,83.15,Terminus 2 (Vals),https://www.vals.ai/benchmarks/terminal-bench-2-1,2026-09-28,yes
+GPT-6 Sol,OpenAI,no,Terminal-Bench 4.0,44.44,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+GPT-6 Sol,OpenAI,no,Vibe Code Bench v1.1,87.82,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+GPT-6 Sol,OpenAI,no,ProgramBench,2.0,mini-SWE-agent via Valkyrie (Vals),https://www.vals.ai/benchmarks/programbench,2026-10-12,yes
+GPT-6 Sol,OpenAI,no,AA Coding Agent Index,"56.7 (Codex, max)",AA Coding Agent Index (mirror of AA; agent named in score),https://benchlm.ai/md/benchmarks/aacodingagents.md,2026-10-19 (mirror capture),yes
+GPT-5.6 Sol,OpenAI,no,SWE-bench Verified,96.2,mini-SWE-agent (Vals),https://www.vals.ai/benchmarks/swebench,2026-09-01,yes
+GPT-5.6 Sol,OpenAI,no,Terminal-Bench 2.1,85.77,Terminus 2 (Vals),https://www.vals.ai/benchmarks/terminal-bench-2-1,2026-09-28,yes
+GPT-5.6 Sol,OpenAI,no,Terminal-Bench 4.0,37.88,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+GPT-5.6 Sol,OpenAI,no,Vibe Code Bench v1.1,80.5,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+GPT-5.6 Sol,OpenAI,no,ProgramBench,1.5,mini-SWE-agent via Valkyrie (Vals),https://www.vals.ai/benchmarks/programbench,2026-10-12,yes
+GPT-5.6 Sol,OpenAI,no,LiveCodeBench v6,82.6,"LCB v6, Vals run",https://www.vals.ai/benchmarks/lcb,2026-09-01,yes
+GPT-5.6 Sol,OpenAI,no,AA Coding Agent Index,"54.6 (Codex, max)",AA Coding Agent Index (mirror of AA; agent named in score),https://benchlm.ai/md/benchmarks/aacodingagents.md,2026-10-19 (mirror capture),yes
+GPT-5.6 Sol,OpenAI,no,Terminal-Bench 4.0,37.3,"vendor; Opus 5.5 at xhigh, Claude Code-style harness",https://www.anthropic.com/news/claude-opus-5-5,2026-09-22,no
+GPT-5.6 Terra,OpenAI,no,SWE-bench Verified,95.4,mini-SWE-agent (Vals),https://www.vals.ai/benchmarks/swebench,2026-09-01,yes
+GPT-5.6 Terra,OpenAI,no,Terminal-Bench 2.1,77.53,Terminus 2 (Vals),https://www.vals.ai/benchmarks/terminal-bench-2-1,2026-09-28,yes
+GPT-5.6 Terra,OpenAI,no,Terminal-Bench 4.0,22.73,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+GPT-5.6 Terra,OpenAI,no,Vibe Code Bench v1.1,74.59,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+GPT-5.6 Terra,OpenAI,no,ProgramBench,0.5,mini-SWE-agent via Valkyrie (Vals),https://www.vals.ai/benchmarks/programbench,2026-10-12,yes
+GPT-5.6 Terra,OpenAI,no,LiveCodeBench v6,85.93,"LCB v6, Vals run",https://www.vals.ai/benchmarks/lcb,2026-09-01,yes
+GPT-5.6 Terra,OpenAI,no,AA Intelligence Index,42 (max; $1.40/task),AA Intelligence Index (v4.3.x per secondary sources); best listed effort,https://artificialanalysis.ai/leaderboards/models,2026-10-23 (accessed),yes
+GPT-6 Luna,OpenAI,no,SWE-bench Multimodal,37.5,"mini-SWE-agent, no internet (Vals)",https://www.vals.ai/benchmarks/swebench-multimodal,2026-10-16,yes
+GPT-6 Luna,OpenAI,no,Terminal-Bench 2.1,73.03,Terminus 2 (Vals),https://www.vals.ai/benchmarks/terminal-bench-2-1,2026-09-28,yes
+GPT-6 Luna,OpenAI,no,Terminal-Bench 4.0,13.64,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+GPT-6 Luna,OpenAI,no,Vibe Code Bench v1.1,81.65,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+GPT-6 Luna,OpenAI,no,ProgramBench,0.5,mini-SWE-agent via Valkyrie (Vals),https://www.vals.ai/benchmarks/programbench,2026-10-12,yes
+GPT-6 Luna,OpenAI,no,AA Intelligence Index,38 (max; $0.07/task),AA Intelligence Index (v4.3.x per secondary sources); best listed effort,https://artificialanalysis.ai/leaderboards/models,2026-10-23 (accessed),yes
+GPT-6 Luna,OpenAI,no,AA Coding Agent Index,"41.1 (Codex, max)",AA Coding Agent Index (mirror of AA; agent named in score),https://benchlm.ai/md/benchmarks/aacodingagents.md,2026-10-19 (mirror capture),yes
+GPT-6 Luna,OpenAI,no,Terminal-Bench 4.0 (as cited by Anthropic),16.4,vendor (pass@1),https://www.anthropic.com/news/claude-haiku-5-5,2026-10-07,no
+GPT-5.6 Luna,OpenAI,no,SWE-bench Verified,93.0,mini-SWE-agent (Vals),https://www.vals.ai/benchmarks/swebench,2026-09-01,yes
+GPT-5.6 Luna,OpenAI,no,Terminal-Bench 2.1,79.03,Terminus 2 (Vals),https://www.vals.ai/benchmarks/terminal-bench-2-1,2026-09-28,yes
+GPT-5.6 Luna,OpenAI,no,Terminal-Bench 4.0,11.62,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+GPT-5.6 Luna,OpenAI,no,Vibe Code Bench v1.1,77.06,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+GPT-5.6 Luna,OpenAI,no,ProgramBench,0.0,mini-SWE-agent via Valkyrie (Vals),https://www.vals.ai/benchmarks/programbench,2026-10-12,yes
+GPT-5.6 Luna,OpenAI,no,AA Coding Agent Index,"43.2 (Codex, max)",AA Coding Agent Index (mirror of AA; agent named in score),https://benchlm.ai/md/benchmarks/aacodingagents.md,2026-10-19 (mirror capture),yes
+GPT-5.4 mini,OpenAI,no,SWE-bench Verified,73.0,mini-SWE-agent (Vals),https://www.vals.ai/benchmarks/swebench,2026-09-01,yes
+GPT-5.4 mini,OpenAI,no,Terminal-Bench 2.0,44.94,Terminus 2 (Vals),https://www.vals.ai/benchmarks/terminal-bench-2,2026-06-04,yes
+GPT-5.4 mini,OpenAI,no,Terminal-Bench 2.1,54.68,Terminus 2 (Vals),https://www.vals.ai/benchmarks/terminal-bench-2-1,2026-09-28,yes
+GPT-5.4 mini,OpenAI,no,Terminal-Bench 4.0,2.52,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+GPT-5.4 mini,OpenAI,no,Vibe Code Bench v1.1,47.97,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+GPT-5.4 mini,OpenAI,no,ProgramBench,0.0,mini-SWE-agent via Valkyrie (Vals),https://www.vals.ai/benchmarks/programbench,2026-10-12,yes
+GPT-5.4 mini,OpenAI,no,LiveCodeBench v6,81.47,"LCB v6, Vals run",https://www.vals.ai/benchmarks/lcb,2026-09-01,yes
+gpt-oss-120b,OpenAI,yes,SWE-bench Verified,33.6,mini-SWE-agent (Vals),https://www.vals.ai/benchmarks/swebench,2026-09-01,yes
+gpt-oss-120b,OpenAI,yes,Terminal-Bench 2.0,19.1,Terminus 2 (Vals),https://www.vals.ai/benchmarks/terminal-bench-2,2026-06-04,yes
+gpt-oss-120b,OpenAI,yes,LiveCodeBench v6,83.23,"LCB v6, Vals run",https://www.vals.ai/benchmarks/lcb,2026-09-01,yes
+gpt-oss-120b,OpenAI,yes,AA Intelligence Index,12 (high; $0.11/task),AA Intelligence Index (v4.3.x per secondary sources); best listed effort,https://artificialanalysis.ai/leaderboards/models,2026-10-23 (accessed),yes
+gpt-oss-120b,OpenAI,yes,Aider polyglot,41.8,"aider polyglot, diff format",https://aider.chat/docs/leaderboards/,2025-08-06,yes
+gpt-oss-120b,OpenAI,yes,SWE-bench Pro (public),16.2,"SWE-bench Pro public set (Scale), harness not stated",https://labs.scale.com/leaderboard/swe_bench_pro_public,undated (pre-2026-H2 entries),yes
+Gemini 4 Argon,Google,no,SWE-bench Multimodal,56.04,"mini-SWE-agent, no internet (Vals)",https://www.vals.ai/benchmarks/swebench-multimodal,2026-10-16,yes
+Gemini 4 Argon,Google,no,Terminal-Bench 2.1,57.68,Terminus 2 (Vals),https://www.vals.ai/benchmarks/terminal-bench-2-1,2026-09-28,yes
+Gemini 4 Argon,Google,no,Terminal-Bench 4.0,57.58,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+Gemini 4 Argon,Google,no,Vibe Code Bench v1.1,91.91,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+Gemini 4 Argon,Google,no,ProgramBench,2.5,mini-SWE-agent via Valkyrie (Vals),https://www.vals.ai/benchmarks/programbench,2026-10-12,yes
+Gemini 4 Argon,Google,no,AA Intelligence Index,53 (high; $1.99/task),AA Intelligence Index (v4.3.x per secondary sources); best listed effort,https://artificialanalysis.ai/leaderboards/models,2026-10-23 (accessed),yes
+Gemini 4 Argon,Google,no,AA Coding Agent Index,"63.8 (Antigravity CLI, high)",AA Coding Agent Index (mirror of AA; agent named in score),https://benchlm.ai/md/benchmarks/aacodingagents.md,2026-10-19 (mirror capture),yes
+Gemini 4 Argon,Google,no,Terminal-Bench 4.0,57.4,vendor via secondary outlet,https://pasqualepillitteri.it/de/news/19647/gemini-4-argon-start-benchmarks-preis,2026-09-30,no
+Gemini 3.8 Flash,Google,no,SWE-bench Verified,80.0,mini-SWE-agent (Vals),https://www.vals.ai/benchmarks/swebench,2026-09-01,yes
+Gemini 3.8 Flash,Google,no,SWE-bench Multimodal,40.83,"mini-SWE-agent, no internet (Vals)",https://www.vals.ai/benchmarks/swebench-multimodal,2026-10-16,yes
+Gemini 3.8 Flash,Google,no,Terminal-Bench 2.1,81.27,Terminus 2 (Vals),https://www.vals.ai/benchmarks/terminal-bench-2-1,2026-09-28,yes
+Gemini 3.8 Flash,Google,no,Terminal-Bench 4.0,19.7,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+Gemini 3.8 Flash,Google,no,Vibe Code Bench v1.1,78.65,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+Gemini 3.8 Flash,Google,no,ProgramBench,1.0,mini-SWE-agent via Valkyrie (Vals),https://www.vals.ai/benchmarks/programbench,2026-10-12,yes
+Gemini 3.8 Flash,Google,no,LiveCodeBench v6,89.48,"LCB v6, Vals run",https://www.vals.ai/benchmarks/lcb,2026-09-01,yes
+Gemini 3.8 Flash,Google,no,AA Intelligence Index,41 (high; $1.24/task),AA Intelligence Index (v4.3.x per secondary sources); best listed effort,https://artificialanalysis.ai/leaderboards/models,2026-10-23 (accessed),yes
+Gemini 3.8 Flash,Google,no,AA Coding Agent Index,"41.9 (Antigravity SDK, high)",AA Coding Agent Index (mirror of AA; agent named in score),https://benchlm.ai/md/benchmarks/aacodingagents.md,2026-10-19 (mirror capture),yes
+DeepSeek V4.1 Flash (Sept 2026),DeepSeek,yes (MIT),SWE-bench Multimodal,46.46,"mini-SWE-agent, no internet (Vals)",https://www.vals.ai/benchmarks/swebench-multimodal,2026-10-16,yes
+DeepSeek V4.1 Flash (Sept 2026),DeepSeek,yes (MIT),Terminal-Bench 2.1,74.53,Terminus 2 (Vals),https://www.vals.ai/benchmarks/terminal-bench-2-1,2026-09-28,yes
+DeepSeek V4.1 Flash (Sept 2026),DeepSeek,yes (MIT),Terminal-Bench 4.0,19.7,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+DeepSeek V4.1 Flash (Sept 2026),DeepSeek,yes (MIT),Vibe Code Bench v1.1,84.74,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+DeepSeek V4.1 Flash (Sept 2026),DeepSeek,yes (MIT),ProgramBench,0.5,mini-SWE-agent via Valkyrie (Vals),https://www.vals.ai/benchmarks/programbench,2026-10-12,yes
+DeepSeek V4.1 Flash (Sept 2026),DeepSeek,yes (MIT),Terminal-Bench 2.1,90.6,vendor via secondary outlet,https://propakistani.pk/2026/09/11/deepseek-v4-1-flash-launches-with-lower-prices-and-native-vision/,2026-09-10,no
+DeepSeek V4.1 Flash (Sept 2026),DeepSeek,yes (MIT),DeepSWE v1.1,74.2,vendor via secondary outlet,https://propakistani.pk/2026/09/11/deepseek-v4-1-flash-launches-with-lower-prices-and-native-vision/,2026-09-10,no
+DeepSeek V4.1 Flash 1017,DeepSeek,yes (MIT),Terminal-Bench 4.0,31.82,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+DeepSeek V4.1 Flash 1017,DeepSeek,yes (MIT),Vibe Code Bench v1.1,87.73,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+DeepSeek V4.1 Flash 1017,DeepSeek,yes (MIT),AA Intelligence Index,45 (max; $0.26/task),AA Intelligence Index (v4.3.x per secondary sources); best listed effort,https://artificialanalysis.ai/leaderboards/models,2026-10-23 (accessed),yes
+DeepSeek V4.1 Flash 1017,DeepSeek,yes (MIT),Terminal-Bench 4.0,42.3,vendor via secondary outlet,https://aiweekly.co/fr/alerts/deepseek-v41-flash-1017-763b-sous-mit-426-sur-hle-sans-outils,2026-10-17,no
+DeepSeek V4.1 Flash 1017,DeepSeek,yes (MIT),DeepSWE v1.1,77.0,vendor via secondary outlet,https://aiweekly.co/fr/alerts/deepseek-v41-flash-1017-763b-sous-mit-426-sur-hle-sans-outils,2026-10-17,no
+DeepSeek V4 Flash 0731,DeepSeek,yes,SWE-bench Verified,88.8,mini-SWE-agent (Vals),https://www.vals.ai/benchmarks/swebench,2026-09-01,yes
+DeepSeek V4 Flash 0731,DeepSeek,yes,Terminal-Bench 2.1,67.04,Terminus 2 (Vals),https://www.vals.ai/benchmarks/terminal-bench-2-1,2026-09-28,yes
+DeepSeek V4 Flash 0731,DeepSeek,yes,Terminal-Bench 4.0,18.69,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+DeepSeek V4 Flash 0731,DeepSeek,yes,Vibe Code Bench v1.1,74.74,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+DeepSeek V4 Flash 0731,DeepSeek,yes,ProgramBench,0.0,mini-SWE-agent via Valkyrie (Vals),https://www.vals.ai/benchmarks/programbench,2026-10-12,yes
+DeepSeek V4 Flash 0731,DeepSeek,yes,LiveCodeBench v6,87.26,"LCB v6, Vals run",https://www.vals.ai/benchmarks/lcb,2026-09-01,yes
+DeepSeek V4 Flash 0731,DeepSeek,yes,AA Coding Agent Index,"38.7 (Codex, max)",AA Coding Agent Index (mirror of AA; agent named in score),https://benchlm.ai/md/benchmarks/aacodingagents.md,2026-10-19 (mirror capture),yes
+DeepSeek V4 Pro 0813,DeepSeek,yes,SWE-bench Verified,96.4,mini-SWE-agent (Vals),https://www.vals.ai/benchmarks/swebench,2026-09-01,yes
+DeepSeek V4 Pro 0813,DeepSeek,yes,Terminal-Bench 2.1,54.68,Terminus 2 (Vals),https://www.vals.ai/benchmarks/terminal-bench-2-1,2026-09-28,yes
+DeepSeek V4 Pro 0813,DeepSeek,yes,Terminal-Bench 4.0,14.14,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+DeepSeek V4 Pro 0813,DeepSeek,yes,Vibe Code Bench v1.1,82.3,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+DeepSeek V4 Pro 0813,DeepSeek,yes,ProgramBench,0.0,mini-SWE-agent via Valkyrie (Vals),https://www.vals.ai/benchmarks/programbench,2026-10-12,yes
+DeepSeek V4 Pro 0813,DeepSeek,yes,LiveCodeBench v6,87.53,"LCB v6, Vals run",https://www.vals.ai/benchmarks/lcb,2026-09-01,yes
+DeepSeek V4 Pro 0813,DeepSeek,yes,AA Intelligence Index,36 (max; $0.67/task),AA Intelligence Index (v4.3.x per secondary sources); best listed effort,https://artificialanalysis.ai/leaderboards/models,2026-10-23 (accessed),yes
+DeepSeek V4 Pro 0813,DeepSeek,yes,AA Coding Agent Index,"43.1 (Codex, max)",AA Coding Agent Index (mirror of AA; agent named in score),https://benchlm.ai/md/benchmarks/aacodingagents.md,2026-10-19 (mirror capture),yes
+GLM-5.3,Z.ai,unclear (weights announced; gating reported),SWE-bench Verified,95.4,mini-SWE-agent (Vals),https://www.vals.ai/benchmarks/swebench,2026-09-01,yes
+GLM-5.3,Z.ai,unclear (weights announced; gating reported),Terminal-Bench 2.1,71.54,Terminus 2 (Vals),https://www.vals.ai/benchmarks/terminal-bench-2-1,2026-09-28,yes
+GLM-5.3,Z.ai,unclear (weights announced; gating reported),Terminal-Bench 4.0,38.89,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+GLM-5.3,Z.ai,unclear (weights announced; gating reported),Vibe Code Bench v1.1,78.13,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+GLM-5.3,Z.ai,unclear (weights announced; gating reported),ProgramBench,1.5,mini-SWE-agent via Valkyrie (Vals),https://www.vals.ai/benchmarks/programbench,2026-10-12,yes
+GLM-5.3,Z.ai,unclear (weights announced; gating reported),LiveCodeBench v6,80.53,"LCB v6, Vals run",https://www.vals.ai/benchmarks/lcb,2026-09-01,yes
+GLM-5.3,Z.ai,unclear (weights announced; gating reported),AA Intelligence Index,45 (max; $2.01/task),AA Intelligence Index (v4.3.x per secondary sources); best listed effort,https://artificialanalysis.ai/leaderboards/models,2026-10-23 (accessed),yes
+GLM-5.3,Z.ai,unclear (weights announced; gating reported),AA Coding Agent Index,"53.6 (Opencode, max)",AA Coding Agent Index (mirror of AA; agent named in score),https://benchlm.ai/md/benchmarks/aacodingagents.md,2026-10-19 (mirror capture),yes
+GLM-5.3,Z.ai,unclear (weights announced; gating reported),Terminal-Bench 3.0,28.3,vendor via secondary outlet,https://datanorth.ai/news/z-ai-releases-glm-5-3,2026-08-14,no
+GLM-5.3,Z.ai,unclear (weights announced; gating reported),DeepSWE v1.1,66.9,vendor via secondary outlet,https://datanorth.ai/news/z-ai-releases-glm-5-3,2026-08-14,no
+GLM-5.3 Flash,Z.ai,not found,SWE-bench Verified,92.0,mini-SWE-agent (Vals),https://www.vals.ai/benchmarks/swebench,2026-09-01,yes
+GLM-5.3 Flash,Z.ai,not found,Terminal-Bench 2.1,62.92,Terminus 2 (Vals),https://www.vals.ai/benchmarks/terminal-bench-2-1,2026-09-28,yes
+GLM-5.3 Flash,Z.ai,not found,Terminal-Bench 4.0,37.37,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+GLM-5.3 Flash,Z.ai,not found,Vibe Code Bench v1.1,30.76,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+GLM-5.3 Flash,Z.ai,not found,ProgramBench,0.0,mini-SWE-agent via Valkyrie (Vals),https://www.vals.ai/benchmarks/programbench,2026-10-12,yes
+GLM-5.3 Flash,Z.ai,not found,LiveCodeBench v6,80.51,"LCB v6, Vals run",https://www.vals.ai/benchmarks/lcb,2026-09-01,yes
+GLM-5.3 Flash,Z.ai,not found,AA Intelligence Index,42 ($0.28/task),AA Intelligence Index (v4.3.x per secondary sources); best listed effort,https://artificialanalysis.ai/leaderboards/models,2026-10-23 (accessed),yes
+Kimi K3,Moonshot,yes (license disputed),SWE-bench Verified,93.4,mini-SWE-agent (Vals),https://www.vals.ai/benchmarks/swebench,2026-09-01,yes
+Kimi K3,Moonshot,yes (license disputed),SWE-bench Multimodal,44.17,"mini-SWE-agent, no internet (Vals)",https://www.vals.ai/benchmarks/swebench-multimodal,2026-10-16,yes
+Kimi K3,Moonshot,yes (license disputed),Terminal-Bench 2.1,80.9,Terminus 2 (Vals),https://www.vals.ai/benchmarks/terminal-bench-2-1,2026-09-28,yes
+Kimi K3,Moonshot,yes (license disputed),Terminal-Bench 4.0,17.17,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+Kimi K3,Moonshot,yes (license disputed),Vibe Code Bench v1.1,84.97,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+Kimi K3,Moonshot,yes (license disputed),ProgramBench,2.0,mini-SWE-agent via Valkyrie (Vals),https://www.vals.ai/benchmarks/programbench,2026-10-12,yes
+Kimi K3,Moonshot,yes (license disputed),LiveCodeBench v6,87.19,"LCB v6, Vals run",https://www.vals.ai/benchmarks/lcb,2026-09-01,yes
+Kimi K3,Moonshot,yes (license disputed),AA Intelligence Index,44 (max; $2.00/task),AA Intelligence Index (v4.3.x per secondary sources); best listed effort,https://artificialanalysis.ai/leaderboards/models,2026-10-23 (accessed),yes
+Kimi K3,Moonshot,yes (license disputed),AA Coding Agent Index,51.9 (Kimi Code CLI),AA Coding Agent Index (mirror of AA; agent named in score),https://benchlm.ai/md/benchmarks/aacodingagents.md,2026-10-19 (mirror capture),yes
+Kimi K3,Moonshot,yes (license disputed),Terminal-Bench 2.1,88.3,vendor via secondary outlet,https://www.yottalabs.ai/post/kimi-k3-specs-benchmarks-how-to-access-2026,2026-07-16,no
+Kimi K3,Moonshot,yes (license disputed),DeepSWE,67.5,vendor via secondary outlet,https://www.yottalabs.ai/post/kimi-k3-specs-benchmarks-how-to-access-2026,2026-07-16,no
+Kimi K2.7 Code,Moonshot,not found,SWE-bench Verified,78.2,mini-SWE-agent (Vals),https://www.vals.ai/benchmarks/swebench,2026-09-01,yes
+Kimi K2.7 Code,Moonshot,not found,Terminal-Bench 2.1,67.04,Terminus 2 (Vals),https://www.vals.ai/benchmarks/terminal-bench-2-1,2026-09-28,yes
+Kimi K2.7 Code,Moonshot,not found,Vibe Code Bench v1.1,47.21,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+Kimi K2.7 Code,Moonshot,not found,ProgramBench,0.0,mini-SWE-agent via Valkyrie (Vals),https://www.vals.ai/benchmarks/programbench,2026-10-12,yes
+Kimi K2.7 Code,Moonshot,not found,LiveCodeBench v6,82.05,"LCB v6, Vals run",https://www.vals.ai/benchmarks/lcb,2026-09-01,yes
+Kimi K2.7 Code,Moonshot,not found,AA Intelligence Index,26 ($0.54/task),AA Intelligence Index (v4.3.x per secondary sources); best listed effort,https://artificialanalysis.ai/leaderboards/models,2026-10-23 (accessed),yes
+Qwen 3.8 Max (0902),Alibaba,no (API),Terminal-Bench 4.0,38.89,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+Qwen 3.8 Max (0902),Alibaba,no (API),Vibe Code Bench v1.1,77.14,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+Qwen 3.8 Max (0902),Alibaba,no (API),AA Intelligence Index,45 ($5.41/task),AA Intelligence Index (v4.3.x per secondary sources); best listed effort,https://artificialanalysis.ai/leaderboards/models,2026-10-23 (accessed),yes
+Qwen 3.8 Max,Alibaba,no (API),SWE-bench Verified,85.6,mini-SWE-agent (Vals),https://www.vals.ai/benchmarks/swebench,2026-09-01,yes
+Qwen 3.8 Max,Alibaba,no (API),SWE-bench Multimodal,42.5,"mini-SWE-agent, no internet (Vals)",https://www.vals.ai/benchmarks/swebench-multimodal,2026-10-16,yes
+Qwen 3.8 Max,Alibaba,no (API),Terminal-Bench 2.1,67.42,Terminus 2 (Vals),https://www.vals.ai/benchmarks/terminal-bench-2-1,2026-09-28,yes
+Qwen 3.8 Max,Alibaba,no (API),Terminal-Bench 4.0,34.34,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+Qwen 3.8 Max,Alibaba,no (API),Vibe Code Bench v1.1,64.7,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+Qwen 3.8 Max,Alibaba,no (API),ProgramBench,0.0,mini-SWE-agent via Valkyrie (Vals),https://www.vals.ai/benchmarks/programbench,2026-10-12,yes
+Qwen 3.8 Max,Alibaba,no (API),LiveCodeBench v6,87.85,"LCB v6, Vals run",https://www.vals.ai/benchmarks/lcb,2026-09-01,yes
+Qwen 3.8 Max,Alibaba,no (API),AA Coding Agent Index,43.3 (Claude Code),AA Coding Agent Index (mirror of AA; agent named in score),https://benchlm.ai/md/benchmarks/aacodingagents.md,2026-10-19 (mirror capture),yes
+Qwen 3.8 27B,Alibaba,likely (not verified),SWE-bench Verified,86.0,mini-SWE-agent (Vals),https://www.vals.ai/benchmarks/swebench,2026-09-01,yes
+Qwen 3.8 27B,Alibaba,likely (not verified),Terminal-Bench 2.1,58.43,Terminus 2 (Vals),https://www.vals.ai/benchmarks/terminal-bench-2-1,2026-09-28,yes
+Qwen 3.8 27B,Alibaba,likely (not verified),Vibe Code Bench v1.1,64.85,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+Qwen 3.8 27B,Alibaba,likely (not verified),ProgramBench,0.0,mini-SWE-agent via Valkyrie (Vals),https://www.vals.ai/benchmarks/programbench,2026-10-12,yes
+Qwen 3.8 27B,Alibaba,likely (not verified),LiveCodeBench v6,84.0,"LCB v6, Vals run",https://www.vals.ai/benchmarks/lcb,2026-09-01,yes
+Qwen 3.8 27B,Alibaba,likely (not verified),AA Intelligence Index,34 (xhigh; $1.01/task),AA Intelligence Index (v4.3.x per secondary sources); best listed effort,https://artificialanalysis.ai/leaderboards/models,2026-10-23 (accessed),yes
+Qwen3.8 2.4T A95B,Alibaba,likely (not verified),AA Intelligence Index,40 ($2.16/task),AA Intelligence Index (v4.3.x per secondary sources); best listed effort,https://artificialanalysis.ai/leaderboards/models,2026-10-23 (accessed),yes
+MiniMax-M3.1-Flash,MiniMax,yes (per opencode.ai listing),Terminal-Bench 4.0,25.25,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+MiniMax-M3.1-Flash,MiniMax,yes (per opencode.ai listing),Vibe Code Bench v1.1,73.94,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+MiniMax-M3.1-Flash,MiniMax,yes (per opencode.ai listing),AA Intelligence Index,43 ($0.22/task),AA Intelligence Index (v4.3.x per secondary sources); best listed effort,https://artificialanalysis.ai/leaderboards/models,2026-10-23 (accessed),yes
+MiniMax-M3,MiniMax,yes,SWE-bench Verified,75.0,mini-SWE-agent (Vals),https://www.vals.ai/benchmarks/swebench,2026-09-01,yes
+MiniMax-M3,MiniMax,yes,SWE-bench Multimodal,33.33,"mini-SWE-agent, no internet (Vals)",https://www.vals.ai/benchmarks/swebench-multimodal,2026-10-16,yes
+MiniMax-M3,MiniMax,yes,Terminal-Bench 2.1,53.56,Terminus 2 (Vals),https://www.vals.ai/benchmarks/terminal-bench-2-1,2026-09-28,yes
+MiniMax-M3,MiniMax,yes,Terminal-Bench 4.0,1.01,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+MiniMax-M3,MiniMax,yes,Vibe Code Bench v1.1,47.57,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+MiniMax-M3,MiniMax,yes,LiveCodeBench v6,82.15,"LCB v6, Vals run",https://www.vals.ai/benchmarks/lcb,2026-09-01,yes
+MiniMax-M3,MiniMax,yes,AA Intelligence Index,29 ($0.51/task),AA Intelligence Index (v4.3.x per secondary sources); best listed effort,https://artificialanalysis.ai/leaderboards/models,2026-10-23 (accessed),yes
+MiMo V2.6 Pro,Xiaomi,not found,SWE-bench Multimodal,41.25,"mini-SWE-agent, no internet (Vals)",https://www.vals.ai/benchmarks/swebench-multimodal,2026-10-16,yes
+MiMo V2.6 Pro,Xiaomi,not found,Terminal-Bench 2.1,67.79,Terminus 2 (Vals),https://www.vals.ai/benchmarks/terminal-bench-2-1,2026-09-28,yes
+MiMo V2.6 Pro,Xiaomi,not found,Terminal-Bench 4.0,31.31,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+MiMo V2.6 Pro,Xiaomi,not found,Vibe Code Bench v1.1,85.22,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+MiMo V2.6 Pro,Xiaomi,not found,ProgramBench,0.5,mini-SWE-agent via Valkyrie (Vals),https://www.vals.ai/benchmarks/programbench,2026-10-12,yes
+MiMo V2.6 Flash,Xiaomi,not found,Terminal-Bench 2.1,76.4,Terminus 2 (Vals),https://www.vals.ai/benchmarks/terminal-bench-2-1,2026-09-28,yes
+MiMo V2.6 Flash,Xiaomi,not found,Terminal-Bench 4.0,24.24,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+MiMo V2.6 Flash,Xiaomi,not found,Vibe Code Bench v1.1,78.96,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+MiMo V2.6 Flash,Xiaomi,not found,ProgramBench,0.5,mini-SWE-agent via Valkyrie (Vals),https://www.vals.ai/benchmarks/programbench,2026-10-12,yes
+Grok 4.7,xAI,no,SWE-bench Multimodal,42.92,"mini-SWE-agent, no internet (Vals)",https://www.vals.ai/benchmarks/swebench-multimodal,2026-10-16,yes
+Grok 4.7,xAI,no,Terminal-Bench 2.1,73.41,Terminus 2 (Vals),https://www.vals.ai/benchmarks/terminal-bench-2-1,2026-09-28,yes
+Grok 4.7,xAI,no,Terminal-Bench 4.0,28.79,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+Grok 4.7,xAI,no,Vibe Code Bench v1.1,86.17,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+Grok 4.7,xAI,no,ProgramBench,0.5,mini-SWE-agent via Valkyrie (Vals),https://www.vals.ai/benchmarks/programbench,2026-10-12,yes
+Grok 4.7,xAI,no,AA Intelligence Index,46 (xhigh; $3.74/task),AA Intelligence Index (v4.3.x per secondary sources); best listed effort,https://artificialanalysis.ai/leaderboards/models,2026-10-23 (accessed),yes
+Grok 4.7,xAI,no,AA Coding Agent Index,"56.3 (Grok Build, xhigh)",AA Coding Agent Index (mirror of AA; agent named in score),https://benchlm.ai/md/benchmarks/aacodingagents.md,2026-10-19 (mirror capture),yes
+Grok 4.6,xAI,no,SWE-bench Verified,95.6,mini-SWE-agent (Vals),https://www.vals.ai/benchmarks/swebench,2026-09-01,yes
+Grok 4.6,xAI,no,Terminal-Bench 2.1,78.28,Terminus 2 (Vals),https://www.vals.ai/benchmarks/terminal-bench-2-1,2026-09-28,yes
+Grok 4.6,xAI,no,Terminal-Bench 4.0,17.17,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+Grok 4.6,xAI,no,Vibe Code Bench v1.1,76.24,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+Grok 4.6,xAI,no,ProgramBench,1.0,mini-SWE-agent via Valkyrie (Vals),https://www.vals.ai/benchmarks/programbench,2026-10-12,yes
+Grok 4.6,xAI,no,LiveCodeBench v6,88.22,"LCB v6, Vals run",https://www.vals.ai/benchmarks/lcb,2026-09-01,yes
+Grok 4.6,xAI,no,AA Coding Agent Index,"47.0 (Grok Build, xhigh)",AA Coding Agent Index (mirror of AA; agent named in score),https://benchlm.ai/md/benchmarks/aacodingagents.md,2026-10-19 (mirror capture),yes
+Mistral Large 4,Mistral,not found,SWE-bench Multimodal,33.13,"mini-SWE-agent, no internet (Vals)",https://www.vals.ai/benchmarks/swebench-multimodal,2026-10-16,yes
+Mistral Large 4,Mistral,not found,Terminal-Bench 4.0,27.78,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+Mistral Large 4,Mistral,not found,Vibe Code Bench v1.1,78.4,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+Mistral Large 4,Mistral,not found,AA Intelligence Index,38 (Preview; $1.13/task),AA Intelligence Index (v4.3.x per secondary sources); best listed effort,https://artificialanalysis.ai/leaderboards/models,2026-10-23 (accessed),yes
+Devstral 2,Mistral,not verified,SWE-bench Verified,62.8,mini-SWE-agent (Vals),https://www.vals.ai/benchmarks/swebench,2026-09-01,yes
+Devstral 2,Mistral,not verified,LiveCodeBench v6,51.84,"LCB v6, Vals run",https://www.vals.ai/benchmarks/lcb,2026-09-01,yes
+Step 5 Preview,StepFun,not found,SWE-bench Multimodal,40.83,"mini-SWE-agent, no internet (Vals)",https://www.vals.ai/benchmarks/swebench-multimodal,2026-10-16,yes
+Step 5 Preview,StepFun,not found,Terminal-Bench 4.0,31.82,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+Step 5 Preview,StepFun,not found,Vibe Code Bench v1.1,70.4,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+Step 5 Preview,StepFun,not found,AA Coding Agent Index,51.2 (Claude Code),AA Coding Agent Index (mirror of AA; agent named in score),https://benchlm.ai/md/benchmarks/aacodingagents.md,2026-10-19 (mirror capture),yes
+Muse Spark Open,Meta,implied by name; not verified,Terminal-Bench 4.0,6.57,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+Muse Spark Open,Meta,implied by name; not verified,Vibe Code Bench v1.1,76.19,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+Muse Spark Open,Meta,implied by name; not verified,AA Intelligence Index,39 (xhigh; $0.84/task),AA Intelligence Index (v4.3.x per secondary sources); best listed effort,https://artificialanalysis.ai/leaderboards/models,2026-10-23 (accessed),yes
+Muse Spark Open,Meta,implied by name; not verified,AA Coding Agent Index,"41.2 (Muse Code, xhigh)",AA Coding Agent Index (mirror of AA; agent named in score),https://benchlm.ai/md/benchmarks/aacodingagents.md,2026-10-19 (mirror capture),yes
+Muse Wonder Full,Meta,no,Terminal-Bench 4.0,58.08,"mini-SWE-agent, avg@3 (Vals)",https://www.vals.ai/benchmarks/terminal-bench-4,2026-10-22,yes
+Muse Wonder Full,Meta,no,SWE-bench Multimodal,47.29,"mini-SWE-agent, no internet (Vals)",https://www.vals.ai/benchmarks/swebench-multimodal,2026-10-16,yes
+Muse Wonder Full,Meta,no,Vibe Code Bench v1.1,86.0,OpenHands (Vals),https://www.vals.ai/benchmarks/vibe-code,2026-10-20,yes
+Muse Wonder Full,Meta,no,ProgramBench,0.5,mini-SWE-agent via Valkyrie (Vals),https://www.vals.ai/benchmarks/programbench,2026-10-12,yes
+Muse Wonder Full,Meta,no,AA Intelligence Index,56 (max),AA Intelligence Index (v4.3.x per secondary sources); best listed effort,https://artificialanalysis.ai/leaderboards/models,2026-10-23 (accessed),yes
+Muse Wonder Full,Meta,no,AA Coding Agent Index,"68.0 (Muse Code, max)",AA Coding Agent Index (mirror of AA; agent named in score),https://benchlm.ai/md/benchmarks/aacodingagents.md,2026-10-19 (mirror capture),yes
