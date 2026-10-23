@@ -1533,3 +1533,27 @@ api: 9
 flow: 14
 meta: 1
 ```
+
+### Q42. Writer-time re-run of the headline bounds at the PR head (plan step 7 (i)) and the R-verdict re-derivations (plan step 6)
+
+- repo: `LinearViewer` · SHA: `c5694b68` (code) and `origin/main` = `8e59ed62` (docs-only drift) · run at: `2026-10-23T09:49:45Z`
+
+```text
+window commits e69e2cc9..c5694b68:                1158   (lib/routes/server.js: 577)
+added lib/routes files:                      134
+deleted lib/routes files:                    lib/dispatch-repo-guard.js lib/prompts/meta-prompt-template.js lib/workspace-repos.js 
+C8 run-3 query hits/files at pin:            52 / 17
+C8 at origin/main:                           52
+code diff pin..origin/main (lib routes server.js public): 0 files
+scheduler.register sites in server.js:       7
+checkPeriodicalReportGate( call sites:       1  -> routes/proxy-writes.js:374:    const gate = checkPeriodicalReportGate({
+OwnerCredentialStore module imports:         server.js:64:import { OwnerCredentialStore } from './lib/owner-credential-store.js'
+periodicalId in routes/proxy-dispatch.js:    routes/proxy-dispatch.js:335:   * `periodicalId` (LIN-1825/LIN-2385): optional p
+workspace-registry exports:                  19:export async function recordWorkspace(workspaceStore, workspace, { logger = console } = {}) {
+observer-efficacy-signal prod importers:     0
+free-tier key builder:                       lib/free-tier-store.js:97:  _getGlobalHourKey(hour = this._getHourKey()) { lib/free-tier-store.js:149:    const hourKey = this._getGlobalHourKey(hour); lib/free-tier-store.js:225:    const globalId = this._getGlobalHourKey(hour); 
+hourly cleanup bare interval:                server.js:4599:  cleanupTimer = setInterval(runHourlyCleanup, CLEANUP_INTERVAL_MS)
+tracker states read 2026-10-23T09:37Z via the workspace API: LIN-2576 Todo; 2846 Backlog; 1629 Todo; 2328 Todo; 1933 Todo; 3634 Done; 3649 Backlog; 3417 Backlog; 2120 Backlog; 1040 Backlog; 1041 Backlog; 3700 Done; 3394 Backlog; 3074 Backlog; 3745 Backlog; 2150 Todo; 2493/2287/1900/2609/2188 Backlog; 3741 Backlog; 3635/3642/3404 Done; 1410 Backlog; 3238/3239/3269/3706/2955 Done
+```
+
+Census test on the PR branch: `node --test tests/unit/claude-md-scheduler-jobs-census.test.js` -> tests 5, pass 5, fail 0 (run 2026-10-23, before opening the PR).

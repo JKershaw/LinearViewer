@@ -66,3 +66,9 @@ The one file the scoring step reads. Counts and exceptions only; the row tables 
 - **Disagreements with research, flagged:** R12 ("worsened", not "improved 5→4": research's own 4 persisting + 2 new = 6 > 5); LIN-3649 (not LIN-3417) is the open readiness-lane ticket (confirmed in LIN-3634's description via the API); denominator 51, not 52.
 - **N5:** `api-openrouter` needs a content reason (commits `3ee41011`, `279258c9`, `a89c43b7`, `8c41aa19`; `lib/openrouter.js` has 31 window commits) before it is filed unchanged.
 - **N3:** the Arm 2 editions read and the Code Quality F-dashboard disposition go in `c14-members.md`, together with the C9 member table (`c9-members.md`, with the `observer-sweep:645` vs `credential-invariant-sweep:20` borderline reason, N4) in the scoring step.
+
+## 6. Addendum at report writing (2026-10-23T09:41Z)
+
+- **Drift is no longer zero.** LinearViewer `origin/main` is `8e59ed62` (one docs-only commit after `c5694b68`: two `docs/incidents/` files and `docs/operator-execution.md`; 0 files under `lib routes server.js public`). simple-dispatcher is unchanged at `bb1da78`. The report's first finding records this and carries the content of the commit as a dated note. Section 1 above ("Drift: none") describes the evidence step on 2026-10-21 and stays as written.
+- The C8 query returns 52 hits at both `c5694b68` and `8e59ed62`; the window counts are unchanged (`rerun-outputs.md` Q42).
+- New files in this folder at scoring: `c9-members.md`, `c14-members.md`. Q42 (writer-time re-run) is appended to `rerun-outputs.md`.
