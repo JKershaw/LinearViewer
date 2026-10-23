@@ -6,6 +6,7 @@
  * with JS on, because `securitypolicyviolation` needs a listener.
  */
 import { test, expect } from '@playwright/test';
+import { expectNoClippedOverflow } from '../helpers.js';
 
 test.describe('Library — server-rendered, no JavaScript', () => {
   test.use({ javaScriptEnabled: false });
@@ -158,3 +159,35 @@ test.describe('Library figures — dark mode', () => {
     });
   });
 });
+
+// LIN-3761 — wide tables were clipped and unreachable under `overflow-x: clip`
+// (LIN-1068). Sweep every catalog document at phone widths; never `scrollWidth`
+// on the root as the witness (LIN-3715).
+for (const width of [390, 320]) {
+  test.describe(`Library — no clipped overflow at ${width}px`, () => {
+    test.use({ viewport: { width, height: 800 } });
+
+    test('every catalog document keeps wide content reachable', async ({ page, request }) => {
+      test.setTimeout(300_000);
+      const xml = await (await request.get('/sitemap.xml')).text();
+      const paths = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)]
+        .map((m) => new URL(m[1]).pathname)
+        .filter((p) => p.startsWith('/library/'));
+      expect(paths.length).toBeGreaterThan(0);
+      for (const path of paths) {
+        await page.goto(path);
+        const hasTable = (await page.locator('.library-doc__body table').count()) > 0;
+        if (hasTable) {
+          const unwrapped = await page.locator('.library-doc__body table:not(.library-doc__table-wrap table)').count();
+          expect(unwrapped, `${path}: table outside a wrapper`).toBe(0);
+        }
+        await expectNoClippedOverflow(page, hasTable ? { wrapSel: '.library-doc__table-wrap', wraps: true } : {});
+        // Behavioural reachability: a wrapper that overflows its box scrolls.
+        const stuck = await page.evaluate(() => [...document.querySelectorAll('.library-doc__table-wrap')]
+          .filter((w) => w.scrollWidth > w.clientWidth)
+          .filter((w) => { w.scrollLeft = 9999; return w.scrollLeft <= 0; }).length);
+        expect(stuck, `${path}: overflowing table cannot be scrolled`).toBe(0);
+      }
+    });
+  });
+}
