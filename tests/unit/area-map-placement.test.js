@@ -20,6 +20,7 @@ describe('code-shape area map placement (LIN-3729)', () => {
     assert.strictEqual(areaOf('lib/proxy-fetch.js'), 'Platform & plumbing');
     assert.strictEqual(areaOf('lib/openrouter-key-resolver.js'), 'Auth, accounts & workspaces');
     assert.strictEqual(areaOf('lib/guest-task-path.js'), 'Auth, accounts & workspaces');
+    assert.strictEqual(areaOf('lib/vendor-assets.js'), 'Platform & plumbing'); // LIN-3787
   });
 
   test('sibling files the lookaheads must not steal stay where they were', () => {
