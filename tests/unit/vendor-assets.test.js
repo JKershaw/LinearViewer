@@ -8,9 +8,11 @@ import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import vm from 'node:vm';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, mkdtempSync, mkdirSync, copyFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { defaultCacheControl } from '../../lib/response-headers.js';
 import { VENDOR_ASSETS, vendorAssetPath, createVendorAssetsRouter } from '../../lib/vendor-assets.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -48,6 +50,8 @@ describe('vendor asset table', () => {
     const v = installed('dompurify');
     assert.ok(semverGte(v, '3.4.17'), `installed DOMPurify ${v} < 3.4.17`);
     assert.ok(semverGte(pkg.dependencies.dompurify, '3.4.17'));
+    // The bytes the router serves, not just the package manifest (LIN-3787 review item 7).
+    assert.ok(semverGte(sandbox.DOMPurify.version, '3.4.17'), `served DOMPurify ${sandbox.DOMPurify.version} < 3.4.17`);
   });
 
   test('server.js mounts the router immediately before express.static, so defaultCacheControl skips it', () => {
@@ -61,13 +65,34 @@ describe('vendor asset table', () => {
   test('an unknown URL is rejected by the path helper', () => {
     assert.throws(() => vendorAssetPath('/nope.js'), /Unknown vendor asset/);
   });
+
+  test('a missing vendor file fails the boot, naming the path', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'vendor-assets-'));
+    try {
+      // Only two of the three files exist: chart.js is missing.
+      for (const url of ['/purify.min.js', '/marked.min.js']) {
+        const dest = vendorAssetPath(url, tmp);
+        mkdirSync(dirname(dest), { recursive: true });
+        copyFileSync(vendorAssetPath(url), dest);
+      }
+      assert.throws(
+        () => createVendorAssetsRouter({ nodeModulesDir: tmp }),
+        (err) => err.code === 'ENOENT' && err.message.includes(join('chart.js', 'dist', 'chart.umd.min.js')),
+      );
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('vendor router', () => {
   let server, port;
   before(async () => {
     const app = express();
+    // Same stack as server.js: vendor router, then static, then defaultCacheControl (LIN-3692).
     app.use(createVendorAssetsRouter());
+    app.use(express.static(join(ROOT, 'public')));
+    app.use(defaultCacheControl());
     server = await new Promise((r) => { const s = app.listen(0, '127.0.0.1', () => r(s)); });
     port = server.address().port;
   });
@@ -83,6 +108,19 @@ describe('vendor router', () => {
       assert.deepEqual(Buffer.from(await res.arrayBuffer()), readFileSync(vendorAssetPath(url)));
     });
   }
+
+  test('HEAD returns 200 with the same Cache-Control', async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/marked.min.js`, { method: 'HEAD' });
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('cache-control'), 'public, max-age=0');
+  });
+
+  test('Range requests behave as on the old static files: Accept-Ranges and 206', async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/chart.umd.min.js`, { headers: { Range: 'bytes=0-9' } });
+    assert.equal(res.status, 206);
+    assert.equal(res.headers.get('accept-ranges'), 'bytes');
+    assert.equal((await res.arrayBuffer()).byteLength, 10);
+  });
 });
 
 describe('public/ stays free of vendored third-party libraries', () => {
@@ -92,7 +130,7 @@ describe('public/ stays free of vendored third-party libraries', () => {
       if (!/\.js$/.test(f)) continue;
       if (Object.keys(VENDOR_ASSETS).some((u) => u.endsWith('/' + f.split('/').pop()))) offenders.push(f);
       const head = readFileSync(join(ROOT, 'public', f), 'utf8').slice(0, 400);
-      if (/@license DOMPurify|marked v\d|Chart\.js v\d/.test(head)) offenders.push(f);
+      if (/@license|Copyright|Released under/.test(head)) offenders.push(f);
     }
     assert.deepEqual(offenders, [], 'declare it in package.json and add it to lib/vendor-assets.js instead');
   });
