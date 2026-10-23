@@ -92,7 +92,7 @@ async function runFetchAndPrepareProjects(teamId, teams, matchedTeamId) {
     getBindingCredentials: () => ({ token: 'real-token' }),
     getBindingCallScope: () => 'call-scope',
     // LIN-3774: local to server.js; no secondary binding in this harness
-    secondaryRemint: { ensureFresh: async () => false, isSecondaryRemintable: () => false },
+    secondaryRemint: { ensureFresh: async () => false, isSecondaryBinding: () => false },
     matchTeamId: (t, rawTeamId) => { calls.matchTeamIdArgs = { teams: t, rawTeamId }; return matchedTeamId; },
     isWorkspaceFeatureEnabled: async () => false,
     workspacePreferencesStore: {} // local to server.js; unused with urlKey null

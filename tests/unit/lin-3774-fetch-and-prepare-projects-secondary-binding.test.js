@@ -196,6 +196,46 @@ describe('LIN-3774 fetchAndPrepareProjects — tag and degrade', () => {
   });
 });
 
+describe('LIN-3790 fetchAndPrepareProjects — legacy (not connection-backed) secondary', () => {
+  /** Legacy Linear-primary workspace with a legacy GitHub secondary; `provider` may be undefined. */
+  function legacyWorkspace({ provider = 'linear' } = {}) {
+    const linear = { provider: 'linear', scope: 'org-1', credentials: { token: 'legacy-lin' } };
+    const github = { provider: 'github', scope: 'JKershaw/LinearViewer', credentials: { token: 'legacy-gh' } };
+    const ws = { id: 'org-1', urlKey: 'lv', accessToken: 'legacy-lin', bindings: [linear, github] };
+    if (provider) ws.provider = provider;
+    return ws;
+  }
+
+  test('retry pass: a legacy GitHub secondary that fails is degraded, the Linear source renders, and nothing is renewed', async () => {
+    const { value, error, calls } = await run(legacyWorkspace(), { githubFails: authError(), opts: { degradeSecondary: true } });
+    assert.equal(error, undefined);
+    assert.deepEqual(plain(value.degradedSources), [{ provider: 'github', scope: 'JKershaw/LinearViewer' }]);
+    assert.equal(value.organizationName, 'linear-org');
+    assert.equal(calls.remint.length, 0, 'a legacy binding has no renewal path');
+  });
+
+  test('first pass: a legacy secondary 401 still rethrows, tagged with an undefined connectionId', async () => {
+    const { error } = await run(legacyWorkspace(), { githubFails: authError() });
+    assert.equal(error.message, 'Bad credentials');
+    assert.deepEqual(plain(error.binding), { provider: 'github', scope: 'JKershaw/LinearViewer' });
+  });
+
+  for (const provider of ['linear', undefined]) {
+    test(`retry pass: the legacy ACTIVE binding's failure still rethrows (workspace.provider ${provider}) — never an empty dashboard`, async () => {
+      const { error, value } = await run(legacyWorkspace({ provider }), { linearFails: authError(), opts: { degradeSecondary: true } });
+      assert.equal(value, undefined);
+      assert.equal(error.message, 'Bad credentials');
+    });
+  }
+
+  test('a single legacy binding with an undefined provider takes no degrade path: a failure rethrows', async () => {
+    const linear = { provider: 'linear', scope: 'org-1', credentials: { token: 'legacy-token' } };
+    const ws = { id: 'org-1', urlKey: 'lv', accessToken: 'legacy-token', bindings: [linear] };
+    const { error } = await run(ws, { linearFails: authError(), opts: { degradeSecondary: true } });
+    assert.equal(error.message, 'Bad credentials');
+  });
+});
+
 describe('LIN-3774 every fetchAndPrepareProjects call site passes accountId', () => {
   test('all five call sites carry accountId; the three non-dashboard sites keep urlKey null', () => {
     const calls = [...SERVER_SRC.matchAll(/(?<!function )fetchAndPrepareProjects\((workspace,[^\n]*)/g)].map(m => m[1]);

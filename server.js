@@ -1665,11 +1665,12 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
         try { error.binding = { provider: binding.provider, scope: binding.scope, connectionId: binding.connectionId }; } catch { /* frozen error: stays untagged */ }
       }
       // Degrade instead of failing the page: only on the retry pass (which exists
-      // only because of a 401 and has already re-minted), and only for an in-scope
-      // secondary. The first pass always rethrows, so a non-auth failure fails the
-      // page as it does today.
-      if (degradeSecondary && secondaryRemint.isSecondaryRemintable(workspace, binding)) {
-        console.error(`Secondary ${binding.provider} source (${binding.scope}) failed after re-mint; rendering without it:`, error);
+      // only because of a 401 and has already attempted a renewal), and only for a
+      // secondary (LIN-3790: any non-active binding, legacy and refresh-token kinds
+      // included; the active binding still rethrows). The first pass always
+      // rethrows, so a non-auth failure fails the page as it does today.
+      if (degradeSecondary && secondaryRemint.isSecondaryBinding(workspace, binding)) {
+        console.error(`Secondary ${binding.provider} source (${binding.scope}) failed after renewal attempt; rendering without it:`, error);
         degradedSources.push({ provider: binding.provider, scope: binding.scope });
         continue;
       }
@@ -1977,24 +1978,36 @@ async function handleUnauthorizedError(workspace, session, teamId, assigneeState
     return;
   }
 
-  // LIN-3774: a tagged failure from a SECONDARY connection-backed GitHub-family
-  // binding (a Linear-primary workspace's GitHub source) re-mints THAT binding
-  // only — it is not evidence the active binding's credential is bad, so the
-  // ladder below (a Linear refresh-token rotation, the owner credential store,
-  // workspace removal) is skipped. Guarded on `error?.binding` so a caller that
-  // passes no error never touches the seam. The retry always renders the
-  // dashboard (LIN-2526, all five routes) with `degradeSecondary`, so a source
-  // that is still dead shows the notice instead of a 503. Untagged, active,
-  // legacy, refresh-token-kind and unhydrated-tagged errors fall through.
+  // LIN-3774: a tagged failure from a SECONDARY binding renews THAT binding only
+  // (when it is renewable) — it is not evidence the active binding's credential
+  // is bad, so the ladder below (a Linear refresh-token rotation, the owner
+  // credential store, workspace removal) is skipped. LIN-3790 widened this from
+  // connection-backed GitHub-family to every non-active binding: refresh-token
+  // kinds renew through the same seam, and a legacy / unhydrated secondary has no
+  // renewal (`remint` is a no-op) and just degrades, where its 401 used to go down
+  // the active ladder and could end in `handleWorkspaceRemoval`. Guarded on
+  // `error?.binding` so a caller that passes no error never touches the seam. The
+  // retry always renders the dashboard (LIN-2526, all five routes) with
+  // `degradeSecondary`, so a source that is still dead shows the notice instead
+  // of a 503. Untagged and active-tagged errors fall through.
   const failedSecondary = error?.binding ? secondaryRemint.bindingForError(workspace, error) : null;
   if (failedSecondary) {
     await secondaryRemint.remint(workspace, failedSecondary, session.accountId);
     try {
       return await renderDashboardAfterRefresh(workspace, session, teamId, assigneeState, openRouterSource, res);
     } catch (renderError) {
-      const ref = errorReference();
-      console.error('Post-secondary-remint dashboard render failed (workspace preserved):', renderError, `[ref ${ref}]`);
-      return res.status(503).send(renderSourceErrorPage(renderError, workspace, { ref, relink: relinkNotice }));
+      // LIN-3790 R1: an auth error from the ACTIVE binding (or untagged) on this
+      // retry is the active binding's own recovery problem, which the dead
+      // secondary was hiding behind the 503. Fall out of the arm into the active
+      // ladder below (no recursion, so the arm cannot re-enter). A secondary-tagged
+      // or non-auth failure keeps the 503.
+      const activeAuthFailure = isAuthError(renderError)
+        && !(renderError?.binding && secondaryRemint.bindingForError(workspace, renderError));
+      if (!activeAuthFailure) {
+        const ref = errorReference();
+        console.error('Post-secondary-remint dashboard render failed (workspace preserved):', renderError, `[ref ${ref}]`);
+        return res.status(503).send(renderSourceErrorPage(renderError, workspace, { ref, relink: relinkNotice }));
+      }
     }
   }
 

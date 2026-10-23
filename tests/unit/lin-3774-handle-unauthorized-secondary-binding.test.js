@@ -33,7 +33,7 @@ import { renderPage } from '../../lib/render.js';
 import { orderIssuesForSwipe } from '../../lib/render-swipe.js';
 import { nodeKey } from '../../lib/tree.js';
 import { renderSourceErrorPage } from '../../lib/render-pages.js';
-import { errorReference } from '../../lib/errors.js';
+import { errorReference, isAuthError } from '../../lib/errors.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
@@ -61,11 +61,24 @@ function makeWorkspace({ ghHydrated = true, ghProvider = 'github', ghConnectionI
 }
 
 /**
+ * LIN-3790: a LEGACY (no connectionId) workspace. `primary` is the active provider
+ * (undefined `provider` = a pre-`provider` workspace, normalised to linear); the
+ * secondary is any non-connection-backed binding of another kind.
+ */
+function makeLegacyWorkspace({ primary = 'linear', secondary = { provider: 'github', scope: 'JKershaw/LinearViewer' } } = {}) {
+  const active = { provider: 'linear', scope: 'org-1', credentials: { token: 'lin-token' } };
+  const sec = { ...secondary, credentials: { token: 'stale-sec' } };
+  const ws = { id: 'org-1', urlKey: 'lv', accessToken: 'lin-token', activeBinding: { provider: 'linear', scope: 'org-1' }, bindings: [active, sec] };
+  if (primary) ws.provider = primary;
+  return ws;
+}
+
+/**
  * @param {Object} o
  * @param {Object} [o.fetchResult] - what the (faked) fetchAndPrepareProjects resolves for the retry render
  * @param {boolean} [o.remintFails]
  */
-function harness({ degraded = [], remintFails = false, fetchThrows = null } = {}) {
+function harness({ degraded = [], remintFails = false, fetchThrows = null, fetchThrowsSeq = null } = {}) {
   const calls = { errorLogs: [], githubRemint: [], linearRefresh: [], linearExchange: 0, fetch: [], removal: 0, saveSession: 0, durableRead: 0 };
   const res = {
     statusCode: 200, body: null,
@@ -85,7 +98,7 @@ function harness({ degraded = [], remintFails = false, fetchThrows = null } = {}
   const context = vm.createContext({
     process, console: { ...console, error: (...a) => { calls.errorLogs.push(a); }, log: () => {} },
     REFRESH_STRATEGY, refreshDeclarationFor, normalizeProvider,
-    renderPage, orderIssuesForSwipe, nodeKey, renderSourceErrorPage, errorReference, relinkNotice,
+    renderPage, orderIssuesForSwipe, nodeKey, renderSourceErrorPage, errorReference, isAuthError, relinkNotice,
     secondaryRemint,
     activeConnectionIdForWorkspace: (ws) => activeConnectionBackedBinding(ws)?.connectionId ?? null,
     customPromptsStore: { list: async () => [] },
@@ -95,6 +108,8 @@ function harness({ degraded = [], remintFails = false, fetchThrows = null } = {}
     fetchAndPrepareProjects: async (...args) => {
       calls.fetch.push(args);
       if (fetchThrows) throw fetchThrows;
+      // LIN-3790: errors for the 1st, 2nd... render; later renders succeed.
+      if (fetchThrowsSeq && calls.fetch.length <= fetchThrowsSeq.length && fetchThrowsSeq[calls.fetch.length - 1]) throw fetchThrowsSeq[calls.fetch.length - 1];
       return { trees: [], inProgressTrees: [], recentActivityTrees: [], organizationName: 'Acme', teams: [], selectedTeamId: null, showSource: true, truncated: false, availableAssignees: [], appliedAssigneeName: null, degradedSources: degraded };
     },
     // The active-binding ladder, spied: a connection-backed Linear workspace refreshes via its Connection.
@@ -245,17 +260,123 @@ describe('LIN-3774 handleUnauthorizedError — everything else keeps today\'s la
     assert.equal(calls.linearRefresh.length, 1);
   });
 
-  test('legacy-tagged, refresh-token-kind-tagged and unhydrated-tagged errors take the ladder', async () => {
-    const cases = [
-      [makeWorkspace({ ghConnectionId: undefined }), { provider: 'github', scope: 'JKershaw/LinearViewer', connectionId: undefined }],
-      [makeWorkspace({ ghProvider: 'jira' }), { provider: 'jira', scope: 'JKershaw/LinearViewer', connectionId: 'a::github::1' }],
-      [makeWorkspace({ ghHydrated: false }), GH_TAG],
-    ];
-    for (const [workspace, tag] of cases) {
-      const { calls } = await ladder(authError(tag), workspace);
-      assert.equal(calls.githubRemint.length, 0, JSON.stringify(tag));
-      assert.equal(calls.linearRefresh.length, 1, JSON.stringify(tag));
+  // LIN-3790: legacy, refresh-token-kind and unhydrated SECONDARIES no longer take
+  // the active ladder (they used to; see the secondary describe below). Same-kind
+  // legacy bindings are the active binding by one-source-per-kind and still do.
+  test('LIN-3790: a legacy binding of the PRIMARY kind (not a secondary) takes the ladder', async () => {
+    const ws = makeLegacyWorkspace({ secondary: { provider: 'linear', scope: 'org-2' } });
+    const { calls } = await ladder(authError({ provider: 'linear', scope: 'org-2', connectionId: undefined }), ws);
+    assert.equal(calls.removal + calls.durableRead > 0, true, 'the active ladder ran');
+  });
+});
+
+describe('LIN-3790 handleUnauthorizedError — legacy and refresh-token-kind secondaries', () => {
+  const JIRA_TAG = { provider: 'jira', scope: 'https://x.atlassian.net', connectionId: 'a::jira::x' };
+
+  function jiraOAuthWorkspace({ hydrated = true } = {}) {
+    const ws = makeWorkspace();
+    const jira = { provider: 'jira', scope: 'https://x.atlassian.net', connectionId: 'a::jira::x' };
+    if (hydrated) setBindingCredential(jira, { token: 'stale-jira', tokenExpiresAt: NOW - 1000 });
+    ws.bindings = [ws.bindings[0], jira];
+    return ws;
+  }
+
+  test('a connection-backed Jira OAuth secondary is renewed through the seam, spends no Linear refresh, then renders degradeSecondary', async () => {
+    const { calls, res, run } = harness();
+    await run(jiraOAuthWorkspace(), authError(JIRA_TAG));
+    assert.equal(calls.githubRemint.length, 1, 'one refreshConnectionForWorkspace call');
+    assert.deepEqual(JSON.parse(JSON.stringify(calls.githubRemint[0].connection)), { _id: 'a::jira::x', provider: 'jira' });
+    assert.equal(calls.linearRefresh.length, 0);
+    assert.equal(calls.removal, 0);
+    assert.equal(calls.fetch[0][4].degradeSecondary, true);
+    assert.equal(res.statusCode, 200);
+  });
+
+  // F2 witness: at HEAD this tag went down the active ladder and ended in handleWorkspaceRemoval.
+  for (const provider of [undefined, 'linear']) {
+    test(`F2: a dead LEGACY GitHub secondary on a legacy Linear-primary (workspace.provider ${provider}) degrades: no removal, no Linear refresh`, async () => {
+      const { calls, res, run } = harness({ degraded: [{ provider: 'github', scope: 'JKershaw/LinearViewer' }] });
+      await run(makeLegacyWorkspace({ primary: provider }), authError({ provider: 'github', scope: 'JKershaw/LinearViewer', connectionId: undefined }));
+      assert.equal(calls.removal, 0, 'the workspace is not removed over a dead secondary');
+      assert.equal(calls.linearRefresh.length, 0);
+      assert.equal(calls.linearExchange, 0);
+      assert.equal(calls.durableRead, 0);
+      assert.equal(calls.githubRemint.length, 0, 'a legacy secondary has no renewal path');
+      assert.equal(calls.fetch.length, 1);
+      assert.equal(calls.fetch[0][4].degradeSecondary, true);
+      assert.equal(res.statusCode, 200);
+      assert.match(res.body, /dashboard-source-notice/);
+    });
+  }
+
+  test('a dead legacy Jira Basic secondary degrades the same way', async () => {
+    const ws = makeLegacyWorkspace({ secondary: { provider: 'jira', scope: 'https://x.atlassian.net' } });
+    const { calls, res, run } = harness({ degraded: [{ provider: 'jira', scope: 'https://x.atlassian.net' }] });
+    await run(ws, authError({ provider: 'jira', scope: 'https://x.atlassian.net', connectionId: undefined }));
+    assert.equal(calls.removal, 0);
+    assert.equal(calls.linearRefresh.length, 0);
+    assert.match(res.body, /dashboard-source-notice/);
+  });
+
+  test('a dead legacy Linear secondary under a legacy GitHub primary degrades, with no GitHub re-mint', async () => {
+    const ws = makeLegacyWorkspace({ primary: 'github', secondary: { provider: 'linear', scope: 'org-1' } });
+    ws.bindings = [{ provider: 'github', scope: 'o/r', credentials: { token: 'gh' } }, ws.bindings[1]];
+    ws.activeBinding = { provider: 'github', scope: 'o/r' };
+    const { calls, res, run } = harness({ degraded: [{ provider: 'linear', scope: 'org-1' }] });
+    await run(ws, authError({ provider: 'linear', scope: 'org-1', connectionId: undefined }));
+    assert.equal(calls.removal, 0);
+    assert.equal(calls.githubRemint.length, 0);
+    assert.match(res.body, /dashboard-source-notice/);
+  });
+
+  test('an unhydrated connection-backed secondary degrades without the ladder (remint is a no-op)', async () => {
+    const { calls, res, run } = harness({ degraded: [{ provider: 'github', scope: 'JKershaw/LinearViewer' }] });
+    await run(makeWorkspace({ ghHydrated: false }), authError(GH_TAG));
+    assert.equal(calls.githubRemint.length, 0);
+    assert.equal(calls.linearRefresh.length, 0);
+    assert.equal(calls.fetch[0][4].degradeSecondary, true);
+    assert.match(res.body, /dashboard-source-notice/);
+  });
+
+  // F3 witness: at HEAD a dead Linear secondary spent a GitHub installation re-mint on the ACTIVE binding.
+  test('F3: a connection-backed GitHub-primary with a dead Linear secondary re-mints the secondary only, never the active GitHub installation', async () => {
+    const gh = { provider: 'github', scope: 'o/r', connectionId: 'a::github::1' };
+    const lin = { provider: 'linear', scope: 'org-1', connectionId: 'a::linear::org-1' };
+    setBindingCredential(gh, { token: 'gh', tokenExpiresAt: NOW + 3_600_000 });
+    setBindingCredential(lin, { token: 'stale-lin', tokenExpiresAt: NOW - 1000 });
+    const ws = { id: 'org-1', urlKey: 'lv', provider: 'github', activeBinding: { provider: 'github', scope: 'o/r' }, bindings: [gh, lin] };
+    const { calls, res, run } = harness();
+    await run(ws, authError({ provider: 'linear', scope: 'org-1', connectionId: 'a::linear::org-1' }));
+    assert.equal(calls.githubRemint.length, 1);
+    assert.equal(calls.githubRemint[0].connection.provider, 'linear', 'the Linear secondary was renewed');
+    assert.equal(res.statusCode, 200);
+  });
+
+  describe('R1: a retry that fails with the ACTIVE binding\'s auth error falls through to the active ladder', () => {
+    const LIN_TAG = { provider: 'linear', scope: 'org-1', connectionId: 'a::linear::org-1' };
+    for (const [name, tag] of [['active-tagged', LIN_TAG], ['untagged', null]]) {
+      test(`${name} auth error on the secondary arm's retry runs the ladder instead of the 503`, async () => {
+        const { calls, res, run } = harness({ fetchThrowsSeq: [authError(tag)] });
+        await run(makeWorkspace(), authError(GH_TAG));
+        assert.equal(calls.githubRemint.length, 1, 'the secondary was renewed first');
+        assert.equal(calls.linearRefresh.length, 1, 'then the active ladder ran');
+        assert.equal(res.statusCode, 200);
+      });
     }
+
+    test('a secondary-tagged auth error on the retry stays the 503 (no ladder)', async () => {
+      const { calls, res, run } = harness({ fetchThrows: authError(GH_TAG) });
+      await run(makeWorkspace(), authError(GH_TAG));
+      assert.equal(res.statusCode, 503);
+      assert.equal(calls.linearRefresh.length, 0);
+    });
+
+    test('a non-auth retry failure stays the 503 (no ladder)', async () => {
+      const { calls, res, run } = harness({ fetchThrows: Object.assign(new Error('GitHub 502'), { status: 502 }) });
+      await run(makeWorkspace(), authError(GH_TAG));
+      assert.equal(res.statusCode, 503);
+      assert.equal(calls.linearRefresh.length, 0);
+    });
   });
 });
 
