@@ -270,7 +270,7 @@ describe('LIN-3796 review follow-ups', () => {
     }
   });
 
-  test('hostile inputs under 100ms-class bounds', () => {
+  test('hostile inputs under the 1000 ms bound', () => {
     const cases = [
       `<p>${'-----BEGIN RSA PRIVATE KEY-----<br>'.repeat(6500)}</p>`,
       `<p>${escapeHtml('-----BEGIN RSA PRIVATE KEY-----<br>'.repeat(6500))}</p>`,
