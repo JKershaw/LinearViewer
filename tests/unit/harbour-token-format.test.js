@@ -62,7 +62,9 @@ describe('masking', () => {
     const s = share();
     const hex = createHash('sha256').update('x').digest('hex');
     const html = `<div data-state-url="/t/${s}/state"></div><p>${legacy()} ${hex}</p>`;
-    assert.equal(maskSecretsInHtml(html), html);
+    // Asserts this rule's id, not byte-equality: random tokens can hit an unrelated rule
+    // (openai-api-key, ~2.5e-6 per token), which must not turn this witness red.
+    assert.ok(!maskResult(html).hits.includes(RULE_ID));
   });
 
   test("(b') a 43-char share token constructed to start hb?_ is not masked", () => {
@@ -71,7 +73,7 @@ describe('masking', () => {
       assert.equal(s.length, 43);
       assert.equal(harbourHits(s).length, 0, s);
       const html = `<div data-state-url="/t/${s}/state"></div>`;
-      assert.equal(maskSecretsInHtml(html), html, p);
+      assert.ok(!maskResult(html).hits.includes(RULE_ID), p);
     }
   });
 
