@@ -1,0 +1,46 @@
+# C1 landing-status grep — LinearViewer 76fc3e91, simple-dispatcher 1798790
+# pattern: INERT|until beat|read by nothing|touches no read path|later beat|not yet wired|no production caller|zero consumers|is beat [0-9]|no runtime caller
+## LinearViewer lib routes
+lib/collective-presets-store.js:7: * launch time (a later beat).
+lib/proxy-tokens.js:126:   * until beat 3 redirects it here to copy grants.
+lib/proxy-tokens.js:339:   * decision lin3059-credential-boundary-j1-j4). INERT in S1: no production
+lib/periodicals.js:94://   recommend/loop. (Autopilot is not yet wired to dispatch periodicals; that
+lib/account-workspace-store.js:139:   *   (machines) and workspace sharing. LIN-1892 adds no production caller;
+lib/dispatch-store.js:30: *   cascade: boolean,         // Cascade-close modifier on an abort (optional, defaults false). When true, abortTo names the ROOT session of a subtree Harbour expands into one abort per descendant (the recursive walk is a later beat). Route layer rejects cascade:true without abort. Stored + forwarded blindly; consumed by Harbour's expansion, not the runner. See LIN-946.
+lib/dispatch-store.js:361:   * @param {boolean} [item.cascade] - Cascade-close modifier on an abort (default false); abortTo names a subtree root Harbour expands (walk is a later beat). Stored + forwarded blindly (LIN-946)
+lib/dispatch-store.js:601:   * Decisions 2, 8, 10). Inert: no production caller yet.
+lib/dispatch-store.js:2017:   * no-op, so the walk never needs to pre-check liveness. INERT until a caller
+lib/dispatch-store.js:2530:      //     resume target, so a resumed stepper's later beats + terminal land on a
+lib/dispatch-entrance.js:313:// every later beat is redundant and risks confusing the worker. The prose append
+lib/dispatch-entrance.js:818:// work (a cascade carries no prompt). INERT: nothing issues a cascade at end-of-run yet.
+lib/proxy-preamble.js:444:  // ── Declared branch (LIN-3138). Inert: no production caller passes a
+lib/proxy-preamble.js:692: * 2, 3, 7's helper attach mode, 10). Inert: no production caller yet.
+lib/render-ship-biscuit.js:9: * INERT in V1 — the on-demand article-body pass is deferred to V2. Clicking a
+lib/providers/interface.js:140:  // — no call-site changes that ticket, zero consumers yet. `listConnectionScopes`
+lib/providers/interface.js:547:  // against — inventing one here, with zero consumers, would be unvalidated
+lib/providers/models.js:127:// zero consumers today — the same unvalidated-interface-widening trap named
+lib/collective-preset-defs.js:21: * launch time (a later beat) — definition-time binding would be unworkable
+lib/prompts/collective-participant.js:126: *   block. This is the seam for LIN-820 — no production caller passes a custom
+routes/held-connection.js:27: * POST (add-source; `mode=new` is beat 4):
+## simple-dispatcher *.js
+pacing.js:80://       control-channel probe) — `undefined` (not passed at all) stays INERT, same null-safety idiom
+opencode-liveness.js:7:// C1 IS INERT: nothing in reapers.js calls readOpenCodeLiveness yet. `readOpenCodeExitSentinel`
+reapers.js:1212:  // unbounded form; LIN-3585: no production caller uses it any more (cleanup passes the BLOCKED_REAP_MS bound).
+reapers.js:1743:// LANDS INERT — nothing calls this yet. Its two callers (the hold-expired backstop, and the
+phases.js:104:  // divert. isLegalTransition has no runtime caller; this is documentation only.
+transcript.js:110:const INERT_ATTACHMENT_TYPES = new Set([
+transcript.js:120:const INERT_SYSTEM_SUBTYPES = new Set([
+transcript.js:138:  if (entry.type === 'attachment') return INERT_ATTACHMENT_TYPES.has(entry.attachment?.type);
+transcript.js:140:    return entry.subtype !== 'scheduled_task_fire' && INERT_SYSTEM_SUBTYPES.has(entry.subtype);
+transcript.js:184:      return INERT_SYSTEM_SUBTYPES.has(entry.subtype) ? 'inert' : 'human';
+transcript.js:192:      return INERT_ATTACHMENT_TYPES.has(att.type) ? 'inert' : 'human';
+transcript.js:531:  walkAssistantTextBlocks, userEntryText, classifyTurnDriver, INERT_ATTACHMENT_TYPES, walkToolActivity, walkUsage, walkTicketMarkers,
+
+## Verdicts after a per-hit caller check (LIN-3825, read at the SHAs above)
+FALSE (13): proxy-tokens.js:339,126 | dispatch-store.js:601,2017,30,361 | proxy-preamble.js:692,444 | owner-credential-store.js:9-11 (not in this grep; see report) | connection-binding.js:16-18 (same) | held-connection.js:27 | account-workspace-store.js:139 | SD opencode-liveness.js:7 | SD reapers.js:1743
+  proxy-preamble.js:444  -> declaredGrants:['dispatch'] is passed at lib/dispatch-entrance.js:739,776 and routes/workspace-api.js:3095
+  account-workspace-store.js:139 -> getWorkspaceOwnerAccountId is called at lib/workspace-owner.js:77 and lib/connection-credential.js:1452
+LIKELY FALSE, not fully re-derived: prompts/collective-participant.js:126 (routes/collective.js:545 threads a user-supplied character; lib/collective-characters-store.js exists)
+TRUE / design-status (not findings): dispatch-entrance.js:818, SD reapers.js:1212, SD phases.js:104, render-ship-biscuit.js:9 (INERT in V1 is a stated product decision), providers/interface.js:140 and :547, providers/models.js:127 (design rationale), collective-presets-store.js:7 / collective-preset-defs.js:21 (a later beat = launch-time binding, intended), dispatch-store.js:2530 (unrelated sense), dispatch-entrance.js:313 (unrelated sense), periodicals.js:94 (Autopilot periodical dispatch: not re-derived)
+NOISE: SD transcript.js INERT_* constants, pacing.js:80 (null-safety idiom)
+Bound: lexical only. A status claim worded differently ("S1 only", "PR3 will") escapes this grep.

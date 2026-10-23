@@ -1,0 +1,5 @@
+"[working · editing] 6 tools in 32s: Edit×4, Bash×2 · 40 total" => {"toolCount":6,"elapsedSeconds":32,"breakdown":{"Edit":4,"Bash":2},"total":40,"state":null,"timestamp":null,"raw":"[working · editing] 6 tools in 32s: Edit×4, Bash×2 · 40 total"}
+"[working] no tool calls in 5m · 40 total" => {"toolCount":0,"elapsedSeconds":300,"breakdown":null,"total":40,"state":"idle","timestamp":null,"raw":"[working] no tool calls in 5m · 40 total"}
+"[working · running] Bash running for 3m" => null
+"[stalled?] no activity for 20m" => null
+"[working · verifying] 3 tools in 10s: Bash×3 · 9 total" => {"toolCount":3,"elapsedSeconds":10,"breakdown":{"Bash":3},"total":9,"state":null,"timestamp":null,"raw":"[working · verifying] 3 tools in 10s: Bash×3 · 9 total"}
