@@ -19,10 +19,11 @@
  * lib/ module may name the collection (the class guard in
  * tests/unit/urlkey-holders.test.js scans lib/ for collection literals). The
  * operator runs it against production through the Railway route recorded in
- * docs/operator-execution.md (LIN-3204), from the checkout holding this file,
- * with the flag INSIDE the quoted sh -c string:
- *   railway run -p <project> -e production -s MongoDB-harbour -- \
- *     sh -c 'MONGODB_URI="$MONGO_PUBLIC_URL" node scripts/drop-funnel-events-collection.mjs [--drop]'
+ * docs/operator-execution.md (LIN-3204). That record's `railway run … MONGO_PUBLIC_URL`
+ * form no longer works since 23 Oct (the public endpoint is gone), and no working run
+ * form for this script is recorded yet; the route is now `railway ssh` (see the banner
+ * in docs/operator-execution.md). It needs root, not the app's readWrite user
+ * (docs/runbooks/mongodb-app-user.md), because dropping a collection is an operator action.
  *
  * Uses the same MONGODB_URI / HARBOUR_DATA_DIR convention as server.js.
  */

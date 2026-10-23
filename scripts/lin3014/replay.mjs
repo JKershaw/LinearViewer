@@ -14,6 +14,9 @@
  * this script makes is into the throwaway LOCAL mongod, which is not
  * production and is never the target the role guard restricts.
  *
+ * `lin3014_read`'s only route, the public proxy, is gone since 23 Oct; see the open
+ * question on that user in docs/runbooks/mongodb-app-user.md.
+ *
  * Usage:
  *   LIN3014_MONGO_URI=mongodb://<read-user>@... node scripts/lin3014/replay.mjs copy \
  *     --url-key linearviewer --since-days 30 \

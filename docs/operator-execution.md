@@ -35,7 +35,13 @@ deliverable is the verified execution trace. No repository code changed.
 > - For a longer script, base64 it into that string, decode it to `/dev/shm`, run it with `--file`,
 >   then delete it.
 > - A `railway ssh` shell's environment is not the service's environment: Railway's ssh session
->   adds its own tokens. Read a service's configuration with `railway variables`, not `env`.
+>   adds its own tokens. Do not read a
+>   service's configuration with `env`, or with `railway variables` / `railway variable list` in
+>   any form: they print raw values (`docs/runbooks/mongodb-app-user.md`).
+>
+> - `railway ssh` as root is the **operator** route. harbour-cat itself is to move to its own
+>   `readWrite@linear-viewer` user (planned, not yet cut over; `docs/runbooks/mongodb-app-user.md`).
+>   The root credential stays for operator use only.
 >
 > The rest of this section is the original 2026-10 trace, kept as history.
 

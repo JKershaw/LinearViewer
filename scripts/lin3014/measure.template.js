@@ -4,11 +4,13 @@
 // classify() body) instead.
 //
 // READ-ONLY: find/aggregate/count/distinct only, never a write. Run it the
-// runbook way (docs/runbooks/harbour-degraded.md:41-96): a quoted-heredoc
+// runbook way (the read-only `mongosh` section of docs/runbooks/harbour-degraded.md): a quoted-heredoc
 // `--file`, never `--eval`, and always against the `lin3014_read` user
 // (ruling `16c2be3e`) — never root.
 //
 //   railway run -s MongoDB-harbour -- sh -c 'mongosh "$LIN3014_MONGO_URI" --quiet --file "$0"' measure.js
+//   (`lin3014_read`'s only route, the public proxy, is gone since 23 Oct, so this form no
+//   longer works; see the open question on that user in docs/runbooks/mongodb-app-user.md.)
 //
 // Set NO_DOC_EGRESS=1 to fall back to counters-only mode: per-document sizes
 // are computed server-side via $bsonSize inside the aggregation, so no
