@@ -883,7 +883,7 @@ function handleAccordionClick(e) {
 }
 
 // LIN-3126 residual: the swipe card's issue already carries its own `source`
-// (lib/render-swipe.js), so the comments read forwards it via the one shared
+// (lib/task-order.js), so the comments read forwards it via the one shared
 // builder — the comment route resolves strictly. Sparse: an unsourced issue
 // yields the byte-identical pre-residual URL.
 function swipeCommentsUrl(apiPrefix, issue) {

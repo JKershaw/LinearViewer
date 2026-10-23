@@ -1,11 +1,11 @@
 /**
- * Unit tests for lib/render-swipe.js — issueToCard() provenance stamp (LIN-2046).
+ * Unit tests for lib/task-order.js — issueToCard() provenance stamp (LIN-2046).
  *
  * Run with: node --test tests/unit/render-swipe.test.js
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { flattenTrees } from '../../lib/render-swipe.js';
+import { flattenTrees } from '../../lib/task-order.js';
 import { issueSource } from '../../lib/providers/models.js';
 
 // Build a single-project tree shaped like buildForest output, so flattenTrees

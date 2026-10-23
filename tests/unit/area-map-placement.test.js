@@ -28,4 +28,12 @@ describe('code-shape area map placement (LIN-3729)', () => {
     assert.strictEqual(areaOf('lib/openrouter.js'), 'LLM & prompts');
     assert.strictEqual(areaOf('lib/pat-session.js'), 'Auth, accounts & workspaces');
   });
+
+  // LIN-3554: task ordering is its own area; graph-features is relabelled into it
+  // (first match wins, so Task model must sit ahead of LLM & prompts).
+  test('task ordering and the blocking-graph primitives land in Task model', () => {
+    assert.strictEqual(areaOf('lib/task-order.js'), 'Task model');
+    assert.strictEqual(areaOf('lib/graph-features.js'), 'Task model');
+    assert.strictEqual(areaOf('lib/tree.js'), 'Front end: server-rendered pages');
+  });
 });
