@@ -129,7 +129,8 @@ existing `issuedAt`; the nonce is not consumed, so the same nonce works after th
 check is 0 under `NODE_ENV=test`) is refused. The per-address 24 h cap and the global ceiling
 (`MagicLinkStore.recentCount`, backed by the `{createdAt:-1}` index) sit beside the 15 min cap.
 Every refusal except the per-IP 429 is the normal check-inbox page: no mail, no row, no session
-save. Each refusal logs `[email-auth] send refused: <reason>` (`honeypot`, `too-fast`,
+save (the 403 for a bad send nonce is also logged, as `nonce`). Each refusal logs
+`[email-auth] send refused: <reason>` (`nonce`, `honeypot`, `too-fast`,
 `recipient-throttle`, `recipient-daily-cap`, `global-ceiling`, `per-ip-limit`) and never an
 address. Known trade-off: the global ceiling is a shared budget, so a bot that reaches it can
 make real sign-ins silently go unanswered until the hour rolls; the logs show it. No

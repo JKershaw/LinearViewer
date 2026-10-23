@@ -429,6 +429,7 @@ export function createEmailAuthRoutes({
     // stops a cross-site POST from planting a fresh session (and an
     // attacker-chosen request nonce) in the victim's browser.
     if (!verifySendNonce(req.session, body.nonce, now())) {
+      console.warn('[email-auth] send refused: nonce');
       return res.status(403).send(renderEmailSendRefusedPage());
     }
 

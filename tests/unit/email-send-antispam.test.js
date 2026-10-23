@@ -171,3 +171,85 @@ describe('per-IP limiter', () => {
     } finally { warn.restore(); await harness.close(); }
   });
 });
+
+describe('nonce refusal', () => {
+  test('a POST with a wrong nonce is still a 403 and logs the reason without any address', async () => {
+    const warn = captureWarnings();
+    const harness = await startEmailAuthHarness();
+    try {
+      const b = harness.browser();
+      await b.openForm();
+      const res = await b.post('/auth/email/send', { email: 'nonce-victim@x.io', nonce: 'N'.repeat(43) }, SAME_ORIGIN);
+      assert.strictEqual(res.status, 403);
+      assert.strictEqual(await linkCount(harness), 0);
+      assert.deepStrictEqual(warn.lines, ['[email-auth] send refused: nonce']);
+      assert.ok(!warn.lines.join('\n').includes('@'), 'the address is never logged');
+    } finally { warn.restore(); await harness.close(); }
+  });
+});
+
+// F1 (review): every test above passes minFormMs / globalSendMax explicitly, and the
+// harness forces them off otherwise, so nothing pinned what production runs. These
+// build the router with its own defaults (null = leave the options out).
+describe('production defaults', () => {
+  const withNodeEnv = async (value, fn) => {
+    const saved = process.env.NODE_ENV;
+    process.env.NODE_ENV = value;
+    try { return await fn(); } finally {
+      if (saved === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = saved;
+    }
+  };
+
+  test('under production a POST 1999 ms after the form is refused as too-fast, and 2000 ms is sent', async () => {
+    const warn = captureWarnings();
+    await withNodeEnv('production', async () => {
+      const clock = { ms: 1_000_000 };
+      const harness = await startEmailAuthHarness({ minFormMs: null, globalSendMax: null, nonceClock: clock });
+      try {
+        const b = harness.browser();
+        const { nonce } = await b.openForm();
+        clock.ms += 1999;
+        await b.post('/auth/email/send', { email: 'prod@x.io', nonce }, SAME_ORIGIN);
+        assert.strictEqual(await linkCount(harness), 0);
+        assert.deepStrictEqual(warn.lines, ['[email-auth] send refused: too-fast']);
+        clock.ms += 1;
+        await b.post('/auth/email/send', { email: 'prod@x.io', nonce }, SAME_ORIGIN);
+        assert.ok(harness.transport.lastMessageTo('prod@x.io'));
+      } finally { await harness.close(); }
+    });
+    warn.restore();
+  });
+
+  test('under production the 11th send in an hour is refused as global-ceiling', async () => {
+    const warn = captureWarnings();
+    await withNodeEnv('production', async () => {
+      const clock = { ms: 1_000_000 };
+      const harness = await startEmailAuthHarness({ minFormMs: null, globalSendMax: null, nonceClock: clock });
+      try {
+        const sendAfterWait = async email => {
+          const b = harness.browser();
+          const { nonce } = await b.openForm();
+          clock.ms += EMAIL_SEND_MIN_FORM_MS;
+          return b.post('/auth/email/send', { email, nonce }, SAME_ORIGIN);
+        };
+        for (let i = 0; i < 10; i++) await sendAfterWait(`p${i}@x.io`);
+        assert.strictEqual(await linkCount(harness), 10);
+        await sendAfterWait('p-over@x.io');
+        assert.strictEqual(await linkCount(harness), 10);
+        assert.strictEqual(harness.transport.lastMessageTo('p-over@x.io'), null);
+        assert.deepStrictEqual(warn.lines, ['[email-auth] send refused: global-ceiling']);
+      } finally { await harness.close(); }
+    });
+    warn.restore();
+  });
+
+  test('under NODE_ENV=test an immediate POST sends (the e2e bypass)', async () => {
+    await withNodeEnv('test', async () => {
+      const harness = await startEmailAuthHarness({ minFormMs: null, globalSendMax: null });
+      try {
+        await harness.browser().requestLink('instant@x.io');
+        assert.ok(harness.transport.lastMessageTo('instant@x.io'));
+      } finally { await harness.close(); }
+    });
+  });
+});
