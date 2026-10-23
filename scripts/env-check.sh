@@ -17,19 +17,27 @@ ready=()
 
 # --- Collect check results ---
 
-# Check Node.js
+# Check Node.js (required major comes from .nvmrc, the single pin — LIN-3788)
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+required_major=$(tr -d '[:space:]v' < "$repo_root/.nvmrc" 2>/dev/null | cut -d. -f1)
 if command -v node &> /dev/null; then
   node_version=$(node --version | sed 's/v//')
   node_major=$(echo "$node_version" | cut -d. -f1)
-  if [ "$node_major" -ge 20 ]; then
-    ready+=("Node.js $node_version (≥20 required)")
+  if ! [[ "$required_major" =~ ^[0-9]+$ ]]; then
+    ready+=("Node.js $node_version (no .nvmrc pin found; floor not checked)")
+  elif [ "$node_major" -ge "$required_major" ]; then
+    ready+=("Node.js $node_version (≥$required_major required)")
   else
-    blockers+=("Upgrade Node.js (current: $node_version, need ≥20)")
-    blocker_commands+=("Install Node.js 20+ from https://nodejs.org")
+    blockers+=("Upgrade Node.js (current: $node_version, need ≥$required_major)")
+    blocker_commands+=("Install Node.js $required_major+ (nvm install; see .nvmrc) or from https://nodejs.org")
   fi
 else
   blockers+=("Install Node.js")
-  blocker_commands+=("Install Node.js 20+ from https://nodejs.org")
+  if [[ "$required_major" =~ ^[0-9]+$ ]]; then
+    blocker_commands+=("Install Node.js $required_major+ (nvm install; see .nvmrc) or from https://nodejs.org")
+  else
+    blocker_commands+=("Install Node.js (see .nvmrc) or from https://nodejs.org")
+  fi
 fi
 
 # Check npm
