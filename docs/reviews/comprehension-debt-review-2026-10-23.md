@@ -63,10 +63,14 @@ The wave itself kept its rationale (table in `comprehension-debt-rebuild-rationa
 
 The counter used here (acorn `onComment`, ref set diff per commit) is already a working starting point. **Follow-up: LIN-3829**, plus a comment on each of LIN-3742, LIN-3755, LIN-3608.
 
+### N13 — `runStallFailsafe-unsafe-to-modify` — **Medium** (SD) — *added after the second-read*
+SD `reapers.js:1854-2832` is one function of about 979 lines, of which 500 are `//` comment lines. It holds every arm that fails, re-fires or kills real sessions (transcript heal, verify and exhausted-refire, the opencode hold-expired arm, broker re-arm, blocked-child shielding) behind about 15 injected dependencies. Its comments are mostly provenance (LIN-1125, 1358, 1397, 2446, 2720, 2738, 3270) rather than a constraint a newcomer can act on, and nothing at the function says which arm's ordering is load-bearing. **Cold-hand-off test: fails** (inferred from size and comment style; the ordering constraints were not traced by this run). N7 filed the same module as Low "rationale inflation" and cited only `:1139-1185`; that understated it. A stale cite sits in the same file: `reapers.js:36` says "runStallFailsafe's opencode arm (:1754)", but `:1754` is inside `refireSentinelOverResume` (starts `:1661`); this is another N8-class instance.
+**Fix:** a short ordered list of the arms and which orderings are load-bearing at the top of the function, and cite by symbol at `:36`. Complexity itself is Code Quality's (as for LIN-3741 on the runner kit). **Not promoted** (follow-ups are capped at 3 and N13 was found after they were minted); next run should promote it if LIN-3827 does not absorb the `:36` cite.
+
 ### Medium-Low / Low — recorded, not promoted
 - **N5 `phase-graph-unenforced`** (SD, Medium-Low). `isLegalTransition` (`phases.js:135`) has no runtime caller; only `test/phases.test.js` uses it. This is stated once, mid-table at `phases.js:104`. The header (`phases.js:7-8`) says invariants "are checkable" and SD `CLAUDE.md:27-31` says "the rules live in one place". A reader adding a `.phase =` write assumes a guard exists. Fix: say "documentation-only" in the header and in CLAUDE.md.
 - **N6 `connection-model-decision-codes-offsite`** (Low-Medium; reader, not re-derived). About 90 LIN-3124 codes (D1–D18, S2–S8, PR2/PR3) across `lib/connection-*.js` with no key, colliding with LIN-3125's C1/F2 codes (`routes/held-connection.js:5-16`). About two thirds paraphrase locally; D6/D15 are test-pinned. Fix: a one-screen code key.
-- **N7 `reapers-rationale-inflation`** (SD; reader, not re-derived). `reapers.js:1139-1185` is a 47-line block that buries the BLOCKED-child shielding constraint in provenance; also `:1503-1510`, `:1950`. About 107 lines across 4 SD modules carry plan labels (C2/§4/D4/A3/R3/E1) whose plans are not in the repo.
+- **N7 `reapers-rationale-inflation`** (SD; reader, not re-derived; see N13 for the larger reapers.js issue). `reapers.js:1139-1185` is a 47-line block that buries the BLOCKED-child shielding constraint in provenance; also `:1503-1510`, `:1950`. About 107 lines across 4 SD modules carry plan labels (C2/§4/D4/A3/R3/E1) whose plans are not in the repo.
 - **N8 SD marker/resume cites by line number.** Confirmed: `feedback.js:19-22` cites `dispatch-terminal.js:53`, but `WAKE_FEEDBACK_REGEX` is at `lib/dispatch-terminal.js:63`. `lib/dispatch-terminal.js:98-115` cites `hook.js:~826/~837` (reader: moved about 400 lines, not re-derived). Fix: cite by symbol. Folded into LIN-3828's optional scope.
 - **N9 `pipeline-loops-5d-residue`.** 18 refs dropped (the paper's "17" is net of the added LIN-3384). LIN-2187 is gone from HEAD code and survives only in `tests/unit/pipeline-loops.test.js:2112`. The singleton anchor-bucket reason (`lib/pipeline-loops.js:71-74,489`) and "lineageId never replaces loopId" (`:341-372`) are reader-reported losses, not re-derived.
 - **N10 stale twin pointers** after moves (`lib/dispatch-factory.js:999-1000`; `routes/proxy-compute.js:108,188`, `routes/task-chat.js:58`). Owned by Code Quality 10-20 (`code-quality-review-2026-10-20.md:104-106`); cross-reference only.
@@ -131,7 +135,7 @@ Searched first (`/search`: "landing-status", "INERT claim", "no production calle
 | 1 | 2026-06-12 | `f746725` | baseline | LIN-439 |
 | 2 | 2026-06-25 | `8de7da5` | F2–F6 | LIN-674 |
 | 3 | 2026-07-01 | `6e5d928` | F7 new; F2–F6 carried | LIN-895 |
-| 4 | 2026-10-23 | `76fc3e91` / SD `1798790` | N1–N4 new (+ N5–N12 recorded); F2, F6 retired; F3 re-scoped; F4 merged; F7 folded | ~2,650 commits since run 3; SD read for the first time |
+| 4 | 2026-10-23 | `76fc3e91` / SD `1798790` | N1–N4 new (+ N5–N13 recorded); F2, F6 retired; F3 re-scoped; F4 merged; F7 folded | ~2,650 commits since run 3; SD read for the first time |
 
 ## Notes for the next run
 1. Re-run the C1 grep and re-check LIN-3827. If it landed, the class should be empty. Widen the pattern ("S1 only", "PR3 will", "for now") because the bound is lexical.
@@ -143,4 +147,19 @@ Searched first (`/search`: "landing-status", "INERT claim", "no production calle
 7. Do not re-flag N10 (Code Quality 10-20) or the `contract.json` lag (LIN-3809, LIN-3823).
 
 ## Adversarial Second-Read
-*(filled in after the cold read; see below)*
+**Tier:** 2 (a fresh-context sub-agent, given no conclusion, verdict or finding of this report; it named its own candidate from the repos before reading the report).
+**Question:** "What is the largest item in this window that this report missed or misfiled?"
+
+**Reader's answer (condensed, no changes of substance):**
+- Own candidate before reading the report: `simple-dispatcher/reapers.js:1854-2864`, `runStallFailsafe`, one function of about 1,000 lines with about 8 arms, ~525 comment lines and ~15 injected dependencies; comments carry provenance, not actionable constraints. It also found a stale cite, `reapers.js:36` ("opencode arm (:1754)").
+- Missed or misfiled: the report never names `runStallFailsafe`; it filed the module's problem as N7 (Low, "inflation", reader-sourced) pointing only at `:1139-1185`.
+- Citation spot-check: 10 of 10 checked claims hold (N1 rows for `proxy-tokens.js:339-340,124-126`, `dispatch-store.js:601`, `proxy-preamble.js:692`, `opencode-liveness.js:7-9`, `reapers.js:1743-1745`; `phases.js:104`; `feedback.js:19-22` vs `dispatch-terminal.js:63`; `server.js:1272`). `connection-binding.js:16-18` consumers were not verified by the reader.
+- The reader judged N1 real and well evidenced.
+
+**Author's check of the reader's claim:** `runStallFailsafe` spans `reapers.js:1854-2832` (979 lines, 500 `//` comment lines in that range; the reader's 525 included lines past the function end). The `:36` cite is stale (`:1754` is inside `refireSentinelOverResume`, which starts at `:1661`). Both confirmed. The size and comment-style claims are verified; "unsafe to modify" remains an inference.
+
+Adversarial second-read verdict: DISAGREE
+Differed from top finding: YES
+Disposition: fixed in place
+
+The report was corrected in place before merge: N13 added above, N7 cross-referenced. N1 remains the top finding because it is the one with verified, directly misleading claims on the credential and dispatch core; N13 is ranked below it as Medium because its harm is inferred, not shown.
