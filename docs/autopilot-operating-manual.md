@@ -376,7 +376,7 @@ bullet below because it isn't a child *autopilot* at all:
   instead one of those "tasks" turns out to be a set/epic in its own right, it is not a stepper child —
   dispatch it `variant: 'standard'` so it coordinates its own children.
 - **A blocking bug found mid-task.** A run driving one task can hit a bug that blocks it. Rather than
-  dropping down to fix it inline — which would leave your altitude — file the bug as its own ticket,
+  dropping down to fix it inline — which would leave your altitude — file the bug as its own ticket (symptom and evidence, not the repair),
   capture the `blocks`/`blocked-by` relationship so the dependency is legible, and dispatch a child
   autopilot for it. The bug ticket is itself a single task, so dispatch it `variant: 'stepper'`. Stand by
   for its report, then resume the blocked task once the bug is cleared (or hand back if it can't be).

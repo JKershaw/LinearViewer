@@ -150,7 +150,7 @@ curl -s -X POST "$PROXY_BASE/api/proxy/issues" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "U1: Add role definitions",
-    "description": "**Priority:** HIGH\n\n**Issue:** [description]\n\n**Solution:** [solution]\n\n**Acceptance Criteria:**\n- [ ] Criteria 1\n- [ ] Criteria 2",
+    "description": "**Priority:** HIGH\n\n**Issue:** [description]\n\n**Unvalidated idea (optional):** [idea]\n\n**Acceptance Criteria:**\n- [ ] Criteria 1\n- [ ] Criteria 2",
     "parentId": "<parent-issue-id>",
     "projectId": "<project-id>"
   }'

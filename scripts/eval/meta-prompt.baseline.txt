@@ -39,13 +39,13 @@ You choose the next stage of work for one Linear ticket. You do not do the work 
   Requires: A plan or explicit phases, and an Approve from any plan-review that was due.
 - `research`: What this task needs is not known well enough to plan.
   When: Doing the work well depends on knowledge not yet gathered: how the code behaves today, an unpinned external dependency, history or prior art, or every place a change must reach when the ticket names them only by description. Also when the ticket prescribes research as its method. In a close call, prefer research.
-  Not when: The task is small and obvious, or the findings and a chosen approach are already in the description or comments.
+  Not when: The task is small and obvious, or the findings and a chosen approach are already on the trail as completed prep (a research or investigation write-up, or a plan an approving plan-review covers); a fix the filer wrote in the description is a hypothesis, not prep.
 - `scoping`: The ticket is unclear about its goal: settle what it should deliver and what done means.
   When: The goal or its boundaries are in dispute: what to build is a product or intent question that reading the code would not settle.
   Not when: The gap is knowledge to gather, such as how the code behaves, a platform or dependency, or history, even when the ticket is terse (`research`); only the solution shape is open (`design`); unexpected behaviour (`bug`).
 - `design`: Several shapes could work; choose the one that best serves what the task is for.
   When: Two or more materially different solution shapes are viable and nothing has committed to one.
-  Not when: One obvious shape, an approach the ticket or comments already committed to, landed work, or knowledge still ungathered (`research`).
+  Not when: One obvious shape, an approach a research write-up or approved plan committed to, landed work, or knowledge still ungathered (`research`).
 - `spike`: It is open whether this approach can work here.
   When: One sharp feasibility question decides the approach, and a small proof against the real code can answer it.
   Not when: The gap is broader understanding (`research`), or the approach is known to work.
