@@ -213,6 +213,7 @@
    side-by-side panel on /styleguide. (The legacy amber variant was removed in
    LIN-785.) */
 .theme-dark {
+  color-scheme: dark;  /* LIN-3763: native controls/scrollbars/UA chrome go dark */
   --bg: #16181d;
   --bg-muted: #1f222a;
   --bg-alt: rgba(255, 255, 255, 0.05);
@@ -2223,6 +2224,31 @@ a.wordmark:hover {
   color: var(--fg);
 }
 
+/* LIN-3763: login/error shells left links and native controls at UA defaults
+   (rgb(0,0,238) on #16181d = 1.89:1; white native boxes). Shared rules keyed on
+   the hooks the renderers already emit; colours/borders only — no layout on the
+   shared .github-repo-* hooks (see LIN-2820 note above). Control look mirrors
+   .repo-picker-filter. Class-bearing anchors keep their own rules. */
+.login-input,
+select.github-repo-select {
+  font-family: var(--font-content);
+  font-size: inherit;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.6rem;
+}
+
+.repo-picker-row input[type="radio"] {
+  accent-color: var(--brand);
+}
+
+.login-container a:not([class]),
+.error-container a:not([class]) {
+  color: var(--blue);
+}
+
 .repo-picker-truncated-note {
   margin: var(--space-2) 0 0;
   font-size: 0.85em;
@@ -2308,6 +2334,7 @@ body.is-landing {
    `--fg` override alone does not reach them). */
 @media (prefers-color-scheme: dark) {
   body.is-landing {
+    color-scheme: dark;  /* LIN-3763 */
     --bg: #16181d;
     --bg-muted: #1f222a;
     --bg-alt: rgba(255, 255, 255, 0.05);
