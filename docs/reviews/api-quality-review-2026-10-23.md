@@ -108,8 +108,9 @@ relation create (`proxy-writes.js:675`, no dedupe), custom-prompt cap (`lib/cust
 * Jira is missing from both compatibility lists: create → 422, PATCH `projectId`/`parentId:null` →
   422, `priority` dropped (`lib/providers/jira/index.js:1123-1139`).
 * The periodical-gate 409s (`PERIODICAL_REPORT_NOT_PERSISTED`,
-  `PERIODICAL_ADVERSARIAL_READ_NOT_RECORDED`; `proxy-writes.js:363-381`) are undocumented; the only
-  409 in the catalog is "trashed issue".
+  `PERIODICAL_ADVERSARIAL_READ_NOT_RECORDED`; emitted at `proxy-writes.js:363-381`, defined at
+  `lib/periodical-report-gate.js:123,137`) are undocumented; the status table's only write-endpoint
+  409 is "trashed issue" (`lib/proxy-instructions.js:1090`).
 
 Provider-neutrality decision: the create/PATCH asymmetry is a contract gap a caller can hit (it
 did hit the research run), so the recommendation is to make PATCH refuse like create, not to
@@ -159,8 +160,9 @@ mapped by the runner to `http-<status>`, tried once, then a token-less launch
 (`SD: feedback.js:214-216`). The token exchange returns one 401 `PROXY_TOKEN_INVALID` for spent,
 expired, unknown and owner-recheck failure (`routes/proxy-token-exchange.js:55`) while data
 endpoints expose `bootstrap_only`/`expired`. The broker's own errors are text/plain and Harbour's
-are JSON, but the instructions' "six responses" do not tell agents to branch on Content-Type; a
-spent-bootstrap 401 and a transient 429/500 both become the same 502; the broker uses bare `fetch`
+are JSON; the instructions tell agents to tell the broker's 403 from Harbour's by body
+(`lib/proxy-instructions.js:1085-1088`), but the broker's 404/500/502 rows (`:1136-1138`) name no
+content type; a spent-bootstrap 401 and a transient 429/500 both become the same 502; the broker uses bare `fetch`
 with no timeout (`SD: harbour-token-mcp-server.js:102,240`). Mostly on the caller side (read-only
 repo), so report only.
 
