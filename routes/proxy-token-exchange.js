@@ -17,8 +17,9 @@ import { WORKING_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
  * @param {Object} deps.proxyEventStore - Proxy event/audit storage instance
  * @param {Function} deps.proxyLimiter - Per-IP rate limiter middleware (module-scope in routes/proxy.js, shared as-is; injected here rather than redeclared so that lifetime is preserved)
  * @param {Object} deps.PROXY_TOKEN_REJECTED_EXTRA - Structured-error-envelope extra fields for a proxy-token rejection (closure-local in createProxyRoutes, built from STAGE_PROXY_TOKEN; injected here rather than duplicating the literal)
+ * @param {Object} deps.PROXY_TOKEN_STORE_UNAVAILABLE_EXTRA - The retryable 503 envelope for a token-store failure (LIN-3699; same closure, same reason)
  */
-export function createTokenExchangeRoutes({ proxyTokenStore, proxyEventStore, proxyLimiter, PROXY_TOKEN_REJECTED_EXTRA }) {
+export function createTokenExchangeRoutes({ proxyTokenStore, proxyEventStore, proxyLimiter, PROXY_TOKEN_REJECTED_EXTRA, PROXY_TOKEN_STORE_UNAVAILABLE_EXTRA }) {
   const router = Router();
 
   /**
@@ -76,8 +77,11 @@ export function createTokenExchangeRoutes({ proxyTokenStore, proxyEventStore, pr
         notes: 'The bootstrap token you sent has been consumed by this exchange. Use the token above (the "token" field of this response) for all subsequent requests — the bootstrap is now spent and will never authenticate again.'
       });
     } catch (err) {
+      // LIN-3699: only a failure BEFORE the bootstrap was consumed reaches here
+      // (the store keeps a post-consume one as null, the 401 above), so the
+      // bootstrap is still live and a retry can succeed.
       console.error('Proxy token exchange error:', err.message);
-      jsonError(res, 500, 'Failed to exchange token');
+      jsonError(res, 503, 'Token check unavailable', PROXY_TOKEN_STORE_UNAVAILABLE_EXTRA);
     }
   });
 

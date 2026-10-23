@@ -438,7 +438,7 @@ left no way to tell that apart from a garbage/never-issued bearer:
   Never conflate the two: a `proxyTokenState` field never appears alongside `expiryKind` in the
   same response, and vice versa.
 - This is observability only — it does not change the remedy. `retryable` stays `false` in every
-  case; the only recovery today is an operator-minted replacement token (see the [token lifetimes
+  `401` case (a store failure while checking the token is not one of them: it is the `503` below); the only recovery today is an operator-minted replacement token (see the [token lifetimes
   table](#token-lifetimes-lin-1938) above and LIN-2602/LIN-2603 for the tracked self-service work).
 - The recognized-expired case now also writes an audit row (`stage: "proxy-token"`, `status: 401`)
   where before it left none at all — an expired working token used to be invisible to an operator
@@ -446,6 +446,16 @@ left no way to tell that apart from a garbage/never-issued bearer:
   since the caller's own token is the one being rejected) and is excluded from
   `GET /api/proxy/credential-health`'s provider-lane fold by construction (`stage` and `status`
   both differ from what that endpoint counts).
+
+**`PROXY_TOKEN_STORE_UNAVAILABLE`** (LIN-3699) is the `503` sibling. Before it, a failure of the token store while checking your bearer answered the same `401` `PROXY_TOKEN_INVALID` `retryable: false` as a rejected token, so a database blip looked like a dead credential. Now a store failure answers:
+
+```json
+{ "error": "Token check unavailable", "code": "PROXY_TOKEN_STORE_UNAVAILABLE",
+  "category": "upstream", "retryable": true }
+```
+
+- It carries **no** `stage`: `stage: "proxy-token"` means "re-issue your token", the opposite remedy. Back off and retry with the same token.
+- `POST /api/proxy/token` returns it too, but only when the failure came **before** the bootstrap was consumed, so the bootstrap is still live and the retry can succeed. A failure after the consume (the bootstrap is already spent) stays a `401` `PROXY_TOKEN_INVALID`: retrying cannot recover, mint a new bootstrap.
 
 Before this, both classes of `401` were undocumented and easy to conflate — a caller-token rejection carried no `code`/`category`/`stage` at all, and the distinction lived only in Harbour's own server-side logs (`[credential-rejected]`), invisible to the very agent that has to pick a remedy.
 
@@ -2681,7 +2691,7 @@ Read scope is enough. `state` defaults to `open`; `limit` defaults to 200 (max 1
 |--------|-------|-------------|
 | 400 | Various | Invalid input (bad UUID, missing required field, malformed page cursor, etc.). Also covers input the **upstream provider** rejects as a caller error — Linear flags these with `userError` inside an HTTP 200 GraphQL envelope, and the proxy maps them here rather than to a 500. `detail` carries the provider's own explanation of what was wrong. **Never retryable** — fix the input. |
 | 401 | `Missing or invalid Authorization header` | No Bearer token provided |
-| 401 | `Invalid, expired, or consumed token` | Token doesn't exist, expired, or was single-use and already used |
+| 401 | `Invalid, expired, or consumed token` | Token doesn't exist, expired, or was single-use and already used. `POST /token` answers the same way with `Invalid, expired, or already-exchanged bootstrap token`. `code: PROXY_TOKEN_INVALID`, `retryable: false` |
 | 403 | `This endpoint requires a read-write token` | Write endpoint called with read-only token |
 | 404 | `Issue not found` / `Cycle not found` | Resource doesn't exist — or, on the task-automation context endpoints, the target is trashed |
 | 404 | `Team not found: <teamId>` (`code: TEAM_NOT_FOUND`) | A well-formed `teamId` filter on `GET /issues`/`/labels`/`/cycles` did not match any team in this workspace. The body also carries `truncated: <boolean>` (LIN-2033) — `true` means the team list this was checked against was itself capped (e.g. Jira's project-listing cap), so the id may be real and simply beyond where the provider stopped looking, not genuinely absent. |
@@ -2695,6 +2705,7 @@ Read scope is enough. `state` defaults to `open`; `limit` defaults to 200 (max 1
 | 500 | `Failed to ...` | Server error |
 | 502 | `Failed to ...` | Upstream write was rejected (the create/update did not land) |
 | 503 | `Workspace not available` | Workspace access token expired or unavailable |
+| 503 | `Token check unavailable` (`code: PROXY_TOKEN_STORE_UNAVAILABLE`, `retryable: true`) | Harbour's token store failed while checking your bearer (LIN-3699), so it could not say whether the token is good. **Back off and retry the same token**; nothing to re-authenticate. Distinct from `Workspace not available` above. On `POST /token` only a pre-consume failure is a 503; once the bootstrap is spent the answer is the 401 |
 | 504 | `...timed out` | Upstream provider request timed out or was aborted (mapped from a `TimeoutError`/`AbortError`) |
 
 ## Building a Consumer
@@ -2769,7 +2780,7 @@ curl -s -X POST -H "$AUTH" -H "Content-Type: application/json" \
 
 3. **Check label IDs before adding** — use `GET /api/proxy/labels` to find the UUID, then pass it to the add-label endpoint.
 
-4. **Handle 503 gracefully, but check `retryable` before deciding what "gracefully" means** — a `WORKSPACE_*`-coded 503 (see the structured error envelope above) means the workspace OAuth token has expired or is otherwise unavailable; the user needs to re-authenticate. A `LINEAR_AUTH`-coded 503 is different: it means a credential this proxy believed was still valid was rejected upstream anyway — back off and retry, it is usually a short-lived race that heals on its own (LIN-2216). If it keeps happening for the same request, it self-escalates to a `401` on its own; treat that as the re-authenticate case.
+4. **Handle 503 gracefully, but check `retryable` before deciding what "gracefully" means** — a `PROXY_TOKEN_STORE_UNAVAILABLE`-coded 503 (LIN-3699) means Harbour's own token store failed while checking your bearer: back off and retry the same token, there is nothing to re-authenticate. A `WORKSPACE_*`-coded 503 (see the structured error envelope above) means the workspace OAuth token has expired or is otherwise unavailable; the user needs to re-authenticate. A `LINEAR_AUTH`-coded 503 is different: it means a credential this proxy believed was still valid was rejected upstream anyway — back off and retry, it is usually a short-lived race that heals on its own (LIN-2216). If it keeps happening for the same request, it self-escalates to a `401` on its own; treat that as the re-authenticate case.
 
 5. **On a `401`, check `stage` before assuming "the workspace is disconnected"** (LIN-1985) — `stage: "proxy-token"` (`code: "PROXY_TOKEN_INVALID"`) means YOUR bearer/bootstrap token was rejected; mint or re-issue one, the workspace was never touched. `stage: "provider-lane"` (`code: "LINEAR_AUTH"`) means the STORED workspace credential was rejected; escalate/reconnect the workspace instead. Never guess from the bare status code alone — see the structured error envelope above.
 

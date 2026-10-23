@@ -288,6 +288,146 @@
       "sd": "a consumer may send the fields in lib/consumer-heartbeat.js (HEARTBEAT_FIELDS) every intervalMs to POST /api/dispatch/heartbeat; Harbour reads it as stale after 3 x intervalMs (LIN-1952)",
       "kit": "not sent (the runner-kit producer, POST /api/proxy/runner/heartbeat, is a follow-up)",
       "difference": "SD is the first producer (LIN-1952). The Harbour receiver accepts the kit already, on the runner door; the kit does not send a beat yet."
+    },
+    {
+      "area": "auth",
+      "case": "dispatch: rejected (unknown) token",
+      "halt": null,
+      "item": {
+        "surface": "dispatch",
+        "status": 401,
+        "code": "DISPATCH_TOKEN_INVALID",
+        "retryable": false
+      },
+      "sd": "credential-dead",
+      "kit": "credential",
+      "difference": "LIN-3699: same reply, each side's own vocabulary. SD latches the workspace dead on a `retryable:false` body (queue.js); the kit's wait returns reason `credential` on any 401. The kit polls /api/proxy/runner/*, SD polls /api/dispatch/poll, so each surface is a row and both sides are driven with the same status."
+    },
+    {
+      "area": "auth",
+      "case": "dispatch: expired token",
+      "halt": null,
+      "item": {
+        "surface": "dispatch",
+        "status": 401,
+        "code": "DISPATCH_TOKEN_INVALID",
+        "retryable": false
+      },
+      "sd": "credential-dead",
+      "kit": "credential",
+      "difference": "LIN-3699: same reply, each side's own vocabulary. SD latches the workspace dead on a `retryable:false` body (queue.js); the kit's wait returns reason `credential` on any 401. The kit polls /api/proxy/runner/*, SD polls /api/dispatch/poll, so each surface is a row and both sides are driven with the same status."
+    },
+    {
+      "area": "auth",
+      "case": "dispatch: missing Authorization header",
+      "halt": null,
+      "item": {
+        "surface": "dispatch",
+        "status": 401,
+        "code": "DISPATCH_TOKEN_INVALID",
+        "retryable": false
+      },
+      "sd": "credential-dead",
+      "kit": "credential",
+      "difference": "LIN-3699: same reply, each side's own vocabulary. SD latches the workspace dead on a `retryable:false` body (queue.js); the kit's wait returns reason `credential` on any 401. The kit polls /api/proxy/runner/*, SD polls /api/dispatch/poll, so each surface is a row and both sides are driven with the same status."
+    },
+    {
+      "area": "auth",
+      "case": "proxy: rejected (unknown) token",
+      "halt": null,
+      "item": {
+        "surface": "proxy",
+        "status": 401,
+        "code": "PROXY_TOKEN_INVALID",
+        "retryable": false
+      },
+      "sd": "credential-dead",
+      "kit": "credential",
+      "difference": "LIN-3699: same reply, each side's own vocabulary. SD latches the workspace dead on a `retryable:false` body (queue.js); the kit's wait returns reason `credential` on any 401. The kit polls /api/proxy/runner/*, SD polls /api/dispatch/poll, so each surface is a row and both sides are driven with the same status."
+    },
+    {
+      "area": "auth",
+      "case": "proxy: expired token",
+      "halt": null,
+      "item": {
+        "surface": "proxy",
+        "status": 401,
+        "code": "PROXY_TOKEN_INVALID",
+        "retryable": false
+      },
+      "sd": "credential-dead",
+      "kit": "credential",
+      "difference": "LIN-3699: same reply, each side's own vocabulary. SD latches the workspace dead on a `retryable:false` body (queue.js); the kit's wait returns reason `credential` on any 401. The kit polls /api/proxy/runner/*, SD polls /api/dispatch/poll, so each surface is a row and both sides are driven with the same status."
+    },
+    {
+      "area": "auth",
+      "case": "proxy: missing Authorization header",
+      "halt": null,
+      "item": {
+        "surface": "proxy",
+        "status": 401,
+        "code": "PROXY_TOKEN_INVALID",
+        "retryable": false
+      },
+      "sd": "credential-dead",
+      "kit": "credential",
+      "difference": "LIN-3699: same reply, each side's own vocabulary. SD latches the workspace dead on a `retryable:false` body (queue.js); the kit's wait returns reason `credential` on any 401. The kit polls /api/proxy/runner/*, SD polls /api/dispatch/poll, so each surface is a row and both sides are driven with the same status."
+    },
+    {
+      "area": "auth",
+      "case": "exchange: rejected or already-exchanged bootstrap",
+      "halt": null,
+      "item": {
+        "surface": "exchange",
+        "status": 401,
+        "code": "PROXY_TOKEN_INVALID",
+        "retryable": false
+      },
+      "sd": "credential-dead",
+      "kit": "credential",
+      "difference": "LIN-3699: same reply, each side's own vocabulary. SD latches the workspace dead on a `retryable:false` body (queue.js); the kit's wait returns reason `credential` on any 401. The kit polls /api/proxy/runner/*, SD polls /api/dispatch/poll, so each surface is a row and both sides are driven with the same status."
+    },
+    {
+      "area": "auth",
+      "case": "dispatch: token store failure",
+      "halt": null,
+      "item": {
+        "surface": "dispatch",
+        "status": 503,
+        "code": "DISPATCH_TOKEN_STORE_UNAVAILABLE",
+        "retryable": true
+      },
+      "sd": "5xx",
+      "kit": "error",
+      "difference": "LIN-3699: same reply, each side's own vocabulary. SD counts a retryable 5xx toward host-wide auto-pause and never latches; the kit's wait returns reason `error` (re-arm), and `login` says Harbour could not check the bootstrap."
+    },
+    {
+      "area": "auth",
+      "case": "proxy: token store failure",
+      "halt": null,
+      "item": {
+        "surface": "proxy",
+        "status": 503,
+        "code": "PROXY_TOKEN_STORE_UNAVAILABLE",
+        "retryable": true
+      },
+      "sd": "5xx",
+      "kit": "error",
+      "difference": "LIN-3699: same reply, each side's own vocabulary. SD counts a retryable 5xx toward host-wide auto-pause and never latches; the kit's wait returns reason `error` (re-arm), and `login` says Harbour could not check the bootstrap."
+    },
+    {
+      "area": "auth",
+      "case": "exchange: token store failure before the bootstrap is consumed",
+      "halt": null,
+      "item": {
+        "surface": "exchange",
+        "status": 503,
+        "code": "PROXY_TOKEN_STORE_UNAVAILABLE",
+        "retryable": true
+      },
+      "sd": "5xx",
+      "kit": "error",
+      "difference": "LIN-3699: same reply, each side's own vocabulary. SD counts a retryable 5xx toward host-wide auto-pause and never latches; the kit's wait returns reason `error` (re-arm), and `login` says Harbour could not check the bootstrap."
     }
   ]
 }
