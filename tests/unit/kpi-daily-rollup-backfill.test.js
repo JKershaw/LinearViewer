@@ -215,17 +215,13 @@ describe('runBackfill', () => {
         listIndexes: () => ({ toArray: async () => { throw Object.assign(new Error('network down'), { code: 6 }); } })
       })
     };
-    const noisy = { ...quiet, warn() {} };
-    const realWarn = console.warn;
-    console.warn = () => {};
-    try {
-      await assert.rejects(
-        runBackfill({ db: unreadable, now: NOW, logger: noisy }),
-        (err) => err.code === 3 && /could not be read/.test(err.message)
-      );
-    } finally {
-      console.warn = realWarn;
-    }
+    const warnings = [];
+    const noisy = { ...quiet, warn: (line) => warnings.push(line) };
+    await assert.rejects(
+      runBackfill({ db: unreadable, now: NOW, logger: noisy }),
+      (err) => err.code === 3 && /could not be read/.test(err.message)
+    );
+    assert.ok(warnings.length > 0 && warnings.every((line) => /could not read indexes/.test(line)), 'the unknown-state warnings go through the backfill logger');
   });
 
   test('backfill equals the job\'s last write for a day past the horizon (a missing row is zero)', async () => {

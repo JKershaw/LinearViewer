@@ -17,8 +17,9 @@
  *   MONGODB_URI=<set in your shell> node scripts/backfill-kpi-daily-rollup.mjs --write --from YYYY-MM-DD --to YYYY-MM-DD
  *
  * Exit codes: 0 done, 1 failed, 2 neither MONGODB_URI nor HARBOUR_DATA_DIR is
- * set, 3 the `{ urlKey: 1, dispatchedAt: 1 }` index is missing, 4 a refused
- * --from/--to.
+ * set, 3 the `{ urlKey: 1, dispatchedAt: 1 }` index is not confirmed built:
+ * missing, `dispatch-history` absent, or the index state unreadable (LIN-3811),
+ * 4 a refused --from/--to.
  */
 
 import { MongoClient } from 'mongodb'
