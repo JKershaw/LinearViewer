@@ -391,7 +391,7 @@ describe('dispatch router (token lane and session lane)', () => {
   }
 
   test('each member answers the 503 envelope on a fault, and the true 404/200 on a real miss', async () => {
-    const { app, auth, queue, history, store } = await setup();
+    const { app, auth, queue, history } = await setup();
     const q = quiet();
     try {
       await serve(app, async (base) => {
@@ -420,7 +420,6 @@ describe('dispatch router (token lane and session lane)', () => {
         }
       });
     } finally { q.mock.restore(); }
-    assert.ok(store);
   });
 
   test('broker-token: a status read fault is the 503 envelope, not the final 403 status-unreadable', async () => {
@@ -438,6 +437,88 @@ describe('dispatch router (token lane and session lane)', () => {
         store.getItemStatus = realStatus;
         store.getGrantDeclaration = async () => { throw new DispatchStoreFault('getGrantDeclaration', BOOM); };
         await assertEnvelope(await sendJson(base, 'POST', '/api/dispatch/broker-token', auth, { itemId: item._id }), 'broker-token declaration');
+      });
+    } finally { q.mock.restore(); }
+  });
+});
+
+// Rows the unhandled-status guard requires for a keepalive-armed route (see below).
+const POST_FLUSH_ROWS = new Set();
+
+describe('enqueue lanes: an addItem fault is the 503 envelope', () => {
+  async function dispatchSetup() {
+    const { createDispatchRoutes } = await import('../../routes/dispatch.js');
+    const { DispatchTokenStore } = await import('../../lib/dispatch-tokens.js');
+    const { default: express } = await import('express');
+    const parts = makeStore();
+    const tokens = new DispatchTokenStore({ collection: createMockCollection() });
+    const app = express();
+    app.use(express.json());
+    app.use((req, res, next) => { req.session = { accountId: 'acct-1' }; next(); });
+    app.use(createDispatchRoutes({
+      dispatchQueueStore: parts.store,
+      dispatchTokenStore: tokens,
+      workspaceFromUrl: (req, res, next) => { req.workspace = WORKSPACE; next(); },
+      userPreferencesStore: {},
+      workspaceOwnerCheck: async () => ({ status: 'owner' }),
+      proxyTokenStore: { createToken: async () => ({ token: 'tok' }) }
+    }));
+    return { ...parts, app };
+  }
+
+  test('POST /workspace/:urlKey/api/dispatch: a plain enqueue and a cascade abort', async () => {
+    const { app, queue, history, store } = await dispatchSetup();
+    const q = quiet();
+    try {
+      await serve(app, async (base) => {
+        const path = `/workspace/${URL_KEY}/api/dispatch`;
+        assert.equal((await sendJson(base, 'POST', path, {}, { prompt: 'p' })).status, 201, 'the happy path is untouched');
+        queue.fail.insertOne = true;
+        await assertEnvelope(await sendJson(base, 'POST', path, {}, { prompt: 'p2' }), 'session enqueue');
+        queue.fail.insertOne = false;
+
+        const parent = await store.addItem(URL_KEY, { prompt: 'parent', kind: 'implementation' });
+        const cascade = { abort: true, cascade: true, abortTo: parent._id };
+        queue.fail.find = true;
+        await assertEnvelope(await sendJson(base, 'POST', path, {}, cascade), 'cascade listItems');
+        queue.fail.find = false;
+        history.fail.find = true;
+        await assertEnvelope(await sendJson(base, 'POST', path, {}, cascade), 'cascade listHistory');
+      });
+    } finally { q.mock.restore(); }
+  });
+
+  test('POST /api/proxy/dispatch and recommend-and-dispatch (relay:false drive)', async () => {
+    const { buildApp } = await import('./lib/proxy-fake-deps.js');
+    const parts = makeStore();
+    const app = buildApp({
+      dispatchQueueStore: parts.store,
+      workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
+      proxyTokenStore: {
+        validateToken: async () => ({
+          tokenId: 't1', urlKey: URL_KEY, label: 'runner', scope: 'readWrite', createdBy: 'acct-1',
+          grants: ['take', 'dispatch'], workspaceId: 'ws-acme'
+        }),
+        listTokens: async () => [],
+        describeRejectionCause: async () => null
+      }
+    });
+    const auth = { Authorization: 'Bearer anything' };
+    const q = quiet();
+    try {
+      await serve(app, async (base) => {
+        const rows = [
+          ['proxy dispatch', '/api/proxy/dispatch', { prompt: 'next beat', issueIdentifier: 'TEST-1', target: 'cli', appendProxyContext: false }],
+          ['recommend-and-dispatch', '/api/proxy/recommend-and-dispatch', { issueIdentifier: 'TEST-1', kind: 'implementation', appendProxyContext: false }]
+        ];
+        for (const [label, path, body] of rows) {
+          const ok = await sendJson(base, 'POST', path, auth, body);
+          assert.equal(ok.status, 201, `${label}: happy path ${await ok.text()}`);
+          parts.queue.fail.insertOne = true;
+          try {
+            await assertEnvelope(await sendJson(base, 'POST', path, auth, { ...body, force: true }), label);
+          } finally { parts.queue.fail.insertOne = false; }
+        }
       });
     } finally { q.mock.restore(); }
   });
@@ -487,8 +568,8 @@ describe('proxy runner and proxy dispatch routes', () => {
     } finally { q.mock.restore(); }
   });
 
-  test('watch long-poll: a fault on the SECOND read replies through the keepalive (real 503 before the flush, statusCode:503 after)', async () => {
-    const { store, app, auth, history } = await setup();
+  test('watch long-poll: a fault on the SECOND read before the flush is a real 503', async () => {
+    const { store, app, auth } = await setup();
     const item = await store.addItem(URL_KEY, { prompt: 'p' });
     await store.takeItem(item._id, URL_KEY, TOKEN);
     const q = quiet();
@@ -505,9 +586,50 @@ describe('proxy runner and proxy dispatch routes', () => {
         assert.equal(res.status, 503, 'a real 503 while the headers are still uncommitted');
         await assertEnvelope(res, 'watch pre-flush');
         store.getItemStatus = real;
-        assert.ok(history);
       });
     } finally { q.mock.restore(); }
+  });
+
+  // A past X-Request-Start puts the request beyond the keepalive's first-byte target, so it
+  // flushes at once (before the second read, one DISPATCH_WAIT_POLL_MS later) and the status
+  // is a committed 200: the real one rides in the body as `statusCode` (lib/http-keepalive.js).
+  const PAST = () => ({ 'X-Request-Start': String(Date.now() - 25_000) });
+
+  async function watchSecondReadThrows(error) {
+    const { store, app, auth } = await setup();
+    const item = await store.addItem(URL_KEY, { prompt: 'p' });
+    await store.takeItem(item._id, URL_KEY, TOKEN);
+    const real = store.getItemStatus.bind(store);
+    let reads = 0;
+    store.getItemStatus = async (...args) => {
+      if (++reads >= 2) throw error;
+      return real(...args);
+    };
+    const q = quiet();
+    try {
+      return await serve(app, async (base) => {
+        const res = await sendJson(base, 'GET', `/api/proxy/dispatch/${item._id}?wait=5`, { ...auth, ...PAST() });
+        return { res, body: JSON.parse(await res.text()), reads };
+      });
+    } finally { q.mock.restore(); }
+  }
+
+  test('watch long-poll: a store fault on the SECOND read after the flush is 200 with statusCode:503 and the envelope', async () => {
+    const { res, body } = await watchSecondReadThrows(new DispatchStoreFault('getItemStatus', BOOM));
+    assert.equal(res.status, 200, 'the headers were committed at the flush');
+    assert.equal(body.statusCode, 503);
+    assert.equal(body.code, 'DISPATCH_STORE_UNAVAILABLE');
+    assert.equal(body.category, 'upstream');
+    assert.equal(body.retryable, true);
+    POST_FLUSH_ROWS.add('GET /api/proxy/dispatch/:id');
+  });
+
+  test('watch long-poll: a plain Error on the SECOND read after the flush is 200 with statusCode:500, no hang or ERR_HEADERS_SENT', async () => {
+    const { res, body } = await watchSecondReadThrows(new Error('boom'));
+    assert.equal(res.status, 200);
+    assert.equal(body.statusCode, 500);
+    assert.equal(body.error, 'Failed to read dispatch item');
+    assert.notEqual(body.code, 'DISPATCH_STORE_UNAVAILABLE', 'a bug is not dressed as a store fault');
   });
 });
 
@@ -596,31 +718,49 @@ describe('the contract is stated where callers read it', () => {
     // A route added to a lane router without a fault row fails here until a row (or an explicit
     // exemption with its reason) is added: a new unhandled route cannot pass silently.
     const { createDispatchRoutes } = await import('../../routes/dispatch.js');
-    const stackOf = (router) => router.stack.filter((l) => l.route).map((l) => {
-      const methods = Object.keys(l.route.methods).filter((m) => l.route.methods[m]).map((m) => m.toUpperCase());
-      return methods.map((m) => `${m} ${l.route.path}`);
-    }).flat();
+    const { buildApp } = await import('./lib/proxy-fake-deps.js');
+    const stackOf = (stack) => stack.flatMap((l) => {
+      if (l.route) {
+        const paths = [].concat(l.route.path);
+        return Object.keys(l.route.methods).filter((m) => l.route.methods[m])
+          .flatMap((m) => paths.map((p) => `${m.toUpperCase()} ${p}`));
+      }
+      return l.handle?.stack ? stackOf(l.handle.stack) : [];
+    });
     const covered = new Set([
-      // dispatch router: token lane and session lane
+      // dispatch router: token lane, session lane, enqueue
       'GET /api/dispatch/poll', 'POST /api/dispatch/take/:itemId', 'POST /api/dispatch/feedback/:itemId',
       'POST /api/dispatch/broker-token',
+      'POST /workspace/:urlKey/api/dispatch',
       'GET /workspace/:urlKey/api/dispatch', 'GET /workspace/:urlKey/api/dispatch/count',
       'GET /workspace/:urlKey/api/dispatch/history', 'DELETE /workspace/:urlKey/api/dispatch/:itemId',
       'PATCH /workspace/:urlKey/api/dispatch/:sessionId/trim',
       // proxy runner and dispatch
       'GET /api/proxy/runner/poll', 'POST /api/proxy/runner/take/:id', 'POST /api/proxy/runner/feedback/:id',
+      'POST /api/proxy/dispatch', 'POST /api/proxy/recommend-and-dispatch',
       'GET /api/proxy/dispatch', 'GET /api/proxy/dispatch/:id', 'GET /api/proxy/dispatch/:id/prompt'
     ]);
-    // Routes that never reach a converted store member, or are covered by their own file.
-    const exempt = /heartbeat|tokens|presets|halt|recent-prompts|favorite-prompts|quota|^POST \/workspace\/:urlKey\/api\/dispatch$|wake-shadow|recommend|autopilot|^(GET|POST|DELETE|PATCH) \/api\/proxy\/(?!runner|dispatch)/;
+    // Routes that never reach a converted store member, each with its reason.
+    const exempt = [
+      [/\/heartbeat$/, 'heartbeat ingest: its own store, not the dispatch queue'],
+      [/\/dispatch\/(tokens|presets|halt|recent-prompts|favorite-prompts|quota)/, 'token/preset/preference/halt/quota stores, not the dispatch queue members'],
+      [/\/api\/proxy\/dispatch\/halt$/, 'halt flag store'],
+      [/\/api\/proxy\/wake-shadow$/, 'wake-shadow tally, a different member'],
+      [/\/api\/proxy\/runner\/prompt$/, 'static runner prompt text, no store read']
+    ];
+    // Routes whose keepalive can flush before the reply: each needs a post-flush row.
+    const keepaliveArmed = ['GET /api/proxy/dispatch/:id'];
+
     const dispatchRoutes = stackOf(createDispatchRoutes({
       dispatchQueueStore: {}, dispatchTokenStore: {}, workspaceFromUrl: (q, r, n) => n(), userPreferencesStore: {}, proxyTokenStore: {}
-    }));
-    const missing = dispatchRoutes.filter((r) => /dispatch/.test(r) && !covered.has(r) && !exempt.test(r));
+    }).stack);
+    const proxyRoutes = stackOf(buildApp({})._router.stack).filter((r) => /\/api\/proxy\/(runner|dispatch|recommend-and-dispatch)/.test(r));
+    assert.ok(proxyRoutes.length >= 10, 'the proxy-runner and proxy-dispatch routers are enumerated, not skipped');
+    const all = [...dispatchRoutes.filter((r) => /dispatch/.test(r)), ...proxyRoutes];
+
+    const missing = all.filter((r) => !covered.has(r) && !exempt.some(([re]) => re.test(r)));
     assert.deepEqual(missing, [], 'add a fault row for the route (or exempt it with a reason)');
-    for (const r of covered) {
-      const found = dispatchRoutes.includes(r) || r.includes('/api/proxy/');
-      assert.ok(found, `${r} is no longer registered`);
-    }
+    for (const r of covered) assert.ok(all.includes(r), `${r} is no longer registered`);
+    for (const r of keepaliveArmed) assert.ok(POST_FLUSH_ROWS.has(r), `${r} is keepalive-armed and needs a post-flush fault row`);
   });
 });

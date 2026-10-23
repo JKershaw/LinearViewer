@@ -463,6 +463,18 @@ describe('fossil pass F4 (LIN-2653 close-out) — a write error is reported as a
     assert.match(result.report, /e1 — not-found/);
   });
 
+  test('LIN-3805: a stampBookkeeping that THROWS a store fault is a write-error and the run completes', async () => {
+    const store = storeWithStampFailure({ postFailureStatus: 'taken', postFailureBookkeeping: null });
+    store.stampBookkeeping = async () => { throw Object.assign(new Error('Dispatch store unavailable'), { code: 'DISPATCH_STORE_UNAVAILABLE', retryable: true }); };
+    const result = await runFossilPass({
+      dispatchStore: store, agentStatusStore: emptyAgentStatusStore, now: NOW_MS, execute: true, log: () => {}
+    });
+    assert.equal(result.stamped.length, 1, 'the run was not aborted');
+    assert.equal(result.stamped[0].ok, false);
+    assert.equal(result.stamped[0].disposition, 'write-error');
+    assert.match(result.report, /WRITE ERROR/);
+  });
+
   test('a row already stamped or no longer taken by the time of the re-read is disposition "refused"', async () => {
     const store = storeWithStampFailure({
       postFailureStatus: 'taken',
