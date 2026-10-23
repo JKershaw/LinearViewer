@@ -339,7 +339,7 @@ describe('db-indexes', () => {
       specs.map(s => ({ keySpec: s.keySpec, options: s.options })),
       [
         { keySpec: { emailNorm: 1, createdAt: -1 }, options: {} },
-        // LIN-3771: backs MagicLinkStore.recentCount (the global hourly send ceiling).
+        // LIN-3771: backs MagicLinkStore.recentCount (the hourly send-volume alarm, LIN-3789).
         { keySpec: { createdAt: -1 }, options: {} },
         { keySpec: { expiresAt: 1 }, options: { expireAfterSeconds: 86400 } }
       ]

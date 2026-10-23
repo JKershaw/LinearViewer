@@ -118,7 +118,7 @@ fall back to the request origin (their links reach only the server log / test ou
 **Links** — 32 random bytes (base64url), stored only as SHA-256 (`email-magic-links`,
 `_id` = hash), 15-minute expiry enforced by every query, `peek` never consumes, `consume`
 is an atomic `findOneAndUpdate` (single use). Sends are throttled per address (3 / 15 min
-and 5 / 24 h), per IP (10 / 15 min, a 429) and globally (10 / rolling hour, any address), and
+and 20 / 24 h) and per IP (10 / 15 min, a 429); there is no site-wide limit (LIN-3789), and
 every send answers with the same page (no enumeration).
 
 **Anti-spam on `POST /auth/email/send` (LIN-3771)** — a form-spam bot (many IPs, one send per
@@ -126,14 +126,18 @@ address) made per-IP and per-address caps insufficient. After the send-nonce che
 anything is stored or sent: a filled honeypot field (`website`, on all three send forms, not the
 confirm forms) or a POST less than 2 s after the form's GET (measured from the send nonce's
 existing `issuedAt`; the nonce is not consumed, so the same nonce works after the wait; the
-check is 0 under `NODE_ENV=test`) is refused. The per-address 24 h cap and the global ceiling
-(`MagicLinkStore.recentCount`, backed by the `{createdAt:-1}` index) sit beside the 15 min cap.
+check is 0 under `NODE_ENV=test`) is refused. The per-address 24 h cap (20, LIN-3789) sits beside the 15 min cap. Site-wide volume gets an
+alarm, not a refusal: after a link is issued, if `MagicLinkStore.recentCount` (backed by the
+`{createdAt:-1}` index) reaches `EMAIL_SEND_ALARM_PER_HOUR` (50, a constant, not an env var) in the
+rolling hour, one `[email-auth] send volume alarm: <count> in the last hour` warning is logged,
+at most once per hour per process (so one line per instance per hour when scaled out), with no
+address; a count or logging failure never blocks the send.
 Every refusal except the per-IP 429 is the normal check-inbox page: no mail, no row, no session
 save (the 403 for a bad send nonce is also logged, as `nonce`). Each refusal logs
 `[email-auth] send refused: <reason>` (`nonce`, `honeypot`, `too-fast`,
-`recipient-throttle`, `recipient-daily-cap`, `global-ceiling`, `per-ip-limit`) and never an
-address. Known trade-off: the global ceiling is a shared budget, so a bot that reaches it can
-make real sign-ins silently go unanswered until the hour rolls; the logs show it. No
+`recipient-throttle`, `recipient-daily-cap`, `per-ip-limit`) and never an
+address. Volume is an alarm, never a refusal (LIN-3789): LIN-3771's shared site-wide budget let one
+bot silently lock every real person out. No
 third-party captcha, and no known-addresses-only mode, by decision.
 A TTL index removes dead rows a day after expiry.
 

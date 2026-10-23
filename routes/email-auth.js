@@ -33,7 +33,8 @@ import {
   EMAIL_SEND_THROTTLE_MAX,
   EMAIL_SEND_DAILY_MAX,
   EMAIL_SEND_DAILY_WINDOW_MS,
-  EMAIL_SEND_GLOBAL_MAX,
+  EMAIL_SEND_ALARM_PER_HOUR,
+  EMAIL_SEND_ALARM_WINDOW_MS,
   EMAIL_SEND_MIN_FORM_MS,
   sendNonceAgeMs,
   mintConfirmNonce,
@@ -138,7 +139,7 @@ function sha256Hex(value) {
  * @param {'on'|'off'|'opt-in'} [options.promptStep='off'] - the S3 provider-user prompt gate (lib/email-availability.js resolvePromptStepMode); the middleware is installed only when transport exists and this isn't 'off'
  * @param {Function} [options.sendLimiter] - defaults to the module-scope per-IP limiter
  * @param {number} [options.minFormMs] - least ms between the form's GET and its send POST (LIN-3771); 0 under NODE_ENV=test
- * @param {number} [options.globalSendMax] - sends allowed per rolling hour across all addresses (LIN-3771)
+ * @param {number} [options.alarmPerHour] - sends in the rolling hour, across all addresses, at which one warning is logged; nothing is refused (LIN-3789)
  * @param {() => number} [options.now] - clock for nonce ages (tests)
  * @returns {Router}
  */
@@ -152,10 +153,33 @@ export function createEmailAuthRoutes({
   promptStep = 'off',
   sendLimiter = emailSendLimiter,
   minFormMs = defaultMinFormMs(),
-  globalSendMax = EMAIL_SEND_GLOBAL_MAX,
+  alarmPerHour = EMAIL_SEND_ALARM_PER_HOUR,
   now = Date.now,
 }) {
   const router = Router();
+
+  // LIN-3789: when the alarm last fired. Per process, so with several instances
+  // there is at most one line per instance per hour; a log-only signal needs no
+  // shared marker.
+  let lastAlarmAt = -Infinity;
+
+  // Site-wide volume is an alarm, never a refusal. Runs after issue() (a refused
+  // send makes no row, so it never counts) and before transport.send() so a
+  // failing transport cannot hide it. Its own catch keeps a count or logging
+  // failure from blocking the send. The check and the set have no await between
+  // them, so two concurrent sends cannot both log. Logs the count only.
+  async function checkSendVolume() {
+    try {
+      const count = await magicLinkStore.recentCount();
+      if (count < alarmPerHour) return;
+      const t = now();
+      if (t - lastAlarmAt < EMAIL_SEND_ALARM_WINDOW_MS) return;
+      lastAlarmAt = t;
+      console.warn(`[email-auth] send volume alarm: ${count} in the last hour`);
+    } catch (err) {
+      console.error('[email-auth] send volume check failed:', err?.name || 'Error');
+    }
+  }
 
   function unavailable(res) {
     return res.status(503).send(renderEmailUnavailablePage());
@@ -492,7 +516,6 @@ export function createEmailAuthRoutes({
       let refusal = null;
       if (await magicLinkStore.recentCountForEmail(emailNorm) >= EMAIL_SEND_THROTTLE_MAX) refusal = 'recipient-throttle';
       else if (await magicLinkStore.recentCountForEmail(emailNorm, EMAIL_SEND_DAILY_WINDOW_MS) >= EMAIL_SEND_DAILY_MAX) refusal = 'recipient-daily-cap';
-      else if (await magicLinkStore.recentCount() >= globalSendMax) refusal = 'global-ceiling';
       if (refusal) {
         console.warn(`[email-auth] send refused: ${refusal}`);
       } else {
@@ -502,6 +525,7 @@ export function createEmailAuthRoutes({
           linkToAccountId,
           requestNonceHash: sha256Hex(req.session.emailRequestNonce),
         });
+        await checkSendVolume();
         const url = linkUrl(req, token);
         const lead = mode === 'link' ? 'Confirm this email for your Harbour account' : 'Sign in to Harbour';
         const text = `${lead}:\n\n${url}\n\nThis link works once, for 15 minutes. If you didn't ask for it, ignore this email.`;
