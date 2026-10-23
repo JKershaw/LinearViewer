@@ -1,7 +1,7 @@
 # Comprehension-Debt Review — run of 2026-10-23
 
 **Task:** LIN-3825 (periodical run 4; the first since LIN-895 on 2026-07-01). **Mode:** review only. No code, config or docs under review were changed.
-**Grounding:** LinearViewer `76fc3e91`, simple-dispatcher (SD) `1798790`. Both `main` = `origin/main`, and neither moved between the ticket seed and this report. Every `file:line` below was read at those SHAs.
+**Grounding:** LinearViewer `76fc3e91`, simple-dispatcher (SD) `1798790`. Both `main` = `origin/main`, and neither moved between the ticket seed and this report. Every `file:line` below was read at those SHAs. After writing, SD `main` advanced to `1a6da96` (LIN-3809 contract re-copy) and LinearViewer to `c832f79b` (docs/plans only); no cited code line moved, but the SD contract row count in 'Not a finding' reflects `1798790`.
 **Prior runs:** 2026-06-12 (LIN-439), 2026-06-25 (LIN-674), 2026-07-01 (LIN-895, `6e5d928`). SD had never been read by this series.
 **Evidence:** `docs/reviews/_evidence-2026-10-23/comprehension-debt-*` (rationale diff and counting method, landing-status grep with verdicts, heartbeat spike).
 
@@ -48,7 +48,7 @@ Confirmed false at HEAD (each by grepping callers):
 - **Producer:** SD `heartbeat.js:338-360` (`buildHeartbeatMessage`), `:78-83` (`formatBreakdown`, the `×`). It names no consumer.
 - **Consumer:** `lib/session-telemetry.js:127-136` (`HEARTBEAT_HINT`, `TOOL_COUNT_RE`, `ELAPSED_RE`, `BREAKDOWN_RE`, `TOTAL_RE`). It explains its regexes and never names the producer. Downstream: `lib/live-console.js`, `lib/wall-clock-summary.js:98`, `public/live-console.js:161`.
 - **No test spans the two repos.** `lib/runner-kit/contract.json` covers the host heartbeat route, not this free text.
-- **Spike (re-run this session, `comprehension-debt-heartbeat-spike.out.txt`):** `[working · editing] 6 tools in 32s: Edit×4, Bash×2 · 40 total` parses (`state:null`); `[working] no tool calls in 5m · 40 total` gives `state:'idle'`; `[working · running] Bash running for 3m` gives **null**; `[stalled?] …` gives null. So `state:'running'`, documented at `lib/session-telemetry.js:144` and `public/llms.txt:769`, is unreachable against the real producer.
+- **Spike (re-run this session, `comprehension-debt-heartbeat-spike.out.txt`):** `[working · editing] 6 tools in 32s: Edit×4, Bash×2 · 40 total` parses (`state:null`); `[working] no tool calls in 5m · 40 total` gives `state:'idle'`; `[working · running] Bash running for 3m` gives **null**; `[stalled?] …` gives null. So `state:'running'`, documented at `lib/session-telemetry.js:145` and `public/llms.txt:769`, is unreachable against the real producer.
 - F4's old mitigation ("no UI consumer") no longer holds: `public/live-console.js:161` reads `hb.state === 'idle'`.
 - **Cold-hand-off test: fails.** Rewording "tools in" or `×` to `x` in SD's pure `heartbeat.js` passes every SD test and empties Harbour's live-console activity and wall-clock attribution.
 - **Constraint note:** the grammar is the contract. Keep it at both ends, and state the `state` vocabulary truthfully. Related: N8 (stale line-number cites). **Follow-up: LIN-3828.**
