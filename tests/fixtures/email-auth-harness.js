@@ -53,12 +53,12 @@ export const sha256 = value => createHash('sha256').update(value).digest('hex');
  * @param {string|null} [options.linkOrigin] - the configured origin for emailed links
  * @param {'on'|'off'|'opt-in'} [options.promptStep] - the S3 provider-user prompt gate
  * @param {number|null} [options.minFormMs] - minimum GET-to-POST ms for a send (default 0 here; production 2000; null = the router's own default)
- * @param {number|null} [options.globalSendMax] - the rolling-hour send ceiling (default: none here; production 10; null = the router's own default)
+ * @param {number|null} [options.alarmPerHour] - the rolling-hour send-volume alarm threshold (default: never here; production 50; null = the router's own default)
  * @param {Function} [options.mount] - optional `(app, stores) => void`, invoked after the
  *   email router so a test can compose another REAL router (e.g. the Linear OAuth
  *   callback for the S3-4 end-to-end re-proof witness) over the same real session.
  */
-export async function startEmailAuthHarness({ transport = createCaptureTransport(), sendLimiter = (req, res, next) => next(), storeClock, nonceClock, linkOrigin = null, promptStep = 'off', minFormMs = 0, globalSendMax = Infinity, mount } = {}) {
+export async function startEmailAuthHarness({ transport = createCaptureTransport(), sendLimiter = (req, res, next) => next(), storeClock, nonceClock, linkOrigin = null, promptStep = 'off', minFormMs = 0, alarmPerHour = Infinity, mount } = {}) {
   const dbDir = mkdtempSync(join(tmpdir(), 'email-auth-harness-'));
   const client = new MangoClient(dbDir);
   await client.connect();
@@ -143,11 +143,12 @@ export async function startEmailAuthHarness({ transport = createCaptureTransport
     linkOrigin,
     promptStep,
     // LIN-3771: 0 so the existing tests, which POST straight after the GET, are not
-    // refused as too fast, and the ceiling is off for the same reason (one harness
-    // sends well over 10 links); the anti-spam tests set both.
+    // refused as too fast. LIN-3789: the volume alarm is Infinity for the same kind
+    // of reason (a harness can send past 50 links, and the alarm's warning would
+    // break exact `warn.lines` assertions); the anti-spam tests set both.
     // null = leave the router's own default in place (what production runs).
     ...(minFormMs === null ? {} : { minFormMs }),
-    ...(globalSendMax === null ? {} : { globalSendMax }),
+    ...(alarmPerHour === null ? {} : { alarmPerHour }),
     ...(nonceClock ? { now: () => nonceClock.ms } : {}),
   }));
 
