@@ -10,13 +10,9 @@ The script is `scripts/backfill-kpi-daily-rollup.mjs`, a thin CLI over
 
 ## Steps
 
-1. **Create the history index** (with John's approval; not built at boot because boot awaits every index and this one covers all of `dispatch-history`):
+1. **Build the history index** by running the deferred-index script ([deferred-index-build.md](deferred-index-build.md); with John's approval, at a quiet time). The `{ urlKey: 1, dispatchedAt: 1 }` index is a declared `deferred` spec: boot does not build it and the server never does.
 
-   ```js
-   db['dispatch-history'].createIndex({ urlKey: 1, dispatchedAt: 1 })
-   ```
-
-   Without it the script exits 3 (`index missing: see runbook`) before reading anything.
+   Without it the script exits 3 (`index missing: see runbook`) before reading anything. It exits 3 as well when the index state cannot be read (`listIndexes` failed), and says so; only a confirmed build passes.
 
 2. **Plan only.** Prints the workspaces, each one's oldest day and the query count, then stops:
 

@@ -19,7 +19,7 @@ installAsyncErrorForwarding()
 import session from 'express-session'
 import { MongoClient } from 'mongodb'
 import { MangoClient } from '@jkershaw/mangodb'
-import { ensureIndexes } from './lib/db-indexes.js'
+import { ensureIndexes, reportDeferredIndexes } from './lib/db-indexes.js'
 import { runOwnerBackfill } from './lib/owner-backfill.js'
 import { Scheduler } from './lib/scheduler.js'
 import { MongoSessionStore } from './lib/session-store.js'
@@ -286,6 +286,9 @@ const db = dbClient.db('linear-viewer')
 // Boot-time index creation (LIN-610). Idempotent — running on every boot is the
 // deploy mechanism (no migration framework). Best-effort per index, so a failed
 // build can never wedge startup. Must run after connect and before app.listen.
+// Builds the boot tier only (LIN-3811): deferred specs are never built here or
+// after listen, only reported (reportDeferredIndexes, below app.listen) and
+// built by scripts/apply-deferred-indexes.mjs.
 await ensureIndexes(db)
 
 // One-shot owner backfill (LIN-3142): every ownerless workspace bound before
@@ -1004,8 +1007,9 @@ scheduler.register({
 
 // KPI daily rollup (LIN-3724, design LIN-3712): the scheduler is interval-only,
 // so this ticks hourly and the job gates on a marker doc to make ONE full
-// dispatch-history scan per UTC day (lib/kpi-daily-rollup.js). No
-// `{ dispatchedAt: 1 }` index is added for it (see ROLLUP_HISTORY_INDEX).
+// dispatch-history scan per UTC day (lib/kpi-daily-rollup.js). Its window scan
+// is served by the deferred `{ dispatchedAt: 1, urlKey: 1 }` spec once the
+// deferred-index script has been run (LIN-3811, see ROLLUP_HISTORY_INDEX).
 const KPI_DAILY_ROLLUP_INTERVAL_MS = 60 * 60 * 1000
 const KPI_DAILY_ROLLUP_LEASE_MS = 10 * 60 * 1000
 scheduler.register({
@@ -1048,7 +1052,8 @@ const app = express()
 // deploy's healthcheck. Static and synchronous — no DB probe — because the
 // top-level `await dbClient.connect()` / `await ensureIndexes(db)` above
 // already gate this module from completing (and app.listen from opening)
-// until the DB is genuinely ready.
+// until the DB is genuinely ready. That wait covers the boot tier only
+// (LIN-3811); deferred index state is logged after listen, never probed here.
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' })
 })
@@ -4696,6 +4701,14 @@ const server = app.listen(PORT, () => {
   // actually opened, so starting earlier would let a tick begin acquiring and
   // running before the process is reachable at all (LIN-2128, plan-review F4).
   scheduler.start()
+
+  // Report which deferred indexes exist (LIN-3811). Report only: nothing here
+  // builds an index (John's ruling: the deferred-index script, run once after
+  // deploy at a quiet time, is the only build path), and it is not awaited, so
+  // it can never delay the listen it follows.
+  reportDeferredIndexes(db).catch((err) => {
+    console.error(`[db-indexes] deferred-index report failed — state unknown this boot: ${err.message}`)
+  })
 
   // Start periodic cleanup of expired items (every hour)
   const CLEANUP_INTERVAL_MS = 60 * 60 * 1000 // 1 hour

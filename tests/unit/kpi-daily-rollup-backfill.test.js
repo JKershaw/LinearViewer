@@ -209,6 +209,25 @@ describe('runBackfill', () => {
     assert.equal(counted.counter.aggregates, 0);
   });
 
+  test('exit 3: an unreadable index state refuses too, it never passes as built (LIN-3811)', async () => {
+    const unreadable = {
+      collection: () => ({
+        listIndexes: () => ({ toArray: async () => { throw Object.assign(new Error('network down'), { code: 6 }); } })
+      })
+    };
+    const noisy = { ...quiet, warn() {} };
+    const realWarn = console.warn;
+    console.warn = () => {};
+    try {
+      await assert.rejects(
+        runBackfill({ db: unreadable, now: NOW, logger: noisy }),
+        (err) => err.code === 3 && /could not be read/.test(err.message)
+      );
+    } finally {
+      console.warn = realWarn;
+    }
+  });
+
   test('backfill equals the job\'s last write for a day past the horizon (a missing row is zero)', async () => {
     const D = '2026-08-10';
     await history.insertMany([

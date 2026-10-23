@@ -16,7 +16,9 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MangoClient } from '@jkershaw/mangodb';
-import { INDEX_SPECS, ensureIndexes } from '../../lib/db-indexes.js';
+import {
+  INDEX_SPECS, ensureIndexes, tierOf, sameKeySpec, deferredIndexState, applyDeferredIndexes, reportDeferredIndexes
+} from '../../lib/db-indexes.js';
 import { ProxyEventStore } from '../../lib/proxy-events.js';
 import { PromptTraceStore } from '../../lib/prompt-trace-store.js';
 import { LlmCallLogStore } from '../../lib/llm-call-log.js';
@@ -63,6 +65,9 @@ function hasIndexFor(indexList, keySpec) {
   return indexList.some(idx => JSON.stringify(idx.key) === want);
 }
 
+const BOOT_SPECS = INDEX_SPECS.filter(s => tierOf(s) === 'boot');
+const DEFERRED_SPECS = INDEX_SPECS.filter(s => tierOf(s) === 'deferred');
+
 describe('db-indexes', () => {
   let dbDir;
   let client;
@@ -98,10 +103,10 @@ describe('db-indexes', () => {
     const { applied, failed } = await ensureIndexes(db);
 
     assert.strictEqual(failed.length, 0, 'no spec should fail on a clean db');
-    assert.strictEqual(applied.length, INDEX_SPECS.length);
+    assert.strictEqual(applied.length, BOOT_SPECS.length);
 
-    // Confirm each spec is actually present on its collection.
-    for (const spec of INDEX_SPECS) {
+    // Confirm each boot spec is actually present on its collection.
+    for (const spec of BOOT_SPECS) {
       const list = await db.collection(spec.collection).indexes();
       assert.ok(
         hasIndexFor(list, spec.keySpec),
@@ -425,7 +430,7 @@ describe('db-indexes', () => {
 
     assert.strictEqual(result.failed.length, 1, 'exactly one build should fail');
     assert.strictEqual(result.failed[0].collection, failingCollection);
-    assert.strictEqual(result.applied.length, INDEX_SPECS.length - 1, 'the rest still apply');
+    assert.strictEqual(result.applied.length, BOOT_SPECS.length - 1, 'the rest still apply');
     assert.strictEqual(warnings.length, 1, 'the failure should be logged once');
     assert.match(warnings[0], /db-indexes/);
     assert.match(warnings[0], new RegExp(failingCollection));
@@ -574,9 +579,160 @@ describe('KPI daily rollup indexes (LIN-3724)', () => {
     assert.ok(spec.reason);
   });
 
-  test('boot carries no { urlKey, dispatchedAt } or { dispatchedAt } index on dispatch-history', () => {
-    const onHistory = INDEX_SPECS.filter(s => s.collection === 'dispatch-history').map(s => JSON.stringify(s.keySpec));
-    assert.ok(!onHistory.includes(JSON.stringify({ urlKey: 1, dispatchedAt: 1 })), 'the history index is a runbook step, not boot');
-    assert.ok(!onHistory.includes(JSON.stringify({ dispatchedAt: 1 })));
+  test('both dispatch-history window specs are declared, deferred and ascending (LIN-3811)', () => {
+    for (const keySpec of [{ urlKey: 1, dispatchedAt: 1 }, { dispatchedAt: 1, urlKey: 1 }]) {
+      const spec = INDEX_SPECS.find(s => s.collection === 'dispatch-history' && sameKeySpec(s.keySpec, keySpec));
+      assert.ok(spec, `dispatch-history ${JSON.stringify(keySpec)} declared`);
+      assert.strictEqual(tierOf(spec), 'deferred');
+    }
+  });
+
+  test('dispatch-queue { urlKey, dispatchedAt } is deliberately not declared (LIN-3811)', () => {
+    assert.ok(!INDEX_SPECS.some(s => s.collection === 'dispatch-queue' && sameKeySpec(s.keySpec, { urlKey: 1, dispatchedAt: 1 })));
+  });
+});
+
+describe('deferred index tier (LIN-3811)', () => {
+  let dbDir;
+  let client;
+  let counter = 0;
+  const quiet = () => {
+    const lines = { log: [], warn: [] };
+    return { lines, log: m => lines.log.push(m), warn: m => lines.warn.push(m) };
+  };
+
+  before(async () => {
+    dbDir = mkdtempSync(join(tmpdir(), 'db-indexes-deferred-'));
+    client = new MangoClient(dbDir);
+    await client.connect();
+  });
+  after(async () => {
+    if (client?.close) await client.close();
+    if (dbDir) rmSync(dbDir, { recursive: true, force: true });
+  });
+  const freshDb = () => client.db(`deferred_${counter++}`);
+
+  test('the deferred specs are the five agreed, each with a reason', () => {
+    const ids = DEFERRED_SPECS.map(s => `${s.collection} ${JSON.stringify(s.keySpec)}`).sort();
+    assert.deepStrictEqual(ids, [
+      'dispatch-history {"dispatchedAt":1,"urlKey":1}',
+      'dispatch-history {"urlKey":1,"dispatchedAt":1}',
+      'foreman-status {"timestamp":1}',
+      'owner-credentials {"urlKey":1}',
+      'proxy-events {"timestamp":1}'
+    ]);
+    for (const spec of DEFERRED_SPECS) assert.ok(spec.reason);
+  });
+
+  test('every deferred spec is non-unique with no TTL (correctness indexes cannot be deferred)', () => {
+    for (const spec of DEFERRED_SPECS) {
+      assert.ok(!spec.options?.unique, `${spec.collection} ${JSON.stringify(spec.keySpec)} must not be unique`);
+      assert.strictEqual(spec.options?.expireAfterSeconds, undefined);
+    }
+  });
+
+  test('every tier value is boot or deferred', () => {
+    for (const spec of INDEX_SPECS) assert.ok(['boot', 'deferred'].includes(tierOf(spec)));
+  });
+
+  test('ROLLUP_HISTORY_INDEX deep-equals a declared deferred dispatch-history keySpec', async () => {
+    const { ROLLUP_HISTORY_INDEX } = await import('../../lib/kpi-daily-rollup.js');
+    assert.ok(DEFERRED_SPECS.some(s => s.collection === 'dispatch-history' && sameKeySpec(s.keySpec, ROLLUP_HISTORY_INDEX)));
+  });
+
+  test('ensureIndexes never calls createIndex for a deferred spec', async () => {
+    const created = [];
+    const fakeDb = { collection: name => ({ createIndex: async keySpec => { created.push([name, keySpec]); return 'x'; } }) };
+    const { applied } = await ensureIndexes(fakeDb);
+    assert.strictEqual(created.length, BOOT_SPECS.length);
+    for (const spec of DEFERRED_SPECS) {
+      assert.ok(!created.some(([c, k]) => c === spec.collection && sameKeySpec(k, spec.keySpec)));
+    }
+    assert.strictEqual(applied.length, BOOT_SPECS.length);
+  });
+
+  test('state reads pending, then built after apply; an absent collection is pending without throwing', async () => {
+    const db = freshDb();
+    const before = await deferredIndexState(db);
+    assert.strictEqual(before.length, DEFERRED_SPECS.length);
+    assert.ok(before.every(s => s.built === false));
+
+    const logger = quiet();
+    const { applied, failed } = await applyDeferredIndexes(db, { logger });
+    assert.strictEqual(failed.length, 0);
+    assert.strictEqual(applied.length, DEFERRED_SPECS.length);
+    assert.ok((await deferredIndexState(db)).every(s => s.built === true));
+    // one start and one finish line per spec
+    assert.strictEqual(logger.lines.log.filter(m => /building/.test(m)).length, DEFERRED_SPECS.length);
+    assert.strictEqual(logger.lines.log.filter(m => /built .* as /.test(m)).length, DEFERRED_SPECS.length);
+  });
+
+  test('apply is idempotent: a second run builds nothing', async () => {
+    const db = freshDb();
+    await applyDeferredIndexes(db, { logger: quiet() });
+    const { applied, failed } = await applyDeferredIndexes(db, { logger: quiet() });
+    assert.strictEqual(applied.length, 0);
+    assert.strictEqual(failed.length, 0);
+  });
+
+  test('an index built by hand under another name counts as built (matched by key spec)', async () => {
+    const db = freshDb();
+    await db.collection('dispatch-history').createIndex({ urlKey: 1, dispatchedAt: 1 }, { name: 'hand_built' });
+    const entry = (await deferredIndexState(db)).find(
+      s => s.collection === 'dispatch-history' && sameKeySpec(s.keySpec, { urlKey: 1, dispatchedAt: 1 })
+    );
+    assert.strictEqual(entry.built, true);
+    const { applied } = await applyDeferredIndexes(db, { logger: quiet() });
+    assert.ok(!applied.some(a => a.collection === 'dispatch-history' && sameKeySpec(a.keySpec, { urlKey: 1, dispatchedAt: 1 })));
+  });
+
+  test('a non-26 listIndexes error reads unknown, not built, and is logged not thrown', async () => {
+    const db = {
+      collection: () => ({ listIndexes: () => ({ toArray: async () => { throw Object.assign(new Error('network down'), { code: 6 }); } }) })
+    };
+    const logger = quiet();
+    const state = await deferredIndexState(db, { logger });
+    assert.ok(state.every(s => s.built === 'unknown'));
+    assert.ok(logger.lines.warn.length > 0);
+  });
+
+  test('Mongo code 26 reads pending', async () => {
+    const db = {
+      collection: () => ({ listIndexes: () => ({ toArray: async () => { throw Object.assign(new Error('ns not found'), { code: 26 }); } }) })
+    };
+    assert.ok((await deferredIndexState(db, { logger: quiet() })).every(s => s.built === false));
+  });
+
+  test('a failed build is logged and skipped; the rest still build', async () => {
+    const db = freshDb();
+    const real = db.collection.bind(db);
+    db.collection = name => {
+      const c = real(name);
+      if (name !== 'proxy-events') return c;
+      return { listIndexes: () => c.listIndexes(), createIndex: async () => { throw new Error('boom'); } };
+    };
+    const logger = quiet();
+    const { applied, failed } = await applyDeferredIndexes(db, { logger });
+    assert.strictEqual(failed.length, 1);
+    assert.strictEqual(applied.length, DEFERRED_SPECS.length - 1);
+    assert.ok(logger.lines.warn.some(m => /FAILED proxy-events/.test(m)));
+  });
+
+  test('only filters to one spec', async () => {
+    const db = freshDb();
+    const { applied } = await applyDeferredIndexes(db, { logger: quiet(), only: 'proxy-events:timestamp_1' });
+    assert.deepStrictEqual(applied.map(a => a.collection), ['proxy-events']);
+  });
+
+  test('the reporter logs one line and never creates an index', async () => {
+    const db = freshDb();
+    const created = [];
+    const spy = { collection: name => { const c = db.collection(name); return { listIndexes: () => c.listIndexes(), createIndex: async (...a) => { created.push(name); return c.createIndex(...a); } }; } };
+    const logger = quiet();
+    await reportDeferredIndexes(spy, { logger });
+    assert.deepStrictEqual(created, []);
+    assert.strictEqual(logger.lines.log.length, 1);
+    assert.match(logger.lines.log[0], new RegExp(`\\[db-indexes\\] deferred: 0 built, ${DEFERRED_SPECS.length} pending \\(`));
+    assert.ok((await deferredIndexState(db)).every(s => s.built === false), 'still nothing built');
   });
 });
