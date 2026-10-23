@@ -9,6 +9,7 @@ import { maskSecretsInHtml, MASK } from '../../lib/mask-secrets-in-html.js';
 import { SECRET_RULES, scanText, findSecretMatches } from '../../lib/secret-scan.js';
 import { FIXTURE_SECRETS as F } from '../fixtures/secret-scan-fixtures.js';
 import { escapeHtml } from '../../lib/utils/html.js';
+import { renderTaskDocs } from '../../lib/render-task-page.js';
 
 // One fixture text per rule id. Every rule must appear here (guard below).
 const BY_RULE = {
@@ -197,6 +198,91 @@ describe('LIN-3796 PEM split across <br>-separated text', () => {
       const t = Date.now();
       maskSecretsInHtml(html);
       assert.ok(Date.now() - t < 2000, `took ${Date.now() - t}ms`);
+    }
+  });
+});
+
+describe('LIN-3796 review follow-ups', () => {
+  const leaks = (html) => findSecretMatches(html.replace(/<[^>]+>/g, '\n')).length;
+  const brCount = (h) => h.split('<br>').length;
+  const PEMS = {
+    'full PEM': F.privateKey,
+    'encrypted PEM': F.encryptedPrivateKey,
+    'truncated PEM': F.truncatedPrivateKey,
+  };
+  const body = (text) => text.split('\n');
+
+  // Known limit, same as base: a <br>-SPLIT truncated PEM followed by more text is not a
+  // truncated PEM to the end-of-input-anchored rule, and per-line segments hold no PEM.
+  test('truncated PEM followed by <br>text stays masked (per-segment scan kept)', () => {
+    const t = F.truncatedPrivateKey;
+    for (const html of [
+      `<pre>${escapeHtml(t)}<br>end of log.</pre>`,
+      `<p>${escapeHtml(t)}<br>-- sent from CI</p>`,
+      `<p>${escapeHtml(t)}<br>end of log.</p><p>${body(t).join('<br>')}</p>`,
+      `<p>${escapeHtml(body(t).join('<br>'))}</p>`,
+    ]) {
+      const r = maskSecretsInHtml(html);
+      assert.ok(r.hits.includes('private-key-block-truncated'), html.slice(0, 80));
+      assert.ok(!r.html.includes('MIIEow'));
+      assert.equal(maskSecretsInHtml(r.html).html, r.html);
+      assert.equal(brCount(maskSecretsInHtml(r.html).html), brCount(r.html));
+    }
+  });
+
+  for (const [name, pem] of Object.entries(PEMS)) {
+    test(`${name}: element, literal and mixed <br> are masked; tags survive a second pass`, () => {
+      const ls = body(pem);
+      const mixed = ls.map((l, i) => (i % 2 ? escapeHtml(l) : l)).join('<br>');
+      for (const html of [
+        `<p>${ls.join('<br>')}</p>`,
+        `<p>${escapeHtml(ls.join('<br>'))}</p>`,
+        `<p>${ls.map(escapeHtml).join('<br>')}</p>`,
+        `<p>${mixed}</p>`,
+      ]) {
+        const r = maskSecretsInHtml(html);
+        assert.ok(r.hits.length > 0);
+        assert.ok(!r.html.includes('MIIEow'));
+        assert.equal(leaks(r.html), 0);
+        assert.equal(brCount(r.html), brCount(html));
+        const again = maskSecretsInHtml(r.html);
+        assert.equal(again.html, r.html);
+        assert.equal(brCount(again.html), brCount(r.html));
+      }
+    });
+  }
+
+  test('real /t/ shape: markdown description with literal <br> via renderTaskDocs', () => {
+    for (const pem of Object.values(PEMS)) {
+      const html = renderTaskDocs({ description: pem.split('\n').join('<br>'), comments: [{ author: 'a', body: pem.split('\n').join('<br />') }] });
+      assert.ok(html.includes('&lt;br&gt;'));
+      const r = maskSecretsInHtml(html);
+      assert.ok(r.hits.length > 0);
+      assert.ok(!r.html.includes('MIIEow'));
+    }
+  });
+
+  test('doctype, processing instruction and comment between lines break the run', () => {
+    const ls = body(F.privateKey);
+    for (const sep of ['<!doctype html>', '<?x?>', '<!-- c -->', '<b>x</b>']) {
+      const html = `<p>${ls.join(sep)}</p>`;
+      assert.equal(maskSecretsInHtml(html).html, html, sep);
+    }
+  });
+
+  test('hostile inputs under 100ms-class bounds', () => {
+    const cases = [
+      `<p>${'-----BEGIN RSA PRIVATE KEY-----<br>'.repeat(6500)}</p>`,
+      `<p>${escapeHtml('-----BEGIN RSA PRIVATE KEY-----<br>'.repeat(6500))}</p>`,
+      `<p>-----BEGIN RSA PRIVATE KEY-----<br>Proc-Type: 4,ENCRYPTED<br>DEK-Info: ${'A,'.repeat(5000)}<br></p>`,
+      `<p>${'A<br>'.repeat(100000)}</p>`,
+    ];
+    for (const html of cases) {
+      maskSecretsInHtml(html); // warm
+      const t = process.hrtime.bigint();
+      maskSecretsInHtml(html);
+      const ms = Number(process.hrtime.bigint() - t) / 1e6;
+      assert.ok(ms < 1000, `took ${ms}ms`);
     }
   });
 });
