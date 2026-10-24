@@ -9,7 +9,7 @@
     {
       "name": "Front end: server-rendered pages",
       "match": [
-        "^lib/(render[^/]*|components/.*|tree|ship-layout|swim-graph|swim-lanes|timeline-zoom|parse-landing|mask-secrets-in-html|task-page-href|question-card|security-headers|ship-journey|settings-areas)\\.js$"
+        "^lib/(render[^/]*|components/.*|tree|task-board-view|ship-layout|swim-graph|swim-lanes|timeline-zoom|parse-landing|mask-secrets-in-html|task-page-href|question-card|security-headers|ship-journey|settings-areas)\\.js$"
       ]
     },
     {

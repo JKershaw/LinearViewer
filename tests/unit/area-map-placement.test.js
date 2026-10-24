@@ -43,4 +43,11 @@ describe('code-shape area map placement (LIN-3729)', () => {
     assert.strictEqual(areaOf('lib/llm-jobs.js'), 'LLM & prompts');
     assert.strictEqual(areaOf('lib/llm-call-log.js'), 'LLM & prompts');
   });
+
+  // LIN-3754: the task board view model composes the ordering rules for the
+  // three boards. It is filed with the pages because each board's composition is
+  // a page choice; under Task model it would add a new "pages ⇄ Task model" pair.
+  test('the task board view model lands in the server-rendered pages', () => {
+    assert.strictEqual(areaOf('lib/task-board-view.js'), 'Front end: server-rendered pages');
+  });
 });
