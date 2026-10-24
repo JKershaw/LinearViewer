@@ -237,7 +237,7 @@ describe('LIN-3238 — relay coverage (static guard)', () => {
     // routes/proxy-kickoff.js and lib/dispatch-entrance.js) are one unit. This used to
     // require exactly the four files dispatch.js, proxy-dispatch.js, proxy-kickoff.js
     // and workspace-api.js, each with its own relay. Now: outside the entrances the
-    // gated files are exactly workspace-api.js (the two feedback lanes) and it relays;
+    // gated files are workspace-API unit files (the two feedback lanes; LIN-3861) and each relays;
     // inside them at least one file passes runGate to createDispatchItem and the unit
     // holds a relay. Which of the four holds either is not pinned.
     const entranceFiles = new Set(['dispatch.js', 'proxy-dispatch.js', 'proxy-kickoff.js']);
@@ -247,8 +247,12 @@ describe('LIN-3238 — relay coverage (static guard)', () => {
     const hasRelayIn = (src) => /err\.runLimit/.test(src) || /mapDispatchRefusal\s*\(/.test(src) || /relayDispatchRefusal\s*\(/.test(src);
 
     const gatedOutside = files.filter(f => !entranceFiles.has(f) && isGated(read(f))).sort();
-    // The two feedback lanes (workspace-api) are the only gated lanes outside the entrances.
-    assert.deepEqual(gatedOutside, ['workspace-api.js'], `unexpected gated-lane file set outside the entrances: ${gatedOutside.join(', ')}`);
+    // The two feedback lanes are the only gated lanes outside the entrances. LIN-3861: they sit in the
+    // workspace-API unit (routes/workspace-api.js or routes/workspace-api-*.js), not in one named file; the
+    // set must be non-empty, every member a unit file, and each member relays (per file, below). The
+    // rule is gatedOutsideProblems above, with its synthetic-file witnesses.
+    assert.ok(gatedOutside.length > 0, 'no gated lane file outside the entrances');
+    for (const f of gatedOutside) assert.ok(isWorkspaceApiUnitFile(`routes/${f}`), `unexpected gated-lane file outside the entrances and the workspace-API unit: ${f}`);
 
     const entranceSources = [...[...entranceFiles].map(f => ({ name: f, src: read(f) })), entranceLib];
     const gatedInside = entranceSources.filter(e => isGated(e.src));
