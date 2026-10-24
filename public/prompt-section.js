@@ -234,7 +234,7 @@
    *
    * Go's own states live on `state.go` (outside `phase`/`result`):
    *   - ready: pressable. Rung vocabulary stays `run-task` (data-rung, pinned by
-   *     task-mode-store.test.js). Ready means dispatch AND proxy AND autopilot.
+   *     task-mode-store.test.js). Ready means the viewer has run controls (LIN-3849: the owner of a workspace with a live runner key or queue token).
    *   - not set up: shown as "Go ○ set up ›" (never hidden); a press records
    *     intent and writes the notice, dispatching nothing.
    *   - run-limited: disabled with the run-limit reason, from the same quota as
@@ -245,7 +245,13 @@
    * every phase and is the same account-wide count the run rungs used.
    */
   function goReady(opts) {
-    return !!(opts.dispatchEnabled && opts.proxyEnabled && opts.hasAutopilot);
+    return !!opts.dispatchEnabled;
+  }
+
+  // LIN-3849: key tools (+proxy, Autopilot) have no switch. The landing preview
+  // is the one surface without a workspace, and it has no key to make.
+  function hasKeyTools(opts) {
+    return !!opts.urlKey;
   }
 
   function renderGo(opts, state) {
@@ -272,8 +278,12 @@
         : '<p class="task-sentence" data-testid="opened-task-sentence">Started.</p>';
       html += `<div class="opened-task-started" data-testid="opened-task-started" data-go-status="${esc(g.status)}">${body}${link}</div>`;
     } else if (!ready) {
-      const needs = opts.dispatchEnabled ? 'proxy' : 'dispatch';
-      html += `<button class="opened-task-go opened-task-go--setup" data-testid="opened-task-go" data-rung="run-task" data-action="setup" data-setup-needs="${needs}">Go <span class="opened-task-setup">\u25CB set up \u203A</span></button>`;
+      // LIN-3849: only an owner with no way to run yet is offered "set up ›";
+      // anyone else gets no run control at all (copy-first view, LIN-3833, is
+      // not built yet, so this is today's non-run view).
+      if (opts.runSetup) {
+        html += `<button class="opened-task-go opened-task-go--setup" data-testid="opened-task-go" data-rung="run-task" data-action="setup" data-setup-needs="dispatch">Go <span class="opened-task-setup">\u25CB set up \u203A</span></button>`;
+      }
     } else if (runsExhausted) {
       html += `<button class="opened-task-go opened-task-go--limited" data-testid="opened-task-go" data-rung="run-task" disabled title="${runLimitTitle}">Go <span class="opened-task-setup">${runLimitTitle}</span></button>`;
     } else if (g.status === 'starting') {
@@ -303,7 +313,8 @@
   /**
    * The ladder beside Go: copy \u2192 run this step. A rung not yet enabled is
    * SHOWN as "\u25CB set up \u203A", never hidden,
-   * and keyed on `featureFlags.dispatch` / `featureFlags.proxy`. Pressing a
+   * for an owner with no way to run (`opts.runSetup`, LIN-3849); for anyone
+   * else the run rung is not rendered. Pressing a
    * not-yet-enabled rung says what it needs, and the press is recorded as a
    * mode event (LIN-2942); `data-rung` / `data-setup-needs` are that record's
    * vocabulary (lib/task-mode-store.js, pinned by a unit test).
@@ -374,12 +385,12 @@
       if (runsExhausted) {
         rungs.push(runLimited('run-step', 'run this step'));
       } else {
-        const force = opts.proxyEnabled && runnerMarkerSet(opts.urlKey) ? ' data-proxy-force="runner"' : '';
+        const force = runnerMarkerSet(opts.urlKey) ? ' data-proxy-force="runner"' : '';
         rungs.push(`<button class="opened-task-rung opened-task-rung--ready" data-rung="run-step" data-action="run-step" data-target="cli"${force}>run this step</button>`);
       }
     } else if (opts.dispatchEnabled) {
       rungs.push(needsPrompt('run-step', 'run this step'));
-    } else {
+    } else if (opts.runSetup) {
       rungs.push('<button class="opened-task-rung opened-task-rung--setup" data-rung="run-step" data-action="setup" data-setup-needs="dispatch">run this step <span class="opened-task-setup">\u25CB set up \u203A</span></button>');
     }
     // LIN-3341: the `run the whole task` rung is DELETED — Go is that rung now
@@ -419,7 +430,7 @@
       const name = promptMeta[key] || key;
       html += `<button class="swipe-prompt-btn" data-prompt="${esc(key)}">${esc(name)}</button>`;
     }
-    if (opts.hasAutopilot) {
+    if (hasKeyTools(opts)) {
       // LIN-836: sibling stepper variant of the run-whole-task rung. Same kickoff
       // endpoint fetched with ?variant=stepper; dispatch contract stays kind:autopilot.
       html += `<button class="swipe-prompt-btn autopilot-btn" data-prompt="__autopilot_stepper__" title="Run on autopilot in stepped mode — drips ordered beats into one warm session, judging each before advancing">Autopilot · stepped</button>`;
@@ -493,11 +504,11 @@
   }
 
   function renderActionCluster(opts) {
-    const { dispatchEnabled, proxyEnabled, isLocalhost, issue } = opts;
+    const { dispatchEnabled, isLocalhost, issue } = opts;
     let html = '';
     html += '<button class="swipe-prompt-copy" data-action="copy">copy</button>';
     html += '<button class="swipe-prompt-download" data-action="download" title="Download prompt as a .md file">download</button>';
-    if (proxyEnabled) {
+    if (hasKeyTools(opts) && !opts.hideProxyToggle) {
       // Active look is driven by the body[data-proxy-active] CSS rule (LIN-525
       // #1), so no per-button class is rendered here. data-action is kept off
       // the button: applyState binds ProxyToggle to it after insertion.
@@ -509,11 +520,8 @@
         + '<summary class="opened-task-proxy-label">your agent can read &amp; update your tasks \u00b7 what\u2019s this? \u203A</summary>'
         + '<div class="opened-task-proxy-faq">'
         + '<p>With this on, every prompt you copy, download or dispatch carries a workspace API access block so your agent can read and update your tasks through Harbour\u2019s own API. Each copy mints a fresh single-use read/write token, valid for 48 hours, and it appears in this prompt only.</p>'
-        + '<p>It also enables the proxy page and nav link, Autopilot prompts and next-run dispatch, and it removes the \u201cproxy off\u201d notices on the surfaces that need it.</p>'
         + '<p>Token creation for prompt copies is capped at 60 per 15 minutes per account. If the cap is reached, the copy or download still completes but skips the agent-access block, and a note beside the toggle says so \u2014 try again in a few minutes.</p>'
-        + '<p>Turn it off any time by pressing <strong>+proxy</strong> again, or by switching off <strong>Linear API proxy</strong> in <a href="/workspace/'
-        + esc(opts.urlKey || '')
-        + '/settings">Settings</a>.</p>'
+        + '<p>Turn it off any time by pressing <strong>+proxy</strong> again.</p>'
         + '</div>'
         + '</details>';
     }
@@ -545,7 +553,7 @@
     // do not. The cluster is rebuilt on every render, so switching to another
     // result restores the toggle.
     const isForced = !!(state.result && state.result.proxyForce);
-    const actions = renderActionCluster(isForced ? { ...opts, proxyEnabled: false } : opts);
+    const actions = renderActionCluster(isForced ? { ...opts, hideProxyToggle: true } : opts);
     // LIN-2944: the remembered prompt shows its age ("generated 2h ago") with a
     // one-click regenerate (re-runs the same label). Only rendered once the
     // entry carries a `generatedAt` (always true for a freshly built entry and
@@ -1182,13 +1190,12 @@
         // LIN-3341: Go is its own control now, so its not-set-up notice names
         // Go, not the run-step rung. The run-step and prompt wording is unchanged.
         const isGo = btn.dataset.rung === 'run-task';
+        // LIN-3849: `proxy` left the vocabulary with its switch.
         const notice = needs === 'dispatch'
           ? (isGo ? 'Go needs the dispatch runner set up' : 'running this step needs the dispatch runner set up')
-          : needs === 'prompt'
-            ? 'generate a prompt first'
-            : (isGo ? 'Go needs the proxy set up' : 'running the whole task needs the proxy set up');
+          : 'generate a prompt first';
         state.setupNotice = notice;
-        state.setupNoticeLink = needs === 'dispatch' || needs === 'proxy' ? runnerSetupHref(opts) : null;
+        state.setupNoticeLink = needs === 'dispatch' ? runnerSetupHref(opts) : null;
         const slot = container.querySelector('[data-setup-notice-slot]');
         if (slot) slot.innerHTML = setupNoticeHtml(state.setupNotice, state.setupNoticeLink);
         recordTaskMode({ rung: btn.dataset.rung, ready: false, needs, act: 'press' });
