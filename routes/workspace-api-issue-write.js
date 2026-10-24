@@ -239,7 +239,7 @@ function partialWriteFailed(res, err) {
  * Register the three issue-write routes, in order: comment write, issue create, issue patch.
  * @param {import('express').Router} router - the composer's router
  */
-export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQueueStore, taskDecisionsStore, harbourCommentsStore = null, sessionsFeedCache = null, ownerCredentialStore = null, adoptConnectionCredential = null, onTicketWrite = null }) {
+export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQueueStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, adoptConnectionCredential, onTicketWrite }) {
   /**
    * Add a human comment to an issue (LIN-2154) — the session-auth twin of the
    * agent-lane `POST /api/proxy/issues/:issueId/comments` (routes/proxy.js).

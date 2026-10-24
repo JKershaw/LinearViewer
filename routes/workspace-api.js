@@ -953,7 +953,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
   // ===========================================================================
 
   // The issue-read routes (GET comments, detail, image) moved to workspace-api-issue-read.js (LIN-3872);
-  // they register on this router, here, so GET comments still precedes POST comments below.
+  // they register on this router, here, so GET comments still precedes POST comments, registered next.
   registerIssueReadRoutes(router, { workspaceFromUrl, getOpenRouterSource, customPromptsStore });
 
   // The issue-write routes (POST comments, POST issues, PATCH issues) moved to workspace-api-issue-write.js

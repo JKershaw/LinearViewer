@@ -1,9 +1,9 @@
 /**
  * LIN-3876: the issue-write routes moved to routes/workspace-api-issue-write.js and
  * register on the composer's OWN router, not a mounted sub-router. A mounted inner
- * router would answer OPTIONS on /api/comments/:issueId itself (`Allow: GET,HEAD`)
- * instead of reaching the composer's POST route, so the verb set Express reports is
- * the observable proof of direct registration. Behavioural only: no source reads.
+ * router answers OPTIONS on /api/comments/:issueId itself (`Allow: POST`), and calling
+ * the writes before the reads gives `POST,GET,HEAD`; both differ from `GET,HEAD,POST`,
+ * so the verb set Express reports is the observable proof of direct registration. Behavioural only: no source reads.
  *
  * Run with: node --test tests/unit/workspace-api-issue-write-registration.test.js
  */
