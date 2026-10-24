@@ -1,10 +1,10 @@
 /**
  * Unit tests for lib/render-passage-planner.js (LIN-1849).
  *
- * Covers the render-time proxy-availability gate: `data-proxy-available`
- * always reflects `featureFlags.proxy === true` (never `data-proxy-feature`,
- * which nothing on this page reads), and a degradation notice + Settings
- * link appear only when proxy access is off. Mirrors
+ * LIN-3849 removed the per-user `proxy` switch: the page no longer emits
+ * `data-proxy-available` (or `data-proxy-feature`) or a degradation notice, and
+ * the copy handler always force-appends the access block
+ * (tests/e2e/passage-planner-proxy-copy.spec.js). Mirrors
  * tests/unit/render-flight-companion.test.js.
  *
  * Run with: node --test tests/unit/render-passage-planner.test.js
@@ -13,28 +13,20 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { renderPassagePlannerPage } from '../../lib/render-passage-planner.js';
 
-describe('renderPassagePlannerPage — proxy availability gating', () => {
-  test('proxy: true → no degradation notice, data-proxy-available="true", no data-proxy-feature', () => {
-    const html = renderPassagePlannerPage({ prompt: 'kickoff' }, { urlKey: 'ws', featureFlags: { proxy: true } });
-    assert.ok(html.includes('data-proxy-available="true"'));
-    assert.ok(!html.includes('data-proxy-feature'));
-    assert.ok(!html.includes('passage-planner-degraded'));
-    assert.ok(!/requires workspace API access/.test(html));
-  });
+describe('renderPassagePlannerPage — no proxy switch', () => {
+  for (const [name, featureFlags] of [['no flags', {}], ['stale proxy:true', { proxy: true }], ['stale proxy:false', { proxy: false }]]) {
+    test(`${name} → no availability attribute, no degradation notice`, () => {
+      const html = renderPassagePlannerPage({ prompt: 'kickoff' }, { urlKey: 'ws', featureFlags });
+      assert.ok(!html.includes('data-proxy-available'));
+      assert.ok(!html.includes('data-proxy-feature'));
+      assert.ok(!html.includes('passage-planner-degraded'));
+      assert.ok(!/requires workspace API access/.test(html));
+      assert.ok(html.includes('id="passage-planner-copy"'));
+    });
+  }
 
-  test('proxy: false → degradation notice + Settings link, data-proxy-available="false"', () => {
-    const html = renderPassagePlannerPage({ prompt: 'kickoff' }, { urlKey: 'ws', featureFlags: { proxy: false } });
-    assert.ok(html.includes('data-proxy-available="false"'));
-    assert.ok(!html.includes('data-proxy-feature'));
-    assert.ok(/requires workspace API access/.test(html));
-    assert.ok(/will not include the access block/.test(html));
-    assert.match(html, /href="\/workspace\/ws\/settings"/);
-  });
-
-  test('no-featureFlags call path (page-title-primitive.test.js) renders cleanly, treated as proxy off', () => {
+  test('no-featureFlags call path (page-title-primitive.test.js) renders cleanly', () => {
     const html = renderPassagePlannerPage({}, { urlKey: 'ws' });
     assert.ok(html.startsWith('<!DOCTYPE html>'));
-    assert.ok(html.includes('data-proxy-available="false"'));
-    assert.ok(!html.includes('data-proxy-feature'));
   });
 });

@@ -169,15 +169,14 @@ function loadPromptSection(overrides = {}) {
 const ISSUE = { id: 'uuid-42', identifier: 'LIN-42', title: 'A task', source: 'linear' };
 
 function baseOpts(extra = {}) {
-  return {
+  // LIN-3849: `runSetup` (the owner's "set up ›" rung) defaults to the old not-dispatch-enabled state.
+  const o = {
     urlKey: 'ws',
     issue: ISSUE,
     surface: 'swipe',
     hasAI: true,
     aiState: 'ready',
-    hasAutopilot: true,
     dispatchEnabled: true,
-    proxyEnabled: true,
     isLocalhost: false,
     customPrompts: [],
     defaultPromptKeys: ['implementation'],
@@ -185,6 +184,7 @@ function baseOpts(extra = {}) {
     promptMeta: { implementation: 'Implementation' },
     ...extra,
   };
+  return { runSetup: !o.dispatchEnabled, ...o };
 }
 
 async function mount(overrides = {}, extra = {}, loadOverrides = {}) {

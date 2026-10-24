@@ -359,6 +359,8 @@ describe('LIN-2942 — POST and GET /workspace/:urlKey/api/task-mode', () => {
     ['a not-ready press without needs', { ...COPY, ready: false, act: 'press' }, /needs must be one of/],
     ['no issueIdentifier', { ...COPY, issueIdentifier: undefined }, /issueIdentifier is required/],
     ['no act', { ...COPY, act: undefined }, /act must be one of/],
+    // LIN-3849: `proxy` left the vocabulary with its switch; a stale cached client's press is refused.
+    ['a stale needs:proxy press', { ...COPY, rung: 'run-task', ready: false, needs: 'proxy', act: 'press' }, /needs must be one of/],
   ]) {
     test(`POST with ${name} is a 400 and records nothing`, async () => {
       const res = await call(buildTaskModeApp({ taskModeStore: store }), 'post', TASK_MODE_PATH, body);
@@ -370,7 +372,7 @@ describe('LIN-2942 — POST and GET /workspace/:urlKey/api/task-mode', () => {
 
   test('GET returns the account\'s entry for the task', async () => {
     const app = buildTaskModeApp({ taskModeStore: store });
-    await call(app, 'post', TASK_MODE_PATH, { ...COPY, rung: 'run-task', ready: false, needs: 'proxy', act: 'press' });
+    await call(app, 'post', TASK_MODE_PATH, { ...COPY, rung: 'run-task', ready: false, needs: 'dispatch', act: 'press' });
     await call(app, 'post', TASK_MODE_PATH, COPY);
     const res = await call(app, 'get', `${TASK_MODE_PATH}/LIN-42`);
 

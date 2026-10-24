@@ -405,7 +405,7 @@ test.describe('Swipe Dispatched Sessions', () => {
 
   test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
     await clearSessions(page, localWorkerUrlKey);
-    await seedLocal(workspaceApiLocalSeed, { features: { dispatch: true } });
+    await seedLocal(workspaceApiLocalSeed, { runnerKey: true });
   });
 
   test('accordion header shows the baked-in session count', async ({ page, localWorkerUrlKey }) => {
@@ -460,7 +460,7 @@ test.describe('Swipe Dispatched Sessions', () => {
   });
 
   test('accordion is absent when dispatch feature is disabled', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(workspaceApiLocalSeed, { features: { dispatch: false } });
+    await seedLocal(workspaceApiLocalSeed, { runnerKey: false });
     await openSwipeAt(page, localWorkerUrlKey, 'TEST-14');
 
     await expect(sessionsAccordion(page)).toHaveCount(0);

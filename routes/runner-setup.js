@@ -6,11 +6,10 @@
  *   GET /workspace/:urlKey/runner
  *
  * It NEVER redirects: every state renders a page that says what it needs
- * (lib/render-runner-setup.js). The state comes from the session's feature
- * flags and the owner check:
+ * (lib/render-runner-setup.js). The state comes from the owner check alone
+ * (LIN-3849: the per-user proxy / dispatch switches are gone):
  *
- *   proxy off                  → proxy-off (the owner check isn't asked)
- *   owner, dispatch on / off   → owner / owner-dispatch-off
+ *   the owner                  → owner
  *   not the owner / no owner   → not-owner / no-owner
  *   the owner check throws     → unavailable
  *
@@ -27,7 +26,7 @@
 import { Router } from 'express';
 import { renderRunnerSetupPage } from '../lib/render-runner-setup.js';
 import { renderErrorPage } from '../lib/render.js';
-import { getFeatureFlags } from '../lib/feature-defaults.js';
+import { requestFeatureFlags } from '../lib/run-controls.js';
 import { checkWorkspaceOwner, readOwnerSeamStatus } from '../lib/workspace-owner.js';
 import { buildRunnerKickoff } from '../lib/prompts/runner-kickoff.js';
 import { publicOrigin } from '../lib/public-origin.js';
@@ -56,26 +55,22 @@ export function createRunnerSetupRoutes({
 
   router.get('/workspace/:urlKey/runner', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
-    const featureFlags = getFeatureFlags(req.session);
+    const featureFlags = await requestFeatureFlags(req);
     const accountId = req.session?.accountId || null;
 
     let state;
-    if (featureFlags.proxy !== true) {
-      state = 'proxy-off';
-    } else {
-      // LIN-3673: a throw and an unrecognised answer are both 'unavailable' but
-      // word their warn differently, so `threw` is kept apart.
-      const { status, threw, error: err } = await readOwnerSeamStatus(() => ownerCheck({ workspaceId: workspace.id, accountId }));
-      if (threw) {
-        console.warn(`Runner setup: owner check unavailable (urlKey=${workspace.urlKey}): ${err?.message ?? String(err)}`);
-      } else if (status === 'unavailable') {
-        console.warn(`Runner setup: owner check unavailable (urlKey=${workspace.urlKey}): unrecognised owner answer`);
-      }
-      if (status === 'owner') state = featureFlags.dispatch === true ? 'owner' : 'owner-dispatch-off';
-      else if (status === 'no-owner') state = 'no-owner';
-      else if (status === 'unavailable') state = 'unavailable';
-      else state = 'not-owner';
+    // LIN-3673: a throw and an unrecognised answer are both 'unavailable' but
+    // word their warn differently, so `threw` is kept apart.
+    const { status, threw, error: err } = await readOwnerSeamStatus(() => ownerCheck({ workspaceId: workspace.id, accountId }));
+    if (threw) {
+      console.warn(`Runner setup: owner check unavailable (urlKey=${workspace.urlKey}): ${err?.message ?? String(err)}`);
+    } else if (status === 'unavailable') {
+      console.warn(`Runner setup: owner check unavailable (urlKey=${workspace.urlKey}): unrecognised owner answer`);
     }
+    if (status === 'owner') state = 'owner';
+    else if (status === 'no-owner') state = 'no-owner';
+    else if (status === 'unavailable') state = 'unavailable';
+    else state = 'not-owner';
 
     try {
       const baseUrl = publicOrigin(req);

@@ -7,6 +7,7 @@
 import { Router } from 'express';
 import crypto from 'crypto';
 import { getWorkspaceByUrlKey } from '../lib/workspace.js';
+import { RUNNER_GRANTS } from '../lib/proxy-scopes.js';
 import { isValidFeatureKey, isValidWorkspaceFeatureKey } from '../lib/feature-defaults.js';
 import { setWorkspaceFeature } from '../lib/workspace-preferences.js';
 import { getProvider } from '../lib/providers/registry.js';
@@ -191,6 +192,45 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     res.json([{ id: JIRA_OAUTH_TEST_CLOUD_ID, url: JIRA_SITE, name: 'Acme' }]);
   });
 
+  // LIN-3849: run controls need a live runner key or queue token, so e2e specs
+  // that exercise them seed one through the SAME mint path production uses
+  // (mintGrantBootstrap, then the bootstrap's one exchange for the working token).
+  // `want === false` clears both stores for the workspace, so a spec that asserts
+  // "no key" cannot inherit one a previous spec minted on the same per-worker urlKey.
+  //
+  // `claimOwner` (the seed routes pass it, /test/create-runner-key does not) makes the
+  // session account the workspace's owner first, as a fresh-id seed already is. A
+  // per-worker urlKey keeps its workspace id across specs, so an earlier spec that
+  // left the owner edge 'foreign' would otherwise refuse this mint (GRANT_OWNER_ONLY)
+  // and, worse, hide the owner-only set-up rung from a spec that asks for it.
+  async function seedRunnerKey({ urlKey, workspaceId, ownerAccountId, want, claimOwner = false, queueToken = false, keepQueueTokens = false }) {
+    await proxyTokenStore.clear(urlKey);
+    // A spec that made a queue token BEFORE seeding (consumer-API specs) keeps it.
+    if (!keepQueueTokens) await dispatchTokenStore.clear(urlKey);
+    if (claimOwner && ownerAccountId) {
+      const edges = accountWorkspaceStore.collection;
+      await edges.updateMany({ workspaceId }, { $set: { role: null } });
+      const existing = await edges.findOne({ accountId: ownerAccountId, workspaceId });
+      if (existing) await edges.updateOne({ _id: existing._id }, { $set: { role: 'owner' } });
+      else await edges.insertOne({ _id: crypto.randomUUID(), accountId: ownerAccountId, workspaceId, createdAt: new Date(), role: 'owner' });
+    }
+    // `queueToken` gives run controls through the other half of the rule (a live
+    // queue token) WITHOUT a runner credential. A runner key counts as "someone is
+    // listening" for 20 minutes (lib/consumer-poll-warning.js), so a spec that
+    // asserts the "nothing is listening" warning uses this instead.
+    if (queueToken) {
+      const { tokenId } = await dispatchTokenStore.createToken(urlKey, 'e2e queue token');
+      return { tokenId };
+    }
+    if (!want) return null;
+    const bootstrap = await proxyTokenStore.mintGrantBootstrap({
+      urlKey, workspaceId, ownerAccountId, grants: RUNNER_GRANTS, label: 'e2e runner key'
+    });
+    const working = await proxyTokenStore.exchangeBootstrapToken(bootstrap.token);
+    if (!working) throw new Error('runner key exchange failed');
+    return { tokenId: working.tokenId };
+  }
+
   // Endpoint to set a test session without going through OAuth flow
   // Query parameters:
   //   ?tokenExpired=true        - Set token expiry in the past
@@ -308,6 +348,20 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     // having no identity to link).
     if (!noLinearUser) {
       await establishAccount(req.session, accountStore, accountWorkspaceStore, 'linear', 'test-linear-user-id', {}, workspaces[0].id)
+      // LIN-3849: `?runnerKey=1` mints a live runner key for the first workspace
+      // (the owner is the session account); `?runnerKey=0` clears every key.
+      // Omitted leaves the stores alone.
+      const runnerKeyParam = req.query.runnerKey
+      if (runnerKeyParam !== undefined) {
+        await seedRunnerKey({
+          urlKey: workspaces[0].urlKey,
+          workspaceId: workspaces[0].id,
+          ownerAccountId: req.session.accountId,
+          want: runnerKeyParam === '1' || runnerKeyParam === 'true',
+          claimOwner: true,
+          keepQueueTokens: req.query.keepQueueTokens === '1'
+        })
+      }
     }
 
     // LIN-1524: seed a durable record for every non-PAT Linear workspace,
@@ -1497,6 +1551,9 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       // itself (Q6 — freshly-unique per real create, never a false-conflict
       // risk), mirroring routes/workspace.js's POST /workspace/new.
       await establishAccount(req.session, accountStore, accountWorkspaceStore, 'local', urlKey, {}, wsId);
+      if (typeof body.runnerKey === 'boolean') {
+        await seedRunnerKey({ urlKey, workspaceId: wsId, ownerAccountId: req.session.accountId, want: body.runnerKey, claimOwner: true, queueToken: body.queueToken === true, keepQueueTokens: body.keepQueueTokens === true });
+      }
       for (const { binding, refreshToken } of connectionBackedExtras) {
         const conversion = await convertFixtureBinding(req, wsId, binding, refreshToken);
         if (!conversion.connectionBacked) throw new Error(`connection-backed extra binding ${binding.provider} did not convert`);
@@ -1540,6 +1597,21 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     }
   };
   router.get('/test/set-local-session', setLocalSession);
+  // LIN-3849: add (default) or remove (`?state=none`) the session workspace's
+  // runner key after the session exists, e.g. to flip a spec from "no key" to
+  // "has a key". Mints on the calling worker's own urlKey through the session
+  // account, which owns it unless /test/set-workspace-ownership says otherwise.
+  router.post('/test/create-runner-key', async (req, res) => {
+    try {
+      const ws = getWorkspaceByUrlKey(req.session, req.query.urlKey);
+      if (!ws) return res.status(400).json({ error: 'workspace not in session' });
+      const want = req.query.state !== 'none';
+      const key = await seedRunnerKey({ urlKey: ws.urlKey, workspaceId: ws.id, ownerAccountId: req.session.accountId, want });
+      res.json({ ok: true, key });
+    } catch (err) {
+      res.status(500).json({ error: err.message, code: err.code });
+    }
+  });
   router.post('/test/set-local-session', setLocalSession);
 
   // Exercise the provider WRITE path directly (the gap this provider exists to

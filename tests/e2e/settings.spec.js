@@ -65,14 +65,15 @@ test.describe('Settings Page', () => {
   })
 
   test('toggling a feature flips its state', async ({ page }) => {
-    // dispatch is off by default. The ● / ○ glyphs make the assertion robust
-    // against feature description text that merely contains "on"/"off".
-    await expect(settings(page).toggle('dispatch')).toContainText('○ off')
+    // roadmap is off by default (LIN-3849: dispatch is no longer a switch). The
+    // ● / ○ glyphs make the assertion robust against feature description text
+    // that merely contains "on"/"off".
+    await expect(settings(page).toggle('roadmap')).toContainText('○ off')
 
-    await settings(page).toggleFeature('dispatch')
+    await settings(page).toggleFeature('roadmap')
     await page.waitForLoadState('networkidle')
 
-    await expect(settings(page).toggle('dispatch')).toContainText('● on')
+    await expect(settings(page).toggle('roadmap')).toContainText('● on')
   })
 
   test('model pricing hint updates with the selected model (LIN-993)', async ({ page }) => {
@@ -165,7 +166,7 @@ test.describe('Settings account email threading (LIN-1892 S3-3, G3)', () => {
 test.describe('Token Management', () => {
   test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
     await page.goto(`/test/clear-dispatch-tokens?urlKey=${localWorkerUrlKey}`)
-    await seedLocal(undefined, { features: { dispatch: true } })
+    await seedLocal(undefined, { runnerKey: true })
     // LIN-3137 J5: the mint is owner-only — seed the owner edge explicitly.
     await seedWorkspaceOwnership(page, localWorkerUrlKey)
     await page.goto(`/workspace/${localWorkerUrlKey}/dispatch`)
@@ -302,7 +303,7 @@ test.describe('Token Management', () => {
 test.describe('Token API Integration', () => {
   test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
     await page.goto(`/test/clear-dispatch-tokens?urlKey=${localWorkerUrlKey}`)
-    await seedLocal(undefined, { features: { dispatch: true } })
+    await seedLocal(undefined, { runnerKey: true })
   })
 
   test('created token works with consumer API', async ({ page, request, localWorkerUrlKey }) => {

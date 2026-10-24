@@ -124,7 +124,7 @@ test.describe('Free Tier run contract (ladder)', () => {
     // dispatch + proxy enable the run rungs so the run-limit state is visible.
     await seedLocal(workspaceApiLocalSeed, {
       freeTierEnabled: true,
-      features: { dispatch: true, proxy: true },
+      runnerKey: true,
     });
     await clearRuns(page, localWorkerUrlKey);
   });
@@ -240,7 +240,7 @@ test.describe('Free Tier UI', () => {
     // dispatch + proxy render the run rungs, so the run-limit state is visible.
     await seedLocal(workspaceApiLocalSeed, {
       freeTierEnabled: true,
-      features: { dispatch: true, proxy: true },
+      runnerKey: true,
     });
     await clearRuns(page, localWorkerUrlKey);
     const { limit } = await readQuota(page, localWorkerUrlKey);

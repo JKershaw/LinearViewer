@@ -186,13 +186,12 @@ function loadPromptSection({ autopilotResult, apiResult, proxyAppend } = {}) {
 }
 
 function baseOpts(issue, extra = {}) {
-  return {
+  // LIN-3849: `runSetup` (the owner's "set up ›" rung) defaults to the old not-dispatch-enabled state.
+  const o = {
     urlKey: 'ws',
     issue,
     hasAI: true,
-    hasAutopilot: true,
     dispatchEnabled: false,
-    proxyEnabled: true,
     isLocalhost: false,
     customPrompts: [],
     defaultPromptKeys: ['implementation'],
@@ -200,6 +199,7 @@ function baseOpts(issue, extra = {}) {
     promptMeta: { implementation: 'Implementation' },
     ...extra,
   };
+  return { runSetup: !o.dispatchEnabled, ...o };
 }
 
 // Let the fire-and-forget fetchPrompt microtasks flush.

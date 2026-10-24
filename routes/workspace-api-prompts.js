@@ -288,8 +288,7 @@ export function createPromptsRoutes({ workspaceFromUrl, promptTraceStore, custom
    * The general (stack-walk) kickoff is served at the issueless route below and
    * at /api/proxy/autopilot/kickoff for external agents.
    *
-   * Gated on the proxy feature flag — the kickoff drives the
-   * proxy API exclusively. Optional `?mode=readonly` restricts the run to
+   * The kickoff drives the proxy API exclusively (no per-user switch, LIN-3849). Optional `?mode=readonly` restricts the run to
    * investigation/research prompts; default is write (merge-gated).
    *
    * @route GET /workspace/:urlKey/api/autopilot-prompt/:issueId
@@ -299,10 +298,6 @@ export function createPromptsRoutes({ workspaceFromUrl, promptTraceStore, custom
   router.get('/workspace/:urlKey/api/autopilot-prompt/:issueId', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
     const { issueId } = req.params;
-
-    if (getFeatureFlags(req.session).proxy !== true) {
-      return jsonError(res, 403, 'Proxy feature is not enabled');
-    }
 
     if (!isValidIssueId(issueId)) {
       return badRequest.json(res, 'Invalid issue ID format');
@@ -375,10 +370,6 @@ export function createPromptsRoutes({ workspaceFromUrl, promptTraceStore, custom
    * @returns {Object} { label, promptName, kind, prompt } or error
    */
   router.get('/workspace/:urlKey/api/autopilot-prompt', workspaceFromUrl, async (req, res) => {
-    if (getFeatureFlags(req.session).proxy !== true) {
-      return jsonError(res, 403, 'Proxy feature is not enabled');
-    }
-
     // LIN-836: same variant wiring as the issue-scoped twin above (stepper only
     // changes the response strings; standard stays byte-identical).
     const { mode, variant, stepper, baseUrl } = autopilotParams(req);

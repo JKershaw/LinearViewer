@@ -38,7 +38,7 @@ test.describe('Workspace Halt (LIN-2994 Surface 4 / LIN-3026)', () => {
     DISPATCH_URL = `/workspace/${WS}/dispatch`;
     API_PREFIX = `/workspace/${WS}`;
 
-    await seedLocalWorkspace(page, null, { features: { dispatch: true }, urlKey: WS });
+    await seedLocalWorkspace(page, null, { runnerKey: true, urlKey: WS });
     // LIN-3137 J5: the mint is owner-only — seed the owner edge explicitly.
     await seedWorkspaceOwnership(page, WS);
 

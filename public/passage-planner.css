@@ -34,11 +34,6 @@
   font-size: 0.9em;
 }
 
-.passage-planner-degraded {
-  color: var(--muted);
-  margin: 0 0 0.75rem;
-}
-
 .passage-planner-prompt {
   max-height: 60vh;
   overflow: auto;

@@ -19,7 +19,7 @@
 import { Router } from 'express';
 import { renderPassagePlannerPage } from '../lib/render-passage-planner.js';
 import { renderErrorPage } from '../lib/render.js';
-import { getFeatureFlags } from '../lib/feature-defaults.js';
+import { requestFeatureFlags } from '../lib/run-controls.js';
 import { buildPassagePlannerKickoff } from '../lib/prompts/passage-planner-kickoff.js';
 
 /**
@@ -32,9 +32,9 @@ import { buildPassagePlannerKickoff } from '../lib/prompts/passage-planner-kicko
 export function createPassagePlannerRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo }) {
   const router = Router();
 
-  router.get('/workspace/:urlKey/passage-planner', workspaceFromUrl, (req, res) => {
+  router.get('/workspace/:urlKey/passage-planner', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
-    const featureFlags = getFeatureFlags(req.session);
+    const featureFlags = await requestFeatureFlags(req);
 
     // Gate: experimental feature must be enabled (mirrors collective/task-chat/next-run/flight-companion).
     if (featureFlags.passagePlanner !== true) {

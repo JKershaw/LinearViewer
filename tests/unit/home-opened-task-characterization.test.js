@@ -9,7 +9,7 @@
  *                                          component test in prompt-section-p0
  *   - AI-off drops the AI primary        → `__HOME_PROMPT_OPTS__.aiState` + the
  *                                          component test (disabled primary)
- *   - proxy-off drops "run the whole task" → `__HOME_PROMPT_OPTS__.proxyEnabled`
+ *   - run controls → `__HOME_PROMPT_OPTS__.dispatchEnabled` / `.runSetup` (LIN-3849)
  *   - promptButtons-off hides templates  → removed in LIN-3848 (templates always show)
  * No assertion was deleted or loosened; each moved. The client-side half of the
  * F9 conditions is covered by `tests/unit/prompt-section-p0.test.js`.
@@ -79,9 +79,18 @@ describe('Home opened-task page options: feature-flag truth conditions (F9)', ()
     assert.equal(opts.hasAI, false);
   });
 
-  test('proxy off drops the run-whole-task rung (K6)', () => {
-    assert.equal(homeOpts({ featureFlags: { proxy: false } }).proxyEnabled, false);
-    assert.equal(homeOpts({ featureFlags: { proxy: false } }).hasAutopilot, false);
+  test('run controls follow the derived bits, not stored switches (K6, LIN-3849)', () => {
+    // A stale stored dispatch/proxy value is ignored: only runControls / runSetup count.
+    const stale = homeOpts({ featureFlags: { dispatch: true, proxy: false } });
+    assert.equal(stale.dispatchEnabled, false);
+    assert.equal(stale.runSetup, false);
+    assert.ok(!('proxyEnabled' in stale) && !('hasAutopilot' in stale), 'the proxy opts keys are gone');
+    const owner = homeOpts({ featureFlags: { runControls: true } });
+    assert.equal(owner.dispatchEnabled, true);
+    assert.equal(owner.runSetup, false);
+    const keyless = homeOpts({ featureFlags: { runSetup: true } });
+    assert.equal(keyless.dispatchEnabled, false);
+    assert.equal(keyless.runSetup, true);
   });
 
   test('a stale promptButtons=false is ignored: the templates are always shown (K7, LIN-3848)', () => {

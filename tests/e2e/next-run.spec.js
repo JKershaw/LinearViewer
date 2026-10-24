@@ -32,7 +32,7 @@ test.describe('Suggested Next Run Page (experimental)', () => {
     });
 
     test('loads when the flag is on', async ({ page }) => {
-      await page.goto(`/test/set-session?${featuresParam({ nextRun: true, proxy: false })}&urlKey=${URL_KEY}`);
+      await page.goto(`/test/set-session?${featuresParam({ nextRun: true })}&urlKey=${URL_KEY}`);
       await page.goto(PAGE_URL);
       await page.waitForLoadState('networkidle');
       // Title routes through the shared renderPageHeader primitive (LIN-975).
@@ -56,7 +56,7 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       await page.waitForLoadState('networkidle');
       await expect(page.locator('.settings-action:has-text("open the next-run suggester")')).toHaveCount(0);
 
-      await page.goto(`/test/set-session?${featuresParam({ nextRun: true, proxy: false })}&urlKey=${URL_KEY}`);
+      await page.goto(`/test/set-session?${featuresParam({ nextRun: true })}&urlKey=${URL_KEY}`);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
       await expect(page.locator('.settings-action:has-text("open the next-run suggester")')).toBeVisible();
@@ -65,7 +65,7 @@ test.describe('Suggested Next Run Page (experimental)', () => {
 
   test.describe('Page Structure', () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto(`/test/set-session?${featuresParam({ nextRun: true, proxy: false })}&urlKey=${URL_KEY}`);
+      await page.goto(`/test/set-session?${featuresParam({ nextRun: true })}&urlKey=${URL_KEY}`);
       await page.goto(PAGE_URL);
       await page.waitForLoadState('networkidle');
     });
@@ -100,9 +100,7 @@ test.describe('Suggested Next Run Page (experimental)', () => {
 
   test.describe('Generation', () => {
     test.beforeEach(async ({ page }) => {
-      // proxy explicitly off: the goal-prefilled dispatch LINK is only rendered
-      // in the proxy-off fallback (proxy now defaults on, LIN-2944 P3).
-      await page.goto(`/test/set-session?${featuresParam({ nextRun: true, proxy: false })}&urlKey=${URL_KEY}`);
+      await page.goto(`/test/set-session?${featuresParam({ nextRun: true })}&urlKey=${URL_KEY}`);
       await page.goto(PAGE_URL);
       await page.waitForLoadState('networkidle');
     });
@@ -123,34 +121,31 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       await expect(page.locator('.next-run-open-tag')).toContainText('continue until stopped');
     });
 
-    test('expanding a card reveals its reasoning and a goal-prefilled dispatch link', async ({ page }) => {
+    test('expanding a card reveals its reasoning and a Dispatch disclosure', async ({ page }) => {
       await page.locator('#next-run-generate').click();
       const card = page.locator('.next-run-option:not(.next-run-option-open)').first();
       await expect(card).toBeVisible({ timeout: 5000 });
 
       // Body (reasoning + actions) is collapsed until the head is clicked.
       const reasoning = card.locator('.next-run-reasoning');
-      const accept = card.locator('.next-run-accept');
-      await expect(accept).toBeHidden();
+      const toggle = card.locator('.next-run-dispatch-toggle');
+      await expect(toggle).toBeHidden();
 
       await card.locator('.next-run-option-head').click();
       await expect(card).toHaveClass(/is-open/);
       await expect(reasoning).toBeVisible();
-      await expect(accept).toBeVisible();
-      const href = await accept.getAttribute('href');
-      expect(href).toContain('/dispatch?goal=');
+      // LIN-3849: the navigate-to-/dispatch?goal= link went with the proxy switch;
+      // the inline disclosure is the only way to send.
+      await expect(toggle).toBeVisible();
+      await expect(card.locator('.next-run-accept')).toHaveCount(0);
     });
 
-    test('the continue-until-stopped option links to dispatch with no goal', async ({ page }) => {
+    test('the continue-until-stopped option offers the Dispatch disclosure too', async ({ page }) => {
       await page.locator('#next-run-generate').click();
       const card = page.locator('.next-run-option-open');
       await expect(card).toBeVisible({ timeout: 5000 });
       await card.locator('.next-run-option-head').click();
-      const accept = card.locator('.next-run-accept');
-      await expect(accept).toBeVisible();
-      const href = await accept.getAttribute('href');
-      expect(href).toContain('/dispatch');
-      expect(href).not.toContain('goal=');
+      await expect(card.locator('.next-run-dispatch-toggle')).toBeVisible();
     });
 
     // LIN-1566: goals are now grouped under directions and only the selected
@@ -339,7 +334,7 @@ test.describe('Suggested Next Run Page (experimental)', () => {
   // resolver's trailing catch-all is exercised for real.
   test.describe('Direction chooser', () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto(`/test/set-session?${featuresParam({ nextRun: true, proxy: false })}&urlKey=${URL_KEY}`);
+      await page.goto(`/test/set-session?${featuresParam({ nextRun: true })}&urlKey=${URL_KEY}`);
       await page.goto(PAGE_URL);
       await page.waitForLoadState('networkidle');
     });
@@ -493,12 +488,12 @@ test.describe('Suggested Next Run Page (experimental)', () => {
     });
   });
 
-  // LIN-640: when the proxy feature is on, cards offer inline `Dispatch ▾` options
-  // (parity with projects/swipe) that build the autopilot kickoff and dispatch in
-  // place; when proxy is off, the navigate-to-/dispatch?goal= fallback is kept.
-  test.describe('Inline dispatch options (proxy on)', () => {
+  // LIN-640: cards offer inline `Dispatch ▾` options (parity with projects/swipe)
+  // that build the autopilot kickoff and dispatch in place. LIN-3849: that is the
+  // only path now; the navigate-to-/dispatch?goal= fallback went with the proxy switch.
+  test.describe('Inline dispatch options', () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto(`/test/set-session?${featuresParam({ nextRun: true, proxy: true })}&urlKey=${URL_KEY}`);
+      await page.goto(`/test/set-session?${featuresParam({ nextRun: true })}&urlKey=${URL_KEY}`);
       await page.goto(PAGE_URL);
       await page.waitForLoadState('networkidle');
       await page.locator('#next-run-generate').click();
@@ -509,7 +504,7 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       await expect(card).toBeVisible({ timeout: 5000 });
       await card.locator('.next-run-option-head').click();
 
-      // The proxy-off navigate link is replaced by the inline disclosure.
+      // No navigate link: the inline disclosure is the only way to send.
       await expect(card.locator('.next-run-accept')).toHaveCount(0);
       const toggle = card.locator('.next-run-dispatch-toggle');
       await expect(toggle).toBeVisible();
@@ -796,29 +791,13 @@ test.describe('Suggested Next Run Page (experimental)', () => {
     });
   });
 
-  test.describe('Dispatch fallback (proxy off)', () => {
-    test('keeps the navigate-to-dispatch link and renders no inline disclosure', async ({ page }) => {
-      await page.goto(`/test/set-session?${featuresParam({ nextRun: true, proxy: false })}&urlKey=${URL_KEY}`);
-      await page.goto(PAGE_URL);
-      await page.waitForLoadState('networkidle');
-      await page.locator('#next-run-generate').click();
-
-      const card = page.locator('.next-run-option:not(.next-run-option-open)').first();
-      await expect(card).toBeVisible({ timeout: 5000 });
-      await card.locator('.next-run-option-head').click();
-
-      await expect(card.locator('.next-run-dispatch-toggle')).toHaveCount(0);
-      const accept = card.locator('.next-run-accept');
-      await expect(accept).toBeVisible();
-      expect(await accept.getAttribute('href')).toContain('/dispatch?goal=');
-    });
-
+  test.describe('Dispatched goal', () => {
     // LIN-1002: the dispatched goal must carry the referenced task id + title,
     // not the prose paragraph alone, so the autopilot gets an unambiguous task
     // reference. The first concrete mock option references TEST-1 ("Parent task
     // in progress").
     test('the dispatched goal embeds the referenced task id and title', async ({ page }) => {
-      await page.goto(`/test/set-session?${featuresParam({ nextRun: true, proxy: false })}&urlKey=${URL_KEY}`);
+      await page.goto(`/test/set-session?${featuresParam({ nextRun: true })}&urlKey=${URL_KEY}`);
       await page.goto(PAGE_URL);
       await page.waitForLoadState('networkidle');
       await page.locator('#next-run-generate').click();
@@ -827,8 +806,12 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       await expect(card).toBeVisible({ timeout: 5000 });
       await card.locator('.next-run-option-head').click();
 
-      const href = await card.locator('.next-run-accept').getAttribute('href');
-      const goal = decodeURIComponent(href.split('goal=')[1] || '');
+      // The goal travels on the kickoff GET (the inline path builds the kickoff first).
+      const kickoffReq = page.waitForRequest(req =>
+        req.url().includes('/api/autopilot-prompt') && req.method() === 'GET');
+      await card.locator('.next-run-dispatch-toggle').click();
+      await card.locator('.next-run-dispatch[data-target="cli"]').click();
+      const goal = new URL((await kickoffReq).url()).searchParams.get('goal') || '';
       // The prose is preserved AND the referenced task is folded in (id + title).
       expect(goal).toContain('Referenced tasks:');
       expect(goal).toContain('TEST-1');
@@ -844,7 +827,7 @@ test.describe('Suggested Next Run Page (experimental)', () => {
     });
 
     test('returns options including the open-ended one when the flag is on', async ({ page }) => {
-      await page.goto(`/test/set-session?${featuresParam({ nextRun: true, proxy: false })}&urlKey=${URL_KEY}`);
+      await page.goto(`/test/set-session?${featuresParam({ nextRun: true })}&urlKey=${URL_KEY}`);
       const res = await page.request.post(SUGGEST_API, { data: {} });
       expect(res.status()).toBe(200);
       const body = await res.json();
@@ -877,7 +860,7 @@ test.describe('Suggested Next Run Page (experimental)', () => {
     // the only response the e2e suite ever sees, so a mock missing `directions`
     // would let every grouped test pass against the flat fallback.
     test('returns a resolved directions grouping in parity with the live generator', async ({ page }) => {
-      await page.goto(`/test/set-session?${featuresParam({ nextRun: true, proxy: false })}&urlKey=${URL_KEY}`);
+      await page.goto(`/test/set-session?${featuresParam({ nextRun: true })}&urlKey=${URL_KEY}`);
       const res = await page.request.post(SUGGEST_API, { data: {} });
       const body = await res.json();
 

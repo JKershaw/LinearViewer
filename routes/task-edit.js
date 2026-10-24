@@ -27,7 +27,7 @@
 import { Router } from 'express';
 import { renderTaskEditPage } from '../lib/render-task-edit.js';
 import { renderErrorPage } from '../lib/render.js';
-import { getFeatureFlags } from '../lib/feature-defaults.js';
+import { requestFeatureFlags } from '../lib/run-controls.js';
 import { resolveIssueBinding, isValidIssueId } from '../lib/workspace.js';
 
 /**
@@ -82,7 +82,7 @@ export function createTaskEditRoutes({ workspaceFromUrl, getOpenRouterSource, ge
       urlKey: workspace.urlKey,
       openRouterSource: getOpenRouterSource(req),
       workspaces: req.session.workspaces,
-      featureFlags: getFeatureFlags(req.session)
+      featureFlags: await requestFeatureFlags(req)
     };
 
     if (!isValidIssueId(issueId)) {

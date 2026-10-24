@@ -84,11 +84,6 @@
     feedbackEl.className = 'next-run-feedback' + (isError ? ' error' : '');
   }
 
-  function dispatchUrl(goal) {
-    var base = '/workspace/' + encodeURIComponent(urlKey) + '/dispatch';
-    return goal ? base + '?goal=' + encodeURIComponent(goal) : base;
-  }
-
   // The referenced tasks carried on an option: prefer the enriched
   // `referencedTasks: [{id, title}]`, fall back to bare `referencedTaskIds`
   // (older responses) with no title text, else []. Shared by the card renderer
@@ -411,19 +406,10 @@
       // option has no goal (and no refs), so it stays an empty open-ended walk.
       var dispatchGoalText = isOpen ? '' : buildDispatchGoal(opt);
 
-      if (data.proxyEnabled) {
-        // Proxy on: offer inline dispatch options (parity with projects/swipe).
-        // The open option dispatches with no goal (an open-ended stack walk).
-        actions.appendChild(buildDispatchDisclosure(dispatchGoalText));
-      } else {
-        // Proxy off: the kickoff endpoint is unavailable, so keep handing the goal
-        // to the dispatch page via ?goal= (its proxy-off receiver, unchanged).
-        var acceptLink = document.createElement('a');
-        acceptLink.className = 'action-btn save next-run-accept';
-        acceptLink.href = dispatchUrl(dispatchGoalText);
-        acceptLink.textContent = isOpen ? 'start (no goal) →' : 'send to dispatch →';
-        actions.appendChild(acceptLink);
-      }
+      // Inline dispatch options (parity with projects/swipe). The open option
+      // dispatches with no goal (an open-ended stack walk). LIN-3849: no proxy
+      // switch to fall back on any more.
+      actions.appendChild(buildDispatchDisclosure(dispatchGoalText));
 
       if (!isOpen && opt.goal) {
         var copyBtn = document.createElement('button');

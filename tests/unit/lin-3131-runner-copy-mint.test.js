@@ -391,15 +391,4 @@ describe('LIN-3131 S2b.2 — the no-runner path is unchanged', () => {
     assert.equal(res.status, 201, JSON.stringify(res.body));
     assert.equal(res.body.kind, 'standard');
   });
-
-  test('the proxy feature gate still runs first (403 before any runner verdict)', async () => {
-    const { collection, proxyTokenStore } = harness();
-    const app = buildApp({ proxyTokenStore, session: session({ accountId: null, features: { proxy: false } }) });
-
-    const res = await call(app, { runner: true });
-
-    assert.equal(res.status, 403, JSON.stringify(res.body));
-    assert.match(res.body.error, /not enabled/i);
-    assert.equal(collection._docs().length, 0);
-  });
 });

@@ -115,11 +115,9 @@ const ROWS = [
   // --- Group A: user-facing (session-auth) token admin, workspace-prefixed ---
   // (LIN-679 Stage 2 / LIN-2534: moved to routes/proxy-tokens-admin.js)
   {
-    group: 'A', method: 'POST', url: '/workspace/acme/api/proxy/tokens', expect: 403,
-    note: 'feature flag off (routes/proxy-tokens-admin.js:51)',
-    // LIN-2944 P3: proxy now defaults on, so an explicit proxy:false is needed
-    // to reach this gate's off branch.
-    run: () => call(sessionWorkspaceApp({ features: { proxy: false } }), 'POST', '/workspace/acme/api/proxy/tokens', { body: {} }),
+    group: 'A', method: 'POST', url: '/workspace/acme/api/proxy/tokens', expect: 400,
+    note: 'F4 grants refusal (routes/proxy-tokens-admin.js); LIN-3849 removed the proxy-flag 403 that used to answer here',
+    run: () => call(sessionWorkspaceApp({}), 'POST', '/workspace/acme/api/proxy/tokens', { body: { grants: ['take'] } }),
   },
   {
     group: 'A', method: 'GET', url: '/workspace/acme/api/proxy/tokens', expect: 200,

@@ -52,7 +52,7 @@ async function seedTasks(page, { omit = [], reviewed = false } = {}) {
   const resp = await page.request.post('/test/set-local-session', {
     data: {
       urlKey: URL_KEY,
-      features: { dispatch: true },
+      runnerKey: true,
       projects: [{ id: id('tp-proj'), name: 'Task page project', content: 'A project', sortOrder: 1 }],
       issues: [
         issue('tp-gone', 'LOCAL-TP5', 'A task the tracker later loses', { name: 'In Progress', type: 'started' }),
@@ -421,7 +421,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
         // append:true gives this session's account a FRESH workspace id so its
         // first edge marks it the owner (LIN-1892) — required to mint a share.
         append: true,
-        features: { dispatch: true },
+        runnerKey: true,
         projects: [{ id: id('tp-proj'), name: 'Task page project', content: 'A project', sortOrder: 1 }],
         issues: [{
           id: TASK_UUID, identifier: 'LOCAL-TP1', title: 'A task with a running build',
@@ -516,7 +516,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
       data: {
         urlKey: URL_KEY,
         append: true,
-        features: { dispatch: true },
+        runnerKey: true,
         projects: [{ id: id('tp-proj'), name: 'Task page project', content: 'A project', sortOrder: 1 }],
         issues: [{
           id: TASK_UUID, identifier: 'LOCAL-TP1', title: 'A task with a moving head',
@@ -571,7 +571,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     const resp = await page.request.post('/test/set-local-session', {
       data: {
         urlKey: URL_KEY,
-        features: { dispatch: true },
+        runnerKey: true,
         projects: [{ id: id('tp-proj'), name: 'Task page project', content: 'A project', sortOrder: 1 }],
         issues: [{
           id: TASK_UUID, identifier: 'LOCAL-TP1', title: 'A finished task',
@@ -634,7 +634,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
       // append:true marks this session's account the owner on a fresh edge
       // (LIN-1892), so the share-box-backed pages render the owner controls.
       append: true,
-      features: { dispatch: true },
+      runnerKey: true,
       projects: [{ id: id('tp-proj'), name: 'Task page project', content: 'A project', sortOrder: 1 }],
       issues: [{
         id: TASK_UUID, identifier: 'LOCAL-TP1', title: 'A reopened task',

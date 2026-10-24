@@ -130,7 +130,7 @@ describe('LIN-2944 P3 — data-proxy-active is emitted from the render bodyAttrs
     const on = renderPage([], [], [], 'Org', { urlKey: 'ws', workspaces: [WORKSPACE], featureFlags: { proxy: true }, proxyDefault: true });
     assert.match(bodyTag(on), /data-proxy-active="true"/);
 
-    const off = renderPage([], [], [], 'Org', { urlKey: 'ws', workspaces: [WORKSPACE], featureFlags: { proxy: true }, proxyDefault: false });
+    const off = renderPage([], [], [], 'Org', { urlKey: 'ws', workspaces: [WORKSPACE], featureFlags: {}, proxyDefault: false });
     assert.match(bodyTag(off), /data-proxy-active="false"/);
   });
 
@@ -139,12 +139,12 @@ describe('LIN-2944 P3 — data-proxy-active is emitted from the render bodyAttrs
     assert.match(bodyTag(unset), /data-proxy-active="true"/);
     const on = renderSwipePage(EMPTY_TREES, { urlKey: 'ws', workspaces: [WORKSPACE], featureFlags: { proxy: true }, proxyDefault: true });
     assert.match(bodyTag(on), /data-proxy-active="true"/);
-    const off = renderSwipePage(EMPTY_TREES, { urlKey: 'ws', workspaces: [WORKSPACE], featureFlags: { proxy: true }, proxyDefault: false });
+    const off = renderSwipePage(EMPTY_TREES, { urlKey: 'ws', workspaces: [WORKSPACE], featureFlags: {}, proxyDefault: false });
     assert.match(bodyTag(off), /data-proxy-active="false"/);
   });
 
   test('Dispatch and Flight Companion also carry the attribute', () => {
-    const dispatch = renderDispatchPage('WS', { urlKey: 'ws', featureFlags: { proxy: true }, proxyDefault: false });
+    const dispatch = renderDispatchPage('WS', { urlKey: 'ws', featureFlags: {}, proxyDefault: false });
     assert.match(bodyTag(dispatch), /data-proxy-active="false"/);
     const fc = renderFlightCompanionPage({}, { urlKey: 'ws', featureFlags: { proxy: true }, proxyDefault: true });
     assert.match(bodyTag(fc), /data-proxy-active="true"/);

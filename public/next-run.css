@@ -197,13 +197,6 @@
   font-size: var(--font-size-sm);
 }
 
-.next-run-budget-hint {
-  margin: var(--space-1) 0 0;
-  color: var(--fg-dim);
-  font-size: var(--font-size-sm);
-  line-height: 1.4;
-}
-
 .next-run-options {
   list-style: none;
   margin: 0;

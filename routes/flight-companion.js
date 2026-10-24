@@ -78,6 +78,7 @@ import { Router } from 'express';
 import { renderFlightCompanionPage } from '../lib/render-flight-companion.js';
 import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
+import { requestFeatureFlags } from '../lib/run-controls.js';
 import { buildFlightCompanionKickoff } from '../lib/prompts/flight-companion-kickoff.js';
 import { PASS_INSTANCE_PREFIX } from '../lib/observer-pass.js';
 import { DEFAULT_SWEEP_LIVENESS_HORIZON_MS } from '../lib/flight-companion-gate.js';
@@ -392,7 +393,7 @@ export function createFlightCompanionRoutes({
 
   router.get('/workspace/:urlKey/flight-companion', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
-    const featureFlags = getFeatureFlags(req.session);
+    const featureFlags = await requestFeatureFlags(req);
 
     // Gate: experimental feature must be enabled (mirrors collective/task-chat/next-run).
     if (featureFlags.flightCompanion !== true) {

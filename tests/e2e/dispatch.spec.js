@@ -68,7 +68,7 @@ test.describe('Dispatch Queue', () => {
     await page.goto(`/test/clear-dispatch-history?urlKey=${URL_KEY}`);
 
     // Set up test session with dispatch feature enabled
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}&urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?runnerKey=1&urlKey=${URL_KEY}`);
     // LIN-3383/LIN-3398: enqueue, delete and trim are owner-only; state it rather
     // than rely on the shared account having been the first binder.
     await seedWorkspaceOwnership(page, URL_KEY);
@@ -1288,7 +1288,7 @@ test.describe('Custom Prompt Dispatch', () => {
 
     // Set up test session with dispatch feature enabled (proxy explicitly off so
     // the custom prompt dispatches bare — LIN-2944 P3 made proxy default on).
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true, proxy: false }))}&urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?runnerKey=1&proxyDefault=false&urlKey=${URL_KEY}`);
   });
 
   /**
@@ -1409,7 +1409,7 @@ test.describe('Custom Prompt Dispatch', () => {
 
     // Should show "prompt is empty" feedback
     const feedback = page.locator('.dispatch-prompt-feedback');
-    await expect(feedback).toHaveText('prompt is empty');
+    await expect(feedback).toHaveText('enter a prompt or a goal');
 
     // Feedback should clear after delay
     await expect(feedback).toHaveText('', { timeout: 3000 });
@@ -2058,7 +2058,7 @@ test.describe('Dispatch History UI', () => {
     await page.goto(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
     await page.goto(`/test/clear-dispatch-tokens?urlKey=${URL_KEY}`);
     await page.goto(`/test/clear-dispatch-history?urlKey=${URL_KEY}`);
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}&urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?runnerKey=1&urlKey=${URL_KEY}`);
   });
 
   test('history section shows on dispatch page with dispatch enabled', async ({ page }) => {
@@ -2073,13 +2073,13 @@ test.describe('Dispatch History UI', () => {
     await expect(empty).toContainText('No dispatch history yet');
   });
 
-  test('dispatch page redirects to settings when dispatch disabled', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: false }))}&urlKey=${URL_KEY}`);
+  test('dispatch page is read-only without run controls: no redirect, no send menu (LIN-3849)', async ({ page }) => {
+    await page.goto(`/test/set-session?runnerKey=0&urlKey=${URL_KEY}`);
     await page.goto(`/workspace/${URL_KEY}/dispatch`);
     await page.waitForLoadState('networkidle');
 
-    // Should redirect to settings page
-    expect(page.url()).toContain('/settings');
+    expect(page.url()).toContain('/dispatch');
+    await expect(page.locator('.dispatch-toggle')).toHaveCount(0);
   });
 
   test('taken item shows with correct status indicator', async ({ page, request }) => {
@@ -2087,7 +2087,7 @@ test.describe('Dispatch History UI', () => {
     const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${URL_KEY}`);
     const { token } = await tokenResponse.json();
 
-    await request.get(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}&urlKey=${URL_KEY}`);
+    await request.get(`/test/set-session?runnerKey=1&keepQueueTokens=1&urlKey=${URL_KEY}`);
 
     const createResponse = await request.post(`${API_PREFIX}/api/dispatch`, {
       data: { prompt: 'Taken prompt', promptName: 'Taken Test', issueIdentifier: 'LIN-99' }
@@ -2110,7 +2110,7 @@ test.describe('Dispatch History UI', () => {
   });
 
   test('cancelled item shows with correct status indicator', async ({ page, request }) => {
-    await request.get(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}&urlKey=${URL_KEY}`);
+    await request.get(`/test/set-session?runnerKey=1&keepQueueTokens=1&urlKey=${URL_KEY}`);
 
     const createResponse = await request.post(`${API_PREFIX}/api/dispatch`, {
       data: { prompt: 'Cancelled prompt', promptName: 'Cancel Test' }
@@ -2129,7 +2129,7 @@ test.describe('Dispatch History UI', () => {
   });
 
   test('history loads a page at a time and "show more" reaches every item', async ({ page, request }) => {
-    await request.get(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}&urlKey=${URL_KEY}`);
+    await request.get(`/test/set-session?runnerKey=1&keepQueueTokens=1&urlKey=${URL_KEY}`);
 
     // Create 25 history items
     for (let i = 1; i <= 25; i++) {

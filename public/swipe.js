@@ -21,9 +21,8 @@ const morePromptKeys = data.morePromptKeys || [];
 const customPrompts = data.customPrompts || [];
 const urlKey = data.urlKey || '';
 const hasAI = data.hasAI || false;
-const hasAutopilot = data.hasAutopilot || false;
 const dispatchEnabled = data.dispatchEnabled || false;
-const proxyEnabled = data.proxyEnabled || false;
+const runSetup = data.runSetup || false;
 const isLocalhost = data.isLocalhost || false;
 // LIN-2944: AI state drives the shared component's disabled primary-action
 // wording (F9 / addendum 5). LIN-3239: the
@@ -866,9 +865,8 @@ function handleAccordionClick(e) {
           hasAI,
           aiState,
           freeTier,
-          hasAutopilot,
           dispatchEnabled,
-          proxyEnabled,
+          runSetup,
           isLocalhost,
           customPrompts,
           defaultPromptKeys,

@@ -100,14 +100,13 @@ function loadPromptSection({ copyFails = false, recordFails = false, recordThrow
 const ISSUE = { id: 'uuid-42', identifier: 'LIN-42', title: 'A task' };
 
 function baseOpts(extra = {}) {
-  return {
+  // LIN-3849: `runSetup` (the owner's "set up ›" rung) defaults to the old not-dispatch-enabled state.
+  const o = {
     urlKey: 'ws',
     issue: ISSUE,
     surface: 'swipe',
     hasAI: true,
-    hasAutopilot: true,
     dispatchEnabled: true,
-    proxyEnabled: true,
     isLocalhost: false,
     customPrompts: [],
     defaultPromptKeys: ['implementation'],
@@ -115,6 +114,7 @@ function baseOpts(extra = {}) {
     promptMeta: { implementation: 'Implementation' },
     ...extra,
   };
+  return { runSetup: !o.dispatchEnabled, ...o };
 }
 
 const flush = () => new Promise((r) => setImmediate(r));
@@ -143,15 +143,13 @@ describe('LIN-2942 vocabulary drift pin', () => {
       for (const m of html.matchAll(/data-rung="([^"]+)"/g)) rungs.add(m[1]);
       for (const m of html.matchAll(/data-setup-needs="([^"]+)"/g)) needs.add(m[1]);
     };
-    for (const dispatchEnabled of [true, false]) {
-      for (const proxyEnabled of [true, false]) {
-        for (const hasAutopilot of [true, false]) {
-          const idle = await mount({ dispatchEnabled, proxyEnabled, hasAutopilot });
-          collect(idle.container.innerHTML);
-          const fresh = await withResult('implementation', { dispatchEnabled, proxyEnabled, hasAutopilot });
-          collect(fresh.container.innerHTML);
-        }
-      }
+    // LIN-3849: the states are run controls on, set-up rung (owner, no way to
+    // run), and neither (member).
+    for (const state of [{ dispatchEnabled: true, runSetup: false }, { dispatchEnabled: false, runSetup: true }, { dispatchEnabled: false, runSetup: false }]) {
+      const idle = await mount(state);
+      collect(idle.container.innerHTML);
+      const fresh = await withResult('implementation', state);
+      collect(fresh.container.innerHTML);
     }
     assert.deepEqual([...rungs].sort(), [...RUNGS].sort());
     assert.deepEqual([...needs].sort(), [...NEEDS].sort());
@@ -222,7 +220,7 @@ describe('LIN-2942 client hooks in PromptSection', () => {
     });
   }
 
-  for (const [rung, needs] of [['copy', 'prompt'], ['run-step', 'dispatch'], ['run-step', 'prompt'], ['run-task', 'proxy']]) {
+  for (const [rung, needs] of [['copy', 'prompt'], ['run-step', 'dispatch'], ['run-step', 'prompt'], ['run-task', 'dispatch']]) {
     test(`a set-up press on ${rung} records ready:false, needs:${needs} and dispatches nothing`, async () => {
       const m = await mount();
       await m.container.click({ action: 'setup', rung, setupNeeds: needs });
@@ -283,7 +281,7 @@ describe('LIN-2942 client hooks in PromptSection', () => {
 
   test('without a surface option the event carries surface null', async () => {
     const m = await mount({ surface: undefined });
-    await m.container.click({ action: 'setup', rung: 'run-task', setupNeeds: 'proxy' });
+    await m.container.click({ action: 'setup', rung: 'run-task', setupNeeds: 'dispatch' });
     await flush();
     assert.equal(m.calls.records[0].body.surface, null);
   });

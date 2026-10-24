@@ -21,6 +21,7 @@ import { Router } from 'express';
 import { renderCollectivePage } from '../lib/render-collective.js';
 import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
+import { requestFeatureFlags } from '../lib/run-controls.js';
 import { normalizeYapChannel, nickFromWorkspaceName, randomChannelName } from '../lib/yap-client.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { resolveRunnerOwnerRefusal } from '../lib/runner-owner-gate.js';
@@ -99,7 +100,7 @@ export function createCollectiveRoutes({
 
   router.get('/workspace/:urlKey/collective', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
-    const featureFlags = getFeatureFlags(req.session);
+    const featureFlags = await requestFeatureFlags(req);
 
     // Gate: experimental feature must be enabled (mirrors pipeline).
     if (featureFlags.collective !== true) {
@@ -520,7 +521,7 @@ export function createCollectiveRoutes({
   // token so the full shape — including the auto-appended Linear-access block —
   // is visible without minting a real token.
 
-  router.post('/workspace/:urlKey/collective/preview', workspaceFromUrl, (req, res) => {
+  router.post('/workspace/:urlKey/collective/preview', workspaceFromUrl, async (req, res) => {
     const featureFlags = getFeatureFlags(req.session);
     if (featureFlags.collective !== true) {
       return jsonError(res, 403, 'Collective feature is not enabled');

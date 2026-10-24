@@ -26,7 +26,8 @@ import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 
 let URL_KEY;
 const BLOCKED_ISSUE_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
-const FEATS = encodeURIComponent(JSON.stringify({ proxy: true, dispatch: true }));
+// LIN-3849: no feature switches left to set; the runner key gives the owner run controls.
+const FEATS = `${encodeURIComponent(JSON.stringify({}))}&runnerKey=1`;
 const PROXY_MARKER = '## Workspace API access';
 const INSTRUCTIONS_MARKER = '/api/proxy/instructions';
 

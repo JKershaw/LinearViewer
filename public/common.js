@@ -1932,10 +1932,9 @@ window.fetchAutopilotKickoff = async function fetchAutopilotKickoff({ urlKey, is
  *    <body> + CSS, NOT a per-button class — so buttons injected after load
  *    (lazy issue-detail blocks, swipe re-renders) inherit it automatically and
  *    can't "miss the restore" (LIN-525 #1).
- *  - The proxy feature flag is per-user/per-workspace and known only to the
- *    server; the page shell emits it as `data-proxy-feature` on <body>. When it
- *    is absent/off the toggle is inert — no block appended, no token minted —
- *    even if the account's proxy default is on (LIN-525 #2).
+ *  - LIN-3849: the per-user proxy feature flag (LIN-525 #2, a body attribute)
+ *    is gone. Key tools are always on; only the account's +proxy default above
+ *    decides whether the toggle path appends.
  *  - Bootstrap tokens are single-use (LIN-376): each is spent by the agent's
  *    one exchange at `POST /api/proxy/token`. They are therefore minted FRESH on
  *    every append and never cached — caching one and serving it to a later
@@ -1953,11 +1952,6 @@ window.ProxyToggle = (function () {
   // the server has not stamped yet reads as off until the next page render.
   function isActive() {
     return !!(document.body && document.body.dataset.proxyActive === 'true');
-  }
-
-  // The server-emitted proxy feature flag for the current workspace/user.
-  function isFeatureEnabled() {
-    return document.body && document.body.dataset.proxyFeature === 'true';
   }
 
   // LIN-2944 P3 R1: when the toggle-path mint is refused with 429, the append
@@ -2231,15 +2225,12 @@ window.ProxyToggle = (function () {
    * @param {string} urlKey
    * @param {{ force?: boolean }} [opts]
    * @returns {Promise<string>}
-   * @throws {Error} when (active+enabled OR forced) but no block can be produced
+   * @throws {Error} when (active OR forced) but no block can be produced
    */
   async function maybeAppend(text, urlKey, opts) {
     rateLimitSkip = false;
     const force = !!(opts && opts.force);
-    if (!force) {
-      if (!isActive()) return text;
-      if (!isFeatureEnabled()) return text;
-    }
+    if (!force && !isActive()) return text;
     if (!urlKey) throw new Error('Proxy is enabled but no workspace context was found for this prompt.');
     const { token, providerDisplayName, grants, error, rateLimited } = await getOrCreateToken(urlKey, force ? { purpose: 'driver' } : undefined);
     if (force && error) throw new Error(error.message);
@@ -2263,7 +2254,7 @@ window.ProxyToggle = (function () {
 
   /**
    * Decide whether a prompt SHOULD carry proxy context, WITHOUT minting a token or
-   * appending anything (LIN-1162). Same gate as `maybeAppend` — active + feature-on,
+   * appending anything (LIN-1162). Same gate as `maybeAppend` — active,
    * or `force` — but it returns only the boolean intent. The dispatch choke point
    * uses this to set `attachProxy` on the payload and let the SERVER mint + append
    * (harness-aware, so claude-code takes the MCP `bootstrapToken` field path). The
@@ -2275,7 +2266,7 @@ window.ProxyToggle = (function () {
    */
   function shouldAppend(urlKey, opts) {
     if (opts && opts.force) return true;
-    return isActive() && isFeatureEnabled();
+    return isActive();
   }
 
   // LIN-3401: the +proxy toggle answers only the button Harbour created. There is
@@ -2317,7 +2308,7 @@ window.ProxyToggle = (function () {
     });
   }
 
-  return { isActive, isFeatureEnabled, getOrCreateToken, getRunnerBootstrap, RUNNER_BOOTSTRAP_ERROR_COPY, DRIVER_COPY_ERROR_COPY, buildBlock, maybeAppend, shouldAppend, init, bind, setActive, takeRateLimitNotice, RATE_LIMIT_SKIP_NOTICE };
+  return { isActive, getOrCreateToken, getRunnerBootstrap, RUNNER_BOOTSTRAP_ERROR_COPY, DRIVER_COPY_ERROR_COPY, buildBlock, maybeAppend, shouldAppend, init, bind, setActive, takeRateLimitNotice, RATE_LIMIT_SKIP_NOTICE };
 })();
 
 // Back-compat global consumed by app.js / dispatch.js call sites

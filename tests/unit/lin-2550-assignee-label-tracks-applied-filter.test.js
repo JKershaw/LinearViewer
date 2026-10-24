@@ -103,6 +103,8 @@ function baseContext(calls, appliedAssigneeName, assigneeState) {
       return '<html/>';
     },
     getFeatureFlags: () => ({}),
+    requestFeatureFlags: async () => ({}),
+    resolveRunControls: async () => ({ runControls: false, runSetup: false }),
     isAuthError: () => false,
     handleUnauthorizedError: async () => {},
     renderUpstreamAwareErrorPage: () => '<error/>',

@@ -9,7 +9,8 @@ import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 // refused before any token is written.
 
 let URL_KEY;
-const FEATS = encodeURIComponent(JSON.stringify({ proxy: true, dispatch: true }));
+// LIN-3849: no feature switches left to set; the runner key gives the owner run controls.
+const FEATS = `${encodeURIComponent(JSON.stringify({}))}&runnerKey=1`;
 
 test.beforeEach(({ workerUrlKey }) => {
   URL_KEY = workerUrlKey;

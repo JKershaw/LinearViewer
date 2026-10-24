@@ -22,6 +22,7 @@ import { renderNextRunPage } from '../lib/render-next-run.js';
 import { renderErrorPage } from '../lib/render.js';
 import { jsonError, serviceUnavailable, unauthorized } from '../lib/errors.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
+import { requestFeatureFlags } from '../lib/run-controls.js';
 import { generateGoalSuggestions, CONTINUE_UNTIL_STOPPED_OPTION, formatNextRunContext, buildNextRunSummary, ensureSizeCoverage, attachReferencedTaskTitles, resolveDirections } from '../lib/next-run.js';
 import { buildRoadmapModel } from '../lib/roadmap.js';
 import { resolveChatCredential, checkFreeTierGate, freeTierRefusalBlock } from '../lib/chat-request.js';
@@ -125,9 +126,9 @@ export function createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspace
 
   // ─── HTML page ──────────────────────────────────────────────────────────────
 
-  router.get('/workspace/:urlKey/next-run', workspaceFromUrl, (req, res) => {
+  router.get('/workspace/:urlKey/next-run', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
-    const featureFlags = getFeatureFlags(req.session);
+    const featureFlags = await requestFeatureFlags(req);
 
     // Gate: experimental feature must be enabled (mirrors collective/task-chat).
     if (featureFlags.nextRun !== true) {

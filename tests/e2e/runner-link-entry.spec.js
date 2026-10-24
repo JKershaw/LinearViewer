@@ -7,8 +7,8 @@ import { seedLocalWorkspace, workspaceApiLocalSeed } from '../fixtures/local-har
  * John: "I don't want to be faffing with links. Either it's a feature or it's
  * not." A signed-in owner who opens a task — in the tree view or on Swipe —
  * sees the link IN THE VIEWPORT of a 390×844 phone without expanding any
- * section, whatever the proxy/dispatch flags say (/runner explains what to
- * turn on), and tapping it reaches /runner. One desktop check too.
+ * section, whether or not the workspace has a runner key yet (/runner is where
+ * the first one is made), and tapping it reaches /runner. One desktop check too.
  *
  * Phone screenshots land in test-results/runner-link-entry/ (not committed).
  */
@@ -18,14 +18,15 @@ const SHOTS = 'test-results/runner-link-entry';
 // "Blocked on external API", the in-progress task of workspaceApiLocalSeed.
 const TASK_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 
+// LIN-3849: the link is shown whether or not the workspace has a way to run yet.
 const FLAG_STATES = [
-  { name: 'flags-off', features: { proxy: false, dispatch: false } },
-  { name: 'flags-on', features: { proxy: true, dispatch: true } },
+  { name: 'no-key', runnerKey: false },
+  { name: 'key', runnerKey: true },
 ];
 
-async function seedOwner(page, key, features) {
+async function seedOwner(page, key, runnerKey) {
   // append: true makes the session's account the workspace OWNER (LIN-1892).
-  const seeded = await seedLocalWorkspace(page, workspaceApiLocalSeed, { urlKey: key, append: true, features });
+  const seeded = await seedLocalWorkspace(page, workspaceApiLocalSeed, { urlKey: key, append: true, runnerKey });
   return seeded.urlKey;
 }
 
@@ -38,9 +39,9 @@ async function openTreeTask(page, urlKey) {
 }
 
 test.describe('run on my machine › wherever a task opens (LIN-3098 S4b, phone)', () => {
-  for (const { name, features } of FLAG_STATES) {
+  for (const { name, runnerKey } of FLAG_STATES) {
     test(`tree view (${name}): visible in the viewport as the task opens, and reaches /runner`, async ({ page }) => {
-      const urlKey = await seedOwner(page, `runner-entry-tree-${name}`, features);
+      const urlKey = await seedOwner(page, `runner-entry-tree-${name}`, runnerKey);
       const details = await openTreeTask(page, urlKey);
       const link = details.getByTestId('opened-task-runner-link');
       await expect(link).toBeVisible();
@@ -57,7 +58,7 @@ test.describe('run on my machine › wherever a task opens (LIN-3098 S4b, phone)
     });
 
     test(`Swipe (${name}): visible in the viewport on the card, and reaches /runner`, async ({ page }) => {
-      const urlKey = await seedOwner(page, `runner-entry-swipe-${name}`, features);
+      const urlKey = await seedOwner(page, `runner-entry-swipe-${name}`, runnerKey);
       await page.goto(`/workspace/${urlKey}/swipe`);
       const card = page.locator('#swipe-card');
       const link = card.getByTestId('opened-task-runner-link');
@@ -75,7 +76,7 @@ test.describe('run on my machine › wherever a task opens (LIN-3098 S4b, phone)
   }
 
   test('opening Prompts on Swipe does not add a second link', async ({ page }) => {
-    const urlKey = await seedOwner(page, 'runner-entry-swipe-once', { proxy: true, dispatch: true });
+    const urlKey = await seedOwner(page, 'runner-entry-swipe-once', true);
     await page.goto(`/workspace/${urlKey}/swipe`);
     await page.locator('.swipe-accordion-header[data-accordion="prompts"]').first().tap();
     await expect(page.locator('.prompt-section').first()).toBeVisible();
@@ -86,8 +87,8 @@ test.describe('run on my machine › wherever a task opens (LIN-3098 S4b, phone)
 test.describe('run on my machine › on desktop (LIN-3098 S4b)', () => {
   test.use({ viewport: { width: 1280, height: 800 }, hasTouch: false, isMobile: false });
 
-  test('tree view and Swipe, flags off', async ({ page }) => {
-    const urlKey = await seedOwner(page, 'runner-entry-desktop', { proxy: false, dispatch: false });
+  test('tree view and Swipe, no runner key', async ({ page }) => {
+    const urlKey = await seedOwner(page, 'runner-entry-desktop', false);
     await page.goto(`/workspace/${urlKey}/`);
     await page.locator(`.in-progress-items [data-testid="issue-line"][data-id="${TASK_ID}"]`).click();
     const treeLink = page.locator(`.in-progress-items .details[data-details-for="${TASK_ID}"]`).getByTestId('opened-task-runner-link');

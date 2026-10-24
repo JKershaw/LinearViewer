@@ -61,6 +61,7 @@ import { CredentialLifecycleEventStore, CREDENTIAL_LIFECYCLE_EVENT_KINDS } from 
 import { WorkspaceStore } from './lib/workspace-store.js'
 import { AccountWorkspaceStore } from './lib/account-workspace-store.js'
 import { createWorkspaceOwnerCheck } from './lib/workspace-owner.js'
+import { createRunControlsResolver, setRunControlsResolver, requestFeatureFlags, resolveRunControls } from './lib/run-controls.js'
 import { OwnerCredentialStore } from './lib/owner-credential-store.js'
 import { ConnectionStore } from './lib/connection-store.js'
 import { sanitizeSessionForPersist, createHydrationMiddleware, createConnectionRefresher, createConnectionAccess, createSweepConnectionDataLoader, rehydrateAfterRefresh, rehydrateBindingAfterRefresh, createAuthorizedAccountConnectionReader, createInstallationTokenResolver, createReferentHolderReader, heldConnectionCredentials, connectionBackedWritesEnabled, convertToConnectionBacked, CONNECTION_RETRY_TITLE, CONNECTION_RETRY_MESSAGE } from './lib/connection-credential.js'
@@ -670,6 +671,8 @@ const accountWorkspaceStore = new AccountWorkspaceStore({ collection: accountWor
 // into a named const so the legacy dispatch-token mint consumes the SAME seam.
 const workspaceOwnerCheck = createWorkspaceOwnerCheck({ accountWorkspaceStore, accountStore })
 proxyTokenStore.setOwnerCheck(workspaceOwnerCheck)
+// LIN-3849: run controls are derived (owner AND a live runner key / queue token), not a per-user switch.
+setRunControlsResolver(createRunControlsResolver({ ownerCheck: workspaceOwnerCheck, proxyTokenStore, dispatchTokenStore }))
 // LIN-3421: what removing a workspace revokes for the removing account.
 const workspaceRemovalRevoker = createWorkspaceRemovalRevoker({
   proxyTokenStore,
@@ -1949,7 +1952,8 @@ async function renderDashboardAfterRefresh(workspace, session, teamId, assigneeS
     openRouterSource,
     deployInfo,
     urlKey: workspace.urlKey,
-    featureFlags: getFeatureFlags(session),
+    // LIN-3849: no `req` on this post-401 path, so call the resolver directly.
+    featureFlags: { ...getFeatureFlags(session), ...(await resolveRunControls({ workspace, accountId: session.accountId })) },
     customPrompts,
     showSource,
     truncated,
@@ -3415,7 +3419,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       openRouterSource,
       deployInfo,
       urlKey: workspace.urlKey,
-      featureFlags: getFeatureFlags(req.session),
+      featureFlags: await requestFeatureFlags(req),
       customPrompts,
       isLocalhost,
       showSource,
@@ -3492,7 +3496,7 @@ app.get('/workspace/:urlKey/swipe/:identifier?', workspaceFromUrl, async (req, r
         openRouterSource,
         workspaces: req.session.workspaces,
         workspace,
-        featureFlags: getFeatureFlags(req.session),
+        featureFlags: await requestFeatureFlags(req),
         customPrompts,
         initialIdentifier: req.params.identifier || null,
         isLocalhost,
@@ -3547,7 +3551,7 @@ app.get('/workspace/:urlKey/swim', workspaceFromUrl, async (req, res) => {
         openRouterSource,
         workspaces: req.session.workspaces,
         workspace,
-        featureFlags: getFeatureFlags(req.session),
+        featureFlags: await requestFeatureFlags(req),
         teams,
         selectedTeamId
       }
@@ -3619,7 +3623,7 @@ app.get('/workspace/:urlKey/ship', workspaceFromUrl, async (req, res) => {
         openRouterSource,
         workspaces: req.session.workspaces,
         workspace,
-        featureFlags: getFeatureFlags(req.session),
+        featureFlags: await requestFeatureFlags(req),
         orientation: latestReport?.orientation || [],
         orientationMeta: latestReport
           ? { generatedAt: latestReport.generatedAt, northStar: latestReport.northStar, model: latestReport.model }
@@ -3653,7 +3657,7 @@ app.get('/workspace/:urlKey/roadmap', workspaceFromUrl, async (req, res) => {
   const workspace = req.workspace;
   const deployInfo = getDeployInfo();
   const openRouterSource = getOpenRouterSource(req);
-  const featureFlags = getFeatureFlags(req.session);
+  const featureFlags = await requestFeatureFlags(req);
 
   if (!featureFlags.roadmap) {
     return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/`);
@@ -3735,7 +3739,7 @@ app.get('/workspace/:urlKey/roadmap', workspaceFromUrl, async (req, res) => {
  * Operator Dashboard page - requires authentication.
  * Displays workspace audit and health check functionality.
  */
-app.get('/workspace/:urlKey/audit', workspaceFromUrl, (req, res) => {
+app.get('/workspace/:urlKey/audit', workspaceFromUrl, async (req, res) => {
   const workspace = req.workspace;
   const deployInfo = getDeployInfo();
   const openRouterSource = getOpenRouterSource(req);
@@ -3745,7 +3749,7 @@ app.get('/workspace/:urlKey/audit', workspaceFromUrl, (req, res) => {
     urlKey: workspace.urlKey,
     openRouterSource,
     workspaces: req.session.workspaces,
-    featureFlags: getFeatureFlags(req.session)
+    featureFlags: await requestFeatureFlags(req)
   });
   res.send(html);
 });
@@ -3911,7 +3915,7 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
     modelError,
     urlKey: workspace.urlKey,
     workspaces: req.session.workspaces,
-    featureFlags: getFeatureFlags(req.session),
+    featureFlags: await requestFeatureFlags(req),
     workspaceFeatures,
     llmStats,
     providerContextSummary,
@@ -3937,7 +3941,7 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
  * Prompts page - requires authentication.
  * Displays all prompt templates organized by category.
  */
-app.get('/workspace/:urlKey/prompts', workspaceFromUrl, (req, res) => {
+app.get('/workspace/:urlKey/prompts', workspaceFromUrl, async (req, res) => {
   const workspace = req.workspace;
   const deployInfo = getDeployInfo();
   const openRouterSource = getOpenRouterSource(req);
@@ -3947,7 +3951,7 @@ app.get('/workspace/:urlKey/prompts', workspaceFromUrl, (req, res) => {
     urlKey: workspace.urlKey,
     openRouterSource,
     workspaces: req.session.workspaces,
-    featureFlags: getFeatureFlags(req.session)
+    featureFlags: await requestFeatureFlags(req)
   });
   res.send(html);
 });
@@ -3975,7 +3979,7 @@ app.get('/workspace/:urlKey/prompts/custom', workspaceFromUrl, async (req, res) 
     urlKey: workspace.urlKey,
     openRouterSource,
     workspaces: req.session.workspaces,
-    featureFlags: getFeatureFlags(req.session)
+    featureFlags: await requestFeatureFlags(req)
   });
   res.send(html);
 });
@@ -3988,12 +3992,11 @@ app.get('/workspace/:urlKey/dispatch', workspaceFromUrl, async (req, res) => {
   const workspace = req.workspace;
   const deployInfo = getDeployInfo();
   const openRouterSource = getOpenRouterSource(req);
-  const featureFlags = getFeatureFlags(req.session);
+  const featureFlags = await requestFeatureFlags(req);
 
-  // Guard: dispatch feature must be enabled
-  if (featureFlags.dispatch !== true) {
-    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
-  }
+  // LIN-3849: no switch to gate on any more. The page stays reachable by URL
+  // for a member, read-only: the send controls render only when
+  // `featureFlags.runControls` is set, and the enqueue API's owner gate is unchanged.
 
   const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h));
 
@@ -4021,19 +4024,14 @@ app.get('/workspace/:urlKey/dispatch', workspaceFromUrl, async (req, res) => {
 });
 
 /**
- * Proxy page - requires authentication and proxy feature flag.
+ * Proxy page - requires authentication (key tools are always on, LIN-3849).
  * Displays proxy token management, agent prompt, and event log.
  */
-app.get('/workspace/:urlKey/proxy', workspaceFromUrl, (req, res) => {
+app.get('/workspace/:urlKey/proxy', workspaceFromUrl, async (req, res) => {
   const workspace = req.workspace;
   const deployInfo = getDeployInfo();
   const openRouterSource = getOpenRouterSource(req);
-  const featureFlags = getFeatureFlags(req.session);
-
-  // Guard: proxy feature must be enabled
-  if (featureFlags.proxy !== true) {
-    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
-  }
+  const featureFlags = await requestFeatureFlags(req);
 
   const html = renderProxyPage(workspace.name || 'Workspace', {
     deployInfo,

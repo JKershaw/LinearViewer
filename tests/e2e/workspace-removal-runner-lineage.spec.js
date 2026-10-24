@@ -19,8 +19,8 @@ async function cookieHeader(page) {
 
 async function setup(page, request) {
   // Two workspaces in one session so removing X takes the multi-workspace branch.
-  await seedLocalWorkspace(page, null, { urlKey: KEY_X, append: true, features: { proxy: true } });
-  await seedLocalWorkspace(page, null, { urlKey: KEY_Y, append: true, features: { proxy: true } });
+  await seedLocalWorkspace(page, null, { urlKey: KEY_X, append: true });
+  await seedLocalWorkspace(page, null, { urlKey: KEY_Y, append: true });
   await seedWorkspaceOwnership(page, KEY_X, 'owner');
   await page.goto(`/test/clear-proxy-tokens?urlKey=${KEY_X}`);
   const header = await cookieHeader(page);

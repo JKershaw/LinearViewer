@@ -25,6 +25,7 @@ import { renderErrorPage } from '../lib/render.js';
 import { jsonError, serverError } from '../lib/errors.js';
 import { findWorkspaceByUrlKey } from '../lib/workspace-lookup.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
+import { requestFeatureFlags } from '../lib/run-controls.js';
 import { buildConsoleFeed, DEFAULT_PAGE_SIZE, isLoopActive, snapPulseWindowMs } from '../lib/live-console.js';
 import { getLoopsForWorkspace } from '../lib/pipeline-loops.js';
 import { collectAgentTokenIds, foldCredentialIndex } from '../lib/credential-state.js';
@@ -130,9 +131,9 @@ export function createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, di
   }
 
   // ─── HTML page ────────────────────────────────────────────────────────────
-  router.get('/workspace/:urlKey/live-console', workspaceFromUrl, (req, res) => {
+  router.get('/workspace/:urlKey/live-console', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
-    const featureFlags = getFeatureFlags(req.session);
+    const featureFlags = await requestFeatureFlags(req);
     if (featureFlags.liveConsole !== true) {
       return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
     }

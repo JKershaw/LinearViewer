@@ -191,7 +191,7 @@ test.describe('Tree view: Dispatched Sessions (LIN-522)', () => {
   }
 
   test('sessions toggle is absent when the dispatch flag is off', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(undefined, { features: { dispatch: false } });
+    await seedLocal(undefined, { runnerKey: false });
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.evaluate(() => localStorage.clear());
 
@@ -201,7 +201,7 @@ test.describe('Tree view: Dispatched Sessions (LIN-522)', () => {
 
   test('sessions toggle lazy-loads and lists dispatched sessions', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await clearSessions(page, localWorkerUrlKey);
-    await seedLocal(undefined, { features: { dispatch: true } });
+    await seedLocal(undefined, { runnerKey: true });
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.evaluate(() => localStorage.clear());
 
@@ -222,7 +222,7 @@ test.describe('Tree view: Dispatched Sessions (LIN-522)', () => {
 
   test('sessions toggle shows the empty state for an undispatched issue', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await clearSessions(page, localWorkerUrlKey);
-    await seedLocal(undefined, { features: { dispatch: true } });
+    await seedLocal(undefined, { runnerKey: true });
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.evaluate(() => localStorage.clear());
 

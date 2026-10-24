@@ -14,7 +14,7 @@ import { resolveIssueBinding } from '../lib/workspace.js';
 import { computeEffortReadout, eligibleIssueIdentifiers } from '../lib/effort-readout.js';
 import { renderEffortReadoutPage } from '../lib/render-effort-readout.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
-import { getFeatureFlags } from '../lib/feature-defaults.js';
+import { requestFeatureFlags } from '../lib/run-controls.js';
 import { settleWithConcurrency } from './dashboard-session-state.js';
 
 // Max per-issue provider round trips in flight for the effort read-out's
@@ -192,7 +192,7 @@ function effortReadoutPage(ctx) {
       res.send(renderEffortReadoutPage(workspace.name, {
         urlKey: workspace.urlKey,
         workspaces: req.session.workspaces || [],
-        featureFlags: getFeatureFlags(req.session),
+        featureFlags: await requestFeatureFlags(req),
         readout,
         generatedAt: now.toISOString(),
       }));

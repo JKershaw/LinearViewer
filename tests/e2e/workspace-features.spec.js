@@ -86,14 +86,13 @@ test.describe('Workspace feature toggles', () => {
     await page.waitForLoadState('networkidle');
 
     // Per-user defaults before the workspace toggle.
-    await expect(page.locator('[data-feature="proxy"] .toggle-state')).toHaveText('● on');
+    await expect(page.locator('[data-feature="roadmap"] .toggle-state')).toHaveText('○ off');
 
     await page.locator('[data-feature="periodicals"] .toggle-btn').click();
     await expect(page.locator('[data-feature="periodicals"] .toggle-state')).toHaveText('● on');
 
     // Per-user toggle states are untouched by the workspace write.
-    await expect(page.locator('[data-feature="proxy"] .toggle-state')).toHaveText('● on');
-    await expect(page.locator('[data-feature="dispatch"] .toggle-state')).toHaveText('○ off');
+    await expect(page.locator('[data-feature="roadmap"] .toggle-state')).toHaveText('○ off');
   });
 
   test('handler rejects an invalid workspace feature key', async ({ page, seedLocal, localWorkerUrlKey }) => {

@@ -76,6 +76,7 @@ import { PartialWriteError } from '../lib/partial-write-error.js';
 import { isTrashed } from '../lib/trashed-signal.js';
 import { validateIssueWriteFields, isValidPriority, validateCommentBody, MAX_COMMENT_LENGTH } from '../lib/issue-write-validation.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
+import { requestFeatureFlags } from '../lib/run-controls.js';
 // LIN-2154: the session-auth (human-lane) comment write shares the agent-lane's
 // dedupe cache instances (routes/proxy.js) rather than a fresh pair that would
 // miss workspace-wide generation bumps, and its key-building primitive.
@@ -1661,7 +1662,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         isLanding: false,
         openRouterSource: getOpenRouterSource(req),
         urlKey: workspace.urlKey,
-        featureFlags: getFeatureFlags(req.session),
+        featureFlags: await requestFeatureFlags(req),
         customPrompts,
         isLocalhost,
         provider,
@@ -3299,7 +3300,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         source,
         store: dispatchQueueStore,
         seam,
-        runnerReady: seam.runnerReady ? !!seam.runnerReady(req) : getFeatureFlags(req.session).dispatch === true,
+        runnerReady: seam.runnerReady ? !!seam.runnerReady(req) : (await requestFeatureFlags(req)).runControls === true,
         owner: true,
         byPersonCheck: true,
         installationTokenFor,

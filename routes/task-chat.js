@@ -19,6 +19,7 @@ import { Router } from 'express';
 import { renderTaskChatPage } from '../lib/render-task-chat.js';
 import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
+import { requestFeatureFlags } from '../lib/run-controls.js';
 import { buildTaskChatMessages } from '../lib/prompts/task-chat-template.js';
 import { streamChat, streamChatWithTools } from '../lib/openrouter.js';
 import { createChatToolCatalog } from '../lib/chat-tools.js';
@@ -244,9 +245,9 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
 
   // ─── HTML page ──────────────────────────────────────────────────────────────
 
-  router.get('/workspace/:urlKey/task-chat', workspaceFromUrl, (req, res) => {
+  router.get('/workspace/:urlKey/task-chat', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
-    const featureFlags = getFeatureFlags(req.session);
+    const featureFlags = await requestFeatureFlags(req);
 
     // Gate: experimental feature must be enabled (mirrors collective/pipeline).
     if (featureFlags.taskChat !== true) {

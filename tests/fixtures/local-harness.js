@@ -401,7 +401,7 @@ export function createLocalProvider() {
  *   Local has no live add-source POST to produce a real one from.
  * @returns {Promise<{urlKey: string, dashboard: string}>}
  */
-export async function seedLocalWorkspace(page, seed = null, { features, openRouterConnected, freeTierEnabled, extraBindings, urlKey = LOCAL_WORKSPACE_URL_KEY, append, providerAdded, proxyDefault } = {}) {
+export async function seedLocalWorkspace(page, seed = null, { features, openRouterConnected, freeTierEnabled, extraBindings, urlKey = LOCAL_WORKSPACE_URL_KEY, append, providerAdded, proxyDefault, runnerKey, queueToken, keepQueueTokens } = {}) {
   const data = { ...(seed ?? defaultLocalSeed(urlKey)), urlKey };
   if (features) data.features = features;
   if (openRouterConnected) data.openRouterConnected = openRouterConnected;
@@ -409,6 +409,21 @@ export async function seedLocalWorkspace(page, seed = null, { features, openRout
   // LIN-2944 P3: the +proxy toggle's session default (unset means on). Lets a
   // spec run with the toggle explicitly off without touching localStorage.
   if (proxyDefault !== undefined) data.proxyDefault = proxyDefault;
+  // LIN-3849: run controls (Run / Go, the Dispatch menus and page link, the queue
+  // and rulings badges) show for the workspace OWNER when the workspace has a live
+  // runner key or queue token. `runnerKey: true` mints a runner key through the
+  // production path; `runnerKey: false` clears every key for this urlKey. The
+  // default is false, not "leave the stores alone": keys live in the shared store
+  // and outlast the spec that minted them, so a spec that did not ask for run
+  // controls could otherwise inherit them from an earlier spec on the same
+  // per-worker urlKey. The seeded session account is the workspace owner.
+  data.runnerKey = runnerKey === true;
+  // Without an explicit runnerKey the default seed clears runner keys but leaves queue
+  // tokens alone: consumer-API specs mint one before they seed.
+  if (runnerKey === undefined || keepQueueTokens === true) data.keepQueueTokens = true;
+  // `queueToken: true` gives run controls through a live queue token instead, so no
+  // runner credential exists to read as "someone is listening" (routes/test.js).
+  if (queueToken === true) data.queueToken = true;
   // Make the seeded workspace explicitly multi-binding (LIN-717): the local
   // binding stays active, with each extra appended so the providers settings
   // surface can exercise the active-provider switch end-to-end.

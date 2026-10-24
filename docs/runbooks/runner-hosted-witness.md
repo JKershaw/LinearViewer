@@ -27,11 +27,12 @@ when you're in the workspace.
   workspace**. You land in it, and the
   address bar shows its urlKey. (Already
   made one this morning? Use it.)
-- **Two toggles.** In that workspace's
-  Settings, turn on **Linear API proxy**
-  and **Dispatch queue** (they may already
-  be on):
-  https://harbour.cat/workspace/URLKEY/settings
+- **A runner key.** Open that workspace's
+  Runner page and mint one (there are no
+  Settings switches to turn on; **run this
+  step** appears once the workspace has a
+  live runner key):
+  https://harbour.cat/workspace/URLKEY/runner
 - **No token in a prompt.** **run this
   step** sends the `claude-code` harness
   (or the one picked in the card's

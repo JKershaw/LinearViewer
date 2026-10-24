@@ -71,13 +71,14 @@ describe('workspace feature defaults', () => {
     assert.strictEqual(FEATURE_KEYS.includes('periodicals'), false);
     // Spot-check the per-user set still has its known members.
     assert.ok(FEATURE_KEYS.includes(FEATURES.ROADMAP));
-    assert.ok(FEATURE_KEYS.includes(FEATURES.PROXY));
+    assert.ok(FEATURE_KEYS.includes(FEATURES.SHIP));
   });
 
-  // LIN-3848: the nine switches that did nothing or were superseded are gone
+  // LIN-3849 also removed `dispatch` and `proxy` (run controls and key tools are
+  // derived / always on). LIN-3848: the nine switches that did nothing or were superseded are gone
   // from every table, and both validators reject them. (Saved values for them
   // stay harmless: getFeatureFlags / getWorkspaceFeatures filter unknown keys.)
-  const REMOVED_USER_KEYS = ['linearMcp', 'aiRecommendations', 'promptButtons', 'codeReview', 'codeReviewSelf', 'codeReviewCicd', 'codeReviewPr', 'feedbackTriage'];
+  const REMOVED_USER_KEYS = ['dispatch', 'proxy', 'linearMcp', 'aiRecommendations', 'promptButtons', 'codeReview', 'codeReviewSelf', 'codeReviewCicd', 'codeReviewPr', 'feedbackTriage'];
   const REMOVED_WORKSPACE_KEYS = ['observerAuthority'];
 
   test('removed per-user keys are absent from every table and rejected by isValidFeatureKey (LIN-3848)', () => {

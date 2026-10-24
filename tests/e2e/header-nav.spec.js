@@ -11,11 +11,13 @@ import { nav } from '../helpers.js';
 // before/after screenshot review uses). Flagged power-user views are enabled so
 // the switcher is at its widest (7 links) — the worst case for wrapping.
 
-const FLAGS = { roadmap: true, dispatch: true, proxy: true };
+// LIN-3849: `dispatch` and `proxy` are not switches any more. Dispatch shows for the
+// owner of a workspace with a runner key (`runnerKey: true` on the seed), Proxy always.
+const FLAGS = { roadmap: true };
 
 test.describe('Header view switcher (LIN-978)', () => {
   test.beforeEach(async ({ seedLocal }) => {
-    await seedLocal(swimLocalSeed, { features: FLAGS });
+    await seedLocal(swimLocalSeed, { features: FLAGS, runnerKey: true });
   });
 
   test('carries the tier-gated view links in the header on the dashboard', async ({ page, localWorkerUrlKey }) => {
@@ -34,19 +36,30 @@ test.describe('Header view switcher (LIN-978)', () => {
     await expect(page.locator('.footer-actions [data-testid^="footer-link-"]')).toHaveCount(0);
   });
 
-  test('flagged power-user views are hidden when their flags are off', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    // proxy explicitly off: it now defaults on, so an empty features map would
-    // still show the proxy link (LIN-2944 P3).
-    await seedLocal(swimLocalSeed, { features: { proxy: false } });
+  test('gated views are hidden without their flag / run controls; Proxy is always there (LIN-3849)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(swimLocalSeed, { features: {}, runnerKey: false });
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
     for (const view of ['observation', 'swipe', 'swim', 'settings']) {
       await expect(nav(page).getView(view)).toBeVisible();
     }
-    for (const view of ['roadmap', 'dispatch', 'proxy']) {
+    for (const view of ['roadmap', 'dispatch']) {
       await expect(nav(page).getView(view)).toHaveCount(0);
     }
+    await expect(nav(page).getView('proxy')).toHaveCount(1);
+  });
+
+  test('Dispatch needs the OWNER: a member of a workspace that has a runner key does not get the link (LIN-3849)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(swimLocalSeed, { features: FLAGS, runnerKey: true });
+    const res = await page.request.get(`/test/set-workspace-ownership?urlKey=${localWorkerUrlKey}&state=foreign`);
+    expect(res.ok()).toBe(true);
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
+    await page.waitForLoadState('networkidle');
+
+    await expect(nav(page).getView('dispatch')).toHaveCount(0);
+    await expect(nav(page).getView('proxy')).toHaveCount(1);
+    await expect(page.locator('[data-queue-badge]')).toHaveCount(0);
   });
 
   test('experimental views appear in the header ONLY when their flag is on (gated, LIN-1247)', async ({ page, seedLocal, localWorkerUrlKey }) => {
@@ -145,7 +158,7 @@ test.describe('Header view switcher (LIN-978)', () => {
 test.describe('Desktop nav overflow (LIN-1286)', () => {
   // The widest possible switcher: 5 first-class + 3 power-user + 6 experimental.
   const WIDE_FLAGS = {
-    roadmap: true, dispatch: true, proxy: true,
+    roadmap: true,
     collective: true, taskChat: true, ship: true,
     nextRun: true, flightCompanion: true, shipBiscuit: true
   };
@@ -161,7 +174,7 @@ test.describe('Desktop nav overflow (LIN-1286)', () => {
   };
 
   test('collapses the excess behind ⋯ more at a narrow desktop width, no horizontal scroll', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(swimLocalSeed, { features: WIDE_FLAGS });
+    await seedLocal(swimLocalSeed, { features: WIDE_FLAGS, runnerKey: true });
     // A narrow DESKTOP width (above the 640px mobile breakpoint) that cannot fit all
     // 14 tabs — so the measuring routine must collapse the excess.
     await page.setViewportSize({ width: 800, height: 800 });
@@ -193,7 +206,7 @@ test.describe('Desktop nav overflow (LIN-1286)', () => {
 
   test('does NOT collapse when the row already fits at a wide desktop width', async ({ page, seedLocal, localWorkerUrlKey }) => {
     // Only the 3 power-user flags on → 8 tabs, comfortably fitting a wide desktop.
-    await seedLocal(swimLocalSeed, { features: { roadmap: true, dispatch: true, proxy: true } });
+    await seedLocal(swimLocalSeed, { features: { roadmap: true }, runnerKey: true });
     await page.setViewportSize({ width: 1400, height: 800 });
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
@@ -208,7 +221,7 @@ test.describe('Desktop nav overflow (LIN-1286)', () => {
   });
 
   test('keeps the active overflow view inline on desktop (active-hoist invariant)', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(swimLocalSeed, { features: WIDE_FLAGS });
+    await seedLocal(swimLocalSeed, { features: WIDE_FLAGS, runnerKey: true });
     await page.setViewportSize({ width: 800, height: 800 });
     // Dispatch is a flag-gated overflow view — but it is the current page here, so it
     // must be hoisted inline and NEVER hidden inside the collapsed `⋯ more`.
@@ -229,7 +242,7 @@ test.describe('Desktop nav overflow (LIN-1286)', () => {
 // all pages), and the gating rules must not leak one onto the wrong page.
 test.describe('nav-actions placement (LIN-1149)', () => {
   test('search toggle precedes queue badge precedes rulings badge in DOM order on the projects page', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(swimLocalSeed, { features: FLAGS });
+    await seedLocal(swimLocalSeed, { features: FLAGS, runnerKey: true });
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
@@ -250,7 +263,7 @@ test.describe('nav-actions placement (LIN-1149)', () => {
   });
 
   test('the queue + rulings badges are the sole nav-actions on non-projects pages when dispatch is on (no search leak)', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(swimLocalSeed, { features: FLAGS });
+    await seedLocal(swimLocalSeed, { features: FLAGS, runnerKey: true });
     // The observation page is non-projects — search must NOT leak here.
     await page.goto(`/workspace/${localWorkerUrlKey}/observation`);
     await page.waitForLoadState('networkidle');
@@ -264,7 +277,7 @@ test.describe('nav-actions placement (LIN-1149)', () => {
   });
 
   test('search toggle is present but both badges absent on projects when dispatch is off (search is NOT dispatch-gated)', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(swimLocalSeed, { features: {} }); // dispatch flag OFF
+    await seedLocal(swimLocalSeed, { features: {}, runnerKey: false }); // no way to run: run controls OFF
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
@@ -288,7 +301,7 @@ test.describe('nav-actions placement (LIN-1149)', () => {
 // shipped. Height measured at runtime; no pixel value is hardcoded.
 test.describe('Sticky header pin + clearance (LIN-1068)', () => {
   test.beforeEach(async ({ seedLocal }) => {
-    await seedLocal(swimLocalSeed, { features: FLAGS });
+    await seedLocal(swimLocalSeed, { features: FLAGS, runnerKey: true });
   });
 
   for (const width of [390, 1280]) {
@@ -364,7 +377,7 @@ test.describe('Sticky header pin + clearance (LIN-1068)', () => {
 // condition).
 test.describe('Mobile nav-strip density sweep (LIN-2179)', () => {
   const ALL_EXPERIMENTAL_FLAGS = {
-    roadmap: true, dispatch: true, proxy: true,
+    roadmap: true,
     collective: true, taskChat: true, ship: true, nextRun: true,
     flightCompanion: true, passagePlanner: true, shipBiscuit: true,
     liveConsole: true, shipJourney: true
@@ -381,7 +394,7 @@ test.describe('Mobile nav-strip density sweep (LIN-2179)', () => {
   ];
 
   test.beforeEach(async ({ seedLocal }) => {
-    await seedLocal(swimLocalSeed, { features: ALL_EXPERIMENTAL_FLAGS });
+    await seedLocal(swimLocalSeed, { features: ALL_EXPERIMENTAL_FLAGS, runnerKey: true });
   });
 
   for (const width of MOBILE_SWEEP_WIDTHS) {

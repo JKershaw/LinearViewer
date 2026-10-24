@@ -114,7 +114,7 @@ describe('LIN-2952 — GET /workspace/:urlKey/api/milestone-funnel', () => {
     });
     await w.taskModeStore.record({
       accountId: a._id, urlKey: 'acme', issueId: null, issueIdentifier: 'LIN-1',
-      rung: 'run-task', ready: false, needs: 'proxy', act: 'press', surface: 'swipe'
+      rung: 'run-task', ready: false, needs: 'dispatch', act: 'press', surface: 'swipe'
     });
 
     const res = await call(buildApp(w, { accountId: a._id }), 'get', PATH);

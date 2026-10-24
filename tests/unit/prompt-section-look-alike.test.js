@@ -66,7 +66,7 @@ function makeContainer() {
 
 const opts = {
   urlKey: 'ws', issue: { id: 'i1', identifier: 'LIN-1', title: 't' }, hasAI: true,
-  dispatchEnabled: false, proxyEnabled: true, isLocalhost: false, customPrompts: [],
+  dispatchEnabled: false, runSetup: true, isLocalhost: false, customPrompts: [],
   defaultPromptKeys: ['implementation'], morePromptKeys: [], promptMeta: { implementation: 'Implementation' },
 };
 

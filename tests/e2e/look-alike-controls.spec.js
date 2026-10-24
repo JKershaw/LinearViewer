@@ -103,7 +103,7 @@ test.describe('Look-alike controls in ticket text answer nothing (LIN-3385)', ()
     const resp = await page.request.post('/test/set-local-session', {
       data: {
         urlKey: URL_KEY,
-        features: { dispatch: true },
+        runnerKey: true,
         projects: [{ id: id('la-proj'), name: 'Look-alike project', content: 'p', sortOrder: 1 }],
         issues: [{
           id: TASK_UUID, identifier: 'LOCAL-LA1', title: 'A task with hostile text',
@@ -201,7 +201,7 @@ test.describe('Look-alike controls in ticket text answer nothing (LIN-3385)', ()
 
   test('Flight Companion: a look-alike in a restored chat turn drives nothing; the real copy button still works', async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-    const feats = encodeURIComponent(JSON.stringify({ flightCompanion: true, proxy: true }));
+    const feats = encodeURIComponent(JSON.stringify({ flightCompanion: true }));
     await page.goto(`/test/set-session?features=${feats}&urlKey=${URL_KEY}`);
     await seedWorkspaceOwnership(page, URL_KEY);
     // A stored session whose assistant turn carries the hostile markup, so it

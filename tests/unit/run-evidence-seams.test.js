@@ -15,6 +15,10 @@ import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { createDashboardRoutes } from '../../routes/dashboard.js';
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
 import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cache.js';
+import { setRunControlsResolver } from '../../lib/run-controls.js';
+
+// LIN-3849: runnerReady is the derived runControls bit, not the old dispatch switch.
+setRunControlsResolver(async () => ({ runControls: true, runSetup: false }));
 import { InMemoryRunParagraphStore } from '../../lib/run-paragraph-store.js';
 import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
 import { findRouteLayer } from './lib/route-layer.js';
@@ -118,7 +122,7 @@ describe('run page owner path (routes/dashboard.js)', () => {
     const handler = layer.route.stack[layer.route.stack.length - 1].handle;
     const res = { statusCode: 200, status(c) { this.statusCode = c; return this; }, send(b) { this.sentBody = b; return this; } };
     let nextErr = null;
-    await handler({ session: { features: { dispatch: true }, workspaces: [{ urlKey: 'ws-a', name: 'A' }] }, workspace: { urlKey: 'ws-a', id: 'ws-id-7' }, params: { sessionId: SID }, query: {} }, res, (err) => { nextErr = err; });
+    await handler({ session: { workspaces: [{ urlKey: 'ws-a', name: 'A' }] }, workspace: { urlKey: 'ws-a', id: 'ws-id-7' }, params: { sessionId: SID }, query: {} }, res, (err) => { nextErr = err; });
     assert.equal(nextErr, null);
     assert.equal(res.statusCode, 200);
     assert.equal(calls.length, 1);
@@ -132,7 +136,7 @@ describe('run page owner path (routes/dashboard.js)', () => {
     assert.equal(args.asked, 'Anchor title');
     assert.equal(args.issueIdentifier, 'LIN-10');
     assert.equal(args.urlKey, 'ws-a');
-    assert.equal(args.runnerReady, true, 'runnerReady still comes from the request\'s dispatch flag');
+    assert.equal(args.runnerReady, true, 'runnerReady still comes from the request\'s derived runControls bit');
     assert.equal(args.stopAt, null);
     assert.equal(args.variant, 'unknown');
   });
@@ -154,7 +158,7 @@ describe('run page owner path (routes/dashboard.js)', () => {
       bindings: [{ provider: 'github', scope: 'JKershaw/Herd', credentials: { token: 'ghs_workspace_tok' } }]
     };
     let nextErr = null;
-    await handler({ session: { features: { dispatch: true }, workspaces: [{ urlKey: 'ws-a', name: 'A' }] }, workspace, params: { sessionId: SID }, query: {} }, res, (err) => { nextErr = err; });
+    await handler({ session: { workspaces: [{ urlKey: 'ws-a', name: 'A' }] }, workspace, params: { sessionId: SID }, query: {} }, res, (err) => { nextErr = err; });
     assert.equal(nextErr, null);
     assert.equal(calls.length, 1);
     assert.equal(calls[0].urlKey, 'ws-a', 'the scope key the authenticated PR cache is keyed by');

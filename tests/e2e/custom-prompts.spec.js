@@ -509,7 +509,7 @@ test.describe('Custom Prompts on Swipe Page', () => {
 
   test('dispatch targets are collapsed behind a Dispatch ▾ trigger on swipe', async ({ page, seedLocal, localWorkerUrlKey }) => {
     // Enable dispatch so the action cluster renders the dispatch disclosure.
-    await seedLocal(workspaceApiLocalSeed, { features: { dispatch: true } });
+    await seedLocal(workspaceApiLocalSeed, { runnerKey: true });
 
     const createRes = await page.request.post(`/workspace/${localWorkerUrlKey}/api/prompts/custom`, {
       data: { name: 'Swipe Dispatch', template: 'Analyze: {{title}}' }
@@ -545,7 +545,7 @@ test.describe('Custom Prompts on Swipe Page', () => {
   // LIN-1096: the shared model/harness exec controls live inside the same
   // dispatch options panel on the swipe prompt-compose section.
   test('exec controls appear in the swipe dispatch panel and flow through to the dispatched item', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(workspaceApiLocalSeed, { features: { dispatch: true } });
+    await seedLocal(workspaceApiLocalSeed, { runnerKey: true });
 
     const createRes = await page.request.post(`/workspace/${localWorkerUrlKey}/api/prompts/custom`, {
       data: { name: 'Swipe Exec Controls', template: 'Analyze: {{title}}' }

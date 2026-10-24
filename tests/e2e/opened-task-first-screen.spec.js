@@ -128,7 +128,7 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
         route.fulfill({ status: 200, contentType: 'text/event-stream', body: SSE_BODY })
       );
 
-      await page.goto(`/test/set-session?openRouterConnected=true&features=${encodeURIComponent(JSON.stringify({ proxy: false }))}`);
+      await page.goto(`/test/set-session?openRouterConnected=true`);
       await seedGitHubWorkspace(page);
 
       await page.goto(`/workspace/${GITHUB_WORKSPACE_URL_KEY}/swipe`);
@@ -173,7 +173,7 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
   test.describe('local-connected', () => {
     test('top task with its one-line why, Go, tailored prompt with visible reasoning', async ({ page, seedLocal, localWorkerUrlKey }) => {
       const seen = recommendSpy(page);
-      await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, features: { proxy: false } });
+      await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true });
       await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
       await page.waitForLoadState('networkidle');
 
@@ -267,7 +267,7 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
   // ---------------------------------------------------------------------------
   test.describe('fix-up: ladder ready state, regenerate gate, promptButtons', () => {
     test('with dispatch enabled, "run this step" sends the dispatch request for the top task', async ({ page, seedLocal, localWorkerUrlKey }) => {
-      await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, features: { dispatch: true } });
+      await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, runnerKey: true });
       await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
       await page.waitForLoadState('networkidle');
       await openPrompts(page);
@@ -356,7 +356,7 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
     // (kills mutant R7, which enabled it before a prompt exists — a dead
     // control that silently did nothing because handleDispatch has no raw).
     test('with dispatch enabled, the rendered idle run-step stays a set-up rung (N2)', async ({ page, seedLocal, localWorkerUrlKey }) => {
-      await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, features: { dispatch: true } });
+      await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, runnerKey: true });
       await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
       await page.waitForLoadState('networkidle');
       await openPrompts(page);
@@ -373,7 +373,7 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
     // N3 (class closure): a notice raised in idle must not survive into fresh,
     // and must never sit beside an ENABLED run-step.
     test('an idle setup notice is cleared once a prompt lands, with dispatch enabled (N3)', async ({ page, seedLocal, localWorkerUrlKey }) => {
-      await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, features: { dispatch: true } });
+      await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, runnerKey: true });
       await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
       await page.waitForLoadState('networkidle');
       await openPrompts(page);
@@ -398,9 +398,9 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
     // mid-stream (the proxy set-up rung) is cleared once the stream settles.
     test('a ladder rung pressed mid-stream keeps the streamed reasoning; settle clears the notice (N4/T1)', async ({ page, seedLocal, localWorkerUrlKey }) => {
       const STREAMED_REASONING = 'Reasoning about the task in several words.';
-      // Proxy explicitly off: this case asserts the proxy set-up rung/notice
-      // (LIN-2944 P3 made proxy default on, which makes run-task ready).
-      await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, features: { dispatch: true, proxy: false } });
+      // LIN-3849: an owner with no runner key sees the "set up ›" rungs; this case
+      // asserts the notice they raise mid-stream (it used to turn the proxy off).
+      await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, runnerKey: false });
       await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
       await page.waitForLoadState('networkidle');
       await openPrompts(page);
@@ -429,21 +429,23 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
       await expect(component).toHaveClass(/streaming/);
       await expect(body).toContainText(STREAMED_REASONING);
 
-      // run this step needs a prompt; one is generating, so the press is inert.
-      await ladder.locator('[data-rung="run-step"]').click({ force: true });
+      // run this step is a set-up rung: its press raises the set-up notice in the
+      // notice slot, keeps the body, and never says "generate a prompt first".
+      await ladder.locator('[data-rung="run-step"]').click();
+      await expect(notice).toContainText(/dispatch runner set up/i);
       await expect(body).toContainText(STREAMED_REASONING);
       await expect(component.getByText(/generate a prompt first/i)).toHaveCount(0);
 
-      // Go needs the proxy: its notice shows in the same notice slot, body kept.
+      // Go is a set-up rung too: its notice replaces the first, body kept.
       await component.locator('[data-testid="opened-task-go"]').click();
-      await expect(notice).toContainText(/proxy set up/i);
+      await expect(notice).toContainText(/Go needs the dispatch runner set up/i);
       await expect(body).toContainText(STREAMED_REASONING);
 
       await page.evaluate(() => window.__releaseStream());
       await expect(component).not.toHaveClass(/streaming/);
       await expect(body).toContainText('Do the thing');
       await expect(notice).toHaveCount(0);
-      await expect(ladder.locator('[data-rung="run-step"]')).toHaveAttribute('data-action', 'run-step');
+      await expect(ladder.locator('[data-rung="run-step"]')).toHaveAttribute('data-action', 'setup');
     });
   });
 });
@@ -458,9 +460,11 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
 // =============================================================================
 test.describe('LIN-2942 — the ladder records its mode', () => {
   async function openTopTask(page, seedLocal, urlKey, options) {
-    // LIN-2944 P3: proxy now defaults on; the ladder-mode cases assert the
-    // "set up" ladder shape, so keep proxy explicitly off unless a case says on.
-    await seedLocal(workspaceApiLocalSeed, { ...(options || {}), features: { proxy: false, ...((options && options.features) || {}) } });
+    // LIN-3849: the ladder-mode cases assert the "set up" ladder shape, which is
+    // the owner of a workspace with no runner key; a case that wants run controls
+    // passes `runnerKey: true`.
+    // proxyDefault:false keeps a copy bare (these cases predate the +proxy default being on for everyone).
+    await seedLocal(workspaceApiLocalSeed, { runnerKey: false, proxyDefault: false, ...(options || {}) });
     await page.goto(`/test/clear-task-mode-events?urlKey=${urlKey}`);
     await page.goto(`/workspace/${urlKey}/swipe`);
     await page.waitForLoadState('networkidle');
@@ -520,7 +524,7 @@ test.describe('LIN-2942 — the ladder records its mode', () => {
   });
 
   test('(c) a ready run-step records an event whose dispatchId is the created item', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    const { component, identifier } = await openTopTask(page, seedLocal, localWorkerUrlKey, { openRouterConnected: true, features: { dispatch: true } });
+    const { component, identifier } = await openTopTask(page, seedLocal, localWorkerUrlKey, { openRouterConnected: true, runnerKey: true });
     await page.request.get(`/test/clear-dispatch-queue?urlKey=${localWorkerUrlKey}`);
     await page.request.get(`/test/clear-dispatch-history?urlKey=${localWorkerUrlKey}`);
     await pickTemplate(component);
@@ -608,7 +612,7 @@ test.describe('LIN-2944 P1 — Home top-task mark', () => {
 test.describe('LIN-2944 P1 — Home first-screen witness (R1/R2)', () => {
   test('top task shows why + Go, streams a TEST-13 prompt with reasoning, and copies in 3 clicks with no spend before Go', async ({ page, context, seedLocal, localWorkerUrlKey }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, features: { proxy: false } });
+    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, proxyDefault: false });
 
     const spend = recommendSpy(page);
     let clicks = 0;
@@ -803,7 +807,7 @@ test.describe('LIN-2944 P3 — seed demotion on the first screen', () => {
   // LIN-2944 P3 review N1: the plain-words proxy label is visible beside +proxy
   // and its FAQ discloses the side effects.
   test('the plain-words proxy label sits beside +proxy and the FAQ opens with the side effects (N1)', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, features: { proxy: true } });
+    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true });
     await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
     await page.waitForLoadState('networkidle');
     await openPrompts(page);
@@ -823,8 +827,8 @@ test.describe('LIN-2944 P3 — seed demotion on the first screen', () => {
     await expect(faq).toBeVisible();
     await expect(faq).toContainText(/read and update your tasks/i);
     await expect(faq).toContainText(/token/i);
-    await expect(faq).toContainText(/Autopilot/i);
-    await expect(faq).toContainText(/Settings/i);
+    // LIN-3849: the FAQ no longer tells anyone to switch the proxy off in Settings.
+    await expect(faq).not.toContainText(/Settings/i);
   });
 
   // LIN-2944 P3 review N3: onboarding keys on the UNFILTERED workspace. A
@@ -856,7 +860,10 @@ test.describe('LIN-2944 P3 — seed demotion on the first screen', () => {
 // =============================================================================
 test.describe('LIN-3341 — Go is one press', () => {
   test('one press on Go dispatches the run once and shows the started line with a task-page link', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, features: { proxy: true, dispatch: true } });
+    // A queue token, not a runner key: a runner credential reads as "someone is
+    // listening" (lib/consumer-poll-warning.js), and this case asserts the
+    // "nothing is listening" line.
+    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, queueToken: true });
     // Go always forces the proxy attach, which mints the owner-only driver copy;
     // record the workspace owner so the dispatch is admitted (LIN-3136).
     await seedWorkspaceOwnership(page, localWorkerUrlKey);
@@ -902,7 +909,7 @@ test.describe('LIN-3341 — Go is one press', () => {
   });
 
   test('reopening with a live run shows the running line and no Go (the John-on-his-phone case)', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, features: { proxy: true, dispatch: true } });
+    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, runnerKey: true });
     await page.route('**/api/task/*/state*', (route) => route.fulfill({
       status: 200,
       contentType: 'application/json',

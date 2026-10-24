@@ -184,13 +184,12 @@ function loadPromptSection({ localStorage, readSSEStream, fetchImpl } = {}) {
 }
 
 function baseOpts(issue, extra = {}) {
-  return {
+  // LIN-3849: `runSetup` (the owner's "set up ›" rung) defaults to the old not-dispatch-enabled state.
+  const o = {
     urlKey: 'ws',
     issue,
     hasAI: true,
-    hasAutopilot: true,
     dispatchEnabled: false,
-    proxyEnabled: false,
     isLocalhost: false,
     customPrompts: [],
     defaultPromptKeys: ['implementation'],
@@ -198,6 +197,7 @@ function baseOpts(issue, extra = {}) {
     promptMeta: { implementation: 'Implementation' },
     ...extra,
   };
+  return { runSetup: !o.dispatchEnabled, ...o };
 }
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
@@ -619,7 +619,7 @@ describe('P0 re-review N1: the set-up notice renders in the fresh state too', ()
     const container = makeContainer();
     PromptSection.init(container, baseOpts(
       { id: 'issue-27', identifier: 'LIN-27' },
-      { dispatchEnabled: false, proxyEnabled: false }
+      { dispatchEnabled: false }
     ));
 
     await container.click({ prompt: 'implementation' });
@@ -642,13 +642,13 @@ describe('P0 re-review N1: the set-up notice renders in the fresh state too', ()
     }));
     const { PromptSection } = loadPromptSection({ localStorage: ls });
     const container = makeContainer();
-    PromptSection.init(container, baseOpts({ id: 'issue-28', identifier: 'LIN-28' }, { dispatchEnabled: false, proxyEnabled: false }));
+    PromptSection.init(container, baseOpts({ id: 'issue-28', identifier: 'LIN-28' }, { dispatchEnabled: false }));
 
     assert.equal(container.getAttribute('data-phase'), 'fresh');
     // Drive the shared handler the same way the delegated click does.
-    await container.click({ action: 'setup', setupNeeds: 'proxy' });
+    await container.click({ action: 'setup', setupNeeds: 'dispatch' });
     assert.match(container.innerHTML, /opened-task-setup-notice/);
-    assert.match(container.innerHTML, /proxy set up/);
+    assert.match(container.innerHTML, /dispatch runner set up/);
   });
 });
 
@@ -689,7 +689,7 @@ describe('P0 re-review N3: the setup notice is tied to phase transitions (class 
   function optsFor(combo, opts = {}) {
     return baseOpts(
       { id: `issue-${combo.dispatch}-${combo.proxy}`, identifier: 'LIN-60' },
-      { dispatchEnabled: combo.dispatch, proxyEnabled: combo.proxy, hasAutopilot: combo.proxy, ...opts }
+      { dispatchEnabled: combo.dispatch, ...opts }
     );
   }
 
@@ -1060,16 +1060,25 @@ describe('LIN-836 / LIN-2944 P1: the Autopilot proxy gate', () => {
     return container;
   };
 
-  test('proxy on ⇒ Go is the enabled run-task entry, plus the stepper sibling', () => {
-    const container = mount({ proxyEnabled: true, hasAutopilot: true, dispatchEnabled: true });
+  test('run controls ⇒ Go is the enabled run-task entry, plus the stepper sibling', () => {
+    const container = mount({ dispatchEnabled: true });
     assert.match(container.innerHTML, /data-rung="run-task"[^>]*data-action="go"/, 'Go is the enabled run-task entry');
     assert.match(container.innerHTML, /data-prompt="__autopilot_stepper__"/, 'stepper sibling renders under other prompts');
   });
 
-  test('proxy off ⇒ Go is a set-up entry, no stepper', () => {
-    const container = mount({ proxyEnabled: false, hasAutopilot: false });
+  test('owner with no way to run ⇒ Go is a set-up entry; the stepper (a key tool) still renders', () => {
+    const container = mount({ dispatchEnabled: false, runSetup: true });
     assert.match(container.innerHTML, /data-rung="run-task"[^>]*data-action="setup"/, 'Go shows ○ set up');
     assert.equal(container.innerHTML.includes('data-prompt="__autopilot__"'), false, 'no enabled Autopilot entry');
-    assert.equal(container.innerHTML.includes('data-prompt="__autopilot_stepper__"'), false, 'no stepper sibling');
+    assert.match(container.innerHTML, /data-prompt="__autopilot_stepper__"/, 'LIN-3849: key tools have no switch');
+  });
+
+  test('member (neither bit) ⇒ no Go control and no set-up rung at all', () => {
+    const container = mount({ dispatchEnabled: false, runSetup: false });
+    assert.equal(/data-rung="run-task"/.test(container.innerHTML), false, 'no Go');
+    assert.equal(/data-setup-needs="dispatch"/.test(container.innerHTML), false, 'no set-up rung for running');
+    assert.equal(/data-rung="run-step"/.test(container.innerHTML), false, 'no run-step rung');
+    assert.equal(/data-action="go"/.test(container.innerHTML), false);
+    assert.match(container.innerHTML, /data-rung="copy"/, 'the copy rung stays');
   });
 });

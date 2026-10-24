@@ -116,7 +116,7 @@ describe('renderNavBar — feedback trigger (LIN-2298)', () => {
   test('trails the queue and rulings badges in nav-actions source order', () => {
     const html = renderNavBar({
       workspaces: WORKSPACES, urlKey: 'test-ws',
-      featureFlags: { dispatch: true, feedbackWidget: true }
+      featureFlags: { runControls: true, feedbackWidget: true }
     });
     const queue = html.indexOf('data-queue-badge');
     const rulings = html.indexOf('data-rulings-badge');

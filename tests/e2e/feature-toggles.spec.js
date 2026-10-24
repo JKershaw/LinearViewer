@@ -31,8 +31,7 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('.settings-header:text-is("Workflow")')).toBeVisible();
 
     // All feature toggle labels should be present (split across sections)
-    await expect(page.locator('.feature-toggle-label:has-text("Dispatch queue")')).toBeVisible();
-    await expect(page.locator('.feature-toggle-label:has-text("Linear API proxy")')).toBeVisible();
+    // LIN-3849: no Dispatch queue or Linear API proxy toggle any more.
     await expect(page.locator('.feature-toggle-label:has-text("Narrative roadmap")')).toBeVisible();
   });
 
@@ -40,9 +39,7 @@ test.describe('Feature Toggle Settings', () => {
     await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
-    // Defaults: dispatch OFF, proxy ON, roadmap OFF
-    await expect(page.locator('[data-feature="dispatch"] .toggle-state')).toHaveText('○ off');
-    await expect(page.locator('[data-feature="proxy"] .toggle-state')).toHaveText('● on');
+    // Defaults: roadmap OFF
     await expect(page.locator('[data-feature="roadmap"] .toggle-state')).toHaveText('○ off');
   });
 
@@ -87,20 +84,6 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('[data-feature="roadmap"] .toggle-state')).toHaveText('● on');
   });
 
-  test('can toggle dispatch on', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
-    await page.waitForLoadState('networkidle');
-
-    // dispatch should start OFF
-    await expect(page.locator('[data-feature="dispatch"] .toggle-state')).toHaveText('○ off');
-
-    // Click to turn it on (AJAX — no page reload)
-    await page.locator('[data-feature="dispatch"] .toggle-btn').click();
-
-    // Should update inline via AJAX
-    await expect(page.locator('[data-feature="dispatch"] .toggle-state')).toHaveText('● on');
-  });
-
   test('toggling one feature does not affect others', async ({ page, localWorkerUrlKey }) => {
     await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
@@ -110,8 +93,7 @@ test.describe('Feature Toggle Settings', () => {
 
     // roadmap should be on, but others unchanged
     await expect(page.locator('[data-feature="roadmap"] .toggle-state')).toHaveText('● on');
-    await expect(page.locator('[data-feature="dispatch"] .toggle-state')).toHaveText('○ off');
-    await expect(page.locator('[data-feature="proxy"] .toggle-state')).toHaveText('● on');
+    await expect(page.locator('[data-feature="feedbackWidget"] .toggle-state')).toHaveText('○ off');
   });
 
   // =========================================================================
@@ -162,8 +144,9 @@ test.describe('Feature Toggle Settings', () => {
   // LIN-170: Dispatch toggle affects UI visibility
   // =========================================================================
 
-  test('dispatch UI is hidden by default (dispatch off)', async ({ page, localWorkerUrlKey }) => {
-    // Default: dispatch is OFF
+  test('dispatch UI is hidden when the workspace has no way to run (LIN-3849)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    // No runner key and no queue token: no run controls, whoever the viewer is.
+    await seedLocal(workspaceApiLocalSeed, { runnerKey: false });
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
@@ -174,8 +157,8 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('.dispatch-btn')).toHaveCount(0);
   });
 
-  test('dispatch UI is visible when dispatch is on', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(workspaceApiLocalSeed, { features: { dispatch: true } });
+  test('dispatch UI is visible for the owner of a workspace with a runner key', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { runnerKey: true });
 
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
@@ -184,7 +167,7 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('[data-queue-badge]')).toHaveCount(1);
   });
 
-  test('dispatch section hidden in settings when dispatch off', async ({ page, localWorkerUrlKey }) => {
+  test('dispatch section hidden in settings (LIN-3849: no dispatch switch at all)', async ({ page, localWorkerUrlKey }) => {
     await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
@@ -192,15 +175,24 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('.settings-header:text-is("Dispatch")')).toHaveCount(0);
   });
 
-  test('dispatch link visible in header switcher when dispatch on', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(workspaceApiLocalSeed, { features: { dispatch: true } });
+  test('dispatch link visible in header switcher with run controls', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { runnerKey: true });
 
     await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
-    // The dispatch link now lives in the header view switcher (LIN-978), gated
-    // on the same per-user flag it always was.
+    // The dispatch link lives in the header view switcher (LIN-978), gated on run controls (LIN-3849).
     await expect(page.locator('.nav-views [data-testid="nav-view-dispatch"]')).toBeVisible();
+  });
+
+  test('Settings carries neither a Dispatch queue nor a Linear API proxy switch (LIN-3849)', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('[data-feature="dispatch"]')).toHaveCount(0);
+    await expect(page.locator('[data-feature="proxy"]')).toHaveCount(0);
+    await expect(page.locator('.feature-toggle-label:has-text("Linear API proxy")')).toHaveCount(0);
+    await expect(page.locator('.feature-toggle-label:has-text("Dispatch queue")')).toHaveCount(0);
   });
 
   test('prompts section is always visible (LIN-3848: promptButtons switch removed)', async ({ page, localWorkerUrlKey }) => {
@@ -256,49 +248,19 @@ test.describe('Feature Toggle Settings', () => {
   // LIN-193: Proxy toggle affects UI visibility
   // =========================================================================
 
-  test('proxy toggle is visible in Workflow section on settings page', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
-    await page.waitForLoadState('networkidle');
-
-    await expect(page.locator('.feature-toggle-label:has-text("Linear API proxy")')).toBeVisible();
-  });
-
-  test('proxy toggle default is ON (P3 default-on)', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
-    await page.waitForLoadState('networkidle');
-
-    await expect(page.locator('[data-feature="proxy"] .toggle-state')).toHaveText('● on');
-  });
-
-  test('proxy nav link hidden when proxy is explicitly off', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(workspaceApiLocalSeed, { features: { proxy: false } });
-    await page.goto(`/workspace/${localWorkerUrlKey}/`);
-    await page.waitForLoadState('networkidle');
-
-    await expect(page.locator('a[href*="/proxy"]')).toHaveCount(0);
-  });
-
-  test('proxy header nav link visible when proxy is on', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(workspaceApiLocalSeed, { features: { proxy: true } });
+  test('proxy header nav link is always visible (LIN-3849)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, {});
 
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
-    // The flagged power-user proxy link now lives in the header view switcher
-    // (LIN-978), gated on the same per-user flag it always was.
+    // The proxy link lives in the header view switcher (LIN-978). LIN-3849: it is a
+    // key tool, so it is always there (it was gated on a per-user flag).
     await expect(page.locator('.nav-views [data-testid="nav-view-proxy"]')).toBeVisible();
   });
 
-  test('proxy page redirects to settings when proxy is explicitly off', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(workspaceApiLocalSeed, { features: { proxy: false } });
-    await page.goto(`/workspace/${localWorkerUrlKey}/proxy`);
-
-    // Should redirect to settings
-    await expect(page).toHaveURL(new RegExp(`/workspace/${localWorkerUrlKey}/settings`));
-  });
-
-  test('proxy page loads when proxy is on', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(workspaceApiLocalSeed, { features: { proxy: true } });
+  test('proxy page loads with no flag set (LIN-3849)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, {});
 
     await page.goto(`/workspace/${localWorkerUrlKey}/proxy`);
     await page.waitForLoadState('networkidle');
@@ -307,39 +269,12 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page).toHaveURL(new RegExp(`/workspace/${localWorkerUrlKey}/proxy`));
   });
 
-  test('can toggle proxy on via settings and state persists', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(workspaceApiLocalSeed, { features: { proxy: false } });
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
-    await page.waitForLoadState('networkidle');
-
-    // Should start OFF
-    await expect(page.locator('[data-feature="proxy"] .toggle-state')).toHaveText('○ off');
-
-    // Click to turn on
-    await page.locator('[data-feature="proxy"] .toggle-btn').click();
-    await expect(page.locator('[data-feature="proxy"] .toggle-state')).toHaveText('● on');
-
-    // Reload — state should persist
-    await page.reload();
-    await page.waitForLoadState('networkidle');
-    await expect(page.locator('[data-feature="proxy"] .toggle-state')).toHaveText('● on');
-  });
-
   // =========================================================================
   // Proxy toggle button in prompt UI
   // =========================================================================
 
-  test('proxy toggle button hidden when proxy feature is off', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(workspaceApiLocalSeed, { features: { proxy: false } });
-    await page.goto(`/workspace/${localWorkerUrlKey}/`);
-    await page.waitForLoadState('networkidle');
-
-    // Proxy toggle buttons should not exist
-    await expect(page.locator('.prompt-proxy-toggle')).toHaveCount(0);
-  });
-
   test('proxy toggle button rendered in the opened-task component when proxy feature is on', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(workspaceApiLocalSeed, { features: { proxy: true } });
+    await seedLocal(workspaceApiLocalSeed, {});
 
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
@@ -356,8 +291,8 @@ test.describe('Feature Toggle Settings', () => {
     await expect(component.locator('.prompt-proxy-toggle')).toBeAttached();
   });
 
-  test('proxy toggle button appears on dispatch page when proxy is on', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(workspaceApiLocalSeed, { features: { proxy: true, dispatch: true } });
+  test('proxy toggle button appears on dispatch page for the owner (LIN-3849)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { runnerKey: true });
 
     await page.goto(`/workspace/${localWorkerUrlKey}/dispatch`);
     await page.waitForLoadState('networkidle');
@@ -366,15 +301,6 @@ test.describe('Feature Toggle Settings', () => {
     // expand it so the button is visible.
     await page.locator('.dispatch-toggle').click();
     await expect(page.locator('.prompt-proxy-toggle')).toBeVisible();
-  });
-
-  test('proxy toggle button absent on dispatch page when proxy is off', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(workspaceApiLocalSeed, { features: { dispatch: true, proxy: false } });
-
-    await page.goto(`/workspace/${localWorkerUrlKey}/dispatch`);
-    await page.waitForLoadState('networkidle');
-
-    await expect(page.locator('.prompt-proxy-toggle')).toHaveCount(0);
   });
 
   // =========================================================================

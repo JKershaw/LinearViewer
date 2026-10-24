@@ -11,7 +11,7 @@ import { test, expect } from '../fixtures/test-base.js';
 // +proxy in dispatch-page.spec.js, the settings toggle in feature-toggles.spec.js.
 
 let URL_KEY;
-const PROXY_FEAT = encodeURIComponent(JSON.stringify({ proxy: true }));
+const PROXY_FEAT = encodeURIComponent(JSON.stringify({}));
 const SENTINEL = '__SENTINEL__';
 
 test.beforeEach(({ workerUrlKey }) => {

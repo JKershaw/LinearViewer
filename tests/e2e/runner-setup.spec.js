@@ -11,18 +11,18 @@ import { expectNoClippedOverflow } from '../helpers.js';
  * comes from `append: true`, so the session's account is its OWNER
  * (LIN-1892) and can mint the runner copy (LIN-3131).
  *
- *   (a) owner, both flags on: tap 1 mints, and the textarea holds the served
+ *   (a) owner with a runner key: tap 1 mints, and the textarea holds the served
  *       prompt plus the credential block (bootstrap, expiresAt, owner id);
  *       tap 2 fills the clipboard; the bootstrap exchanges to take+dispatch.
  *       A refused clipboard leaves the text selected, with the fallback note.
  *   (b) not the owner: no mint button.
- *   (c) proxy off: a notice, and no mint request at all.
- *   (d) dispatch off: the "○ set up ›" run-step notice reaches /runner.
- *   (e) both flags on: "run on my machine ›" is visible on the Swipe card
+ *   (c) removed in LIN-3849 (the proxy-off state left with the switch).
+ *   (d) owner with no runner key: the "○ set up ›" run-step notice reaches /runner.
+ *   (e) owner with a runner key: "run on my machine ›" is visible on the Swipe card
  *       (S4b: under the title, no longer beside the ladder inside Prompts) and
  *       reaches /runner. Every flag state: runner-link-entry.spec.js.
- *   (f) proxy on, dispatch off: /runner shows the dispatch note and the mint
- *       works.
+ *   (f) owner with no runner key: /runner offers the mint (no Settings switch
+ *       to turn on first) and it works.
  *
  * One phone-size screenshot per state lands in test-results/runner-setup/
  * (not committed).
@@ -31,9 +31,10 @@ test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true
 
 const SHOTS = 'test-results/runner-setup';
 
-async function seedOwner(page, key, features) {
-  const seeded = await seedLocalWorkspace(page, workspaceApiLocalSeed, { urlKey: key, append: true, features });
-  await page.goto(`/test/clear-proxy-tokens?urlKey=${seeded.urlKey}`);
+// LIN-3849: `runnerKey` replaces the old proxy / dispatch switches. true seeds a live
+// runner key (run controls on); false clears every key (the keyless owner).
+async function seedOwner(page, key, runnerKey) {
+  const seeded = await seedLocalWorkspace(page, workspaceApiLocalSeed, { urlKey: key, append: true, runnerKey });
   return seeded.urlKey;
 }
 
@@ -50,7 +51,7 @@ async function openPrompts(page) {
 test.describe('runner setup page (LIN-3098 S4, phone)', () => {
   test('(a) owner: tap to mint, the textarea holds the prompt and credential, tap to copy', async ({ page, context, request }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-    const urlKey = await seedOwner(page, 'runner-setup-a', { proxy: true, dispatch: true });
+    const urlKey = await seedOwner(page, 'runner-setup-a', true);
     const accountId = await sessionAccountId(page);
 
     await page.goto(`/workspace/${urlKey}/runner`);
@@ -91,7 +92,7 @@ test.describe('runner setup page (LIN-3098 S4, phone)', () => {
     await page.addInitScript(() => {
       Object.defineProperty(navigator, 'clipboard', { value: { writeText: () => Promise.reject(new Error('denied')) }, configurable: true });
     });
-    const urlKey = await seedOwner(page, 'runner-setup-clip', { proxy: true, dispatch: true });
+    const urlKey = await seedOwner(page, 'runner-setup-clip', true);
     await page.goto(`/workspace/${urlKey}/runner`);
     await page.getByTestId('runner-setup-mint').tap();
     const output = page.getByTestId('runner-setup-output');
@@ -104,7 +105,7 @@ test.describe('runner setup page (LIN-3098 S4, phone)', () => {
   });
 
   test('(b) not the owner: a notice and no mint button', async ({ page }) => {
-    const urlKey = await seedOwner(page, 'runner-setup-b', { proxy: true, dispatch: true });
+    const urlKey = await seedOwner(page, 'runner-setup-b', true);
     await page.goto(`/test/set-workspace-ownership?urlKey=${urlKey}&state=foreign`);
     await page.goto(`/workspace/${urlKey}/runner`);
     await expect(page.getByTestId('runner-setup-page')).toHaveAttribute('data-state', 'not-owner');
@@ -113,22 +114,8 @@ test.describe('runner setup page (LIN-3098 S4, phone)', () => {
     await page.screenshot({ path: `${SHOTS}/b-not-owner.png`, fullPage: true });
   });
 
-  test('(c) proxy off: a notice with a Settings link, and no mint request', async ({ page }) => {
-    const mints = [];
-    page.on('request', (req) => { if (req.url().includes('/api/proxy/tokens')) mints.push(req.url()); });
-    const urlKey = await seedOwner(page, 'runner-setup-c', { proxy: false, dispatch: true });
-    await page.goto(`/workspace/${urlKey}/runner`);
-    await expect(page.getByTestId('runner-setup-page')).toHaveAttribute('data-state', 'proxy-off');
-    await expect(page.getByTestId('runner-setup-notice')).toContainText(/workspace API access/i);
-    await expect(page.getByTestId('runner-setup-notice').locator(`a[href="/workspace/${urlKey}/settings"]`)).toBeVisible();
-    await expect(page.getByTestId('runner-setup-mint')).toHaveCount(0);
-    await page.waitForLoadState('networkidle');
-    expect(mints).toEqual([]);
-    await page.screenshot({ path: `${SHOTS}/c-proxy-off.png`, fullPage: true });
-  });
-
-  test('(d) dispatch off: the ○ set up › run-step notice reaches /runner', async ({ page }) => {
-    const urlKey = await seedOwner(page, 'runner-setup-d', { proxy: true, dispatch: false });
+  test('(d) no runner key: the ○ set up › run-step notice reaches /runner', async ({ page }) => {
+    const urlKey = await seedOwner(page, 'runner-setup-d', false);
     await page.goto(`/workspace/${urlKey}/swipe`);
     await page.waitForLoadState('networkidle');
     await openPrompts(page);
@@ -142,8 +129,8 @@ test.describe('runner setup page (LIN-3098 S4, phone)', () => {
     await expect(page.getByTestId('runner-setup-page')).toBeVisible();
   });
 
-  test('(e) both flags on: "run on my machine ›" is visible on the Swipe card and reaches /runner', async ({ page }) => {
-    const urlKey = await seedOwner(page, 'runner-setup-e', { proxy: true, dispatch: true });
+  test('(e) runner key: "run on my machine ›" is visible on the Swipe card and reaches /runner', async ({ page }) => {
+    const urlKey = await seedOwner(page, 'runner-setup-e', true);
     await page.goto(`/workspace/${urlKey}/swipe`);
     await page.waitForLoadState('networkidle');
     // S4b: on the card itself, so Prompts need not be opened; the ladder no
@@ -159,18 +146,18 @@ test.describe('runner setup page (LIN-3098 S4, phone)', () => {
     await expect(page.getByTestId('runner-setup-page')).toHaveAttribute('data-state', 'owner');
   });
 
-  test('(f) proxy on, dispatch off: the dispatch note, and the mint works', async ({ page }) => {
-    const urlKey = await seedOwner(page, 'runner-setup-f', { proxy: true, dispatch: false });
+  test('(f) no runner key: /runner offers the mint with no Settings step, and it works', async ({ page }) => {
+    const urlKey = await seedOwner(page, 'runner-setup-f', false);
     await page.goto(`/workspace/${urlKey}/runner`);
-    await expect(page.getByTestId('runner-setup-page')).toHaveAttribute('data-state', 'owner-dispatch-off');
-    await expect(page.getByTestId('runner-setup-dispatch-note')).toContainText(/Dispatch queue/);
+    await expect(page.getByTestId('runner-setup-page')).toHaveAttribute('data-state', 'owner');
+    await expect(page.getByTestId('runner-setup-dispatch-note')).toHaveCount(0);
     await page.getByTestId('runner-setup-mint').tap();
     await expect(page.getByTestId('runner-setup-output')).toHaveValue(/## Your runner credential/);
-    await page.screenshot({ path: `${SHOTS}/f-dispatch-off-minted.png`, fullPage: true });
+    await page.screenshot({ path: `${SHOTS}/f-no-key-minted.png`, fullPage: true });
   });
 
   test('the Dispatch page links to the setup page', async ({ page }) => {
-    const urlKey = await seedOwner(page, 'runner-setup-g', { proxy: true, dispatch: true });
+    const urlKey = await seedOwner(page, 'runner-setup-g', true);
     await page.goto(`/workspace/${urlKey}/dispatch`);
     const link = page.getByTestId('dispatch-runner-setup-link');
     await expect(link).toBeVisible();
@@ -179,7 +166,7 @@ test.describe('runner setup page (LIN-3098 S4, phone)', () => {
   });
 
   test('no horizontal scroll at phone width', async ({ page }) => {
-    const urlKey = await seedOwner(page, 'runner-setup-w', { proxy: true, dispatch: true });
+    const urlKey = await seedOwner(page, 'runner-setup-w', true);
     await page.goto(`/workspace/${urlKey}/runner`);
     await page.getByTestId('runner-setup-mint').tap();
     await expect(page.getByTestId('runner-setup-output')).toHaveValue(/## Your runner credential/);

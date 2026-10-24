@@ -27,6 +27,7 @@ import { renderShipBiscuitPage } from '../lib/render-ship-biscuit.js';
 import { renderErrorPage } from '../lib/render.js';
 import { jsonError, keepaliveError, serviceUnavailable } from '../lib/errors.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
+import { requestFeatureFlags } from '../lib/run-controls.js';
 import { buildEditionModel, windowRange } from '../lib/ship-biscuit.js';
 import { buildEditorMessages, parseEditorResponse, assessEditorOutcome, buildQuietEdition, buildMockEdition } from '../lib/prompts/ship-biscuit-editor.js';
 import { DEFAULT_MODEL, streamChat, resolveReasoningBudget } from '../lib/openrouter.js';
@@ -83,7 +84,7 @@ export function createShipBiscuitRoutes({
 
   router.get('/workspace/:urlKey/ship-biscuit', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
-    const featureFlags = getFeatureFlags(req.session);
+    const featureFlags = await requestFeatureFlags(req);
 
     // Gate: experimental feature must be enabled (mirrors flight-companion/next-run).
     if (featureFlags.shipBiscuit !== true) {

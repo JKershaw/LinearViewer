@@ -1364,7 +1364,7 @@ test.describe('Ambient rulings nav badge (LIN-1728 Phase 3)', () => {
   // guards in the press handler could never fire). Exercised on the projects
   // page here; the Observation-specific coverage is below.
   test('hidden with no rulings, shows a workspace-scoped count once one exists, gated on the dispatch flag like the queue badge', async ({ page }) => {
-    await page.goto(`/test/set-session?urlKey=${URL_KEY}${featuresParam({ dispatch: true })}`);
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}&runnerKey=1`);
     await clearRuns(page);
     await page.goto(`/workspace/${URL_KEY}/`);
     await page.waitForLoadState('networkidle');
@@ -1397,15 +1397,15 @@ test.describe('Ambient rulings nav badge (LIN-1728 Phase 3)', () => {
     expect(body.workspaces.map(w => w.urlKey)).toContain(URL_KEY);
   });
 
-  test('absent when the dispatch flag is off', async ({ page }) => {
-    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+  test('absent when the workspace has no way to run (LIN-3849)', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}&runnerKey=0`);
     await page.goto(`/workspace/${URL_KEY}/`);
     await page.waitForLoadState('networkidle');
     await expect(page.locator('[data-rulings-badge]')).toHaveCount(0);
   });
 
   test('LIN-1728 review F7: the badge actually initializes and updates on the Observation page itself', async ({ page }) => {
-    await page.goto(`/test/set-session?urlKey=${URL_KEY}${featuresParam({ dispatch: true })}`);
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}&runnerKey=1`);
     await clearRuns(page);
     await seedDecisionWorker(page, { issueIdentifier: 'LIN-1728-B7', issueTitle: 'F7 badge ruling', decisionId: 'd-rulings-badge-f7', blocked: true });
 
@@ -1424,7 +1424,7 @@ test.describe('Ambient rulings nav badge (LIN-1728 Phase 3)', () => {
   });
 
   test('LIN-1728 review F6: the badge is a real link into the Rulings tab, not a button that does nothing', async ({ page }) => {
-    await page.goto(`/test/set-session?urlKey=${URL_KEY}${featuresParam({ dispatch: true })}`);
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}&runnerKey=1`);
     await clearRuns(page);
     await seedDecisionWorker(page, { issueIdentifier: 'LIN-1728-B6', issueTitle: 'F6 badge ruling', decisionId: 'd-rulings-badge-f6', blocked: true });
 
@@ -1482,7 +1482,7 @@ test.describe('Ambient rulings nav badge (LIN-1728 Phase 3)', () => {
 // fails on; the other three are descriptive.
 test.describe('.nav-actions width at ≤320px with both badges visible (LIN-2191 follow-up check)', () => {
   test('two visible badges do not add wrapping or overflow beyond the pre-existing zero-badge shape', async ({ page }) => {
-    await page.goto(`/test/set-session?urlKey=${URL_KEY}${featuresParam({ dispatch: true })}`);
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}&runnerKey=1`);
     await clearRuns(page);
     await page.setViewportSize({ width: 320, height: 800 });
     await page.goto(`/workspace/${URL_KEY}/`);

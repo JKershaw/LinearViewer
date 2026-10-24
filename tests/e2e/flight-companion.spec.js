@@ -155,7 +155,7 @@ test.describe('Flight Companion Page (experimental)', () => {
       // This one test also needs the proxy flag, layered locally without
       // perturbing the shared beforeEach's flag-on-only session for the rest
       // of this block.
-      await page.goto(`/test/set-session?${featuresParam({ flightCompanion: true, proxy: true })}&urlKey=${URL_KEY}`);
+      await page.goto(`/test/set-session?${featuresParam({ flightCompanion: true })}&urlKey=${URL_KEY}`);
       await page.goto(PAGE_URL);
       await page.waitForLoadState('networkidle');
 
@@ -171,9 +171,9 @@ test.describe('Flight Companion Page (experimental)', () => {
       // the actions were ever moved inside the disclosure. Not clicking
       // either control here: that's flight-companion-proxy-copy.spec.js's job.
       await expect(page.locator('#flight-companion-copy')).toBeVisible();
-      // LIN-3079: the inert +proxy toggle is removed even with the feature on;
-      // the feature-gate attribute is still emitted for the forced copy path.
-      await expect(page.locator('body')).toHaveAttribute('data-proxy-feature', 'true');
+      // LIN-3079: the inert +proxy toggle is removed (LIN-3849: and the feature-gate
+      // attribute with the switch it reported).
+      await expect(page.locator('body')).not.toHaveAttribute('data-proxy-feature', /.*/);
       await expect(page.locator('.prompt-proxy-toggle')).toHaveCount(0);
     });
 

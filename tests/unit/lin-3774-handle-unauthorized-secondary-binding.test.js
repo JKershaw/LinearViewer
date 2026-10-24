@@ -105,6 +105,8 @@ function harness({ degraded = [], remintFails = false, fetchThrows = null, fetch
     getDeployInfo: () => ({}),
     getProviderForWorkspace: () => ({ supports: () => false }),
     getFeatureFlags: () => ({}),
+    requestFeatureFlags: async () => ({}),
+    resolveRunControls: async () => ({ runControls: false, runSetup: false }),
     fetchAndPrepareProjects: async (...args) => {
       calls.fetch.push(args);
       if (fetchThrows) throw fetchThrows;

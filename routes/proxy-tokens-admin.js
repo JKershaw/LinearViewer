@@ -15,7 +15,6 @@ import { badRequest, jsonError, notFound, serviceUnavailable } from '../lib/erro
 import { MAX_NAME_LENGTH } from '../lib/issue-write-validation.js';
 import { UUID_REGEX } from '../lib/workspace.js';
 import { getProvider } from '../lib/providers/registry.js';
-import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { ownerlessCompatEnabled } from '../lib/ownerless-token-policy.js';
 import { BOOTSTRAP_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
 import { SCOPES, RUNNER_GRANTS } from '../lib/proxy-scopes.js';
@@ -140,14 +139,10 @@ export function createTokensAdminRoutes({ proxyTokenStore, proxyEventStore, work
   router.post('/workspace/:urlKey/api/proxy/tokens', proxyTokenCreationLimiter, workspaceFromUrl, async (req, res) => {
     const { workspace } = req;
 
-    // LIN-525 #2: token minting is gated on the proxy feature flag (defense in
-    // depth — independent of the UI). The proxy page that mints tokens
-    // is itself flag-gated, so a mint request on a flag-off session means a
-    // stale global +proxy toggle is trying to inject where no button is shown.
-    if (getFeatureFlags(req.session).proxy !== true) {
-      return jsonError(res, 403, 'Proxy feature is not enabled for this workspace');
-    }
-
+    // LIN-3849: the per-user proxy switch (LIN-525 #2) is gone. Keys belong to
+    // the workspace, so read and read-write keys mint for any member; a key
+    // that carries grants (runner / driver / agent) still goes through the
+    // owner-checked mint below.
     try {
       const { label, scope, singleUse, bootstrap, runner, grants, purpose } = req.body || {};
 

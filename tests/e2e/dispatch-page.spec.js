@@ -46,7 +46,7 @@ const REPO_SEED = {
 // so its session-scoped dispatch POSTs resolve the local workspace. seedLocalWorkspace
 // only needs a `.request` API context, so a `{ request }` shim suffices.
 function seedRequestSession(request) {
-  return seedLocalWorkspace({ request }, REPO_SEED, { features: { dispatch: true, proxy: false }, urlKey: WS });
+  return seedLocalWorkspace({ request }, REPO_SEED, { runnerKey: true, proxyDefault: false, keepQueueTokens: true, urlKey: WS });
 }
 
 test.describe('Dispatch Page', () => {
@@ -61,7 +61,7 @@ test.describe('Dispatch Page', () => {
 
   test.describe('Page Access', () => {
     test('dispatch page loads when feature flag is enabled', async ({ page }) => {
-      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true, proxy: false }, urlKey: WS });
+      await seedLocalWorkspace(page, REPO_SEED, { runnerKey: true, proxyDefault: false, urlKey: WS });
       await seedWorkspaceOwnership(page, WS, 'owner'); // LIN-3383: runner enqueue is owner-only
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
@@ -70,18 +70,22 @@ test.describe('Dispatch Page', () => {
       await expect(page.locator('.dispatch-subtitle')).toContainText('Queue prompts');
     });
 
-    test('dispatch page redirects to settings when feature flag is disabled', async ({ page }) => {
+    test('without run controls the page stays reachable by URL, read-only: no send menu (LIN-3849)', async ({ page }) => {
       await seedLocalWorkspace(page, REPO_SEED, { urlKey: WS });
       await seedWorkspaceOwnership(page, WS, 'owner'); // LIN-3383: runner enqueue is owner-only
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
 
-      // Should redirect to settings page
-      expect(page.url()).toContain('/settings');
+      // No redirect to Settings (there is no switch to turn on), and no send controls.
+      expect(page.url()).toContain('/dispatch');
+      await expect(page.locator('.dispatch-toggle')).toHaveCount(0);
+      await expect(page.locator('.dispatch-prompt-send')).toHaveCount(0);
+      // Key tools stay.
+      await expect(page.locator('.dispatch-load-autopilot').first()).toBeVisible();
     });
 
     test('dispatch page shows all four sections', async ({ page }) => {
-      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true, proxy: false }, urlKey: WS });
+      await seedLocalWorkspace(page, REPO_SEED, { runnerKey: true, proxyDefault: false, urlKey: WS });
       await seedWorkspaceOwnership(page, WS, 'owner'); // LIN-3383: runner enqueue is owner-only
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
@@ -97,7 +101,7 @@ test.describe('Dispatch Page', () => {
     test.beforeEach(async ({ page }) => {
       // Seed FIRST so the local session (user `test-local-user-id`) exists before
       // clearing recents — `/test/clear-recent-prompts` clears the session's user.
-      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true, proxy: false }, urlKey: WS });
+      await seedLocalWorkspace(page, REPO_SEED, { runnerKey: true, proxyDefault: false, urlKey: WS });
       // LIN-3383: queueing for a runner is owner-only; state the owner explicitly.
       await seedWorkspaceOwnership(page, WS, 'owner');
       await page.goto(`/test/clear-dispatch-queue?urlKey=${WS}`);
@@ -175,7 +179,7 @@ test.describe('Dispatch Page', () => {
       await dispatchBtn.click();
 
       const feedback = page.locator('.dispatch-prompt-feedback');
-      await expect(feedback).toHaveText('prompt is empty');
+      await expect(feedback).toHaveText('enter a prompt or a goal');
     });
 
     test('recent prompts appear after dispatch', async ({ page }) => {
@@ -282,7 +286,7 @@ test.describe('Dispatch Page', () => {
     test.beforeEach(async ({ page }) => {
       // Seed FIRST so the local session's user exists before clearing, then
       // clear BOTH lists (favourites survive the recents cap, so both matter).
-      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true, proxy: false }, urlKey: WS });
+      await seedLocalWorkspace(page, REPO_SEED, { runnerKey: true, proxyDefault: false, urlKey: WS });
       await seedWorkspaceOwnership(page, WS, 'owner'); // LIN-3383: runner enqueue is owner-only
       await page.goto('/test/clear-recent-prompts');
       await page.goto('/test/clear-favorite-prompts');
@@ -375,7 +379,7 @@ test.describe('Dispatch Page', () => {
 
   test.describe('Dispatch Options Disclosure', () => {
     test.beforeEach(async ({ page }) => {
-      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true, proxy: false }, urlKey: WS });
+      await seedLocalWorkspace(page, REPO_SEED, { runnerKey: true, proxyDefault: false, urlKey: WS });
       await seedWorkspaceOwnership(page, WS, 'owner'); // LIN-3383: runner enqueue is owner-only
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
@@ -469,7 +473,7 @@ test.describe('Dispatch Page', () => {
 
   test.describe('Model/Harness Exec Controls (LIN-1096)', () => {
     test.beforeEach(async ({ page }) => {
-      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true, proxy: false }, urlKey: WS });
+      await seedLocalWorkspace(page, REPO_SEED, { runnerKey: true, proxyDefault: false, urlKey: WS });
       await seedWorkspaceOwnership(page, WS, 'owner'); // LIN-3383: runner enqueue is owner-only
       await page.goto(`/test/clear-dispatch-queue?urlKey=${WS}`);
       await page.goto(DISPATCH_URL);
@@ -632,7 +636,7 @@ test.describe('Dispatch Page', () => {
     const PROXY_MARKER = '## Workspace API access (auto-appended)';
 
     test.beforeEach(async ({ page }) => {
-      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true, proxy: true }, proxyDefault: false, urlKey: WS });
+      await seedLocalWorkspace(page, REPO_SEED, { runnerKey: true, proxyDefault: false, urlKey: WS });
       await seedWorkspaceOwnership(page, WS, 'owner'); // LIN-3383: runner enqueue is owner-only
       await page.goto(`/test/clear-dispatch-queue?urlKey=${WS}`);
       await page.goto(DISPATCH_URL);
@@ -715,7 +719,7 @@ test.describe('Dispatch Page', () => {
   test.describe('Queue List', () => {
     test.beforeEach(async ({ page }) => {
       await page.goto(`/test/clear-dispatch-queue?urlKey=${WS}`);
-      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true, proxy: false }, urlKey: WS });
+      await seedLocalWorkspace(page, REPO_SEED, { runnerKey: true, proxyDefault: false, urlKey: WS });
       await seedWorkspaceOwnership(page, WS, 'owner'); // LIN-3383: runner enqueue is owner-only
     });
 
@@ -833,7 +837,7 @@ test.describe('Dispatch Page', () => {
     // place: window.renderQueueRow is the single source of row markup both twins
     // (public/app.js, public/dispatch.js) delegate to.
     test('renderQueueRow: local→harbour label + follow-up/force/harness/kind chip branches', async ({ page }) => {
-      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true, proxy: false }, urlKey: WS });
+      await seedLocalWorkspace(page, REPO_SEED, { runnerKey: true, proxyDefault: false, urlKey: WS });
       await seedWorkspaceOwnership(page, WS, 'owner'); // LIN-3383: runner enqueue is owner-only
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
@@ -875,7 +879,7 @@ test.describe('Dispatch Page', () => {
   test.describe('Token Management', () => {
     test.beforeEach(async ({ page }) => {
       await page.goto(`/test/clear-dispatch-tokens?urlKey=${WS}`);
-      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true, proxy: false }, urlKey: WS });
+      await seedLocalWorkspace(page, REPO_SEED, { runnerKey: true, proxyDefault: false, urlKey: WS });
       await seedWorkspaceOwnership(page, WS, 'owner'); // LIN-3383: runner enqueue is owner-only
       // LIN-3137 J5: the mint is owner-only — seed the owner edge explicitly.
       await seedWorkspaceOwnership(page, WS);
@@ -975,7 +979,7 @@ test.describe('Dispatch Page', () => {
       await page.goto(`/test/clear-dispatch-queue?urlKey=${WS}`);
       await page.goto(`/test/clear-dispatch-tokens?urlKey=${WS}`);
       await page.goto(`/test/clear-dispatch-history?urlKey=${WS}`);
-      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true, proxy: false }, urlKey: WS });
+      await seedLocalWorkspace(page, REPO_SEED, { runnerKey: true, proxyDefault: false, urlKey: WS });
       await seedWorkspaceOwnership(page, WS, 'owner'); // LIN-3383: runner enqueue is owner-only
     });
 
@@ -1112,7 +1116,7 @@ test.describe('Dispatch Page', () => {
       await page.goto(`/test/clear-dispatch-queue?urlKey=${WS}`);
       await page.goto(`/test/clear-dispatch-tokens?urlKey=${WS}`);
       await page.goto(`/test/clear-dispatch-history?urlKey=${WS}`);
-      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true, proxy: false }, urlKey: WS });
+      await seedLocalWorkspace(page, REPO_SEED, { runnerKey: true, proxyDefault: false, urlKey: WS });
       await seedWorkspaceOwnership(page, WS, 'owner'); // LIN-3383: runner enqueue is owner-only
     });
 
@@ -1228,7 +1232,7 @@ test.describe('Dispatch Page', () => {
 
   test.describe('Navigation', () => {
     test('header switcher shows dispatch as current when feature enabled', async ({ page }) => {
-      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true, proxy: false }, urlKey: WS });
+      await seedLocalWorkspace(page, REPO_SEED, { runnerKey: true, proxyDefault: false, urlKey: WS });
       await seedWorkspaceOwnership(page, WS, 'owner'); // LIN-3383: runner enqueue is owner-only
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
@@ -1239,7 +1243,7 @@ test.describe('Dispatch Page', () => {
     });
 
     test('header dispatch link works from other pages', async ({ page }) => {
-      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true, proxy: false }, urlKey: WS });
+      await seedLocalWorkspace(page, REPO_SEED, { runnerKey: true, proxyDefault: false, urlKey: WS });
       await seedWorkspaceOwnership(page, WS, 'owner'); // LIN-3383: runner enqueue is owner-only
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
@@ -1266,7 +1270,7 @@ test.describe('Dispatch Page', () => {
     });
 
     test('navbar shows projects link on dispatch page', async ({ page }) => {
-      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true, proxy: false }, urlKey: WS });
+      await seedLocalWorkspace(page, REPO_SEED, { runnerKey: true, proxyDefault: false, urlKey: WS });
       await seedWorkspaceOwnership(page, WS, 'owner'); // LIN-3383: runner enqueue is owner-only
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
@@ -1278,7 +1282,7 @@ test.describe('Dispatch Page', () => {
 
   test.describe('Settings Page Cleanup', () => {
     test('settings page no longer shows dispatch section when dispatch enabled', async ({ page }) => {
-      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true, proxy: false }, urlKey: WS });
+      await seedLocalWorkspace(page, REPO_SEED, { runnerKey: true, proxyDefault: false, urlKey: WS });
       await seedWorkspaceOwnership(page, WS, 'owner'); // LIN-3383: runner enqueue is owner-only
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
@@ -1291,15 +1295,6 @@ test.describe('Dispatch Page', () => {
       await expect(page.locator('.history-list')).toHaveCount(0);
     });
 
-    test('settings page still shows dispatch feature toggle', async ({ page }) => {
-      await seedLocalWorkspace(page, REPO_SEED, { urlKey: WS });
-      await seedWorkspaceOwnership(page, WS, 'owner'); // LIN-3383: runner enqueue is owner-only
-      await page.goto(SETTINGS_URL);
-      await page.waitForLoadState('networkidle');
-
-      // Dispatch toggle should still be present
-      await expect(page.locator('[data-feature="dispatch"]')).toBeVisible();
-    });
   });
 
   // LIN-564: a free-text goal typed before "load Autopilot" must reach the
@@ -1307,7 +1302,7 @@ test.describe('Dispatch Page', () => {
   // after it. The goal control + load button are proxy-gated, so seed proxy on.
   test.describe('Autopilot Goal', () => {
     test.beforeEach(async ({ page }) => {
-      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true, proxy: true }, urlKey: WS });
+      await seedLocalWorkspace(page, REPO_SEED, { runnerKey: true, proxyDefault: false, urlKey: WS });
       await seedWorkspaceOwnership(page, WS, 'owner'); // LIN-3383: runner enqueue is owner-only
       // fixture:LIN-3136: an autopilot launch declares the dispatch grant for the session's owner (M2)
       await seedWorkspaceOwnership(page, WS);
@@ -1420,7 +1415,7 @@ test.describe('Dispatch Page', () => {
 
       await expect(dispatchBtn).toContainText('dispatched!');
       // No misleading empty-prompt error appeared.
-      await expect(page.locator('.dispatch-prompt-feedback')).not.toHaveText('prompt is empty');
+      await expect(page.locator('.dispatch-prompt-feedback')).not.toHaveText('enter a prompt or a goal');
 
       // The dispatched item is the goal-scoped Autopilot kickoff, not a blank prompt.
       const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
