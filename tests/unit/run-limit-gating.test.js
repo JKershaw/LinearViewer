@@ -24,6 +24,7 @@ import vm from 'node:vm';
 import express from 'express';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { FreeTierStore } from '../../lib/free-tier-store.js';
+import { isWorkspaceApiUnitFile } from './lib/workspace-api-unit.js';
 
 const FUTURE = '2026-10-03T00:00:00.000Z';
 const PATH = '/workspace/acme/api/dispatch';
@@ -236,7 +237,7 @@ describe('LIN-3238 — relay coverage (static guard)', () => {
     // routes/proxy-kickoff.js and lib/dispatch-entrance.js) are one unit. This used to
     // require exactly the four files dispatch.js, proxy-dispatch.js, proxy-kickoff.js
     // and workspace-api.js, each with its own relay. Now: outside the entrances the
-    // gated files are exactly workspace-api.js (the two feedback lanes) and it relays;
+    // gated files are workspace-API unit files (the two feedback lanes; LIN-3861) and each relays;
     // inside them at least one file passes runGate to createDispatchItem and the unit
     // holds a relay. Which of the four holds either is not pinned.
     const entranceFiles = new Set(['dispatch.js', 'proxy-dispatch.js', 'proxy-kickoff.js']);
@@ -246,8 +247,12 @@ describe('LIN-3238 — relay coverage (static guard)', () => {
     const hasRelayIn = (src) => /err\.runLimit/.test(src) || /mapDispatchRefusal\s*\(/.test(src) || /relayDispatchRefusal\s*\(/.test(src);
 
     const gatedOutside = files.filter(f => !entranceFiles.has(f) && isGated(read(f))).sort();
-    // The two feedback lanes (workspace-api) are the only gated lanes outside the entrances.
-    assert.deepEqual(gatedOutside, ['workspace-api.js'], `unexpected gated-lane file set outside the entrances: ${gatedOutside.join(', ')}`);
+    // The two feedback lanes are the only gated lanes outside the entrances. LIN-3861: they sit in the
+    // workspace-API unit (routes/workspace-api.js or routes/workspace-api-*.js), not in one named file; the
+    // set must be non-empty, every member a unit file, and each member relays (per file, below). The
+    // rule is gatedOutsideProblems above, with its synthetic-file witnesses.
+    assert.ok(gatedOutside.length > 0, 'no gated lane file outside the entrances');
+    for (const f of gatedOutside) assert.ok(isWorkspaceApiUnitFile(`routes/${f}`), `unexpected gated-lane file outside the entrances and the workspace-API unit: ${f}`);
 
     const entranceSources = [...[...entranceFiles].map(f => ({ name: f, src: read(f) })), entranceLib];
     const gatedInside = entranceSources.filter(e => isGated(e.src));
@@ -260,6 +265,56 @@ describe('LIN-3238 — relay coverage (static guard)', () => {
       assert.ok(hasRelayIn(read(f)), `${f} passes runGate but has no err.runLimit relay`);
     }
     assert.ok(entranceSources.some(e => hasRelayIn(e.src)), 'the dispatch entrances pass runGate but nothing in them relays err.runLimit');
+  });
+
+  // LIN-3861: outside the entrances the gated files are a non-empty set of workspace-API unit files
+  // (routes/workspace-api.js and routes/workspace-api-*.js: the two feedback lanes, wherever the LIN-2246
+  // moves put them), and EACH gated file relays err.runLimit (per file, never "the unit holds a relay":
+  // that is the LIN-3601 shape, which would let one relay cover a lane that has none). A pure check over a
+  // `{ rel: src }` map of routes/; the witnesses plant violations in a synthetic map. The behaviour carrier
+  // is feedback-route.test.js 'feedback submit — free-tier run limit (LIN-3238 Q10)': both lanes answer
+  // 201 { launched:false, code, retryable, message } through runGate and the relay.
+  const ENTRANCES = new Set(['routes/dispatch.js', 'routes/proxy-dispatch.js', 'routes/proxy-kickoff.js']);
+  const gated = (src) => /createDispatchItem\s*\(/.test(src) && /runGate/.test(src);
+  const relays = (src) => /err\.runLimit/.test(src) || /mapDispatchRefusal\s*\(/.test(src) || /relayDispatchRefusal\s*\(/.test(src);
+  function gatedOutsideProblems(routeSources) {
+    const gatedOutside = Object.keys(routeSources).filter(rel => !ENTRANCES.has(rel) && gated(routeSources[rel])).sort();
+    const problems = [];
+    if (!gatedOutside.length) problems.push('no gated lane file outside the entrances (the two feedback lanes are gated)');
+    for (const rel of gatedOutside) {
+      if (!isWorkspaceApiUnitFile(rel)) problems.push(`${rel} is gated outside the entrances and outside the workspace-API unit`);
+      else if (!relays(routeSources[rel])) problems.push(`${rel} passes runGate but has no err.runLimit relay`);
+    }
+    return problems;
+  }
+
+  test('LIN-3861 W rule: outside the entrances the gated files are workspace-API unit files, and each relays', () => {
+    const live = Object.fromEntries(files.map(f => [`routes/${f}`, readFileSync(`${routesDir}/${f}`, 'utf8')]));
+    assert.deepEqual(gatedOutsideProblems(live), []);
+  });
+
+  describe('LIN-3861 W rule witnesses (synthetic route files)', () => {
+    const LANE = 'await createDispatchItem(store, { runGate });\n';
+    const RELAY = 'const limit = err ? err.runLimit : null;\n';
+    test('the lanes in routes/workspace-api.js, or moved to routes/workspace-api-x.js with their relay, pass', () => {
+      assert.deepEqual(gatedOutsideProblems({ 'routes/workspace-api.js': LANE + RELAY, 'routes/proxy.js': 'export {};\n' }), []);
+      assert.deepEqual(gatedOutsideProblems({ 'routes/workspace-api.js': 'export {};\n', 'routes/workspace-api-x.js': LANE + RELAY }), []);
+    });
+    test('a gated file outside the unit fails', () => {
+      assert.deepEqual(gatedOutsideProblems({ 'routes/workspace-api.js': LANE + RELAY, 'routes/zz-lane.js': LANE + RELAY }),
+        ['routes/zz-lane.js is gated outside the entrances and outside the workspace-API unit']);
+    });
+    test('a gated W file without a relay fails, even when another W file relays (per gated file)', () => {
+      assert.deepEqual(gatedOutsideProblems({ 'routes/workspace-api.js': LANE }), ['routes/workspace-api.js passes runGate but has no err.runLimit relay']);
+      assert.deepEqual(gatedOutsideProblems({ 'routes/workspace-api.js': LANE + RELAY, 'routes/workspace-api-x.js': LANE }),
+        ['routes/workspace-api-x.js passes runGate but has no err.runLimit relay']);
+      assert.deepEqual(gatedOutsideProblems({ 'routes/workspace-api.js': LANE, 'routes/workspace-api-x.js': RELAY }),
+        ['routes/workspace-api.js passes runGate but has no err.runLimit relay']);
+    });
+    test('no gated file outside the entrances fails (the empty set), and an entrance file is not outside', () => {
+      assert.deepEqual(gatedOutsideProblems({ 'routes/workspace-api.js': 'export {};\n' }), ['no gated lane file outside the entrances (the two feedback lanes are gated)']);
+      assert.deepEqual(gatedOutsideProblems({ 'routes/workspace-api.js': LANE + RELAY, 'routes/dispatch.js': LANE }), []);
+    });
   });
 
   test('routes/proxy.js defines the shared relayDispatchRefusal, which maps via lib/dispatch-refusal.js', () => {

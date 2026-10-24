@@ -32,6 +32,9 @@ import { createSessionsFeedCache } from '../../lib/sessions-feed-cache.js';
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
 import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
 import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
+import { randomUUID } from 'node:crypto';
+import { fingerprintCredential } from '../../lib/credential-diagnostics.js';
+import { readBindingCredential, readWorkspaceCredential, setWorkspaceCredential } from '../../lib/connection-binding.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -205,7 +208,7 @@ function makeSpyHarbourCommentsStore() {
   };
 }
 
-function buildApp({ provider, session, dispatchQueueStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, workspaceOverrides } = {}) {
+function buildApp({ provider, session, dispatchQueueStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, workspaceOverrides, adoptConnectionCredential, onWorkspace } = {}) {
   registerProvider(provider);
   const app = express();
   app.use(express.json());
@@ -213,6 +216,9 @@ function buildApp({ provider, session, dispatchQueueStore, taskDecisionsStore, h
   const workspaceRouter = createWorkspaceApiRoutes({
     workspaceFromUrl: (req, res, next) => {
       req.workspace = { urlKey: req.params.urlKey, provider: PROVIDER_NAME, accessToken: 'ws-token', ...workspaceOverrides };
+      // LIN-3861: a per-request hook (the connection-backed adopt tests hydrate the request's
+      // workspace credential here, as lib/connection-credential.js does, and keep the object).
+      if (onWorkspace) onWorkspace(req.workspace);
       req.session = session || { accountId: 'acct-1' };
       next();
     },
@@ -232,6 +238,9 @@ function buildApp({ provider, session, dispatchQueueStore, taskDecisionsStore, h
     // never eligible without one), injected explicitly by the recovery
     // describe block below.
     ownerCredentialStore,
+    // LIN-3861: the connection-backed adopt entrant (LIN-2933 / LIN-3124 D7); optional, so every
+    // test that does not pass it is unchanged (the route defaults it to null).
+    ...(adoptConnectionCredential ? { adoptConnectionCredential } : {}),
   });
   app.use(workspaceRouter);
 
@@ -1236,6 +1245,97 @@ describe('POST /workspace/:urlKey/api/comments/:issueId — session-lane auth re
     assert.match(body.error, /trashed/i);
     assert.strictEqual(guardCalls, 2);
     assert.strictEqual(calls.createComment.length, 1, 'the retry never reaches createComment — the retried guard already terminated it');
+  });
+});
+
+// =============================================================================
+// LIN-3861: the connection-backed adopt entrant (LIN-2933 / LIN-3124 D7), driven over HTTP.
+// This replaces the four source-text regexes on routes/workspace-api.js that
+// tests/unit/lin-3124-pr3-checkpoint-c3.test.js used to carry: a connection-backed
+// workspace adopts through the injected `adoptConnectionCredential({ workspace,
+// ownerAccountId, fingerprint })`, then hydrates the binding (`setBindingCredential`) and
+// the workspace (`setWorkspaceCredential`), because `applyAccessTokenToWorkspace` no-ops
+// for it. Each construct has its own failing mutation (see the PR): (a) the adopt call
+// replaced by null, (b) the setBindingCredential line deleted, (c) the setWorkspaceCredential
+// line deleted, (d) `activeConnectionBackedBinding(workspace)?.connectionId` replaced by null.
+// Credentials are built at run time (no token-shaped literal; lib/secret-scan.js reads tests too).
+// =============================================================================
+describe('POST /workspace/:urlKey/api/comments/:issueId — connection-backed adopt entrant (LIN-3861, was lin-3124-pr3-checkpoint-c3)', () => {
+  const runtimeToken = (label) => `${label}-${randomUUID()}`;
+
+  // A connection-backed active Linear binding; the request's workspace is hydrated with
+  // the stale credential (the side-table is the only place a connection-backed
+  // workspace's credential lives). `session.accountId` is the owner the spy must see.
+  function connectionBackedFixture({ adopted = true } = {}) {
+    const staleToken = runtimeToken('stale');
+    const adoptedToken = runtimeToken('adopted');
+    const events = [];
+    const binding = { provider: 'linear', scope: 'acme', connectionId: `conn-${randomUUID()}` };
+    const adoptedBag = { token: adoptedToken, tokenExpiresAt: Date.now() + 3600_000 };
+    const adoptCalls = [];
+    const adoptConnectionCredential = async (args) => {
+      adoptCalls.push(args);
+      events.push('adopt');
+      return adopted ? { binding, credentialBag: adoptedBag, token: adoptedToken, expiresAt: adoptedBag.tokenExpiresAt } : null;
+    };
+    const workspaces = [];
+    const onWorkspace = (workspace) => {
+      workspaces.push(workspace);
+      setWorkspaceCredential(workspace, { token: staleToken, tokenExpiresAt: Date.now() + 3600_000 });
+    };
+    const { provider, calls } = makeCredentialKeyedProvider({ rejectedTokens: [staleToken] });
+    const createComment = provider.createComment;
+    provider.createComment = async (token, ...rest) => {
+      events.push(token === staleToken ? 'create:stale' : 'create:other');
+      return createComment.call(provider, token, ...rest);
+    };
+    // A durable-store the legacy path would read: never consulted by the connection arm, and
+    // present because the recovery's eligibility needs one. It holds nothing to adopt.
+    const { store: ownerCredentialStore, calls: storeCalls } = makeFakeOwnerCredentialStore(null);
+    const session = makeRecoverySession({ accountId: `acct-${randomUUID()}` });
+    const app = buildApp({
+      provider, session, ownerCredentialStore, adoptConnectionCredential, onWorkspace,
+      workspaceOverrides: { provider: 'linear', accessToken: undefined, activeBinding: { provider: 'linear', scope: 'acme' }, bindings: [binding] },
+    });
+    return { app, provider, calls, binding, adoptedBag, adoptedToken, staleToken, adoptCalls, events, storeCalls, session, workspaces };
+  }
+
+  test('a rejected write on a connection-backed workspace adopts through the injected seam, hydrates binding and workspace, retries with the adopted token, 201', async () => {
+    const f = connectionBackedFixture();
+
+    const { status, body } = await postComment(f.app, ISSUE_ID, { body: 'LIN-3861 connection-backed adopt' });
+
+    // Positive control: the first write was attempted with the stale credential and refused,
+    // before the adopt ran; a fixture that stops short of the 401 catch cannot pass this.
+    assert.deepStrictEqual(f.events, ['create:stale', 'adopt', 'create:other'], 'stale write refused, then adopt, then the retry');
+    assert.deepStrictEqual(f.calls.createComment, [f.staleToken, f.adoptedToken], 'the retry carries the adopted token');
+    assert.deepStrictEqual(f.calls.issueWriteGuard, [f.staleToken, f.adoptedToken], 'the retried guard carries the adopted token too');
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(body.success, true);
+    assert.strictEqual(f.adoptCalls.length, 1, 'the adopt seam is called once');
+    const [args] = f.adoptCalls;
+    assert.strictEqual(args.ownerAccountId, f.session.accountId, 'the owner is the session account');
+    assert.strictEqual(args.fingerprint, fingerprintCredential(f.staleToken), 'the fingerprint is that of the credential that was refused');
+    assert.strictEqual(args.workspace, f.workspaces[0], 'the request workspace is handed to the seam');
+    assert.strictEqual(f.storeCalls.length, 0, 'the legacy durable store is not consulted for a connection-backed workspace');
+
+    assert.strictEqual(readBindingCredential(f.binding), f.adoptedBag, 'the binding holds the adopted bag');
+    assert.strictEqual(readWorkspaceCredential(f.workspaces[0]), f.adoptedBag, 'the workspace holds the adopted bag');
+    assert.strictEqual(f.workspaces[0].accessToken, undefined, 'no scalar mirror is written onto a connection-backed workspace');
+  });
+
+  test('nothing newer to adopt: the seam is asked once, nothing is hydrated, and there is no retry', async () => {
+    const f = connectionBackedFixture({ adopted: false });
+
+    const { status } = await postComment(f.app, ISSUE_ID, { body: 'LIN-3861 connection-backed, nothing to adopt' });
+
+    assert.deepStrictEqual(f.events, ['create:stale', 'adopt'], 'refused once, adopt asked, no retry');
+    assert.strictEqual(f.adoptCalls.length, 1);
+    assert.deepStrictEqual(f.calls.createComment, [f.staleToken]);
+    assert.notStrictEqual(status, 201);
+    assert.strictEqual(readBindingCredential(f.binding), undefined, 'nothing was hydrated onto the binding');
+    assert.notStrictEqual(readWorkspaceCredential(f.workspaces[0])?.token, f.adoptedToken);
   });
 });
 

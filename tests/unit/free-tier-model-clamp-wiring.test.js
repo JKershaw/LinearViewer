@@ -15,6 +15,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { dashboardUnitFiles } from './lib/dashboard-unit.js';
+import { workspaceApiUnitFiles } from './lib/workspace-api-unit.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -30,8 +31,10 @@ const DISPLAY_ONLY = new Set([
 ]);
 
 const FILES = [
-  'routes/workspace-api.js',
-  'routes/workspace-api-roadmap.js',
+  // LIN-3861: the workspace-API unit (routes/workspace-api.js and routes/workspace-api-*.js), not two file names.
+  // The two fixed entries were blind to routes/workspace-api-prompts.js and -steps.js (LIN-3842) and, under a
+  // move of the route bodies into another unit file, to the 6 billed clamp sites.
+  ...workspaceApiUnitFiles(root),
   'routes/proxy.js',
   'routes/proxy-compute.js',
   'routes/task-chat.js',
@@ -119,4 +122,44 @@ test('LIN-3840 witness: dropping forceDefault: isFreeTier from the run-summary s
   const hit = clampProblems({ 'routes/dashboard.js': clamped, 'routes/dashboard-body.js': `\n${dropped}` });
   assert.equal(hit.length, 1, hit.join('\n'));
   assert.match(hit[0], /^routes\/dashboard-body\.js:2 /);
+});
+
+// ─── LIN-3861: the workspace-API routes as one unit ──────────────────────────
+// The same rule over the whole workspace-API unit (routes/workspace-api.js and
+// routes/workspace-api-*.js; tests/unit/lib/workspace-api-unit.js). The fixed FILES list above
+// named routes/workspace-api.js and routes/workspace-api-roadmap.js only, so it was blind to
+// routes/workspace-api-prompts.js and -steps.js (LIN-3842) and would be blind to every file the
+// LIN-2246 moves add. A billed call anywhere in the unit is scanned.
+//
+// Reported, not fixed here: the DISPLAY_ONLY comment above says the metadata line
+// (`reportHistoryStore.save` metadata) is in routes/workspace-api.js, but that line lives in
+// routes/workspace-api-roadmap.js. Both display-only lines are matched by their exact content, not
+// their location, so the allow-list is unaffected. No ticket identified.
+const readUnit = () => Object.fromEntries(workspaceApiUnitFiles(root).map(rel => [rel, readFileSync(join(root, rel), 'utf8')]));
+
+test('LIN-3861: every billed call in the workspace-API unit threads forceDefault: isFreeTier', () => {
+  const sources = readUnit();
+  assert.ok(Object.keys(sources).length >= 4, 'the unit is listed');
+  assert.deepEqual(clampProblems(sources), []);
+  // Billed sites exist in the unit (a zero scan would be vacuous; clampProblems also fails it).
+  const clamped = Object.values(sources).join('\n').split('\n').filter(l => /resolve(?:AiOperation|Workspace)Model\(\{/.test(l) && l.includes('forceDefault: isFreeTier'));
+  assert.ok(clamped.length > 0);
+});
+
+// Built from synthetic unit files, never from the live text of routes/workspace-api.js (which is free to move).
+test('LIN-3861 witness: dropping forceDefault: isFreeTier from a billed site in ANY unit file fails', () => {
+  const clamped = "const model = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'recap', forceDefault: isFreeTier });";
+  const dropped = clamped.replace(', forceDefault: isFreeTier', '');
+  assert.notEqual(dropped, clamped);
+  assert.deepEqual(clampProblems({ 'routes/workspace-api.js': clamped }), []);
+  assert.deepEqual(clampProblems({ 'routes/workspace-api.js': '', 'routes/workspace-api-x.js': clamped }), []);
+  for (const rel of ['routes/workspace-api.js', 'routes/workspace-api-prompts.js', 'routes/workspace-api-steps.js', 'routes/workspace-api-x.js']) {
+    const hit = clampProblems({ 'routes/workspace-api-roadmap.js': clamped, [rel]: `\n${dropped}` });
+    assert.equal(hit.length, 1, `${rel}: ${hit.join('\n')}`);
+    assert.match(hit[0], new RegExp(`^${rel.replace(/\./g, '\\.')}:2 `));
+  }
+});
+
+test('LIN-3861 witness: a zero scan of the unit is vacuous and fails', () => {
+  assert.deepEqual(clampProblems({ 'routes/workspace-api.js': 'export {};\n' }), ['no clamped billed site found: a zero scan is vacuous']);
 });

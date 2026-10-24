@@ -111,6 +111,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join, relative } from 'node:path';
 import { dashboardUnitFiles, isDashboardUnitFile } from './lib/dashboard-unit.js';
+import { workspaceApiUnitFiles, isWorkspaceApiUnitFile } from './lib/workspace-api-unit.js';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 
@@ -145,8 +146,10 @@ const SHARED_CHAIN_EXPR = 'sessionApiKey || getPaidEnvKey() || freeTierKey';
 const expectedGateCalls = {
   'routes/next-run.js': 1,
   'routes/ship-biscuit.js': 1,
-  // Six full-adopt sites + the feedback-title live call (LIN-3635).
-  'routes/workspace-api.js': 7,
+  // LIN-3861: the routes/workspace-api.js row (7: six full-adopt sites + the feedback-title live call,
+  // LIN-3635) is gone. The workspace-API unit (routes/workspace-api.js and routes/workspace-api-*.js)
+  // holds exactly 7 checkFreeTierGate( calls in total, wherever they sit: the W rule at the end of this
+  // file (workspaceGateProblems, over the W files not keyed here, so roadmap's own row below stays).
   // LIN-3840: the routes/dashboard.js row (2) is gone. One quota unit per request at the two
   // summary routes is carried by (1) the dashboard-unit rule at the end of this file (exactly 2
   // checkFreeTierGate( calls across the unit), (2) dashboard-routes.test.js 'LIN-3658: a
@@ -192,12 +195,13 @@ describe('Interactive OpenRouter chain: byte-identity census (LIN-2412 / LIN-297
     assert.equal(roadmapCallCount, 2, 'routes/workspace-api-roadmap.js should call resolveChatCredential exactly TWICE — roadmap-chat (LIN-2970) and roadmap-generate/resolveRoadmapLLM (LIN-2978, credential only; chargeRoadmapLayer stays its own per-layer charge, outside this module)');
   });
 
-  test('routes/workspace-api.js: resolveChatCredential is called exactly 8 times, and the old duplicated ternary shape is gone entirely (LIN-2978, LIN-3238)', () => {
-    const src = read('routes/workspace-api.js');
-    const callCount = (src.match(/resolveChatCredential\s*\(/g) || []).length;
-    assert.equal(callCount, 8, `expected exactly 8 resolveChatCredential calls in routes/workspace-api.js (the six full-adopt sites — recommend/recommend-stream/recap/brief/scan/scan-retire — plus the credential-only feedback-title site, plus the LIN-3238 feedback dispatch-point re-derivation for the free-tier run gate), found ${callCount}`);
-    assert.doesNotMatch(src, /apiKeyToUse = sessionApiKey \|\| \(isFreeTier \? freeTierKey : undefined\)/, 'the old per-site duplicated ternary must be gone — resolveChatCredential now supplies apiKeyToUse directly at each site');
-  });
+  // LIN-3861: 'routes/workspace-api.js: resolveChatCredential is called exactly 8 times, and the old
+  // duplicated ternary shape is gone entirely (LIN-2978, LIN-3238)' read one file name. Both halves are
+  // now the W rule at the end of this file (workspaceChatCredentialProblems): exactly 8 over the
+  // workspace-API unit other than roadmap (roadmap's own 2 stay pinned above), and the ternary absent
+  // from every unit file. The 8: the six full-adopt sites (recommend, recommend-stream, recap, brief,
+  // scan, scan-retire), the credential-only feedback-title site, and the LIN-3238 feedback
+  // dispatch-point re-derivation for the free-tier run gate.
 
   // LIN-3840: 'routes/dashboard.js: resolveChatCredential is called exactly twice, and the
   // degrade guard at both sites is now `if (!apiKey)` (LIN-2978)' is gone. The two counts are
@@ -282,7 +286,9 @@ function gateCallProblems(files, expected) {
   }
   if (unitCalls !== UNIT_GATE_CALLS) problems.push(`the dashboard unit holds ${unitCalls} checkFreeTierGate( call(s), expected exactly ${UNIT_GATE_CALLS}`);
   const listed = Object.keys(expected).filter(rel => !isDashboardUnitFile(rel));
-  for (const rel of outside) if (!listed.includes(rel)) problems.push(`${rel} calls checkFreeTierGate( but is neither a key of expectedGateCalls nor a dashboard-unit file`);
+  // LIN-3861: the workspace-API unit is a second unit. A W file is not "unlisted" (its calls are
+  // counted by the W rule below, exactly); a keyed W file (roadmap's row) is still checked as listed.
+  for (const rel of outside) if (!listed.includes(rel) && !isWorkspaceApiUnitFile(rel)) problems.push(`${rel} calls checkFreeTierGate( but is neither a key of expectedGateCalls nor a dashboard-unit file`);
   for (const rel of listed) if (!outside.includes(rel)) problems.push(`${rel} is a key of expectedGateCalls but no longer calls checkFreeTierGate(`);
   return problems;
 }
@@ -335,5 +341,112 @@ describe('LIN-3840: dashboard unit rules (B pins, each with planted-violation wi
   test('witness: a call in an unlisted non-unit file fails', () => {
     const files = planted(liveGateScope(), 'routes/zz-unlisted.js', () => 'await checkFreeTierGate({});\n');
     assert.deepEqual(gateCallProblems(files, expectedOutsideUnit), ['routes/zz-unlisted.js calls checkFreeTierGate( but is neither a key of expectedGateCalls nor a dashboard-unit file']);
+  });
+});
+
+// ─── LIN-3861: the workspace-API routes as one unit ──────────────────────────
+// The rules below judge routes/workspace-api.js and routes/workspace-api-*.js as a set
+// (tests/unit/lib/workspace-api-unit.js), so the LIN-2246 moves can place the route groups in
+// any unit file. Pure functions over a `{ rel: src }` map: the live tests read the unit through
+// workspaceApiUnitFiles; the witnesses plant violations in a synthetic map (never in live text).
+// The counts stay EXACT over the unit (an allow-list, never "at least one"). Roadmap keeps its own
+// pinned rows (expectedGateCalls' roadmap row, the `resolveChatCredential` count of 2 above): no
+// planned move touches it, so the W counts below exclude it by file name.
+const W_GATE_CALLS = 7;            // recommend GET, recommend stream, recap, brief, scan, scan retire, feedback title
+const W_CHAT_CREDENTIAL_CALLS = 8; // the 6 full-adopt sites + feedback title + the LIN-3238 feedback re-derivation
+const ROADMAP_FILE = 'routes/workspace-api-roadmap.js';
+const OLD_APIKEY_TERNARY = /apiKeyToUse = sessionApiKey \|\| \(isFreeTier \? freeTierKey : undefined\)/;
+const liveWorkspaceUnit = () => readMap(workspaceApiUnitFiles(ROOT));
+const countOf = (src, re) => (src.match(re) || []).length;
+
+/** The W files other than those keyed in `expected` hold EXACTLY W_GATE_CALLS checkFreeTierGate( calls in total. */
+function workspaceGateProblems(files, expected) {
+  let total = 0;
+  for (const [rel, src] of Object.entries(files)) {
+    if (isWorkspaceApiUnitFile(rel) && !(rel in expected)) total += countOf(src, /checkFreeTierGate\s*\(/g);
+  }
+  return total === W_GATE_CALLS ? [] : [`the workspace-API unit (files not keyed in expectedGateCalls) holds ${total} checkFreeTierGate( call(s), expected exactly ${W_GATE_CALLS}`];
+}
+
+/** resolveChatCredential( exactly W_CHAT_CREDENTIAL_CALLS over the W files other than roadmap; the old ternary absent from EVERY W file. */
+function workspaceChatCredentialProblems(unit) {
+  const problems = [];
+  let total = 0;
+  for (const [rel, src] of Object.entries(unit)) {
+    if (rel !== ROADMAP_FILE) total += countOf(src, /resolveChatCredential\s*\(/g);
+    if (OLD_APIKEY_TERNARY.test(src)) problems.push(`${rel}: the old per-site duplicated apiKeyToUse ternary is back`);
+  }
+  if (total !== W_CHAT_CREDENTIAL_CALLS) problems.push(`the workspace-API unit (other than roadmap) holds ${total} resolveChatCredential( call(s), expected exactly ${W_CHAT_CREDENTIAL_CALLS}`);
+  return problems;
+}
+
+describe('LIN-3861: workspace-API unit rules (B pins, each with planted-violation witnesses)', () => {
+  // expectedGateCalls has no routes/workspace-api.js row: it is carried by the W rule.
+  const expectedOutsideW = expectedGateCalls;
+  const GATE = 'const gate = await checkFreeTierGate({ isFreeTier, urlKey, freeTierStore });\n';
+  const CRED = 'const { apiKey: apiKeyToUse } = resolveChatCredential({ sessionApiKey, freeTierKey });\n';
+  const gateFiles = (unit) => ({ ...Object.fromEntries(Object.entries(liveGateScope()).filter(([rel]) => !isWorkspaceApiUnitFile(rel))), ...unit });
+  const gateUnit = (n) => GATE.repeat(n);
+
+  test('checkFreeTierGate( : the W files not keyed in expectedGateCalls hold exactly 7 calls in total', () => {
+    assert.deepEqual(workspaceGateProblems(liveGateScope(), expectedOutsideW), []);
+  });
+
+  test('the live scope passes the extended gateCallProblems with the W row dropped (a W file is not unlisted)', () => {
+    assert.deepEqual(gateCallProblems(liveGateScope(), Object.fromEntries(Object.entries(expectedOutsideW).filter(([rel]) => !isDashboardUnitFile(rel)))), []);
+  });
+
+  test('witness: the 7 may sit in one W file or be split across W files (the unit is judged whole)', () => {
+    assert.deepEqual(workspaceGateProblems(gateFiles({ 'routes/workspace-api.js': gateUnit(7) }), expectedOutsideW), []);
+    assert.deepEqual(workspaceGateProblems(gateFiles({ 'routes/workspace-api.js': gateUnit(4), 'routes/workspace-api-x.js': gateUnit(3) }), expectedOutsideW), []);
+    assert.deepEqual(workspaceGateProblems(gateFiles({ 'routes/workspace-api-a.js': gateUnit(7), [ROADMAP_FILE]: GATE }), expectedOutsideW), [], 'roadmap keeps its own keyed row and is not counted');
+  });
+
+  test('witness: an 8th call planted in a synthetic W file fails', () => {
+    const files = gateFiles({ 'routes/workspace-api.js': gateUnit(7), 'routes/workspace-api-x.js': GATE });
+    assert.deepEqual(workspaceGateProblems(files, expectedOutsideW), ['the workspace-API unit (files not keyed in expectedGateCalls) holds 8 checkFreeTierGate( call(s), expected exactly 7']);
+  });
+
+  test('witness: a call removed from the unit fails', () => {
+    assert.deepEqual(workspaceGateProblems(gateFiles({ 'routes/workspace-api.js': gateUnit(6) }), expectedOutsideW),
+      ['the workspace-API unit (files not keyed in expectedGateCalls) holds 6 checkFreeTierGate( call(s), expected exactly 7']);
+  });
+
+  test('witness: a roadmap call does not count toward the 7, and an extra one there is the roadmap row\'s to catch', () => {
+    const files = gateFiles({ 'routes/workspace-api.js': gateUnit(7), [ROADMAP_FILE]: gateUnit(2) });
+    assert.deepEqual(workspaceGateProblems(files, expectedOutsideW), []);
+    assert.deepEqual(gateCallProblems(files, Object.fromEntries(Object.entries(expectedOutsideW).filter(([rel]) => !isDashboardUnitFile(rel)))), [], 'gateCallProblems takes no count for the roadmap key (its count is the :156-class row pinned in the test above)');
+  });
+
+  test('witness: a call in a synthetic routes/workspace-api-x.js is not "unlisted" but counts toward W, and a call in an unlisted non-unit file still fails', () => {
+    const files = gateFiles({ 'routes/workspace-api.js': gateUnit(7), 'routes/workspace-api-x.js': GATE });
+    const outsideDashboard = Object.fromEntries(Object.entries(expectedOutsideW).filter(([rel]) => !isDashboardUnitFile(rel)));
+    assert.ok(!gateCallProblems({ ...liveGateScope(), 'routes/workspace-api-x.js': GATE }, outsideDashboard).some(p => p.includes('workspace-api-x.js')), 'a W file is not "unlisted"');
+    assert.equal(workspaceGateProblems(files, expectedOutsideW).length, 1, 'but it counts toward (and fails) the W total');
+    assert.deepEqual(gateCallProblems({ ...liveGateScope(), 'routes/zz-unlisted.js': GATE }, outsideDashboard),
+      ['routes/zz-unlisted.js calls checkFreeTierGate( but is neither a key of expectedGateCalls nor a dashboard-unit file']);
+  });
+
+  test('resolveChatCredential( : exactly 8 over the W files other than roadmap, and the old ternary is absent from every W file', () => {
+    assert.deepEqual(workspaceChatCredentialProblems(liveWorkspaceUnit()), []);
+  });
+
+  test('witness: the 8 may be split across W files; roadmap\'s own calls are not counted here', () => {
+    assert.deepEqual(workspaceChatCredentialProblems({ 'routes/workspace-api.js': CRED.repeat(5), 'routes/workspace-api-x.js': CRED.repeat(3), [ROADMAP_FILE]: CRED.repeat(2) }), []);
+  });
+
+  test('witness: a 9th call planted in a synthetic W file fails; a call removed fails', () => {
+    assert.deepEqual(workspaceChatCredentialProblems({ 'routes/workspace-api.js': CRED.repeat(8), 'routes/workspace-api-x.js': CRED }),
+      ['the workspace-API unit (other than roadmap) holds 9 resolveChatCredential( call(s), expected exactly 8']);
+    assert.deepEqual(workspaceChatCredentialProblems({ 'routes/workspace-api.js': CRED.repeat(7) }),
+      ['the workspace-API unit (other than roadmap) holds 7 resolveChatCredential( call(s), expected exactly 8']);
+  });
+
+  test('witness: the old ternary planted in routes/workspace-api-x.js (or roadmap) fails', () => {
+    const ternary = 'const apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined);\n';
+    assert.deepEqual(workspaceChatCredentialProblems({ 'routes/workspace-api.js': CRED.repeat(8), 'routes/workspace-api-x.js': ternary }),
+      ['routes/workspace-api-x.js: the old per-site duplicated apiKeyToUse ternary is back']);
+    assert.deepEqual(workspaceChatCredentialProblems({ 'routes/workspace-api.js': CRED.repeat(8), [ROADMAP_FILE]: ternary }),
+      [`${ROADMAP_FILE}: the old per-site duplicated apiKeyToUse ternary is back`]);
   });
 });

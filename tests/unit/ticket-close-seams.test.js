@@ -18,6 +18,7 @@ import { registerProvider } from '../../lib/providers/registry.js';
 import { CloseOutEventsStore } from '../../lib/close-out-events-store.js';
 import { createOnTicketWrite } from '../../lib/ticket-close-closer.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { findRouteLayer } from './lib/route-layer.js';
 
 const tick = () => new Promise(r => setImmediate(r));
 const ISSUE_UUID = '33333333-3333-3333-3333-333333333333';
@@ -215,7 +216,7 @@ describe('seam 3: close-out check Done write', () => {
     return router;
   }
   async function check(router) {
-    const layer = router.stack.find(l => l.route?.path === '/workspace/:urlKey/api/run-evidence/:issueIdentifier/check' && l.route.methods.post);
+    const layer = findRouteLayer(router, 'post', '/workspace/:urlKey/api/run-evidence/:issueIdentifier/check');
     const res = { statusCode: 200, jsonBody: null, status(c) { this.statusCode = c; return this; }, json(b) { this.jsonBody = b; return this; } };
     await layer.route.stack[layer.route.stack.length - 1].handle({
       session: { accountId: 'acct-1', workspaces: ['ws'] }, workspace: { urlKey: 'ws', id: 'ws', accessToken: 't' },

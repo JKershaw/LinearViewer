@@ -17,6 +17,7 @@ import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
 import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cache.js';
 import { InMemoryRunParagraphStore } from '../../lib/run-paragraph-store.js';
 import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
+import { findRouteLayer } from './lib/route-layer.js';
 
 before(() => { process.env.NODE_ENV = 'test'; });
 
@@ -53,7 +54,7 @@ describe('readRunEvidence: viewerIsOwner defaults to false', () => {
       workspaceFromUrl: (req, res, next) => next(),
       runEvidence: { resolveProvider: () => ({ provider, callScope: 's' }), readPrStatus: unreadable }
     });
-    const layer = router.stack.find(l => l.route?.path === '/workspace/:urlKey/api/run-evidence/:issueIdentifier' && l.route.methods.get);
+    const layer = findRouteLayer(router, 'get', '/workspace/:urlKey/api/run-evidence/:issueIdentifier');
     const handler = layer.route.stack[layer.route.stack.length - 1].handle;
     const res = { statusCode: 200, jsonBody: null, status(c) { this.statusCode = c; return this; }, json(b) { this.jsonBody = b; return this; } };
     await handler({ session: {}, workspace: { urlKey: 'ws' }, params: { urlKey: 'ws', issueIdentifier: 'LIN-1' }, query: {} }, res, (err) => { if (err) throw err; });
