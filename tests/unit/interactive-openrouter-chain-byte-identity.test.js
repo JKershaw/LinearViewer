@@ -146,8 +146,10 @@ const SHARED_CHAIN_EXPR = 'sessionApiKey || getPaidEnvKey() || freeTierKey';
 const expectedGateCalls = {
   'routes/next-run.js': 1,
   'routes/ship-biscuit.js': 1,
-  // Six full-adopt sites + the feedback-title live call (LIN-3635).
-  'routes/workspace-api.js': 7,
+  // LIN-3861: the routes/workspace-api.js row (7: six full-adopt sites + the feedback-title live call,
+  // LIN-3635) is gone. The workspace-API unit (routes/workspace-api.js and routes/workspace-api-*.js)
+  // holds exactly 7 checkFreeTierGate( calls in total, wherever they sit: the W rule at the end of this
+  // file (workspaceGateProblems, over the W files not keyed here, so roadmap's own row below stays).
   // LIN-3840: the routes/dashboard.js row (2) is gone. One quota unit per request at the two
   // summary routes is carried by (1) the dashboard-unit rule at the end of this file (exactly 2
   // checkFreeTierGate( calls across the unit), (2) dashboard-routes.test.js 'LIN-3658: a
@@ -193,12 +195,13 @@ describe('Interactive OpenRouter chain: byte-identity census (LIN-2412 / LIN-297
     assert.equal(roadmapCallCount, 2, 'routes/workspace-api-roadmap.js should call resolveChatCredential exactly TWICE — roadmap-chat (LIN-2970) and roadmap-generate/resolveRoadmapLLM (LIN-2978, credential only; chargeRoadmapLayer stays its own per-layer charge, outside this module)');
   });
 
-  test('routes/workspace-api.js: resolveChatCredential is called exactly 8 times, and the old duplicated ternary shape is gone entirely (LIN-2978, LIN-3238)', () => {
-    const src = read('routes/workspace-api.js');
-    const callCount = (src.match(/resolveChatCredential\s*\(/g) || []).length;
-    assert.equal(callCount, 8, `expected exactly 8 resolveChatCredential calls in routes/workspace-api.js (the six full-adopt sites — recommend/recommend-stream/recap/brief/scan/scan-retire — plus the credential-only feedback-title site, plus the LIN-3238 feedback dispatch-point re-derivation for the free-tier run gate), found ${callCount}`);
-    assert.doesNotMatch(src, /apiKeyToUse = sessionApiKey \|\| \(isFreeTier \? freeTierKey : undefined\)/, 'the old per-site duplicated ternary must be gone — resolveChatCredential now supplies apiKeyToUse directly at each site');
-  });
+  // LIN-3861: 'routes/workspace-api.js: resolveChatCredential is called exactly 8 times, and the old
+  // duplicated ternary shape is gone entirely (LIN-2978, LIN-3238)' read one file name. Both halves are
+  // now the W rule at the end of this file (workspaceChatCredentialProblems): exactly 8 over the
+  // workspace-API unit other than roadmap (roadmap's own 2 stay pinned above), and the ternary absent
+  // from every unit file. The 8: the six full-adopt sites (recommend, recommend-stream, recap, brief,
+  // scan, scan-retire), the credential-only feedback-title site, and the LIN-3238 feedback
+  // dispatch-point re-derivation for the free-tier run gate.
 
   // LIN-3840: 'routes/dashboard.js: resolveChatCredential is called exactly twice, and the
   // degrade guard at both sites is now `if (!apiKey)` (LIN-2978)' is gone. The two counts are
@@ -378,8 +381,8 @@ function workspaceChatCredentialProblems(unit) {
 }
 
 describe('LIN-3861: workspace-API unit rules (B pins, each with planted-violation witnesses)', () => {
-  // expectedGateCalls without its routes/workspace-api.js row: that row is carried by the W rule.
-  const expectedOutsideW = Object.fromEntries(Object.entries(expectedGateCalls).filter(([rel]) => rel !== 'routes/workspace-api.js'));
+  // expectedGateCalls has no routes/workspace-api.js row: it is carried by the W rule.
+  const expectedOutsideW = expectedGateCalls;
   const GATE = 'const gate = await checkFreeTierGate({ isFreeTier, urlKey, freeTierStore });\n';
   const CRED = 'const { apiKey: apiKeyToUse } = resolveChatCredential({ sessionApiKey, freeTierKey });\n';
   const gateFiles = (unit) => ({ ...Object.fromEntries(Object.entries(liveGateScope()).filter(([rel]) => !isWorkspaceApiUnitFile(rel))), ...unit });
