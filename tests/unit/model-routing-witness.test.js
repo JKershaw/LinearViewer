@@ -6,7 +6,8 @@
  * the live resolvers over a real WorkspacePreferencesStore + ModelRoutingStore (the lazy
  * migration included) on memory collections. Every cell must be equal unless it is listed
  * in INTENDED_DIFFERENCES, whose only permitted tickets are D2 (LIN-3856) and D3 (LIN-3857),
- * each added by its own PR. LIN-3856 adds the D2 entries (run-paragraph, and the
+ * each added by its own PR. LIN-3857 adds the D3 rule (opencode rows: effort becomes null and is
+ * reported as not applied). LIN-3856 adds the D2 entries (run-paragraph, and the
  * session-summary precompute path); a listed cell must equal its `expect`, every other
  * cell must still equal the old side.
  *
@@ -148,6 +149,20 @@ for (const [name, expect] of Object.entries(D2_PAID)) {
 for (const name of Object.keys(PREFS)) {
   INTENDED_DIFFERENCES.push({ ticket: 'D2', cell: `harbour/run-paragraph/${name}/free=true/freeModel=${FREE_TIER_MODEL}`, reason: 'a free key takes the free-tier clamp', expect: FREE_TIER_MODEL });
 }
+// LIN-3857 (D3): the one rule entry. INTENDED_DIFFERENCES holds hand-listed cells, which cannot say
+// "every opencode row", so this is a rule: where the old side resolved an effort on the opencode
+// harness, the new side stamps effort null and reports what was asked for. `layer` is one of the four
+// tiers; which one is pinned per tier by tests/unit/dispatch-factory-effort-not-applied.test.js.
+const EFFORT_LAYERS = ['explicit', 'preset', 'anchor', 'workspace'];
+const D3_RULE = {
+  ticket: 'D3',
+  cell: 'agent/*/opencode-effort',
+  reason: 'opencode has no effort control: the effort that runs is null, and the one asked for is reported as not applied',
+  applies: (old) => old.harness === 'opencode' && Boolean(old.effort),
+  expect: (old) => ({ ...old, effort: null, effortNotApplied: { requested: old.effort, harness: 'opencode', layer: EFFORT_LAYERS } })
+};
+INTENDED_DIFFERENCES.push(D3_RULE);
+let d3RuleHits = 0;
 const diffFor = (cell) => INTENDED_DIFFERENCES.find((d) => d.cell === cell);
 
 describe('witness: the store answers as the resolvers did at 6ea1371e', () => {
@@ -156,6 +171,7 @@ describe('witness: the store answers as the resolvers did at 6ea1371e', () => {
     for (const d of INTENDED_DIFFERENCES) assert.ok(PERMITTED_TICKETS.includes(d.ticket));
     // Every entry's expectation differs from the old side (no exemption that changes nothing).
     for (const d of INTENDED_DIFFERENCES) assert.notEqual(d.expect, DEFAULT_MODEL, d.cell);
+    assert.ok(INTENDED_DIFFERENCES.some((d) => d.ticket === 'D3'), 'the D3 entry is present');
   });
 
   test('Harbour calls: every job, every stored preference, free tier on and off', async () => {
@@ -209,7 +225,15 @@ describe('witness: the store answers as the resolvers did at 6ea1371e', () => {
                 const old = await frozen.resolveRouting({ ...args, workspacePreferencesStore: fx.oldStore });
                 const next = await resolveRouting({ ...args, workspacePreferencesStore: fx.preferencesStore });
                 hit(kind);
-                assert.deepEqual(next, old, cell);
+                if (D3_RULE.applies(old)) {
+                  d3RuleHits++;
+                  const want = D3_RULE.expect(old);
+                  const { layer, ...reported } = next.effortNotApplied || {};
+                  assert.ok(EFFORT_LAYERS.includes(layer), `${cell}: layer ${layer}`);
+                  assert.deepEqual({ ...next, effortNotApplied: reported }, { ...want, effortNotApplied: { requested: old.effort, harness: 'opencode' } }, cell);
+                } else {
+                  assert.deepEqual(next, old, cell);
+                }
               }
             }
           }
@@ -316,7 +340,12 @@ describe('witness: the store answers as the resolvers did at 6ea1371e', () => {
   });
 
   test('every D2 entry was exercised by the matrix', () => {
-    for (const d of INTENDED_DIFFERENCES) assert.ok(seenDiffs.has(d.cell), `unused D2 entry: ${d.cell}`);
+    for (const d of INTENDED_DIFFERENCES.filter((e) => e.ticket === 'D2')) assert.ok(seenDiffs.has(d.cell), `unused D2 entry: ${d.cell}`);
+  });
+
+  // LIN-3857: the D3 rule is not vacuous, and the matrix holds the preset/anchor cell the plan review found.
+  test('the D3 rule matched opencode cells in the matrix', () => {
+    assert.ok(d3RuleHits > 0, 'the D3 opencode-effort rule matched nothing');
   });
 
   // Last on purpose: it reads the counters the matrix tests filled in.

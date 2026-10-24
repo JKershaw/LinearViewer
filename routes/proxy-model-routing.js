@@ -40,7 +40,7 @@ import { jsonError } from '../lib/errors.js';
 import { WORKSPACE_FEATURES } from '../lib/feature-defaults.js';
 import { isWorkspaceFeatureEnabled } from '../lib/workspace-preferences.js';
 import { GROUPS, SURFACES, getJob } from '../lib/llm-jobs.js';
-import { FIELDS, MAX_REASON_LENGTH, MODEL_ID_PATTERN, RoutingError } from '../lib/model-routing.js';
+import { FIELDS, MAX_REASON_LENGTH, MODEL_ID_PATTERN, RoutingError, effortNotAppliedForChanges } from '../lib/model-routing.js';
 import { validateOpaqueDispatchField, MAX_NAME_LENGTH } from '../lib/dispatch-validation.js';
 import { DEFAULT_MODEL } from '../lib/openrouter.js';
 
@@ -198,7 +198,16 @@ export function createProxyModelRoutingRoutes({ modelRoutingStore, workspacePref
       };
       try {
         const entry = await prepared.run(ctx);
-        return done(req, res, route, 200, { success: true, entry: publicEntry({ ...entry, actor: { ...entry.actor } }) });
+        // LIN-3857 (D3): the write is accepted (refusing it would break the legitimate order "set
+        // effort, then change harness"); where a touched job now stores an effort its harness
+        // ignores, the response says so instead of letting the mismatch pass unremarked. The store
+        // is unchanged and the stored value is not rewritten. Sparse: absent when nothing applies.
+        const effortNotApplied = effortNotAppliedForChanges(await modelRoutingStore.getTable(ctx.urlKey), entry.changes);
+        return done(req, res, route, 200, {
+          success: true,
+          entry: publicEntry({ ...entry, actor: { ...entry.actor } }),
+          ...(effortNotApplied.length ? { effortNotApplied } : {})
+        });
       } catch (err) {
         return mapError(req, res, route, err);
       }
