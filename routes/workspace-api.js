@@ -49,6 +49,7 @@ import { generateScan, parseScanResponse, buildScanMessages, isExplicitRetiremen
 import { generateFeedbackTitle } from '../lib/feedback-title.js';
 import { readRunEvidence } from '../lib/run-evidence.js';
 import { closeOutSetsDone } from '../lib/run-closeout-state.js';
+import { recordMergedPrs } from '../lib/close-out-merges.js';
 import { readCloseOutChain, closeOutNotReady, closeOutNotReadyRefusal } from '../lib/close-out-readiness.js';
 import { buildContextGraph } from '../lib/context-graph.js';
 import { hashContext } from '../lib/recap-cache.js';
@@ -700,22 +701,6 @@ function feedbackCaptureBlock({ url, userAgent }) {
 // ===========================================================================
 // Close-out helpers (LIN-3248, P3 of LIN-2949)
 // ===========================================================================
-
-// The PR head the reader saw, or null.
-function statusHeadSha(status) {
-  return status?.readable === true ? (status.head?.sha || status.ref || null) : null;
-}
-
-// The open-ledger-item counts at merge: review-ledger items not yet
-// discharged, by scope. Content-free — counts only (the audit trail says what
-// "Done" meant).
-function countOpenLedgerItems(review) {
-  const open = (review?.ledger?.items || []).filter((item) => item && !item.discharged);
-  const inScope = (scope) => open.filter((item) => item.scope === scope).length;
-  const inside = inScope('inside');
-  const outside = inScope('outside');
-  return { inside, outside, unknown: open.length - inside - outside, total: open.length };
-}
 
 // A usable close-out/run-evidence identifier: present and at most 100 chars.
 const validCloseOutIdentifier = (identifier) => !!identifier && identifier.length <= 100;
@@ -2857,7 +2842,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
             return ticketTitle;
           }
           const model = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
-          const generated = await generateFeedbackTitle(message.trim(), { apiKey: aiApiKey, model });
+          const generated = await generateFeedbackTitle(message.trim(), { apiKey: aiApiKey, model, callMeta: { urlKey: workspace.urlKey } });
           if (generated) ticketTitle = generated;
         }
       } catch (error) {
@@ -3248,54 +3233,6 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     return true;
   }
 
-  // The stored merged event for one merged PR: the one already on record, or one
-  // recorded now. LIN-3395: one event per merge — reusing the stored one matters
-  // because re-deriving `by` (a press row stored after the merge) would flip it,
-  // and `by` is part of the idempotency key, so a second merged event and a
-  // second Done write would follow. Without an events store there is no event.
-  async function mergedEventFor({ workspace, accountId, issueIdentifier, pr, headSha, openItems, prOpenedAt, prMergedAt }) {
-    if (!closeOutEventsStore) return null;
-    const { urlKey } = workspace;
-    const stored = await closeOutEventsStore.findMergedByPr({ urlKey, prUrl: pr.url });
-    if (stored) return stored;
-    // F1/F4: a press recorded for this PR at ANY head means the close-out worker
-    // merged it, not "you" (the head is dropped from the lookup so a push between
-    // the press and the merge cannot hide the press).
-    const pressed = await closeOutEventsStore.findAnyByPr({ urlKey, prUrl: pr.url, by: 'press' });
-    return closeOutEventsStore.record({
-      accountId,
-      urlKey,
-      issueId: null,
-      issueIdentifier,
-      by: pressed ? 'close-out' : 'person',
-      prUrl: pr.url,
-      headSha,
-      merged: true,
-      openItems,
-      // LIN-3713: the forge's own times, written on this first sighting only
-      // (the `stored` return above means a repeat check never rewrites them).
-      prOpenedAt,
-      prMergedAt,
-    });
-  }
-
-  // The check's merge bookkeeping: one stored merged event per merged PR, as
-  // `recorded` entries, plus the first of them and its PR's index.
-  async function recordMergedPrs({ workspace, accountId, issueIdentifier, prUrls, prStatuses, ledger }) {
-    const openItems = countOpenLedgerItems(ledger);
-    const recorded = [];
-    let first = { mergedEvent: null, mergedPrIndex: -1 };
-    for (const [index, pr] of prUrls.entries()) {
-      const status = prStatuses[index];
-      if (status?.readable !== true || status.merged !== true) continue;
-      const event = await mergedEventFor({ workspace, accountId, issueIdentifier, pr, headSha: statusHeadSha(status), openItems, prOpenedAt: status.created_at, prMergedAt: status.merged_at });
-      if (!event) continue;
-      recorded.push({ id: event._id, by: event.by, prUrl: event.prUrl, headSha: event.headSha });
-      if (!first.mergedEvent) first = { mergedEvent: event, mergedPrIndex: index };
-    }
-    return { recorded, ...first };
-  }
-
   // Stamp the merge's Done outcome on its stored event (when there is one).
   const stampMergeDone = (workspace, mergedEvent, outcome) => (
     mergedEvent && closeOutEventsStore
@@ -3379,7 +3316,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       // Close-out is a stop-at-PR surface only: a normal run records and sets
       // nothing here.
       if (stopAt === 'pr') {
-        const merges = await recordMergedPrs({ workspace, accountId: req.session.accountId, issueIdentifier, prUrls, prStatuses, ledger });
+        const merges = await recordMergedPrs({ store: closeOutEventsStore, workspace, accountId: req.session.accountId, issueIdentifier, prUrls, prStatuses, ledger });
         recorded = merges.recorded;
         let { mergedEvent } = merges;
 

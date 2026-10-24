@@ -36,4 +36,11 @@ describe('code-shape area map placement (LIN-3729)', () => {
     assert.strictEqual(areaOf('lib/graph-features.js'), 'Task model');
     assert.strictEqual(areaOf('lib/tree.js'), 'Front end: server-rendered pages');
   });
+
+  // LIN-3852: the LLM job registry is a leaf of the LLM area; without its pattern
+  // it would fall through to the catch-all `^lib/` in "Other features".
+  test('the LLM job registry lands in LLM & prompts', () => {
+    assert.strictEqual(areaOf('lib/llm-jobs.js'), 'LLM & prompts');
+    assert.strictEqual(areaOf('lib/llm-call-log.js'), 'LLM & prompts');
+  });
 });
