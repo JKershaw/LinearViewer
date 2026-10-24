@@ -124,6 +124,10 @@ export const SELECTORS = {
     openRouterStatus: '[data-testid="settings-openrouter-status"]',
     openRouterConnect: '[data-testid="settings-openrouter-connect"]',
     openRouterDisconnect: '[data-testid="settings-openrouter-disconnect"]',
+    /** An experimental view's link on Settings › Features, by flag key (LIN-3888): `settings-open-{key}`. */
+    openLink: (key) => `[data-testid="settings-open-${key}"]`,
+    /** The active source's marker on a binding row (LIN-3888). */
+    providerActive: '[data-testid="settings-provider-active"]',
     /** A key row in Settings › Agent access (LIN-3888): its test id is `settings-key-{source}`. Absent from the Proxy and Dispatch pages. */
     keyRows: '[data-testid^="settings-key-"]',
     /** The new Proxy key's name input (LIN-3888). */

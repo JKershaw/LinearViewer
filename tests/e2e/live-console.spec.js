@@ -200,12 +200,12 @@ test.describe('Live Console (experimental)', () => {
       await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
-      await expect(page.locator('.settings-action:has-text("open the live console")')).toHaveCount(0);
+      await expect(page.locator(SELECTORS.settings.openLink('liveConsole'))).toHaveCount(0);
 
       await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
-      await expect(page.locator('.settings-action:has-text("open the live console")')).toBeVisible();
+      await expect(page.locator(SELECTORS.settings.openLink('liveConsole'))).toBeVisible();
     });
   });
 

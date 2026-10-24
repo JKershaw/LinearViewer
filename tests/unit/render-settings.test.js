@@ -222,7 +222,7 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
     assert.match(html, /settings-provider-remove/);
     assert.match(html, /settings-provider-refresh/);
     // Active marker.
-    assert.match(html, /provider-active/);
+    assert.match(html, /data-testid="settings-provider-active"/);
   });
 
   test('marks only the active binding', () => {
@@ -233,7 +233,7 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
         { provider: 'github', scope: 'owner/repo', displayName: 'GitHub', token: 'ccccdddd', active: false },
       ],
     });
-    const activeCount = (html.match(/provider-active/g) || []).length;
+    const activeCount = (html.match(/data-testid="settings-provider-active"/g) || []).length;
     assert.strictEqual(activeCount, 1);
   });
 

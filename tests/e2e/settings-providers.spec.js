@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js'
+import { SELECTORS } from '../helpers.js'
 
 // Provider-management section on the settings page (LIN-634). Rides the local
 // provider harness (`seedLocal`) so the workspace has a REAL `local` binding to
@@ -21,7 +22,7 @@ test.describe('Settings — Providers section (LIN-634)', () => {
     // Local token is the partition key, not a masked secret.
     await expect(binding).toContainText('(partition key)')
     // Active marker present for the sole binding.
-    await expect(binding.locator('.provider-active')).toBeVisible()
+    await expect(binding.locator(SELECTORS.settings.providerActive)).toBeVisible()
   })
 
   // The E2E server runs with NO GitHub env configured, so the add affordance is
@@ -204,8 +205,8 @@ test.describe('Settings — Providers section (LIN-634)', () => {
     const githubBinding = page.locator('[data-testid="settings-provider-binding"][data-provider="github"]')
 
     // Both bindings coexist; local is active (●), GitHub offers "make active".
-    await expect(localBinding.locator('.provider-active')).toBeVisible()
-    await expect(githubBinding.locator('.provider-active')).toHaveCount(0)
+    await expect(localBinding.locator(SELECTORS.settings.providerActive)).toBeVisible()
+    await expect(githubBinding.locator(SELECTORS.settings.providerActive)).toHaveCount(0)
     await expect(githubBinding.locator('[data-testid="settings-provider-activate"]')).toBeVisible()
 
     // Switch the active provider to GitHub.
@@ -214,15 +215,15 @@ test.describe('Settings — Providers section (LIN-634)', () => {
 
     await expect(page.locator('[data-testid="settings-provider-notice"]')).toContainText('Switched active provider to github')
     // Active marker now tracks GitHub; local exposes the switch instead.
-    await expect(githubBinding.locator('.provider-active')).toBeVisible()
-    await expect(localBinding.locator('.provider-active')).toHaveCount(0)
+    await expect(githubBinding.locator(SELECTORS.settings.providerActive)).toBeVisible()
+    await expect(localBinding.locator(SELECTORS.settings.providerActive)).toHaveCount(0)
     await expect(localBinding.locator('[data-testid="settings-provider-activate"]')).toBeVisible()
 
     // Persisted: a fresh load keeps GitHub active.
     await page.goto(`/workspace/${urlKey}/settings/sources`)
     await page.waitForLoadState('networkidle')
-    await expect(githubBinding.locator('.provider-active')).toBeVisible()
-    await expect(localBinding.locator('.provider-active')).toHaveCount(0)
+    await expect(githubBinding.locator(SELECTORS.settings.providerActive)).toBeVisible()
+    await expect(localBinding.locator(SELECTORS.settings.providerActive)).toHaveCount(0)
   })
 
   // LIN-2803 acceptance: the non-active second source is now CROSS-kind
@@ -271,8 +272,8 @@ test.describe('Settings — Providers section (LIN-634)', () => {
     await expect(page.locator('[data-testid="settings-provider-notice"]')).toContainText('Switched active provider to github')
 
     // The switched-to binding is now active; the local one still coexists.
-    await expect(page.locator('[data-testid="settings-provider-binding"][data-provider="github"] .provider-active')).toBeVisible()
-    await expect(page.locator('[data-testid="settings-provider-binding"][data-provider="local"] .provider-active')).toHaveCount(0)
+    await expect(page.locator('[data-testid="settings-provider-binding"][data-provider="github"]').locator(SELECTORS.settings.providerActive)).toBeVisible()
+    await expect(page.locator('[data-testid="settings-provider-binding"][data-provider="local"]').locator(SELECTORS.settings.providerActive)).toHaveCount(0)
   })
 
   test('remove unlinks the binding and persists across reload', async ({ page }) => {
