@@ -200,11 +200,11 @@ test('merge-time card: under 3 reads too few merges, with the n line, at n = 2 a
   }
 });
 
-test('merge-time card: the "Harbour saw" note is always there and no NaN or null text appears', () => {
+test('merge-time card: the merge-time note is always there and no NaN or null text appears', () => {
   for (const mergeTime of [{ n: 4, medianHours: 1, p90Hours: 2 }, { n: 0, medianHours: null, p90Hours: null }, undefined]) {
     const html = withMerge(mergeTime);
     assert.ok(has(html, 'workspace-kpis-merge-time-note'));
-    assert.match(html, /only merges Harbour saw on a PR check/);
+    assert.match(html, /set Done through Harbour.*A merge closed outside Harbour is not counted/);
     assert.equal(/NaN|undefined|>null</.test(html), false);
   }
 });

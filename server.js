@@ -127,6 +127,7 @@ import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
 import { createDispatchRoutes } from './routes/dispatch.js'
 import { ConsumerHeartbeatStore } from './lib/consumer-heartbeat-store.js'
 import { createTaskModeRoutes } from './routes/task-mode.js'
+import { createPipelineMergeRecorder, createSessionWorkspaceIdResolver } from './lib/close-out-merges.js'
 import { createProxyRoutes, commentDedupe } from './routes/proxy.js'
 import { createProxyDefaultRoute } from './lib/settings-proxy-default.js'
 import { createMilestoneFunnelRoutes } from './routes/milestone-funnel.js'
@@ -3152,7 +3153,15 @@ const onTicketWrite = createOnTicketWrite({
   sessionsFeedCache,
   agentStatusStore
 })
-app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore, workspaceOwnerCheck, livenessAlarmStore, onTicketWrite, consumerHeartbeatStore }))
+// LIN-3756: records a pipeline merge on its Done write. Given to the proxy only,
+// so the task-page check route (seam 3) records exactly as it did.
+const recordPipelineMerge = createPipelineMergeRecorder({
+  closeOutEventsStore,
+  dispatchStore: dispatchQueueStore,
+  installationTokenFor,
+  resolveWorkspaceId: createSessionWorkspaceIdResolver({ sessionsCollection })
+})
+app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore, workspaceOwnerCheck, livenessAlarmStore, onTicketWrite, recordPipelineMerge, consumerHeartbeatStore }))
 
 // LIN-3098 S3: the runner kit (lib/runner-kit/*.mjs), public, for the served
 // runner prompt to fetch and verify against its sha256 pins (routes/runner-kit.js).
