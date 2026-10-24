@@ -83,13 +83,17 @@ function count(source, pattern) {
 //
 // A FIFTH mechanism means a new egress shape that needs its own provider guard.
 
-const GRAPHQL_CLIENT_FILES = ['lib/audit.js', 'lib/providers/linear/index.js', 'routes/proxy.js', 'routes/workspace-api.js', 'server.js'];
+// LIN-3861: the workspace-API unit (routes/workspace-api.js and routes/workspace-api-*.js), not one file name:
+// the fixed 'routes/workspace-api.js' entry was blind to routes/workspace-api-prompts.js and -steps.js (LIN-3842)
+// and would be to every file the LIN-2246 moves add. The total stays 2.
+const GRAPHQL_CLIENT_FILES = ['lib/audit.js', 'lib/providers/linear/index.js', 'routes/proxy.js', ...workspaceApiUnitFiles(repoRoot), 'server.js'];
 const KNOWN_GRAPHQL_CLIENT_COUNT = 2;
 
 // The two raw-fetch asset relays, anchored by the host allowlist that gates each.
 // routes/proxy-reads.js (LIN-679 Stage 3a / LIN-2536): the attachment relay
 // moved out of routes/proxy.js — widen the file set, never relax the count.
-const ASSET_RELAY_FILES = ['routes/workspace-api.js', 'routes/proxy.js', 'routes/proxy-reads.js'];
+// LIN-3861: the workspace-API unit replaces the one file name; the proxy entries stay. The total stays 2.
+const ASSET_RELAY_FILES = [...workspaceApiUnitFiles(repoRoot), 'routes/proxy.js', 'routes/proxy-reads.js'];
 const KNOWN_ASSET_RELAY_COUNT = 2;
 
 describe('LIN-1899 census (a) — credential-bearing Linear egress mechanisms', () => {
@@ -131,11 +135,12 @@ describe('LIN-1899 census (a) — credential-bearing Linear egress mechanisms', 
     // Cheap backstop for the one mutation the counts above cannot see: a guard
     // deleted while its call site stays put. Presence only — the behavioural
     // proof lives in the two egress-observing test files named at the top.
-    const source = read('routes/workspace-api.js');
+    // LIN-3861: counted over the workspace-API unit (routes/workspace-api.js and routes/workspace-api-*.js).
+    const source = workspaceApiUnitFiles(repoRoot).map(read).join('\n');
     assert.equal(
       count(source, /isActiveProviderLinear\(workspace\)/g),
       2,
-      'expected exactly 2 isActiveProviderLinear(workspace) guards in routes/workspace-api.js — the audit ' +
+      'expected exactly 2 isActiveProviderLinear(workspace) guards across the workspace-API unit — the audit ' +
       'route (refuses 422) and the image proxy (withholds the header). If a guard was intentionally removed, ' +
       'the consumer it protected must no longer read workspace.accessToken on a Linear-bound path (LIN-1899).'
     );
@@ -161,7 +166,10 @@ describe('LIN-1899 census (b) — scalar feeds, by owner', () => {
     // number that is really "1 call + 1 comment" and drift the moment either
     // moves. So the call sites are counted on non-comment lines only, and the
     // total is asserted alongside it to keep the raw grep honest.
-    const source = read('routes/workspace-api.js');
+    // LIN-3861: both counts are exact over the workspace-API unit (routes/workspace-api.js and
+    // routes/workspace-api-*.js). Reported, not fixed: the raw count pins a comment, so blanking
+    // comments would fail it.
+    const source = workspaceApiUnitFiles(repoRoot).map(read).join('\n');
     const callSites = source
       .split('\n')
       .filter(line => /runAudit\(/.test(line) && !/^\s*(\/\/|\*|\/\*)/.test(line));
@@ -169,7 +177,7 @@ describe('LIN-1899 census (b) — scalar feeds, by owner', () => {
     assert.equal(
       callSites.length,
       1,
-      `Found ${callSites.length} runAudit call site(s) in routes/workspace-api.js, expected exactly 1 ` +
+      `Found ${callSites.length} runAudit call site(s) in the workspace-API unit, expected exactly 1 ` +
       '(GET /workspace/:urlKey/api/audit). runAudit goes straight to a Linear GraphQL client, so a SECOND ' +
       'caller needs its own isActiveProviderLinear(workspace) guard — otherwise a Jira-active workspace ' +
       'discloses its raw API token to api.linear.app (LIN-1899).'
@@ -177,7 +185,7 @@ describe('LIN-1899 census (b) — scalar feeds, by owner', () => {
     assert.equal(
       count(source, /runAudit\(/g),
       2,
-      'expected 2 raw runAudit( occurrences in routes/workspace-api.js: 1 call site + 1 mention in the ' +
+      'expected 2 raw runAudit( occurrences in the workspace-API unit: 1 call site + 1 mention in the ' +
       'test-mock comment. If this drifts, re-check which of the two moved before touching the pinned counts.'
     );
   });
@@ -191,8 +199,9 @@ describe('LIN-1899 census (b) — scalar feeds, by owner', () => {
     // LIN-3840: the dashboard key is the sum over every dashboard-unit file (routes/dashboard.js
     // and routes/dashboard-*.js), so moving code inside the unit cannot blind it. Still 0 inside
     // the total of 1; the other keys are unchanged.
+    // LIN-3861: the workspace-API key is likewise the sum over every unit file, still inside the total of 1.
     const counts = {
-      'routes/workspace-api.js': count(read('routes/workspace-api.js'), BEARER_MIRROR),
+      'workspace-API unit': workspaceApiUnitFiles(repoRoot).reduce((n, rel) => n + count(read(rel), BEARER_MIRROR), 0),
       'routes/proxy.js': count(read('routes/proxy.js'), BEARER_MIRROR),
       'dashboard unit': dashboardUnitFiles(repoRoot).reduce((n, rel) => n + count(read(rel), BEARER_MIRROR), 0),
     };
@@ -269,7 +278,7 @@ function bearerMirrorProblems(unit, others) {
 }
 
 describe('LIN-3840 census (b) — the dashboard unit', () => {
-  const others = () => ({ 'routes/workspace-api.js': read('routes/workspace-api.js'), 'routes/proxy.js': read('routes/proxy.js') });
+  const others = () => ({ 'workspace-API unit': workspaceApiUnitFiles(repoRoot).map(read).join('\n'), 'routes/proxy.js': read('routes/proxy.js') });
 
   test('the dashboard unit has exactly 2 getWorkspaceAccessToken( sites', () => {
     assert.deepEqual(unitAccessorProblems(readUnit()), []);
