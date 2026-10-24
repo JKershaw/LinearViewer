@@ -70,14 +70,18 @@ test.describe('Dispatch Page', () => {
       await expect(page.locator('.dispatch-subtitle')).toContainText('Queue prompts');
     });
 
-    test('dispatch page redirects to settings when feature flag is disabled', async ({ page }) => {
+    test('without run controls the page stays reachable by URL, read-only: no send menu (LIN-3849)', async ({ page }) => {
       await seedLocalWorkspace(page, REPO_SEED, { urlKey: WS });
       await seedWorkspaceOwnership(page, WS, 'owner'); // LIN-3383: runner enqueue is owner-only
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
 
-      // Should redirect to settings page
-      expect(page.url()).toContain('/settings');
+      // No redirect to Settings (there is no switch to turn on), and no send controls.
+      expect(page.url()).toContain('/dispatch');
+      await expect(page.locator('.dispatch-toggle')).toHaveCount(0);
+      await expect(page.locator('.dispatch-prompt-send')).toHaveCount(0);
+      // Key tools stay.
+      await expect(page.locator('.dispatch-load-autopilot').first()).toBeVisible();
     });
 
     test('dispatch page shows all four sections', async ({ page }) => {

@@ -2073,13 +2073,13 @@ test.describe('Dispatch History UI', () => {
     await expect(empty).toContainText('No dispatch history yet');
   });
 
-  test('dispatch page redirects to settings when dispatch disabled', async ({ page }) => {
+  test('dispatch page is read-only without run controls: no redirect, no send menu (LIN-3849)', async ({ page }) => {
     await page.goto(`/test/set-session?runnerKey=0&urlKey=${URL_KEY}`);
     await page.goto(`/workspace/${URL_KEY}/dispatch`);
     await page.waitForLoadState('networkidle');
 
-    // Should redirect to settings page
-    expect(page.url()).toContain('/settings');
+    expect(page.url()).toContain('/dispatch');
+    await expect(page.locator('.dispatch-toggle')).toHaveCount(0);
   });
 
   test('taken item shows with correct status indicator', async ({ page, request }) => {
