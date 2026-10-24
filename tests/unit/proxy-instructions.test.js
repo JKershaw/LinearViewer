@@ -285,4 +285,25 @@ describe('buildInstructions — dispatch "harness" blank-fill chain (LIN-3858, d
   test('states the real chain: explicit, then workspace defaults, then claude-code', () => {
     assert.match(harnessLine, /explicit.*workspace's dispatch defaults.*claude-code/i);
   });
+
+  test('names the follow-up tier and no longer says the runner owns harness defaulting', () => {
+    assert.match(harnessLine, /followUpTo.*anchor's harness.*workspace's dispatch defaults/i);
+    assert.doesNotMatch(harnessLine, /registry and defaulting/);
+  });
+
+  test('POST /recommend-and-dispatch harness line does not deny the server-side fill', () => {
+    const line = text.split('\n').find((l) => l.includes('threaded onto the dispatched item') && l.includes('"harness" (optional)'));
+    assert.ok(line, 'recommend-and-dispatch harness line present');
+    assert.doesNotMatch(line, /consumer's own default/);
+    assert.match(line, /explicit.*workspace's dispatch defaults.*claude-code/i);
+  });
+
+  test('the "model" lines say a blank model is filled from the workspace dispatch defaults', () => {
+    const lines = text.split('\n').filter((l) => l.includes('"model" (optional)') && l.includes('EXECUTION model'));
+    assert.equal(lines.length, 2, 'dispatch and recommend-and-dispatch model lines present');
+    for (const line of lines) {
+      assert.doesNotMatch(line, /keep the consumer('s current)? default/);
+      assert.match(line, /workspace's dispatch defaults/);
+    }
+  });
 });
