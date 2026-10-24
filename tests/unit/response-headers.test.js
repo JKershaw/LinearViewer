@@ -142,14 +142,16 @@ describe('source scans (LIN-3692)', () => {
   const files = [join(ROOT, 'server.js'), ...listJsFiles(join(ROOT, 'lib')), ...listJsFiles(join(ROOT, 'routes'))];
   const rel = (f) => relative(ROOT, f).split(sep).join('/');
   const HOST_READ = /req\.protocol|req\.hostname|req\.host\b|get\(['"]host['"]\)|headers\.host|headers\[['"]host|x-forwarded-host/gi;
-  // The 7 localhost-only reads (no URL is built from them).
-  const LOCAL_ONLY = { 'lib/dispatch-entrance.js': 1, 'routes/next-run.js': 1, 'routes/workspace-api.js': 1, 'server.js': 5 };
+  // The 7 localhost-only reads (no URL is built from them). LIN-3861: the workspace-API reads are summed
+  // under one key over routes/workspace-api.js and routes/workspace-api-*.js (exactly 1: the detail route's
+  // localhost read, wherever it sits); the witnesses are the describe at the end of this file.
+  const LOCAL_ONLY = { 'lib/dispatch-entrance.js': 1, 'routes/next-run.js': 1, 'workspace-API unit': 1, 'server.js': 5 };
 
   test('only publicOrigin, the redirect and the localhost-only reads touch Host or protocol', () => {
     const found = {};
     for (const f of files) {
       const n = (readFileSync(f, 'utf8').match(HOST_READ) || []).length;
-      if (n) found[rel(f)] = n;
+      if (n) { const key = isWorkspaceApiUnitFile(rel(f)) ? 'workspace-API unit' : rel(f); found[key] = (found[key] || 0) + n; }
     }
     assert.ok(found['lib/public-origin.js'] >= 2, 'the helper reads protocol and host');
     delete found['lib/public-origin.js'];
