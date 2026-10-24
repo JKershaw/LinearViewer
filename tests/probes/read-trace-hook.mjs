@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 const pattern = process.env.MOVE_PROBE_TRACE_PATTERN ? new RegExp(process.env.MOVE_PROBE_TRACE_PATTERN) : null;
 const out = process.env.MOVE_PROBE_TRACE_OUT;
 const append = fs.appendFileSync;
+const HOOK_FILE = 'tests/probes/read-trace-hook.mjs';
 const TESTS_FRAME = /(?:file:\/\/)?(\/[^\s():]*?\/(tests\/[^\s():]+?\.(?:m?js|cjs))):\d+:\d+/;
 
 function normalise(p) {
@@ -32,9 +33,13 @@ function record(p) {
   if (!path) return;
   const hit = pattern.exec(path);
   if (!hit) return;
+  // The default limit (10 frames) can cut the stack off before it reaches the test file.
+  const limit = Error.stackTraceLimit;
+  Error.stackTraceLimit = 200;
   const stack = new Error().stack ?? '';
+  Error.stackTraceLimit = limit;
   if (stack.includes('node:internal/modules')) return;
-  const frame = stack.split('\n').map((l) => TESTS_FRAME.exec(l)).find(Boolean);
+  const frame = stack.split('\n').filter((l) => !l.includes(HOOK_FILE)).map((l) => TESTS_FRAME.exec(l)).find(Boolean);
   if (!frame) return;
   append(out, `${frame[2]}\t${hit[0].replace(/^\//, '')}\n`);
 }
