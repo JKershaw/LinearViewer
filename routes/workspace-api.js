@@ -2842,7 +2842,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
             return ticketTitle;
           }
           const model = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
-          const generated = await generateFeedbackTitle(message.trim(), { apiKey: aiApiKey, model });
+          const generated = await generateFeedbackTitle(message.trim(), { apiKey: aiApiKey, model, callMeta: { urlKey: workspace.urlKey } });
           if (generated) ticketTitle = generated;
         }
       } catch (error) {
