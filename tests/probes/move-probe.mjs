@@ -157,10 +157,12 @@ async function main() {
 
     const unitFiles = variant === 'all-unit' ? workspaceApiUnitFiles(tree) : [MAIN_UNIT_FILE];
     const layout = buildLayout(Object.fromEntries(unitFiles.map((rel) => [rel, readFileSync(join(tree, rel), 'utf8')])), { variant, factory: flags['--factory'] });
+    for (const rel of Object.keys(layout)) {
+      if (!unitFiles.includes(rel) && existsSync(join(tree, rel))) throw new UsageError(`${rel} already exists at ${sha.slice(0, 8)}`);
+    }
     for (const rel of unitFiles) renameSync(join(tree, rel), join(tree, bodyName(rel)));
     for (const [rel, src] of Object.entries(layout)) {
-      if (!unitFiles.includes(rel) && existsSync(join(tree, rel))) throw new UsageError(`${rel} already exists at ${sha.slice(0, 8)}`);
-      writeFileSync(join(tree, rel), src);
+      if (unitFiles.includes(rel)) writeFileSync(join(tree, rel), src);
     }
     const moved = run(variant);
     const after = parseTap(moved.tap, { root: tree });
