@@ -92,9 +92,30 @@ function markerDoneItem(id, identifier) {
 
 // ─── Handler extraction ─────────────────────────────────────────────────────────
 
+// LIN-3840: one finder, structure only. It descends nested routers
+// (`layer.handle.stack`) so the test does not care whether createDashboardRoutes
+// registers a route directly or through a router it mounts, returns the single
+// matching route layer, and fails on zero or more than one match. It loosens no
+// guard: every assertion made on the layer or its handler is unchanged.
+function findRouteLayer(router, method, path) {
+  const matches = [];
+  const walk = (stack) => {
+    for (const layer of stack) {
+      if (layer.route) {
+        if (layer.route.path === path && layer.route.methods[method]) matches.push(layer);
+      } else if (Array.isArray(layer.handle?.stack)) {
+        walk(layer.handle.stack);
+      }
+    }
+  };
+  walk(router.stack);
+  assert.ok(matches.length > 0, `${method.toUpperCase()} ${path} route is registered`);
+  assert.equal(matches.length, 1, `${method.toUpperCase()} ${path} is registered ${matches.length} times, expected exactly once`);
+  return matches[0];
+}
+
 function getHandler(router, method, path) {
-  const layer = router.stack.find(l => l.route?.path === path && l.route.methods[method]);
-  assert.ok(layer, `${method.toUpperCase()} ${path} route is registered`);
+  const layer = findRouteLayer(router, method, path);
   return layer.route.stack[layer.route.stack.length - 1].handle;
 }
 
@@ -984,8 +1005,7 @@ describe('POST /api/dashboard/rulings/reverse-withdrawal (LIN-2891/LIN-3035)', (
       getDeployInfo: () => ({})
     });
 
-    const layer = router.stack.find(l => l.route?.path === REVERSE_PATH && l.route.methods.post);
-    assert.ok(layer, 'the route must be registered');
+    const layer = findRouteLayer(router, 'post', REVERSE_PATH);
     assert.ok(
       layer.route.stack.some(s => s.handle === sessionOnlyMiddleware),
       'the route must be mounted under the injected workspaceFromUrl middleware, by identity'
