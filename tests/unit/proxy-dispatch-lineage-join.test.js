@@ -604,6 +604,29 @@ describe('LIN-3812 — the list on persisted lineage fields (the four intended v
     const { body } = await get(app, '/api/proxy/dispatch?status=aborted');
     assert.ok(body.items.find(i => i.id === 'target-1'), 'the target is aborted although its abort row is far outside the newest 200');
   });
+
+  test('F1 — the page is chosen by dispatchedAt, not resolvedAt: limit=1 returns the later-dispatched row even when it resolved earlier', async () => {
+    const A = row({ id: 'A', status: 'taken', dispatchedAt: '2026-06-22T10:00:00.000Z', resolvedAt: '2026-06-22T12:00:00.000Z' });
+    const X = row({ id: 'X', status: 'cancelled', dispatchedAt: '2026-06-22T11:00:00.000Z', resolvedAt: '2026-06-22T11:05:00.000Z' });
+    const { app } = await buildApp({ history: [A, X] });
+    const { body } = await get(app, '/api/proxy/dispatch?limit=1');
+    assert.deepEqual(body.items.map(i => i.id), ['X'], 'base answered X: newest dispatch first, then sliced');
+    assert.equal(body.total, 2);
+  });
+
+  test('F2 — a stale persisted row is never served under a ?status= its healed status does not match, and total drops it', async () => {
+    // The state after a recompute lost every CAS (or threw): own [done], persisted lineageStatus null, bases apart.
+    const stale = row({
+      id: 'stale-1', feedback: [{ message: '[done] finished', timestamp: T2 }],
+      lineageStatus: null, lineageBasis: 1, lineageStatusBasis: 0
+    });
+    const { app } = await buildApp({ history: [stale] });
+    const taken = await get(app, '/api/proxy/dispatch?status=taken');
+    assert.deepEqual(taken.body.items, [], 'healed to done, so it does not belong to ?status=taken');
+    assert.equal(taken.body.total, 0);
+    const unfiltered = await get(app, '/api/proxy/dispatch');
+    assert.equal(unfiltered.body.items.find(i => i.id === 'stale-1').status, 'done');
+  });
 });
 
 /**

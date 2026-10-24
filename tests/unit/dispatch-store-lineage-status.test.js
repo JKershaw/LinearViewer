@@ -365,6 +365,43 @@ describe('lineage list fields persisted at write time (real MangoDB tmpdir, LIN-
       assert.deepEqual(calls.slice(0, 2), ['push', 'fanout']);
     });
 
+    test('CAS on lineageBasis: a sibling fan-out landing between the recompute\'s read and its write makes the write lose, and the retry persists the post-fan-out values', async () => {
+      const root = await run();
+      await tick();
+      const child = await run({ followUpTo: root, rootItemId: root });
+      await tick();
+      const realUpdateOne = history.updateOne.bind(history);
+      const writes = [];
+      let raced = false;
+      history.updateOne = async (q, u) => {
+        if (!raced && q._id === root) {
+          raced = true;
+          // The recompute has read R (basis 0, no sibling entry); the child's tagged entry now lands.
+          history.updateOne = realUpdateOne;
+          await post(child, 'heartbeat', root);
+          history.updateOne = async (q2, u2) => {
+            const res = await realUpdateOne(q2, u2);
+            if (q2._id === root) writes.push(res.matchedCount);
+            return res;
+          };
+        }
+        const res = await realUpdateOne(q, u);
+        if (q._id === root) writes.push(res.matchedCount);
+        return res;
+      };
+      try {
+        await recomputeLineageRows(history, URL_KEY, [root]);
+      } finally {
+        history.updateOne = realUpdateOne;
+      }
+      assert.equal(writes[0], 0, 'the first write lost its compare-and-set: the fan-out bumped lineageBasis under it');
+      assert.equal(writes[1], 1, 'the retry won');
+      const row = await persisted(root);
+      assert.ok(isLineageFresh(row), `fresh after the retry (basis ${row.lineageBasis} vs status basis ${row.lineageStatusBasis})`);
+      assert.equal(row.lineageFeedbackCount, 1, 'holding the post-fan-out values (the child\'s entry, counted once)');
+      await assertPersistedMatchesOracle('cas-race');
+    });
+
     test('a CAS lost on every attempt logs once and leaves the row stale, never throws', async () => {
       const root = await run();
       const realUpdateOne = history.updateOne.bind(history);
