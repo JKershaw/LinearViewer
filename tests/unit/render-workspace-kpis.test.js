@@ -204,7 +204,7 @@ test('merge-time card: the merge-time note is always there and no NaN or null te
   for (const mergeTime of [{ n: 4, medianHours: 1, p90Hours: 2 }, { n: 0, medianHours: null, p90Hours: null }, undefined]) {
     const html = withMerge(mergeTime);
     assert.ok(has(html, 'workspace-kpis-merge-time-note'));
-    assert.match(html, /set Done through Harbour.*A merge closed outside Harbour is not counted/);
+    assert.match(html, /close-out sets a task Done through Harbour.*Other merges, such as one closed outside Harbour, are not counted/);
     assert.equal(/NaN|undefined|>null</.test(html), false);
   }
 });

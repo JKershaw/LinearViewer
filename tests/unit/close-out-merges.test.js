@@ -3,7 +3,7 @@
 
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { createPipelineMergeRecorder } from '../../lib/close-out-merges.js';
+import { createPipelineMergeRecorder, createSessionWorkspaceIdResolver } from '../../lib/close-out-merges.js';
 import { CloseOutEventsStore } from '../../lib/close-out-events-store.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 
@@ -132,5 +132,27 @@ describe('createPipelineMergeRecorder', () => {
     await assert.doesNotReject(c.run({ workspaceId: null }));
     const bad = await c.run({ provider: { name: 'github', async fetchIssueComments() { throw new Error('down'); } } });
     assert.deepEqual(bad, { recorded: [] });
+  });
+});
+
+// LIN-3756: the legacy-token fallback, wired only in server.js. Session-bound: a live
+// session names the workspace, an expired one does not.
+describe('createSessionWorkspaceIdResolver', () => {
+  const T = Date.parse('2026-10-24T10:00:00Z');
+  const row = (expires, workspaces) => ({ expires, session: JSON.stringify({ workspaces }) });
+  const sessionsCollection = {
+    find: () => ({
+      toArray: async () => [
+        row(new Date(T + 3600e3), [{ id: 'w-9', urlKey: 'ws' }]),
+        row(new Date(T - 1), [{ id: 'w-old', urlKey: 'old' }]),
+      ],
+    }),
+  };
+
+  test('resolves a live session\'s workspace and nothing else', async () => {
+    const resolver = createSessionWorkspaceIdResolver({ sessionsCollection, now: () => T });
+    assert.equal(await resolver('ws'), 'w-9');
+    assert.equal(await resolver('old'), null);
+    assert.equal(await resolver('nope'), null);
   });
 });
