@@ -87,7 +87,7 @@ async function generateRunSummaryReply(ctx, req, res, { loop, inputHash }) {
 
   try {
     const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'run-summary', forceDefault: isFreeTier });
-    const { summary, model } = await generateRunSummary(loop, { apiKey, model: selectedModel });
+    const { summary, model } = await generateRunSummary(loop, { apiKey, model: selectedModel, callMeta: { urlKey: workspace.urlKey } });
     await runSummaryCacheStore.put(workspace.urlKey, loopId, { inputHash, summary, model });
     res.json({ status: 'fresh', loopId, summary, model, generatedAt: new Date().toISOString() });
   } catch (error) {
@@ -275,7 +275,7 @@ async function generateSessionSummaryReply(ctx, req, res, { session, inputHash }
   try {
     const childOutcomes = await gatherChildOutcomes(ctx, session, workspace.urlKey);
     const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'session-summary', forceDefault: isFreeTier });
-    const { summary, model } = await generateSessionSummary(session, { apiKey, model: selectedModel, childOutcomes });
+    const { summary, model } = await generateSessionSummary(session, { apiKey, model: selectedModel, childOutcomes, callMeta: { urlKey: workspace.urlKey } });
     await sessionSummaryCacheStore.put(workspace.urlKey, sessionId, { inputHash, summary, model });
     res.json({ status: 'fresh', sessionId, live: false, summary, model, generatedAt: new Date().toISOString() });
   } catch (error) {
