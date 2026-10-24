@@ -79,7 +79,8 @@ test.describe('Periodicals group', () => {
     // the count to this row's node — the group now holds more than one periodical.
     await row.click();
     const docNode = group.locator('.node', { has: page.locator('.line:has-text("Documentation Review")') });
-    await expect(docNode.locator('[data-kind="periodical"]')).toHaveCount(1);
+    // LIN-3849: "+ Autopilot" is a key tool and always renders beside the plain Mint.
+    await expect(docNode.locator('[data-kind="periodical"]')).toHaveCount(2);
     // LIN-1973 review F3: `[data-action="create-task"]` only exists on the
     // ui.write-only (e.g. Jira) branch of render.js's add-task link — under
     // this spec's Local provider (ui.inlineCreate: true), that selector is
@@ -115,8 +116,10 @@ test.describe('Periodicals group', () => {
     await row.click();
 
     // Open the dispatch disclosure, then dispatch to the cli target.
-    await docNode.locator('.dispatch-disclosure').click();
-    const dispatchBtn = docNode.locator('.prompt-dispatch[data-target="cli"]');
+    // The plain Mint container comes first; "+ Autopilot" (proxy-forced) follows it.
+    const plain = docNode.locator('[data-kind="periodical"]:not([data-proxy-force="true"])');
+    await plain.locator('.dispatch-disclosure').click();
+    const dispatchBtn = plain.locator('.prompt-dispatch[data-target="cli"]');
     await dispatchBtn.click();
 
     // The button reaches the success state (it showed "failed" before the fix).

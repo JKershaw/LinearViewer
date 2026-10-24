@@ -197,9 +197,30 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   // (mintGrantBootstrap, then the bootstrap's one exchange for the working token).
   // `want === false` clears both stores for the workspace, so a spec that asserts
   // "no key" cannot inherit one a previous spec minted on the same per-worker urlKey.
-  async function seedRunnerKey({ urlKey, workspaceId, ownerAccountId, want }) {
+  //
+  // `claimOwner` (the seed routes pass it, /test/create-runner-key does not) makes the
+  // session account the workspace's owner first, as a fresh-id seed already is. A
+  // per-worker urlKey keeps its workspace id across specs, so an earlier spec that
+  // left the owner edge 'foreign' would otherwise refuse this mint (GRANT_OWNER_ONLY)
+  // and, worse, hide the owner-only set-up rung from a spec that asks for it.
+  async function seedRunnerKey({ urlKey, workspaceId, ownerAccountId, want, claimOwner = false, queueToken = false }) {
     await proxyTokenStore.clear(urlKey);
     await dispatchTokenStore.clear(urlKey);
+    if (claimOwner && ownerAccountId) {
+      const edges = accountWorkspaceStore.collection;
+      await edges.updateMany({ workspaceId }, { $set: { role: null } });
+      const existing = await edges.findOne({ accountId: ownerAccountId, workspaceId });
+      if (existing) await edges.updateOne({ _id: existing._id }, { $set: { role: 'owner' } });
+      else await edges.insertOne({ _id: crypto.randomUUID(), accountId: ownerAccountId, workspaceId, createdAt: new Date(), role: 'owner' });
+    }
+    // `queueToken` gives run controls through the other half of the rule (a live
+    // queue token) WITHOUT a runner credential. A runner key counts as "someone is
+    // listening" for 20 minutes (lib/consumer-poll-warning.js), so a spec that
+    // asserts the "nothing is listening" warning uses this instead.
+    if (queueToken) {
+      const { tokenId } = await dispatchTokenStore.createToken(urlKey, 'e2e queue token');
+      return { tokenId };
+    }
     if (!want) return null;
     const bootstrap = await proxyTokenStore.mintGrantBootstrap({
       urlKey, workspaceId, ownerAccountId, grants: RUNNER_GRANTS, label: 'e2e runner key'
@@ -335,7 +356,8 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
           urlKey: workspaces[0].urlKey,
           workspaceId: workspaces[0].id,
           ownerAccountId: req.session.accountId,
-          want: runnerKeyParam === '1' || runnerKeyParam === 'true'
+          want: runnerKeyParam === '1' || runnerKeyParam === 'true',
+          claimOwner: true
         })
       }
     }
@@ -1528,7 +1550,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       // risk), mirroring routes/workspace.js's POST /workspace/new.
       await establishAccount(req.session, accountStore, accountWorkspaceStore, 'local', urlKey, {}, wsId);
       if (typeof body.runnerKey === 'boolean') {
-        await seedRunnerKey({ urlKey, workspaceId: wsId, ownerAccountId: req.session.accountId, want: body.runnerKey });
+        await seedRunnerKey({ urlKey, workspaceId: wsId, ownerAccountId: req.session.accountId, want: body.runnerKey, claimOwner: true, queueToken: body.queueToken === true });
       }
       for (const { binding, refreshToken } of connectionBackedExtras) {
         const conversion = await convertFixtureBinding(req, wsId, binding, refreshToken);

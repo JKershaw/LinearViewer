@@ -286,8 +286,9 @@ async function expandPromptsSection(page, containerSelector, issueId) {
 
 test.describe('Streaming AI Recommendations - UI', () => {
   test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
-    // The ✦ primary requires OpenRouter to be configured.
-    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true });
+    // The ✦ primary requires OpenRouter to be configured. proxyDefault:false keeps the
+    // copy bare (LIN-3849: the proxy switch these cases used to turn off is gone).
+    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, proxyDefault: false });
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
   });
