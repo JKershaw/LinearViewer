@@ -6,8 +6,8 @@
 //   MOVE_PROBE_TRACE_PATTERN  regex source matched against the normalised path
 //   MOVE_PROBE_TRACE_OUT      file the lines are appended to
 // The reading test file is the nearest `tests/` frame in the stack. A read whose stack goes through
-// the module loader (`node:internal/modules`) is the loader importing the file, not a test reading
-// its text, and is skipped.
+// the module loader as its immediate caller (`node:internal/modules`) is the loader importing the
+// file, not a test reading its text, and is skipped.
 import fs from 'node:fs';
 import { syncBuiltinESMExports } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -38,8 +38,11 @@ function record(p) {
   Error.stackTraceLimit = 200;
   const stack = new Error().stack ?? '';
   Error.stackTraceLimit = limit;
-  if (stack.includes('node:internal/modules')) return;
-  const frame = stack.split('\n').filter((l) => !l.includes(HOOK_FILE)).map((l) => TESTS_FRAME.exec(l)).find(Boolean);
+  const frames = stack.split('\n').filter((l) => l.trim().startsWith('at ') && !l.includes(HOOK_FILE));
+  // The loader's own read has the loader as its immediate caller. A test module that reads at its top
+  // level also has the loader somewhere BELOW it (it is being evaluated), so only the caller counts.
+  if (frames[0]?.includes('node:internal/modules')) return;
+  const frame = frames.map((l) => TESTS_FRAME.exec(l)).find(Boolean);
   if (!frame) return;
   append(out, `${frame[2]}\t${hit[0].replace(/^\//, '')}\n`);
 }
