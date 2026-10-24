@@ -96,3 +96,31 @@ describe('key tools render with no flag set', () => {
     assert.ok(!html.includes('dispatch-prompt-send'), 'but no send targets');
   });
 });
+
+describe('the Dispatch page is read-only for a member', () => {
+  const page = (featureFlags) => renderDispatchPage('Acme', { urlKey: 'acme', featureFlags });
+
+  test('a member gets no halt buttons but keeps the halt status, and the token form is disabled', () => {
+    const html = page({});
+    assert.ok(!html.includes('dispatch-halt-pause'));
+    assert.ok(!html.includes('dispatch-halt-stop'));
+    assert.ok(!html.includes('dispatch-halt-resume'));
+    assert.ok(html.includes('data-testid="dispatch-halt-status"'));
+    // The form element stays: public/dispatch.js returns early without it and the token list would not load.
+    assert.match(html, /id="create-token-form"/);
+    assert.match(html, /<button type="submit" class="action-btn save" disabled>/);
+    assert.ok(html.includes('only the workspace owner can make a queue token'));
+    assert.match(html, /class="token-list"[^>]*data-can-revoke="false"/);
+  });
+
+  for (const [name, flags] of [['an owner with a way to run', { runControls: true }], ['a keyless owner (runSetup)', { runSetup: true }]]) {
+    test(`${name} gets the halt buttons and an enabled token form`, () => {
+      const html = page(flags);
+      assert.ok(html.includes('data-testid="dispatch-halt-pause"'));
+      assert.ok(html.includes('data-testid="dispatch-halt-resume"'));
+      assert.match(html, /<button type="submit" class="action-btn save">/);
+      assert.ok(!html.includes('only the workspace owner can make a queue token'));
+      assert.match(html, /class="token-list"[^>]*data-can-revoke="true"/);
+    });
+  }
+});

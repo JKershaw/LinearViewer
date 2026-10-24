@@ -951,6 +951,8 @@ function renderDispatchTokenList(container, tokens, urlKey) {
     return
   }
 
+  // Revoke is owner-only on the server; a member's page marks the list read-only.
+  const canRevoke = container.dataset?.canRevoke !== 'false'
   container.innerHTML = tokens.map(t => {
     const created = new Date(t.createdAt).toLocaleDateString()
     const lastUsed = t.lastUsedAt
@@ -970,7 +972,7 @@ function renderDispatchTokenList(container, tokens, urlKey) {
           <span class="token-label-text">${escapeHtml(t.label)}</span>
           <div class="token-meta">created ${created} · ${lastUsed} · ${formatDispatchTokenExpiry(t.expiresAt)}${ownerless ? ' · ' : ''}${ownerless}</div>
         </div>
-        <button class="action-btn token-revoke" data-token-id="${escapeHtml(t.tokenId)}">revoke</button>
+        ${canRevoke ? `<button class="action-btn token-revoke" data-token-id="${escapeHtml(t.tokenId)}">revoke</button>` : ''}
       </div>
     `
   }).join('')
