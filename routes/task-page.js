@@ -25,7 +25,7 @@
 
 import { Router } from 'express';
 import { renderErrorPage } from '../lib/render.js';
-import { getFeatureFlags } from '../lib/feature-defaults.js';
+import { requestFeatureFlags } from '../lib/run-controls.js';
 import { resolveIssueBinding, isValidIssueId } from '../lib/workspace.js';
 import { jsonError } from '../lib/errors.js';
 import {
@@ -62,7 +62,7 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
       deployInfo: getDeployInfo(),
       openRouterSource: getOpenRouterSource(req),
       workspaces: req.session.workspaces,
-      featureFlags: getFeatureFlags(req.session),
+      featureFlags: await requestFeatureFlags(req),
     };
 
     // A malformed id is just a task that doesn't exist: 404 body, no detail.
@@ -84,7 +84,7 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         identifier,
         access,
         viewerIsOwner: true,
-        runnerReady: getFeatureFlags(req.session).dispatch === true,
+        runnerReady: (await requestFeatureFlags(req)).runControls === true,
       });
       if (result.notFound) {
         return res.status(404).send(renderTaskNotFoundPage({ identifier, urlKey: workspace.urlKey }, pageOptions));

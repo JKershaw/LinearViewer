@@ -15,7 +15,7 @@ import { computeEscalationKpis } from '../lib/escalation-kpis.js';
 import { renderEscalationKpisPage } from '../lib/render-escalation-kpis.js';
 import { collectUnansweredDecisions } from '../lib/unanswered-decisions.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
-import { getFeatureFlags } from '../lib/feature-defaults.js';
+import { requestFeatureFlags } from '../lib/run-controls.js';
 
 // ─── Escalation KPIs — operator-facing audit page (LIN-1736) ────────────────
 //
@@ -170,7 +170,7 @@ function escalationKpisPage(ctx) {
       res.send(renderEscalationKpisPage(workspace.name, {
         urlKey: workspace.urlKey,
         workspaces: req.session.workspaces || [],
-        featureFlags: getFeatureFlags(req.session),
+        featureFlags: await requestFeatureFlags(req),
         kpis,
         windowDays,
         generatedAt: now.toISOString()

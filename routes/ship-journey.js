@@ -22,7 +22,7 @@
 import { Router } from 'express';
 import { renderShipJourneyPage } from '../lib/render-ship-journey.js';
 import { renderErrorPage } from '../lib/render.js';
-import { getFeatureFlags } from '../lib/feature-defaults.js';
+import { requestFeatureFlags } from '../lib/run-controls.js';
 import { deriveJourney } from '../lib/ship-journey.js';
 
 /**
@@ -40,7 +40,7 @@ export function createShipJourneyRoutes({ workspaceFromUrl, reportHistoryStore, 
 
   router.get('/workspace/:urlKey/ship-journey', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
-    const featureFlags = getFeatureFlags(req.session);
+    const featureFlags = await requestFeatureFlags(req);
 
     // Gate: experimental feature must be enabled (mirrors collective/live-console).
     if (featureFlags.shipJourney !== true) {

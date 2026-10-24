@@ -60,7 +60,7 @@ import { isTerminalLoop, enrichLoop, sessionIsTerminal } from '../lib/run-loop-s
 export { isTerminalLoop, sessionIsTerminal, enrichLoop };
 import { createSessionsFeedCache } from '../lib/sessions-feed-cache.js';
 import { createTaskDoneCache } from '../lib/task-done-cache.js';
-import { getFeatureFlags } from '../lib/feature-defaults.js';
+import { requestFeatureFlags } from '../lib/run-controls.js';
 import { collectAgentTokenIds, foldCredentialIndex } from '../lib/credential-state.js';
 import { findAnchorLoop } from '../lib/session-summary.js';
 import { NON_SESSION_TARGETS } from '../lib/dispatch-targets.js';
@@ -340,7 +340,7 @@ export function createDashboardRoutes(deps) {
         urlKey: workspace.urlKey,
         openRouterSource: getOpenRouterSource(req),
         workspaces: req.session.workspaces,
-        featureFlags: getFeatureFlags(req.session)
+        featureFlags: await requestFeatureFlags(req)
       };
 
       if (!sessionId) {
@@ -430,7 +430,7 @@ export function createDashboardRoutes(deps) {
         asked: anchorIssueTitle,
         viewerIsOwner: true,
         runFacts,
-        runnerReady: getFeatureFlags(req.session).dispatch === true,
+        runnerReady: (await requestFeatureFlags(req)).runControls === true,
       });
 
       // Bare-BLOCKED card inputs (LIN-3252 S2.7): the waiting producer loop

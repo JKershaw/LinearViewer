@@ -14,7 +14,7 @@ import { Router } from 'express';
 import { renderErrorPage } from '../lib/render-pages.js';
 import { renderWorkspaceKpisPage } from '../lib/render-workspace-kpis.js';
 import { collectWorkspaceKpis } from '../lib/workspace-kpi-stats.js';
-import { getFeatureFlags } from '../lib/feature-defaults.js';
+import { requestFeatureFlags } from '../lib/run-controls.js';
 
 /**
  * @param {Object} deps
@@ -33,7 +33,7 @@ export function createWorkspaceKpisRoutes({ workspaceFromUrl, collections, now =
       res.send(renderWorkspaceKpisPage(workspace.name || workspace.urlKey, {
         urlKey: workspace.urlKey,
         workspaces: req.session.workspaces || [],
-        featureFlags: getFeatureFlags(req.session),
+        featureFlags: await requestFeatureFlags(req),
         stats
       }));
     } catch (error) {

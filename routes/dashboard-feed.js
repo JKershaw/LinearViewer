@@ -22,7 +22,7 @@ import { getLoopsForWorkspace, getSessionsForWorkspace } from '../lib/pipeline-l
 import { isTerminalLoop, enrichLoop, sessionIsTerminal } from '../lib/run-loop-state.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { toEpochMs } from '../lib/utils/time.js';
-import { getFeatureFlags } from '../lib/feature-defaults.js';
+import { requestFeatureFlags } from '../lib/run-controls.js';
 import { findAnchorLoop, childLoops } from '../lib/session-summary.js';
 import { STALE_AFTER_MS, WORKSPACE_FANOUT_CONCURRENCY, settleWithConcurrency, isStandaloneSession, deriveSessionStatus, deriveSessionWaiting, loopActivityMs, peakToolCount, deriveFeedStatusLine, connectedWorkspaces } from './dashboard-session-state.js';
 
@@ -638,7 +638,7 @@ function observationPage({ llmCallLogStore, renderObservationPage, getDeployInfo
           urlKey: workspace.urlKey,
           openRouterSource: getOpenRouterSource(req),
           workspaces: req.session.workspaces,
-          featureFlags: getFeatureFlags(req.session),
+          featureFlags: await requestFeatureFlags(req),
           scanCostEstimate
         }
       );

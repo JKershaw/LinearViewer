@@ -28,7 +28,7 @@
 import { Router } from 'express';
 import { renderTaskCreatePage } from '../lib/render-task-create.js';
 import { renderErrorPage } from '../lib/render.js';
-import { getFeatureFlags } from '../lib/feature-defaults.js';
+import { requestFeatureFlags } from '../lib/run-controls.js';
 import { resolveIssueBinding } from '../lib/workspace.js';
 
 /**
@@ -79,7 +79,7 @@ export function createTaskCreateRoutes({ workspaceFromUrl, getOpenRouterSource, 
       urlKey: workspace.urlKey,
       openRouterSource: getOpenRouterSource(req),
       workspaces: req.session.workspaces,
-      featureFlags: getFeatureFlags(req.session)
+      featureFlags: await requestFeatureFlags(req)
     };
 
     // LIN-3240 (LIN-3126 §2) / LIN-3335: creation targets the workspace's
