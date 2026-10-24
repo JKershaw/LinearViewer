@@ -37,6 +37,8 @@ describe('the three row kinds', () => {
 
   test('a group carries who it affects in its title, and notes sit under it', () => {
     const html = group({ title: 'For everyone in Acme', rowsHtml: '<i></i>', note: 'A note.' });
+    assert.match(html, /<h2[^>]*>For everyone in Acme<\/h2>/);
+    assert.match(html, /<p[^>]*>A note\.<\/p>/);
   });
 });
 

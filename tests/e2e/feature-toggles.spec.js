@@ -28,8 +28,8 @@ test.describe('Feature Toggle Settings', () => {
     await page.waitForLoadState('networkidle');
 
     // AI and Workflow section headers should be visible
-    await expect(page.locator(SELECTORS.settings.groupTitle('experimental'))).toBeVisible();
-    await expect(page.locator(SELECTORS.settings.groupTitle('workflow'))).toBeVisible();
+    await expect(page.locator(SELECTORS.settings.groupTitle('experimental'))).toHaveText('Views · for you');
+    await expect(page.locator(SELECTORS.settings.groupTitle('workflow'))).toHaveText('Feedback · for you');
 
     // All feature toggle labels should be present (split across sections)
     // LIN-3849: no Dispatch queue or Linear API proxy toggle any more.
@@ -126,7 +126,7 @@ test.describe('Feature Toggle Settings', () => {
     await page.goto(`/workspace/${localWorkerUrlKey}/settings/features`);
     await page.waitForLoadState('networkidle');
 
-    await expect(page.locator(SELECTORS.settings.groupTitle('workflow'))).toBeVisible();
+    await expect(page.locator(SELECTORS.settings.groupTitle('workflow'))).toHaveText('Feedback · for you');
     await expect(page.locator('[data-feature="featureBranches"]')).toHaveCount(0);
     await expect(page.locator(SELECTORS.settings.area('features'))).toBeVisible();
     await expect(page.locator(SELECTORS.settings.area('features'))).not.toContainText('Feature branch workflow');
@@ -175,7 +175,10 @@ test.describe('Feature Toggle Settings', () => {
 
     // Dispatch section should not be visible
     await expect(page.locator(SELECTORS.settings.groupTitles).first()).toBeVisible();
-    await expect(page.locator(SELECTORS.settings.groupTitles, { hasText: /^Dispatch$/ })).toHaveCount(0);
+    // Scoped to the Features area, so an untagged "Dispatch" group (no test id) is caught too.
+    const features = page.locator(SELECTORS.settings.area('features'));
+    await expect(features).toBeVisible();
+    await expect(features.locator('h2', { hasText: /^Dispatch$/ })).toHaveCount(0);
   });
 
   test('dispatch link visible in header switcher with run controls', async ({ page, seedLocal, localWorkerUrlKey }) => {
