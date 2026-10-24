@@ -57,20 +57,21 @@ const WRAPPERS = {
 
 // The call paths, by file: how many call expressions it holds, and which functions
 // build the `callMeta` for the ones that take their options from a builder. A site
-// is 'inline' when its own `callMeta` literal carries urlKey, 'passthrough' when it
+// is 'inline' when its own `callMeta` literal carries urlKey, 'passthrough' (marked
+// `passthrough: true`; the only files where a spread may stand in for urlKey) when it
 // spreads the caller's callMeta over a feature default (covered by WRAPPERS), and
 // 'builder' when the options come from a named function (checked by name).
 const CALL_PATHS = {
   'lib/agent-turn.js': { sites: 2 },
-  'lib/brief.js': { sites: 1 },
-  'lib/feedback-title.js': { sites: 1 },
+  'lib/brief.js': { sites: 1, passthrough: true },
+  'lib/feedback-title.js': { sites: 1, passthrough: true },
   'lib/next-run.js': { sites: 1 },
   'lib/observer-pass.js': { sites: 1 },
-  'lib/recap.js': { sites: 1 },
-  'lib/run-paragraph.js': { sites: 1 },
-  'lib/run-summary.js': { sites: 1 },
-  'lib/scan.js': { sites: 1 },
-  'lib/session-summary.js': { sites: 1 },
+  'lib/recap.js': { sites: 1, passthrough: true },
+  'lib/run-paragraph.js': { sites: 1, passthrough: true },
+  'lib/run-summary.js': { sites: 1, passthrough: true },
+  'lib/scan.js': { sites: 1, passthrough: true },
+  'lib/session-summary.js': { sites: 1, passthrough: true },
   'routes/proxy.js': { sites: 1 },
   'routes/ship-biscuit.js': { sites: 1 },
   'routes/workspace-api-roadmap.js': { sites: 3 },
@@ -225,7 +226,7 @@ export function checkCensus({ sources, dispatchKinds, aiOperationKinds, jobs }) 
     for (const s of f.sites) {
       const m = s.meta;
       if (m.state === 'none') problems.push(`${s.file}:${s.line} ${s.name}() passes no callMeta, so its row has no urlKey and no log reader returns it`);
-      else if (m.state === 'literal' && !m.keys.has('urlKey') && !m.spreads) problems.push(`${s.file}:${s.line} ${s.name}() callMeta has no urlKey, so its row is never listed`);
+      else if (m.state === 'literal' && !m.keys.has('urlKey') && !(m.spreads && entry?.passthrough)) problems.push(`${s.file}:${s.line} ${s.name}() callMeta has no urlKey, so its row is never listed`);
       else if (m.state === 'unresolved' && !entry?.builders?.length) problems.push(`${s.file}:${s.line} ${s.name}() takes its options from a builder that CALL_PATHS does not name`);
     }
     for (const b of entry?.builders || []) {
@@ -301,6 +302,14 @@ describe('LIN-3852: every LLM use is a registered job', () => {
 
   test('a call whose callMeta has a feature but no urlKey fails, naming the site', () => {
     const edited = sources['lib/next-run.js'].replace("urlKey: options.urlKey || null, feature: 'next-run'", "feature: 'next-run'");
+    assert.notEqual(edited, sources['lib/next-run.js'], 'fixture edit applied');
+    const problems = checkCensus({ ...inputs, sources: { ...sources, 'lib/next-run.js': edited } });
+    assert.equal(problems.length, 1, problems.join('\n'));
+    assert.match(problems[0], /^lib\/next-run\.js:\d+ streamChat\(\) callMeta has no urlKey/);
+  });
+
+  test('a spread in callMeta does not excuse a missing urlKey outside a marked passthrough wrapper', () => {
+    const edited = sources['lib/next-run.js'].replace("urlKey: options.urlKey || null, feature: 'next-run'", "feature: 'next-run', ...(options.extraMeta || {})");
     assert.notEqual(edited, sources['lib/next-run.js'], 'fixture edit applied');
     const problems = checkCensus({ ...inputs, sources: { ...sources, 'lib/next-run.js': edited } });
     assert.equal(problems.length, 1, problems.join('\n'));
