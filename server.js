@@ -19,7 +19,7 @@ installAsyncErrorForwarding()
 import session from 'express-session'
 import { MongoClient } from 'mongodb'
 import { MangoClient } from '@jkershaw/mangodb'
-import { ensureIndexes, reportDeferredIndexes } from './lib/db-indexes.js'
+import { ensureIndexes, reportDeferredIndexes, scheduleDeferredIndexBuild } from './lib/db-indexes.js'
 import { runOwnerBackfill } from './lib/owner-backfill.js'
 import { Scheduler } from './lib/scheduler.js'
 import { MongoSessionStore } from './lib/session-store.js'
@@ -287,9 +287,9 @@ const db = dbClient.db('linear-viewer')
 // Boot-time index creation (LIN-610). Idempotent — running on every boot is the
 // deploy mechanism (no migration framework). Best-effort per index, so a failed
 // build can never wedge startup. Must run after connect and before app.listen.
-// Builds the boot tier only (LIN-3811): deferred specs are never built here or
-// after listen, only reported (reportDeferredIndexes, below app.listen) and
-// built by scripts/apply-deferred-indexes.mjs.
+// Builds the boot tier only (LIN-3811): deferred specs are not built here. After
+// listen they are reported (reportDeferredIndexes) and built once in the
+// background (scheduleDeferredIndexBuild, LIN-3865), both below app.listen.
 await ensureIndexes(db)
 
 // One-shot owner backfill (LIN-3142): every ownerless workspace bound before
@@ -1010,7 +1010,7 @@ scheduler.register({
 // so this ticks hourly and the job gates on a marker doc to make ONE full
 // dispatch-history scan per UTC day (lib/kpi-daily-rollup.js). Its window scan
 // is served by the deferred `{ dispatchedAt: 1, urlKey: 1 }` spec once the
-// deferred-index script has been run (LIN-3811, see ROLLUP_HISTORY_INDEX).
+// server's post-listen build has made it (LIN-3811, LIN-3865, see ROLLUP_HISTORY_INDEX).
 const KPI_DAILY_ROLLUP_INTERVAL_MS = 60 * 60 * 1000
 const KPI_DAILY_ROLLUP_LEASE_MS = 10 * 60 * 1000
 scheduler.register({
@@ -1054,7 +1054,8 @@ const app = express()
 // top-level `await dbClient.connect()` / `await ensureIndexes(db)` above
 // already gate this module from completing (and app.listen from opening)
 // until the DB is genuinely ready. That wait covers the boot tier only
-// (LIN-3811); deferred index state is logged after listen, never probed here.
+// (LIN-3811); deferred index state is logged, and pending specs are built in
+// the background, after listen (LIN-3865), never probed here.
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' })
 })
@@ -4708,6 +4709,9 @@ const PORT = process.env.PORT || 3000
 // Handles captured for graceful shutdown (LIN-1691) — both were previously
 // discarded, leaving nothing for a SIGTERM handler to close.
 let cleanupTimer
+// Handle for the one-shot post-listen deferred-index build (LIN-3865), so
+// gracefulShutdown can cancel it.
+let deferredIndexBuild
 const server = app.listen(PORT, () => {
   console.log(`Harbour running at http://localhost:${PORT}`)
 
@@ -4717,13 +4721,17 @@ const server = app.listen(PORT, () => {
   // running before the process is reachable at all (LIN-2128, plan-review F4).
   scheduler.start()
 
-  // Report which deferred indexes exist (LIN-3811). Report only: nothing here
-  // builds an index (John's ruling: the deferred-index script, run once after
-  // deploy at a quiet time, is the only build path), and it is not awaited, so
-  // it can never delay the listen it follows.
+  // Report which deferred indexes exist (LIN-3811). Report only: this call
+  // builds nothing, and it is not awaited, so it can never delay the listen it
+  // follows.
   reportDeferredIndexes(db).catch((err) => {
     console.error(`[db-indexes] deferred-index report failed — state unknown this boot: ${err.message}`)
   })
+
+  // Build any still-pending deferred index, once, after a short delay (LIN-3865;
+  // supersedes LIN-3811's script-only rule). Not awaited, never throws, and the
+  // delay keeps it clear of a deploy handover. Cancelled in gracefulShutdown.
+  deferredIndexBuild = scheduleDeferredIndexBuild(db)
 
   // Start periodic cleanup of expired items (every hour)
   const CLEANUP_INTERVAL_MS = 60 * 60 * 1000 // 1 hour
@@ -4774,6 +4782,9 @@ function gracefulShutdown(signal) {
   // shutdown time still completes on its own.
   scheduler.stop()
   if (cleanupTimer) clearInterval(cleanupTimer)
+  // The drain can outlast the build delay, so unref alone would still let the
+  // deferred-index build start mid-drain (LIN-3865). Stops an unstarted build only.
+  deferredIndexBuild?.cancel()
 
   // Idle keep-alive sockets would otherwise hold server.close() open until
   // keepAliveTimeout; only supported on Node >= 18.2, so optionally chained.

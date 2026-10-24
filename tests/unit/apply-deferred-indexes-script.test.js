@@ -81,10 +81,24 @@ describe('apply-deferred-indexes script', () => {
 describe('server.js deferred-index wiring', () => {
   const src = readFileSync(new URL('../../server.js', import.meta.url), 'utf8');
 
-  test('the reporter is called inside app.listen, not awaited, and nothing builds deferred specs', () => {
+  test('the reporter is called inside app.listen and not awaited', () => {
     assert.ok(!/await\s+reportDeferredIndexes/.test(src));
-    assert.ok(!/applyDeferredIndexes/.test(src));
     assert.ok(src.indexOf('reportDeferredIndexes(db)') > src.indexOf('app.listen(PORT'));
     assert.ok(!/HARBOUR_DEFERRED_INDEX_BUILD/.test(src));
+  });
+
+  // LIN-3865 replaces LIN-3811's "nothing builds deferred specs" pin: the server now
+  // builds pending deferred specs, but only via the one wrapper, only after listen,
+  // never awaited, and cancelled on graceful shutdown.
+  test('the build is scheduled inside app.listen, not awaited, reuses the one builder, and is cancelled on shutdown', () => {
+    assert.ok(!/await\s+scheduleDeferredIndexBuild/.test(src));
+    assert.ok(!/applyDeferredIndexes/.test(src), 'server.js calls the wrapper, never the builder directly');
+    const call = src.indexOf('scheduleDeferredIndexBuild(db');
+    assert.ok(call > src.indexOf('app.listen(PORT'));
+    assert.ok(call < src.indexOf('function gracefulShutdown'));
+    const shutdown = src.slice(src.indexOf('function gracefulShutdown'), src.indexOf('server.close(async'));
+    assert.match(shutdown, /deferredIndexBuild\??\.cancel\(\)/);
+    assert.ok(src.indexOf('deferredIndexBuild?.cancel()') < src.indexOf('server.close(async'));
+    assert.strictEqual(src.split('scheduleDeferredIndexBuild(').length - 1, 1, 'scheduled exactly once, nowhere before listen');
   });
 });
