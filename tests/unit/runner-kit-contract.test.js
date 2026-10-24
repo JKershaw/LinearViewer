@@ -326,3 +326,55 @@ describe('feedback is capped where it is posted (runCommand feedback)', () => {
     assert.deepEqual(posts, []);
   });
 });
+
+// LIN-3857 (D3): a subagent model/effort the kit drops or inherits is posted to the ITEM (a status
+// feedback on the lineage root), not only handed to the runner session in `take`'s note.
+describe('take posts what it dropped to the item (LIN-3857)', () => {
+  const run = async (taken, fetchWrap) => {
+    const s = setup(taken);
+    try {
+      const fetchImpl = fetchWrap ? fetchWrap(s.fetchImpl) : s.fetchImpl;
+      const out = await runCommand(['take', taken.id, '--url-key', 'acme'], { home: s.home, cwd: ROOT, fetchImpl, now: () => Date.now() });
+      return { out, posts: s.posts };
+    } finally { s.cleanup(); }
+  };
+  const fresh = (extra) => ({ ...itemFor({ route: 'fresh' }), ...extra });
+
+  test('an unmapped model (fable) and an effort are posted as a status on the item', async () => {
+    const { out, posts } = await run(fresh({ model: 'fable', effort: 'high' }));
+    assert.equal(out.subagent.model, null);
+    const note = posts.filter((m) => m.startsWith('[subagent]'));
+    assert.equal(note.length, 1, JSON.stringify(posts));
+    assert.match(note[0], /"fable" is not a mapped Task-tool alias/);
+    assert.match(note[0], /effort "high" not applied/);
+  });
+
+  test('the post carries status kind and the lineage rootItemId', async () => {
+    const bodies = [];
+    await run(fresh({ effort: 'low' }), (inner) => async (url, init) => {
+      if (url.includes('/runner/feedback/')) bodies.push(JSON.parse(init.body));
+      return inner(url, init);
+    });
+    const b = bodies.find((x) => x.message.startsWith('[subagent]'));
+    assert.equal(b.kind, 'status');
+    assert.equal(b.rootItemId, ITEM_ID);
+  });
+
+  test('nothing is dropped, nothing is posted', async () => {
+    const { out, posts } = await run(fresh({ model: 'claude-opus-5-5' }));
+    assert.equal(out.subagent.model, 'opus');
+    assert.deepEqual(posts.filter((m) => m.startsWith('[subagent]')), []);
+    assert.equal('noteError' in out, false);
+  });
+
+  test('a failing post does not fail the take; it comes back as noteError', async () => {
+    const { out } = await run(fresh({ effort: 'high' }), (inner) => async (url, init) => {
+      if (url.includes('/runner/feedback/') && JSON.parse(init.body).message.startsWith('[subagent]')) {
+        return { status: 503, ok: false, json: async () => ({ error: 'x' }) };
+      }
+      return inner(url, init);
+    });
+    assert.ok(out.item && out.subagent, 'the take still returns');
+    assert.match(out.noteError, /HTTP 503/);
+  });
+});

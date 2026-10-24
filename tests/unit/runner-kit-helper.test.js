@@ -999,7 +999,10 @@ describe('subagentModelFor (NB5: map model onto the subagent, ignore effort)', (
     ['claude-haiku-4-5-20251001', 'haiku'],
     ['opus', 'opus'],
     ['gpt-5', null],
-    ['', null]
+    ['', null],
+    // LIN-3857 (D3): `fable` stays unmapped (inherit) until a recorded runner-kit run settles it.
+    ['fable', null],
+    ['claude-fable-5-1', null]
   ];
   for (const [model, want] of rows) {
     test(`model ${JSON.stringify(model)} → ${want ?? 'inherit'}`, () => {
@@ -1013,7 +1016,27 @@ describe('subagentModelFor (NB5: map model onto the subagent, ignore effort)', (
   });
 });
 
+describe('subagentModelFor names what it dropped (LIN-3857)', () => {
+  test('an unmapped model is named in the note and flagged dropped; a mapped one is not', () => {
+    const fable = subagentModelFor(item({ model: 'fable' }));
+    assert.equal(fable.model, null);
+    assert.equal(fable.dropped, true);
+    assert.match(fable.note, /inherit \(runner session's own\); "fable" is not a mapped Task-tool alias/);
+    assert.equal(subagentModelFor(item({ model: 'claude-opus-5-5' })).dropped, false);
+    assert.equal(subagentModelFor(item({})).dropped, false, 'nothing asked for, nothing dropped');
+  });
+  test('an effort alone is flagged dropped', () => {
+    assert.equal(subagentModelFor(item({ model: 'sonnet', effort: 'high' })).dropped, true);
+  });
+});
+
 describe('markers', () => {
+  test('[subagent] (LIN-3857) matches neither the terminal nor the wake parser', () => {
+    const m = `[subagent] ${subagentModelFor(item({ model: 'fable', effort: 'high' })).note}`;
+    assert.equal(findTerminalFeedback(fb(m)), null);
+    assert.equal(findWakeEvent(fb(m)), null);
+  });
+
   test('[handoff] matches neither the terminal nor the wake parser', () => {
     for (const m of [handoffMessage(K, 'agent-1', null), handoffMessage(W1, 'agent-1', K)]) {
       assert.equal(findTerminalFeedback(fb(m)), null);
