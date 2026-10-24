@@ -152,7 +152,7 @@ for (const name of Object.keys(PREFS)) {
 // LIN-3857 (D3): the one rule entry. INTENDED_DIFFERENCES holds hand-listed cells, which cannot say
 // "every opencode row", so this is a rule: where the old side resolved an effort on the opencode
 // harness, the new side stamps effort null and reports what was asked for. `layer` is one of the four
-// tiers; which one is pinned per tier by tests/unit/dispatch-factory-effort-not-applied.test.js.
+// tiers; which one is pinned per tier by tests/unit/effort-not-applied.test.js.
 const EFFORT_LAYERS = ['explicit', 'preset', 'anchor', 'workspace'];
 const D3_RULE = {
   ticket: 'D3',

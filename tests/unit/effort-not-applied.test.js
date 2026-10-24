@@ -121,6 +121,7 @@ describe('Surface 2: the dispatch receipts', () => {
     a.use(createProxyRoutes({
       proxyTokenStore: {
         createToken: async () => ({ token: 'test-bootstrap', kind: 'bootstrap', scope: 'readWrite' }),
+        mintGrantBootstrap: async () => ({ token: 'test-bootstrap', kind: 'bootstrap', scope: 'readWrite' }),
         validateToken: async () => ({ grants: ['dispatch'], workspaceId: 'ws-acme', tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1' })
       },
       proxyEventStore: { recordEvent: async () => {} },
@@ -137,12 +138,12 @@ describe('Surface 2: the dispatch receipts', () => {
     }));
     return a;
   }
-  const post = async (body) => {
+  const post = async (body, path = '/api/proxy/dispatch') => {
     const captured = {};
     const server = app(captured).listen(0, '127.0.0.1');
     await new Promise((r) => server.once('listening', r));
     try {
-      const res = await fetch(`http://127.0.0.1:${server.address().port}/api/proxy/dispatch`, {
+      const res = await fetch(`http://127.0.0.1:${server.address().port}${path}`, {
         method: 'POST', headers: { Authorization: 'Bearer x', 'Content-Type': 'application/json' }, body: JSON.stringify(body)
       });
       return { status: res.status, body: await res.json(), captured };
@@ -161,6 +162,20 @@ describe('Surface 2: the dispatch receipts', () => {
     assert.equal(res.status, 201, JSON.stringify(res.body));
     assert.equal('effortNotApplied' in res.body, false);
     assert.equal(res.captured.item.effort, 'high');
+  });
+
+  // The kickoff layout is its own RECEIPTS entry (lib/dispatch-entrance.js), so the proxy case above
+  // does not cover it: removing the spread from RECEIPTS.kickoff must go red here.
+  test('the kickoff receipt reports the dropped effort, and omits the key when nothing was dropped', async () => {
+    const dropped = await post({ goal: 'ship it', target: 'cli', harness: 'opencode', effort: 'high' }, '/api/proxy/autopilot/kickoff');
+    assert.equal(dropped.status, 201, JSON.stringify(dropped.body));
+    assert.deepEqual(dropped.body.effortNotApplied, { requested: 'high', harness: 'opencode', layer: 'explicit' });
+    assert.equal(dropped.captured.item.effort, null);
+
+    const kept = await post({ goal: 'ship it', target: 'cli', harness: 'claude-code', effort: 'high' }, '/api/proxy/autopilot/kickoff');
+    assert.equal(kept.status, 201, JSON.stringify(kept.body));
+    assert.equal('effortNotApplied' in kept.body, false);
+    assert.equal(kept.captured.item.effort, 'high');
   });
 });
 
@@ -227,6 +242,25 @@ describe('Surface 4: the model-routing proxy writes are accepted and flagged', (
     assert.equal(res.status, 200);
     assert.equal('effortNotApplied' in res.body, false);
     assert.equal('effortNotApplied' in (await post('/jobs/review', { reason: 'r', model: 'opus' })).body, false);
+  });
+
+  // The flag read happens after the write has landed: if it throws, the agent must still be told the
+  // write succeeded (a mapped failure would invite a duplicate retry), just without the flag.
+  test('a failing flag read after a landed write still answers 200, without the key', async () => {
+    const store = Object.create(fx.routingStore);
+    let wrote = false;
+    store.changeJob = async (...a) => { const entry = await fx.routingStore.changeJob(...a); wrote = true; return entry; };
+    store.getTable = async (...a) => { if (wrote) throw new Error('read blew up'); return fx.routingStore.getTable(...a); };
+    const app = buildBaseApp({
+      proxyTokenStore: { ...token, validateToken: async () => ({ tokenId: 'tok-1', urlKey: ACME, label: 'l', scope: 'readWrite', createdBy: 'acct-9', workspaceId: 'ws-acme' }) },
+      modelRoutingStore: store,
+      workspacePreferencesStore: fx.preferencesStore
+    });
+    const res = await call(app, 'POST', `${BASE}/jobs/review`, { body: { reason: 'r', harness: 'opencode', effort: 'high' } });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.success, true);
+    assert.equal('effortNotApplied' in res.body, false);
+    assert.equal(wrote, true);
   });
 
   test('a group write flags only that group\'s jobs that now carry an ignored effort', async () => {

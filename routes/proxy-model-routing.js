@@ -202,7 +202,14 @@ export function createProxyModelRoutingRoutes({ modelRoutingStore, workspacePref
         // effort, then change harness"); where a touched job now stores an effort its harness
         // ignores, the response says so instead of letting the mismatch pass unremarked. The store
         // is unchanged and the stored value is not rewritten. Sparse: absent when nothing applies.
-        const effortNotApplied = effortNotAppliedForChanges(await modelRoutingStore.getTable(ctx.urlKey), entry.changes);
+        // The write has already landed, so a failed read here must not answer it with an error (an agent
+        // would retry a duplicate write): the flag is dropped and logged, the 200 still goes out.
+        let effortNotApplied = [];
+        try {
+          effortNotApplied = effortNotAppliedForChanges(await modelRoutingStore.getTable(ctx.urlKey), entry.changes);
+        } catch (flagErr) {
+          console.error('Model routing effort-not-applied flag error:', flagErr.message);
+        }
         return done(req, res, route, 200, {
           success: true,
           entry: publicEntry({ ...entry, actor: { ...entry.actor } }),
