@@ -4,9 +4,10 @@
 //
 //   (default)      base against head. Expected for a docs/tests-only move: zero differences.
 //   --self-check   base against base (two exports, two ports, two data dirs). Must be zero.
-//   --control      positive controls: 1px is planted on the HEAD export only (never the tree you are
-//                  editing), once on .settings-row and once on .field. The pages that differ must be
-//                  exactly the pages whose base render shows that selector, computed from the DOM.
+//   --control [name]  positive controls (all, or those whose name contains [name]): a painted 1px line
+//                  is planted on the HEAD export only (never the tree you are editing), once on
+//                  .settings-row and once on .field. The pages that differ must be exactly the pages
+//                  whose base render shows that selector outside any mask, computed from the DOM.
 //
 // Each side is `git archive` of its own commit in its own temp dir, with its own port and its own
 // HARBOUR_DATA_DIR, and runs `node server.js` with the same env as playwright.visual.config.js.
@@ -160,7 +161,9 @@ if (selfCheck) {
 }
 
 if (control) {
-  for (const c of CONTROLS) {
+  const named = opt('control');
+  const only = named && !named.startsWith('--') ? named : null;
+  for (const c of CONTROLS.filter((x) => !only || x.name.includes(only))) {
     const { rows } = await runPair({ baseRev: base, headRev: base, patch: c, probe: c.probe });
     printSummary(`positive control (${c.name}, planted on the head export only)`, rows);
     const differing = new Set(rows.filter((r) => r.result !== 'byte-equal').map(key));

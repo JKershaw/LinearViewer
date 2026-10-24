@@ -91,8 +91,11 @@ async function shoot(browser, baseURL, viewport, theme, entry) {
     const masks = entry.masks || [];
     const present = [];
     for (const m of masks) if (await page.locator(m.selector).count()) present.push(m);
+    // Where the planted piece is shown, for the positive control: rendered, and NOT inside a mask (a
+    // difference inside a masked row is hidden by design, so it must not be expected to show).
+    const maskSelectors = present.map((m) => m.selector).join(',');
     const probe = PROBE
-      ? await page.locator(PROBE).evaluateAll((els) => els.filter((e) => e.getClientRects().length > 0).length)
+      ? await page.locator(PROBE).evaluateAll((els, masked) => els.filter((e) => e.getClientRects().length > 0 && !(masked && e.closest(masked))).length, maskSelectors)
       : null;
     const take = () => page.screenshot({
       fullPage: true, animations: 'disabled', caret: 'hide',
