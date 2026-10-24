@@ -47,7 +47,7 @@ describe('group titles and notes, by element and text', () => {
   });
 
   test('a group without a test id gets no title test id', () => {
-    assert.doesNotMatch(group({ title: 'For you', rowsHtml: '' }), /-title"/);
+    assert.doesNotMatch(group({ title: 'For you', rowsHtml: '' }), /data-testid="[^"]*-title"/);
   });
 });
 
