@@ -147,7 +147,12 @@ const expectedGateCalls = {
   'routes/ship-biscuit.js': 1,
   // Six full-adopt sites + the feedback-title live call (LIN-3635).
   'routes/workspace-api.js': 7,
-  'routes/dashboard.js': 2,
+  // LIN-3840: the routes/dashboard.js row (2) is gone. One quota unit per request at the two
+  // summary routes is carried by (1) the dashboard-unit rule at the end of this file (exactly 2
+  // checkFreeTierGate( calls across the unit), (2) dashboard-routes.test.js 'LIN-3658: a
+  // free-tier denial is a 429 ...' at both summary routes (the store is charged exactly once,
+  // deepEqual(calls, ['ws-a'])), and (3) dashboard-summary-credential-chain.test.js (d), the
+  // allow path: a free-tier key with an allowing store is charged exactly once.
   'routes/workspace-api-roadmap.js': 1,
   'routes/flight-companion.js': 2,
   'routes/task-chat.js': 1,
@@ -194,14 +199,13 @@ describe('Interactive OpenRouter chain: byte-identity census (LIN-2412 / LIN-297
     assert.doesNotMatch(src, /apiKeyToUse = sessionApiKey \|\| \(isFreeTier \? freeTierKey : undefined\)/, 'the old per-site duplicated ternary must be gone — resolveChatCredential now supplies apiKeyToUse directly at each site');
   });
 
-  test('routes/dashboard.js: resolveChatCredential is called exactly twice, and the degrade guard at both sites is now `if (!apiKey)` (LIN-2978)', () => {
-    const src = read('routes/dashboard.js');
-    const callCount = (src.match(/resolveChatCredential\s*\(/g) || []).length;
-    assert.equal(callCount, 2, `expected exactly 2 resolveChatCredential calls in routes/dashboard.js (run-summary + session-summary), found ${callCount}`);
-    const guardCount = (src.match(/if \(!apiKey\) \{/g) || []).length;
-    assert.equal(guardCount, 2, `expected exactly 2 "if (!apiKey) {" degrade guards in routes/dashboard.js, found ${guardCount}`);
-    assert.doesNotMatch(src, /hasPaidEnvKey/, 'hasPaidEnvKey must be fully dead in routes/dashboard.js — its only calls were inside the code this sweep replaced');
-  });
+  // LIN-3840: 'routes/dashboard.js: resolveChatCredential is called exactly twice, and the
+  // degrade guard at both sites is now `if (!apiKey)` (LIN-2978)' is gone. The two counts are
+  // carried by behaviour: dashboard-summary-credential-chain.test.js drives POST run-summary and
+  // POST session-summary over HTTP (no key anywhere -> 503 "AI summaries are not configured"; the
+  // session key wins and is never free-tier; the paid env key alone; the free-tier key alone,
+  // charged once). The absence (hasPaidEnvKey dead) is the dashboard-unit rule at the end of
+  // this file, over every unit file.
 
   test('routes/proxy.js resolves through lib/chat-request.js (LIN-2427)', () => {
     const src = read('routes/proxy.js');
@@ -216,16 +220,10 @@ describe('Interactive OpenRouter chain: byte-identity census (LIN-2412 / LIN-297
     }
   });
 
-  test('expectedGateCalls is exhaustive — every routes/ or lib/ file calling checkFreeTierGate( is pinned', () => {
-    const chatRequestPath = join(ROOT, 'lib/chat-request.js'); // definition, not a call site
-    const files = [...walk(join(ROOT, 'routes')), ...walk(join(ROOT, 'lib'))];
-    const filesWithCalls = files
-      .filter(f => f !== chatRequestPath)
-      .filter(f => /checkFreeTierGate\s*\(/.test(readFileSync(f, 'utf8')))
-      .map(f => relative(ROOT, f));
-    assert.deepEqual(filesWithCalls.sort(), Object.keys(expectedGateCalls).sort(),
-      'every routes/ or lib/ file calling checkFreeTierGate( must be a key in expectedGateCalls');
-  });
+  // LIN-3840: 'expectedGateCalls is exhaustive — every routes/ or lib/ file calling
+  // checkFreeTierGate( is pinned' is now the dashboard-unit rule at the end of this file: a file
+  // calling checkFreeTierGate( must be a key of expectedGateCalls OR a dashboard-unit file, and
+  // the unit holds exactly 2 calls in total.
 
   // LIN-3658: the priority ladder moved to lib/chat-request.js
   // (resolveOpenRouterSource); its behavioural replacement for the old byte pin
