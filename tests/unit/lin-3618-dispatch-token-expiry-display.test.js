@@ -1,11 +1,13 @@
 /**
- * LIN-3618 — the Settings/Dispatch token list and the mint modal show a
- * token's expiry: "never expires" (null/absent), "expires <date>" (future),
- * "expired <date>" (past). The API already returned `expiresAt`; the UI hid it.
+ * LIN-3618 — the mint modal shows a token's expiry: "never expires" (null/absent),
+ * "expires <date>" (future), "expired <date>" (past). The API already returned
+ * `expiresAt`; the UI hid it. The key list in Settings › Agent access pins its own
+ * expiry text in tests/unit/settings-keys.test.js (LIN-3846 removed the Dispatch
+ * page's list and its renderer).
  *
  * `public/dispatch.js` is a browser script, so this vm-sandboxes the slice that
- * holds the expiry helpers, the list renderer and the modal-body builder, the
- * same technique as tests/unit/dispatch-feedback-entries.test.js.
+ * holds the expiry helper and the modal-body builder, the same technique as
+ * tests/unit/dispatch-feedback-entries.test.js.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -42,19 +44,6 @@ test('formatDispatchTokenExpiry: null/absent never expires, future expires, past
   assert.equal(s.formatDispatchTokenExpiry(undefined, NOW), 'never expires');
   assert.equal(s.formatDispatchTokenExpiry(FUTURE, NOW), `expires ${day(FUTURE)}`);
   assert.equal(s.formatDispatchTokenExpiry(PAST, NOW), `expired ${day(PAST)}`);
-});
-
-test('the token list renders each row\'s expiry beside created / last used', () => {
-  const s = makeSandbox();
-  const container = { innerHTML: '' };
-  s.renderDispatchTokenList(container, [
-    { tokenId: 'a', label: 'legacy', createdAt: PAST, lastUsedAt: null, expiresAt: null, hasOwner: true },
-    { tokenId: 'b', label: 'fresh', createdAt: PAST, lastUsedAt: null, expiresAt: FUTURE, hasOwner: true },
-    { tokenId: 'c', label: 'dead', createdAt: PAST, lastUsedAt: null, expiresAt: PAST, hasOwner: false }
-  ], 'acme');
-  assert.match(container.innerHTML, /legacy[\s\S]*never expires[\s\S]*fresh/);
-  assert.match(container.innerHTML, new RegExp(`fresh[\\s\\S]*expires ${day(FUTURE).replace(/[/.]/g, '\\$&')}`));
-  assert.match(container.innerHTML, new RegExp(`dead[\\s\\S]*expired ${day(PAST).replace(/[/.]/g, '\\$&')}`));
 });
 
 test('the mint modal body shows "expires <date>" or "never expires" and still shows the token', () => {

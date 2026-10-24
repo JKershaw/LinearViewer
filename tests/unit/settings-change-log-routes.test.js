@@ -63,8 +63,8 @@ before(async () => {
       getBindingCredentials: () => ({}),
       isActiveBinding: () => false,
       dispatchPresetsStore: null,
-      proxyTokenStore: { listTokens: async () => [] },
-      dispatchTokenStore: { listTokens: async () => [] },
+      proxyTokenStore: { listTokens: async () => state.proxyRows },
+      dispatchTokenStore: { listTokens: async () => state.dispatchRows },
       proxyEventStore: null,
       workspaceHaltStore: haltStore,
       workspaceChangeLogStore: logStore,
@@ -86,7 +86,7 @@ beforeEach(() => {
   // The same wiring as server.js: every halt writer lands in the log through the store's hook.
   haltStore.setOnChange(({ urlKey, from, to, via, setBy, reason }) =>
     logStore.record({ urlKey, setting: 'halt', from, to, reason: reason || 'Changed outside Settings (Dispatch page or API)', actor: { via, ...(setBy ? { id: setBy } : {}) } }));
-  state = { accountId: OWNER, ownerCheck };
+  state = { accountId: OWNER, ownerCheck, proxyRows: [], dispatchRows: [] };
 });
 
 const post = (path, body) => fetch(`${base}/workspace/alpha/settings/${path}`, {
@@ -174,6 +174,17 @@ describe('pause / stop / resume from Settings: owner-only', () => {
       assert.equal((await logStore.getLog('alpha')).length, 0, 'nothing logged');
     });
   }
+
+  test('member: a halt with no reason is refused at the gate (403), not sent back to ask for a reason', async () => {
+    state.accountId = MEMBER;
+    await haltStore.setWorkspaceHalt('alpha', { mode: 'stop', setBy: OWNER, now: new Date() });
+    const before = structuredClone(await haltCollection.findOne({ _id: 'alpha' }));
+    const res = await post('running/halt', { mode: 'pause' });
+    assert.equal(res.status, 403);
+    assert.equal(res.headers.get('location'), null, 'no ?error=reason redirect: the gate comes before the reason is looked at');
+    assert.equal((await res.json()).code, 'RUNNER_OWNER_ONLY');
+    assert.deepEqual(await haltCollection.findOne({ _id: 'alpha' }), before, 'the halt is unchanged');
+  });
 
   test('FAIL-CLOSED: no owner seam refuses the owner too, and writes nothing', async () => {
     state.ownerCheck = null;
@@ -288,6 +299,22 @@ describe('the index and the areas', () => {
     }
     const unknown = await fetch(`${base}/workspace/alpha/settings/nope`);
     assert.equal(unknown.status, 404);
+  });
+
+  test('a workspace with only a live queue token reads "Runner ready" and shows the queue token as the last poll', async () => {
+    // plan-review B4: Settings and the Dispatch run controls must agree on "has a runner".
+    // The route wires hasLiveRunnerKey || hasLiveQueueToken itself, so this goes through the route.
+    state.proxyRows = [];
+    state.dispatchRows = [{ tokenId: 'q', label: 'legacy', hasOwner: true, createdAt: new Date(Date.now() - 864e5).toISOString(), lastUsedAt: new Date(Date.now() - 6e4).toISOString(), expiresAt: new Date(Date.now() + 864e5).toISOString() }];
+    const index = await (await fetch(`${base}/workspace/alpha/settings`)).text();
+    assert.match(index, /data-testid="settings-state-running"[^>]*>\s*Runner ready/);
+    const running = await (await fetch(`${base}/workspace/alpha/settings/running`)).text();
+    assert.match(running, /data-testid="settings-runner-last-poll"[\s\S]*?queue token/);
+  });
+
+  test('with no keys at all the Running state reads "No runner"', async () => {
+    const index = await (await fetch(`${base}/workspace/alpha/settings`)).text();
+    assert.match(index, /data-testid="settings-state-running"[^>]*>\s*No runner/);
   });
 
   test('a provider return on the bare index goes to Sources with its query intact', async () => {
