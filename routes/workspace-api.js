@@ -2,7 +2,7 @@
  * Workspace-prefixed API routes.
  *
  * Handles all /workspace/:urlKey/api/* endpoints:
- * - Audit: Run workspace audit
+ * - Audit (GET audit): moved to workspace-api-audit.js (LIN-3883), registered on this router where the block sat
  * - Prompts: moved to workspace-api-prompts.js (LIN-3842): GET /api/prompt/:issueId/:labelName and both GET /api/autopilot-prompt
  * - Recommendations: AI-generated prompts via OpenRouter
  * - Issue reads (GET comments, detail, image): moved to workspace-api-issue-read.js (LIN-3872)
@@ -12,7 +12,7 @@
  * Shape (LIN-3596): every route is registered explicitly, in the order below, as a
  * thin handler over a small set of shared steps. The steps sit in two places:
  *   - module level, where they need no dependency (`recommendCallOptions`, `toHopRecord`, ...;
- *     `openIssue`, `refuseCapability`, `failureOf`, `isTestToken`, `refuseFreeTier`, `aiNotConfigured`, `keepaliveFailure` and `loadContext` live in workspace-api-steps.js, shared with workspace-api-prompts.js, workspace-api-issue-read.js, workspace-api-issue-write.js and workspace-api-scan.js);
+ *     `openIssue`, `refuseCapability`, `failureOf`, `isTestToken`, `refuseFreeTier`, `aiNotConfigured`, `keepaliveFailure` and `loadContext` live in workspace-api-steps.js, shared with workspace-api-prompts.js, workspace-api-issue-read.js, workspace-api-issue-write.js, workspace-api-scan.js and workspace-api-audit.js);
  *   - inside `createWorkspaceApiRoutes`, where they close over the injected stores.
  * The AI pre-flight calls (`resolveChatCredential`, `checkFreeTierGate`, the
  * `forceDefault` model clamp) are deliberately NOT shared: each route names its own,
@@ -31,6 +31,7 @@ import { createRoadmapRoutes } from './workspace-api-roadmap.js';
 import { createPromptsRoutes } from './workspace-api-prompts.js';
 import { registerIssueReadRoutes } from './workspace-api-issue-read.js';
 import { registerIssueWriteRoutes } from './workspace-api-issue-write.js';
+import { registerAuditRoutes } from './workspace-api-audit.js';
 import { registerScanRoutes } from './workspace-api-scan.js';
 export { decisionStampDedupe } from './workspace-api-issue-write.js';
 import { isTestToken, failureOf, openIssue, refuseCapability, refuseFreeTier, aiNotConfigured, keepaliveFailure, loadContext } from './workspace-api-steps.js';
@@ -59,8 +60,7 @@ import { buildContextGraph } from '../lib/context-graph.js';
 import { hashContext } from '../lib/recap-cache.js';
 import { getLoopsForIssue } from '../lib/pipeline-loops.js';
 import { toSessionView } from '../lib/sessions-view.js';
-import { runAudit, computeAuditFromData } from '../lib/audit.js';
-import { getWorkspaceToken, resolveIssueBinding, isActiveProviderLinear } from '../lib/workspace.js';
+import { resolveIssueBinding } from '../lib/workspace.js';
 import { resolveStateRef } from '../lib/proxy-ref-resolver.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
@@ -76,7 +76,6 @@ import {
   buildMockRecap,
   buildMockBrief,
   buildMockFeedbackTitle,
-  buildMockAuditData,
 } from '../lib/workspace-api-mocks.js';
 
 // The two mock builders other modules import from this router (tests, the dashboard).
@@ -407,60 +406,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
   // are disjoint from every other group's, so mount order is not load-bearing here.
   router.use(createPromptsRoutes({ workspaceFromUrl, promptTraceStore, customPromptsStore }));
 
-  // ===========================================================================
-  // Audit API
-  // ===========================================================================
-
-  /**
-   * Audit API endpoint - runs a workspace audit and returns JSON.
-   * Requires authentication.
-   */
-  router.get('/workspace/:urlKey/api/audit', workspaceFromUrl, async (req, res) => {
-    const workspace = req.workspace;
-
-    try {
-      // Use mock audit data in test mode. Audit is NOT provider-routed —
-      // runAudit() goes straight to GraphQL — so the local provider can't back
-      // this surface; instead the deterministic mock gate is widened to fire for
-      // local sessions too (LIN-412). This stays a DATA-mock carve-out (its own
-      // predicate, NOT shouldMockAi): the semantics are "serve the deterministic
-      // audit report", not "mock the AI call". The mock data below is unchanged —
-      // the local-seed identity only affects session/workspace resolution.
-      if (process.env.NODE_ENV === 'test' &&
-          (workspace.accessToken === 'test-token' || workspace.provider === 'local')) {
-        return res.json(computeAuditFromData(buildMockAuditData()));
-      }
-
-      // LIN-1899: the audit is a Linear-SPECIFIC capability — it reads the
-      // provider-agnostic scalar mirror `workspace.accessToken` and hands it to
-      // a statically Linear-bound GraphQL client (lib/audit.js:180). For a
-      // non-Linear active binding that mirror holds THAT provider's credential
-      // (a raw Jira API token, say), so the call below discloses it to
-      // api.linear.app — and returns a misleading 401 from the catch branch
-      // because Linear rejects it. Refuse instead: a capability endpoint with no
-      // meaningful non-Linear rendering declines with 422 CAPABILITY_NOT_SUPPORTED
-      // (the denyIfUnsupported envelope, routes/proxy.js:750-757), not the 503
-      // workspaceUnavailable envelope — a provider mismatch is not transient.
-      //
-      // Placed AFTER the test-mode mock branch above so the LIN-412 local
-      // carve-out keeps firing (tests/e2e/audit.spec.js runs on a genuine
-      // `provider: 'local'` seed). Consequence, recorded deliberately: a local
-      // workspace is mocked in test but REFUSED in production — today it sends
-      // its urlKey to Linear for a fake 401, and 422 is the honest answer.
-      // `linear`-only, never `linear` OR `local` (LIN-1891's settled rule); the
-      // sibling asset relay withholds the header instead of refusing, because
-      // capability endpoints refuse and asset relays degrade (see /api/image).
-      if (!isActiveProviderLinear(workspace)) {
-        return refuseCapability(res, workspace.provider, 'audit', 'this');
-      }
-
-      const report = await runAudit(getWorkspaceToken(workspace));
-      res.json(report);
-    } catch (error) {
-      console.error('Audit error:', error);
-      jsonError(res, ...failureOf(error, 'Audit failed', { notFound: false }));
-    }
-  });
+  registerAuditRoutes(router, { workspaceFromUrl });
 
   // What one recommendation model call takes — the issue, its prepared input and
   // the call options — as the argument list for `getRecommendation` /
