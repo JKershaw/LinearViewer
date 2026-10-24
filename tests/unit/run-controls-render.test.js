@@ -112,7 +112,7 @@ describe('the Dispatch page is read-only for a member', () => {
     assert.ok(html.includes('only the workspace owner can make a queue token'));
     // LIN-3846: the queue-token list moved to Settings › Agent access, which owns the owner-only revoke.
     assert.ok(html.includes('data-testid="dispatch-keys-link"'));
-    assert.ok(!html.includes('class="token-list"'));
+    assert.ok(!html.includes('data-testid="settings-key-'));
   });
 
   for (const [name, flags] of [['an owner with a way to run', { runControls: true }], ['a keyless owner (runSetup)', { runSetup: true }]]) {

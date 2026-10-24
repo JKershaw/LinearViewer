@@ -22,7 +22,7 @@ describe('LIN-3846 — the Proxy page links to the key list instead of carrying 
 
   test('no runner credentials section and no token list container', () => {
     assert.doesNotMatch(html, /id="proxy-runner-credentials"/);
-    assert.doesNotMatch(html, /proxy-token-list/);
+    assert.doesNotMatch(html, /data-testid="settings-key-/);
   });
 
   test('a link row points at Settings › Agent access', () => {

@@ -8,7 +8,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -125,7 +125,8 @@ test('self-hosts Inter and JetBrains Mono via @font-face (no build step)', () =>
 // whole class of enforced public CSS files against regression. (Token *definitions* like
 // `--font-structural: 'JetBrains Mono', …, monospace` and the `--font-mono` fallback itself
 // are not `font-family:` declarations, so they are correctly not matched.)
-const TYPO_ENFORCED_CSS = ['style.css', 'settings.css', 'styleguide.css'];
+// Every public stylesheet (LIN-3888): a rule that moves into another sheet stays under the check.
+const TYPO_ENFORCED_CSS = readdirSync(join(__dirname, '../../public')).filter(f => f.endsWith('.css'));
 
 test('enforced public CSS uses no raw-mono font-family declaration (LIN-985)', () => {
   for (const file of TYPO_ENFORCED_CSS) {

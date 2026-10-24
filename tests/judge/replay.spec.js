@@ -72,7 +72,7 @@ async function prepare(page, context, entry) {
   await page.goto(url);
   await settle(page);
   if (entry.state === 'ask-open') await page.getByTestId('settings-toggle-periodicals').locator('summary').click();
-  if (entry.state === 'key-open') await page.locator('.settings-row[data-testid^="settings-key-"] summary').first().click();
+  if (entry.state === 'key-open') await page.locator('[data-testid="settings-key-proxy"], [data-testid="settings-key-dispatch"]').locator('summary').first().click();
 }
 
 async function shoot(browser, baseURL, viewport, theme, entry) {
@@ -90,7 +90,11 @@ async function shoot(browser, baseURL, viewport, theme, entry) {
     }, NORMALISE);
     const masks = entry.masks || [];
     const present = [];
-    for (const m of masks) if (await page.locator(m.selector).count()) present.push(m);
+    for (const m of masks) {
+      // A mask that matches nothing would drop silently and let the judge read a false zero.
+      if (!await page.locator(m.selector).count()) throw new Error(`mask matched nothing on ${entry.id}: ${m.selector}`);
+      present.push(m);
+    }
     // Where the planted piece is shown, for the positive control: rendered, and NOT inside a mask (a
     // difference inside a masked row is hidden by design, so it must not be expected to show).
     const maskSelectors = present.map((m) => m.selector).join(',');

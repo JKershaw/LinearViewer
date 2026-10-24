@@ -336,7 +336,7 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
     // Each GitHub row uses the blocked presentation. Linear is NOT gated by the
     // GitHub config flag (LIN-1351 made its add-source live), so with GitHub
     // disabled the ONLY live add button left is Linear's.
-    assert.match(html, /class="line provider-add" data-testid="settings-provider-add-linear"/);
+    assert.match(html, /data-testid="settings-provider-add-linear"/);
     assert.match(html, /settings-provider-add-btn/);
     // Honest reason, not a stale ticket-blocked message.
     assert.doesNotMatch(html, /blocked on LIN-541/);
@@ -353,7 +353,7 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
     const html = renderSettingsPage('Acme', BASE);
     // Linear add-source is live: the row renders a real "add" form (POSTing to the
     // providers/add action → /auth/linear?mode=add-source), NOT the LIN-544 stopgap.
-    assert.match(html, /class="line provider-add" data-testid="settings-provider-add-linear"/);
+    assert.match(html, /data-testid="settings-provider-add-linear"/);
     assert.match(html, /settings-provider-add-btn/);
     assert.doesNotMatch(html, /blocked on LIN-544/);
     // Honest copy: "+ Linear" connects another organization as its own workspace,
@@ -1027,10 +1027,10 @@ describe('renderSettingsPage — OpenRouter unattended-use consent (LIN-2412)', 
     const html = renderSettingsPage('Acme', { ...BASE, openRouterSource: 'oauth', openRouterConsentedAt: '2026-08-01T00:00:00.000Z' });
     assert.match(html, /data-testid="settings-openrouter-consent-status"[^>]*>✓ enabled/);
     assert.doesNotMatch(html, /data-testid="settings-openrouter-consent-grant"/);
-    // openrouter-auth.spec.js locates the connection status by `.settings-value.connected`
-    // alone — the consent badge must never also carry that exact class pair.
-    const connectedMatches = html.match(/class="settings-value connected"/g) || [];
-    assert.equal(connectedMatches.length, 1, 'exactly one element may carry "settings-value connected" — the connection status, not the consent badge');
+    // openrouter-auth.spec.js locates the connection status by its test id alone — the consent
+    // badge must never also carry that test id.
+    const connectedMatches = html.match(/data-testid="settings-openrouter-status">● connected</g) || [];
+    assert.equal(connectedMatches.length, 1, 'exactly one OpenRouter status reads connected — the connection status, not the consent badge');
   });
 
   test('LIN-3846: granted consent can be turned off without disconnecting, and says what reads it', () => {
@@ -1056,7 +1056,7 @@ describe('renderSettingsPage — OpenRouter unattended-use consent (LIN-2412)', 
 
   test('not connected: connect link is present alongside the blast-radius notice (no consent grant form — there is no key yet)', () => {
     const html = renderSettingsPage('Acme', { ...BASE, openRouterSource: null });
-    assert.match(html, /class="action-btn connect"/);
+    assert.match(html, /data-testid="settings-openrouter-connect"/);
     assert.match(html, /data-testid="settings-openrouter-consent-notice"/);
     assert.doesNotMatch(html, /data-testid="settings-openrouter-consent-grant"/);
     assert.doesNotMatch(html, /data-testid="settings-openrouter-consent-status"/);

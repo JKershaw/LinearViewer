@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 import { workspaceApiLocalSeed } from '../fixtures/local-harness.js';
 
 // LIN-3239 S2 — the free-tier RUN contract.
@@ -285,7 +286,7 @@ test.describe('Free Tier Settings', () => {
     const freeTierStatus = page.locator('[data-free-tier-status]');
     await expect(freeTierStatus).toBeVisible();
     await expect(freeTierStatus).toContainText('free tier');
-    await expect(page.locator('.action-btn.connect')).toContainText('connect for unlimited');
+    await expect(page.locator(SELECTORS.settings.openRouterConnect)).toContainText('connect for unlimited');
 
     // The usage slot is the run allowance, filled from the own-counts quota read.
     const usageEl = page.locator('[data-free-tier-usage]');

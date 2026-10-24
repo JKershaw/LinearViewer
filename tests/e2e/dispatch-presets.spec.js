@@ -13,6 +13,7 @@
  * dispatch-route-presets.test.js / dispatch-factory.test.js for that.
  */
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 
 // LIN-3198: the preset create/save/delete handlers await a fetch, then call
 // window.location.reload() (public/settings.js). A bare
@@ -44,7 +45,7 @@ test.describe('Dispatch presets settings UI', () => {
 
     const section = page.locator('[data-testid="settings-section-dispatch-presets"]');
     await expect(section).toBeVisible();
-    await expect(section.locator('.settings-header')).toHaveText('Dispatch presets');
+    await expect(section.locator(SELECTORS.settings.groupTitle('dispatch-presets'))).toHaveText('Dispatch presets');
 
     // Sibling of Dispatch defaults, not nested inside it.
     const defaultsSection = page.locator('[data-testid="settings-section-dispatch-defaults"]');

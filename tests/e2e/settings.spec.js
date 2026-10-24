@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/test-base.js'
 import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js'
-import { nav, settings } from '../helpers.js'
+import { SELECTORS, nav, settings } from '../helpers.js'
 
 // Proof-of-pattern spec for LIN-215: brittle `:has-text()` / class / href
 // selectors here are migrated to the stable `data-testid` selectors and page
@@ -184,7 +184,7 @@ test.describe('Token Management', () => {
   })
 
   test('shows Tokens section on dispatch page', async ({ page }) => {
-    await expect(page.locator('.dispatch-section-header:text-is("Tokens")')).toBeVisible()
+    await expect(page.locator(SELECTORS.dispatchSection('tokens')).locator('h2', { hasText: 'Tokens' })).toBeVisible()
   })
 
   test('shows token create form', async ({ page }) => {
@@ -202,7 +202,7 @@ test.describe('Token Management', () => {
 
   test('links to the key list instead of listing keys itself', async ({ page, localWorkerUrlKey }) => {
     await expect(page.getByTestId('dispatch-keys-link')).toBeVisible()
-    await expect(page.locator('.token-list')).toHaveCount(0)
+    await expect(page.locator(SELECTORS.settings.keyRows)).toHaveCount(0)
     await openKeys(page, localWorkerUrlKey)
     await expect(keyRows(page)).toHaveCount(0)
   })

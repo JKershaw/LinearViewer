@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 import { seedLocalWorkspace } from '../fixtures/local-harness.js';
 import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 
@@ -90,10 +91,10 @@ test.describe('Dispatch Page', () => {
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
 
-      await expect(page.locator('.dispatch-section-header:has-text("Send Prompt")')).toBeVisible();
-      await expect(page.locator('.dispatch-section-header:has-text("Queue")')).toBeVisible();
-      await expect(page.locator('.dispatch-section-header:has-text("Tokens")')).toBeVisible();
-      await expect(page.locator('.dispatch-section-header:has-text("History")')).toBeVisible();
+      await expect(page.locator(SELECTORS.dispatchSection('send-prompt')).locator('h2', { hasText: 'Send Prompt' })).toBeVisible();
+      await expect(page.locator(SELECTORS.dispatchSection('queue')).locator('h2', { hasText: 'Queue' })).toBeVisible();
+      await expect(page.locator(SELECTORS.dispatchSection('tokens')).locator('h2', { hasText: 'Tokens' })).toBeVisible();
+      await expect(page.locator(SELECTORS.dispatchSection('history')).locator('h2', { hasText: 'History' })).toBeVisible();
     });
   });
 
@@ -889,7 +890,7 @@ test.describe('Dispatch Page', () => {
 
     test('the token section links to the key list instead of listing keys (LIN-3846)', async ({ page }) => {
       await expect(page.getByTestId('dispatch-keys-link')).toHaveAttribute('href', /\/settings\/agent-access$/);
-      await expect(page.locator('.token-list')).toHaveCount(0);
+      await expect(page.locator(SELECTORS.settings.keyRows)).toHaveCount(0);
     });
 
     test('can create token and see modal', async ({ page }) => {

@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 
 // LIN-450: the experimental Collective page. Seeds via /test/set-session (the
@@ -52,10 +53,10 @@ test.describe('Collective Page (experimental)', () => {
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
 
-      await expect(page.locator('.settings-header:has-text("Views")')).toBeVisible();
+      await expect(page.locator(SELECTORS.settings.groupTitles, { hasText: 'Views' })).toBeVisible();
       const toggle = page.locator('[data-feature="collective"]');
       await expect(toggle).toBeVisible();
-      await expect(toggle.locator('.toggle-state')).toContainText('off');
+      await expect(page.locator(SELECTORS.settings.switch('collective'))).toContainText('off');
     });
 
     test('settings link to the page appears only when the flag is on', async ({ page }) => {

@@ -9,6 +9,7 @@
  * `dispatchDefaults` storage shape).
  */
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 
 test.describe('Dispatch defaults settings', () => {
@@ -31,11 +32,12 @@ test.describe('Dispatch defaults settings', () => {
 
     const section = page.locator('[data-testid="settings-section-dispatch-defaults"]');
     await expect(section).toBeVisible();
-    await expect(section.locator('.settings-header')).toHaveText('Dispatch defaults');
+    await expect(section.locator(SELECTORS.settings.groupTitle('dispatch-defaults'))).toHaveText('Dispatch defaults');
 
     // Sibling of the AI section, not nested inside it.
-    const aiSection = page.locator('.settings-section', { has: page.locator('.settings-header:text-is("AI")') });
-    await expect(aiSection.locator('[data-testid="settings-section-dispatch-defaults"]')).toHaveCount(0);
+    // The check used to look for an "AI" group, which LIN-3846 retired, so it could never fail. This one
+    // fails if the Dispatch defaults frame ever nests inside another settings group.
+    await expect(page.locator(`${SELECTORS.settings.sections} ${SELECTORS.settings.section('dispatch-defaults')}`)).toHaveCount(0);
 
     // Workspace-wide row is visible up front; per-kind rows (bug is easy to
     // miss — LIN-1094/this ticket's own count correction — and close-out is

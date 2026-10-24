@@ -6,6 +6,7 @@
  * the per-user feature path.
  */
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 
 test.describe('Workspace feature toggles', () => {
   test.beforeEach(async ({ page, request, seedLocal, localWorkerUrlKey }) => {
@@ -62,7 +63,7 @@ test.describe('Workspace feature toggles', () => {
   test('the workspace switch is not among the per-user features', async ({ page, localWorkerUrlKey }) => {
     await page.goto(`/workspace/${localWorkerUrlKey}/settings/features`);
     await expect(page.locator('[data-feature="periodicals"]')).toHaveCount(0);
-    await expect(page.locator('[data-feature="roadmap"] .toggle-state')).toHaveText('○ off');
+    await expect(page.locator(SELECTORS.settings.switch('roadmap'))).toHaveText('○ off');
   });
 
   test('the handler rejects an invalid workspace feature key, and a change with no reason', async ({ page, localWorkerUrlKey }) => {

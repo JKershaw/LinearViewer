@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 
 // "The Ship's Biscuit" — experimental, flag-gated LLM-set newspaper (LIN-818, V1:
 // front page + index only). Seeds via /test/set-session (the test-token workspace),
@@ -41,10 +42,10 @@ test.describe("The Ship's Biscuit (experimental)", () => {
       await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
-      await expect(page.locator('.settings-header:has-text("Views")')).toBeVisible();
+      await expect(page.locator(SELECTORS.settings.groupTitles, { hasText: 'Views' })).toBeVisible();
       const toggle = page.locator('[data-feature="shipBiscuit"]');
       await expect(toggle).toBeVisible();
-      await expect(toggle.locator('.toggle-state')).toContainText('off');
+      await expect(page.locator(SELECTORS.settings.switch('shipBiscuit'))).toContainText('off');
     });
 
     test('settings link to the page appears only when the flag is on', async ({ page }) => {

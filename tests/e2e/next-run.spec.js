@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 
 // Experimental "suggest the next autopilot run" page (LIN-603). Seeds via
 // /test/set-session (the test-token workspace), so the suggest endpoint serves
@@ -44,10 +45,10 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
 
-      await expect(page.locator('.settings-header:has-text("Views")')).toBeVisible();
+      await expect(page.locator(SELECTORS.settings.groupTitles, { hasText: 'Views' })).toBeVisible();
       const toggle = page.locator('[data-feature="nextRun"]');
       await expect(toggle).toBeVisible();
-      await expect(toggle.locator('.toggle-state')).toContainText('off');
+      await expect(page.locator(SELECTORS.settings.switch('nextRun'))).toContainText('off');
     });
 
     test('settings link to the page appears only when the flag is on', async ({ page }) => {

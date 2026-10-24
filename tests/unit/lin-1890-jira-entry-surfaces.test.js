@@ -307,11 +307,11 @@ describe('LIN-2010 step 9 — Settings add-row gate (F1, unit-level proof ahead 
     unconfigureGithub();
     const html = settingsHtml(isGitHubConfigured());
 
-    const githubRowMatch = html.match(/<div class="line provider-add-blocked" data-testid="settings-provider-add-github"[^]*?<\/div>/);
+    const githubRowMatch = html.match(/<div[^>]*data-testid="settings-provider-add-github"[^]*?<\/div>/);
     assert.ok(githubRowMatch, 'expected a blocked github row');
     assert.match(githubRowMatch[0], /not configured on this server/);
 
-    const projectsRowMatch = html.match(/<div class="line provider-add-blocked" data-testid="settings-provider-add-github-projects"[^]*?<\/div>/);
+    const projectsRowMatch = html.match(/<div[^>]*data-testid="settings-provider-add-github-projects"[^]*?<\/div>/);
     assert.ok(projectsRowMatch, 'expected a blocked github-projects row');
     assert.match(projectsRowMatch[0], /not configured on this server/);
   });

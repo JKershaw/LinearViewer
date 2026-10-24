@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 import { seedJiraWorkspace } from '../fixtures/jira-harness.js';
 // fixture:LIN-3136
 import { mintDriverWriter } from '../fixtures/driver-writer.js';
@@ -47,7 +48,7 @@ test.describe('Proxy Page', () => {
     await expect(page.locator('.proxy-events-list')).not.toBeVisible();
 
     // The page carries no list of keys of its own: one link row to the one list.
-    await expect(page.locator('.proxy-token-list')).toHaveCount(0);
+    await expect(page.locator(SELECTORS.settings.keyRows)).toHaveCount(0);
     await expect(page.getByTestId('proxy-keys-link')).toHaveAttribute('href', /\/settings\/agent-access$/);
   });
 

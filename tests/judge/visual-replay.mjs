@@ -181,7 +181,9 @@ if (control) {
     console.log(`control ${c.name}: ${differing.size} differing, ${expected.size} expected from the DOM (${c.probe} shown)`);
     if (missed.length) { failed = true; console.log(`  MISSED (selector shown, no difference): ${missed.join(', ')}`); }
     if (extra.length) { failed = true; console.log(`  UNEXPECTED (difference where selector is not shown): ${extra.join(', ')}`); }
-    if (!missed.length && !extra.length) console.log('  caught on exactly the pages that show the piece');
+    // With the probe shown on no page, both sets are empty and the control would pass on nothing.
+    if (!expected.size) { failed = true; console.log(`  VACUOUS: ${c.probe} is shown on no page, so this control proves nothing`); }
+    else if (!missed.length && !extra.length) console.log('  caught on exactly the pages that show the piece');
   }
 }
 
