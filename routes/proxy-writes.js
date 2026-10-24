@@ -125,6 +125,7 @@ const SPEC = {
  * @param {Function} deps.logEvent - Audit/witness event logger (closure-local)
  * @param {Object} [deps.harbourCommentsStore] - Durable (urlKey, commentId) ledger (LIN-2648); best-effort record at each createComment seam, never gates the response
  * @param {Function} [deps.onTicketWrite] - Optional ticket-closed closer seam (LIN-3366), fire-and-forget; never changes a response
+ * @param {Function} [deps.recordPipelineMerge] - Optional merged-PR recorder (LIN-3756), fired once beside seam 1 for a state write; fire-and-forget, never changes a response
  */
 export function createProxyWriteRoutes({
   proxyLimiter,
@@ -147,6 +148,7 @@ export function createProxyWriteRoutes({
   logEvent,
   harbourCommentsStore = null,
   onTicketWrite = null,
+  recordPipelineMerge = null,
 }) {
   const router = Router();
   const writeAuth = [proxyLimiter, authenticateProxyToken, requireWriteScope];
@@ -434,6 +436,23 @@ export function createProxyWriteRoutes({
     // Seam 1 (LIN-3366): a state write may have made the ticket terminal.
     if (input.stateId) {
       afterResponse(1, () => onTicketWrite({ urlKey: req.proxyUrlKey, written: updated.issue, readBack: () => provider.fetchIssueContext(token, issueId) }));
+      // LIN-3756: the close-out worker merges, then sets Done here; record the merge.
+      // Its own fire-and-forget (afterResponse returns early when onTicketWrite is
+      // unset). `token` is the structured call scope the PR read needs.
+      if (recordPipelineMerge) {
+        void Promise.resolve()
+          .then(() => recordPipelineMerge({
+            urlKey: req.proxyUrlKey,
+            workspaceId: req.proxyWorkspaceId ?? null,
+            accountId: req.proxyCreatedBy ?? null,
+            provider,
+            callScope: token,
+            source: req.query?.source ?? null,
+            written: updated.issue,
+            readBack: () => provider.fetchIssueContext(token, issueId),
+          }))
+          .catch(e => console.error('[close-out-merges] seam 1 failure:', e?.message || e));
+      }
     }
   }));
 
