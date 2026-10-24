@@ -188,7 +188,7 @@ import { buildRoadmapModel } from './lib/roadmap.js'
 import { renderProxyPage } from './lib/render-proxy.js'
 import { AVAILABLE_MODELS, setLlmCallRecorder, setPromptTraceRecorder, getPaidEnvKey, getFreeTierModelConfigWarning, streamChatWithTools } from './lib/openrouter.js'
 import { resolveOpenRouterSource, isFreeTierOffered } from './lib/chat-request.js'
-import { resolveWorkspaceModel, resolveAiOperationModel, getWorkspaceFeatures, isWorkspaceFeatureEnabled, setWorkspaceFeature, resolveDispatchDefaults } from './lib/workspace-preferences.js'
+import { resolveWorkspaceModel, resolveAiOperationModel, jobModelResolver, getWorkspaceFeatures, isWorkspaceFeatureEnabled, setWorkspaceFeature, resolveDispatchDefaults } from './lib/workspace-preferences.js'
 import { getFeatureFlags, isValidFeatureKey, isValidWorkspaceFeatureKey, WORKSPACE_FEATURES } from './lib/feature-defaults.js'
 import { projectLegacy } from './lib/model-routing.js'
 import { ModelRoutingStore } from './lib/model-routing-store.js'
@@ -524,9 +524,13 @@ const runParagraphCollection = db.collection('run-paragraph')
 const runParagraphStore = new RunParagraphStore({
   collection: runParagraphCollection
 })
+// LIN-3856 (D2): both precomputes resolve their model from the routing store, with the
+// free-tier clamp applied when the credential is the shared free key.
+const precomputeResolveModel = jobModelResolver(workspacePreferencesStore)
 const precomputeRunParagraph = createRunParagraphPrecompute({
   runParagraphStore,
-  isTerminal: sessionIsTerminal
+  isTerminal: sessionIsTerminal,
+  resolveModel: precomputeResolveModel
 })
 
 // Background session-summary precompute (LIN-632) plus the run-paragraph
@@ -542,7 +546,8 @@ const precomputeRunParagraph = createRunParagraphPrecompute({
 const precomputeSessionSummary = createSessionSummaryPrecompute({
   sessionSummaryStore: sessionSummaryCacheStore,
   isTerminal: sessionIsTerminal,
-  runSummaryStore: runSummaryCacheStore
+  runSummaryStore: runSummaryCacheStore,
+  resolveModel: precomputeResolveModel
 })
 
 observationMaterializer.precomputeSessionSummary = createMaterializerPrecompute({
