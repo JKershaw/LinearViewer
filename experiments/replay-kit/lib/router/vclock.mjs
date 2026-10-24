@@ -5,7 +5,8 @@
 // and the GLOBAL `setTimeout`/`setInterval`/`clear*` create virtual timers.
 // Nothing fires on its own: `pumpUntil(done)` waits for the event loop to go
 // quiet (a few real setImmediate turns, so every microtask and fake store
-// settlement has run), then fires the earliest-due virtual timer, advancing the
+// settlement has run, then more turns until no setImmediate callback is still
+// queued: LIN-3851), then fires the earliest-due virtual timer, advancing the
 // clock to its due time. A 1500 ms long-poll re-check, the keepalive's 25 s
 // flush and 15 s heartbeats, the poll-halt read timeout and the factory's
 // valueWithin fallbacks therefore all run in a deterministic order, in no real
@@ -95,13 +96,25 @@ export function now() { return state.now; }
 
 const immediate = () => new Promise(r => real.setImmediate(r));
 
+// LIN-3851: setImmediate is not virtualised, so "quiet" is read from the loop:
+// after the minimum turns, keep yielding while a ref'd Immediate is still
+// queued (a callback chain that re-queues itself). A chain that never ends is
+// cut off at MAX_QUIET_TURNS so the pump cannot spin forever.
+const MIN_QUIET_TURNS = 3;
+const MAX_QUIET_TURNS = 10_000;
+const immediatesQueued = () => process.getActiveResourcesInfo().includes('Immediate');
+async function untilQuiet() {
+  for (let k = 0; k < MIN_QUIET_TURNS; k++) await immediate();
+  for (let k = MIN_QUIET_TURNS; k < MAX_QUIET_TURNS && immediatesQueued(); k++) await immediate();
+}
+
 /**
  * Fire virtual timers in due order whenever the loop is quiet, until `done()`.
  * When no timer is pending the pump just yields (real I/O is in flight).
  */
 export async function pumpUntil(done, canFire = () => true) {
   for (;;) {
-    for (let k = 0; k < 3; k++) await immediate();
+    await untilQuiet();
     if (done()) return;
     if (state.timers.size === 0 || state.fired >= state.maxFirings || !canFire()) {
       await new Promise(r => real.setTimeout(r, 1));
@@ -126,7 +139,7 @@ export async function pumpUntil(done, canFire = () => true) {
 export async function drain(horizonMs = 120_000) {
   const limit = state.now + horizonMs;
   for (;;) {
-    for (let k = 0; k < 3; k++) await immediate();
+    await untilQuiet();
     let next = null;
     for (const t of state.timers.values()) if (!next || t.due < next.due || (t.due === next.due && t.id < next.id)) next = t;
     if (!next || next.due > limit || state.fired >= state.maxFirings) return;
