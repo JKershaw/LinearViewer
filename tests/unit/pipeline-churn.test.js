@@ -141,6 +141,51 @@ test('implementation after an Approve is a fix round close-out owns; after Reque
   assert.deepEqual(causesOf(rc).slice(3), ['implementation:review-changes', 'review:review-changes']);
 });
 
+test('a worker dispatched as a follow-up into another worker is stall recovery, not a fresh stage', () => {
+  const ap = autopilot();
+  const impl = worker('implementation', 1, 10);
+  const probe = worker('implementation', 12, 15, { followUpTo: impl.id });
+  const r = classifyTicket({ identifier: 'LIN-1', rows: [ap, impl, probe] });
+  assert.equal(r.entries[2].cause, 'stall-recovery');
+  assert.match(r.entries[2].note, /^follow-up into implementation /);
+});
+
+test('an implementation re-dispatched after an aborted one is stall recovery, and so is the wake that follows the abort', () => {
+  const ap = autopilot();
+  const hung = worker('implementation', 1, 62, { marker: 'aborted', status: 'aborted', text: 'aborted' });
+  const redo = worker('implementation', 64, 80);
+  const r = classifyTicket({ identifier: 'LIN-1', rows: [ap, hung, wake(62, ap.id), redo] });
+  assert.equal(r.entries[1].cause, 'stage-path'); // the first implementation is the stage path's, hung or not
+  assert.equal(r.entries[2].cause, 'stall-recovery'); // the wake an aborted stage-path worker sends is the stall's
+  assert.equal(r.entries[2].ownerId, hung.id);
+  assert.equal(r.entries[3].cause, 'stall-recovery');
+  assert.match(r.entries[3].note, /^previous implementation .* aborted$/);
+});
+
+test('a second close-out dispatched while the first one\'s turn is still open is a concurrent duplicate', () => {
+  const ap = autopilot();
+  const first = worker('close-out', 5, 30);
+  const second = worker('close-out', 10, 20);
+  const r = classifyTicket({ identifier: 'LIN-1', rows: [ap, worker('implementation', 1, 4), first, second] });
+  assert.equal(r.entries[2].cause, 'stage-path');
+  assert.equal(r.entries[3].cause, 'concurrent-duplicate');
+  assert.match(r.entries[3].note, /still live$/);
+});
+
+test('an answer resumed into a close-out while a newer close-out is live runs the stage twice', () => {
+  const ap = autopilot();
+  const held = worker('close-out', 6, 8, { marker: 'blocked', text: 'BLOCKED: the merge is held on a ruling.' });
+  const fresh = worker('close-out', 30, 40);
+  const rulings = [{ decision: { decision_id: 'merge-ok', question: 'Merge?', options: [{ id: 'y', label: 'Merge it' }] },
+    anchor: { loopId: held.id }, stampLoopId: held.id,
+    resolution: { raisedAt: at(8), resolvedAt: at(34.9), outcome: 'answered' } }];
+  const resume = custom(35, 'Merge it', { followUpTo: held.id });
+  const r = classifyTicket({ identifier: 'LIN-1', rows: [ap, worker('implementation', 1, 5), held, fresh, resume], rulings });
+  assert.equal(r.entries[3].cause, 'close-out-held');
+  assert.equal(r.entries[4].cause, 'concurrent-duplicate');
+  assert.match(r.entries[4].note, /^merge-ok resumed close-out .* while .* was live$/);
+});
+
 test('a stall counts only inside the working window, and a parked worker\'s span keeps its wait', () => {
   const stalled = worker('close-out', 0, 70, { extra: [
     { timestamp: at(64), kind: 'heartbeat', message: '[stalled?] no tool activity for 61m 57s in EXECUTING (last tool: Bash)' }] });
