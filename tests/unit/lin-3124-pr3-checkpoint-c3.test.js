@@ -17,7 +17,6 @@ import { workspaceApiUnitFiles } from './lib/workspace-api-unit.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
-const WORKSPACE_API_SRC = readFileSync(join(__dirname, '../../routes/workspace-api.js'), 'utf8');
 const CREDENTIAL_SRC = readFileSync(join(__dirname, '../../lib/connection-credential.js'), 'utf8');
 
 const BUFFER = 5 * 60 * 1000;
@@ -95,20 +94,21 @@ describe('LIN-3124 PR3 checkpoint C3 — source-text pins', () => {
   // invalid_grant deletes the Connection and its record and takes the removal /
   // re-link path).
 
-  test('workspace-api adopt entrant uses the injected connection read + hydrates the side-table', () => {
-    assert.match(WORKSPACE_API_SRC, /activeConnectionBackedBinding\(workspace\)\?\.connectionId/);
-    assert.match(WORKSPACE_API_SRC, /adoptConnectionCredential\(\{/);
-    assert.match(WORKSPACE_API_SRC, /setBindingCredential\(adoptedConnection\.binding, adoptedConnection\.credentialBag\)/);
-    assert.match(WORKSPACE_API_SRC, /setWorkspaceCredential\(workspace, adoptedConnection\.credentialBag\)/);
-  });
+  // LIN-3861: the four source regexes that stood here (the injected connection read
+  // `activeConnectionBackedBinding(workspace)?.connectionId`, the `adoptConnectionCredential({` call, and
+  // `setBindingCredential` / `setWorkspaceCredential` hydrating the binding and the workspace) pinned WHERE
+  // that code sits in routes/workspace-api.js. They are replaced by behaviour: the describe 'POST
+  // /workspace/:urlKey/api/comments/:issueId — connection-backed adopt entrant (LIN-3861 ...)' in
+  // comment-write-route.test.js drives the entrant over HTTP (positive control: the first write is
+  // refused 401 first). Each construct was shown failing it in a scratch copy (PR evidence): the adopt call
+  // replaced by null, the setBindingCredential line deleted, the setWorkspaceCredential line deleted, and
+  // `activeConnectionBackedBinding(workspace)?.connectionId` replaced by null.
 
-  test('the seam exposes adoptConnectionCredential and the workspace-api module imports no connection seam', () => {
+  test('the seam exposes adoptConnectionCredential', () => {
     assert.match(CREDENTIAL_SRC, /async function adoptConnectionCredential\(/);
-    assert.match(WORKSPACE_API_SRC, /from '\.\.\/lib\/connection-binding\.js'/);
-    assert.doesNotMatch(WORKSPACE_API_SRC, /from '\.\.\/lib\/connection-(?:credential|store|lifecycle|access)\.js'/);
   });
 
-  // LIN-3861: the workspace-API half of the pin above, judged over the whole unit
+  // LIN-3861: the workspace-API half of the old `no connection seam` pin, judged over the whole unit
   // (routes/workspace-api.js and routes/workspace-api-*.js) instead of one file name,
   // so the route groups can move. A pure check over a `{rel: src}` map: the live
   // test reads the unit through workspaceApiUnitFiles, the witnesses plant violations in a
