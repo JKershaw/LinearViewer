@@ -5,13 +5,12 @@
  * - Audit: Run workspace audit
  * - Prompts: moved to workspace-api-prompts.js (LIN-3842): GET /api/prompt/:issueId/:labelName and both GET /api/autopilot-prompt
  * - Recommendations: AI-generated prompts via OpenRouter
- * - Comments: Fetch issue comments
- * - Images: Proxy Linear-hosted images with auth
+ * - Issue reads (GET comments, detail, image): moved to workspace-api-issue-read.js (LIN-3872); POST comments stays here
  *
  * Shape (LIN-3596): every route is registered explicitly, in the order below, as a
  * thin handler over a small set of shared steps. The steps sit in two places:
- *   - module level, where they need no dependency (`openIssue`, `refuseCapability`, `refuseFreeTier`, `scanRow`, `loadContext`, ...;
- *     `failureOf` and `isTestToken` live in workspace-api-steps.js, shared with workspace-api-prompts.js);
+ *   - module level, where they need no dependency (`refuseFreeTier`, `scanRow`, `loadContext`, ...;
+ *     `openIssue`, `refuseCapability`, `failureOf` and `isTestToken` live in workspace-api-steps.js, shared with workspace-api-prompts.js and workspace-api-issue-read.js);
  *   - inside `createWorkspaceApiRoutes`, where they close over the injected stores.
  * The AI pre-flight calls (`resolveChatCredential`, `checkFreeTierGate`, the
  * `forceDefault` model clamp) are deliberately NOT shared: each route names its own,
@@ -28,9 +27,10 @@ import { getProviderForWorkspace, getProvider } from '../lib/providers/registry.
 import '../lib/providers/linear/index.js'; // side effect: self-registers the Linear provider into the registry
 import { createRoadmapRoutes } from './workspace-api-roadmap.js';
 import { createPromptsRoutes } from './workspace-api-prompts.js';
-import { isTestToken, failureOf } from './workspace-api-steps.js';
+import { registerIssueReadRoutes } from './workspace-api-issue-read.js';
+import { isTestToken, failureOf, openIssue, refuseCapability } from './workspace-api-steps.js';
 import { generatePrompt } from '../lib/prompt-templates.js';
-import { renderDetailsContent, PRIORITY_OPTION_LABELS } from '../lib/render.js';
+import { PRIORITY_OPTION_LABELS } from '../lib/render.js';
 import { attachProxyContext, isCodedGrantRefusal, codedGrantRefusalResponse } from '../lib/proxy-preamble.js';
 import { buildAutopilotKickoff } from '../lib/prompts/autopilot-kickoff.js';
 import { isRecommendationEnabled, getRecommendation, getRecommendationStream, getModelDisplayName, streamChat } from '../lib/openrouter.js';
@@ -39,7 +39,7 @@ import { resolveChatCredential, isAiUnavailable, checkFreeTierGate, buildRunGate
 import { getModelCatalog, isFreeModel } from '../lib/openrouter-catalog.js';
 import { resolveRecommendation, armHopSignal } from '../lib/recommend-recurse.js';
 import { prepareRecommendationInput } from '../lib/recommendation-input.js';
-import { sniffRasterType, parseFeedbackImage } from '../lib/attachment-upload.js';
+import { parseFeedbackImage } from '../lib/attachment-upload.js';
 import { resolveWorkspaceModel, resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { validateOpaqueDispatchField, MAX_NAME_LENGTH } from '../lib/dispatch-validation.js';
@@ -121,12 +121,6 @@ const CONTEXT_FETCH_TIMEOUT_MS = 45_000;
 const DUE_CHECK_PAGE_SIZE = 40;
 const DUE_CHECK_CONCURRENCY = 5;
 
-// Max image size: 10MB to prevent memory exhaustion
-const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
-
-// The render sections the lazy detail route whitelists (LIN-732).
-const KNOWN_SECTIONS = ['project', 'in-progress', 'recent-activity'];
-
 // LIN-2208: whether the decision-answer stamp(s) for a given comment-dedupe
 // `key` have already succeeded — separate from `commentDedupe` itself (which
 // caches the WRITTEN COMMENT and is spread verbatim into the JSON response;
@@ -147,16 +141,6 @@ const refuseFreeTier = (res, check) => jsonError(res, 429, check.reason, freeTie
 const aiNotConfigured = (res, noun) =>
   jsonError(res, 503, `AI ${noun} is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.`, { code: 'AI_NOT_CONFIGURED' });
 
-/**
- * Clean 422 (never a raw NotImplementedError) when the provider cannot do `capability`.
- * @param {string} doing - the tail of "This workspace's provider does not support …"
- */
-function refuseCapability(res, providerName, capability, doing) {
-  return jsonError(res, 422, `This workspace's provider does not support ${doing}`, {
-    code: 'CAPABILITY_NOT_SUPPORTED', capability, provider: providerName,
-  });
-}
-
 // Never let a durable scan record be keyed under a non-canonical fallback
 // (LIN-2197 Phase 2 close-out ledger item 3). Spread into jsonError / keepaliveError.
 const CANONICAL_ID_REFUSAL = [422, "This task's canonical id could not be resolved; scan requires a canonical identity", { code: 'CANONICAL_ID_REQUIRED' }];
@@ -166,43 +150,6 @@ function keepaliveFailure(keepalive, label, error, fallbackMessage, arms) {
   keepalive.stop();
   console.error(label, error);
   keepaliveError(keepalive, ...failureOf(error, fallbackMessage, arms));
-}
-
-/**
- * The preamble every issue-addressed route opens with: resolve the issue's own binding
- * (LIN-1904: per the `source` provenance stamp, not always the workspace's active
- * provider), then refuse, in this order, a malformed id, a missing scan-record id, an
- * unconfigured store, and a provider without recommendation context (LIN-1910). Replies
- * and returns null when it refuses.
- * @param {Object} [checks]
- * @param {boolean} [checks.recordId] - the body must carry a scan record `id`
- * @param {*} [checks.store] - the store the route needs, checked with `storeName`
- * @param {string} [checks.storeName] - "<storeName> not configured" (503)
- * @param {string} [checks.capability] - require `fetchRecommendationContext`, worded "<capability> for this issue"
- * @param {boolean} [checks.bind=true] - false where the route resolves the binding only on a branch
- */
-function openIssue(req, res, { recordId = false, store, storeName, capability, bind = true } = {}) {
-  const workspace = req.workspace;
-  const { issueId } = req.params;
-  const binding = bind ? resolveIssueBinding(workspace, req.query.source) : null;
-
-  if (!isValidIssueId(issueId)) {
-    badRequest.json(res, 'Invalid issue ID format');
-    return null;
-  }
-  if (recordId && (typeof req.body?.id !== 'string' || !req.body.id)) {
-    badRequest.json(res, 'A scan record id is required');
-    return null;
-  }
-  if (storeName && !store) {
-    jsonError(res, 503, `${storeName} not configured`);
-    return null;
-  }
-  if (capability && !binding.provider.supports('fetchRecommendationContext')) {
-    refuseCapability(res, binding.provider.name, 'fetchRecommendationContext', `${capability} for this issue`);
-    return null;
-  }
-  return { workspace, issueId, recordId: req.body?.id, provider: binding?.provider, callScope: binding?.callScope };
 }
 
 /**
@@ -1221,31 +1168,9 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
   // Comments API
   // ===========================================================================
 
-  /**
-   * Fetch comments for a specific issue.
-   * LIN-156: Lightweight endpoint for fetching issue comments.
-   *
-   * @route GET /workspace/:urlKey/api/comments/:issueId
-   * @param {string} issueId - The Linear issue ID
-   * @returns {Object} { comments: Array<{id, body, createdAt, user}> }
-   */
-  router.get('/workspace/:urlKey/api/comments/:issueId', workspaceFromUrl, async (req, res) => {
-    // The detail-surface comments path is fully provider-backed: the dashboard
-    // (interactions.spec) reads comments through the local provider and no
-    // test-token spec reaches this endpoint, so the old `testMockData` data-mock
-    // branch was orphaned and removed (LIN-413). Linear + local both serve here.
-    // LIN-1904: the issue's own binding via `source`, same as /api/detail.
-    const issue = openIssue(req, res);
-    if (!issue) return;
-
-    try {
-      const comments = await issue.provider.fetchIssueComments(issue.callScope, issue.issueId);
-      res.json({ comments });
-    } catch (error) {
-      console.error('Comments fetch error:', error);
-      jsonError(res, ...failureOf(error, 'Failed to fetch comments'));
-    }
-  });
+  // The issue-read routes (GET comments, detail, image) moved to workspace-api-issue-read.js (LIN-3872);
+  // they register on this router, here, so GET comments still precedes POST comments below.
+  registerIssueReadRoutes(router, { workspaceFromUrl, getOpenRouterSource, customPromptsStore });
 
   /**
    * Add a human comment to an issue (LIN-2154) — the session-auth twin of the
@@ -1595,84 +1520,6 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       // contract, whether recovery was skipped, found nothing, or was
       // attempted and the adopt, the retry (or the session save) itself failed.
       return jsonError(res, 500, 'Failed to create comment', loggedClassification);
-    }
-  });
-
-  /**
-   * Render one issue's detail block for the lazy dashboard (LIN-442).
-   *
-   * The authenticated homepage now ships only collapsed lines; `renderNode`
-   * emits an empty `.details` wrapper and the client fetches the rendered inner
-   * HTML here on first expand (mirroring the comments lazy-load). This is what
-   * removes the dominant multi-MB per-page payload on large projects.
-   *
-   * Provider-backed for real workspaces (local in E2E, Linear in prod), with a
-   * test-token/testMockData branch for the mock specs (`/test/set-session`),
-   * since those render the homepage from fixtures, not the provider API. The
-   * returned HTML is byte-identical to what `renderDetails` emitted inline before
-   * — same feature flags, provider UI, and prompt containers.
-   *
-   * @route GET /workspace/:urlKey/api/detail/:issueId
-   * @returns {Object} { html } - inner HTML for the issue's `.details` block
-   */
-  router.get('/workspace/:urlKey/api/detail/:issueId', workspaceFromUrl, async (req, res) => {
-    // LIN-1903: the dashboard tree merges issues across ALL of a workspace's
-    // bindings (LIN-544), but a bare id-only drill-down defaulted to the
-    // WORKSPACE's active provider/scope — misrouting a foreign-source row's id
-    // to the wrong provider/credential. The client-supplied `source` (the
-    // issue's own provenance, LIN-561) lets us resolve that issue's own
-    // binding instead, via resolveIssueBinding — bounded to this workspace's
-    // OWN bindings, so it can only select among credentials the caller
-    // already has access to (LIN-1904).
-    const found = openIssue(req, res);
-    if (!found) return;
-    const { workspace, issueId, provider, callScope } = found;
-
-    try {
-      // Test mode (test-token + testMockData): the homepage renders from the mock
-      // fixtures, not the provider API, so the lazy detail must too — fetching via
-      // the Linear provider with 'test-token' would hit the network. Mirrors the
-      // prompt route's test-mode branch.
-      let issue;
-      if (isTestToken(workspace)) {
-        issue = testMockData.issues.find(i => i.id === issueId);
-        if (!issue) {
-          return notFound.json(res, 'Issue not found');
-        }
-      } else {
-        issue = await provider.fetchIssueFields(callScope, issueId);
-      }
-
-      // Custom prompts (non-blocking, fallback to empty) — matches the homepage.
-      let customPrompts = [];
-      try {
-        customPrompts = (await customPromptsStore.list(workspace.urlKey)).map(p => ({ id: p.id, name: p.name }));
-      } catch (e) { /* non-fatal */ }
-
-      const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h));
-
-      // The same issue can be lazily expanded in two sections at once (e.g. In
-      // Progress + its project tree). `section` disambiguates the dispatch
-      // disclosure panel ids so the second appearance's "Dispatch ▾" resolves to
-      // its OWN panel, not the first one's (LIN-732). Whitelisted to the known
-      // render sections; anything else falls back to '' (pre-LIN-732 id scheme).
-      const section = KNOWN_SECTIONS.includes(req.query.section) ? req.query.section : '';
-
-      const html = renderDetailsContent(issue, {
-        isLanding: false,
-        openRouterSource: getOpenRouterSource(req),
-        urlKey: workspace.urlKey,
-        featureFlags: await requestFeatureFlags(req),
-        customPrompts,
-        isLocalhost,
-        provider,
-        section
-      });
-
-      res.json({ html });
-    } catch (error) {
-      console.error('Detail fetch error:', error);
-      jsonError(res, ...failureOf(error, 'Failed to fetch detail'));
     }
   });
 
@@ -2510,128 +2357,6 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       // (defensive — its allSettled shape shouldn't reject), and on any
       // synchronous throw before the response is sent.
       keepalive.stop();
-    }
-  });
-
-  // ===========================================================================
-  // Image Proxy API
-  // ===========================================================================
-
-  /**
-   * Proxy image requests to Linear with authentication.
-   * LIN-156: Linear-hosted images require auth headers that browsers can't add to img src.
-   *
-   * @route GET /workspace/:urlKey/api/image
-   * @query {string} url - The Linear image URL to fetch
-   * @returns {Stream} Image data with appropriate content-type
-   */
-  router.get('/workspace/:urlKey/api/image', workspaceFromUrl, async (req, res) => {
-    const workspace = req.workspace;
-    const imageUrl = req.query.url;
-
-    // Validate URL
-    if (!imageUrl) {
-      return badRequest.json(res, 'Missing url parameter');
-    }
-
-    // A repeated `?url=` parses to an array (LIN-3596): bad input is a 400 here,
-    // not a TypeError out of `startsWith` that surfaces as a 500 (LIN-1158).
-    if (typeof imageUrl !== 'string') {
-      return badRequest.json(res, 'Invalid image URL format');
-    }
-
-    // Only allow HTTPS URLs (security)
-    if (!imageUrl.startsWith('https://')) {
-      return badRequest.json(res, 'Invalid image URL: must be HTTPS');
-    }
-
-    // Only allow Linear-hosted images (security - prevent SSRF)
-    // Use exact hostname matching to prevent bypass via evillinear.app
-    const allowedHosts = new Set(['uploads.linear.app', 'cdn.linear.app', 'linear.app']);
-    try {
-      const urlObj = new URL(imageUrl);
-      if (!allowedHosts.has(urlObj.hostname)) {
-        return badRequest.json(res, 'Invalid image URL: must be from Linear');
-      }
-      // Prevent path traversal attacks
-      if (urlObj.pathname.includes('..')) {
-        return badRequest.json(res, 'Invalid image URL: path traversal not allowed');
-      }
-    } catch {
-      return badRequest.json(res, 'Invalid image URL format');
-    }
-
-    try {
-      // LIN-1899: attach the workspace credential ONLY when the active binding
-      // is Linear. `workspace.accessToken` is the provider-agnostic scalar
-      // mirror, so for a Jira-active workspace this template would send a raw
-      // Jira API token to uploads.linear.app — the same cross-provider
-      // credential egress LIN-1891 closed on the attachment relay
-      // (routes/proxy.js:2477-2479), and this route is the same site class, so
-      // it takes that precedent's consequence verbatim: SERVE the asset, WITHHOLD
-      // the header. Deliberately degrade rather than refuse (unlike the audit
-      // capability above) — a mixed workspace's already-rendered <img> still
-      // resolves for genuinely public linear.app assets, and the security
-      // property is identical either way: the credential does not leave the
-      // system. `linear`-only, never `linear` OR `local` (LIN-1891's rule);
-      // legacy providerless workspaces keep their header.
-      //
-      // Placed at the fetch, AFTER the https-only / exact-host-allowlist /
-      // path-traversal checks above — none of which are reordered or relaxed.
-      const fetchHeaders = isActiveProviderLinear(workspace)
-        ? { Authorization: `Bearer ${getWorkspaceToken(workspace)}` }
-        : {};
-      const response = await fetch(imageUrl, {
-        headers: fetchHeaders,
-        // Prevent redirects that could bypass SSRF protection
-        redirect: 'error'
-      });
-
-      if (!response.ok) {
-        return jsonError(res, response.status, 'Failed to fetch image');
-      }
-
-      // Check content-length if available
-      const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
-      if (contentLength > MAX_IMAGE_SIZE) {
-        return jsonError(res, 413, 'Image too large');
-      }
-
-      // Read response with size limit
-      const arrayBuffer = await response.arrayBuffer();
-      if (arrayBuffer.byteLength > MAX_IMAGE_SIZE) {
-        return jsonError(res, 413, 'Image too large');
-      }
-
-      // Security (LIN-682): do NOT relay the upstream content type verbatim — the
-      // old `startsWith('image/')` guard let `image/svg+xml` through, and an SVG
-      // served inline same-origin executes its embedded script in the operator's
-      // session. Sniff the actual bytes and serve only raster images; reject any
-      // non-raster body (SVG/HTML/JS) via the existing 400 path. This closes the
-      // class for ANY SVG asset reaching the proxy — feedback uploads, legacy
-      // tickets, or the LIN-652 attachments gallery — not just new uploads.
-      //
-      // No `Content-Disposition: attachment`: this is an `<img src>` relay for
-      // both the feedback render and the LIN-652 gallery, so attachment would
-      // force a download and break legitimate inline raster rendering. The
-      // raster allowlist + `nosniff` close the hole while preserving inline use.
-      const buffer = Buffer.from(arrayBuffer);
-      const rasterType = sniffRasterType(buffer);
-      if (!rasterType) {
-        return badRequest.json(res, 'Invalid response: not a supported raster image');
-      }
-
-      res.set('Content-Type', rasterType);
-      res.set('X-Content-Type-Options', 'nosniff');
-      res.set('Cache-Control', 'private, max-age=3600');
-      res.send(buffer);
-    } catch (error) {
-      // Handle redirect errors specifically
-      if (error.cause?.code === 'ERR_FR_TOO_MANY_REDIRECTS' || error.message?.includes('redirect')) {
-        return badRequest.json(res, 'Redirects not allowed');
-      }
-      console.error('Image proxy error:', error);
-      jsonError(res, 500, 'Failed to fetch image');
     }
   });
 
