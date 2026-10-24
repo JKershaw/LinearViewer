@@ -57,7 +57,10 @@ const EXCLUDED_COLLECTIONS = [
   // it relies on THIS test staying red until the exclusion lands, not on
   // manual review, to catch a future contributor adding an INDEX_SPECS entry
   // here.
-  'workspace-halt'
+  'workspace-halt',
+  // model-routing (LIN-3853): read and written by the bare `_id: urlKey`, served by the
+  // automatic `_id_` index, like workspace-halt and workspace-preferences above.
+  'model-routing'
 ];
 
 // MangoDB serialises an index key into a name; compare by key spec instead.

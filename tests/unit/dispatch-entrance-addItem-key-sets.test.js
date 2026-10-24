@@ -90,31 +90,31 @@ const KICKOFF_BODY = {
 const EXPECTED = {
   'S session dispatch': [
     'abort', 'abortTo', 'bootstrapToken', 'cascade', 'consumerLastSeenAt', 'dispatchedBy', 'effort', 'followUpTo',
-    'force', 'harness', 'issueId', 'issueIdentifier', 'issueSource', 'issueTitle', 'issueUrl', 'kind', 'maxTasks',
+    'force', 'harness', 'issueId', 'issueIdentifier', 'issueSource', 'issueTitle', 'issueUrl', 'jobId', 'kind', 'maxTasks',
     'model', 'periodicalId', 'presetConfig', 'presetName', 'prompt', 'promptName', 'queueIfBusy', 'repo', 'sessionId',
     'stopAt', 'subscription', 'target', 'terminal', 'variant', 'waitForFollowUps'
   ],
   'P proxy dispatch': [
     'abort', 'abortTo', 'bootstrapToken', 'cascade', 'consumerLastSeenAt', 'dispatchedBy', 'effort', 'followUpTo',
-    'force', 'harness', 'issueId', 'issueIdentifier', 'issueSource', 'issueTitle', 'issueUrl', 'kind', 'maxTasks',
+    'force', 'harness', 'issueId', 'issueIdentifier', 'issueSource', 'issueTitle', 'issueUrl', 'jobId', 'kind', 'maxTasks',
     'model', 'periodicalId', 'presetConfig', 'presetName', 'prompt', 'promptName', 'queueIfBusy', 'repo', 'sessionId',
     'subscription', 'target', 'terminal', 'waitForFollowUps'
   ],
   'Ro recommend-and-dispatch, verb override': [
     'bootstrapToken', 'consumerLastSeenAt', 'dispatchedBy', 'effort', 'followUpTo', 'force', 'harness', 'issueId',
-    'issueIdentifier', 'issueSource', 'issueTitle', 'issueUrl', 'kind', 'model', 'periodicalId', 'presetConfig',
+    'issueIdentifier', 'issueSource', 'issueTitle', 'issueUrl', 'jobId', 'kind', 'model', 'periodicalId', 'presetConfig',
     'presetName', 'prompt', 'promptName', 'queueIfBusy', 'repo', 'sessionId', 'subscription', 'target', 'terminal',
     'waitForFollowUps'
   ],
   'Rl recommend-and-dispatch, LLM descent': [
     'bootstrapToken', 'consumerLastSeenAt', 'dispatchedBy', 'effort', 'followUpTo', 'force', 'harness', 'issueId',
-    'issueIdentifier', 'issueSource', 'issueTitle', 'issueUrl', 'kind', 'model', 'periodicalId', 'presetConfig',
+    'issueIdentifier', 'issueSource', 'issueTitle', 'issueUrl', 'jobId', 'kind', 'model', 'periodicalId', 'presetConfig',
     'presetName', 'prompt', 'promptName', 'queueIfBusy', 'repo', 'sessionId', 'subscription', 'target', 'terminal',
     'waitForFollowUps'
   ],
   'K kickoff': [
     'bootstrapToken', 'consumerLastSeenAt', 'dispatchedBy', 'effort', 'grantDeclaration', 'harness',
-    'issueIdentifier', 'issueSource', 'kind', 'maxTasks', 'model', 'presetConfig', 'presetName', 'prompt',
+    'issueIdentifier', 'issueSource', 'jobId', 'kind', 'maxTasks', 'model', 'presetConfig', 'presetName', 'prompt',
     'promptName', 'repo', 'sessionId', 'subscription', 'target', 'terminal', 'variant', 'waitForFollowUps'
   ]
 };

@@ -27,7 +27,8 @@ const DISPLAY_ONLY = new Set([
   // routes/workspace-api.js — footer model label (no LLM call)
   'const model = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: \'recommend\' })',
   // routes/workspace-api.js — reportHistoryStore.save metadata (no LLM call)
-  'const model = await resolveWorkspaceModel({ urlKey: req.workspace.urlKey, workspacePreferencesStore });'
+  // (LIN-3853: now resolved as the `roadmap` job; still no LLM call, so still unclamped)
+  'const model = await resolveAiOperationModel({ urlKey: req.workspace.urlKey, workspacePreferencesStore, opKind: \'roadmap\' });'
 ]);
 
 const FILES = [

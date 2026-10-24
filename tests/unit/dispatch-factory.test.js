@@ -516,10 +516,17 @@ describe('createDispatchItem — field passthrough', () => {
     assert.deepEqual(store.captured.item, {
       promptName: 'Triage', issueIdentifier: 'LIN-9', target: 'cli',
       dispatchedBy: 'u1', force: true, waitForFollowUps: true,
-      prompt: 'x', kind: 'triage', model: null, harness: 'claude-code', terminal: null, effort: null, bootstrapToken: null,
+      prompt: 'x', kind: 'triage', jobId: 'triage', model: null, harness: 'claude-code', terminal: null, effort: null, bootstrapToken: null,
       presetConfig: null, presetName: null, consumerLastSeenAt: null,
     });
     assert.equal(store.captured.urlKey, 'acme');
+  });
+
+  // LIN-3853: the stamp is the job the routing table resolved for; a kind that is not a job adds no key.
+  test('the row is stamped with its job id for a registry kind and not for `defer`', async () => {
+    const store = capturingStore();
+    await createDispatchItem({ store, urlKey: 'acme', kind: 'defer', prompt: 'x', fields: { promptName: 'Defer', issueIdentifier: 'LIN-9', target: 'cli' } });
+    assert.equal('jobId' in store.captured.item, false);
   });
 });
 

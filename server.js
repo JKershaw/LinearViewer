@@ -188,10 +188,11 @@ import { buildRoadmapModel } from './lib/roadmap.js'
 import { renderProxyPage } from './lib/render-proxy.js'
 import { AVAILABLE_MODELS, setLlmCallRecorder, setPromptTraceRecorder, getPaidEnvKey, getFreeTierModelConfigWarning, streamChatWithTools } from './lib/openrouter.js'
 import { resolveOpenRouterSource, isFreeTierOffered } from './lib/chat-request.js'
-import { resolveWorkspaceModel, resolveAiOperationModel, getWorkspaceFeatures, isWorkspaceFeatureEnabled, setWorkspaceFeature, resolveDispatchDefaults, AI_OPERATION_KINDS } from './lib/workspace-preferences.js'
+import { resolveWorkspaceModel, resolveAiOperationModel, getWorkspaceFeatures, isWorkspaceFeatureEnabled, setWorkspaceFeature, resolveDispatchDefaults } from './lib/workspace-preferences.js'
 import { getFeatureFlags, isValidFeatureKey, isValidWorkspaceFeatureKey, WORKSPACE_FEATURES } from './lib/feature-defaults.js'
-import { DISPATCH_DEFAULT_KINDS } from './lib/prompt-templates.js'
-import { validateOpaqueDispatchField, MAX_NAME_LENGTH } from './lib/dispatch-validation.js'
+import { projectLegacy } from './lib/model-routing.js'
+import { ModelRoutingStore } from './lib/model-routing-store.js'
+import { createSettingsModelRoutes } from './routes/settings-model.js'
 import { getDeployInfo } from './lib/deploy-info.js'
 import { securityHeaders } from './lib/security-headers.js'
 import { publicOrigin } from './lib/public-origin.js'
@@ -324,8 +325,27 @@ const userPreferencesStore = new UserPreferencesStore({
 // keyed by urlKey. Holds the workspace AI model selection so that UI and
 // proxy traffic use the same model.
 const workspacePreferencesCollection = db.collection('workspace-preferences')
+
+// Model routing (LIN-3853): every job's harness/model/effort, the group defaults, the
+// change log and the table presets. The resolvers read it; the old preference fields are
+// only its migration source. The lambdas close over stores declared further down, which
+// is safe because nothing calls them until the server is handling requests.
+const modelRoutingStore = new ModelRoutingStore({
+  collection: db.collection('model-routing'),
+  logCollection: db.collection('model-routing-log'),
+  presetsCollection: db.collection('model-routing-presets'),
+  getPreferences: (urlKey) => workspacePreferencesStore.getWorkspacePreferences(urlKey),
+  // Read-time only; no name is ever stored in the log. An account that still exists reads as
+  // "a member" until accounts carry a display name (item 4 of LIN-3820 owns the log's page);
+  // one that is gone or erased reads as "former member" in the store.
+  resolveActorName: async (accountId) => {
+    const account = await accountStore.getAccount(accountId)
+    return account ? (account.displayName || 'a member') : null
+  }
+})
 const workspacePreferencesStore = new WorkspacePreferencesStore({
-  collection: workspacePreferencesCollection
+  collection: workspacePreferencesCollection,
+  routingStore: modelRoutingStore
 })
 
 // Custom prompts (workspace-scoped)
@@ -1119,7 +1139,7 @@ if (process.env.NODE_ENV === 'test') {
   // additive, test-only seam so a spec can inject a rejecting aggregate() on
   // the exact two collections /kpis' loaders read, without touching /kpis'
   // own route logic. See routes/test.js's kpis-fail-next-aggregate handler.
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache: (mode) => kpiPage.reset(mode), workspaceHaltStore, emailTransport: emailTransport?.kind === 'capture' ? emailTransport : null, commentDedupe, decisionStampDedupe, taskModeStore, taskShareCollection: db.collection('task_share_links'), kpiDailyRollupCollection }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, modelRoutingStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache: (mode) => kpiPage.reset(mode), workspaceHaltStore, emailTransport: emailTransport?.kind === 'capture' ? emailTransport : null, commentDedupe, decisionStampDedupe, taskModeStore, taskShareCollection: db.collection('task_share_links'), kpiDailyRollupCollection }))
 }
 
 // =============================================================================
@@ -3873,7 +3893,8 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
   // workspaceFeatures above already read it via their own established helpers
   // (resolveWorkspaceModel/getWorkspaceFeatures, used at ~20 other call sites),
   // so this stays a separate, targeted read rather than reshaping those.
-  const dispatchDefaultsPrefs = await workspacePreferencesStore.getWorkspacePreferences(workspace.urlKey);
+  // LIN-3853: the store, projected back to the shape these sections render.
+  const dispatchDefaultsPrefs = projectLegacy(await workspacePreferencesStore.getRoutingTable(workspace.urlKey));
   const dispatchDefaults = dispatchDefaultsPrefs.dispatchDefaults || {};
   const dispatchDefaultsError = req.query.dispatchDefaultsError || null;
 
@@ -4044,203 +4065,9 @@ app.get('/workspace/:urlKey/proxy', workspaceFromUrl, async (req, res) => {
   res.send(html);
 });
 
-/**
- * Save the workspace AI model selection.
- * Persists to the workspace preferences store so all LLM call sites
- * (UI + proxy) see the same value.
- * Accepts either a preset model ID or a custom model ID.
- */
-app.post('/workspace/:urlKey/settings/model', workspaceFromUrl, async (req, res) => {
-  const workspace = req.workspace;
-
-  const { modelId, customModelId } = req.body;
-
-  // Use custom model ID if provided, otherwise use selected preset
-  let selectedModel = customModelId?.trim() || modelId;
-
-  // Validate model ID format: provider/model (with optional :variant)
-  // Example: anthropic/claude-sonnet-4, meta-llama/llama-3.3-70b-instruct:free
-  // Dots allowed for version numbers (e.g., claude-3.5-sonnet) but not consecutive (..)
-  const modelIdRegex = /^[a-z0-9-]+\/[a-z0-9.-]+(?::[a-z0-9-]+)?$/i;
-
-  // Validate and provide feedback on failure
-  if (!selectedModel) {
-    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings?error=empty`);
-  }
-
-  if (selectedModel.length > 100) {
-    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings?error=too-long`);
-  }
-
-  // Reject path traversal sequences
-  if (selectedModel.includes('..')) {
-    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings?error=invalid-format`);
-  }
-
-  if (!modelIdRegex.test(selectedModel)) {
-    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings?error=invalid-format`);
-  }
-
-  // Validation passed — save the model to workspace preferences.
-  // This is workspace-scoped (shared across all users of the org) so the
-  // selection applies to both UI and proxy/agent traffic.
-  try {
-    const existingPrefs = await workspacePreferencesStore.getWorkspacePreferences(workspace.urlKey);
-    const ok = await workspacePreferencesStore.saveWorkspacePreferences(workspace.urlKey, {
-      ...existingPrefs,
-      modelId: selectedModel
-    });
-    if (!ok) throw new Error('saveWorkspacePreferences returned false');
-  } catch (err) {
-    console.error('Failed to save workspace model preference:', err);
-    return res.status(500).send(renderErrorPage('Settings Error', 'Failed to save model preference. Please try again.', {
-      action: 'Back to settings',
-      actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/settings`
-    }));
-  }
-
-  res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
-});
-
-/**
- * Save workspace-wide + per-prompt-type dispatch model/harness/effort defaults
- * (LIN-1095, `effort` added LIN-2616/G2). Distinct from /settings/model above:
- * that selects the model used to WRITE prompts; this selects the
- * model/harness/effort dispatched agents EXECUTE with, consumed at dispatch
- * time via resolveDispatchDefaults() (LIN-1094). All three fields stay opaque
- * strings (no registry), validated with the same shared
- * validateOpaqueDispatchField() the dispatch/proxy routes use (LIN-1084).
- * Persists via the same read-merge-write discipline as /settings/model so
- * dispatchDefaults never clobbers modelId/features.
- */
-app.post('/workspace/:urlKey/settings/dispatch-defaults', workspaceFromUrl, async (req, res) => {
-  const workspace = req.workspace;
-  const settingsUrl = `/workspace/${encodeURIComponent(workspace.urlKey)}/settings`;
-
-  const readField = (key) => (req.body[key] || '').trim() || undefined;
-  // The free-text "custom harness" input was removed in LIN-1282; the harness is
-  // now only ever the select's value (one of the two real harnesses, or blank).
-  const readHarness = (selectKey) => (req.body[selectKey] || '').trim() || undefined;
-
-  let hasFieldError = false;
-  const validate = (value, name) => {
-    if (validateOpaqueDispatchField(value, name, { maxLength: MAX_NAME_LENGTH })) {
-      hasFieldError = true;
-    }
-  };
-
-  const model = readField('defaultModel');
-  const harness = readHarness('defaultHarnessSelect');
-  const effort = readField('defaultEffort');
-  validate(model, 'model');
-  validate(harness, 'harness');
-  validate(effort, 'effort');
-
-  // byKind is scoped to DISPATCH_DEFAULT_KINDS (the PROMPT_TEMPLATES step-kinds
-  // plus `autopilot`, LIN-1278), both by only ever reading these specific field
-  // names (any other posted field is simply never looked at) and defensively at
-  // read time in resolveDispatchDefaults.
-  const byKind = {};
-  for (const kind of DISPATCH_DEFAULT_KINDS) {
-    const kindModel = readField(`kind__${kind}__Model`);
-    const kindHarness = readHarness(`kind__${kind}__HarnessSelect`);
-    const kindEffort = readField(`kind__${kind}__Effort`);
-    validate(kindModel, 'model');
-    validate(kindHarness, 'harness');
-    validate(kindEffort, 'effort');
-    if (kindModel || kindHarness || kindEffort) {
-      byKind[kind] = {};
-      if (kindModel) byKind[kind].model = kindModel;
-      if (kindHarness) byKind[kind].harness = kindHarness;
-      if (kindEffort) byKind[kind].effort = kindEffort;
-    }
-  }
-
-  if (hasFieldError) {
-    return res.redirect(`${settingsUrl}?dispatchDefaultsError=invalid-field`);
-  }
-
-  const dispatchDefaults = {};
-  if (model) dispatchDefaults.model = model;
-  if (harness) dispatchDefaults.harness = harness;
-  if (effort) dispatchDefaults.effort = effort;
-  if (Object.keys(byKind).length) dispatchDefaults.byKind = byKind;
-
-  try {
-    const existingPrefs = await workspacePreferencesStore.getWorkspacePreferences(workspace.urlKey);
-    const ok = await workspacePreferencesStore.saveWorkspacePreferences(workspace.urlKey, {
-      ...existingPrefs,
-      dispatchDefaults
-    });
-    if (!ok) throw new Error('saveWorkspacePreferences returned false');
-  } catch (err) {
-    console.error('Failed to save workspace dispatch defaults:', err);
-    return res.status(500).send(renderErrorPage('Settings Error', 'Failed to save dispatch defaults. Please try again.', {
-      action: 'Back to settings',
-      actionUrl: settingsUrl
-    }));
-  }
-
-  res.redirect(settingsUrl);
-});
-
-/**
- * Save per-operation AI model overrides (LIN-1145).
- * Each kind in AI_OPERATION_KINDS gets an optional model override stored
- * under prefs.aiModelOverrides.byKind[op].model. Blank rows signal "inherit
- * the global default" and are NOT stored as empty-string overrides — they
- * are simply omitted from the byKind map. Uses the same session-auth +
- * read-merge-write discipline as /settings/model so aiModelOverrides
- * never clobbers modelId/features/dispatchDefaults.
- */
-app.post('/workspace/:urlKey/settings/ai-model-overrides', workspaceFromUrl, async (req, res) => {
-  const workspace = req.workspace;
-  const settingsUrl = `/workspace/${encodeURIComponent(workspace.urlKey)}/settings`;
-  const modelIdRegex = /^[a-z0-9-]+\/[a-z0-9.-]+(?::[a-z0-9-]+)?$/i;
-  const MAX_LENGTH = 100;
-
-  let hasFieldError = false;
-
-  const byKind = {};
-  for (const kind of AI_OPERATION_KINDS) {
-    const fieldName = `byKind__${kind}__model`;
-    const customFieldName = `${fieldName}Custom`;
-    const custom = (req.body[customFieldName] || '').trim();
-    const select = (req.body[fieldName] || '').trim();
-    const model = custom || select || '';
-
-    if (!model) continue;
-
-    if (model.length > MAX_LENGTH || model.includes('..') || !modelIdRegex.test(model)) {
-      hasFieldError = true;
-      break;
-    }
-
-    byKind[kind] = { model };
-  }
-
-  if (hasFieldError) {
-    return res.redirect(`${settingsUrl}?aiOverridesError=invalid-format`);
-  }
-
-  try {
-    const existingPrefs = await workspacePreferencesStore.getWorkspacePreferences(workspace.urlKey);
-    const aiModelOverrides = Object.keys(byKind).length ? { byKind } : {};
-    const ok = await workspacePreferencesStore.saveWorkspacePreferences(workspace.urlKey, {
-      ...existingPrefs,
-      aiModelOverrides
-    });
-    if (!ok) throw new Error('saveWorkspacePreferences returned false');
-  } catch (err) {
-    console.error('Failed to save workspace AI model overrides:', err);
-    return res.status(500).send(renderErrorPage('Settings Error', 'Failed to save AI model overrides. Please try again.', {
-      action: 'Back to settings',
-      actionUrl: settingsUrl
-    }));
-  }
-
-  res.redirect(settingsUrl);
-});
+// The three old model forms (POST /settings/model, /settings/dispatch-defaults, /settings/ai-model-overrides)
+// live in routes/settings-model.js and write through the model-routing store (LIN-3853).
+app.use(createSettingsModelRoutes({ workspaceFromUrl, modelRoutingStore }))
 
 /**
  * Toggle a workspace-scoped feature flag on or off (LIN-340).

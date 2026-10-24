@@ -163,6 +163,8 @@ const COLLECTION_CLASSES = {
   'observer-state': 'C', 'local-issues': 'C',
   'consumer-heartbeats': 'C', 'kpi-daily-rollup': 'C', 'dismissal-suggestions': 'C', 'dispatch-presets': 'C', 'run-proposals': 'C', 'shelved-rulings': 'C',
   'ship-biscuit-editions': 'C', 'collective-characters': 'C', 'collective-presets': 'C',
+  // LIN-3853: the table (key in `_id`), the log (urlKey; actor.id may be a token label so not an actor source), the presets (urlKey and createdBy).
+  'model-routing': 'C', 'model-routing-log': 'C', 'model-routing-presets': 'BC',
   // The only C members NOT read; the report names them (UNENUMERATED_SOURCES) so the count is never read as complete.
   'run-summary-cache': 'C-named', 'session-summary-cache': 'C-named',
   // No urlKey at all.

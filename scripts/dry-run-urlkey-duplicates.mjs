@@ -80,11 +80,15 @@ export const URLKEY_SOURCES = Object.freeze([
     'task-snapshots', 'task-decisions', 'run-paragraph', 'workspaces', 'task_share_links',
     'observer-shadow-log', 'saved-chats', 'credential-lifecycle-events',
     'owner-credentials', 'dismissal-suggestions', 'dispatch-presets', 'run-proposals', 'shelved-rulings',
-    'ship-biscuit-editions', 'collective-characters', 'collective-presets', 'consumer-heartbeats', 'kpi-daily-rollup'
+    'ship-biscuit-editions', 'collective-characters', 'collective-presets', 'consumer-heartbeats', 'kpi-daily-rollup',
+    // LIN-3853. The log is NOT in ACTOR_SOURCES: its actor.id may be a token label (item 3),
+    // which the field branch would count as an actor account. Presets hold account ids only.
+    'model-routing-log', 'model-routing-presets'
   ].map(collection => ({ collection, shape: 'field', field: 'urlKey' })),
   { collection: 'local-issues', shape: 'field', field: 'scope' },
   { collection: 'workspace-halt', shape: 'id' },
   { collection: 'workspace-preferences', shape: 'id' },
+  { collection: 'model-routing', shape: 'id' },
   // `_id` is `${urlKey}::${commentId}`.
   { collection: 'harbour-comments', shape: 'id', parse: id => id.split('::')[0] },
   // `_id` is `sweep:v1:${urlKey}` or `companion:v1:${urlKey}[:proxy]`; other ids carry no key.
@@ -124,6 +128,7 @@ export const ACTOR_SOURCES = Object.freeze([
   { collection: 'credential-lifecycle-events', fields: ['accountId'] },
   { collection: 'task_share_links', fields: ['ownerAccountId'] },
   { collection: 'close-out-events', fields: ['accountId'] },
+  { collection: 'model-routing-presets', fields: ['createdBy'] },
   // `_id` is the account; the keys of each map are workspace keys.
   {
     collection: 'user-preferences',

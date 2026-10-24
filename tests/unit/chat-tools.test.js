@@ -1098,12 +1098,13 @@ describe('pass-3 write tool — send_follow_up (LIN-1073)', () => {
     // stay null (the factory is called with applyDefaultHarness:false — the
     // claude-code interpose is scoped to the proxy dispatch boundary, LIN-1159);
     // kind derives to 'custom' (no promptName); bootstrapToken is null (no proxy
-    // context on this path). The caller-owned fields are unchanged.
+    // context on this path). The caller-owned fields are unchanged. LIN-3853: the row also
+    // carries the job id the routing table resolved (`custom` is a registry job).
     assert.deepStrictEqual(dispatchQueueStore.calls[0], {
       urlKey: URL_KEY,
       item: {
         prompt: 'ship it', followUpTo: 'sess-done', target: 'cli', force: true, dispatchedBy: 'user-42',
-        kind: 'custom', model: null, harness: null, terminal: null, effort: null, presetConfig: null, presetName: null, bootstrapToken: null,
+        kind: 'custom', jobId: 'custom', model: null, harness: null, terminal: null, effort: null, presetConfig: null, presetName: null, bootstrapToken: null,
         consumerLastSeenAt: null,
       },
     });

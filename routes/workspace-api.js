@@ -40,7 +40,7 @@ import { getModelCatalog, isFreeModel } from '../lib/openrouter-catalog.js';
 import { resolveRecommendation, armHopSignal } from '../lib/recommend-recurse.js';
 import { prepareRecommendationInput } from '../lib/recommendation-input.js';
 import { sniffRasterType, parseFeedbackImage } from '../lib/attachment-upload.js';
-import { resolveWorkspaceModel, resolveAiOperationModel } from '../lib/workspace-preferences.js';
+import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { validateOpaqueDispatchField, MAX_NAME_LENGTH } from '../lib/dispatch-validation.js';
 import { generateRecap } from '../lib/recap.js';
@@ -2291,7 +2291,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       const { context, canonicalId } = subject;
 
       const inputHash = hashContext(context);
-      const model = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'scan', forceDefault: isFreeTier });
+      const model = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'scan-retire', forceDefault: isFreeTier });
 
       // The raw text of THIS call's own re-scan is the only input to the
       // retirement decision — nothing the client sent, which is just the row `id`.
@@ -2842,7 +2842,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
             console.warn(`Feedback AI title skipped, free-tier gate refused (urlKey=${workspace.urlKey}): ${check.reason}`);
             return ticketTitle;
           }
-          const model = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
+          const model = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'feedback-title', forceDefault: isFreeTier });
           const generated = await generateFeedbackTitle(message.trim(), { apiKey: aiApiKey, model, callMeta: { urlKey: workspace.urlKey } });
           if (generated) ticketTitle = generated;
         }

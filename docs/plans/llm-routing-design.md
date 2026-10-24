@@ -229,10 +229,12 @@ Each can be added later without changing the model above:
 
 ## Breakdown (filed when LIN-3757 has chosen its direction)
 
+Status, 24 October: item 2 (LIN-3853) is built. `lib/model-routing.js` (pure table, migration, resolution), `lib/model-routing-store.js` (the store, log, undo, presets) and `routes/settings-model.js` (the three old forms, writing through the store). The witness (`tests/unit/model-routing-witness.test.js`) holds the resolvers frozen at `6ea1371e` against the store; its intended-differences table is empty and waits for D2 and D3. The first log entry stays unseeded until its workspace urlKey and stored model strings are filled in from production data (`SEEDED_ENTRY` in `lib/model-routing.js`).
+
 | # | Ticket | Repos | Done when |
 |---|---|---|---|
 | 1 | Jobs: the registry with group and description; census test; name the four call sites the call log misses | LV | Every call site and dispatch kind is a job; the test fails on one that is not |
-| 2 | One settings store: job settings, group defaults, presets, change log; both surfaces resolve from it; migration and witness test | LV | The witness test is green and the old settings are read-only |
+| 2 | One settings store: job settings, group defaults, presets, change log; both surfaces resolve from it; migration and witness test | LV | The witness test is green and the store is the single source of truth; the old forms still write, through the store (item 4 retires them) |
 | 3 | Proxy: read and write, with reasons and log | LV | An agent can read the table and change a job or group, and the log shows it |
 | 4 | Settings › Models page, to the principles above and LIN-3757's direction | LV | John can move a job or a group in one edit with a reason, on desktop and phone |
 | D1–D5 | The fixes above (D1 may go first) | both | Each named as an intended difference in the witness test |

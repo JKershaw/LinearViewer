@@ -34,7 +34,7 @@
     {
       "name": "LLM & prompts",
       "match": [
-        "^lib/prompts/|^lib/(openrouter(?!-key-resolver\\.js$)[^/]*|prompt-[^/]*|stage-router|recommend[^/]*|recommendation-[^/]*|chat-[^/]*|agent-turn|bash-tool|llm-call-log|llm-jobs|model-pricing|should-mock-ai|brief[^/]*|recap[^/]*|collective-[^/]*|yap-client|next-run|north-star-resolver|scan|scan-fingerprint|audit|roadmap|context-graph|graph-features|library|library-metadata|custom-prompts-store|saved-chat-store|file-pointer|feedback-title|action-kind|flight-companion-gate|flight-companion-census-seed|harbour-comments-store|report-history-store|ship-biscuit|ship-biscuit-history-store|periodicals)\\.js$"
+        "^lib/prompts/|^lib/(openrouter(?!-key-resolver\\.js$)[^/]*|prompt-[^/]*|stage-router|recommend[^/]*|recommendation-[^/]*|chat-[^/]*|agent-turn|bash-tool|llm-call-log|llm-jobs|model-routing[^/]*|model-pricing|should-mock-ai|brief[^/]*|recap[^/]*|collective-[^/]*|yap-client|next-run|north-star-resolver|scan|scan-fingerprint|audit|roadmap|context-graph|graph-features|library|library-metadata|custom-prompts-store|saved-chat-store|file-pointer|feedback-title|action-kind|flight-companion-gate|flight-companion-census-seed|harbour-comments-store|report-history-store|ship-biscuit|ship-biscuit-history-store|periodicals)\\.js$"
       ]
     },
     {

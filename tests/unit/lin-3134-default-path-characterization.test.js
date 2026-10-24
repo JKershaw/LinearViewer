@@ -330,7 +330,8 @@ describe('S0 — createDispatchItem default path: addItem call shape', () => {
   const FIELDS = { promptName: 'Prompt', issueIdentifier: 'LIN-1', dispatchedBy: 'u1', followUpTo: null };
   const FACTORY_ADD_ITEM_KEYS = [
     ...Object.keys(FIELDS),
-    'prompt', 'kind', 'model', 'harness', 'terminal', 'effort',
+    // jobId: LIN-3853 stamps the registry job the routing table resolved (sparse, absent for `defer`).
+    'prompt', 'kind', 'jobId', 'model', 'harness', 'terminal', 'effort',
     'presetConfig', 'presetName', 'bootstrapToken', 'consumerLastSeenAt'
   ].sort();
 
@@ -1037,5 +1038,30 @@ describe('S0 — wake branch createToken args + output', () => {
     assert.deepEqual(mintCalls[0].opts, {
       kind: 'bootstrap', scope: 'readWrite', label: 'wake-bootstrap', ttl: BOOTSTRAP_TOKEN_TTL_SECONDS, createdBy: 'acct'
     });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LIN-3853: the job id stamped by the factory is persisted and archived, sparsely.
+// A whitelisting store would otherwise drop it silently (the LIN-1698/LIN-3130 class).
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('LIN-3853 — jobId survives addItem and the queue→history archive, and is absent when not given', () => {
+  const ITEM = { prompt: 'run me', promptName: 'Prompt', issueIdentifier: 'LIN-1', dispatchedBy: 'u1' };
+
+  test('a row with a job id persists it and archives it', async () => {
+    const { store, historyCollection } = makeStore();
+    const doc = await store.addItem('acme', { ...ITEM, jobId: 'implementation' });
+    assert.equal(doc.jobId, 'implementation');
+    await store.takeItem(doc._id, 'acme');
+    assert.equal(historyCollection._docs[0].jobId, 'implementation');
+  });
+
+  test('a row without one keeps its key set (no jobId key at all)', async () => {
+    const { store, historyCollection } = makeStore();
+    const doc = await store.addItem('acme', ITEM);
+    assert.equal('jobId' in doc, false);
+    await store.takeItem(doc._id, 'acme');
+    assert.equal('jobId' in historyCollection._docs[0], false);
   });
 });
