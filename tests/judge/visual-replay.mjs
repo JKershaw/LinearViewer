@@ -78,6 +78,7 @@ async function startServer(dir, dataDir) {
 // One comparison: base export vs head export (optionally patched), returns the rows.
 async function runPair({ baseRev, headRev, patch = null, probe = '' }) {
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'harbour-judge-'));
+  let keep = false;
   try {
     const sides = {};
     for (const [side, rev] of [['base', baseRev], ['head', headRev]]) {
@@ -106,9 +107,14 @@ async function runPair({ baseRev, headRev, patch = null, probe = '' }) {
     const missing = [...expected].filter((k) => !got.has(k));
     if (missing.length) throw new Error(`INCOMPLETE: ${missing.length} of ${expected.size} comparisons never ran (first: ${missing[0]}):\n${run.stdout.slice(-1500)}\n${run.stderr.slice(-1500)}`);
     return { rows, playwrightStatus: run.status };
+  } catch (err) {
+    // The error cites server.log inside the work dir, so a failed run keeps it.
+    keep = true;
+    err.message += `\n(work dir kept: ${work})`;
+    throw err;
   } finally {
     killAll();
-    fs.rmSync(work, { recursive: true, force: true });
+    if (!keep) fs.rmSync(work, { recursive: true, force: true });
   }
 }
 

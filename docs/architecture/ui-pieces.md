@@ -106,7 +106,7 @@ The class is "a rule written in 2 or more places that Settings shares". Two repr
 - **Counting rule:** a site is a rule whose body is that byte-identical declaration block (`--dup-blocks` body #10).
 - **Sites at base (4):** `style.css:3133` `.field` (the authority), `dispatch.css:19` `.dispatch-section .line`, `proxy.css:104` `.proxy-section .line`, `settings.css:45` `.settings-section .line`.
 - **Consolidate deletes:** the three `.X-section .line` blocks.
-- **Same-name collision, not a copy:** the dashboard tree's own `.line` (`style.css:1222`, and the phone override at `:1931`) is a different rule (`align-items: baseline`, `padding: 4px 0`). It is scoped to the tree in intent and **harmless**, except that new Settings rows also carry the class `line` (`render-settings-shell.js:37`, `render-settings-workspace.js:20`, `render-settings-you.js:144`), so the bare `.line` at `style.css:1222` also matches them. Class: **unclear**; Rebuild must drop the `line` class from Settings rows or scope the tree rule.
+- **Same-name collision, not a copy:** the dashboard tree's own `.line` (`style.css:1222`, and the phone override at `:1931`) is a different rule (`align-items: baseline`, `padding: 4px 0`). It is scoped to the tree in intent and **harmless**, except that new Settings rows also carry the class `line` (`render-settings-shell.js:37`, `render-settings-workspace.js:20` and `:188`, `render-settings-you.js:60`, `:80`, `:95`, `:107`, `:115` and `:144`), so the bare `.line` at `style.css:1222` also matches them. Class: **unclear**; Rebuild must drop the `line` class from Settings rows or scope the tree rule.
 - **Differences:** the three `.X-section .line` copies wrap at 640px and `.field` does not (`dispatch.css:486`, `proxy.css:424`, `settings.css:543`, each `flex-wrap: wrap`). Class: **fix** (provisional): a field row that cannot wrap overflows on a phone; give `.field` the wrap. Not changed here.
 - **Variant:** `.dispatch-prompt-line { align-items: flex-start }` (`dispatch.css:28`), kept as a named variant.
 
@@ -116,8 +116,8 @@ The class is "a rule written in 2 or more places that Settings shares". Two repr
 - **Authority:** `.settings-row` (`settings.css:696`) and its builders `switchRow` (`render-settings-shell.js:34`), `drillRow` (:51), `actionRow` (:70), with `group` (:93), all in `lib/render-settings-shell.js`.
 - **Reason:** LIN-3846 built it for exactly this and every Settings area uses it.
 - **Counting rule:** a site is a row builder or a hand-written `<... class="settings-row ...">` in `lib/`.
-- **Sites at base:** the three builders; hand-written rows at `render-settings.js:866` (`settings-row settings-row-drill`) and `render-settings-workspace.js:20` (`staticRow`), `render-settings-you.js:144-147` (a switch written out by hand).
-- **Consolidate deletes:** the hand-written copies at `render-settings-you.js:144-147` and `render-settings.js:866`, replaced by the builders.
+- **Sites at base:** the three builders; hand-written rows at `render-settings.js:866` (`settings-row settings-row-drill`), `render-settings-workspace.js:20` (`staticRow`, module-local), `render-settings-workspace.js:177` and `:188` (the change-log rows inside `changeRow`; `:188` is the static one), `render-settings-you.js:60`, `:80`, `:95`, `:107`, `:115` (static rows written out by hand), `render-settings-you.js:110` (an action row written out by hand: `settings-row settings-row-action settings-action-teal`, a copy of `actionRow`) and `render-settings-you.js:144-147` (a switch written out by hand).
+- **Consolidate deletes:** the hand-written copies at `render-settings-you.js:144-147`, `render-settings-you.js:110` (replaced by `actionRow`) and `render-settings.js:866`, replaced by the builders. The five static rows in `render-settings-you.js` (`:60`, `:80`, `:95`, `:107`, `:115`) and the one at `render-settings-workspace.js:188` are hand-written copies of `staticRow` (`render-settings-workspace.js:20`). **`staticRow` becomes a shared builder** in `render-settings-shell.js` beside `switchRow`, `drillRow` and `actionRow`, and those six are replaced by it: it is the same markup six times over, and a second private copy is how the count got short. The change-log row at `:177` stays a `changeRow` concern.
 - **Differences:** `.settings-row` has its own spacing (`0.7rem 0.8rem`) and size (`0.95em`) that match neither the scale nor `.field`. Class: **variant** (a row in a card is not a bare field), recorded here as the named variant "row in a card".
 - **Variant:** `settings-row-static` (a read-only row), `settings-row-drill`, `settings-row-action`, `settings-row-switch`.
 
@@ -148,9 +148,10 @@ The class is "a rule written in 2 or more places that Settings shares". Two repr
 - **Decides:** how a change is confirmed. **Decided by John on 24 October: confirmation happens in place.** See "Decisions made".
 - **Authority:** `askInPlace` (`render-settings-shell.js:106`) and `.settings-ask*` (`settings.css:741-766`). The confirm is a bare `.action-btn`.
 - **Counting rule:** a site is a `askInPlace(...)` call, or a hand-written ask form.
-- **Sites at base:** the builder, and calls at `render-settings-workspace.js:57` (halt), `:67` (periodic reviews), `render-settings-shell.js` `changeRow` undo (`render-settings-workspace.js:181`).
+- **Sites at base:** the builder, and calls at `render-settings-workspace.js:57` (halt), `:67` (periodic reviews), `:146` (agents can change models), `:178` (the change-log undo, inside `changeRow`) and `render-settings.js:703` (remove source). One hand-written confirm-in-place: the key revoke, `render-settings-workspace.js:100` (a red `.action-btn` and "cannot be undone" text inside the opened key row, no Cancel, wired by `public/settings.js:313`).
 - **Consolidate deletes:** nothing here. `docs/ui-divergences.md` needs updating to match; **Consolidate makes that edit** (this PR does not touch it).
 - **Differences:** the confirm is a bare `.action-btn` and so inherits Button's open question. Class: **unclear**.
+- **Difference, key revoke:** `render-settings-workspace.js:100` confirms in place without `askInPlace`: the opened key row is the confirmation, there is no Cancel (collapsing the row is the way out) and no `.settings-ask*` markup. It is the same kind of thing as the decision John made, so it sits under the decided "confirmation in place" authority. Class: **unclear**: Consolidate decides whether it moves onto `askInPlace` or stays a named variant.
 
 ### 9. Note
 
@@ -268,3 +269,9 @@ Each keeps today's behaviour until answered.
 ## The judge
 
 `node tests/judge/visual-replay.mjs --base <rev> --head <rev> [--self-check] [--control]` replays 18 pages and states (15 pages, 3 opened states; Running with no runner is the Running page itself) in light and dark at 1280×900 and 390×844 on two exports of two commits, at zero tolerance. It lives in `tests/judge/`, is not part of `npm test`, and commits no reference images. Its page list, masks (each with its reason) and "not covered" list are in `tests/judge/pages.mjs`.
+
+Three things to expect when reading the judge's output:
+
+- **Retakes.** A differing pair is retaken up to 3 times at zero tolerance, and the count is printed. Two identical exports sometimes paint a sub-pixel apart; the source was not found. Seen so far: 1 of 72 in the author's run and 2 of 72 in the reviewer's, none in the base-against-base self-check. A run whose retake count rises above that should be read as suspect.
+- **Shared-stylesheet coverage guard.** The guard finds the renderers that link a sheet with `git grep -F <name>.css` over `lib/`, which matches mentions as well as links (`style.css` returns 48 files, including comment mentions in `lib/components/*`; `common-actions.css` 23). The first Consolidate change to either sheet therefore prints NOT ZERO-CLAIMABLE until the judge's page list grows to cover them. That is the ticket's page-list rule failing safe, not a fault in the change.
+- **Failed server start.** When a server fails to start, the driver keeps its work directory and prints its path, so the `server.log` the error cites still exists. The directory is removed on success.
