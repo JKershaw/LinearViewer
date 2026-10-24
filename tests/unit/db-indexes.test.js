@@ -10,14 +10,15 @@
  *   skipped, the rest still apply, and startup never throws
  * - the deliberately-excluded `_id`-only collections get no extra index
  */
-import { test, describe, before, after } from 'node:test';
+import { test, describe, before, after, afterEach, mock } from 'node:test';
 import assert from 'node:assert';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MangoClient } from '@jkershaw/mangodb';
 import {
-  INDEX_SPECS, ensureIndexes, tierOf, sameKeySpec, deferredIndexState, applyDeferredIndexes, reportDeferredIndexes
+  INDEX_SPECS, ensureIndexes, tierOf, sameKeySpec, deferredIndexState, applyDeferredIndexes, reportDeferredIndexes,
+  scheduleDeferredIndexBuild
 } from '../../lib/db-indexes.js';
 import { ProxyEventStore } from '../../lib/proxy-events.js';
 import { PromptTraceStore } from '../../lib/prompt-trace-store.js';
@@ -597,8 +598,8 @@ describe('deferred index tier (LIN-3811)', () => {
   let client;
   let counter = 0;
   const quiet = () => {
-    const lines = { log: [], warn: [] };
-    return { lines, log: m => lines.log.push(m), warn: m => lines.warn.push(m) };
+    const lines = { log: [], warn: [], error: [] };
+    return { lines, log: m => lines.log.push(m), warn: m => lines.warn.push(m), error: m => lines.error.push(m) };
   };
 
   before(async () => {
@@ -734,5 +735,91 @@ describe('deferred index tier (LIN-3811)', () => {
     assert.strictEqual(logger.lines.log.length, 1);
     assert.match(logger.lines.log[0], new RegExp(`\\[db-indexes\\] deferred: 0 built, ${DEFERRED_SPECS.length} pending \\(`));
     assert.ok((await deferredIndexState(db)).every(s => s.built === false), 'still nothing built');
+  });
+
+  describe('scheduleDeferredIndexBuild: the server builds pending deferred specs after listen (LIN-3865)', () => {
+    const DELAY = 60_000;
+    afterEach(() => mock.timers.reset());
+    // Let the build that the timer started run to completion (it awaits a real MangoDB).
+    const settle = () => new Promise(resolve => setImmediate(resolve));
+
+    test('builds nothing before the delay, then builds every pending deferred spec', async () => {
+      mock.timers.enable({ apis: ['setTimeout'] });
+      const db = freshDb();
+      const touched = [];
+      const spy = { collection: name => { const c = db.collection(name); return { listIndexes: () => { touched.push(name); return c.listIndexes(); }, createIndex: (...a) => { touched.push(name); return c.createIndex(...a); } }; } };
+      scheduleDeferredIndexBuild(spy, { logger: quiet(), delayMs: DELAY });
+      mock.timers.tick(DELAY - 1);
+      await settle();
+      assert.deepStrictEqual(touched, [], 'the db is not even read before the delay');
+      mock.timers.tick(1);
+      for (let i = 0; i < 5000 && !(await deferredIndexState(db, { logger: quiet() })).every(s => s.built === true); i++) await settle();
+      assert.ok((await deferredIndexState(db, { logger: quiet() })).every(s => s.built === true), 'all five built after the delay');
+    });
+
+    test('returns synchronously: boot does not wait on the build', () => {
+      mock.timers.enable({ apis: ['setTimeout'] });
+      const handle = scheduleDeferredIndexBuild(freshDb(), { logger: quiet(), delayMs: DELAY });
+      assert.strictEqual(typeof handle.cancel, 'function');
+      assert.ok(!(handle instanceof Promise));
+      handle.cancel();
+    });
+
+    test('a spec whose key already exists under another name is not rebuilt', async () => {
+      mock.timers.enable({ apis: ['setTimeout'] });
+      const db = freshDb();
+      const spec = DEFERRED_SPECS.find(s => s.collection === 'foreman-status');
+      await db.collection('foreman-status').createIndex(spec.keySpec, { name: 'hand_built_name' });
+      const created = [];
+      const spy = { collection: name => { const c = db.collection(name); return { listIndexes: () => c.listIndexes(), createIndex: async (k, o) => { created.push(name); return c.createIndex(k, o); } }; } };
+      scheduleDeferredIndexBuild(spy, { logger: quiet(), delayMs: DELAY });
+      mock.timers.tick(DELAY);
+      for (let i = 0; i < 5000 && created.length < DEFERRED_SPECS.length - 1; i++) await settle();
+      assert.ok(!created.includes('foreman-status'));
+      assert.strictEqual(created.length, DEFERRED_SPECS.length - 1);
+    });
+
+    test('a failing build, and an unreadable state, are logged and never throw or reject', async () => {
+      mock.timers.enable({ apis: ['setTimeout'] });
+      const logger = quiet();
+      const rejections = [];
+      const onRejection = e => rejections.push(e);
+      process.on('unhandledRejection', onRejection);
+      try {
+        const failing = { collection: () => ({ listIndexes: () => ({ toArray: async () => [] }), createIndex: async () => { throw new Error('boom'); } }) };
+        const broken = { collection: () => { throw new Error('no db'); } };
+        assert.doesNotThrow(() => scheduleDeferredIndexBuild(failing, { logger, delayMs: DELAY }));
+        assert.doesNotThrow(() => scheduleDeferredIndexBuild(broken, { logger, delayMs: DELAY }));
+        mock.timers.tick(DELAY);
+        for (let i = 0; i < 20; i++) await settle();
+        assert.ok(logger.lines.warn.some(m => /FAILED .*boom/.test(m)), 'build failure logged');
+        assert.ok(logger.lines.warn.some(m => /no db/.test(m)), 'unreadable db logged');
+        assert.deepStrictEqual(rejections, []);
+      } finally {
+        process.off('unhandledRejection', onRejection);
+      }
+    });
+
+    test('cancel() before the delay builds nothing; the timer is one-shot and unref-ed', async () => {
+      mock.timers.enable({ apis: ['setTimeout'] });
+      const db = freshDb();
+      const handle = scheduleDeferredIndexBuild(db, { logger: quiet(), delayMs: DELAY });
+      handle.cancel();
+      mock.timers.tick(DELAY * 3);
+      await settle();
+      assert.ok((await deferredIndexState(db, { logger: quiet() })).every(s => s.built === false));
+    });
+
+    test('the timer is unref-ed so it cannot hold the process open', () => {
+      const real = globalThis.setTimeout;
+      let unrefCalled = false;
+      globalThis.setTimeout = (...a) => { const t = real(...a); const u = t.unref.bind(t); t.unref = () => { unrefCalled = true; return u(); }; return t; };
+      try {
+        scheduleDeferredIndexBuild(freshDb(), { logger: quiet(), delayMs: 5_000 }).cancel();
+      } finally {
+        globalThis.setTimeout = real;
+      }
+      assert.ok(unrefCalled);
+    });
   });
 });

@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 /**
  * Deferred index build (LIN-3811): prints, and with `--apply` builds, the
- * indexes `lib/db-indexes.js` declares with `tier: 'deferred'`. These are never
- * built by the server (boot builds the boot tier only; after `listen` the server
- * only reports), so this script is the one build path. Run it once after a
- * deploy, at a quiet time; runbook: docs/runbooks/deferred-index-build.md.
+ * indexes `lib/db-indexes.js` declares with `tier: 'deferred'`. Boot builds the
+ * boot tier only; after `listen` the server builds any still-pending deferred
+ * spec itself in the background (LIN-3865, `scheduleDeferredIndexBuild`, which
+ * calls the same `applyDeferredIndexes`). This script is the manual tool, and
+ * it is how the first production build was run (over `railway ssh` on the app
+ * service); runbook: docs/runbooks/deferred-index-build.md.
  *
  * `--plan` is the default and writes nothing. NOT a route and NOT imported by
- * the app; an agent never runs it against production.
+ * the app.
  *
  * Usage:
  *   MONGODB_URI=<set in your shell> node scripts/apply-deferred-indexes.mjs

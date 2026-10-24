@@ -3,13 +3,13 @@
 `lib/db-indexes.js` declares every index in two tiers.
 
 - **boot** (the default): small and unique correctness indexes. `ensureIndexes` builds them before `app.listen` on every boot.
-- **deferred**: indexes on large, lifetime-retained collections (`dispatch-history`, `proxy-events`, `foreman-status`) and the held `owner-credentials {urlKey}` (LIN-2954). Declared, never built by the server. After `listen` the server only **reports** their state. They are built by `scripts/apply-deferred-indexes.mjs` and nothing else, so merging and deploying change nothing on prod and deploy order does not matter.
+- **deferred**: indexes on large, lifetime-retained collections (`dispatch-history`, `proxy-events`, `foreman-status`) and `owner-credentials {urlKey}`. Declared, not built at boot, so a build never holds a deploy. After `listen` the server **reports** their state and, once, 60 s later, **builds** any still-pending one in the background (`scheduleDeferredIndexBuild`, LIN-3865, reusing the script's `applyDeferredIndexes`). It is not awaited, so neither boot nor `/health` waits; a failure is logged and retried on the next boot, never looped; graceful shutdown cancels a build that has not started. `scripts/apply-deferred-indexes.mjs` remains as the manual tool.
 
-There is no environment flag that builds them automatically, on purpose.
+There is no environment flag to turn the server build on or off, on purpose. LIN-3865 supersedes LIN-3811's script-only rule on John's 24 Oct words (agents create the indexes, no separate sign-off); the `owner-credentials` hold (LIN-2954) no longer applies.
 
 ## When to run
 
-Once after a deploy that adds deferred specs, at a quiet time, with John's recorded yes. A build reads the whole collection. The script is idempotent: it skips a spec whose key already exists (under any name), so a re-run is safe.
+Normally never by hand: the server builds a newly declared deferred spec after the deploy that adds it. Run the script to build or check without waiting for a deploy (it is how the first production build was run), or when the server's build failed. A build reads the whole collection, online on MongoDB 8. The script is idempotent: it skips a spec whose key already exists (under any name), so a re-run is safe.
 
 ## Steps
 
@@ -20,6 +20,8 @@ Once after a deploy that adds deferred specs, at a quiet time, with John's recor
    ```
 
    `unknown` is appended when an index list could not be read (a `listIndexes` error other than "namespace not found"). Unknown is never counted as built.
+
+On production, run the script from the app service over `railway ssh -p <project> -e production -s harbour-cat -- '<one single-quoted command>'`, so `MONGODB_URI` expands remotely (see `docs/operator-execution.md`; never `env` or `railway variables`).
 
 2. **Plan** (the default; writes nothing). Prints built, pending or unknown per spec:
 
