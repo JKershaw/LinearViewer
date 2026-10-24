@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PAGES, AREAS, coverageOfChange, coveredRenderers, cssNamesIn, parsePixelDiff, renderersOf } from './pages.mjs';
 
-test('the page list holds the 15 pages and the 4 states the ticket asks for', () => {
+test('the page list holds the 15 pages and the 3 states the ticket asks for (the 4th, Running with no runner, is the Running page itself)', () => {
   const ids = PAGES.map((p) => p.id);
   assert.equal(new Set(ids).size, ids.length);
   for (const id of ['home', 'task', 'dispatch', 'proxy', 'audit', 'settings-index', 'styleguide', ...AREAS.map((a) => `settings-${a}`)]) assert.ok(ids.includes(id), id);

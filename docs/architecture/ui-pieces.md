@@ -267,4 +267,4 @@ Each keeps today's behaviour until answered.
 
 ## The judge
 
-`node tests/judge/visual-replay.mjs --base <rev> --head <rev> [--self-check] [--control]` replays 19 pages and states in light and dark at 1280×900 and 390×844 on two exports of two commits, at zero tolerance. It lives in `tests/judge/`, is not part of `npm test`, and commits no reference images. Its page list, masks (each with its reason) and "not covered" list are in `tests/judge/pages.mjs`.
+`node tests/judge/visual-replay.mjs --base <rev> --head <rev> [--self-check] [--control]` replays 18 pages and states (15 pages, 3 opened states; Running with no runner is the Running page itself) in light and dark at 1280×900 and 390×844 on two exports of two commits, at zero tolerance. It lives in `tests/judge/`, is not part of `npm test`, and commits no reference images. Its page list, masks (each with its reason) and "not covered" list are in `tests/judge/pages.mjs`.

@@ -17,7 +17,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { NORMALISE, NOT_COVERED, coverageOfChange, renderersOf } from './pages.mjs';
+import { NORMALISE, NOT_COVERED, PAGES, THEMES, VIEWPORTS, coverageOfChange, renderersOf } from './pages.mjs';
 
 const REPO = path.resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const git = (args, opts = {}) => execFileSync('git', ['-C', REPO, ...args], { encoding: 'utf8', maxBuffer: 1 << 28, ...opts });
@@ -26,9 +26,13 @@ const argv = process.argv.slice(2);
 const flag = (n) => argv.includes(`--${n}`);
 const opt = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] : null; };
 
+// One painted pixel row on the piece. A layout-only +1px (a margin) is not a safe control: on desktop
+// Sources and the Settings index the lone `.settings-row` sits in `.line.provider-binding`, which
+// absorbs a 1px margin without moving one pixel (found in the first control run: same hash before
+// and after). A painted line shows wherever the piece does.
 const CONTROLS = [
-  { name: '+1px on .settings-row', file: 'public/settings.css', css: '\n.settings-row { margin-top: 1px; }\n', probe: '.settings-row' },
-  { name: '+1px on .field', file: 'public/style.css', css: '\n.field { margin-top: 1px; }\n', probe: '.field' },
+  { name: '1px line on .settings-row', file: 'public/settings.css', css: '\n.settings-row { box-shadow: inset 0 1px 0 #f0f; }\n', probe: '.settings-row' },
+  { name: '1px line on .field', file: 'public/style.css', css: '\n.field { box-shadow: inset 0 1px 0 #f0f; }\n', probe: '.field' },
 ];
 
 const freePort = () => new Promise((resolve, reject) => {
@@ -94,6 +98,12 @@ async function runPair({ baseRev, headRev, patch = null, probe = '' }) {
     });
     const rows = fs.readFileSync(results, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
     if (!rows.length) throw new Error(`the judge produced no rows:\n${run.stdout}\n${run.stderr}`);
+    // A run that stopped early (a crash, a killed server) must never read as "zero differences".
+    const only = process.env.JUDGE_ONLY ? new RegExp(process.env.JUDGE_ONLY) : null;
+    const expected = new Set(PAGES.filter((p) => !only || only.test(p.id)).flatMap((p) => VIEWPORTS.flatMap((v) => THEMES.map((t) => `${p.id} ${v.name} ${t}`))));
+    const got = new Set(rows.map(key));
+    const missing = [...expected].filter((k) => !got.has(k));
+    if (missing.length) throw new Error(`INCOMPLETE: ${missing.length} of ${expected.size} comparisons never ran (first: ${missing[0]}):\n${run.stdout.slice(-1500)}\n${run.stderr.slice(-1500)}`);
     return { rows, playwrightStatus: run.status };
   } finally {
     killAll();
