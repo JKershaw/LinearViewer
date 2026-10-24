@@ -24,7 +24,8 @@ describe('swipe page provider display name (LIN-177 S3)', () => {
     registerProvider({ name: 'swipe-stub', ui: { displayName: 'Stub Tracker' } });
     const html = renderSwipePage(emptyData, {
       urlKey: 'ws',
-      workspaces: [{ id: 'w1', urlKey: 'ws', provider: 'swipe-stub' }]
+      workspaces: [{ id: 'w1', urlKey: 'ws', provider: 'swipe-stub' }],
+      workspace: { id: 'w1', urlKey: 'ws', provider: 'swipe-stub' }
     });
     assert.ok(html.includes('"providerDisplayName":"Stub Tracker"'), 'stub display name injected');
   });
@@ -32,7 +33,8 @@ describe('swipe page provider display name (LIN-177 S3)', () => {
   test('falls back to Linear for a legacy workspace (no provider field)', () => {
     const html = renderSwipePage(emptyData, {
       urlKey: 'ws',
-      workspaces: [{ id: 'w1', urlKey: 'ws' }]
+      workspaces: [{ id: 'w1', urlKey: 'ws' }],
+      workspace: { id: 'w1', urlKey: 'ws' }
     });
     assert.ok(html.includes('"providerDisplayName":"Linear"'), 'Linear fallback injected');
   });
@@ -50,7 +52,8 @@ describe('ship page provider display name (LIN-356 / F1)', () => {
     registerProvider({ name: 'ship-stub', ui: { displayName: 'Stub Tracker' } });
     const html = renderShipPage(emptyData, {
       urlKey: 'ws',
-      workspaces: [{ id: 'w1', urlKey: 'ws', provider: 'ship-stub' }]
+      workspaces: [{ id: 'w1', urlKey: 'ws', provider: 'ship-stub' }],
+      workspace: { id: 'w1', urlKey: 'ws', provider: 'ship-stub' }
     });
     assert.ok(html.includes('View in Stub Tracker &rarr;'), 'stub display name interpolated');
     assert.ok(!html.includes('View in Linear &rarr;'), 'no hardcoded Linear string remains');
@@ -59,7 +62,8 @@ describe('ship page provider display name (LIN-356 / F1)', () => {
   test('falls back to Linear for a legacy workspace (no provider field)', () => {
     const html = renderShipPage(emptyData, {
       urlKey: 'ws',
-      workspaces: [{ id: 'w1', urlKey: 'ws' }]
+      workspaces: [{ id: 'w1', urlKey: 'ws' }],
+      workspace: { id: 'w1', urlKey: 'ws' }
     });
     assert.ok(html.includes('View in Linear &rarr;'), 'Linear fallback');
   });
@@ -77,7 +81,8 @@ describe('swim page provider display name (LIN-356 / F1)', () => {
     registerProvider({ name: 'swim-stub', ui: { displayName: 'Stub Tracker' } });
     const html = renderSwimPage(emptyData, {
       urlKey: 'ws',
-      workspaces: [{ id: 'w1', urlKey: 'ws', provider: 'swim-stub' }]
+      workspaces: [{ id: 'w1', urlKey: 'ws', provider: 'swim-stub' }],
+      workspace: { id: 'w1', urlKey: 'ws', provider: 'swim-stub' }
     });
     assert.ok(html.includes('View in Stub Tracker &rarr;'), 'stub display name interpolated');
     assert.ok(!html.includes('View in Linear &rarr;'), 'no hardcoded Linear string remains');
@@ -86,7 +91,8 @@ describe('swim page provider display name (LIN-356 / F1)', () => {
   test('falls back to Linear for a legacy workspace (no provider field)', () => {
     const html = renderSwimPage(emptyData, {
       urlKey: 'ws',
-      workspaces: [{ id: 'w1', urlKey: 'ws' }]
+      workspaces: [{ id: 'w1', urlKey: 'ws' }],
+      workspace: { id: 'w1', urlKey: 'ws' }
     });
     assert.ok(html.includes('View in Linear &rarr;'), 'Linear fallback');
   });

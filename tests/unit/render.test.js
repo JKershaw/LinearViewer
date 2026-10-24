@@ -469,7 +469,8 @@ describe('"+ Add task" across real providers (LIN-1973 F2)', () => {
     return renderPage([projectTreeWithId('real-project', 'Real')], [], [], 'Test', {
       isLanding: false,
       urlKey: 'ws',
-      workspaces: [{ id: 'w1', name: 'WS', urlKey: 'ws', provider: providerName }]
+      workspaces: [{ id: 'w1', name: 'WS', urlKey: 'ws', provider: providerName }],
+      workspace: { id: 'w1', name: 'WS', urlKey: 'ws', provider: providerName }
     });
   }
 
@@ -719,7 +720,8 @@ describe('capability-aware rendering (LIN-177 S3)', () => {
     return renderPage([stubTree()], [], [], 'Test', {
       isLanding: false,
       urlKey: 'ws',
-      workspaces: [{ id: 'w1', name: 'WS', urlKey: 'ws', provider: provider.name }]
+      workspaces: [{ id: 'w1', name: 'WS', urlKey: 'ws', provider: provider.name }],
+      workspace: { id: 'w1', name: 'WS', urlKey: 'ws', provider: provider.name }
     });
   }
   // LIN-442: detail content (comments toggle, estimate, View-in link) is now
@@ -897,7 +899,8 @@ describe('capability-aware rendering (LIN-177 S3)', () => {
     const result = renderPage([stubTree()], [], [], 'Test', {
       isLanding: false,
       urlKey: 'ws',
-      workspaces: [{ id: 'w1', name: 'WS', urlKey: 'ws' }]
+      workspaces: [{ id: 'w1', name: 'WS', urlKey: 'ws' }],
+      workspace: { id: 'w1', name: 'WS', urlKey: 'ws' }
     });
     // LIN-1553/LIN-1973: Linear's ui.inlineCreate is true, so the project links
     // to the dedicated /task/new page (the external linear.app deep-link is
