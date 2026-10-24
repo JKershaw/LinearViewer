@@ -22,7 +22,7 @@ The papers and essays behind Harbour are published unauthenticated at `/library`
 ## Navigation
 
 - **Workspace selector**: `workspace: {name}` in nav bar - click to switch
-- **View switcher**: `.nav-views` row in the header - switch between views (observation/swipe/swim/settings/kpis + flag-gated roadmap/dispatch/proxy); at the top of the page, reachable without scrolling on mobile
+- **View switcher**: `.nav-views` row in the header - switch between views (observation/swipe/swim/settings/kpis/proxy + flag-gated roadmap, plus dispatch for an owner whose workspace has a live runner key or queue token); at the top of the page, reachable without scrolling on mobile
 - **Team filter**: `team: {name}` in nav bar - filter issues by team
 - **Expand/collapse**: Click task row or ▶/▼ arrow
 - **Project collapse**: Click project header
@@ -57,7 +57,7 @@ Issues are wrapped in nested `.node` containers:
       .detail-toggle[data-toggle="recap"]    - "Recap ▶" toggle (auth only, nested; lazy AI recap)
       .detail-toggle[data-toggle="scan"]     - "Scan ▶" toggle (auth only, nested; human-triggered scan for an operator-worthy blocker — one click still starts every run, and a run may be this single scan or the Observation Scan-due tab's own bounded/refusable/abortable batch of N (LIN-2707, shipped); no auto-run either way. That tab now offers a "Scan selected (N)" / Stop control alongside its selection and pricing)
       .detail-toggle[data-toggle="context"] - "Context ▶" toggle (auth only, nested; lazy relationship diagram)
-      .detail-toggle[data-toggle="sessions"] - "Dispatched Sessions ▶" toggle (nested; dispatch flag only)
+      .detail-toggle[data-toggle="sessions"] - "Dispatched Sessions ▶" toggle (nested; run controls only: the workspace owner with a live runner key or queue token)
     .detail-toggle[data-toggle="prompts"]  - "Prompts ▶" toggle (auth only)
     .detail-content[data-content="prompts"] - prompt buttons (hidden)
     [data-testid="opened-task-runner-link"] - "run on my machine ›" link to /workspace/{urlKey}/runner (auth only, outside the collapsed sections, every flag state; also on the Swipe card under the title and in the Swim popover)
@@ -70,7 +70,7 @@ Issues are wrapped in nested `.node` containers:
 When a task is expanded, its details contain toggleable sections:
 - **Details ▶**: Description and metadata (assignee, dates, labels)
 - **Prompts ▶**: Prompt buttons and AI features (authenticated users only)
-- **run on my machine ›**: Link to the runner setup page (authenticated users only; always visible, whatever the proxy/dispatch flags — the page explains what to turn on)
+- **run on my machine ›**: Link to the runner setup page (authenticated users only; always visible; the page is where an owner mints the first runner key)
 - **View in {provider} →**: Navigation link (always visible; provider name is dynamic, e.g. "View in Linear"). Same provider-aware text on the swim/ship popovers.
 
 Toggle behavior:
@@ -129,7 +129,7 @@ Both In Progress and Projects sections use the same nested structure:
 - `#team-options` - team dropdown panel
 - `[data-team="{id}"]` - team filter option (use "all" for all teams)
 - `.nav-views` - header-level cross-view switcher row (LIN-978); single scrolling row at the top of every workspace page
-- `[data-testid="nav-view-{name}"]` - a view-switcher link by its visible text (e.g. `observation`, `swipe`, `swim`, `settings`, `kpis`, and the flag-gated `roadmap`/`dispatch`/`proxy`); the active view renders as a `<strong class="nav-view-current">` instead of an `<a>`. First-class views always show; power-user views only with their per-user flag; experimental views appear in the `⋯ more` overflow group when their own flag is on (same gated-inclusion policy as power-user views, not Settings-only)
+- `[data-testid="nav-view-{name}"]` - a view-switcher link by its visible text (e.g. `observation`, `swipe`, `swim`, `settings`, `kpis`, `proxy`, and the gated `roadmap`/`dispatch`); the active view renders as a `<strong class="nav-view-current">` instead of an `<a>`. First-class views and `proxy` always show; `dispatch` only with run controls (the workspace owner, with a live runner key or queue token); `roadmap` only with its per-user flag; experimental views appear in the `⋯ more` overflow group when their own flag is on (same gated-inclusion policy as power-user views, not Settings-only)
 
 ### Workspace KPIs page (`/workspace/:urlKey/kpis`)
 One workspace's counts, last 7 and 30 UTC days, plus 30-day trend charts as rates (LIN-3711), and a running total of tasks done behind a rate/total toggle on the tasks-done chart (LIN-3732); nothing instance-wide. Reads only the session's own workspace (a workspace the session lacks gets the 404 page, no session redirects to `/`).
@@ -172,7 +172,7 @@ One workspace's counts, last 7 and 30 UTC days, plus 30-day trend charts as rate
 - `.detail-toggle[data-toggle="recap"]` - Recap toggle (nested in Details, lazy AI progress recap)
 - `.detail-toggle[data-toggle="scan"]` - Scan toggle (nested in Details, human-triggered scan for an operator-worthy blocker — one click still starts every run; never auto-runs on expand, only a cheap status check does. A run may be this single scan or the Observation Scan-due tab's own bounded/refusable/abortable batch of N (LIN-2707, see Autopilot Observation Endpoints below) — that tab now ships its own "Scan selected (N)" / Stop controls (selection and pricing from LIN-2706, the run itself from LIN-2707), so this single scan is no longer the only run any of this starts. A found blocker renders a question + options + an answer box (durable comment write) and a dismiss action.)
 - `.detail-toggle[data-toggle="context"]` - Context toggle (nested in Details, lazy relationship diagram: blockers/blocked/parent/children/related). Each task node is `.context-node` with `data-context-nav="LIN-123"`.
-- `.detail-toggle[data-toggle="sessions"]` - Dispatched Sessions toggle (nested in Details, dispatch flag only)
+- `.detail-toggle[data-toggle="sessions"]` - Dispatched Sessions toggle (nested in Details, run controls only)
 - `.detail-content[data-content="prompts"]` - Prompts section content (hidden by default)
 - `.in-progress-header` - collapsible section header
 
@@ -270,7 +270,7 @@ Templates (including `retro`) are available on completed/canceled issues too.
 
 ## Dispatched Sessions (Swipe)
 - `GET /workspace/{urlKey}/api/sessions/{identifier}` → `{ sessions: [...] }` (newest-first dispatch loops for one issue, with feedback)
-- Swipe card "Dispatched Sessions [N]" accordion (`data-accordion="sessions"`); shown only when the `dispatch` feature flag is on. `[N]` count is baked into the card server-side.
+- Swipe card "Dispatched Sessions [N]" accordion (`data-accordion="sessions"`); shown only with run controls (the workspace owner with a live runner key or queue token). `[N]` count is baked into the card server-side.
 
 ## Task Page (first-class drill-down)
 
@@ -418,7 +418,7 @@ Tool use is visible (LIN-2632 beat 2, "it doesn't appear to use tools?"): a `too
 
 Since LIN-2620 the companion is also reachable directly over the workspace API proxy — `POST /api/proxy/flight-companion/turn` (`read` scope, billed to the token creator's own OpenRouter key) — so an agent can drive a turn without a browser tab at all: send `message`/`history` for a normal turn, or omit `message` for a message-less check-in tick (its own reservation instance, `stream: true` for the identical SSE frames or the default aggregated JSON body). It is always propose-only regardless of message presence — a model-proposed follow-up still waits for a human on the session-authed approve endpoint. See `GET /api/proxy/instructions` for the full request/response shape. Since LIN-2634, `GET /api/proxy/flight-companion/transcripts` (also `read` scope) is the other half of that loop — it returns the token creator's own saved companion transcripts (LIN-2437's opt-in saved chats), never another user's, so an agent can read what the companion told a human rather than only talk to it.
 
-The page also surfaces a copyable kickoff prompt (`lib/prompts/flight-companion-kickoff.js`) that you paste into a real Claude Code session, for when a full agent session — not just chat — is wanted; the copy carries a `readWrite` token that also holds the dispatch grant (LIN-3136), so that session can queue work. Since LIN-2618 the two are no longer separate mechanisms with separate copy: both render the SAME brief (`lib/prompts/flight-companion-brief.js`) — one persona, one disposition, one readout shape, one surfacing policy, one vocabulary, one propose-then-wait gate — and differ only in transport, the kickoff adding its proxy setup and curl catalog, the chat adding its tool names, the census seed, the clock and the turn kind. What is still separate is the SESSION each drives, not what the companion is. It monitors the same dispatch feedback stream (`GET /api/proxy/dispatch?status=taken` — plus its companion `GET /api/proxy/dispatch?status=blocked` for runs parked waiting on a human, which since LIN-2079 no longer appear under `status=taken` — and `GET /api/proxy/dispatch/{id}`, NOT the browser-cookie observation endpoints). When the per-user `proxy` feature flag is also on, `copy prompt` always appends the Workspace API access block (a FORCED append through the shared `ProxyToggle` seam, LIN-1764/LIN-3079; there is no `+proxy` toggle on this page): it mints the workspace owner's single-use DRIVER credential (`{ "purpose": "driver" }`, holding the dispatch grant), and for anyone else the copy is refused with a visible message and nothing is copied. Since LIN-2443 the prompt TEXT sits inside a `<details class="disclosure">` collapsed by default; `copy prompt`, the `+proxy` toggle and the copy-status text stay OUTSIDE it and are always actionable, so copying never requires expanding the disclosure (the copy path reads the `<pre>`'s `textContent`, which a closed `<details>` still has).
+The page also surfaces a copyable kickoff prompt (`lib/prompts/flight-companion-kickoff.js`) that you paste into a real Claude Code session, for when a full agent session — not just chat — is wanted; the copy carries a `readWrite` token that also holds the dispatch grant (LIN-3136), so that session can queue work. Since LIN-2618 the two are no longer separate mechanisms with separate copy: both render the SAME brief (`lib/prompts/flight-companion-brief.js`) — one persona, one disposition, one readout shape, one surfacing policy, one vocabulary, one propose-then-wait gate — and differ only in transport, the kickoff adding its proxy setup and curl catalog, the chat adding its tool names, the census seed, the clock and the turn kind. What is still separate is the SESSION each drives, not what the companion is. It monitors the same dispatch feedback stream (`GET /api/proxy/dispatch?status=taken` — plus its companion `GET /api/proxy/dispatch?status=blocked` for runs parked waiting on a human, which since LIN-2079 no longer appear under `status=taken` — and `GET /api/proxy/dispatch/{id}`, NOT the browser-cookie observation endpoints). `copy prompt` always appends the Workspace API access block (a FORCED append through the shared `ProxyToggle` seam, LIN-1764/LIN-3079; there is no `+proxy` toggle on this page): it mints the workspace owner's single-use DRIVER credential (`{ "purpose": "driver" }`, holding the dispatch grant), and for anyone else the copy is refused with a visible message and nothing is copied. Since LIN-2443 the prompt TEXT sits inside a `<details class="disclosure">` collapsed by default; `copy prompt`, the `+proxy` toggle and the copy-status text stay OUTSIDE it and are always actionable, so copying never requires expanding the disclosure (the copy path reads the `<pre>`'s `textContent`, which a closed `<details>` still has).
 
 ### Flight Companion DOM Structure
 ```
@@ -656,7 +656,7 @@ main.flight-companion-page[data-url-key]  - page container
                                               brief as the chat since LIN-2618). Below 600px,
                                               folds below the chat section too
     #flight-companion-copy                  - copy-to-clipboard button (outside the collapse)
-    .prompt-proxy-toggle                    - +proxy toggle (only when the proxy flag is on)
+    .prompt-proxy-toggle                    - +proxy toggle (always present on workspace pages)
     #flight-companion-copy-feedback         - copy status text
     details.disclosure                      - collapsed by default (rendered without `open`)
       #flight-companion-prompt                - the kickoff prompt itself (pre, copyable)
@@ -673,12 +673,11 @@ A decision-card tap (`.fc-decision`, LIN-2621 beat 4) is NOT a Flight-Companion-
 
 ## Passage Planner (experimental)
 
-The Passage Planner page (`/workspace/{urlKey}/passage-planner`) is Flight Companion parity (LIN-1849) for the Passage Planner prompt. It surfaces the validated live passage-planning session kickoff prompt (`lib/prompts/passage-planner-kickoff.js`, which reads `docs/passage-planner-prompt.md` at HEAD with its design-artifact preamble stripped) that you paste into a fresh Claude Code session with a `readWrite` proxy token holding the dispatch grant to orient off the real state of the workspace and negotiate a small ratified passage of work together. Requires the per-user `passagePlanner` feature flag; reached only via a link in Settings. Unlike Flight Companion, there is no user-facing `+proxy` toggle — the prompt requires the access block, so copy always attempts a FORCED append (`ProxyToggle.maybeAppend(text, urlKey, {force:true})`) when the per-user `proxy` feature flag is also on. That append mints the workspace owner's DRIVER credential (holding the dispatch grant the planner's single kickoff call needs); a non-owner's copy is refused with a visible message and nothing is copied (LIN-3136). When `proxy` is off, the page renders a degradation notice (with a Settings link) and copy skips the mint attempt entirely, copying the bare prompt instead of attempting a mint that would 403.
+The Passage Planner page (`/workspace/{urlKey}/passage-planner`) is Flight Companion parity (LIN-1849) for the Passage Planner prompt. It surfaces the validated live passage-planning session kickoff prompt (`lib/prompts/passage-planner-kickoff.js`, which reads `docs/passage-planner-prompt.md` at HEAD with its design-artifact preamble stripped) that you paste into a fresh Claude Code session with a `readWrite` proxy token holding the dispatch grant to orient off the real state of the workspace and negotiate a small ratified passage of work together. Requires the per-user `passagePlanner` feature flag; reached only via a link in Settings. Unlike Flight Companion, there is no user-facing `+proxy` toggle — the prompt requires the access block, so copy always attempts a FORCED append (`ProxyToggle.maybeAppend(text, urlKey, {force:true})`) (there is no per-user proxy switch, LIN-3849). That append mints the workspace owner's DRIVER credential (holding the dispatch grant the planner's single kickoff call needs); a non-owner's copy is refused with a visible message and nothing is copied (LIN-3136).
 
 ### Passage Planner DOM Structure
 ```
 main.passage-planner-page[data-url-key]   - page container
-  body[data-proxy-available]              - "true"/"false", read by the copy handler
   #passage-planner-prompt                 - the kickoff prompt (pre, copyable)
   #passage-planner-copy                   - copy-to-clipboard button
   #passage-planner-copy-feedback          - copy status text

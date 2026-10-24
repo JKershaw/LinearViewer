@@ -89,14 +89,11 @@ Each dispatched item carries: prompt text, prompt name, issue metadata (id, iden
 ### 4. Feature Toggle System
 
 The per-user toggles are stored account-owned (keyed by accountId in `lib/user-preferences.js`), mirrored
-into session per-request and synced to MongoDB for cross-device persistence (LIN-1331):
+into session per-request and synced to MongoDB for cross-device persistence (LIN-1331). The
+remaining toggles are the experimental views and the feedback widget (see Settings); the former
+`dispatch` and `proxy` rows are gone:
 
-| Toggle | Default | Effect |
-|--------|---------|--------|
-| `dispatch` | **off** | Dispatch queue UI + API |
-| `proxy` | **off** | Proxy token toggle + API |
-
-The AI suggest button, the prompt buttons row and the "in Linear" hints are always on; the `aiRecommendations`, `promptButtons`, `linearMcp` and `codeReview*` switches were removed in LIN-3848 (stale saved values are ignored).
+The AI suggest button, the prompt buttons row and the "in Linear" hints are always on; the `aiRecommendations`, `promptButtons`, `linearMcp` and `codeReview*` switches were removed in LIN-3848, and the `dispatch` and `proxy` switches in LIN-3849 (stale saved values are ignored). Run controls (Run and Go, the Dispatch menus and page link, the queue and rulings badges) now show for the workspace owner when the workspace has a live runner key or queue token (`lib/run-controls.js`); key tools (the Proxy page, making keys, +proxy, Autopilot) are always on.
 
 ---
 
@@ -189,7 +186,7 @@ This metadata could drive follow-on logic: "the `plan` prompt was completed → 
 
 ### Feature Flags
 
-The toggle system (`lib/feature-defaults.js`) provides a clean mechanism to gate the follow-on feature behind a new flag, consistent with how `dispatch` and `proxy` are gated today.
+The toggle system (`lib/feature-defaults.js`) provides a clean mechanism to gate the follow-on feature behind a new flag, consistent with how the experimental views (`roadmap`, `taskChat`, …) are gated today.
 
 ---
 
