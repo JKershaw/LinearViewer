@@ -459,10 +459,12 @@ main.flight-companion-page[data-url-key]  - page container
                                               data-default-tools-on. `hidden` iff the
                                               model that will run is tools-on: on load,
                                               the resolved DEFAULT; after a pick, the
-                                              pick's own data-tools (a catalog-only
-                                              model is tools-off, so picking one shows
-                                              the warning; picking a curated model hides
-                                              it). A free-tier page ignores any pick
+                                              pick's own data-tools (a model that is
+                                              not tool-capable shows the warning; a
+                                              tool-capable one hides it — LIN-3882:
+                                              tools follow the catalog's
+                                              supported_parameters when present, else
+                                              curated membership). A free-tier page ignores any pick
                                               (the clamp runs the default)
       .fc-strip-checkin                       - "last check-in: <time>|never" — the
                                               companion doc's own lastTurnAt
@@ -491,9 +493,11 @@ main.flight-companion-page[data-url-key]  - page container
                                               curated AVAILABLE_MODELS ids plus the live
                                               catalog (searchable by id or name), which
                                               is exactly what resolveTurnModelOverride
-                                              accepts, so no offered choice 400s. A
-                                              catalog-only option is tools-off (tagged
-                                              "tools off"; free ones tagged "free")
+                                              accepts, so no offered choice 400s. An
+                                              option that is not tool-capable is tagged
+                                              "tools off" (LIN-3882: a catalog-only
+                                              model listing `tools` is tool-capable);
+                                              free ones are tagged "free"
         #flight-companion-model-search           - the visible <input type="search"
                                               role="combobox">, aria-label "Per-turn
                                               model override", aria-controls the list.

@@ -37,11 +37,12 @@ import { resolveChatCredential, checkFreeTierGate, CHAT_MESSAGE_MAX_LENGTH, free
  *     default (which resolveWorkspaceModel already forced to DEFAULT_MODEL), so
  *     a body-supplied model can't bill an expensive model against the shared
  *     free-tier key (LIN-513).
- *   - Allow-list: only a curated AVAILABLE_MODELS id is honored. An unknown,
- *     invalid, empty, or non-string value falls back to the workspace default,
- *     so nothing unchecked ever reaches OpenRouter. The curated select IS the
- *     validation here (stronger than a format regex; the roadmap selector offers
- *     no free-text custom id).
+ *   - Allow-list: a curated AVAILABLE_MODELS id, or (LIN-3882) an id present in
+ *     the cached OpenRouter catalog, is honored. An unknown, invalid, empty, or
+ *     non-string value falls back to the workspace default, so nothing unchecked
+ *     ever reaches OpenRouter. Membership is the validation here (stronger than a
+ *     format regex); a cold catalog cache leaves only the curated ids, so it
+ *     fails closed.
  *
  * @param {*} requested - Raw `req.body.model` (untrusted).
  * @param {string} workspaceModel - Model already resolved for this workspace.
@@ -302,9 +303,10 @@ export function createRoadmapRoutes({ workspaceFromUrl, freeTierStore, userPrefe
     //   1. Free tier stays clamped to the default (forceDefault won it above) so
     //      a body-supplied model can't bill an arbitrary expensive model against
     //      the operator's shared key.
-    //   2. Only curated AVAILABLE_MODELS ids are honored — an unknown/invalid id
-    //      is never passed unchecked to OpenRouter; it silently falls back to the
-    //      workspace default, preserving existing behavior.
+    //   2. Only curated AVAILABLE_MODELS ids, or (LIN-3882) ids in the cached
+    //      OpenRouter catalog, are honored — an unknown/invalid id is never passed
+    //      unchecked to OpenRouter; it silently falls back to the workspace
+    //      default, preserving existing behavior.
     const model = resolveRoadmapModelOverride(req.body?.model, workspaceModel, isFreeTier);
     const orientationModel = resolveRoadmapModelOverride(req.body?.model, orientationWorkspaceModel, isFreeTier);
     return { apiKey, model, orientationModel, isFreeTier };

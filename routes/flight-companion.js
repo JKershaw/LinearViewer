@@ -211,9 +211,12 @@ export async function resolveTurnModelOverride(rawModel, { loadCatalog } = {}) {
  * option can 400. Built via the shared `buildModelOptions` merge (lib/
  * openrouter-catalog.js), reused rather than forked. Each option carries
  * `curated`; the renderer offers every option (LIN-3363 S2: a searchable
- * combobox, catalog-only entries tagged tools-off). Curated display name/pricing come straight from
- * `AVAILABLE_MODELS`; a catalog-only id uses its catalog label and a null
- * pricing hint) and `currentPricing` (the resolved default's
+ * combobox, entries that are not tool-capable tagged tools-off; LIN-3882: a
+ * catalog-only id is tool-capable when its `supported_parameters` lists
+ * `tools`). Curated display name/pricing come straight from
+ * `AVAILABLE_MODELS`; a catalog-only id uses its catalog label and
+ * `getModelPricingHint`'s rate-card row, else its catalog price (LIN-3882))
+ * and `currentPricing` (the resolved default's
  * own rate-card hint, `null` when unpriced — never fabricated, matching
  * `getModelPricingHint`'s own contract).
  *
@@ -236,7 +239,8 @@ export function buildFlightCompanionStripData({ model, companionDoc, censusDoc, 
   // LIN-3363: the option set is curated ids plus the cached catalog, deduped
   // by `buildModelOptions` (curated first). Curated entries keep their
   // AVAILABLE_MODELS name/pricing; a catalog-only id uses its catalog label and
-  // `getModelPricingHint` (null for it). `curated` marks the two
+  // `getModelPricingHint` (its rate-card row, else its catalog price, LIN-3882).
+  // `curated` marks the two
   // apart (the renderer offers both); `toolsOn`/`free` are per-option facts.
   const modelOptions = buildModelOptions({ curatedIds: AVAILABLE_MODELS.map((m) => m.id), catalog }).map((d) => {
     const curated = AVAILABLE_MODELS.find((m) => m.id === d.id);
@@ -357,9 +361,11 @@ export function buildFlightCompanionStripData({ model, companionDoc, censusDoc, 
  *   `chatClient` and asserting on the calls it recorded — rather than a
  *   source-text assertion, without pulling the whole unit suite into Node's
  *   `--experimental-test-module-mocks` flag (which nothing else here uses).
- *   `isToolCapableModel` itself is NOT part of this seam: it is a pure,
- *   synchronous allowlist membership check (`lib/openrouter.js`) with no
- *   network of its own, so a test can call the real one directly.
+ *   `isToolCapableModel` itself is NOT part of this seam: it is a
+ *   synchronous check (`lib/openrouter.js`) — the cached catalog's
+ *   `supported_parameters` first, curated membership as the fallback
+ *   (LIN-3882) — that never fetches, so a test can call the real one directly
+ *   (seeding the catalog cache through `_setCatalogCacheForTests`).
  * @param {Function} [deps.createToolCatalog] - Same reasoning, for
  *   `createChatToolCatalog` (`lib/chat-tools.js`): defaults to the real one;
  *   overriding it lets a test capture the exact `followUpMode` the route

@@ -7,6 +7,8 @@ import {
   AVAILABLE_MODELS, FREE_TIER_MODEL_IDS, DEFAULT_MODEL, isToolCapableModel, isReasoningModel,
   resolveReasoningBudget, resolveFreeTierModel, getModelPricingHint,
 } from '../../lib/openrouter.js';
+import { runAgentTurn } from '../../lib/agent-turn.js';
+import { buildFlightCompanionStripData } from '../../routes/flight-companion.js';
 import {
   _setCatalogCacheForTests, _resetCatalogCacheForTests, getCachedCatalogModel, getModelCatalog,
 } from '../../lib/openrouter-catalog.js';
@@ -120,4 +122,61 @@ test('pricing hint falls back to the catalog and rejects variable (-1) pricing',
   assert.equal(getModelPricingHint('x/catalog-priced'), '$4.00 in / $20.00 out per 1M tokens');
   assert.equal(getModelPricingHint('x/router'), null);
   assert.equal(getModelPricingHint('x/absent'), null);
+});
+
+test('pricing hint: a rate-card row wins over a different catalog price', () => {
+  seed(entry(NEW_ID, { pricing: { prompt: '0.00009', completion: '0.00009' } }));
+  assert.equal(getModelPricingHint(NEW_ID), '$2.00 in / $10.00 out per 1M tokens');
+});
+
+// Done-when 1 at the consumer level: a catalog-only model listing `tools` gets
+// tools in the shared turn core (Task Chat via buildMessages, Flight Companion
+// without) and on the Flight Companion strip.
+const CATALOG_TOOLS_ID = 'x/catalog-tools-model';
+
+function turnDeps(calls, extra = {}) {
+  return {
+    observerStateStore: { readCurrent: async () => null, ensureSeeded: async (_k, s) => ({ rev: 1, state: s }), advance: async () => true },
+    workspacePreferencesStore: null,
+    chatClient: {
+      async streamChat(_m, o, onEvent) { calls.push(['streamChat', o.model]); onEvent('done', {}); },
+      async streamChatWithTools(_m, o, onEvent) { calls.push(['streamChatWithTools', o.model]); onEvent('done', {}); },
+    },
+    createToolCatalog: () => ({ tools: [], executeTool: async () => ({}) }),
+    getProvider: () => ({}),
+    getScope: () => ({}),
+    buildCensusSeedText: () => 'CENSUS SEED',
+    sessionIsTerminal: () => false,
+    now: () => 1_700_000_000_000,
+    ...extra,
+  };
+}
+
+for (const [surface, extra] of [
+  ['Flight Companion', {}],
+  ['Task Chat', { buildMessages: ({ message }) => [{ role: 'user', content: message }] }],
+]) {
+  test(`${surface} turn: a catalog-only model listing tools runs streamChatWithTools; without tools, streamChat`, async () => {
+    seed(entry(CATALOG_TOOLS_ID, { supported_parameters: ['tools'] }),
+      entry('x/catalog-no-tools', { supported_parameters: ['max_tokens'] }));
+    for (const [model, expected] of [[CATALOG_TOOLS_ID, 'streamChatWithTools'], ['x/catalog-no-tools', 'streamChat']]) {
+      const calls = [];
+      await runAgentTurn({
+        workspace: { urlKey: 'acme', id: 'ws-1' }, turnKind: 'user-initiated', message: 'hi',
+        apiKey: 'sk-test', model, onEvent: () => {}, deps: turnDeps(calls, extra),
+      });
+      assert.deepEqual(calls, [[expected, model]], `${surface} ${model}`);
+    }
+  });
+}
+
+test('Flight Companion strip: a catalog-only model listing tools is tools-on, as the default and as an option', () => {
+  const catalogEntry = entry(CATALOG_TOOLS_ID, { supported_parameters: ['tools'] });
+  seed(catalogEntry);
+  const strip = buildFlightCompanionStripData({ model: CATALOG_TOOLS_ID, companionDoc: null, censusDoc: null, catalog: [catalogEntry] });
+  assert.equal(strip.toolsOn, true);
+  const option = strip.modelOptions.find(o => o.id === CATALOG_TOOLS_ID);
+  assert.ok(option, 'the catalog model is offered');
+  assert.equal(option.curated, false);
+  assert.equal(option.toolsOn, true);
 });
