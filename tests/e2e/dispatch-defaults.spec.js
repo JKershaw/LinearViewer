@@ -174,6 +174,11 @@ test.describe('Dispatch defaults settings', () => {
     // this ticket says G2 is inert without. Post a dispatch with explicit
     // model/harness (both already set above) and NO effort, then confirm the
     // created item's effort came from the workspace-wide default.
+    // LIN-3857 (D3): this default's harness is opencode, which has no effort control, so the
+    // workspace-wide 'high' is still STORED (asserted above) but what runs is null, and the
+    // response reports the dropped value with the tier it came from. The claude-code resolution
+    // of a workspace-wide effort is pinned by the witness fixture 'workspace-wide dispatch only'
+    // (tests/unit/model-routing-witness.test.js, LIN-2615).
     await page.request.get(`/test/clear-dispatch-queue?urlKey=${localWorkerUrlKey}`);
     const createRes = await page.request.post(`/workspace/${localWorkerUrlKey}/api/dispatch`, {
       data: { prompt: 'G2 resolution witness', promptName: 'G2 witness', model: 'anthropic/claude-opus-4.8', harness: 'opencode' }
@@ -183,7 +188,9 @@ test.describe('Dispatch defaults settings', () => {
     const { items } = await (await page.request.get(`/workspace/${localWorkerUrlKey}/api/dispatch`)).json();
     const created = items.find(i => i.promptName === 'G2 witness');
     expect(created).toBeDefined();
-    expect(created.effort).toBe('high');
+    expect(created.effort).toBeNull();
+    const receipt = await createRes.json();
+    expect(JSON.stringify(receipt)).toContain('"effortNotApplied":{"requested":"high","harness":"opencode","layer":"workspace"}');
 
     await page.request.get(`/test/clear-dispatch-queue?urlKey=${localWorkerUrlKey}`);
   });

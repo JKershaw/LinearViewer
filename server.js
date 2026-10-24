@@ -190,7 +190,7 @@ import { AVAILABLE_MODELS, setLlmCallRecorder, setPromptTraceRecorder, getPaidEn
 import { resolveOpenRouterSource, isFreeTierOffered } from './lib/chat-request.js'
 import { resolveWorkspaceModel, resolveAiOperationModel, jobModelResolver, getWorkspaceFeatures, isWorkspaceFeatureEnabled, setWorkspaceFeature, resolveDispatchDefaults } from './lib/workspace-preferences.js'
 import { getFeatureFlags, isValidFeatureKey, WORKSPACE_FEATURES } from './lib/feature-defaults.js'
-import { projectLegacy } from './lib/model-routing.js'
+import { projectLegacy, prefillDefaults } from './lib/model-routing.js'
 import { ModelRoutingStore } from './lib/model-routing-store.js'
 import { createSettingsModelRoutes } from './routes/settings-model.js'
 import { createSettingsRouter } from './routes/settings.js'
@@ -3873,7 +3873,8 @@ app.get('/workspace/:urlKey/dispatch', workspaceFromUrl, async (req, res) => {
   // leaves the controls with generic placeholders.
   let dispatchDefaults = { model: null, harness: null, effort: null };
   try {
-    dispatchDefaults = await resolveDispatchDefaults({ urlKey: workspace.urlKey, store: workspacePreferencesStore });
+    // LIN-3857 (D3): the prefill must not promise an effort the default harness ignores.
+    dispatchDefaults = prefillDefaults(await resolveDispatchDefaults({ urlKey: workspace.urlKey, store: workspacePreferencesStore }));
   } catch (e) {
     // Non-fatal
   }

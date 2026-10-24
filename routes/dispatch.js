@@ -29,6 +29,7 @@ import path from 'path';
 import os from 'os';
 import { spawnClaudeSession } from '../lib/harbour-spawn.js';
 import { DISPATCH_DEFAULT_KINDS } from '../lib/prompt-templates.js';
+import { effortNotAppliedForConfig } from '../lib/workspace-preferences.js';
 import { isPositiveInteger } from '../lib/dispatch-fields.js';
 import { enterSessionDispatch, opaqueFieldError } from '../lib/dispatch-entrance.js';
 import { provisionResumeCredential, isStructuralGrantRefusal } from '../lib/proxy-preamble.js';
@@ -1070,7 +1071,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         name,
         config: buildDispatchPresetConfig({ model, harness, effort, byKind: checked.byKind })
       });
-      res.status(201).json({ success: true, preset });
+      // LIN-3857 (D3): a saved config whose harness ignores its effort says so (sparse). UI rendering is LIN-3855.
+      const effortNotApplied = effortNotAppliedForConfig(preset?.config);
+      res.status(201).json({ success: true, preset, ...(effortNotApplied.length ? { effortNotApplied } : {}) });
     } catch (error) {
       console.error('Create dispatch preset error:', error.message);
       jsonError(res, dispatchPresetErrorStatus(error.message), error.message || 'Failed to create preset');
@@ -1101,7 +1104,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         config
       });
       if (!preset) return notFound.json(res, 'Preset not found');
-      res.json({ success: true, preset });
+      const effortNotApplied = effortNotAppliedForConfig(preset?.config);
+      res.json({ success: true, preset, ...(effortNotApplied.length ? { effortNotApplied } : {}) });
     } catch (error) {
       console.error('Update dispatch preset error:', error.message);
       jsonError(res, dispatchPresetErrorStatus(error.message), error.message || 'Failed to update preset');
