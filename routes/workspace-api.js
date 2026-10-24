@@ -3,7 +3,7 @@
  *
  * Handles all /workspace/:urlKey/api/* endpoints:
  * - Audit: Run workspace audit
- * - Prompts: Generate handwritten prompts
+ * - Prompts: moved to workspace-api-prompts.js (LIN-3842): GET /api/prompt/:issueId/:labelName and both GET /api/autopilot-prompt
  * - Recommendations: AI-generated prompts via OpenRouter
  * - Comments: Fetch issue comments
  * - Images: Proxy Linear-hosted images with auth
