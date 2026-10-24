@@ -70,7 +70,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, { lo
     if (!opts.apply) {
       const state = await deferredIndexState(db, { logger })
       for (const entry of state) logger.log(`[deferred-indexes] ${statusOf(entry.built).padEnd(7)} ${deferredSpecId(entry)}`)
-      logger.log('[deferred-indexes] plan only: nothing was built. Re-run with --apply at a quiet time.')
+      logger.log('[deferred-indexes] plan only: nothing was built. Re-run with --apply to build the pending specs.')
       return state.some(entry => entry.built === 'unknown') ? EXIT_FAILED : 0
     }
     const { failed } = await applyDeferredIndexes(db, { logger, only: opts.only })

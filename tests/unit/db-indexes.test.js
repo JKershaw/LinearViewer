@@ -803,10 +803,13 @@ describe('deferred index tier (LIN-3811)', () => {
     test('cancel() before the delay builds nothing; the timer is one-shot and unref-ed', async () => {
       mock.timers.enable({ apis: ['setTimeout'] });
       const db = freshDb();
-      const handle = scheduleDeferredIndexBuild(db, { logger: quiet(), delayMs: DELAY });
+      const touched = [];
+      const spy = { collection: name => { touched.push(name); return db.collection(name); } };
+      const handle = scheduleDeferredIndexBuild(spy, { logger: quiet(), delayMs: DELAY });
       handle.cancel();
       mock.timers.tick(DELAY * 3);
       await settle();
+      assert.deepStrictEqual(touched, [], 'a cancelled build never reads or builds');
       assert.ok((await deferredIndexState(db, { logger: quiet() })).every(s => s.built === false));
     });
 

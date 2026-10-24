@@ -21,7 +21,7 @@ Normally never by hand: the server builds a newly declared deferred spec after t
 
    `unknown` is appended when an index list could not be read (a `listIndexes` error other than "namespace not found"). Unknown is never counted as built.
 
-On production, run the script from the app service over `railway ssh -p <project> -e production -s harbour-cat -- '<one single-quoted command>'`, so `MONGODB_URI` expands remotely (see `docs/operator-execution.md`; never `env` or `railway variables`).
+   On production, run the script from the app service over `railway ssh -p <project> -e production -s harbour-cat -- '<one single-quoted command>'`, so `MONGODB_URI` expands remotely (see `docs/operator-execution.md`; never `env` or `railway variables`).
 
 2. **Plan** (the default; writes nothing). Prints built, pending or unknown per spec:
 
@@ -49,4 +49,4 @@ On production, run the script from the app service over `railway ssh -p <project
 
 ## Not run in CI
 
-The tests cover the script against a MangoDB tmpdir only. No prod build or `explain` was run when this landed.
+The tests cover the script against a MangoDB tmpdir only. No `explain` was run. The first prod build was run by hand with this script over `railway ssh` (LIN-3865); the server's own build is covered by unit tests against MangoDB only.
