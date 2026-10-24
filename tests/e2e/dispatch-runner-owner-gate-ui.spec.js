@@ -32,21 +32,28 @@ test.afterEach(async ({ page }) => {
 });
 
 test.describe('LIN-3408 — non-owner member on the Dispatch page (e2e)', () => {
-  test('Pause is refused with the owner-only toast and no halt is stored', async ({ page }) => {
+  test('a member sees no halt buttons (LIN-3849), and a direct halt request is still refused with nothing stored', async ({ page }) => {
     await seedWorkspaceOwnership(page, urlKey, 'foreign');
     await page.goto(`/workspace/${urlKey}/dispatch`);
     await page.waitForLoadState('networkidle');
 
-    await dispatchHalt(page).pause().click();
+    // The page is read-only for a member: the status line stays, the buttons are not drawn.
+    await expect(dispatchHalt(page).status()).toBeVisible();
+    await expect(dispatchHalt(page).pause()).toHaveCount(0);
+    await expect(dispatchHalt(page).stop()).toHaveCount(0);
+    await expect(dispatchHalt(page).resume()).toHaveCount(0);
 
-    const toast = page.getByRole('alert').filter({ hasText: 'Failed to request pause' });
-    await expect(toast).toBeVisible({ timeout: 5000 });
-    await expect(toast).toContainText(REFUSAL);
+    // The server gate is unchanged: the same request the button used to send is refused.
+    const refused = await page.request.post(`${api}/halt`, {
+      headers: { 'Content-Type': 'application/json' },
+      data: { mode: 'pause' }
+    });
+    expect(refused.ok()).toBe(false);
+    expect(JSON.stringify(await refused.json())).toContain(REFUSAL);
 
     const read = await page.request.get(`${api}/halt`);
     expect(read.status()).toBe(200);
     expect(await read.json()).toEqual({ halt: null });
-    await expect(dispatchHalt(page).status()).not.toContainText('Pause requested');
   });
 
   test('✕ on a cli queue row is refused with the owner-only toast and the row stays', async ({ page }) => {
