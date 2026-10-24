@@ -191,7 +191,7 @@ describe('routes/jira-auth.js', () => {
 
       await handler({ body: { workspace: 'acme', email: 'ada@acme.com', apiToken: 'tok-123', site: `${SITE}/` }, session }, res)
 
-      assert.equal(res.redirectedTo, '/workspace/acme/settings?provider_ok=jira')
+      assert.equal(res.redirectedTo, '/workspace/acme/settings/sources?provider_ok=jira')
 
       const ws = session.workspaces[0]
       assert.equal(ws.provider, 'jira')
@@ -241,7 +241,7 @@ describe('routes/jira-auth.js', () => {
 
       await handler({ body: { workspace: 'acme', email: 'ada@acme.com', apiToken: 'basic-secret-tok', site: SITE }, session }, res)
 
-      assert.equal(res.redirectedTo, '/workspace/acme/settings?provider_ok=jira')
+      assert.equal(res.redirectedTo, '/workspace/acme/settings/sources?provider_ok=jira')
       assert.equal(connectionStore.calls.length, 1, 'exactly one Connection write')
       const call = connectionStore.calls[0]
       assert.equal(call.accountId, session.accountId)
@@ -384,7 +384,7 @@ describe('routes/jira-auth.js', () => {
       const attempt2 = makeRes()
       await handler({ body: { workspace: 'acme', email: 'ada@acme.com', apiToken: 'tok-456', site: SITE }, session }, attempt2)
 
-      assert.equal(attempt2.redirectedTo, '/workspace/acme/settings?provider_ok=jira', 'attempt 2: succeeds and redirects')
+      assert.equal(attempt2.redirectedTo, '/workspace/acme/settings/sources?provider_ok=jira', 'attempt 2: succeeds and redirects')
       assert.ok(session.accountId, 'attempt 2: a fresh accountId is established on the same session')
       const account = await accountStore.getAccount(session.accountId)
       assert.ok(account, 'attempt 2: the newly established account is real and durable')

@@ -24,7 +24,7 @@ test.beforeEach(({ workerUrlKey }) => {
   URL_KEY = workerUrlKey;
   OBSERVATION_URL = `/workspace/${URL_KEY}/observation`;
   DASHBOARD_URL = `/workspace/${URL_KEY}/dashboard`;
-  SETTINGS_URL = `/workspace/${URL_KEY}/settings`;
+  SETTINGS_URL = `/workspace/${URL_KEY}/settings/features`;
   SESSIONS_URL = `/workspace/${URL_KEY}/api/dashboard/sessions`;
 });
 

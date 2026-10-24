@@ -104,7 +104,7 @@ export function createCollectiveRoutes({
 
     // Gate: experimental feature must be enabled (mirrors pipeline).
     if (featureFlags.collective !== true) {
-      return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
+      return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings/features`);
     }
 
     try {

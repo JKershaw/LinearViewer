@@ -26,7 +26,7 @@ test.describe('Dispatch defaults settings', () => {
   });
 
   test('settings page shows the Dispatch defaults section as a sibling of AI, with a row per live prompt type', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/models`);
     await page.waitForLoadState('networkidle');
 
     const section = page.locator('[data-testid="settings-section-dispatch-defaults"]');
@@ -51,7 +51,7 @@ test.describe('Dispatch defaults settings', () => {
   });
 
   test('the per-kind rows are collapsed behind a closed toggle until expanded (LIN-1111)', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/models`);
     await page.waitForLoadState('networkidle');
 
     const details = page.locator('details.dispatch-kind-overrides');
@@ -67,7 +67,7 @@ test.describe('Dispatch defaults settings', () => {
   // RE-EXPRESS (LIN-2719 migration table #3): the page-level datalists are
   // gone — the workspace-default row's own <select> carries the option set.
   test('the default model select offers the four Claude presets, plus blank/other (LIN-1111 / LIN-1282 / LIN-2719)', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/models`);
     await page.waitForLoadState('networkidle');
 
     // Workspace default pre-selects claude-code (LIN-1111), so its model
@@ -84,7 +84,7 @@ test.describe('Dispatch defaults settings', () => {
   // RE-EXPRESS (LIN-2719 migration table #1): no `list` attribute on a
   // <select> — assert the rebuilt option set directly after each harness switch.
   test('the model select is harness-aware: it swaps option sets when the harness changes (LIN-1282 / LIN-2719)', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/models`);
     await page.waitForLoadState('networkidle');
 
     const modelSelect = page.locator('select[name="defaultModel"]');
@@ -106,7 +106,7 @@ test.describe('Dispatch defaults settings', () => {
   // RE-EXPRESS (LIN-2719 migration table #4): same assertions, now against
   // the OpenCode row's inline option set instead of the shared page datalist.
   test('the live OpenRouter catalog is merged into the model option set (LIN-1111 Session 2 / LIN-2719)', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/models`);
     await page.waitForLoadState('networkidle');
 
     // Local-provider sessions are mock-gated (routes/workspace-api.js
@@ -127,7 +127,7 @@ test.describe('Dispatch defaults settings', () => {
   // text — selecting the free-marked fixture model shows the hint; a priced
   // one does not; the pricing:null fixture entry does not either.
   test('the free-marker hint line reflects the selected option, not option text (LIN-2719)', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/models`);
     await page.waitForLoadState('networkidle');
     await page.selectOption('select[name="defaultHarnessSelect"]', 'opencode');
 
@@ -147,7 +147,7 @@ test.describe('Dispatch defaults settings', () => {
   });
 
   test('saving the workspace-wide default persists across reloads', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/models`);
     await page.waitForLoadState('networkidle');
 
     // Switch harness FIRST — 'anthropic/claude-opus-4.8' is only reachable in
@@ -203,7 +203,7 @@ test.describe('Dispatch defaults settings', () => {
   // mutating renderDispatchDefaultsSection to inherit reddens that test and
   // leaves this one green. Keep both — they cover different halves.
   test('saving one per-kind effort override does not write byKind.effort entries for untouched kinds (LIN-2616)', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/models`);
     await page.waitForLoadState('networkidle');
 
     await page.locator('[data-testid="dispatch-kind-overrides-toggle"]').click();
@@ -244,7 +244,7 @@ test.describe('Dispatch defaults settings', () => {
   // Settings save + a real dispatch resolution, not just the unit-level
   // resolveRoutingFromConfig coverage this mirrors.
   test('a per-kind effort override scoped to another harness does not donate (row-atomic, LIN-2616/LIN-1694)', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/models`);
     await page.waitForLoadState('networkidle');
 
     await page.locator('[data-testid="dispatch-kind-overrides-toggle"]').click();
@@ -280,7 +280,7 @@ test.describe('Dispatch defaults settings', () => {
   });
 
   test('saving a per-prompt-type override persists independently of the workspace-wide default', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/models`);
     await page.waitForLoadState('networkidle');
 
     // Per-kind rows live behind the collapsed progressive-disclosure toggle
@@ -311,7 +311,7 @@ test.describe('Dispatch defaults settings', () => {
     // the actual `for (const kind of DISPATCH_DEFAULT_KINDS)` save loop in the
     // POST handler — save → persist → re-render — for autopilot specifically,
     // not by composition of the step-kind rows.
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/models`);
     await page.waitForLoadState('networkidle');
 
     await page.locator('[data-testid="dispatch-kind-overrides-toggle"]').click();
@@ -333,20 +333,20 @@ test.describe('Dispatch defaults settings', () => {
   });
 
   test('the workspace-wide harness select pre-selects claude-code when unconfigured (LIN-1111)', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/models`);
     await page.waitForLoadState('networkidle');
     await expect(page.locator('select[name="defaultHarnessSelect"]')).toHaveValue('claude-code');
   });
 
   test('per-kind override rows leave their harness select blank (inherit) even though the workspace-wide row pre-selects claude-code (LIN-1111)', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/models`);
     await page.waitForLoadState('networkidle');
     const row = page.locator('[data-testid="dispatch-default-row-implementation"]');
     await expect(row.locator('select.harness-select')).toHaveValue('');
   });
 
   test('saving a per-kind-only change also persists the pre-selected claude-code workspace default (LIN-1111, expected consequence of the shared form)', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/models`);
     await page.waitForLoadState('networkidle');
 
     await page.locator('[data-testid="dispatch-kind-overrides-toggle"]').click();
@@ -384,7 +384,7 @@ test.describe('Dispatch defaults settings', () => {
     const settingsUrl = `/workspace/${localWorkerUrlKey}/settings`;
 
     await page.request.post(`${settingsUrl}/workspace-features`, {
-      form: { feature: 'periodicals', enabled: 'true' }
+      form: { feature: 'periodicals', enabled: 'true', reason: 'seed' }
     });
     await page.request.post(`${settingsUrl}/model`, {
       form: { modelId: 'anthropic/claude-opus-4.8' }
@@ -393,10 +393,12 @@ test.describe('Dispatch defaults settings', () => {
       form: { defaultModel: 'anthropic/claude-sonnet-5', defaultHarnessSelect: 'claude-code' }
     });
 
-    await page.goto(settingsUrl);
+    // LIN-3846: periodic reviews are on Running, the model forms on Models.
+    await page.goto(`${settingsUrl}/running`);
+    await expect(page.getByTestId('settings-periodicals-state')).toContainText('On');
+    await page.goto(`${settingsUrl}/models`);
     await page.waitForLoadState('networkidle');
 
-    await expect(page.locator('[data-feature="periodicals"] .toggle-state')).toHaveText('● on');
     await expect(page.locator('.model-id')).toHaveText('anthropic/claude-opus-4.8');
     // Posted directly (bypassing the rendered form), so this is an OpenCode
     // curated id landing on a claude-code row — not in that row's preset-only
@@ -418,7 +420,7 @@ test.describe('Dispatch defaults settings', () => {
     });
     expect(res.ok()).toBeTruthy();
 
-    await page.goto(settingsUrl);
+    await page.goto(`${settingsUrl}/models`);
     await page.waitForLoadState('networkidle');
     // No harness posted → the workspace-default row pre-selects claude-code
     // (LIN-1111) on render, so this curated OpenCode id again degrades onto

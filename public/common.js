@@ -2989,55 +2989,28 @@ function setupNavViewsOverflow(navBar) {
 }
 
 // =============================================================================
-// Global light/dark theme toggle (LIN-785)
+// Light/dark theme (LIN-785; the footer link moved to Settings › Account, LIN-3846)
 // =============================================================================
 //
 // The shared shell applies the persisted theme to <html> pre-paint from a cookie
-// (see lib/components/page.js), so this only owns the footer control: it syncs
-// the control's label/state from the applied theme, and on click flips the class
-// for instant feedback, writes the cookie (so the choice persists on this device
-// even if the POST fails or there is no workspace), and POSTs to the durable,
-// cross-device preference route.
-function initThemeToggle() {
-  const toggles = document.querySelectorAll('.footer-theme-toggle');
-  if (!toggles.length) return;
-
-  const currentTheme = () =>
-    document.documentElement.classList.contains('theme-dark') ? 'dark' : 'light';
-
-  const syncToggle = (el) => {
-    const theme = currentTheme();
-    el.dataset.theme = theme;
-    el.setAttribute('aria-checked', theme === 'dark' ? 'true' : 'false');
-    el.textContent = `theme: ${theme}`;
-  };
-
-  const writeCookie = (theme) => {
-    const oneYearSecs = 365 * 24 * 60 * 60;
-    const secure = location.protocol === 'https:' ? '; Secure' : '';
-    document.cookie = `theme=${theme}; path=/; max-age=${oneYearSecs}; SameSite=Lax${secure}`;
-  };
-
-  toggles.forEach((el) => {
-    syncToggle(el);
-    el.addEventListener('click', (e) => {
-      e.preventDefault();
-      const next = currentTheme() === 'dark' ? 'light' : 'dark';
-      document.documentElement.classList.toggle('theme-dark', next === 'dark');
-      writeCookie(next);
-      document.querySelectorAll('.footer-theme-toggle').forEach(syncToggle);
-
-      const urlKey = el.dataset.urlKey;
-      if (urlKey) {
-        fetch(`/workspace/${encodeURIComponent(urlKey)}/settings/theme`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-          body: JSON.stringify({ theme: next })
-        }).catch(() => { /* cookie already persists the choice on this device */ });
-      }
-    });
-  });
-}
+// (see lib/components/page.js). The Settings › Account choice calls this: it flips
+// the class for instant feedback, writes the cookie (so the choice persists on this
+// device even if the POST fails), and POSTs to the durable, cross-device route.
+// Returns the theme it applied.
+window.applyTheme = function applyTheme(theme, urlKey) {
+  const oneYearSecs = 365 * 24 * 60 * 60;
+  const secure = location.protocol === 'https:' ? '; Secure' : '';
+  document.documentElement.classList.toggle('theme-dark', theme === 'dark');
+  document.cookie = `theme=${theme}; path=/; max-age=${oneYearSecs}; SameSite=Lax${secure}`;
+  if (urlKey) {
+    fetch(`/workspace/${encodeURIComponent(urlKey)}/settings/theme`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify({ theme })
+    }).catch(() => { /* cookie already persists the choice on this device */ });
+  }
+  return theme;
+};
 
 // =============================================================================
 // Rulings Badge (LIN-1728 Phase 3)
@@ -3197,7 +3170,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initLocalTimes();
   initDisclosure();
   initNavBar();
-  initThemeToggle();
   initRulingsBadge();
   window.ProxyToggle.init();
 });

@@ -346,7 +346,7 @@ describe('routes/openrouter-auth.js: POST /auth/openrouter/consent (retroactive 
     await handler(req, res);
 
     assert.ok(await userPreferencesStore.getOpenRouterConsent('acct-1'));
-    assert.equal(res.redirectedTo, `/workspace/${WORKSPACE.urlKey}/settings`);
+    assert.equal(res.redirectedTo, `/workspace/${WORKSPACE.urlKey}/settings/account`);
   });
 
   test('409s when the account has no existing durable key to consent for', async () => {

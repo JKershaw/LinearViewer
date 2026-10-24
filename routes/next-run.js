@@ -132,7 +132,7 @@ export function createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspace
 
     // Gate: experimental feature must be enabled (mirrors collective/task-chat).
     if (featureFlags.nextRun !== true) {
-      return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
+      return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings/features`);
     }
 
     try {

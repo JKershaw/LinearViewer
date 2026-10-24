@@ -23,12 +23,12 @@ test.describe('Feature Toggle Settings', () => {
   });
 
   test('settings page shows AI and Workflow sections with all toggles', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/features`);
     await page.waitForLoadState('networkidle');
 
     // AI and Workflow section headers should be visible
-    await expect(page.locator('.settings-header:text-is("AI")')).toBeVisible();
-    await expect(page.locator('.settings-header:text-is("Workflow")')).toBeVisible();
+    await expect(page.locator('.settings-header:text-is("Views · for you")')).toBeVisible();
+    await expect(page.locator('.settings-header:text-is("Feedback · for you")')).toBeVisible();
 
     // All feature toggle labels should be present (split across sections)
     // LIN-3849: no Dispatch queue or Linear API proxy toggle any more.
@@ -36,7 +36,7 @@ test.describe('Feature Toggle Settings', () => {
   });
 
   test('shows correct default toggle states', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/features`);
     await page.waitForLoadState('networkidle');
 
     // Defaults: roadmap OFF
@@ -45,7 +45,7 @@ test.describe('Feature Toggle Settings', () => {
 
   // LIN-3848: nine switches that did nothing or were superseded are gone.
   test('settings offers none of the removed switches', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/features`);
     await page.waitForLoadState('networkidle');
 
     for (const key of ['linearMcp', 'aiRecommendations', 'promptButtons', 'codeReview', 'codeReviewSelf', 'codeReviewCicd', 'codeReviewPr', 'feedbackTriage', 'observerAuthority']) {
@@ -55,7 +55,7 @@ test.describe('Feature Toggle Settings', () => {
   });
 
   test('can toggle a feature on and state persists on reload', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/features`);
     await page.waitForLoadState('networkidle');
 
     // roadmap should start OFF
@@ -85,7 +85,7 @@ test.describe('Feature Toggle Settings', () => {
   });
 
   test('toggling one feature does not affect others', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/features`);
     await page.waitForLoadState('networkidle');
 
     // Turn on roadmap (AJAX — no page reload)
@@ -122,10 +122,10 @@ test.describe('Feature Toggle Settings', () => {
   // =========================================================================
 
   test('settings no longer offers a feature branch toggle', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/features`);
     await page.waitForLoadState('networkidle');
 
-    await expect(page.locator('.settings-header:text-is("Workflow")')).toBeVisible();
+    await expect(page.locator('.settings-header:text-is("Feedback · for you")')).toBeVisible();
     await expect(page.locator('[data-feature="featureBranches"]')).toHaveCount(0);
     await expect(page.locator('.feature-toggle-label:has-text("Feature branch workflow")')).toHaveCount(0);
   });
@@ -168,7 +168,7 @@ test.describe('Feature Toggle Settings', () => {
   });
 
   test('dispatch section hidden in settings (LIN-3849: no dispatch switch at all)', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/features`);
     await page.waitForLoadState('networkidle');
 
     // Dispatch section should not be visible
@@ -178,7 +178,7 @@ test.describe('Feature Toggle Settings', () => {
   test('dispatch link visible in header switcher with run controls', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(workspaceApiLocalSeed, { runnerKey: true });
 
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/features`);
     await page.waitForLoadState('networkidle');
 
     // The dispatch link lives in the header view switcher (LIN-978), gated on run controls (LIN-3849).
@@ -186,7 +186,7 @@ test.describe('Feature Toggle Settings', () => {
   });
 
   test('Settings carries neither a Dispatch queue nor a Linear API proxy switch (LIN-3849)', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/features`);
     await page.waitForLoadState('networkidle');
 
     await expect(page.locator('[data-feature="dispatch"]')).toHaveCount(0);

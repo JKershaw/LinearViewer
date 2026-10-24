@@ -7,7 +7,7 @@ test.describe('PAT Authentication Mode', () => {
 
   test.beforeEach(async ({ page, workerUrlKey }) => {
     WORKSPACE_URL = `/workspace/${workerUrlKey}/`
-    SETTINGS_URL = `/workspace/${workerUrlKey}/settings`
+    SETTINGS_URL = `/workspace/${workerUrlKey}/settings/account`
     await page.goto(`/test/set-session?patMode=true&urlKey=${workerUrlKey}`)
   })
 

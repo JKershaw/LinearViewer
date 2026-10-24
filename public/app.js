@@ -1495,7 +1495,7 @@ async function removeQueueItem(urlKey, itemId) {
  * without a full page reload. Falls back to standard form POST on error.
  */
 function initFeatureToggles() {
-  const toggleBtns = document.querySelectorAll('.settings-section .toggle-btn')
+  const toggleBtns = document.querySelectorAll('.settings-section .toggle-btn:not(.settings-json-toggle)')
   if (!toggleBtns.length) return // Not on settings page
 
   // LIN-3401: bound to the buttons the settings page rendered, at load.
@@ -1563,6 +1563,13 @@ function initFeatureToggles() {
         feedback.classList.add('visible')
         setTimeout(() => feedback.classList.remove('visible'), 1500)
       }
+
+      // Changes for just you apply at once, with Undo (LIN-3846). The Undo is the
+      // same switch, clicked again; `undoing` stops that click offering another.
+      if (featureLine && btn.dataset.undoing !== '1') {
+        addInlineUndo(featureLine, btn)
+      }
+      delete btn.dataset.undoing
     } catch (err) {
       // Auth failure — redirect to re-authenticate (covers 401 and 403).
       if (err.status === 401 || err.status === 403) {
@@ -1576,6 +1583,29 @@ function initFeatureToggles() {
       btn.disabled = false
     }
   }))
+}
+
+/**
+ * A short-lived inline "Undo" beside a just-changed switch (LIN-3846). No popup:
+ * it sits in the row, re-fires the same switch, and goes away after a few
+ * seconds. Bound to the element Harbour rendered (LIN-3401), never by class.
+ */
+function addInlineUndo(row, switchBtn) {
+  const existing = row.querySelector('.settings-undo')
+  if (existing) existing.remove()
+  const undo = document.createElement('button')
+  undo.type = 'button'
+  undo.className = 'settings-undo'
+  undo.textContent = 'Undo'
+  undo.setAttribute('data-testid', 'settings-undo-inline')
+  const timer = setTimeout(() => undo.remove(), 6000)
+  undo.addEventListener('click', () => {
+    clearTimeout(timer)
+    undo.remove()
+    switchBtn.dataset.undoing = '1'
+    switchBtn.click()
+  })
+  row.appendChild(undo)
 }
 
 // ==========================================================================

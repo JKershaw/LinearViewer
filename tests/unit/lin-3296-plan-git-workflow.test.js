@@ -10,7 +10,7 @@ import { generatePrompt } from '../../lib/prompt-templates.js';
 import { buildRouterPrompt } from '../../lib/stage-router.js';
 import { buildSelectorArgs } from '../../lib/openrouter.js';
 import { FEATURE_DEFAULTS, getFeatureFlags, isValidFeatureKey } from '../../lib/feature-defaults.js';
-import { renderSettingsPage } from '../../lib/render-settings.js';
+import { renderAllAreas as renderSettingsPage } from '../helpers/render-settings-areas.js';
 
 const issue = {
   id: 'issue-1',

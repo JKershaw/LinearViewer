@@ -1,9 +1,10 @@
 /**
  * Settings Page Client-Side Logic
  *
- * Currently just Dispatch presets CRUD (LIN-1391 S7) — every other Settings
- * section is a plain server-rendered `<form method="POST">` and needs no
- * client JS. Presets are a growable list, so create/edit/delete go through
+ * Dispatch presets CRUD (LIN-1391 S7), plus the area controls added in
+ * LIN-3846 (theme choice, the +proxy JSON switch, key revoke and New key, old
+ * fragments). Every other Settings control is a plain server-rendered
+ * `<form method="POST">` and needs no client JS. Presets are a growable list, so create/edit/delete go through
  * JSON endpoints (routes/dispatch.js, following the routes/collective.js
  * preset-CRUD convention) instead. On success this reloads the page rather
  * than re-rendering the list client-side — the config-row markup
@@ -215,6 +216,146 @@ function initDispatchPresets() {
   })
 }
 
+// ---------------------------------------------------------------------------
+// LIN-3846: the areas. Everything below binds to elements the server rendered
+// (LIN-3401), never by a page-wide class listener.
+// ---------------------------------------------------------------------------
+
+// Old fragments (#dispatch-presets, #ai-model, #dispatch-defaults) lived on the one long
+// page; they are on the Models page now.
+function redirectOldFragments() {
+  const hash = window.location.hash
+  const onModels = /\/settings\/models(?:[/?#]|$)/.test(window.location.pathname)
+  if (!hash || onModels || /\/settings\/[a-z-]+/.test(window.location.pathname)) return
+  if (['#dispatch-presets', '#ai-model', '#dispatch-defaults'].includes(hash)) {
+    window.location.replace(window.location.pathname.replace(/\/settings\/?$/, '/settings/models') + hash)
+  }
+}
+
+// A short inline Undo beside a just-changed row. No popup.
+function offerUndo(row, redo) {
+  const old = row.querySelector('.settings-undo')
+  if (old) old.remove()
+  const undo = document.createElement('button')
+  undo.type = 'button'
+  undo.className = 'settings-undo'
+  undo.textContent = 'Undo'
+  undo.setAttribute('data-testid', 'settings-undo-inline')
+  const timer = setTimeout(() => undo.remove(), 6000)
+  undo.addEventListener('click', () => { clearTimeout(timer); undo.remove(); redo() })
+  row.appendChild(undo)
+}
+
+// The theme: two visible choices posting the existing route. Works with no script
+// (a plain form post); with script it applies at once, with Undo.
+function initThemeChoices() {
+  const row = document.querySelector('[data-testid="settings-theme"]')
+  if (!row) return
+  const buttons = Array.from(row.querySelectorAll('[data-theme-choice]'))
+  const select = (theme) => buttons.forEach((b) => {
+    const on = b.dataset.themeChoice === theme
+    b.classList.toggle('is-selected', on)
+    b.setAttribute('aria-pressed', on ? 'true' : 'false')
+  })
+  buttons.forEach((btn) => btn.addEventListener('click', (e) => {
+    if (!window.applyTheme) return // falls back to the form POST
+    e.preventDefault()
+    const previous = document.documentElement.classList.contains('theme-dark') ? 'dark' : 'light'
+    const next = btn.dataset.themeChoice
+    if (next === previous) return
+    select(window.applyTheme(next, btn.dataset.urlKey))
+    offerUndo(row, () => select(window.applyTheme(previous, btn.dataset.urlKey)))
+  }))
+  // The server knows the cookie/session theme; the class on <html> is what is really applied.
+  select(document.documentElement.classList.contains('theme-dark') ? 'dark' : 'light')
+}
+
+// The +proxy default posts JSON (the route accepts only a boolean).
+function initJsonToggles() {
+  document.querySelectorAll('form[data-settings-json]').forEach((form) => {
+    const btn = form.querySelector('button')
+    const row = form.closest('.feature-toggle')
+    const field = form.dataset.settingsJson
+    const paint = (on) => {
+      form.dataset.value = on ? 'true' : 'false'
+      btn.classList.toggle('toggle-on', on)
+      btn.classList.toggle('toggle-off', !on)
+      btn.setAttribute('aria-checked', on ? 'true' : 'false')
+      const state = btn.querySelector('.toggle-state')
+      if (state) state.textContent = on ? '● on' : '○ off'
+    }
+    const save = async (on) => {
+      try {
+        await window.api(form.action, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          body: JSON.stringify({ [field]: on }),
+          on401: false
+        })
+        paint(on)
+        return true
+      } catch (err) {
+        toast('Failed to save: ' + err.message, { type: 'error' })
+        return false
+      }
+    }
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault()
+      const was = form.dataset.value === 'true'
+      if (await save(!was) && row) offerUndo(row, () => save(was))
+    })
+  })
+}
+
+// Revoke a key from the list, through today's DELETE routes (their owner rules apply).
+// The button is only inside the opened row, which is the in-place confirmation.
+function initKeyRevoke() {
+  document.querySelectorAll('.settings-key-revoke').forEach((btn) => btn.addEventListener('click', async () => {
+    btn.disabled = true
+    try {
+      await window.api(btn.dataset.revokeRoute, { method: 'DELETE', on401: false })
+      window.location.reload()
+    } catch (err) {
+      btn.disabled = false
+      toast('Failed to revoke: ' + (err.message || 'refused'), { type: 'error' })
+    }
+  }))
+}
+
+// New key: read, or read and update; the secret is shown once, in place.
+function initNewKey() {
+  const form = document.querySelector('[data-testid="settings-newkey-form"]')
+  if (!form) return
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const submit = form.querySelector('.settings-newkey-submit')
+    const out = form.querySelector('.settings-newkey-secret')
+    submit.disabled = true
+    try {
+      const data = await window.api(form.dataset.newkeyRoute, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          label: form.querySelector('.settings-newkey-label').value.trim() || undefined,
+          scope: form.querySelector('input[name="scope"]:checked').value
+        }),
+        on401: false
+      })
+      out.textContent = 'Copy this now, it is shown once: ' + (data.token || '')
+      out.hidden = false
+      submit.hidden = true
+    } catch (err) {
+      submit.disabled = false
+      toast('Failed to create key: ' + (err.message || 'refused'), { type: 'error' })
+    }
+  })
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+  redirectOldFragments()
   initDispatchPresets()
+  initThemeChoices()
+  initJsonToggles()
+  initKeyRevoke()
+  initNewKey()
 })

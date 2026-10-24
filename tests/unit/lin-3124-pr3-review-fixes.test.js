@@ -555,7 +555,7 @@ describe('LIN-3124 PR3 review fixes (verdict 71b71694)', () => {
         const router = createAuthRoutes({ ...withResolver(), provider, accountStore: s.accountStore, accountWorkspaceStore: s.accountWorkspaceStore, ...spiedStores(s, log) });
         const res = makeRes();
         await getHandler(router, 'get', '/auth/callback')({ query: { code: 'c', state: 'st' }, session }, res);
-        assert.equal(res.redirectedTo, '/workspace/org-a/settings?provider_ok=linear');
+        assert.equal(res.redirectedTo, '/workspace/org-a/settings/sources?provider_ok=linear');
         await assertStayedLegacy(s, log, session.workspaces.find(w => w.id === 'org-b').bindings[0], { provider: 'linear', unitId: 'org-b', accountId: acct._id });
         assert.equal((await s.ownerCredentialStore.get(acct._id, 'org-b', 'linear')).refreshToken, 'RB', 'the legacy durable write, as today');
       } finally {

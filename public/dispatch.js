@@ -301,7 +301,7 @@ async function loadDispatchPresetPicker(container) {
   // "use on Dispatch" link (lib/render-settings.js).
   const emptyLinkHtml = presets.length
     ? ''
-    : `<a href="/workspace/${encodeURIComponent(urlKey)}/settings#dispatch-presets" class="settings-action dispatch-preset-create-link" data-testid="dispatch-preset-create-link">create a preset &rarr;</a>`
+    : `<a href="/workspace/${encodeURIComponent(urlKey)}/settings/models#dispatch-presets" class="settings-action dispatch-preset-create-link" data-testid="dispatch-preset-create-link">create a preset &rarr;</a>`
   container.innerHTML = `<select class="dispatch-preset-select" aria-label="Preset">
     <option value="">&mdash; none &mdash;</option>
     ${optionsHtml}
@@ -911,26 +911,8 @@ function initWorkspaceHalt() {
 }
 
 // =============================================================================
-// Token Management
+// Token Management (minting only: the key list and revoke live in Settings › Agent access)
 // =============================================================================
-
-/**
- * Load and display token list
- */
-async function loadDispatchTokenList(urlKey) {
-  const listEl = document.querySelector('.token-list')
-  if (!listEl) return
-
-  try {
-    // on401:false — consistent with the token CRUD calls (no redirect); failure
-    // surfaces on the inline empty state below.
-    const { tokens } = await api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/tokens`, { on401: false })
-    renderDispatchTokenList(listEl, tokens, urlKey)
-  } catch (e) {
-    console.error('Failed to load tokens:', e)
-    listEl.innerHTML = '<div class="token-list-empty">Failed to load tokens</div>'
-  }
-}
 
 /**
  * LIN-3618: a token's expiry as list/modal text. Null or absent `expiresAt` is a
@@ -940,42 +922,6 @@ function formatDispatchTokenExpiry(expiresAt, now = new Date()) {
   if (!expiresAt) return 'never expires'
   const when = new Date(expiresAt)
   return `${when.getTime() > now.getTime() ? 'expires' : 'expired'} ${when.toLocaleDateString()}`
-}
-
-/**
- * Render token list in container
- */
-function renderDispatchTokenList(container, tokens, urlKey) {
-  if (tokens.length === 0) {
-    container.innerHTML = '<div class="token-list-empty">No tokens yet</div>'
-    return
-  }
-
-  // Revoke is owner-only on the server; a member's page marks the list read-only.
-  const canRevoke = container.dataset?.canRevoke !== 'false'
-  container.innerHTML = tokens.map(t => {
-    const created = new Date(t.createdAt).toLocaleDateString()
-    const lastUsed = t.lastUsedAt
-      ? `last used ${new Date(t.lastUsedAt).toLocaleDateString()}`
-      : 'never used'
-    // LIN-1448: an ownerless (pre-LIN-1397) token cannot mint a working broker
-    // bootstrap — anything it mints is dead on arrival at every workspace-scoped
-    // verb. `hasOwner === false` is the signal to re-issue it; older API responses
-    // omit the field entirely, so only an explicit false warns.
-    const ownerless = t.hasOwner === false
-      ? '<span class="token-ownerless" title="Minted before token ownership existed. Tokens it mints cannot access the workspace — re-issue this token and update the consumer.">no owner · re-issue</span>'
-      : ''
-
-    return `
-      <div class="card token-item" data-token-id="${escapeHtml(t.tokenId)}">
-        <div class="token-info">
-          <span class="token-label-text">${escapeHtml(t.label)}</span>
-          <div class="token-meta">created ${created} · ${lastUsed} · ${formatDispatchTokenExpiry(t.expiresAt)}${ownerless ? ' · ' : ''}${ownerless}</div>
-        </div>
-        ${canRevoke ? `<button class="action-btn token-revoke" data-token-id="${escapeHtml(t.tokenId)}">revoke</button>` : ''}
-      </div>
-    `
-  }).join('')
 }
 
 /**
@@ -999,39 +945,11 @@ async function createDispatchToken(urlKey, label) {
 
     // Show token in modal (one-time display)
     showDispatchTokenModal(token, expiresAt)
-
-    // Refresh list
-    await loadDispatchTokenList(urlKey)
   } catch (e) {
     console.error('Failed to create token:', e)
     toast('Failed to create token: ' + e.message, { type: 'error' })
   } finally {
     if (submitBtn) submitBtn.textContent = originalText
-  }
-}
-
-/**
- * Revoke a dispatch token
- */
-async function revokeDispatchToken(urlKey, tokenId) {
-  try {
-    // on401:false — keep the existing throw→catch→toast path (no redirect).
-    await api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/tokens/${tokenId}`, {
-      method: 'DELETE',
-      on401: false
-    })
-
-    // Remove from DOM
-    document.querySelector(`.token-item[data-token-id="${tokenId}"]`)?.remove()
-
-    // Check if list is now empty
-    const listEl = document.querySelector('.token-list')
-    if (listEl && listEl.querySelectorAll('.token-item').length === 0) {
-      listEl.innerHTML = '<div class="token-list-empty">No tokens yet</div>'
-    }
-  } catch (e) {
-    console.error('Failed to revoke token:', e)
-    toast('Failed to revoke token: ' + e.message, { type: 'error' })
   }
 }
 
@@ -1085,9 +1003,6 @@ function initDispatchTokenManagement() {
 
   const urlKey = createForm.dataset.urlKey
 
-  // Load existing tokens
-  loadDispatchTokenList(urlKey)
-
   // Handle create form submission
   createForm.addEventListener('submit', async (e) => {
     e.preventDefault()
@@ -1095,23 +1010,6 @@ function initDispatchTokenManagement() {
     await createDispatchToken(urlKey, label)
     createForm.reset()
   })
-
-  // Handle revoke clicks (delegated on token-list)
-  const tokenList = document.querySelector('.token-list')
-  if (tokenList) {
-    tokenList.addEventListener('click', async (e) => {
-      const revokeBtn = e.target.closest('.token-revoke')
-      if (!revokeBtn) return
-
-      e.preventDefault()
-      const tokenId = revokeBtn.dataset.tokenId
-      // Native confirm() is the ratified destructive-action primitive (LIN-511);
-      // see docs/ui-divergences.md.
-      if (confirm('Revoke this token? It will immediately stop working.')) {
-        await revokeDispatchToken(urlKey, tokenId)
-      }
-    })
-  }
 }
 
 // =============================================================================

@@ -38,7 +38,7 @@ export function createPassagePlannerRoutes({ workspaceFromUrl, getOpenRouterSour
 
     // Gate: experimental feature must be enabled (mirrors collective/task-chat/next-run/flight-companion).
     if (featureFlags.passagePlanner !== true) {
-      return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
+      return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings/features`);
     }
 
     try {

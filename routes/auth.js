@@ -355,7 +355,7 @@ export function createAuthRoutes({ userPreferencesStore, provider, accountStore,
             action: 'Back to settings', actionUrl: `/workspace/${encodeURIComponent(returnUrlKey)}/settings`
           }))
         }
-        return res.redirect(`/workspace/${encodeURIComponent(returnUrlKey)}/settings?provider_ok=linear`)
+        return res.redirect(`/workspace/${encodeURIComponent(returnUrlKey)}/settings/sources?provider_ok=linear`)
       }
 
       // === Normal Linear login (mode:'new') ===

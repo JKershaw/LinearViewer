@@ -88,7 +88,7 @@ export function createShipBiscuitRoutes({
 
     // Gate: experimental feature must be enabled (mirrors flight-companion/next-run).
     if (featureFlags.shipBiscuit !== true) {
-      return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
+      return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings/features`);
     }
 
     try {

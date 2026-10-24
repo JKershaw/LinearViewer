@@ -19,87 +19,60 @@ test.describe('Workspace feature toggles', () => {
     await request.get(`/test/set-workspace-model?urlKey=${localWorkerUrlKey}`);
   });
 
-  test('settings page shows the Workspace features section with periodicals (default off)', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+  const RUNNING = (key) => `/workspace/${key}/settings/running`;
+  // LIN-3846: periodic reviews affect everyone, so the switch is an in-place ask: open the row,
+  // say why, confirm. The state shows in a static row beside it.
+  async function turn(page, reason) {
+    const row = page.getByTestId('settings-toggle-periodicals');
+    await row.locator('summary').click();
+    await row.locator('textarea[name="reason"]').fill(reason);
+    await row.locator('[data-testid$="-confirm"]').click();
     await page.waitForLoadState('networkidle');
+  }
+  const state = (page) => page.getByTestId('settings-periodicals-state');
 
-    await expect(page.locator('.settings-header:has-text("Workspace features")')).toBeVisible();
-    await expect(page.locator('.feature-toggle-label:has-text("Periodicals")')).toBeVisible();
-    await expect(page.locator('[data-feature="periodicals"] .toggle-state')).toHaveText('○ off');
-
-    // periodicals must render exactly once — it is NOT part of the per-user
-    // AI/Workflow auto-render loop.
-    await expect(page.locator('[data-feature="periodicals"]')).toHaveCount(1);
+  test('Running shows periodic reviews (default off), once', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(RUNNING(localWorkerUrlKey));
+    await expect(page.getByTestId('settings-section-workspace-features')).toContainText('For everyone in');
+    await expect(state(page)).toContainText('Off');
+    await expect(page.getByTestId('settings-toggle-periodicals')).toHaveCount(1);
+    await expect(page.getByTestId('settings-section-workspace-features')).toContainText('by hand');
   });
 
-  test('toggling periodicals on persists to the store across reloads', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
-    await page.waitForLoadState('networkidle');
-
-    await expect(page.locator('[data-feature="periodicals"] .toggle-state')).toHaveText('○ off');
-
-    // Toggle on (settings-page toggle client posts via AJAX)
-    await page.locator('[data-feature="periodicals"] .toggle-btn').click();
-    await expect(page.locator('[data-feature="periodicals"] .toggle-state')).toHaveText('● on');
-
-    // Reload — value must come back from WorkspacePreferencesStore, proving it
-    // persisted server-side (not just a client-side flip).
+  test('turning periodic reviews on asks why and persists across reloads', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(RUNNING(localWorkerUrlKey));
+    await turn(page, 'Weekly reviews');
+    await expect(state(page)).toContainText('On');
     await page.reload();
-    await page.waitForLoadState('networkidle');
-    await expect(page.locator('[data-feature="periodicals"] .toggle-state')).toHaveText('● on');
+    await expect(state(page)).toContainText('On');
   });
 
-  test('toggling periodicals off persists across reloads', async ({ page, localWorkerUrlKey }) => {
-    // Seed it on directly via the handler (page.request shares the session
-    // cookie), then toggle off through the UI.
+  test('turning them off persists across reloads', async ({ page, localWorkerUrlKey }) => {
     await page.request.post(`/workspace/${localWorkerUrlKey}/settings/workspace-features`, {
+      form: { feature: 'periodicals', enabled: 'true', reason: 'seed' }
+    });
+    await page.goto(RUNNING(localWorkerUrlKey));
+    await expect(state(page)).toContainText('On');
+    await turn(page, 'Not needed');
+    await expect(state(page)).toContainText('Off');
+    await page.reload();
+    await expect(state(page)).toContainText('Off');
+  });
+
+  test('the workspace switch is not among the per-user features', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/features`);
+    await expect(page.locator('[data-feature="periodicals"]')).toHaveCount(0);
+    await expect(page.locator('[data-feature="roadmap"] .toggle-state')).toHaveText('○ off');
+  });
+
+  test('the handler rejects an invalid workspace feature key, and a change with no reason', async ({ page, localWorkerUrlKey }) => {
+    const bad = await page.request.post(`/workspace/${localWorkerUrlKey}/settings/workspace-features`, {
+      form: { feature: 'roadmap', enabled: 'true', reason: 'x' } // a per-user key, not a workspace key
+    });
+    expect(bad.status()).toBe(400);
+    const noReason = await page.request.post(`/workspace/${localWorkerUrlKey}/settings/workspace-features`, {
       form: { feature: 'periodicals', enabled: 'true' }
     });
-
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
-    await page.waitForLoadState('networkidle');
-    await expect(page.locator('[data-feature="periodicals"] .toggle-state')).toHaveText('● on');
-
-    await page.locator('[data-feature="periodicals"] .toggle-btn').click();
-    await expect(page.locator('[data-feature="periodicals"] .toggle-state')).toHaveText('○ off');
-
-    await page.reload();
-    await page.waitForLoadState('networkidle');
-    await expect(page.locator('[data-feature="periodicals"] .toggle-state')).toHaveText('○ off');
-  });
-
-  test('workspace toggle is isolated — it does not appear in the per-user features sections', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
-    await page.waitForLoadState('networkidle');
-
-    // The periodicals toggle lives only under "Workspace features".
-    const periodicalsSection = page.locator('.settings-section', { has: page.locator('[data-feature="periodicals"]') });
-    await expect(periodicalsSection.locator('.settings-header')).toHaveText('Workspace features');
-
-    // And the AI / Workflow sections do not render it.
-    const aiSection = page.locator('.settings-section', { has: page.locator('.settings-header:text-is("AI")') });
-    await expect(aiSection.locator('[data-feature="periodicals"]')).toHaveCount(0);
-  });
-
-  test('toggling periodicals does not disturb per-user toggles', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
-    await page.waitForLoadState('networkidle');
-
-    // Per-user defaults before the workspace toggle.
-    await expect(page.locator('[data-feature="roadmap"] .toggle-state')).toHaveText('○ off');
-
-    await page.locator('[data-feature="periodicals"] .toggle-btn').click();
-    await expect(page.locator('[data-feature="periodicals"] .toggle-state')).toHaveText('● on');
-
-    // Per-user toggle states are untouched by the workspace write.
-    await expect(page.locator('[data-feature="roadmap"] .toggle-state')).toHaveText('○ off');
-  });
-
-  test('handler rejects an invalid workspace feature key', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal();
-    const res = await page.request.post(`/workspace/${localWorkerUrlKey}/settings/workspace-features`, {
-      form: { feature: 'roadmap', enabled: 'true' } // a per-user key, not a workspace key
-    });
-    expect(res.status()).toBe(400);
+    expect(noReason.status()).toBe(400);
   });
 });

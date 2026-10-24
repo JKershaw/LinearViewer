@@ -1118,7 +1118,7 @@ describe('GitHub Projects auth routes', () => {
     assert.ok(viewedWs.bindings?.some(b => b.provider === 'github-projects' && b.scope === 'octocat/5'), 'viewed workspace gets the binding');
     assert.ok(!activeWs.bindings, 'active workspace untouched');
     assert.equal(viewedWs.provider, 'linear', 'viewed primary scalar unchanged by the non-active binding');
-    assert.equal(res.redirectedTo, '/workspace/acme/settings?provider_ok=github-projects');
+    assert.equal(res.redirectedTo, '/workspace/acme/settings/sources?provider_ok=github-projects');
   });
 
   test('POST link (re-bind, new) mints the installation token for the chosen board and writes the LIN-711 binding (LIN-735)', async () => {
@@ -1167,7 +1167,7 @@ describe('GitHub Projects auth routes', () => {
       urlKey: 'acme', scope: 'octocat/5', installationId: '77', token: 'ghs_inst', tokenExpiresAt: Date.parse('2026-06-25T20:00:00Z'),
     });
     assert.equal(linearWs.provider, 'linear', 'non-active re-add must not clobber the active scalar mirror');
-    assert.equal(res.redirectedTo, '/workspace/acme/settings?provider_ok=github-projects');
+    assert.equal(res.redirectedTo, '/workspace/acme/settings/sources?provider_ok=github-projects');
   });
 
   test('POST link (re-bind) rejects a board that is not in the enumerated installation map (LIN-735)', async () => {
@@ -1527,7 +1527,7 @@ describe('GitHub Projects auth routes', () => {
     session.activeWorkspaceId = 'github:42';
     const res2 = makeRes();
     await handler({ body: { board: 'octocat/5' }, session }, res2);
-    assert.equal(res2.redirectedTo, '/workspace/gh-42/settings?provider_ok=github-projects');
+    assert.equal(res2.redirectedTo, '/workspace/gh-42/settings/sources?provider_ok=github-projects');
 
     const all = await connectionStore.collection.find({ accountId, provider: 'github-projects', unitId: '99' }).toArray();
     assert.equal(all.length, 1, 'exactly one Connection record for the installation');

@@ -37,7 +37,7 @@ AI agents, and verifies the work on real evidence.
 ## Design Principles
 
 - CLI/terminal *character*, not pure monospace (LIN-785 / LIN-782): a typographic split — **mono (JetBrains Mono) for machine facts** (IDs, counts, paths, tree scaffolding), **sans (Inter) for human structure/labels** (headings, prose, controls). Box-drawing (├─ └─ │) stays as subtle structural character. Both faces are self-hosted woff2 under `public/fonts/` (no build step) and head the `--font-structural` / `--font-content` stacks with robust system fallbacks.
-- Light is the default theme; **dark is an opt-in `.theme-dark` hook** applied to `<html>` pre-paint by the shared shell (`lib/components/page.js`) from a persisted preference, with a global toggle in the footer. Themes are pure overrides of the color tokens; the semantic token layer (`--text/--muted/--card/--line/--brand/--amber/--slate` …) and structural tokens stay shared. Default (no class) output is unchanged.
+- Light is the default theme; **dark is an opt-in `.theme-dark` hook** applied to `<html>` pre-paint by the shared shell (`lib/components/page.js`) from a persisted preference, chosen in Settings › Account. Themes are pure overrides of the color tokens; the semantic token layer (`--text/--muted/--card/--line/--brand/--amber/--slate` …) and structural tokens stay shared. Default (no class) output is unchanged.
 - State indicators: ✓ (done/green), ◐ (in-progress/yellow), ○ (todo/dim)
 - Mobile-responsive layout
 - Keep it minimal - no frameworks, no build step

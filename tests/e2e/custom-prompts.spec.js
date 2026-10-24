@@ -337,7 +337,7 @@ test.describe('Custom Prompts Page', () => {
   // =========================================================================
 
   test('settings page links to custom prompts', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/features`);
     await page.waitForLoadState('networkidle');
 
     const link = page.locator('a[href*="/prompts/custom"]');

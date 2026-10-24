@@ -103,7 +103,7 @@ describe('renderSourceErrorPage', () => {
     const active = html(tagged(401, 'github', 'JKershaw/LinearViewer'), ghWs);
     assert.ok(active.includes(`href="${relinkNotice(ghWs).actionUrl}"`) || active.includes(relinkNotice(ghWs).actionUrl.replace(/&/g, '&amp;')));
     const secondary = html(tagged(401, 'github', 'o/other'), linWs);
-    assert.match(secondary, /href="\/workspace\/acme\/settings"/);
+    assert.match(secondary, /href="\/workspace\/acme\/settings\/sources"/);
     assert.match(secondary, /Go to settings/);
   });
 
@@ -113,7 +113,7 @@ describe('renderSourceErrorPage', () => {
     assert.match(expected, /^\/auth\/jira/);
     const out = html(tagged(401, 'jira', 'https://a.atlassian.net'), jiraWs);
     assert.ok(out.includes(`href="${expected.replace(/&/g, '&amp;')}"`), 'button links to relinkNotice target');
-    assert.doesNotMatch(out, /href="\/workspace\/acme\/settings"/);
+    assert.doesNotMatch(out, /href="\/workspace\/acme\/settings\/sources"/);
     assert.doesNotMatch(out, /Go to settings/);
   });
 

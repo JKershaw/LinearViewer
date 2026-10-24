@@ -61,7 +61,7 @@ test.describe('Held connection picker (LIN-3125 Phase 3)', () => {
     expect(urlKey).toBe(GITHUB_WORKSPACE_URL_KEY);
     expect((await counters(page)).listUserInstallations).toBe(0);
 
-    const settingsUrl = `/workspace/${urlKey}/settings`;
+    const settingsUrl = `/workspace/${urlKey}/settings/sources`;
 
     // ---- 1. a second GitHub source on the SAME workspace is refused (LIN-3334) ----
     await page.goto(settingsUrl);

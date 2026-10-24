@@ -51,6 +51,7 @@ routes/
   workspace-kpis.js    Workspace KPIs page (LIN-3689; trend charts LIN-3711): GET /workspace/:urlKey/kpis — one workspace's counts (last 7 and 30 UTC days activity, 30-day trend series, 30-day funnel, top dispatch kinds, stored prompt/report counts), the in-Harbour sibling of the public /kpis. Session-auth via `workspaceFromUrl`; the handler reads the workspace only from `req.workspace.urlKey`, never `req.params`/`req.query`, and never reads every session workspace (unlike the escalation KPIs page). Uncached (login-gated, indexed reads). Factory `createWorkspaceKpisRoutes({ workspaceFromUrl, collections, now })`
   runner-setup.js      Runner setup page (LIN-3098 S4): GET /workspace/:urlKey/runner, the phone-usable UI mint. Never redirects; its state comes from checkWorkspaceOwner alone (the runner mint's own seam, merged-account aware; LIN-3849 removed the proxy/dispatch switches): owner, not-owner, no-owner, unavailable. Shows the served runner prompt (lib/prompts/runner-kickoff.js) in every state
   test.js              Test-only routes for E2E tests (mock sessions, fixtures)
+  settings.js          Settings, one page per area (LIN-3846): GET /workspace/:urlKey/settings (the list of areas) and /settings/:area; periodic reviews (asks why, logged); pause/stop/resume and Undo (owner-only, gated like the other halt writers); the Change log undo for both logs. Moved out of server.js
   settings-model.js    The three old Settings model forms (POST /settings/model, /dispatch-defaults, /ai-model-overrides), writing through the model-routing store with a fixed reason each (LIN-3853); item 4 of LIN-3820 retires them
   legacy-redirects.js  Backward-compatible redirects for old URLs
 lib/
@@ -78,7 +79,13 @@ lib/
   render-pages.js      Standalone page renderers (login, error, workspace-not-found)
   render-landing.js    Bespoke unauthenticated home showcase (LIN-980): Harbour top area (hero + loop) + fake-data glimpses of real surfaces (observation feed, swim board, grounded prompt) + providers strip + distinct Harbour OS section; composes D's shared nav (renderNavBar isLanding); NOT the project-tree renderer. Styles in public/landing.css
   render-audit.js      Operator dashboard page renderer
-  render-settings.js   Settings page renderer
+  render-settings.js   Settings page renderer: one area at a time (`area` option); Sources, Models (the legacy forms until LIN-3855) and Health (LIN-3846)
+  render-settings-shell.js  Settings sidebar + page frame and the three row kinds (switch, drill-in, action) plus `askInPlace` (LIN-3846)
+  render-settings-you.js  Settings › Account and Features (theme, consent on/off, +proxy default) (LIN-3846)
+  render-settings-workspace.js  Settings › Running, Agent access and Change log (LIN-3846)
+  settings-areas.js    The one census table of Settings areas: which settings and routes each holds, and the sidebar state word (LIN-3846; tests/unit/settings-areas-census.test.js)
+  settings-keys.js     The one key list from both token stores, kinds by what a key can do (LIN-3846)
+  workspace-change-log.js  Everyone-changes outside model routing (periodic reviews, run halt): `workspace-change-log` collection, reason + actor + before/after, Undo refuses on a conflict; `mergeChangeLog` lists it beside `model-routing-log` (LIN-3846)
   render-workspace-kpis.js  Workspace KPIs page renderer (LIN-3689): `renderWorkspaceKpisPage` — activity / done-per-day / runs-by-kind / cost / funnel / kinds / stored sections with `workspace-kpis-*` test ids (LIN-3711: three card sparklines, and per chart a canvas plus a closed `<details>` holding a server-rendered table, so the page works without JavaScript; embeds `stats.daily` as `__WORKSPACE_KPI_DATA__` and loads Chart.js, `chart-helpers.js` and `workspace-kpis.js` before common/app), a time-to-merge card `workspace-kpis-card-merge-time` (LIN-3713; median and p90 hours, shown from `MIN_MERGE_TIME_N = 3`, with a note that only merges Harbour saw on a PR check count), a `workspace-kpis-empty` line when the 30-day window has no dispatches or agent actions, `-` for unknown values. Reuses the card styles of public/escalation-kpis.css; not lib/render-kpis.js. LIN-3732: the tasks-done section also renders the "Tasks done since <date>" line, a toggle mount, a hidden caption and a hidden empty note from `daily.doneTotal`.
   render-prompts.js    Prompts catalog page renderer
   render-custom-prompts.js  Custom prompts page (/prompts/custom) renderer

@@ -25,7 +25,7 @@ export const LEGACY_FORM_REASONS = Object.freeze({
 export function createSettingsModelRoutes({ workspaceFromUrl, modelRoutingStore }) {
   const router = Router();
 
-  const settingsUrlOf = (workspace) => `/workspace/${encodeURIComponent(workspace.urlKey)}/settings`;
+  const settingsUrlOf = (workspace) => `/workspace/${encodeURIComponent(workspace.urlKey)}/settings/models`;
   const contextOf = (req, reason) => ({
     urlKey: req.workspace.urlKey,
     reason,

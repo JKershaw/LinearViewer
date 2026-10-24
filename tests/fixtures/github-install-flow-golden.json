@@ -158,7 +158,7 @@
     "link:add-source-success": {
       "statusCode": 200,
       "body": null,
-      "redirectedTo": "/workspace/acme/settings?provider_ok=github"
+      "redirectedTo": "/workspace/acme/settings/sources?provider_ok=github"
     },
     "link:new-existing-success": {
       "statusCode": 200,
@@ -350,7 +350,7 @@
     "link:add-source-success": {
       "statusCode": 200,
       "body": null,
-      "redirectedTo": "/workspace/acme/settings?provider_ok=github-projects"
+      "redirectedTo": "/workspace/acme/settings/sources?provider_ok=github-projects"
     },
     "link:new-existing-success": {
       "statusCode": 200,

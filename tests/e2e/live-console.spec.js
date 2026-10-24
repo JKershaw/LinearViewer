@@ -165,7 +165,7 @@ async function seedDeadCredential(page, key, tokenId) {
 test.beforeEach(({ workerUrlKey }) => {
   URL_KEY = workerUrlKey;
   PAGE_URL = `/workspace/${URL_KEY}/live-console`;
-  SETTINGS_URL = `/workspace/${URL_KEY}/settings`;
+  SETTINGS_URL = `/workspace/${URL_KEY}/settings/features`;
   EVENTS_API = `/workspace/${URL_KEY}/api/live-console/events`;
 });
 
@@ -189,7 +189,7 @@ test.describe('Live Console (experimental)', () => {
       await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
-      await expect(page.locator('.settings-header:has-text("Experimental")')).toBeVisible();
+      await expect(page.locator('.settings-header:has-text("Views")')).toBeVisible();
       const toggle = page.locator('[data-feature="liveConsole"]');
       await expect(toggle).toBeVisible();
       await expect(toggle.locator('.toggle-state')).toContainText('off');

@@ -10,7 +10,7 @@ test.describe('Settings — Providers section (LIN-634)', () => {
 
   test.beforeEach(async ({ page, seedLocal }) => {
     ({ urlKey } = await seedLocal())
-    await page.goto(`/workspace/${urlKey}/settings`)
+    await page.goto(`/workspace/${urlKey}/settings/sources`)
     await page.waitForLoadState('networkidle')
   })
 
@@ -197,7 +197,7 @@ test.describe('Settings — Providers section (LIN-634)', () => {
         { provider: 'github', scope: 'octo/repo', credentials: { token: 'gh-install-tok', installationId: '99', tokenExpiresAt: Number.MAX_SAFE_INTEGER } },
       ],
     }))
-    await page.goto(`/workspace/${urlKey}/settings`)
+    await page.goto(`/workspace/${urlKey}/settings/sources`)
     await page.waitForLoadState('networkidle')
 
     const localBinding = page.locator('[data-testid="settings-provider-binding"][data-provider="local"]')
@@ -219,7 +219,7 @@ test.describe('Settings — Providers section (LIN-634)', () => {
     await expect(localBinding.locator('[data-testid="settings-provider-activate"]')).toBeVisible()
 
     // Persisted: a fresh load keeps GitHub active.
-    await page.goto(`/workspace/${urlKey}/settings`)
+    await page.goto(`/workspace/${urlKey}/settings/sources`)
     await page.waitForLoadState('networkidle')
     await expect(githubBinding.locator('.provider-active')).toBeVisible()
     await expect(localBinding.locator('.provider-active')).toHaveCount(0)
@@ -246,7 +246,7 @@ test.describe('Settings — Providers section (LIN-634)', () => {
     // The flash alone does not produce a notice — it only ever ADDS an
     // `activate` affordance to an existing `provider_ok` notice (defends a
     // stale/cross-tab flash), exactly as a real add-source redirect would land.
-    await page.goto(`/workspace/${urlKey}/settings?provider_ok=github`)
+    await page.goto(`/workspace/${urlKey}/settings/sources?provider_ok=github`)
     await page.waitForLoadState('networkidle')
 
     const notice = page.locator('[data-testid="settings-provider-notice"]')
@@ -257,14 +257,14 @@ test.describe('Settings — Providers section (LIN-634)', () => {
 
     // Reloading the SAME page a second time must not still offer it — the
     // flash is one-shot, read-and-cleared on the load above.
-    await page.goto(`/workspace/${urlKey}/settings?provider_ok=github`)
+    await page.goto(`/workspace/${urlKey}/settings/sources?provider_ok=github`)
     await page.waitForLoadState('networkidle')
     await expect(page.locator('[data-testid="settings-provider-notice-activate"]')).toHaveCount(0)
 
     // Re-establish the flash (cleared by the reload above) and actually
     // activate through it this time.
     await seedLocal(null, seeded)
-    await page.goto(`/workspace/${urlKey}/settings?provider_ok=github`)
+    await page.goto(`/workspace/${urlKey}/settings/sources?provider_ok=github`)
     await page.waitForLoadState('networkidle')
     await page.locator('[data-testid="settings-provider-notice-activate"]').click()
     await page.waitForLoadState('networkidle')
@@ -277,6 +277,8 @@ test.describe('Settings — Providers section (LIN-634)', () => {
 
   test('remove unlinks the binding and persists across reload', async ({ page }) => {
     await page.locator('[data-testid="settings-provider-binding"][data-provider="local"] [data-testid="settings-provider-remove"]').click()
+    // LIN-3846: removing asks first, in place; the confirm button is inside the opened row.
+    await page.locator('[data-testid="settings-provider-binding"][data-provider="local"] [data-testid="settings-provider-remove-confirm"]').click()
     await page.waitForLoadState('networkidle')
 
     // Notice confirms removal and the binding is gone.
@@ -284,7 +286,7 @@ test.describe('Settings — Providers section (LIN-634)', () => {
     await expect(page.locator('[data-testid="settings-provider-binding"][data-provider="local"]')).toHaveCount(0)
 
     // Persisted: a fresh load still shows no local binding.
-    await page.goto(`/workspace/${urlKey}/settings`)
+    await page.goto(`/workspace/${urlKey}/settings/sources`)
     await page.waitForLoadState('networkidle')
     await expect(page.locator('[data-testid="settings-provider-binding"][data-provider="local"]')).toHaveCount(0)
   })

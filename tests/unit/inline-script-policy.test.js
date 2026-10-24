@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { APP_CSP } from '../../lib/security-headers.js';
 import { renderPage, scriptBodyHash } from '../../lib/components/page.js';
 import { renderGitHubRepoSelectPage } from '../../lib/render-pages.js';
-import { renderSettingsPage } from '../../lib/render-settings.js';
+import { renderAllAreas as renderSettingsPage } from '../helpers/render-settings-areas.js';
 import { AVAILABLE_MODELS } from '../../lib/openrouter.js';
 import { renderEscalationKpisPage } from '../../lib/render-escalation-kpis.js';
 import * as emailAuth from '../../lib/render-email-auth.js';

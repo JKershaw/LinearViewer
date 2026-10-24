@@ -66,7 +66,7 @@ test.describe('Feedback widget', () => {
     const { urlKey } = await seedLocal()
     await enableWidget(page, urlKey)
     const trigger = page.getByTestId('nav-feedback-trigger')
-    const footerToggle = page.getByTestId('footer-theme-toggle')
+    const footerToggle = page.locator('.page-footer a.footer-legal[href="/privacy"]')
 
     await trigger.click()
     await expect(page.getByTestId('feedback-popup')).toBeVisible()
@@ -400,12 +400,12 @@ test.describe('Feedback widget', () => {
   // coverage for the FAB").
   test.describe('LIN-2298: no fixed overlay covers the footer controls, at any scroll offset', () => {
     for (const width of [320, 360, 390, 430]) {
-      test(`the footer theme toggle is clear of every fixed overlay (${width}px)`, async ({ page, seedLocal }) => {
+      test(`the footer controls are clear of every fixed overlay (${width}px)`, async ({ page, seedLocal }) => {
         const { urlKey } = await seedLocal()
         await page.setViewportSize({ width, height: 844 })
         await enableWidget(page, urlKey)
 
-        const result = await sweepFixedOverlaps(page, '[data-testid="footer-theme-toggle"]')
+        const result = await sweepFixedOverlaps(page, '.page-footer a.footer-legal[href="/privacy"]')
         // The sweep's walk found something. This is a NARROW guarantee — the
         // only candidate here is the top-pinned sticky nav, which can never
         // reach this bottom-anchored footer control, so it does not establish
@@ -452,7 +452,7 @@ test.describe('Feedback widget', () => {
 
       const m = await page.evaluate(() => {
         window.scrollTo(0, document.documentElement.scrollHeight)
-        const toggle = document.querySelector('[data-testid="footer-theme-toggle"]').getBoundingClientRect()
+        const toggle = document.querySelector('.page-footer a.footer-legal[href="/privacy"]').getBoundingClientRect()
         return { top: toggle.top, bottom: toggle.bottom, viewportH: window.innerHeight }
       })
 
@@ -537,7 +537,7 @@ async function enableWidget(page, urlKey) {
   // LIN-3848: Settings is the single place the widget is switched. The toggle
   // saves in place (AJAX, no reload) and the new state is read back from the
   // response, so waiting on '● on' waits on the saved flag.
-  await page.goto(`/workspace/${urlKey}/settings`)
+  await page.goto(`/workspace/${urlKey}/settings/features`)
   await page.waitForLoadState('networkidle')
   await page.locator('[data-feature="feedbackWidget"] .toggle-btn').click()
   await expect(page.locator('[data-feature="feedbackWidget"] .toggle-state')).toHaveText('● on')

@@ -20,10 +20,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const src = readFileSync(fileURLToPath(new URL('../../server.js', import.meta.url)), 'utf8');
+const src = readFileSync(fileURLToPath(new URL('../../routes/settings.js', import.meta.url)), 'utf8');
 
 function providerNoticeFromQueryBody() {
-  const start = src.indexOf('function providerNoticeFromQuery(');
+  const start = src.indexOf('export function providerNoticeFromQuery(');
   assert.notEqual(start, -1, 'providerNoticeFromQuery must exist');
   const end = src.indexOf('\n}\n', start);
   assert.notEqual(end, -1, 'providerNoticeFromQuery must have a closing brace');
@@ -31,9 +31,10 @@ function providerNoticeFromQueryBody() {
 }
 
 function settingsRouteBody() {
-  const start = src.indexOf("app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {");
-  assert.notEqual(start, -1, 'the settings route registration must exist');
-  const tailMarker = 'res.send(html);\n});';
+  // LIN-3846: moved to routes/settings.js; the flash is read in the one handler every settings GET shares.
+  const start = src.indexOf('async function sendSettingsPage(req, res, areaId) {');
+  assert.notEqual(start, -1, 'the settings page handler must exist');
+  const tailMarker = 'res.send(html);\n  }';
   const tailIdx = src.indexOf(tailMarker, start);
   assert.notEqual(tailIdx, -1, 'the settings route must end with the standard res.send(html) tail');
   return src.slice(start, tailIdx + tailMarker.length);
@@ -56,7 +57,7 @@ describe('server.js: post-bind session flash wiring (LIN-2803)', () => {
     const body = settingsRouteBody();
     assert.match(
       body,
-      /providerNoticeFromQuery\(req\.query,\s*providerAddedFlash\)/,
+      /providerNoticeFromQuery\(req\.query,\s*providerAddedFlash(?:,\s*getProvider)?\)/,
       'must pass the read flash as providerNoticeFromQuery\'s second argument'
     );
   });

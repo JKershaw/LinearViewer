@@ -39,7 +39,7 @@ test.describe('Dispatch presets settings UI', () => {
   });
 
   test('settings page shows the Dispatch presets section as a sibling of Dispatch defaults', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/models`);
     await page.waitForLoadState('networkidle');
 
     const section = page.locator('[data-testid="settings-section-dispatch-presets"]');
@@ -52,13 +52,13 @@ test.describe('Dispatch presets settings UI', () => {
   });
 
   test('shows an empty state with no saved presets', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/models`);
     await page.waitForLoadState('networkidle');
     await expect(page.locator('[data-testid="dispatch-presets-empty"]')).toBeVisible();
   });
 
   test('creating a preset persists it and clears the empty state', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/models`);
     await page.waitForLoadState('networkidle');
 
     const createForm = page.locator('[data-testid="dispatch-preset-create-form"]');
@@ -90,7 +90,7 @@ test.describe('Dispatch presets settings UI', () => {
     // SOME rows (the dispatch-defaults workspace-wide row); a preset's new-row
     // must stay preselectDefault:false so an untouched blank harness really
     // means "not set by this preset", never an implicit claude-code override.
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/models`);
     await page.waitForLoadState('networkidle');
 
     const createForm = page.locator('[data-testid="dispatch-preset-create-form"]');
@@ -113,7 +113,7 @@ test.describe('Dispatch presets settings UI', () => {
       data: { name: 'Editable preset', config: { harness: 'opencode' } }
     });
 
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/models`);
     await page.waitForLoadState('networkidle');
 
     const item = page.locator('.dispatch-preset-item', { has: page.locator('.dispatch-preset-name-input[value="Editable preset"]') });
@@ -141,7 +141,7 @@ test.describe('Dispatch presets settings UI', () => {
       data: { name: 'To be deleted', config: { model: 'anthropic/claude-opus-4.8' } }
     });
 
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/models`);
     await page.waitForLoadState('networkidle');
 
     const item = page.locator('.dispatch-preset-item', { has: page.locator('.dispatch-preset-name-input[value="To be deleted"]') });
@@ -159,7 +159,7 @@ test.describe('Dispatch presets settings UI', () => {
   });
 
   test('creating a blend preset via the per-kind editor persists per-kind overrides (LIN-1400)', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/models`);
     await page.waitForLoadState('networkidle');
 
     const createForm = page.locator('[data-testid="dispatch-preset-create-form"]');
@@ -197,7 +197,7 @@ test.describe('Dispatch presets settings UI', () => {
       }
     });
 
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/models`);
     await page.waitForLoadState('networkidle');
 
     const item = page.locator('.dispatch-preset-item', { has: page.locator('.dispatch-preset-name-input[value="Two-kind blend"]') });
@@ -225,7 +225,7 @@ test.describe('Dispatch presets settings UI', () => {
       data: { name: 'Clearable blend', config: { byKind: { review: { model: 'opus' } } } }
     });
 
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/models`);
     await page.waitForLoadState('networkidle');
 
     const item = page.locator('.dispatch-preset-item', { has: page.locator('.dispatch-preset-name-input[value="Clearable blend"]') });
@@ -252,7 +252,7 @@ test.describe('Dispatch presets settings UI', () => {
       data: { name: 'Top-level only', config: { model: 'anthropic/claude-opus-4.8', harness: 'claude-code' } }
     });
 
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/models`);
     await page.waitForLoadState('networkidle');
 
     const item = page.locator('.dispatch-preset-item', { has: page.locator('.dispatch-preset-name-input[value="Top-level only"]') });
@@ -272,7 +272,7 @@ test.describe('Dispatch presets settings UI', () => {
     await request.post(`/test/seed-dispatch-preset?urlKey=${localWorkerUrlKey}`, { data: { name: 'Preset A', config: { harness: 'claude-code' } } });
     await request.post(`/test/seed-dispatch-preset?urlKey=${localWorkerUrlKey}`, { data: { name: 'Preset B', config: { harness: 'opencode' } } });
 
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/models`);
     await page.waitForLoadState('networkidle');
 
     await expect(page.locator('.dispatch-preset-item')).toHaveCount(2);
@@ -293,7 +293,7 @@ test.describe('Dispatch presets settings UI', () => {
     const preset = await createRes.json();
     const presetId = preset.id ?? preset._id;
 
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/models`);
     await page.waitForLoadState('networkidle');
 
     const link = page.getByTestId(`dispatch-preset-use-${presetId}`);

@@ -96,8 +96,13 @@ export const SELECTORS = {
     view: (name) => `.nav-views [data-testid="nav-view-${name}"]`,
   },
   settings: {
-    /** Settings card by slug: ai | ai-usage | workflow | workspace-features | experimental | account. */
+    /** Settings group by slug (LIN-3846 kept the survivors): account | providers | ai-model | dispatch-defaults | dispatch-presets | ai-usage | workspace-features | experimental | workflow. */
     section: (name) => `[data-testid="settings-section-${name}"]`,
+    /** An area's page frame (LIN-3846): sources | models | running | agent-access | health | change-log | features | account. */
+    area: (id) => `[data-testid="settings-area-${id}"]`,
+    /** A sidebar row, and its state word. */
+    navRow: (id) => `[data-testid="settings-nav-${id}"]`,
+    navState: (id) => `[data-testid="settings-state-${id}"]`,
     /** Feature-toggle line by feature key, e.g. 'dispatch', 'roadmap'. */
     toggle: (key) => `[data-testid="settings-toggle-${key}"]`,
     logout: '[data-testid="settings-logout"]',
@@ -249,6 +254,11 @@ export function settings(page) {
     section: (name) => page.locator(SELECTORS.settings.section(name)),
     toggle: (key) => page.locator(SELECTORS.settings.toggle(key)),
     logout: () => page.locator(SELECTORS.settings.logout),
+    area: (id) => page.locator(SELECTORS.settings.area(id)),
+    navRow: (id) => page.locator(SELECTORS.settings.navRow(id)),
+    navState: (id) => page.locator(SELECTORS.settings.navState(id)),
+    /** Open one area's page (LIN-3846): Settings is a page per area. */
+    gotoArea: (urlKey, id) => page.goto(`/workspace/${urlKey}/settings/${id}`),
     /** Submit a feature toggle's form (flips it on the server, page reloads). */
     toggleFeature: (key) =>
       page.locator(`${SELECTORS.settings.toggle(key)} button[type="submit"]`).click(),

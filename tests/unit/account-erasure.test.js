@@ -107,9 +107,9 @@ describe('INVENTORY completeness (Done-when 5)', () => {
     assert.deepStrictEqual(missingFrom(without), ['workspace-halt']);
   });
 
-  test('the universe is the 55 names the plan bounded (funnel-events retired by LIN-3632 is not in it)', () => {
+  test('the universe is the 56 names the plan bounded (funnel-events retired by LIN-3632 is not in it)', () => {
     const universe = collectionUniverse();
-    assert.strictEqual(universe.size, 55);
+    assert.strictEqual(universe.size, 56);
     assert.ok(!universe.has('funnel-events'));
     assert.ok(!INVENTORY.some((r) => r.collection === 'funnel-events'), 'LIN-3632: no lib module may name the retired collection');
   });
@@ -290,6 +290,20 @@ describe('model-routing rows at a Full wipe (LIN-3853)', () => {
     assert.strictEqual(preset.createdBy, ERASED_ACCOUNT_ID);
     assert.strictEqual(await db.collection('model-routing-log').findOne({ _id: idOf('model-routing-log', 'alone') }), null);
     assert.strictEqual(await db.collection('model-routing-presets').findOne({ _id: idOf('model-routing-presets', 'alone') }), null);
+  });
+});
+
+// LIN-3846: the change log for everyone-changes names accounts by id only, like the routing log.
+describe('workspace-change-log rows at a Full wipe (LIN-3846)', () => {
+  test('actor.id becomes the erased id in a shared workspace and the row goes with an Alone one', async () => {
+    const { db, seed } = await fresh();
+    const plan = await planOf(db, 'full');
+    await applyOf(db, plan);
+    const idOf = (workspace) => seed.index.find((e) => e.collection === 'workspace-change-log' && e.workspace === workspace && e.tenant === 'person')?._id;
+    assert.ok(idOf('alone') && idOf('shared'), 'the seed has a row for each');
+    const shared = await db.collection('workspace-change-log').findOne({ _id: idOf('shared') });
+    assert.strictEqual(shared.actor.id, ERASED_ACCOUNT_ID);
+    assert.strictEqual(await db.collection('workspace-change-log').findOne({ _id: idOf('alone') }), null);
   });
 });
 

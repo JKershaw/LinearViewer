@@ -18,7 +18,7 @@ const featuresParam = (obj) => `features=${encodeURIComponent(JSON.stringify(obj
 test.beforeEach(({ workerUrlKey }) => {
   URL_KEY = workerUrlKey;
   PAGE_URL = `/workspace/${URL_KEY}/next-run`;
-  SETTINGS_URL = `/workspace/${URL_KEY}/settings`;
+  SETTINGS_URL = `/workspace/${URL_KEY}/settings/features`;
   SUGGEST_API = `/workspace/${URL_KEY}/api/next-run/suggest`;
 });
 
@@ -44,7 +44,7 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
 
-      await expect(page.locator('.settings-header:has-text("Experimental")')).toBeVisible();
+      await expect(page.locator('.settings-header:has-text("Views")')).toBeVisible();
       const toggle = page.locator('[data-feature="nextRun"]');
       await expect(toggle).toBeVisible();
       await expect(toggle.locator('.toggle-state')).toContainText('off');

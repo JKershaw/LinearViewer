@@ -18,7 +18,7 @@ let API_PREFIX;
 test.beforeEach(({ workerUrlKey }) => {
   URL_KEY = workerUrlKey;
   COLLECTIVE_URL = `/workspace/${URL_KEY}/collective`;
-  SETTINGS_URL = `/workspace/${URL_KEY}/settings`;
+  SETTINGS_URL = `/workspace/${URL_KEY}/settings/features`;
   API_PREFIX = `/workspace/${URL_KEY}`;
 });
 
@@ -52,7 +52,7 @@ test.describe('Collective Page (experimental)', () => {
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
 
-      await expect(page.locator('.settings-header:has-text("Experimental")')).toBeVisible();
+      await expect(page.locator('.settings-header:has-text("Views")')).toBeVisible();
       const toggle = page.locator('[data-feature="collective"]');
       await expect(toggle).toBeVisible();
       await expect(toggle.locator('.toggle-state')).toContainText('off');

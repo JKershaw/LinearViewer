@@ -25,21 +25,23 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const src = readFileSync(fileURLToPath(new URL('../../server.js', import.meta.url)), 'utf8');
+const src = readFileSync(fileURLToPath(new URL('../../routes/settings.js', import.meta.url)), 'utf8');
 
 function settingsRouteBody() {
-  const start = src.indexOf("app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {");
-  assert.notEqual(start, -1, 'the settings route registration must exist');
+  // LIN-3846: the handler moved from server.js to routes/settings.js; the index and every
+  // area page share this one function, so the assertions below cover each of them.
+  const start = src.indexOf('async function sendSettingsPage(req, res, areaId) {');
+  assert.notEqual(start, -1, 'the settings page handler must exist');
   // Bounded by the route's own closing res.send(html);\n});  — the next
   // top-level app.get/app.post registration is well past this, so anchor on
   // the route's own known tail rather than a generic brace-matcher.
-  const tailMarker = 'res.send(html);\n});';
+  const tailMarker = 'res.send(html);\n  }';
   const tailIdx = src.indexOf(tailMarker, start);
   assert.notEqual(tailIdx, -1, 'the settings route must end with the standard res.send(html) tail');
   return src.slice(start, tailIdx + tailMarker.length);
 }
 
-describe('server.js: GET /workspace/:urlKey/settings consent read wiring (LIN-2412 F2)', () => {
+describe('routes/settings.js: GET /workspace/:urlKey/settings consent read wiring (LIN-2412 F2)', () => {
   test('performs a FRESH per-request read of the current account\'s durable consent (not a session read)', () => {
     const body = settingsRouteBody();
     assert.match(

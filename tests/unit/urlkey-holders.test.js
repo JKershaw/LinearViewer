@@ -165,6 +165,8 @@ const COLLECTION_CLASSES = {
   'ship-biscuit-editions': 'C', 'collective-characters': 'C', 'collective-presets': 'C',
   // LIN-3853: the table (key in `_id`), the log (urlKey; actor.id may be a token label so not an actor source), the presets (urlKey and createdBy).
   'model-routing': 'C', 'model-routing-log': 'C', 'model-routing-presets': 'BC',
+  // LIN-3846: urlKey field; actor.id may be a token label, so not an actor source.
+  'workspace-change-log': 'C',
   // The only C members NOT read; the report names them (UNENUMERATED_SOURCES) so the count is never read as complete.
   'run-summary-cache': 'C-named', 'session-summary-cache': 'C-named',
   // No urlKey at all.

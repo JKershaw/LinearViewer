@@ -188,12 +188,14 @@ import { buildRoadmapModel } from './lib/roadmap.js'
 import { renderProxyPage } from './lib/render-proxy.js'
 import { AVAILABLE_MODELS, setLlmCallRecorder, setPromptTraceRecorder, getPaidEnvKey, getFreeTierModelConfigWarning, streamChatWithTools } from './lib/openrouter.js'
 import { resolveOpenRouterSource, isFreeTierOffered } from './lib/chat-request.js'
-import { resolveWorkspaceModel, resolveAiOperationModel, jobModelResolver, getWorkspaceFeatures, isWorkspaceFeatureEnabled, resolveDispatchDefaults } from './lib/workspace-preferences.js'
+import { resolveWorkspaceModel, resolveAiOperationModel, jobModelResolver, getWorkspaceFeatures, isWorkspaceFeatureEnabled, setWorkspaceFeature, resolveDispatchDefaults } from './lib/workspace-preferences.js'
 import { getFeatureFlags, isValidFeatureKey, WORKSPACE_FEATURES } from './lib/feature-defaults.js'
 import { projectLegacy } from './lib/model-routing.js'
 import { ModelRoutingStore } from './lib/model-routing-store.js'
 import { createSettingsModelRoutes } from './routes/settings-model.js'
-import { createSettingsWorkspaceFeatureRoutes } from './routes/settings-workspace-features.js'
+import { createSettingsRouter } from './routes/settings.js'
+import { settingsAreaUrl } from './lib/settings-areas.js'
+import { WorkspaceChangeLogStore, OUTSIDE_SETTINGS_REASON } from './lib/workspace-change-log.js'
 import { getDeployInfo } from './lib/deploy-info.js'
 import { securityHeaders } from './lib/security-headers.js'
 import { publicOrigin } from './lib/public-origin.js'
@@ -360,6 +362,25 @@ const workspaceHaltCollection = db.collection('workspace-halt')
 const workspaceHaltStore = new WorkspaceHaltStore({
   collection: workspaceHaltCollection
 })
+
+// Workspace change log (LIN-3846): settings changes that affect everyone, outside
+// model routing (periodic reviews, run halt). Not model-routing-log: that log's
+// `seq` is the routing table's version. Ids only; names resolve at read time.
+const workspaceChangeLogStore = new WorkspaceChangeLogStore({
+  collection: db.collection('workspace-change-log'),
+  resolveActorName: async (accountId) => {
+    const account = await accountStore.getAccount(accountId)
+    return account ? (account.displayName || 'a member') : null
+  }
+})
+// Every halt writer (Settings, the Dispatch page, the proxy route) lands in the log through
+// the store's hook, so the log never misses a change. A hook failure never fails the halt.
+workspaceHaltStore.setOnChange(({ urlKey, from, to, via, setBy, reason }) =>
+  workspaceChangeLogStore.record({
+    urlKey, setting: 'halt', from, to,
+    reason: reason || OUTSIDE_SETTINGS_REASON,
+    actor: { via: via === 'proxy' ? 'proxy' : 'page', ...(setBy ? { id: setBy } : {}) }
+  }))
 
 // Collective characters (personas the user picks for the experimental Collective
 // discussion, LIN-1048). Partitioned by the anchor workspace urlKey; each record
@@ -3614,7 +3635,7 @@ app.get('/workspace/:urlKey/ship', workspaceFromUrl, async (req, res) => {
   // Gate: ship is an experimental, in-development view surfaced via Settings
   // (LIN-496). When the flag is off, redirect to settings — mirrors collective.
   if (getFeatureFlags(req.session).ship !== true) {
-    return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
+    return res.redirect(settingsAreaUrl(workspace.urlKey, 'features'));
   }
 
   // LIN-2521: shared persist/restore rule (5 routes + the refresh-retry path).
@@ -3782,189 +3803,7 @@ app.get('/workspace/:urlKey/audit', workspaceFromUrl, async (req, res) => {
   res.send(html);
 });
 
-/**
- * Settings page - requires authentication.
- * Displays user preferences and AI configuration.
- */
-/**
- * Translate provider-action redirect query params into a settings-page notice
- * for the Providers section (LIN-634). The provider-action POST handlers redirect
- * back with one of these flags; the renderer escapes the text, so the derived
- * messages (not raw query echoes) keep it injection-safe.
- *
- * `flash` (LIN-2803) is the one-shot `req.session.providerAdded` value written
- * beside each add-source `linkProvider` call and read-and-cleared once by the
- * settings GET handler below. It never changes `text` (every `provider_ok`
- * arm's existing copy is unchanged, so the byte-pinned redirect/golden tests
- * stay untouched) — it only ever ADDS an `activate` affordance, and only when
- * both hold: the flash's own provider matches THIS notice's `provider_ok`
- * (defends a stale/cross-tab flash from attaching to an unrelated notice —
- * `providerOkKey` resolves to exactly `provider.name` on every wired arm), and
- * that provider's add genuinely binds onto this workspace rather than
- * creating a separate one (`createsWorkspace !== true` — Linear's add-source
- * flash still gets written, but never earns `activate`, since there is
- * nothing on THIS workspace to make active).
- * @param {Object} query - req.query
- * @param {{provider: string, scope: string}|null} [flash] - the just-read-and-cleared session flash
- * @returns {{type: 'ok'|'fail'|'blocked', text: string, activate?: {provider: string, scope: string}}|null}
- */
-function providerNoticeFromQuery(query = {}, flash = null) {
-  if (query.provider_blocked) {
-    return { type: 'blocked', text: `Adding ${query.provider_blocked} is not available yet.` };
-  }
-  if (query.provider_removed) {
-    return { type: 'ok', text: `Removed ${query.provider_removed} binding.` };
-  }
-  if (query.provider_switched) {
-    return { type: 'ok', text: `Switched active provider to ${query.provider_switched}.` };
-  }
-  if (query.provider_ok) {
-    const notice = { type: 'ok', text: `${query.provider_ok} credentials are valid.` };
-    if (flash && flash.provider === query.provider_ok && getProvider(flash.provider)?.addProvider?.createsWorkspace !== true) {
-      notice.activate = { provider: flash.provider, scope: flash.scope };
-    }
-    return notice;
-  }
-  if (query.provider_fail) {
-    return { type: 'fail', text: `${query.provider_fail} credentials failed validation.` };
-  }
-  if (query.provider_error) {
-    return { type: 'fail', text: 'Provider action could not be completed.' };
-  }
-  return null;
-}
-
-app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
-  const workspace = req.workspace;
-
-  // Determine OpenRouter connection status
-  const openRouterSource = getOpenRouterSource(req);
-  const deployInfo = getDeployInfo();
-
-  // Durable unattended-use consent state (LIN-2412) — a FRESH read of the
-  // current account's own durable preferences, never from req.session (the
-  // interactive chain above never reads this field, and this route must not
-  // start mirroring it into the session either). renderSettingsPage has no
-  // store access of its own, so the route fetches and threads it in.
-  const openRouterConsentedAt = req.session.accountId
-    ? await userPreferencesStore.getOpenRouterConsent(req.session.accountId)
-    : null;
-
-  // Get current workspace model selection (helper handles default)
-  const currentModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore });
-
-  // Get current workspace-scoped feature flags (helper handles defaults).
-  // Read from WorkspacePreferencesStore, NOT from session — these are
-  // workspace-scoped, not per-user.
-  const workspaceFeatures = await getWorkspaceFeatures({ urlKey: workspace.urlKey, store: workspacePreferencesStore });
-
-  // Check for model validation error from redirect
-  const modelError = req.query.error;
-
-  // LLM usage KPIs (LIN-418): aggregate per-call metadata over the retained window.
-  const llmStats = await llmCallLogStore.summarize(workspace.urlKey);
-
-  // Provider-context disclosure (LIN-2357): surfaces a null providerUi on a
-  // recorded prompt trace as counts + a coverage basis, so a future
-  // LIN-2353-class regression (a recording seam that stops threading
-  // provider.ui) doesn't sit unread in the trace store the way this one did.
-  const providerContextSummary = await promptTraceStore.summarizeProviderContext(
-    workspace.urlKey,
-    { expectedUi: getProviderForWorkspace(workspace)?.ui || null }
-  );
-
-  // Provider bindings for the Providers management section (LIN-634). Shape each
-  // binding with its provider's human displayName (registry); the masked-token
-  // and active-marker presentation lives in the renderer. Mark the binding whose
-  // provider matches the workspace's active pointer AND whose credential is the one
-  // mirrored into the scalar fields — provider-name alone would mark two same-provider
-  // bindings active at once (mirrors remintActiveCredential's active-binding match).
-  const providerBindings = getBindingsForWorkspace(workspace).map(b => ({
-    provider: b.provider,
-    scope: b.scope,
-    displayName: getProvider(b.provider)?.ui?.displayName || b.provider,
-    token: getBindingCredentials(b)?.token,
-    active: isActiveBinding(workspace, b),
-  }));
-  // One-shot session flash (LIN-2803): read and delete unconditionally, even
-  // when this load carries no matching `provider_ok` (or none at all) — a
-  // stale flash must never survive a second, unrelated settings load. Its
-  // deletion is an ordinary session mutation; `resave: false` (this file's
-  // session config) still persists it at response end.
-  const providerAddedFlash = req.session.providerAdded || null;
-  delete req.session.providerAdded;
-  const providerNotice = providerNoticeFromQuery(req.query, providerAddedFlash);
-
-  // Dispatch model/harness defaults (LIN-1095): the model/harness dispatched
-  // agents execute WITH, distinct from currentModel above (which writes
-  // prompts). Own read of workspacePreferencesStore — currentModel/
-  // workspaceFeatures above already read it via their own established helpers
-  // (resolveWorkspaceModel/getWorkspaceFeatures, used at ~20 other call sites),
-  // so this stays a separate, targeted read rather than reshaping those.
-  // LIN-3853: the store, projected back to the shape these sections render.
-  const dispatchDefaultsPrefs = projectLegacy(await workspacePreferencesStore.getRoutingTable(workspace.urlKey));
-  const dispatchDefaults = dispatchDefaultsPrefs.dispatchDefaults || {};
-  const dispatchDefaultsError = req.query.dispatchDefaultsError || null;
-
-  // Dispatch presets (LIN-1391 S7): named, workspace-scoped saved routing
-  // configs, listed beside Dispatch defaults. Non-fatal on failure — the
-  // section just renders empty, mirroring the dispatchDefaults read above.
-  let dispatchPresets = [];
-  try {
-    dispatchPresets = dispatchPresetsStore ? await dispatchPresetsStore.list(workspace.urlKey) : [];
-  } catch (e) {
-    // Non-fatal
-  }
-
-  // AI model overrides (LIN-1145): per-operation model overrides read from the
-  // same prefs object as dispatchDefaults, keyed under aiModelOverrides.
-  const aiModelOverrides = dispatchDefaultsPrefs.aiModelOverrides || {};
-  const aiOverridesError = req.query.aiOverridesError || null;
-
-  // Live OpenRouter model catalog (LIN-1111 Session 2): the same cache module
-  // the dispatch-time client controls fetch via /api/openrouter/models, called
-  // here directly since Settings renders server-side. Supplements (never
-  // replaces) the static DISPATCH_MODEL_SUGGESTIONS datalist in
-  // renderDispatchDefaultsSection. Mocked in tests via the same predicate that
-  // gates the AI recommendation mock, so this never makes a live network call
-  // during automated test runs.
-  const dispatchModelCatalog = await getModelCatalog({ mock: shouldMockAi(workspace) });
-
-  // S3-3 (LIN-1892): the account's own email identity for the Settings "email"
-  // surface. Read fresh from the store (canonicalised) — never from req.session.
-  const accountEmails = req.session.accountId ? await accountStore.listEmailIdentities(req.session.accountId) : [];
-
-  const html = renderSettingsPage(workspace.name || 'Workspace', {
-    openRouterConnected: !!(openRouterSource === 'oauth' || openRouterSource === 'env'),
-    openRouterSource,
-    openRouterConsentedAt,
-    deployInfo,
-    currentModel,
-    availableModels: AVAILABLE_MODELS,
-    modelError,
-    urlKey: workspace.urlKey,
-    workspaces: req.session.workspaces,
-    featureFlags: await requestFeatureFlags(req),
-    workspaceFeatures,
-    llmStats,
-    providerContextSummary,
-    providerBindings,
-    providerNotice,
-    dispatchDefaults,
-    dispatchDefaultsError,
-    dispatchModelCatalog,
-    aiModelOverrides,
-    aiOverridesError,
-    dispatchPresets,
-    accountEmails,
-    // Gate the GitHub add affordance on the SAME shared predicate the /auth/github
-    // route guard and landing hero use (LIN-761), so the settings page never offers
-    // an add that would 503/hang on a server where GitHub isn't fully configured.
-    githubEnabled: getProvider('github').entryCta.isConfigured(),
-    jiraOAuthEnabled: getProvider('jira').entryCta.isConfigured()
-  });
-  res.send(html);
-});
+// GET /workspace/:urlKey/settings[/:area] and providerNoticeFromQuery live in routes/settings.js (LIN-3846).
 
 /**
  * Prompts page - requires authentication.
@@ -4076,9 +3915,18 @@ app.get('/workspace/:urlKey/proxy', workspaceFromUrl, async (req, res) => {
 // The three old model forms (POST /settings/model, /settings/dispatch-defaults, /settings/ai-model-overrides)
 // live in routes/settings-model.js and write through the model-routing store (LIN-3853).
 app.use(createSettingsModelRoutes({ workspaceFromUrl, modelRoutingStore }))
+app.use(createSettingsRouter({
+  workspaceFromUrl, getOpenRouterSource, getDeployInfo, userPreferencesStore, workspacePreferencesStore,
+  llmCallLogStore, promptTraceStore, accountStore, requestFeatureFlags, resolveWorkspaceModel,
+  getWorkspaceFeatures, setWorkspaceFeature, projectLegacy, getModelCatalog, shouldMockAi, AVAILABLE_MODELS,
+  getProvider, getProviderForWorkspace, getBindingsForWorkspace, getBindingCredentials, isActiveBinding,
+  dispatchPresetsStore, proxyTokenStore, dispatchTokenStore, proxyEventStore, workspaceHaltStore,
+  workspaceChangeLogStore, modelRoutingStore, workspaceOwnerCheck
+}))
 
-/** Workspace feature toggles (LIN-340): moved to routes/settings-workspace-features.js so a unit test can drive it (LIN-3854). */
-app.use(createSettingsWorkspaceFeatureRoutes({ workspaceFromUrl, workspacePreferencesStore }))
+// POST /settings/workspace-features (periodic reviews, agents-can-change-models) lives in routes/settings.js
+// (LIN-3846): both are for everyone, so it asks why and logs. It was routes/settings-workspace-features.js
+// for a moment (LIN-3854); that module is folded into the Settings router so there is one writer.
 
 /**
  * Toggle a feature flag on or off.
@@ -4108,7 +3956,7 @@ app.post('/workspace/:urlKey/settings/features', workspaceFromUrl, async (req, r
     console.error('Failed to save feature toggle:', err);
     return res.status(500).send(renderErrorPage('Settings Error', 'Failed to save feature toggle. Please try again.', {
       action: 'Back to settings',
-      actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/settings`
+      actionUrl: settingsAreaUrl(workspace.urlKey, 'features')
     }));
   }
 
@@ -4135,7 +3983,7 @@ app.post('/workspace/:urlKey/settings/features', workspaceFromUrl, async (req, r
   if (req.headers['x-requested-with'] === 'XMLHttpRequest') {
     res.json({ ok: true, feature, enabled: isEnabled });
   } else {
-    res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
+    res.redirect(settingsAreaUrl(workspace.urlKey, 'features'));
   }
 });
 
@@ -4183,7 +4031,7 @@ app.post('/workspace/:urlKey/settings/theme', workspaceFromUrl, async (req, res)
   if (req.headers['x-requested-with'] === 'XMLHttpRequest') {
     res.json({ ok: true, theme });
   } else {
-    res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
+    res.redirect(settingsAreaUrl(workspace.urlKey, 'account'));
   }
 });
 
@@ -4216,7 +4064,7 @@ app.use(createProxyDefaultRoute({ workspaceFromUrl, userPreferencesStore, saveSe
  */
 app.post('/workspace/:urlKey/settings/providers/remove', workspaceFromUrl, async (req, res) => {
   const workspace = req.workspace;
-  const settingsUrl = `/workspace/${encodeURIComponent(workspace.urlKey)}/settings`;
+  const settingsUrl = settingsAreaUrl(workspace.urlKey, 'sources');
   const { provider, scope } = req.body;
 
   if (!provider || !scope) {
@@ -4294,7 +4142,7 @@ app.post('/workspace/:urlKey/settings/providers/remove', workspaceFromUrl, async
  */
 app.post('/workspace/:urlKey/settings/providers/switch', workspaceFromUrl, async (req, res) => {
   const workspace = req.workspace;
-  const settingsUrl = `/workspace/${encodeURIComponent(workspace.urlKey)}/settings`;
+  const settingsUrl = settingsAreaUrl(workspace.urlKey, 'sources');
   const { provider, scope } = req.body;
 
   if (!provider || !scope) {
@@ -4323,7 +4171,7 @@ app.post('/workspace/:urlKey/settings/providers/switch', workspaceFromUrl, async
  */
 app.post('/workspace/:urlKey/settings/providers/refresh', workspaceFromUrl, async (req, res) => {
   const workspace = req.workspace;
-  const settingsUrl = `/workspace/${encodeURIComponent(workspace.urlKey)}/settings`;
+  const settingsUrl = settingsAreaUrl(workspace.urlKey, 'sources');
   const { provider, scope } = req.body;
 
   if (!provider || !scope) {
@@ -4360,7 +4208,7 @@ app.post('/workspace/:urlKey/settings/providers/refresh', workspaceFromUrl, asyn
  */
 app.post('/workspace/:urlKey/settings/providers/add', workspaceFromUrl, async (req, res) => {
   const workspace = req.workspace;
-  const settingsUrl = `/workspace/${encodeURIComponent(workspace.urlKey)}/settings`;
+  const settingsUrl = settingsAreaUrl(workspace.urlKey, 'sources');
   const { provider } = req.body;
 
   // LIN-3334: a workspace may have only one source of each kind. Refuse a

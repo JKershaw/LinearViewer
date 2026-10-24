@@ -26,7 +26,7 @@ const featuresParam = (obj) => `features=${encodeURIComponent(JSON.stringify(obj
 test.beforeEach(({ workerUrlKey }) => {
   URL_KEY = workerUrlKey;
   PAGE_URL = `/workspace/${URL_KEY}/flight-companion`;
-  SETTINGS_URL = `/workspace/${URL_KEY}/settings`;
+  SETTINGS_URL = `/workspace/${URL_KEY}/settings/features`;
 });
 
 /**
@@ -69,13 +69,13 @@ test.describe('Flight Companion Page (experimental)', () => {
 
       const res = await page.request.get(PAGE_URL, { maxRedirects: 0 });
       expect(res.status()).toBe(302);
-      expect(res.headers()['location']).toBe(`/workspace/${URL_KEY}/settings`);
+      expect(res.headers()['location']).toBe(`/workspace/${URL_KEY}/settings/features`);
 
       // Negative control: a real browser navigation lands on Settings, not a
       // flight-companion page shell (idiom: ship.spec.js:463-470).
       await page.goto(PAGE_URL);
       await page.waitForLoadState('networkidle');
-      await expect(page).toHaveURL(/\/settings$/);
+      await expect(page).toHaveURL(/\/settings\/features$/);
       await expect(page.locator('.flight-companion-page')).toHaveCount(0);
     });
 
@@ -101,7 +101,7 @@ test.describe('Flight Companion Page (experimental)', () => {
       await page.waitForLoadState('networkidle');
 
       // Positive control — the Experimental section actually rendered.
-      await expect(page.locator('.settings-header:has-text("Experimental")')).toBeVisible();
+      await expect(page.locator('.settings-header:has-text("Views")')).toBeVisible();
 
       // lib/render-settings.js emits data-feature="<key>" from TWO distinct
       // renderers (renderFeatureToggle + renderWorkspaceFeatureToggle) — pin

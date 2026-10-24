@@ -256,7 +256,7 @@ describe('LIN-1887 G3 — the non-destructive response is provider-appropriate',
     const notice = relinkNotice({ provider: 'local', urlKey: 'acme' });
     assert.doesNotMatch(notice.message, /Jira/, 'the pre-LIN-1887 response was Jira’s, hard-coded');
     assert.doesNotMatch(notice.action, /Jira/);
-    assert.equal(notice.actionUrl, '/workspace/acme/settings');
+    assert.equal(notice.actionUrl, '/workspace/acme/settings/sources');
   });
 
   test('a Basic Jira workspace keeps LIN-1885’s copy byte-for-byte', () => {
@@ -719,6 +719,6 @@ describe('LIN-3775 — ensureValidToken (1380) and handleUnauthorizedError (2210
     const { res } = await reactiveWith(workspace,
       async () => { throw Object.assign(new Error('Bad credentials'), { status: 401, binding: tag }); });
     assert.match(res.body, /GitHub Issues \(o\/r\)/);
-    assert.match(res.body, /href="\/workspace\/acme\/settings"/);
+    assert.match(res.body, /href="\/workspace\/acme\/settings\/sources"/);
   });
 });

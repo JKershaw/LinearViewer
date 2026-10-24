@@ -5,7 +5,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { renderSettingsPage } from '../../lib/render-settings.js';
+import { renderAllAreas as renderSettingsPage } from '../helpers/render-settings-areas.js';
 import { AVAILABLE_MODELS } from '../../lib/openrouter.js';
 import { PROMPT_TEMPLATES } from '../../lib/prompt-template-defs.js';
 import { getProvider } from '../../lib/providers/registry.js';
@@ -20,7 +20,8 @@ const BASE = { urlKey: 'acme', workspaces: [], currentModel: 'openai/gpt-5.4-min
 describe('renderSettingsPage — AI usage section', () => {
   test('always renders the AI usage section header', () => {
     const html = renderSettingsPage('Acme', BASE);
-    assert.match(html, /AI usage/);
+    assert.match(html, /data-testid="settings-section-ai-usage"/);
+    assert.match(html, /AI calls/);
   });
 
   test('shows an empty state when no calls are recorded', () => {
@@ -198,7 +199,9 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
   test('always renders the Providers section header', () => {
     const html = renderSettingsPage('Acme', BASE);
     assert.match(html, /data-testid="settings-section-providers"/);
-    assert.match(html, /Providers/);
+    // LIN-3846: sources are labelled as yours (they follow the account, not everyone).
+    assert.match(html, /Yours/);
+    assert.match(html, /Sources are yours/);
   });
 
   test('renders a row per binding with displayName, scope, masked token and remove/refresh forms', () => {
@@ -933,80 +936,62 @@ describe('renderSettingsPage — Dispatch presets section (LIN-1391 S7)', () => 
   });
 });
 
-describe('renderSettingsPage — User/Workspace Settings groups (LIN-1399)', () => {
-  // Group membership per control, not mere presence — a control can render
-  // correctly but land in the wrong group, which a presence-only assertion
-  // would miss entirely.
-  function groupBoundaries(html) {
-    const userIdx = html.indexOf('data-testid="settings-group-user"');
-    const workspaceIdx = html.indexOf('data-testid="settings-group-workspace"');
-    assert.ok(userIdx > -1 && workspaceIdx > -1 && userIdx < workspaceIdx, 'expected both group containers, User before Workspace');
-    return { userIdx, workspaceIdx };
-  }
+describe('renderSettingsPage — areas and their groups (LIN-3846, replaces the LIN-1399 User/Workspace split)', () => {
+  // Where a control lives is per area now: a page per area, grouped in the sidebar as the
+  // workspace and "You". The sidebar is on every page.
+  const page = (area, extra = {}) => renderSettingsPage('Acme', { ...BASE, area, ...extra });
 
-  function groupOf(html, testid) {
-    const { userIdx, workspaceIdx } = groupBoundaries(html);
-    const idx = html.indexOf(`data-testid="${testid}"`);
-    assert.ok(idx > -1, `expected to find data-testid="${testid}"`);
-    if (idx < userIdx) return null;
-    return idx < workspaceIdx ? 'user' : 'workspace';
-  }
-
-  test('renders both group headings with their subtitles', () => {
-    const html = renderSettingsPage('Acme', BASE);
-    assert.match(html, /data-testid="settings-group-user"[\s\S]*?>User Settings</);
-    assert.match(html, /Only affects you, across all your workspaces/);
-    assert.match(html, /data-testid="settings-group-workspace"[\s\S]*?>Workspace Settings</);
-    assert.match(html, /Applies to everyone in this workspace/);
+  test('the sidebar lists every area in two groups on every page', () => {
+    const html = page('account');
+    assert.match(html, />Workspace</);
+    assert.match(html, />You</);
+    for (const id of ['sources', 'models', 'running', 'agent-access', 'health', 'change-log', 'features', 'account']) {
+      assert.match(html, new RegExp(`data-testid="settings-nav-${id}"`), `nav row for ${id}`);
+    }
   });
 
-  test('the old undifferentiated AI section is retired; it is decomposed into ai-user and ai-model', () => {
-    const html = renderSettingsPage('Acme', BASE);
-    assert.ok(!html.includes('data-testid="settings-section-ai"'), 'the old undifferentiated AI section testid must be retired');
-    assert.equal(groupOf(html, 'settings-section-ai-user'), 'user');
-    assert.equal(groupOf(html, 'settings-section-ai-model'), 'workspace');
-  });
-
-  test('every settings section lands in its correct group', () => {
-    const html = renderSettingsPage('Acme', BASE);
+  test('each surviving section testid lands on its own area page', () => {
     const expectations = {
-      'settings-section-ai-user': 'user',
-      'settings-section-workflow': 'user',
-      'settings-section-experimental': 'user',
-      'settings-section-account': 'user',
-      'settings-section-ai-model': 'workspace',
-      'settings-section-dispatch-defaults': 'workspace',
-      'settings-section-dispatch-presets': 'workspace',
-      'settings-section-ai-usage': 'workspace',
-      'settings-section-workspace-features': 'workspace',
-      'settings-section-providers': 'workspace',
+      'settings-section-providers': 'sources',
+      'settings-section-ai-model': 'models',
+      'settings-section-dispatch-defaults': 'models',
+      'settings-section-dispatch-presets': 'models',
+      'settings-section-ai-usage': 'health',
+      'settings-section-workspace-features': 'running',
+      'settings-section-account': 'account',
+      'settings-section-workflow': 'features',
+      'settings-section-experimental': 'features',
     };
-    for (const [testid, expected] of Object.entries(expectations)) {
-      assert.equal(groupOf(html, testid), expected, `expected ${testid} in the ${expected} group`);
+    for (const [testid, area] of Object.entries(expectations)) {
+      assert.match(page(area), new RegExp(`data-testid="${testid}"`), `${testid} on ${area}`);
+      const others = ['sources', 'models', 'running', 'agent-access', 'health', 'change-log', 'features', 'account'].filter(a => a !== area);
+      for (const other of others) {
+        assert.doesNotMatch(page(other), new RegExp(`data-testid="${testid}"`), `${testid} must not also be on ${other}`);
+      }
     }
   });
 
-  test('the OpenRouter connection control lands in the User group (account-owned, LIN-1331)', () => {
-    const html = renderSettingsPage('Acme', { ...BASE, openRouterSource: 'oauth' });
-    const { userIdx, workspaceIdx } = groupBoundaries(html);
-    const connectIdx = html.indexOf('disconnect');
-    assert.ok(connectIdx > userIdx && connectIdx < workspaceIdx, 'expected the OpenRouter connection control inside the User group');
+  test('the OpenRouter connection control is on Account (account-owned, LIN-1331)', () => {
+    assert.match(page('account', { openRouterSource: 'oauth' }), /disconnect/);
+    assert.doesNotMatch(page('sources', { openRouterSource: 'oauth' }), /action="\/auth\/openrouter\/disconnect"/);
   });
 
-  test('the proxy model-routing writes toggle renders in the Workspace group, off by default (LIN-3854)', () => {
-    const off = renderSettingsPage('Acme', BASE);
-    assert.equal(groupOf(off, 'settings-toggle-modelRoutingProxyWrites'), 'workspace');
+  test('the roadmap switch is on Features', () => {
+    assert.match(page('features'), /data-testid="settings-toggle-roadmap"/);
+  });
+
+  test('the proxy model-routing writes setting is on Agent access, off by default, and asks why (LIN-3854, LIN-3846)', () => {
+    const off = page('agent-access');
+    assert.match(off, /data-testid="settings-toggle-modelRoutingProxyWrites"/);
     assert.match(off, /Agents can change models/);
-    assert.match(off, /name="feature" value="modelRoutingProxyWrites">\s*<input type="hidden" name="enabled" value="true">/);
-    const on = renderSettingsPage('Acme', { ...BASE, workspaceFeatures: { modelRoutingProxyWrites: true } });
-    assert.match(on, /name="feature" value="modelRoutingProxyWrites">\s*<input type="hidden" name="enabled" value="false">/);
-  });
-
-  test('the per-user AI feature toggles land in the User group', () => {
-    const html = renderSettingsPage('Acme', BASE);
-    for (const key of ['roadmap']) {
-      assert.equal(groupOf(html, `settings-toggle-${key}`), 'user', `expected settings-toggle-${key} in the user group`);
-    }
+    assert.match(off, /name="feature" value="modelRoutingProxyWrites"/);
+    assert.match(off, /name="enabled" value="true"/);
+    assert.match(off, /name="reason"/);
+    assert.match(off, /data-testid="settings-modelRoutingProxyWrites-state"[^>]*>[\s\S]*?Off/);
+    const on = page('agent-access', { workspaceFeatures: { modelRoutingProxyWrites: true } });
+    assert.match(on, /name="enabled" value="false"/);
+    assert.match(on, /data-testid="settings-modelRoutingProxyWrites-state"[^>]*>[\s\S]*?On/);
+    for (const other of ['sources', 'models', 'running', 'features', 'account']) assert.doesNotMatch(page(other), /settings-toggle-modelRoutingProxyWrites/);
   });
 
   // RETIRE (LIN-2719 S2, F4): this guard protected a forward id reference —
@@ -1048,6 +1033,27 @@ describe('renderSettingsPage — OpenRouter unattended-use consent (LIN-2412)', 
     assert.equal(connectedMatches.length, 1, 'exactly one element may carry "settings-value connected" — the connection status, not the consent badge');
   });
 
+  test('LIN-3846: granted consent can be turned off without disconnecting, and says what reads it', () => {
+    const html = renderSettingsPage('Acme', { ...BASE, openRouterSource: 'oauth', openRouterConsentedAt: '2026-10-01T00:00:00.000Z' });
+    assert.match(html, /action="\/auth\/openrouter\/consent\/clear" method="POST"/);
+    assert.match(html, /data-testid="settings-openrouter-consent-clear"/);
+    assert.match(html, /15-minute observer pass/);
+    // the connection stays: disconnect is a separate form
+    assert.match(html, /action="\/auth\/openrouter\/disconnect"/);
+  });
+
+  test('LIN-3846: not-yet-granted consent offers the grant, not the clear', () => {
+    const html = renderSettingsPage('Acme', { ...BASE, openRouterSource: 'oauth' });
+    assert.doesNotMatch(html, /consent\/clear/);
+  });
+
+  test('LIN-3846: the free tier says the limit is on new runs, resets at midnight UTC, and prompts are not limited', () => {
+    const html = renderSettingsPage('Acme', { ...BASE, openRouterSource: 'free' });
+    assert.match(html, /new runs per account per UTC day/);
+    assert.match(html, /midnight UTC/);
+    assert.match(html, /prompts are not limited/);
+  });
+
   test('not connected: connect link is present alongside the blast-radius notice (no consent grant form — there is no key yet)', () => {
     const html = renderSettingsPage('Acme', { ...BASE, openRouterSource: null });
     assert.match(html, /class="action-btn connect"/);
@@ -1067,7 +1073,7 @@ describe('renderSettingsPage — OpenRouter unattended-use consent (LIN-2412)', 
     // The attribute path is kept (app.js fills it); only the content changed.
     assert.match(html, /data-free-tier-status/);
     assert.match(html, /data-free-tier-usage/);
-    assert.match(html, /runs:/, 'the slot is labelled as the run allowance');
+    assert.match(html, />Runs</, 'the slot is labelled as the run allowance');
     assert.doesNotMatch(html, /daily prompt|prompts remaining/, 'no daily prompt quota wording');
   });
 

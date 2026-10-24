@@ -83,7 +83,9 @@ export const URLKEY_SOURCES = Object.freeze([
     'ship-biscuit-editions', 'collective-characters', 'collective-presets', 'consumer-heartbeats', 'kpi-daily-rollup',
     // LIN-3853. The log is NOT in ACTOR_SOURCES: its actor.id may be a token label (item 3),
     // which the field branch would count as an actor account. Presets hold account ids only.
-    'model-routing-log', 'model-routing-presets'
+    'model-routing-log', 'model-routing-presets',
+    // LIN-3846. Like the routing log, not in ACTOR_SOURCES: actor.id may be a token label.
+    'workspace-change-log'
   ].map(collection => ({ collection, shape: 'field', field: 'urlKey' })),
   { collection: 'local-issues', shape: 'field', field: 'scope' },
   { collection: 'workspace-halt', shape: 'id' },

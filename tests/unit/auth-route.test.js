@@ -490,7 +490,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
 
     await handler({ query: { code: 'good-code', state: 'real' }, session }, res);
 
-    assert.strictEqual(res.redirectedTo, '/workspace/acme/settings?provider_ok=linear');
+    assert.strictEqual(res.redirectedTo, '/workspace/acme/settings/sources?provider_ok=linear');
     assert.strictEqual(session.activeWorkspaceId, 'org-1', 'active workspace NOT switched to the new org');
     // OAuth state/intent cleared on success.
     assert.strictEqual(session.oauthIntent, undefined);
@@ -739,7 +739,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
 
     await handler({ query: { code: 'good-code', state: 'real' }, session }, res);
 
-    assert.strictEqual(res.redirectedTo, '/workspace/acme/settings?provider_ok=linear');
+    assert.strictEqual(res.redirectedTo, '/workspace/acme/settings/sources?provider_ok=linear');
     assert.strictEqual(session.oauthState, undefined);
     assert.strictEqual(session.oauthIntent, undefined);
   });

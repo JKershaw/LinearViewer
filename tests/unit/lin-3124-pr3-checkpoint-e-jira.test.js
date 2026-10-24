@@ -249,7 +249,7 @@ describe('LIN-3124 PR3 checkpoint E — Jira add-source pick seam (D8/D18, T20/T
         const w = await world();
         const s = w.session();
         const res = await w.addSource(s, { mode });
-        assert.equal(res.redirectedTo, '/workspace/acme/settings?provider_ok=jira', res.body);
+        assert.equal(res.redirectedTo, '/workspace/acme/settings/sources?provider_ok=jira', res.body);
         const order = w.log.filter(n => ['copyToConnection', 'conn.link', 'saveSession', 'finalizePromotion', 'deleteByConnection'].includes(n));
         assert.deepEqual(order.slice(-4), ['copyToConnection', 'conn.link', 'saveSession', 'finalizePromotion']);
         assert.ok(!w.log.includes('deleteByConnection'), 'the converter never deletes');
@@ -316,11 +316,11 @@ describe('LIN-3124 PR3 checkpoint E — Jira add-source pick seam (D8/D18, T20/T
           retry.oauthIntent = beforePickClone.oauthIntent;
           const res2 = makeRes();
           await getHandler(createJiraAuthRoutes({ ...withResolver(), provider: { validateCredential: async () => ({ accountId: 'atl-human' }) }, accountStore: w.real.accountStore, accountWorkspaceStore: w.real.accountWorkspaceStore, ownerCredentialStore: w.real.ownerStore, connectionStore: w.real.connectionStore }), 'post', '/auth/jira/oauth/link')({ body: { cloudId: SITE_B.id }, session: retry }, res2);
-          assert.equal(res2.redirectedTo, '/workspace/acme/settings?provider_ok=jira');
+          assert.equal(res2.redirectedTo, '/workspace/acme/settings/sources?provider_ok=jira');
         } else {
           retry.workspaces = persisted.workspaces;
           const res2 = await w.addSource(retry, { mode });
-          assert.equal(res2.redirectedTo, '/workspace/acme/settings?provider_ok=jira');
+          assert.equal(res2.redirectedTo, '/workspace/acme/settings/sources?provider_ok=jira');
         }
         assert.deepEqual((await w.real.ownerStore.collection.find({}).toArray()).map(r => r._id), [w.connectionIdFor()]);
         assert.equal(await liveCopies(retry, w.real.ownerStore, 'R1'), 1);
@@ -378,7 +378,7 @@ describe('LIN-3124 PR3 checkpoint E — Jira add-source pick seam (D8/D18, T20/T
           });
         };
         const res = await w.addSource(s, { mode, beforePick: async () => { armed = true; } });
-        assert.equal(res.redirectedTo, '/workspace/acme/settings?provider_ok=jira');
+        assert.equal(res.redirectedTo, '/workspace/acme/settings/sources?provider_ok=jira');
         assert.equal((await w.staged()).refreshToken, 'R9', 'a later flow\'s own grant is never deleted');
         const grants = grantServer(['R1', 'R9']);
         const refresh = createConnectionRefresher({ connectionStore: w.real.connectionStore, ownerCredentialStore: w.real.ownerStore, resolveExchange: () => grants.exchange });
@@ -392,13 +392,13 @@ describe('LIN-3124 PR3 checkpoint E — Jira add-source pick seam (D8/D18, T20/T
         let armed = mode === 'single';
         s.save = function (cb) { origSave.call(this, async (err) => { if (armed) await w.real.ownerStore.collection.deleteOne({ _id: w.connectionIdFor() }); cb(err); }); };
         const res = await w.addSource(s, { mode, beforePick: async () => { armed = true; } });
-        assert.equal(res.redirectedTo, '/workspace/acme/settings?provider_ok=jira');
+        assert.equal(res.redirectedTo, '/workspace/acme/settings/sources?provider_ok=jira');
         assert.equal((await w.staged()).refreshToken, 'R1', 'finalize can never delete the only refresh token');
 
         const w2 = await world({ ownerFaults: { finalizePromotion: async () => { throw new Error('store blip'); } } });
         const s2 = w2.session();
         const res2 = await w2.addSource(s2, { mode });
-        assert.equal(res2.redirectedTo, '/workspace/acme/settings?provider_ok=jira');
+        assert.equal(res2.redirectedTo, '/workspace/acme/settings/sources?provider_ok=jira');
         assert.equal((await w2.staged()).refreshToken, 'R1');
         assert.equal(w2.bindingFor(s2).connectionId, w2.connectionIdFor(), 'B reads C');
         assert.equal(await liveCopies(s2, w2.real.ownerStore, 'R1'), 1, 'S has no reader in this session');
@@ -600,7 +600,7 @@ describe('LIN-3124 PR3 checkpoint E — Jira add-source pick seam (D8/D18, T20/T
         const w = await world();
         const s = w.session();
         const res = await w.addSource(s, { mode });
-        assert.equal(res.redirectedTo, '/workspace/acme/settings?provider_ok=jira');
+        assert.equal(res.redirectedTo, '/workspace/acme/settings/sources?provider_ok=jira');
         assert.deepEqual(w.log.filter(n => n !== 'saveSession'), ['put', 'conn.put'], 'the staging put and the LIN-3127 dual-write only');
         assert.equal(w.bindingFor(s).credentials.authType, 'oauth');
         assert.equal((await w.staged()).refreshToken, 'R1');

@@ -27,7 +27,7 @@ import { createJiraClient } from '../../lib/providers/jira/client.js';
 import { JiraProvider } from '../../lib/providers/jira/index.js';
 import { getWorkspaceCallScope, getBindingCallScope, AMBIGUOUS_CALL_SCOPE, linkProvider } from '../../lib/workspace.js';
 import { TokenRefreshError } from '../../lib/token-refresh.js';
-import { renderSettingsPage } from '../../lib/render-settings.js';
+import { renderAllAreas as renderSettingsPage } from '../helpers/render-settings-areas.js';
 
 const ENV_KEYS = ['JIRA_CLIENT_ID', 'JIRA_CLIENT_SECRET', 'JIRA_REDIRECT_URI'];
 let savedEnv;

@@ -44,7 +44,7 @@ export function createShipJourneyRoutes({ workspaceFromUrl, reportHistoryStore, 
 
     // Gate: experimental feature must be enabled (mirrors collective/live-console).
     if (featureFlags.shipJourney !== true) {
-      return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
+      return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings/features`);
     }
 
     try {

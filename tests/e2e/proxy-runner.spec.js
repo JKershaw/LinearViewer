@@ -21,6 +21,7 @@ const RUNNER_LOCAL_KEY = 'proxy-runner-local';
 let urlKey;
 let apiPrefix;
 let proxyUrl;
+let keysUrl;
 
 test.beforeEach(async ({ page }) => {
   const seeded = await seedLocalWorkspace(page, null, {
@@ -34,6 +35,7 @@ test.beforeEach(async ({ page }) => {
   await seedWorkspaceOwnership(page, urlKey, 'owner');
   apiPrefix = `/workspace/${urlKey}/api/proxy`;
   proxyUrl = `/workspace/${urlKey}/proxy`;
+  keysUrl = `/workspace/${urlKey}/settings/agent-access`;
   await page.goto(`/test/clear-proxy-tokens?urlKey=${urlKey}`);
   await page.goto(`/test/clear-dispatch-queue?urlKey=${urlKey}`);
   await page.goto(`/test/clear-dispatch-tokens?urlKey=${urlKey}`);
@@ -81,17 +83,17 @@ test.describe('Proxy page - Runner credentials (LIN-3131 S2b.3)', () => {
     expect(pollOk.status()).toBe(200);
 
     // The Settings surface lists the active row with hour/minute expiry.
-    await page.goto(proxyUrl);
+    // LIN-3846: the runner key is a row of the one key list (Settings › Agent access).
+    await page.goto(keysUrl);
     await page.waitForLoadState('networkidle');
-    const runnerGroup = page.locator('#proxy-runner-credentials');
-    await expect(runnerGroup.locator('.runner-credential-item')).toHaveCount(1);
-    await expect(runnerGroup).toContainText('active');
-    await expect(runnerGroup).toContainText(/expires in \d+h \d+m/);
+    const keys = page.getByTestId('settings-key-proxy').filter({ hasText: 'Runner key' });
+    await expect(keys).toHaveCount(1);
+    await keys.locator('summary').click();
+    await expect(keys).toContainText(/expires 2/);
 
-    // Revoke via the UI (lineage revoke by the live row's own id).
-    page.on('dialog', dialog => dialog.accept());
-    await runnerGroup.locator('.runner-credential-revoke').click();
-    await expect(runnerGroup).toContainText('No runner credentials yet');
+    // Revoke from the opened row (lineage revoke by the live row's own id, the owner's DELETE route).
+    await keys.getByTestId('settings-key-revoke').click();
+    await expect(page.getByTestId('settings-key-proxy').filter({ hasText: 'Runner key' })).toHaveCount(0);
 
     // The revoked working credential is dead: the next poll is a 401.
     const pollRevoked = await request.get('/api/proxy/runner/poll', {
@@ -104,11 +106,12 @@ test.describe('Proxy page - Runner credentials (LIN-3131 S2b.3)', () => {
     const header = await cookieHeader(page);
     await mintRunnerBootstrap(request, header);
 
-    await page.goto(proxyUrl);
+    await page.goto(keysUrl);
     await page.waitForLoadState('networkidle');
-    const row = page.locator('#proxy-runner-credentials .runner-credential-item').first();
-    await expect(row).toContainText('waiting for exchange');
-    await expect(row).toContainText(/expires in (\d+m|\d+h \d+m)/);
+    const row = page.getByTestId('settings-key-proxy').filter({ hasText: 'Runner key' }).first();
+    await expect(row).toContainText('waiting to be used');
+    await row.locator('summary').click();
+    await expect(row).toContainText(/expires 2/);
   });
 });
 
