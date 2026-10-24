@@ -4,7 +4,8 @@
  * (isTestToken, failureOf) and routes/workspace-api-issue-read.js (isTestToken,
  * failureOf, openIssue) and routes/workspace-api-issue-write.js (isTestToken,
  * refuseCapability) and routes/workspace-api-scan.js (failureOf, openIssue,
- * refuseCapability, refuseFreeTier, aiNotConfigured, keepaliveFailure, loadContext) import them; each is defined here once. `openIssue` and
+ * refuseCapability, refuseFreeTier, aiNotConfigured, keepaliveFailure, loadContext) and
+ * routes/workspace-api-feedback.js (refuseCapability) import them; each is defined here once. `openIssue` and
  * `refuseCapability` moved here with LIN-3872; `refuseFreeTier`, `aiNotConfigured`,
  * `keepaliveFailure` and `loadContext` with LIN-3877 (the composer reads them too).
  */
