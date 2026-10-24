@@ -2,7 +2,8 @@
  * Shared steps for the workspace API routers (LIN-2246: extracted from
  * workspace-api.js). routes/workspace-api.js, routes/workspace-api-prompts.js
  * (isTestToken, failureOf) and routes/workspace-api-issue-read.js (isTestToken,
- * failureOf, openIssue) import them; each is defined here once. `openIssue` and
+ * failureOf, openIssue) and routes/workspace-api-issue-write.js (isTestToken,
+ * refuseCapability) import them; each is defined here once. `openIssue` and
  * `refuseCapability` moved here with LIN-3872.
  */
 import { badRequest, jsonError } from '../lib/errors.js';

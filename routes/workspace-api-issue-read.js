@@ -4,8 +4,9 @@
  * and GET /api/image.
  *
  * They register on the router they are given (the composer's own), not on a mounted
- * sub-router: POST /api/comments/:issueId stays in workspace-api.js, and a mounted
- * inner router would answer OPTIONS on that path itself (`Allow: GET,HEAD`) instead
+ * sub-router: POST /api/comments/:issueId lives in workspace-api-issue-write.js and
+ * registers on the same router after these routes, and a mounted inner router would
+ * answer OPTIONS on that path itself (`Allow: GET,HEAD`) instead
  * of reaching the composer's POST route (`Allow: GET,HEAD,POST`).
  */
 import { badRequest, jsonError, notFound } from '../lib/errors.js';

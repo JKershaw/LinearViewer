@@ -56,7 +56,7 @@
     try {
       setStatus('Creating…');
 
-      // v1 create body (routes/workspace-api.js POST /api/issues). Only include
+      // v1 create body (routes/workspace-api-issue-write.js POST /api/issues). Only include
       // a field when the page actually rendered its control — i.e. the provider
       // both declared it (createFields()) and the field has a value to submit.
       // The route now REJECTS a submitted-but-undeclared stateId/priority with

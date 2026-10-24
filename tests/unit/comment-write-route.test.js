@@ -790,7 +790,7 @@ describe('POST /workspace/:urlKey/api/comments/:issueId — harbour-comments led
 // LIN-2755 beat 2: ruling-write cache invalidation (RED until beat 3).
 // =============================================================================
 //
-// This route's stamp block (`stampDecisionAnswers`, routes/workspace-api.js)
+// This route's stamp block (`stampDecisionAnswers`, routes/workspace-api-issue-write.js)
 // is TWO of the ticket's 11 write sites in one request:
 //   - the loop half (`markDecisionAnswered`, workspace-api.js:262) — writes
 //     into data the sessions-feed cache actually holds (mergeLoops
