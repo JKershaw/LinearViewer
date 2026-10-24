@@ -137,6 +137,18 @@ function execMerge(repo, date) {
     { env: { ...process.env, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date } });
 }
 
+test('CLI: a file moved between areas counts in both (--no-renames)', () => {
+  const repo = makeRepo();
+  try {
+    repo.commit({ 'lib/a/mv.js': 'export const x = 1;\n' }, '2026-01-01T00:00:00Z');
+    repo.commit({ 'lib/a/mv.js': null, 'lib/b/mv.js': 'export const x = 1;\n' }, '2026-02-01T00:00:00Z');
+    const areas = join(repo.dir, 'areas.json');
+    writeFileSync(areas, JSON.stringify({ areas: [{ name: 'Alpha', match: ['^lib/a/'] }, { name: 'Beta', match: ['^lib/b/'] }] }));
+    const out = JSON.parse(cli([repo.dir, 'HEAD', '--areas', areas, '--days', '10']).stdout);
+    assert.deepEqual(out.pairs, [{ areas: ['Alpha', 'Beta'], changes: 1 }]);
+  } finally { repo.cleanup(); }
+});
+
 test('CLI: usage errors exit 2, a result never sets the exit code', () => {
   assert.equal(cli([]).status, 2);
   assert.equal(cli(['.', 'HEAD', '--nope']).status, 2);

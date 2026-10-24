@@ -1180,7 +1180,8 @@ describe('Seams & Tangles specifics (LIN-3550)', () => {
     assert.match(prompt, /candidate seam/i);
     assert.match(prompt, /pairs of areas only/i);
     assert.match(prompt, /per-file churn is not this bullet's/i);
-    assert.doesNotMatch(prompt, /scripts\/code-shape|cochange/i);
+    assert.match(prompt, /could not place \(unmapped files, a shallow clone\)/i);
+    assert.doesNotMatch(prompt, /scripts\/|\.mjs|cochange/i);
   });
 
   test('hands off to sibling reviews and shapes follow-ups as one move', () => {
