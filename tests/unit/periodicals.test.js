@@ -1173,6 +1173,16 @@ describe('Seams & Tangles specifics (LIN-3550)', () => {
     }
   });
 
+  test('reads change coupling beside the import tool: pairs of areas, same guide and window, candidate seams as prose (LIN-3860)', () => {
+    assert.match(prompt, /change-coupling tool/i);
+    assert.match(prompt, /same area guide and the same window length/i);
+    assert.match(prompt, /commit the previous report measured/i);
+    assert.match(prompt, /candidate seam/i);
+    assert.match(prompt, /pairs of areas only/i);
+    assert.match(prompt, /per-file churn is not this bullet's/i);
+    assert.doesNotMatch(prompt, /scripts\/code-shape|cochange/i);
+  });
+
   test('hands off to sibling reviews and shapes follow-ups as one move', () => {
     assert.match(prompt, /Drift & Coherence Review/);
     assert.match(prompt, /Code Quality Review/);
