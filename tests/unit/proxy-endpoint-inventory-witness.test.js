@@ -520,6 +520,47 @@ const ROWS = [
     note: 'clears an already-unset halt — BASE_DEPS() default workspaceHaltStore.clearWorkspaceHalt is a harmless no-op',
     run: () => call(buildApp({ workspaceOwnerCheck: async () => ({ status: 'owner' }) }), 'DELETE', '/api/proxy/dispatch/halt'),  // LIN-3409: owner-gated
   },
+  // --- Group M: model routing (LIN-3854, routes/proxy-model-routing.js) ---
+  {
+    group: 'M', method: 'GET', url: '/api/proxy/model-routing', expect: 200,
+    note: 'BASE_DEPS() default modelRoutingStore.getEffectiveTable resolves an empty table',
+    expectBody: { version: 0, jobs: [], groups: {}, defaults: { harbourFallbackModel: 'openai/gpt-5.4-mini' }, unrouted: [] },
+    run: () => call(buildApp(), 'GET', '/api/proxy/model-routing'),
+  },
+  {
+    group: 'M', method: 'GET', url: '/api/proxy/model-routing/presets', expect: 200,
+    expectBody: { presets: [] },
+    run: () => call(buildApp(), 'GET', '/api/proxy/model-routing/presets'),
+  },
+  {
+    group: 'M', method: 'GET', url: '/api/proxy/model-routing/log', expect: 200,
+    expectBody: { entries: [] },
+    run: () => call(buildApp(), 'GET', '/api/proxy/model-routing/log'),
+  },
+  {
+    group: 'M', method: 'POST', url: '/api/proxy/model-routing/jobs/:jobId', expect: 500,
+    note: 'passes auth + write scope, then the workspace-setting read fails closed: BASE_DEPS() workspacePreferencesStore is {}',
+    expectBody: { error: 'Failed to change the model routing table' },
+    run: () => call(buildApp(), 'POST', '/api/proxy/model-routing/jobs/review', { body: { reason: 'x', model: 'm' } }),
+  },
+  {
+    group: 'M', method: 'POST', url: '/api/proxy/model-routing/groups/:group', expect: 500,
+    note: 'same fail-closed setting read',
+    expectBody: { error: 'Failed to change the model routing table' },
+    run: () => call(buildApp(), 'POST', '/api/proxy/model-routing/groups/judge', { body: { reason: 'x', surface: 'agent-session', model: 'm' } }),
+  },
+  {
+    group: 'M', method: 'POST', url: '/api/proxy/model-routing/presets/:presetId/apply', expect: 500,
+    note: 'same fail-closed setting read',
+    expectBody: { error: 'Failed to change the model routing table' },
+    run: () => call(buildApp(), 'POST', '/api/proxy/model-routing/presets/p1/apply', { body: { reason: 'x' } }),
+  },
+  {
+    group: 'M', method: 'POST', url: '/api/proxy/model-routing/log/:entryId/undo', expect: 500,
+    note: 'same fail-closed setting read',
+    expectBody: { error: 'Failed to change the model routing table' },
+    run: () => call(buildApp(), 'POST', '/api/proxy/model-routing/log/e1/undo', { body: { reason: 'x' } }),
+  },
   {
     group: 'K', method: 'GET', url: '/api/proxy/alarms', expect: 200,
     note: 'LIN-3258: BASE_DEPS() default livenessAlarmStore.list resolves []',

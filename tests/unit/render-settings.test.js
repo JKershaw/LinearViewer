@@ -993,6 +993,15 @@ describe('renderSettingsPage — User/Workspace Settings groups (LIN-1399)', () 
     assert.ok(connectIdx > userIdx && connectIdx < workspaceIdx, 'expected the OpenRouter connection control inside the User group');
   });
 
+  test('the proxy model-routing writes toggle renders in the Workspace group, off by default (LIN-3854)', () => {
+    const off = renderSettingsPage('Acme', BASE);
+    assert.equal(groupOf(off, 'settings-toggle-modelRoutingProxyWrites'), 'workspace');
+    assert.match(off, /Agents can change models/);
+    assert.match(off, /name="feature" value="modelRoutingProxyWrites">\s*<input type="hidden" name="enabled" value="true">/);
+    const on = renderSettingsPage('Acme', { ...BASE, workspaceFeatures: { modelRoutingProxyWrites: true } });
+    assert.match(on, /name="feature" value="modelRoutingProxyWrites">\s*<input type="hidden" name="enabled" value="false">/);
+  });
+
   test('the per-user AI feature toggles land in the User group', () => {
     const html = renderSettingsPage('Acme', BASE);
     for (const key of ['roadmap']) {

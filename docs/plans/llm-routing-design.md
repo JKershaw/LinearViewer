@@ -188,7 +188,7 @@ An agent can do what the page does:
 - **Read:** jobs, groups, each job's effective setting and where it comes from, presets, and the log.
 - **Change:** a job, a group, or apply a preset. Each change takes a reason.
 
-Writes are logged with the token's attribution. The recommendation is that only the workspace owner's tokens may write (question 2). Endpoint names and shapes are the builder's call. They follow the proxy's existing conventions and are documented in the proxy instructions.
+Writes are logged with the token's attribution (`via: proxy`, the minting account, the token id). John's ruling on LIN-3820 (24 October, built in LIN-3854): writes sit behind one workspace setting, `modelRoutingProxyWrites`, off by default and changed only on the Settings page; while it is on, any `readWrite` token may write, with no owner-only gate (question 2). Endpoint names and shapes are the builder's call. They follow the proxy's existing conventions and are documented in the proxy instructions.
 
 ## Migration: the switch changes nothing
 
@@ -216,14 +216,14 @@ Each can be added later without changing the model above:
 
 - **Lanes as data:** who pays, limits, what happens when one runs out.
 - **Experiments as a feature.** Until then, a trial is a preset applied for a while and read on the page.
-- **The proposals queue.** Until then, an agent comments on a ticket, or writes over the proxy with an owner token.
+- **The proposals queue.** Until then, an agent comments on a ticket, or writes over the proxy when the workspace has switched that on.
 - **Routing by the size or risk of a change.**
 - **Subagents as jobs.**
 
 ## Questions for John
 
 1. **Six groups as placed?** Recommend yes.
-2. **Who may write over the proxy?** Recommend owner tokens only.
+2. **Who may write over the proxy?** **Answered, 24 October (LIN-3820):** any `readWrite` token, while the workspace setting is on; off by default. Finer abilities (IAM-style) later.
 3. **Per-dispatch presets.** Keep `presetId` working as today, or retire it in favour of table presets? **Open.** John, 23 October: "that's a specific area we're prototyping next, along with the expandable task section on the home page." The answer comes from that prototype. Until then, `presetId` keeps working as today.
 4. **D1 now, ahead of the queue?** **Answered, 23 October: yes, D1 first,** as its own ticket, not waiting on LIN-3757.
 

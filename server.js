@@ -188,11 +188,12 @@ import { buildRoadmapModel } from './lib/roadmap.js'
 import { renderProxyPage } from './lib/render-proxy.js'
 import { AVAILABLE_MODELS, setLlmCallRecorder, setPromptTraceRecorder, getPaidEnvKey, getFreeTierModelConfigWarning, streamChatWithTools } from './lib/openrouter.js'
 import { resolveOpenRouterSource, isFreeTierOffered } from './lib/chat-request.js'
-import { resolveWorkspaceModel, resolveAiOperationModel, jobModelResolver, getWorkspaceFeatures, isWorkspaceFeatureEnabled, setWorkspaceFeature, resolveDispatchDefaults } from './lib/workspace-preferences.js'
-import { getFeatureFlags, isValidFeatureKey, isValidWorkspaceFeatureKey, WORKSPACE_FEATURES } from './lib/feature-defaults.js'
+import { resolveWorkspaceModel, resolveAiOperationModel, jobModelResolver, getWorkspaceFeatures, isWorkspaceFeatureEnabled, resolveDispatchDefaults } from './lib/workspace-preferences.js'
+import { getFeatureFlags, isValidFeatureKey, WORKSPACE_FEATURES } from './lib/feature-defaults.js'
 import { projectLegacy } from './lib/model-routing.js'
 import { ModelRoutingStore } from './lib/model-routing-store.js'
 import { createSettingsModelRoutes } from './routes/settings-model.js'
+import { createSettingsWorkspaceFeatureRoutes } from './routes/settings-workspace-features.js'
 import { getDeployInfo } from './lib/deploy-info.js'
 import { securityHeaders } from './lib/security-headers.js'
 import { publicOrigin } from './lib/public-origin.js'
@@ -3193,7 +3194,7 @@ const recordPipelineMerge = createPipelineMergeRecorder({
   installationTokenFor,
   resolveWorkspaceId: createSessionWorkspaceIdResolver({ sessionsCollection })
 })
-app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore, workspaceOwnerCheck, livenessAlarmStore, onTicketWrite, recordPipelineMerge, consumerHeartbeatStore }))
+app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore, workspaceOwnerCheck, modelRoutingStore, livenessAlarmStore, onTicketWrite, recordPipelineMerge, consumerHeartbeatStore }))
 
 // LIN-3098 S3: the runner kit (lib/runner-kit/*.mjs), public, for the served
 // runner prompt to fetch and verify against its sha256 pins (routes/runner-kit.js).
@@ -4076,55 +4077,8 @@ app.get('/workspace/:urlKey/proxy', workspaceFromUrl, async (req, res) => {
 // live in routes/settings-model.js and write through the model-routing store (LIN-3853).
 app.use(createSettingsModelRoutes({ workspaceFromUrl, modelRoutingStore }))
 
-/**
- * Toggle a workspace-scoped feature flag on or off (LIN-340).
- * Accepts { feature, enabled } in body.
- *
- * Mirrors the model handler above: persists to the workspace preferences store
- * (shared across all users of the org), then redirects back to settings. It
- * deliberately does NOT touch session.features, getFeatureFlags(session), or the
- * per-user UserPreferencesStore — workspace features are a separate contract.
- */
-app.post('/workspace/:urlKey/settings/workspace-features', workspaceFromUrl, async (req, res) => {
-  const workspace = req.workspace;
-  const { feature, enabled } = req.body;
-
-  // Validate workspace feature key
-  if (!feature || !isValidWorkspaceFeatureKey(feature)) {
-    return badRequest.json(res, 'Invalid workspace feature key');
-  }
-
-  const isEnabled = enabled === 'true' || enabled === true;
-
-  // Persist to the workspace preferences store. setWorkspaceFeature preserves
-  // every other workspace preference key (e.g. modelId) and every other
-  // workspace feature flag while flipping just this one.
-  try {
-    const ok = await setWorkspaceFeature({
-      urlKey: workspace.urlKey,
-      featureKey: feature,
-      enabled: isEnabled,
-      store: workspacePreferencesStore
-    });
-    if (!ok) throw new Error('setWorkspaceFeature returned false');
-  } catch (err) {
-    console.error('Failed to save workspace feature toggle:', err);
-    return res.status(500).send(renderErrorPage('Settings Error', 'Failed to save workspace feature. Please try again.', {
-      action: 'Back to settings',
-      actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/settings`
-    }));
-  }
-
-  // AJAX requests get JSON; regular form submissions get redirect. This is only
-  // the response shape the settings-page toggle client (app.js) expects for ALL
-  // settings toggles — persistence above is exclusively to workspacePreferencesStore,
-  // never to session.features or the per-user store.
-  if (req.headers['x-requested-with'] === 'XMLHttpRequest') {
-    res.json({ ok: true, feature, enabled: isEnabled });
-  } else {
-    res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
-  }
-});
+/** Workspace feature toggles (LIN-340): moved to routes/settings-workspace-features.js so a unit test can drive it (LIN-3854). */
+app.use(createSettingsWorkspaceFeatureRoutes({ workspaceFromUrl, workspacePreferencesStore }))
 
 /**
  * Toggle a feature flag on or off.

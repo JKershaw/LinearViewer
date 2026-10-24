@@ -94,6 +94,14 @@ export const BASE_DEPS = () => ({
     setWorkspaceHalt: async () => {},
     clearWorkspaceHalt: async () => {},
   },
+  // LIN-3854: routes/proxy-model-routing.js's required dep. Reads resolve an empty
+  // table; the write rows stop at the workspace-setting gate (workspacePreferencesStore
+  // above is `{}`, so the setting read fails closed with a 500 only if reached).
+  modelRoutingStore: {
+    getEffectiveTable: async () => ({ version: 0, jobs: [], groups: {}, defaults: {}, unrouted: [] }),
+    getLog: async () => [],
+    listPresets: async () => [],
+  },
   // LIN-3258: routes/proxy-alarms.js's required dep. The composed composer
   // mount needs it present; the alarms probes override it.
   livenessAlarmStore: {
