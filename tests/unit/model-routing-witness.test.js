@@ -52,6 +52,12 @@ const PREFS = {
     dispatchDefaults: { model: '', harness: '', effort: '', byKind: { implementation: { model: '', harness: '', effort: '' }, review: { model: 'r-m' } } },
     aiModelOverrides: { byKind: { recommend: { model: '' }, scan: { model: '' } } }
   },
+  // LIN-3853 review F2: a blank per-op override above a NON-blank modelId. Old code
+  // falls through on `||`; a `??`/`!== undefined` unification would return ''.
+  'blank per-op override above a non-blank modelId': {
+    modelId: 'anthropic/ws-model',
+    aiModelOverrides: { byKind: { recommend: { model: '' }, scan: { model: '' } } }
+  },
   'null values': { modelId: null, dispatchDefaults: { model: null, harness: null, byKind: { implementation: null, bug: { model: null } } } },
   'stray byKind for custom / periodical / non-op keys': {
     modelId: 'anthropic/ws-model',
