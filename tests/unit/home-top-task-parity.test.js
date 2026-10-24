@@ -216,6 +216,18 @@ describe('page-level options embedded for Home (LIN-2944 P1 addendum 9)', () => 
     const html = renderPage([], [], [], 'Org', { isLanding: true });
     assert.ok(!html.includes('__HOME_PROMPT_OPTS__'), 'no embedded options on landing');
   });
+
+  test('landing Swipe ignores stale flags: no AI, no promptButtons key (LIN-3848)', () => {
+    // The stale aiRecommendations:true must not turn the landing preview's AI on:
+    // hasAI:false is what separates the kept behaviour from a revived flag.
+    const html = renderSwipePage({ trees: [], teams: [] }, {
+      isLanding: true,
+      featureFlags: { aiRecommendations: true, promptButtons: false }
+    });
+    assert.ok(html.includes('"hasAI":false'), 'landing preview has no AI');
+    assert.ok(html.includes('"aiState":"unconfigured"'), 'landing preview AI state is unconfigured');
+    assert.ok(!html.includes('"promptButtons"'), 'no promptButtons key is embedded');
+  });
 });
 
 // =============================================================================

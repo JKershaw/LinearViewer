@@ -838,7 +838,7 @@ scheduler.register({
 // (`pass:v1:<urlKey>`, never a second store) and reads observer-sweep's
 // already-written census read-only — no fourth fleet summary.
 //
-// Report-only: no relay write, no wake sink, no dispatch/kick authority. The
+// Report-only: no relay write, no wake sink, no dispatch/kick authority.
 // (The `observerAuthority` switch was removed in LIN-3848 — see
 // lib/observer-pass.js's header.)
 //

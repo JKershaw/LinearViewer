@@ -2957,8 +2957,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       }
 
       // Post-create action (LIN-918); every branch is best-effort and never fails
-      // the submission, the ticket already existing. An explicit widget action wins
-      // — 'save' files only,
+      // the submission, the ticket already existing. An explicit widget action picks the lane: 'save' files only,
       // 'triage' always enqueues triage, 'autopilot' enqueues a scoped autopilot run
       // carrying the feedback-origin brief. With none (the legacy plain send) the
       // ticket is filed only (LIN-3848).
