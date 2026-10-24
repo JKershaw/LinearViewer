@@ -23,6 +23,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { buildKeyList } from '../../lib/settings-keys.js';
 import { dirname, join } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -44,46 +45,6 @@ function makeEl(extra = {}) {
 const iso = (ms) => new Date(ms).toISOString();
 const flush = () => new Promise(resolve => setTimeout(resolve, 0));
 
-function loadProxyPage(tokens) {
-  const tokenListEl = makeEl({ dataset: { urlKey: 'acme' } });
-  const runnerEl = makeEl();
-  const tokensCollapsible = makeEl();
-  const tokensCount = makeEl();
-  const sandbox = {
-    window: {
-      location: { origin: 'https://harbour.test' },
-      relativeTime: () => 'just now',
-      api: async (url) => (url.includes('/api/proxy/tokens') ? { tokens } : {})
-    },
-    document: {
-      getElementById: (id) => ({
-        'proxy-runner-credentials': runnerEl,
-        'proxy-tokens-collapsible': tokensCollapsible,
-        'proxy-tokens-count': tokensCount
-      }[id] || null),
-      querySelector: (sel) => (sel === '.proxy-token-list' ? tokenListEl : null),
-      addEventListener() {}
-    },
-    navigator: { clipboard: { writeText: async () => {} } },
-    setTimeout, clearTimeout, console,
-    escapeHtml: (v) => String(v),
-    confirm: () => false,
-    toast: () => {}
-  };
-  sandbox.globalThis = sandbox;
-  vm.createContext(sandbox);
-  vm.runInContext(PROXY_SRC, sandbox, { filename: 'proxy.js' });
-  return { tokenListEl, runnerEl, tokensCollapsible, tokensCount };
-}
-
-async function ordinaryListHtml(page) {
-  await flush();
-  page.tokensCollapsible.open = true;
-  page.tokensCollapsible._handlers.toggle[0]();
-  await flush();
-  return page.tokenListEl.innerHTML;
-}
-
 function fixtures() {
   const now = Date.now();
   const base = { scope: 'readWrite', hasOwner: true, lastUsedAt: null, createdAt: iso(now - 1000) };
@@ -99,62 +60,51 @@ function fixtures() {
   ];
 }
 
-describe('LIN-3136 S7 — runner rows are the take holders only', () => {
-  test('[dispatch] tokens are not runner credentials; [take, dispatch] still are', async () => {
-    const page = loadProxyPage(fixtures());
-    await flush();
-    const html = page.runnerEl.innerHTML;
-    assert.match(html, /data-token-id="runner-work"/);
-    assert.doesNotMatch(html, /decl-work|driver-waiting|decl-boot-spent/);
+// LIN-3846: the Proxy page's own lists moved into the one key list (lib/settings-keys.js); the
+// same rules are pinned against it. Only `take` holders are runner keys.
+describe('LIN-3136 S7 (moved by LIN-3846) — runner rows are the take holders only', () => {
+  const list = (tokens) => buildKeyList({ proxyRows: tokens, dispatchRows: [], isOwner: true, urlKey: 'acme' });
+  const kindOf = (rows, id) => rows.find(r => r.id === id)?.kind;
+
+  test('[dispatch] tokens are not runner keys; [take, dispatch] still are', () => {
+    const rows = list(fixtures());
+    assert.equal(kindOf(rows, 'runner-work'), 'Runner key');
+    for (const id of ['decl-work', 'driver-waiting']) assert.equal(kindOf(rows, id), 'Can start runs');
   });
 
-  test('a dispatch-only working token and an unconsumed driver bootstrap list as ordinary tokens, marked +dispatch', async () => {
-    const page = loadProxyPage(fixtures());
-    const html = await ordinaryListHtml(page);
-    assert.match(html, /data-token-id="plain-1"/);
-    assert.match(html, /data-token-id="decl-work"/);
-    assert.match(html, /data-token-id="driver-waiting"/);
-    assert.doesNotMatch(html, /data-token-id="runner-work"/, 'runner rows are not double-shown');
-    const rowOf = (id) => html.split('token-item').find(chunk => chunk.includes(`data-token-id="${id}"`));
-    assert.match(rowOf('decl-work'), /\+dispatch/);
-    assert.match(rowOf('driver-waiting'), /\+dispatch/);
-    assert.doesNotMatch(rowOf('plain-1'), /\+dispatch/);
+  test('a dispatch-only working token and an unconsumed driver bootstrap are listed, marked as able to start runs', () => {
+    const rows = list(fixtures());
+    assert.equal(kindOf(rows, 'plain-1'), 'Read');
+    assert.equal(kindOf(rows, 'decl-work'), 'Can start runs');
+    assert.equal(kindOf(rows, 'driver-waiting'), 'Can start runs');
   });
 
-  test('LIN-3491: an agent-prompt-dispatch token lists as an ordinary row marked +dispatch', async () => {
+  test('LIN-3491: an agent-prompt-dispatch token lists as a key that can start runs', () => {
     const now = Date.now();
-    const page = loadProxyPage([{
+    const rows = list([{
       tokenId: 'agent-work', label: 'agent-prompt-dispatch', scope: 'readWrite', kind: 'standard', singleUse: false,
       consumed: false, hasOwner: true, grants: ['dispatch'], parentTokenId: 'agent-boot', createdAt: iso(now - 1000),
       lastUsedAt: null, expiresAt: iso(now + 47 * 3600e3)
     }]);
-    const html = await ordinaryListHtml(page);
-    assert.match(html, /data-token-id="agent-work"/);
-    assert.match(html, /\[\+dispatch\]/);
+    assert.equal(kindOf(rows, 'agent-work'), 'Can start runs');
   });
 
-  test('a consumed grant-bearing bootstrap is hidden (its revoke would kill the live lineage)', async () => {
-    const page = loadProxyPage(fixtures());
-    const html = await ordinaryListHtml(page);
-    assert.doesNotMatch(html, /decl-boot-spent/);
+  test('a consumed grant-bearing bootstrap is hidden (its revoke would kill the live lineage)', () => {
+    assert.equal(list(fixtures()).some(r => r.id === 'decl-boot-spent'), false);
   });
 
-  test('the ordinary count matches the ordinary list', async () => {
-    const page = loadProxyPage(fixtures());
-    await ordinaryListHtml(page);
-    assert.equal(page.tokensCount.textContent, '(3)', 'plain-1, decl-work, driver-waiting');
+  test('the count is the list: plain-1, decl-work, driver-waiting and the runner key', () => {
+    assert.equal(list(fixtures()).length, 4);
   });
 
-  test('a consumed grant-LESS bootstrap is still listed as before', async () => {
+  test('a consumed grant-LESS bootstrap is still listed as before', () => {
     const now = Date.now();
-    const page = loadProxyPage([{
+    const rows = list([{
       tokenId: 'plain-boot-spent', label: 'prompt-proxy', scope: 'readWrite', kind: 'bootstrap', singleUse: true,
       consumed: true, hasOwner: true, grants: [], parentTokenId: null, createdAt: iso(now - 1000), lastUsedAt: null,
       expiresAt: iso(now + 47 * 3600e3)
     }]);
-    const html = await ordinaryListHtml(page);
-    assert.match(html, /data-token-id="plain-boot-spent"/);
-    assert.match(html, /\(consumed\)/);
+    assert.equal(kindOf(rows, 'plain-boot-spent'), 'Read and update');
   });
 });
 

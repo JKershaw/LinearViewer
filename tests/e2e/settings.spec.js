@@ -8,28 +8,31 @@ import { nav, settings } from '../helpers.js'
 // (`seedLocal`); navigation drives off the urlKey it returns, not a
 // hard-coded literal (parallel-aware caller discipline for LIN-625).
 
+// LIN-3846: Settings is a page per area; each test opens the area it is about.
 test.describe('Settings Page', () => {
-  test.beforeEach(async ({ page, seedLocal }) => {
-    const { urlKey } = await seedLocal()
-    await page.goto(`/workspace/${urlKey}/settings`)
+  let urlKey
+  test.beforeEach(async ({ seedLocal }) => {
+    ({ urlKey } = await seedLocal())
+  })
+  const openArea = async (page, area) => {
+    await settings(page).gotoArea(urlKey, area)
     await page.waitForLoadState('networkidle')
-  })
+  }
 
-  test('renders settings page with title and sections', async ({ page }) => {
-    await expect(page.locator('h1')).toContainText('Settings')
-    await expect(settings(page).section('ai-user')).toContainText('AI')
-  })
-
-  test('splits settings into User Settings and Workspace Settings groups (LIN-1399)', async ({ page }) => {
-    await expect(page.locator('[data-testid="settings-group-user"]')).toContainText('User Settings')
-    await expect(page.locator('[data-testid="settings-group-workspace"]')).toContainText('Workspace Settings')
-    // AI is decomposed: the OpenRouter connection + AI toggles live in User,
-    // the workspace model selector + per-operation overrides live in Workspace.
-    await expect(page.locator('[data-testid="settings-group-user"]')).toContainText('AI')
-    await expect(page.locator('[data-testid="settings-group-workspace"]')).toContainText('AI Model')
+  test('renders the list of areas with a state for each, in two groups (LIN-3846)', async ({ page }) => {
+    await page.goto(`/workspace/${urlKey}/settings`)
+    await expect(page.locator('h1').first()).toContainText('Settings')
+    const nav = page.getByTestId('settings-nav')
+    await expect(nav).toContainText('Workspace')
+    await expect(nav).toContainText('You')
+    for (const area of ['sources', 'models', 'running', 'agent-access', 'health', 'change-log', 'features', 'account']) {
+      await expect(page.getByTestId(`settings-nav-${area}`)).toBeVisible()
+      await expect(page.getByTestId(`settings-state-${area}`)).not.toBeEmpty()
+    }
   })
 
   test('has header view-switcher links', async ({ page }) => {
+    await openArea(page, 'account')
     // Cross-view links moved from the footer into the shared header switcher
     // (LIN-978); settings is the current page so it renders as the bold current.
     await expect(nav(page).getView('swipe')).toBeVisible()
@@ -38,6 +41,7 @@ test.describe('Settings Page', () => {
   })
 
   test('has Account section with logout', async ({ page }) => {
+    await openArea(page, 'account')
     await expect(settings(page).section('account')).toBeVisible()
     const logoutLink = settings(page).logout()
     await expect(logoutLink).toBeVisible()
@@ -47,6 +51,7 @@ test.describe('Settings Page', () => {
   test('offers the email add affordance in the Account section (LIN-1892 S3-3)', async ({ page }) => {
     // The Playwright server runs the capture transport, so email sign-in is
     // available and a local (email-less) account is offered the link-mode add.
+    await openArea(page, 'account')
     const add = page.getByTestId('settings-account-add-email')
     await expect(add).toBeVisible()
     await expect(add).toContainText('Add email')
@@ -54,6 +59,7 @@ test.describe('Settings Page', () => {
   })
 
   test('shows workspace dropdown in nav', async ({ page }) => {
+    await openArea(page, 'account')
     const workspaceToggle = page.locator('#workspace-toggle')
     await expect(workspaceToggle).toBeVisible()
     await expect(workspaceToggle).toContainText('Local Workspace')
@@ -61,6 +67,7 @@ test.describe('Settings Page', () => {
 
   test('shows the AI usage KPI section (LIN-418)', async ({ page }) => {
     // No LLM calls in a fresh local workspace → empty state.
+    await openArea(page, 'health')
     await expect(settings(page).section('ai-usage')).toContainText('none recorded yet')
   })
 
@@ -68,6 +75,7 @@ test.describe('Settings Page', () => {
     // roadmap is off by default (LIN-3849: dispatch is no longer a switch). The
     // ● / ○ glyphs make the assertion robust against feature description text
     // that merely contains "on"/"off".
+    await openArea(page, 'features')
     await expect(settings(page).toggle('roadmap')).toContainText('○ off')
 
     await settings(page).toggleFeature('roadmap')
@@ -77,6 +85,7 @@ test.describe('Settings Page', () => {
   })
 
   test('model pricing hint updates with the selected model (LIN-993)', async ({ page }) => {
+    await openArea(page, 'models')
     const price = page.locator('[data-model-price]')
     const select = page.locator('.model-select')
     await expect(price).toBeVisible()
@@ -100,6 +109,7 @@ test.describe('Settings Page', () => {
     // workspacePreferencesStore) can carry a leftover override from an
     // earlier run of this very test. The round trip is proven by SETTING a
     // value and observing it persist, not by assuming an empty start.
+    await openArea(page, 'models')
     async function setOverrideAndSave(value) {
       const details = page.locator('[data-testid="ai-kind-overrides"]')
       const select = page.locator('[data-testid="ai-override-row-flight-companion"] select')
@@ -157,7 +167,7 @@ test.describe('Settings account email threading (LIN-1892 S3-3, G3)', () => {
     // identity onto the live accountId rather than replacing the account.
     const { urlKey } = await seedLocal();
 
-    await page.goto(`/workspace/${urlKey}/settings`);
+    await page.goto(`/workspace/${urlKey}/settings/account`);
     await expect(page.getByTestId('settings-account-emails')).toContainText(email);
     await expect(page.getByTestId('settings-account-add-email')).toHaveCount(0);
   });
@@ -183,8 +193,18 @@ test.describe('Token Management', () => {
     await expect(page.locator('#create-token-form button[type="submit"]')).toBeVisible()
   })
 
-  test('shows empty state when no tokens', async ({ page }) => {
-    await expect(page.locator('.token-list-empty')).toContainText('No tokens')
+  // LIN-3846: the list of keys is Settings › Agent access; this page links to it.
+  const keyRows = (page) => page.getByTestId('settings-key-dispatch')
+  const openKeys = async (page, localWorkerUrlKey) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/agent-access`)
+    await page.waitForLoadState('networkidle')
+  }
+
+  test('links to the key list instead of listing keys itself', async ({ page, localWorkerUrlKey }) => {
+    await expect(page.getByTestId('dispatch-keys-link')).toBeVisible()
+    await expect(page.locator('.token-list')).toHaveCount(0)
+    await openKeys(page, localWorkerUrlKey)
+    await expect(keyRows(page)).toHaveCount(0)
   })
 
   test('can create a token with label', async ({ page }) => {
@@ -237,7 +257,7 @@ test.describe('Token Management', () => {
     await expect(page.locator('.token-modal')).not.toBeVisible()
   })
 
-  test('created token appears in list', async ({ page }) => {
+  test('created token appears in list', async ({ page, localWorkerUrlKey }) => {
     await page.fill('.token-label-input', 'listed-token')
     await page.click('#create-token-form button[type="submit"]')
 
@@ -249,31 +269,34 @@ test.describe('Token Management', () => {
     // Close modal
     await page.click('.token-modal-close')
 
-    // Token should be in list
-    await expect(page.locator('.token-item .token-label-text')).toContainText('listed-token')
-    await expect(page.locator('.token-item .token-meta')).toContainText('created')
+    // Token should be in the key list on Settings › Agent access
+    await openKeys(page, localWorkerUrlKey)
+    await expect(keyRows(page)).toHaveCount(1)
+    await keyRows(page).locator('summary').click()
+    await expect(keyRows(page)).toContainText('listed-token')
     // LIN-3618: a new token carries a 90-day expiry and the list shows it
-    await expect(page.locator('.token-item .token-meta')).toContainText('expires')
+    await expect(keyRows(page)).toContainText('expires 2')
   })
 
-  test('can revoke a token', async ({ page }) => {
+  test('can revoke a token', async ({ page, localWorkerUrlKey }) => {
     // Create a token first
     await page.fill('.token-label-input', 'to-revoke')
     await page.click('#create-token-form button[type="submit"]')
     await page.click('.token-modal-close')
 
-    // Verify token is in list
-    await expect(page.locator('.token-item')).toBeVisible()
+    // Verify token is in the list
+    await openKeys(page, localWorkerUrlKey)
+    await expect(keyRows(page)).toHaveCount(1)
 
-    // Revoke it (accept confirmation dialog)
-    page.on('dialog', dialog => dialog.accept())
-    await page.click('.token-revoke')
+    // Revoke it: the button lives inside the opened row (the in-place confirmation, no dialog)
+    await keyRows(page).locator('summary').click()
+    await keyRows(page).getByTestId('settings-key-revoke').click()
 
-    // Should show empty state again
-    await expect(page.locator('.token-list-empty')).toContainText('No tokens')
+    // The list no longer has it
+    await expect(keyRows(page)).toHaveCount(0)
   })
 
-  test('shows multiple tokens in list', async ({ page }) => {
+  test('shows multiple tokens in list', async ({ page, localWorkerUrlKey }) => {
     // Create first token
     await page.fill('.token-label-input', 'token-one')
     await page.click('#create-token-form button[type="submit"]')
@@ -285,18 +308,18 @@ test.describe('Token Management', () => {
     await page.click('.token-modal-close')
 
     // Both should appear
-    const items = page.locator('.token-item')
-    await expect(items).toHaveCount(2)
+    await openKeys(page, localWorkerUrlKey)
+    await expect(keyRows(page)).toHaveCount(2)
   })
 
-  test('token list shows "never used" for new tokens', async ({ page }) => {
+  test('token list shows "never used" for new tokens', async ({ page, localWorkerUrlKey }) => {
     await page.fill('.token-label-input', 'unused-token')
     await page.click('#create-token-form button[type="submit"]')
     await page.click('.token-modal-close')
 
-    // Wait for token list to re-render after modal close
-    await expect(page.locator('.token-item')).toBeVisible()
-    await expect(page.locator('.token-meta')).toContainText('never used')
+    await openKeys(page, localWorkerUrlKey)
+    await expect(keyRows(page)).toBeVisible()
+    await expect(keyRows(page)).toContainText('never used')
   })
 })
 
@@ -334,8 +357,10 @@ test.describe('Token API Integration', () => {
     const tokenValue = await page.locator('.token-value').textContent()
     await page.click('.token-modal-close')
 
-    // Wait for token list to re-render after modal close
-    await expect(page.locator('.token-item')).toBeVisible()
+    // The token is in the key list on Settings › Agent access
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/agent-access`)
+    await page.waitForLoadState('networkidle')
+    await expect(page.getByTestId('settings-key-dispatch')).toBeVisible()
 
     // Verify it works
     let response = await request.get('/api/dispatch/poll', {
@@ -343,12 +368,14 @@ test.describe('Token API Integration', () => {
     })
     expect(response.status()).toBe(200)
 
-    // Revoke via UI
-    page.on('dialog', dialog => dialog.accept())
-    await page.click('.token-revoke')
+    // Revoke via UI (the button is inside the opened row; the owner may revoke a queue token)
+    await seedWorkspaceOwnership(page, localWorkerUrlKey)
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/agent-access`)
+    await page.getByTestId('settings-key-dispatch').locator('summary').click()
+    await page.getByTestId('settings-key-dispatch').getByTestId('settings-key-revoke').click()
 
     // Wait for revoke to complete
-    await expect(page.locator('.token-list-empty')).toBeVisible()
+    await expect(page.getByTestId('settings-key-dispatch')).toHaveCount(0)
 
     // Verify it no longer works
     response = await request.get('/api/dispatch/poll', {

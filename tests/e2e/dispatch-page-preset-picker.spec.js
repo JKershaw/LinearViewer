@@ -74,7 +74,7 @@ test.describe('Dispatch page preset picker (LIN-1391 S9)', () => {
     await expect(select.locator('option')).toHaveCount(1);
     const createLink = page.getByTestId('dispatch-preset-create-link');
     await expect(createLink).toBeVisible();
-    await expect(createLink).toHaveAttribute('href', `/workspace/${WS}/settings#dispatch-presets`);
+    await expect(createLink).toHaveAttribute('href', `/workspace/${WS}/settings/models#dispatch-presets`);
   });
 
   test('a failed presets fetch degrades to the same empty-picker "create a preset" link', async ({ page }) => {
@@ -224,7 +224,7 @@ test.describe('375px acceptance journey (LIN-2719 S5)', () => {
 
     // 1. Choose a free model on Settings, at 375px, and save it as a preset —
     // the datalist this ticket was filed against had no usable dropdown here.
-    await page.goto(`/workspace/${urlKey}/settings`);
+    await page.goto(`/workspace/${urlKey}/settings/models`);
     await page.waitForLoadState('networkidle');
     const createForm = page.locator('[data-testid="dispatch-preset-create-form"]');
     await createForm.locator('.dispatch-preset-name-input').fill('375px free preset');

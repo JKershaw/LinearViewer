@@ -1019,6 +1019,27 @@ describe('renderSettingsPage — OpenRouter unattended-use consent (LIN-2412)', 
     assert.equal(connectedMatches.length, 1, 'exactly one element may carry "settings-value connected" — the connection status, not the consent badge');
   });
 
+  test('LIN-3846: granted consent can be turned off without disconnecting, and says what reads it', () => {
+    const html = renderSettingsPage('Acme', { ...BASE, openRouterSource: 'oauth', openRouterConsentedAt: '2026-10-01T00:00:00.000Z' });
+    assert.match(html, /action="\/auth\/openrouter\/consent\/clear" method="POST"/);
+    assert.match(html, /data-testid="settings-openrouter-consent-clear"/);
+    assert.match(html, /15-minute observer pass/);
+    // the connection stays: disconnect is a separate form
+    assert.match(html, /action="\/auth\/openrouter\/disconnect"/);
+  });
+
+  test('LIN-3846: not-yet-granted consent offers the grant, not the clear', () => {
+    const html = renderSettingsPage('Acme', { ...BASE, openRouterSource: 'oauth' });
+    assert.doesNotMatch(html, /consent\/clear/);
+  });
+
+  test('LIN-3846: the free tier says the limit is on new runs, resets at midnight UTC, and prompts are not limited', () => {
+    const html = renderSettingsPage('Acme', { ...BASE, openRouterSource: 'free' });
+    assert.match(html, /new runs per account per UTC day/);
+    assert.match(html, /midnight UTC/);
+    assert.match(html, /prompts are not limited/);
+  });
+
   test('not connected: connect link is present alongside the blast-radius notice (no consent grant form — there is no key yet)', () => {
     const html = renderSettingsPage('Acme', { ...BASE, openRouterSource: null });
     assert.match(html, /class="action-btn connect"/);

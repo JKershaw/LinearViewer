@@ -293,6 +293,20 @@ describe('model-routing rows at a Full wipe (LIN-3853)', () => {
   });
 });
 
+// LIN-3846: the change log for everyone-changes names accounts by id only, like the routing log.
+describe('workspace-change-log rows at a Full wipe (LIN-3846)', () => {
+  test('actor.id becomes the erased id in a shared workspace and the row goes with an Alone one', async () => {
+    const { db, seed } = await fresh();
+    const plan = await planOf(db, 'full');
+    await applyOf(db, plan);
+    const idOf = (workspace) => seed.index.find((e) => e.collection === 'workspace-change-log' && e.workspace === workspace && e.tenant === 'person')?._id;
+    assert.ok(idOf('alone') && idOf('shared'), 'the seed has a row for each');
+    const shared = await db.collection('workspace-change-log').findOne({ _id: idOf('shared') });
+    assert.strictEqual(shared.actor.id, ERASED_ACCOUNT_ID);
+    assert.strictEqual(await db.collection('workspace-change-log').findOne({ _id: idOf('alone') }), null);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Dry run, output, errors
 // ---------------------------------------------------------------------------

@@ -887,9 +887,9 @@ test.describe('Dispatch Page', () => {
       await page.waitForLoadState('networkidle');
     });
 
-    test('token section shows empty state', async ({ page }) => {
-      const empty = page.locator('.token-list-empty');
-      await expect(empty).toContainText('No tokens yet');
+    test('the token section links to the key list instead of listing keys (LIN-3846)', async ({ page }) => {
+      await expect(page.getByTestId('dispatch-keys-link')).toHaveAttribute('href', /\/settings\/agent-access$/);
+      await expect(page.locator('.token-list')).toHaveCount(0);
     });
 
     test('can create token and see modal', async ({ page }) => {
@@ -933,10 +933,12 @@ test.describe('Dispatch Page', () => {
       await expect(modal).toBeVisible({ timeout: 5000 });
       await modal.locator('.token-modal-close').click();
 
-      // Token should appear in list
-      const tokenItem = page.locator('.token-item');
+      // Token should appear in the key list on Settings › Agent access
+      await page.getByTestId('dispatch-keys-link').click();
+      const tokenItem = page.getByTestId('settings-key-dispatch');
       await expect(tokenItem).toBeVisible();
-      await expect(tokenItem.locator('.token-label-text')).toContainText('List Token');
+      await tokenItem.locator('summary').click();
+      await expect(tokenItem).toContainText('List Token');
     });
 
     test('can revoke token', async ({ page }) => {
@@ -948,13 +950,13 @@ test.describe('Dispatch Page', () => {
       await expect(modal).toBeVisible({ timeout: 5000 });
       await modal.locator('.token-modal-close').click();
 
-      // Revoke the token
-      page.on('dialog', dialog => dialog.accept());
-      const revokeBtn = page.locator('.token-revoke');
-      await revokeBtn.click();
+      // Revoke the token from the key list (the button is inside the opened row)
+      await page.getByTestId('dispatch-keys-link').click();
+      await page.getByTestId('settings-key-dispatch').locator('summary').click();
+      await page.getByTestId('settings-key-dispatch').getByTestId('settings-key-revoke').click();
 
       // Token should be removed
-      await expect(page.locator('.token-list-empty')).toContainText('No tokens yet');
+      await expect(page.getByTestId('settings-key-dispatch')).toHaveCount(0);
     });
 
     test('LIN-3137: a non-owner mint surfaces the owner-only refusal, no modal, no token row', async ({ page }) => {
@@ -970,7 +972,8 @@ test.describe('Dispatch Page', () => {
       await expect(toast).toContainText("Only this workspace's owner can mint a dispatch token");
 
       await expect(page.locator('.token-modal')).toHaveCount(0);
-      await expect(page.locator('.token-item')).toHaveCount(0);
+      await page.getByTestId('dispatch-keys-link').click();
+      await expect(page.getByTestId('settings-key-dispatch')).toHaveCount(0);
     });
   });
 

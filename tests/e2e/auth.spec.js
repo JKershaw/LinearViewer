@@ -80,7 +80,7 @@ test.describe('Logout Flow', () => {
   });
 
   test('logout link destroys session and shows landing page', async ({ page, workerUrlKey }) => {
-    await page.goto(`/workspace/${workerUrlKey}/settings`);
+    await page.goto(`/workspace/${workerUrlKey}/settings/account`);
 
     // Verify we're authenticated
     await expect(page.locator('.nav-bar')).toBeVisible();
@@ -96,7 +96,7 @@ test.describe('Logout Flow', () => {
   });
 
   test('after logout, navigating to home shows landing page', async ({ page, workerUrlKey }) => {
-    await page.goto(`/workspace/${workerUrlKey}/settings`);
+    await page.goto(`/workspace/${workerUrlKey}/settings/account`);
 
     // Click logout on settings page and wait for redirect
     await Promise.all([

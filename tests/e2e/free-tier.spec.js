@@ -279,7 +279,7 @@ test.describe('Free Tier Settings', () => {
   });
 
   test('settings page shows free tier status and the runs allowance', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/account`);
     await page.waitForLoadState('networkidle');
 
     const freeTierStatus = page.locator('[data-free-tier-status]');

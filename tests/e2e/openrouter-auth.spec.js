@@ -9,7 +9,7 @@ let SETTINGS_URL;
 test.beforeEach(({ workerUrlKey }) => {
   WORKSPACE_KEY = workerUrlKey;
   WORKSPACE_URL = `/workspace/${workerUrlKey}/`;
-  SETTINGS_URL = `/workspace/${workerUrlKey}/settings`;
+  SETTINGS_URL = `/workspace/${workerUrlKey}/settings/account`;
 });
 
 /**

@@ -244,7 +244,7 @@ async function runCopyButton(providerDisplayName) {
   const promptOutput = el();
   const tokenList = el({ dataset: { urlKey: 'acme' } });
 
-  const byId = { 'proxy-generate-btn': generateBtn, 'proxy-prompt-output': promptOutput };
+  const byId = { 'proxy-generate-btn': generateBtn, 'proxy-prompt-output': promptOutput, 'proxy-create-token-form': tokenList };
   const bySelector = { '.proxy-token-list': tokenList };
 
   const sandbox = {

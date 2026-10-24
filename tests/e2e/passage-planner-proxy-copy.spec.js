@@ -91,6 +91,6 @@ test.describe('Passage Planner route gate — flag off', () => {
     await page.goto(`/workspace/${URL_KEY}/passage-planner`);
     await page.waitForLoadState('networkidle');
 
-    await expect(page).toHaveURL(new RegExp(`/workspace/${URL_KEY}/settings$`));
+    await expect(page).toHaveURL(new RegExp(`/workspace/${URL_KEY}/settings/features$`));
   });
 });

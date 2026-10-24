@@ -39,17 +39,16 @@ test.describe('Proxy Page', () => {
     await expect(page.locator('text=Event Log')).toBeVisible();
   });
 
-  test('token list and event log are collapsed by default', async ({ page }) => {
+  test('the event log is collapsed by default and the token list is a link to Settings (LIN-3846)', async ({ page }) => {
     await page.goto(PROXY_PAGE_URL);
     await page.waitForLoadState('networkidle');
 
-    // Both collapsibles should be present but closed
-    await expect(page.locator('#proxy-tokens-collapsible')).not.toHaveAttribute('open', '');
     await expect(page.locator('#proxy-events-collapsible')).not.toHaveAttribute('open', '');
-
-    // Token list content is not visible while collapsed
-    await expect(page.locator('.proxy-token-list')).not.toBeVisible();
     await expect(page.locator('.proxy-events-list')).not.toBeVisible();
+
+    // The page carries no list of keys of its own: one link row to the one list.
+    await expect(page.locator('.proxy-token-list')).toHaveCount(0);
+    await expect(page.getByTestId('proxy-keys-link')).toHaveAttribute('href', /\/settings\/agent-access$/);
   });
 
   test('can create and revoke proxy tokens via UI', async ({ page }) => {
@@ -68,47 +67,27 @@ test.describe('Proxy Page', () => {
     await page.click('.token-modal-close');
     await expect(page.locator('.token-modal')).not.toBeVisible();
 
-    // Tokens collapsible auto-opens and token appears in list
-    await expect(page.locator('#proxy-tokens-collapsible')).toHaveAttribute('open', '');
-    await expect(page.locator('.proxy-token-list')).toContainText('test-ui-token');
+    // The token is in the one key list on Settings › Agent access
+    await page.getByTestId('proxy-keys-link').click();
+    const key = page.getByTestId('settings-key-proxy').filter({ hasText: 'test-ui-token' });
+    await expect(key).toHaveCount(1);
 
-    // Revoke the token
-    page.on('dialog', dialog => dialog.accept());
-    await page.click('.token-revoke');
-
-    // Should be empty again (list stays open)
-    await expect(page.locator('.proxy-token-list')).toContainText('No proxy tokens yet');
+    // Revoke it from the opened row
+    await key.locator('summary').click();
+    await key.getByTestId('settings-key-revoke').click();
+    await expect(page.getByTestId('settings-key-proxy').filter({ hasText: 'test-ui-token' })).toHaveCount(0);
   });
 
-  test('tokens section shows show-more when more than 5 tokens exist', async ({ page }) => {
+  test('the key list on Settings shows every key, however many (LIN-3846)', async ({ page }) => {
     // Seed 7 tokens via the test endpoint
     for (let i = 0; i < 7; i++) {
       await page.goto(`/test/create-proxy-token?label=seed-${i}&urlKey=${URL_KEY}`);
     }
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
 
-    await page.goto(PROXY_PAGE_URL);
+    await page.goto(`/workspace/${URL_KEY}/settings/agent-access`);
     await page.waitForLoadState('networkidle');
-
-    // Expand tokens section
-    await page.locator('#proxy-tokens-collapsible summary').click();
-
-    // Wait for tokens to render
-    await page.waitForSelector('.token-item');
-
-    // Only 5 tokens visible initially + show-more button
-    const visibleItemsCount = await page.locator('.token-item:visible').count();
-    expect(visibleItemsCount).toBe(5);
-
-    const showMore = page.locator('.token-show-more');
-    await expect(showMore).toBeVisible();
-    await expect(showMore).toContainText('show 2 more');
-
-    await showMore.click();
-
-    // All 7 tokens now visible, button gone
-    await expect(page.locator('.token-show-more')).toHaveCount(0);
-    expect(await page.locator('.token-item:visible').count()).toBe(7);
+    await expect(page.getByTestId('settings-key-proxy').filter({ hasText: 'Read' })).toHaveCount(7);
   });
 });
 
@@ -2495,23 +2474,22 @@ test.describe('Proxy credential-fault visibility (LIN-1586)', () => {
       await page.goto(`/test/create-proxy-token?label=legacy-runner&ownerless=true&urlKey=${URL_KEY}`);
       await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
 
-      await page.goto(PROXY_PAGE_URL);
-      await page.click('#proxy-tokens-collapsible summary');
+      await page.goto(`/workspace/${URL_KEY}/settings/agent-access`);
 
-      const row = page.locator('.proxy-token-list .token-item', { hasText: 'legacy-runner' });
-      await expect(row.locator('.token-ownerless')).toHaveText('no owner · re-issue');
+      const row = page.getByTestId('settings-key-proxy').filter({ hasText: 'legacy-runner' });
+      await row.locator('summary').click();
+      await expect(row).toContainText('no owner · re-issue');
     });
 
     test('an owned token wears no badge', async ({ page }) => {
       await page.goto(`/test/create-proxy-token?label=owned-runner&urlKey=${URL_KEY}`);
       await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
 
-      await page.goto(PROXY_PAGE_URL);
-      await page.click('#proxy-tokens-collapsible summary');
+      await page.goto(`/workspace/${URL_KEY}/settings/agent-access`);
 
-      const row = page.locator('.proxy-token-list .token-item', { hasText: 'owned-runner' });
+      const row = page.getByTestId('settings-key-proxy').filter({ hasText: 'owned-runner' });
       await expect(row).toBeVisible();
-      await expect(row.locator('.token-ownerless')).toHaveCount(0);
+      await expect(row).not.toContainText('no owner');
     });
 
     test('the tokens API reports hasOwner as a verdict, never the account id', async ({ page }) => {

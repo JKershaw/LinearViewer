@@ -464,7 +464,7 @@ test.describe('Ship Page — gating (LIN-496)', () => {
     await seedLocal(swimLocalSeed(localWorkerUrlKey)); // no ship flag
     await page.goto(`/workspace/${localWorkerUrlKey}/ship`);
     await page.waitForLoadState('networkidle');
-    await expect(page).toHaveURL(new RegExp(`/workspace/${localWorkerUrlKey}/settings$`));
+    await expect(page).toHaveURL(new RegExp(`/workspace/${localWorkerUrlKey}/settings/features$`));
     await expect(page.locator('#ship-rect')).toHaveCount(0);
   });
 });

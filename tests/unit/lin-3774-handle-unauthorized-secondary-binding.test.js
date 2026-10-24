@@ -222,7 +222,7 @@ describe('LIN-3774 handleUnauthorizedError — tagged secondary 401', () => {
     const { res, run } = harness({ fetchThrows });
     await run(makeWorkspace(), authError(GH_TAG));
     assert.equal(res.statusCode, 503);
-    assert.match(res.body, /href="\/workspace\/lv\/settings"/);
+    assert.match(res.body, /href="\/workspace\/lv\/settings\/sources"/);
     assert.match(res.body, /Go to settings/);
   });
 });
