@@ -43,6 +43,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { dashboardUnitFiles } from './lib/dashboard-unit.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, '..', '..');
@@ -186,10 +187,13 @@ describe('LIN-1899 census (b) — scalar feeds, by owner', () => {
     // EITHER the legacy inline raw read or the S0 accessor. The SET is
     // unchanged: exactly one Bearer template, still the image proxy.
     const BEARER_MIRROR = /Bearer \$\{(?:workspace\.accessToken|getWorkspaceToken\(workspace\))\}/g;
+    // LIN-3840: the dashboard key is the sum over every dashboard-unit file (routes/dashboard.js
+    // and routes/dashboard-*.js), so moving code inside the unit cannot blind it. Still 0 inside
+    // the total of 1; the other keys are unchanged.
     const counts = {
       'routes/workspace-api.js': count(read('routes/workspace-api.js'), BEARER_MIRROR),
       'routes/proxy.js': count(read('routes/proxy.js'), BEARER_MIRROR),
-      'routes/dashboard.js': count(read('routes/dashboard.js'), BEARER_MIRROR),
+      'dashboard unit': dashboardUnitFiles(repoRoot).reduce((n, rel) => n + count(read(rel), BEARER_MIRROR), 0),
     };
     const total = Object.values(counts).reduce((a, b) => a + b, 0);
 
@@ -212,7 +216,10 @@ describe('LIN-1899 census (b) — scalar feeds, by owner', () => {
     // resolveWorkspaceAccess( call left in the file is resolveProviderAccess's
     // own internal read, so the count below is now 1, not 10.
     const proxyResolves = count(read('routes/proxy.js'), /resolveWorkspaceAccess\(/g);
-    const dashboardReads = count(read('routes/dashboard.js'), /getWorkspaceAccessToken\(/g);
+    // LIN-3840: counted over every dashboard-unit file (routes/dashboard.js and
+    // routes/dashboard-*.js); the number is unchanged. The behaviour witness for these
+    // two sites is the C2 pair in lin-3124-pr3-checkpoint-c2.test.js.
+    const dashboardReads = dashboardUnitFiles(repoRoot).reduce((n, rel) => n + count(read(rel), /getWorkspaceAccessToken\(/g), 0);
 
     assert.equal(
       proxyResolves,
@@ -226,10 +233,71 @@ describe('LIN-1899 census (b) — scalar feeds, by owner', () => {
     assert.equal(
       dashboardReads,
       2,
-      `Found ${dashboardReads} getWorkspaceAccessToken( sites in routes/dashboard.js (expected 2, both ` +
+      `Found ${dashboardReads} getWorkspaceAccessToken( sites across the dashboard unit (expected 2, both ` +
       'LIN-1912\'s, unaffected by LIN-2044 — that ticket scoped routes/proxy.js only). routes/dashboard.js:829 ' +
       'fires on a POLL with no user action, making it the most reachable member of this class — more so than ' +
       'the audit route this ticket was filed for.'
     );
+  });
+});
+
+// =============================================================================
+// LIN-3840 — the dashboard half of (b), judged over the dashboard unit
+// =============================================================================
+// routes/dashboard.js and routes/dashboard-*.js are one unit (tests/unit/lib/
+// dashboard-unit.js), so the createDashboardRoutes rebuild (LIN-3742) may place
+// its code anywhere in it. The numbers do not change: the class is Drift's
+// (LIN-1912 / LIN-1989). Pure functions over a `{ rel: src }` map so the witnesses
+// plant violations in a synthetic map. The behaviour witness for the accessor
+// sites is the C2 pair in lin-3124-pr3-checkpoint-c2.test.js.
+const BEARER_MIRROR_RE = /Bearer \$\{(?:workspace\.accessToken|getWorkspaceToken\(workspace\))\}/g;
+const readUnit = () => Object.fromEntries(dashboardUnitFiles(repoRoot).map(rel => [rel, read(rel)]));
+
+/** getWorkspaceAccessToken( across every unit file: exactly 2 (LIN-1912's two sites). */
+function unitAccessorProblems(unit) {
+  const total = Object.values(unit).reduce((n, src) => n + count(src, /getWorkspaceAccessToken\(/g), 0);
+  return total === 2 ? [] : [`found ${total} getWorkspaceAccessToken( sites across the dashboard unit, expected exactly 2`];
+}
+
+/** The raw-mirror Bearer template: 1 in total, with the unit contributing to the sum. */
+function bearerMirrorProblems(unit, others) {
+  const counts = { ...Object.fromEntries(Object.entries(others).map(([k, src]) => [k, count(src, BEARER_MIRROR_RE)])),
+    'dashboard unit': Object.values(unit).reduce((n, src) => n + count(src, BEARER_MIRROR_RE), 0) };
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  return total === 1 ? [] : [`found ${total} raw-mirror Bearer template(s) ${JSON.stringify(counts)}, expected exactly 1 (the image proxy)`];
+}
+
+describe('LIN-3840 census (b) — the dashboard unit', () => {
+  const others = () => ({ 'routes/workspace-api.js': read('routes/workspace-api.js'), 'routes/proxy.js': read('routes/proxy.js') });
+
+  test('the dashboard unit has exactly 2 getWorkspaceAccessToken( sites', () => {
+    assert.deepEqual(unitAccessorProblems(readUnit()), []);
+  });
+
+  test('witness: a third site planted in a unit file fails', () => {
+    const unit = { ...readUnit(), 'routes/dashboard.js': `${read('routes/dashboard.js')}\nconst t = await getWorkspaceAccessToken(urlKey);\n` };
+    assert.equal(unitAccessorProblems(unit).length, 1);
+  });
+
+  test('witness: a site in a new routes/dashboard-x.js fails', () => {
+    const unit = { ...readUnit(), 'routes/dashboard-x.js': 'export const t = (urlKey) => getWorkspaceAccessToken(urlKey);\n' };
+    assert.equal(unitAccessorProblems(unit).length, 1);
+  });
+
+  // Built from synthetic unit files, never from the live text of routes/dashboard.js.
+  test('witness: a site moved between unit files stays clean, a site dropped fails', () => {
+    const site = 'const token = await getWorkspaceAccessToken(wsUrlKey, req.session);\n';
+    assert.deepEqual(unitAccessorProblems({ 'routes/dashboard.js': site + site }), []);
+    assert.deepEqual(unitAccessorProblems({ 'routes/dashboard.js': site, 'routes/dashboard-x.js': site }), []);
+    assert.equal(unitAccessorProblems({ 'routes/dashboard.js': site }).length, 1);
+  });
+
+  test('the raw-mirror Bearer template totals 1 with the whole unit counted', () => {
+    assert.deepEqual(bearerMirrorProblems(readUnit(), others()), []);
+  });
+
+  test('witness: a Bearer ${workspace.accessToken} template planted in a non-dashboard.js unit file fails', () => {
+    const unit = { ...readUnit(), 'routes/dashboard-x.js': 'export const h = (workspace) => ({ Authorization: `Bearer ${workspace.accessToken}` });\n' };
+    assert.equal(bearerMirrorProblems(unit, others()).length, 1);
   });
 });

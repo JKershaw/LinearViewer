@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { dashboardUnitFiles } from './lib/dashboard-unit.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -35,7 +36,8 @@ const FILES = [
   'routes/proxy-compute.js',
   'routes/task-chat.js',
   'routes/next-run.js',
-  'routes/dashboard.js'
+  // LIN-3840: the dashboard unit (routes/dashboard.js and routes/dashboard-*.js), not one file.
+  ...dashboardUnitFiles(root)
 ];
 
 const RESOLVER_FNS = ['resolveWorkspaceModel', 'resolveAiOperationModel'];
@@ -69,4 +71,52 @@ test('every billed resolveWorkspaceModel / resolveAiOperationModel call threads 
   // not a pinned count: dropping the clamp from one real billed site in a
   // scanned file must fail this test (recorded in the PR).
   assert.ok(billedClampCount > 0, 'expected at least one clamped billed site — a zero scan would be vacuous');
+});
+
+// ─── LIN-3840: the dashboard routes as one unit ──────────────────────────────
+// The same rule over the whole dashboard unit (routes/dashboard.js and
+// routes/dashboard-*.js; tests/unit/lib/dashboard-unit.js), so the
+// createDashboardRoutes rebuild (LIN-3742) can place its two summary routes in any
+// unit file and a file that holds a billed call is still scanned.
+//
+// Reported, not fixed here: FILES is stale. It omits routes/flight-companion.js
+// (its :420 call spans lines, so the one-line rule would fail it), routes/ship-biscuit.js
+// (clamped), lib/agent-turn.js (:465) and lib/observer-pass.js (:392, unclamped), and
+// still lists routes/task-chat.js, which is no longer a caller. No ticket identified.
+
+/** Unclamped, non-display-only resolver calls in `{ rel: src }`; [] means clean. */
+function clampProblems(sources) {
+  const problems = [];
+  let billed = 0;
+  for (const [rel, src] of Object.entries(sources)) {
+    src.split('\n').forEach((line, i) => {
+      const fn = RESOLVER_FNS.find(f => line.includes(`${f}({`));
+      if (!fn) return;
+      const trimmed = line.trim();
+      if (trimmed.includes('forceDefault: isFreeTier')) { billed++; return; }
+      if (!DISPLAY_ONLY.has(trimmed)) problems.push(`${rel}:${i + 1} calls ${fn} without the free-tier clamp: ${trimmed}`);
+    });
+  }
+  if (billed === 0) problems.push('no clamped billed site found: a zero scan is vacuous');
+  return problems;
+}
+
+test('LIN-3840: every billed call in the dashboard unit threads forceDefault: isFreeTier', () => {
+  const sources = Object.fromEntries(dashboardUnitFiles(root).map(rel => [rel, readFileSync(join(root, rel), 'utf8')]));
+  assert.deepEqual(clampProblems(sources), []);
+  // Both summary routes are billed sites in the unit.
+  const clamped = Object.values(sources).join('\n').split('\n').filter(l => l.includes('resolveAiOperationModel({') && l.includes('forceDefault: isFreeTier'));
+  assert.equal(clamped.length, 2);
+});
+
+// Built from synthetic unit files, never from the live text of routes/dashboard.js.
+test('LIN-3840 witness: dropping forceDefault: isFreeTier from the run-summary site of any unit file fails', () => {
+  const clamped = "const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'run-summary', forceDefault: isFreeTier });";
+  const dropped = clamped.replace(', forceDefault: isFreeTier', '');
+  assert.notEqual(dropped, clamped);
+  assert.deepEqual(clampProblems({ 'routes/dashboard.js': clamped }), []);
+  assert.deepEqual(clampProblems({ 'routes/dashboard.js': '', 'routes/dashboard-body.js': clamped }), []);
+  const hit = clampProblems({ 'routes/dashboard.js': clamped, 'routes/dashboard-body.js': `\n${dropped}` });
+  assert.equal(hit.length, 1, hit.join('\n'));
+  assert.match(hit[0], /^routes\/dashboard-body\.js:2 /);
 });

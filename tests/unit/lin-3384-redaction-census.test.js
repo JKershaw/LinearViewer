@@ -39,6 +39,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { isDashboardUnitFile } from './lib/dashboard-unit.js';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const STORE_FILE = 'lib/dispatch-store.js';
@@ -132,8 +133,10 @@ const TABLE = {
   'routes/dispatch.js :: host': [SRV, 1],
   'routes/dispatch.js :: refuse': [SRV, 1],
   'routes/proxy-kickoff.js :: parentRun': [SRV, 1],
-  'routes/dashboard.js :: computeWorkspaceEffortReadout': [SRV, 2],
-  'routes/dashboard.js :: loadRunForSummary': [SRV, 1],
+  // LIN-3840: the routes/dashboard.js rows (computeWorkspaceEffortReadout 2, loadRunForSummary 1,
+  // both server-side-only) are gone. The dashboard unit (routes/dashboard.js, routes/dashboard-*.js)
+  // is judged by reader kind at the end of this file and swept with a canary token by
+  // dashboard-redaction-canary-sweep.test.js.
   'lib/dispatch-session-read.js :: pointReadSession': [SRV, 3], // LIN-3812: lifted from routes/dashboard.js
   // routes — explicit allow-list / projection
   'routes/proxy-dispatch.js :: /api/proxy/dispatch': [PRJ, 3],
@@ -176,6 +179,7 @@ function check(files, table = TABLE) {
   const eKinds = new Set();
   for (const [id, { count, body, kinds }] of sites) {
     const file = id.split(' :: ')[0];
+    if (isDashboardUnitFile(file)) continue; // LIN-3840: judged by checkDashboardUnit below
     if (file === E_LIB_FILE) { kinds.forEach(k => eKinds.add(k)); continue; }
     if (E_ROUTE_FILES.has(file)) kinds.forEach(k => eKinds.add(k));
     const row = table[id];
@@ -191,6 +195,7 @@ function check(files, table = TABLE) {
   }
   for (const kind of E_READER_KINDS) if (!eKinds.has(kind)) v.push(`E reader kind ${kind}: no call left in the entrances — stale, or it moved out of E`);
   for (const kind of eKinds) if (!E_READER_KINDS.includes(kind)) v.push(`E reader kind ${kind}: an unlisted reader kind in the entrances — classify it and add a canary-sweep row`);
+  v.push(...checkDashboardUnit(files));
   return v;
 }
 
@@ -294,5 +299,63 @@ describe('LIN-3384 census — mutation witnesses (each fake must fail the scan)'
   test('a stale row (site removed) is caught', () => {
     const v = check(clone(), { ...TABLE, 'lib/gone.js :: nothing': [SRV, 1] });
     assert.ok(v.some(x => x.includes('stale row: lib/gone.js')), v.join('\n'));
+  });
+});
+
+// ─── LIN-3840: the dashboard routes as one unit ──────────────────────────────
+// Inside the dashboard unit (routes/dashboard.js, routes/dashboard-*.js) what is
+// pinned is the reader KIND: each kind below must still occur, an unlisted kind
+// (a raw historyCollection read, a direct formatter call, a runner reader) fails.
+// Counts and `file :: function` keys are dropped so the createDashboardRoutes rebuild
+// (LIN-3742) can place its reads anywhere in the unit. Which response a read may
+// leave in is carried by dashboard-redaction-canary-sweep.test.js, which drives
+// every dashboard route with a runtime-built canary token. These are the unit's own
+// kinds, not E_READER_KINDS.
+const DASHBOARD_UNIT_READER_KINDS = ['getItemStatus', 'listItems', 'listHistory'];
+
+/** Violations of the unit rule against a set of `{file, src}`; [] means clean. */
+function checkDashboardUnit(files) {
+  const v = [];
+  const kinds = new Set();
+  for (const { kinds: k } of scanSites(files.filter(f => isDashboardUnitFile(f.file))).values()) k.forEach(x => kinds.add(x));
+  for (const kind of DASHBOARD_UNIT_READER_KINDS) if (!kinds.has(kind)) v.push(`dashboard unit reader kind ${kind}: no call left in the unit — stale, or it moved out of the unit`);
+  for (const kind of kinds) if (!DASHBOARD_UNIT_READER_KINDS.includes(kind)) v.push(`dashboard unit reader kind ${kind}: an unlisted reader kind in the unit — classify it and add a canary-sweep row`);
+  return v;
+}
+
+describe('LIN-3840 census — dashboard unit reader kinds', () => {
+  const clone = () => LIVE.map(f => ({ ...f }));
+
+  test('the live unit reads exactly getItemStatus, listItems and listHistory', () => {
+    assert.deepEqual(checkDashboardUnit(LIVE), []);
+  });
+
+  test('moving a reader call into a new unit file stays clean (the unit is judged whole)', () => {
+    const files = [...clone(), { file: 'routes/dashboard-moved.js', src: 'export const m = (dispatchQueueStore, urlKey) => dispatchQueueStore.listItems(urlKey);\n' }];
+    assert.deepEqual(checkDashboardUnit(files), []);
+  });
+
+  test('witness: a raw historyCollection.find( planted in a unit file fails', () => {
+    for (const file of ['routes/dashboard.js', 'routes/dashboard-x.js']) {
+      const files = [...clone().filter(f => f.file !== file), { file, src: `${LIVE.find(f => f.file === file)?.src ?? ''}\nexport const rawLeak = (dispatchStore) => dispatchStore\n  .historyCollection\n  .find({});\n` }];
+      const v = checkDashboardUnit(files);
+      assert.ok(v.some(x => x.includes('raw-collection-read') && x.includes('unlisted reader kind')), `${file}: ${v.join('\n')}`);
+    }
+  });
+
+  test('witness: a runner reader (takeItem) planted in a unit file fails', () => {
+    const files = [...clone(), { file: 'routes/dashboard-x.js', src: 'export const t = (s) => s.takeItem("a");\n' }];
+    assert.ok(checkDashboardUnit(files).some(x => x.includes('takeItem') && x.includes('unlisted reader kind')));
+  });
+
+  test('witness: every getItemStatus( removed from the unit fails as stale', () => {
+    const files = clone().map(f => (isDashboardUnitFile(f.file) ? { ...f, src: f.src.replaceAll('.getItemStatus(', '.nothingReads(') } : f));
+    assert.ok(checkDashboardUnit(files).some(x => x.includes('getItemStatus') && x.includes('no call left')));
+  });
+
+  test('a reader in lib/ (outside the unit) does not count toward the unit', () => {
+    const files = clone().map(f => (isDashboardUnitFile(f.file) ? { ...f, src: f.src.replaceAll('.getItemStatus(', '.nothingReads(') } : f));
+    files.push({ file: 'lib/zz-reader.js', src: 'export const r = (s) => s.getItemStatus("u", "i");\n' });
+    assert.ok(checkDashboardUnit(files).some(x => x.includes('getItemStatus') && x.includes('no call left')));
   });
 });

@@ -110,6 +110,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join, relative } from 'node:path';
+import { dashboardUnitFiles, isDashboardUnitFile } from './lib/dashboard-unit.js';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 
@@ -146,7 +147,12 @@ const expectedGateCalls = {
   'routes/ship-biscuit.js': 1,
   // Six full-adopt sites + the feedback-title live call (LIN-3635).
   'routes/workspace-api.js': 7,
-  'routes/dashboard.js': 2,
+  // LIN-3840: the routes/dashboard.js row (2) is gone. One quota unit per request at the two
+  // summary routes is carried by (1) the dashboard-unit rule at the end of this file (exactly 2
+  // checkFreeTierGate( calls across the unit), (2) dashboard-routes.test.js 'LIN-3658: a
+  // free-tier denial is a 429 ...' at both summary routes (the store is charged exactly once,
+  // deepEqual(calls, ['ws-a'])), and (3) dashboard-summary-credential-chain.test.js (d), the
+  // allow path: a free-tier key with an allowing store is charged exactly once.
   'routes/workspace-api-roadmap.js': 1,
   'routes/flight-companion.js': 2,
   'routes/task-chat.js': 1,
@@ -193,14 +199,13 @@ describe('Interactive OpenRouter chain: byte-identity census (LIN-2412 / LIN-297
     assert.doesNotMatch(src, /apiKeyToUse = sessionApiKey \|\| \(isFreeTier \? freeTierKey : undefined\)/, 'the old per-site duplicated ternary must be gone — resolveChatCredential now supplies apiKeyToUse directly at each site');
   });
 
-  test('routes/dashboard.js: resolveChatCredential is called exactly twice, and the degrade guard at both sites is now `if (!apiKey)` (LIN-2978)', () => {
-    const src = read('routes/dashboard.js');
-    const callCount = (src.match(/resolveChatCredential\s*\(/g) || []).length;
-    assert.equal(callCount, 2, `expected exactly 2 resolveChatCredential calls in routes/dashboard.js (run-summary + session-summary), found ${callCount}`);
-    const guardCount = (src.match(/if \(!apiKey\) \{/g) || []).length;
-    assert.equal(guardCount, 2, `expected exactly 2 "if (!apiKey) {" degrade guards in routes/dashboard.js, found ${guardCount}`);
-    assert.doesNotMatch(src, /hasPaidEnvKey/, 'hasPaidEnvKey must be fully dead in routes/dashboard.js — its only calls were inside the code this sweep replaced');
-  });
+  // LIN-3840: 'routes/dashboard.js: resolveChatCredential is called exactly twice, and the
+  // degrade guard at both sites is now `if (!apiKey)` (LIN-2978)' is gone. The two counts are
+  // carried by behaviour: dashboard-summary-credential-chain.test.js drives POST run-summary and
+  // POST session-summary over HTTP (no key anywhere -> 503 "AI summaries are not configured"; the
+  // session key wins and is never free-tier; the paid env key alone; the free-tier key alone,
+  // charged once). The absence (hasPaidEnvKey dead) is the dashboard-unit rule at the end of
+  // this file, over every unit file.
 
   test('routes/proxy.js resolves through lib/chat-request.js (LIN-2427)', () => {
     const src = read('routes/proxy.js');
@@ -215,16 +220,10 @@ describe('Interactive OpenRouter chain: byte-identity census (LIN-2412 / LIN-297
     }
   });
 
-  test('expectedGateCalls is exhaustive — every routes/ or lib/ file calling checkFreeTierGate( is pinned', () => {
-    const chatRequestPath = join(ROOT, 'lib/chat-request.js'); // definition, not a call site
-    const files = [...walk(join(ROOT, 'routes')), ...walk(join(ROOT, 'lib'))];
-    const filesWithCalls = files
-      .filter(f => f !== chatRequestPath)
-      .filter(f => /checkFreeTierGate\s*\(/.test(readFileSync(f, 'utf8')))
-      .map(f => relative(ROOT, f));
-    assert.deepEqual(filesWithCalls.sort(), Object.keys(expectedGateCalls).sort(),
-      'every routes/ or lib/ file calling checkFreeTierGate( must be a key in expectedGateCalls');
-  });
+  // LIN-3840: 'expectedGateCalls is exhaustive — every routes/ or lib/ file calling
+  // checkFreeTierGate( is pinned' is now the dashboard-unit rule at the end of this file: a file
+  // calling checkFreeTierGate( must be a key of expectedGateCalls OR a dashboard-unit file, and
+  // the unit holds exactly 2 calls in total.
 
   // LIN-3658: the priority ladder moved to lib/chat-request.js
   // (resolveOpenRouterSource); its behavioural replacement for the old byte pin
@@ -245,5 +244,96 @@ describe('Interactive OpenRouter chain: byte-identity census (LIN-2412 / LIN-297
     const fnEnd = src.indexOf('\n}', fnStart);
     const fnBody = src.slice(fnStart, fnEnd);
     assert.doesNotMatch(fnBody, /openRouterDurableConsentAt|getOpenRouterConsent/, 'the interactive source predicate must never read the unattended-use consent field');
+  });
+});
+
+// ─── LIN-3840: the dashboard routes as one unit ──────────────────────────────
+// The rules below judge routes/dashboard.js and routes/dashboard-*.js as a set
+// (tests/unit/lib/dashboard-unit.js), so the createDashboardRoutes rebuild
+// (LIN-3742) can place its code anywhere in the unit. Pure functions over a
+// `{ rel: src }` map, so the witnesses plant violations in a synthetic map.
+const UNIT_GATE_CALLS = 2; // run-summary + session-summary: one quota unit per request, kept EXACT
+const readMap = (rels) => Object.fromEntries(rels.map(rel => [rel, read(rel)]));
+
+/** `{rel: src}` for the dashboard unit, and for every routes/ + lib/ file. */
+const liveUnit = () => readMap(dashboardUnitFiles(ROOT));
+const liveGateScope = () => readMap([...walk(join(ROOT, 'routes')), ...walk(join(ROOT, 'lib'))]
+  .map(f => relative(ROOT, f)).filter(rel => rel !== 'lib/chat-request.js'));
+
+/** hasPaidEnvKey must stay dead in every unit file. */
+function paidEnvKeyProblems(unit) {
+  return Object.entries(unit).filter(([, src]) => /hasPaidEnvKey/.test(src)).map(([rel]) => `${rel}: hasPaidEnvKey is back`);
+}
+
+/**
+ * A file calling checkFreeTierGate( must be a key of `expected` or a dashboard-unit
+ * file, and the unit holds EXACTLY UNIT_GATE_CALLS calls in total.
+ */
+function gateCallProblems(files, expected) {
+  const problems = [];
+  const calls = (src) => (src.match(/checkFreeTierGate\s*\(/g) || []).length;
+  let unitCalls = 0;
+  const outside = [];
+  for (const [rel, src] of Object.entries(files)) {
+    const n = calls(src);
+    if (!n) continue;
+    if (isDashboardUnitFile(rel)) unitCalls += n;
+    else outside.push(rel);
+  }
+  if (unitCalls !== UNIT_GATE_CALLS) problems.push(`the dashboard unit holds ${unitCalls} checkFreeTierGate( call(s), expected exactly ${UNIT_GATE_CALLS}`);
+  const listed = Object.keys(expected).filter(rel => !isDashboardUnitFile(rel));
+  for (const rel of outside) if (!listed.includes(rel)) problems.push(`${rel} calls checkFreeTierGate( but is neither a key of expectedGateCalls nor a dashboard-unit file`);
+  for (const rel of listed) if (!outside.includes(rel)) problems.push(`${rel} is a key of expectedGateCalls but no longer calls checkFreeTierGate(`);
+  return problems;
+}
+
+describe('LIN-3840: dashboard unit rules (B pins, each with planted-violation witnesses)', () => {
+  const planted = (files, rel, fn) => ({ ...files, [rel]: fn(files[rel] ?? '') });
+
+  test('hasPaidEnvKey is absent from every dashboard-unit file', () => {
+    assert.deepEqual(paidEnvKeyProblems(liveUnit()), []);
+  });
+
+  test('witness: hasPaidEnvKey planted in a unit file other than routes/dashboard.js fails', () => {
+    const unit = planted(liveUnit(), 'routes/dashboard-x.js', () => 'import { hasPaidEnvKey } from "../lib/openrouter.js";\nexport const k = hasPaidEnvKey();\n');
+    assert.deepEqual(paidEnvKeyProblems(unit), ['routes/dashboard-x.js: hasPaidEnvKey is back']);
+  });
+
+  const expectedOutsideUnit = Object.fromEntries(Object.entries(expectedGateCalls).filter(([rel]) => !isDashboardUnitFile(rel)));
+
+  test('checkFreeTierGate( : the unit holds exactly 2 calls, every other caller is a key of expectedGateCalls', () => {
+    assert.deepEqual(gateCallProblems(liveGateScope(), expectedOutsideUnit), []);
+  });
+
+  // The unit is judged whole, wherever its two calls sit. These cases are built from synthetic
+  // unit files (never from the live text of routes/dashboard.js, which is free to move).
+  const CALL = 'const check = await checkFreeTierGate({ isFreeTier, urlKey, freeTierStore });\n';
+  const withUnit = (unit) => {
+    const files = Object.fromEntries(Object.entries(liveGateScope()).filter(([rel]) => !isDashboardUnitFile(rel)));
+    return { ...files, ...unit };
+  };
+
+  test('the two calls may sit in one unit file or be split across unit files (the unit is judged whole)', () => {
+    assert.deepEqual(gateCallProblems(withUnit({ 'routes/dashboard.js': CALL + CALL }), expectedOutsideUnit), []);
+    assert.deepEqual(gateCallProblems(withUnit({ 'routes/dashboard.js': CALL, 'routes/dashboard-body.js': CALL }), expectedOutsideUnit), []);
+  });
+
+  test('witness: a third call planted in a unit file fails', () => {
+    const files = withUnit({ 'routes/dashboard.js': CALL + CALL + CALL });
+    assert.deepEqual(gateCallProblems(files, expectedOutsideUnit), ['the dashboard unit holds 3 checkFreeTierGate( call(s), expected exactly 2']);
+  });
+
+  test('witness: a call in a new routes/dashboard-x.js counts toward the unit and fails', () => {
+    const files = withUnit({ 'routes/dashboard.js': CALL + CALL, 'routes/dashboard-x.js': CALL });
+    assert.deepEqual(gateCallProblems(files, expectedOutsideUnit), ['the dashboard unit holds 3 checkFreeTierGate( call(s), expected exactly 2']);
+  });
+
+  test('witness: a call removed from the unit fails', () => {
+    assert.deepEqual(gateCallProblems(withUnit({ 'routes/dashboard.js': CALL }), expectedOutsideUnit), ['the dashboard unit holds 1 checkFreeTierGate( call(s), expected exactly 2']);
+  });
+
+  test('witness: a call in an unlisted non-unit file fails', () => {
+    const files = planted(liveGateScope(), 'routes/zz-unlisted.js', () => 'await checkFreeTierGate({});\n');
+    assert.deepEqual(gateCallProblems(files, expectedOutsideUnit), ['routes/zz-unlisted.js calls checkFreeTierGate( but is neither a key of expectedGateCalls nor a dashboard-unit file']);
   });
 });
