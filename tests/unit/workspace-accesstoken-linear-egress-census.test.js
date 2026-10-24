@@ -187,10 +187,13 @@ describe('LIN-1899 census (b) — scalar feeds, by owner', () => {
     // EITHER the legacy inline raw read or the S0 accessor. The SET is
     // unchanged: exactly one Bearer template, still the image proxy.
     const BEARER_MIRROR = /Bearer \$\{(?:workspace\.accessToken|getWorkspaceToken\(workspace\))\}/g;
+    // LIN-3840: the dashboard key is the sum over every dashboard-unit file (routes/dashboard.js
+    // and routes/dashboard-*.js), so moving code inside the unit cannot blind it. Still 0 inside
+    // the total of 1; the other keys are unchanged.
     const counts = {
       'routes/workspace-api.js': count(read('routes/workspace-api.js'), BEARER_MIRROR),
       'routes/proxy.js': count(read('routes/proxy.js'), BEARER_MIRROR),
-      'routes/dashboard.js': count(read('routes/dashboard.js'), BEARER_MIRROR),
+      'dashboard unit': dashboardUnitFiles(repoRoot).reduce((n, rel) => n + count(read(rel), BEARER_MIRROR), 0),
     };
     const total = Object.values(counts).reduce((a, b) => a + b, 0);
 
@@ -213,7 +216,10 @@ describe('LIN-1899 census (b) — scalar feeds, by owner', () => {
     // resolveWorkspaceAccess( call left in the file is resolveProviderAccess's
     // own internal read, so the count below is now 1, not 10.
     const proxyResolves = count(read('routes/proxy.js'), /resolveWorkspaceAccess\(/g);
-    const dashboardReads = count(read('routes/dashboard.js'), /getWorkspaceAccessToken\(/g);
+    // LIN-3840: counted over every dashboard-unit file (routes/dashboard.js and
+    // routes/dashboard-*.js); the number is unchanged. The behaviour witness for these
+    // two sites is the C2 pair in lin-3124-pr3-checkpoint-c2.test.js.
+    const dashboardReads = dashboardUnitFiles(repoRoot).reduce((n, rel) => n + count(read(rel), /getWorkspaceAccessToken\(/g), 0);
 
     assert.equal(
       proxyResolves,
@@ -227,7 +233,7 @@ describe('LIN-1899 census (b) — scalar feeds, by owner', () => {
     assert.equal(
       dashboardReads,
       2,
-      `Found ${dashboardReads} getWorkspaceAccessToken( sites in routes/dashboard.js (expected 2, both ` +
+      `Found ${dashboardReads} getWorkspaceAccessToken( sites across the dashboard unit (expected 2, both ` +
       'LIN-1912\'s, unaffected by LIN-2044 — that ticket scoped routes/proxy.js only). routes/dashboard.js:829 ' +
       'fires on a POLL with no user action, making it the most reachable member of this class — more so than ' +
       'the audit route this ticket was filed for.'
