@@ -146,6 +146,17 @@ const EXPECTED_HEADINGS = new Map([
   ['views.md', '### View Tiers'],
   ['ci.md', '## GitHub Actions CI (for AI Agents)'],
   ['experiments.md', '## Collective (experimental, LIN-450)'],
+  ['ui-pieces.md', '# UI pieces: who owns each shared UI decision'],
+]);
+
+// Docs under docs/architecture/ that CLAUDE.md does not point to directly, each with the doc that
+// does carry the pointer (LIN-3887). CLAUDE.md sits at its 110-line ceiling and the ticket that wrote
+// ui-pieces.md forbade editing it, so the note is reached through the source map, which CLAUDE.md
+// lists. This is one entry with its reason, not a loosening for every doc: the test below still
+// reads the carrier doc and fails if it stops naming the note. Remove the entry when CLAUDE.md gains
+// a pointer bullet of its own.
+const REACHED_VIA = new Map([
+  ['ui-pieces.md', 'source-map.md'],
 ]);
 
 const rows = [];
@@ -190,7 +201,11 @@ describe('docs/architecture/ anchor resolver (LIN-2896)', () => {
     const sectionMatch = claudeMd.match(/## Where the detail lives\n([\s\S]*?)\n## /);
     assert.ok(sectionMatch, 'CLAUDE.md must carry a "## Where the detail lives" section');
     const listed = new Set([...sectionMatch[1].matchAll(/docs\/architecture\/([a-z][a-z-]*\.md)/g)].map((m) => m[1]));
-    const missingFromClaudeMd = [...existingDocs].filter((d) => !listed.has(d));
+    const viaCarrier = (d) => {
+      const carrier = REACHED_VIA.get(d);
+      return Boolean(carrier) && listed.has(carrier) && readFileSync(join(architectureDir, carrier), 'utf8').includes(d);
+    };
+    const missingFromClaudeMd = [...existingDocs].filter((d) => !listed.has(d) && !viaCarrier(d));
     const danglingInClaudeMd = [...listed].filter((d) => !existingDocs.has(d));
     assert.deepEqual(missingFromClaudeMd, [],
       `docs/architecture/ has doc(s) that CLAUDE.md's "Where the detail lives" section does not point to: ` +
