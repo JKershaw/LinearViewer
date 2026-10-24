@@ -412,10 +412,12 @@ export async function seedLocalWorkspace(page, seed = null, { features, openRout
   // LIN-3849: run controls (Run / Go, the Dispatch menus and page link, the queue
   // and rulings badges) show for the workspace OWNER when the workspace has a live
   // runner key or queue token. `runnerKey: true` mints a runner key through the
-  // production path and `runnerKey: false` clears every key for this urlKey (so a
-  // "no key" spec cannot inherit one from an earlier spec on the same worker key).
-  // Omitted leaves the stores alone. The seeded session account is the owner.
-  if (typeof runnerKey === 'boolean') data.runnerKey = runnerKey;
+  // production path; `runnerKey: false` clears every key for this urlKey. The
+  // default is false, not "leave the stores alone": keys live in the shared store
+  // and outlast the spec that minted them, so a spec that did not ask for run
+  // controls could otherwise inherit them from an earlier spec on the same
+  // per-worker urlKey. The seeded session account is the workspace owner.
+  data.runnerKey = runnerKey === true;
   // Make the seeded workspace explicitly multi-binding (LIN-717): the local
   // binding stays active, with each extra appended so the providers settings
   // surface can exercise the active-provider switch end-to-end.

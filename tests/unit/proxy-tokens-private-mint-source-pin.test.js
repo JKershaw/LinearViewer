@@ -86,12 +86,19 @@ describe('LIN-3129/LIN-3131 — the grant API caller allow-lists', () => {
   // S2b.2 adds the live owner-checked runner mint in routes/proxy-tokens-admin.js
   // (the ONE route that turns the feature on). Still an exact allow-list, not a
   // loosening: any OTHER caller fails.
-  test('mintGrantBootstrap callers are exactly the inert mechanism module and the S2b.2 runner mint route', () => {
+  //
+  // WIDENED (LIN-3849) by exactly one file: routes/test.js seeds a runner key for
+  // e2e specs (`runnerKey: true` on the seed, POST /test/create-runner-key), because
+  // run controls now need a live key. It goes through the SAME mintGrantBootstrap
+  // owner check production uses (never a direct insert), and the whole router is
+  // mounted only under NODE_ENV === 'test' (server.js "Test Mode Setup").
+  test('mintGrantBootstrap callers are exactly the inert mechanism module, the S2b.2 runner mint route and the test-only seeding route', () => {
     const offenders = SOURCE_FILES.filter(f => readFileSync(f, 'utf8').includes('mintGrantBootstrap')).sort();
     assert.deepEqual(offenders, [
       join(REPO, 'lib/proxy-preamble.js'),
-      join(REPO, 'routes/proxy-tokens-admin.js')
-    ].sort(), 'only the inert declared-mint mechanism and the S2b.2 runner mint route may call mintGrantBootstrap');
+      join(REPO, 'routes/proxy-tokens-admin.js'),
+      join(REPO, 'routes/test.js')
+    ].sort(), 'only the inert declared-mint mechanism, the S2b.2 runner mint route and the test-only seeding route may call mintGrantBootstrap');
   });
 
   // UPDATED (LIN-3131 S2b.1): the owner seam is now wired in production, so the
