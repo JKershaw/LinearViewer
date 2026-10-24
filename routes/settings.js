@@ -5,7 +5,7 @@
  *
  *   GET  /workspace/:urlKey/settings                         the index (the list of areas)
  *   GET  /workspace/:urlKey/settings/:area                   one area (lib/settings-areas.js)
- *   POST /workspace/:urlKey/settings/workspace-features      periodic reviews; asks why, logs, Undo
+ *   POST /workspace/:urlKey/settings/workspace-features      periodic reviews and agents-can-change-models; asks why, logs, Undo
  *   POST /workspace/:urlKey/settings/running/halt            pause / stop / resume; OWNER-ONLY
  *   POST /workspace/:urlKey/settings/change-log/:source/:id/undo
  *
@@ -87,6 +87,13 @@ const CHANGE_ERRORS = {
 };
 
 const DEFAULT_REASON_LIMIT = 500;
+
+/**
+ * The workspace feature switches that are changes for everyone, with the area each lives in.
+ * A new workspace feature key must be added here (and to the change log's SETTINGS) before the
+ * route accepts it: it would otherwise change for everyone with no reason and no log entry.
+ */
+const LOGGED_WORKSPACE_FEATURES = { periodicals: 'running', modelRoutingProxyWrites: 'agent-access' };
 
 function cookieTheme(req) {
   if (req.session?.theme === 'dark' || req.session?.theme === 'light') return req.session.theme;
@@ -362,8 +369,8 @@ export function createSettingsRouter(deps) {
     if (!feature || !isValidWorkspaceFeatureKey(feature)) {
       return badRequest.json(res, 'Invalid workspace feature key');
     }
-    if (feature !== 'periodicals') {
-      // Only `periodicals` exists today; a second key must get its own log mapping first.
+    const area = LOGGED_WORKSPACE_FEATURES[feature];
+    if (!area) {
       return badRequest.json(res, 'Unsupported workspace feature key');
     }
     const reason = reasonOf(req);
@@ -381,19 +388,19 @@ export function createSettingsRouter(deps) {
       console.error('Failed to save workspace feature toggle:', err);
       return res.status(500).send(renderErrorPage('Settings Error', 'Failed to save workspace feature. Please try again.', {
         action: 'Back to settings',
-        actionUrl: backTo(workspace, 'running')
+        actionUrl: backTo(workspace, area)
       }));
     }
 
     try {
-      await workspaceChangeLogStore.record({ urlKey: workspace.urlKey, setting: 'periodicals', reason, actor: actorOf(req), from: before, to: isEnabled });
+      await workspaceChangeLogStore.record({ urlKey: workspace.urlKey, setting: feature, reason, actor: actorOf(req), from: before, to: isEnabled });
     } catch (err) {
       console.error('workspace-change-log: the setting changed but its log entry could not be written', err);
-      return res.redirect(backTo(workspace, 'running', { error: 'log_failed' }));
+      return res.redirect(backTo(workspace, area, { error: 'log_failed' }));
     }
 
     if (wantsJson(req)) return res.json({ ok: true, feature, enabled: isEnabled });
-    return res.redirect(backTo(workspace, 'running', { changed: '1' }));
+    return res.redirect(backTo(workspace, area, { changed: '1' }));
   });
 
   // -------------------------------------------------------------------------

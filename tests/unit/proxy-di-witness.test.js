@@ -400,6 +400,23 @@ describe('Half B: reach probes through the real composer', () => {
     assert.deepEqual(calls, [ACME], 'handler did not reach the injected workspaceHaltStore.getWorkspaceHalt');
   });
 
+  test('LIN-3854/model-routing: GET /api/proxy/model-routing must land in createProxyModelRoutingRoutes and dereference modelRoutingStore.getEffectiveTable (routes/proxy-model-routing.js)', async () => {
+    const calls = [];
+    const app = buildApp({
+      modelRoutingStore: {
+        ...BASE_DEPS().modelRoutingStore,
+        getEffectiveTable: async (urlKey) => { calls.push(urlKey); return { version: 7, jobs: [], groups: {}, defaults: {}, unrouted: [] }; },
+      },
+    });
+
+    const { status, body } = await call(app, 'GET', '/api/proxy/model-routing');
+
+    // modelRoutingStore is undefaulted in the factory, so a dropped mount key answers 500.
+    assert.equal(status, 200);
+    assert.equal(body.version, 7);
+    assert.deepEqual(calls, [ACME], 'handler did not reach the injected modelRoutingStore.getEffectiveTable');
+  });
+
   test('LIN-3409/halt: POST /api/proxy/dispatch/halt must land in createProxyHaltRoutes and dereference the injected workspaceOwnerCheck (a dropped mount key fails closed, not open)', async () => {
     const seen = [];
     const setCalls = [];

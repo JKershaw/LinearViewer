@@ -980,6 +980,20 @@ describe('renderSettingsPage — areas and their groups (LIN-3846, replaces the 
     assert.match(page('features'), /data-testid="settings-toggle-roadmap"/);
   });
 
+  test('the proxy model-routing writes setting is on Agent access, off by default, and asks why (LIN-3854, LIN-3846)', () => {
+    const off = page('agent-access');
+    assert.match(off, /data-testid="settings-toggle-modelRoutingProxyWrites"/);
+    assert.match(off, /Agents can change models/);
+    assert.match(off, /name="feature" value="modelRoutingProxyWrites"/);
+    assert.match(off, /name="enabled" value="true"/);
+    assert.match(off, /name="reason"/);
+    assert.match(off, /data-testid="settings-modelRoutingProxyWrites-state"[^>]*>[\s\S]*?Off/);
+    const on = page('agent-access', { workspaceFeatures: { modelRoutingProxyWrites: true } });
+    assert.match(on, /name="enabled" value="false"/);
+    assert.match(on, /data-testid="settings-modelRoutingProxyWrites-state"[^>]*>[\s\S]*?On/);
+    for (const other of ['sources', 'models', 'running', 'features', 'account']) assert.doesNotMatch(page(other), /settings-toggle-modelRoutingProxyWrites/);
+  });
+
   // RETIRE (LIN-2719 S2, F4): this guard protected a forward id reference —
   // the two page-level `<datalist>`s were emitted inside the Dispatch-defaults
   // section and referenced by `list="…"` (by id) from preset rows rendered

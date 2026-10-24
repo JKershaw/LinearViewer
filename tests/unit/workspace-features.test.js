@@ -9,8 +9,12 @@
  * are genuinely workspace-scoped (via the store) and isolated from the per-user
  * FEATURES / session.features path.
  */
-import { test, describe, beforeEach } from 'node:test';
+import { test, describe, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert';
+import express from 'express';
+import { createSettingsRouter } from '../../routes/settings.js';
+import { WorkspaceChangeLogStore } from '../../lib/workspace-change-log.js';
+import { memoryCollection } from './helpers/routing-fakes.js';
 import { WorkspacePreferencesStore, getWorkspaceFeatures, isWorkspaceFeatureEnabled, setWorkspaceFeature } from '../../lib/workspace-preferences.js';
 import {
   FEATURES,
@@ -182,5 +186,58 @@ describe('setWorkspaceFeature — shared-store safety', () => {
     assert.strictEqual(await isWorkspaceFeatureEnabled({ urlKey: 'ws-1', featureKey: 'periodicals', store }), true);
     await setWorkspaceFeature({ urlKey: 'ws-1', featureKey: 'periodicals', enabled: false, store });
     assert.strictEqual(await isWorkspaceFeatureEnabled({ urlKey: 'ws-1', featureKey: 'periodicals', store }), false);
+  });
+});
+
+// LIN-3854: the proxy model-routing writes sit behind `modelRoutingProxyWrites`, which is "toggled
+// only through the session-authed settings route". This drives that route for real. LIN-3846: it is
+// a change for everyone, so the route (routes/settings.js) now asks why and logs it.
+describe('POST /workspace/:urlKey/settings/workspace-features (LIN-3854)', () => {
+  const FEATURE = WORKSPACE_FEATURES.MODEL_ROUTING_PROXY_WRITES;
+  let server, base, store, log;
+  before(async () => {
+    const app = express();
+    app.use(express.urlencoded({ extended: false }));
+    const workspaceFromUrl = (req, _res, next) => { req.workspace = { urlKey: req.params.urlKey, name: 'Acme' }; next(); };
+    app.use((req, res, next) => createSettingsRouter({ workspaceFromUrl, workspacePreferencesStore: store, getWorkspaceFeatures, setWorkspaceFeature, workspaceChangeLogStore: log })(req, res, next));
+    await new Promise((resolve) => { server = app.listen(0, '127.0.0.1', resolve); });
+    base = `http://127.0.0.1:${server.address().port}`;
+  });
+  after(() => new Promise((resolve) => server.close(resolve)));
+  beforeEach(() => { store = new WorkspacePreferencesStore({ collection: createMockCollection() }); log = new WorkspaceChangeLogStore({ collection: memoryCollection() }); });
+
+  const post = (urlKey, body) => fetch(`${base}/workspace/${urlKey}/settings/workspace-features`, {
+    method: 'POST',
+    redirect: 'manual',
+    headers: { 'content-type': 'application/x-www-form-urlencoded', 'x-requested-with': 'XMLHttpRequest' },
+    body: new URLSearchParams(body).toString()
+  });
+  const enabled = (urlKey) => isWorkspaceFeatureEnabled({ urlKey, featureKey: FEATURE, store });
+
+  test('the model-routing proxy-writes feature is off until the route flips it, for that workspace only', async () => {
+    assert.strictEqual(await enabled('acme'), false);
+    const res = await post('acme', { feature: FEATURE, enabled: 'true', reason: 'Let the planning agent tune models' });
+    assert.strictEqual(res.status, 200);
+    assert.deepStrictEqual(await res.json(), { ok: true, feature: FEATURE, enabled: true });
+    assert.strictEqual(await enabled('acme'), true);
+    assert.strictEqual(await enabled('other'), false);
+    await post('acme', { feature: FEATURE, enabled: 'false', reason: 'Back to read-only' });
+    assert.strictEqual(await enabled('acme'), false);
+  });
+
+  test('it asks why: no reason is a 400 and nothing is written; with one, the change is logged', async () => {
+    const noReason = await post('acme', { feature: FEATURE, enabled: 'true' });
+    assert.strictEqual(noReason.status, 400);
+    assert.strictEqual(await enabled('acme'), false);
+    assert.deepStrictEqual(await log.getLog('acme'), []);
+    await post('acme', { feature: FEATURE, enabled: 'true', reason: 'Trying it' });
+    const [entry] = await log.getLog('acme');
+    assert.deepStrictEqual([entry.setting, entry.from, entry.to, entry.reason], [FEATURE, false, true, 'Trying it']);
+  });
+
+  test('an unknown feature key is refused and nothing is written', async () => {
+    const res = await post('acme', { feature: 'notAFeature', enabled: 'true', reason: 'x' });
+    assert.strictEqual(res.status, 400);
+    assert.strictEqual(await enabled('acme'), false);
   });
 });

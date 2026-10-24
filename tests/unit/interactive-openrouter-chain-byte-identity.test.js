@@ -159,6 +159,10 @@ const expectedGateCalls = {
   'routes/workspace-api-roadmap.js': 1,
   'routes/flight-companion.js': 2,
   'routes/task-chat.js': 1,
+  // LIN-3875: the two background precomputes charge the hourly gate right before their one
+  // generator call (precompute-free-tier-gate.test.js pins the behaviour of each).
+  'lib/run-paragraph-hook.js': 1,
+  'lib/session-materializer-precompute.js': 1,
 };
 
 describe('Interactive OpenRouter chain: byte-identity census (LIN-2412 / LIN-2970 / LIN-2978)', () => {

@@ -188,8 +188,8 @@ import { buildRoadmapModel } from './lib/roadmap.js'
 import { renderProxyPage } from './lib/render-proxy.js'
 import { AVAILABLE_MODELS, setLlmCallRecorder, setPromptTraceRecorder, getPaidEnvKey, getFreeTierModelConfigWarning, streamChatWithTools } from './lib/openrouter.js'
 import { resolveOpenRouterSource, isFreeTierOffered } from './lib/chat-request.js'
-import { resolveWorkspaceModel, resolveAiOperationModel, jobModelResolver, getWorkspaceFeatures, isWorkspaceFeatureEnabled, setWorkspaceFeature, resolveDispatchDefaults } from './lib/workspace-preferences.js'
-import { getFeatureFlags, isValidFeatureKey, isValidWorkspaceFeatureKey, WORKSPACE_FEATURES } from './lib/feature-defaults.js'
+import { resolveWorkspaceModel, resolveAiOperationModel, jobModelResolver, getWorkspaceFeatures, isWorkspaceFeatureEnabled, resolveDispatchDefaults } from './lib/workspace-preferences.js'
+import { getFeatureFlags, isValidFeatureKey, WORKSPACE_FEATURES } from './lib/feature-defaults.js'
 import { projectLegacy } from './lib/model-routing.js'
 import { ModelRoutingStore } from './lib/model-routing-store.js'
 import { createSettingsModelRoutes } from './routes/settings-model.js'
@@ -552,7 +552,8 @@ const precomputeResolveModel = jobModelResolver(workspacePreferencesStore)
 const precomputeRunParagraph = createRunParagraphPrecompute({
   runParagraphStore,
   isTerminal: sessionIsTerminal,
-  resolveModel: precomputeResolveModel
+  resolveModel: precomputeResolveModel,
+  freeTierStore // LIN-3875: the hourly free-tier gate on the shared free key
 })
 
 // Background session-summary precompute (LIN-632) plus the run-paragraph
@@ -569,7 +570,8 @@ const precomputeSessionSummary = createSessionSummaryPrecompute({
   sessionSummaryStore: sessionSummaryCacheStore,
   isTerminal: sessionIsTerminal,
   runSummaryStore: runSummaryCacheStore,
-  resolveModel: precomputeResolveModel
+  resolveModel: precomputeResolveModel,
+  freeTierStore // LIN-3875
 })
 
 observationMaterializer.precomputeSessionSummary = createMaterializerPrecompute({
@@ -3213,7 +3215,7 @@ const recordPipelineMerge = createPipelineMergeRecorder({
   installationTokenFor,
   resolveWorkspaceId: createSessionWorkspaceIdResolver({ sessionsCollection })
 })
-app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore, workspaceOwnerCheck, livenessAlarmStore, onTicketWrite, recordPipelineMerge, consumerHeartbeatStore }))
+app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore, workspaceOwnerCheck, modelRoutingStore, livenessAlarmStore, onTicketWrite, recordPipelineMerge, consumerHeartbeatStore }))
 
 // LIN-3098 S3: the runner kit (lib/runner-kit/*.mjs), public, for the served
 // runner prompt to fetch and verify against its sha256 pins (routes/runner-kit.js).
@@ -3922,7 +3924,9 @@ app.use(createSettingsRouter({
   workspaceChangeLogStore, modelRoutingStore, workspaceOwnerCheck
 }))
 
-// POST /settings/workspace-features (periodic reviews) lives in routes/settings.js (LIN-3846): it asks why and logs.
+// POST /settings/workspace-features (periodic reviews, agents-can-change-models) lives in routes/settings.js
+// (LIN-3846): both are for everyone, so it asks why and logs. It was routes/settings-workspace-features.js
+// for a moment (LIN-3854); that module is folded into the Settings router so there is one writer.
 
 /**
  * Toggle a feature flag on or off.
