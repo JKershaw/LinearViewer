@@ -459,7 +459,7 @@
 }
 
 .provider-notice-fail .field-value {
-  color: var(--red, #c0392b);
+  color: var(--red);
 }
 
 .provider-notice-blocked .field-value {
@@ -474,7 +474,7 @@
 }
 
 .provider-remove-btn {
-  color: var(--red, #c0392b);
+  color: var(--red);
 }
 
 /* Inline save feedback */
@@ -785,7 +785,7 @@
 
 .settings-theme-choice.is-selected {
   background: var(--brand);
-  color: var(--bg, #fff);
+  color: var(--bg);
   border-color: var(--brand);
 }
 
