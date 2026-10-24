@@ -6,7 +6,9 @@
  * the live resolvers over a real WorkspacePreferencesStore + ModelRoutingStore (the lazy
  * migration included) on memory collections. Every cell must be equal unless it is listed
  * in INTENDED_DIFFERENCES, whose only permitted tickets are D2 (LIN-3856) and D3 (LIN-3857),
- * each added by its own PR. This PR lands with the table empty.
+ * each added by its own PR. LIN-3856 adds the D2 entries (run-paragraph, and the
+ * session-summary precompute path); a listed cell must equal its `expect`, every other
+ * cell must still equal the old side.
  *
  * Run with: node --test tests/unit/model-routing-witness.test.js
  */
@@ -18,12 +20,18 @@ import { readFileSync } from 'node:fs';
 import { DEFAULT_MODEL, AVAILABLE_MODELS } from '../../lib/openrouter.js';
 import { JOBS } from '../../lib/llm-jobs.js';
 import { AI_OPERATION_KINDS, UNROUTED_JOBS } from '../../lib/model-routing.js';
-import { resolveWorkspaceModel, resolveAiOperationModel, resolveDispatchDefaults } from '../../lib/workspace-preferences.js';
+import { DEFAULT_SESSION_SUMMARY_MODEL } from '../../lib/session-summary.js';
+import { createSessionSummaryPrecompute } from '../../lib/session-materializer-precompute.js';
+import { resolveWorkspaceModel, resolveAiOperationModel, resolveDispatchDefaults, jobModelResolver } from '../../lib/workspace-preferences.js';
 import { resolveRouting, createDispatchItem } from '../../lib/dispatch-factory.js';
 import * as frozen from './helpers/frozen-resolvers-6ea1371e.js';
 import { routingFixture } from './helpers/routing-fakes.js';
 
-/** Named, reviewed differences between old and new. Entries: `{ ticket: 'D2'|'D3', cell, reason }`. */
+/**
+ * Named, reviewed differences between old and new. Entries:
+ * `{ ticket: 'D2'|'D3', cell, reason, expect }`, `expect` being what the new side must answer.
+ * The D2 rows are built from D2_EXPECT below, a hand table (not a pattern that only exempts).
+ */
 export const INTENDED_DIFFERENCES = [];
 const PERMITTED_TICKETS = ['D2', 'D3'];
 
@@ -100,13 +108,13 @@ const HARBOUR_OLD = {
   // workspace-api.js read the `scan` override for the retire re-scan as well.
   'scan-retire': (args) => frozen.resolveAiOperationModel({ ...args, opKind: 'scan' }),
   ...Object.fromEntries(WORKSPACE_WIDE_ONLY.map((id) => [id, (args) => frozen.resolveWorkspaceModel(args)])),
-  // Unrouted today (LIN-3856): hard-coded, no clamp, no store.
-  ...Object.fromEntries(UNROUTED_JOBS.map((id) => [id, async () => DEFAULT_MODEL]))
+  // Frozen old side (LIN-3856): run-paragraph was hard-coded, no clamp, no store.
+  'run-paragraph': async () => DEFAULT_MODEL
 };
 
 const cellCount = new Map();
+const seenDiffs = new Set();
 const hit = (job) => cellCount.set(job, (cellCount.get(job) || 0) + 1);
-const allowed = (cell) => INTENDED_DIFFERENCES.some((d) => d.cell === cell);
 
 async function fixtureFor(index, prefs) {
   const fx = routingFixture();
@@ -117,10 +125,37 @@ async function fixtureFor(index, prefs) {
 
 const FREE_TIER_MODEL = AVAILABLE_MODELS.find((m) => m.id !== DEFAULT_MODEL)?.id;
 
+// LIN-3856 (D2): the one hand-written table of what changed. `run-paragraph` was
+// hard-coded to DEFAULT_MODEL with no clamp; it now resolves like every other job.
+// PAID: the model the job's stored settings give (the `tell` group default, which the
+// migration seeds from the workspace `modelId`); sets that name none still answer
+// DEFAULT_MODEL and so are not listed. FREE: with a curated OPENROUTER_FREE_TIER_MODEL the
+// clamp answers it whatever is stored; without one the clamp is DEFAULT_MODEL (no change).
+const D2_PAID = {
+  'workspace model only': 'anthropic/ws-model',
+  'partial per-kind rows': 'anthropic/ws-model',
+  'blank per-op override above a non-blank modelId': 'anthropic/ws-model',
+  'stray byKind for custom / periodical / non-op keys': 'anthropic/ws-model',
+  'a scan override': 'anthropic/ws-model',
+  'every operation overridden': 'anthropic/ws-model',
+  'everything set': 'anthropic/ws-model'
+};
+for (const [name, expect] of Object.entries(D2_PAID)) {
+  for (const freeModel of [undefined, FREE_TIER_MODEL]) {
+    INTENDED_DIFFERENCES.push({ ticket: 'D2', cell: `harbour/run-paragraph/${name}/free=false/freeModel=${freeModel}`, reason: 'a paid key resolves the job setting, not DEFAULT_MODEL', expect });
+  }
+}
+for (const name of Object.keys(PREFS)) {
+  INTENDED_DIFFERENCES.push({ ticket: 'D2', cell: `harbour/run-paragraph/${name}/free=true/freeModel=${FREE_TIER_MODEL}`, reason: 'a free key takes the free-tier clamp', expect: FREE_TIER_MODEL });
+}
+const diffFor = (cell) => INTENDED_DIFFERENCES.find((d) => d.cell === cell);
+
 describe('witness: the store answers as the resolvers did at 6ea1371e', () => {
-  test('the intended-differences table is empty, and could only ever hold D2 and D3', () => {
-    assert.deepEqual(INTENDED_DIFFERENCES, []);
+  test('the intended-differences table holds only D2 and D3 entries, none vacuous', async () => {
+    assert.ok(INTENDED_DIFFERENCES.length > 0);
     for (const d of INTENDED_DIFFERENCES) assert.ok(PERMITTED_TICKETS.includes(d.ticket));
+    // Every entry's expectation differs from the old side (no exemption that changes nothing).
+    for (const d of INTENDED_DIFFERENCES) assert.notEqual(d.expect, DEFAULT_MODEL, d.cell);
   });
 
   test('Harbour calls: every job, every stored preference, free tier on and off', async () => {
@@ -138,11 +173,11 @@ describe('witness: the store answers as the resolvers did at 6ea1371e', () => {
               assert.ok(oldFn, `Harbour job "${job.id}" has no old-side resolver in the witness: add its matrix coverage`);
               const cell = `harbour/${job.id}/${name}/free=${forceDefault}/freeModel=${freeTierModel}`;
               const old = await oldFn({ urlKey: fx.urlKey, workspacePreferencesStore: fx.oldStore, forceDefault });
-              const next = UNROUTED_JOBS.includes(job.id)
-                ? DEFAULT_MODEL // nothing reads the store for it; the effective-setting read says so
-                : await resolveAiOperationModel({ urlKey: fx.urlKey, workspacePreferencesStore: fx.preferencesStore, opKind: job.id, forceDefault });
+              const next = await resolveAiOperationModel({ urlKey: fx.urlKey, workspacePreferencesStore: fx.preferencesStore, opKind: job.id, forceDefault });
               hit(job.id);
-              if (!allowed(cell)) assert.equal(next, old, cell);
+              const diff = diffFor(cell);
+              assert.equal(next, diff ? diff.expect : old, cell);
+              if (diff) seenDiffs.add(cell);
             }
             // Callers with no job: the workspace-wide value, and kinds the table does not know.
             const cell = `harbour/job-less/${name}/free=${forceDefault}`;
@@ -174,7 +209,7 @@ describe('witness: the store answers as the resolvers did at 6ea1371e', () => {
                 const old = await frozen.resolveRouting({ ...args, workspacePreferencesStore: fx.oldStore });
                 const next = await resolveRouting({ ...args, workspacePreferencesStore: fx.preferencesStore });
                 hit(kind);
-                if (!allowed(cell)) assert.deepEqual(next, old, cell);
+                assert.deepEqual(next, old, cell);
               }
             }
           }
@@ -231,10 +266,57 @@ describe('witness: the store answers as the resolvers did at 6ea1371e', () => {
     assert.equal(captured.item.jobId, 'implementation');
   });
 
-  test('the precompute and run-paragraph stay unrouted: the gap is LIN-3856, not decided here', () => {
-    const precompute = readFileSync(new URL('../../lib/session-materializer-precompute.js', import.meta.url), 'utf8');
-    assert.ok(!/workspace-preferences|model-routing/.test(precompute), 'D2 (LIN-3856) routes the precompute, with its own intended-difference row');
-    assert.deepEqual([...UNROUTED_JOBS], ['run-paragraph']);
+  test('precompute/session-summary: the old side is the DEFAULT_MODEL alias; free gets the clamp, paid the job setting (D2)', async () => {
+    const saved = process.env.OPENROUTER_FREE_TIER_MODEL;
+    try {
+      let index = 500;
+      for (const [name, prefs] of Object.entries(PREFS)) {
+        const fx = await fixtureFor(index++, prefs);
+        const resolveModel = jobModelResolver(fx.preferencesStore);
+        for (const freeModel of [undefined, FREE_TIER_MODEL]) {
+          if (freeModel === undefined) delete process.env.OPENROUTER_FREE_TIER_MODEL;
+          else process.env.OPENROUTER_FREE_TIER_MODEL = freeModel;
+          for (const isFreeTier of [false, true]) {
+            const called = [];
+            const sessionSummaryStore = { get: async () => null, put: async () => {} };
+            const pre = createSessionSummaryPrecompute({
+              sessionSummaryStore,
+              isTerminal: () => true,
+              resolveModel,
+              freeTierStore: { tryUse: async () => ({ allowed: true }) }, // LIN-3875: the free cell must pass the gate to reach the model
+              generateSummary: async (_s, opts) => { called.push(opts.model); return { summary: {}, model: opts.model }; }
+            });
+            await pre(fx.urlKey, { sessionId: 's' }, { apiKey: 'k', isFreeTier });
+            // What the on-demand route resolves for the same inputs: the new side must agree.
+            const expected = await resolveAiOperationModel({ urlKey: fx.urlKey, workspacePreferencesStore: fx.preferencesStore, opKind: 'session-summary', forceDefault: isFreeTier });
+            const cell = `precompute/session-summary/${name}/free=${isFreeTier}/freeModel=${freeModel}`;
+            assert.deepEqual(called, [expected], cell);
+            if (isFreeTier && freeModel) assert.equal(called[0], freeModel, cell);
+            // Nothing stored, or the clamp without a curated id: the old default (a live alias of DEFAULT_MODEL).
+            if (expected === DEFAULT_MODEL) assert.equal(called[0], DEFAULT_SESSION_SUMMARY_MODEL, cell);
+            hit('session-summary');
+          }
+        }
+      }
+    } finally {
+      if (saved === undefined) delete process.env.OPENROUTER_FREE_TIER_MODEL;
+      else process.env.OPENROUTER_FREE_TIER_MODEL = saved;
+    }
+  });
+
+  test('UNROUTED_JOBS is empty and server.js hands both precomputes jobModelResolver(workspacePreferencesStore)', () => {
+    assert.deepEqual([...UNROUTED_JOBS], []);
+    const server = readFileSync(new URL('../../server.js', import.meta.url), 'utf8');
+    const m = server.match(/const (\w+) = jobModelResolver\(workspacePreferencesStore\)/);
+    assert.ok(m, 'server.js builds the resolver from the production export');
+    const closure = new RegExp(`createRunParagraphPrecompute\\(\\{[^}]*resolveModel: ${m[1]}[^}]*\\}\\)`);
+    const summary = new RegExp(`createSessionSummaryPrecompute\\(\\{[^}]*resolveModel: ${m[1]}[^}]*\\}\\)`);
+    assert.match(server, closure);
+    assert.match(server, summary);
+  });
+
+  test('every D2 entry was exercised by the matrix', () => {
+    for (const d of INTENDED_DIFFERENCES) assert.ok(seenDiffs.has(d.cell), `unused D2 entry: ${d.cell}`);
   });
 
   // Last on purpose: it reads the counters the matrix tests filled in.

@@ -12,7 +12,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { createRunParagraphPrecompute, resolvePrecomputeApiKey } from '../../lib/run-paragraph-hook.js';
+import { createRunParagraphPrecompute, resolvePrecomputeCredential } from '../../lib/run-paragraph-hook.js';
 import { InMemoryRunParagraphStore } from '../../lib/run-paragraph-store.js';
 import { buildRunView } from '../../lib/run-view.js';
 
@@ -82,28 +82,30 @@ function makeRig({ isTerminal = () => false, generateParagraph } = {}) {
   return { store, calls, hook };
 }
 
-describe('resolvePrecomputeApiKey (the shared offline guard)', () => {
+describe('resolvePrecomputeCredential (the shared offline guard)', () => {
   test('LIN-3664: a whitespace free-tier key is no key; a padded one is trimmed', () => {
-    assert.equal(resolvePrecomputeApiKey({ OPENROUTER_FREE_TIER_KEY: '   ' }), null);
-    assert.equal(resolvePrecomputeApiKey({ OPENROUTER_FREE_TIER_KEY: ' free ' }), 'free');
+    assert.equal(resolvePrecomputeCredential({ OPENROUTER_FREE_TIER_KEY: '   ' }), null);
+    assert.deepEqual(resolvePrecomputeCredential({ OPENROUTER_FREE_TIER_KEY: ' free ' }), { apiKey: 'free', isFreeTier: true });
   });
 
   test('LIN-3664: a whitespace paid key is no key, so it falls through to the free-tier key (as resolveChatCredential does)', () => {
-    assert.equal(resolvePrecomputeApiKey({ OPENROUTER_API_KEY: '  ', OPENROUTER_FREE_TIER_KEY: 'free' }), 'free');
-    assert.equal(resolvePrecomputeApiKey({ OPENROUTER_API_KEY: '  ' }), null);
+    assert.deepEqual(resolvePrecomputeCredential({ OPENROUTER_API_KEY: '  ', OPENROUTER_FREE_TIER_KEY: 'free' }), { apiKey: 'free', isFreeTier: true });
+    assert.equal(resolvePrecomputeCredential({ OPENROUTER_API_KEY: '  ' }), null);
   });
 
   test('returns null under NODE_ENV=test (tests stay offline)', () => {
-    assert.equal(resolvePrecomputeApiKey({ NODE_ENV: 'test', OPENROUTER_API_KEY: 'k' }), null);
+    assert.equal(resolvePrecomputeCredential({ NODE_ENV: 'test', OPENROUTER_API_KEY: 'k' }), null);
   });
 
   test('returns null when no key is configured', () => {
-    assert.equal(resolvePrecomputeApiKey({}), null);
+    assert.equal(resolvePrecomputeCredential({}), null);
   });
 
   test('prefers the primary key, falls back to the free-tier key', () => {
-    assert.equal(resolvePrecomputeApiKey({ OPENROUTER_API_KEY: 'primary' }), 'primary');
-    assert.equal(resolvePrecomputeApiKey({ OPENROUTER_FREE_TIER_KEY: 'free' }), 'free');
+    assert.deepEqual(resolvePrecomputeCredential({ OPENROUTER_API_KEY: 'primary' }), { apiKey: 'primary', isFreeTier: false });
+    assert.deepEqual(resolvePrecomputeCredential({ OPENROUTER_FREE_TIER_KEY: 'free' }), { apiKey: 'free', isFreeTier: true });
+    // The paid key wins and is not the free tier, even with the free key also set.
+    assert.deepEqual(resolvePrecomputeCredential({ OPENROUTER_API_KEY: 'primary', OPENROUTER_FREE_TIER_KEY: 'free' }), { apiKey: 'primary', isFreeTier: false });
   });
 });
 

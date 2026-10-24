@@ -298,7 +298,7 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
   // TTL-gated shape is what this test used to assert (see git history) —
   // it was pinning the bug's own symptom as expected behavior. Now that the
   // stamp calls `sessionsFeedCache.clear(urlKey)` on success
-  // (routes/workspace-api.js's `stampDecisionAnswers`), the very NEXT read —
+  // (routes/workspace-api-issue-write.js's `stampDecisionAnswers`), the very NEXT read —
   // taken immediately, well inside the old 5s TTL window, with no wait at
   // all — already reconstructs and excludes the answered row. Asserting that
   // with zero wait is what makes this a genuine witness of server-side cache

@@ -229,7 +229,7 @@ Each can be added later without changing the model above:
 
 ## Breakdown (filed when LIN-3757 has chosen its direction)
 
-Status, 24 October: item 2 (LIN-3853) is built. `lib/model-routing.js` (pure table, migration, resolution), `lib/model-routing-store.js` (the store, log, undo, presets) and `routes/settings-model.js` (the three old forms, writing through the store). The witness (`tests/unit/model-routing-witness.test.js`) holds the resolvers frozen at `6ea1371e` against the store; its intended-differences table is empty and waits for D2 and D3. The first log entry (the 23 Oct autopilot move) was dropped by ruling; the log starts at each workspace's migration, and the move is on the charter (LIN-3490).
+Status, 24 October: item 2 (LIN-3853) is built. `lib/model-routing.js` (pure table, migration, resolution), `lib/model-routing-store.js` (the store, log, undo, presets) and `routes/settings-model.js` (the three old forms, writing through the store). The witness (`tests/unit/model-routing-witness.test.js`) holds the resolvers frozen at `6ea1371e` against the store; its intended-differences table holds the D2 entries (LIN-3856, built: the session-summary precompute and `run-paragraph` take the free-tier clamp and resolve from the store through `jobModelResolver`) and waits for D3. The first log entry (the 23 Oct autopilot move) was dropped by ruling; the log starts at each workspace's migration, and the move is on the charter (LIN-3490).
 
 | # | Ticket | Repos | Done when |
 |---|---|---|---|
