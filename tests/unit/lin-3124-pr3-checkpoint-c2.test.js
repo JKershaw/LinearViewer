@@ -21,7 +21,6 @@ import { appAround, request } from './lib/entrance-route-sweep.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
-const DASHBOARD_SRC = readFileSync(join(__dirname, '../../routes/dashboard.js'), 'utf8');
 
 const BUFFER = 5 * 60 * 1000;
 const future = () => Date.now() + 3_600_000;
@@ -167,7 +166,7 @@ describe('LIN-3124 PR3 checkpoint C2 — D16 owner-blind threading on the dashbo
   });
 });
 
-describe('LIN-3124 PR3 checkpoint C2 — D16 owner-blind threading (source-text pins)', () => {
+describe('LIN-3124 PR3 checkpoint C2 — D16 owner-blind threading (source-text pins on server.js and the factory)', () => {
   test('getWorkspaceAccessToken takes a session and consults the side-table only with one', () => {
     assert.match(SERVER_SRC, /async function getWorkspaceAccessToken\(urlKey, session = null\)/);
     const start = SERVER_SRC.indexOf('async function getWorkspaceAccessToken(');
@@ -211,12 +210,13 @@ describe('LIN-3124 PR3 checkpoint C2 — D16 owner-blind threading (source-text 
     }
   });
 
-  test('routes/dashboard.js threads the session through mergeSessions and the hydrate route', () => {
-    assert.match(DASHBOARD_SRC, /mergeSessions\(workspaces, \{ live = false, session = null \}/);
-    assert.match(DASHBOARD_SRC, /getWorkspaceAccessToken\(b\.ws\.urlKey, session\)/);
-    assert.match(DASHBOARD_SRC, /getWorkspaceAccessToken\(wsUrlKey, req\.session\)/);
-    assert.match(DASHBOARD_SRC, /mergeSessions\(workspaces, \{ live: isSessionsView, session: req\.session \}\)/);
-  });
+  // LIN-3840: the source-text test 'routes/dashboard.js threads the session through
+  // mergeSessions and the hydrate route' (four regexes on routes/dashboard.js) is gone. Its
+  // behaviour replacements are the two route tests in the describe block above:
+  //   - GET /api/dashboard/sessions threads req.session into the touched-task hydration read
+  //   - GET /api/dashboard/hydrate/:wsUrlKey/:identifier threads req.session into the token lookup
+  // The credential census (workspace-accesstoken-linear-egress-census) keeps the
+  // getWorkspaceAccessToken( site count over the dashboard unit.
 
   test('lib/dispatch-factory.js is NOT edited to know about sessions', () => {
     const factory = readFileSync(join(__dirname, '../../lib/dispatch-factory.js'), 'utf8');
