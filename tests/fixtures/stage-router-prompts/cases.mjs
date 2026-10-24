@@ -15,8 +15,8 @@
  *   node scripts/eval/regen-stage-router-snapshots.mjs
  */
 
-const GITHUB = { featureFlags: { linearMcp: false }, providerUi: { displayName: 'GitHub Issues' } };
-const LOCAL = { featureFlags: { linearMcp: false }, providerUi: { displayName: 'Local' } };
+const GITHUB = { providerUi: { displayName: 'GitHub Issues' } };
+const LOCAL = { providerUi: { displayName: 'Local' } };
 
 const open = { name: 'In Progress', type: 'started' };
 const done = { name: 'Done', type: 'completed' };

@@ -15,9 +15,15 @@ import { WorkspacePreferencesStore, getWorkspaceFeatures, isWorkspaceFeatureEnab
 import {
   FEATURES,
   FEATURE_KEYS,
+  FEATURE_DEFAULTS,
+  FEATURE_LABELS,
+  FEATURE_DESCRIPTIONS,
+  FEATURE_NOTES,
   getFeatureFlags,
   WORKSPACE_FEATURES,
   WORKSPACE_FEATURE_DEFAULTS,
+  WORKSPACE_FEATURE_LABELS,
+  WORKSPACE_FEATURE_DESCRIPTIONS,
   WORKSPACE_FEATURE_KEYS,
   isValidWorkspaceFeatureKey,
   isValidFeatureKey
@@ -56,6 +62,7 @@ describe('workspace feature defaults', () => {
     assert.ok(WORKSPACE_FEATURE_KEYS.includes('periodicals'));
     assert.ok(isValidWorkspaceFeatureKey('periodicals'));
     assert.strictEqual(isValidWorkspaceFeatureKey('linearMcp'), false);
+    assert.strictEqual(isValidWorkspaceFeatureKey('observerAuthority'), false);
   });
 
   test('per-user FEATURES set is unchanged and does not contain periodicals', () => {
@@ -63,22 +70,35 @@ describe('workspace feature defaults', () => {
     assert.strictEqual(isValidFeatureKey('periodicals'), false);
     assert.strictEqual(FEATURE_KEYS.includes('periodicals'), false);
     // Spot-check the per-user set still has its known members.
-    assert.ok(FEATURE_KEYS.includes(FEATURES.LINEAR_MCP));
+    assert.ok(FEATURE_KEYS.includes(FEATURES.ROADMAP));
     assert.ok(FEATURE_KEYS.includes(FEATURES.PROXY));
   });
 
-  // LIN-2395: the cloud observer pass's authority toggle. Ship the toggle,
-  // not an acting path — default OFF, on the workspace-scoped path only.
-  test('observerAuthority is a workspace feature, default off', () => {
-    assert.strictEqual(WORKSPACE_FEATURES.OBSERVER_AUTHORITY, 'observerAuthority');
-    assert.strictEqual(WORKSPACE_FEATURE_DEFAULTS.observerAuthority, false);
-    assert.ok(WORKSPACE_FEATURE_KEYS.includes('observerAuthority'));
-    assert.ok(isValidWorkspaceFeatureKey('observerAuthority'));
+  // LIN-3848: the nine switches that did nothing or were superseded are gone
+  // from every table, and both validators reject them. (Saved values for them
+  // stay harmless: getFeatureFlags / getWorkspaceFeatures filter unknown keys.)
+  const REMOVED_USER_KEYS = ['linearMcp', 'aiRecommendations', 'promptButtons', 'codeReview', 'codeReviewSelf', 'codeReviewCicd', 'codeReviewPr', 'feedbackTriage'];
+  const REMOVED_WORKSPACE_KEYS = ['observerAuthority'];
+
+  test('removed per-user keys are absent from every table and rejected by isValidFeatureKey (LIN-3848)', () => {
+    for (const key of REMOVED_USER_KEYS) {
+      assert.strictEqual(isValidFeatureKey(key), false, key);
+      assert.ok(!(key in FEATURE_DEFAULTS), `${key} in FEATURE_DEFAULTS`);
+      assert.ok(!(key in FEATURE_LABELS), `${key} in FEATURE_LABELS`);
+      assert.ok(!(key in FEATURE_DESCRIPTIONS), `${key} in FEATURE_DESCRIPTIONS`);
+      assert.ok(!(key in FEATURE_NOTES), `${key} in FEATURE_NOTES`);
+      assert.ok(!FEATURE_KEYS.includes(key), `${key} in FEATURE_KEYS`);
+    }
   });
 
-  test('observerAuthority does not leak into the per-user FEATURES set', () => {
-    assert.strictEqual(isValidFeatureKey('observerAuthority'), false);
-    assert.strictEqual(FEATURE_KEYS.includes('observerAuthority'), false);
+  test('removed workspace keys are absent from every table and rejected by isValidWorkspaceFeatureKey (LIN-3848)', () => {
+    for (const key of REMOVED_WORKSPACE_KEYS) {
+      assert.strictEqual(isValidWorkspaceFeatureKey(key), false, key);
+      assert.ok(!(key in WORKSPACE_FEATURE_DEFAULTS), key);
+      assert.ok(!(key in WORKSPACE_FEATURE_LABELS), key);
+      assert.ok(!(key in WORKSPACE_FEATURE_DESCRIPTIONS), key);
+      assert.ok(!WORKSPACE_FEATURE_KEYS.includes(key), key);
+    }
   });
 });
 

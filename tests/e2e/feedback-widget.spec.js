@@ -6,27 +6,26 @@ import { sweepFixedOverlaps, describeHits, expectSweepNotVacuous } from '../fixe
 // caller discipline, LIN-625). The server submit→ticket→triage flow is covered
 // by the unit route test (tests/unit/feedback-route.test.js) — the local
 // provider has zero teams, so a full submit is out of scope here. This spec
-// pins the client surface: footer toggle, hidden-by-default, popup open, and
+// pins the client surface: Settings toggle (LIN-3848: the footer link is gone), hidden-by-default, popup open, and
 // minimize-without-losing-input (localStorage draft survives reload).
 
 test.describe('Feedback widget', () => {
-  test('is hidden by default and toggles on from the footer', async ({ page, seedLocal }) => {
+  test('is hidden by default and Settings is the only place that turns it on', async ({ page, seedLocal }) => {
     const { urlKey } = await seedLocal()
     await page.goto(`/workspace/${urlKey}/`)
     await page.waitForLoadState('networkidle')
 
-    // Hidden by default — the nav trigger is not rendered until the flag is on.
+    // Hidden by default — the nav trigger is not rendered until the flag is on,
+    // and the footer carries no feedback switch (LIN-3848).
     await expect(page.getByTestId('nav-feedback-trigger')).toHaveCount(0)
+    await expect(page.getByTestId('footer-feedback-toggle')).toHaveCount(0)
+    await expect(page.locator('#feedback-widget-root')).toHaveAttribute('data-enabled', 'false')
 
-    const toggle = page.getByTestId('footer-feedback-toggle')
-    await expect(toggle).toBeVisible()
-    await expect(toggle).toHaveAttribute('data-enabled', 'false')
+    await enableWidget(page, urlKey)
 
-    // Toggling reloads the page; the FAB then appears.
-    await clickAndAwaitReload(page, toggle)
-
-    await expect(page.getByTestId('footer-feedback-toggle')).toHaveAttribute('data-enabled', 'true')
+    await expect(page.locator('#feedback-widget-root')).toHaveAttribute('data-enabled', 'true')
     await expect(page.getByTestId('nav-feedback-trigger')).toBeVisible()
+    await expect(page.getByTestId('footer-feedback-toggle')).toHaveCount(0)
   })
 
   // LIN-2298 a11y. The trigger moved from beside the panel (the FAB) to the top
@@ -67,7 +66,7 @@ test.describe('Feedback widget', () => {
     const { urlKey } = await seedLocal()
     await enableWidget(page, urlKey)
     const trigger = page.getByTestId('nav-feedback-trigger')
-    const footerToggle = page.getByTestId('footer-feedback-toggle')
+    const footerToggle = page.getByTestId('footer-theme-toggle')
 
     await trigger.click()
     await expect(page.getByTestId('feedback-popup')).toBeVisible()
@@ -401,12 +400,12 @@ test.describe('Feedback widget', () => {
   // coverage for the FAB").
   test.describe('LIN-2298: no fixed overlay covers the footer controls, at any scroll offset', () => {
     for (const width of [320, 360, 390, 430]) {
-      test(`the footer feedback toggle is clear of every fixed overlay (${width}px)`, async ({ page, seedLocal }) => {
+      test(`the footer theme toggle is clear of every fixed overlay (${width}px)`, async ({ page, seedLocal }) => {
         const { urlKey } = await seedLocal()
         await page.setViewportSize({ width, height: 844 })
         await enableWidget(page, urlKey)
 
-        const result = await sweepFixedOverlaps(page, '[data-testid="footer-feedback-toggle"]')
+        const result = await sweepFixedOverlaps(page, '[data-testid="footer-theme-toggle"]')
         // The sweep's walk found something. This is a NARROW guarantee — the
         // only candidate here is the top-pinned sticky nav, which can never
         // reach this bottom-anchored footer control, so it does not establish
@@ -415,7 +414,7 @@ test.describe('Feedback widget', () => {
         // race `enableWidget` below now guards against. Detection capability
         // is underwritten by tests/e2e/overlay-sweep-control.spec.js; this
         // sweep is the regression net.
-        expectSweepNotVacuous(expect, result, `footer toggle @${width}px`)
+        expectSweepNotVacuous(expect, result, `footer theme toggle @${width}px`)
         expect(result.hits, describeHits(result)).toEqual([])
       })
     }
@@ -453,7 +452,7 @@ test.describe('Feedback widget', () => {
 
       const m = await page.evaluate(() => {
         window.scrollTo(0, document.documentElement.scrollHeight)
-        const toggle = document.querySelector('[data-testid="footer-feedback-toggle"]').getBoundingClientRect()
+        const toggle = document.querySelector('[data-testid="footer-theme-toggle"]').getBoundingClientRect()
         return { top: toggle.top, bottom: toggle.bottom, viewportH: window.innerHeight }
       })
 
@@ -474,7 +473,7 @@ test.describe('Feedback widget', () => {
       await enableWidget(page, urlKey)
 
       // Precondition: the widget really is on, so this is not vacuous.
-      await expect(page.getByTestId('footer-feedback-toggle')).toHaveAttribute('data-enabled', 'true')
+      await expect(page.locator('#feedback-widget-root')).toHaveAttribute('data-enabled', 'true')
 
       const pads = await page.evaluate(() => ({
         deploy: getComputedStyle(document.querySelector('.footer-deploy')).paddingRight,
@@ -521,42 +520,29 @@ async function dropFileOnZone(page, { name, type, bytes, size }) {
   }, { name, type, bytes, size })
 }
 
-// Enable the flag via the footer toggle and land on a reloaded page with the
-// widget mounted AND hydrated.
+// Enable the flag in Settings (LIN-3848: the footer link is gone) and land on a
+// page with the widget mounted AND hydrated.
 //
 // The wait is `toBeEnabled()`, not `toBeVisible()`, and that is load-bearing.
-// The toggle handler POSTs and then calls `window.location.reload()`, so the
-// `networkidle` below can resolve against the PRE-reload page — the reload has
-// not started yet. `toBeVisible()` does not catch that: the nav is server-
-// rendered near the top of the document, so the trigger is visible while the
-// rest of the page is still parsing (`document.readyState === 'loading'`).
-//
-// Measured, not theorised: with a visibility wait, the sweeps below ran against
-// a half-parsed document at 320/360/390 nondeterministically. An earlier version
-// of this comment said `body *` matched NOTHING at 390; that was imprecise and
-// is corrected here. Elements existed — what was empty was the OVERLAY set: at
-// that point the stylesheet had not applied, so `.nav-bar` computed as `static`
-// rather than `sticky` and nothing qualified. Either way the sweep had nothing
-// to find and "no overlaps" was true and meaningless. The vacuity precondition
-// added for the LIN-2298 review is what surfaced it; it was invisible before,
-// and the same race would have let the ORIGINAL `.feedback-fab` sweeps pass by
-// finding no FAB rather than by finding no overlap.
-//
-// `toBeEnabled()` is the real readiness signal because LIN-2298 made it one:
-// the trigger ships `disabled` and public/feedback-widget.js clears that only
-// after the panel is built and the click handler bound. Waiting on it means
-// waiting on hydration, not on paint.
-//
-// LIN-3198: the click no longer waits on `networkidle` (which, as above,
-// resolves at once against the pre-reload page). That left `toBeEnabled()`'s
-// 5s expect timeout to cover the toggle POST, the whole reload AND hydration;
-// under load it ran out with the trigger still `disabled` (1/440 in the
-// seven-spec ×20 run). `clickAndAwaitReload` waits on the reload the app
-// actually triggers instead, so `toBeEnabled()` only checks hydration.
+// The nav is server-rendered near the top of the document, so the trigger is
+// visible while the rest of the page is still parsing
+// (`document.readyState === 'loading'`). Measured, not theorised: with a
+// visibility wait the geometry sweeps below ran against a half-parsed document
+// (stylesheet not yet applied, so `.nav-bar` computed `static` and nothing
+// qualified as an overlay) and "no overlaps" was true and meaningless.
+// `toBeEnabled()` is the real readiness signal (LIN-2298): the trigger ships
+// `disabled` and public/feedback-widget.js clears that only after the panel is
+// built and the click handler bound.
 async function enableWidget(page, urlKey) {
+  // LIN-3848: Settings is the single place the widget is switched. The toggle
+  // saves in place (AJAX, no reload) and the new state is read back from the
+  // response, so waiting on '● on' waits on the saved flag.
+  await page.goto(`/workspace/${urlKey}/settings`)
+  await page.waitForLoadState('networkidle')
+  await page.locator('[data-feature="feedbackWidget"] .toggle-btn').click()
+  await expect(page.locator('[data-feature="feedbackWidget"] .toggle-state')).toHaveText('● on')
   await page.goto(`/workspace/${urlKey}/`)
   await page.waitForLoadState('networkidle')
-  await clickAndAwaitReload(page, page.getByTestId('footer-feedback-toggle'))
   await expect(page.getByTestId('nav-feedback-trigger')).toBeEnabled()
   // `toBeEnabled()` can resolve at readyState 'interactive': /feedback-widget.js
   // is `defer`, its init runs on DOMContentLoaded, and it clears `disabled`
@@ -564,15 +550,4 @@ async function enableWidget(page, urlKey) {
   // without this the DCL->load window would surface as a confusing hard error
   // rather than a wait. Narrow, but the failure is ugly and the fix is a line.
   await page.waitForLoadState('load')
-}
-
-// The footer toggle POSTs and then calls `window.location.reload()`
-// (public/feedback-widget.js). Arm the `load` listener BEFORE the click so the
-// app-triggered reload can never fire unseen, then click and await it — the
-// same shape as dispatch-presets.spec.js (LIN-3198). `networkidle` stays after
-// plain `goto`/`reload`, where no app-triggered navigation is in flight.
-async function clickAndAwaitReload(page, locator) {
-  const loaded = page.waitForEvent('load')
-  await locator.click()
-  await loaded
 }

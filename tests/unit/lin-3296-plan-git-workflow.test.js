@@ -49,9 +49,9 @@ test('a stale stored featureBranches value is ignored', () => {
   assert.strictEqual(isValidFeatureKey('featureBranches'), false);
   assert.ok(!('featureBranches' in FEATURE_DEFAULTS));
 
-  const flags = getFeatureFlags({ features: { featureBranches: true, linearMcp: false } });
+  const flags = getFeatureFlags({ features: { featureBranches: true, roadmap: true } });
   assert.ok(!('featureBranches' in flags));
-  assert.strictEqual(flags.linearMcp, false, 'valid stored keys still apply');
+  assert.strictEqual(flags.roadmap, true, 'valid stored keys still apply');
 
   const html = renderSettingsPage('Acme', {
     urlKey: 'acme', workspaces: [], currentModel: 'openai/gpt-5.4-mini', availableModels: [],
@@ -59,5 +59,30 @@ test('a stale stored featureBranches value is ignored', () => {
   });
   assert.ok(!html.includes('featureBranches'));
   assert.ok(!/feature branch workflow/i.test(html));
-  assert.ok(html.includes('data-feature="linearMcp"'), 'the other Workflow toggles still render');
+  assert.ok(html.includes('data-feature="dispatch"'), 'the other Workflow toggles still render');
+});
+
+// LIN-3848: nine switches were removed. A stored preference saved before that
+// may still carry them; they are ignored — nothing throws, no flag is exposed,
+// the validators reject them, and Settings renders no row for them.
+const REMOVED_BY_LIN_3848 = ['linearMcp', 'aiRecommendations', 'promptButtons', 'codeReview', 'codeReviewSelf', 'codeReviewCicd', 'codeReviewPr', 'feedbackTriage'];
+
+test('stale stored values for the LIN-3848 removed switches are ignored harmlessly', () => {
+  const stored = Object.fromEntries(REMOVED_BY_LIN_3848.map(k => [k, true]));
+  const flags = getFeatureFlags({ features: { ...stored, roadmap: true } });
+  for (const key of REMOVED_BY_LIN_3848) {
+    assert.ok(!(key in flags), `${key} must not be exposed`);
+    assert.strictEqual(isValidFeatureKey(key), false);
+  }
+  assert.strictEqual(flags.roadmap, true);
+
+  const html = renderSettingsPage('Acme', {
+    urlKey: 'acme', workspaces: [], currentModel: 'openai/gpt-5.4-mini', availableModels: [],
+    featureFlags: { ...flags, ...stored }
+  });
+  for (const key of [...REMOVED_BY_LIN_3848, 'observerAuthority']) {
+    assert.ok(!html.includes(`data-feature="${key}"`), `Settings must not render ${key}`);
+    assert.ok(!html.includes(`settings-toggle-${key}`), `Settings must not render ${key}`);
+  }
+  assert.ok(html.includes('data-feature="feedbackWidget"'), 'feedbackWidget stays, in Settings');
 });

@@ -152,7 +152,7 @@ describe('Flight Companion — LIN-2395 observer report panel (route)', () => {
     assert.strictEqual(status, 200);
     assert.match(text, /Two loops working, one blocked on a decision\./);
     assert.match(text, /blocked-cluster/);
-    assert.match(text, /<code>off<\/code>/);
+    assert.doesNotMatch(text, /Authority:/, 'LIN-3848: the authority line is gone');
     // The stored attention row must be visible — this is the read surface
     // LIN-2405 closes.
     assert.match(text, /LIN-3003/);
@@ -227,7 +227,7 @@ describe('Flight Companion — LIN-2395 observer report panel (route)', () => {
     assert.match(text, /No attention rows this tick\./);
   });
 
-  test('an authority: on-unimplemented report still renders as plainly report-only (same lanes/narrative shape, only the stamp differs)', async () => {
+  test('an old report carrying a stale authority stamp renders with no Authority line (LIN-3848)', async () => {
     const reportDoc = {
       rev: 2,
       updatedAt: new Date('2026-08-30T07:15:00.000Z'),
@@ -249,7 +249,7 @@ describe('Flight Companion — LIN-2395 observer report panel (route)', () => {
     const observerStateStore = readOnlyObserverStateStore(reportDoc);
     const app = buildApp({ observerStateStore });
     const { text } = await get(app, '/workspace/acme/flight-companion');
-    assert.match(text, /<code>on-unimplemented<\/code>/);
+    assert.doesNotMatch(text, /Authority:|on-unimplemented/);
     assert.match(text, /No flags this tick\./);
     assert.deepStrictEqual(observerStateStore.calls, [
       // LIN-2621: the GET handler ALSO reads the companion + census docs

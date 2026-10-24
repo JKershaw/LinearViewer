@@ -273,8 +273,8 @@ Code appends the write fields (section 3).
 | `meta-prompt-template.js:300` | "Triage prompts must also preserve scope: instruct the agent that triage may change only labels, priority, state, and project — it must not rewrite the task's description or otherwise change its scope, and must not create follow-up tasks or subtasks; findings stay observations, never new work items (scope changes belong to the scoping/plan/breakdown steps)." |
 
 Unlike the others, triage's scope limits mostly have a real reason, and the ideal keeps their
-substance. Triage runs automatically on user feedback (`enqueueFeedbackTriage`, behind the
-`feedbackTriage` flag), before anyone has decided the ticket is worth working. The reporter's
+substance. Triage runs on user feedback (`enqueueFeedbackTriage`, when the widget sends the
+`triage` action), before anyone has decided the ticket is worth working. The reporter's
 words are the evidence. Spawning tickets at this point feeds the 2.1-created-per-closed ratio.
 What should go is the framing: "preserves scope", "never new work items", and the list of later
 stages that own scope. The ideal states the reason (whether to work on it is decided after

@@ -839,8 +839,8 @@ scheduler.register({
 // already-written census read-only — no fourth fleet summary.
 //
 // Report-only: no relay write, no wake sink, no dispatch/kick authority. The
-// `observerAuthority` workspace feature (default OFF) has no acting branch
-// in this ticket — see lib/observer-pass.js's header.
+// (The `observerAuthority` switch was removed in LIN-3848 — see
+// lib/observer-pass.js's header.)
 //
 // Cadence: 15 minutes, the in-tree precedent for an infrequent job
 // (credential-invariant-sweep below) — an LLM pass has no reason to run at

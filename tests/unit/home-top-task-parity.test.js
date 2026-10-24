@@ -193,22 +193,23 @@ describe('page-level options embedded for Home (LIN-2944 P1 addendum 9)', () => 
     assert.equal(opts.hasAutopilot, true);
     assert.equal(opts.dispatchEnabled, true);
     assert.equal(opts.proxyEnabled, true);
-    assert.equal(opts.promptButtons, true);
+    assert.ok(!('promptButtons' in opts), 'LIN-3848: no promptButtons key');
     assert.deepEqual(opts.customPrompts, [{ id: 'c1', name: 'Custom' }]);
     assert.ok(Array.isArray(opts.defaultPromptKeys) && opts.defaultPromptKeys.includes('implementation'));
     assert.ok(Array.isArray(opts.morePromptKeys) && opts.morePromptKeys.includes('retro'));
     assert.equal(opts.promptMeta.implementation, 'implement');
   });
 
-  test('AI off by choice is reflected as aiState=off, hasAI=false (F9)', () => {
+  test('a stale aiRecommendations=false is ignored: AI stays available (LIN-3848)', () => {
     const data = buildTrees();
     const html = renderPage(data.projectTrees, data.inProgressTrees, data.recentActivityTrees, 'Org', {
       urlKey: 'ws', workspaces: [WORKSPACE], openRouterSource: 'oauth',
       featureFlags: { aiRecommendations: false }
     });
     const opts = embedded(html, '__HOME_PROMPT_OPTS__');
-    assert.equal(opts.hasAI, false);
-    assert.equal(opts.aiState, 'off');
+    assert.equal(opts.hasAI, true);
+    assert.equal(opts.aiState, 'ready');
+    assert.ok(!('promptButtons' in opts));
   });
 
   test('landing pages emit no Home prompt options (byte-identical, no prompt UI)', () => {

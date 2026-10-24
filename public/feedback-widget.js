@@ -91,38 +91,6 @@
 
     const urlKey = root.dataset.urlKey;
 
-    // The footer toggle persists the flag through the shared /settings/features
-    // path, then reloads so the widget appears/disappears. LIN-3385: bound on
-    // the toggle inside the footer Harbour rendered, not delegated on the
-    // document by class, so a look-alike `.footer-feedback-toggle` in ticket
-    // text cannot write the setting. `init` runs before any page markdown
-    // renders (this script is deferred; the Flight Companion restores its
-    // thread only on DOMContentLoaded), so this lookup is Harbour's own.
-    const toggle = document.querySelector('footer.page-footer .footer-feedback-toggle');
-    if (toggle) toggle.addEventListener('click', async (e) => {
-      e.preventDefault();
-      if (toggle.dataset.busy === 'true') return;
-      toggle.dataset.busy = 'true';
-
-      const tUrlKey = toggle.dataset.urlKey || urlKey;
-      const next = toggle.dataset.enabled !== 'true';
-      try {
-        const res = await fetch(`/workspace/${encodeURIComponent(tUrlKey)}/settings/features`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'X-Requested-With': 'XMLHttpRequest'
-          },
-          body: new URLSearchParams({ feature: 'feedbackWidget', enabled: String(next) })
-        });
-        if (!res.ok) throw new Error(`status ${res.status}`);
-        window.location.reload();
-      } catch (err) {
-        console.error('Failed to toggle feedback widget:', err);
-        toggle.dataset.busy = 'false';
-      }
-    });
-
     // The widget itself only renders when the flag is on.
     if (root.dataset.enabled !== 'true' || !urlKey) return;
 

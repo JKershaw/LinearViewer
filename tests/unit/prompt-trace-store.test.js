@@ -366,18 +366,14 @@ describe('providerContextVerdict (LIN-2357, pure fold)', () => {
     assert.deepStrictEqual(result, { traces: 0, untracedContext: 0, divergent: 0, benign: 0, newestUntracedContextAt: null });
   });
 
-  test('the verdict is derived from resolvePromptUi, not restated — a flag that changes divergence outcome flips the fold too', () => {
-    // includeTracker is gated on write + the linearMcp flag (resolvePromptUi):
-    // with linearMcp:false, null (write:true) and github (write:true) both
-    // resolve includeTracker:false, but comments/subtasks/displayName still
-    // differ for github, so the trace stays divergent either way — proving
-    // the fold reads resolvePromptUi's full output, not a single field.
+  test('the verdict is derived from resolvePromptUi, not restated — a stale linearMcp:false trace flag is ignored (LIN-3848)', () => {
+    // LIN-3848 removed the linearMcp switch: a trace recorded with the old flag
+    // resolves exactly like one without it, and the fold still reads the full
+    // resolvePromptUi output (null vs github differ in comments/subtasks/name).
     const traces = [{ providerUi: null, featureFlags: { linearMcp: false }, timestamp: new Date() }];
     const withGithub = providerContextVerdict(traces, GITHUB_UI);
     assert.strictEqual(withGithub.divergent, 1);
-    // Sanity: resolvePromptUi really does change shape under the flag, so this
-    // test is not accidentally passing regardless of featureFlags handling.
-    assert.notDeepStrictEqual(
+    assert.deepStrictEqual(
       resolvePromptUi({ linearMcp: false }, null),
       resolvePromptUi({}, null)
     );

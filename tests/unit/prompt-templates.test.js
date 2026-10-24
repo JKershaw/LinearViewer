@@ -2256,10 +2256,29 @@ describe('resolvePromptUi (LIN-177 S4)', () => {
     assert.strictEqual(caps.displayName, 'Docs');
   });
 
-  test('linearMcp flag is the soft preference within a writable provider', () => {
+  test('tracker wording is always on for a writable provider; a stale linearMcp:false is ignored (LIN-3848)', () => {
     const caps = resolvePromptUi({ linearMcp: false }, { write: true, displayName: 'Local' });
     assert.strictEqual(caps.write, true);
-    assert.strictEqual(caps.includeTracker, false, 'flag off suppresses the suffix even when writable');
+    assert.strictEqual(caps.includeTracker, true, 'the removed flag no longer suppresses the suffix');
+    assert.strictEqual(resolvePromptUi({}, { write: false }).includeTracker, false, 'provider capability stays the floor');
+  });
+
+  test('implementation prompt carries tracker wording with {} and with a stale linearMcp:false (LIN-3848)', () => {
+    const issue = { identifier: 'LIN-900', title: 'S', description: 'd', state: { name: 'Todo', type: 'unstarted' }, labels: [] };
+    for (const flags of [{}, { linearMcp: false }]) {
+      const { prompt } = generatePrompt('implementation', issue, {}, flags);
+      assert.ok(prompt.includes(' in Linear'), `tracker wording present for ${JSON.stringify(flags)}`);
+    }
+  });
+
+  test('implementation prompt has no review sections even with stale codeReview* flags (LIN-3848)', () => {
+    const issue = { identifier: 'LIN-900', title: 'S', description: 'd', state: { name: 'Todo', type: 'unstarted' }, labels: [] };
+    const stale = { codeReview: true, codeReviewSelf: true, codeReviewCicd: true, codeReviewPr: true };
+    const { prompt } = generatePrompt('implementation', issue, {}, stale);
+    for (const heading of ['## Self-Review', '## CI/CD Check', '## PR Review']) {
+      assert.ok(!prompt.includes(heading), `no ${heading}`);
+    }
+    assert.strictEqual(prompt, generatePrompt('implementation', issue, {}, {}).prompt);
   });
 
   test('displayName falls back to Linear when the provider ui omits it', () => {

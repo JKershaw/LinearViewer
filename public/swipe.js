@@ -26,11 +26,10 @@ const dispatchEnabled = data.dispatchEnabled || false;
 const proxyEnabled = data.proxyEnabled || false;
 const isLocalhost = data.isLocalhost || false;
 // LIN-2944: AI state drives the shared component's disabled primary-action
-// wording (F9 / addendum 5); promptButtons hides templates. LIN-3239: the
+// wording (F9 / addendum 5). LIN-3239: the
 // free-tier flag tells the ladder to read the caller's own run allowance.
 const aiState = data.aiState || null;
 const freeTier = data.freeTier === true;
-const promptButtons = data.promptButtons !== false;
 const initialIdentifier = data.initialIdentifier || null;
 
 // Build reverse lookup: issueId → array of issues that block it (non-terminal only)
@@ -867,7 +866,6 @@ function handleAccordionClick(e) {
           hasAI,
           aiState,
           freeTier,
-          promptButtons,
           hasAutopilot,
           dispatchEnabled,
           proxyEnabled,

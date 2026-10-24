@@ -10,7 +10,7 @@
  *   - AI-off drops the AI primary        → `__HOME_PROMPT_OPTS__.aiState` + the
  *                                          component test (disabled primary)
  *   - proxy-off drops "run the whole task" → `__HOME_PROMPT_OPTS__.proxyEnabled`
- *   - promptButtons-off hides templates  → `__HOME_PROMPT_OPTS__.promptButtons`
+ *   - promptButtons-off hides templates  → removed in LIN-3848 (templates always show)
  * No assertion was deleted or loosened; each moved. The client-side half of the
  * F9 conditions is covered by `tests/unit/prompt-section-p0.test.js`.
  */
@@ -58,13 +58,13 @@ describe('Home opened-task mount: source provenance (LIN-1904/LIN-1910)', () => 
 });
 
 describe('Home opened-task page options: feature-flag truth conditions (F9)', () => {
-  test('AI off by choice keeps the templates catalog but drops the AI primary (K4/K5)', () => {
+  test('a stale aiRecommendations=false is ignored: templates and the AI primary stay (K4/K5, LIN-3848)', () => {
     const opts = homeOpts({ featureFlags: { aiRecommendations: false } });
-    assert.equal(opts.promptButtons, true, 'templates stay enabled');
+    assert.ok(!('promptButtons' in opts), 'no promptButtons key: templates always show');
     assert.ok(opts.defaultPromptKeys.includes('implementation'), 'default template catalog present');
     assert.ok(opts.morePromptKeys.includes('retro'), 'more template catalog present');
-    assert.equal(opts.aiState, 'off', 'AI primary reasons as off-by-choice');
-    assert.equal(opts.hasAI, false, 'AI primary is not runnable');
+    assert.equal(opts.aiState, 'ready', 'AI primary is always available');
+    assert.equal(opts.hasAI, true, 'AI primary is runnable');
   });
 
   test('AI on resolves aiState ready and hasAI true (K5 baseline)', () => {
@@ -84,8 +84,10 @@ describe('Home opened-task page options: feature-flag truth conditions (F9)', ()
     assert.equal(homeOpts({ featureFlags: { proxy: false } }).hasAutopilot, false);
   });
 
-  test('promptButtons off hides the templates (K7)', () => {
-    assert.equal(homeOpts({ featureFlags: { promptButtons: false } }).promptButtons, false);
+  test('a stale promptButtons=false is ignored: the templates are always shown (K7, LIN-3848)', () => {
+    const opts = homeOpts({ featureFlags: { promptButtons: false } });
+    assert.ok(!('promptButtons' in opts));
+    assert.ok(opts.defaultPromptKeys.length > 0);
   });
 
   test('landing pages emit no Home prompt options (no prompt UI)', () => {

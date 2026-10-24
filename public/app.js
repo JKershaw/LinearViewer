@@ -329,7 +329,6 @@ function mountHomePromptSections(root) {
       hasAI: page.hasAI,
       aiState: page.aiState,
       freeTier: page.freeTier,
-      promptButtons: page.promptButtons,
       hasAutopilot: page.hasAutopilot,
       dispatchEnabled: page.dispatchEnabled,
       proxyEnabled: page.proxyEnabled,
@@ -1564,20 +1563,6 @@ function initFeatureToggles() {
         void feedback.offsetWidth
         feedback.classList.add('visible')
         setTimeout(() => feedback.classList.remove('visible'), 1500)
-      }
-
-      // Show/hide sub-toggles when a parent feature with children is toggled
-      const nodeDiv = featureLine.closest('.node')
-      if (nodeDiv) {
-        // Map each parent feature to the children container it controls.
-        const childSelector = {
-          codeReview: '.children.code-review-options',
-          feedbackWidget: '.children.feedback-widget-options'
-        }[featureLine.dataset.feature]
-        if (childSelector) {
-          const childrenDiv = nodeDiv.querySelector(childSelector)
-          if (childrenDiv) childrenDiv.hidden = !data.enabled
-        }
       }
     } catch (err) {
       // Auth failure — redirect to re-authenticate (covers 401 and 403).

@@ -21,7 +21,7 @@ import { sweepFixedOverlaps, describeHits, expectSweepNotVacuous } from '../fixe
 // elsewhere mean something. If this file goes red, every other sweep result in
 // the suite is suspect regardless of what it says.
 test.describe('LIN-2298: the overlay sweep can actually detect an overlay', () => {
-  // Inject a fixed overlay sitting over the footer toggle's own band. The
+  // Inject a fixed overlay sitting over the footer theme toggle's own band. The
   // overlay mimics the FAB this ticket deleted (83x32 at a 16px bottom inset),
   // but its horizontal position is taken from the target's measured rect rather
   // than a hardcoded right edge: the footer's legal row reflows when a link is
@@ -54,7 +54,7 @@ test.describe('LIN-2298: the overlay sweep can actually detect an overlay', () =
     // The dashboard footer is the same target tests/e2e/feedback-widget.spec.js
     // sweeps, so this control exercises the real call shape rather than a
     // synthetic page the other specs never touch.
-    const target = '[data-testid="footer-feedback-toggle"]'
+    const target = '[data-testid="footer-theme-toggle"]'
 
     await injectOverlay(page, target)
     const withOverlay = await sweepFixedOverlaps(page, target)
@@ -64,7 +64,7 @@ test.describe('LIN-2298: the overlay sweep can actually detect an overlay', () =
     ).toContain('sweep-control-overlay')
     expect(
       withOverlay.hits.length,
-      `a fixed overlay in the target's band MUST be reported over the footer toggle — ${describeHits(withOverlay)}`
+      `a fixed overlay in the target's band MUST be reported over the footer theme toggle — ${describeHits(withOverlay)}`
     ).toBeGreaterThan(0)
     expect(withOverlay.hits.every(h => h.overlay === 'sweep-control-overlay')).toBe(true)
 
@@ -97,7 +97,7 @@ test.describe('LIN-2298: the overlay sweep can actually detect an overlay', () =
     await page.waitForLoadState('networkidle')
 
     await page.evaluate(() => {
-      const target = document.querySelector('[data-testid="footer-feedback-toggle"]')
+      const target = document.querySelector('[data-testid="footer-theme-toggle"]')
       const r = target.getBoundingClientRect()
       const width = Math.max(120, r.width)
       const left = Math.min(Math.max(0, r.left), Math.max(0, window.innerWidth - width - 16))
@@ -110,7 +110,7 @@ test.describe('LIN-2298: the overlay sweep can actually detect an overlay', () =
       }
     })
 
-    const result = await sweepFixedOverlaps(page, '[data-testid="footer-feedback-toggle"]')
+    const result = await sweepFixedOverlaps(page, '[data-testid="footer-theme-toggle"]')
     const named = new Set(result.hits.map(h => h.overlay))
     expect(
       [...named].sort(),
@@ -139,7 +139,7 @@ test.describe('LIN-2298: the overlay sweep can actually detect an overlay', () =
     // silently stop covering the sticky branch.
     expect(position, '.nav-bar is expected to be sticky — see public/style.css').toBe('sticky')
 
-    const result = await sweepFixedOverlaps(page, '[data-testid="footer-feedback-toggle"]')
+    const result = await sweepFixedOverlaps(page, '[data-testid="footer-theme-toggle"]')
     expectSweepNotVacuous(expect, result, 'dashboard footer')
     expect(
       result.candidates.some(c => String(c).includes('nav-bar')),
