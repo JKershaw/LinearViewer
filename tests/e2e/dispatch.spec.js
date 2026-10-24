@@ -1288,7 +1288,7 @@ test.describe('Custom Prompt Dispatch', () => {
 
     // Set up test session with dispatch feature enabled (proxy explicitly off so
     // the custom prompt dispatches bare — LIN-2944 P3 made proxy default on).
-    await page.goto(`/test/set-session?runnerKey=1&urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?runnerKey=1&proxyDefault=false&urlKey=${URL_KEY}`);
   });
 
   /**

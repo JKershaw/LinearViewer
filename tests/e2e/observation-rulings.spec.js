@@ -1397,8 +1397,8 @@ test.describe('Ambient rulings nav badge (LIN-1728 Phase 3)', () => {
     expect(body.workspaces.map(w => w.urlKey)).toContain(URL_KEY);
   });
 
-  test('absent when the dispatch flag is off', async ({ page }) => {
-    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+  test('absent when the workspace has no way to run (LIN-3849)', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}&runnerKey=0`);
     await page.goto(`/workspace/${URL_KEY}/`);
     await page.waitForLoadState('networkidle');
     await expect(page.locator('[data-rulings-badge]')).toHaveCount(0);

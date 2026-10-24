@@ -445,7 +445,7 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
       await expect(component).not.toHaveClass(/streaming/);
       await expect(body).toContainText('Do the thing');
       await expect(notice).toHaveCount(0);
-      await expect(ladder.locator('[data-rung="run-step"]')).toHaveAttribute('data-action', 'run-step');
+      await expect(ladder.locator('[data-rung="run-step"]')).toHaveAttribute('data-action', 'setup');
     });
   });
 });
