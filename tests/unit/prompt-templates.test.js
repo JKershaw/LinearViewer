@@ -2573,13 +2573,14 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       const deployAt = land.search(/wait until the deploy has landed/);
       const doneAt = land.search(/Then set the task to Done/);
       assert.ok(deployAt > -1 && doneAt > deployAt, 'Done comes after the post-deploy steps');
-      // LIN-3614: both holds stay pinned; an unasked check no longer shares the second one.
-      assert.ok(/If a post-deploy step fails, or one the ticket asked for is beyond your access, the task stays open/.test(prompt),
-        'a failed post-deploy step, and a ticket-asked one beyond access, keep the task open');
+      // LIN-3903: the three holds stay pinned; the asked/unasked split is gone.
+      assert.ok(/The task stays open only if the deploy has not landed, a post-deploy step ran and failed, or a post-deploy step that is not a check \(a data clean-up, a migration\) is beyond your access/.test(prompt),
+        'an undeployed change, a failed post-deploy step and a non-check step beyond access keep the task open');
     });
 
-    // LIN-3614: a live or post-deploy check the ticket did not ask for, which
-    // close-out cannot run, is recorded as not run and the task closes. Each rule
+    // LIN-3614, widened by LIN-3903 (John's 12 Oct ruling): once the deploy has
+    // landed, a post-deploy check close-out cannot run is recorded as not run and
+    // the task closes, however the ticket or review names it. Each rule
     // is checked in the rendered section that carries it.
     const section = (prompt, from, to) => {
       const start = prompt.indexOf(from);
@@ -2594,25 +2595,28 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       assert.ok(/list it in the ledger as not run, with why/.test(manual), 'Manual Verification routes it to the ledger as not run');
       assert.ok(!/flag it for human testing/i.test(prompt), 'the human-testing route is gone');
       const after = section(prompt, '- **After the deploy**', '- **A named monitor**');
-      assert.ok(/never as a condition on the merge\. Only where the ticket asks for it or close-out can run it\./.test(after),
-        'the After-the-deploy route applies only where the ticket asks for it or close-out can run it');
+      assert.ok(/never as a condition on the merge\./.test(after), 'a post-deploy step is never a merge condition');
+      assert.ok(!/asks for it|can run it/.test(after), 'LIN-3903: the asked/can-run filter on the producer route is gone');
     });
 
-    test('close-out (LIN-3614): Land It keeps two holds and records an unasked check it cannot run as not run, then closes', () => {
+    test('close-out (LIN-3903): Land It keeps three holds; a check it cannot run never holds the close once the deploy has landed', () => {
       const { prompt } = generatePrompt('close-out', issue, context);
       const land = section(prompt, '### Land It and Close the Loop', '### Follow-up Triage');
-      assert.ok(/If a post-deploy step fails, or one the ticket asked for is beyond your access, the task stays open: say what is left and name the next action\./.test(land),
-        'a failed step and a ticket-asked step beyond access still keep the task open');
-      assert.ok(/An unasked live or post-deploy check you cannot run does not hold the close: record it as not run \(what, why, who or what can run it, or "none"\) on the ticket and in the PR, then close/.test(land),
-        'an unasked check is recorded as not run with what, why and the follow-up, then the task closes');
-      assert.ok(/no monitor settles it, and raise no ruling/.test(land), 'no monitor settles it and no ruling is raised');
+      assert.ok(/The task stays open only if the deploy has not landed, a post-deploy step ran and failed, or a post-deploy step that is not a check \(a data clean-up, a migration\) is beyond your access: say what is left and name the next action\./.test(land),
+        'the three holds are named, with the next action');
+      assert.ok(/Once the deploy has landed, a post-deploy check you cannot run never holds the close, however the ticket or review names it: record it as not run \(what, why, who can run it\) on the ticket and in the PR, list it for the operator, then close/.test(land),
+        'a check it cannot run is recorded as not run, listed for the operator, and the task closes');
+      assert.ok(/no monitor settles it, and raise no ruling\./.test(land), 'no monitor settles it and no ruling is raised');
+      assert.ok(/A product question is not a check and still goes to a ruling\./.test(land), 'a product question still goes to a ruling');
+      assert.ok(!/unasked/i.test(prompt), 'the asked/unasked wording is gone from the assembled prompt');
+      assert.ok(!/one the ticket asked for is beyond your access/.test(prompt), 'the ticket-asked hold is gone');
     });
 
-    test('close-out (LIN-3614): Settle the Ledger points the unasked check to Land It and keeps the outsider standard on filing', () => {
+    test('close-out (LIN-3903): Settle the Ledger points the post-deploy check to Land It and keeps the outsider standard on filing', () => {
       const { prompt } = generatePrompt('close-out', issue, context);
       const settle = section(prompt, '### Settle the Ledger', '### Land It and Close the Loop');
       const inside = settle.split('\n').find(l => l.startsWith('- **Inside**'));
-      assert.ok(inside && /An unasked live or post-deploy check you cannot run: see Land It\./.test(inside),
+      assert.ok(inside && /A post-deploy check you cannot run: see Land It\./.test(inside),
         'the Inside bullet carries the not-run exception, pointing to Land It');
       assert.ok(/Leave one undone only when finishing it is a change the team would need to hear about first/.test(inside),
         'the hold for real inside work stays');
@@ -2634,10 +2638,10 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
         'a stale citation is a fix outside the ticket\'s files, bounded to citations and comments');
     });
 
-    test('close-out completion signals (LIN-3614) name the not-run route with its bound', () => {
+    test('close-out completion signals (LIN-3903) name the not-run route with its bound', () => {
       const sig = COMPLETION_SIGNALS['close-out'];
-      assert.ok(sig.signals.some(s => /unasked live or post-deploy check/i.test(s) && /not run/i.test(s)),
-        'the ledger signal records an unasked live or post-deploy check close-out cannot run as not run');
+      assert.ok(sig.signals.some(s => /once the deploy landed, a post-deploy check close-out cannot run/i.test(s) && /not run/i.test(s) && !/unasked/i.test(s)),
+        'the ledger signal records a post-deploy check close-out cannot run, once the deploy landed, as not run');
     });
 
     test('close-out closes the loop on the related tickets the work settles', () => {
@@ -2677,7 +2681,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
   // untouched; this only adds an existence/re-raise check on top of it.
   describe('idempotency guidance — existing-ticket check and no-re-raise (LIN-2991/LIN-3022 §5)', () => {
     const existingTicketClause = /before filing an outside item.*search the anchor's relations.*GET \/api\/proxy\/issues\/\{id\}\/relations.*GET \/api\/proxy\/search.*if one exists,? link it/is;
-    const noReRaiseClause = /before raising a `DECISION:` on a finding.*GET \/api\/proxy\/rulings\?issueIdentifier=<anchor>&includeResolved=true.*do not re-raise a finding.*includeResolved.*covers loop-backed rulings only, never a task-bound one/is;
+    const noReRaiseClause = /before raising any `DECISION:`.*GET \/api\/proxy\/rulings\?issueIdentifier=<anchor>&includeResolved=true.*do not re-raise a question.*includeResolved.*covers loop-backed rulings only, never a task-bound one.*ask for every fact the question needs in the one ruling/is;
 
     // LIN-3293: one owner for filing. Review files nothing, so it carries the
     // no-re-raise check but not the filing check; close-out files the outside
@@ -2689,6 +2693,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       const nextSectionIdx = review.indexOf('### Test Quality Check');
       assert.ok(eligibilityIdx > -1, 'sanity: LIN-3006\'s eligibility clause is present');
       assert.ok(eligibilityIdx < noReRaiseIdx && noReRaiseIdx < nextSectionIdx, 'the no-re-raise clause sits after the eligibility clause');
+      assert.ok(!/on a finding, check it is not already covered/i.test(review), 'LIN-3903: the trigger is any DECISION:, not only one on a finding');
       assert.equal(review.search(existingTicketClause), -1, 'review files nothing, so it has no filing check');
       assert.match(review, /close-out files it, after checking it does not already exist/);
     });

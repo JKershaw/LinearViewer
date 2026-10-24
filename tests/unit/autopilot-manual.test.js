@@ -56,13 +56,23 @@ describe('extractPrincipleZeroSection', () => {
     const section = extractPrincipleZeroSection();
     const eligibilityAt = section.indexOf('offer **file** only for');
     const existingTicketAt = section.indexOf('Before offering file, check the ticket');
-    const noReRaiseAt = section.indexOf('Before raising a `DECISION:` on a finding, check it isn');
+    const noReRaiseAt = section.indexOf('Before raising any `DECISION:`, check it isn');
     const mergeAt = section.indexOf('Merge sibling blockers before you bubble up');
     assert.ok(eligibilityAt > -1, 'sanity: the LIN-3006 eligibility sentence is present');
     assert.ok(existingTicketAt > -1, 'the existing-ticket-check clause is present');
     assert.ok(noReRaiseAt > -1, 'the no-re-raise clause is present');
     assert.ok(eligibilityAt < existingTicketAt && existingTicketAt < noReRaiseAt && noReRaiseAt < mergeAt,
       'both new clauses sit after the eligibility sentence and before sibling-merge, in order');
+    // LIN-3903: the check covers any DECISION:, and one ruling asks for every fact.
+    assert.ok(section.includes("Don't re-raise a question an open, answered, dismissed, or withdrawn row"), 'the check covers a question, not only a finding');
+    assert.ok(section.includes('Ask for every fact the question needs in the one ruling.'), 'one ruling asks for every fact');
+  });
+
+  test('the close-out hold is the 12 Oct standing ruling, not the asked/unasked split (LIN-3903)', () => {
+    const manual = buildAutopilotManual();
+    assert.ok(!/did not ask for/.test(manual), 'the asked/unasked parenthetical is gone');
+    assert.ok(/LIN-3903: once the deploy has landed, a post-deploy check close-out cannot run is recorded as not run/.test(manual),
+      'the standing ruling is stated');
   });
 
   test('is an exact substring of the full manual (a pure slice, not a rewrite)', () => {
