@@ -393,7 +393,7 @@ describe('computeUsageCostUsd — long-context override tier (LIN-2403)', () => 
     assert.strictEqual(cost, 5_000_000 * 5.00 / 1e6);
   });
 
-  test('the 10 rows with no override tier price byte-identically to HEAD', () => {
+  test('the rows with no override tier price byte-identically to HEAD', () => {
     for (const id of Object.keys(MODEL_PRICING)) {
       if (Array.isArray(MODEL_PRICING[id].overrides)) continue;
       const usage = { model: id, harness: 'claude-code', inputTokens: 1_000_000, outputTokens: 1 };
@@ -509,14 +509,14 @@ describe('rate table shape (LIN-1495)', () => {
     }
   });
 
-  test('cacheWrite1h (LIN-2113) is present ONLY on the 9 anthropic/claude-* rows, at exactly 2x prompt', () => {
+  test('cacheWrite1h (LIN-2113) is present ONLY on the anthropic/claude-* rows, at exactly 2x prompt', () => {
     // Verified live against https://openrouter.ai/api/v1/models on 2026-08-15: the six
     // then-existing anthropic/claude-* rows publish
     // input_cache_write_1h at exactly prompt x 2; the three LIN-3094 rows come from Anthropic's published rates (18 Oct 2026), not the OpenRouter catalog;
     // openai/gpt-5.6-sol carries input_cache_write but no 1h key, and the other three
     // OpenAI rows carry neither.
     const anthropicRows = Object.keys(MODEL_PRICING).filter(id => id.startsWith('anthropic/claude-'));
-    assert.strictEqual(anthropicRows.length, 9, 'expected exactly 9 anthropic/claude-* rows (LIN-3094 added 3)');
+    assert.strictEqual(anthropicRows.length, 10, 'expected exactly 10 anthropic/claude-* rows (LIN-3094 added 3, LIN-3916 added Haiku 5.5)');
     for (const id of anthropicRows) {
       const rate = MODEL_PRICING[id];
       assert.strictEqual(rate.cacheWrite1h, rate.prompt * 2, `${id} cacheWrite1h must be prompt x 2`);
@@ -597,17 +597,24 @@ describe('rate table shape (LIN-1495)', () => {
     }
   });
 
-  test('overrides are present on exactly the 5 openai rows the live catalog gates at 272000 (LIN-2403)', () => {
-    // Sibling of the cacheWrite1h-only-on-anthropic test above — the tripwire that
-    // forces the LIN-2403 cumulative-guard conversation the day an anthropic row
-    // gains an override tier (the live catalog already publishes one on
-    // anthropic/claude-sonnet-4.5 and anthropic/claude-sonnet-4, both currently
-    // absent from this curated table).
+  test('overrides are present on exactly the 5 openai rows gated at 272000 and the Haiku 5.5 row gated at 100000 (LIN-2403, LIN-3916)', () => {
+    // Sibling of the cacheWrite1h-only-on-anthropic test above. Haiku 5.5 (LIN-3916) is the
+    // first anthropic row with an override tier, so the LIN-2403 cumulative-guard question is
+    // live: a claude-code Haiku session over 100k prices to null (open question in the PR).
+    // A new anthropic override must be added to this map deliberately, with its threshold.
+    const expectedThreshold = {
+      'openai/gpt-5.5': 272000,
+      'openai/gpt-5.5-pro': 272000,
+      'openai/gpt-5.6-sol': 272000,
+      'openai/gpt-5.6-terra': 272000,
+      'openai/gpt-6.1-sol': 272000,
+      'anthropic/claude-haiku-5.5': 100000,
+    };
     const overrideRows = Object.keys(MODEL_PRICING).filter(id => Array.isArray(MODEL_PRICING[id].overrides));
-    assert.deepStrictEqual(overrideRows.sort(), ['openai/gpt-5.5', 'openai/gpt-5.5-pro', 'openai/gpt-5.6-sol', 'openai/gpt-5.6-terra', 'openai/gpt-6.1-sol'].sort());
+    assert.deepStrictEqual(overrideRows.sort(), Object.keys(expectedThreshold).sort());
     for (const id of overrideRows) {
       assert.strictEqual(MODEL_PRICING[id].overrides.length, 1, `${id} carries exactly one override entry today`);
-      assert.strictEqual(MODEL_PRICING[id].overrides[0].minPromptTokens, 272000, `${id} gates at 272000`);
+      assert.strictEqual(MODEL_PRICING[id].overrides[0].minPromptTokens, expectedThreshold[id], `${id} gates at ${expectedThreshold[id]}`);
     }
   });
 });
@@ -715,8 +722,110 @@ describe('models in use are priced (LIN-3094)', () => {
 
   test('pricing rows are not permissions: none of the new ids is in AVAILABLE_MODELS', () => {
     const ids = AVAILABLE_MODELS.map(m => m.id);
-    for (const id of ['anthropic/claude-fable-5.1', 'anthropic/claude-opus-5.5', 'anthropic/claude-sonnet-5.5']) {
+    for (const id of ['anthropic/claude-fable-5.1', 'anthropic/claude-opus-5.5', 'anthropic/claude-sonnet-5.5', 'anthropic/claude-haiku-5.5', 'deepseek/deepseek-v4.1-flash-1017', 'z-ai/glm-5.3-flash', 'xiaomi/mimo-v2.6-flash']) {
       assert.ok(!ids.includes(id), `${id} must not be selectable`);
+    }
+  });
+});
+
+describe('LIN-3916 rows: Haiku 5.5, DeepSeek V4.1 Flash 1017, GLM-5.3 Flash, MiMo V2.6 Flash', () => {
+  // Expected arithmetic is written out by hand from the rate per 1M tokens, not read back
+  // from the row, so a transcription error in the row fails here (the LIN-2384 lesson).
+  const NON_ANTHROPIC = ['deepseek/deepseek-v4.1-flash-1017', 'z-ai/glm-5.3-flash', 'xiaomi/mimo-v2.6-flash'];
+
+  test('each of the four ids has a row', () => {
+    for (const id of ['anthropic/claude-haiku-5.5', ...NON_ANTHROPIC]) {
+      assert.ok(getModelRate(id), `${id} must have a rate row`);
+    }
+  });
+
+  test('Haiku 5.5 row carries the catalog rates and its over-100k override', () => {
+    assert.deepStrictEqual({ ...MODEL_PRICING['anthropic/claude-haiku-5.5'] }, {
+      prompt: 0.10, completion: 0.50, cacheRead: 0.01, cacheWrite: 0.125, cacheWrite1h: 0.20,
+      overrides: MODEL_PRICING['anthropic/claude-haiku-5.5'].overrides,
+    });
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(MODEL_PRICING['anthropic/claude-haiku-5.5'].overrides)), [
+      { minPromptTokens: 100000, prompt: 0.50, completion: 2.50, cacheRead: 0.05, cacheWrite: 0.625, cacheWrite1h: 1.00 },
+    ]);
+  });
+
+  test('DeepSeek, GLM and MiMo rows carry the catalog base rates and no write tiers or overrides', () => {
+    assert.deepStrictEqual({ ...MODEL_PRICING['deepseek/deepseek-v4.1-flash-1017'] },
+      { prompt: 0.15, completion: 0.60, cacheRead: 0.003 });
+    assert.deepStrictEqual({ ...MODEL_PRICING['z-ai/glm-5.3-flash'] },
+      { prompt: 0.15, completion: 0.50, cacheRead: 0.03 });
+    assert.deepStrictEqual({ ...MODEL_PRICING['xiaomi/mimo-v2.6-flash'] },
+      { prompt: 0.14, completion: 0.28, cacheRead: 0.0028 });
+  });
+
+  test('each id prices a known usage to its hand-computed cost', () => {
+    // 10,000 input + 2,000 output + 5,000 cache-read: prompt is 15,000, well under Haiku's 100k gate.
+    const usage = { inputTokens: 10_000, outputTokens: 2_000, cacheReadInputTokens: 5_000, harness: 'opencode' };
+    const expected = {
+      'anthropic/claude-haiku-5.5': 0.00205,  // 10000*0.10 + 2000*0.50 + 5000*0.01 = 2050 /1e6
+      'deepseek/deepseek-v4.1-flash-1017': 0.002715, // 10000*0.15 + 2000*0.60 + 5000*0.003 = 2715 /1e6
+      'z-ai/glm-5.3-flash': 0.00265,          // 10000*0.15 + 2000*0.50 + 5000*0.03 = 2650 /1e6
+      'xiaomi/mimo-v2.6-flash': 0.001974,     // 10000*0.14 + 2000*0.28 + 5000*0.0028 = 1974 /1e6
+    };
+    for (const [model, want] of Object.entries(expected)) {
+      const cost = computeUsageCostUsd({ ...usage, model });
+      assert.ok(cost !== null && Math.abs(cost - want) < 1e-12, `${model} priced to ${cost}, want ${want}`);
+    }
+  });
+
+  test('the four ids resolve as worker models: Haiku from its dashed Claude Code name, the rest pass through', () => {
+    assert.strictEqual(resolveWorkerModelId('claude-haiku-5-5'), 'anthropic/claude-haiku-5.5');
+    for (const id of NON_ANTHROPIC) {
+      assert.strictEqual(resolveWorkerModelId(id), id, `${id} is an OpenRouter-native id and passes through`);
+    }
+  });
+
+  test('Haiku 5.5 cache writes split 5m and 1h: 600 at 0.125 plus 400 at 0.20 is 155 per 1M', () => {
+    const cost = computeUsageCostUsd({
+      model: 'anthropic/claude-haiku-5.5', harness: 'opencode',
+      cacheCreationInputTokens: 1000, cacheCreation1hInputTokens: 400,
+    });
+    assert.ok(Math.abs(cost - 0.000155) < 1e-12, `priced to ${cost}`);
+  });
+
+  test('Haiku 5.5 at exactly 100,000 prompt tokens prices at the base rate (the gate is strictly greater)', () => {
+    const cost = computeUsageCostUsd({ model: 'claude-haiku-5-5', harness: 'opencode', inputTokens: 100_000 });
+    assert.ok(Math.abs(cost - 0.01) < 1e-12, `priced to ${cost}`);
+  });
+
+  test('Haiku 5.5 at 100,001 prompt tokens prices at the override tier', () => {
+    const cost = computeUsageCostUsd({ model: 'claude-haiku-5-5', harness: 'opencode', inputTokens: 100_001 });
+    assert.ok(Math.abs(cost - 0.0500005) < 1e-12, `priced to ${cost}`);
+  });
+
+  test('the Haiku threshold counts the whole prompt: input + cache-read + cache-write, not input alone', () => {
+    // 50,000 + 30,000 + 20,000 = 100,000 exactly: base rate.
+    const atBase = computeUsageCostUsd({
+      model: 'claude-haiku-5-5', harness: 'opencode',
+      inputTokens: 50_000, cacheReadInputTokens: 30_000, cacheCreationInputTokens: 20_000,
+    });
+    assert.ok(Math.abs(atBase - 0.0078) < 1e-12, `base priced to ${atBase}`); // 5000 + 300 + 2500 = 7800 /1e6
+    // One more cache-write token tips the whole prompt over: override tier.
+    const overThreshold = computeUsageCostUsd({
+      model: 'claude-haiku-5-5', harness: 'opencode',
+      inputTokens: 50_000, cacheReadInputTokens: 30_000, cacheCreationInputTokens: 20_001,
+    });
+    assert.ok(Math.abs(overThreshold - 0.039000625) < 1e-12, `override priced to ${overThreshold}`); // 25000 + 1500 + 12500.625
+  });
+
+  test('Haiku 5.5 over 100k under claude-code is still null: a cumulative row cannot prove the per-request size', () => {
+    assert.strictEqual(computeUsageCostUsd({ model: 'claude-haiku-5-5', harness: 'claude-code', inputTokens: 100_001 }), null);
+    assert.strictEqual(computeUsageCostUsd({ model: 'claude-haiku-5-5', inputTokens: 100_001 }), null);
+  });
+
+  test('Haiku 5.5 at exactly 100k under claude-code prices normally', () => {
+    const cost = computeUsageCostUsd({ model: 'claude-haiku-5-5', harness: 'claude-code', inputTokens: 100_000 });
+    assert.ok(Math.abs(cost - 0.01) < 1e-12, `priced to ${cost}`);
+  });
+
+  test('non-Anthropic rows have no write tiers: cache-creation tokens price to null, not free', () => {
+    for (const model of NON_ANTHROPIC) {
+      assert.strictEqual(computeUsageCostUsd({ model, harness: 'opencode', cacheCreationInputTokens: 1000 }), null, model);
     }
   });
 });
