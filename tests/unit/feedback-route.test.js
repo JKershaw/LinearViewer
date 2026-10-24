@@ -7,8 +7,9 @@
 //   - priority is forwarded (clamped to Linear's 0-4)
 //   - page URL + browser are captured into the ticket body
 //   - the team is resolved server-side when the body omits teamId
-//   - a triage follow-up is OPT-IN (default off, LIN-733): not enqueued unless
-//     the per-user `feedbackTriage` flag is on
+//   - a triage follow-up is OPT-IN (LIN-733): only the explicit widget action
+//     enqueues one; a POST with no action files only (the `feedbackTriage`
+//     flag was removed in LIN-3848)
 //   - when triage is on, the prompt carries the workspace API proxy details
 //   - capability gates still return a clean 422 (never 500)
 //   - a failed triage enqueue does not fail the submission
@@ -136,7 +137,7 @@ describe('feedback submit (LIN-635)', () => {
   test('files a ticket with priority + captured URL/UA, no triage by default (LIN-733)', async () => {
     const { provider, calls } = makeFakeProvider();
     const dispatch = capturingDispatchStore();
-    // No features → feedbackTriage defaults off.
+    // No action → file only.
     const app = buildApp({ provider, dispatchQueueStore: dispatch, proxyTokenStore: fakeProxyTokenStore() });
 
     const { status, body } = await submit(app, 'acme', {
@@ -192,16 +193,35 @@ describe('feedback submit (LIN-635)', () => {
     assert.match(description, /iPhone/);
   });
 
-  test('enqueues triage with proxy details when feedbackTriage is on (LIN-733)', async () => {
-    const { provider } = makeFakeProvider();
+  // LIN-3848: the `feedbackTriage` flag is gone. A POST with no `action` files
+  // only, even when a stale stored `feedbackTriage: true` rides the session.
+  test('no action + a stale feedbackTriage:true flag: files the ticket, enqueues and mints nothing (LIN-3848)', async () => {
+    const { provider, calls } = makeFakeProvider();
     const dispatch = capturingDispatchStore();
-    const proxyTokenStore = fakeProxyTokenStore('rw-tok-123');
+    const proxyTokenStore = fakeProxyTokenStore();
     const app = buildApp({
       provider, dispatchQueueStore: dispatch, proxyTokenStore,
       features: { feedbackTriage: true }
     });
 
     const { status, body } = await submit(app, 'acme', { message: 'Something is broken', priority: 2 });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(body.success, true);
+    assert.strictEqual(calls.createIssue.length, 1);
+    assert.strictEqual(dispatch.items.length, 0);
+    assert.strictEqual(proxyTokenStore.calls.length + proxyTokenStore.grantCalls.length, 0);
+  });
+
+  test("action:'triage' enqueues triage with proxy details (LIN-733)", async () => {
+    const { provider } = makeFakeProvider();
+    const dispatch = capturingDispatchStore();
+    const proxyTokenStore = fakeProxyTokenStore('rw-tok-123');
+    const app = buildApp({
+      provider, dispatchQueueStore: dispatch, proxyTokenStore
+    });
+
+    const { status, body } = await submit(app, 'acme', { message: 'Something is broken', priority: 2, action: 'triage' });
 
     assert.strictEqual(status, 201);
     assert.strictEqual(body.success, true);
@@ -236,7 +256,7 @@ describe('feedback submit (LIN-635)', () => {
 
   // === Explicit post-create actions (LIN-918) ==============================
 
-  test("action:'save' files only — nothing enqueued even when feedbackTriage is on", async () => {
+  test("action:'save' files only — nothing enqueued even with a stale feedbackTriage flag", async () => {
     const { provider } = makeFakeProvider();
     const dispatch = capturingDispatchStore();
     // Flag ON, but an explicit save must still short-circuit any follow-up.
@@ -252,11 +272,11 @@ describe('feedback submit (LIN-635)', () => {
     assert.strictEqual(dispatch.items.length, 0);
   });
 
-  test("action:'triage' enqueues triage even when the feedbackTriage flag is OFF (decoupled)", async () => {
+  test("action:'triage' enqueues triage with no flag involved", async () => {
     const { provider } = makeFakeProvider();
     const dispatch = capturingDispatchStore();
     const proxyTokenStore = fakeProxyTokenStore('rw-tok-triage');
-    // No features → flag defaults off; the explicit action must triage anyway.
+    // The explicit action alone triages.
     const app = buildApp({ provider, dispatchQueueStore: dispatch, proxyTokenStore });
 
     const { status } = await submit(app, 'acme', { message: 'triage me', priority: 3, action: 'triage' });
@@ -389,10 +409,11 @@ describe('feedback submit (LIN-635)', () => {
     assert.match(item.prompt, /Workspace API access/);
   });
 
-  test('an unknown action falls back to the legacy plain send (flag-gated triage)', async () => {
+  test('an unknown action falls back to the legacy plain send (files only)', async () => {
     const { provider } = makeFakeProvider();
     const dispatch = capturingDispatchStore();
-    // Unknown action + flag OFF → nothing enqueued (legacy default).
+    // Unknown action → nothing enqueued (LIN-3848: no flag-gated triage).
+
     const app = buildApp({ provider, dispatchQueueStore: dispatch, proxyTokenStore: fakeProxyTokenStore() });
     const { status } = await submit(app, 'acme', { message: 'hi', action: 'bogus' });
     assert.strictEqual(status, 201);
@@ -569,12 +590,12 @@ describe('feedback submit (LIN-635)', () => {
   test('still succeeds when the triage enqueue throws (best-effort)', async () => {
     const { provider } = makeFakeProvider();
     const failingDispatch = { addItem: async () => { throw new Error('queue down'); } };
-    // Flag on so the triage path actually runs and hits the failing enqueue.
+    // The explicit triage action makes the triage path run and hit the failing enqueue.
     const app = buildApp({
       provider, dispatchQueueStore: failingDispatch,
-      proxyTokenStore: fakeProxyTokenStore(), features: { feedbackTriage: true }
+      proxyTokenStore: fakeProxyTokenStore()
     });
-    const { status, body } = await submit(app, 'acme', { message: 'hi' });
+    const { status, body } = await submit(app, 'acme', { message: 'hi', action: 'triage' });
     assert.strictEqual(status, 201);
     assert.strictEqual(body.success, true);
   });
@@ -610,7 +631,7 @@ describe('feedback submit (LIN-635)', () => {
 
     const app = buildApp({
       provider, dispatchQueueStore: dispatch,
-      proxyTokenStore, features: { feedbackTriage: true },
+      proxyTokenStore,
       workspacePreferencesStore: store
     });
 
@@ -650,7 +671,7 @@ describe('feedback submit (LIN-635)', () => {
 
     const app = buildApp({
       provider, dispatchQueueStore: dispatch,
-      proxyTokenStore, features: { feedbackTriage: false },
+      proxyTokenStore,
       workspacePreferencesStore: store
     });
 
@@ -834,7 +855,7 @@ describe('feedback submit (LIN-635)', () => {
     const proxyTokenStore = fakeProxyTokenStore('rw-tok');
     const app = buildApp({
       provider, dispatchQueueStore: dispatch,
-      proxyTokenStore, features: { feedbackTriage: true }
+      proxyTokenStore
     });
 
     const { status } = await submit(app, 'acme', { message: 'hi', action: 'triage' });
@@ -865,7 +886,6 @@ describe('feedback submit — free-tier run limit (LIN-3238 Q10)', () => {
 
   for (const [name, payload] of [
     ["action:'triage'", { action: 'triage' }],
-    ['legacy flag-on triage', {}],
     ["action:'autopilot'", { action: 'autopilot' }],
   ]) {
     test(`${name}: an exhausted free-tier account still files the ticket, enqueues nothing, mints nothing, and reports the refusal`, async () => {
@@ -874,7 +894,6 @@ describe('feedback submit — free-tier run limit (LIN-3238 Q10)', () => {
       const proxyTokenStore = fakeProxyTokenStore();
       const app = buildApp({
         provider, dispatchQueueStore: dispatch, proxyTokenStore,
-        features: { feedbackTriage: true },
         freeTierStore: freeTier(async () => REFUSED)
       });
 
@@ -941,8 +960,7 @@ describe('feedback submit — owner-only lanes (LIN-3383)', () => {
 
   for (const [lane, payload, features] of [
     ['autopilot', { message: 'run it', action: 'autopilot' }, {}],
-    ['triage (explicit)', { message: 'triage it', action: 'triage' }, {}],
-    ['triage (legacy flag send)', { message: 'triage it' }, { feedbackTriage: true }]
+    ['triage (explicit)', { message: 'triage it', action: 'triage' }, {}]
   ]) {
     test(`a non-owner's ${lane} feedback still files; the lane is refused and nothing is enqueued or minted`, async () => {
       const { provider, calls } = makeFakeProvider();

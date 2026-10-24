@@ -12,8 +12,8 @@
  * function is reached through, POST /workspace/:urlKey/api/feedback with
  * `action: 'triage'`), with a GitHub-shaped fake provider substituted so the
  * queued dispatch item's prompt can be inspected for the displayName swap.
- * The existing feature-flag-gated enqueue behaviour (triage only when
- * `action === 'triage'` or the `feedbackTriage` flag is on) is untouched by
+ * The existing enqueue behaviour (triage only when
+ * `action === 'triage'`) is untouched by
  * this fix and is covered by feedback-route.test.js — not re-asserted here.
  */
 process.env.NODE_ENV = 'test';
@@ -118,9 +118,9 @@ describe('LIN-2353 — enqueueFeedbackTriage (workspace-api.js:2862) threads pro
   test('a github-backed workspace queues a triage prompt shaped with GitHub Issues, not Linear', async () => {
     const provider = makeGithubShapedProvider();
     const dispatch = capturingDispatchStore();
-    const app = buildApp({ provider, dispatchQueueStore: dispatch, features: { feedbackTriage: true } });
+    const app = buildApp({ provider, dispatchQueueStore: dispatch });
 
-    const { status } = await submit(app, 'acme', { message: 'Something is broken' });
+    const { status } = await submit(app, 'acme', { message: 'Something is broken', action: 'triage' });
 
     assert.strictEqual(status, 201);
     assert.strictEqual(dispatch.items.length, 1);
@@ -136,7 +136,7 @@ describe('LIN-2353 — enqueueFeedbackTriage (workspace-api.js:2862) threads pro
     assert.ok(!body.includes('Linear'), 'must carry no literal "Linear" in the generated body');
   });
 
-  test('the existing feature-flag gate is untouched: triage is not enqueued with the flag off and no explicit action', async () => {
+  test('triage is not enqueued with no explicit action (LIN-3848: no flag path)', async () => {
     const provider = makeGithubShapedProvider();
     const dispatch = capturingDispatchStore();
     const app = buildApp({ provider, dispatchQueueStore: dispatch, features: {} });
@@ -144,7 +144,7 @@ describe('LIN-2353 — enqueueFeedbackTriage (workspace-api.js:2862) threads pro
     const { status } = await submit(app, 'acme', { message: 'Something is broken' });
 
     assert.strictEqual(status, 201);
-    assert.strictEqual(dispatch.items.length, 0, 'triage is opt-in — no flag, no explicit action, nothing enqueued');
+    assert.strictEqual(dispatch.items.length, 0, 'triage is opt-in — no explicit action, nothing enqueued');
   });
 
   // --- LIN-2353 close-out, ledger item 4: the missing Linear + bare-fixture pair ---
@@ -153,11 +153,10 @@ describe('LIN-2353 — enqueueFeedbackTriage (workspace-api.js:2862) threads pro
     const dispatch = capturingDispatchStore();
     const app = buildApp({
       provider: makeProvider(LINEAR_SHAPED_NAME, LINEAR_SHAPED_UI),
-      dispatchQueueStore: dispatch,
-      features: { feedbackTriage: true }
+      dispatchQueueStore: dispatch
     });
 
-    const { status } = await submit(app, 'acme', { message: 'Something is broken' });
+    const { status } = await submit(app, 'acme', { message: 'Something is broken', action: 'triage' });
 
     assert.strictEqual(status, 201);
     assert.strictEqual(dispatch.items.length, 1);
@@ -179,8 +178,8 @@ describe('LIN-2353 — enqueueFeedbackTriage (workspace-api.js:2862) threads pro
     // regression of THIS test's body-only claim.
     async function queuedPrompt(provider) {
       const dispatch = capturingDispatchStore();
-      const app = buildApp({ provider, dispatchQueueStore: dispatch, features: { feedbackTriage: true } });
-      const { status } = await submit(app, 'acme', { message: 'Something is broken' });
+      const app = buildApp({ provider, dispatchQueueStore: dispatch });
+      const { status } = await submit(app, 'acme', { message: 'Something is broken', action: 'triage' });
       assert.strictEqual(status, 201);
       assert.strictEqual(dispatch.items.length, 1);
       return dispatch.items[0].item.prompt.split('You have a workspace API proxy')[0];
@@ -230,7 +229,7 @@ describe('LIN-2981 — feedback-title generation stays deterministic when OPENRO
       const dispatch = capturingDispatchStore();
       const app = buildApp({ provider, dispatchQueueStore: dispatch, features: {} });
 
-      const { status } = await submit(app, 'acme', { message: 'Something is broken' });
+      const { status } = await submit(app, 'acme', { message: 'Something is broken', action: 'triage' });
 
       assert.strictEqual(status, 201);
       // The deterministic mock title (routes/workspace-api.js's

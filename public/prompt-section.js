@@ -178,13 +178,12 @@
 
   /**
    * Why the ✦ primary action is disabled, in plain words — or null when it can
-   * run. Distinguishes the states addendum 5 requires: AI off by the person's
-   * choice, and unconfigured (no OpenRouter). The prompt action is NOT gated by
+   * run. Unconfigured (no OpenRouter) is the only disabled state (LIN-3848 removed the
+   * `aiRecommendations` switch). The prompt action is NOT gated by
    * the run allowance (LIN-3239): prompts are unlimited, so only run rungs carry
    * the run-limit state. The action is SHOWN in every state, never hidden (F9).
    */
   function primaryDisabledReason(opts, state) {
-    if (opts.aiState === 'off') return 'AI suggestions are off \u00b7 turn on in settings';
     if (opts.aiState === 'unconfigured') return 'needs OpenRouter';
     if (opts.aiState === 'ready') return null;
     // Legacy callers that only pass hasAI keep the old gate.
@@ -407,10 +406,9 @@
    * "The handwritten templates stay available under 'other prompts'."). The
    * `.swipe-prompt-buttons` / `.swipe-prompt-btn` classes are kept so the
    * established Swipe selectors keep resolving these controls. Honours
-   * `promptButtons === false` by hiding the group (F9).
+   * Always shown (LIN-3848 removed the `promptButtons` switch).
    */
   function renderOtherPrompts(opts, state) {
-    if (opts.promptButtons === false) return '';
     const { defaultPromptKeys = [], morePromptKeys = [], promptMeta = {}, customPrompts = [] } = opts;
     const moreVisible = state.moreVisible;
     const hasMore = morePromptKeys.length > 0 || (customPrompts && customPrompts.length > 0);

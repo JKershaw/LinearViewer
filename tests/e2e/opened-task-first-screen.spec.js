@@ -216,8 +216,7 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
       await page.waitForTimeout(200);
     }
 
-    test('AI off by choice: disabled primary with explanation, zero recommend requests', async ({ page, seedLocal, localWorkerUrlKey }) => {
-      const seen = recommendSpy(page);
+    test('a stale aiRecommendations=false is ignored: the ✦ primary stays enabled (LIN-3848)', async ({ page, seedLocal, localWorkerUrlKey }) => {
       await seedLocal(workspaceApiLocalSeed, {
         openRouterConnected: true,
         features: { aiRecommendations: false },
@@ -227,9 +226,8 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
       await openPrompts(page);
 
       const component = page.locator('.prompt-section').first();
-      await expect(component.locator('[data-testid="opened-task-primary-reason"]')).toContainText(/suggestions are off/i);
-      await clickDisabledWithoutSpend(page, component);
-      expect(seen).toEqual([]);
+      await expect(component.locator('[data-testid="opened-task-next-step"]')).toBeEnabled();
+      await expect(component.locator('[data-testid="opened-task-primary-reason"]')).toHaveCount(0);
     });
 
     test('AI unconfigured: disabled primary with "needs OpenRouter", zero recommend requests', async ({ page, seedLocal, localWorkerUrlKey }) => {
@@ -264,7 +262,7 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
 
   // ---------------------------------------------------------------------------
   // P0 review fix-up (verdict d4b4adf7): F1 ladder ready state, F2 regenerate
-  // gate, F4/M16 promptButtons. Each was observed failing against the unfixed
+  // gate, F4/M16 promptButtons (switch removed in LIN-3848). Each was observed failing against the unfixed
   // behaviour or an equivalent mutation (excerpts in the fix-up report).
   // ---------------------------------------------------------------------------
   test.describe('fix-up: ladder ready state, regenerate gate, promptButtons', () => {
@@ -294,7 +292,7 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
       expect(body.harness).toBe('claude-code');
     });
 
-    test('a remembered AI prompt disables regenerate and spends nothing when AI is off', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    test('a remembered AI prompt disables regenerate and spends nothing when AI is unconfigured', async ({ page, seedLocal, localWorkerUrlKey }) => {
       const seen = recommendSpy(page);
       // 1. AI on: generate and persist a tailored prompt for the top card.
       await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true });
@@ -306,8 +304,8 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
       const spent = seen.length;
       expect(spent).toBeGreaterThan(0);
 
-      // 2. Re-seed with AI off by choice and reload; the card hydrates from memory.
-      await seedLocal(workspaceApiLocalSeed, { features: { aiRecommendations: false } });
+      // 2. Re-seed with no OpenRouter key and reload; the card hydrates from memory.
+      await seedLocal(workspaceApiLocalSeed);
       await page.reload();
       await page.waitForLoadState('networkidle');
       await openPrompts(page);
@@ -322,14 +320,14 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
       expect(seen.length).toBe(spent);
     });
 
-    test('promptButtons=false hides "other prompts" while the AI primary stays', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    test('a stale promptButtons=false is ignored: "other prompts" show beside the AI primary (LIN-3848)', async ({ page, seedLocal, localWorkerUrlKey }) => {
       await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, features: { promptButtons: false } });
       await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
       await page.waitForLoadState('networkidle');
       await openPrompts(page);
 
       const component = page.locator('.prompt-section').first();
-      await expect(component.locator('[data-testid="other-prompts"]')).toHaveCount(0);
+      await expect(component.locator('[data-testid="other-prompts"]')).toBeVisible();
       await expect(component.locator('[data-testid="opened-task-next-step"]')).toBeVisible();
     });
 

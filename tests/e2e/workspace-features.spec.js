@@ -86,20 +86,20 @@ test.describe('Workspace feature toggles', () => {
     await page.waitForLoadState('networkidle');
 
     // Per-user defaults before the workspace toggle.
-    await expect(page.locator('[data-feature="linearMcp"] .toggle-state')).toHaveText('● on');
+    await expect(page.locator('[data-feature="proxy"] .toggle-state')).toHaveText('● on');
 
     await page.locator('[data-feature="periodicals"] .toggle-btn').click();
     await expect(page.locator('[data-feature="periodicals"] .toggle-state')).toHaveText('● on');
 
     // Per-user toggle states are untouched by the workspace write.
-    await expect(page.locator('[data-feature="linearMcp"] .toggle-state')).toHaveText('● on');
+    await expect(page.locator('[data-feature="proxy"] .toggle-state')).toHaveText('● on');
     await expect(page.locator('[data-feature="dispatch"] .toggle-state')).toHaveText('○ off');
   });
 
   test('handler rejects an invalid workspace feature key', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal();
     const res = await page.request.post(`/workspace/${localWorkerUrlKey}/settings/workspace-features`, {
-      form: { feature: 'linearMcp', enabled: 'true' } // a per-user key, not a workspace key
+      form: { feature: 'roadmap', enabled: 'true' } // a per-user key, not a workspace key
     });
     expect(res.status()).toBe(400);
   });

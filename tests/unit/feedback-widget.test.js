@@ -34,57 +34,41 @@ describe('feedbackWidget feature flag (LIN-635)', () => {
   });
 });
 
-describe('feedbackTriage feature flag (LIN-733)', () => {
-  test('is registered as a valid per-user flag', () => {
-    assert.strictEqual(FEATURES.FEEDBACK_TRIAGE, 'feedbackTriage');
-    assert.strictEqual(isValidFeatureKey('feedbackTriage'), true);
-  });
-
-  test('defaults to off — triage dispatch is opt-in', () => {
-    assert.strictEqual(FEATURE_DEFAULTS.feedbackTriage, false);
-  });
-
-  test('has a human-readable label for the settings UI', () => {
-    assert.ok(FEATURE_LABELS.feedbackTriage);
+describe('feedbackTriage feature flag (LIN-733, removed in LIN-3848)', () => {
+  test('is no longer a flag: the widget\'s own action picks the lane', () => {
+    assert.strictEqual('FEEDBACK_TRIAGE' in FEATURES, false);
+    assert.strictEqual(isValidFeatureKey('feedbackTriage'), false);
+    assert.ok(!('feedbackTriage' in FEATURE_DEFAULTS));
+    assert.ok(!('feedbackTriage' in FEATURE_LABELS));
   });
 });
 
 describe('footer feedback surface (LIN-635)', () => {
-  test('renders the toggle and widget mount on an authenticated workspace page', () => {
+  test('renders the widget mount on an authenticated workspace page, with no footer toggle (LIN-3848)', () => {
     const html = renderPageFooter({ urlKey: 'acme', featureFlags: {} });
-    assert.match(html, /data-testid="footer-feedback-toggle"/);
     assert.match(html, /data-testid="feedback-widget-root"/);
     assert.match(html, /\/feedback-widget\.js/);
     assert.match(html, /\/feedback-widget\.css/);
-    // urlKey is threaded onto both the toggle and the mount.
     assert.match(html, /data-url-key="acme"/);
+    assert.doesNotMatch(html, /footer-feedback-toggle/);
+    assert.doesNotMatch(html, />feedback</);
   });
 
-  test('reflects the off state when the flag is disabled', () => {
-    const html = renderPageFooter({ urlKey: 'acme', featureFlags: { feedbackWidget: false } });
-    // mount + link both report disabled
-    assert.match(html, /id="feedback-widget-root"[^>]*data-enabled="false"/);
-    assert.match(html, /footer-feedback-toggle[^>]*data-enabled="false"/);
+  test('the mount reflects the flag state', () => {
+    const off = renderPageFooter({ urlKey: 'acme', featureFlags: { feedbackWidget: false } });
+    assert.match(off, /id="feedback-widget-root"[^>]*data-enabled="false"/);
+    const on = renderPageFooter({ urlKey: 'acme', featureFlags: { feedbackWidget: true } });
+    assert.match(on, /id="feedback-widget-root"[^>]*data-enabled="true"/);
   });
 
-  test('reflects the on state when the flag is enabled', () => {
+  test('Settings is the single place to switch the widget (LIN-3848)', () => {
+    assert.ok(FEATURE_LABELS.feedbackWidget);
     const html = renderPageFooter({ urlKey: 'acme', featureFlags: { feedbackWidget: true } });
-    assert.match(html, /id="feedback-widget-root"[^>]*data-enabled="true"/);
-    assert.match(html, /footer-feedback-toggle[^>]*data-enabled="true"/);
-  });
-
-  test('renders feedback as a simple link alongside the privacy/terms legal links (LIN-641)', () => {
-    const html = renderPageFooter({ urlKey: 'acme', featureFlags: {} });
-    // Presented as a plain "feedback" link styled like the legal links, no ●/○ toggle text.
-    assert.match(html, /class="footer-legal footer-feedback-toggle"[^>]*>feedback</);
-    assert.doesNotMatch(html, /feedback: [●○]/);
-    // It lives inside the .footer-deploy legal row, not in a standalone wrap after </footer>.
-    assert.doesNotMatch(html, /footer-feedback-toggle-wrap/);
     const deployRow = html.match(/<div class="footer-deploy">([\s\S]*?)<\/div>/);
     assert.ok(deployRow, 'footer-deploy row present');
     assert.match(deployRow[1], /privacy/);
     assert.match(deployRow[1], /terms/);
-    assert.match(deployRow[1], /footer-feedback-toggle/);
+    assert.doesNotMatch(deployRow[1], /feedback/);
   });
 
   // LIN-1132: the widget's model/harness exec-controls read the workspace

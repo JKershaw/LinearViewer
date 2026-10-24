@@ -559,7 +559,6 @@ describe('P0 fix-up F2: regenerate obeys the same gate as the primary', () => {
   }
 
   for (const [name, opts] of [
-    ['AI off by choice', { aiState: 'off' }],
     ['unconfigured', { aiState: 'unconfigured' }],
   ]) {
     test(`a remembered AI prompt disables regenerate when ${name}`, () => {
@@ -1013,21 +1012,30 @@ describe('LIN-2944 P1 F9: the picker and the primary under the flag states', () 
     assert.ok(container.innerHTML.includes('data-prompt="custom:c1"'), 'custom prompt revealed');
   });
 
-  test('promptButtons=false hides the templates but keeps the ✦ primary (F9)', () => {
+  // LIN-3848: the promptButtons switch is gone — the other prompts always show,
+  // and a stale `promptButtons: false` option is ignored.
+  test('the other prompts are always shown, even with a stale promptButtons=false (LIN-3848)', () => {
     const { PromptSection } = loadPromptSection();
     const container = makeContainer();
     PromptSection.init(container, baseOpts({ id: 'issue-pb', identifier: 'LIN-PB' }, { promptButtons: false }));
-    assert.equal(container.innerHTML.includes('data-testid="other-prompts"'), false, 'templates hidden');
-    assert.ok(container.innerHTML.includes('data-testid="opened-task-go"'), '✦ primary still shown');
+    assert.ok(container.innerHTML.includes('data-testid="other-prompts"'), 'templates shown');
+    assert.ok(container.innerHTML.includes('data-testid="opened-task-go"'), '✦ primary shown');
   });
 
-  test('AI off by choice disables the ✦ next-step with a reason and a click spends nothing (F9)', async () => {
+  test('a stale aiState=off is not a state any more: no "AI suggestions are off" reason (LIN-3848)', () => {
+    const { PromptSection } = loadPromptSection();
+    const container = makeContainer();
+    PromptSection.init(container, baseOpts({ id: 'issue-off', identifier: 'LIN-OFF' }, { aiState: 'off' }));
+    assert.ok(!container.innerHTML.includes('AI suggestions are off'));
+  });
+
+  test('unconfigured disables the ✦ next-step with a reason and a click spends nothing (F9)', async () => {
     const { PromptSection, calls } = loadPromptSection();
     const container = makeContainer();
-    PromptSection.init(container, baseOpts({ id: 'issue-ai', identifier: 'LIN-AI' }, { aiState: 'off', hasAI: false }));
+    PromptSection.init(container, baseOpts({ id: 'issue-ai', identifier: 'LIN-AI' }, { aiState: 'unconfigured', hasAI: false }));
 
     assert.match(container.innerHTML, /data-testid="opened-task-next-step"[^>]*disabled/, 'next step is disabled');
-    assert.match(container.innerHTML, /data-testid="opened-task-primary-reason"[^>]*>AI suggestions are off/, 'plain-words reason shown');
+    assert.match(container.innerHTML, /data-testid="opened-task-primary-reason"[^>]*>needs OpenRouter/, 'plain-words reason shown');
 
     // A disabled button never fires a click (the browser guarantee); the guard in
     // handleClick is the load-bearing half, so press with a disabled synthetic button.

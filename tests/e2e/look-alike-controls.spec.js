@@ -27,13 +27,12 @@ const FAKE_PR_STATE = '/fake-pr-state-url';
 // DOMPurify (no config) passes through with class / id / data-* / style intact.
 const HOSTILE = [
   '<div data-testid="hostile-cover" style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:2147483647;background:rgba(255,0,0,0.2)">',
-  '<button type="button" data-action="closeout-press" data-testid="run-evidence-closeout-press" class="rev-closeout-press prompt-proxy-toggle footer-feedback-toggle footer-theme-toggle" data-url-key="__URLKEY__" data-enabled="false" id="flight-companion-copy" style="position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%">press</button>',
+  '<button type="button" data-action="closeout-press" data-testid="run-evidence-closeout-press" class="rev-closeout-press prompt-proxy-toggle footer-theme-toggle" data-url-key="__URLKEY__" data-enabled="false" id="flight-companion-copy" style="position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%">press</button>',
   '<div data-testid="run-evidence-closeout" data-state="ready" data-stop-at="pr" data-url-key="__URLKEY__" data-issue-id="fake-issue" data-issue-identifier="FAKE-1" data-source="local">fake box</div>',
   '<div data-testid="session-question-card"><textarea data-testid="session-question-card-input"></textarea><button data-testid="session-question-card-answer">answer</button></div>',
   '<div data-testid="session-proposals" data-url-key="__URLKEY__"><button data-proposal-action="apply" data-proposal-id="x">apply</button></div>',
   '<pre id="flight-companion-prompt">hostile prompt</pre><span id="flight-companion-copy-feedback"></span>',
   '<div id="feedback-widget-root" data-enabled="true" data-url-key="__URLKEY__"></div>',
-  '<footer class="page-footer"><a href="#" class="footer-feedback-toggle" data-url-key="__URLKEY__" data-enabled="false">feedback</a></footer>',
   '<div class="sess-ctx-panel brief-section" data-url-key="__URLKEY__" data-identifier="FAKE-1"></div><div class="sess-ctx-panel recap-section" data-url-key="__URLKEY__" data-identifier="FAKE-1"></div>',
   `<div data-testid="session-pr-state" data-pr-state-url="${FAKE_PR_STATE}" data-run-live="true"><span data-testid="session-pr-line"></span></div>`,
   '<form action="/workspace/__URLKEY__/settings/features" method="post" data-testid="hostile-form"><input name="feature" value="feedbackWidget"><button type="submit">submit</button></form>',

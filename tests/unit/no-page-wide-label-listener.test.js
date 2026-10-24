@@ -160,7 +160,6 @@ const LOOKUP_ALLOW = {
   'flight-companion.js:flight-companion-tools-warning': 'top-level capture',
   'flight-companion.js:flight-companion-model-price': 'top-level capture',
   'feedback-widget.js:feedback-widget-root': 'init runs before any page markdown (deferred script; FC restores late)',
-  'feedback-widget.js:footer.page-footer .footer-feedback-toggle': 'footer-scoped, init runs before any page markdown',
   'feedback-widget.js:[data-testid="nav-feedback-trigger"]': 'ui-only: opens the panel',
 };
 

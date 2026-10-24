@@ -995,7 +995,7 @@ describe('renderSettingsPage — User/Workspace Settings groups (LIN-1399)', () 
 
   test('the per-user AI feature toggles land in the User group', () => {
     const html = renderSettingsPage('Acme', BASE);
-    for (const key of ['aiRecommendations', 'promptButtons', 'roadmap']) {
+    for (const key of ['roadmap']) {
       assert.equal(groupOf(html, `settings-toggle-${key}`), 'user', `expected settings-toggle-${key} in the user group`);
     }
   });

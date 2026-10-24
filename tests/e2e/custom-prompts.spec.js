@@ -164,14 +164,14 @@ test.describe('Custom Prompts API', () => {
     expect(data.promptName).toBe('My Custom');
   });
 
-  test('custom prompt respects linearMcp feature flag', async ({ page, seedLocal, localWorkerUrlKey }) => {
+  test('custom prompt keeps the provider-write mention, ignoring a stale linearMcp flag (LIN-3848)', async ({ page, seedLocal, localWorkerUrlKey }) => {
     // Create a custom prompt mentioning the provider write surface.
     const createRes = await page.request.post(`/workspace/${localWorkerUrlKey}/api/prompts/custom`, {
       data: { name: 'Linear Test', template: 'Update the task in Linear with your findings' }
     });
     const { prompt } = await createRes.json();
 
-    // With linearMcp ON (default, writable provider), the provider-write mention
+    // Tracker wording is always on (writable provider), so the provider-write mention
     // stays — capability-awareness (LIN-177) rewrites "Linear" to the active
     // provider's display name, which is "Local" on the local provider.
     const onRes = await page.request.get(
@@ -180,15 +180,15 @@ test.describe('Custom Prompts API', () => {
     const onData = await onRes.json();
     expect(onData.prompt).toContain('in Local');
 
-    // With linearMcp OFF — re-establish the local session with the flag cleared.
-    // The custom-prompts store is partitioned by urlKey (unchanged), so the
+    // A stale stored linearMcp:false is ignored — re-establish the local session
+    // with it. The custom-prompts store is partitioned by urlKey (unchanged), so the
     // prompt created above survives the re-seed.
     await seedLocal(workspaceApiLocalSeed, { features: { linearMcp: false } });
     const offRes = await page.request.get(
       `/workspace/${localWorkerUrlKey}/api/prompt/${TEST_ISSUE_ID}/custom:${prompt.id}`
     );
     const offData = await offRes.json();
-    expect(offData.prompt).not.toContain('in Local');
+    expect(offData.prompt).toContain('in Local');
   });
 
   // Note: the '401 when not authenticated' case is dropped for the local-session

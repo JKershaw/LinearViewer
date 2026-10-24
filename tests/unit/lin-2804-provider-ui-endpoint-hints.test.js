@@ -172,7 +172,7 @@ function buildFeedbackApp({ provider, dispatchQueueStore }) {
     workspaceOwnerCheck: async () => ({ status: 'owner' }),
     workspaceFromUrl: (req, res, next) => {
       req.workspace = { urlKey: req.params.urlKey, provider: provider.name, accessToken: 'ws-token' };
-      req.session = { accountId: 'u1', linearUserId: 'user-1', features: { feedbackTriage: true } };
+      req.session = { accountId: 'u1', linearUserId: 'user-1' };
       next();
     },
     dispatchQueueStore,
@@ -227,7 +227,7 @@ describe('LIN-2804 — workspace-scoped idiom (getProvider(workspace.provider)?.
     const dispatch = capturingWorkspaceDispatchStore();
     const app = buildFeedbackApp({ provider, dispatchQueueStore: dispatch });
 
-    const { status } = await submitFeedback(app, 'acme', { message: 'Something is broken' });
+    const { status } = await submitFeedback(app, 'acme', { message: 'Something is broken', action: 'triage' });
 
     assert.strictEqual(status, 201);
     assert.strictEqual(dispatch.items.length, 1);
@@ -245,7 +245,7 @@ describe('LIN-2804 — workspace-scoped idiom (getProvider(workspace.provider)?.
       const dispatch = capturingWorkspaceDispatchStore();
       const provider = feedbackCapableProvider('lin2804-linear-triage', { displayName: 'Linear', ...uiOverride });
       const app = buildFeedbackApp({ provider, dispatchQueueStore: dispatch });
-      const { status } = await submitFeedback(app, 'acme', { message: 'Something is broken' });
+      const { status } = await submitFeedback(app, 'acme', { message: 'Something is broken', action: 'triage' });
       assert.strictEqual(status, 201);
       assert.strictEqual(dispatch.items.length, 1);
       return dispatch.items[0].item.prompt.split('You have a workspace API proxy')[1] ?? '';

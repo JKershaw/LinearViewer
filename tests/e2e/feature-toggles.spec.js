@@ -11,8 +11,8 @@ import {
 //
 // One faithful assertion shift: the prompt's tracker reference renders as the
 // provider's display name. On the local provider that is "in Local", not "in
-// Linear" (applyPromptCapabilities renames `Linear` → `Local`). The `linearMcp`
-// toggle still gates that reference identically — only the tracker name differs.
+// Linear" (applyPromptCapabilities renames `Linear` → `Local`). LIN-3848 removed
+// the `linearMcp` switch: that reference is now always present.
 // UUID-format issue ID from the seed (TEST-6 = "Task needing preparation", Backlog)
 const TEST_ISSUE_ID = '66666666-6666-6666-6666-666666666666';
 
@@ -31,12 +31,8 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('.settings-header:text-is("Workflow")')).toBeVisible();
 
     // All feature toggle labels should be present (split across sections)
-    await expect(page.locator('.feature-toggle-label:has-text("Reference Linear in prompts")')).toBeVisible();
-    await expect(page.locator('.feature-toggle-label:has-text("Code review before completing")')).toBeVisible();
     await expect(page.locator('.feature-toggle-label:has-text("Dispatch queue")')).toBeVisible();
     await expect(page.locator('.feature-toggle-label:has-text("Linear API proxy")')).toBeVisible();
-    await expect(page.locator('.feature-toggle-label:has-text("AI recommendations")')).toBeVisible();
-    await expect(page.locator('.feature-toggle-label:has-text("Prompt buttons")')).toBeVisible();
     await expect(page.locator('.feature-toggle-label:has-text("Narrative roadmap")')).toBeVisible();
   });
 
@@ -44,31 +40,29 @@ test.describe('Feature Toggle Settings', () => {
     await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
-    // Defaults: linearMcp ON, featureBranches OFF, codeReview OFF, dispatch OFF, proxy ON, aiRecommendations ON, promptButtons ON, roadmap OFF
-    await expect(page.locator('[data-feature="linearMcp"] .toggle-state')).toHaveText('● on');
-    await expect(page.locator('[data-feature="codeReview"] .toggle-state')).toHaveText('○ off');
+    // Defaults: dispatch OFF, proxy ON, roadmap OFF
     await expect(page.locator('[data-feature="dispatch"] .toggle-state')).toHaveText('○ off');
     await expect(page.locator('[data-feature="proxy"] .toggle-state')).toHaveText('● on');
-    await expect(page.locator('[data-feature="aiRecommendations"] .toggle-state')).toHaveText('● on');
-    await expect(page.locator('[data-feature="promptButtons"] .toggle-state')).toHaveText('● on');
     await expect(page.locator('[data-feature="roadmap"] .toggle-state')).toHaveText('○ off');
   });
 
-  test('shows recommendation note on Linear references toggle', async ({ page, localWorkerUrlKey }) => {
+  // LIN-3848: nine switches that did nothing or were superseded are gone.
+  test('settings offers none of the removed switches', async ({ page, localWorkerUrlKey }) => {
     await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
-    const mcpNote = page.locator('[data-feature="linearMcp"] .feature-note');
-    await expect(mcpNote).toBeVisible();
-    await expect(mcpNote).toContainText('Recommended');
+    for (const key of ['linearMcp', 'aiRecommendations', 'promptButtons', 'codeReview', 'codeReviewSelf', 'codeReviewCicd', 'codeReviewPr', 'feedbackTriage', 'observerAuthority']) {
+      await expect(page.locator(`[data-feature="${key}"]`)).toHaveCount(0);
+    }
+    await expect(page.locator('[data-feature="feedbackWidget"]')).toHaveCount(1);
   });
 
-  test('can toggle a feature off and state persists on reload', async ({ page, localWorkerUrlKey }) => {
+  test('can toggle a feature on and state persists on reload', async ({ page, localWorkerUrlKey }) => {
     await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
-    // linearMcp should start ON
-    await expect(page.locator('[data-feature="linearMcp"] .toggle-state')).toHaveText('● on');
+    // roadmap should start OFF
+    await expect(page.locator('[data-feature="roadmap"] .toggle-state')).toHaveText('○ off');
 
     // LIN-3401: the bound click handler must be what saves, not the button's native
     // form submit (which also persists the toggle and would mask a missing handler).
@@ -79,21 +73,21 @@ test.describe('Feature Toggle Settings', () => {
       r.method() === 'POST' && r.headers()['x-requested-with'] === 'XMLHttpRequest' && /\/settings\//.test(r.url())
     );
 
-    // Click the toggle button to turn it off (AJAX — no page reload)
-    await page.locator('[data-feature="linearMcp"] .toggle-btn').click();
+    // Click the toggle button to turn it on (AJAX — no page reload)
+    await page.locator('[data-feature="roadmap"] .toggle-btn').click();
     await ajaxPost;
 
     // Should update inline via AJAX
-    await expect(page.locator('[data-feature="linearMcp"] .toggle-state')).toHaveText('○ off');
+    await expect(page.locator('[data-feature="roadmap"] .toggle-state')).toHaveText('● on');
     expect(navigated, 'the toggle saved in place, not by a full-page form submit').toBe(false);
 
     // Reload page — state should persist (stored in session)
     await page.reload();
     await page.waitForLoadState('networkidle');
-    await expect(page.locator('[data-feature="linearMcp"] .toggle-state')).toHaveText('○ off');
+    await expect(page.locator('[data-feature="roadmap"] .toggle-state')).toHaveText('● on');
   });
 
-  test('can toggle a feature on', async ({ page, localWorkerUrlKey }) => {
+  test('can toggle dispatch on', async ({ page, localWorkerUrlKey }) => {
     await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
@@ -111,42 +105,32 @@ test.describe('Feature Toggle Settings', () => {
     await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
-    // Turn off linearMcp (AJAX — no page reload)
-    await page.locator('[data-feature="linearMcp"] .toggle-btn').click();
+    // Turn on roadmap (AJAX — no page reload)
+    await page.locator('[data-feature="roadmap"] .toggle-btn').click();
 
-    // linearMcp should be off, but others unchanged
-    await expect(page.locator('[data-feature="linearMcp"] .toggle-state')).toHaveText('○ off');
-    await expect(page.locator('[data-feature="codeReview"] .toggle-state')).toHaveText('○ off');
+    // roadmap should be on, but others unchanged
+    await expect(page.locator('[data-feature="roadmap"] .toggle-state')).toHaveText('● on');
     await expect(page.locator('[data-feature="dispatch"] .toggle-state')).toHaveText('○ off');
-    await expect(page.locator('[data-feature="aiRecommendations"] .toggle-state')).toHaveText('● on');
-    await expect(page.locator('[data-feature="promptButtons"] .toggle-state')).toHaveText('● on');
+    await expect(page.locator('[data-feature="proxy"] .toggle-state')).toHaveText('● on');
   });
 
   // =========================================================================
-  // Linear references toggle affects prompt content
+  // LIN-3848: tracker wording is always on (the linearMcp switch is gone)
   // =========================================================================
 
-  test('prompts include tracker references by default', async ({ page, localWorkerUrlKey }) => {
-    // Default: linearMcp is ON. The tracker reference renders with the provider's
-    // display name — "in Local" on the local provider (was "in Linear" on Linear).
-    const response = await page.request.get(
-      `/workspace/${localWorkerUrlKey}/api/prompt/${TEST_ISSUE_ID}/look-into`
-    );
-    expect(response.ok()).toBeTruthy();
-    const data = await response.json();
-    expect(data.prompt).toContain('in Local');
-  });
-
-  test('prompts exclude tracker references when linearMcp is off', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    // Re-seed with linearMcp OFF — the tracker reference must drop out entirely.
-    await seedLocal(workspaceApiLocalSeed, { features: { linearMcp: false } });
-
-    const response = await page.request.get(
-      `/workspace/${localWorkerUrlKey}/api/prompt/${TEST_ISSUE_ID}/look-into`
-    );
-    expect(response.ok()).toBeTruthy();
-    const data = await response.json();
-    expect(data.prompt).not.toContain('in Local');
+  test('prompts include tracker references, even with a stale linearMcp:false', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    // The tracker reference renders with the provider's display name — "in Local"
+    // on the local provider (was "in Linear" on Linear). A stale stored
+    // `linearMcp: false` is ignored.
+    for (const features of [undefined, { linearMcp: false }]) {
+      if (features) await seedLocal(workspaceApiLocalSeed, { features });
+      const response = await page.request.get(
+        `/workspace/${localWorkerUrlKey}/api/prompt/${TEST_ISSUE_ID}/look-into`
+      );
+      expect(response.ok()).toBeTruthy();
+      const data = await response.json();
+      expect(data.prompt).toContain('in Local');
+    }
   });
 
   // =========================================================================
@@ -219,29 +203,7 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('.nav-views [data-testid="nav-view-dispatch"]')).toBeVisible();
   });
 
-  // =========================================================================
-  // LIN-172 / LIN-2944 F9: the promptButtons toggle hides the TEMPLATES only
-  // =========================================================================
-
-  test('promptButtons off hides the templates but keeps the ✦ primary', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(workspaceApiLocalSeed, { features: { promptButtons: false } });
-
-    await page.goto(`/workspace/${localWorkerUrlKey}/`);
-    await page.waitForLoadState('networkidle');
-
-    // Expand an issue and open its Prompts section (the section still renders;
-    // F9 shows the ✦ primary rather than hiding the surface).
-    await page.locator('.in-progress-items .line.expandable').first().click();
-    await page.locator('.in-progress-items .detail-toggle[data-toggle="prompts"]').first().click();
-    const component = page.locator('.in-progress-items .prompt-section').first();
-    await expect(component).toBeVisible();
-
-    // Templates are gone; the primary remains.
-    await expect(component.locator('[data-testid="other-prompts"]')).toHaveCount(0);
-    await expect(component.locator('[data-testid="opened-task-next-step"]')).toBeVisible();
-  });
-
-  test('prompts section is visible by default (promptButtons on)', async ({ page, localWorkerUrlKey }) => {
+  test('prompts section is always visible (LIN-3848: promptButtons switch removed)', async ({ page, localWorkerUrlKey }) => {
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
@@ -252,38 +214,7 @@ test.describe('Feature Toggle Settings', () => {
     await expect(component.locator('[data-testid="other-prompts"]')).toBeVisible();
   });
 
-  // =========================================================================
-  // LIN-171 / LIN-2944 F9: aiRecommendations disables the ✦ primary, never hides it
-  // =========================================================================
-
-  test('aiRecommendations off disables the ✦ primary with a reason and spends nothing', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(workspaceApiLocalSeed, { features: { aiRecommendations: false } });
-
-    const recommendSpend = [];
-    page.on('request', (req) => {
-      const p = new URL(req.url()).pathname;
-      if (p.includes('/api/recommend/') && !p.endsWith('/api/recommend/status')) recommendSpend.push(req.url());
-    });
-
-    await page.goto(`/workspace/${localWorkerUrlKey}/`);
-    await page.waitForLoadState('networkidle');
-
-    await page.locator('.in-progress-items .line.expandable').first().click();
-    await page.locator('.in-progress-items .detail-toggle[data-toggle="prompts"]').first().click();
-    const component = page.locator('.in-progress-items .prompt-section').first();
-
-    const go = component.locator('[data-testid="opened-task-next-step"]');
-    await expect(go).toBeDisabled();
-    await expect(component.locator('[data-testid="opened-task-primary-reason"]')).toContainText(/AI suggestions are off/i);
-
-    // A disabled button never fires a click; force-dispatch to be sure and assert
-    // the request counter stays empty (the zero-spend guarantee).
-    await go.click({ force: true }).catch(() => {});
-    await page.waitForTimeout(300);
-    expect(recommendSpend).toEqual([]);
-  });
-
-  test('the ✦ primary is shown when aiRecommendations is on (default)', async ({ page, localWorkerUrlKey }) => {
+  test('the ✦ primary is always shown (LIN-3848: aiRecommendations switch removed)', async ({ page, localWorkerUrlKey }) => {
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
@@ -293,85 +224,9 @@ test.describe('Feature Toggle Settings', () => {
     await expect(go).toBeVisible();
   });
 
-  // =========================================================================
-  // LIN-173: Code review toggle affects prompt content and sub-toggle visibility
-  // =========================================================================
-
-  test('code review sub-toggles hidden by default (codeReview off)', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
-    await page.waitForLoadState('networkidle');
-
-    // Parent toggle should be off
-    await expect(page.locator('[data-feature="codeReview"] .toggle-state')).toHaveText('○ off');
-
-    // Sub-toggles should be hidden
-    await expect(page.locator('.code-review-options')).toBeHidden();
-  });
-
-  test('code review sub-toggles visible when codeReview is on', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(workspaceApiLocalSeed, { features: { codeReview: true } });
-
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
-    await page.waitForLoadState('networkidle');
-
-    // Parent toggle should be on
-    await expect(page.locator('[data-feature="codeReview"] .toggle-state')).toHaveText('● on');
-
-    // Sub-toggles should be visible with correct defaults
-    await expect(page.locator('.code-review-options')).toBeVisible();
-    await expect(page.locator('[data-feature="codeReviewSelf"] .toggle-state')).toHaveText('● on');
-    await expect(page.locator('[data-feature="codeReviewCicd"] .toggle-state')).toHaveText('○ off');
-    await expect(page.locator('[data-feature="codeReviewPr"] .toggle-state')).toHaveText('○ off');
-  });
-
-  test('clicking codeReview toggle dynamically shows sub-toggles via AJAX', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
-    await page.waitForLoadState('networkidle');
-
-    // Sub-toggles should start hidden (codeReview defaults to off)
-    await expect(page.locator('.code-review-options')).toBeHidden();
-
-    // Click the codeReview toggle to turn it on
-    await page.locator('[data-feature="codeReview"] .toggle-btn').click();
-
-    // Sub-toggles should appear without page reload
-    await expect(page.locator('.code-review-options')).toBeVisible();
-  });
-
-  test('clicking codeReview toggle dynamically hides sub-toggles via AJAX', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    // Start with codeReview ON
-    await seedLocal(workspaceApiLocalSeed, { features: { codeReview: true } });
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
-    await page.waitForLoadState('networkidle');
-
-    // Sub-toggles should start visible
-    await expect(page.locator('.code-review-options')).toBeVisible();
-
-    // Click the codeReview toggle to turn it off
-    await page.locator('[data-feature="codeReview"] .toggle-btn').click();
-
-    // Sub-toggles should hide without page reload
-    await expect(page.locator('.code-review-options')).toBeHidden();
-  });
-
-  test('codeReview sub-toggles round-trip: on then off in single session', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
-    await page.waitForLoadState('networkidle');
-
-    // Start off
-    await expect(page.locator('.code-review-options')).toBeHidden();
-
-    // Toggle on
-    await page.locator('[data-feature="codeReview"] .toggle-btn').click();
-    await expect(page.locator('.code-review-options')).toBeVisible();
-
-    // Toggle off again without reload
-    await page.locator('[data-feature="codeReview"] .toggle-btn').click();
-    await expect(page.locator('.code-review-options')).toBeHidden();
-  });
-
+  // LIN-3848: no prompt carries review sections any more, whatever stale
+  // codeReview* values a saved preference still holds.
   test('prompts exclude code review sections by default', async ({ page, localWorkerUrlKey }) => {
-    // Default: codeReview is OFF
     const response = await page.request.get(
       `/workspace/${localWorkerUrlKey}/api/prompt/${TEST_ISSUE_ID}/plan`
     );
@@ -382,44 +237,19 @@ test.describe('Feature Toggle Settings', () => {
     expect(data.prompt).not.toContain('PR Review');
   });
 
-  test('plan prompt does NOT get code review sections (plan is not implementation)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+  test('implementation and review prompts have no review sections, even with stale codeReview* flags', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(workspaceApiLocalSeed, { features: { codeReview: true, codeReviewCicd: true, codeReviewPr: true } });
 
-    const response = await page.request.get(
-      `/workspace/${localWorkerUrlKey}/api/prompt/${TEST_ISSUE_ID}/plan`
-    );
-    expect(response.ok()).toBeTruthy();
-    const data = await response.json();
-    // Plan is a pure planning step — code review sections only apply to implementation
-    expect(data.prompt).not.toContain('Self-Review');
-    expect(data.prompt).not.toContain('CI/CD Check');
-    expect(data.prompt).not.toContain('PR Review');
-  });
-
-  test('implementation prompt also gets code review sections', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(workspaceApiLocalSeed, { features: { codeReview: true, codeReviewCicd: true } });
-
-    const response = await page.request.get(
-      `/workspace/${localWorkerUrlKey}/api/prompt/${TEST_ISSUE_ID}/implementation`
-    );
-    expect(response.ok()).toBeTruthy();
-    const data = await response.json();
-    expect(data.prompt).toContain('Self-Review');
-    expect(data.prompt).toContain('CI/CD Check');
-  });
-
-  test('review prompt does NOT get code review sections', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(workspaceApiLocalSeed, { features: { codeReview: true, codeReviewCicd: true } });
-
-    const response = await page.request.get(
-      `/workspace/${localWorkerUrlKey}/api/prompt/${TEST_ISSUE_ID}/review`
-    );
-    expect(response.ok()).toBeTruthy();
-    const data = await response.json();
-    // review IS a review (code-review was consolidated into it — LIN-523); the
-    // implementation-only codeReview flag sections must not be appended to it.
-    expect(data.prompt).not.toContain('## Self-Review');
-    expect(data.prompt).not.toContain('## CI/CD Check');
+    for (const kind of ['plan', 'implementation', 'review']) {
+      const response = await page.request.get(
+        `/workspace/${localWorkerUrlKey}/api/prompt/${TEST_ISSUE_ID}/${kind}`
+      );
+      expect(response.ok()).toBeTruthy();
+      const data = await response.json();
+      expect(data.prompt).not.toContain('## Self-Review');
+      expect(data.prompt).not.toContain('## CI/CD Check');
+      expect(data.prompt).not.toContain('## PR Review');
+    }
   });
 
   // =========================================================================

@@ -597,7 +597,7 @@ const MAX_FEEDBACK_CONTEXT_LENGTH = 2_000; // url / userAgent clamp
 
 // The three explicit post-create actions the feedback widget can request
 // (LIN-918). Anything else (including an omitted action) is the legacy plain
-// send, which still honours the per-user `feedbackTriage` flag.
+// send, which files the ticket only (LIN-3848 removed the `feedbackTriage` flag).
 const FEEDBACK_ACTIONS = new Set(['save', 'triage', 'autopilot']);
 
 // Shared framing core: a widget-filed feedback ticket is a raw, un-triaged user
@@ -2689,9 +2689,9 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
 
   // Best-effort triage follow-up after a feedback ticket is filed (LIN-635 S6),
   // on the existing dispatch substrate. Non-fatal: the ticket already exists, so
-  // a failure here must not fail the submission. The caller invokes it only when
-  // the per-user `feedbackTriage` flag is on (default off, LIN-733); the prompt
-  // then always carries this workspace's API proxy block, as the proxy dispatch
+  // a failure here must not fail the submission. The caller invokes it only for
+  // the explicit 'triage' action (LIN-733; the `feedbackTriage` flag was removed
+  // in LIN-3848); the prompt always carries this workspace's API proxy block, as the proxy dispatch
   // endpoints' preamble does.
   async function enqueueFeedbackTriage(workspace, issue, priority, session, baseUrl, overrides = {}) {
     if (!dispatchQueueStore || !issue?.identifier) return;
@@ -2957,11 +2957,10 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       }
 
       // Post-create action (LIN-918); every branch is best-effort and never fails
-      // the submission, the ticket already existing. An explicit widget action wins
-      // and is DECOUPLED from the `feedbackTriage` flag — 'save' files only,
+      // the submission, the ticket already existing. An explicit widget action picks the lane: 'save' files only,
       // 'triage' always enqueues triage, 'autopilot' enqueues a scoped autopilot run
       // carrying the feedback-origin brief. With none (the legacy plain send) the
-      // old behaviour holds: triage only when the per-user flag is on.
+      // ticket is filed only (LIN-3848).
       const baseUrl = publicOrigin(req);
       // LIN-3238 Q10 free-tier run gate: the title step's `isFreeTier` is scoped to
       // it, so re-derive it at the dispatch point. It goes to both enqueue helpers
@@ -2985,9 +2984,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       // Only the three known actions branch (`save` names no lane); anything else,
       // an omitted action included, is the legacy plain send.
       const action = FEEDBACK_ACTIONS.has(body.action) ? body.action : null;
-      const lane = action
-        ? (action === 'save' ? null : action)
-        : (getFeatureFlags(req.session).feedbackTriage ? 'triage' : null);
+      const lane = action === 'save' ? null : action;
       const laneRefusal = lane && await resolveRunnerOwnerRefusal({
         ownerCheck: workspaceOwnerCheck,
         workspaceId: workspace.id,

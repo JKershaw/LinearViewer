@@ -40,7 +40,7 @@ This is the system most relevant to the planned follow-on prompts feature.
 | Ready | `plan`, `code-review` | Issue in backlog/unstarted/started state |
 | Universal | `look-into`, `triage`, `breakdown`, `research`, `scoping`, `design`, `spike`, `context`, `implementation`, `review` | Always available |
 
-Each template receives rich context from Linear (parent task, siblings, children with status, project info including repo URL, comments) and respects feature flags (`linearMcp`, `codeReview` sub-toggles). Output is a structured prompt with header, context sections, workflow steps, and completion signals.
+Each template receives rich context from Linear (parent task, siblings, children with status, project info including repo URL, comments) and carries the tracker wording and no review sections (the `linearMcp` and `codeReview*` switches were removed in LIN-3848). Output is a structured prompt with header, context sections, workflow steps, and completion signals.
 
 Formatting helpers in `lib/prompt-formatters.js` produce consistent sections across templates: git workflow instructions, self-review checklists, CI/CD checks, subtask summaries.
 
@@ -88,17 +88,15 @@ Each dispatched item carries: prompt text, prompt name, issue metadata (id, iden
 
 ### 4. Feature Toggle System
 
-10 toggles stored account-owned (keyed by accountId in `lib/user-preferences.js`), mirrored
+The per-user toggles are stored account-owned (keyed by accountId in `lib/user-preferences.js`), mirrored
 into session per-request and synced to MongoDB for cross-device persistence (LIN-1331):
 
 | Toggle | Default | Effect |
 |--------|---------|--------|
-| `aiRecommendations` | on | AI suggest button + recommendation streaming |
-| `promptButtons` | on | Prompt buttons row visibility |
 | `dispatch` | **off** | Dispatch queue UI + API |
 | `proxy` | **off** | Proxy token toggle + API |
-| `linearMcp` | on | "in Linear" hints in prompts |
-| `codeReview` | off | Nested sub-toggles: self, CI/CD, PR |
+
+The AI suggest button, the prompt buttons row and the "in Linear" hints are always on; the `aiRecommendations`, `promptButtons`, `linearMcp` and `codeReview*` switches were removed in LIN-3848 (stale saved values are ignored).
 
 ---
 
@@ -191,7 +189,7 @@ This metadata could drive follow-on logic: "the `plan` prompt was completed → 
 
 ### Feature Flags
 
-The toggle system (`lib/feature-defaults.js`) provides a clean mechanism to gate the follow-on feature behind a new flag, consistent with how `dispatch` and `aiRecommendations` are gated today.
+The toggle system (`lib/feature-defaults.js`) provides a clean mechanism to gate the follow-on feature behind a new flag, consistent with how `dispatch` and `proxy` are gated today.
 
 ---
 

@@ -5,12 +5,12 @@
  * Run with: node --test tests/unit/observer-pass.test.js
  *
  * Coverage:
- *   A. Pure helpers — resolveAuthorityStamp, assessQuietPath, parseObserverPassResponse.
+ *   A. Pure helpers — assessQuietPath, parseObserverPassResponse.
  *   B. runObserverPass — against a REAL MangoDB tmpdir ObserverStateStore
  *      (same precedent as tests/unit/observer-sweep.test.js / observer-state-store.test.js):
  *      memory read-back, deterministic quiet behaviour (no census / empty
  *      fleet / unchanged census), report-to-census reconciliation, staleness
- *      visibility, authority OFF/default and ON-still-report-only, and
+ *      visibility, no authority stamp (LIN-3848), and
  *      negative-capability + network guards.
  *   C. createObserverPassRun — the production tick closure (round-robin,
  *      fail-soft, misconfigured intervalMs, deps.now guard) — mirrors
@@ -27,7 +27,6 @@ import { randomUUID } from 'node:crypto';
 import { MangoClient } from '@jkershaw/mangodb';
 
 import {
-  resolveAuthorityStamp,
   assessQuietPath,
   parseObserverPassResponse,
   buildPassMessages,
@@ -39,15 +38,6 @@ import { ObserverStateStore } from '../../lib/observer-state-store.js';
 import { guardNetwork } from '../fixtures/network-guard.js';
 
 // ─── A. Pure helpers ─────────────────────────────────────────────────────
-
-describe('observer-pass: resolveAuthorityStamp', () => {
-  test('true -> on-unimplemented, everything else -> off', () => {
-    assert.strictEqual(resolveAuthorityStamp(true), 'on-unimplemented');
-    assert.strictEqual(resolveAuthorityStamp(false), 'off');
-    assert.strictEqual(resolveAuthorityStamp(undefined), 'off');
-    assert.strictEqual(resolveAuthorityStamp(null), 'off');
-  });
-});
 
 describe('observer-pass: assessQuietPath', () => {
   const nonEmptyLanes = { working: 1, silent: 0, blocked: 0, terminal: 0, queued: 0, resolved: 0, unknown: 0 };
@@ -275,9 +265,10 @@ describe('observer-pass: runObserverPass', () => {
     assert.strictEqual(net.attempts.length, 0);
     net.restore();
     assert.strictEqual(result.quiet, true);
-    assert.strictEqual(result.authority, 'off');
+    assert.ok(!('authority' in result), 'LIN-3848: no authority in the result');
 
     const doc = await observerStateStore.readCurrent(`${PASS_INSTANCE_PREFIX}${urlKey}`);
+    assert.ok(!('authority' in doc.state), 'LIN-3848: no authority stamp written');
     assert.ok(doc, 'the pass instance must exist — ensureSeeded runs every tick');
     assert.match(doc.state.report.narrative, /No fleet census/);
     assert.deepStrictEqual(doc.state.report.lanes, {}, 'no census -> no lane numbers to report');
@@ -632,7 +623,7 @@ describe('observer-pass: runObserverPass', () => {
     assert.match(secondUserMsg, /Observation #1\./, "pass 2's own LLM input must carry pass 1's summary — the read-side continuity the write-only tests would miss");
   });
 
-  test('authority default OFF vs ON: writes are otherwise identical — only the stamp differs, and ON is still report-only', async () => {
+  test('a stale observerAuthority workspace value changes nothing and no authority stamp is written (LIN-3848)', async () => {
     const observerStateStore = freshStore();
     const urlKeyOff = `ws-auth-off-${randomUUID()}`;
     const urlKeyOn = `ws-auth-on-${randomUUID()}`;
@@ -652,29 +643,15 @@ describe('observer-pass: runObserverPass', () => {
     const resultOff = await runObserverPass(urlKeyOff, { ...baseDeps, workspacePreferencesStore: fakeWorkspacePreferencesStore({ features: { observerAuthority: false } }), now: Date.now() });
     const resultOn = await runObserverPass(urlKeyOn, { ...baseDeps, workspacePreferencesStore: fakeWorkspacePreferencesStore({ features: { observerAuthority: true } }), now: Date.now() });
 
-    assert.strictEqual(resultOff.authority, 'off');
-    assert.strictEqual(resultOn.authority, 'on-unimplemented');
+    assert.ok(!('authority' in resultOff));
+    assert.ok(!('authority' in resultOn));
 
     const docOff = await observerStateStore.readCurrent(`${PASS_INSTANCE_PREFIX}${urlKeyOff}`);
     const docOn = await observerStateStore.readCurrent(`${PASS_INSTANCE_PREFIX}${urlKeyOn}`);
-    // Same everything except the authority stamp — proves ON has no acting
-    // branch: the report/summary/lanes/flags are identical either way.
     assert.strictEqual(docOff.state.report.narrative, docOn.state.report.narrative);
     assert.deepStrictEqual(docOff.state.report.lanes, docOn.state.report.lanes);
-    assert.strictEqual(docOff.state.authority, 'off');
-    assert.strictEqual(docOn.state.authority, 'on-unimplemented');
-  });
-
-  test('missing observerAuthority default resolves the same as an explicit false (default-OFF path)', async () => {
-    const observerStateStore = freshStore();
-    const urlKey = `ws-auth-default-${randomUUID()}`;
-    await observerStateStore.ensureSeeded(`sweep:v1:${urlKey}`, emptyCensus);
-    const result = await runObserverPass(urlKey, {
-      observerStateStore,
-      workspacePreferencesStore: fakeWorkspacePreferencesStore({}), // no `features` key at all
-      now: Date.now()
-    });
-    assert.strictEqual(result.authority, 'off');
+    assert.ok(!('authority' in docOff.state));
+    assert.ok(!('authority' in docOn.state));
   });
 
   test('ensureSeeded is called every tick, independent of whether advance() actually wrote anything (retention liveness)', async () => {
@@ -908,7 +885,7 @@ describe('observer-pass: static import assertion', () => {
     const specifiers = [...src.matchAll(/^import\s+(?:[^;]*?from\s+)?['"](.+?)['"]\s*;?\s*$/gm)].map((m) => m[1]);
     assert.deepStrictEqual(
       specifiers.sort(),
-      ['./feature-defaults.js', './loose-json.js', './observer-sweep.js', './workspace-preferences.js'].sort(),
+      ['./loose-json.js', './observer-sweep.js', './workspace-preferences.js'].sort(),
       'a new import here (e.g. a direct lib/openrouter.js or dispatch-store/agent-status-store import bypassing the injected LLM seam) must be caught by this assertion. ' +
       './loose-json.js is the pure shared JSON-reply extractor (LIN-3114). ./observer-sweep.js is imported ONLY for its pure, I/O-free roster-union helpers (resolveRosterFromSessions/mergeRosterUnion) — reused rather than re-derived — never for buildSweepPayload or a fourth fleet summary.'
     );
