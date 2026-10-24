@@ -283,6 +283,7 @@ describe('witness: the store answers as the resolvers did at 6ea1371e', () => {
               sessionSummaryStore,
               isTerminal: () => true,
               resolveModel,
+              freeTierStore: { tryUse: async () => ({ allowed: true }) }, // LIN-3875: the free cell must pass the gate to reach the model
               generateSummary: async (_s, opts) => { called.push(opts.model); return { summary: {}, model: opts.model }; }
             });
             await pre(fx.urlKey, { sessionId: 's' }, { apiKey: 'k', isFreeTier });

@@ -530,7 +530,8 @@ const precomputeResolveModel = jobModelResolver(workspacePreferencesStore)
 const precomputeRunParagraph = createRunParagraphPrecompute({
   runParagraphStore,
   isTerminal: sessionIsTerminal,
-  resolveModel: precomputeResolveModel
+  resolveModel: precomputeResolveModel,
+  freeTierStore // LIN-3875: the hourly free-tier gate on the shared free key
 })
 
 // Background session-summary precompute (LIN-632) plus the run-paragraph
@@ -547,7 +548,8 @@ const precomputeSessionSummary = createSessionSummaryPrecompute({
   sessionSummaryStore: sessionSummaryCacheStore,
   isTerminal: sessionIsTerminal,
   runSummaryStore: runSummaryCacheStore,
-  resolveModel: precomputeResolveModel
+  resolveModel: precomputeResolveModel,
+  freeTierStore // LIN-3875
 })
 
 observationMaterializer.precomputeSessionSummary = createMaterializerPrecompute({
