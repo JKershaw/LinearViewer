@@ -10,8 +10,8 @@
  *
  * Shape (LIN-3596): every route is registered explicitly, in the order below, as a
  * thin handler over a small set of shared steps. The steps sit in two places:
- *   - module level, where they need no dependency (`openIssue`, `failureOf`,
- *     `refuseCapability`, `refuseFreeTier`, `scanRow`, `loadContext`, ...);
+ *   - module level, where they need no dependency (`openIssue`, `refuseCapability`, `refuseFreeTier`, `scanRow`, `loadContext`, ...;
+ *     `failureOf` and `isTestToken` live in workspace-api-steps.js, shared with workspace-api-prompts.js);
  *   - inside `createWorkspaceApiRoutes`, where they close over the injected stores.
  * The AI pre-flight calls (`resolveChatCredential`, `checkFreeTierGate`, the
  * `forceDefault` model clamp) are deliberately NOT shared: each route names its own,
@@ -28,11 +28,11 @@ import { getProviderForWorkspace, getProvider } from '../lib/providers/registry.
 import '../lib/providers/linear/index.js'; // side effect: self-registers the Linear provider into the registry
 import { createRoadmapRoutes } from './workspace-api-roadmap.js';
 import { createPromptsRoutes } from './workspace-api-prompts.js';
-import { generatePrompt, generateCustomPrompt, hasPrompt } from '../lib/prompt-templates.js';
+import { isTestToken, failureOf } from './workspace-api-steps.js';
+import { generatePrompt } from '../lib/prompt-templates.js';
 import { renderDetailsContent, PRIORITY_OPTION_LABELS } from '../lib/render.js';
-import { buildPromptFilename } from '../lib/prompt-formatters.js';
 import { attachProxyContext, isCodedGrantRefusal, codedGrantRefusalResponse } from '../lib/proxy-preamble.js';
-import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
+import { buildAutopilotKickoff } from '../lib/prompts/autopilot-kickoff.js';
 import { isRecommendationEnabled, getRecommendation, getRecommendationStream, getModelDisplayName, streamChat } from '../lib/openrouter.js';
 import { isRetryableRunLimit } from '../lib/plan-allowance.js';
 import { resolveChatCredential, isAiUnavailable, checkFreeTierGate, buildRunGate, isFlagFreeTier, freeTierRefusalBlock } from '../lib/chat-request.js';
@@ -43,7 +43,6 @@ import { sniffRasterType, parseFeedbackImage } from '../lib/attachment-upload.js
 import { resolveWorkspaceModel, resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { validateOpaqueDispatchField, MAX_NAME_LENGTH } from '../lib/dispatch-validation.js';
-import { validateRunField } from '../lib/dispatch-fields.js';
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
 import { generateScan, parseScanResponse, buildScanMessages, isExplicitRetirementSignal, extractScanPayload } from '../lib/scan.js';
@@ -90,7 +89,6 @@ import {
   generateMockRecommendation,
   buildMockRecommendationHop,
   planMockDescent,
-  buildMockPromptInput,
   buildMockRecapContext,
   buildMockRecap,
   buildMockBrief,
@@ -142,13 +140,6 @@ export const decisionStampDedupe = createDedupeCache();
 // Shared steps that need no dependency
 // ===========================================================================
 
-/**
- * The test-token workspace (`/test/set-session`): data comes from `testMockData`,
- * never from a provider. `mockAi` (lib/should-mock-ai.js) is the separate, wider
- * predicate for the AI mock, which local-provider sessions also trip (LIN-388/LIN-405).
- */
-const isTestToken = (workspace) => process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
-
 const refuseFreeTier = (res, check) => jsonError(res, 429, check.reason, freeTierRefusalBlock(check));
 
 const aiNotConfigured = (res, noun) =>
@@ -167,20 +158,6 @@ function refuseCapability(res, providerName, capability, doing) {
 // Never let a durable scan record be keyed under a non-canonical fallback
 // (LIN-2197 Phase 2 close-out ledger item 3). Spread into jsonError / keepaliveError.
 const CANONICAL_ID_REFUSAL = [422, "This task's canonical id could not be resolved; scan requires a canonical identity", { code: 'CANONICAL_ID_REQUIRED' }];
-
-/**
- * The error ladder shared by the upstream-calling routes, as `[status, message, extra]`
- * ready to spread into `jsonError(res, …)` or `keepaliveError(keepalive, …)`. Arms, in
- * order: a provider 401; "not found" (the message is relayed); an OpenRouter failure.
- * Anything else is the route's own 500.
- * @param {{notFound?: boolean, openRouter?: boolean}} [arms] - which optional arms the route has
- */
-function failureOf(error, fallbackMessage, { notFound: hasNotFoundArm = true, openRouter: hasOpenRouterArm = false } = {}) {
-  if (error.response?.status === 401) return [401, 'Token expired or invalid'];
-  if (hasNotFoundArm && error.message?.includes('not found')) return [404, error.message];
-  if (hasOpenRouterArm && error.message?.includes('OpenRouter')) return [503, 'AI service temporarily unavailable', { message: error.message }];
-  return [500, fallbackMessage, { message: error.message }];
-}
 
 /** The catch tail of the keepalive routes: stop the keepalive, log, and reply through it with the ladder's answer. */
 function keepaliveFailure(keepalive, label, error, fallbackMessage, arms) {
@@ -267,51 +244,6 @@ function scanRow(record, { raw = false } = {}) {
     outcomeBasisHash: orNull(record.outcomeBasisHash),
   };
 }
-
-/**
- * Send a generated prompt as JSON (default) or as a downloadable markdown
- * file when `?format=md` is set. The markdown branch serves the bare prompt
- * string with attachment headers (Content-Disposition); the in-app `+proxy`
- * block is appended client-side, so it intentionally never appears here.
- * Default JSON behaviour is unchanged for every existing consumer.
- * @param {import('express').Request} req
- * @param {import('express').Response} res
- * @param {Object} opts
- * @param {Object} opts.json - JSON body returned when not downloading
- * @param {string} opts.prompt - Raw prompt string for the markdown download
- * @param {string} opts.identifier - Issue identifier for the filename (may be empty)
- * @param {string} opts.downloadName - Prompt name slug for the filename
- */
-function sendPromptResult(req, res, { json, prompt, identifier, downloadName }) {
-  if (req.query.format === 'md') {
-    res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${buildPromptFilename(identifier, downloadName)}"`);
-    return res.send(prompt);
-  }
-  return res.json(json);
-}
-
-// LIN-836: surface the stepper variant in the UI. Validate against the shared
-// list (unknown/absent → standard), thread it into the kickoff body, and let
-// ONLY the stepper branch change label/promptName/downloadName — the standard
-// strings stay byte-identical to preserve the LIN-791 additive invariant.
-function autopilotParams(req) {
-  const mode = AUTOPILOT_MODES.includes(req.query.mode) ? req.query.mode : AUTOPILOT_MODE_DEFAULT;
-  const variant = AUTOPILOT_VARIANTS.includes(req.query.variant) ? req.query.variant : AUTOPILOT_VARIANT_DEFAULT;
-  return { mode, variant, stepper: variant === 'stepper', baseUrl: publicOrigin(req) };
-}
-
-function sendAutopilotPrompt(req, res, { stepper, identifier, promptName, prompt }) {
-  const label = stepper ? 'autopilot-stepper' : 'autopilot';
-  sendPromptResult(req, res, {
-    identifier,
-    downloadName: label,
-    prompt,
-    json: { label, promptName, kind: 'autopilot', prompt }
-  });
-}
-
-const autopilotTitle = (stepper) => (stepper ? 'Autopilot (stepped)' : 'Autopilot');
 
 /** The recommendation call options the buffered GET and both stream paths pass the model. */
 function recommendCallOptions({ apiKey, model, session, provider, workspace, identifier, signal }) {
@@ -854,11 +786,10 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     ? harbourCommentsStore.wereRecordedByHarbour(workspace.urlKey, comments)
     : new Set());
 
-  // Prompt-traces + custom-prompts API endpoints (LIN-2246: extracted to
-  // workspace-api-prompts.js). Mounted first, at the same relative position
-  // the prompt-traces group previously occupied inline; both groups' literal
-  // path prefixes (/prompt-traces, /prompts/custom) are disjoint from every
-  // other group's, so mount order is not load-bearing here.
+  // Prompt-traces, custom-prompts and prompt-generation API endpoints (LIN-2246 /
+  // LIN-3842: extracted to workspace-api-prompts.js). Mounted first; the groups'
+  // literal path prefixes (/prompt-traces, /prompts/custom, /prompt/, /autopilot-prompt)
+  // are disjoint from every other group's, so mount order is not load-bearing here.
   router.use(createPromptsRoutes({ workspaceFromUrl, promptTraceStore, customPromptsStore }));
 
   // ===========================================================================
@@ -913,243 +844,6 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     } catch (error) {
       console.error('Audit error:', error);
       jsonError(res, ...failureOf(error, 'Audit failed', { notFound: false }));
-    }
-  });
-
-  // ===========================================================================
-  // Prompt Generation API
-  // ===========================================================================
-
-  /**
-   * Generate a prompt for a specific issue and label.
-   * Returns a prompt that can be copied and used with Claude Code and the workspace API.
-   *
-   * @route GET /workspace/:urlKey/api/prompt/:issueId/:labelName
-   * @param {string} issueId - The Linear issue ID
-   * @param {string} labelName - The label name (must have a prompt template)
-   * @returns {Object} { label, promptName, prompt } or error
-   */
-  router.get('/workspace/:urlKey/api/prompt/:issueId/:labelName', workspaceFromUrl, async (req, res) => {
-    const workspace = req.workspace;
-    const { issueId, labelName } = req.params;
-
-    if (!isValidIssueId(issueId)) {
-      return badRequest.json(res, 'Invalid issue ID format');
-    }
-
-    // Check if this is a custom prompt request (format: custom:promptId)
-    const isCustomPrompt = labelName.startsWith('custom:');
-
-    // Check if label has a prompt template (unless it's a custom prompt)
-    if (!isCustomPrompt && !hasPrompt(labelName)) {
-      return notFound.json(res, `No prompt template for label: ${labelName}`);
-    }
-
-    // Capability-aware prompt generation (LIN-177 S4/S5): thread the active
-    // provider's UI surface into prompt generation. Resolved from the workspace
-    // (source isn't populated on canonical issues); falls back to Linear for
-    // legacy workspaces. For Linear this is a no-op — output stays byte-identical.
-    const providerUi = getProviderForWorkspace(workspace)?.ui || null;
-
-    try {
-      // The issue and the context the template reads: fixtures in test mode, else the provider's.
-      let identifier, issue, context;
-      if (isTestToken(workspace)) {
-        const mock = buildMockPromptInput(issueId);
-        if (!mock) {
-          return notFound.json(res, 'Issue not found');
-        }
-        ({ identifier, issue, context } = mock);
-      } else {
-        // LIN-1904: resolve the issue's OWN binding (per the `source` provenance
-        // stamp LIN-561 puts on every merged-tree row, LIN-544) rather than
-        // always the workspace's active provider — same fix as /api/detail
-        // (LIN-1903), same helper.
-        const { provider: issueProvider, callScope: issueCallScope } = resolveIssueBinding(workspace, req.query.source);
-        const { issue: fetched, parent, siblings, project, children, comments, attachments } = await issueProvider.fetchIssueContext(issueCallScope, issueId);
-        issue = fetched;
-        identifier = issue.identifier;
-        // Forward `attachments` (LIN-776) so the in-app /prompt endpoint surfaces the
-        // worker-facing Attachments section, matching the proxy /prompt route.
-        context = { parent, siblings, project, children, comments, attachments };
-      }
-
-      let result;
-      if (isCustomPrompt) {
-        const customPromptDef = await customPromptsStore.get(workspace.urlKey, labelName.slice('custom:'.length));
-        if (!customPromptDef) {
-          return notFound.json(res, 'Custom prompt not found');
-        }
-        // NOTE: generateCustomPrompt renders no Attachments section (variable
-        // substitution only) — passing `attachments` would be a no-op, so it's left
-        // out here; that's a separate pre-existing gap, not part of LIN-776.
-        const { attachments: _unused, ...customContext } = context;
-        result = generateCustomPrompt(customPromptDef, issue, customContext, getFeatureFlags(req.session), providerUi);
-      } else {
-        result = generatePrompt(labelName, issue, context, getFeatureFlags(req.session), providerUi);
-      }
-
-      if (!result) {
-        return jsonError(res, 500, 'Failed to generate prompt');
-      }
-
-      sendPromptResult(req, res, {
-        identifier,
-        downloadName: result.name,
-        prompt: result.prompt,
-        json: {
-          label: labelName,
-          promptName: result.name,
-          prompt: result.prompt
-        }
-      });
-    } catch (error) {
-      console.error('Prompt generation error:', error);
-      jsonError(res, ...failureOf(error, 'Failed to generate prompt'));
-    }
-  });
-
-  /**
-   * Generate an Autopilot kickoff prompt scoped to a specific issue — the
-   * "run on autopilot until this task is done" instruction. Autopilot is a
-   * light orchestrator that dispatches the actual work to a separate worker;
-   * dispatching this prompt to `web` lets the user sit back and watch the loop.
-   *
-   * The general (stack-walk) kickoff is served at the issueless route below and
-   * at /api/proxy/autopilot/kickoff for external agents.
-   *
-   * Gated on the proxy feature flag — the kickoff drives the
-   * proxy API exclusively. Optional `?mode=readonly` restricts the run to
-   * investigation/research prompts; default is write (merge-gated).
-   *
-   * @route GET /workspace/:urlKey/api/autopilot-prompt/:issueId
-   * @param {string} issueId - The Linear issue ID (UUID)
-   * @returns {Object} { label, promptName, kind, prompt, repo } or error
-   */
-  router.get('/workspace/:urlKey/api/autopilot-prompt/:issueId', workspaceFromUrl, async (req, res) => {
-    const workspace = req.workspace;
-    const { issueId } = req.params;
-
-    if (getFeatureFlags(req.session).proxy !== true) {
-      return jsonError(res, 403, 'Proxy feature is not enabled');
-    }
-
-    if (!isValidIssueId(issueId)) {
-      return badRequest.json(res, 'Invalid issue ID format');
-    }
-
-    const { mode, variant, stepper, baseUrl } = autopilotParams(req);
-
-    // Run boundary (LIN-3246 / LIN-2949 P1b): optional `?stopAt=pr`. Query params
-    // are always strings, so blank/whitespace-only is ABSENT, not an error — the
-    // same rule maxTasks follows on the general twin below. Only the literal 'pr'
-    // is valid; any other non-blank value is a 400, matching the dispatch route's
-    // contract (`routes/dispatch.js`).
-    let stopAt = null;
-    if (typeof req.query.stopAt === 'string' && req.query.stopAt.trim() !== '') {
-      const stopAtMsg = validateRunField('stopAt', req.query.stopAt.trim());
-      if (stopAtMsg) {
-        return badRequest.json(res, stopAtMsg);
-      }
-      stopAt = 'pr';
-    }
-
-    try {
-      // Use mock data in test mode
-      if (isTestToken(workspace)) {
-        const mockIssue = testMockData.issues.find(i => i.id === issueId);
-        if (!mockIssue) {
-          return notFound.json(res, 'Issue not found');
-        }
-        const identifier = mockIssue.url?.split('/').pop() || '';
-        const prompt = buildAutopilotKickoff({
-          baseUrl,
-          issue: { identifier, title: mockIssue.title },
-          mode,
-          variant,
-          stopAt,
-          standalone: true
-        });
-        return sendAutopilotPrompt(req, res, { stepper, identifier, prompt, promptName: `${autopilotTitle(stepper)} — ${identifier}` });
-      }
-
-      // LIN-1904: resolve the issue's own binding via `source`, same as /api/prompt.
-      const { provider: issueProvider, callScope: issueCallScope } = resolveIssueBinding(workspace, req.query.source);
-      const { issue } = await issueProvider.fetchIssueContext(issueCallScope, issueId);
-      const prompt = buildAutopilotKickoff({
-        baseUrl,
-        issue: { identifier: issue.identifier, title: issue.title },
-        mode,
-        variant,
-        stopAt,
-        standalone: true,
-        // LIN-2804: mirrors the identical generatePrompt pattern already at
-        // lines 948/1299/1388 in this file — issueProvider is the actually
-        // resolved (possibly cross-source) provider for this issue.
-        providerUi: issueProvider.ui || null
-      });
-      sendAutopilotPrompt(req, res, { stepper, identifier: issue.identifier, prompt, promptName: `${autopilotTitle(stepper)} — ${issue.identifier}` });
-    } catch (error) {
-      console.error('Autopilot prompt error:', error);
-      jsonError(res, ...failureOf(error, 'Failed to generate autopilot prompt'));
-    }
-  });
-
-  /**
-   * Generate a general (stack-walking) Autopilot kickoff — no issue scope.
-   * Autopilot orients off `GET /stack` under the precedence policy and works the
-   * backlog until it needs the human. Optional `?goal=` supplies a free-text
-   * focus; `?mode=readonly` restricts to investigation/research prompts.
-   *
-   * @route GET /workspace/:urlKey/api/autopilot-prompt
-   * @returns {Object} { label, promptName, kind, prompt } or error
-   */
-  router.get('/workspace/:urlKey/api/autopilot-prompt', workspaceFromUrl, async (req, res) => {
-    if (getFeatureFlags(req.session).proxy !== true) {
-      return jsonError(res, 403, 'Proxy feature is not enabled');
-    }
-
-    // LIN-836: same variant wiring as the issue-scoped twin above (stepper only
-    // changes the response strings; standard stays byte-identical).
-    const { mode, variant, stepper, baseUrl } = autopilotParams(req);
-    // LIN-2818: stays at 1000 on purpose. This general/stack-walk goal arrives in
-    // the URL query string (the dispatch page's goal textarea round-trips it via
-    // `?goal=`), and Node's default 16KB header ceiling can't reliably carry more;
-    // it is matched to the textarea's own maxlength. The scoped POST body cap
-    // (routes/proxy-kickoff.js) is the surface that rose to MAX_DESCRIPTION_LENGTH.
-    const goal = typeof req.query.goal === 'string' ? req.query.goal.slice(0, 1000) : '';
-
-    // Task budget (LIN-1737 D3/Beat 1 seam #3): an optional scope bound threaded
-    // into the kickoff so its prose states it, then forwarded by the client to
-    // POST /api/dispatch where it is actually enforced (LIN-1751). Query params
-    // are always strings, so blank/whitespace-only is treated as ABSENT, not an
-    // error — distinct from the JSON-body validation at the dispatch route,
-    // which has no such "blank" case to account for. A non-blank value follows
-    // the same integer->=1 rule and error text as every other maxTasks entry point.
-    let maxTasks = null;
-    if (typeof req.query.maxTasks === 'string' && req.query.maxTasks.trim() !== '') {
-      const parsedMaxTasks = Number(req.query.maxTasks.trim());
-      const maxTasksRuleError = validateRunField('maxTasks', parsedMaxTasks);
-      if (maxTasksRuleError) {
-        return badRequest.json(res, maxTasksRuleError);
-      }
-      maxTasks = parsedMaxTasks;
-    }
-
-    try {
-      // LIN-2804: mirrors the identical generatePrompt pattern at lines 439/3415.
-      const prompt = buildAutopilotKickoff({ baseUrl, goal, mode, variant, standalone: true, maxTasks, providerUi: getProviderForWorkspace(req.workspace)?.ui || null });
-      sendAutopilotPrompt(req, res, {
-        stepper,
-        identifier: '',
-        prompt,
-        promptName: goal.trim()
-          ? `${autopilotTitle(stepper)} — ${goal.trim().slice(0, 60)}`
-          : (stepper ? 'Autopilot (stepped, stack walk)' : 'Autopilot (stack walk)')
-      });
-    } catch (error) {
-      console.error('Autopilot kickoff error:', error);
-      jsonError(res, 500, 'Failed to generate autopilot kickoff', { message: error.message });
     }
   });
 
