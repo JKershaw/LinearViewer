@@ -566,3 +566,308 @@
     width: 100%;
   }
 }
+
+/* =============================================================================
+   LIN-3846: one page per area, built from three kinds of row
+   Desktop: a sidebar of areas beside one ~600px column (Models gets the full
+   width). Phone: the same list; a tap opens the area, "‹ Settings" goes back.
+   Tokens only (light and dark come from the shared theme layer).
+   ============================================================================= */
+.settings-shell {
+  display: grid;
+  grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.settings-pane {
+  min-width: 0;
+  max-width: 600px;
+}
+
+.settings-shell[data-wide="true"] .settings-pane {
+  max-width: none;
+}
+
+.settings-back {
+  display: none;
+  color: var(--brand-dim);
+  text-decoration: none;
+  margin-bottom: var(--space-2);
+}
+
+.settings-area-title {
+  font-family: var(--font-content);
+  font-size: 1.2em;
+  font-weight: 600;
+  margin: 0 0 var(--space-3) 0;
+}
+
+.settings-nav-group {
+  margin-bottom: var(--space-3);
+}
+
+.settings-nav-title {
+  font-family: var(--font-content);
+  font-size: 0.75em;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin: 0 0 var(--space-1) 0;
+}
+
+.settings-nav-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.settings-nav-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.55rem 0.6rem;
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  text-decoration: none;
+  font-family: var(--font-content);
+  font-size: 0.95em;
+}
+
+.settings-nav-link:hover,
+.settings-nav-link.is-current {
+  background: var(--card);
+}
+
+.settings-nav-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-state {
+  color: var(--muted);
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+
+.settings-state-bad {
+  color: var(--red-dim, var(--red));
+}
+
+.settings-dot {
+  display: inline-block;
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: var(--radius-full);
+  background: var(--red);
+  margin-right: 0.35em;
+}
+
+.settings-chevron {
+  color: var(--muted);
+}
+
+/* Groups and rows */
+.settings-group-block {
+  margin-bottom: var(--space-4);
+}
+
+.settings-group-title {
+  font-family: var(--font-content);
+  font-size: 0.8em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin: 0 0 var(--space-1) 0;
+}
+
+.settings-rows {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.settings-rows > * + *,
+.settings-rows > .settings-row-form + * {
+  border-top: 1px solid var(--line);
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding: 0.7rem 0.8rem;
+  font-family: var(--font-content);
+  font-size: 0.95em;
+  color: var(--fg);
+  text-decoration: none;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.settings-row-label {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.settings-row-note {
+  display: block;
+  color: var(--muted);
+  font-size: 0.85em;
+}
+
+.settings-row-value {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.settings-row-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  cursor: pointer;
+  list-style: none;
+}
+
+.settings-row-summary::-webkit-details-marker {
+  display: none;
+}
+
+.settings-row-open,
+.settings-ask {
+  display: block;
+}
+
+.settings-row-body,
+.settings-ask-form {
+  padding-top: var(--space-2);
+}
+
+.settings-ask-text {
+  color: var(--muted);
+  margin: 0 0 var(--space-2) 0;
+}
+
+.settings-ask-label {
+  display: block;
+  margin-bottom: var(--space-2);
+}
+
+.settings-ask-reason,
+.settings-newkey-label {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  margin-top: var(--space-1);
+}
+
+.settings-action-teal,
+.settings-action-teal .settings-row-label {
+  color: var(--brand-dim);
+}
+
+.settings-action-red,
+.settings-action-red .settings-row-label {
+  color: var(--red-dim, var(--red));
+}
+
+.settings-row-action {
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-content);
+}
+
+.settings-row-form {
+  margin: 0;
+}
+
+.settings-note {
+  color: var(--muted);
+  font-family: var(--font-content);
+  font-size: 0.85em;
+  margin: var(--space-1) 0 0 0;
+}
+
+.settings-flash {
+  color: var(--fg);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+}
+
+.settings-flash-error {
+  color: var(--red-dim, var(--red));
+}
+
+.settings-inline-form {
+  display: inline;
+}
+
+.settings-undo {
+  background: none;
+  border: 0;
+  color: var(--brand-dim);
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
+}
+
+.settings-segmented {
+  display: inline-flex;
+  gap: 0;
+}
+
+.settings-theme-choice {
+  font: inherit;
+  padding: 0.3rem 0.8rem;
+  background: none;
+  color: var(--fg);
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.settings-theme-choice.is-selected {
+  background: var(--brand);
+  color: var(--bg, #fff);
+  border-color: var(--brand);
+}
+
+.settings-newkey-secret {
+  overflow-wrap: anywhere;
+  font-family: var(--font-structural);
+}
+
+.settings-main {
+  max-width: 1000px;
+}
+
+/* Phone: the list, or the page with "‹ Settings". No sideways scroll. */
+@media (max-width: 760px) {
+  .settings-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-shell[data-view="index"] .settings-pane {
+    display: none;
+  }
+
+  .settings-shell[data-view="area"] .settings-nav {
+    display: none;
+  }
+
+  .settings-back {
+    display: inline-block;
+  }
+
+  .settings-pane {
+    max-width: none;
+  }
+}

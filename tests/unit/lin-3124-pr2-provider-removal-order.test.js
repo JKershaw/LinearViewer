@@ -17,6 +17,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { unlinkProvider } from '../../lib/workspace.js';
 import { releaseConnectionCredential } from '../../lib/connection-lifecycle.js';
+import { settingsAreaUrl } from '../../lib/settings-areas.js';
 
 const SERVER_SRC = readFileSync(new URL('../../server.js', import.meta.url), 'utf8');
 
@@ -37,6 +38,7 @@ async function runUnlink(workspace, body) {
     app: { post: (_path, _mw, h) => { handler = h; } },
     workspaceFromUrl: (_req, _res, next) => next?.(),
     encodeURIComponent,
+    settingsAreaUrl,
     unlinkProvider,
     releaseConnectionCredential: async () => ({}),
     workspaceRemovalRevoker: { revoke: async (a) => { revokes.push(a); return {}; } },
@@ -100,6 +102,7 @@ describe('LIN-3124 PR2 B1 — provider removal releases the pre-unlink binding',
       app: { post: (_path, _mw, h) => { handler = h; } },
       workspaceFromUrl: (_req, _res, next) => next?.(),
       encodeURIComponent,
+      settingsAreaUrl,
       unlinkProvider,
       releaseConnectionCredential,
       workspaceRemovalRevoker: { revoke: async () => ({}) }, // LIN-3619
@@ -132,6 +135,6 @@ describe('LIN-3124 PR2 B1 — provider removal releases the pre-unlink binding',
     ]);
     assert.strictEqual(calls.deleteIfUnreferenced.length, 1);
     assert.deepStrictEqual(calls.durableDeletes[0], ['acc', 'acme', 'linear'], 'the legacy per-partition delete still runs');
-    assert.strictEqual(redirectTo, '/workspace/acme/settings?provider_removed=linear');
+    assert.strictEqual(redirectTo, '/workspace/acme/settings/sources?provider_removed=linear');
   });
 });

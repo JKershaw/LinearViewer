@@ -882,7 +882,7 @@ describe('LIN-2300 close-out — OAuth add-source self-heals across a same-sessi
     const attempt2 = await request(app, { path: `/auth/jira/oauth/callback?code=c&state=${encodeURIComponent(session.oauthState)}` });
 
     assert.equal(attempt2.status, 302, 'attempt 2: succeeds and redirects');
-    assert.equal(attempt2.location, '/workspace/acme-linear/settings?provider_ok=jira');
+    assert.equal(attempt2.location, '/workspace/acme-linear/settings/sources?provider_ok=jira');
     assert.ok(session.accountId, 'attempt 2: a fresh accountId is established on the same session');
   });
 });

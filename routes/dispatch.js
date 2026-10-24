@@ -760,8 +760,10 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
   //
   // Setting a halt is a REQUEST the runner honours (lib/runner-kit/runner.mjs
   // haltAction: pause leaves fresh items, stop sweeps), so set/clear are
-  // owner-only (LIN-3398). No per-write audit log is added here; the halt
-  // document's own `setAt`/`setBy` is its audit trail.
+  // owner-only (LIN-3398). Every write here passes `via: 'page'` so the store's
+  // change hook (LIN-3846) records it in the workspace change log, with the fixed
+  // reason "Changed outside Settings"; the halt document's own `setAt`/`setBy`
+  // stays the current-state trail.
   // =========================================================================
 
   /**
@@ -805,7 +807,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const now = new Date();
 
     try {
-      await workspaceHaltStore.setWorkspaceHalt(req.workspace.urlKey, { mode, setBy, now });
+      await workspaceHaltStore.setWorkspaceHalt(req.workspace.urlKey, { mode, setBy, now, via: 'page' });
       res.json({ success: true, halt: { mode, setAt: now, setBy } });
     } catch (err) {
       return reportFailure(res, 'Workspace halt set error:', err, 'Failed to set halt');
@@ -825,7 +827,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     }
 
     try {
-      await workspaceHaltStore.clearWorkspaceHalt(req.workspace.urlKey);
+      await workspaceHaltStore.clearWorkspaceHalt(req.workspace.urlKey, { via: 'page', setBy: req.session?.accountId || null });
       res.json({ success: true });
     } catch (err) {
       return reportFailure(res, 'Workspace halt clear error:', err, 'Failed to clear halt');

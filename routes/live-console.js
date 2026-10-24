@@ -135,7 +135,7 @@ export function createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, di
     const workspace = req.workspace;
     const featureFlags = await requestFeatureFlags(req);
     if (featureFlags.liveConsole !== true) {
-      return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
+      return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings/features`);
     }
     try {
       res.send(renderLiveConsolePage({

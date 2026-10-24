@@ -227,7 +227,7 @@ export function createAccountMergeRoutes({ accountStore, accountWorkspaceStore, 
       }))
     }
     if (hasWorkspace && pending.mode === 'add-source') {
-      return res.redirect(`/workspace/${encodeURIComponent(pending.returnUrlKey)}/settings?provider_ok=${encodeURIComponent(pending.provider)}`)
+      return res.redirect(`/workspace/${encodeURIComponent(pending.returnUrlKey)}/settings/sources?provider_ok=${encodeURIComponent(pending.provider)}`)
     }
     if (hasWorkspace) {
       return res.redirect(`/workspace/${encodeURIComponent(pending.workspace.urlKey)}/`)

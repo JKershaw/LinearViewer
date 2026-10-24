@@ -9,13 +9,13 @@
     {
       "name": "Front end: server-rendered pages",
       "match": [
-        "^lib/(render[^/]*|components/.*|tree|ship-layout|swim-graph|swim-lanes|timeline-zoom|parse-landing|mask-secrets-in-html|task-page-href|question-card|security-headers|ship-journey)\\.js$"
+        "^lib/(render[^/]*|components/.*|tree|ship-layout|swim-graph|swim-lanes|timeline-zoom|parse-landing|mask-secrets-in-html|task-page-href|question-card|security-headers|ship-journey|settings-areas)\\.js$"
       ]
     },
     {
       "name": "Agent API (proxy)",
       "match": [
-        "^routes/proxy[^/]*\\.js$|^lib/proxy-(?!fetch\\.js$)[^/]*\\.js$|^lib/(require-grant|harbour-feedback-tokens|harbour-token-format|dispatch-tokens|settings-proxy-default)\\.js$"
+        "^routes/proxy[^/]*\\.js$|^lib/proxy-(?!fetch\\.js$)[^/]*\\.js$|^lib/(require-grant|harbour-feedback-tokens|harbour-token-format|dispatch-tokens|settings-proxy-default|settings-keys)\\.js$"
       ]
     },
     {

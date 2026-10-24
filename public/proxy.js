@@ -1,7 +1,8 @@
 /**
  * Proxy Page Client-Side Logic
  *
- * Handles: token generation, agent prompt creation, token CRUD, event log display.
+ * Handles: token generation, agent prompt creation, event log display. The token
+ * lists (ordinary and runner keys) moved to Settings › Agent access (LIN-3846).
  */
 
 /* global escapeHtml, showModal, toast, api */
@@ -15,10 +16,6 @@
   const promptOutput = document.getElementById('proxy-prompt-output');
   const generateFeedback = document.getElementById('proxy-generate-feedback');
   const createTokenForm = document.getElementById('proxy-create-token-form');
-  const tokenList = document.querySelector('.proxy-token-list');
-  const runnerList = document.getElementById('proxy-runner-credentials');
-  const tokensCollapsible = document.getElementById('proxy-tokens-collapsible');
-  const tokensCount = document.getElementById('proxy-tokens-count');
   const eventsList = document.querySelector('.proxy-events-list');
   const eventsCollapsible = document.getElementById('proxy-events-collapsible');
   const eventsCount = document.getElementById('proxy-events-count');
@@ -29,16 +26,14 @@
   const eventsNextBtn = eventsPager?.querySelector('.proxy-events-next');
   const refreshBtn = document.querySelector('.proxy-events-refresh');
 
-  const urlKey = tokenList?.dataset?.urlKey || generateBtn?.closest('[data-url-key]')?.dataset?.urlKey;
+  const urlKey = createTokenForm?.dataset?.urlKey || generateBtn?.closest('[data-url-key]')?.dataset?.urlKey;
   if (!urlKey) return;
 
   const apiBase = `/workspace/${encodeURIComponent(urlKey)}/api/proxy`;
   const baseUrl = window.location.origin;
 
-  const TOKENS_INITIAL_VISIBLE = 5;
   const EVENTS_PAGE_SIZE = 25;
 
-  let tokensExpanded = false;
   let eventsExpanded = false;
   let eventsOffset = 0;
   let eventsTotal = 0;
@@ -90,9 +85,6 @@
           showFeedback(generateFeedback, 'Generated (copy manually)', false);
         }
 
-        // Refresh token list (only renders if expanded; always refreshes count)
-        refreshTokenCount();
-        if (tokensExpanded) loadTokens();
       } catch (err) {
         showFeedback(generateFeedback, mintErrorText(err, scopeSelect?.value === 'readWriteDispatch'), true);
       } finally {
@@ -195,146 +187,10 @@ This will return all available endpoints with examples. Your token scope is: ${s
         showTokenModal(data.token, data.label, data.scope);
         createTokenForm.reset();
 
-        // Open the tokens section so the new token is visible, and refresh
-        if (tokensCollapsible && !tokensCollapsible.open) {
-          tokensCollapsible.open = true;
-        }
-        refreshTokenCount();
-        loadTokens();
       } catch (err) {
         toast('Failed to create token: ' + err.message, { type: 'error' });
       }
     });
-  }
-
-  async function fetchTokens() {
-    try {
-      // on401:false — callers treat null as "failed to load"; never redirect.
-      const data = await window.api(`${apiBase}/tokens`, { on401: false });
-      return (data && data.tokens) || [];
-    } catch {
-      return null;
-    }
-  }
-
-  async function refreshTokenCount() {
-    if (!tokensCount) return;
-    const tokens = await fetchTokens();
-    if (tokens === null) {
-      tokensCount.textContent = '';
-      return;
-    }
-    // LIN-3131 S2b.3: runner credentials (`take` holders) live in their own
-    // "Runner credentials" group, so this count covers the ordinary tokens only.
-    const generic = tokens.filter(isOrdinaryListed);
-    tokensCount.textContent = generic.length ? `(${generic.length})` : '(0)';
-  }
-
-  async function loadTokens() {
-    if (!tokenList) return;
-
-    const tokens = await fetchTokens();
-    if (tokens === null) {
-      tokenList.innerHTML = '<div class="token-list-empty">Failed to load tokens</div>';
-      return;
-    }
-    const generic = tokens.filter(isOrdinaryListed);
-    if (tokensCount) {
-      tokensCount.textContent = generic.length ? `(${generic.length})` : '(0)';
-    }
-    renderTokenList(generic);
-  }
-
-  function renderTokenList(tokens) {
-    if (!tokens.length) {
-      tokenList.innerHTML = '<div class="token-list-empty">No proxy tokens yet</div>';
-      return;
-    }
-
-    const initial = tokens.slice(0, TOKENS_INITIAL_VISIBLE);
-    const rest = tokens.slice(TOKENS_INITIAL_VISIBLE);
-
-    const itemsHtml = initial.map(renderTokenItem).join('');
-    const hiddenHtml = rest.length
-      ? `<div class="token-items-extra" hidden>${rest.map(renderTokenItem).join('')}</div>
-         <button type="button" class="action-btn token-show-more">show ${rest.length} more</button>`
-      : '';
-
-    tokenList.innerHTML = itemsHtml + hiddenHtml;
-
-    // Revoke handlers
-    tokenList.querySelectorAll('.token-revoke').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const tokenId = btn.dataset.tokenId;
-        // Native confirm() is the ratified destructive-action primitive (LIN-511);
-        // see docs/ui-divergences.md.
-        if (!confirm('Revoke this token?')) return;
-
-        try {
-          // on401:false — failure is reported by the catch's toast, not a redirect.
-          await window.api(`${apiBase}/tokens/${tokenId}`, { method: 'DELETE', on401: false });
-          // LIN-1140: +proxy bootstrap tokens are minted fresh per copy/download
-          // and never cached client-side, so a revoke leaves nothing stale to drop.
-          loadTokens();
-        } catch (err) {
-          toast('Failed to revoke: ' + err.message, { type: 'error' });
-        }
-      });
-    });
-
-    // Show-more handler
-    const showMore = tokenList.querySelector('.token-show-more');
-    if (showMore) {
-      showMore.addEventListener('click', () => {
-        const extra = tokenList.querySelector('.token-items-extra');
-        if (extra) extra.hidden = false;
-        showMore.remove();
-      });
-    }
-  }
-
-  function renderTokenItem(t) {
-    const scopeBadge = t.scope === 'readWrite' ? ' [rw]' : ' [r]';
-    // LIN-3136: marks the ordinary tokens that can enqueue work (declared
-    // launches, driver copies, agent prompt copies) — the dispatch grant without `take`.
-    const grantBadge = hasDispatchGrant(t) ? ' [+dispatch]' : '';
-    const consumedBadge = t.consumed ? ' (consumed)' : '';
-    const expiryBadge = renderExpiryBadge(t.expiresAt);
-    const meta = [
-      formatTimeAgo(t.createdAt),
-      t.lastUsedAt ? `used ${formatTimeAgo(t.lastUsedAt)}` : 'never used'
-    ].join(' \u00B7 ');
-    // LIN-1586, mirroring the dispatch-token badge shipped by LIN-1448 (same
-    // class, same copy, same title \u2014 one wording for one fault). Older API
-    // responses omit `hasOwner` entirely, so only an explicit false warns.
-    const ownerless = t.hasOwner === false
-      ? ' \u00B7 <span class="token-ownerless" title="Minted before token ownership existed. Tokens it mints cannot access the workspace \u2014 re-issue this token and update the consumer.">no owner \u00B7 re-issue</span>'
-      : '';
-
-    return `<div class="surface token-item">
-      <div class="token-info">
-        <div class="token-label-text">${escapeHtml(t.label)}${scopeBadge}${grantBadge}${consumedBadge}${expiryBadge}</div>
-        <div class="token-meta">${escapeHtml(meta)}${ownerless}</div>
-      </div>
-      <button class="action-btn token-revoke" data-token-id="${escapeHtml(t.tokenId)}">revoke</button>
-    </div>`;
-  }
-
-  function renderExpiryBadge(expiresAt) {
-    if (!expiresAt) return '';
-    const ms = new Date(expiresAt).getTime() - Date.now();
-    if (Number.isNaN(ms)) return '';
-    // Canonical run-status dot pill (LIN-854): ok→done, warn→running, expired→error.
-    let state, text;
-    if (ms <= 0) {
-      state = 'error';
-      text = 'expired';
-    } else {
-      const days = Math.floor(ms / (24 * 60 * 60 * 1000));
-      state = days <= 7 ? 'running' : 'done';
-      text = days < 1 ? 'expires <1d' : `expires in ${days}d`;
-    }
-    return ` ${statusDotPill(state, text)}`;
   }
 
   // Hand-emits the shipped `.status-pill` dot markup (public/style.css) — the
@@ -344,125 +200,6 @@ This will return all available endpoints with examples. Your token scope is: ${s
     return `<span class="status-pill status-pill--dot status-pill--${state}">` +
       '<span class="status-pill__dot" aria-hidden="true"></span>' +
       `<span class="status-pill__label">${escapeHtml(String(label))}</span></span>`;
-  }
-
-  // =========================================================================
-  // Runner credentials (LIN-3131 S2b.3)
-  //
-  // The owner-checked runner copy mints a grant-bearing bootstrap that exchanges
-  // into a working token. These render as ONE derived row per credential lineage
-  // (plan P3(c)): a *waiting* row is an unconsumed bootstrap, an *active* row is
-  // the exchanged working token, and a spent bootstrap is HIDDEN — its working
-  // token is the live row. Revoke always sends the LIVE row's own `tokenId`
-  // (never a derived display key); the store revokes the whole lineage
-  // structurally (lib/proxy-tokens.js `revokeToken`), so no new route is needed.
-  // =========================================================================
-
-  // LIN-3136 (the LIN-3131 O-d carry): a runner row is a `take` holder. Any
-  // grant is no longer enough — declared launches, driver copies and agent prompt copies mint
-  // `['dispatch']` tokens, which are ordinary rows with ordinary revoke copy.
-  function isRunnerToken(t) {
-    return Array.isArray(t.grants) && t.grants.includes('take');
-  }
-
-  function hasDispatchGrant(t) {
-    return Array.isArray(t.grants) && t.grants.includes('dispatch');
-  }
-
-  // The ordinary list: everything but runner rows, and minus a CONSUMED
-  // grant-bearing bootstrap. Revoking one revokes its whole lineage
-  // (lib/proxy-tokens.js `revokeToken`), including a running autopilot's live
-  // working token — the runner group hides its spent bootstraps for the same
-  // reason. Display-only, but revoking a grant-bearing lineage is owner-only since LIN-3409 (checked inside
-  // `ProxyTokenStore.revokeToken`).
-  function isOrdinaryListed(t) {
-    if (isRunnerToken(t)) return false;
-    const grantBearing = Array.isArray(t.grants) && t.grants.length > 0;
-    return !(t.kind === 'bootstrap' && t.consumed && grantBearing);
-  }
-
-  async function loadRunnerCredentials() {
-    if (!runnerList) return;
-    const tokens = await fetchTokens();
-    if (tokens === null) {
-      runnerList.innerHTML = '<div class="token-list-empty">Failed to load runner credentials</div>';
-      return;
-    }
-    renderRunnerCredentials(tokens);
-  }
-
-  function runnerCredentialRows(tokens) {
-    const rows = [];
-    for (const t of tokens) {
-      if (!isRunnerToken(t)) continue;
-      if (t.kind === 'bootstrap') {
-        // Spent bootstrap → hidden: the exchanged working token is the live row.
-        if (t.consumed) continue;
-        rows.push({ state: 'waiting', token: t });
-      } else {
-        rows.push({ state: 'active', token: t });
-      }
-    }
-    return rows;
-  }
-
-  function renderRunnerCredentials(tokens) {
-    const rows = runnerCredentialRows(tokens);
-    if (!rows.length) {
-      runnerList.innerHTML = '<div class="token-list-empty">No runner credentials yet</div>';
-      return;
-    }
-    runnerList.innerHTML = rows.map(renderRunnerCredentialItem).join('');
-
-    runnerList.querySelectorAll('.runner-credential-revoke').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const tokenId = btn.dataset.tokenId;
-        // Destructive-action copy ratified for runner credentials (plan P3(c)).
-        if (!confirm('Revoke this runner credential? The session using it stops taking work immediately and loses its tracker access too.')) return;
-        try {
-          // on401:false — failure is reported by the catch's toast, not a redirect.
-          await window.api(`${apiBase}/tokens/${tokenId}`, { method: 'DELETE', on401: false });
-          loadRunnerCredentials();
-          refreshTokenCount();
-          if (tokensExpanded) loadTokens();
-        } catch (err) {
-          toast('Failed to revoke runner credential: ' + err.message, { type: 'error' });
-        }
-      });
-    });
-  }
-
-  function renderRunnerCredentialItem(row) {
-    const t = row.token;
-    const stateLabel = row.state === 'waiting' ? 'waiting for exchange' : 'active';
-    const stateBadge = `<span class="runner-credential-state runner-credential-state--${row.state}">${stateLabel}</span>`;
-    const grants = escapeHtml(t.grants.join(', '));
-    const meta = [
-      escapeHtml(t.label || 'default'),
-      `grants: ${grants}`,
-      escapeHtml(formatRunnerExpiry(t.expiresAt))
-    ].join(' \u00B7 ');
-    return `<div class="surface runner-credential-item" data-token-id="${escapeHtml(t.tokenId)}">
-      <div class="runner-credential-info">
-        <div class="runner-credential-label">runner ${stateBadge}</div>
-        <div class="runner-credential-meta">${meta}</div>
-      </div>
-      <button class="action-btn runner-credential-revoke" data-token-id="${escapeHtml(t.tokenId)}">revoke</button>
-    </div>`;
-  }
-
-  // Hour/minute expiry (the ordinary badge above is day-granular). A runner
-  // bootstrap lives an hour and its working token a day, so days would read
-  // "expires <1d" for both — useless for the copy-again decision.
-  function formatRunnerExpiry(expiresAt) {
-    if (!expiresAt) return 'no expiry';
-    const ms = new Date(expiresAt).getTime() - Date.now();
-    if (Number.isNaN(ms)) return '';
-    if (ms <= 0) return 'expired';
-    const totalMinutes = Math.max(1, Math.round(ms / 60000));
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-    return hours >= 1 ? `expires in ${hours}h ${minutes}m` : `expires in ${minutes}m`;
   }
 
   function showTokenModal(token, label, scope) {
@@ -650,15 +387,6 @@ This will return all available endpoints with examples. Your token scope is: ${s
   // Collapsible Sections — lazy-load on first expand
   // =========================================================================
 
-  if (tokensCollapsible) {
-    tokensCollapsible.addEventListener('toggle', () => {
-      if (tokensCollapsible.open && !tokensExpanded) {
-        tokensExpanded = true;
-        loadTokens();
-      }
-    });
-  }
-
   if (eventsCollapsible) {
     eventsCollapsible.addEventListener('toggle', () => {
       if (eventsCollapsible.open && !eventsExpanded) {
@@ -688,10 +416,8 @@ This will return all available endpoints with examples. Your token scope is: ${s
   }
 
   // =========================================================================
-  // Init — fetch counts only; full lists lazy-load when sections expand
+  // Init — fetch the event count only; the full list lazy-loads when expanded
   // =========================================================================
-  refreshTokenCount();
   refreshEventsCount();
   loadCredentialHealth();
-  loadRunnerCredentials();
 })();

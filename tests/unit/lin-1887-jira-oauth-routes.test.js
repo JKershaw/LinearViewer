@@ -204,7 +204,7 @@ describe('LIN-1887 Step 4/5 — the callback', () => {
     const res = await request(app, { path: '/auth/jira/oauth/callback?code=c&state=nonce' });
 
     assert.equal(res.status, 302);
-    assert.equal(res.location, '/workspace/acme/settings?provider_ok=jira');
+    assert.equal(res.location, '/workspace/acme/settings/sources?provider_ok=jira');
 
     // 1. Durable, partitioned, correctly labelled.
     const durable = await store.get('acct-1', 'acme', 'jira');

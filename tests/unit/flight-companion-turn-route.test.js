@@ -2374,7 +2374,7 @@ describe('Flight Companion GET page (LIN-2621) — model resolution + status str
     });
     const { status, headers } = await get(app, '/workspace/acme/flight-companion');
     assert.strictEqual(status, 302);
-    assert.match(headers.get('location'), /\/settings$/);
+    assert.match(headers.get('location'), /\/settings\/features$/);
   });
 
   // LIN-2623 beat 3 — mandated red-first case, exercised on the real page.

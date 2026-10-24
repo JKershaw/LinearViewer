@@ -283,7 +283,7 @@ describe('LIN-3125 Phase 3 — held picker route', () => {
     const session = makeSession({ workspaces: [{ id: 'w1', urlKey: 'acme', bindings: [existingBinding] }] });
     await get(buildRoute(connectionStore, { provider: githubProvider() }), session); // offers only octo/b
     const res = await post(buildRoute(connectionStore, { provider: githubProvider() }), session, { repo: 'octo/a' });
-    assert.equal(res.redirectedTo, '/workspace/acme/settings?provider_ok=github');
+    assert.equal(res.redirectedTo, '/workspace/acme/settings/sources?provider_ok=github');
     assert.deepEqual(session.workspaces[0].bindings, [existingBinding]);
     const row = await connectionStore.collection.findOne({ _id: CONN_ID });
     assert.deepEqual(row.referents, [], 'no referent write on idempotent POST');
@@ -373,7 +373,7 @@ describe('LIN-3125 Phase 3 — held picker route', () => {
     await get(route, session);
     const res = await post(buildRoute(connectionStore, { provider: githubProvider() }), session, { repo: 'octo/a' });
 
-    assert.equal(res.redirectedTo, '/workspace/acme/settings?provider_ok=github');
+    assert.equal(res.redirectedTo, '/workspace/acme/settings/sources?provider_ok=github');
     const binding = session.workspaces[0].bindings.find(b => b.scope === 'octo/a');
     assert.deepEqual(binding, { provider: 'github', scope: 'octo/a', connectionId: CONN_ID });
     assert.ok(!('credentials' in binding), 'no credentials on the binding');
@@ -412,7 +412,7 @@ describe('LIN-3125 Phase 3 — held picker route', () => {
     assert.equal(session.heldEntry.offered['second/only'], `${ACCT}::github::second`, 'offered by the second connection');
 
     const res = await post(buildRoute(connectionStore, { provider }), session, { repo: 'second/only' });
-    assert.equal(res.redirectedTo, '/workspace/acme/settings?provider_ok=github');
+    assert.equal(res.redirectedTo, '/workspace/acme/settings/sources?provider_ok=github');
     const binding = session.workspaces[0].bindings.find(b => b.scope === 'second/only');
     assert.deepEqual(binding, { provider: 'github', scope: 'second/only', connectionId: `${ACCT}::github::second` });
   });

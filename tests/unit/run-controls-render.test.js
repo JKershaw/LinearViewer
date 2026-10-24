@@ -110,7 +110,9 @@ describe('the Dispatch page is read-only for a member', () => {
     assert.match(html, /id="create-token-form"/);
     assert.match(html, /<button type="submit" class="action-btn save" disabled>/);
     assert.ok(html.includes('only the workspace owner can make a queue token'));
-    assert.match(html, /class="token-list"[^>]*data-can-revoke="false"/);
+    // LIN-3846: the queue-token list moved to Settings › Agent access, which owns the owner-only revoke.
+    assert.ok(html.includes('data-testid="dispatch-keys-link"'));
+    assert.ok(!html.includes('class="token-list"'));
   });
 
   for (const [name, flags] of [['an owner with a way to run', { runControls: true }], ['a keyless owner (runSetup)', { runSetup: true }]]) {
@@ -120,7 +122,7 @@ describe('the Dispatch page is read-only for a member', () => {
       assert.ok(html.includes('data-testid="dispatch-halt-resume"'));
       assert.match(html, /<button type="submit" class="action-btn save">/);
       assert.ok(!html.includes('only the workspace owner can make a queue token'));
-      assert.match(html, /class="token-list"[^>]*data-can-revoke="true"/);
+      assert.ok(html.includes('data-testid="dispatch-keys-link"'));
     });
   }
 });

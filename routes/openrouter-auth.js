@@ -15,6 +15,7 @@ import { Router } from 'express'
 import { renderErrorPage, renderOpenRouterConsentPage } from '../lib/render.js'
 import { saveSession, getActiveWorkspace } from '../lib/workspace.js'
 import { jsonError } from '../lib/errors.js'
+import { settingsAreaUrl } from '../lib/settings-areas.js'
 import { publicOrigin } from '../lib/public-origin.js'
 
 /**
@@ -202,7 +203,7 @@ export function createOpenRouterAuthRoutes({ userPreferencesStore } = {}) {
       await saveSession(req.session)
 
       // Redirect back to settings page where OpenRouter connection status is shown
-      res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`)
+      res.redirect(settingsAreaUrl(workspace.urlKey, 'account'))
     } catch (err) {
       console.error('OpenRouter OAuth callback error:', err)
       const html = renderErrorPage('Something Went Wrong', 'An unexpected error occurred during authentication. Please try again.', {
@@ -234,7 +235,7 @@ export function createOpenRouterAuthRoutes({ userPreferencesStore } = {}) {
     }
     delete req.session.openRouterApiKey
     await saveSession(req.session)
-    res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`)
+    res.redirect(settingsAreaUrl(workspace.urlKey, 'account'))
   })
 
   /**
@@ -260,7 +261,29 @@ export function createOpenRouterAuthRoutes({ userPreferencesStore } = {}) {
     }
 
     await userPreferencesStore.setOpenRouterConsent(req.session.accountId)
-    res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`)
+    res.redirect(settingsAreaUrl(workspace.urlKey, 'account'))
+  })
+
+  /**
+   * Step 5: Turn unattended use off (LIN-3846)
+   * Clears the durable consent and leaves the OpenRouter key connected. The
+   * only other way to clear consent was to disconnect, which deleted the key.
+   * Same auth and no-account handling as the grant above; idempotent.
+   * `?undo=1` is only the flash text ("Turned off · Undo", a form that posts
+   * the grant route again).
+   */
+  router.post('/auth/openrouter/consent/clear', async (req, res) => {
+    const workspace = getActiveWorkspace(req.session)
+    if (!workspace) {
+      return res.redirect('/')
+    }
+
+    if (!userPreferencesStore || !req.session.accountId) {
+      return jsonError(res, 400, 'no_account', { message: 'No account to clear consent for.' })
+    }
+
+    await userPreferencesStore.clearOpenRouterConsent(req.session.accountId)
+    res.redirect(settingsAreaUrl(workspace.urlKey, 'account', { consent_off: '1' }))
   })
 
   return router

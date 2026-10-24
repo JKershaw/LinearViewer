@@ -984,7 +984,7 @@ describe('GitHub auth routes', () => {
     // A non-active re-add must NOT clobber the active scalar mirror (LIN-717).
     assert.equal(linearWs.provider, 'linear');
     assert.equal(linearWs.accessToken, 'lin_tok');
-    assert.equal(res.redirectedTo, '/workspace/acme/settings?provider_ok=github');
+    assert.equal(res.redirectedTo, '/workspace/acme/settings/sources?provider_ok=github');
   });
 
   test('POST link (re-bind) rejects a repo that is not in the enumerated installation map (LIN-728)', async () => {
@@ -1551,7 +1551,7 @@ describe('GitHub auth routes', () => {
     assert.equal(session.workspaces.length, 1, 'no new workspace');
     assert.equal(linearWs.provider, 'linear', 'active provider unchanged by a non-active binding');
     assert.ok(linearWs.bindings.some(b => b.provider === 'github' && b.scope === 'octocat/hello-world'));
-    assert.equal(res.redirectedTo, '/workspace/acme/settings?provider_ok=github');
+    assert.equal(res.redirectedTo, '/workspace/acme/settings/sources?provider_ok=github');
   });
 
   // LIN-1329: add-source is the one GitHub mode that does NOT regenerate the
@@ -1640,7 +1640,7 @@ describe('GitHub auth routes', () => {
     // The binding lands on the VIEWED workspace (acme), NOT the active one (globex).
     assert.ok(viewedWs.bindings?.some(b => b.provider === 'github' && b.scope === 'octocat/hello-world'), 'viewed workspace gets the binding');
     assert.ok(!activeWs.bindings, 'active workspace is untouched');
-    assert.equal(res.redirectedTo, '/workspace/acme/settings?provider_ok=github');
+    assert.equal(res.redirectedTo, '/workspace/acme/settings/sources?provider_ok=github');
   });
 
   test('POST link (add-source) falls back to the active workspace when no target urlKey was carried', async () => {
@@ -1657,7 +1657,7 @@ describe('GitHub auth routes', () => {
     await handler({ body: { repo: 'octocat/hello-world' }, session }, res);
 
     assert.ok(activeWs.bindings?.some(b => b.provider === 'github' && b.scope === 'octocat/hello-world'));
-    assert.equal(res.redirectedTo, '/workspace/globex/settings?provider_ok=github');
+    assert.equal(res.redirectedTo, '/workspace/globex/settings/sources?provider_ok=github');
   });
 
   test('POST link (add-source) falls back to active when the carried urlKey no longer resolves', async () => {
@@ -1674,7 +1674,7 @@ describe('GitHub auth routes', () => {
     await handler({ body: { repo: 'octocat/hello-world' }, session }, res);
 
     assert.ok(activeWs.bindings?.some(b => b.provider === 'github' && b.scope === 'octocat/hello-world'));
-    assert.equal(res.redirectedTo, '/workspace/globex/settings?provider_ok=github');
+    assert.equal(res.redirectedTo, '/workspace/globex/settings/sources?provider_ok=github');
   });
 
   test('POST link rejects when there is no pending GitHub session', async () => {
@@ -2050,7 +2050,7 @@ describe('GitHub auth routes', () => {
     session.activeWorkspaceId = 'github:42';
     const res2 = makeRes();
     await handler({ body: { repo: 'octocat/repo-a' }, session }, res2);
-    assert.equal(res2.redirectedTo, '/workspace/gh-42/settings?provider_ok=github');
+    assert.equal(res2.redirectedTo, '/workspace/gh-42/settings/sources?provider_ok=github');
 
     // Exactly ONE durable Connection record for (account, github, installationId),
     // carrying the MOST RECENTLY written binding's credentials — a rebind mints a

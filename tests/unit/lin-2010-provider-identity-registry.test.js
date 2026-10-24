@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 
 import { getAllProviders, getProvider } from '../../lib/providers/index.js';
 import { renderLandingPage } from '../../lib/render-landing.js';
-import { renderSettingsPage } from '../../lib/render-settings.js';
+import { renderAllAreas as renderSettingsPage } from '../helpers/render-settings-areas.js';
 
 describe('LIN-2010 provider identity registry — barrel guard', () => {
   test('the barrel registers exactly the five known providers', () => {

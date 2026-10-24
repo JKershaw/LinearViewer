@@ -469,6 +469,6 @@ function saveThen(req, send) {
 function finishAdd(req, res, { provider, surface, workspace, scope }) {
   req.session.providerAdded = { provider: surface.providerOkKey, scope }
   delete req.session.heldEntry
-  const redirect = `/workspace/${encodeURIComponent(workspace.urlKey)}/settings?provider_ok=${surface.providerOkKey}`
+  const redirect = `/workspace/${encodeURIComponent(workspace.urlKey)}/settings/sources?provider_ok=${surface.providerOkKey}`
   return saveThen(req, () => res.redirect(redirect))
 }

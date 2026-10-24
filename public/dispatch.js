@@ -301,7 +301,7 @@ async function loadDispatchPresetPicker(container) {
   // "use on Dispatch" link (lib/render-settings.js).
   const emptyLinkHtml = presets.length
     ? ''
-    : `<a href="/workspace/${encodeURIComponent(urlKey)}/settings#dispatch-presets" class="settings-action dispatch-preset-create-link" data-testid="dispatch-preset-create-link">create a preset &rarr;</a>`
+    : `<a href="/workspace/${encodeURIComponent(urlKey)}/settings/models#dispatch-presets" class="settings-action dispatch-preset-create-link" data-testid="dispatch-preset-create-link">create a preset &rarr;</a>`
   container.innerHTML = `<select class="dispatch-preset-select" aria-label="Preset">
     <option value="">&mdash; none &mdash;</option>
     ${optionsHtml}

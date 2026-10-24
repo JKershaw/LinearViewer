@@ -26,7 +26,7 @@ import { renderLandingHero } from '../../lib/components/landing-hero.js';
 import { renderLandingPage } from '../../lib/render-landing.js';
 import { renderNavBar } from '../../lib/components/navbar.js';
 import { renderLoginPage } from '../../lib/render-pages.js';
-import { renderSettingsPage } from '../../lib/render-settings.js';
+import { renderAllAreas as renderSettingsPage } from '../helpers/render-settings-areas.js';
 import { isGitHubConfigured } from '../../lib/providers/github/app-auth.js';
 
 const JIRA_ENV_KEYS = ['JIRA_CLIENT_ID', 'JIRA_CLIENT_SECRET', 'JIRA_REDIRECT_URI'];

@@ -143,6 +143,15 @@ const MEMBERS = [
   { id: 15, file: 'routes/proxy-tokens-admin.js', sink: 'revokeToken', count: 1, verdict: 'store-gated',
     reason: 'ProxyTokenStore.revokeToken owner-checks a grant-bearing lineage itself (it owns the seam and the branch logic); the route must pass the requester',
     handler: "router.delete('/workspace/:urlKey/api/proxy/tokens/:tokenId'", passes: ['workspaceId:', 'accountId:'] },
+  // LIN-3846: the Settings page's two halt writers (running/halt and the Undo of a halt entry)
+  // share one function, so each sink has exactly one site, and that function gates itself first.
+  { id: 17, file: 'routes/settings.js', sink: 'setWorkspaceHalt', count: 1, verdict: 'gated',
+    reason: 'Settings pause/stop and Undo of a halt entry: owner-only; writeHalt gates before the write (the handlers also gate earlier, so a member is refused before a reason or a conflict is looked at)',
+    fn: 'async function writeHalt(', before: ['setWorkspaceHalt('], gateToken: 'haltRefusal(',
+    helper: { fn: 'const haltRefusal = (', contains: ['resolveRunnerOwnerRefusal(', 'workspaceOwnerCheck', 'req.workspace.id', 'req.session?.accountId'] } },
+  { id: 17, file: 'routes/settings.js', sink: 'clearWorkspaceHalt', count: 1, verdict: 'gated',
+    reason: 'Settings resume and Undo of a stop: the same function and the same gate',
+    fn: 'async function writeHalt(', before: ['clearWorkspaceHalt('], gateToken: 'haltRefusal(' },
   { id: 16, file: 'routes/test.js', sink: 'clearWorkspaceHalt', count: 1, verdict: 'test-only',
     reason: '/test cleanup route, mounted only under the test harness; no session, no member identity' }
 ];

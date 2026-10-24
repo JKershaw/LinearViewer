@@ -12,7 +12,7 @@ import { test, describe, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createSettingsModelRoutes, LEGACY_FORM_REASONS } from '../../routes/settings-model.js';
-import { renderSettingsPage } from '../../lib/render-settings.js';
+import { renderAllAreas as renderSettingsPage } from '../helpers/render-settings-areas.js';
 import { projectLegacy } from '../../lib/model-routing.js';
 import { DEFAULT_MODEL } from '../../lib/openrouter.js';
 import { routingFixture } from './helpers/routing-fakes.js';
@@ -67,7 +67,7 @@ describe('the old Settings forms, through the store', () => {
   test('POST /settings/model keeps its validation redirects and writes nothing when refused', async () => {
     for (const [body, error] of [[{ modelId: '' }, 'empty'], [{ modelId: 'no-slash' }, 'invalid-format'], [{ modelId: 'a/b..c' }, 'invalid-format']]) {
       const res = await post('model', body);
-      assert.equal(res.headers.get('location'), `/workspace/${URL_KEY}/settings?error=${error}`);
+      assert.equal(res.headers.get('location'), `/workspace/${URL_KEY}/settings/models?error=${error}`);
     }
     assert.deepEqual(await fx.routingStore.getLog(URL_KEY), []);
   });

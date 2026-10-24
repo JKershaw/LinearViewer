@@ -141,7 +141,7 @@ export function createProxyHaltRoutes({ workspaceHaltStore, workspaceOwnerCheck,
     const now = new Date();
 
     try {
-      await workspaceHaltStore.setWorkspaceHalt(req.proxyUrlKey, { mode, setBy, now });
+      await workspaceHaltStore.setWorkspaceHalt(req.proxyUrlKey, { mode, setBy, now, via: 'proxy' });
       logEvent(req, HALT_ROUTE, 200);
       return res.json({ success: true, halt: { mode, setAt: now, setBy } });
     } catch (err) {
@@ -166,7 +166,7 @@ export function createProxyHaltRoutes({ workspaceHaltStore, workspaceOwnerCheck,
     }
 
     try {
-      await workspaceHaltStore.clearWorkspaceHalt(req.proxyUrlKey);
+      await workspaceHaltStore.clearWorkspaceHalt(req.proxyUrlKey, { via: 'proxy', setBy: req.proxyCreatedBy });
       logEvent(req, HALT_ROUTE, 200);
       return res.json({ success: true });
     } catch (err) {

@@ -18,7 +18,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { MangoClient } from '@jkershaw/mangodb';
 import { AccountStore } from '../../lib/account-store.js';
-import { renderSettingsPage } from '../../lib/render-settings.js';
+import { renderAllAreas as renderSettingsPage } from '../helpers/render-settings-areas.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -56,7 +56,7 @@ describe('AccountStore.listEmailIdentities (S3-3)', () => {
     const emails = await s.listEmailIdentities(P._id);
     assert.deepStrictEqual(emails, ['y@x.io'], 'the merged-away email is visible from canonical P');
 
-    const html = renderSettingsPage('Acme', { urlKey: 'acme', accountEmails: emails });
+    const html = renderSettingsPage('Acme', { urlKey: 'acme', accountEmails: emails, area: 'account' });
     assert.match(html, /data-testid="settings-account-emails">y@x\.io</);
     assert.doesNotMatch(html, /settings-account-add-email/);
   });
@@ -81,33 +81,34 @@ describe('renderSettingsPage — the email identity surface (S3-3)', () => {
 
   test('shows the account\'s email(s) when present (and no add link)', () => {
     emailOff();
-    const html = renderSettingsPage('Acme', { urlKey: 'acme', accountEmails: ['a@x.io', 'b@x.io'] });
+    const html = renderSettingsPage('Acme', { urlKey: 'acme', accountEmails: ['a@x.io', 'b@x.io'], area: 'account' });
     assert.match(html, /data-testid="settings-account-emails">a@x\.io, b@x\.io</);
     assert.doesNotMatch(html, /settings-account-add-email/);
   });
 
   test('offers the link-mode add when there is no email and email sign-in is available', () => {
     emailOn();
-    const html = renderSettingsPage('Acme', { urlKey: 'acme', accountEmails: [] });
+    const html = renderSettingsPage('Acme', { urlKey: 'acme', accountEmails: [], area: 'account' });
     assert.match(html, /data-testid="settings-account-add-email"[^>]*>Add email/);
-    assert.match(html, /href="\/auth\/email\/register\?next=%2Fworkspace%2Facme%2Fsettings"/);
+    assert.match(html, /href="\/auth\/email\/register\?next=%2Fworkspace%2Facme%2Fsettings%2Faccount"/);
   });
 
   test('hides the add link when email sign-in is unavailable', () => {
     emailOff();
-    const html = renderSettingsPage('Acme', { urlKey: 'acme', accountEmails: [] });
+    const html = renderSettingsPage('Acme', { urlKey: 'acme', accountEmails: [], area: 'account' });
     assert.doesNotMatch(html, /settings-account-add-email/);
     assert.doesNotMatch(html, /settings-account-emails/);
   });
 });
 
 describe('server.js threads the account email into renderSettingsPage (S3-3)', () => {
-  const source = readFileSync(join(ROOT, 'server.js'), 'utf8');
+  // LIN-3846: the settings handler moved from server.js to routes/settings.js.
+  const source = readFileSync(join(ROOT, 'routes/settings.js'), 'utf8');
 
   function settingsRouteBody() {
-    const start = source.indexOf("app.get('/workspace/:urlKey/settings'");
-    assert.ok(start >= 0, 'the settings route exists');
-    const end = source.indexOf('\napp.', start + 1);
+    const start = source.indexOf('async function sendSettingsPage(');
+    assert.ok(start >= 0, 'the settings page handler exists');
+    const end = source.indexOf('router.get(', start + 1);
     return source.slice(start, end);
   }
 
@@ -116,6 +117,6 @@ describe('server.js threads the account email into renderSettingsPage (S3-3)', (
     assert.match(body, /accountStore\.listEmailIdentities\(/, 'route reads the account email identity');
     const render = body.indexOf('renderSettingsPage(');
     assert.ok(render >= 0, 'route renders the settings page');
-    assert.match(body.slice(render, render + 900), /accountEmails/, 'accountEmails is threaded into renderSettingsPage');
+    assert.match(body.slice(render, render + 4000), /accountEmails/, 'accountEmails is threaded into renderSettingsPage');
   });
 });

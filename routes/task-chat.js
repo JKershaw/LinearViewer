@@ -251,7 +251,7 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
 
     // Gate: experimental feature must be enabled (mirrors collective/pipeline).
     if (featureFlags.taskChat !== true) {
-      return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
+      return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings/features`);
     }
 
     try {

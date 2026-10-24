@@ -515,7 +515,7 @@ describe('LIN-3124 PR3 checkpoint E — convertToConnectionBacked', () => {
       await linearLogin(s, session);
       session.oauthIntent = { mode: 'add-source', workspaceUrlKey: 'org-a' };
       const res = await linearLogin(s, session, linearProvider({ org: { id: 'org-b', name: 'Org B', urlKey: 'org-b' }, viewer: { id: 'viewer-b' }, refresh: 'R-b' }));
-      assert.equal(res.redirectedTo, '/workspace/org-a/settings?provider_ok=linear');
+      assert.equal(res.redirectedTo, '/workspace/org-a/settings/sources?provider_ok=linear');
       const wsB = session.workspaces.find(w => w.id === 'org-b');
       assert.equal(wsB.bindings[0].connectionId, `${session.accountId}::linear::org-b`);
       assert.equal((await s.ownerCredentialStore.getByConnection(wsB.bindings[0].connectionId)).refreshToken, 'R-b');
@@ -530,7 +530,7 @@ describe('LIN-3124 PR3 checkpoint E — convertToConnectionBacked', () => {
       const beforeRows = await dump(s);
       session.oauthIntent = { mode: 'add-source', workspaceUrlKey: 'org-a' };
       const res = await linearLogin(s, session, linearProvider({ org: { id: 'org-b', name: 'Org B', urlKey: 'org-b' }, viewer: { id: 'viewer-b' }, refresh: 'R-b' }));
-      assert.notEqual(res.redirectedTo, '/workspace/org-a/settings?provider_ok=linear');
+      assert.notEqual(res.redirectedTo, '/workspace/org-a/settings/sources?provider_ok=linear');
       assert.deepEqual(stable(await dump(s)), stable(beforeRows), 'the refused link wrote nothing durable');
       assert.ok(!session.workspaces.some(w => w.id === 'org-b'));
     });

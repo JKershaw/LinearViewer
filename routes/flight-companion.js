@@ -397,7 +397,7 @@ export function createFlightCompanionRoutes({
 
     // Gate: experimental feature must be enabled (mirrors collective/task-chat/next-run).
     if (featureFlags.flightCompanion !== true) {
-      return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
+      return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings/features`);
     }
 
     try {

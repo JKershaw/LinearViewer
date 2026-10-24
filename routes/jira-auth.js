@@ -350,7 +350,7 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
     // notice support.
     req.session.providerAdded = { provider: 'jira', scope: normalizedSite }
     await saveSession(req.session)
-    res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings?provider_ok=jira`)
+    res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings/sources?provider_ok=jira`)
   })
 
   // ---------------------------------------------------------------------------
@@ -730,7 +730,7 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
         action: 'Back to settings', actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/settings`
       }))
     }
-    res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings?provider_ok=jira`)
+    res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings/sources?provider_ok=jira`)
   }
 
   /**
