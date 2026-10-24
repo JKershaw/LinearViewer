@@ -222,7 +222,8 @@ export function deriveSessionWaiting(enrichedLoops) {
  * Pure; exported for unit tests (mirrors `deriveSessionWaiting` above).
  *
  * LIN-3252 G2: injects the SAME `liveDispatchOnAnchor` predicate (`liveOnAnchor`
- * below) the dashboard rulings feed and `routes/proxy-rulings.js` use — a live run already
+ * below) as the dashboard rulings feed; `routes/proxy-rulings.js` keeps an
+ * identical inline copy — a live run already
  * on the anchor means `resolveEffect` branch 3, so a `gone` row answers
  * `record`, never a second run racing the live one.
  *

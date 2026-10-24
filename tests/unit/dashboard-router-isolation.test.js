@@ -1,11 +1,16 @@
 /**
- * LIN-3742: two routers built by createDashboardRoutes share no default cache.
+ * LIN-3742: two routers built by createDashboardRoutes share no default cache,
+ * and the composer's dependency defaults apply to `undefined` only.
  *
  * The router's feed cache (`sessionsFeedCache`) and its touched-task done-state
  * cache (`taskDoneCache`) are built per call when none is injected, so one
  * router's warm entries must never answer for another's. The rebuild of
  * createDashboardRoutes moves the code that builds them; this holds the line.
  * It reads behaviour only (store reads, backend reads), never source text.
+ *
+ * The default rule: an omitted (`undefined`) dependency takes its default, an
+ * explicit `null` passes through untouched. A `== null` check in the composer
+ * would swallow the `null` and silently restore the default; (c) holds that line.
  *
  * Deliberately NOT asserted: that the default PR-state store is per call. It is
  * not: `createPrStateStore` shares one module-level cache and fetch counter and
@@ -23,6 +28,7 @@ import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
 
 const NOW_ISO = new Date().toISOString();
 const SESSIONS_PATH = '/workspace/:urlKey/api/dashboard/sessions';
+const LOOPS_PATH = '/workspace/:urlKey/api/dashboard/loops';
 const WORKSPACES = [{ urlKey: 'ws-iso', name: 'Iso' }];
 
 // Terminal + errored session: the one class the feed hydrates a done-state for.
@@ -62,23 +68,23 @@ function build(stores, extra = {}) {
   });
 }
 
-function sessionsHandler(router) {
+function routeHandler(router, path) {
   const matches = [];
   const walk = (stack) => {
     for (const layer of stack) {
       if (layer.route) {
-        if (layer.route.path === SESSIONS_PATH && layer.route.methods.get) matches.push(layer);
+        if (layer.route.path === path && layer.route.methods.get) matches.push(layer);
       } else if (Array.isArray(layer.handle?.stack)) {
         walk(layer.handle.stack);
       }
     }
   };
   walk(router.stack);
-  assert.equal(matches.length, 1, 'the sessions route is registered exactly once');
+  assert.equal(matches.length, 1, `${path} is registered exactly once`);
   return matches[0].route.stack[matches[0].route.stack.length - 1].handle;
 }
 
-async function poll(router) {
+async function poll(router, path = SESSIONS_PATH) {
   const req = { session: { workspaces: WORKSPACES, features: {} }, query: {}, params: {}, body: {} };
   const res = {
     statusCode: 200,
@@ -90,7 +96,7 @@ async function poll(router) {
     end() { return this; },
     headersSent: false
   };
-  await sessionsHandler(router)(req, res);
+  await routeHandler(router, path)(req, res);
   assert.equal(res.statusCode, 200);
   return res.jsonBody;
 }
@@ -126,5 +132,19 @@ describe('LIN-3742: per-call default caches', () => {
 
     await poll(routerB);
     assert.equal(reads, 2, 'router B did not reuse router A\'s cached done-state');
+  });
+
+  test('(c) the composer defaults apply to undefined only: recentLimit null passes through, omitted takes 120', async () => {
+    const stores = countingStores();
+    const nullRouter = build(stores, { recentLimit: null });
+    const omittedRouter = build(stores);
+
+    // The same store holds terminal loops; `slice(0, null)` is empty, `slice(0, 120)` keeps them.
+    const withNull = await poll(nullRouter, LOOPS_PATH);
+    const omitted = await poll(omittedRouter, LOOPS_PATH);
+
+    assert.ok(omitted.recent.length > 0, 'omitted recentLimit took the default cap');
+    assert.deepEqual(withNull.recent, [], 'an explicit null recentLimit was not replaced by the default');
+    assert.equal(withNull.counts.total, omitted.counts.total, 'both routers read the same loops');
   });
 });
