@@ -305,27 +305,31 @@ describe('LIN-3840: dashboard unit rules (B pins, each with planted-violation wi
     assert.deepEqual(gateCallProblems(liveGateScope(), expectedOutsideUnit), []);
   });
 
-  test('moving a gate call between unit files stays clean (the unit is judged whole)', () => {
-    let files = liveGateScope();
-    const donor = files['routes/dashboard.js'];
-    const call = donor.match(/ *const check = await checkFreeTierGate\([^\n]*\);/)[0];
-    files = { ...files, 'routes/dashboard.js': donor.replace(call, ''), 'routes/dashboard-body.js': `${call}\n` };
-    assert.deepEqual(gateCallProblems(files, expectedOutsideUnit), []);
+  // The unit is judged whole, wherever its two calls sit. These cases are built from synthetic
+  // unit files (never from the live text of routes/dashboard.js, which is free to move).
+  const CALL = 'const check = await checkFreeTierGate({ isFreeTier, urlKey, freeTierStore });\n';
+  const withUnit = (unit) => {
+    const files = Object.fromEntries(Object.entries(liveGateScope()).filter(([rel]) => !isDashboardUnitFile(rel)));
+    return { ...files, ...unit };
+  };
+
+  test('the two calls may sit in one unit file or be split across unit files (the unit is judged whole)', () => {
+    assert.deepEqual(gateCallProblems(withUnit({ 'routes/dashboard.js': CALL + CALL }), expectedOutsideUnit), []);
+    assert.deepEqual(gateCallProblems(withUnit({ 'routes/dashboard.js': CALL, 'routes/dashboard-body.js': CALL }), expectedOutsideUnit), []);
   });
 
   test('witness: a third call planted in a unit file fails', () => {
-    const files = planted(liveGateScope(), 'routes/dashboard.js', src => `${src}\nawait checkFreeTierGate({});\n`);
+    const files = withUnit({ 'routes/dashboard.js': CALL + CALL + CALL });
     assert.deepEqual(gateCallProblems(files, expectedOutsideUnit), ['the dashboard unit holds 3 checkFreeTierGate( call(s), expected exactly 2']);
   });
 
   test('witness: a call in a new routes/dashboard-x.js counts toward the unit and fails', () => {
-    const files = planted(liveGateScope(), 'routes/dashboard-x.js', () => 'await checkFreeTierGate({});\n');
+    const files = withUnit({ 'routes/dashboard.js': CALL + CALL, 'routes/dashboard-x.js': CALL });
     assert.deepEqual(gateCallProblems(files, expectedOutsideUnit), ['the dashboard unit holds 3 checkFreeTierGate( call(s), expected exactly 2']);
   });
 
   test('witness: a call removed from the unit fails', () => {
-    const files = planted(liveGateScope(), 'routes/dashboard.js', src => src.replace(/ *const check = await checkFreeTierGate\([^\n]*\);/, ''));
-    assert.deepEqual(gateCallProblems(files, expectedOutsideUnit), ['the dashboard unit holds 1 checkFreeTierGate( call(s), expected exactly 2']);
+    assert.deepEqual(gateCallProblems(withUnit({ 'routes/dashboard.js': CALL }), expectedOutsideUnit), ['the dashboard unit holds 1 checkFreeTierGate( call(s), expected exactly 2']);
   });
 
   test('witness: a call in an unlisted non-unit file fails', () => {

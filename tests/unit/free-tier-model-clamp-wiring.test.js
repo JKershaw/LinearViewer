@@ -109,16 +109,14 @@ test('LIN-3840: every billed call in the dashboard unit threads forceDefault: is
   assert.equal(clamped.length, 2);
 });
 
+// Built from synthetic unit files, never from the live text of routes/dashboard.js.
 test('LIN-3840 witness: dropping forceDefault: isFreeTier from the run-summary site of any unit file fails', () => {
-  const src = readFileSync(join(root, 'routes/dashboard.js'), 'utf8');
-  const site = "opKind: 'run-summary', forceDefault: isFreeTier }";
-  assert.ok(src.includes(site));
-  const problems = clampProblems({
-    'routes/dashboard.js': src.replace(site, "opKind: 'run-summary' }"),
-    'routes/dashboard-body.js': src
-  });
-  assert.equal(problems.filter(p => p.startsWith('routes/dashboard.js:')).length, 1, problems.join('\n'));
-  // Moved to another unit file, the same drop is still caught.
-  const moved = clampProblems({ 'routes/dashboard.js': '', 'routes/dashboard-body.js': src.replace(site, "opKind: 'run-summary' }") });
-  assert.equal(moved.filter(p => p.startsWith('routes/dashboard-body.js:')).length, 1, moved.join('\n'));
+  const clamped = "const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'run-summary', forceDefault: isFreeTier });";
+  const dropped = clamped.replace(', forceDefault: isFreeTier', '');
+  assert.notEqual(dropped, clamped);
+  assert.deepEqual(clampProblems({ 'routes/dashboard.js': clamped }), []);
+  assert.deepEqual(clampProblems({ 'routes/dashboard.js': '', 'routes/dashboard-body.js': clamped }), []);
+  const hit = clampProblems({ 'routes/dashboard.js': clamped, 'routes/dashboard-body.js': `\n${dropped}` });
+  assert.equal(hit.length, 1, hit.join('\n'));
+  assert.match(hit[0], /^routes\/dashboard-body\.js:2 /);
 });

@@ -284,13 +284,12 @@ describe('LIN-3840 census (b) — the dashboard unit', () => {
     assert.equal(unitAccessorProblems(unit).length, 1);
   });
 
+  // Built from synthetic unit files, never from the live text of routes/dashboard.js.
   test('witness: a site moved between unit files stays clean, a site dropped fails', () => {
-    const src = read('routes/dashboard.js');
-    const site = 'const token = await getWorkspaceAccessToken(wsUrlKey, req.session);';
-    assert.ok(src.includes(site));
-    const moved = { 'routes/dashboard.js': src.replace(site, ''), 'routes/dashboard-x.js': `${site}\n` };
-    assert.deepEqual(unitAccessorProblems(moved), []);
-    assert.equal(unitAccessorProblems({ 'routes/dashboard.js': src.replace(site, '') }).length, 1);
+    const site = 'const token = await getWorkspaceAccessToken(wsUrlKey, req.session);\n';
+    assert.deepEqual(unitAccessorProblems({ 'routes/dashboard.js': site + site }), []);
+    assert.deepEqual(unitAccessorProblems({ 'routes/dashboard.js': site, 'routes/dashboard-x.js': site }), []);
+    assert.equal(unitAccessorProblems({ 'routes/dashboard.js': site }).length, 1);
   });
 
   test('the raw-mirror Bearer template totals 1 with the whole unit counted', () => {
