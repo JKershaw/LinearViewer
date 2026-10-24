@@ -5,7 +5,7 @@
 // output file.
 //   MOVE_PROBE_TRACE_PATTERN  regex source matched against the normalised path
 //   MOVE_PROBE_TRACE_OUT      file the lines are appended to
-// The reading test file is the nearest `tests/` frame in the stack. A read whose stack goes through
+// The reading test file is the nearest `tests/` frame in the stack. A read with
 // the module loader as its immediate caller (`node:internal/modules`) is the loader importing the
 // file, not a test reading its text, and is skipped.
 import fs from 'node:fs';
