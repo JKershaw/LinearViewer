@@ -11,6 +11,7 @@
 import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
+import { findRouteLayer } from './lib/route-layer.js';
 
 const PATH = '/workspace/:urlKey/api/run-evidence/:issueIdentifier';
 const PR_A = 'https://github.com/acme/widget/pull/12';
@@ -18,8 +19,7 @@ const PR_A = 'https://github.com/acme/widget/pull/12';
 before(() => { process.env.NODE_ENV = 'test'; });
 
 function getHandler(router, method, path) {
-  const layer = router.stack.find(l => l.route?.path === path && l.route.methods[method]);
-  assert.ok(layer, `${method.toUpperCase()} ${path} route is registered`);
+  const layer = findRouteLayer(router, method, path);
   return layer.route.stack[layer.route.stack.length - 1].handle;
 }
 

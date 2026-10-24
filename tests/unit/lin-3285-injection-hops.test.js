@@ -34,6 +34,7 @@ import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cach
 import { InMemoryRunParagraphStore } from '../../lib/run-paragraph-store.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { findRouteLayer } from './lib/route-layer.js';
 import {
   PR_URL, MINTED_AUTH, OWNER, WS, installAppKey, fakeGitHub, connection, makeSeam,
 } from '../fixtures/lin-3285-seam.js';
@@ -80,8 +81,7 @@ function assertAuthenticated(github, what) {
 }
 
 function getHandler(router, method, path) {
-  const layer = router.stack.find(l => l.route?.path === path && l.route.methods[method]);
-  assert.ok(layer, `${method.toUpperCase()} ${path} registered`);
+  const layer = findRouteLayer(router, method, path);
   return layer.route.stack[layer.route.stack.length - 1].handle;
 }
 
