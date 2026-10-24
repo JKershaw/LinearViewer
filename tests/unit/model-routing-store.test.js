@@ -48,6 +48,12 @@ describe('the model-routing store', () => {
     assert.equal(JSON.stringify([fx.collections.routing._docs, fx.collections.log._docs, fx.collections.presets._docs]), before);
   });
 
+  test('LIN-3854: a proxy actor keeps its token id beside the account id, and nothing else new', async () => {
+    await store().changeJob('review', { model: 'm' }, ctx('r', { via: 'proxy', id: 'acct-1', tokenId: 'tok-1', label: 'typed label', name: 'A Person', extra: 'x' }));
+    const [entry] = await fx.collections.log._docs;
+    assert.deepEqual(entry.actor, { via: 'proxy', id: 'acct-1', tokenId: 'tok-1', label: 'typed label' });
+  });
+
   test('changeJob stores the value, the effective table reads it, and one entry records from and to', async () => {
     await store().changeJob('review', { model: 'sonnet', effort: 'high' }, ctx('judging to Sonnet'));
     const table = await store().getEffectiveTable(URL_KEY, { defaultModel: DEFAULT_MODEL });

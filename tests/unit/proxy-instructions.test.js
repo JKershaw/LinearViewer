@@ -307,3 +307,24 @@ describe('buildInstructions — dispatch "harness" blank-fill chain (LIN-3858, d
     }
   });
 });
+
+describe('LIN-3854: model-routing endpoints in the instructions', () => {
+  const READS = ['GET ${BASE_URL}/api/proxy/model-routing', '/api/proxy/model-routing/presets', '/api/proxy/model-routing/log'];
+  const WRITES = ['POST ${BASE_URL}/api/proxy/model-routing/jobs/{jobId}', '/api/proxy/model-routing/groups/{group}', '/api/proxy/model-routing/presets/{presetId}/apply', '/api/proxy/model-routing/log/{entryId}/undo', 'MODEL_ROUTING_WRITES_DISABLED'];
+
+  test('read endpoints appear for read and readWrite; write endpoints and the 403 code only for readWrite', () => {
+    const read = buildInstructions({ baseUrl: BASE_URL, scope: 'read' });
+    const rw = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite' });
+    for (const r of READS) {
+      const needle = r.replace('${BASE_URL}', BASE_URL);
+      assert.ok(read.includes(needle), `read lists ${needle}`);
+      assert.ok(rw.includes(needle), `readWrite lists ${needle}`);
+    }
+    for (const w of WRITES) {
+      const needle = w.replace('${BASE_URL}', BASE_URL);
+      assert.ok(rw.includes(needle), `readWrite lists ${needle}`);
+      assert.ok(!read.includes(needle), `read must not list ${needle}`);
+    }
+    assert.ok(!read.includes('modelRoutingProxyWrites'));
+  });
+});

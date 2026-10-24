@@ -93,6 +93,8 @@ grant-less tokens get `409 PROXY_TOKEN_UNBOUND`); the Dispatch page is the other
 guide](../proxy-integration.md#operator-halt-lin-2994-decision-4), not here. For incident use,
 see the [degraded-mode runbook](../runbooks/harbour-degraded.md).
 
+`/api/proxy/model-routing/*` (LIN-3854, `routes/proxy-model-routing.js`) reads the model-routing table for any token and writes it (job, group, preset apply, undo) only for a `readWrite` token while the workspace feature `modelRoutingProxyWrites` is on (off by default; changed only by the session-authed `POST /settings/workspace-features`, never over the proxy). Off is `403 MODEL_ROUTING_WRITES_DISABLED`. Every write needs a reason and is logged with `via: 'proxy'`, the token creator and the token id.
+
 **See [docs/proxy-integration.md](docs/proxy-integration.md)** for the full consumer integration guide.
 
 ## Wake shadow (LIN-3257, M1 shadow)
