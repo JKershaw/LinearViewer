@@ -71,7 +71,7 @@ describe('findPricingConformanceViolations', () => {
     const result = findPricingConformanceViolations(catalog);
     assert.strictEqual(result.verified, true);
     assert.deepStrictEqual(result.violations, [
-      { id: 'openai/gpt-5.6-sol', tier: 'completion', tableValue: 10.00, catalogValue: 30.00 },
+      { id: 'openai/gpt-5.6-sol', tier: 'completion', tableValue: 20.00, catalogValue: 30.00 },
     ]);
   });
 
@@ -136,11 +136,11 @@ describe('findPricingConformanceViolations — override tiers (LIN-2403)', () =>
 
   test('a drifted override value is reported with its threshold in the tier label', () => {
     const catalog = catalogRawFromTable();
-    catalog.find(m => m.id === 'openai/gpt-5.6-sol').pricing.overrides[0].input_cache_write = '0.000006'; // 6.00 vs the table's 5.00
+    catalog.find(m => m.id === 'openai/gpt-5.6-sol').pricing.overrides[0].prompt = '0.000009'; // 9.00 vs the table's 8.00
     const result = findPricingConformanceViolations(catalog);
     assert.strictEqual(result.verified, true);
     assert.deepStrictEqual(result.violations, [
-      { id: 'openai/gpt-5.6-sol', tier: 'overrides[272000]:cacheWrite', tableValue: 5.00, catalogValue: 6.00 },
+      { id: 'openai/gpt-5.6-sol', tier: 'overrides[272000]:prompt', tableValue: 8.00, catalogValue: 9.00 },
     ]);
   });
 

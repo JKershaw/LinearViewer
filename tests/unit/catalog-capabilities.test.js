@@ -110,10 +110,14 @@ test('paid roadmap override accepts a catalog id outside the suggestions; free t
   assert.equal(resolveRoadmapModelOverride('x/not-listed', DEFAULT_MODEL, false), DEFAULT_MODEL);
 });
 
+test('pricing hint shows rate-card rows for uncurated ids (LIN-3882)', () => {
+  assert.equal(getModelPricingHint(NEW_ID), '$2.00 in / $10.00 out per 1M tokens');
+});
+
 test('pricing hint falls back to the catalog and rejects variable (-1) pricing', () => {
-  seed(entry(NEW_ID, { pricing: { prompt: '0.000004', completion: '0.00002' } }),
+  seed(entry('x/catalog-priced', { pricing: { prompt: '0.000004', completion: '0.00002' } }),
     entry('x/router', { pricing: { prompt: '-1', completion: '-1' } }));
-  assert.equal(getModelPricingHint(NEW_ID), '$4.00 in / $20.00 out per 1M tokens');
+  assert.equal(getModelPricingHint('x/catalog-priced'), '$4.00 in / $20.00 out per 1M tokens');
   assert.equal(getModelPricingHint('x/router'), null);
   assert.equal(getModelPricingHint('x/absent'), null);
 });
