@@ -138,7 +138,7 @@ describe('computeUsageCostUsd — 1h cache-write split (LIN-2113)', () => {
       cacheCreationInputTokens: 100,
       cacheCreation1hInputTokens: 0,
     });
-    assert.strictEqual(cost, (1 * 10.00 + 100 * 2.50) / 1e6);
+    assert.strictEqual(cost, (1 * 20.00 + 100 * 5.00) / 1e6);
   });
 
   for (const [label, oneHour] of [
@@ -280,11 +280,11 @@ describe('computeUsageCostUsd — long-context override tier (LIN-2403)', () => 
       cacheCreationInputTokens: 80_000,
       outputTokens: 0,
     });
-    const expected = (100_000 * 4.00 + 100_000 * 0.40 + 80_000 * 5.00) / 1e6; // override rates
+    const expected = (100_000 * 8.00 + 100_000 * 0.80 + 80_000 * 10.00) / 1e6; // override rates (LIN-3882: explicit override cache tiers)
     assert.strictEqual(cost, expected);
-    // Sanity: the base-rate reading (had the sum not crossed) would have been half this.
-    const baseReading = (100_000 * 2.00 + 100_000 * 0.20 + 80_000 * 2.50) / 1e6;
-    assert.strictEqual(cost, baseReading * 2);
+    // Sanity: the base-rate reading (had the sum not crossed) is strictly lower.
+    const baseReading = (100_000 * 4.00 + 100_000 * 0.40 + 80_000 * 5.00) / 1e6;
+    assert.ok(cost > baseReading);
   });
 
   test('the threshold counts the WHOLE prompt — inputTokens + cacheRead alone crossing is enough', () => {
@@ -305,8 +305,8 @@ describe('computeUsageCostUsd — long-context override tier (LIN-2403)', () => 
     // cache-creation total still prices to null under the override, exactly as it
     // would under the base rate (the meaningful "omitted key inherits a REAL base
     // price" case is covered directly against a synthetic rate in the
-    // selectRateForPrompt suite above, since none of this table's 3 real
-    // override-bearing rows happen to omit a tier their base row prices).
+    // selectRateForPrompt suite above, since none of this table's real
+    // override-bearing rows omit a tier their base row prices).
     assert.strictEqual(computeUsageCostUsd({
       model: 'openai/gpt-5.5',
       harness: 'opencode',
@@ -323,7 +323,8 @@ describe('computeUsageCostUsd — long-context override tier (LIN-2403)', () => 
       outputTokens: 1,
       cacheCreationInputTokens: 10,
     });
-    const expected = (300_000 * 4.00 + 1 * 15.00 + 10 * 5.00) / 1e6;
+    // LIN-3882: the override carries its own cacheWrite (10.00), not the base 5.00.
+    const expected = (300_000 * 8.00 + 1 * 30.00 + 10 * 10.00) / 1e6;
     assert.strictEqual(cost, expected);
   });
 
@@ -532,13 +533,26 @@ describe('rate table shape (LIN-1495)', () => {
     // survived. Re-verified against https://openrouter.ai/api/v1/models on
     // 2026-08-30 (LIN-2384): prompt/cacheRead/cacheWrite were 2.5x overstated,
     // completion was 3x overstated.
+    // LIN-3882: corrected again to the catalog rate the operator pasted on 2026-10-24
+    // ($4/$20; the catalog moved since LIN-2384). The override cache tiers (0.80 / 10.00)
+    // are the operator-pasted pricing.overrides[0] values, twice the base cache rates.
     assert.deepStrictEqual(MODEL_PRICING['openai/gpt-5.6-sol'], {
-      prompt: 2.00,
-      completion: 10.00,
-      cacheRead: 0.20,
-      cacheWrite: 2.50,
-      // LIN-2403: long-context override tier, verified 2026-09-02.
-      overrides: [{ minPromptTokens: 272000, prompt: 4.00, completion: 15.00, cacheRead: 0.40, cacheWrite: 5.00 }],
+      prompt: 4.00,
+      completion: 20.00,
+      cacheRead: 0.40,
+      cacheWrite: 5.00,
+      overrides: [{ minPromptTokens: 272000, prompt: 8.00, completion: 30.00, cacheRead: 0.80, cacheWrite: 10.00 }],
+    });
+  });
+
+  test('gpt-6.1-sol and gpt-5.6-terra rows match the operator-pasted catalog rates (LIN-3882)', () => {
+    assert.deepStrictEqual(MODEL_PRICING['openai/gpt-6.1-sol'], {
+      prompt: 2.00, completion: 10.00, cacheRead: 0.10, cacheWrite: 2.50,
+      overrides: [{ minPromptTokens: 272000, prompt: 4.00, completion: 15.00, cacheRead: 0.20, cacheWrite: 5.00 }],
+    });
+    assert.deepStrictEqual(MODEL_PRICING['openai/gpt-5.6-terra'], {
+      prompt: 2.00, completion: 12.00, cacheRead: 0.20, cacheWrite: 2.50,
+      overrides: [{ minPromptTokens: 272000, prompt: 4.00, completion: 18.00, cacheRead: 0.40, cacheWrite: 5.00 }],
     });
   });
 
@@ -583,14 +597,14 @@ describe('rate table shape (LIN-1495)', () => {
     }
   });
 
-  test('overrides are present on exactly the 3 openai rows the live catalog gates at 272000 (LIN-2403)', () => {
+  test('overrides are present on exactly the 5 openai rows the live catalog gates at 272000 (LIN-2403)', () => {
     // Sibling of the cacheWrite1h-only-on-anthropic test above — the tripwire that
     // forces the LIN-2403 cumulative-guard conversation the day an anthropic row
     // gains an override tier (the live catalog already publishes one on
     // anthropic/claude-sonnet-4.5 and anthropic/claude-sonnet-4, both currently
     // absent from this curated table).
     const overrideRows = Object.keys(MODEL_PRICING).filter(id => Array.isArray(MODEL_PRICING[id].overrides));
-    assert.deepStrictEqual(overrideRows.sort(), ['openai/gpt-5.5', 'openai/gpt-5.5-pro', 'openai/gpt-5.6-sol'].sort());
+    assert.deepStrictEqual(overrideRows.sort(), ['openai/gpt-5.5', 'openai/gpt-5.5-pro', 'openai/gpt-5.6-sol', 'openai/gpt-5.6-terra', 'openai/gpt-6.1-sol'].sort());
     for (const id of overrideRows) {
       assert.strictEqual(MODEL_PRICING[id].overrides.length, 1, `${id} carries exactly one override entry today`);
       assert.strictEqual(MODEL_PRICING[id].overrides[0].minPromptTokens, 272000, `${id} gates at 272000`);
@@ -612,7 +626,7 @@ describe('AVAILABLE_MODELS derives its pricing from this table (LIN-993 charter 
     'anthropic/claude-opus-5': { prompt: 5.00, completion: 25.00 },
     'anthropic/claude-fable-5': { prompt: 10.00, completion: 50.00 },
     'anthropic/claude-haiku-4.5': { prompt: 1.00, completion: 5.00 },
-    'openai/gpt-5.6-sol': { prompt: 2.00, completion: 10.00 },
+    'openai/gpt-5.6-sol': { prompt: 4.00, completion: 20.00 },
   };
 
   test('every curated entry deep-equals its known-good pricing', () => {
@@ -643,7 +657,7 @@ describe('AVAILABLE_MODELS derives its pricing from this table (LIN-993 charter 
       'anthropic/claude-opus-5': '$5.00 in / $25.00 out per 1M tokens',
       'anthropic/claude-fable-5': '$10.00 in / $50.00 out per 1M tokens',
       'anthropic/claude-haiku-4.5': '$1.00 in / $5.00 out per 1M tokens',
-      'openai/gpt-5.6-sol': '$2.00 in / $10.00 out per 1M tokens',
+      'openai/gpt-5.6-sol': '$4.00 in / $20.00 out per 1M tokens',
     };
     for (const m of AVAILABLE_MODELS) {
       assert.strictEqual(formatModelPricing(m), expected[m.id], `${m.id} hint is byte-identical`);

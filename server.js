@@ -982,6 +982,16 @@ scheduler.register({
 // matches CATALOG_CACHE_TTL_MS: no value polling faster than the catalog
 // itself refreshes.
 const PRICING_CONFORMANCE_SWEEP_INTERVAL_MS = CATALOG_CACHE_TTL_MS
+
+// LIN-3882: the capability lookups (lib/openrouter.js supportsTools /
+// isReasoningModel) read the catalog cache synchronously and never fetch, so every
+// process warms it at boot and re-touches it on an unref'd interval. getModelCatalog
+// only refreshes once the snapshot is older than the TTL, so the interval is half
+// the TTL (a refresh lands within 1.5x TTL). Not under NODE_ENV=test: no live call.
+if (process.env.NODE_ENV !== 'test') {
+  getModelCatalog().catch(() => {})
+  setInterval(() => { getModelCatalog().catch(() => {}) }, CATALOG_CACHE_TTL_MS / 2).unref()
+}
 const PRICING_CONFORMANCE_SWEEP_LEASE_MS = 15 * 60 * 1000
 scheduler.register({
   name: 'pricing-conformance-sweep',
