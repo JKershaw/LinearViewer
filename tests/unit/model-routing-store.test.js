@@ -82,11 +82,11 @@ describe('the model-routing store', () => {
     await assert.rejects(store().changeGroup('agent-session', 'nope', { model: 'x' }, ctx()), (e) => e.code === 'INVALID');
   });
 
-  test('unrouted jobs are reported as what runs, not what is stored (LIN-3856)', async () => {
-    await store().changeJob('run-paragraph', { model: 'stored-but-unread' }, ctx());
+  test('a stored run-paragraph setting is the effective one, routed (LIN-3856 D2)', async () => {
+    await store().changeJob('run-paragraph', { model: 'stored-and-read' }, ctx());
     const row = (await store().getEffectiveTable(URL_KEY, { defaultModel: DEFAULT_MODEL })).jobs.find((j) => j.id === 'run-paragraph');
-    assert.deepEqual([row.model, row.routed, row.source.model, row.tracked], [DEFAULT_MODEL, false, 'none', 'LIN-3856']);
-    assert.deepEqual([...UNROUTED_JOBS], ['run-paragraph']);
+    assert.deepEqual([row.model, row.routed, row.source.model, row.tracked], ['stored-and-read', true, 'job', undefined]);
+    assert.deepEqual([...UNROUTED_JOBS], []);
   });
 
   describe('undo', () => {

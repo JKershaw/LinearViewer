@@ -32,7 +32,7 @@ import {
   isFlagFreeTier,
   freeTierRefusalBlock
 } from '../../lib/chat-request.js';
-import { resolvePrecomputeApiKey } from '../../lib/run-paragraph-hook.js';
+import { resolvePrecomputeCredential } from '../../lib/run-paragraph-hook.js';
 
 const ENV_KEYS = ['OPENROUTER_API_KEY', 'OPENROUTER_FREE_TIER_KEY'];
 let savedEnv;
@@ -463,7 +463,10 @@ describe('LIN-3706 — who is Free, for each purpose, over every combination of 
               sessionApiKey ? 'oauth' : paidKey ? 'env' : (freeKey || flag) ? 'free' : null
             );
             assert.equal(isFlagFreeTier({ sessionApiKey, sessionFreeTierFlag: flag }), flag && noOwn);
-            assert.equal(resolvePrecomputeApiKey({ OPENROUTER_API_KEY: paid, OPENROUTER_FREE_TIER_KEY: free }), paidKey || freeKey || null);
+            const precompute = resolvePrecomputeCredential({ OPENROUTER_API_KEY: paid, OPENROUTER_FREE_TIER_KEY: free });
+            assert.equal(precompute?.apiKey ?? null, paidKey || freeKey || null);
+            // LIN-3856: the session-less free-tier bit (no own key ever reaches a precompute).
+            if (precompute) assert.equal(precompute.isFreeTier, !paidKey && !!freeKey);
           });
         }
       }

@@ -191,6 +191,13 @@ describe('generateRunParagraph', () => {
     assert.doesNotMatch(userMsg, /Task:|Outcome:|Evidence:|pull request|PR\b/i);
   });
 
+  test('LIN-3856: options.model is the model called and the one returned for storage', async () => {
+    const stub = makeStubChat('A paragraph.');
+    const { model } = await generateRunParagraph(runningView(), { chat: stub.chat, model: 'routed/model' });
+    assert.equal(stub.calls[0].options.model, 'routed/model');
+    assert.equal(model, 'routed/model');
+  });
+
   test('an empty model response yields an empty paragraph, not a fabricated one', async () => {
     const stub = makeStubChat('');
     const { paragraph } = await generateRunParagraph(runningView(), { chat: stub.chat });

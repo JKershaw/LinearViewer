@@ -47,7 +47,7 @@ function makeComposed({ terminal = false, apiKey = 'k' } = {}) {
       hashSessionFn: () => 'hash-1',
       childLoopsFn: () => []
     }),
-    resolveApiKey: () => apiKey
+    resolveCredential: () => (apiKey ? { apiKey, isFreeTier: false } : null)
   });
   return { hook, paragraph, summaryGenerated, store };
 }
