@@ -19,7 +19,7 @@ import { buildRoadmapGapMessages } from '../lib/prompts/roadmap-gap-template.js'
 import { buildRoadmapDigestMessages } from '../lib/prompts/roadmap-digest-template.js';
 import { buildRoadmapOrientationMessages, serializeOrientationCandidates, countOrientationCandidates, parseOrientationLines, ORIENTATION_BEARINGS } from '../lib/prompts/roadmap-orientation-template.js';
 import { resolveReasoningBudget, streamChat, AVAILABLE_MODELS } from '../lib/openrouter.js';
-import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
+import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { getWorkspaceCallScope, matchTeamId } from '../lib/workspace.js';
 import { testMockTeams, testMockData } from '../lib/sample-data/mock-data.js';
@@ -197,7 +197,7 @@ export function createRoadmapRoutes({ workspaceFromUrl, freeTierStore, userPrefe
     }
 
     try {
-      const model = await resolveWorkspaceModel({ urlKey: req.workspace.urlKey, workspacePreferencesStore });
+      const model = await resolveAiOperationModel({ urlKey: req.workspace.urlKey, workspacePreferencesStore, opKind: 'roadmap' });
       const report = await reportHistoryStore.save(req.workspace.urlKey, {
         model,
         northStar: typeof northStar === 'string' ? northStar : '',
@@ -287,7 +287,9 @@ export function createRoadmapRoutes({ workspaceFromUrl, freeTierStore, userPrefe
       return null;
     }
 
-    const workspaceModel = await resolveWorkspaceModel({ urlKey: req.workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
+    const workspaceModel = await resolveAiOperationModel({ urlKey: req.workspace.urlKey, workspacePreferencesStore, opKind: 'roadmap', forceDefault: isFreeTier });
+    // LIN-3853: orientation is its own job, so it has its own stored setting.
+    const orientationWorkspaceModel = await resolveAiOperationModel({ urlKey: req.workspace.urlKey, workspacePreferencesStore, opKind: 'roadmap-orientation', forceDefault: isFreeTier });
 
     // Per-request roadmap model override (LIN-819). A user may pick a stronger
     // model for just this generation without changing the workspace-wide default
@@ -300,7 +302,8 @@ export function createRoadmapRoutes({ workspaceFromUrl, freeTierStore, userPrefe
     //      is never passed unchecked to OpenRouter; it silently falls back to the
     //      workspace default, preserving existing behavior.
     const model = resolveRoadmapModelOverride(req.body?.model, workspaceModel, isFreeTier);
-    return { apiKey, model, isFreeTier };
+    const orientationModel = resolveRoadmapModelOverride(req.body?.model, orientationWorkspaceModel, isFreeTier);
+    return { apiKey, model, orientationModel, isFreeTier };
   }
 
   /**
@@ -540,10 +543,10 @@ export function createRoadmapRoutes({ workspaceFromUrl, freeTierStore, userPrefe
         const messages = buildRoadmapOrientationMessages(roadmapModel, northStar);
         let text = '';
         // LIN-1000: reserve reasoning headroom on top of the orientation prose budget.
-        const { reasoning, maxTokens } = resolveReasoningBudget({ model: llm.model, proseTokens: orientationMaxTokens(candidates.length) });
+        const { reasoning, maxTokens } = resolveReasoningBudget({ model: llm.orientationModel, proseTokens: orientationMaxTokens(candidates.length) });
         await streamChat(
           messages,
-          { apiKey: llm.apiKey, model: llm.model, maxTokens, reasoning,
+          { apiKey: llm.apiKey, model: llm.orientationModel, maxTokens, reasoning,
             callMeta: { urlKey: req.workspace?.urlKey || null, feature: 'roadmap-orientation' } },
           (type, data) => { if (type === 'token') text += (data && data.token) || ''; }
         );
@@ -834,7 +837,7 @@ export function createRoadmapRoutes({ workspaceFromUrl, freeTierStore, userPrefe
       return jsonError(res, 500, 'Failed to build chat prompt');
     }
 
-    const selectedModel = await resolveWorkspaceModel({ urlKey: req.workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
+    const selectedModel = await resolveAiOperationModel({ urlKey: req.workspace.urlKey, workspacePreferencesStore, opKind: 'roadmap-chat', forceDefault: isFreeTier });
 
     // Start SSE
     res.set({

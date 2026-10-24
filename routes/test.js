@@ -94,7 +94,7 @@ const uuidForUrlKey = (key) => {
  * @param {Object|null} [options.taskModeStore] - Task-mode event store (LIN-2942), for /test/clear-task-mode-events
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, emailTransport = null, commentDedupe = null, decisionStampDedupe = null, taskModeStore = null, taskShareCollection = null, kpiDailyRollupCollection = null }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, modelRoutingStore = null, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, emailTransport = null, commentDedupe = null, decisionStampDedupe = null, taskModeStore = null, taskShareCollection = null, kpiDailyRollupCollection = null }) {
   const router = Router();
 
   // ── Connection-backed fixture variants (LIN-3124 PR3 checkpoint F, T27) ────
@@ -1388,18 +1388,21 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
 
   // Endpoint to seed/clear the workspace model preference for tests.
   // Query params: ?modelId=<id>  → save, or omit/empty → delete
+  //
+  // LIN-3853: the model lives in the model-routing store, so this writes and resets
+  // through it. Seeding sets the Harbour default and every Harbour group (what
+  // `prefs.modelId` meant); the reset also removes the store's table, log and presets, so
+  // the next access re-migrates from the now-empty preferences and a spec never inherits
+  // the last one's routing. Nothing is cached in-process, so the next resolve sees it.
   router.get('/test/set-workspace-model', async (req, res) => {
     try {
       const urlKey = req.query.urlKey || 'test-workspace';
       const modelId = req.query.modelId || '';
       if (modelId) {
-        const existing = await workspacePreferencesStore.getWorkspacePreferences(urlKey);
-        await workspacePreferencesStore.saveWorkspacePreferences(urlKey, {
-          ...existing,
-          modelId
-        });
+        await modelRoutingStore.saveHarbourModel(modelId, { urlKey, reason: 'Seeded by /test/set-workspace-model', actor: { via: 'page' } });
       } else {
         await workspacePreferencesStore.deleteWorkspacePreferences(urlKey);
+        await modelRoutingStore.deleteWorkspace(urlKey);
       }
       res.send('ok');
     } catch (err) {

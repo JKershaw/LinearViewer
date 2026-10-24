@@ -107,9 +107,9 @@ describe('INVENTORY completeness (Done-when 5)', () => {
     assert.deepStrictEqual(missingFrom(without), ['workspace-halt']);
   });
 
-  test('the universe is the 52 names the plan bounded (funnel-events retired by LIN-3632 is not in it)', () => {
+  test('the universe is the 55 names the plan bounded (funnel-events retired by LIN-3632 is not in it)', () => {
     const universe = collectionUniverse();
-    assert.strictEqual(universe.size, 52);
+    assert.strictEqual(universe.size, 55);
     assert.ok(!universe.has('funnel-events'));
     assert.ok(!INVENTORY.some((r) => r.collection === 'funnel-events'), 'LIN-3632: no lib module may name the retired collection');
   });
@@ -274,6 +274,24 @@ for (const level of ['standard', 'full']) {
     });
   });
 }
+
+// LIN-3853: the routing log and presets name accounts by id only, so the existing rewrite is
+// all a Full wipe needs; this pins the two fields by name (the loop above is generic).
+describe('model-routing rows at a Full wipe (LIN-3853)', () => {
+  test('actor.id and createdBy become the erased id in a shared workspace and the rows go with an Alone one', async () => {
+    const { db, seed } = await fresh();
+    const plan = await planOf(db, 'full');
+    await applyOf(db, plan);
+    const idOf = (collection, workspace) => seed.index.find((e) => e.collection === collection && e.workspace === workspace && e.tenant === 'person')?._id;
+    for (const c of ['model-routing-log', 'model-routing-presets']) assert.ok(idOf(c, 'alone') && idOf(c, 'shared'), `${c}: the seed has a row for each`);
+    const log = await db.collection('model-routing-log').findOne({ _id: idOf('model-routing-log', 'shared') });
+    const preset = await db.collection('model-routing-presets').findOne({ _id: idOf('model-routing-presets', 'shared') });
+    assert.strictEqual(log.actor.id, ERASED_ACCOUNT_ID);
+    assert.strictEqual(preset.createdBy, ERASED_ACCOUNT_ID);
+    assert.strictEqual(await db.collection('model-routing-log').findOne({ _id: idOf('model-routing-log', 'alone') }), null);
+    assert.strictEqual(await db.collection('model-routing-presets').findOne({ _id: idOf('model-routing-presets', 'alone') }), null);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Dry run, output, errors
