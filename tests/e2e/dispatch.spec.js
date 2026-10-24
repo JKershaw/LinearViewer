@@ -1409,7 +1409,7 @@ test.describe('Custom Prompt Dispatch', () => {
 
     // Should show "prompt is empty" feedback
     const feedback = page.locator('.dispatch-prompt-feedback');
-    await expect(feedback).toHaveText('prompt is empty');
+    await expect(feedback).toHaveText('enter a prompt or a goal');
 
     // Feedback should clear after delay
     await expect(feedback).toHaveText('', { timeout: 3000 });
@@ -2087,7 +2087,7 @@ test.describe('Dispatch History UI', () => {
     const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${URL_KEY}`);
     const { token } = await tokenResponse.json();
 
-    await request.get(`/test/set-session?runnerKey=1&urlKey=${URL_KEY}`);
+    await request.get(`/test/set-session?runnerKey=1&keepQueueTokens=1&urlKey=${URL_KEY}`);
 
     const createResponse = await request.post(`${API_PREFIX}/api/dispatch`, {
       data: { prompt: 'Taken prompt', promptName: 'Taken Test', issueIdentifier: 'LIN-99' }
@@ -2110,7 +2110,7 @@ test.describe('Dispatch History UI', () => {
   });
 
   test('cancelled item shows with correct status indicator', async ({ page, request }) => {
-    await request.get(`/test/set-session?runnerKey=1&urlKey=${URL_KEY}`);
+    await request.get(`/test/set-session?runnerKey=1&keepQueueTokens=1&urlKey=${URL_KEY}`);
 
     const createResponse = await request.post(`${API_PREFIX}/api/dispatch`, {
       data: { prompt: 'Cancelled prompt', promptName: 'Cancel Test' }
@@ -2129,7 +2129,7 @@ test.describe('Dispatch History UI', () => {
   });
 
   test('history loads a page at a time and "show more" reaches every item', async ({ page, request }) => {
-    await request.get(`/test/set-session?runnerKey=1&urlKey=${URL_KEY}`);
+    await request.get(`/test/set-session?runnerKey=1&keepQueueTokens=1&urlKey=${URL_KEY}`);
 
     // Create 25 history items
     for (let i = 1; i <= 25; i++) {

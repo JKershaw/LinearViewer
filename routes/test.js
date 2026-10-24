@@ -203,9 +203,10 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   // per-worker urlKey keeps its workspace id across specs, so an earlier spec that
   // left the owner edge 'foreign' would otherwise refuse this mint (GRANT_OWNER_ONLY)
   // and, worse, hide the owner-only set-up rung from a spec that asks for it.
-  async function seedRunnerKey({ urlKey, workspaceId, ownerAccountId, want, claimOwner = false, queueToken = false }) {
+  async function seedRunnerKey({ urlKey, workspaceId, ownerAccountId, want, claimOwner = false, queueToken = false, keepQueueTokens = false }) {
     await proxyTokenStore.clear(urlKey);
-    await dispatchTokenStore.clear(urlKey);
+    // A spec that made a queue token BEFORE seeding (consumer-API specs) keeps it.
+    if (!keepQueueTokens) await dispatchTokenStore.clear(urlKey);
     if (claimOwner && ownerAccountId) {
       const edges = accountWorkspaceStore.collection;
       await edges.updateMany({ workspaceId }, { $set: { role: null } });
@@ -357,7 +358,8 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
           workspaceId: workspaces[0].id,
           ownerAccountId: req.session.accountId,
           want: runnerKeyParam === '1' || runnerKeyParam === 'true',
-          claimOwner: true
+          claimOwner: true,
+          keepQueueTokens: req.query.keepQueueTokens === '1'
         })
       }
     }
@@ -1550,7 +1552,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       // risk), mirroring routes/workspace.js's POST /workspace/new.
       await establishAccount(req.session, accountStore, accountWorkspaceStore, 'local', urlKey, {}, wsId);
       if (typeof body.runnerKey === 'boolean') {
-        await seedRunnerKey({ urlKey, workspaceId: wsId, ownerAccountId: req.session.accountId, want: body.runnerKey, claimOwner: true, queueToken: body.queueToken === true });
+        await seedRunnerKey({ urlKey, workspaceId: wsId, ownerAccountId: req.session.accountId, want: body.runnerKey, claimOwner: true, queueToken: body.queueToken === true, keepQueueTokens: body.keepQueueTokens === true });
       }
       for (const { binding, refreshToken } of connectionBackedExtras) {
         const conversion = await convertFixtureBinding(req, wsId, binding, refreshToken);

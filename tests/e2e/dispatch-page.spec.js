@@ -46,7 +46,7 @@ const REPO_SEED = {
 // so its session-scoped dispatch POSTs resolve the local workspace. seedLocalWorkspace
 // only needs a `.request` API context, so a `{ request }` shim suffices.
 function seedRequestSession(request) {
-  return seedLocalWorkspace({ request }, REPO_SEED, { runnerKey: true, proxyDefault: false, urlKey: WS });
+  return seedLocalWorkspace({ request }, REPO_SEED, { runnerKey: true, proxyDefault: false, keepQueueTokens: true, urlKey: WS });
 }
 
 test.describe('Dispatch Page', () => {
@@ -179,7 +179,7 @@ test.describe('Dispatch Page', () => {
       await dispatchBtn.click();
 
       const feedback = page.locator('.dispatch-prompt-feedback');
-      await expect(feedback).toHaveText('prompt is empty');
+      await expect(feedback).toHaveText('enter a prompt or a goal');
     });
 
     test('recent prompts appear after dispatch', async ({ page }) => {
@@ -1415,7 +1415,7 @@ test.describe('Dispatch Page', () => {
 
       await expect(dispatchBtn).toContainText('dispatched!');
       // No misleading empty-prompt error appeared.
-      await expect(page.locator('.dispatch-prompt-feedback')).not.toHaveText('prompt is empty');
+      await expect(page.locator('.dispatch-prompt-feedback')).not.toHaveText('enter a prompt or a goal');
 
       // The dispatched item is the goal-scoped Autopilot kickoff, not a blank prompt.
       const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
