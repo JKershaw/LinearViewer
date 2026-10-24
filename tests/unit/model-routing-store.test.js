@@ -272,9 +272,10 @@ describe('the model-routing store', () => {
       assert.equal(new ModelRoutingStore({}).erasedAccountId, ERASED_ACCOUNT_ID);
     });
 
-    test('a proxy actor with a label reads as the label when it is not an account', async () => {
-      await store().changeJob('review', { model: 'a' }, ctx('r', { via: 'proxy', id: 'ci-bot-token' }));
-      assert.equal((await store().getLog(URL_KEY))[0].actor.name, 'ci-bot-token');
+    test('a proxy actor id is an account id (LIN-3854): one that no longer resolves reads as former member, never as the id', async () => {
+      await store().changeJob('review', { model: 'a' }, ctx('r', { via: 'proxy', id: 'gone', tokenId: 'tok-1' }));
+      const [entry] = await store().getLog(URL_KEY);
+      assert.equal(entry.actor.name, 'former member');
     });
   });
 

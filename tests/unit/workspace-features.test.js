@@ -9,8 +9,10 @@
  * are genuinely workspace-scoped (via the store) and isolated from the per-user
  * FEATURES / session.features path.
  */
-import { test, describe, beforeEach } from 'node:test';
+import { test, describe, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert';
+import express from 'express';
+import { createSettingsWorkspaceFeatureRoutes } from '../../routes/settings-workspace-features.js';
 import { WorkspacePreferencesStore, getWorkspaceFeatures, isWorkspaceFeatureEnabled, setWorkspaceFeature } from '../../lib/workspace-preferences.js';
 import {
   FEATURES,
@@ -182,5 +184,47 @@ describe('setWorkspaceFeature — shared-store safety', () => {
     assert.strictEqual(await isWorkspaceFeatureEnabled({ urlKey: 'ws-1', featureKey: 'periodicals', store }), true);
     await setWorkspaceFeature({ urlKey: 'ws-1', featureKey: 'periodicals', enabled: false, store });
     assert.strictEqual(await isWorkspaceFeatureEnabled({ urlKey: 'ws-1', featureKey: 'periodicals', store }), false);
+  });
+});
+
+// LIN-3854: the proxy model-routing writes sit behind `modelRoutingProxyWrites`, which is "toggled
+// only through the session-authed settings route". This drives that route for real.
+describe('POST /workspace/:urlKey/settings/workspace-features (LIN-3854)', () => {
+  const FEATURE = WORKSPACE_FEATURES.MODEL_ROUTING_PROXY_WRITES;
+  let server, base, store;
+  before(async () => {
+    const app = express();
+    app.use(express.urlencoded({ extended: false }));
+    const workspaceFromUrl = (req, _res, next) => { req.workspace = { urlKey: req.params.urlKey, name: 'Acme' }; next(); };
+    app.use((req, res, next) => createSettingsWorkspaceFeatureRoutes({ workspaceFromUrl, workspacePreferencesStore: store })(req, res, next));
+    await new Promise((resolve) => { server = app.listen(0, '127.0.0.1', resolve); });
+    base = `http://127.0.0.1:${server.address().port}`;
+  });
+  after(() => new Promise((resolve) => server.close(resolve)));
+  beforeEach(() => { store = new WorkspacePreferencesStore({ collection: createMockCollection() }); });
+
+  const post = (urlKey, body) => fetch(`${base}/workspace/${urlKey}/settings/workspace-features`, {
+    method: 'POST',
+    redirect: 'manual',
+    headers: { 'content-type': 'application/x-www-form-urlencoded', 'x-requested-with': 'XMLHttpRequest' },
+    body: new URLSearchParams(body).toString()
+  });
+  const enabled = (urlKey) => isWorkspaceFeatureEnabled({ urlKey, featureKey: FEATURE, store });
+
+  test('the model-routing proxy-writes feature is off until the route flips it, for that workspace only', async () => {
+    assert.strictEqual(await enabled('acme'), false);
+    const res = await post('acme', { feature: FEATURE, enabled: 'true' });
+    assert.strictEqual(res.status, 200);
+    assert.deepStrictEqual(await res.json(), { ok: true, feature: FEATURE, enabled: true });
+    assert.strictEqual(await enabled('acme'), true);
+    assert.strictEqual(await enabled('other'), false);
+    await post('acme', { feature: FEATURE, enabled: 'false' });
+    assert.strictEqual(await enabled('acme'), false);
+  });
+
+  test('an unknown feature key is refused and nothing is written', async () => {
+    const res = await post('acme', { feature: 'notAFeature', enabled: 'true' });
+    assert.strictEqual(res.status, 400);
+    assert.strictEqual(await enabled('acme'), false);
   });
 });
