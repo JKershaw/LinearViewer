@@ -110,6 +110,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join, relative } from 'node:path';
+import { dashboardUnitFiles, isDashboardUnitFile } from './lib/dashboard-unit.js';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 
@@ -245,5 +246,92 @@ describe('Interactive OpenRouter chain: byte-identity census (LIN-2412 / LIN-297
     const fnEnd = src.indexOf('\n}', fnStart);
     const fnBody = src.slice(fnStart, fnEnd);
     assert.doesNotMatch(fnBody, /openRouterDurableConsentAt|getOpenRouterConsent/, 'the interactive source predicate must never read the unattended-use consent field');
+  });
+});
+
+// ─── LIN-3840: the dashboard routes as one unit ──────────────────────────────
+// The rules below judge routes/dashboard.js and routes/dashboard-*.js as a set
+// (tests/unit/lib/dashboard-unit.js), so the createDashboardRoutes rebuild
+// (LIN-3742) can place its code anywhere in the unit. Pure functions over a
+// `{ rel: src }` map, so the witnesses plant violations in a synthetic map.
+const UNIT_GATE_CALLS = 2; // run-summary + session-summary: one quota unit per request, kept EXACT
+const readMap = (rels) => Object.fromEntries(rels.map(rel => [rel, read(rel)]));
+
+/** `{rel: src}` for the dashboard unit, and for every routes/ + lib/ file. */
+const liveUnit = () => readMap(dashboardUnitFiles(ROOT));
+const liveGateScope = () => readMap([...walk(join(ROOT, 'routes')), ...walk(join(ROOT, 'lib'))]
+  .map(f => relative(ROOT, f)).filter(rel => rel !== 'lib/chat-request.js'));
+
+/** hasPaidEnvKey must stay dead in every unit file. */
+function paidEnvKeyProblems(unit) {
+  return Object.entries(unit).filter(([, src]) => /hasPaidEnvKey/.test(src)).map(([rel]) => `${rel}: hasPaidEnvKey is back`);
+}
+
+/**
+ * A file calling checkFreeTierGate( must be a key of `expected` or a dashboard-unit
+ * file, and the unit holds EXACTLY UNIT_GATE_CALLS calls in total.
+ */
+function gateCallProblems(files, expected) {
+  const problems = [];
+  const calls = (src) => (src.match(/checkFreeTierGate\s*\(/g) || []).length;
+  let unitCalls = 0;
+  const outside = [];
+  for (const [rel, src] of Object.entries(files)) {
+    const n = calls(src);
+    if (!n) continue;
+    if (isDashboardUnitFile(rel)) unitCalls += n;
+    else outside.push(rel);
+  }
+  if (unitCalls !== UNIT_GATE_CALLS) problems.push(`the dashboard unit holds ${unitCalls} checkFreeTierGate( call(s), expected exactly ${UNIT_GATE_CALLS}`);
+  const listed = Object.keys(expected).filter(rel => !isDashboardUnitFile(rel));
+  for (const rel of outside) if (!listed.includes(rel)) problems.push(`${rel} calls checkFreeTierGate( but is neither a key of expectedGateCalls nor a dashboard-unit file`);
+  for (const rel of listed) if (!outside.includes(rel)) problems.push(`${rel} is a key of expectedGateCalls but no longer calls checkFreeTierGate(`);
+  return problems;
+}
+
+describe('LIN-3840: dashboard unit rules (B pins, each with planted-violation witnesses)', () => {
+  const planted = (files, rel, fn) => ({ ...files, [rel]: fn(files[rel] ?? '') });
+
+  test('hasPaidEnvKey is absent from every dashboard-unit file', () => {
+    assert.deepEqual(paidEnvKeyProblems(liveUnit()), []);
+  });
+
+  test('witness: hasPaidEnvKey planted in a unit file other than routes/dashboard.js fails', () => {
+    const unit = planted(liveUnit(), 'routes/dashboard-x.js', () => 'import { hasPaidEnvKey } from "../lib/openrouter.js";\nexport const k = hasPaidEnvKey();\n');
+    assert.deepEqual(paidEnvKeyProblems(unit), ['routes/dashboard-x.js: hasPaidEnvKey is back']);
+  });
+
+  const expectedOutsideUnit = Object.fromEntries(Object.entries(expectedGateCalls).filter(([rel]) => !isDashboardUnitFile(rel)));
+
+  test('checkFreeTierGate( : the unit holds exactly 2 calls, every other caller is a key of expectedGateCalls', () => {
+    assert.deepEqual(gateCallProblems(liveGateScope(), expectedOutsideUnit), []);
+  });
+
+  test('moving a gate call between unit files stays clean (the unit is judged whole)', () => {
+    let files = liveGateScope();
+    const donor = files['routes/dashboard.js'];
+    const call = donor.match(/ *const check = await checkFreeTierGate\([^\n]*\);/)[0];
+    files = { ...files, 'routes/dashboard.js': donor.replace(call, ''), 'routes/dashboard-body.js': `${call}\n` };
+    assert.deepEqual(gateCallProblems(files, expectedOutsideUnit), []);
+  });
+
+  test('witness: a third call planted in a unit file fails', () => {
+    const files = planted(liveGateScope(), 'routes/dashboard.js', src => `${src}\nawait checkFreeTierGate({});\n`);
+    assert.deepEqual(gateCallProblems(files, expectedOutsideUnit), ['the dashboard unit holds 3 checkFreeTierGate( call(s), expected exactly 2']);
+  });
+
+  test('witness: a call in a new routes/dashboard-x.js counts toward the unit and fails', () => {
+    const files = planted(liveGateScope(), 'routes/dashboard-x.js', () => 'await checkFreeTierGate({});\n');
+    assert.deepEqual(gateCallProblems(files, expectedOutsideUnit), ['the dashboard unit holds 3 checkFreeTierGate( call(s), expected exactly 2']);
+  });
+
+  test('witness: a call removed from the unit fails', () => {
+    const files = planted(liveGateScope(), 'routes/dashboard.js', src => src.replace(/ *const check = await checkFreeTierGate\([^\n]*\);/, ''));
+    assert.deepEqual(gateCallProblems(files, expectedOutsideUnit), ['the dashboard unit holds 1 checkFreeTierGate( call(s), expected exactly 2']);
+  });
+
+  test('witness: a call in an unlisted non-unit file fails', () => {
+    const files = planted(liveGateScope(), 'routes/zz-unlisted.js', () => 'await checkFreeTierGate({});\n');
+    assert.deepEqual(gateCallProblems(files, expectedOutsideUnit), ['routes/zz-unlisted.js calls checkFreeTierGate( but is neither a key of expectedGateCalls nor a dashboard-unit file']);
   });
 });
