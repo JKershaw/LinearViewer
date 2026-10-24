@@ -254,7 +254,7 @@ function reverseWithdrawalSpec({ dispatchQueueStore }) {
 // route); re-deriving it needs a read this route does not otherwise take,
 // for a value sourced from an already-validated standing suggestion.
 //
-// This route and `stampDecisionAnswers`'s task half (routes/workspace-api.js)
+// This route and `stampDecisionAnswers`'s task half (routes/workspace-api-issue-write.js)
 // both call the shared `TaskDecisionsStore.answer()` (LIN-2889), which
 // un-retires a self-resolved row before re-stamping it — a human answer
 // always outranks the model's earlier self-resolve guess — and reports

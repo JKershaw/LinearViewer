@@ -16,7 +16,7 @@
  * This file combines, for real, all three: the real `deliverRulingReply`
  * (public/observation.js), the real `window.ReplyDelivery` IIFE
  * (public/common.js, unstubbed), and a real HTTP round-trip to the real
- * Express comment route (routes/workspace-api.js, mounted via
+ * Express comment route (routes/workspace-api-issue-write.js, registered by
  * createWorkspaceApiRoutes) — against a CREDENTIAL-KEYED fake Linear
  * provider, not a count-keyed one, per the research's own correction.
  *

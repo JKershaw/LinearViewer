@@ -857,7 +857,7 @@ describe('deliverRulingReply — record delivery (LIN-2775 Area 6)', () => {
     await new Promise((r) => setImmediate(r));
     await new Promise((r) => setImmediate(r));
 
-    // Exactly the pair stampDecisionAnswers (routes/workspace-api.js) keys on
+    // Exactly the pair stampDecisionAnswers (routes/workspace-api-issue-write.js) keys on
     // — never the task-bound {taskDecisionId, taskDecisionIssueId} shape,
     // which would leave this decision permanently unanswered. Field-by-field,
     // not deepEqual — see the note on the sibling test above.

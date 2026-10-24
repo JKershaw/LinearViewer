@@ -448,7 +448,7 @@ describe('PATCH /workspace/:urlKey/api/issues/:issueId (update)', () => {
 // Symbolic reference resolution (LIN-1556 — LIN-1552 ledger follow-up)
 //
 // Proves the wrapper wiring (resolveIssueTeamRef/resolveIssueProjectRef/
-// resolveIssueStateRef in routes/workspace-api.js) end-to-end: a scoped list
+// resolveIssueStateRef in routes/workspace-api-issue-write.js) end-to-end: a scoped list
 // fetch (fetchTeams/fetchProjectsList/states) happens for a non-UUID ref, and
 // the RESOLVED native id — not the symbolic string — reaches the provider
 // write. A bare 201/200 status proves nothing here (a wrapper that silently
