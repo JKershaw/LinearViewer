@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { request } from 'node:http';
 import { hstsHeader, defaultCacheControl } from '../../lib/response-headers.js';
 import { createLibraryRouter } from '../../routes/library.js';
+import { isWorkspaceApiUnitFile } from './lib/workspace-api-unit.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -167,5 +168,68 @@ describe('source scans (LIN-3692)', () => {
       assert.ok(at > last, `${m} is in order`);
       last = at;
     }
+  });
+});
+
+// LIN-3861: the host-read allow-list with the workspace-API unit as one key. The detail route's
+// localhost read (no URL is built from it) is the unit's one read, wherever in routes/workspace-api.js
+// or routes/workspace-api-*.js it sits, so the LIN-2246 moves cannot trip it. A pure function over a
+// `{ rel: src }` map (the live test reads server.js, lib/ and routes/; the witnesses plant in a
+// synthetic map). Every other row, and the helper's own two reads, are as in the scan above.
+describe('source scans (LIN-3692), workspace-API unit rule (LIN-3861)', () => {
+  const HOST_READ = /req\.protocol|req\.hostname|req\.host\b|get\(['"]host['"]\)|headers\.host|headers\[['"]host|x-forwarded-host/gi;
+  const UNIT_KEY = 'workspace-API unit';
+  const LOCAL_ONLY = { 'lib/dispatch-entrance.js': 1, 'routes/next-run.js': 1, [UNIT_KEY]: 1, 'server.js': 5 };
+
+  function hostReadProblems(sources) {
+    const found = {};
+    for (const [rel, src] of Object.entries(sources)) {
+      const n = (src.match(HOST_READ) || []).length;
+      if (!n) continue;
+      const key = isWorkspaceApiUnitFile(rel) ? UNIT_KEY : rel;
+      found[key] = (found[key] || 0) + n;
+    }
+    const problems = [];
+    if (!(found['lib/public-origin.js'] >= 2)) problems.push('the helper reads protocol and host');
+    delete found['lib/public-origin.js'];
+    for (const [key, n] of Object.entries(found)) if (n !== LOCAL_ONLY[key]) problems.push(`${key}: ${n} host/protocol reads outside publicOrigin`);
+    for (const key of Object.keys(LOCAL_ONLY)) if (!(key in found)) problems.push(`${key}: no host/protocol read, but listed`);
+    return problems;
+  }
+
+  const live = () => Object.fromEntries([join(ROOT, 'server.js'), ...listJsFiles(join(ROOT, 'lib')), ...listJsFiles(join(ROOT, 'routes'))]
+    .map(f => [relative(ROOT, f).split(sep).join('/'), readFileSync(f, 'utf8')]));
+  const READ = "const local = req.hostname === 'localhost';\n";
+  // A synthetic tree, never the live text: the helper, the other rows, and one read in the unit.
+  const tree = (unit) => ({
+    'lib/public-origin.js': 'const a = req.protocol; const b = req.get("host");\n',
+    'lib/dispatch-entrance.js': READ,
+    'routes/next-run.js': READ,
+    'server.js': READ.repeat(5),
+    ...unit,
+  });
+
+  test('only publicOrigin, the redirect and the localhost-only reads touch Host or protocol; the workspace-API unit holds exactly 1', () => {
+    assert.deepStrictEqual(hostReadProblems(live()), []);
+  });
+
+  test('witness: the one read may sit in any W file (moved to routes/workspace-api-x.js stays clean)', () => {
+    assert.deepStrictEqual(hostReadProblems(tree({ 'routes/workspace-api.js': READ })), []);
+    assert.deepStrictEqual(hostReadProblems(tree({ 'routes/workspace-api.js': 'export {};\n', 'routes/workspace-api-x.js': READ })), []);
+  });
+
+  test('witness: a second read in a synthetic W file fails, wherever it sits', () => {
+    const expected = ['workspace-API unit: 2 host/protocol reads outside publicOrigin'];
+    assert.deepStrictEqual(hostReadProblems(tree({ 'routes/workspace-api.js': READ, 'routes/workspace-api-x.js': READ })), expected);
+    assert.deepStrictEqual(hostReadProblems(tree({ 'routes/workspace-api.js': READ + READ })), expected);
+  });
+
+  test('witness: the read removed from the unit fails (a stale allow-list row), and a read in a non-unit file still fails', () => {
+    assert.deepStrictEqual(hostReadProblems(tree({})), ['workspace-API unit: no host/protocol read, but listed']);
+    assert.deepStrictEqual(hostReadProblems(tree({ 'routes/workspace-api.js': READ, 'routes/zz-other.js': READ })), ['routes/zz-other.js: 1 host/protocol reads outside publicOrigin']);
+  });
+
+  test('the other rows stay exact: an extra read in server.js fails', () => {
+    assert.deepStrictEqual(hostReadProblems(tree({ 'routes/workspace-api.js': READ, 'server.js': READ.repeat(6) })), ['server.js: 6 host/protocol reads outside publicOrigin']);
   });
 });
