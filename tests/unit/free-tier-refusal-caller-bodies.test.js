@@ -28,6 +28,7 @@ import { createRoadmapRoutes } from '../../routes/workspace-api-roadmap.js';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { registerProvider } from '../../lib/providers/registry.js';
 import { testMockData } from '../../lib/sample-data/mock-data.js';
+import { findRouteLayer } from './lib/route-layer.js';
 
 const PROVIDER_NAME = 'lin3658-caller-bodies-fake';
 registerProvider({
@@ -76,8 +77,7 @@ async function withEnv(overrides, fn) {
 const FREE_TIER_ENV = { NODE_ENV: 'production', OPENROUTER_API_KEY: undefined, OPENROUTER_FREE_TIER_KEY: 'free-tier-test-key' };
 
 function getHandler(router, method, path) {
-  const layer = router.stack.find(l => l.route?.path === path && l.route.methods[method]);
-  assert.ok(layer, `${method.toUpperCase()} ${path} route is registered`);
+  const layer = findRouteLayer(router, method, path);
   return layer.route.stack[layer.route.stack.length - 1].handle;
 }
 

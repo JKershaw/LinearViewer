@@ -44,6 +44,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { dashboardUnitFiles } from './lib/dashboard-unit.js';
+import { workspaceApiUnitFiles } from './lib/workspace-api-unit.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, '..', '..');
@@ -82,13 +83,17 @@ function count(source, pattern) {
 //
 // A FIFTH mechanism means a new egress shape that needs its own provider guard.
 
-const GRAPHQL_CLIENT_FILES = ['lib/audit.js', 'lib/providers/linear/index.js', 'routes/proxy.js', 'routes/workspace-api.js', 'server.js'];
+// LIN-3861: the workspace-API unit (routes/workspace-api.js and routes/workspace-api-*.js), not one file name:
+// the fixed 'routes/workspace-api.js' entry was blind to routes/workspace-api-prompts.js and -steps.js (LIN-3842)
+// and would be to every file the LIN-2246 moves add. The total stays 2.
+const GRAPHQL_CLIENT_FILES = ['lib/audit.js', 'lib/providers/linear/index.js', 'routes/proxy.js', ...workspaceApiUnitFiles(repoRoot), 'server.js'];
 const KNOWN_GRAPHQL_CLIENT_COUNT = 2;
 
 // The two raw-fetch asset relays, anchored by the host allowlist that gates each.
 // routes/proxy-reads.js (LIN-679 Stage 3a / LIN-2536): the attachment relay
 // moved out of routes/proxy.js — widen the file set, never relax the count.
-const ASSET_RELAY_FILES = ['routes/workspace-api.js', 'routes/proxy.js', 'routes/proxy-reads.js'];
+// LIN-3861: the workspace-API unit replaces the one file name; the proxy entries stay. The total stays 2.
+const ASSET_RELAY_FILES = [...workspaceApiUnitFiles(repoRoot), 'routes/proxy.js', 'routes/proxy-reads.js'];
 const KNOWN_ASSET_RELAY_COUNT = 2;
 
 describe('LIN-1899 census (a) — credential-bearing Linear egress mechanisms', () => {
@@ -130,11 +135,12 @@ describe('LIN-1899 census (a) — credential-bearing Linear egress mechanisms', 
     // Cheap backstop for the one mutation the counts above cannot see: a guard
     // deleted while its call site stays put. Presence only — the behavioural
     // proof lives in the two egress-observing test files named at the top.
-    const source = read('routes/workspace-api.js');
+    // LIN-3861: counted over the workspace-API unit (routes/workspace-api.js and routes/workspace-api-*.js).
+    const source = workspaceApiUnitFiles(repoRoot).map(read).join('\n');
     assert.equal(
       count(source, /isActiveProviderLinear\(workspace\)/g),
       2,
-      'expected exactly 2 isActiveProviderLinear(workspace) guards in routes/workspace-api.js — the audit ' +
+      'expected exactly 2 isActiveProviderLinear(workspace) guards across the workspace-API unit — the audit ' +
       'route (refuses 422) and the image proxy (withholds the header). If a guard was intentionally removed, ' +
       'the consumer it protected must no longer read workspace.accessToken on a Linear-bound path (LIN-1899).'
     );
@@ -160,7 +166,10 @@ describe('LIN-1899 census (b) — scalar feeds, by owner', () => {
     // number that is really "1 call + 1 comment" and drift the moment either
     // moves. So the call sites are counted on non-comment lines only, and the
     // total is asserted alongside it to keep the raw grep honest.
-    const source = read('routes/workspace-api.js');
+    // LIN-3861: both counts are exact over the workspace-API unit (routes/workspace-api.js and
+    // routes/workspace-api-*.js). Reported, not fixed: the raw count pins a comment, so blanking
+    // comments would fail it.
+    const source = workspaceApiUnitFiles(repoRoot).map(read).join('\n');
     const callSites = source
       .split('\n')
       .filter(line => /runAudit\(/.test(line) && !/^\s*(\/\/|\*|\/\*)/.test(line));
@@ -168,7 +177,7 @@ describe('LIN-1899 census (b) — scalar feeds, by owner', () => {
     assert.equal(
       callSites.length,
       1,
-      `Found ${callSites.length} runAudit call site(s) in routes/workspace-api.js, expected exactly 1 ` +
+      `Found ${callSites.length} runAudit call site(s) in the workspace-API unit, expected exactly 1 ` +
       '(GET /workspace/:urlKey/api/audit). runAudit goes straight to a Linear GraphQL client, so a SECOND ' +
       'caller needs its own isActiveProviderLinear(workspace) guard — otherwise a Jira-active workspace ' +
       'discloses its raw API token to api.linear.app (LIN-1899).'
@@ -176,7 +185,7 @@ describe('LIN-1899 census (b) — scalar feeds, by owner', () => {
     assert.equal(
       count(source, /runAudit\(/g),
       2,
-      'expected 2 raw runAudit( occurrences in routes/workspace-api.js: 1 call site + 1 mention in the ' +
+      'expected 2 raw runAudit( occurrences in the workspace-API unit: 1 call site + 1 mention in the ' +
       'test-mock comment. If this drifts, re-check which of the two moved before touching the pinned counts.'
     );
   });
@@ -190,8 +199,9 @@ describe('LIN-1899 census (b) — scalar feeds, by owner', () => {
     // LIN-3840: the dashboard key is the sum over every dashboard-unit file (routes/dashboard.js
     // and routes/dashboard-*.js), so moving code inside the unit cannot blind it. Still 0 inside
     // the total of 1; the other keys are unchanged.
+    // LIN-3861: the workspace-API key is likewise the sum over every unit file, still inside the total of 1.
     const counts = {
-      'routes/workspace-api.js': count(read('routes/workspace-api.js'), BEARER_MIRROR),
+      'workspace-API unit': workspaceApiUnitFiles(repoRoot).reduce((n, rel) => n + count(read(rel), BEARER_MIRROR), 0),
       'routes/proxy.js': count(read('routes/proxy.js'), BEARER_MIRROR),
       'dashboard unit': dashboardUnitFiles(repoRoot).reduce((n, rel) => n + count(read(rel), BEARER_MIRROR), 0),
     };
@@ -268,7 +278,7 @@ function bearerMirrorProblems(unit, others) {
 }
 
 describe('LIN-3840 census (b) — the dashboard unit', () => {
-  const others = () => ({ 'routes/workspace-api.js': read('routes/workspace-api.js'), 'routes/proxy.js': read('routes/proxy.js') });
+  const others = () => ({ 'workspace-API unit': workspaceApiUnitFiles(repoRoot).map(read).join('\n'), 'routes/proxy.js': read('routes/proxy.js') });
 
   test('the dashboard unit has exactly 2 getWorkspaceAccessToken( sites', () => {
     assert.deepEqual(unitAccessorProblems(readUnit()), []);
@@ -299,5 +309,117 @@ describe('LIN-3840 census (b) — the dashboard unit', () => {
   test('witness: a Bearer ${workspace.accessToken} template planted in a non-dashboard.js unit file fails', () => {
     const unit = { ...readUnit(), 'routes/dashboard-x.js': 'export const h = (workspace) => ({ Authorization: `Bearer ${workspace.accessToken}` });\n' };
     assert.equal(bearerMirrorProblems(unit, others()).length, 1);
+  });
+});
+
+// =============================================================================
+// LIN-3861 — the workspace-API half of (a) and (b), judged over the workspace-API unit
+// =============================================================================
+// routes/workspace-api.js and routes/workspace-api-*.js are one unit (tests/unit/lib/
+// workspace-api-unit.js), so the LIN-2246 moves may place the route groups in any of its files.
+// The numbers do not change; only the file part of each key widens to the unit. This also closes
+// the blind spot the fixed lists above had to routes/workspace-api-prompts.js and -steps.js
+// (LIN-3842). Every total stays EXACT. Pure functions over `{ rel: src }` maps, so the witnesses
+// plant violations in a synthetic map, never in live text. The non-W entries (lib/audit.js,
+// lib/providers/linear/index.js, routes/proxy.js, routes/proxy-reads.js, server.js) are read live
+// and are unchanged. The behaviour witnesses for the two guards are named at the top of this file
+// (audit-route-provider-guard.test.js and the LIN-1899 block in image-proxy.test.js).
+const readW = () => Object.fromEntries(workspaceApiUnitFiles(repoRoot).map(rel => [rel, read(rel)]));
+const sumOver = (map, pattern) => Object.values(map).reduce((n, src) => n + count(src, pattern), 0);
+
+/** `new GraphQLClient(` : exactly 2 across the unit plus the other Linear-bound client files. */
+function graphqlClientProblems(unit, others) {
+  const counts = { 'workspace-API unit': sumOver(unit, /new GraphQLClient\(/g), ...Object.fromEntries(Object.entries(others).map(([k, src]) => [k, count(src, /new GraphQLClient\(/g)])) };
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  return total === KNOWN_GRAPHQL_CLIENT_COUNT ? [] : [`found ${total} GraphQL client construction(s) ${JSON.stringify(counts)}, expected exactly ${KNOWN_GRAPHQL_CLIENT_COUNT}`];
+}
+
+/** `'uploads.linear.app'` : exactly 2 across the unit plus the proxy relay files. */
+function assetRelayProblems(unit, others) {
+  const counts = { 'workspace-API unit': sumOver(unit, /'uploads\.linear\.app'/g), ...Object.fromEntries(Object.entries(others).map(([k, src]) => [k, count(src, /'uploads\.linear\.app'/g)])) };
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  return total === KNOWN_ASSET_RELAY_COUNT ? [] : [`found ${total} Linear asset-host allowlist(s) ${JSON.stringify(counts)}, expected exactly ${KNOWN_ASSET_RELAY_COUNT}`];
+}
+
+/** `isActiveProviderLinear(workspace)` : exactly 2 across the unit (the audit route refuses 422, the image proxy withholds the header). */
+function providerGuardProblems(unit) {
+  const total = sumOver(unit, /isActiveProviderLinear\(workspace\)/g);
+  return total === 2 ? [] : [`found ${total} isActiveProviderLinear(workspace) guard(s) across the workspace-API unit, expected exactly 2`];
+}
+
+/** `runAudit(` : exactly 1 non-comment call site and 2 raw occurrences (1 call + 1 comment mention) across the unit. */
+function runAuditProblems(unit) {
+  const problems = [];
+  const callSites = Object.entries(unit).flatMap(([rel, src]) => src.split('\n')
+    .filter(line => /runAudit\(/.test(line) && !/^\s*(\/\/|\*|\/\*)/.test(line)).map(() => rel));
+  if (callSites.length !== 1) problems.push(`found ${callSites.length} runAudit( call site(s) across the workspace-API unit, expected exactly 1`);
+  const raw = sumOver(unit, /runAudit\(/g);
+  if (raw !== 2) problems.push(`found ${raw} raw runAudit( occurrence(s) across the workspace-API unit, expected 2 (1 call + 1 comment mention)`);
+  return problems;
+}
+
+/** The raw-mirror Bearer template: 1 in total, the unit contributing one summed key. */
+function workspaceBearerMirrorProblems(unit, others) {
+  const counts = { 'workspace-API unit': sumOver(unit, BEARER_MIRROR_RE), ...Object.fromEntries(Object.entries(others).map(([k, src]) => [k, count(src, BEARER_MIRROR_RE)])) };
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  return total === 1 ? [] : [`found ${total} raw-mirror Bearer template(s) ${JSON.stringify(counts)}, expected exactly 1 (the image proxy)`];
+}
+
+describe('LIN-3861 census — the workspace-API unit (each rule with planted-violation witnesses)', () => {
+  const graphqlOthers = () => Object.fromEntries(['lib/audit.js', 'lib/providers/linear/index.js', 'routes/proxy.js', 'server.js'].map(rel => [rel, read(rel)]));
+  const relayOthers = () => Object.fromEntries(['routes/proxy.js', 'routes/proxy-reads.js'].map(rel => [rel, read(rel)]));
+  const bearerOthers = () => ({ 'routes/proxy.js': read('routes/proxy.js'), 'dashboard unit': Object.values(readUnit()).join('\n') });
+  const CLIENT = "const client = new GraphQLClient('https://api.linear.app/graphql');\n";
+  const RELAY = "const ALLOWED_HOSTS = ['uploads.linear.app'];\n";
+  const GUARD = 'if (!isActiveProviderLinear(workspace)) return refuse();\n';
+  const AUDIT_CALL = 'const report = await runAudit(client, options);\n';
+  const AUDIT_MENTION = '// runAudit() goes straight to GraphQL\n';
+  const BEARER = 'const headers = { Authorization: `Bearer ${workspace.accessToken}` };\n';
+  // Synthetic units, never the live text: the baseline sits in routes/workspace-api.js, plants go elsewhere.
+  const base = { 'routes/workspace-api.js': 'export {};\n', 'routes/workspace-api-prompts.js': 'export {};\n' };
+
+  test('exactly 2 statically Linear-bound GraphQL clients, workspace-API unit included (closes the -prompts/-steps blind spot)', () => {
+    assert.deepEqual(graphqlClientProblems(readW(), graphqlOthers()), []);
+  });
+  test('witness: new GraphQLClient( planted in a W file other than workspace-api.js fails; one moved between W files stays clean', () => {
+    assert.equal(graphqlClientProblems({ ...readW(), 'routes/workspace-api-x.js': CLIENT }, graphqlOthers()).length, 1);
+    assert.equal(graphqlClientProblems({ ...readW(), 'routes/workspace-api-steps.js': CLIENT }, graphqlOthers()).length, 1);
+    assert.deepEqual(graphqlClientProblems({ 'routes/workspace-api-x.js': CLIENT }, { a: CLIENT }), []);
+    assert.deepEqual(graphqlClientProblems({ 'routes/workspace-api.js': CLIENT }, { a: CLIENT }), []);
+  });
+
+  test('exactly 2 raw-fetch relays to Linear asset hosts, workspace-API unit included', () => {
+    assert.deepEqual(assetRelayProblems(readW(), relayOthers()), []);
+  });
+  test('witness: a third uploads.linear.app planted in a W file fails; the image proxy moved to routes/workspace-api-x.js stays clean', () => {
+    assert.equal(assetRelayProblems({ ...readW(), 'routes/workspace-api-x.js': RELAY }, relayOthers()).length, 1);
+    assert.deepEqual(assetRelayProblems({ 'routes/workspace-api-x.js': RELAY }, { 'routes/proxy-reads.js': RELAY }), []);
+  });
+
+  test('exactly 2 isActiveProviderLinear(workspace) guards across the unit', () => {
+    assert.deepEqual(providerGuardProblems(readW()), []);
+  });
+  test('witness: a third guard in a W file fails; one removed fails; the two split across W files stay clean', () => {
+    assert.equal(providerGuardProblems({ ...base, 'routes/workspace-api-x.js': GUARD.repeat(3) }).length, 1);
+    assert.equal(providerGuardProblems({ ...base, 'routes/workspace-api-x.js': GUARD }).length, 1);
+    assert.deepEqual(providerGuardProblems({ 'routes/workspace-api.js': GUARD, 'routes/workspace-api-x.js': GUARD }), []);
+  });
+
+  test('exactly 1 non-comment runAudit( call site and 2 raw occurrences across the unit', () => {
+    // Reported, not fixed: the raw count pins a comment, so blanking comments would fail it.
+    assert.deepEqual(runAuditProblems(readW()), []);
+  });
+  test('witness: a second runAudit( call in a W file fails; the call and its mention split across W files stay clean', () => {
+    assert.equal(runAuditProblems({ 'routes/workspace-api.js': AUDIT_CALL + AUDIT_MENTION, 'routes/workspace-api-x.js': AUDIT_CALL }).length, 2);
+    assert.deepEqual(runAuditProblems({ 'routes/workspace-api.js': AUDIT_MENTION, 'routes/workspace-api-x.js': AUDIT_CALL }), []);
+    assert.equal(runAuditProblems({ 'routes/workspace-api.js': AUDIT_MENTION }).length, 2, 'no call site fails both counts');
+  });
+
+  test('the raw-mirror Bearer template totals 1 with the workspace-API unit summed under one key', () => {
+    assert.deepEqual(workspaceBearerMirrorProblems(readW(), bearerOthers()), []);
+  });
+  test('witness: Bearer ${workspace.accessToken} planted in a W file other than workspace-api.js fails; the image proxy moved stays clean', () => {
+    assert.equal(workspaceBearerMirrorProblems({ ...readW(), 'routes/workspace-api-x.js': BEARER }, bearerOthers()).length, 1);
+    assert.deepEqual(workspaceBearerMirrorProblems({ 'routes/workspace-api-x.js': BEARER }, { 'routes/proxy.js': '', 'dashboard unit': '' }), []);
   });
 });

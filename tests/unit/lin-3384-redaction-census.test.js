@@ -40,9 +40,15 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { isDashboardUnitFile } from './lib/dashboard-unit.js';
+import { isWorkspaceApiUnitFile } from './lib/workspace-api-unit.js';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const STORE_FILE = 'lib/dispatch-store.js';
+// LIN-3861: a site in any workspace-API unit file (routes/workspace-api.js, routes/workspace-api-*.js) is keyed
+// by its route under this one name, so the LIN-2246 moves can place the route in any unit file. Verdict and
+// count stay exact; a W route that is not in the table still fails as an unlisted site.
+const W_UNIT = 'workspace-API unit';
+const siteFile = (file) => (isWorkspaceApiUnitFile(file) ? W_UNIT : file);
 
 function walk(dir) {
   const out = [];
@@ -102,7 +108,7 @@ function scanSites(files) {
       const idx = src.slice(0, m.index).split('\n').length - 1;
       if (/^\s*(\/\/|\*|\/\*)/.test(lines[idx])) continue;
       const { key, body } = enclosing(lines, idx);
-      const id = `${file} :: ${key}`;
+      const id = `${siteFile(file)} :: ${key}`;
       const cur = sites.get(id) || { count: 0, body, kinds: [] };
       cur.count += 1;
       cur.kinds.push(m[1] || m[2] || 'raw-collection-read');
@@ -129,7 +135,7 @@ const TABLE = {
   // LIN-3398: the delete handler's owner-gate read (target only; the row is never sent)
   'routes/dispatch.js :: /workspace/:urlKey/api/dispatch/:itemId': [SRV, 1],
   // LIN-3657: the press route reads the named dispatch row for its issueSource only (the row is never sent)
-  'routes/workspace-api.js :: /workspace/:urlKey/api/run-evidence/:issueIdentifier/close-out-press': [SRV, 1],
+  'workspace-API unit :: /workspace/:urlKey/api/run-evidence/:issueIdentifier/close-out-press': [SRV, 1],
   'routes/dispatch.js :: host': [SRV, 1],
   'routes/dispatch.js :: refuse': [SRV, 1],
   'routes/proxy-kickoff.js :: parentRun': [SRV, 1],
@@ -357,5 +363,44 @@ describe('LIN-3840 census — dashboard unit reader kinds', () => {
     const files = clone().map(f => (isDashboardUnitFile(f.file) ? { ...f, src: f.src.replaceAll('.getItemStatus(', '.nothingReads(') } : f));
     files.push({ file: 'lib/zz-reader.js', src: 'export const r = (s) => s.getItemStatus("u", "i");\n' });
     assert.ok(checkDashboardUnit(files).some(x => x.includes('getItemStatus') && x.includes('no call left')));
+  });
+});
+
+// ─── LIN-3861: the press route's read is a W row ─────────────────────────────
+// Witnesses are built from a SYNTHETIC unit (LIVE with every W file taken out, plus synthetic W files),
+// never from the live text of routes/workspace-api.js, which is free to move.
+describe('LIN-3861 census — the close-out-press read is keyed to the workspace-API unit', () => {
+  const PRESS = '/workspace/:urlKey/api/run-evidence/:issueIdentifier/close-out-press';
+  const route = (path, reads = 1) => `export function mount(router) {\n  router.post('${path}', async (req, res) => {\n${'    const row = await dispatchQueueStore.getItemStatus(req.workspace.urlKey, req.params.issueIdentifier);\n'.repeat(reads)}    res.json({ ok: true });\n  });\n}\n`;
+  const unitOf = (map) => [...LIVE.filter(f => !isWorkspaceApiUnitFile(f.file)), ...Object.entries(map).map(([file, src]) => ({ file, src }))];
+
+  test('the press route in routes/workspace-api.js, or moved to routes/workspace-api-x.js, keeps the census clean', () => {
+    assert.deepEqual(check(unitOf({ 'routes/workspace-api.js': route(PRESS) })), []);
+    assert.deepEqual(check(unitOf({ 'routes/workspace-api-x.js': route(PRESS) })), []);
+    assert.deepEqual(check(unitOf({ 'routes/workspace-api.js': 'export {};\n', 'routes/workspace-api-press.js': route(PRESS) })), []);
+  });
+
+  test('a second getItemStatus read in the press route fails the exact count (1)', () => {
+    const v = check(unitOf({ 'routes/workspace-api-x.js': route(PRESS, 2) }));
+    assert.ok(v.some(x => x.startsWith(`${W_UNIT} :: ${PRESS}: 2 calls, table says 1`)), v.join('\n'));
+  });
+
+  test('the same route split over two W files also counts 2 (the row is keyed to the unit)', () => {
+    const v = check(unitOf({ 'routes/workspace-api.js': route(PRESS), 'routes/workspace-api-x.js': route(PRESS) }));
+    assert.ok(v.some(x => x.startsWith(`${W_UNIT} :: ${PRESS}: 2 calls, table says 1`)), v.join('\n'));
+  });
+
+  test('a getItemStatus in a new W route fails as an unlisted site, wherever in the unit it sits', () => {
+    for (const file of ['routes/workspace-api.js', 'routes/workspace-api-x.js']) {
+      const v = check(unitOf({ [file]: route(PRESS) + route('/workspace/:urlKey/api/leak/:id') }));
+      assert.ok(v.some(x => x.includes('unlisted site') && x.includes(`${W_UNIT} :: /workspace/:urlKey/api/leak/:id`)), `${file}: ${v.join('\n')}`);
+    }
+  });
+
+  test('the press read removed from the unit fails as a stale row; the same route in a non-W file is a different, unlisted key', () => {
+    const stale = check(unitOf({ 'routes/workspace-api.js': 'export {};\n' }));
+    assert.ok(stale.some(x => x.startsWith(`stale row: ${W_UNIT} :: ${PRESS}`)), stale.join('\n'));
+    const elsewhere = check(unitOf({ 'routes/workspace-api.js': route(PRESS), 'routes/zz-press.js': route(PRESS) }));
+    assert.ok(elsewhere.some(x => x.includes('unlisted site') && x.includes(`routes/zz-press.js :: ${PRESS}`)), elsewhere.join('\n'));
   });
 });

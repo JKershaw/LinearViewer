@@ -23,6 +23,10 @@
  *     follow-up/provisionResumeCredential, -/provisionResumeCredential (the refire
  *     broker) and launch/attachProxyContext; any other arm|helper in E fails;
  *   - the location-free shape checks on every E call stay (see entranceShape).
+ * LIN-3861: the workspace-API unit (W: routes/workspace-api.js and routes/workspace-api-*.js,
+ * tests/unit/lib/workspace-api-unit.js) is the second unit. The M4 writer and the two feedback
+ * createDispatchItem calls are keyed to W, not to a file name, so the LIN-2246 moves can place them
+ * in any W file; their counts stay exact (M4 exactly 1, the two lane calls, the two launch mints).
  * Which route reaches which mint, from which origin and with which grants, is
  * carried by dispatch-entrance-mint-sweep.test.js, which spies the real token
  * store boundary while every origin is driven over HTTP. Rows outside E (the lib
@@ -35,6 +39,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { attachProxyContext } from '../../lib/proxy-preamble.js';
+import { isWorkspaceApiUnitFile } from './lib/workspace-api-unit.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO = join(__dirname, '../..');
@@ -98,6 +103,10 @@ const PRODUCTION = loadProductionSources();
 const E_FILES = new Set(['routes/dispatch.js', 'routes/proxy-dispatch.js', 'routes/proxy-kickoff.js', 'lib/dispatch-entrance.js']);
 const inE = (file) => E_FILES.has(file);
 
+// LIN-3861: the workspace-API unit. A site in any W file is keyed `W`, never by file name.
+const inW = (file) => isWorkspaceApiUnitFile(file);
+const siteFile = (file) => (inW(file) ? 'W' : file);
+
 /**
  * Applies a replacement at `needle` in whichever entrance file holds it (the
  * witnesses must not care which of the four that is). Fails loudly if no entrance
@@ -116,6 +125,25 @@ function plantInE(files, needle, replacement) {
   return out;
 }
 
+/**
+ * Appends `text` to whichever W file holds `needle` (the witnesses must not care which of the unit's
+ * files that is). Fails loudly if no W file contains the anchor, so a witness can never pass by
+ * planting nothing. The plantInE shape.
+ */
+function appendToWHolding(files, needle, text) {
+  let planted = false;
+  const out = files.map((f) => {
+    if (planted || !inW(f.file) || !f.src.includes(needle)) return f;
+    planted = true;
+    return { file: f.file, src: `${f.src}\n${text}\n` };
+  });
+  assert.ok(planted, `mutation anchor not found in the workspace-API unit: ${needle}`);
+  return out;
+}
+
+/** The production sources with the whole workspace-API unit taken out, so a W witness plants a synthetic unit. */
+const withoutW = (files) => files.filter(f => !inW(f.file));
+
 /** Appends `text` to one entrance file's source. */
 function appendToE(files, file, text) {
   assert.ok(inE(file), `${file} is not an entrance file`);
@@ -131,21 +159,22 @@ function appendToE(files, file, text) {
 
 // LIN-3601: M1 (kickoff) and M2 (session dispatch) are the two writers in E. The
 // declared-writer allow-list is the one place E is counted exactly: E holds 2,
-// wherever they sit. M4 (feedback autopilot) is outside E and stays exact.
+// wherever they sit. M4 (feedback autopilot) is outside E and stays exact: W (the workspace-API
+// unit, LIN-3861) holds exactly 1, in whichever of its files.
 const F3_WRITERS = [
   { site: 'M1+M2', unit: 'E', count: 2, text: "declaredGrants: ['dispatch']," },
-  { site: 'M4', file: 'routes/workspace-api.js', text: "declaredGrants: ['dispatch']," }
+  { site: 'M4', unit: 'W', count: 1, text: "declaredGrants: ['dispatch']," }
 ];
 
 /** F3 against the allowed writer set: each listed writer exactly as often as listed, nothing unlisted. */
 function checkF3(files, allowed = F3_WRITERS) {
   const v = [];
   const hits = scanF3(files);
-  const belongs = (w, h) => h.text === w.text && (w.unit === 'E' ? inE(h.file) : w.file === h.file);
+  const belongs = (w, h) => h.text === w.text && (w.unit === 'E' ? inE(h.file) : w.unit === 'W' ? inW(h.file) : w.file === h.file);
   for (const w of allowed) {
     const found = hits.filter(h => belongs(w, h)).length;
     const expected = w.count ?? 1;
-    if (found !== expected) v.push(`${w.site} (${w.unit === 'E' ? 'the dispatch entrances' : w.file}): expected exactly ${expected === 1 ? 'one writer' : `${expected} writers`}, found ${found}`);
+    if (found !== expected) v.push(`${w.site} (${w.unit === 'E' ? 'the dispatch entrances' : w.unit === 'W' ? 'the workspace-API unit' : w.file}): expected exactly ${expected === 1 ? 'one writer' : `${expected} writers`}, found ${found}`);
   }
   for (const h of hits) {
     if (!allowed.some(w => belongs(w, h))) v.push(`unlisted writer: ${h.file}:${h.line} ${h.text}`);
@@ -174,10 +203,27 @@ describe('F3 — the declared-mint writer set is exactly M1+M2 (in E) and M4', (
     assert.ok(checkF3(mutated).some(m => m.startsWith('unlisted writer: routes/collective.js')));
   });
 
-  test('mutation: a second literal at a listed site fails F3', () => {
-    const mutated = PRODUCTION.map(f => (f.file === 'routes/workspace-api.js'
-      ? { ...f, src: `${f.src}\n          declaredGrants: ['dispatch'],\n` } : f));
-    assert.ok(checkF3(mutated).some(m => m.startsWith('M4 (routes/workspace-api.js): expected exactly one writer, found 2')));
+  // LIN-3861: re-anchored from routes/workspace-api.js to whichever W file holds the literal.
+  test('mutation: a second literal in any W file fails F3 (M4 is exactly 1 over the unit)', () => {
+    const mutated = appendToWHolding(PRODUCTION, "declaredGrants: ['dispatch'],", "          declaredGrants: ['dispatch'],");
+    assert.ok(checkF3(mutated).some(m => m.startsWith('M4 (the workspace-API unit): expected exactly one writer, found 2')), checkF3(mutated).join('\n'));
+  });
+
+  // LIN-3861 W witnesses, built from a synthetic unit (never the live text of routes/workspace-api.js).
+  const M4_LITERAL = "      declaredGrants: ['dispatch'],\n";
+  test('the M4 writer in a synthetic routes/workspace-api-x.js passes F3 (W is judged whole)', () => {
+    assert.deepEqual(checkF3([...withoutW(PRODUCTION), { file: 'routes/workspace-api-x.js', src: M4_LITERAL }]), []);
+    assert.deepEqual(checkF3([...withoutW(PRODUCTION), { file: 'routes/workspace-api.js', src: M4_LITERAL }]), []);
+  });
+  test('M4 split over two synthetic W files fails F3 (exactly 1 over the unit), and M4 removed from W fails (found 0)', () => {
+    const two = checkF3([...withoutW(PRODUCTION), { file: 'routes/workspace-api.js', src: M4_LITERAL }, { file: 'routes/workspace-api-x.js', src: M4_LITERAL }]);
+    assert.ok(two.some(m => m.startsWith('M4 (the workspace-API unit): expected exactly one writer, found 2')), two.join('\n'));
+    const none = checkF3(withoutW(PRODUCTION));
+    assert.ok(none.some(m => m.startsWith('M4 (the workspace-API unit): expected exactly one writer, found 0')), none.join('\n'));
+  });
+  test('a declaredGrants literal in a non-W, non-E file still fails F3 as unlisted', () => {
+    const mutated = [...withoutW(PRODUCTION), { file: 'routes/workspace-api.js', src: M4_LITERAL }, { file: 'routes/zz-lane.js', src: M4_LITERAL }];
+    assert.ok(checkF3(mutated).some(m => m.startsWith('unlisted writer: routes/zz-lane.js')));
   });
 
   test('mutation: a listed writer removed from E fails F3 (the set never shrinks silently)', () => {
@@ -413,7 +459,9 @@ function scanDispatchCalls(files) {
   return calls;
 }
 
-const callKey = (c) => `${c.file} | ${c.construct} | ${c.kind}`;
+// LIN-3861: a call in any workspace-API unit file is keyed `W | construct | kind` (the file is dropped;
+// construct and kind stay exact).
+const callKey = (c) => `${siteFile(c.file)} | ${c.construct} | ${c.kind}`;
 
 // The follow-up-carrying calls (Class F) OUTSIDE E. `predicate` is null where the
 // call is a follow-up by construction (no launch arm). LIN-3601: the four
@@ -428,8 +476,8 @@ const FOLLOWUP_SITES = [
 // The calls outside E with no follow-up (launch or leaf only).
 const NON_FOLLOWUP_CALLS = [
   "routes/collective.js | POST /workspace/:urlKey/collective/start | kind: 'custom'",
-  "routes/workspace-api.js | function enqueueFeedbackTriage | kind: 'triage'",
-  "routes/workspace-api.js | function enqueueFeedbackAutopilot | kind: 'autopilot'"
+  "W | function enqueueFeedbackTriage | kind: 'triage'",
+  "W | function enqueueFeedbackAutopilot | kind: 'autopilot'"
 ];
 
 // The two follow-up gate forms an E call may use: `if (isFollowUp) {` (the proxy
@@ -581,7 +629,7 @@ function scanMintSites(files) {
             arm = gate && idx > gate.open && idx < gate.close ? 'follow-up' : 'launch';
           }
         }
-        const key = `${file} | ${construct} | ${arm} | ${fn}`;
+        const key = `${siteFile(file)} | ${construct} | ${arm} | ${fn}`;
         counts.set(key, (counts.get(key) || 0) + 1);
       }
     }
@@ -614,10 +662,10 @@ const MINT_SITE_TABLE = [
   { key: 'lib/follow-up-dispatch.js | function enqueueFollowUp [(none)] | follow-up | provisionResumeCredential', count: 1, cls: 'followup-helper', modes: ['pbt'], reason: 'enqueueFollowUp: a follow-up by construction (dispatchSessionFollowUp: approve-follow-up + Apply; the CI wake sweep, LIN-3661)' },
   { key: 'lib/chat-tools.js | tool send_follow_up [(none)] | follow-up | provisionResumeCredential', count: 1, cls: 'followup-helper', modes: ['pbt'], reason: 'send_follow_up: a follow-up by construction' },
   { key: 'lib/wake-credential.js | function buildWakeCredentialProvisioner | - | provisionResumeCredential', count: 1, cls: 'wake-helper', reason: 'the wake (Class F eleventh member)' },
-  { key: "routes/workspace-api.js | function enqueueFeedbackAutopilot [kind: 'autopilot'] | launch | attachProxyContext", count: 1, cls: 'launch-M4', reason: 'feedback autopilot launch: declared M4 (LIN-3136)' },
+  { key: "W | function enqueueFeedbackAutopilot [kind: 'autopilot'] | launch | attachProxyContext", count: 1, cls: 'launch-M4', reason: 'feedback autopilot launch: declared M4 (LIN-3136)' },
   { key: "routes/collective.js | POST /workspace/:urlKey/collective/start [kind: 'custom'] | launch | attachProxyContext", count: 1, cls: 'leaf', reason: 'collective participant: never holds dispatch' },
   { key: "routes/collective.js | POST /workspace/:urlKey/collective/start [kind: 'custom'] | launch | provisionBootstrapToken", count: 1, cls: 'leaf', reason: 'collective participant prose branch' },
-  { key: "routes/workspace-api.js | function enqueueFeedbackTriage [kind: 'triage'] | launch | attachProxyContext", count: 1, cls: 'leaf', reason: 'feedback triage worker: never holds dispatch' },
+  { key: "W | function enqueueFeedbackTriage [kind: 'triage'] | launch | attachProxyContext", count: 1, cls: 'leaf', reason: 'feedback triage worker: never holds dispatch' },
   { key: 'lib/proxy-preamble.js | function attachProxyContext | - | provisionBootstrapToken', count: 1, cls: 'internal', reason: 'attach delegates its mint' },
   { key: 'lib/proxy-preamble.js | function provisionResumeCredential | - | attachProxyContext', count: 2, cls: 'internal', reason: 'the helper\'s attach mode (no record / record)' },
   { key: 'lib/proxy-preamble.js | function provisionResumeCredential | - | provisionBootstrapToken', count: 2, cls: 'internal', reason: 'the helper\'s pbt mode (no record / record)' }
@@ -1127,5 +1175,56 @@ describe('C2 (i) closure — no aliased or computed addItem reference', () => {
   test('mutation: a computed-access writer (store[\'addItem\']) fails', () => {
     const mutated = [...PRODUCTION, { file: 'routes/new-bracket.js', src: "export function w(s, u, p) {\n  return s['addItem'](u, { prompt: p });\n}" }];
     assert.notDeepEqual(scanAddItemNonCallRefs(mutated), ADD_ITEM_NON_CALL_REFS);
+  });
+});
+
+// ── LIN-3861: the feedback lanes as W (workspace-API unit) rows ───────────────
+// Witnesses are built from a SYNTHETIC unit (withoutW + synthetic W files), never from the live text of
+// routes/workspace-api.js, which is free to move. A W site is keyed `W | function … | kind` (calls) and
+// `W | function … [kind] | launch | attachProxyContext` (mints): the file is dropped, construct, kind and
+// counts stay exact, and an unlisted W site still fails.
+describe('LIN-3861 — the two feedback lanes are W rows (NON_FOLLOWUP_CALLS and MINT_SITE_TABLE)', () => {
+  const lane = (name, kind, withMint) =>
+    `async function ${name}(ctx) {\n  return createDispatchItem({ store: ctx.store, kind: '${kind}', ${withMint ? 'finalizePrompt: (h) => attachProxyContext({ h }), ' : ''}fields: { a: 1 } });\n}\n`;
+  const TRIAGE = lane('enqueueFeedbackTriage', 'triage', true);
+  const AUTOPILOT = lane('enqueueFeedbackAutopilot', 'autopilot', true);
+  const unit = (map) => [...withoutW(PRODUCTION), ...Object.entries(map).map(([file, src]) => ({ file, src }))];
+
+  test('both lanes in one synthetic W file, or split over two, keep the call census and the mint census clean', () => {
+    for (const map of [
+      { 'routes/workspace-api.js': TRIAGE + AUTOPILOT },
+      { 'routes/workspace-api-x.js': TRIAGE + AUTOPILOT },
+      { 'routes/workspace-api.js': TRIAGE, 'routes/workspace-api-feedback.js': AUTOPILOT }
+    ]) {
+      assert.deepEqual(censusC2(unit(map)), [], Object.keys(map).join(','));
+      assert.deepEqual(censusClassification(unit(map)), [], Object.keys(map).join(','));
+    }
+  });
+
+  test('a third createDispatchItem call in any W file fails the call census (unlisted), and the outside-E total of 5 stays exact', () => {
+    const extra = lane('enqueueFeedbackExtra', 'extra', false);
+    const v = censusC2(unit({ 'routes/workspace-api-x.js': TRIAGE + AUTOPILOT + extra }));
+    assert.ok(v.some(m => m.startsWith("(i) unlisted createDispatchItem call: W | function enqueueFeedbackExtra | kind: 'extra'")), v.join('\n'));
+    assert.equal(scanDispatchCalls(unit({ 'routes/workspace-api-x.js': TRIAGE + AUTOPILOT + extra })).filter(c => !inE(c.file)).length, 6);
+  });
+
+  test('a lane removed from W fails the call census (stale) and the mint census (stale table entry)', () => {
+    const v = censusC2(unit({ 'routes/workspace-api.js': AUTOPILOT }));
+    assert.ok(v.some(m => m.startsWith("(i) stale non-follow-up call (not found): W | function enqueueFeedbackTriage | kind: 'triage'")), v.join('\n'));
+    const m = censusClassification(unit({ 'routes/workspace-api.js': AUTOPILOT }));
+    assert.ok(m.some(x => x.startsWith("stale table entry: W | function enqueueFeedbackTriage [kind: 'triage'] | launch | attachProxyContext")), m.join('\n'));
+  });
+
+  test('an unlisted mint helper call in a synthetic W file fails the mint census; a second listed mint fails the count', () => {
+    const rogue = 'async function rogueHelper(ctx) {\n  return provisionBootstrapToken({ ctx });\n}\n';
+    const unlisted = censusClassification(unit({ 'routes/workspace-api.js': TRIAGE + AUTOPILOT, 'routes/workspace-api-x.js': rogue }));
+    assert.ok(unlisted.some(m => m.startsWith('unlisted mint site: W | function rogueHelper | - | provisionBootstrapToken')), unlisted.join('\n'));
+    const twice = censusClassification(unit({ 'routes/workspace-api.js': TRIAGE + AUTOPILOT, 'routes/workspace-api-x.js': TRIAGE }));
+    assert.ok(twice.some(m => m.startsWith("count drift: W | function enqueueFeedbackTriage [kind: 'triage'] | launch | attachProxyContext expected x1, found x2")), twice.join('\n'));
+  });
+
+  test('a lane in a non-W file is not a W row: it fails as an unlisted call', () => {
+    const v = censusC2(unit({ 'routes/workspace-api.js': TRIAGE + AUTOPILOT, 'routes/zz-lane.js': lane('enqueueFeedbackTriage', 'triage', false) }));
+    assert.ok(v.some(m => m.startsWith("(i) unlisted createDispatchItem call: routes/zz-lane.js | function enqueueFeedbackTriage")), v.join('\n'));
   });
 });

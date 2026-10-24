@@ -10,7 +10,7 @@ The script is `scripts/backfill-kpi-daily-rollup.mjs`, a thin CLI over
 
 ## Steps
 
-1. **Build the history index** by running the deferred-index script ([deferred-index-build.md](deferred-index-build.md); with John's approval, at a quiet time). The `{ urlKey: 1, dispatchedAt: 1 }` index is a declared `deferred` spec: boot does not build it and the server never does.
+1. **Build the history index** by running the deferred-index script ([deferred-index-build.md](deferred-index-build.md)). The `{ urlKey: 1, dispatchedAt: 1 }` index is a declared `deferred` spec: boot does not build it, but the server builds it in the background after `listen` (LIN-3865), so on a deployed instance it is normally already there.
 
    Without it the script exits 3 (`index missing: see runbook`) before reading anything. It exits 3 as well when the index state cannot be read (`listIndexes` failed), and says so; only a confirmed build passes.
 

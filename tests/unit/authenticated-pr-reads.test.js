@@ -25,6 +25,7 @@ import { readRunEvidence } from '../../lib/run-evidence.js';
 import { renderTaskPullRequest } from '../../lib/render-task-page.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
+import { findRouteLayer } from './lib/route-layer.js';
 
 const REPO = 'acme/widget';
 const PR_URL = `https://github.com/${REPO}/pull/12`;
@@ -309,8 +310,7 @@ describe('readRunEvidence default reader (run page / run-evidence route path)', 
 
 describe('routes', () => {
   function getHandler(router, method, path) {
-    const layer = router.stack.find(l => l.route?.path === path && l.route.methods[method]);
-    assert.ok(layer, `${method} ${path} registered`);
+    const layer = findRouteLayer(router, method, path);
     return layer.route.stack[layer.route.stack.length - 1].handle;
   }
   function resObj() {

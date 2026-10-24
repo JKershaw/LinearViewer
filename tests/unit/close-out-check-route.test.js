@@ -14,6 +14,7 @@ import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { CloseOutEventsStore } from '../../lib/close-out-events-store.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { findRouteLayer } from './lib/route-layer.js';
 
 const CHECK_PATH = '/workspace/:urlKey/api/run-evidence/:issueIdentifier/check';
 const PRESS_PATH = '/workspace/:urlKey/api/run-evidence/:issueIdentifier/close-out-press';
@@ -27,8 +28,7 @@ before(() => harness.connect());
 after(() => harness.close());
 
 function getHandler(router, method, path) {
-  const layer = router.stack.find(l => l.route?.path === path && l.route.methods[method]);
-  assert.ok(layer, `${method.toUpperCase()} ${path} route is registered`);
+  const layer = findRouteLayer(router, method, path);
   return layer.route.stack[layer.route.stack.length - 1].handle;
 }
 
