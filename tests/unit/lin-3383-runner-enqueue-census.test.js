@@ -32,12 +32,20 @@
  * an unlisted kind fails. Which route reaches a sink, and behind which gate, is
  * carried by the route sweeps (dispatch-entrance-session-owner-sweep and
  * dispatch-entrance-proxy-grant-sweep), which call the routes over HTTP.
+ *
+ * LIN-3861: the workspace-API unit (W: routes/workspace-api.js and routes/workspace-api-*.js,
+ * tests/unit/lib/workspace-api-unit.js) is the second unit. The feedback row (3-4) is keyed to W,
+ * not to a file name, so the LIN-2246 moves can place the feedback handler and its two helpers in any
+ * W file: the handler is found in EXACTLY ONE W file (zero or two fails), `count` is exact over W, and
+ * `onlyCalledIn` holds over W. Its witnesses plant in whichever W file holds the anchor and fail loudly
+ * if none does (the plantInE shape of lin-3134-declared-mint-census.test.js).
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, relative } from 'node:path';
+import { isWorkspaceApiUnitFile } from './lib/workspace-api-unit.js';
 
 // LIN-3635: feedbackSubmitLimiter skips only under NODE_ENV=test; this file posts the
 // route more than its 5-per-window budget.
@@ -101,7 +109,7 @@ function findSinks(tree) {
  * must each be preceded, inside that text, by GATE (or the row's own `gate`).
  */
 const MEMBERS = [
-  { id: '3-4', file: 'routes/workspace-api.js', sink: 'createDispatchItem', count: 2, verdict: 'gated',
+  { id: '3-4', unit: 'W', sink: 'createDispatchItem', count: 2, verdict: 'gated',
     reason: 'feedback triage + autopilot lanes; the two helper callers below are the only entry and sit in the feedback handler',
     handler: "router.post('/workspace/:urlKey/api/feedback'", before: ['enqueueFeedbackTriage(', 'enqueueFeedbackAutopilot('],
     onlyCalledIn: ['enqueueFeedbackTriage(', 'enqueueFeedbackAutopilot('] },
@@ -155,6 +163,9 @@ const MEMBERS = [
  * Non-E rows keep their exact counts and positional gates (MEMBERS above).
  */
 const E_FILES = new Set(['routes/dispatch.js', 'routes/proxy-dispatch.js', 'routes/proxy-kickoff.js', 'lib/dispatch-entrance.js']);
+// LIN-3861: a sink in any workspace-API unit file is counted under the one key `W`.
+const inW = (file) => isWorkspaceApiUnitFile(file);
+const siteOf = (file) => (inW(file) ? 'W' : file);
 const E_MEMBERS = [
   { sink: 'createDispatchItem', verdict: 'gated', reason: 'session POST /api/dispatch (LIN-3383 owner gate: every browser launcher lands here) and the three proxy POSTs behind requireGrant(\'dispatch\') (LIN-3136; the grant is minted owner-checked only)' },
   { sink: 'expandCascadeAborts', verdict: 'gated', reason: 'cascade abort expansion writes runner-consumed abort rows without the factory: the session POST behind the owner gate, the proxy POST behind the dispatch grant' },
@@ -252,10 +263,10 @@ function scanSinks(tree) {
     }
   }
   const counts = {};
-  for (const h of hits) { const k = `${h.file}|${h.sink}`; counts[k] = (counts[k] || 0) + 1; }
+  for (const h of hits) { const k = `${siteOf(h.file)}|${h.sink}`; counts[k] = (counts[k] || 0) + 1; }
   const listed = new Set();
   for (const m of MEMBERS) {
-    const k = `${m.file}|${m.sink}`;
+    const k = `${m.unit === 'W' ? 'W' : m.file}|${m.sink}`;
     if (listed.has(k)) v.push(`table lists ${k} twice`);
     listed.add(k);
     if (!m.reason) v.push(`${k}: a row needs a recorded reason`);
@@ -267,42 +278,57 @@ function scanSinks(tree) {
   }
   for (const k of Object.keys(counts)) {
     if (!listed.has(k)) {
-      const lines = hits.filter(h => `${h.file}|${h.sink}` === k).map(h => h.line).join(',');
+      const lines = hits.filter(h => `${siteOf(h.file)}|${h.sink}` === k).map(h => `${h.file}:${h.line}`).join(',');
       v.push(`${k}: an unlisted session-reachable sink (line ${lines}) — give it a gated | token-scoped verdict`);
     }
   }
 
   for (const m of MEMBERS.filter(x => x.verdict === 'gated' || x.verdict === 'store-gated')) {
-    const f = tree.find(t => t.file === m.file);
-    if (!f) { v.push(`${m.file}: missing`); continue; }
     const where = m.handler || m.fn;
+    let f;
+    if (m.unit === 'W') {
+      // LIN-3861: the handler is found in EXACTLY ONE W file; zero or two fails.
+      const holders = tree.filter(t => inW(t.file) && (m.handler ? handlerText(t.src, m.handler) : functionText(t.src, m.fn)) !== null);
+      if (holders.length !== 1) { v.push(`W (${where}): found in ${holders.length} workspace-API unit file(s) (${holders.map(h => h.file).join(', ') || 'none'}), expected exactly one`); continue; }
+      f = holders[0];
+    } else {
+      f = tree.find(t => t.file === m.file);
+      if (!f) { v.push(`${m.file}: missing`); continue; }
+    }
+    const file = f.file;
     const text = m.handler ? handlerText(f.src, m.handler) : functionText(f.src, m.fn);
-    if (text === null) { v.push(`${m.file}: ${where} not found`); continue; }
+    if (text === null) { v.push(`${file}: ${where} not found`); continue; }
     const gate = m.gateToken || GATE;
-    for (const msg of gatedBefore(text, m.before || [], gate)) v.push(`${m.file} (${where}): ${msg}`);
+    for (const msg of gatedBefore(text, m.before || [], gate)) v.push(`${file} (${where}): ${msg}`);
     if (m.helper) {
       const helperText = functionText(f.src, m.helper.fn);
-      if (helperText === null) v.push(`${m.file}: gate helper ${m.helper.fn} not found`);
+      if (helperText === null) v.push(`${file}: gate helper ${m.helper.fn} not found`);
       else for (const token of m.helper.contains) {
-        if (!helperText.slice(0, helperText.indexOf('\n  }\n') + 1 || undefined).includes(token)) v.push(`${m.file}: gate helper ${m.helper.fn} lost ${token}`);
+        if (!helperText.slice(0, helperText.indexOf('\n  }\n') + 1 || undefined).includes(token)) v.push(`${file}: gate helper ${m.helper.fn} lost ${token}`);
       }
     }
-    if (m.failClosed && !text.includes(m.failClosed)) v.push(`${m.file} (${where}): missing the fail-closed branch ${m.failClosed}`);
+    if (m.failClosed && !text.includes(m.failClosed)) v.push(`${file} (${where}): missing the fail-closed branch ${m.failClosed}`);
     for (const token of m.passes || []) {
       const block = callBlock(text, text.indexOf(`${m.sink}(`));
-      if (!block.includes(token)) v.push(`${m.file} (${where}): the ${m.sink}( call does not pass ${token}`);
+      if (!block.includes(token)) v.push(`${file} (${where}): the ${m.sink}( call does not pass ${token}`);
     }
+    // `onlyCalledIn` is over the whole unit for a W row: the handler's own text is the one inside, every other
+    // call (in its file, or in any other W file) is outside.
+    const scope = m.unit === 'W' ? tree.filter(t => inW(t.file)) : [f];
     for (const helper of m.onlyCalledIn || []) {
       const handlerStart = f.src.indexOf(m.handler);
       const handlerEnd = handlerStart + text.length;
-      let from = 0;
-      for (;;) {
-        const at = f.src.indexOf(helper, from);
-        if (at === -1) break;
-        const lineStart = f.src.lastIndexOf('\n', at) + 1;
-        const isDef = /function\s+\w*$/.test(f.src.slice(lineStart, at));
-        if (!isDef && (at < handlerStart || at > handlerEnd)) v.push(`${m.file}: ${helper} is also called outside ${m.handler} (ungated entry)`);
-        from = at + helper.length;
+      for (const t of scope) {
+        let from = 0;
+        for (;;) {
+          const at = t.src.indexOf(helper, from);
+          if (at === -1) break;
+          const lineStart = t.src.lastIndexOf('\n', at) + 1;
+          const isDef = /function\s+\w*$/.test(t.src.slice(lineStart, at));
+          const inside = t === f && at >= handlerStart && at <= handlerEnd;
+          if (!isDef && !inside) v.push(`${t.file}: ${helper} is also called outside ${m.handler} (ungated entry)`);
+          from = at + helper.length;
+        }
       }
     }
   }
@@ -380,6 +406,19 @@ describe('LIN-3383 census — every session-reachable runner enqueue sink is gat
 // ── mutation witnesses ───────────────────────────────────────────────────────
 
 const mutate = (file, fn) => TREE.map(t => (t.file === file ? { ...t, src: fn(t.src) } : t));
+// LIN-3861: plant in whichever W file holds `anchor`; fails loudly if none does, so a witness can never
+// pass by planting nothing (the plantInE shape of lin-3134-declared-mint-census.test.js).
+function mutateWHolding(anchor, fn) {
+  let planted = false;
+  const out = TREE.map(t => {
+    if (planted || !inW(t.file) || !t.src.includes(anchor)) return t;
+    planted = true;
+    return { ...t, src: fn(t.src) };
+  });
+  assert.ok(planted, `mutation anchor not found in the workspace-API unit: ${anchor}`);
+  return out;
+}
+const W_FILE_START = /^routes\/workspace-api(?:-[^/]+)?\.js/;
 
 describe('LIN-3383 census — mutation witnesses', () => {
   // LIN-3601: 'removing the Dispatch route gate' and 'moving the cascade expansion
@@ -390,12 +429,12 @@ describe('LIN-3383 census — mutation witnesses', () => {
   // mutations were shown failing that test in a scratch copy (PR evidence).
 
   test('removing the feedback lane gate fails the census', () => {
-    const v = scanSinks(mutate('routes/workspace-api.js', s => s.replaceAll('resolveRunnerOwnerRefusal(', 'noGate(')));
-    assert.ok(v.some(m => m.startsWith('routes/workspace-api.js') && m.includes('enqueueFeedbackTriage(')), v.join('\n'));
+    const v = scanSinks(mutateWHolding("router.post('/workspace/:urlKey/api/feedback'", s => s.replaceAll('resolveRunnerOwnerRefusal(', 'noGate(')));
+    assert.ok(v.some(m => W_FILE_START.test(m) && m.includes('enqueueFeedbackTriage(')), v.join('\n'));
   });
 
   test('a second, ungated caller of a feedback helper fails the census', () => {
-    const v = scanSinks(mutate('routes/workspace-api.js', s => s.replace("  router.post('/workspace/:urlKey/api/feedback'", "  router.post('/workspace/:urlKey/api/x', async () => { await enqueueFeedbackTriage(); });\n  router.post('/workspace/:urlKey/api/feedback'")));
+    const v = scanSinks(mutateWHolding("router.post('/workspace/:urlKey/api/feedback'", s => s.replace("  router.post('/workspace/:urlKey/api/feedback'", "  router.post('/workspace/:urlKey/api/x', async () => { await enqueueFeedbackTriage(); });\n  router.post('/workspace/:urlKey/api/feedback'")));
     assert.ok(v.some(m => m.includes('also called outside')), v.join('\n'));
   });
 
@@ -559,5 +598,62 @@ describe('LIN-3409 census — mutation witnesses for the runner-state sinks', ()
 
   test('there is no pending verdict, and the closed set is exactly the four named', () => {
     assert.deepEqual(VERDICTS, ['gated', 'token-scoped', 'store-gated', 'test-only']);
+  });
+});
+
+// ── LIN-3861: the feedback row is a W row ────────────────────────────────────
+// Witnesses are built from a SYNTHETIC unit (the tree with every W file taken out, plus synthetic W
+// files), never from the live text of routes/workspace-api.js, which is free to move.
+describe('LIN-3861 census — the feedback row (3-4) is judged over the workspace-API unit', () => {
+  const HANDLER = "  router.post('/workspace/:urlKey/api/feedback', async (req, res) => {\n    const refusal = await resolveRunnerOwnerRefusal(req);\n    await enqueueFeedbackTriage();\n    await enqueueFeedbackAutopilot();\n  });\n";
+  const HELPERS = "  async function enqueueFeedbackTriage() {\n    return createDispatchItem({ lane: 1 });\n  }\n  async function enqueueFeedbackAutopilot() {\n    return createDispatchItem({ lane: 2 });\n  }\n";
+  const wrap = (body) => `export function createRoutes(router) {\n${body}  return router;\n}\n`;
+  const unitOf = (map) => [...TREE.filter(t => !inW(t.file)), ...Object.entries(map).map(([file, src]) => ({ file, src }))];
+  const w = (map) => scanSinks(unitOf(map));
+
+  test('handler and helpers in one synthetic W file, in routes/workspace-api-x.js, or helpers in a sibling, all pass', () => {
+    assert.deepEqual(w({ 'routes/workspace-api.js': wrap(HELPERS + HANDLER) }), []);
+    assert.deepEqual(w({ 'routes/workspace-api-x.js': wrap(HELPERS + HANDLER) }), []);
+    // the helpers may be defined anywhere in the unit; only their CALLS are bound to the handler
+    assert.deepEqual(w({ 'routes/workspace-api.js': wrap(HANDLER), 'routes/workspace-api-feedback.js': wrap(HELPERS) }), []);
+  });
+
+  test('a third createDispatchItem( in any W file fails the exact count (2)', () => {
+    const v = w({ 'routes/workspace-api.js': wrap(HELPERS + HANDLER), 'routes/workspace-api-x.js': wrap("  async function other() {\n    return createDispatchItem({ lane: 3 });\n  }\n") });
+    assert.ok(v.some(m => m.startsWith('W|createDispatchItem: expected 2 sink(s), found 3')), v.join('\n'));
+  });
+
+  test('one lane removed fails the exact count (found 1)', () => {
+    const one = "  async function enqueueFeedbackTriage() {\n    return createDispatchItem({ lane: 1 });\n  }\n";
+    const v = w({ 'routes/workspace-api.js': wrap(one + HANDLER.replace('    await enqueueFeedbackAutopilot();\n', '')) });
+    assert.ok(v.some(m => m.startsWith('W|createDispatchItem: expected 2 sink(s), found 1')), v.join('\n'));
+  });
+
+  test('the handler found in zero W files fails, and in two W files fails (exactly one)', () => {
+    const zero = w({ 'routes/workspace-api.js': wrap(HELPERS) });
+    assert.ok(zero.some(m => m.includes('found in 0 workspace-API unit file(s)') && m.includes('expected exactly one')), zero.join('\n'));
+    const two = w({ 'routes/workspace-api.js': wrap(HELPERS + HANDLER), 'routes/workspace-api-x.js': wrap(HANDLER) });
+    assert.ok(two.some(m => m.includes('found in 2 workspace-API unit file(s)') && m.includes('expected exactly one')), two.join('\n'));
+  });
+
+  test('a helper called outside the handler, in the same W file or in another W file, fails (ungated entry)', () => {
+    const same = w({ 'routes/workspace-api.js': wrap(HELPERS + HANDLER + "  router.post('/workspace/:urlKey/api/x', async () => {\n    await enqueueFeedbackTriage();\n  });\n") });
+    assert.ok(same.some(m => m.includes('enqueueFeedbackTriage( is also called outside')), same.join('\n'));
+    const other = w({ 'routes/workspace-api.js': wrap(HELPERS + HANDLER), 'routes/workspace-api-x.js': wrap("  router.get('/x', async () => {\n    await enqueueFeedbackAutopilot();\n  });\n") });
+    assert.ok(other.some(m => m.startsWith('routes/workspace-api-x.js: enqueueFeedbackAutopilot( is also called outside')), other.join('\n'));
+  });
+
+  test('the owner gate removed from the handler (wherever it sits) fails', () => {
+    const v = w({ 'routes/workspace-api-x.js': wrap(HELPERS + HANDLER.replace('resolveRunnerOwnerRefusal(req)', 'noGate(req)')) });
+    assert.ok(v.some(m => m.startsWith('routes/workspace-api-x.js') && m.includes('is reached before resolveRunnerOwnerRefusal(')), v.join('\n'));
+  });
+
+  test('a createDispatchItem( in a non-W file is not the feedback row: it fails as an unlisted sink', () => {
+    const v = w({ 'routes/workspace-api.js': wrap(HELPERS + HANDLER), 'routes/zz-lane.js': wrap("  async function lane() {\n    return createDispatchItem({ lane: 4 });\n  }\n") });
+    assert.ok(v.some(m => m.startsWith('routes/zz-lane.js|createDispatchItem') && m.includes('unlisted')), v.join('\n'));
+  });
+
+  test('mutateWHolding fails loudly when no W file holds the anchor (a witness cannot pass by planting nothing)', () => {
+    assert.throws(() => mutateWHolding('this anchor is in no workspace-API file', s => s), /mutation anchor not found in the workspace-API unit/);
   });
 });
