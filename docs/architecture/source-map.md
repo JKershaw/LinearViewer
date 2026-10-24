@@ -326,7 +326,10 @@ tests/
   fixtures/            Shared mock data and test helpers
   screenshots/         Reference images for visual specs
   visual/              Playwright visual-regression specs
+  measures/            css-measures.mjs: the CSS measures of a commit (spacing, font sizes, button classes, breakpoints, duplicate bodies); `node --test tests/measures/` for its tests. Not in `npm test` (LIN-3887)
+  judge/               visual-replay.mjs: the visual replay judge, base commit against head on two exports at zero tolerance (own Playwright config, no committed images); `pages.mjs` is its page list. Not in `npm test` (LIN-3887)
 docs/
+  architecture/ui-pieces.md    Who owns each shared UI decision Settings stands on, how to count its sites, what Consolidate deletes, and the measures at the series base (LIN-3886/LIN-3887)
   reviews/                     Periodical review reports (LIN-1967). Canonical, discoverable location: a
                                periodical's report lives on `main` at `docs/reviews/<periodical-name>-<date>.md`
                                (e.g. `docs/reviews/documentation-review-2026-08-23.md`), landed via a normal

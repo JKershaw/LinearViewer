@@ -1,0 +1,171 @@
+/**
+ * Visual replay (LIN-3887): opens the same fixed list of pages and states on a BASE server and a
+ * HEAD server (each an export of its own commit, see visual-replay.mjs), screenshots both at
+ * 1280×900 and 390×844 in light and dark, and compares them at zero tolerance.
+ *
+ * Two tiers. (1) PNG bytes equal = zero difference. (2) Bytes differ: Playwright's own
+ * comparator with threshold 0 and maxDiffPixels 0 counts the differing pixels. Bytes that differ
+ * with zero differing pixels are their own row ("bytes differ, pixels equal"), never a pass.
+ *
+ * Seeded through tests/fixtures/local-harness.js (the local provider), not the mock fixtures.
+ * Nothing leaves the machine: every non-loopback request is aborted.
+ */
+import { test, expect } from '@playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
+import { defaultLocalSeed } from '../fixtures/local-harness.js';
+import { PAGES, VIEWPORTS, THEMES, FROZEN_TIME, NORMALISE, parsePixelDiff } from './pages.mjs';
+
+const BASE_URL = process.env.JUDGE_BASE_URL;
+const HEAD_URL = process.env.JUDGE_HEAD_URL;
+const RESULTS = process.env.JUDGE_RESULTS;
+const PROBE = process.env.JUDGE_PROBE_SELECTOR || '';
+const ATTEMPTS = 3;
+const ONLY = process.env.JUDGE_ONLY ? new RegExp(process.env.JUDGE_ONLY) : null;
+
+const isLoopback = (url) => /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(url) || url.startsWith('data:') || url.startsWith('blob:');
+
+async function openContext(browser, baseURL, viewport, theme, urlKey) {
+  const context = await browser.newContext({
+    baseURL, viewport: { width: viewport.width, height: viewport.height },
+    colorScheme: theme, deviceScaleFactor: 1, reducedMotion: 'reduce',
+  });
+  await context.route('**/*', (route) => (isLoopback(route.request().url()) ? route.continue() : route.abort()));
+  await context.addCookies([{ name: 'theme', value: theme, url: baseURL }]);
+  await context.clock.setFixedTime(new Date(FROZEN_TIME));
+  const seed = { ...defaultLocalSeed(urlKey), urlKey, runnerKey: false };
+  const resp = await context.request.post('/test/set-local-session', { data: seed });
+  if (!resp.ok()) throw new Error(`seed failed on ${baseURL}: ${resp.status()} ${await resp.text()}`);
+  return context;
+}
+
+async function settle(page) {
+  await page.waitForLoadState('load');
+  await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+  // `fonts.ready` alone resolves before a face that has not been asked for yet is requested, which
+  // moved the wordmark by a sub-pixel between two identical runs. Ask for every declared face first.
+  await page.evaluate(async () => {
+    await Promise.all([...document.fonts].map((f) => f.load().catch(() => {})));
+    await document.fonts.ready;
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  });
+}
+
+// Per-state set-up: identical on both sides, driven by the page's own markup.
+async function prepare(page, context, entry) {
+  const url = entry.path(entry.urlKey);
+  if (entry.state === 'key-open') {
+    const minted = await context.request.get(`/test/create-proxy-token?urlKey=${entry.urlKey}&label=judge-key&scope=read`);
+    if (!minted.ok()) throw new Error(`mint failed: ${minted.status()}`);
+  }
+  if (entry.state === 'change-log-entry') {
+    // The log is only written by really submitting the ask; do it once per server.
+    await page.goto(url);
+    if (await page.getByTestId('settings-change-empty').count()) {
+      await page.goto(url.replace(/change-log$/, 'running'));
+      const ask = page.getByTestId('settings-toggle-periodicals');
+      await ask.locator('summary').click();
+      await ask.locator('textarea[name="reason"]').fill('Judge fixture');
+      await Promise.all([page.waitForURL(/settings\/running/), ask.locator('[data-testid$="-confirm"]').click()]);
+    }
+  }
+  await page.goto(url);
+  await settle(page);
+  if (entry.state === 'ask-open') await page.getByTestId('settings-toggle-periodicals').locator('summary').click();
+  if (entry.state === 'key-open') await page.locator('.settings-row[data-testid^="settings-key-"] summary').first().click();
+}
+
+async function shoot(browser, baseURL, viewport, theme, entry) {
+  const context = await openContext(browser, baseURL, viewport, theme, entry.urlKey);
+  try {
+    const page = await context.newPage();
+    await prepare(page, context, entry);
+    await settle(page);
+    // Rewrite per-run text (see NORMALISE in pages.mjs) in text nodes, before the screenshot.
+    await page.evaluate((rules) => {
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+        for (const r of rules) n.nodeValue = n.nodeValue.replace(new RegExp(r.pattern, 'g'), r.replacement);
+      }
+    }, NORMALISE);
+    const masks = entry.masks || [];
+    const present = [];
+    for (const m of masks) if (await page.locator(m.selector).count()) present.push(m);
+    const probe = PROBE
+      ? await page.locator(PROBE).evaluateAll((els) => els.filter((e) => e.getClientRects().length > 0).length)
+      : null;
+    const take = () => page.screenshot({
+      fullPage: true, animations: 'disabled', caret: 'hide',
+      mask: present.map((m) => page.locator(m.selector)),
+    });
+    // Settle until the page paints the same twice in a row. Two identical exports sometimes differed
+    // by a sub-pixel in the first paint of the nav text; a real CSS difference is stable, so it
+    // survives this and is still reported. No tolerance is involved.
+    let buffer = await take();
+    for (let i = 0; i < 6; i++) {
+      await page.waitForTimeout(150);
+      const again = await take();
+      const stable = again.equals(buffer);
+      buffer = again;
+      if (stable) break;
+    }
+    return { buffer, masked: present.map((m) => `${m.selector} (${m.reason})`), probe };
+  } finally {
+    await context.close();
+  }
+}
+
+const record = (row) => RESULTS && fs.appendFileSync(RESULTS, `${JSON.stringify(row)}\n`);
+
+for (const entry of PAGES) {
+  if (ONLY && !ONLY.test(entry.id)) continue;
+  test(entry.id, async ({ browser }, testInfo) => {
+    const failures = [];
+    for (const viewport of VIEWPORTS) {
+      for (const theme of THEMES) {
+        const name = `${entry.id}-${viewport.name}-${theme}`;
+        // A freshly started server sometimes paints the nav text a sub-pixel off for one load (two
+        // identical exports, found in the self-check). A real difference is stable, so a pair that
+        // differs is taken again, up to ATTEMPTS times, and the result is the LAST attempt. A retried
+        // pair is counted in the summary (`attempts`), so noise is visible, never silently absorbed.
+        let base;
+        let head;
+        let attempts = 0;
+        do {
+          attempts++;
+          base = await shoot(browser, BASE_URL, viewport, theme, entry);
+          head = await shoot(browser, HEAD_URL, viewport, theme, entry);
+        } while (!base.buffer.equals(head.buffer) && attempts < ATTEMPTS);
+        const row = { page: entry.id, viewport: viewport.name, theme, masked: base.masked, probe: base.probe, attempts };
+        if (base.buffer.equals(head.buffer)) {
+          record({ ...row, result: 'byte-equal', pixels: 0 });
+          continue;
+        }
+        // JUDGE_KEEP_DIR keeps both images of every non-equal pair, for finding the source of a difference.
+        if (process.env.JUDGE_KEEP_DIR) {
+          fs.mkdirSync(process.env.JUDGE_KEEP_DIR, { recursive: true });
+          fs.writeFileSync(path.join(process.env.JUDGE_KEEP_DIR, `${name}.base.png`), base.buffer);
+          fs.writeFileSync(path.join(process.env.JUDGE_KEEP_DIR, `${name}.head.png`), head.buffer);
+        }
+        // Tier 2: Playwright's comparator, zero threshold, zero allowed pixels.
+        const snap = testInfo.snapshotPath(`${name}.png`);
+        fs.mkdirSync(path.dirname(snap), { recursive: true });
+        fs.writeFileSync(snap, base.buffer);
+        try {
+          expect(head.buffer).toMatchSnapshot(`${name}.png`, { threshold: 0, maxDiffPixels: 0 });
+          record({ ...row, result: 'bytes-differ-pixels-equal', pixels: 0 });
+          failures.push(name);
+        } catch (e) {
+          const diff = parsePixelDiff(String(e.message)) || {};
+          record({
+            ...row, result: 'differs', pixels: diff.pixels ?? null,
+            class: diff.sizeMismatch ? 'layout (page size differs)' : 'paint (same size)',
+            message: diff.pixels === undefined && !diff.sizeMismatch ? String(e.message).slice(0, 300) : undefined,
+          });
+          failures.push(name);
+        }
+      }
+    }
+    expect(failures, `${entry.id}: pages that differ`).toEqual([]);
+  });
+}
