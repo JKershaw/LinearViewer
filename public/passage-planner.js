@@ -7,7 +7,7 @@
  * +proxy toggle — so the copy handler always force-appends the access block
  * via the shared `ProxyToggle.maybeAppend` seam (LIN-1764) with
  * `{ force: true }` (LIN-3849: the per-user proxy switch and its
- * `data-proxy-available` attribute are gone). On any thrown error, surface it
+ * availability attribute are gone). On any thrown error, surface it
  * in the feedback span and leave the clipboard untouched.
  */
 (function () {

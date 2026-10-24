@@ -264,19 +264,4 @@ describe('LIN-1582 — POST .../api/proxy/tokens and the ownerless switch', () =
     assert.equal(res.statusCode, 503, JSON.stringify(res.jsonBody));
     assert.equal(collection._docs.length, 0);
   });
-
-  test('the proxy feature gate still runs first (403 before any ownerless verdict)', async (t) => {
-    restore(t);
-    process.env[ENV] = 'off';
-    const { collection, proxyTokenStore } = harness();
-
-    const app = buildProxyApp({ proxyTokenStore, session: { accountId: null, features: { proxy: false } } });
-    const res = await call(app, 'post', TOKENS_PATH, { bootstrap: true });
-
-    // LIN-525 #2's defense-in-depth gate must keep precedence: a flag-off caller
-    // learns the feature is off, not that their session lacks an owner.
-    assert.equal(res.statusCode, 403, JSON.stringify(res.jsonBody));
-    assert.match(res.jsonBody.error, /not enabled/i);
-    assert.equal(collection._docs.length, 0);
-  });
 });

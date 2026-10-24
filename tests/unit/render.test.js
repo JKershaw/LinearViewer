@@ -334,35 +334,31 @@ describe('expandable row accessibility markup (LIN-566)', () => {
     assert.ok(lineMatch[0].includes('aria-expanded="false"'), 'periodical row starts not-expanded');
   });
 
-  // LIN-1279: the "Mint + Autopilot" action is a SECOND dispatch container on each
-  // periodical row, gated behind the per-user `proxy` flag (load-bearing — its tail
-  // calls the workspace-API kickoff endpoint). The plain Mint container is always
-  // present; the variant appears only when proxy is on.
-  test('proxy flag OFF: only the plain Mint container renders, no autopilot variant', () => {
+  // LIN-1279: the "Mint + Autopilot" action is a SECOND container on each
+  // periodical row. LIN-3849: it is a key tool, so it always renders (it was
+  // gated behind the per-user `proxy` flag); only the Dispatch disclosure is a
+  // run control and needs `runControls` (the periodicals' Dispatch was ungated
+  // before).
+  test('no flags: both containers render but neither offers Dispatch', () => {
     const result = renderPage([testMockPeriodicalsTree], [], [], 'Test', {
       isLanding: false,
       urlKey: 'test-workspace',
       featureFlags: {}
     });
-    // Plain periodical dispatch container is present (kind=periodical).
     assert.ok(result.includes('data-kind="periodical"'), 'plain Mint container renders');
-    // No Mint + Autopilot variant when proxy is off.
-    assert.ok(!result.includes('periodical-autopilot-options-'), 'no autopilot options panel when proxy off');
-    assert.ok(!result.includes('+ Autopilot'), 'no "+ Autopilot" affordance when proxy off');
-    assert.ok(!result.includes('data-proxy-force'), 'no proxy-force container when proxy off');
+    assert.ok(result.includes('+ Autopilot'), 'the "+ Autopilot" affordance renders with no flag set');
+    assert.ok(result.includes('data-proxy-force="true"'), 'the variant forces proxy context on');
+    assert.ok(!result.includes('dispatch-disclosure-placeholder'), 'no Dispatch for a viewer without run controls');
   });
 
-  test('proxy flag ON: a gated Mint + Autopilot container renders alongside plain Mint', () => {
+  test('run controls: Dispatch renders on both containers', () => {
     const result = renderPage([testMockPeriodicalsTree], [], [], 'Test', {
       isLanding: false,
       urlKey: 'test-workspace',
-      featureFlags: { proxy: true }
+      featureFlags: { runControls: true }
     });
-    // The plain container is still there (non-regression).
-    assert.ok(result.includes('periodical-options-'), 'plain Mint options panel still renders');
-    // The variant: its own disclosure id, a proxy-force container, and the "+ Autopilot" label.
-    assert.ok(result.includes('periodical-autopilot-options-'), 'autopilot options panel renders when proxy on');
-    assert.ok(result.includes('data-proxy-force="true"'), 'the variant forces proxy context on');
+    assert.ok(result.includes('periodical-options-'), 'plain Mint options panel renders');
+    assert.ok(result.includes('periodical-autopilot-options-'), 'autopilot options panel renders');
     assert.ok(result.includes('+ Autopilot'), 'the "+ Autopilot" affordance is labelled');
     // The variant carries the kickoff-endpoint tail (HTML-escaped in the container).
     assert.ok(result.includes('/api/proxy/autopilot/kickoff'), 'the variant prompt names the kickoff endpoint');
@@ -649,7 +645,8 @@ describe('Periodicals group rendering (LIN-341)', () => {
   test('the row is dispatchable with kind=periodical and no Linear link', () => {
     const result = renderPage([testMockPeriodicalsTree], [], [], 'Test', {
       isLanding: false,
-      urlKey: 'test-workspace'
+      urlKey: 'test-workspace',
+      featureFlags: { runControls: true }
     });
     assert.ok(result.includes('data-kind="periodical"'), 'dispatch container tagged kind=periodical');
     // LIN-1137: the server now renders a placeholder div instead of the dispatch
@@ -976,7 +973,7 @@ describe('Per-render-instance mount key (LIN-732)', () => {
     id: 'i1', identifier: 'STB-1', title: 'A task',
     state: { type: 'started' }, labels: { nodes: [] }
   };
-  const flags = { dispatch: true, proxy: true };
+  const flags = { runControls: true };
   const opts = (section) => ({ isLanding: false, urlKey: 'ws', featureFlags: flags, section });
 
   test('renders exactly one opened-task mount for the signed-in detail fragment', () => {
@@ -1019,7 +1016,7 @@ describe('Home retires its inline opened-task renderer (LIN-2944 P1)', () => {
   const render = (flags = {}) => renderDetailsContent(issue, { isLanding: false, urlKey: 'ws', provider, featureFlags: flags });
 
   test('emits the shared-component mount and no legacy opened-task markup', () => {
-    const html = render({ dispatch: true, proxy: true });
+    const html = render({ runControls: true });
     assert.ok(html.includes('data-prompt-mount="1"'), 'shared component mount present');
     for (const legacy of ['label-prompt', 'suggest-btn', 'autopilot-btn', 'recommend-container', 'autopilot-container', 'data-disclosure-prefix']) {
       assert.ok(!html.includes(legacy), `no legacy "${legacy}" markup remains`);

@@ -24,6 +24,7 @@ import { renderLiveConsolePage } from '../lib/render-live-console.js';
 import { renderErrorPage } from '../lib/render.js';
 import { jsonError, serverError } from '../lib/errors.js';
 import { findWorkspaceByUrlKey } from '../lib/workspace-lookup.js';
+import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
 import { buildConsoleFeed, DEFAULT_PAGE_SIZE, isLoopActive, snapPulseWindowMs } from '../lib/live-console.js';
 import { getLoopsForWorkspace } from '../lib/pipeline-loops.js';
@@ -156,7 +157,7 @@ export function createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, di
   // ─── Events endpoint (generation-free poll source + history pages) ──────────
   router.get('/workspace/:urlKey/api/live-console/events', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
-    const featureFlags = await requestFeatureFlags(req);
+    const featureFlags = getFeatureFlags(req.session);
     if (featureFlags.liveConsole !== true) {
       return jsonError(res, 403, 'Live console feature is not enabled');
     }

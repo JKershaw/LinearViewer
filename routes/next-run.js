@@ -21,6 +21,7 @@ import { Router } from 'express';
 import { renderNextRunPage } from '../lib/render-next-run.js';
 import { renderErrorPage } from '../lib/render.js';
 import { jsonError, serviceUnavailable, unauthorized } from '../lib/errors.js';
+import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
 import { generateGoalSuggestions, CONTINUE_UNTIL_STOPPED_OPTION, formatNextRunContext, buildNextRunSummary, ensureSizeCoverage, attachReferencedTaskTitles, resolveDirections } from '../lib/next-run.js';
 import { buildRoadmapModel } from '../lib/roadmap.js';
@@ -168,7 +169,7 @@ export function createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspace
   router.post('/workspace/:urlKey/api/next-run/suggest', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
 
-    const featureFlags = await requestFeatureFlags(req);
+    const featureFlags = getFeatureFlags(req.session);
     if (featureFlags.nextRun !== true) {
       return jsonError(res, 403, 'Suggested next run feature is not enabled');
     }

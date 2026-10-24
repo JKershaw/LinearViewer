@@ -26,6 +26,7 @@ import { Router } from 'express';
 import { renderShipBiscuitPage } from '../lib/render-ship-biscuit.js';
 import { renderErrorPage } from '../lib/render.js';
 import { jsonError, keepaliveError, serviceUnavailable } from '../lib/errors.js';
+import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
 import { buildEditionModel, windowRange } from '../lib/ship-biscuit.js';
 import { buildEditorMessages, parseEditorResponse, assessEditorOutcome, buildQuietEdition, buildMockEdition } from '../lib/prompts/ship-biscuit-editor.js';
@@ -121,7 +122,7 @@ export function createShipBiscuitRoutes({
   router.post('/workspace/:urlKey/api/ship-biscuit/generate', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
 
-    const featureFlags = await requestFeatureFlags(req);
+    const featureFlags = getFeatureFlags(req.session);
     if (featureFlags.shipBiscuit !== true) {
       return jsonError(res, 403, "The Ship's Biscuit feature is not enabled");
     }

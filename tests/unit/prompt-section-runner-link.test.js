@@ -183,13 +183,12 @@ function loadPromptSection({ localStorage, readSSEStream, fetchImpl } = {}) {
 }
 
 function baseOpts(issue, extra = {}) {
-  return {
+  // LIN-3849: `runSetup` (the owner's "set up ›" rung) defaults to the old not-dispatch-enabled state.
+  const o = {
     urlKey: 'ws',
     issue,
     hasAI: true,
-    hasAutopilot: true,
     dispatchEnabled: false,
-    proxyEnabled: false,
     isLocalhost: false,
     customPrompts: [],
     defaultPromptKeys: ['implementation'],
@@ -197,6 +196,7 @@ function baseOpts(issue, extra = {}) {
     promptMeta: { implementation: 'Implementation' },
     ...extra,
   };
+  return { runSetup: !o.dispatchEnabled, ...o };
 }
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
@@ -216,10 +216,10 @@ function rungDataset(html, rung) {
   return ds;
 }
 
-async function fresh({ localStorage, proxyEnabled = true, dispatchEnabled = true } = {}) {
+async function fresh({ localStorage, dispatchEnabled = true } = {}) {
   const loaded = loadPromptSection({ localStorage });
   const container = makeContainer();
-  loaded.PromptSection.init(container, baseOpts({ id: 'issue-1', identifier: 'LIN-1' }, { proxyEnabled, dispatchEnabled }));
+  loaded.PromptSection.init(container, baseOpts({ id: 'issue-1', identifier: 'LIN-1' }, { dispatchEnabled }));
   await container.click({ prompt: 'implementation' });
   await flush();
   return { ...loaded, container };
@@ -245,15 +245,15 @@ describe('"run on my machine ›": the shared markup, and no longer beside the l
     assert.ok(html.includes('href="/workspace/a%22b%20c/runner"'));
   });
 
-  for (const proxyEnabled of [true, false]) {
-    for (const dispatchEnabled of [true, false]) {
-      test(`the component itself renders no runner link (proxy ${proxyEnabled ? 'on' : 'off'}, dispatch ${dispatchEnabled ? 'on' : 'off'}), idle or fresh`, async () => {
+  for (const dispatchEnabled of [true, false]) {
+    {
+      test(`the component itself renders no runner link (dispatch ${dispatchEnabled ? 'on' : 'off'}), idle or fresh`, async () => {
         const { PromptSection } = loadPromptSection();
         const container = makeContainer();
-        PromptSection.init(container, baseOpts({ id: 'issue-1', identifier: 'LIN-1' }, { proxyEnabled, dispatchEnabled }));
+        PromptSection.init(container, baseOpts({ id: 'issue-1', identifier: 'LIN-1' }, { dispatchEnabled }));
         assert.ok(container.innerHTML.includes(LADDER));
         assert.ok(!container.innerHTML.includes(LINK));
-        const { container: freshContainer } = await fresh({ proxyEnabled, dispatchEnabled });
+        const { container: freshContainer } = await fresh({ dispatchEnabled });
         assert.ok(!freshContainer.innerHTML.includes(LINK));
       });
     }
@@ -264,17 +264,9 @@ describe('the ○ set up › notices', () => {
   test('dispatch: the old text, plus the link to /runner', async () => {
     const { PromptSection } = loadPromptSection();
     const container = makeContainer();
-    PromptSection.init(container, baseOpts({ id: 'issue-1', identifier: 'LIN-1' }, { proxyEnabled: true, dispatchEnabled: false }));
+    PromptSection.init(container, baseOpts({ id: 'issue-1', identifier: 'LIN-1' }, { dispatchEnabled: false }));
     await container.click({ action: 'setup', setupNeeds: 'dispatch' });
     assert.match(container.innerHTML, /<div class="opened-task-setup-notice">running this step needs the dispatch runner set up <a [^>]*href="\/workspace\/ws\/runner"[^>]*data-testid="opened-task-setup-runner-link"/);
-  });
-
-  test('proxy: the old text, plus the link (shown even with proxy off: /runner explains the flag)', async () => {
-    const { PromptSection } = loadPromptSection();
-    const container = makeContainer();
-    PromptSection.init(container, baseOpts({ id: 'issue-1', identifier: 'LIN-1' }, { proxyEnabled: false }));
-    await container.click({ action: 'setup', setupNeeds: 'proxy' });
-    assert.match(container.innerHTML, /<div class="opened-task-setup-notice">running the whole task needs the proxy set up <a [^>]*href="\/workspace\/ws\/runner"/);
   });
 
   test('"generate a prompt first" stays byte-identical, with no link', async () => {
@@ -296,11 +288,6 @@ describe('N3: proxyForce only on the run-step rung, only where a runner was set 
 
   test('no marker: no stamp', async () => {
     const { container } = await fresh({ localStorage: makeLocalStorage() });
-    assert.equal(rungDataset(container.innerHTML, 'run-step').proxyForce, undefined);
-  });
-
-  test('marker but proxy off: no stamp', async () => {
-    const { container } = await fresh({ localStorage: marked(), proxyEnabled: false });
     assert.equal(rungDataset(container.innerHTML, 'run-step').proxyForce, undefined);
   });
 

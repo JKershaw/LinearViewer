@@ -77,6 +77,7 @@ import { resolveRunnerOwnerRefusal } from '../lib/runner-owner-gate.js';
 import { Router } from 'express';
 import { renderFlightCompanionPage } from '../lib/render-flight-companion.js';
 import { renderErrorPage } from '../lib/render.js';
+import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
 import { buildFlightCompanionKickoff } from '../lib/prompts/flight-companion-kickoff.js';
 import { PASS_INSTANCE_PREFIX } from '../lib/observer-pass.js';
@@ -478,7 +479,7 @@ export function createFlightCompanionRoutes({
   // above: this route can never write observer state.
   router.get('/workspace/:urlKey/api/flight-companion/playbook', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
-    const featureFlags = await requestFeatureFlags(req);
+    const featureFlags = getFeatureFlags(req.session);
     if (featureFlags.flightCompanion !== true) {
       return jsonError(res, 404, 'Not found');
     }
@@ -498,7 +499,7 @@ export function createFlightCompanionRoutes({
 
   router.post('/workspace/:urlKey/api/flight-companion/turn', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
-    const featureFlags = await requestFeatureFlags(req);
+    const featureFlags = getFeatureFlags(req.session);
 
     if (featureFlags.flightCompanion !== true) {
       return jsonError(res, 403, 'Flight Companion feature is not enabled');
@@ -705,7 +706,7 @@ export function createFlightCompanionRoutes({
   // change to consume this route.
   router.post('/workspace/:urlKey/api/flight-companion/boot', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
-    const featureFlags = await requestFeatureFlags(req);
+    const featureFlags = getFeatureFlags(req.session);
 
     if (featureFlags.flightCompanion !== true) {
       return jsonError(res, 403, 'Flight Companion feature is not enabled');
@@ -815,7 +816,7 @@ export function createFlightCompanionRoutes({
 
   router.post('/workspace/:urlKey/api/flight-companion/approve-follow-up', dispatchQueueLimiter, workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
-    const featureFlags = await requestFeatureFlags(req);
+    const featureFlags = getFeatureFlags(req.session);
 
     if (featureFlags.flightCompanion !== true) {
       return jsonError(res, 403, 'Flight Companion feature is not enabled');

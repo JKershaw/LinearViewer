@@ -28,7 +28,8 @@ const STYLE_CSS = join(__dirname, '../../public/style.css');
 test('getViewNavLinks always includes the first-class views, workspace-prefixed', () => {
   const links = getViewNavLinks('acme', {});
   const texts = links.map(l => l.text);
-  assert.deepEqual(texts, ['projects', 'swipe', 'swim', 'observation', 'settings', 'kpis']);
+  // LIN-3849: the Proxy page is a key tool, always listed (no switch).
+  assert.deepEqual(texts, ['projects', 'swipe', 'swim', 'observation', 'settings', 'kpis', 'proxy']);
   for (const link of links) {
     assert.match(link.href, /^\/workspace\/acme\//);
   }
@@ -38,15 +39,14 @@ test('getViewNavLinks adds power-user views ONLY when their flag is on', () => {
   const off = getViewNavLinks('acme', {}).map(l => l.text);
   assert.ok(!off.includes('roadmap'));
   assert.ok(!off.includes('dispatch'));
-  assert.ok(!off.includes('proxy'));
+  assert.ok(off.includes('proxy'), 'key tools have no switch (LIN-3849)');
 
-  const on = getViewNavLinks('acme', { roadmap: true, dispatch: true, proxy: true }).map(l => l.text);
+  const on = getViewNavLinks('acme', { roadmap: true, runControls: true }).map(l => l.text);
   assert.ok(on.includes('roadmap'));
   assert.ok(on.includes('dispatch'));
-  assert.ok(on.includes('proxy'));
 
   // A non-true value must NOT enable the link (strict `=== true` gate).
-  const truthyButNotTrue = getViewNavLinks('acme', { dispatch: 1 }).map(l => l.text);
+  const truthyButNotTrue = getViewNavLinks('acme', { runControls: 1 }).map(l => l.text);
   assert.ok(!truthyButNotTrue.includes('dispatch'));
 });
 
@@ -119,14 +119,14 @@ test('renderViewNav shows visible label "tasks" but testid keeps internal key "p
 // --- primary/overflow split + active-hoist (LIN-1058 "Confident CLI tab strip") -
 
 test('partitionViewLinks splits first-class (primary) from flag-gated (overflow)', () => {
-  const links = getViewNavLinks('acme', { roadmap: true, dispatch: true, proxy: true });
+  const links = getViewNavLinks('acme', { roadmap: true, runControls: true });
   const { primary, overflow } = partitionViewLinks(links, 'observation');
   assert.deepEqual(primary.map(l => l.text), ['projects', 'swipe', 'swim', 'observation', 'settings', 'kpis']);
   assert.deepEqual(overflow.map(l => l.text), ['roadmap', 'dispatch', 'proxy']);
 });
 
 test('partitionViewLinks HOISTS the active overflow view inline (never hidden)', () => {
-  const links = getViewNavLinks('acme', { roadmap: true, dispatch: true, proxy: true });
+  const links = getViewNavLinks('acme', { roadmap: true, runControls: true });
   const { primary, overflow } = partitionViewLinks(links, 'dispatch');
   // Active flag-gated view is lifted onto the primary strip, after the five.
   assert.deepEqual(primary.map(l => l.text), ['projects', 'swipe', 'swim', 'observation', 'settings', 'kpis', 'dispatch']);
@@ -143,7 +143,7 @@ test('partitionViewLinks HOISTS the active experimental overflow view inline (LI
   // on its kebab route (`task-chat`), matching the kebab `currentPage`.
   assert.deepEqual(primary.map(l => l.text), ['projects', 'swipe', 'swim', 'observation', 'settings', 'kpis', 'task-chat']);
   // …and removed from overflow so it is not rendered twice; ship stays behind ⋯ more.
-  assert.deepEqual(overflow.map(l => l.text), ['ship']);
+  assert.deepEqual(overflow.map(l => l.text), ['proxy', 'ship']);
 });
 
 test('renderViewNav shows a short experimental label but keeps the kebab route testid (LIN-1247)', () => {
@@ -158,19 +158,21 @@ test('renderViewNav shows a short experimental label but keeps the kebab route t
 });
 
 test('renderViewNav emits the ⋯ more toggle + in-flow overflow group ONLY when flag-gated views exist', () => {
-  const withFlags = renderViewNav({ urlKey: 'acme', currentPage: 'observation', featureFlags: { dispatch: true } });
+  const withFlags = renderViewNav({ urlKey: 'acme', currentPage: 'observation', featureFlags: { runControls: true } });
   assert.match(withFlags, /class="nav-more-toggle"[^>]*aria-expanded="false"[^>]*aria-controls="nav-views-overflow"/);
   assert.match(withFlags, /<div class="nav-views-overflow" id="nav-views-overflow">/);
   assert.match(withFlags, /data-testid="nav-view-dispatch"/);
 
-  // No flag-gated views → no overflow machinery (first-class six only).
+  // No flag-gated views → the overflow holds only the always-on Proxy page
+  // (LIN-3849), never Dispatch.
   const noFlags = renderViewNav({ urlKey: 'acme', currentPage: 'observation', featureFlags: {} });
-  assert.doesNotMatch(noFlags, /nav-more-toggle/);
-  assert.doesNotMatch(noFlags, /nav-views-overflow/);
+  assert.match(noFlags, /nav-more-toggle/);
+  assert.match(noFlags, /data-testid="nav-view-proxy"/);
+  assert.doesNotMatch(noFlags, /data-testid="nav-view-dispatch"/);
 });
 
 test('renderViewNav renders the active overflow view as the hoisted current tab (not inside the expander)', () => {
-  const html = renderViewNav({ urlKey: 'acme', currentPage: 'dispatch', featureFlags: { dispatch: true, proxy: true } });
+  const html = renderViewNav({ urlKey: 'acme', currentPage: 'dispatch', featureFlags: { runControls: true } });
   // Active dispatch is the bold current marker, hoisted onto the primary strip
   // BEFORE the overflow group opens.
   const overflowStart = html.indexOf('nav-views-overflow');
@@ -188,7 +190,7 @@ test('renderNavBar carries the view switcher on authenticated workspace pages', 
     workspaces: [{ urlKey: 'acme', name: 'Acme' }],
     urlKey: 'acme',
     currentPage: 'settings',
-    featureFlags: { dispatch: true }
+    featureFlags: { runControls: true }
   });
   assert.match(html, /class="nav-views"/);
   assert.match(html, /data-testid="nav-view-observation"/);
@@ -209,7 +211,7 @@ test('renderNavBar does NOT carry the view switcher on the landing nav', () => {
 // --- footer no longer carries the hoisted links -----------------------------
 
 test('renderPageFooter no longer renders the cross-view links (hoisted to header)', () => {
-  const html = renderPageFooter({ urlKey: 'acme', currentPage: '/settings', featureFlags: { dispatch: true, proxy: true, roadmap: true } });
+  const html = renderPageFooter({ urlKey: 'acme', currentPage: '/settings', featureFlags: { runControls: true, proxy: true, roadmap: true } });
   // The old footer view links are gone.
   for (const text of ['observation', 'swipe', 'swim', 'settings', 'roadmap', 'dispatch', 'proxy']) {
     assert.doesNotMatch(html, new RegExp(`data-testid="footer-link-${text}"`));

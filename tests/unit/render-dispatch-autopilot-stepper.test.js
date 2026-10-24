@@ -5,15 +5,15 @@
  * stepped" button (data-variant="stepper") next to it. dispatch.js reads that
  * marker and appends ?variant=stepper to the general kickoff fetch. The classic
  * "load Autopilot" + "continue until stopped" controls are unchanged, and the
- * whole cluster stays behind the same proxy flag gate.
+ *  * cluster is always rendered (LIN-3849: key tools have no switch).
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { renderDispatchPage } from '../../lib/render-dispatch.js';
 
-test('proxy on ⇒ a stepper load button sits beside the classic one', () => {
-  const html = renderDispatchPage('WS', { featureFlags: { proxy: true, dispatch: true } });
+test('a stepper load button sits beside the classic one', () => {
+  const html = renderDispatchPage('WS', { featureFlags: {} });
   // Classic control still present and still variant-less.
   assert.ok(html.includes('class="action-btn dispatch-load-autopilot" title='),
     'classic "load Autopilot" button unchanged');
@@ -26,8 +26,10 @@ test('proxy on ⇒ a stepper load button sits beside the classic one', () => {
   assert.equal((html.match(/class="action-btn dispatch-load-autopilot"/g) || []).length, 2);
 });
 
-test('proxy off ⇒ no autopilot load controls at all', () => {
-  const html = renderDispatchPage('WS', { featureFlags: { proxy: false, dispatch: true } });
-  assert.ok(!html.includes('dispatch-load-autopilot'), 'no load-autopilot controls without proxy');
-  assert.ok(!html.includes('data-variant="stepper"'), 'no stepper sibling without proxy');
+test('the cluster renders whatever the stale stored switches say (LIN-3849)', () => {
+  const html = renderDispatchPage('WS', { featureFlags: { proxy: false, dispatch: false } });
+  assert.equal((html.match(/class="action-btn dispatch-load-autopilot"/g) || []).length, 2);
+  assert.ok(html.includes('dispatch-continue-until-stopped'));
+  assert.ok(html.includes('prompt-proxy-toggle'));
+  assert.ok(!html.includes('data-proxy-feature'));
 });

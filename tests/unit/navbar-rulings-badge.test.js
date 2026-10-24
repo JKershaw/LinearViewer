@@ -11,27 +11,27 @@ import { renderNavBar } from '../../lib/components/navbar.js';
 const WORKSPACES = [{ id: 'w1', name: 'Test WS', urlKey: 'test-ws' }];
 
 describe('renderNavBar — rulings badge (LIN-1728 Phase 3)', () => {
-  test('renders hidden, zeroed, workspace-scoped markup when the dispatch flag is on', () => {
-    const html = renderNavBar({ workspaces: WORKSPACES, urlKey: 'test-ws', featureFlags: { dispatch: true } });
+  test('renders hidden, zeroed, workspace-scoped markup when the runControls bit is on', () => {
+    const html = renderNavBar({ workspaces: WORKSPACES, urlKey: 'test-ws', featureFlags: { runControls: true } });
     assert.match(html, /data-rulings-badge/);
     assert.match(html, /class="rulings-badge hidden"/);
     assert.match(html, /data-url-key="test-ws"/);
     assert.match(html, /<span class="rulings-count">0<\/span> waiting on you/);
   });
 
-  test('is absent when the dispatch flag is off — same gate as the queue badge', () => {
+  test('is absent when the runControls bit is off — same gate as the queue badge', () => {
     const html = renderNavBar({ workspaces: WORKSPACES, urlKey: 'test-ws', featureFlags: {} });
     assert.doesNotMatch(html, /data-rulings-badge/);
     assert.doesNotMatch(html, /data-queue-badge/);
   });
 
-  test('is absent with no urlKey even if the flag is on (no workspace to scope the count to)', () => {
-    const html = renderNavBar({ workspaces: WORKSPACES, urlKey: null, featureFlags: { dispatch: true } });
+  test('is absent with no urlKey even if the bit is on (no workspace to scope the count to)', () => {
+    const html = renderNavBar({ workspaces: WORKSPACES, urlKey: null, featureFlags: { runControls: true } });
     assert.doesNotMatch(html, /data-rulings-badge/);
   });
 
   test('trails the queue badge in nav-actions source order', () => {
-    const html = renderNavBar({ workspaces: WORKSPACES, urlKey: 'test-ws', featureFlags: { dispatch: true } });
+    const html = renderNavBar({ workspaces: WORKSPACES, urlKey: 'test-ws', featureFlags: { runControls: true } });
     const queueIdx = html.indexOf('data-queue-badge');
     const rulingsIdx = html.indexOf('data-rulings-badge');
     assert.ok(queueIdx !== -1 && rulingsIdx !== -1, 'both badges present');
@@ -39,7 +39,7 @@ describe('renderNavBar — rulings badge (LIN-1728 Phase 3)', () => {
   });
 
   test('is absent entirely on the unauthenticated landing nav', () => {
-    const html = renderNavBar({ isLanding: true, featureFlags: { dispatch: true } });
+    const html = renderNavBar({ isLanding: true, featureFlags: { runControls: true } });
     assert.doesNotMatch(html, /data-rulings-badge/);
   });
 });

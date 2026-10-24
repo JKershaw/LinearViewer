@@ -185,14 +185,14 @@ describe('page-level options embedded for Home (LIN-2944 P1 addendum 9)', () => 
     const data = buildTrees();
     const html = renderPage(data.projectTrees, data.inProgressTrees, data.recentActivityTrees, 'Org', {
       urlKey: 'ws', workspaces: [WORKSPACE], openRouterSource: 'oauth',
-      featureFlags: { dispatch: true, proxy: true }, customPrompts: [{ id: 'c1', name: 'Custom' }]
+      featureFlags: { runControls: true }, customPrompts: [{ id: 'c1', name: 'Custom' }]
     });
     const opts = embedded(html, '__HOME_PROMPT_OPTS__');
     assert.equal(opts.hasAI, true);
     assert.equal(opts.aiState, 'ready');
-    assert.equal(opts.hasAutopilot, true);
     assert.equal(opts.dispatchEnabled, true);
-    assert.equal(opts.proxyEnabled, true);
+    assert.equal(opts.runSetup, false);
+    assert.ok(!('hasAutopilot' in opts) && !('proxyEnabled' in opts), 'LIN-3849: the proxy opts keys are gone');
     assert.ok(!('promptButtons' in opts), 'LIN-3848: no promptButtons key');
     assert.deepEqual(opts.customPrompts, [{ id: 'c1', name: 'Custom' }]);
     assert.ok(Array.isArray(opts.defaultPromptKeys) && opts.defaultPromptKeys.includes('implementation'));

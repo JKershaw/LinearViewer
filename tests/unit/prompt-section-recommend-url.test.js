@@ -81,19 +81,19 @@ function loadPromptSection() {
 }
 
 function baseOpts(issue) {
-  return {
+  // LIN-3849: `runSetup` (the owner's "set up ›" rung) defaults to the old not-dispatch-enabled state.
+  const o = {
     urlKey: 'ws',
     issue,
     hasAI: true,
-    hasAutopilot: false,
     dispatchEnabled: false,
-    proxyEnabled: false,
     isLocalhost: false,
     customPrompts: [],
     defaultPromptKeys: [],
     morePromptKeys: [],
     promptMeta: {},
   };
+  return { runSetup: !o.dispatchEnabled, ...o };
 }
 
 describe('recommend-stream URL construction (LIN-2046)', () => {

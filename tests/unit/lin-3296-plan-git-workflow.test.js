@@ -59,7 +59,7 @@ test('a stale stored featureBranches value is ignored', () => {
   });
   assert.ok(!html.includes('featureBranches'));
   assert.ok(!/feature branch workflow/i.test(html));
-  assert.ok(html.includes('data-feature="dispatch"'), 'the other Workflow toggles still render');
+  assert.ok(html.includes('data-feature="feedbackWidget"'), 'the other Workflow toggles still render');
 });
 
 // LIN-3848: nine switches were removed. A stored preference saved before that

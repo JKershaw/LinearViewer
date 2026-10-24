@@ -72,6 +72,8 @@ async function runRenderDashboardAfterRefresh({ fetchResult, topTask = null }) {
       return '<html/>';
     },
     getFeatureFlags: () => ({}),
+    requestFeatureFlags: async () => ({}),
+    resolveRunControls: async () => ({ runControls: false, runSetup: false }),
     // LIN-2526: renderDashboardAfterRefresh now derives a provider off the
     // workspace to compute canFilterByMe — a bare stub is enough here since
     // this suite is only proving `truncated` survives the refresh render tail.
@@ -174,6 +176,8 @@ async function runPrimaryDashboardRoute({ fetchResult }) {
       return '<html/>';
     },
     getFeatureFlags: () => ({}),
+    requestFeatureFlags: async () => ({}),
+    resolveRunControls: async () => ({ runControls: false, runSetup: false }),
     isAuthError: () => false,
     handleUnauthorizedError: async () => {},
     renderUpstreamAwareErrorPage: () => '<error/>',

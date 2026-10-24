@@ -403,7 +403,7 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
     const issueBinding = resolveIssueBinding(workspace, requestedSource);
     const { provider: issueProvider, callScope: issueCallScope } = issueBinding;
 
-    const featureFlags = await requestFeatureFlags(req);
+    const featureFlags = getFeatureFlags(req.session);
     if (featureFlags.taskChat !== true) {
       return jsonError(res, 403, 'Task chat feature is not enabled');
     }

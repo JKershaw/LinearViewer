@@ -40,14 +40,14 @@ const OWNER = 'acct-owner-1';
 
 const render = (state, over = {}) => renderRunnerSetupPage(
   { state, urlKey: 'acme', accountId: OWNER, prompt: PROMPT, baseUrl: BASE, ...over },
-  { featureFlags: { proxy: state !== 'proxy-off', dispatch: state !== 'owner-dispatch-off' } }
+  { featureFlags: {} }
 );
 
 const has = (html, testid) => html.includes(`data-testid="${testid}"`);
 
 describe('the page\'s states', () => {
   test('the state set', () => {
-    assert.deepEqual([...RUNNER_SETUP_STATES].sort(), ['no-owner', 'not-owner', 'owner', 'owner-dispatch-off', 'proxy-off', 'unavailable']);
+    assert.deepEqual([...RUNNER_SETUP_STATES].sort(), ['no-owner', 'not-owner', 'owner', 'unavailable']);
   });
 
   for (const state of RUNNER_SETUP_STATES) {
@@ -59,7 +59,7 @@ describe('the page\'s states', () => {
     });
   }
 
-  for (const state of ['owner', 'owner-dispatch-off']) {
+  for (const state of ['owner']) {
     test(`${state}: the mint button, the copy target and the owner's account id`, () => {
       const html = render(state);
       assert.ok(has(html, 'runner-setup-mint'));
@@ -71,7 +71,7 @@ describe('the page\'s states', () => {
     });
   }
 
-  for (const state of ['proxy-off', 'not-owner', 'no-owner', 'unavailable']) {
+  for (const state of ['not-owner', 'no-owner', 'unavailable']) {
     test(`${state}: a notice, and no mint button or account id`, () => {
       const html = render(state);
       assert.ok(has(html, 'runner-setup-notice'));
@@ -80,12 +80,6 @@ describe('the page\'s states', () => {
       assert.doesNotMatch(html, /data-account-id=/);
     });
   }
-
-  test('proxy-off: says so and links to Settings', () => {
-    const html = render('proxy-off');
-    assert.match(html, /workspace API access/i);
-    assert.match(html, /href="\/workspace\/acme\/settings"/);
-  });
 
   test('not-owner: only the owner can set one up', () => {
     assert.match(render('not-owner'), /Only this workspace's owner/);
@@ -96,13 +90,15 @@ describe('the page\'s states', () => {
     assert.match(render('unavailable'), /try again/i);
   });
 
-  test('owner-dispatch-off: the mint works, and it says how to turn on the Dispatch queue for "run this step"', () => {
-    const html = render('owner-dispatch-off');
-    assert.ok(has(html, 'runner-setup-dispatch-note'));
-    assert.match(html, /run this step/);
-    assert.match(html, /Dispatch queue/);
-    assert.match(html, /href="\/workspace\/acme\/settings"/);
-    assert.ok(!has(render('owner'), 'runner-setup-dispatch-note'));
+  test('LIN-3849: no state tells anyone to turn on a Settings switch, and the old states are gone', () => {
+    for (const state of RUNNER_SETUP_STATES) {
+      const html = render(state);
+      assert.ok(!has(html, 'runner-setup-dispatch-note'), state);
+      assert.doesNotMatch(html, /Linear API proxy|workspace API access, which is off/, state);
+      assert.doesNotMatch(html, /Dispatch queue/, state);
+    }
+    assert.ok(!RUNNER_SETUP_STATES.includes('proxy-off'));
+    assert.ok(!RUNNER_SETUP_STATES.includes('owner-dispatch-off'));
   });
 
   test('every state shows the served prompt, escaped, in a disclosure', () => {
@@ -201,9 +197,8 @@ describe('the route', () => {
   }
 
   const rows = [
-    ['proxy off', { features: { proxy: false, dispatch: true } }, () => ({ status: 'owner' }), 'proxy-off'],
-    ['owner, both on', {}, () => ({ status: 'owner' }), 'owner'],
-    ['owner, dispatch off', { features: { proxy: true, dispatch: false } }, () => ({ status: 'owner' }), 'owner-dispatch-off'],
+    ['owner', {}, () => ({ status: 'owner' }), 'owner'],
+    ['owner with stale proxy / dispatch switches off (LIN-3849: ignored)', { features: { proxy: false, dispatch: false } }, () => ({ status: 'owner' }), 'owner'],
     ['not the owner', {}, () => ({ status: 'not-owner' }), 'not-owner'],
     ['no recorded owner', {}, () => ({ status: 'no-owner' }), 'no-owner'],
     ['the owner check throws', {}, () => { throw new Error('corrupt merge chain'); }, 'unavailable'],
@@ -271,12 +266,6 @@ describe('the route', () => {
     assert.deepEqual(calls, [{ workspaceId: 'ws-1', accountId: OWNER }]);
   });
 
-  test('proxy off never asks the owner check', async () => {
-    const { app: a, calls } = app({ features: { proxy: false }, ownerCheck: () => ({ status: 'owner' }) });
-    await get(a);
-    assert.equal(calls.length, 0);
-  });
-
   test('NB7: by default it is checkWorkspaceOwner, so a merged-away account resolves to its survivor', async () => {
     const stores = {
       accountWorkspaceStore: { getWorkspaceOwnerAccountId: async (workspaceId) => (workspaceId === 'ws-1' ? 'acct-survivor' : null) },
@@ -319,7 +308,7 @@ describe('the witness runbook link (LIN-3098 S5)', () => {
     assert.ok(existsSync(join(ROOT, 'docs', 'runbooks', 'runner-hosted-witness.md')));
   });
 
-  for (const state of ['owner', 'owner-dispatch-off']) {
+  for (const state of ['owner']) {
     test(`${state}: the page links to it`, () => {
       const html = render(state);
       assert.match(html, /<a href="https:\/\/github\.com\/JKershaw\/LinearViewer\/blob\/main\/docs\/runbooks\/runner-hosted-witness\.md"[^>]*data-testid="runner-setup-runbook-link"[^>]*>witness runbook<\/a>/);

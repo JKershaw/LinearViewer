@@ -20,6 +20,7 @@
 import { Router } from 'express';
 import { renderCollectivePage } from '../lib/render-collective.js';
 import { renderErrorPage } from '../lib/render.js';
+import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
 import { normalizeYapChannel, nickFromWorkspaceName, randomChannelName } from '../lib/yap-client.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
@@ -152,7 +153,7 @@ export function createCollectiveRoutes({
   // ─── Start: multi-workspace dispatch fan-out ─────────────────────────────────
 
   router.post('/workspace/:urlKey/collective/start', workspaceFromUrl, async (req, res) => {
-    const featureFlags = await requestFeatureFlags(req);
+    const featureFlags = getFeatureFlags(req.session);
     if (featureFlags.collective !== true) {
       return jsonError(res, 403, 'Collective feature is not enabled');
     }
@@ -473,7 +474,7 @@ export function createCollectiveRoutes({
   // reusing /start's existing session.workspaces re-validation).
 
   router.post('/workspace/:urlKey/collective/presets', workspaceFromUrl, async (req, res) => {
-    const featureFlags = await requestFeatureFlags(req);
+    const featureFlags = getFeatureFlags(req.session);
     if (featureFlags.collective !== true) {
       return jsonError(res, 403, 'Collective feature is not enabled');
     }
@@ -494,7 +495,7 @@ export function createCollectiveRoutes({
   });
 
   router.delete('/workspace/:urlKey/collective/presets/:presetId', workspaceFromUrl, async (req, res) => {
-    const featureFlags = await requestFeatureFlags(req);
+    const featureFlags = getFeatureFlags(req.session);
     if (featureFlags.collective !== true) {
       return jsonError(res, 403, 'Collective feature is not enabled');
     }
@@ -521,7 +522,7 @@ export function createCollectiveRoutes({
   // is visible without minting a real token.
 
   router.post('/workspace/:urlKey/collective/preview', workspaceFromUrl, async (req, res) => {
-    const featureFlags = await requestFeatureFlags(req);
+    const featureFlags = getFeatureFlags(req.session);
     if (featureFlags.collective !== true) {
       return jsonError(res, 403, 'Collective feature is not enabled');
     }

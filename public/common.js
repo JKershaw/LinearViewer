@@ -1932,7 +1932,7 @@ window.fetchAutopilotKickoff = async function fetchAutopilotKickoff({ urlKey, is
  *    <body> + CSS, NOT a per-button class — so buttons injected after load
  *    (lazy issue-detail blocks, swipe re-renders) inherit it automatically and
  *    can't "miss the restore" (LIN-525 #1).
- *  - LIN-3849: the per-user proxy feature flag (LIN-525 #2, `data-proxy-feature`)
+ *  - LIN-3849: the per-user proxy feature flag (LIN-525 #2, a body attribute)
  *    is gone. Key tools are always on; only the account's +proxy default above
  *    decides whether the toggle path appends.
  *  - Bootstrap tokens are single-use (LIN-376): each is spent by the agent's

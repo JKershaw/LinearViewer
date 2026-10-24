@@ -1,11 +1,11 @@
 /**
  * Unit tests for lib/render-flight-companion.js (LIN-1764).
  *
- * Covers the +proxy toggle affordance: the button and its enabling
- * `data-proxy-feature` body attribute must appear iff `featureFlags.proxy ===
- * true`, and the no-`featureFlags` call path used elsewhere (e.g.
- * tests/unit/page-title-primitive.test.js) must keep rendering cleanly without
- * either.
+ * Covers the +proxy toggle affordance: there is none (LIN-3079: forced append),
+ * and LIN-3849 removed the per-user proxy switch with its `data-proxy-feature`
+ * body attribute and degradation notice. The no-`featureFlags` call path used
+ * elsewhere (e.g. tests/unit/page-title-primitive.test.js) must keep rendering
+ * cleanly.
  *
  * Run with: node --test tests/unit/render-flight-companion.test.js
  */
@@ -15,41 +15,20 @@ import { renderFlightCompanionPage } from '../../lib/render-flight-companion.js'
 import { COMPANION_READOUT_HEADINGS } from '../../lib/prompts/flight-companion-brief.js';
 import { taskPageHref } from '../../lib/task-page-href.js';
 
-describe('renderFlightCompanionPage — proxy feature gate', () => {
-  test('emits data-proxy-feature but NO +proxy toggle when featureFlags.proxy === true (LIN-3079: forced, toggle removed)', () => {
-    const html = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws', featureFlags: { proxy: true } });
-    assert.ok(html.includes('data-proxy-feature="true"'));
-    assert.ok(!html.includes('prompt-proxy-toggle'));
-  });
+describe('renderFlightCompanionPage — no proxy switch (LIN-3849)', () => {
+  for (const [name, featureFlags] of [['no flags', {}], ['stale proxy:true', { proxy: true }], ['stale proxy:false', { proxy: false }]]) {
+    test(`${name}: no data-proxy-feature, no +proxy toggle, no degradation notice`, () => {
+      const html = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws', featureFlags });
+      assert.ok(!html.includes('data-proxy-feature'));
+      assert.ok(!html.includes('prompt-proxy-toggle'));
+      assert.ok(!html.includes('flight-companion-proxy-degraded'));
+      assert.ok(html.includes('data-proxy-active='), 'the +proxy default attribute stays');
+    });
+  }
 
-  test('omits the +proxy toggle and data-proxy-feature attribute when featureFlags.proxy is false', () => {
-    const html = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws', featureFlags: { proxy: false } });
-    assert.ok(!html.includes('data-proxy-feature'));
-    assert.ok(!html.includes('prompt-proxy-toggle'));
-  });
-
-  test('the default no-featureFlags call path (page-title-primitive.test.js) renders cleanly with neither', () => {
+  test('the default no-featureFlags call path (page-title-primitive.test.js) renders cleanly', () => {
     const html = renderFlightCompanionPage({}, { urlKey: 'ws' });
     assert.ok(html.startsWith('<!DOCTYPE html>'));
-    assert.ok(!html.includes('data-proxy-feature'));
-    assert.ok(!html.includes('prompt-proxy-toggle'));
-  });
-});
-
-// LIN-3079 review finding F1. buildFlightCompanionKickoff always promises a
-// bootstrap token "supplied alongside this prompt (the +proxy block)", but with
-// the proxy feature OFF the copy is bare (no block, no mint). The page must not
-// present that token-promising prompt as complete — it degrades explicitly,
-// mirroring the Passage Planner notice (lib/render-passage-planner.js:65-67).
-describe('renderFlightCompanionPage — LIN-3079 F1: proxy-off degradation notice', () => {
-  test('renders the degradation notice when the proxy feature is off', () => {
-    const html = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws', featureFlags: { proxy: false } });
-    assert.ok(html.includes('id="flight-companion-proxy-degraded"'), 'expected the proxy-off degradation notice');
-  });
-
-  test('does NOT render the degradation notice when the proxy feature is on', () => {
-    const html = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws', featureFlags: { proxy: true } });
-    assert.ok(!html.includes('flight-companion-proxy-degraded'), 'the proxy-on page is complete');
   });
 });
 
@@ -89,16 +68,6 @@ describe('renderFlightCompanionPage — LIN-2435 Commit 2: chat-thread render + 
     const fcJsIdx = html.indexOf('src="/flight-companion.js"');
     assert.ok(purifyIdx < markedIdx, 'purify.min.js must load before marked.min.js');
     assert.ok(markedIdx < fcJsIdx, 'marked.min.js must load before flight-companion.js');
-  });
-
-  test('every pre-existing proxy-gate assertion still passes unchanged (re-run against the extended markup)', () => {
-    const onHtml = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws', featureFlags: { proxy: true } });
-    assert.ok(onHtml.includes('data-proxy-feature="true"'));
-    assert.ok(!onHtml.includes('prompt-proxy-toggle'));
-
-    const offHtml = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws', featureFlags: { proxy: false } });
-    assert.ok(!offHtml.includes('data-proxy-feature'));
-    assert.ok(!offHtml.includes('prompt-proxy-toggle'));
   });
 
   test('the narrowed freeze holds: the live e2e contract selectors are untouched', () => {
@@ -155,10 +124,8 @@ describe('renderFlightCompanionPage — LIN-2443: section order, prompt collapse
     assert.ok(copyIdx > -1 && copyIdx < detailsOpenIdx, '#flight-companion-copy must render before the <details>');
     assert.ok(feedbackIdx > -1 && feedbackIdx < detailsOpenIdx, '#flight-companion-copy-feedback must render before the <details>');
 
-    // LIN-3079: the inert +proxy toggle is removed even when the feature is on.
-    const proxyHtml = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws', featureFlags: { proxy: true } });
-    assert.ok(proxyHtml.includes('data-proxy-feature="true"'));
-    assert.ok(!proxyHtml.includes('prompt-proxy-toggle'));
+    // LIN-3079: the inert +proxy toggle is removed.
+    assert.ok(!html.includes('prompt-proxy-toggle'));
   });
 
   test('renders the check-in status mount: present, empty, hidden, aria-live="polite"', () => {

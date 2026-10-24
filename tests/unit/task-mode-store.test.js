@@ -40,7 +40,7 @@ describe('vocabulary', () => {
   test('is frozen, in ladder order, and matches renderLadder\'s data-rung / data-setup-needs values', () => {
     assert.deepStrictEqual([...RUNGS], ['copy', 'run-step', 'run-task']);
     assert.deepStrictEqual([...ACTS], ['press', 'copy', 'dispatch']);
-    assert.deepStrictEqual([...NEEDS], ['prompt', 'dispatch', 'proxy']);
+    assert.deepStrictEqual([...NEEDS], ['prompt', 'dispatch']);
     assert.deepStrictEqual([...SURFACES], ['swipe', 'home']);
     for (const list of [RUNGS, ACTS, NEEDS, SURFACES, RUNG_ACTS, INSTRUMENTED_SURFACES, ...Object.values(RUNG_ACTS)]) {
       assert.ok(Object.isFrozen(list));
@@ -61,7 +61,7 @@ describe('vocabulary', () => {
       { ...TASK, rung: 'run-task', ready: true, needs: null, act: 'press', surface: 'swipe' },
       copyAct({ rung: 'run-task' }),
       dispatchAct('run-task', 'd-2'),
-      setupPress('run-task', 'proxy'),
+      setupPress('run-task', 'dispatch'),
     ]) {
       assert.strictEqual(validateTaskModeEvent(event), null, JSON.stringify(event));
     }
@@ -160,7 +160,7 @@ describe('TaskModeStore.getTaskMode', () => {
 
   test('entry is the first event, taken the first copy/dispatch, furthest the highest rung in ladder order', async () => {
     await recordInOrder(store, [
-      setupPress('run-task', 'proxy'),        // entered on run-task, not set up
+      setupPress('run-task', 'dispatch'),        // entered on run-task, not set up
       setupPress('run-step', 'dispatch'),
       copyAct(),                              // fell back to copy: first act taken
       dispatchAct('run-step', 'd-9'),
@@ -296,7 +296,7 @@ describe('TaskModeStore.countByEntryRung', () => {
 
   test('counts each (account, workspace, task) once, by its entry rung', async () => {
     await recordInOrder(store, [
-      setupPress('run-task', 'proxy', { issueIdentifier: 'LIN-1' }),
+      setupPress('run-task', 'dispatch', { issueIdentifier: 'LIN-1' }),
       copyAct({ issueIdentifier: 'LIN-1' }),                         // not an entry
       copyAct({ issueIdentifier: 'LIN-2' }),
       copyAct({ accountId: 'acct-2', issueIdentifier: 'LIN-2' }),
@@ -323,7 +323,7 @@ describe('TaskModeStore.countByEntryRung', () => {
   });
 
   test('since bounds the entry: a task entered before it is not recounted at a later rung', async () => {
-    await recordInOrder(store, [setupPress('run-task', 'proxy', { issueIdentifier: 'LIN-old' })]);
+    await recordInOrder(store, [setupPress('run-task', 'dispatch', { issueIdentifier: 'LIN-old' })]);
     const cutoff = new Date();
     await new Promise(resolve => setTimeout(resolve, 3));
     await recordInOrder(store, [
