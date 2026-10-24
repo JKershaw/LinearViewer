@@ -513,6 +513,7 @@ describe('rate table shape (LIN-1495)', () => {
     // Verified live against https://openrouter.ai/api/v1/models on 2026-08-15: the six
     // then-existing anthropic/claude-* rows publish
     // input_cache_write_1h at exactly prompt x 2; the three LIN-3094 rows come from Anthropic's published rates (18 Oct 2026), not the OpenRouter catalog;
+    // the LIN-3916 anthropic/claude-haiku-5.5 row comes from the operator-pasted OpenRouter catalog (24 Oct 2026), where input_cache_write_1h is also prompt x 2;
     // openai/gpt-5.6-sol carries input_cache_write but no 1h key, and the other three
     // OpenAI rows carry neither.
     const anthropicRows = Object.keys(MODEL_PRICING).filter(id => id.startsWith('anthropic/claude-'));
