@@ -484,10 +484,10 @@ a finding outside every bounded class.
 same file and finding. If one exists, link it (a `related` relation) and record it in the close-out
 summary instead of raising a ruling or filing a new one.
 
-**Before raising a `DECISION:` on a finding, check it isn't already covered.** Query
+**Before raising any `DECISION:`, check it isn't already covered.** Query
 `GET /api/proxy/rulings?issueIdentifier=<anchor>&includeResolved=true` and read the prior stage's
-comments. Don't re-raise a finding an open, answered, dismissed, or withdrawn row already covers for the same
-anchor — task-bound rulings aren't covered by `includeResolved`.
+comments. Don't re-raise a question an open, answered, dismissed, or withdrawn row already covers for the same
+anchor — task-bound rulings aren't covered by `includeResolved`. Ask for every fact the question needs in the one ruling.
 
 **Merge sibling blockers before you bubble up.** If more than one child you're holding is blocked on
 the same root cause, don't escalate once per child — raise ONE hand-back naming the shared cause, with
@@ -506,7 +506,7 @@ bounded, whether or not research's enumeration listed it — the list is evidenc
 edge — or a claim this ticket's own change depends on. An inside item settles only by cited evidence
 it's done, or by being left undone with what's left and why (warranted only when finishing it is a
 change the team would need to hear about first); **filing a follow-up ticket for it is never a
-discharge**, however well the ticket reads, and an inside item left undone is not filed later. (The one exception, LIN-3614: a live or post-deploy check the ticket did not ask for, which close-out cannot run, is recorded as not run, with what, why and the follow-up, and does not hold the close.) Only an
+discharge**, however well the ticket reads, and an inside item left undone is not filed later. (The one exception, John's 12 Oct standing ruling, LIN-3903: once the deploy has landed, a post-deploy check close-out cannot run is recorded as not run, with what, why and who can run it, listed for the operator, and does not hold the close, however the ticket or review names it, and raises no ruling. A product question is not a check and still gets a ruling.) Only an
 item **outside** every bounded class — a genuinely different kind of problem — may be filed, and only
 when the filing states the problem on its own terms. So when a review lands an Approve (or a
 conditional Approve) on work that's still unmerged, your move is the same as anywhere else —
