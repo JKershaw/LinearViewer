@@ -1,0 +1,101 @@
+// Pure data for the visual replay judge (LIN-3887): the page × state list, the masks (with the
+// reason for each), and the check that maps changed stylesheets to the renderers that link them.
+// No browser, no server, no I/O except the one `git grep` in `renderersOf`.
+import { execFileSync } from 'node:child_process';
+
+export const VIEWPORTS = [
+  { name: 'desktop', width: 1280, height: 900 },
+  { name: 'phone', width: 390, height: 844 },
+];
+export const THEMES = ['light', 'dark'];
+
+// Frozen browser clock for both sides.
+export const FROZEN_TIME = '2026-01-15T12:00:00.000Z';
+
+// Text the page prints about the server it runs on. Each side is its own server on its own port, so
+// the Proxy page's curl examples differ by the port digits alone. The text is rewritten (same length,
+// styling and layout kept) before the screenshot, on both sides, and printed in the summary.
+export const NORMALISE = [
+  { pattern: '127\\.0\\.0\\.1:\\d+', replacement: '127.0.0.1:00000', reason: "each side's own origin (port) appears in the Proxy page's curl examples" },
+];
+
+export const AREAS = ['sources', 'models', 'running', 'agent-access', 'health', 'change-log', 'features', 'account'];
+
+// A server-rendered time ("Last poll", key expiry / last used, the change-log meta) does not follow
+// the browser clock, and `formatWhen` prints proportional digits, so a one-minute tick can move the
+// row's width. The CONTAINING ROW is masked, never the inline span.
+const TIME_MASKS = {
+  key: { selector: '.settings-row[data-testid^="settings-key-"]', reason: 'key expiry and last used are server-rendered times' },
+  change: { selector: '.settings-change-row', reason: 'the change-log meta line carries a server-rendered time (WorkspaceChangeLogStore.record stamps new Date())' },
+  poll: { selector: '[data-testid="settings-runner-last-poll"]', reason: 'Last poll is a server-rendered time' },
+};
+
+// `state` names a set-up the spec performs identically on both sides (see replay.spec.js):
+//   ask-open          open the periodic-reviews ask in place (a change that affects everyone)
+//   key-open          mint a token, open its key row
+//   change-log-entry  really submit the periodic-reviews ask once, so the log has one entry
+// `urlKey` is fixed per entry and identical on both sides. States that write data get their own
+// urlKey so their writes never reach another page's sidebar counts.
+// `renderers` are the files that emit the page, for the changed-stylesheet check below.
+export const PAGES = [
+  { id: 'home', urlKey: 'judge', path: (k) => `/workspace/${k}/`, renderers: ['lib/render.js'] },
+  { id: 'task', urlKey: 'judge', path: (k) => `/workspace/${k}/task/LOCAL-1`, renderers: ['lib/render-task-page.js'] },
+  { id: 'dispatch', urlKey: 'judge', path: (k) => `/workspace/${k}/dispatch`, renderers: ['lib/render-dispatch.js'] },
+  { id: 'proxy', urlKey: 'judge', path: (k) => `/workspace/${k}/proxy`, renderers: ['lib/render-proxy.js'] },
+  { id: 'audit', urlKey: 'judge', path: (k) => `/workspace/${k}/audit`, renderers: ['lib/render-audit.js'] },
+  { id: 'settings-index', urlKey: 'judge', path: (k) => `/workspace/${k}/settings`, renderers: ['lib/render-settings.js'] },
+  ...AREAS.map((area) => ({
+    id: `settings-${area}`, urlKey: 'judge', path: (k) => `/workspace/${k}/settings/${area}`, renderers: ['lib/render-settings.js'],
+  })),
+  { id: 'styleguide', urlKey: 'judge', path: () => '/styleguide', renderers: ['lib/render-styleguide.js'] },
+  // States
+  { id: 'running-ask-open', urlKey: 'judge', path: (k) => `/workspace/${k}/settings/running`, state: 'ask-open', renderers: ['lib/render-settings.js'] },
+  { id: 'agent-access-key-open', urlKey: 'judge-key', path: (k) => `/workspace/${k}/settings/agent-access`, state: 'key-open', masks: [TIME_MASKS.key], renderers: ['lib/render-settings.js'] },
+  { id: 'change-log-entry', urlKey: 'judge-log', path: (k) => `/workspace/${k}/settings/change-log`, state: 'change-log-entry', masks: [TIME_MASKS.change], renderers: ['lib/render-settings.js'] },
+];
+
+// Stated, not assumed: what the seed cannot reach.
+export const NOT_COVERED = [
+  'Running with a runner (Last poll row, run controls): needs a runner key, whose time is server-rendered; this judge runs the no-runner state only',
+  'A change-log entry with a fixed time: the time is server-rendered and so masked, not seeded',
+  'Models body (LIN-3855) and Home content (LIN-3833): listed pages only, not their later states',
+  'Pages with no Settings-shared pieces (swim, swipe, ship, roadmap, library, KPIs, landing)',
+];
+
+// Every page renders through renderPage, so its shell files are covered by any listed page.
+export const SHARED_RENDERERS = ['lib/components/page.js'];
+
+export const coveredRenderers = () => new Set([...SHARED_RENDERERS, ...PAGES.flatMap((p) => p.renderers)]);
+
+export const cssNamesIn = (paths) => [...new Set(paths.filter((p) => /^public\/[^/]+\.css$/.test(p)).map((p) => p.slice('public/'.length)))].sort();
+
+// Renderers (under lib/ and server.js) that link <name>.css, at a revision.
+export const renderersOf = (repo, rev, cssName) => {
+  try {
+    return execFileSync('git', ['-C', repo, 'grep', '-l', '-F', cssName, rev, '--', 'lib', 'server.js'], { encoding: 'utf8' })
+      .split('\n').filter(Boolean).map((l) => l.slice(rev.length + 1)).sort();
+  } catch (e) {
+    if (e.status === 1) return []; // no match
+    throw e;
+  }
+};
+
+// { changed: [css names], uncovered: [{ css, renderers }] }. Non-empty `uncovered` means the page
+// list does not show a changed stylesheet's renderer, so the judge must not report zero.
+export const coverageOfChange = (changedPaths, renderersFor, covered = coveredRenderers()) => {
+  const changed = cssNamesIn(changedPaths);
+  const uncovered = [];
+  for (const css of changed) {
+    const missing = renderersFor(css).filter((r) => !covered.has(r));
+    if (missing.length) uncovered.push({ css, renderers: missing });
+  }
+  return { changed, uncovered };
+};
+
+// Pixel count out of Playwright's comparator message; null when it reports a size mismatch.
+export const parsePixelDiff = (message) => {
+  const m = /(\d+) pixels? \(ratio [\d.]+ of all image pixels\) (?:are|is) different/.exec(message);
+  if (m) return { pixels: Number(m[1]) };
+  if (/Expected an image \d+px by \d+px, received \d+px by \d+px/.test(message) || /size|dimensions/i.test(message)) return { sizeMismatch: true };
+  return null;
+};
