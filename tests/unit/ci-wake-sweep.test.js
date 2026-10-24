@@ -131,10 +131,10 @@ describe('ci-wake-sweep: over a real DispatchQueueStore', () => {
   }
 
   /** A worker row parked [pending], under an autopilot anchor (sessionId), as production builds them. */
-  async function seedParked({ message = `[pending] Unit and four E2E jobs are still pending on ${PR_URL}`, issue = 'LIN-3647', anchor = null, dispatchedBy = OWNER, target = 'cli', park = true } = {}) {
+  async function seedParked({ message = `[pending] Unit and four E2E jobs are still pending on ${PR_URL}`, issue = 'LIN-3647', anchor = null, dispatchedBy = OWNER, target = 'cli', park = true, kind = 'implementation', promptName = 'implementation', followUpTo, rootItemId } = {}) {
     const worker = await store.addItem(URL_KEY, {
-      prompt: 'implement', promptName: 'implementation', kind: 'implementation',
-      issueIdentifier: issue, sessionId: anchor, dispatchedBy, target
+      prompt: 'implement', promptName, kind,
+      issueIdentifier: issue, sessionId: anchor, dispatchedBy, target, followUpTo, rootItemId
     });
     await store.takeItem(worker._id, URL_KEY);
     const past = new Date(Date.now() - 30 * 60 * 1000);
@@ -155,6 +155,28 @@ describe('ci-wake-sweep: over a real DispatchQueueStore', () => {
     assert.equal(posted[0].target, 'cli');
     assert.match(posted[0].prompt, new RegExp(ciWakeMarker('abc1234', 'passing')));
     assert.match(posted[0].prompt, /pull\/1944/);
+  });
+
+  // LIN-3904: the sweep wakes a WORKER parked on its PR's CI, never an autopilot whose
+  // park text merely names a PR ("waiting on the review worker ... PR #N").
+  test('an autopilot lineage parked on text naming a PR gets no CI-finished dispatch', async () => {
+    await seedParked({ kind: 'autopilot', promptName: 'autopilot', message: `[pending] waiting on the review worker for ${PR_URL}` });
+    await buildRun()();
+    assert.equal(posted.length, 0);
+  });
+
+  test('an autopilot lineage whose tail is a custom follow-up gets no CI-finished dispatch', async () => {
+    const root = await seedParked({ kind: 'autopilot', promptName: 'autopilot', park: false });
+    await seedParked({ kind: 'custom', promptName: 'follow-up', followUpTo: root._id, rootItemId: root._id, message: `[pending] waiting on the review worker for ${PR_URL}` });
+    await buildRun()();
+    assert.equal(posted.length, 0);
+  });
+
+  test('a worker parked PENDING-EXTERNAL on its PR CI still gets the dispatch', async () => {
+    const worker = await seedParked({ message: `[pending] PENDING-EXTERNAL: CI running on ${PR_URL}` });
+    await buildRun()();
+    assert.equal(posted.length, 1);
+    assert.equal(posted[0].followUpTo, worker._id);
   });
 
   test('no-session wiring: owner reaches resolveWorkspaceAccess, bare #N resolves through comments with the call scope', async () => {
