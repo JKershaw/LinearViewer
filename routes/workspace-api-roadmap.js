@@ -19,6 +19,7 @@ import { buildRoadmapGapMessages } from '../lib/prompts/roadmap-gap-template.js'
 import { buildRoadmapDigestMessages } from '../lib/prompts/roadmap-digest-template.js';
 import { buildRoadmapOrientationMessages, serializeOrientationCandidates, countOrientationCandidates, parseOrientationLines, ORIENTATION_BEARINGS } from '../lib/prompts/roadmap-orientation-template.js';
 import { resolveReasoningBudget, streamChat, AVAILABLE_MODELS } from '../lib/openrouter.js';
+import { getCachedCatalogModel } from '../lib/openrouter-catalog.js';
 import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { getWorkspaceCallScope, matchTeamId } from '../lib/workspace.js';
@@ -50,7 +51,10 @@ import { resolveChatCredential, checkFreeTierGate, CHAT_MESSAGE_MAX_LENGTH, free
 export function resolveRoadmapModelOverride(requested, workspaceModel, isFreeTier) {
   if (isFreeTier) return workspaceModel;
   const id = typeof requested === 'string' ? requested.trim() : '';
-  if (id && AVAILABLE_MODELS.some(m => m.id === id)) return id;
+  // LIN-3882: a paid request may also name any model in the cached OpenRouter
+  // catalog (same precedent as resolveTurnModelOverride, LIN-3363/3370). A cold
+  // cache is curated-only, so it fails closed; the free tier returned above.
+  if (id && (AVAILABLE_MODELS.some(m => m.id === id) || getCachedCatalogModel(id))) return id;
   return workspaceModel;
 }
 

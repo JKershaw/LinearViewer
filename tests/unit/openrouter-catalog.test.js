@@ -40,7 +40,7 @@ describe('getModelCatalog', () => {
   test('mock:true returns the canned catalog without touching the network', async () => {
     global.fetch = () => { throw new Error('must not be called'); };
     const models = await getModelCatalog({ mock: true });
-    assert.deepEqual(models, MOCK_CATALOG_MODELS.map(m => ({ id: m.id, name: m.name, pricing: m.pricing ?? null })));
+    assert.deepEqual(models, MOCK_CATALOG_MODELS.map(m => ({ id: m.id, name: m.name, pricing: m.pricing ?? null, supported_parameters: null, reasoning: null })));
   });
 
   test('mock:true entries satisfy the same normalized {id, name, pricing} shape as the real path (LIN-2384 F2)', async () => {
@@ -71,7 +71,7 @@ describe('getModelCatalog', () => {
     global.fetch = async () => mockModelsResponse(['real/model-a']);
     await getModelCatalog({ mock: true });
     const real = await getModelCatalog();
-    assert.deepEqual(real, [{ id: 'real/model-a', name: 'real/model-a display name', pricing: null }]);
+    assert.deepEqual(real, [{ id: 'real/model-a', name: 'real/model-a display name', pricing: null, supported_parameters: null, reasoning: null }]);
   });
 
   test('cold cache: fetches, normalizes, and caches the catalog', async () => {
@@ -79,8 +79,8 @@ describe('getModelCatalog', () => {
     global.fetch = async () => { calls++; return mockModelsResponse(['openai/gpt-x', 'anthropic/claude-x']); };
     const models = await getModelCatalog();
     assert.deepEqual(models, [
-      { id: 'openai/gpt-x', name: 'openai/gpt-x display name', pricing: null },
-      { id: 'anthropic/claude-x', name: 'anthropic/claude-x display name', pricing: null }
+      { id: 'openai/gpt-x', name: 'openai/gpt-x display name', pricing: null, supported_parameters: null, reasoning: null },
+      { id: 'anthropic/claude-x', name: 'anthropic/claude-x display name', pricing: null, supported_parameters: null, reasoning: null }
     ]);
     assert.equal(calls, 1);
   });
@@ -90,10 +90,10 @@ describe('getModelCatalog', () => {
     global.fetch = async () => ({
       ok: true,
       status: 200,
-      json: async () => ({ data: [{ id: 'openai/gpt-x', name: 'GPT X', pricing: rawPricing }] })
+      json: async () => ({ data: [{ id: 'openai/gpt-x', name: 'GPT X', pricing: rawPricing, supported_parameters: null, reasoning: null }] })
     });
     const models = await getModelCatalog();
-    assert.deepEqual(models, [{ id: 'openai/gpt-x', name: 'GPT X', pricing: rawPricing }]);
+    assert.deepEqual(models, [{ id: 'openai/gpt-x', name: 'GPT X', pricing: rawPricing, supported_parameters: null, reasoning: null }]);
   });
 
   test('a non-object pricing field normalizes to null rather than passing through raw', async () => {
@@ -103,7 +103,7 @@ describe('getModelCatalog', () => {
       json: async () => ({ data: [{ id: 'openai/gpt-x', name: 'GPT X', pricing: 'not-an-object' }] })
     });
     const models = await getModelCatalog();
-    assert.deepEqual(models, [{ id: 'openai/gpt-x', name: 'GPT X', pricing: null }]);
+    assert.deepEqual(models, [{ id: 'openai/gpt-x', name: 'GPT X', pricing: null, supported_parameters: null, reasoning: null }]);
   });
 
   test('fresh cache: a second call within the TTL does not refetch', async () => {
@@ -158,7 +158,7 @@ describe('getModelCatalog', () => {
       json: async () => ({ data: [{ id: 'ok/model' }, { name: 'no id here' }, null, { id: '' }] })
     });
     const models = await getModelCatalog();
-    assert.deepEqual(models, [{ id: 'ok/model', name: 'ok/model', pricing: null }]);
+    assert.deepEqual(models, [{ id: 'ok/model', name: 'ok/model', pricing: null, supported_parameters: null, reasoning: null }]);
   });
 
   test('a missing/non-array `data` field degrades to []', async () => {
