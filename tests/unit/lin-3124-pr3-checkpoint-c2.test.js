@@ -13,6 +13,10 @@ import { createConnectionAccess } from '../../lib/connection-credential.js';
 import { createWorkspaceTitleResolver } from '../../lib/workspace-title-resolver.js';
 import { fingerprintCredential } from '../../lib/credential-diagnostics.js';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
+import { createDashboardRoutes } from '../../routes/dashboard.js';
+import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
+import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
+import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cache.js';
 import { appAround, request } from './lib/entrance-route-sweep.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -84,6 +88,82 @@ describe('LIN-3124 PR3 checkpoint C2 — title arm (D7)', () => {
     });
     assert.strictEqual((await legacyResolver.resolveWorkspaceForTitles('u', 'acct')).accessToken, 'legacy-tok');
     assert.ok(legacyRow);
+  });
+});
+
+// LIN-3840: the behaviour replacement for the routes/dashboard.js source-text pin
+// below (D16 on the dashboard). Both tests drive the real router over HTTP and
+// require every `getWorkspaceAccessToken` call to arrive carrying the REQUESTING
+// session object, wherever in routes/ the code lives.
+describe('LIN-3124 PR3 checkpoint C2 — D16 owner-blind threading on the dashboard routes (LIN-3840)', () => {
+  const NOW_ISO = new Date().toISOString();
+
+  function dashboardOver({ session, getWorkspaceAccessToken, history = [], agentStatus = [] }) {
+    const router = createDashboardRoutes({
+      workspaceFromUrl: (req, _res, next) => {
+        req.session = session;
+        req.workspace = { urlKey: 'ws-a', id: 'ws-a-id', provider: 'linear' };
+        next();
+      },
+      dispatchQueueStore: {
+        async listItems() { return []; },
+        async listHistory() { return { items: withFreshDigests(history) }; }
+      },
+      agentStatusStore: { async listStatus() { return { items: agentStatus }; } },
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken,
+      fetchIssueContext: async () => ({ issue: { state: { name: 'In Progress', type: 'started' } } }),
+      fetchWorkspaceIssues: async () => [],
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({}),
+      // Pass-through, so the request really enters mergeSessions.
+      sessionsFeedCache: { keyFor: () => 'k', get: async (_k, producer) => producer() }
+    });
+    return appAround(router);
+  }
+
+  test('GET /api/dashboard/sessions threads req.session into the touched-task hydration read', async () => {
+    const session = { accountId: 'acct-owner', workspaces: [{ urlKey: 'ws-a', name: 'A' }] };
+    const seen = [];
+    // A terminal + errored session with a touched task: the only hydration-eligible class.
+    const history = [
+      { id: 'sess-err', kind: 'autopilot', issueIdentifier: 'LIN-300', issueTitle: 'T', promptName: 'autopilot', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken' },
+      { id: 'sess-err-w', sessionId: 'sess-err', issueIdentifier: 'LIN-301', issueTitle: 'T', promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken', feedback: [{ message: '[failed] broke', timestamp: NOW_ISO }] }
+    ];
+    const agentStatus = [{ id: 'as-sess-err', dispatchId: 'sess-err', taskIdentifier: 'LIN-300', action: 'implementation', status: 'completed', summary: 'done', timestamp: NOW_ISO }];
+    const app = dashboardOver({
+      session, history, agentStatus,
+      getWorkspaceAccessToken: async (urlKey, sess) => { seen.push([urlKey, sess]); return 'workspace-token'; }
+    });
+
+    const res = await request(app, 'GET', '/workspace/ws-a/api/dashboard/sessions');
+    assert.equal(res.status, 200, res.text);
+    // Positive control: the eligible session reached the hydration read at all.
+    assert.ok(seen.length >= 1, 'the feed asked for the workspace access token (the session was hydration-eligible)');
+    for (const [urlKey, sess] of seen) {
+      assert.equal(urlKey, 'ws-a');
+      assert.strictEqual(sess, session, 'the token lookup receives the requesting session');
+    }
+  });
+
+  test('GET /api/dashboard/hydrate/:wsUrlKey/:identifier threads req.session into the token lookup', async () => {
+    const session = { accountId: 'acct-owner', workspaces: [{ urlKey: 'ws-a', name: 'A' }] };
+    const seen = [];
+    const app = dashboardOver({
+      session,
+      getWorkspaceAccessToken: async (urlKey, sess) => { seen.push([urlKey, sess]); return 'workspace-token'; }
+    });
+
+    const res = await request(app, 'GET', '/workspace/ws-a/api/dashboard/hydrate/ws-a/LIN-1');
+    assert.equal(res.status, 200, res.text);
+    assert.equal(res.body.hydrated, true);
+    assert.ok(seen.length >= 1, 'the hydrate route asked for the workspace access token');
+    for (const [urlKey, sess] of seen) {
+      assert.equal(urlKey, 'ws-a');
+      assert.strictEqual(sess, session, 'the token lookup receives the requesting session');
+    }
   });
 });
 
