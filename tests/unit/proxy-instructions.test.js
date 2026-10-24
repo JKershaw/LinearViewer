@@ -272,3 +272,17 @@ describe('buildInstructions — GET /api/proxy/rulings publishes the effect enum
     assert.doesNotMatch(text, /"declaredEffect" is guaranteed null/);
   });
 });
+
+describe('buildInstructions — dispatch "harness" blank-fill chain (LIN-3858, design note D4)', () => {
+  const text = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite' });
+  const harnessLine = text.split('\n').find((l) => l.includes('"harness" (optional)'));
+
+  test('does not claim Harbour interposes no per-workspace default', () => {
+    assert.ok(harnessLine, 'harness line present');
+    assert.doesNotMatch(harnessLine, /does not interpose a per-workspace default/);
+  });
+
+  test('states the real chain: explicit, then workspace defaults, then claude-code', () => {
+    assert.match(harnessLine, /explicit.*workspace's dispatch defaults.*claude-code/i);
+  });
+});
