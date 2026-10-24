@@ -166,7 +166,7 @@ describe('LIN-3124 PR3 checkpoint C2 — D16 owner-blind threading on the dashbo
   });
 });
 
-describe('LIN-3124 PR3 checkpoint C2 — D16 owner-blind threading (source-text pins on server.js and the factory)', () => {
+describe('LIN-3124 PR3 checkpoint C2 — D16 owner-blind threading (source-text pins)', () => {
   test('getWorkspaceAccessToken takes a session and consults the side-table only with one', () => {
     assert.match(SERVER_SRC, /async function getWorkspaceAccessToken\(urlKey, session = null\)/);
     const start = SERVER_SRC.indexOf('async function getWorkspaceAccessToken(');
