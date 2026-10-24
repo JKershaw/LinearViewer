@@ -30,7 +30,7 @@ export function createWorkspaceApiRoutes(deps) {
 const SIBLING = `export function createPromptsRoutes() { return 'prompts'; }\n`;
 
 // A scratch dir with the synthetic layout written into it, and the repo's express resolvable from it.
-function withLayout(files, fn) {
+async function withLayout(files, fn) {
   const dir = mkdtempSync(join(tmpdir(), 'move-probe-test-'));
   try {
     mkdirSync(join(dir, 'routes'), { recursive: true });
@@ -38,7 +38,7 @@ function withLayout(files, fn) {
     symlinkSync(join(root, 'node_modules', 'express'), join(dir, 'node_modules', 'express'), 'dir');
     writeFileSync(join(dir, 'package.json'), '{"type":"module"}');
     for (const [rel, src] of Object.entries(files)) writeFileSync(join(dir, rel), src);
-    return fn(dir);
+    return await fn(dir);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
