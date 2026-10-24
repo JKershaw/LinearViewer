@@ -31,8 +31,10 @@ const DISPLAY_ONLY = new Set([
 ]);
 
 const FILES = [
-  'routes/workspace-api.js',
-  'routes/workspace-api-roadmap.js',
+  // LIN-3861: the workspace-API unit (routes/workspace-api.js and routes/workspace-api-*.js), not two file names.
+  // The two fixed entries were blind to routes/workspace-api-prompts.js and -steps.js (LIN-3842) and, under a
+  // move of the route bodies into another unit file, to the 6 billed clamp sites.
+  ...workspaceApiUnitFiles(root),
   'routes/proxy.js',
   'routes/proxy-compute.js',
   'routes/task-chat.js',
