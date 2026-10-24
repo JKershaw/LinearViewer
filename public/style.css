@@ -3149,6 +3149,58 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   color: var(--fg);
 }
 
+/* =============================================================================
+   Inline link and text control (LIN-3889)
+   One body each. `.settings-link` was byte-identical in settings.css and audit.css; the text
+   control was `.model-select` (settings.css, audit.css) and `.token-label-input` (common-actions.css).
+   ============================================================================= */
+.settings-link {
+  color: var(--blue);
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  text-decoration: none;
+  margin-left: var(--space-2);
+}
+
+.settings-link:hover {
+  text-decoration: underline;
+}
+
+.model-select,
+.token-label-input {
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--fg-vdim);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+  min-width: 18ch;
+}
+
+/* One focus rule for both: the border turns blue on focus, and the default ring is kept for
+   keyboard focus (LIN-786: never kill focus outright). `.model-select:focus` used to remove the
+   outline for every focus, mouse or keyboard; that was the difference, and it is now the fix. */
+.model-select:focus,
+.token-label-input:focus {
+  border-color: var(--blue);
+}
+
+.model-select:focus:not(:focus-visible),
+.token-label-input:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* LIN-3889 (Consolidate): the phone wrap for every key/value row. The three per-section `.line`
+   copies (dispatch.css, proxy.css, settings.css) each carried it at 640px; bare `.field` rows,
+   which are Dispatch's, /styleguide's and Audit's client-built rows, did not wrap. Tree rows that
+   wrapped already get it from the `.line` phone rule below, so only bare `.field` changes. */
+@media (max-width: 640px) {
+  .field {
+    flex-wrap: wrap;
+  }
+}
+
 /* =========================================================================
    Card (LIN-468, Phase A.4)
    Canonical slot-based content card, rendered by renderCard()
@@ -3361,6 +3413,29 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   color: var(--muted);
 }
 .btn--ghost:hover { background: var(--card-h); color: var(--text); border-color: transparent; }
+
+/* Tone variants (LIN-3889): the ask-in-place confirm and the key revoke. A filled-tint button in the
+   tone, with the AA-safe -dim token for its text (the same text Settings' red and teal rows already
+   use). Tinted, not solid: whether Rebuild wants a solid fill is an open question in the PR.
+   Both sit after `.btn:hover`, so the tint wins on hover too (`:hover` pairs below). */
+.btn--red {
+  color: var(--red-dim, var(--red));
+  border-color: var(--red);
+  background: color-mix(in srgb, var(--red) 12%, transparent);
+}
+.btn--red:hover {
+  background: color-mix(in srgb, var(--red) 22%, transparent);
+  border-color: var(--red);
+}
+.btn--teal {
+  color: var(--brand-dim);
+  border-color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+}
+.btn--teal:hover {
+  background: color-mix(in srgb, var(--brand) 22%, transparent);
+  border-color: var(--brand);
+}
 
 .btn__icon { display: inline-flex; }
 

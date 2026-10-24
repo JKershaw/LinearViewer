@@ -106,6 +106,10 @@ describe('the Dispatch page is read-only for a member', () => {
     assert.ok(!html.includes('dispatch-halt-stop'));
     assert.ok(!html.includes('dispatch-halt-resume'));
     assert.ok(html.includes('data-testid="dispatch-halt-status"'));
+    // LIN-3889: the shared halt component is gated at the call site, so a member's page has no
+    // halt form and no halt hooks for public/dispatch.js to bind (its `if (form)` early-out).
+    assert.ok(!html.includes('data-halt-mode'), 'no halt control carries a mode');
+    assert.ok(!html.includes('data-halt-form'), 'no halt form');
     // The form element stays: public/dispatch.js returns early without it and the token list would not load.
     assert.match(html, /id="create-token-form"/);
     assert.match(html, /<button type="submit" class="action-btn save" disabled>/);

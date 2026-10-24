@@ -61,96 +61,21 @@
   gap: var(--space-2);
 }
 
-.token-label-input {
-  font-family: var(--font-content);
-  font-size: 0.9em;
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--fg-vdim);
-  border-radius: var(--radius-sm);
-  background: var(--bg);
-  color: var(--fg);
-  min-width: 18ch;
-}
-
-.token-label-input:focus {
-  border-color: var(--blue);
-}
-
-/* Suppress the default ring only for non-keyboard focus; keyboard focus keeps
-   the global S1 :focus-visible ring (LIN-786: never kill focus outright). */
-.token-label-input:focus:not(:focus-visible) {
-  outline: none;
-}
+/* `.token-label-input` body and focus: style.css, with `.model-select` (LIN-3889). */
 
 .token-label-input::placeholder {
   color: var(--fg-dim);
-}
-
-/* =============================================================================
-   Token List
-   ============================================================================= */
-.token-list,
-.proxy-token-list {
-  margin-top: 0.75rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--fg-vdim);
-}
-
-.token-list-loading,
-.token-list-empty {
-  color: var(--fg-dim);
-  font-size: 0.9em;
-  padding: var(--space-1) 0;
-}
-
-.token-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--space-2) 0;
-  border-bottom: 1px solid var(--fg-vdim);
-}
-
-.token-item:last-child {
-  border-bottom: none;
-}
-
-.token-info {
-  flex: 1;
-}
-
-.token-label-text {
-  font-family: var(--font-content);
-  font-weight: 500;
-  color: var(--fg);
-}
-
-.token-meta {
-  font-size: 0.8em;
-  color: var(--fg-dim);
-  margin-top: 0.15rem;
 }
 
 /* LIN-1448: an ownerless (pre-LIN-1397) token is a live fault, not a neutral
    fact — anything it mints is dead on arrival at every workspace verb.
    --amber-dim, not --amber, because this is TEXT: the raw hue fails AA on the
    light surface, and the -dim companion is themed for light and dark alike.
-   LIN-1586 hoisted this from dispatch.css (where it was scoped `.token-list
-   .token-ownerless`) into the shared home of `.token-item`/`.token-meta`, so
-   the proxy token list and the health panel reuse the ONE definition rather
-   than growing a second copy. Both pages load this stylesheet. */
+   LIN-1586 hoisted this from dispatch.css. The token list it was written for has no emitter
+   any more (LIN-3889 deleted that list's rules here); this rule still styles the live
+   proxy-health row. Both pages load this stylesheet. */
 .token-ownerless {
   color: var(--amber-dim);
-}
-
-/* Red - revoke button */
-.token-revoke {
-  color: var(--red);
-  background: color-mix(in srgb, var(--red) 12%, transparent);
-}
-
-.token-revoke:hover {
-  background: color-mix(in srgb, var(--red) 22%, transparent);
 }
 
 /* =============================================================================
@@ -317,11 +242,5 @@
 
   .token-label-input {
     min-width: 100%;
-  }
-
-  .token-item {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-2);
   }
 }

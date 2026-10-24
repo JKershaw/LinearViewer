@@ -6,8 +6,8 @@
  */
 
 /* Section styling is canonical now (.section / .section--boxed / .section-header
-   in style.css, LIN-461). `.proxy-section` survives only as a hook for the
-   `.proxy-section .line` descendant rule below. */
+   in style.css, LIN-461). `.proxy-section` survives only as a hook. Its key/value
+   rows are `.field` (style.css); the `.proxy-section .line` copy is gone (LIN-3889). */
 
 .proxy-hint {
   color: var(--fg-dim);
@@ -101,14 +101,6 @@
   padding: 0;
 }
 
-.proxy-section .line {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.4rem 0;
-  font-family: var(--font-content);
-  font-size: 0.9em;
-}
 
 /* =============================================================================
    Curl Examples
@@ -380,7 +372,7 @@
 .runner-credential-label {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
   font-family: var(--font-content);
   font-weight: 500;
   color: var(--fg);
@@ -419,10 +411,6 @@
   .proxy-prompt-controls {
     flex-direction: column;
     align-items: flex-start;
-  }
-
-  .proxy-section .line {
-    flex-wrap: wrap;
   }
 
   .proxy-event-item {

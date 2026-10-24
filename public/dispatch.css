@@ -6,9 +6,9 @@
  */
 
 /* Section styling is canonical now (.section / .section--boxed / .section-header
-   in style.css, LIN-461). `.dispatch-section` survives only as a hook:
-   dispatch.js reaches the send panel via `.closest('.dispatch-section')` and the
-   `.dispatch-section .line` rule below scopes on it. */
+   in style.css, LIN-461). `.dispatch-section` survives only as a styling hook;
+   dispatch.js reaches the send panel via [data-send-panel] (LIN-3889). Key/value
+   tree rows are `.field` (style.css), so this file no longer restates that row. */
 
 /* `.dispatch-subtitle` is now a no-style E2E hook (dispatch-page.spec.js);
    canonical styling lives in `.page-header__subtitle` (style.css, LIN-462). */
@@ -16,18 +16,9 @@
 /* =============================================================================
    Dispatch Nodes (tree items)
    ============================================================================= */
-.dispatch-section .line {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.4rem 0;
-  font-family: var(--font-content);
-  font-size: 0.9em;
-}
-
-.dispatch-prompt-line {
-  align-items: flex-start;
-}
+/* LIN-3889: `.dispatch-section .line` (a byte copy of `.field`) and `.dispatch-prompt-line`
+   (`align-items: flex-start`) are gone. The copy's 0,2,0 specificity hid the variant, so it
+   never applied; with the copy removed it would, so the dead declaration goes with it (0 px). */
 
 .dispatch-prompt-wrapper {
   flex: 1;
@@ -67,8 +58,9 @@
   border-color: var(--blue);
 }
 
+/* LIN-3889: the `gap` that was here (var(--space-2)) never applied: `.dispatch-section .line`
+   (0,2,0) set the row gap. With that copy gone it would flip, so it is dropped (0 px). */
 .dispatch-prompt-actions {
-  gap: var(--space-2);
   flex-wrap: wrap;
 }
 
@@ -176,7 +168,7 @@
   padding: 0;
   cursor: pointer;
   font-family: var(--font-structural);
-  font-size: 1em;
+  font-size: var(--font-size-base);
   line-height: 1;
   color: var(--fg-dim);
 }
@@ -447,7 +439,7 @@
 .halt-status {
   font-family: var(--font-content);
   font-size: 0.9em;
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-2);
 }
 
 .halt-status code {
@@ -461,7 +453,7 @@
 
 .halt-disclaimer {
   font-family: var(--font-content);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   color: var(--fg-dim);
   margin: 0 0 0.75rem 0;
 }
@@ -476,16 +468,12 @@
 }
 
 .halt-form .action-btn {
-  margin-right: 0.5rem;
+  margin-right: var(--space-2);
 }
 
 /* =============================================================================
    Responsive
    ============================================================================= */
 @media (max-width: 640px) {
-  .dispatch-section .line {
-    flex-wrap: wrap;
-  }
-
   /* Token responsive: see common-actions.css */
 }
