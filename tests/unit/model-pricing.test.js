@@ -280,7 +280,7 @@ describe('computeUsageCostUsd — long-context override tier (LIN-2403)', () => 
       cacheCreationInputTokens: 80_000,
       outputTokens: 0,
     });
-    const expected = (100_000 * 8.00 + 100_000 * 0.40 + 80_000 * 5.00) / 1e6; // override rates (cache keys inherit the base row)
+    const expected = (100_000 * 8.00 + 100_000 * 0.80 + 80_000 * 10.00) / 1e6; // override rates (LIN-3882: explicit override cache tiers)
     assert.strictEqual(cost, expected);
     // Sanity: the base-rate reading (had the sum not crossed) is strictly lower.
     const baseReading = (100_000 * 4.00 + 100_000 * 0.40 + 80_000 * 5.00) / 1e6;
@@ -305,8 +305,8 @@ describe('computeUsageCostUsd — long-context override tier (LIN-2403)', () => 
     // cache-creation total still prices to null under the override, exactly as it
     // would under the base rate (the meaningful "omitted key inherits a REAL base
     // price" case is covered directly against a synthetic rate in the
-    // selectRateForPrompt suite above, since none of this table's 3 real
-    // override-bearing rows happen to omit a tier their base row prices).
+    // selectRateForPrompt suite above, since none of this table's real
+    // override-bearing rows omit a tier their base row prices).
     assert.strictEqual(computeUsageCostUsd({
       model: 'openai/gpt-5.5',
       harness: 'opencode',
@@ -323,7 +323,8 @@ describe('computeUsageCostUsd — long-context override tier (LIN-2403)', () => 
       outputTokens: 1,
       cacheCreationInputTokens: 10,
     });
-    const expected = (300_000 * 8.00 + 1 * 30.00 + 10 * 5.00) / 1e6;
+    // LIN-3882: the override carries its own cacheWrite (10.00), not the base 5.00.
+    const expected = (300_000 * 8.00 + 1 * 30.00 + 10 * 10.00) / 1e6;
     assert.strictEqual(cost, expected);
   });
 
@@ -533,25 +534,25 @@ describe('rate table shape (LIN-1495)', () => {
     // 2026-08-30 (LIN-2384): prompt/cacheRead/cacheWrite were 2.5x overstated,
     // completion was 3x overstated.
     // LIN-3882: corrected again to the catalog rate the operator pasted on 2026-10-24
-    // ($4/$20; the catalog moved since LIN-2384). The override carries prompt/completion
-    // only, so its cache keys inherit the base row.
+    // ($4/$20; the catalog moved since LIN-2384). The override cache tiers (0.80 / 10.00)
+    // are the operator-pasted pricing.overrides[0] values, twice the base cache rates.
     assert.deepStrictEqual(MODEL_PRICING['openai/gpt-5.6-sol'], {
       prompt: 4.00,
       completion: 20.00,
       cacheRead: 0.40,
       cacheWrite: 5.00,
-      overrides: [{ minPromptTokens: 272000, prompt: 8.00, completion: 30.00 }],
+      overrides: [{ minPromptTokens: 272000, prompt: 8.00, completion: 30.00, cacheRead: 0.80, cacheWrite: 10.00 }],
     });
   });
 
   test('gpt-6.1-sol and gpt-5.6-terra rows match the operator-pasted catalog rates (LIN-3882)', () => {
     assert.deepStrictEqual(MODEL_PRICING['openai/gpt-6.1-sol'], {
       prompt: 2.00, completion: 10.00, cacheRead: 0.10, cacheWrite: 2.50,
-      overrides: [{ minPromptTokens: 272000, prompt: 4.00, completion: 15.00 }],
+      overrides: [{ minPromptTokens: 272000, prompt: 4.00, completion: 15.00, cacheRead: 0.20, cacheWrite: 5.00 }],
     });
     assert.deepStrictEqual(MODEL_PRICING['openai/gpt-5.6-terra'], {
       prompt: 2.00, completion: 12.00, cacheRead: 0.20, cacheWrite: 2.50,
-      overrides: [{ minPromptTokens: 272000, prompt: 4.00, completion: 18.00 }],
+      overrides: [{ minPromptTokens: 272000, prompt: 4.00, completion: 18.00, cacheRead: 0.40, cacheWrite: 5.00 }],
     });
   });
 
