@@ -33,6 +33,7 @@ import { parse } from 'acorn';
 import { DISPATCH_KINDS } from '../../lib/prompt-templates.js';
 import { AI_OPERATION_KINDS } from '../../lib/workspace-preferences.js';
 import { JOBS, GROUPS, SURFACES } from '../../lib/llm-jobs.js';
+import { isWorkspaceApiUnitFile } from './lib/workspace-api-unit.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -61,6 +62,7 @@ const WRAPPERS = {
 // `passthrough: true`; the only files where a spread may stand in for urlKey) when it
 // spreads the caller's callMeta over a feature default (covered by WRAPPERS), and
 // 'builder' when the options come from a named function (checked by name).
+const WORKSPACE_API_UNIT = 'workspace-API unit';
 const CALL_PATHS = {
   'lib/agent-turn.js': { sites: 2 },
   'lib/brief.js': { sites: 1, passthrough: true },
@@ -74,8 +76,10 @@ const CALL_PATHS = {
   'lib/session-summary.js': { sites: 1, passthrough: true },
   'routes/proxy.js': { sites: 1 },
   'routes/ship-biscuit.js': { sites: 1 },
-  'routes/workspace-api-roadmap.js': { sites: 3 },
-  'routes/workspace-api.js': { sites: 4, builders: ['recommendCallOptions'] },
+  // The workspace-API unit (LIN-3861) is judged as a whole: 4 sites in the
+  // recommend/feedback groups plus the roadmap's 3, and the builder may live in any
+  // unit file, so the route groups can move between them. Keyed by the unit, not a file.
+  [WORKSPACE_API_UNIT]: { sites: 7, builders: ['recommendCallOptions'] },
 };
 
 const SCAN_DIRS = ['lib', 'routes'];
@@ -214,13 +218,18 @@ export function checkCensus({ sources, dispatchKinds, aiOperationKinds, jobs }) 
   const byPath = new Map(files.map((f) => [f.path, f]));
 
   // 4. Call-path inventory, and urlKey provenance at each site.
+  const unitFiles = files.filter((f) => isWorkspaceApiUnitFile(f.path));
+  const unitSites = unitFiles.reduce((n, f) => n + f.sites.length, 0);
+  if (unitSites !== CALL_PATHS[WORKSPACE_API_UNIT].sites) {
+    problems.push(`${WORKSPACE_API_UNIT} has ${unitSites} model call(s), CALL_PATHS says ${CALL_PATHS[WORKSPACE_API_UNIT].sites}`);
+  }
   for (const f of files) {
-    const entry = CALL_PATHS[f.path];
+    const entry = isWorkspaceApiUnitFile(f.path) ? CALL_PATHS[WORKSPACE_API_UNIT] : CALL_PATHS[f.path];
     if (f.sites.length && !entry) {
       for (const s of f.sites) problems.push(`${s.file}:${s.line} ${s.name}() is a model call with no CALL_PATHS entry`);
       continue;
     }
-    if (entry && f.sites.length !== entry.sites) {
+    if (entry && !isWorkspaceApiUnitFile(f.path) && f.sites.length !== entry.sites) {
       problems.push(`${f.path} has ${f.sites.length} model call(s), CALL_PATHS says ${entry.sites}${f.sites.length ? ` (at ${f.sites.map((s) => s.line).join(', ')})` : ''}`);
     }
     for (const s of f.sites) {
@@ -229,7 +238,7 @@ export function checkCensus({ sources, dispatchKinds, aiOperationKinds, jobs }) 
       else if (m.state === 'literal' && !m.keys.has('urlKey') && !(m.spreads && entry?.passthrough)) problems.push(`${s.file}:${s.line} ${s.name}() callMeta has no urlKey, so its row is never listed`);
       else if (m.state === 'unresolved' && !entry?.builders?.length) problems.push(`${s.file}:${s.line} ${s.name}() takes its options from a builder that CALL_PATHS does not name`);
     }
-    for (const b of entry?.builders || []) {
+    for (const b of isWorkspaceApiUnitFile(f.path) ? [] : entry?.builders || []) {
       const fn = f.functions.get(b);
       let meta = null;
       if (fn) visit(fn, (n) => { if (!meta && n.type === 'Property' && propName(n) === 'callMeta' && n.value.type === 'ObjectExpression') meta = describeObject(n.value); });
@@ -237,7 +246,15 @@ export function checkCensus({ sources, dispatchKinds, aiOperationKinds, jobs }) 
       else if (!meta || !meta.keys.has('urlKey')) problems.push(`${f.path}: builder ${b}() does not put urlKey in its callMeta`);
     }
   }
-  for (const path of Object.keys(CALL_PATHS)) if (!byPath.has(path)) problems.push(`CALL_PATHS names ${path}, which is not in the scanned tree`);
+  for (const b of CALL_PATHS[WORKSPACE_API_UNIT].builders) {
+    const holders = unitFiles.filter((f) => f.functions.has(b));
+    if (holders.length !== 1) { problems.push(`${WORKSPACE_API_UNIT}: builder ${b}() is defined in ${holders.length} unit files, expected 1`); continue; }
+    let meta = null;
+    visit(holders[0].functions.get(b), (n) => { if (!meta && n.type === 'Property' && propName(n) === 'callMeta' && n.value.type === 'ObjectExpression') meta = describeObject(n.value); });
+    if (!meta || !meta.keys.has('urlKey')) problems.push(`${holders[0].path}: builder ${b}() does not put urlKey in its callMeta`);
+  }
+  if (!unitFiles.length) problems.push(`CALL_PATHS names the ${WORKSPACE_API_UNIT}, which has no file in the scanned tree`);
+  for (const path of Object.keys(CALL_PATHS)) if (path !== WORKSPACE_API_UNIT && !byPath.has(path)) problems.push(`CALL_PATHS names ${path}, which is not in the scanned tree`);
 
   // 5. Wrappers that take callMeta from the caller.
   for (const f of files) {
@@ -316,12 +333,27 @@ describe('LIN-3852: every LLM use is a registered job', () => {
     assert.match(problems[0], /^lib\/next-run\.js:\d+ streamChat\(\) callMeta has no urlKey/);
   });
 
-  test('the feedback-title route without its urlKey fails (the fifth invisible call)', () => {
-    const edited = sources['routes/workspace-api.js'].replace('callMeta: { urlKey: workspace.urlKey } });\n          if (generated)', '});\n          if (generated)');
-    assert.notEqual(edited, sources['routes/workspace-api.js'], 'fixture edit applied');
-    const problems = checkCensus({ ...inputs, sources: { ...sources, 'routes/workspace-api.js': edited } });
-    assert.equal(problems.length, 1, problems.join('\n'));
-    assert.match(problems[0], /^routes\/workspace-api\.js:\d+ generateFeedbackTitle\(\) is called without callMeta\.urlKey/);
+  // Built from a synthetic unit file, not the live text of a file that is free to move.
+  const unitFixture = (callMeta) => `import { generateFeedbackTitle } from '../lib/feedback-title.js';\nexport const f = (w) => generateFeedbackTitle({ title: 't' }, { callMeta: ${callMeta} });\n`;
+  const withoutUnit = Object.fromEntries(Object.entries(sources).filter(([p]) => !isWorkspaceApiUnitFile(p)));
+
+  test('a feedback-title call in a unit file without its urlKey fails (the fifth invisible call)', () => {
+    const problems = checkCensus({ ...inputs, sources: { ...withoutUnit, 'routes/workspace-api-x.js': unitFixture('{}') } });
+    assert.ok(problems.some((p) => /^routes\/workspace-api-x\.js:\d+ generateFeedbackTitle\(\) is called without callMeta\.urlKey/.test(p)), problems.join('\n'));
+  });
+
+  test('the same call with its urlKey, in any unit file, raises no site problem (positive control)', () => {
+    const problems = checkCensus({ ...inputs, sources: { ...withoutUnit, 'routes/workspace-api-x.js': unitFixture('{ urlKey: w.urlKey }') } });
+    assert.ok(!problems.some((p) => p.includes('workspace-api-x.js')), problems.join('\n'));
+  });
+
+  test('the unit is counted as a whole: moving its files to other unit names stays clean, an extra model call fails', () => {
+    const moved = { ...withoutUnit };
+    for (const [p, src] of Object.entries(sources)) if (isWorkspaceApiUnitFile(p)) moved[p.replace(/\.js$/, '-moved.js')] = src;
+    assert.deepEqual(checkCensus({ ...inputs, sources: moved }), []);
+    const extra = { ...moved, 'routes/workspace-api-extra.js': "import { streamChat } from '../lib/openrouter.js';\nexport const g = () => streamChat([], { callMeta: { urlKey: 'u' } }, () => {});\n" };
+    const problems = checkCensus({ ...inputs, sources: extra });
+    assert.ok(problems.some((p) => p.includes(`${WORKSPACE_API_UNIT} has 8 model call(s)`)), problems.join('\n'));
   });
 
   test('a job with no group or an empty description fails', () => {
