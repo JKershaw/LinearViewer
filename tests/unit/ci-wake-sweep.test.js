@@ -209,12 +209,12 @@ describe('ci-wake-sweep: over a real DispatchQueueStore', () => {
 
   test('a tail row missing from the raw read is skipped, never read from lean feedback', async () => {
     await seedParked();
-    const realList = store.listHistory.bind(store);
-    store.listHistory = async (...args) => ({ items: [] });
+    const realList = store.listHistoryWithBodies.bind(store);
+    store.listHistoryWithBodies = async (...args) => ({ items: [] });
     try {
       await buildRun()();
     } finally {
-      store.listHistory = realList;
+      store.listHistoryWithBodies = realList;
     }
     assert.equal(posted.length, 0);
   });
@@ -489,7 +489,7 @@ describe('ci-wake-sweep: over a real DispatchQueueStore', () => {
       const worker = await seedParked({ anchor: anchor._id });
       const run = buildRun({ extra: real });
       await run();
-      const queued = await store.listItems(URL_KEY, { rootItemId: worker._id });
+      const queued = await store.listItemsWithPrompt(URL_KEY, { rootItemId: worker._id });
       const wake = queued.filter((row) => row.followUpTo === worker._id);
       assert.equal(wake.length, 1);
       assert.equal(wake[0].rootItemId, worker._id);
@@ -500,7 +500,7 @@ describe('ci-wake-sweep: over a real DispatchQueueStore', () => {
 
       clock += 2 * 60 * 60 * 1000;
       await run();
-      const after = await store.listItems(URL_KEY, { rootItemId: worker._id });
+      const after = await store.listItemsWithPrompt(URL_KEY, { rootItemId: worker._id });
       assert.equal(after.filter((row) => row.followUpTo === worker._id).length, 1);
     });
 
@@ -508,7 +508,7 @@ describe('ci-wake-sweep: over a real DispatchQueueStore', () => {
       ownerAllowed = false;
       const worker = await seedParked();
       await buildRun({ extra: real })();
-      const queued = await store.listItems(URL_KEY, { rootItemId: worker._id });
+      const queued = await store.listItemsWithPrompt(URL_KEY, { rootItemId: worker._id });
       assert.equal(queued.filter((row) => row.followUpTo === worker._id).length, 0);
     });
   });

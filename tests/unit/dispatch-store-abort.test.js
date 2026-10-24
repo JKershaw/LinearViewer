@@ -81,7 +81,7 @@ test('abort + abortTo are carried into history (watch + history list)', async ()
   assert.equal(status.abort, true);
   assert.equal(status.abortTo, abortTo);
 
-  const { items } = await store.listHistory('acme');
+  const { items } = await store.listHistory('acme', { limit: 100 });
   assert.equal(items.length, 1);
   assert.equal(items[0].abort, true);
   assert.equal(items[0].abortTo, abortTo);
@@ -137,7 +137,7 @@ test('cascade is carried through takeItem and into history', async () => {
   const status = await store.getItemStatus('acme', created._id);
   assert.equal(status.cascade, true);
 
-  const { items } = await store.listHistory('acme');
+  const { items } = await store.listHistory('acme', { limit: 100 });
   assert.equal(items[0].cascade, true);
 });
 

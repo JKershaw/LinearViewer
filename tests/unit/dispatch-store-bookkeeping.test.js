@@ -183,7 +183,7 @@ describe('stampBookkeeping (real MangoDB tmpdir, LIN-2653)', () => {
       await seedTakenRow('t15-b');
       await store.stampBookkeeping(URL_KEY, 't15-b', { by: 'operator-1', reason: 'fossil pass' });
 
-      const { items } = await store.listHistory(URL_KEY);
+      const { items } = await store.listHistory(URL_KEY, { limit: 100 });
       const found = items.find(i => i.id === 't15-b');
       assert.ok(found, 'the stamped row is present in listHistory');
       assert.ok(found.bookkeeping, 'listHistory must carry the stamp via _formatHistoryItem');
@@ -196,7 +196,7 @@ describe('stampBookkeeping (real MangoDB tmpdir, LIN-2653)', () => {
       const status = await store.getItemStatus(URL_KEY, 't15-c');
       assert.strictEqual(status.bookkeeping, null);
 
-      const { items } = await store.listHistory(URL_KEY);
+      const { items } = await store.listHistory(URL_KEY, { limit: 100 });
       const found = items.find(i => i.id === 't15-c');
       assert.strictEqual(found.bookkeeping, null);
     });

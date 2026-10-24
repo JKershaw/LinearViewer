@@ -724,7 +724,7 @@ describe('observer-efficacy-signal: collectNewHarnessSignal / collectIncumbentSi
     // getLoopsForWorkspace's own read surface: listItems/listHistory on
     // dispatch, listStatus on agent-status (same allowlist observer-sweep's
     // own negative test uses).
-    const dispatchStore = forbiddenProxy(realDispatchStore, ['listItems', 'listHistory'], 'dispatchStore');
+    const dispatchStore = forbiddenProxy(realDispatchStore, ['listItems', 'listItemsWithPrompt', 'listHistory', 'listHistoryWithBodies'], 'dispatchStore');
     const agentStatusStore = forbiddenProxy(realAgentStatusStore, ['listStatus'], 'agentStatusStore');
 
     const result = await collectIncumbentSignal(urlKey, { dispatchStore, agentStatusStore });

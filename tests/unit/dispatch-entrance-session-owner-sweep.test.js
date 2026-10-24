@@ -46,9 +46,13 @@ function makeWorld({ rowTarget = 'cli', accountId = MEMBER } = {}) {
   const row = { id: SAMPLE_UUID, target: rowTarget, prompt: 'p' };
   const queue = {
     listItems: async () => [],
+    listItemsWithPrompt: async () => [],
     countItems: async () => 0,
     listHistory: async () => ({ items: [], total: 0 }),
+    listHistoryWithBodies: async () => ({ items: [], total: 0 }),
     getItemStatus: async () => ({ ...row }),
+    getItemFeedback: async () => ({ ...row }),
+    getItemPrompt: async () => ({ ...row }),
     pollAvailable: async () => [],
     addItem: spy.wrap('addItem', async (_k, fields) => ({ _id: SAMPLE_UUID, ...fields })),
     expandCascadeAborts: spy.wrap('expandCascadeAborts', async () => ({ aborted: 0 })),

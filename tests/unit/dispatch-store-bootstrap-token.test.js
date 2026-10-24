@@ -63,7 +63,7 @@ test('bootstrapToken is NOT persisted into history (the security boundary)', asy
   const status = await store.getItemStatus('acme', created._id);
   assert.strictEqual(status.bootstrapToken, undefined, 'watch/status history read must not carry it');
 
-  const { items } = await store.listHistory('acme');
+  const { items } = await store.listHistory('acme', { limit: 100 });
   assert.equal(items.length, 1);
   assert.strictEqual(items[0].bootstrapToken, undefined, 'history list must not carry it');
 });

@@ -55,7 +55,7 @@ test('periodicalId is carried into history on archive (takeItem) and survives th
 
   await store.takeItem(created._id, 'acme');
 
-  const { items } = await store.listHistory('acme');
+  const { items } = await store.listHistory('acme', { limit: 100 });
   assert.equal(items.length, 1);
   assert.equal(items[0].periodicalId, 'documentation-review');
 
@@ -69,7 +69,7 @@ test('periodicalId survives archive on cancel and on expiry, not just take', asy
   const cancelled = await store.addItem('acme', { prompt: 'a', kind: 'periodical', periodicalId: 'tpl-a' });
   await store.removeItem('acme', cancelled._id);
 
-  const { items } = await store.listHistory('acme');
+  const { items } = await store.listHistory('acme', { limit: 100 });
   assert.equal(items.length, 1);
   assert.equal(items[0].periodicalId, 'tpl-a');
 });

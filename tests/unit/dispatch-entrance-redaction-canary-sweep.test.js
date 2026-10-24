@@ -65,9 +65,16 @@ function canaryRow(canary, { target = 'cli', dispatchedBy = OWNER } = {}) {
 function queueStoreFor(row) {
   return {
     listItems: async () => [{ ...row }],
+    listItemsWithPrompt: async () => [{ ...row }],
     countItems: async () => 1,
     listHistory: async () => ({ items: [{ ...row, status: 'taken' }], total: 1 }),
+    listHistoryWithBodies: async () => ({ items: [{ ...row, status: 'taken' }], total: 1 }),
+    // LIN-3812: the proxy list's history read; the canary row rides it so the allow-list is what is swept.
+    listHistoryLineageRows: async () => ({ items: [{ ...row, status: 'taken', lineage: { status: null, completedAt: null, feedbackCount: 0 } }], total: 1 }),
+    ensureLineageStatus: async () => {},
     getItemStatus: async () => ({ ...row }),
+    getItemFeedback: async () => ({ ...row }),
+    getItemPrompt: async () => ({ ...row }),
     pollAvailable: async () => [{ ...row }],
     takeItem: async () => ({ ...row }),
     trimSessionBudget: async () => ({ ok: true, item: { ...row } }),

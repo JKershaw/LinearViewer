@@ -823,7 +823,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       const urlKey = req.query.urlKey || 'test-workspace'
       const itemId = req.query.itemId
       if (!itemId) return res.status(400).json({ error: 'itemId is required' })
-      const item = await dispatchQueueStore.getItemStatus(urlKey, itemId)
+      const item = await dispatchQueueStore.getItemFeedback(urlKey, itemId)
       res.json({ ok: true, feedback: item?.feedback || [] })
     } catch (err) {
       res.status(500).json({ error: err.message })

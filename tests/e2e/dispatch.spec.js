@@ -2128,7 +2128,7 @@ test.describe('Dispatch History UI', () => {
     await expect(historyItem.locator('.history-name')).toContainText('Cancel Test');
   });
 
-  test('all history items load without pagination', async ({ page, request }) => {
+  test('history loads a page at a time and "show more" reaches every item', async ({ page, request }) => {
     await request.get(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}&urlKey=${URL_KEY}`);
 
     // Create 25 history items
@@ -2143,11 +2143,12 @@ test.describe('Dispatch History UI', () => {
     await page.goto(`/workspace/${URL_KEY}/dispatch`);
     await page.waitForLoadState('networkidle');
 
-    // Should show all 25 items at once (no pagination limit)
+    // LIN-3812: the server pages history (default 20), so the first page is 20 with a
+    // "show more"; one click loads the remaining 5 and the button goes away.
     const items = page.locator('.history-item');
+    await expect(items).toHaveCount(20);
+    await page.locator('.history-show-more').click();
     await expect(items).toHaveCount(25);
-
-    // No show more button needed
     await expect(page.locator('.history-show-more')).toHaveCount(0);
   });
 });

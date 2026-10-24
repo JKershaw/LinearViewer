@@ -19,6 +19,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
+import { DispatchStoreFault } from '../../lib/errors.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 
 // Wrap a history collection so we can assert which cursor modifiers (sort/skip/
@@ -103,18 +104,37 @@ test('a limited read with an offset paginates via skip+limit', async () => {
   assert.equal(result.total, 5);
 });
 
-test('the unlimited path is unchanged: whole set, JS-sorted, no limit pushed', async () => {
+test('the no-limit path (bounded by `since`): whole window, sorted by the database, no limit pushed', async () => {
   const { store, calls, docs } = makeStore();
   seed(docs, 'acme', 4);
 
-  const result = await store.listHistory('acme');
+  const result = await store.listHistory('acme', { since: new Date(0) });
 
+  // LIN-3812: the in-JS sort/slice over an unbounded read is gone; the sort rides the query.
+  assert.deepEqual(calls.sort, [{ resolvedAt: -1 }]);
   assert.equal(calls.limit.length, 0, 'no query limit on the whole-set path');
   assert.equal(calls.counts, 0, 'no separate count on the whole-set path');
   assert.equal(result.items.length, 4);
   assert.deepEqual(result.items.map(i => i.id), ['d3', 'd2', 'd1', 'd0'],
     'still returned newest-first');
   assert.equal(result.total, 4);
+});
+
+test('LIN-3812: a read with no limit, no since and no identity key is refused, not read', async () => {
+  const { store, docs } = makeStore();
+  seed(docs, 'acme', 2);
+  await assert.rejects(store.listHistory('acme'), (err) => err.name === 'UnboundedHistoryReadError' && !(err instanceof DispatchStoreFault));
+  await assert.rejects(store.listHistoryWithBodies('acme', { status: 'taken' }), /requires a limit/);
+  // residual filters are not bounds
+  await assert.rejects(store.listHistory('acme', { silentSince: new Date(), periodicalEvidenceRow: true }), /requires a limit/);
+  // operator objects other than $in of scalars are not bounds (N4)
+  await assert.rejects(store.listHistory('acme', { issueIdentifier: { $exists: true } }), /requires a limit/);
+  await assert.rejects(store.listHistory('acme', { rootItemId: { $in: [] } }), /requires a limit/);
+  await assert.rejects(store.listHistory('acme', { rootItemId: { $in: [{ a: 1 }] } }), /requires a limit/);
+  // the bounds that do count
+  for (const opts of [{ limit: 1 }, { since: new Date(0) }, { issueIdentifier: 'LIN-1' }, { sessionId: 's' }, { sessionGroupId: { $in: ['g'] } }, { rootItemId: 'r' }, { followUpTo: { $in: ['f'] } }]) {
+    await store.listHistory('acme', opts);
+  }
 });
 
 test('a limited read with {prompt:0} still carries feedback[] (derivation payload)', async () => {

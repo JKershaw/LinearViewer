@@ -52,7 +52,13 @@ function appFor(row) {
     ...deps.dispatchQueueStore,
     listItems: async () => [{ ...row }],
     listHistory: async () => ({ items: [], total: 0 }),
-    getItemStatus: async () => ({ ...row })
+    listHistoryLineageRows: async () => ({ items: [], total: 0 }),
+    ensureLineageStatus: async () => {},
+    getItemStatus: async () => ({ ...row }),
+    // LIN-3812: the watch reads the feedback shape, /prompt the prompt shape.
+    getItemFeedback: async () => ({ ...row }),
+    getItemWatchToken: async () => 'token',
+    getItemPrompt: async () => ({ ...row })
   };
   return appAround(createProxyRoutes(deps));
 }

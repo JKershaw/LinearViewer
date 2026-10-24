@@ -6,7 +6,7 @@
  * the ONE shared `classifyPilotRows`, and prints per-arm tallies.
  *
  * Usage:
- *   node scripts/file-pointer-read.mjs [--url-key <key>] [--json]
+ *   node scripts/file-pointer-read.mjs [--url-key <key>] [--since-days <n, default 30>] [--json]
  *
  * Env: MONGODB_URI (else HARBOUR_DATA_DIR / ./data), LIN3200_URL_KEY.
  *
@@ -32,13 +32,15 @@ import { pathToFileURL } from 'node:url';
 import { MongoClient } from 'mongodb';
 import { MangoClient } from '@jkershaw/mangodb';
 import { DispatchQueueStore } from '../lib/dispatch-store.js';
+import { READ_HORIZON_DAYS } from '../lib/read-horizon.js';
 import { FILE_POINTER_MARKER, RACE_SUSPECT_WINDOW_MS, classifyPilotRows } from '../lib/file-pointer.js';
 
 export function parseArgs(argv) {
-  const out = { urlKey: process.env.LIN3200_URL_KEY || null, json: false, windowMs: RACE_SUSPECT_WINDOW_MS };
+  const out = { urlKey: process.env.LIN3200_URL_KEY || null, json: false, windowMs: RACE_SUSPECT_WINDOW_MS, sinceDays: READ_HORIZON_DAYS };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--url-key') out.urlKey = argv[++i];
     else if (argv[i] === '--window-ms') out.windowMs = Number(argv[++i]);
+    else if (argv[i] === '--since-days') out.sinceDays = Number(argv[++i]);
     else if (argv[i] === '--json') out.json = true;
   }
   return out;
@@ -96,10 +98,14 @@ export function mergePilotRows({ liveItems = [], historyItems = [] } = {}) {
  * @param {string} urlKey
  * @returns {Promise<Array<Object>>}
  */
-export async function loadPilotRows(store, urlKey) {
+export async function loadPilotRows(store, urlKey, { sinceDays = READ_HORIZON_DAYS, now = Date.now() } = {}) {
   const [history, live] = await Promise.all([
-    store.listHistory(urlKey, { projection: { feedback: 0 } }),
-    store.listItems(urlKey)
+    // LIN-3812: history is lifetime-retained and an unbounded read is refused, so the pilot
+    // read is bounded by `since`. The default is the shared 30-day read horizon; a longer
+    // comparison window is `--since-days N`, never a silent lifetime read. The prompt
+    // carries the pointer marker, so the live read keeps it (`listItemsWithPrompt`).
+    store.listHistory(urlKey, { since: new Date(now - sinceDays * 24 * 60 * 60 * 1000), projection: { feedback: 0 } }),
+    store.listItemsWithPrompt(urlKey)
   ]);
   const liveItems = Array.isArray(live) ? live : [];
   const historyItems = Array.isArray(history?.items)
@@ -141,7 +147,7 @@ export async function main(argv = process.argv.slice(2)) {
       historyCollection: db.collection('dispatch-history')
     });
 
-    const rows = await loadPilotRows(store, args.urlKey);
+    const rows = await loadPilotRows(store, args.urlKey, { sinceDays: args.sinceDays });
     const result = classifyPilotRows(rows, { windowMs: args.windowMs });
 
     if (args.json) {

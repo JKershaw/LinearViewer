@@ -75,7 +75,7 @@ test('force is carried into history (watch status + history list)', async () => 
   const status = await store.getItemStatus('acme', created._id);
   assert.equal(status.force, true);
 
-  const { items } = await store.listHistory('acme');
+  const { items } = await store.listHistory('acme', { limit: 100 });
   assert.equal(items.length, 1);
   assert.equal(items[0].force, true);
 });
@@ -90,6 +90,6 @@ test('a plain (non-force) follow-up reads force:false at every seam', async () =
   const taken = await store.takeItem(created._id, 'acme');
   assert.equal(taken.force, false);
 
-  const { items } = await store.listHistory('acme');
+  const { items } = await store.listHistory('acme', { limit: 100 });
   assert.equal(items[0].force, false);
 });

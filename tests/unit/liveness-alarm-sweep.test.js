@@ -53,8 +53,8 @@ function terminalStatusFor(row, now) {
 }
 
 /**
- * A fake read-only dispatch store over the scripted rows. `listItems` returns
- * nothing (every scripted row is taken/archived); `listHistory` serves the
+ * A fake read-only dispatch store over the scripted rows. `listItemsWithPrompt` returns
+ * nothing (every scripted row is taken/archived); `listHistoryWithBodies` serves the
  * targeted by-lineage read the sweep performs.
  */
 function makeDispatchStore(rows, nowRef) {
@@ -62,11 +62,12 @@ function makeDispatchStore(rows, nowRef) {
   const withLineage = rows.map((r) => ({ ...r, lineageId: lineageOf(r) }));
   return {
     async listObservedWorkspaceKeys() { return [URL_KEY]; },
-    async listItems(_urlKey, { rootItemId } = {}) {
+    // LIN-3812: the sweep reads the named full-body methods (it scans raw feedback).
+    async listItemsWithPrompt(_urlKey, { rootItemId } = {}) {
       const now = nowRef.value;
       return withLineage.filter((r) => r.lineageId === rootItemId && Date.parse(r.dispatchedAt) <= now);
     },
-    async listHistory(_urlKey, { rootItemId, since } = {}) {
+    async listHistoryWithBodies(_urlKey, { rootItemId, since } = {}) {
       const now = nowRef.value;
       const items = withLineage.filter((r) => r.lineageId === rootItemId
         && Date.parse(r.dispatchedAt) <= now

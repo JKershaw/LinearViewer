@@ -90,7 +90,7 @@ test('both fields are carried into history (watch + history list)', async () => 
   assert.equal(status.queueIfBusy, true);
   assert.equal(status.subscription, 'everything');
 
-  const { items } = await store.listHistory('acme');
+  const { items } = await store.listHistory('acme', { limit: 100 });
   assert.equal(items.length, 1);
   assert.equal(items[0].queueIfBusy, true);
   assert.equal(items[0].subscription, 'everything');

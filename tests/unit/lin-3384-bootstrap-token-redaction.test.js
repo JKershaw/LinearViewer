@@ -141,7 +141,9 @@ const row = (extra = {}) => ({ id: 'i1', prompt: PROSE, bootstrapToken: TOKEN, d
 const SESSION_ID = '11111111-1111-4111-8111-111111111111';
 const store = {
   listItems: async () => [row()],
+  listItemsWithPrompt: async () => [row()],
   listHistory: async () => ({ items: [row({ bootstrapToken: null })], total: 1 }),
+  listHistoryWithBodies: async () => ({ items: [row({ bootstrapToken: null })], total: 1 }),
   getItemStatus: async () => row(), // LIN-3398: the trim owner gate reads the row for its target
   trimSessionBudget: async () => ({ ok: true, item: row() }),
   pollAvailable: async () => [row()]
@@ -206,7 +208,7 @@ describe('both real prose embeddings are masked', () => {
     });
 
     test(`${name}: through the session list, non-owner masked / owner unchanged`, async () => {
-      const pstore = { ...store, listItems: async () => [row({ prompt, bootstrapToken: null })] };
+      const pstore = { ...store, listItemsWithPrompt: async () => [row({ prompt, bootstrapToken: null })] };
       const other = await get(buildApp(pstore, 'someone-else'), 'GET', '/workspace/acme/api/dispatch');
       assert.ok(!JSON.stringify(other.body).includes(TOKEN));
       const owner = await get(buildApp(pstore, 'owner-1'), 'GET', '/workspace/acme/api/dispatch');
@@ -232,7 +234,7 @@ describe('GET /api/proxy/dispatch/:id/prompt — masked by proxy creator', () =>
       recapCacheStore: { get: async () => null, set: async () => {} },
       briefCacheStore: { get: async () => null, set: async () => {} },
       dispatchQueueStore: {
-        getItemStatus: async (urlKey, id) => ({
+        getItemPrompt: async (urlKey, id) => ({
           id, prompt: PROSE, promptName: 'implementation', kind: 'implementation', target: 'cli',
           followUpTo: null, sessionId: null, dispatchedBy, bootstrapToken: TOKEN
         })

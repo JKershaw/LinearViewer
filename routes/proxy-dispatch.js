@@ -12,7 +12,7 @@ import { Router } from 'express';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { jsonError, keepaliveError, notFound, replyStoreFault } from '../lib/errors.js';
 import { MAX_NAME_LENGTH, DANGEROUS_CHARS_REGEX } from '../lib/issue-write-validation.js';
-import { deriveCompletedAt, deriveWireStatus, deriveWireTerminal, closedProjection, feedbackWithHarvestedAbort, harvestAbortedTargets, mergeLineageFeedback } from '../lib/dispatch-terminal.js';
+import { deriveCompletedAt, deriveWireStatus, deriveWireTerminal, closedProjection } from '../lib/dispatch-terminal.js';
 import { buildQueuedPollWarning, getConsumerLastSeenAt } from '../lib/consumer-poll-warning.js';
 import { redactSessionItem } from '../lib/dispatch-session-redaction.js';
 import { enterProxyDispatch, enterRecommendDispatch, refuseWithoutStore, rejectAudited } from '../lib/dispatch-entrance.js';
@@ -32,68 +32,6 @@ const DISPATCH_WAIT_MAX_S = 50;
 const DISPATCH_WAIT_POLL_MS = 1500;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-// The lineage anchor of a history row (LIN-1470): the doc-level rootItemId, else the
-// first OWN feedback entry carrying one, else the row's own id. NEVER sessionId /
-// sessionGroupId: every worker an autopilot spawns shares its orchestrator's sessionId,
-// so grouping on it would collapse all siblings onto one anchor and reinstate the
-// LIN-1461 production bug.
-const anchorFor = item => item.rootItemId ?? item.feedback?.find(f => f.rootItemId)?.rootItemId ?? item.id;
-
-// Everything the list does with the rows it has read, once the lineage siblings are in:
-// the abort attribution, the lineage merge and each row's effective status. Pure — the
-// store reads stay in the handler.
-function resolveListRows(merged, siblingsByAnchor) {
-  // LIN-1261 F2: attribute an abort's terminality to the loop it TARGETS at the
-  // proxy read boundary too (same class as the reconstruction path, different
-  // consumer). Simple Dispatcher posts `[aborted]` to the abort row's OWN
-  // feedback, never to the `abortTo` target's — so without this a lister of the
-  // aborted TARGET reads it non-terminal until the 24h stale cutoff. Harvest the
-  // abort rows already in `merged` (no extra store call) and derive each item's
-  // effective feedback through the SAME shared F1 guard the reconstruction path
-  // uses — never overriding a later genuine terminal or rewinding completedAt.
-  // NOTE: an issue-scoped list (`?issueIdentifier=`) excludes abort rows at the
-  // store (they carry `issueIdentifier: null`), so attribution applies to the
-  // unscoped list; the point-read watch + follow-up gate are deliberately not
-  // reached here (they need a store seam that finds an abort by target; deferred).
-  const abortedTargets = harvestAbortedTargets(merged);
-
-  // Resolve each item's effective status once (terminal marker → done/failed/
-  // aborted, else `blocked` when the lineage is parked on a human, else the
-  // STORED status) so filtering and the response agree. LIN-2079: this one
-  // assignment feeds the reported field, the `?status=` FILTER and `total`,
-  // so deriving `blocked` here is a wire-behaviour change by design —
-  // `?status=taken` no longer returns parked rows, `?status=blocked` does.
-  // LIN-1470: the lineage merge runs BEFORE abort attribution — ordering is
-  // load-bearing, since `feedbackWithHarvestedAbort`'s F1 guard only lets an
-  // abort win when it is strictly later than the existing terminal, so it
-  // must see the true lineage terminal (a later child `[done]`), not just
-  // this row's own. `_lineageFeedback` (own + verified siblings) feeds the
-  // reported `feedbackCount`; `_terminalFeedback` is `_lineageFeedback` PLUS
-  // any harvested abort and feeds `status`/`completedAt` — kept separate so
-  // the synthetic abort entry never inflates `feedbackCount`.
-  //
-  // Review F7: `joinsLineage` (WHICH ROWS may join) says nothing about
-  // WHICH FEEDBACK a joined row may inherit — a still-`taken` follow-up
-  // dispatched AFTER its parent already finished was absorbing the
-  // parent's earlier terminal. The invariant is structural, not another
-  // status carve-out: a row is never reported complete before it was
-  // itself dispatched. `mergeLineageFeedback` enforces this directly by
-  // taking `i.dispatchedAt` as `since` — a sibling entry only counts if
-  // its timestamp is at or after this row's own dispatch time.
-  const resolved = merged.map(i => {
-    // Rows that never ran (queued, cancelled, expired) opt out of the
-    // lineage join entirely (see above) — `lineageFeedback` stays this
-    // row's own (empty) feedback, same as pre-LIN-1470.
-    const joinsLineage = i.status === 'taken';
-    const anchor = joinsLineage ? anchorFor(i) : null;
-    const siblingRows = anchor ? (siblingsByAnchor.get(anchor) || []).filter(s => s.id !== i.id) : [];
-    const lineageFeedback = joinsLineage ? mergeLineageFeedback(i.feedback, siblingRows, anchor, i.dispatchedAt) : (i.feedback || []);
-    const terminalFeedback = feedbackWithHarvestedAbort(lineageFeedback, abortedTargets.get(i.id));
-    return { ...i, _lineageFeedback: lineageFeedback, _terminalFeedback: terminalFeedback, status: deriveWireStatus({ feedback: terminalFeedback, bookkeeping: i.bookkeeping }) || i.status };
-  });
-  return resolved;
-}
 
 // A dispatch id as the watch and prompt reads take it from the path: present, short and
 // free of control characters. The store lookup is workspace-scoped on top of this.
@@ -220,7 +158,6 @@ function dispatchWatchChanged(baseline, item) {
  *   an absent store just means every dispatch stamps null (never seen).
  * @param {Function} deps.getWorkspaceOpenRouterKey - Resolves the token-creator's OAuth OpenRouter key for a workspace (closure-local)
  * @param {Function} deps.graphqlErrorStatus - Maps a provider/GraphQL error to an HTTP status (closure-local, the route's own registry-bound error mapper)
- * @param {number} deps.LINEAGE_QUERY_LIMIT - Defensive cap on the list endpoint's lineage batch query (module-scope, exported from routes/proxy.js)
  * @param {Function} deps.logEvent - Audit/witness event logger (closure-local)
  * @param {Function} deps.logOpenRouterCredentialSource - Logs which OpenRouter credential source served a request (closure-local)
  * @param {Function} deps.proxyLimiter - Per-IP rate limiter middleware (module-scope in routes/proxy.js, shared as-is)
@@ -245,7 +182,6 @@ export function createDispatchRoutes({
   dispatchTokenStore = null,
   getWorkspaceOpenRouterKey,
   graphqlErrorStatus,
-  LINEAGE_QUERY_LIMIT,
   logEvent,
   logOpenRouterCredentialSource,
   proxyLimiter,
@@ -389,105 +325,40 @@ export function createDispatchRoutes({
     }
 
     try {
-      // Live queue (still 'queued') + resolved history (with feedback), merged.
-      // When scoped to one issue, push `issueIdentifier` into both store reads
-      // (LIN-613/LIN-615 index-backed predicate) instead of fetching the whole
-      // workspace and filtering in JS. The 200-history bound is preserved.
+      // Live queue (still 'queued') + resolved history, merged, newest dispatch first.
       //
-      // This list response is metadata-only — it never returns `prompt`, only
-      // status/feedback-derived fields. So exclude `prompt` at the query (the
-      // LIN-623 lean-feed pattern): for an unscoped read the whole-workspace
-      // 30-day history carries a multi-KB-to-10-MB prompt per row, and
-      // transferring + BSON-deserialising all of them is what pushes a busy
-      // workspace's read past the 30s router timeout into a 503. Column
-      // exclusion only — same rows, correctness-identical.
+      // LIN-3812 (closes LIN-2120): the list used to read the newest 200 history rows plus up
+      // to 2,000 lineage siblings and derive each row's status/completedAt/feedbackCount in
+      // JS (LIN-1470 join, LIN-1261 abort attribution), so `?status=` could not see past the
+      // window. Those three lineage values are now persisted at feedback-write time
+      // (lib/dispatch-lineage-status.js), and the history half is ONE paged, counted read
+      // that evaluates `?status=` in the database. The same path serves scoped and unscoped
+      // lists; a row's lineage is no longer capped, and an abort attributes to its target
+      // whatever the list's scope (an abort row's own issue scope no longer hides it).
+      // The list is metadata-only: the store's read never carries `prompt` or `feedback[]`.
       const scopeOpts = issueIdentifier ? { issueIdentifier } : {};
+      // Only the queue half is not a history row; only a queued filter wants it.
+      const wantsQueue = !statusFilter || statusFilter === 'queued';
+      const lineageDerived = statusFilter && !['queued', 'cancelled', 'expired'].includes(statusFilter);
+      // A lineage-status filter reads the persisted field, so rows from before it existed
+      // are derived first (once per process per workspace).
+      if (lineageDerived) await dispatchQueueStore.ensureLineageStatus(req.proxyUrlKey);
       const [queued, history] = await Promise.all([
-        dispatchQueueStore.listItems(req.proxyUrlKey, { ...scopeOpts, projection: { prompt: 0 } }),
-        dispatchQueueStore.listHistory(req.proxyUrlKey, { limit: 200, ...scopeOpts, projection: { prompt: 0 } })
+        wantsQueue ? dispatchQueueStore.listItems(req.proxyUrlKey, scopeOpts) : [],
+        dispatchQueueStore.listHistoryLineageRows(req.proxyUrlKey, { ...scopeOpts, status: statusFilter, limit })
       ]);
 
       const merged = [
-        ...queued.map(i => ({ ...i, status: 'queued', feedback: [] })),
-        ...history.items
+        ...queued.map(i => ({ ...i, status: 'queued', completedAt: null, feedbackCount: 0 })),
+        // The reported status is the lineage one (terminal, closed, blocked), else the stored one.
+        ...history.items.map(i => ({
+          ...i,
+          status: i.lineage.status || i.status,
+          completedAt: i.lineage.completedAt?.toISOString?.() ?? i.lineage.completedAt,
+          feedbackCount: i.lineage.feedbackCount
+        }))
       ];
-
-      // LIN-1470: lineage join. A repoint (follow-up dispatch) mints a NEW row;
-      // without this, the original row's feedbackCount/completedAt/status freeze
-      // at the point of repoint. Derive each row's lineage anchor per the pinned
-      // two-tier precedence — doc-level rootItemId, then the first OWN feedback
-      // entry carrying rootItemId, then the row's own id — and batch-fetch every
-      // OTHER row sharing an anchor in ONE indexed query (constant in N: 2 reads
-      // above + 1 here, never 2+N). NEVER sessionId/sessionGroupId: every worker
-      // an autopilot spawns shares its orchestrator's sessionId, so grouping on
-      // it would collapse all siblings onto one anchor and reinstate the
-      // LIN-1461 production bug. Anchors are null-filtered before the $in query
-      // ($in: [null] would mass-mis-group every field-less legacy row); the
-      // `?? row.id` fallback means this is defensive rather than reachable today.
-      // History-only (queued rows carry no feedback) and deliberately NOT scoped
-      // by issueIdentifier — rootItemId already isolates the lineage, and
-      // inheriting the issue scope would drop siblings filed under a different
-      // issue. `projection: {prompt: 0}` preserved (the H12/503 read-cost guard).
-      // LIN-1470 (review F1): only rows that actually RAN join the lineage —
-      // i.e. `status === 'taken'`, not merely "not queued". `_archiveItem` is
-      // called with exactly three statuses (`taken` dispatch-store.js:678,
-      // `cancelled` :635, `expired` :715), so a `!== 'queued'` denylist also
-      // swept in cancelled/expired rows, which then inherited a sibling's
-      // terminal feedback: a cancelled/expired follow-up reported `done`/a
-      // completedAt it never earned, and was routed into `?status=done` while
-      // vanishing from `?status=cancelled`/`?status=expired`. The eligible set
-      // is exactly the rows that ran, so this is an allowlist, not an
-      // extended denylist — it needs no future enumeration as new archived
-      // statuses can't be added without also adding an `_archiveItem` call
-      // site. Queued rows still opt out for the original beat-4 reason: a
-      // still-queued row (e.g. a follow-up reply to a finished session,
-      // queued but not yet run) must not inherit an already-completed
-      // sibling's terminal feedback. Mirrors the existing precedent at the
-      // `:id` watch endpoint (`getItemStatus` returns immediately for the
-      // active/queued branch, never calling `_collectGroupFeedback`).
-      const historyRows = merged.filter(i => i.status === 'taken');
-      const anchors = [...new Set(historyRows.map(anchorFor).filter(Boolean))];
-
-      // LIN-1494 (superseding review F2 on LIN-1470): `listHistory` runs
-      // `find()` AND `countDocuments()` under `Promise.all` whenever `limit`
-      // is set (lib/dispatch-store.js `if (limit) { ... }` branch). Earlier
-      // revisions destructured `{ items }` only and recorded the discarded
-      // count as an accepted indexed cost; it is now CONSUMED — the pre-slice
-      // `total` is the exact truncation signal for the L3 telemetry below,
-      // replacing the `length === cap` proxy that false-positived on a
-      // lineage of exactly LINEAGE_QUERY_LIMIT rows and could never report
-      // how far over the cap real traffic runs. (The page query's twin count
-      // feeds the response's honest `total`/`truncated` the same way.)
-      const siblingsByAnchor = new Map();
-      if (anchors.length) {
-        const { items: lineageSiblings, total: lineageTotal } = await dispatchQueueStore.listHistory(req.proxyUrlKey, {
-          rootItemId: { $in: anchors },
-          limit: LINEAGE_QUERY_LIMIT,
-          projection: { prompt: 0 }
-        });
-        // L3 (LIN-1485, exactness via LIN-1494): the store's pre-slice count
-        // says precisely whether the newest-N cap dropped the oldest members
-        // of a lineage — and by how much (the question LIN-1485 named as the
-        // point of this telemetry). Exactly-at-cap is complete, not truncated.
-        if (lineageTotal > LINEAGE_QUERY_LIMIT) {
-          console.warn(`Lineage query exceeded LINEAGE_QUERY_LIMIT (${LINEAGE_QUERY_LIMIT}) for urlKey=${req.proxyUrlKey}, anchors=${anchors.length}, total=${lineageTotal} — result truncated to the newest ${LINEAGE_QUERY_LIMIT}`);
-        }
-        for (const sib of lineageSiblings) {
-          const bucket = siblingsByAnchor.get(sib.rootItemId);
-          if (bucket) bucket.push(sib);
-          else siblingsByAnchor.set(sib.rootItemId, [sib]);
-        }
-      }
-
-      const resolved = resolveListRows(merged, siblingsByAnchor);
-
-      // `status` is derived from feedback (not stored), so it stays a JS filter;
-      // `issueIdentifier` is already enforced at the store layer above.
-      const filtered = resolved.filter(i =>
-        (!statusFilter || i.status === statusFilter)
-      );
-
-      filtered.sort((a, b) => {
+      merged.sort((a, b) => {
         const at = new Date(a.dispatchedAt || 0).getTime();
         const bt = new Date(b.dispatchedAt || 0).getTime();
         return bt - at;
@@ -495,10 +366,10 @@ export function createDispatchRoutes({
 
       // LIN-3367: live poll recency, once per list request (async, lists tokens) —
       // only needed when some returned row is still queued.
-      const liveConsumerLastSeenAt = filtered.slice(0, limit).some(i => i.status === 'queued')
+      const liveConsumerLastSeenAt = merged.slice(0, limit).some(i => i.status === 'queued')
         ? await getConsumerLastSeenAt(dispatchTokenStore, req.proxyUrlKey, proxyTokenStore)
         : null;
-      const items = filtered.slice(0, limit).map(i => ({
+      const items = merged.slice(0, limit).map(i => ({
         id: i.id,
         status: i.status,
         promptName: i.promptName,
@@ -515,13 +386,12 @@ export function createDispatchRoutes({
         dispatchedAt: i.dispatchedAt,
         // resolvedAt = take/archive time; completedAt = real completion (null until terminal).
         resolvedAt: i.resolvedAt || null,
-        completedAt: deriveCompletedAt(i._terminalFeedback),
+        completedAt: i.completedAt,
         // LIN-3364: explicit allow-list entries (this list is not a spread of `i`).
         ...closedProjection(i.bookkeeping),
         // LIN-1470: lineage-wide (own + verified siblings), not just this row's
-        // own stored feedback — see the merge above. Excludes any synthetic
-        // harvested-abort entry (that only lives in `_terminalFeedback`).
-        feedbackCount: i._lineageFeedback.length,
+        // own stored feedback. Excludes any synthetic harvested-abort entry.
+        feedbackCount: i.feedbackCount,
         // Consumer poll-recency stamp + derived warning (LIN-2885) — same
         // fields, same pure derivation as the `:id` watch endpoint above, so a
         // lean-list reader doesn't need a second GET to see whether a queued
@@ -532,22 +402,12 @@ export function createDispatchRoutes({
       }));
 
       logEvent(req, '/api/proxy/dispatch', 200);
-      // LIN-1494: `total` is exact wherever the store can count it. Unfiltered
-      // and issue-scoped reads report queued + the page query's pre-slice
-      // history count (the repo convention that `total` is "the full count
-      // before limit" — /stack, /agent/status, /api/dispatch/history) — not a
-      // count over the newest-200 window presented as the matching total.
-      // A `?status=` read keeps the windowed `filtered.length`: status is
-      // feedback-derived in JS, so an exact per-status total is unknowable
-      // without reading the whole history (not an acceptable trade on an
-      // endpoint with two prior H12/503 incidents). `truncated` (naming
-      // precedent: deferTruncated) discloses the newest-200 window in both
-      // cases — including that the lineage join's anchor set is seeded from
-      // that window only. A windowed list is normal operation, not an
-      // anomaly, so there is no console.warn here.
-      const historyTotal = history.total ?? history.items.length;
-      const total = statusFilter ? filtered.length : queued.length + historyTotal;
-      res.json({ items, total, truncated: historyTotal > history.items.length });
+      // LIN-1494 / LIN-3812: `total` is the exact count of matching rows (queued + the
+      // database's count of matching history), under `?status=` too. There is no read
+      // window any more, so `truncated` (which disclosed the newest-200 window) is
+      // always false; the key stays so existing readers keep parsing.
+      const total = queued.length + history.total;
+      res.json({ items, total, truncated: false });
     } catch (err) {
       // LIN-3805: a store fault is a retryable 503, never a final 500.
       if (replyStoreFault(res, err, { logEvent: (status) => logEvent(req, '/api/proxy/dispatch', status) })) return;
@@ -590,11 +450,13 @@ export function createDispatchRoutes({
     // would throw ERR_HEADERS_SENT.
     let keepalive = null;
     try {
-      // This watch/poll seam is the one caller of getItemStatus that actually
-      // reads `feedback` to derive terminal status, so it's the one caller
-      // that opts into the (indexed-query-plus-merge) group feedback read —
-      // see getItemStatus's includeGroupFeedback doc (LIN-1461).
-      const item = await dispatchQueueStore.getItemStatus(req.proxyUrlKey, id, { includeGroupFeedback: true });
+      // This watch/poll seam reads `feedback` to derive terminal status, so it's the one
+      // caller that opts into the (indexed-query-plus-merge) group feedback read —
+      // see getItemFeedback's includeGroupFeedback doc (LIN-1461).
+      // LIN-3812: the change token is read BEFORE the body, so a change landing between the
+      // two reads moves the token off the body's baseline and is re-checked, never missed.
+      let watchToken = waitSeconds > 0 ? await dispatchQueueStore.getItemWatchToken(req.proxyUrlKey, id) : null;
+      const item = await dispatchQueueStore.getItemFeedback(req.proxyUrlKey, id, { includeGroupFeedback: true });
       if (!item) {
         logEvent(req, '/api/proxy/dispatch/:id', 404);
         return notFound.json(res, 'Dispatch item not found');
@@ -647,7 +509,12 @@ export function createDispatchRoutes({
           }
           // LIN-3805: a fault here is NOT swallowed into "unchanged snapshot" (a hidden
           // sibling `[done]` would read as still running); it propagates to the catch.
-          const next = await dispatchQueueStore.getItemStatus(req.proxyUrlKey, id, { includeGroupFeedback: true });
+          // LIN-3812: scalars only per tick; the whole document plus lineage feedback is re-read
+          // only when the token moved. The re-read body (not the token) decides 'change'.
+          const nextToken = await dispatchQueueStore.getItemWatchToken(req.proxyUrlKey, id);
+          if (nextToken === watchToken) continue;
+          watchToken = nextToken;
+          const next = await dispatchQueueStore.getItemFeedback(req.proxyUrlKey, id, { includeGroupFeedback: true });
           if (!next) break; // item genuinely expired mid-wait; return last known snapshot
           current = next;
           if (dispatchWatchChanged(baseline, current)) { reason = 'change'; break; }
@@ -695,7 +562,7 @@ export function createDispatchRoutes({
     if (isBadDispatchId(id)) return reject400(req, res, '/api/proxy/dispatch/:id/prompt', 'Invalid dispatch id');
 
     try {
-      const item = await dispatchQueueStore.getItemStatus(req.proxyUrlKey, id);
+      const item = await dispatchQueueStore.getItemPrompt(req.proxyUrlKey, id);
       if (!item) {
         logEvent(req, '/api/proxy/dispatch/:id/prompt', 404);
         return notFound.json(res, 'Dispatch item not found');

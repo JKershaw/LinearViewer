@@ -111,7 +111,7 @@ describe('assertion 1+2 (LIN-1870-F4): the sessionId asymmetry, both sides pinne
       bootstrapToken: 'fixture-bootstrap-token', prompt: 'fixture prompt', grantDeclaration: { grants: ['dispatch'] }, grantRefusal: { code: 'X' }, unknownKey: 'u'
     };
     const deps = BASE_DEPS();
-    deps.dispatchQueueStore = { ...deps.dispatchQueueStore, listItems: async () => [{ ...row }], listHistory: async () => ({ items: [], total: 0 }) };
+    deps.dispatchQueueStore = { ...deps.dispatchQueueStore, listItems: async () => [{ ...row }], listHistory: async () => ({ items: [], total: 0 }), listHistoryLineageRows: async () => ({ items: [], total: 0 }), ensureLineageStatus: async () => {} };
     const res = await request(appAround(createProxyRoutes(deps)), 'GET', '/api/proxy/dispatch', { headers: { Authorization: 'Bearer anything' } });
     assert.equal(res.status, 200, res.text);
     const keys = Object.keys(res.body.items[0]);
@@ -139,11 +139,11 @@ describe('assertion 1+2 (LIN-1870-F4): the sessionId asymmetry, both sides pinne
   test('formatDispatchWatch includes sessionId, scoped to its own function body', async () => {
     const row = { id: SAMPLE_UUID, status: 'queued', promptName: 'Prompt', kind: 'custom', target: 'cli', sessionId: 'sess-watch', dispatchedAt: '2026-10-17T00:00:00.000Z', feedback: [] };
     const deps = BASE_DEPS();
-    deps.dispatchQueueStore = { ...deps.dispatchQueueStore, getItemStatus: async () => ({ ...row }) };
+    deps.dispatchQueueStore = { ...deps.dispatchQueueStore, getItemFeedback: async () => ({ ...row }) };
     const res = await request(appAround(createProxyRoutes(deps)), 'GET', `/api/proxy/dispatch/${SAMPLE_UUID}`, { headers: { Authorization: 'Bearer anything' } });
     assert.equal(res.status, 200, res.text);
     assert.equal(res.body.sessionId, 'sess-watch');
-    const noSession = await request(appAround(createProxyRoutes({ ...deps, dispatchQueueStore: { ...deps.dispatchQueueStore, getItemStatus: async () => ({ ...row, sessionId: undefined }) } })),
+    const noSession = await request(appAround(createProxyRoutes({ ...deps, dispatchQueueStore: { ...deps.dispatchQueueStore, getItemFeedback: async () => ({ ...row, sessionId: undefined }) } })),
       'GET', `/api/proxy/dispatch/${SAMPLE_UUID}`, { headers: { Authorization: 'Bearer anything' } });
     assert.ok('sessionId' in noSession.body && noSession.body.sessionId === null, 'the key is present even with no session (null)');
   });

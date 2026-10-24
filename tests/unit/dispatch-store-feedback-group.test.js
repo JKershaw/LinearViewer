@@ -93,10 +93,11 @@ describe('getItemStatus merges feedback across a session-group, scoped to rootIt
     // still see the terminal feedback the runner posted under the repointed
     // follow-up id — not a feedback array frozen at repoint time. This is the
     // watch-seam read, so it opts into the group-feedback merge.
-    const status = await store.getItemStatus(urlKey, original._id, { includeGroupFeedback: true });
+    const status = await store.getItemFeedback(urlKey, original._id, { includeGroupFeedback: true });
 
-    assert.equal(status.id, original._id, 'the queried item\'s own identity (id/prompt) is unchanged');
-    assert.equal(status.prompt, original.prompt);
+    assert.equal(status.id, original._id, 'the queried item\'s own identity is unchanged');
+    // LIN-3812: the feedback read carries the row's scalars and feedback, never its prompt.
+    assert.equal(status.prompt, null);
     assert.equal(status.feedback.length, 2);
     assert.deepEqual(status.feedback.map(f => f.message), ['[heartbeat] working', '[done] all good']);
   });
@@ -133,7 +134,7 @@ describe('getItemStatus merges feedback across a session-group, scoped to rootIt
     });
     await store.addFeedback(c._id, urlKey, { message: '[done] beat on c', rootItemId: a._id }, TOKEN);
 
-    const status = await store.getItemStatus(urlKey, a._id, { includeGroupFeedback: true });
+    const status = await store.getItemFeedback(urlKey, a._id, { includeGroupFeedback: true });
     assert.equal(status.feedback.length, 3);
     assert.deepEqual(status.feedback.map(f => f.message), ['beat on a', 'beat on b', '[done] beat on c']);
   });
@@ -150,7 +151,7 @@ describe('getItemStatus merges feedback across a session-group, scoped to rootIt
     await store.takeItem(other._id, urlKey, TOKEN);
     await store.addFeedback(other._id, urlKey, { message: 'unrelated beat', rootItemId: other._id }, TOKEN);
 
-    const status = await store.getItemStatus(urlKey, a._id, { includeGroupFeedback: true });
+    const status = await store.getItemFeedback(urlKey, a._id, { includeGroupFeedback: true });
     assert.equal(status.feedback.length, 1);
     assert.equal(status.feedback[0].message, 'a beat');
   });
@@ -180,14 +181,14 @@ describe('getItemStatus merges feedback across a session-group, scoped to rootIt
     await store.addFeedback(workerA._id, urlKey, { message: '[heartbeat] worker A still working', rootItemId: workerA._id }, TOKEN);
     await store.addFeedback(workerB._id, urlKey, { message: '[done] worker B finished', rootItemId: workerB._id }, TOKEN);
 
-    const statusA = await store.getItemStatus(urlKey, workerA._id, { includeGroupFeedback: true });
+    const statusA = await store.getItemFeedback(urlKey, workerA._id, { includeGroupFeedback: true });
 
     assert.equal(statusA.feedback.length, 1, 'worker A must not absorb worker B\'s feedback');
     assert.equal(statusA.feedback[0].message, '[heartbeat] worker A still working');
     assert.equal(deriveTerminalStatus(statusA.feedback), null, 'worker A must stay non-terminal — worker B\'s [done] must not leak in');
 
     // Worker B, independently, is unaffected and correctly reads as done.
-    const statusB = await store.getItemStatus(urlKey, workerB._id, { includeGroupFeedback: true });
+    const statusB = await store.getItemFeedback(urlKey, workerB._id, { includeGroupFeedback: true });
     assert.equal(statusB.feedback.length, 1);
     assert.equal(deriveTerminalStatus(statusB.feedback), 'done');
   });
@@ -221,7 +222,7 @@ describe('getItemStatus merges feedback across a session-group, scoped to rootIt
     // LIN-3805: own-only feedback would read a hidden sibling `[done]` as "still
     // running"; the fault surfaces so the route answers a retryable 503.
     await assert.rejects(
-      store.getItemStatus(urlKey, original._id, { includeGroupFeedback: true }),
+      store.getItemFeedback(urlKey, original._id, { includeGroupFeedback: true }),
       (err) => err instanceof DispatchStoreFault && err.operation === '_collectGroupFeedback'
     );
   });
@@ -262,8 +263,8 @@ describe('getItemStatus merges feedback across a session-group, scoped to rootIt
 
     // Two independent reads must return the SAME order every time (determinism),
     // and must not throw.
-    const first = await store.getItemStatus(urlKey, original._id, { includeGroupFeedback: true });
-    const second = await store.getItemStatus(urlKey, original._id, { includeGroupFeedback: true });
+    const first = await store.getItemFeedback(urlKey, original._id, { includeGroupFeedback: true });
+    const second = await store.getItemFeedback(urlKey, original._id, { includeGroupFeedback: true });
 
     assert.deepEqual(first.feedback.map(f => f.message), second.feedback.map(f => f.message));
 
@@ -298,7 +299,7 @@ describe('getItemStatus merges feedback across a session-group, scoped to rootIt
       feedback: [{ message: 'legacy beat', timestamp: now }]
     });
 
-    const status = await store.getItemStatus(urlKey, 'legacy-1', { includeGroupFeedback: true });
+    const status = await store.getItemFeedback(urlKey, 'legacy-1', { includeGroupFeedback: true });
     assert.equal(status.feedback.length, 1);
     assert.equal(status.feedback[0].message, 'legacy beat');
   });
@@ -311,7 +312,7 @@ describe('getItemStatus merges feedback across a session-group, scoped to rootIt
     await store.takeItem(doc._id, urlKey, TOKEN);
     await store.addFeedback(doc._id, urlKey, { message: 'only beat' }, TOKEN);
 
-    const status = await store.getItemStatus(urlKey, doc._id, { includeGroupFeedback: true });
+    const status = await store.getItemFeedback(urlKey, doc._id, { includeGroupFeedback: true });
     assert.equal(status.feedback.length, 1);
     assert.equal(status.feedback[0].message, 'only beat');
   });
@@ -341,7 +342,7 @@ describe('getItemStatus merges feedback across a session-group, scoped to rootIt
     // No options — callers like the followUpTo anchor lookup / Observation
     // materializer / dashboard point-reads / the /prompt endpoint, none of
     // which read `feedback`, must stay on the cheap own-feedback-only path.
-    const status = await store.getItemStatus(urlKey, original._id);
+    const status = await store.getItemFeedback(urlKey, original._id);
 
     assert.equal(siblingQueried, false, 'the sibling group query must not run unless includeGroupFeedback is requested');
     assert.equal(status.feedback.length, 1);
@@ -431,7 +432,7 @@ describe('rootItemId as a first-class item field (LIN-1468, full-A)', () => {
       // no doc-level rootItemId
     });
 
-    const status = await store.getItemStatus('acme', 'legacy-root', { includeGroupFeedback: true });
+    const status = await store.getItemFeedback('acme', 'legacy-root', { includeGroupFeedback: true });
     assert.equal(status.feedback.length, 1);
     assert.equal(status.feedback[0].message, 'legacy own beat');
   });
@@ -460,7 +461,7 @@ describe('rootItemId as a first-class item field (LIN-1468, full-A)', () => {
       // no doc-level rootItemId — the case the straight swap cannot find
     });
 
-    const status = await store.getItemStatus('acme', root._id, { includeGroupFeedback: true });
+    const status = await store.getItemFeedback('acme', root._id, { includeGroupFeedback: true });
     assert.equal(status.feedback.length, 1, 'the field-less sibling is not found under the straight swap');
     assert.equal(status.feedback[0].message, 'root beat');
   });
@@ -472,7 +473,7 @@ describe('rootItemId as a first-class item field (LIN-1468, full-A)', () => {
     await store.addFeedback(doc._id, 'acme', { message: 'tagged', rootItemId: doc._id }, TOKEN);
     await store.addFeedback(doc._id, 'acme', { message: 'untagged' }, TOKEN);
 
-    const status = await store.getItemStatus('acme', doc._id);
+    const status = await store.getItemFeedback('acme', doc._id);
     assert.equal(status.feedback[0].rootItemId, doc._id);
     assert.equal('rootItemId' in status.feedback[1], false, 'an untagged entry must not serialise a null rootItemId key');
     // Every previously-returned field stays byte-identical.
@@ -486,7 +487,7 @@ describe('rootItemId as a first-class item field (LIN-1468, full-A)', () => {
     await store.addFeedback(doc._id, 'acme', { message: 'beat', kind: 'heartbeat' }, TOKEN);
     await store.addFeedback(doc._id, 'acme', { message: 'untagged' }, TOKEN);
 
-    const status = await store.getItemStatus('acme', doc._id);
+    const status = await store.getItemFeedback('acme', doc._id);
     assert.equal(status.feedback[0].kind, 'heartbeat');
     assert.equal('kind' in status.feedback[1], false, 'an untagged entry must not serialise a null kind key');
     // Every previously-returned field stays byte-identical.

@@ -2082,13 +2082,13 @@ describe(
       // listHistory -> _formatHistoryItem, then today's _buildLoops derivation
       // over the un-digested feedback plus the harvested abort. NOT a raw
       // Date-typed array; _buildLoops drops raw docs that lack `id` anyway.
-      const { items: baselineItems } = await store.listHistory(urlKey, { projection: { prompt: 0 } });
+      const { items: baselineItems } = await store.listHistory(urlKey, { limit: 100, projection: { prompt: 0 } });
       const baselineLoops = pipelineInternal._buildLoops({ historyItems: baselineItems, lean: false });
       const baseline = pickLoopFacingFacts(baselineLoops.find((l) => l.loopId === targetId));
 
       // Digest-backed (LIN-3011): a lean read that ALSO excludes feedback,
       // forcing derivation off feedbackDigest (with self-heal) alone.
-      const { items: leanItems } = await store.listHistory(urlKey, { projection: { prompt: 0, feedback: 0 } });
+      const { items: leanItems } = await store.listHistory(urlKey, { limit: 100, projection: { prompt: 0, feedback: 0 } });
       const digestBackedLoops = pipelineInternal._buildLoops({ historyItems: leanItems, lean: true });
       const digestBacked = pickLoopFacingFacts(digestBackedLoops.find((l) => l.loopId === targetId));
 

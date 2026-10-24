@@ -28,6 +28,9 @@ function projectionHistoryCollection(docs) {
   return {
     find(query) {
       return {
+        sort() { return this; },
+        skip() { return this; },
+        limit() { return this; },
         async toArray() {
           return docs.filter(d => d.urlKey === query.urlKey).map(d => ({ ...d }));
         }
@@ -62,6 +65,10 @@ function projectedHistoryCollection(docs) {
     find(query, options = {}) {
       const inner = base.find(query);
       return {
+        // LIN-3812: the store sorts in the query now (the in-JS sort is gone).
+        sort() { return this; },
+        skip() { return this; },
+        limit() { return this; },
         async toArray() {
           return applyProjection(await inner.toArray(), options.projection);
         }
@@ -131,7 +138,7 @@ describe('file-pointer-read — loadPilotRows sees history (P7)', () => {
       collection: createMockCollection(),
       historyCollection: projectedHistoryCollection([historyDoc()])
     });
-    const { items } = await store.listHistory('acme', { projection: { prompt: 1 } });
+    const { items } = await store.listHistory('acme', { since: new Date(0), projection: { prompt: 1 } });
     assert.equal(items.length, 1);
     assert.equal(items[0].kind, 'custom', 'inclusion projection collapses kind');
     assert.equal(items[0].issueIdentifier, undefined);
@@ -151,5 +158,32 @@ describe('file-pointer-read — loadPilotRows sees history (P7)', () => {
     const rows = await loadPilotRows(store, 'acme');
     assert.equal(rows.filter(r => String(r.id) === 'both-1').length, 1);
     assert.equal(classifyPilotRows(rows).totals.eligible, 1);
+  });
+});
+
+describe('file-pointer-read — the pilot history read is bounded by `since` (LIN-3812)', () => {
+  const NOW = Date.parse('2026-10-24T00:00:00.000Z');
+  async function sinceOf(opts) {
+    const queries = [];
+    const history = projectedHistoryCollection([historyDoc()]);
+    const find = history.find.bind(history);
+    history.find = (query, ...rest) => { queries.push(query); return find(query, ...rest); };
+    const store = new DispatchQueueStore({ collection: createMockCollection(), historyCollection: history });
+    await loadPilotRows(store, 'acme', { now: NOW, ...opts });
+    return queries.find(q => q.dispatchedAt).dispatchedAt.$gte;
+  }
+
+  test('defaults to the shared 30-day read horizon', async () => {
+    assert.equal((await sinceOf({})).toISOString(), '2026-09-24T00:00:00.000Z');
+  });
+
+  test('--since-days widens the window explicitly, instead of a silent lifetime read', async () => {
+    assert.equal((await sinceOf({ sinceDays: 90 })).toISOString(), '2026-07-26T00:00:00.000Z');
+  });
+
+  test('parseArgs carries --since-days', async () => {
+    const { parseArgs } = await import('../../scripts/file-pointer-read.mjs');
+    assert.equal(parseArgs([]).sinceDays, 30);
+    assert.equal(parseArgs(['--since-days', '90']).sinceDays, 90);
   });
 });

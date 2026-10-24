@@ -91,7 +91,8 @@ const ARCHIVE_HISTORY_DOC_KEYS = [
   '_id', 'abort', 'abortTo', 'cascade', 'consumerLastSeenAt', 'dispatchedAt',
   'dispatchedBy', 'effort', 'feedbackDigest', 'feedbackVersion', 'followUpTo',
   'force', 'harness', 'issueId', 'issueIdentifier',
-  'issueTitle', 'issueUrl', 'kind', 'maxTasks', 'model',
+  'issueTitle', 'issueUrl', 'kind', 'lineageBasis', 'lineageCompletedAt',
+  'lineageFeedbackCount', 'lineageStatus', 'lineageStatusBasis', 'maxTasks', 'model',
   'periodicalId', 'presetConfig', 'presetName', 'producingItemAttempt',
   'producingItemId', 'prompt', 'promptName', 'queueIfBusy', 'repo', 'resolvedAt',
   'rootItemId', 'sessionGroupId', 'sessionId', 'status', 'stopAt',
@@ -292,18 +293,31 @@ describe('S0 — store projections (undeclared item)', () => {
     assert.equal('bootstrapToken' in item, false);
   });
 
-  test('getItemStatus queued / taken key sets', async () => {
+  test('getItemFeedback queued / taken key sets (the pre-LIN-3812 getItemStatus shape)', async () => {
     const { store } = makeStore();
     const created = await store.addItem('acme', { prompt: 'run me' });
-    const queued = await store.getItemStatus('acme', created._id);
+    const queued = await store.getItemFeedback('acme', created._id);
     assert.deepEqual(sortedKeys(queued), [...FORMAT_ITEM_KEYS, 'status', 'feedback'].sort());
     assert.equal(queued.status, 'queued');
     assertNoDeclaredFields(queued, 'queued status');
 
     await store.takeItem(created._id, 'acme');
-    const taken = await store.getItemStatus('acme', created._id);
+    const taken = await store.getItemFeedback('acme', created._id);
     assert.deepEqual(sortedKeys(taken), [...FORMAT_HISTORY_ITEM_KEYS, 'feedback'].sort());
     assertNoDeclaredFields(taken, 'taken status');
+  });
+
+  test('getItemStatus (lean default, LIN-3812) is the same key set minus feedback, and never carries a declared field', async () => {
+    const { store } = makeStore();
+    const created = await store.addItem('acme', { prompt: 'run me' });
+    const queued = await store.getItemStatus('acme', created._id);
+    assert.deepEqual(sortedKeys(queued), [...FORMAT_ITEM_KEYS, 'status'].sort());
+    assertNoDeclaredFields(queued, 'queued lean status');
+
+    await store.takeItem(created._id, 'acme');
+    const taken = await store.getItemStatus('acme', created._id);
+    assert.deepEqual(sortedKeys(taken), [...FORMAT_HISTORY_ITEM_KEYS].sort());
+    assertNoDeclaredFields(taken, 'taken lean status');
   });
 });
 
@@ -373,8 +387,12 @@ function buildRouteApp({ itemForWatch = null, itemsForList = null } = {}) {
     dispatchQueueStore: {
       addItem: async (urlKey, item) => ({ _id: 'disp-1', dispatchedAt: '2026-06-28T00:00:00.000Z', ...item }),
       getItemStatus: async () => itemForWatch,
+      getItemFeedback: async () => itemForWatch,
+      getItemPrompt: async () => itemForWatch,
       listItems: async () => (itemsForList || []),
-      listHistory: async () => ({ items: [], total: 0 })
+      listHistory: async () => ({ items: [], total: 0 }),
+      listHistoryLineageRows: async () => ({ items: [], total: 0 }),
+      ensureLineageStatus: async () => {}
     },
     workspaceFromUrl: (req, res, next) => next(),
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
@@ -452,8 +470,12 @@ describe('S0 — POST /api/proxy/dispatch createToken arguments', () => {
         getGrantDeclaration: async () => ({ state: 'none' }),
         addItem: async (urlKey, item) => ({ _id: 'disp-1', dispatchedAt: '2026-06-28T00:00:00.000Z', ...item }),
         getItemStatus: async () => null,
+        getItemFeedback: async () => null,
+        getItemPrompt: async () => null,
         listItems: async () => [],
-        listHistory: async () => ({ items: [], total: 0 })
+        listHistory: async () => ({ items: [], total: 0 }),
+        listHistoryLineageRows: async () => ({ items: [], total: 0 }),
+        ensureLineageStatus: async () => {}
       },
       workspaceFromUrl: (req, res, next) => { bodyHook?.(req); next(); },
       workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
@@ -583,7 +605,10 @@ describe('S0 — projection source bodies are spread-free and token-free', () =>
       dispatchQueueStore: {
         listItems: async () => [{ ...row }],
         listHistory: async () => ({ items: [], total: 0 }),
-        getItemStatus: async () => ({ ...row })
+        listHistoryLineageRows: async () => ({ items: [], total: 0 }),
+        ensureLineageStatus: async () => {},
+        getItemStatus: async () => ({ ...row }),
+        getItemFeedback: async () => ({ ...row })
       }
     };
     const app = express();

@@ -26,6 +26,7 @@ import { parseDecisions, parseHeartbeat, deriveRuntime } from '../../lib/session
 import { loopLastActivityMs, isFreshlyActive, isLoopActive, DEFAULT_LANE_STALE_MS } from '../../lib/live-console.js';
 import { digestFeedback, deriveLoopFacingFacts } from '../../lib/digest-feedback.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
+import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { buildSessionCounts } from '../../lib/sessions-view.js';
 import { classifyLoop } from '../../lib/observer-sweep.js';
 import { isDecisionAnsweredInLineage } from '../../lib/unanswered-decisions.js';
@@ -1090,8 +1091,10 @@ describe('lean read projection (LIN-623)', () => {
     const capture = {};
     const stores = makeMockStores({ capture });
     await getSessionsForWorkspace('ws', { ...stores, lean: true });
-    assert.deepStrictEqual(capture.listHistoryOptions.projection, { prompt: 0, feedback: 0 },
-      'the lean feed read must exclude BOTH `prompt` and `feedback` at the query (LIN-3011) — the digest is a complete substitute, so feedback need not cross the wire either');
+    // LIN-3812: lean is the store's DEFAULT read now (it excludes `prompt` AND `feedback` at the query,
+    // pinned in dispatch-store-projection.test.js), so the lean feed asks for the default: no per-caller projection.
+    assert.ok(!('projection' in capture.listHistoryOptions),
+      'the lean feed no longer carries its own projection; the store default drops prompt and feedback');
     // It is a column exclusion, NOT a row cap — the truncation-footgun guard stays.
     assert.ok(!('limit' in capture.listHistoryOptions), 'projection must not become a row cap');
   });
@@ -1119,15 +1122,15 @@ describe('lean read projection (LIN-623)', () => {
     const capture = {};
     const stores = makeMockStores({ capture });
     await getSessionsForWorkspace('ws', { ...stores, lean: true });
-    assert.deepStrictEqual(capture.listHistoryOptions.projection, { prompt: 0, feedback: 0 },
-      'now that the digest carries every derived fact, the lean read excludes feedback too (LIN-3011)');
+    assert.ok(!('projection' in capture.listHistoryOptions),
+      'now that the digest carries every derived fact, the lean (default) read excludes feedback too (LIN-3011, LIN-3812)');
   });
 
   test('getLoopsForWorkspace lean also projects `prompt` AND `feedback` out of the read (LIN-3011)', async () => {
     const capture = {};
     const stores = makeMockStores({ capture });
     await getLoopsForWorkspace('ws', { ...stores, lean: true });
-    assert.deepStrictEqual(capture.listHistoryOptions.projection, { prompt: 0, feedback: 0 });
+    assert.ok(!('projection' in capture.listHistoryOptions));
   });
 
   test('non-lean reads carry NO projection (byte-identical full documents)', async () => {
@@ -1257,11 +1260,12 @@ function makeLeanDigestStores({ items = [], liveItems = [], collectionDocs = [],
     // written state (e.g. "did the write-back land") use this directly so
     // that diagnostic read doesn't itself inflate `findSpy`'s call count.
     _collection: collection,
-    dispatchStore: {
-      historyCollection,
+    // LIN-3812: the self-heal lives in the store, so the heal under test is the REAL store's;
+    // only the lean read it heals is scripted.
+    dispatchStore: Object.assign(new DispatchQueueStore({ collection: createMockCollection(), historyCollection }), {
       async listItems() { return liveItems; },
-      async listHistory() { return { items, total: items.length }; }
-    },
+      async listHistory() { return { items: await this._selfHealDigests(items), total: items.length }; }
+    }),
     agentStatusStore: { async listStatus() { return { items: [], total: 0 }; } }
   };
 }

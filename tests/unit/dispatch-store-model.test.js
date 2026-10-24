@@ -82,7 +82,7 @@ test('model is carried into history (watch status + history list)', async () => 
   const status = await store.getItemStatus('acme', created._id);
   assert.equal(status.model, MODEL);
 
-  const { items } = await store.listHistory('acme');
+  const { items } = await store.listHistory('acme', { limit: 100 });
   assert.equal(items.length, 1);
   assert.equal(items[0].model, MODEL);
 });
@@ -97,7 +97,7 @@ test('a dispatch with no model reads model:null at every seam', async () => {
   const taken = await store.takeItem(created._id, 'acme');
   assert.strictEqual(taken.model, null);
 
-  const { items } = await store.listHistory('acme');
+  const { items } = await store.listHistory('acme', { limit: 100 });
   assert.strictEqual(items[0].model, null);
 });
 
@@ -164,7 +164,7 @@ test('harness is carried into history (watch status + history list)', async () =
   const status = await store.getItemStatus('acme', created._id);
   assert.equal(status.harness, HARNESS);
 
-  const { items } = await store.listHistory('acme');
+  const { items } = await store.listHistory('acme', { limit: 100 });
   assert.equal(items.length, 1);
   assert.equal(items[0].harness, HARNESS);
 });
@@ -179,7 +179,7 @@ test('a dispatch with no harness reads harness:null at every seam', async () => 
   const taken = await store.takeItem(created._id, 'acme');
   assert.strictEqual(taken.harness, null);
 
-  const { items } = await store.listHistory('acme');
+  const { items } = await store.listHistory('acme', { limit: 100 });
   assert.strictEqual(items[0].harness, null);
 });
 
@@ -251,7 +251,7 @@ test('terminal is carried into history (watch status + history list)', async () 
   const status = await store.getItemStatus('acme', created._id);
   assert.equal(status.terminal, TERMINAL);
 
-  const { items } = await store.listHistory('acme');
+  const { items } = await store.listHistory('acme', { limit: 100 });
   assert.equal(items.length, 1);
   assert.equal(items[0].terminal, TERMINAL);
 });
@@ -266,7 +266,7 @@ test('a dispatch with no terminal reads terminal:null at every seam', async () =
   const taken = await store.takeItem(created._id, 'acme');
   assert.strictEqual(taken.terminal, null);
 
-  const { items } = await store.listHistory('acme');
+  const { items } = await store.listHistory('acme', { limit: 100 });
   assert.strictEqual(items[0].terminal, null);
 });
 
@@ -342,7 +342,7 @@ test('effort is carried into history (watch status + history list)', async () =>
   const status = await store.getItemStatus('acme', created._id);
   assert.equal(status.effort, EFFORT);
 
-  const { items } = await store.listHistory('acme');
+  const { items } = await store.listHistory('acme', { limit: 100 });
   assert.equal(items.length, 1);
   assert.equal(items[0].effort, EFFORT);
 });
@@ -357,7 +357,7 @@ test('a dispatch with no effort reads effort:null at every seam', async () => {
   const taken = await store.takeItem(created._id, 'acme');
   assert.strictEqual(taken.effort, null);
 
-  const { items } = await store.listHistory('acme');
+  const { items } = await store.listHistory('acme', { limit: 100 });
   assert.strictEqual(items[0].effort, null);
 });
 

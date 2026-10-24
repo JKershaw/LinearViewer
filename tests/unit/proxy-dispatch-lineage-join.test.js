@@ -26,54 +26,19 @@ process.env.NODE_ENV = 'test';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
-import { createProxyRoutes, LINEAGE_QUERY_LIMIT } from '../../routes/proxy.js';
+import { createProxyRoutes } from '../../routes/proxy.js';
+import { seededStore } from '../fixtures/dispatch-list-store.js';
 
 const T1 = '2026-06-22T10:00:00.000Z';
 const T2 = '2026-06-22T11:00:00.000Z';
 
-// Build an app whose dispatch store returns the given live (queued) + history
-// rows, via an OPTIONS-AWARE, CALL-RECORDING stub (the harness the LIN-1470
-// plan pins): the lineage batch query (`rootItemId: {$in: [...]}`) is
-// distinguished from the ordinary page query so both can be asserted on.
-function buildApp({ queued = [], history = [] } = {}) {
-  const historyCalls = [];
-  const itemsCalls = [];
-
-  const listHistory = async (urlKey, opts = {}) => {
-    historyCalls.push(opts);
-    if (opts.rootItemId && opts.rootItemId.$in) {
-      // A real Mongo query ANDs every field present on `opts` into one query
-      // object, so if the handler ever (wrongly) added `issueIdentifier` to
-      // the lineage query, it WOULD narrow these results too — mirror that
-      // here (rather than ignoring the field) so L4 actually fails if a
-      // future change re-scopes the lineage query by issue, instead of
-      // passing vacuously because the stub never modeled the field.
-      const anchors = opts.rootItemId.$in;
-      let items = history.filter(r => anchors.includes(r.rootItemId));
-      if (opts.issueIdentifier) items = items.filter(r => r.issueIdentifier === opts.issueIdentifier);
-      // LIN-1494: mirror the real store's `limit` branch (lib/dispatch-store.js)
-      // — `total` is the exact PRE-slice matching count, `items` the capped
-      // slice. The old stub ignored `limit` and returned no `total`, which is
-      // exactly the harness gap that let a `length === cap` proxy look correct.
-      const total = items.length;
-      if (opts.limit) items = items.slice(0, opts.limit);
-      return { items, total };
-    }
-    // Real store: the page call DOES push issueIdentifier into the query
-    // when the caller passes it (LIN-613/615 index-backed predicate).
-    let items = opts.issueIdentifier
-      ? history.filter(r => r.issueIdentifier === opts.issueIdentifier)
-      : history;
-    const total = items.length; // pre-slice count, as the real store returns
-    items = opts.limit ? items.slice(0, opts.limit) : items;
-    return { items, total };
-  };
-
-  const listItems = async (urlKey, opts = {}) => {
-    itemsCalls.push(opts);
-    return queued;
-  };
-
+// Build an app over a REAL store seeded with the given live (queued) + history rows
+// (tests/fixtures/dispatch-list-store.js). LIN-3812: the list reads the lineage
+// status/completedAt/feedbackCount PERSISTED on each history row, derived at write
+// time; a seeded row has none yet, so the store's read-time self-heal derives it,
+// which is the same derivation (lib/dispatch-lineage-status.js) every writer runs.
+async function buildApp({ queued = [], history = [] } = {}) {
+  const store = await seededStore({ queued, history });
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
@@ -87,11 +52,11 @@ function buildApp({ queued = [], history = [] } = {}) {
     agentStatusStore: {},
     recapCacheStore: { get: async () => null, set: async () => {} },
     briefCacheStore: { get: async () => null, set: async () => {} },
-    dispatchQueueStore: { getGrantDeclaration: async () => ({ state: 'none' }), listItems, listHistory },
+    dispatchQueueStore: store,
     workspaceFromUrl: (req, res, next) => next(),
     freeTierStore: { tryUse: async () => ({ allowed: true }) }
   }));
-  return { app, historyCalls, itemsCalls };
+  return { app, store };
 }
 
 async function get(app, path) {
@@ -108,15 +73,6 @@ async function get(app, path) {
   } finally {
     await new Promise(resolve => server.close(resolve));
   }
-}
-
-// The lineage batch call is the one carrying `rootItemId.$in`; the page call
-// is everything else on `listHistory`.
-function lineageCallOf(historyCalls) {
-  return historyCalls.find(c => c.rootItemId && c.rootItemId.$in);
-}
-function pageCallOf(historyCalls) {
-  return historyCalls.find(c => !(c.rootItemId && c.rootItemId.$in));
 }
 
 function row(overrides = {}) {
@@ -145,7 +101,7 @@ describe('LIN-1470 — lineage join, FIX-PROVING (fail against pre-change code)'
       id: 'child-1', rootItemId: 'root-1', followUpTo: 'root-1',
       feedback: [{ message: '[done] finished', rootItemId: 'root-1', timestamp: T2 }]
     });
-    const { app } = buildApp({ history: [root, child] });
+    const { app } = await buildApp({ history: [root, child] });
     const { status, body } = await get(app, '/api/proxy/dispatch');
     assert.equal(status, 200);
     const item = body.items.find(i => i.id === 'root-1');
@@ -162,7 +118,7 @@ describe('LIN-1470 — lineage join, FIX-PROVING (fail against pre-change code)'
       id: 'child-1', rootItemId: 'root-1', followUpTo: 'root-1',
       feedback: [{ message: '[done] finished', rootItemId: 'root-1', timestamp: T2 }]
     });
-    const { app } = buildApp({ history: [root, child] });
+    const { app } = await buildApp({ history: [root, child] });
     const { body } = await get(app, '/api/proxy/dispatch');
     const item = body.items.find(i => i.id === 'root-1');
     assert.equal(item.status, 'done', 'lineage-derived, not the frozen own-feedback "taken"');
@@ -177,7 +133,7 @@ describe('LIN-1470 — lineage join, FIX-PROVING (fail against pre-change code)'
       id: 'child-1', rootItemId: 'root-1', followUpTo: 'root-1',
       feedback: [{ message: '[done] finished', rootItemId: 'root-1', timestamp: T2 }]
     });
-    const { app } = buildApp({ history: [root, child] });
+    const { app } = await buildApp({ history: [root, child] });
 
     const done = await get(app, '/api/proxy/dispatch?status=done');
     assert.ok(done.body.items.find(i => i.id === 'root-1'), 'root-1 IS present under ?status=done');
@@ -188,7 +144,7 @@ describe('LIN-1470 — lineage join, FIX-PROVING (fail against pre-change code)'
     assert.equal(taken.body.total, 0);
   });
 
-  test('T5 — the $in:[null] trap, asserted on the query itself + behaviourally', async () => {
+  test('T5 — the null-anchor trap: a row with no anchor falls through to its own id (never a null lineage key)', async () => {
     const modernRoot = row({
       id: 'modern-root', rootItemId: 'm-root',
       feedback: [{ message: 'own', rootItemId: 'm-root', timestamp: T1 }]
@@ -205,15 +161,8 @@ describe('LIN-1470 — lineage join, FIX-PROVING (fail against pre-change code)'
       id: 'legacy-row', rootItemId: null,
       feedback: [{ message: '[done] legacy', timestamp: T1 }]
     });
-    const { app, historyCalls } = buildApp({ history: [modernRoot, modernChild, legacyRow] });
+    const { app } = await buildApp({ history: [modernRoot, modernChild, legacyRow] });
     const { body } = await get(app, '/api/proxy/dispatch');
-
-    const lineageCall = lineageCallOf(historyCalls);
-    assert.ok(lineageCall, 'a lineage query was issued');
-    assert.ok(
-      lineageCall.rootItemId.$in.every(a => a != null && a !== ''),
-      `$in must never contain null/empty — got ${JSON.stringify(lineageCall.rootItemId.$in)}`
-    );
 
     // Behavioural half: the legacy row does not cross-merge with the modern lineage.
     const legacy = body.items.find(i => i.id === 'legacy-row');
@@ -232,7 +181,7 @@ describe('LIN-1470 — lineage join, FIX-PROVING (fail against pre-change code)'
       id: 'abort-1', abort: true, abortTo: 'root-1', issueIdentifier: null,
       feedback: [{ message: '[aborted] cancelled', timestamp: T1 }]
     });
-    const { app } = buildApp({ history: [root, child, abort] });
+    const { app } = await buildApp({ history: [root, child, abort] });
     const { body } = await get(app, '/api/proxy/dispatch');
     const item = body.items.find(i => i.id === 'root-1');
     // Merged-first: the lineage terminal is the LATER [done] at T2, so the F1
@@ -243,74 +192,9 @@ describe('LIN-1470 — lineage join, FIX-PROVING (fail against pre-change code)'
     assert.equal(item.completedAt, T2);
   });
 
-  test('T7 — query count is constant in N (2 history reads regardless of row/lineage count)', async () => {
-    // Small: 3 rows across 2 lineages.
-    {
-      const small = [
-        row({ id: 'a1', rootItemId: 'l1', feedback: [{ message: 'x', rootItemId: 'l1', timestamp: T1 }] }),
-        row({ id: 'a2', rootItemId: 'l1', feedback: [{ message: '[done] x', rootItemId: 'l1', timestamp: T2 }] }),
-        row({ id: 'b1', rootItemId: 'l2', feedback: [{ message: 'y', rootItemId: 'l2', timestamp: T1 }] })
-      ];
-      const { app, historyCalls, itemsCalls } = buildApp({ history: small });
-      await get(app, '/api/proxy/dispatch');
-      assert.equal(historyCalls.length, 2, 'page call + one batched lineage call, small case');
-      assert.equal(itemsCalls.length, 1);
-    }
-    // Larger: 30 rows across 10 lineages.
-    {
-      const large = [];
-      for (let i = 0; i < 10; i++) {
-        const anchor = `lineage-${i}`;
-        for (let j = 0; j < 3; j++) {
-          large.push(row({
-            id: `${anchor}-${j}`, rootItemId: anchor,
-            feedback: [{ message: j === 2 ? '[done] x' : 'beat', rootItemId: anchor, timestamp: T1 }]
-          }));
-        }
-      }
-      const { app, historyCalls, itemsCalls } = buildApp({ history: large });
-      await get(app, '/api/proxy/dispatch');
-      assert.equal(historyCalls.length, 2, 'STILL page call + one batched lineage call — not 2+N — large case');
-      assert.equal(itemsCalls.length, 1);
-    }
-  });
 });
 
 describe('LIN-1470 — lineage join, STANDING GUARD / CHARACTERIZATION (pass before and after)', () => {
-  // T6a/T6b were pinned by the plan as "fail today" but RECLASSIFIED here
-  // (beat 3, per the instruction to verify each fix-proving case against a
-  // pre-change worktree rather than assume the classification): both pass
-  // against pre-change `routes/proxy.js` too, because the invariants they
-  // check — `projection:{prompt:0}` and the page call's `limit:200` — already
-  // held on the SINGLE pre-existing `listHistory` call (H12/503 guards from
-  // f5a94a53/15ca7b47, which predate this ticket). They are real regression
-  // guards for THIS diff — a broken implementation that adds the new lineage
-  // query without projection, or drops the page call's limit, fails them —
-  // just not proof the original bug existed.
-  test('T6a — every recorded call (including the new lineage query) carries projection:{prompt:0}', async () => {
-    const root = row({ id: 'root-1', rootItemId: 'root-1', feedback: [{ message: 'own', rootItemId: 'root-1', timestamp: T1 }] });
-    const child = row({ id: 'child-1', rootItemId: 'root-1', feedback: [{ message: '[done] x', rootItemId: 'root-1', timestamp: T2 }] });
-    const { app, historyCalls, itemsCalls } = buildApp({ history: [root, child] });
-    await get(app, '/api/proxy/dispatch');
-
-    // Deliberately no precondition on historyCalls.length here — T7 owns that
-    // assertion. This check holds over WHATEVER calls were actually made,
-    // which is exactly why it passes vacuously pre-fix (one call, already
-    // compliant) and is a standing guard rather than fix-proving.
-    for (const call of [...historyCalls, ...itemsCalls]) {
-      assert.deepEqual(call.projection, { prompt: 0 }, `every call must exclude prompt — got ${JSON.stringify(call)}`);
-    }
-  });
-
-  test('T6b — the page call still carries limit:200', async () => {
-    const root = row({ id: 'root-1', rootItemId: 'root-1' });
-    const { app, historyCalls } = buildApp({ history: [root] });
-    await get(app, '/api/proxy/dispatch');
-    const pageCall = pageCallOf(historyCalls);
-    assert.ok(pageCall, 'a page (non-lineage) history call was issued');
-    assert.equal(pageCall.limit, 200);
-  });
-
   // Review F6 (verified, not taken on restatement): T3 does NOT catch a
   // coherent re-key of the anchor to sessionId/sessionGroupId (anchor +
   // query field + sibling grouping all switched together) — re-running that
@@ -335,7 +219,7 @@ describe('LIN-1470 — lineage join, STANDING GUARD / CHARACTERIZATION (pass bef
       id: 'wb', rootItemId: 'wb-root', sessionId: 'orch-1', sessionGroupId: 'orch-1',
       feedback: [{ message: '[working · running] 2 tools in 10s', rootItemId: 'wb-root', timestamp: T1 }]
     });
-    const { app } = buildApp({ history: [wa, wb] });
+    const { app } = await buildApp({ history: [wa, wb] });
     const { body } = await get(app, '/api/proxy/dispatch');
     const item = body.items.find(i => i.id === 'wb');
     assert.notEqual(item.status, 'done', 'wb must NOT inherit wa\'s terminal via the shared sessionId/sessionGroupId — that is the LIN-1461 bug');
@@ -352,7 +236,7 @@ describe('LIN-1470 — lineage join, STANDING GUARD / CHARACTERIZATION (pass bef
       id: 'legacy-heartbeat',
       feedback: [{ message: '[working · running] 1 tool in 5s', timestamp: T1 }]
     });
-    const { app } = buildApp({ history: [legacyDone, legacyHeartbeat] });
+    const { app } = await buildApp({ history: [legacyDone, legacyHeartbeat] });
     const { body } = await get(app, '/api/proxy/dispatch');
 
     const done = body.items.find(i => i.id === 'legacy-done');
@@ -387,7 +271,7 @@ describe('LIN-1470 — beat 4 audit finding: queued rows must not join the linea
     delete freshFollowUp.feedback;
     delete freshFollowUp.resolvedAt;
 
-    const { app } = buildApp({ queued: [freshFollowUp], history: [parentDone] });
+    const { app } = await buildApp({ queued: [freshFollowUp], history: [parentDone] });
     const { body } = await get(app, '/api/proxy/dispatch');
 
     const followUp = body.items.find(i => i.id === 'followup-1');
@@ -431,7 +315,7 @@ describe('LIN-1470 — beat 4 audit: abort rows × lineage merge (defense in dep
       id: 'abort-collide', rootItemId: 'root-y', abort: true, abortTo: 'some-other-target', issueIdentifier: null,
       feedback: [{ message: '[aborted] cancelled', timestamp: T2 }] // no rootItemId tag — matches dispatcher.js:479
     });
-    const { app } = buildApp({ history: [sibling, collidingAbort] });
+    const { app } = await buildApp({ history: [sibling, collidingAbort] });
     const { body } = await get(app, '/api/proxy/dispatch');
 
     const item = body.items.find(i => i.id === 'sibling-1');
@@ -457,7 +341,7 @@ describe('LIN-1470 — review F1: archived cancelled/expired rows must NOT join 
     const cancelledChild = row({
       id: 'child-cancelled', rootItemId: 'root-1', followUpTo: 'parent-1', status: 'cancelled', feedback: []
     });
-    const { app } = buildApp({ history: [parentDone, cancelledChild] });
+    const { app } = await buildApp({ history: [parentDone, cancelledChild] });
     const { body } = await get(app, '/api/proxy/dispatch');
 
     const child = body.items.find(i => i.id === 'child-cancelled');
@@ -479,7 +363,7 @@ describe('LIN-1470 — review F1: archived cancelled/expired rows must NOT join 
     const expiredChild = row({
       id: 'child-expired', rootItemId: 'root-1', followUpTo: 'parent-1', status: 'expired', feedback: []
     });
-    const { app } = buildApp({ history: [parentDone, expiredChild] });
+    const { app } = await buildApp({ history: [parentDone, expiredChild] });
     const { body } = await get(app, '/api/proxy/dispatch');
 
     const child = body.items.find(i => i.id === 'child-expired');
@@ -510,7 +394,7 @@ describe('LIN-1470 — review L4: cross-issue lineage under ?issueIdentifier= sc
       id: 'child-1', rootItemId: 'root-1', followUpTo: 'root-1', issueIdentifier: 'LIN-B',
       feedback: [{ message: '[done] finished', rootItemId: 'root-1', timestamp: T2 }]
     });
-    const { app } = buildApp({ history: [root, crossIssueChild] });
+    const { app } = await buildApp({ history: [root, crossIssueChild] });
 
     const scoped = await get(app, '/api/proxy/dispatch?issueIdentifier=LIN-A');
     const item = scoped.body.items.find(i => i.id === 'root-1');
@@ -523,18 +407,6 @@ describe('LIN-1470 — review L4: cross-issue lineage under ?issueIdentifier= sc
     // Sanity: the sibling's OWN scope shows it directly, unaffected.
     const otherScoped = await get(app, '/api/proxy/dispatch?issueIdentifier=LIN-B');
     assert.ok(otherScoped.body.items.find(i => i.id === 'child-1'), 'child-1 is visible under its own LIN-B scope');
-  });
-});
-
-describe('LIN-1470 — open question (beat 3): lineage query bound', () => {
-  test('T8 — the lineage batch query carries a defensive limit', async () => {
-    const root = row({ id: 'root-1', rootItemId: 'root-1' });
-    const { app, historyCalls } = buildApp({ history: [root] });
-    await get(app, '/api/proxy/dispatch');
-    const lineageCall = lineageCallOf(historyCalls);
-    assert.ok(lineageCall, 'a lineage query was issued');
-    assert.equal(typeof lineageCall.limit, 'number', 'the lineage query is bounded, not unbounded');
-    assert.ok(lineageCall.limit >= 200, 'generous enough to never truncate a realistic lineage');
   });
 });
 
@@ -581,7 +453,7 @@ describe('LIN-1470 — review F7: forward-only merge invariant (a row is never r
         const queued = status === 'queued' ? [target] : [];
         const history = status === 'queued' ? [parent, sibling] : [parent, sibling, target];
 
-        const { app } = buildApp({ queued, history });
+        const { app } = await buildApp({ queued, history });
         const { body } = await get(app, '/api/proxy/dispatch');
         const item = body.items.find(i => i.id === 'target-1');
 
@@ -630,7 +502,7 @@ describe('LIN-1470 — review F7: forward-only merge invariant (a row is never r
       id: 'child-1', rootItemId: 'root-1', followUpTo: 'root-1', dispatchedAt: T2,
       feedback: [{ message: '[done] finished', rootItemId: 'root-1', timestamp: T2 }]
     });
-    const { app } = buildApp({ history: [root, child] });
+    const { app } = await buildApp({ history: [root, child] });
     const { body } = await get(app, '/api/proxy/dispatch');
     const item = body.items.find(i => i.id === 'root-1');
     assert.equal(item.feedbackCount, 2, 'still lineage-wide (own + child)');
@@ -648,7 +520,7 @@ describe('LIN-1470 — review F7: forward-only merge invariant (a row is never r
       dispatchedAt: DISPATCH_T, // AFTER the parent's own T2 completion
       feedback: []
     });
-    const { app } = buildApp({ history: [parent, runningFollowUp] });
+    const { app } = await buildApp({ history: [parent, runningFollowUp] });
 
     const { body } = await get(app, '/api/proxy/dispatch');
     const item = body.items.find(i => i.id === 'followup-1');
@@ -663,181 +535,97 @@ describe('LIN-1470 — review F7: forward-only merge invariant (a row is never r
   });
 });
 
-describe('LIN-1485/LIN-1494 — L3: telemetry when the lineage query overruns LINEAGE_QUERY_LIMIT (exact truncation signal)', () => {
-  // Imported from routes/proxy.js (LIN-1494 F2 tidy) — no more hand-mirrored
-  // `const CAP = 2000` kept in sync by naming conventions.
-  const CAP = LINEAGE_QUERY_LIMIT;
-
-  // Builds `count` rows sharing one rootItemId anchor: index 0 is the anchor row
-  // itself (id === anchor), the rest are siblings. The terminal `[done]` entry
-  // rides an EARLY row (index 1) so it survives the stub's limit slice in the
-  // over-cap fixtures — the real store keeps the newest rows, and which rows
-  // are dropped is not what these cases pin.
-  function lineageRows(anchor, count, terminalAt) {
+// LIN-3812 (closes LIN-2120): there is no read window any more. `total` is the exact
+// count of matching rows (queued + the database's count), `?status=` is a database
+// predicate on the persisted lineage status, and a lineage is no longer capped.
+describe('LIN-3812 — the list on persisted lineage fields (the four intended value changes)', () => {
+  function plainRows(count, { issueIdentifier = 'LIN-3812', feedback = [], resolvedBase = 0 } = {}) {
     const rows = [];
     for (let i = 0; i < count; i++) {
-      const isTerminal = terminalAt != null && i === Math.min(1, count - 1);
-      rows.push(row({
-        id: i === 0 ? anchor : `${anchor}-sib-${i}`,
-        rootItemId: anchor,
-        feedback: [{
-          message: isTerminal ? '[done] finished' : 'own beat',
-          rootItemId: anchor,
-          timestamp: isTerminal ? terminalAt : T1
-        }]
-      }));
+      rows.push(row({ id: `h-${issueIdentifier}-${i}`, issueIdentifier, feedback, resolvedAt: new Date(Date.UTC(2026, 5, 1) + (resolvedBase + i) * 1000).toISOString(), dispatchedAt: new Date(Date.UTC(2026, 5, 1) + (resolvedBase + i) * 1000).toISOString() }));
     }
     return rows;
   }
 
-  test('T13 — fires exactly once when the lineage genuinely overruns the cap, and reports the exact total', async (t) => {
-    const warnMock = t.mock.method(console, 'warn', () => {});
-    // CAP + 1 matching rows: the stub returns `items` sliced to CAP with
-    // `total` = CAP + 1 — the store's exact pre-slice count.
-    const history = lineageRows('root-cap', CAP + 1, T2);
-    const { app } = buildApp({ history });
-
-    const { status } = await get(app, '/api/proxy/dispatch');
-
-    assert.equal(status, 200);
-    assert.equal(warnMock.mock.calls.length, 1, 'must fire exactly once when the lineage overruns the cap');
-    const [message] = warnMock.mock.calls[0].arguments;
-    assert.match(message, /LINEAGE_QUERY_LIMIT/, 'the log line should name the signal it is reporting');
-    assert.match(message, new RegExp(String(CAP)), 'the log line should carry the cap value itself');
-    assert.match(message, new RegExp(`total=${CAP + 1}`), 'the log line should answer "how far over cap" with the exact total');
-  });
-
-  test('T13b (LIN-1494 headline) — SILENT on a lineage of exactly LINEAGE_QUERY_LIMIT rows (nothing was truncated)', async (t) => {
-    // The shipped `lineageSiblings.length === LINEAGE_QUERY_LIMIT` gate
-    // false-positived here: a lineage of exactly 2000 rows is complete, but
-    // the proxy read "full page" as "may be truncated". The store's `total`
-    // is exact, so exactly-at-cap must not warn.
-    const warnMock = t.mock.method(console, 'warn', () => {});
-    const history = lineageRows('root-exact', CAP, T2);
-    const { app } = buildApp({ history });
-
-    const { status } = await get(app, '/api/proxy/dispatch');
-
-    assert.equal(status, 200);
-    assert.equal(warnMock.mock.calls.length, 0, 'exactly-at-cap is complete, not truncated — must stay silent');
-  });
-
-  test('T14 — silent when the lineage query returns one row under the cap (the case that actually protects the ticket\'s intent)', async (t) => {
-    const warnMock = t.mock.method(console, 'warn', () => {});
-    const history = lineageRows('root-under', CAP - 1, T2);
-    const { app } = buildApp({ history });
-
-    const { status } = await get(app, '/api/proxy/dispatch');
-
-    assert.equal(status, 200);
-    assert.equal(warnMock.mock.calls.length, 0, 'a healthy under-cap lineage (CAP - 1 rows) must never trip the telemetry');
-  });
-
-  test('T15 — silent on an ordinary small lineage (no anchors even reach the batch query)', async (t) => {
-    const warnMock = t.mock.method(console, 'warn', () => {});
-    const root = row({
-      id: 'root-small', rootItemId: 'root-small',
-      feedback: [{ message: 'own beat', rootItemId: 'root-small', timestamp: T1 }]
-    });
-    const { app } = buildApp({ history: [root] });
-
-    const { status } = await get(app, '/api/proxy/dispatch');
-
-    assert.equal(status, 200);
-    assert.equal(warnMock.mock.calls.length, 0);
-  });
-
-  test('T16 — response payload (merge/feedbackCount/status/completedAt) is unaffected by the telemetry firing', async (t) => {
-    // Deliberately OVER the cap (same fixture shape as T13) so the telemetry
-    // branch actually executes — this proves the added conditional/log line
-    // is read-only and does not perturb the derived response fields it sits
-    // beside, driving the real handler end to end rather than asserting on
-    // the log call in isolation.
-    const warnMock = t.mock.method(console, 'warn', () => {});
-    const history = lineageRows('root-cap-2', CAP + 1, T2);
-    const { app } = buildApp({ history });
-
-    const { body } = await get(app, '/api/proxy/dispatch');
-    const item = body.items.find(i => i.id === 'root-cap-2');
-
-    assert.equal(warnMock.mock.calls.length, 1, 'precondition: the telemetry branch executed for this fixture');
-    assert.ok(item, 'the anchor row is present in the response');
-    // The lineage query returned the capped CAP rows (of CAP + 1), so the
-    // merged feedback covers exactly the rows the store handed back.
-    assert.equal(item.feedbackCount, CAP, 'lineage-wide count over the returned (capped) rows, unaffected by telemetry');
-    assert.equal(item.status, 'done', 'lineage-derived terminal status, unaffected by telemetry');
-    assert.equal(item.completedAt, T2, 'lineage-derived completedAt, unaffected by telemetry');
-  });
-});
-
-describe('LIN-1494 — dispatch-list response: honest `total` + `truncated` from the store\'s pre-slice count', () => {
-  // The page query carries `limit: 200`; `listHistory` returns the exact full
-  // matching count beside the capped items. The response previously reported
-  // `total: filtered.length` — a count over the newest-200 window presented
-  // as the count of matching dispatch items.
-  const PAGE_LIMIT = 200;
-
-  function plainRows(count, { issueIdentifier = 'LIN-1494', feedback = [] } = {}) {
-    // Legacy-style rows (no rootItemId, anchor falls back to own id) keep the
-    // lineage query out of the way of what these cases pin.
-    const rows = [];
-    for (let i = 0; i < count; i++) {
-      rows.push(row({ id: `h-${issueIdentifier}-${i}`, issueIdentifier, feedback }));
-    }
-    return rows;
-  }
-
-  test('unfiltered: total = queued + history.total when the 200-row window truncates, with truncated: true', async () => {
-    const history = plainRows(PAGE_LIMIT + 50);
+  test('total is exact past the old 200-row window, unfiltered and issue-scoped; truncated is never a window disclosure', async () => {
+    const history = [...plainRows(250, { issueIdentifier: 'LIN-A' }), ...plainRows(5, { issueIdentifier: 'LIN-B' })];
     const queuedRow = { ...row({ id: 'q-1' }), status: 'queued' };
-    const { app } = buildApp({ queued: [queuedRow], history });
+    const { app } = await buildApp({ queued: [queuedRow], history });
 
-    const { status, body } = await get(app, '/api/proxy/dispatch');
-
-    assert.equal(status, 200);
-    assert.equal(body.total, 1 + PAGE_LIMIT + 50, 'the store\'s exact matching count, not the windowed 201');
-    assert.equal(body.truncated, true, 'the newest-200 window did not cover the whole history');
-  });
-
-  test('unfiltered: total unchanged and truncated: false when the window covers everything (back-compat)', async () => {
-    const history = plainRows(3);
-    const queuedRow = { ...row({ id: 'q-1' }), status: 'queued' };
-    const { app } = buildApp({ queued: [queuedRow], history });
-
-    const { body } = await get(app, '/api/proxy/dispatch');
-
-    assert.equal(body.total, 4, 'identical to the old filtered.length when history fits the window');
-    assert.equal(body.truncated, false);
-  });
-
-  test('issue-scoped: total is the store\'s exact per-issue count past the window', async () => {
-    const history = [
-      ...plainRows(PAGE_LIMIT + 30, { issueIdentifier: 'LIN-A' }),
-      ...plainRows(5, { issueIdentifier: 'LIN-B' })
-    ];
-    const { app } = buildApp({ history });
-
+    const all = await get(app, '/api/proxy/dispatch');
+    assert.equal(all.body.total, 1 + 255);
+    assert.equal(all.body.truncated, false);
     const scoped = await get(app, '/api/proxy/dispatch?issueIdentifier=LIN-A');
-    assert.equal(scoped.body.total, PAGE_LIMIT + 30, 'the scoped store count is exact for the issue');
-    assert.equal(scoped.body.truncated, true);
-
-    const other = await get(app, '/api/proxy/dispatch?issueIdentifier=LIN-B');
-    assert.equal(other.body.total, 5);
-    assert.equal(other.body.truncated, false);
+    assert.equal(scoped.body.total, 250);
+    assert.equal(scoped.body.items.length, 20);
   });
 
-  test('status-filtered: total stays the windowed filtered.length (exact total is unknowable), truncated still disclosed', async () => {
-    // Status is feedback-derived in JS — the store cannot count it — so the
-    // existing `filtered.length` semantics are deliberately preserved (the
-    // T2b pins depend on this). The `truncated` flag still discloses that
-    // the window (and the lineage anchor seeding) did not cover everything.
-    const history = plainRows(PAGE_LIMIT + 50, { feedback: [{ message: '[done] finished', timestamp: T1 }] });
-    const { app } = buildApp({ history });
+  test('intended change 4 / LIN-2120: ?status= pages in the database — a done row older than the newest 200 is found, and total is exact', async () => {
+    const oldDone = plainRows(3, { issueIdentifier: 'LIN-OLD', feedback: [{ message: '[done] finished', timestamp: T1 }], resolvedBase: 0 });
+    const newerRunning = plainRows(250, { issueIdentifier: 'LIN-NEW', resolvedBase: 1000 });
+    const { app } = await buildApp({ history: [...oldDone, ...newerRunning] });
 
-    const { body } = await get(app, '/api/proxy/dispatch?status=done');
+    const done = await get(app, '/api/proxy/dispatch?status=done&limit=100');
+    assert.equal(done.body.total, 3, 'exact DB-side total under a status filter (was the windowed filtered.length)');
+    assert.deepEqual(done.body.items.map(i => i.id).sort(), oldDone.map(r => r.id).sort(), 'rows the old newest-200 window never reached');
+    assert.equal(done.body.truncated, false);
+    const taken = await get(app, '/api/proxy/dispatch?status=taken&limit=100');
+    assert.equal(taken.body.total, 250);
+  });
 
-    assert.equal(body.total, PAGE_LIMIT, 'the windowed count — NOT the store total — for a derived-status filter');
-    assert.equal(body.truncated, true);
+  test('intended change 3: a lineage past the old LINEAGE_QUERY_LIMIT (2,000 siblings) reports its whole lineage', async () => {
+    const siblings = [];
+    for (let i = 0; i < 2100; i++) {
+      siblings.push(row({ id: `sib-${i}`, rootItemId: 'big', issueIdentifier: 'LIN-BIG', feedback: [{ message: i === 0 ? '[done] finished' : 'beat', rootItemId: 'big', timestamp: T2 }] }));
+    }
+    const root = row({ id: 'big', rootItemId: 'big', issueIdentifier: 'LIN-BIG', feedback: [] });
+    const { app } = await buildApp({ history: [root, ...siblings] });
+    const { body } = await get(app, '/api/proxy/dispatch?issueIdentifier=LIN-BIG&limit=100');
+    const item = body.items.find(i => i.id === 'big');
+    assert.equal(item.feedbackCount, 2100);
+    assert.equal(item.status, 'done');
+  });
+
+  test('intended change 1: an issue-scoped list attributes an abort to its target (the abort row carries issueIdentifier null)', async () => {
+    const target = row({ id: 'target-1', rootItemId: 'target-1', issueIdentifier: 'LIN-AB', feedback: [{ message: '[working] x', rootItemId: 'target-1', timestamp: T1 }] });
+    const abort = row({ id: 'abort-1', abort: true, abortTo: 'target-1', issueIdentifier: null, feedback: [{ message: '[aborted] cancelled', timestamp: T2 }] });
+    const { app } = await buildApp({ history: [target, abort] });
+    const { body } = await get(app, '/api/proxy/dispatch?issueIdentifier=LIN-AB');
+    const item = body.items.find(i => i.id === 'target-1');
+    assert.equal(item.status, 'aborted');
+    assert.equal(item.completedAt, T2);
+  });
+
+  test('intended change 2: abort attribution does not depend on the abort row being inside the newest-200 window', async () => {
+    const target = row({ id: 'target-1', rootItemId: 'target-1', issueIdentifier: 'LIN-AB', feedback: [{ message: '[working] x', rootItemId: 'target-1', timestamp: T1 }], resolvedAt: '2026-06-22T20:00:00.000Z' });
+    const abort = row({ id: 'abort-1', abort: true, abortTo: 'target-1', issueIdentifier: null, feedback: [{ message: '[aborted] cancelled', timestamp: T2 }], resolvedAt: '2026-06-01T00:00:00.000Z' });
+    const filler = plainRows(250, { issueIdentifier: 'LIN-FILL', resolvedBase: 100000 });
+    const { app } = await buildApp({ history: [target, abort, ...filler] });
+    const { body } = await get(app, '/api/proxy/dispatch?status=aborted');
+    assert.ok(body.items.find(i => i.id === 'target-1'), 'the target is aborted although its abort row is far outside the newest 200');
+  });
+
+  test('F1 — the page is chosen by dispatchedAt, not resolvedAt: limit=1 returns the later-dispatched row even when it resolved earlier', async () => {
+    const A = row({ id: 'A', status: 'taken', dispatchedAt: '2026-06-22T10:00:00.000Z', resolvedAt: '2026-06-22T12:00:00.000Z' });
+    const X = row({ id: 'X', status: 'cancelled', dispatchedAt: '2026-06-22T11:00:00.000Z', resolvedAt: '2026-06-22T11:05:00.000Z' });
+    const { app } = await buildApp({ history: [A, X] });
+    const { body } = await get(app, '/api/proxy/dispatch?limit=1');
+    assert.deepEqual(body.items.map(i => i.id), ['X'], 'base answered X: newest dispatch first, then sliced');
+    assert.equal(body.total, 2);
+  });
+
+  test('F2 — a stale persisted row is never served under a ?status= its healed status does not match, and total drops it', async () => {
+    // The state after a recompute lost every CAS (or threw): own [done], persisted lineageStatus null, bases apart.
+    const stale = row({
+      id: 'stale-1', feedback: [{ message: '[done] finished', timestamp: T2 }],
+      lineageStatus: null, lineageBasis: 1, lineageStatusBasis: 0
+    });
+    const { app } = await buildApp({ history: [stale] });
+    const taken = await get(app, '/api/proxy/dispatch?status=taken');
+    assert.deepEqual(taken.body.items, [], 'healed to done, so it does not belong to ?status=taken');
+    assert.equal(taken.body.total, 0);
+    const unfiltered = await get(app, '/api/proxy/dispatch');
+    assert.equal(unfiltered.body.items.find(i => i.id === 'stale-1').status, 'done');
   });
 });
 
@@ -861,7 +649,7 @@ describe('LIN-2079 — derived `blocked` on the list endpoint (FIX-PROVING)', ()
   test('B1 — a [blocked]-only row: absent from ?status=taken, returned by ?status=blocked, reported as blocked unfiltered', async () => {
     const parked = row({ id: 'parked-1', rootItemId: 'root-b', feedback: [blockedEntry()] });
     const running = row({ id: 'running-1', rootItemId: 'root-r', feedback: [{ message: '[working] still going', rootItemId: 'root-r', timestamp: T1 }] });
-    const { app } = buildApp({ history: [parked, running] });
+    const { app } = await buildApp({ history: [parked, running] });
 
     const unfiltered = await get(app, '/api/proxy/dispatch');
     assert.equal(unfiltered.body.items.find(i => i.id === 'parked-1').status, 'blocked',
@@ -882,7 +670,7 @@ describe('LIN-2079 — derived `blocked` on the list endpoint (FIX-PROVING)', ()
 
   test('B2 — a blocked row reports completedAt: null (a parked run has not completed)', async () => {
     const parked = row({ id: 'parked-1', rootItemId: 'root-b', feedback: [blockedEntry()] });
-    const { app } = buildApp({ history: [parked] });
+    const { app } = await buildApp({ history: [parked] });
 
     const { body } = await get(app, '/api/proxy/dispatch');
     const item = body.items.find(i => i.id === 'parked-1');
@@ -898,7 +686,7 @@ describe('LIN-2079 — derived `blocked` on the list endpoint (FIX-PROVING)', ()
     const child = row({ id: 'child-1', rootItemId: 'root-1', followUpTo: 'root-1', feedback: [
       { message: '[done] unblocked and finished', rootItemId: 'root-1', timestamp: T2 }
     ] });
-    const { app } = buildApp({ history: [root, child] });
+    const { app } = await buildApp({ history: [root, child] });
 
     const { body } = await get(app, '/api/proxy/dispatch');
     const item = body.items.find(i => i.id === 'root-1');
@@ -914,7 +702,7 @@ describe('LIN-2079 — derived `blocked` on the list endpoint (FIX-PROVING)', ()
       { message: 'own beat', rootItemId: 'root-1', timestamp: T1 }
     ] });
     const child = row({ id: 'child-1', rootItemId: 'root-1', followUpTo: 'root-1', feedback: [blockedEntry(T2, 'root-1')] });
-    const { app } = buildApp({ history: [root, child] });
+    const { app } = await buildApp({ history: [root, child] });
 
     const { body } = await get(app, '/api/proxy/dispatch');
     assert.equal(body.items.find(i => i.id === 'root-1').status, 'blocked',
@@ -933,7 +721,7 @@ describe('LIN-2079 — derived `blocked` on the list endpoint (FIX-PROVING)', ()
       dispatchedAt: DISPATCH_LATE, // AFTER the sibling's [blocked]
       feedback: []
     });
-    const { app } = buildApp({ history: [parked, laterRow] });
+    const { app } = await buildApp({ history: [parked, laterRow] });
 
     const { body } = await get(app, '/api/proxy/dispatch');
     assert.equal(body.items.find(i => i.id === 'later-1').status, 'taken',
@@ -949,7 +737,7 @@ describe('LIN-2079 — derived `blocked` on the list endpoint (FIX-PROVING)', ()
       feedback: [{ message: '[done] the blocked-kind prompt itself finished', rootItemId: 'root-k', timestamp: T2 }]
     });
     const parkedCustomKind = row({ id: 'kind-2', kind: 'implementation', rootItemId: 'root-b', feedback: [blockedEntry()] });
-    const { app } = buildApp({ history: [finishedBlockedKind, parkedCustomKind] });
+    const { app } = await buildApp({ history: [finishedBlockedKind, parkedCustomKind] });
 
     const { body } = await get(app, '/api/proxy/dispatch');
     const byKind = body.items.find(i => i.id === 'kind-1');
@@ -967,7 +755,7 @@ describe('LIN-2079 — derived `blocked` on the list endpoint (FIX-PROVING)', ()
     const paused = row({ id: 'paused-1', rootItemId: 'root-p', feedback: [
       { message: '[pending] my part is done, the task is not', rootItemId: 'root-p', timestamp: T2 }
     ] });
-    const { app } = buildApp({ history: [paused] });
+    const { app } = await buildApp({ history: [paused] });
 
     const { body } = await get(app, '/api/proxy/dispatch');
     assert.equal(body.items.find(i => i.id === 'paused-1').status, 'taken');
@@ -979,7 +767,7 @@ describe('LIN-2079 — derived `blocked` on the list endpoint (FIX-PROVING)', ()
   test('B8 — only a row that RAN joins a lineage: a queued row is never reported blocked', async () => {
     const queuedRow = { ...row({ id: 'q-1', rootItemId: 'root-b' }), status: 'queued' };
     const parked = row({ id: 'parked-1', rootItemId: 'root-b', feedback: [blockedEntry()] });
-    const { app } = buildApp({ queued: [queuedRow], history: [parked] });
+    const { app } = await buildApp({ queued: [queuedRow], history: [parked] });
 
     const { body } = await get(app, '/api/proxy/dispatch');
     assert.equal(body.items.find(i => i.id === 'q-1').status, 'queued', 'a never-run row keeps its own stored status');

@@ -1609,6 +1609,14 @@ describe('observer-sweep: negative capability — no automated-intervention path
     };
 
     const writeLog = [];
+    // LIN-3812: the self-heal moved INTO the store, so its re-read and write-back run on the real
+    // collection (the store's own `this`), not through this Proxy's nested `historyCollection` gate.
+    // Record the write-back at the collection instead; the assertion on its shape is unchanged.
+    const realUpdateOne = dispatchHistoryCollection.updateOne.bind(dispatchHistoryCollection);
+    dispatchHistoryCollection.updateOne = async (query, update, opts) => {
+      writeLog.push({ query, update });
+      return realUpdateOne(query, update, opts);
+    };
     const dispatchStore = forbiddenProxy(realDispatchStore, ['listItems', 'listHistory'], 'dispatchStore', writeLog);
     const agentStatusStore = forbiddenProxy(realAgentStatusStore, ['listStatus'], 'agentStatusStore');
     const observerStateStore = forbiddenProxy(realObserverStateStore, ['readCurrent', 'ensureSeeded', 'advance'], 'observerStateStore');
@@ -1674,6 +1682,14 @@ describe('observer-sweep: negative capability — no automated-intervention path
     };
 
     const writeLog = [];
+    // LIN-3812: the self-heal moved INTO the store, so its re-read and write-back run on the real
+    // collection (the store's own `this`), not through this Proxy's nested `historyCollection` gate.
+    // Record the write-back at the collection instead; the assertion on its shape is unchanged.
+    const realUpdateOne = dispatchHistoryCollection.updateOne.bind(dispatchHistoryCollection);
+    dispatchHistoryCollection.updateOne = async (query, update, opts) => {
+      writeLog.push({ query, update });
+      return realUpdateOne(query, update, opts);
+    };
     const dispatchStore = forbiddenProxy(realDispatchStore, ['listItems', 'listHistory'], 'dispatchStore', writeLog);
     const agentStatusStore = forbiddenProxy(realAgentStatusStore, ['listStatus'], 'agentStatusStore');
     const observerStateStore = forbiddenProxy(realObserverStateStore, ['readCurrent', 'ensureSeeded', 'advance'], 'observerStateStore');

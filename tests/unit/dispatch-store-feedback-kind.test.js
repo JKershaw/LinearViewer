@@ -147,9 +147,9 @@ describe('addFeedback persists kind/rootItemId (LIN-1297)', () => {
 
     await store.addFeedback(item._id, URL_KEY, { message, kind: 'decision', rootItemId }, 'token-a');
 
-    const { items } = await store.listHistory(URL_KEY);
+    const { items } = await store.listHistoryWithBodies(URL_KEY, { limit: 100 });
     const formatted = items.find((i) => i._id === item._id || i.id === item._id);
-    assert.ok(formatted, 'archived item should be readable via listHistory');
+    assert.ok(formatted, 'archived item should be readable via listHistoryWithBodies');
     assert.equal(formatted.feedback[0].kind, 'decision');
     assert.equal(formatted.feedback[0].message, message);
   });

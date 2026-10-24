@@ -198,8 +198,8 @@ describe('LIN-3246 P1b — child autopilot stopAt PROMPT inheritance', () => {
     assert.equal(withParent.status, 201, JSON.stringify(withParent.body));
     assert.equal(withoutParent.status, 201, JSON.stringify(withoutParent.body));
 
-    const a = basePrompt((await store.getItemStatus('acme', withParent.body.id)).prompt);
-    const b = basePrompt((await store.getItemStatus('acme', withoutParent.body.id)).prompt);
+    const a = basePrompt((await store.getItemPrompt('acme', withParent.body.id)).prompt);
+    const b = basePrompt((await store.getItemPrompt('acme', withoutParent.body.id)).prompt);
     assert.equal(a, b, 'no parent stopAt must not change the child prompt');
     assert.ok(a.includes("## The finish line: dispatch the close, don't merge inline"));
     assert.ok(!a.includes('including as a stepped beat'));
@@ -213,7 +213,7 @@ describe('LIN-3246 P1b — child autopilot stopAt PROMPT inheritance', () => {
 
       const res = await call(app, 'post', KICKOFF, { goal: 'ship it', target: 'cli', sessionId: parentId, variant });
       assert.equal(res.status, 201, JSON.stringify(res.body));
-      const child = await store.getItemStatus('acme', res.body.id);
+      const child = await store.getItemPrompt('acme', res.body.id);
       assert.equal(child.stopAt, 'pr', 'the child row is stamped from the same parent fact');
       assert.match(child.prompt, /stop at the PR/);
       assert.match(child.prompt, /including as a stepped beat/);

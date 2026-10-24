@@ -988,7 +988,7 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
     });
     await store.takeItem(created._id, URL_KEY, 'token-a');
 
-    const { items } = await store.listHistory(URL_KEY, { projection: PERIODICAL_PROJECTION });
+    const { items } = await store.listHistory(URL_KEY, { limit: 100, projection: PERIODICAL_PROJECTION });
     assert.equal(items.length, 1);
     const [row] = items;
     assert.equal(row.kind, 'custom');
@@ -1013,7 +1013,7 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
     });
     await store.takeItem(created._id, URL_KEY, 'token-a');
 
-    const { items } = await store.listHistory(URL_KEY, { projection: PROJECTION_MISSING_EXCLUSION_FIELDS });
+    const { items } = await store.listHistory(URL_KEY, { limit: 100, projection: PROJECTION_MISSING_EXCLUSION_FIELDS });
     assert.equal(items.length, 1);
     const [row] = items;
     // The fields the wrong projection omitted come back falsy — this is the
@@ -1047,7 +1047,7 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
     });
     await store.takeItem(created._id, URL_KEY, 'token-a');
 
-    const { items } = await store.listHistory(URL_KEY, { projection: PERIODICAL_PROJECTION });
+    const { items } = await store.listHistory(URL_KEY, { limit: 100, projection: PERIODICAL_PROJECTION });
     assert.equal(items.length, 1);
     const [row] = items;
     // This pins the fix: PERIODICAL_PROJECTION now carries `repo: 1` (beat 2),
@@ -1099,7 +1099,7 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
     await store.addFeedback(defaultRow._id, URL_KEY, { message: '[done] done' }, 'token-b');
     assert.ok(defaultRow.dispatchedAt.getTime() > repoARow.dispatchedAt.getTime(), 'test setup sanity: defaultRow must be strictly later than repoARow');
 
-    const { items: historyRows } = await store.listHistory(URL_KEY, { projection: repoProjection });
+    const { items: historyRows } = await store.listHistory(URL_KEY, { limit: 100, projection: repoProjection });
     assert.equal(historyRows.length, 2);
 
     const [result] = foldPeriodicalRuns([t], { historyRows }, { now: NOW, historyTtlMs: HISTORY_TTL_MS });
@@ -1153,7 +1153,7 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
     await store.addFeedback(repoBRow._id, URL_KEY, { message: '[done] done' }, 'token-b');
 
     const queueRows = await store.listItems(URL_KEY, { projection: PERIODICAL_PROJECTION });
-    const { items: historyRows } = await store.listHistory(URL_KEY, { projection: PERIODICAL_HISTORY_PROJECTION });
+    const { items: historyRows } = await store.listHistory(URL_KEY, { limit: 100, projection: PERIODICAL_HISTORY_PROJECTION });
     assert.equal(queueRows.length, 1);
     assert.equal(historyRows.length, 1);
 
@@ -1241,9 +1241,12 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
     await store.takeItem(newer._id, URL_KEY, 'token-a');
     await store.addFeedback(newer._id, URL_KEY, { message: '[done] done' }, 'token-a');
 
-    const { items: historyRows } = await store.listHistory(URL_KEY, { projection: PERIODICAL_HISTORY_PROJECTION });
+    // LIN-3812: the store now sorts newest-first in the query, so the read no longer reflects
+    // archive order. Put the read back in the failing direction (non-max row first) explicitly.
+    const { items: read } = await store.listHistory(URL_KEY, { limit: 100, projection: PERIODICAL_HISTORY_PROJECTION });
+    const historyRows = [...read].sort((a, b) => Date.parse(a.dispatchedAt) - Date.parse(b.dispatchedAt));
     assert.equal(historyRows.length, 2);
-    assert.equal(historyRows[0].dispatchedAt, older.dispatchedAt.toISOString(), 'sanity: archive order put the non-max row first in the read');
+    assert.equal(historyRows[0].dispatchedAt, older.dispatchedAt.toISOString(), 'sanity: the non-max row is first in the fold input');
 
     const [result] = foldPeriodicalRuns([t], { historyRows }, {
       now: newer.dispatchedAt.getTime() + 1000,
@@ -1295,11 +1298,13 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
         return realFind(query, opts);
       };
 
-      const { items } = await store.listHistory(URL_KEY, { periodicalEvidenceRow: true });
+      const { items } = await store.listHistory(URL_KEY, { limit: 100, periodicalEvidenceRow: true });
 
-      assert.equal(queriesSeen.length, 1, 'the unlimited history path issues exactly one find');
+      // (the lean read's self-heal adds `_id $in` re-reads; the scoped query itself is one)
+      const scoped = queriesSeen.filter(q => !q._id);
+      assert.equal(scoped.length, 1, 'the history read issues exactly one scoped find');
       assert.deepEqual(
-        queriesSeen[0].$or,
+        scoped[0].$or,
         [{ kind: 'periodical' }, { periodicalId: { $ne: null } }],
         'the admission predicate is pushed into the query, not applied after the read'
       );
@@ -1320,7 +1325,7 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
     test('(b) a kind: "periodical" row is admitted', async () => {
       const store = freshStore();
       await archivedRow(store, { kind: 'periodical', periodicalId: null });
-      const { items } = await store.listHistory(URL_KEY, { periodicalEvidenceRow: true });
+      const { items } = await store.listHistory(URL_KEY, { limit: 100, periodicalEvidenceRow: true });
       assert.equal(items.length, 1);
       assert.equal(items[0].kind, 'periodical');
     });
@@ -1328,7 +1333,7 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
     test('(c) a non-periodical-kind row with periodicalId != null is admitted', async () => {
       const store = freshStore();
       await archivedRow(store, { kind: 'implementation', periodicalId: 'documentation-review' });
-      const { items } = await store.listHistory(URL_KEY, { periodicalEvidenceRow: true });
+      const { items } = await store.listHistory(URL_KEY, { limit: 100, periodicalEvidenceRow: true });
       assert.equal(items.length, 1);
       assert.equal(items[0].periodicalId, 'documentation-review');
     });
@@ -1336,7 +1341,7 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
     test('(d) a non-periodical-kind row with periodicalId == null is excluded', async () => {
       const store = freshStore();
       await archivedRow(store, { kind: 'implementation', periodicalId: null });
-      const { items } = await store.listHistory(URL_KEY, { periodicalEvidenceRow: true });
+      const { items } = await store.listHistory(URL_KEY, { limit: 100, periodicalEvidenceRow: true });
       assert.equal(items.length, 0);
     });
   });

@@ -1091,7 +1091,7 @@ describe('NB1 against the real store and buildTaskCost: kickoff + two wakes coun
       assert.ok(res, 'feedback accepted');
     }
     const rows = [];
-    for (const id of ids) rows.push({ ...(await store.getItemStatus(urlKey, id)), status: 'taken' });
+    for (const id of ids) rows.push({ ...(await store.getItemFeedback(urlKey, id)), status: 'taken' });
     return buildTaskCost({ ownRows: rows });
   }
 

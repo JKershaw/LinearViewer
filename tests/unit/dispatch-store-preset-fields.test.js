@@ -79,7 +79,7 @@ test('presetConfig/presetName are carried into history (watch status + history l
   assert.deepEqual(status.presetConfig, PRESET_CONFIG);
   assert.equal(status.presetName, PRESET_NAME);
 
-  const { items } = await store.listHistory('acme');
+  const { items } = await store.listHistory('acme', { limit: 100 });
   assert.equal(items.length, 1);
   assert.deepEqual(items[0].presetConfig, PRESET_CONFIG);
   assert.equal(items[0].presetName, PRESET_NAME);
@@ -98,7 +98,7 @@ test('a dispatch with no preset reads presetConfig/presetName:null at every seam
   assert.strictEqual(status.presetConfig, null);
   assert.strictEqual(status.presetName, null);
 
-  const { items } = await store.listHistory('acme');
+  const { items } = await store.listHistory('acme', { limit: 100 });
   assert.strictEqual(items[0].presetConfig, null);
   assert.strictEqual(items[0].presetName, null);
 });
