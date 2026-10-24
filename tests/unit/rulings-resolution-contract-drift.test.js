@@ -133,6 +133,19 @@ describe('no-re-raise guidance literal list (LIN-2891/LIN-3038)', () => {
     assert.strictEqual(newTotal, 3, 'the 3 live no-re-raise guidance sites are broadened');
   });
 
+  // LIN-3903: the trigger widened from "on a finding" to any DECISION:, and each
+  // site asks for every fact in the one ruling. Case-insensitive: close-out's
+  // Follow-up Triage bullet is lowercase ("before raising"), review's is bold-initial.
+  test('the 3 no-re-raise sites trigger on any DECISION: and ask for every fact in one ruling', () => {
+    const lower = src => src.toLowerCase();
+    assert.strictEqual(countOccurrences(lower(promptTemplateDefsSource), 'before raising any `decision:`'), 2);
+    assert.strictEqual(countOccurrences(lower(autopilotManualSource), 'before raising any `decision:`'), 1);
+    assert.strictEqual(countOccurrences(lower(promptTemplateDefsSource), 'every fact the question needs'), 2);
+    assert.strictEqual(countOccurrences(lower(autopilotManualSource), 'every fact the question needs'), 1);
+    assert.strictEqual(countOccurrences(lower(promptTemplateDefsSource), 'on a finding, check'), 0);
+    assert.strictEqual(countOccurrences(lower(autopilotManualSource), 'on a finding, check'), 0);
+  });
+
   test('the 2 lib/ sites keep their includeResolved scope note (never a task-bound one)', () => {
     // The two prompt-template-defs.js sites each restate the scope note;
     // broadening the literal list must not have dropped it.
