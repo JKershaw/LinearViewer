@@ -146,7 +146,7 @@ const EXPECTED_HEADINGS = new Map([
   ['views.md', '### View Tiers'],
   ['ci.md', '## GitHub Actions CI (for AI Agents)'],
   ['experiments.md', '## Collective (experimental, LIN-450)'],
-  ['ui-pieces.md', '# UI pieces: who owns each shared UI decision'],
+  ['ui-pieces.md', '# UI pieces: who owns each shared decision'],
 ]);
 
 // Docs under docs/architecture/ that CLAUDE.md does not point to directly, each with the doc that
