@@ -30,6 +30,9 @@ afterEach(() => {
   else process.env.OPENROUTER_FREE_TIER_MODEL = savedFreeModel;
 });
 
+// LIN-3875: the free cell must pass the hourly gate to reach the model it is testing.
+const ALLOWING_STORE = { tryUse: async () => ({ allowed: true }) };
+
 async function setup({ env, stored = {}, resolveModel } = {}) {
   const fx = routingFixture();
   await fx.prefs.insertOne({ _id: URL_KEY, preferences: stored });
@@ -40,6 +43,7 @@ async function setup({ env, stored = {}, resolveModel } = {}) {
     runParagraphStore: { get: async () => null, put: async (...a) => { paragraphPuts.push(a[2]); } },
     buildView: () => ({}),
     resolveModel: resolveModel || jobModelResolver(fx.preferencesStore),
+    freeTierStore: ALLOWING_STORE,
     generateParagraph: async (_v, opts) => { calls.paragraph.push(opts.model); return { paragraph: 'p', model: opts.model ?? DEFAULT_MODEL }; },
     logger: { error() {} }
   });
@@ -49,6 +53,7 @@ async function setup({ env, stored = {}, resolveModel } = {}) {
     hashSessionFn: () => 'h',
     childLoopsFn: () => [],
     resolveModel: resolveModel || jobModelResolver(fx.preferencesStore),
+    freeTierStore: ALLOWING_STORE,
     generateSummary: async (_s, opts) => { calls.summary.push(opts.model); return { summary: 's', model: opts.model ?? DEFAULT_MODEL }; }
   });
   const hook = createMaterializerPrecompute({
