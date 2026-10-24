@@ -3,10 +3,14 @@
  * workspace-api.js). routes/workspace-api.js, routes/workspace-api-prompts.js
  * (isTestToken, failureOf) and routes/workspace-api-issue-read.js (isTestToken,
  * failureOf, openIssue) and routes/workspace-api-issue-write.js (isTestToken,
- * refuseCapability) import them; each is defined here once. `openIssue` and
- * `refuseCapability` moved here with LIN-3872.
+ * refuseCapability) and routes/workspace-api-scan.js (failureOf, openIssue,
+ * refuseCapability, refuseFreeTier, aiNotConfigured, keepaliveFailure, loadContext) import them; each is defined here once. `openIssue` and
+ * `refuseCapability` moved here with LIN-3872; `refuseFreeTier`, `aiNotConfigured`,
+ * `keepaliveFailure` and `loadContext` with LIN-3877 (the composer reads them too).
  */
-import { badRequest, jsonError } from '../lib/errors.js';
+import { badRequest, jsonError, keepaliveError } from '../lib/errors.js';
+import { freeTierRefusalBlock } from '../lib/chat-request.js';
+import { buildMockRecapContext } from '../lib/workspace-api-mocks.js';
 import { isValidIssueId, resolveIssueBinding } from '../lib/workspace.js';
 
 /**
@@ -75,4 +79,29 @@ export function openIssue(req, res, { recordId = false, store, storeName, capabi
     return null;
   }
   return { workspace, issueId, recordId: req.body?.id, provider: binding?.provider, callScope: binding?.callScope };
+}
+
+export const refuseFreeTier = (res, check) => jsonError(res, 429, check.reason, freeTierRefusalBlock(check));
+
+export const aiNotConfigured = (res, noun) =>
+  jsonError(res, 503, `AI ${noun} is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.`, { code: 'AI_NOT_CONFIGURED' });
+
+/** The catch tail of the keepalive routes: stop the keepalive, log, and reply through it with the ladder's answer. */
+export function keepaliveFailure(keepalive, label, error, fallbackMessage, arms) {
+  keepalive.stop();
+  console.error(label, error);
+  keepaliveError(keepalive, ...failureOf(error, fallbackMessage, arms));
+}
+
+/**
+ * The context a recommend-family route works from: the fixtures under a test token,
+ * otherwise the provider's. `missing` is true only when the fixture issue is absent;
+ * a provider's answer is taken as given.
+ */
+export async function loadContext(workspace, issueId, { provider, callScope }) {
+  if (isTestToken(workspace)) {
+    const context = buildMockRecapContext(issueId);
+    return { context, missing: !context };
+  }
+  return { context: await provider.fetchRecommendationContext(callScope, issueId), missing: false };
 }
