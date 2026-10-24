@@ -133,8 +133,10 @@ const TABLE = {
   'routes/dispatch.js :: host': [SRV, 1],
   'routes/dispatch.js :: refuse': [SRV, 1],
   'routes/proxy-kickoff.js :: parentRun': [SRV, 1],
-  'routes/dashboard.js :: computeWorkspaceEffortReadout': [SRV, 2],
-  'routes/dashboard.js :: loadRunForSummary': [SRV, 1],
+  // LIN-3840: the routes/dashboard.js rows (computeWorkspaceEffortReadout 2, loadRunForSummary 1,
+  // both server-side-only) are gone. The dashboard unit (routes/dashboard.js, routes/dashboard-*.js)
+  // is judged by reader kind at the end of this file and swept with a canary token by
+  // dashboard-redaction-canary-sweep.test.js.
   'lib/dispatch-session-read.js :: pointReadSession': [SRV, 3], // LIN-3812: lifted from routes/dashboard.js
   // routes — explicit allow-list / projection
   'routes/proxy-dispatch.js :: /api/proxy/dispatch': [PRJ, 3],
@@ -177,6 +179,7 @@ function check(files, table = TABLE) {
   const eKinds = new Set();
   for (const [id, { count, body, kinds }] of sites) {
     const file = id.split(' :: ')[0];
+    if (isDashboardUnitFile(file)) continue; // LIN-3840: judged by checkDashboardUnit below
     if (file === E_LIB_FILE) { kinds.forEach(k => eKinds.add(k)); continue; }
     if (E_ROUTE_FILES.has(file)) kinds.forEach(k => eKinds.add(k));
     const row = table[id];
@@ -192,6 +195,7 @@ function check(files, table = TABLE) {
   }
   for (const kind of E_READER_KINDS) if (!eKinds.has(kind)) v.push(`E reader kind ${kind}: no call left in the entrances — stale, or it moved out of E`);
   for (const kind of eKinds) if (!E_READER_KINDS.includes(kind)) v.push(`E reader kind ${kind}: an unlisted reader kind in the entrances — classify it and add a canary-sweep row`);
+  v.push(...checkDashboardUnit(files));
   return v;
 }
 
