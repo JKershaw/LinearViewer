@@ -17,7 +17,7 @@ let urlKey;
 let dispatchUrl;
 
 test.beforeEach(async ({ page }) => {
-  const seeded = await seedLocalWorkspace(page, null, { urlKey: KEY, append: true, features: { dispatch: true } });
+  const seeded = await seedLocalWorkspace(page, null, { urlKey: KEY, append: true, runnerKey: true });
   urlKey = seeded.urlKey;
   dispatchUrl = `/workspace/${urlKey}/api/dispatch`;
   await seedWorkspaceOwnership(page, urlKey, 'owner');

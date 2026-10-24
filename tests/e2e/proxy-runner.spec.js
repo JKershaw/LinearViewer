@@ -25,8 +25,7 @@ let proxyUrl;
 test.beforeEach(async ({ page }) => {
   const seeded = await seedLocalWorkspace(page, null, {
     urlKey: RUNNER_LOCAL_KEY,
-    append: true,
-    features: { proxy: true }
+    append: true
   });
   urlKey = seeded.urlKey;
   // LIN-3409: halt and runner-credential revoke are owner-only; state the ownership
@@ -208,7 +207,7 @@ test.describe('Runner mint refusal probes - over HTTP on the running server (LIN
   });
 
   test('GRANT_OWNERLESS (503): a session with no accountId', async ({ page, request }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}&noLinearUser=1&urlKey=${urlKey}`);
+    await page.goto(`/test/set-session?noLinearUser=1&urlKey=${urlKey}`);
     const header = await cookieHeader(page);
     const res = await postRunner(request, header);
     expect(res.status()).toBe(503);

@@ -35,7 +35,7 @@ async function seedTask(page) {
       // first edge marks it the owner (LIN-1892) — the fixed LOCAL_WS_UUID can
       // already be owned by another worker's account. Same seam runner-setup uses.
       append: true,
-      features: { dispatch: true },
+      runnerKey: true,
       projects: [{ id: id('share-proj'), name: 'Share project', content: 'A project', sortOrder: 1 }],
       issues: [
         {

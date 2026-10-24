@@ -53,9 +53,8 @@ test.describe('Periodicals group', () => {
   });
 
   test('flag ON: distinct Periodicals group with a dispatchable Documentation Review row', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    // Proxy explicitly off: this case is about the plain-Mint row only (LIN-2944
-    // P3 made proxy default on, which would add the +Autopilot variant).
-    await seedLocal(workspaceApiLocalSeed, { features: { proxy: false } });
+    // LIN-3849: the Dispatch disclosure is a run control, so the owner needs a runner key.
+    await seedLocal(workspaceApiLocalSeed, { runnerKey: true });
     await setPeriodicalsFlag(page, localWorkerUrlKey, true);
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
@@ -103,8 +102,7 @@ test.describe('Periodicals group', () => {
   // the row *renders* a dispatch container — it never clicks dispatch, which is
   // why this regression slipped through. This test drives the real click path.
   test('flag ON: clicking dispatch on a Periodical actually queues it', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    // Proxy explicitly off so the plain-Mint disclosure is unambiguous (LIN-2944 P3).
-    await seedLocal(workspaceApiLocalSeed, { features: { proxy: false } });
+    await seedLocal(workspaceApiLocalSeed, { runnerKey: true });
     await setPeriodicalsFlag(page, localWorkerUrlKey, true);
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
@@ -138,30 +136,12 @@ test.describe('Periodicals group', () => {
     expect(periodicalItem.periodicalId).toBe('documentation-review');
   });
 
-  // LIN-1279: the "Mint + Autopilot" action is a SECOND dispatch container on each
-  // periodical row, gated behind BOTH the `periodicals` workspace flag (already
-  // required for the group to render) AND the per-user `proxy` flag (its tail calls
-  // the workspace-API kickoff endpoint, so it needs a proxy token). It must show
-  // ONLY when both are on.
-  test('proxy flag OFF: periodical row shows plain Mint only, no Mint + Autopilot', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    // Proxy explicitly off (LIN-2944 P3 made it default on).
-    await seedLocal(workspaceApiLocalSeed, { features: { proxy: false } });
-    await setPeriodicalsFlag(page, localWorkerUrlKey, true);
-    await page.goto(`/workspace/${localWorkerUrlKey}/`);
-    await page.waitForLoadState('networkidle');
-
-    const group = page.locator('[data-project-type="periodicals"]');
-    const docNode = group.locator('.node', { has: page.locator('.line:has-text("Documentation Review")') });
-    await docNode.locator('.line:has-text("Documentation Review")').click();
-
-    // Exactly one dispatch container (plain Mint); no proxy-forced autopilot variant.
-    await expect(docNode.locator('[data-kind="periodical"]')).toHaveCount(1);
-    await expect(docNode.locator('[data-proxy-force="true"]')).toHaveCount(0);
-  });
-
-  test('proxy flag ON: periodical row also shows a proxy-forced Mint + Autopilot', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    // Re-establish the session with the per-user proxy feature enabled.
-    await seedLocal(workspaceApiLocalSeed, { features: { proxy: true } });
+  // LIN-1279: the "Mint + Autopilot" action is a SECOND container on each
+  // periodical row. LIN-3849: it is a key tool, so it shows whenever the
+  // `periodicals` workspace flag renders the group; there is no per-user `proxy`
+  // switch to hide it. Dispatch itself is a run control (owner with a runner key).
+  test('periodical row shows a proxy-forced Mint + Autopilot beside the plain Mint', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { runnerKey: true });
     await setPeriodicalsFlag(page, localWorkerUrlKey, true);
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
@@ -180,8 +160,8 @@ test.describe('Periodicals group', () => {
     await expect(variant.locator('.prompt-text')).toContainText('/api/proxy/autopilot/kickoff');
   });
 
-  test('proxy flag ON: dispatching Mint + Autopilot queues the variant prompt with proxy attached', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(workspaceApiLocalSeed, { features: { proxy: true } });
+  test('dispatching Mint + Autopilot queues the variant prompt with proxy attached', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { runnerKey: true });
     // fixture:LIN-3136: "+ Autopilot" declares the dispatch grant for the session's owner (M2b)
     await seedWorkspaceOwnership(page, localWorkerUrlKey);
     // /fixture:LIN-3136
@@ -221,10 +201,12 @@ test.describe('Periodicals group', () => {
   });
 
   // LIN-3136 (M2b): the "+ Autopilot" dispatch launches an orchestrator holding
-  // the dispatch grant, so only the workspace owner may send it. A non-owner is
-  // refused with the reason shown (not a bare "failed"), and nothing is queued.
-  test('a non-owner Mint + Autopilot dispatch is refused with the reason, nothing queued (LIN-3136)', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(workspaceApiLocalSeed, { features: { proxy: true } });
+  // the dispatch grant, so only the workspace owner may send it. LIN-3849: a
+  // non-owner no longer even sees a Dispatch control on the row (run controls are
+  // owner-only), and the server's refusal stays pinned at the API
+  // (tests/e2e/runner-enqueue-owner-only.spec.js); nothing is queued.
+  test('a non-owner sees no Dispatch on Mint + Autopilot, nothing queued (LIN-3136, LIN-3849)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { runnerKey: true });
     await page.request.get(`/test/clear-dispatch-queue?urlKey=${localWorkerUrlKey}`);
     await setPeriodicalsFlag(page, localWorkerUrlKey, true);
     await seedWorkspaceOwnership(page, localWorkerUrlKey, 'foreign');
@@ -235,15 +217,11 @@ test.describe('Periodicals group', () => {
       const group = page.locator('[data-project-type="periodicals"]');
       const docNode = group.locator('.node', { has: page.locator('.line:has-text("Documentation Review")') });
       await docNode.locator('.line:has-text("Documentation Review")').click();
+      // The key tool stays (the "+ Autopilot" container); the run control does not.
       const variant = docNode.locator('[data-proxy-force="true"]');
-      await variant.locator('.dispatch-disclosure').click();
-      const dispatchBtn = variant.locator('.prompt-dispatch[data-target="cli"]');
-      await dispatchBtn.click();
-
-      await expect(dispatchBtn).toHaveText('failed');
-      // LIN-3383: the owner-only runner enqueue gate runs ahead of M2's mint check,
-      // so a non-owner now meets its message first (M2 stays as the backstop).
-      await expect(page.locator('.toast-error')).toContainText("Only this workspace's owner can act on its runner");
+      await expect(variant).toHaveCount(1);
+      await expect(variant.locator('.dispatch-disclosure')).toHaveCount(0);
+      await expect(docNode.locator('.dispatch-disclosure')).toHaveCount(0);
       const { items } = await (await page.request.get(`/workspace/${localWorkerUrlKey}/api/dispatch`)).json();
       expect(items.filter(i => i.kind === 'periodical')).toHaveLength(0);
     } finally {

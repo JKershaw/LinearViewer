@@ -61,7 +61,7 @@ async function seedLocalWorkspaceWithEvidence(page, { extraPrUrl = null } = {}) 
   const resp = await page.request.post('/test/set-local-session', {
     data: {
       urlKey: URL_KEY,
-      features: { dispatch: true },
+      runnerKey: true,
       projects: [{ id: id('rev-proj'), name: 'Evidence Project', content: 'Seeded project', sortOrder: 1 }],
       issues: [{
         id: id('rev-issue'), identifier: 'LOCAL-EV1', title: 'Finished run evidence', description: 'Seeded run-evidence task',

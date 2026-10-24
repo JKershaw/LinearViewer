@@ -5,6 +5,9 @@ import {
   createRunControlsResolver, hasLiveRunnerKey, hasLiveQueueToken,
   setRunControlsResolver, requestFeatureFlags
 } from '../../lib/run-controls.js';
+import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
+import { RUNNER_GRANTS } from '../../lib/proxy-scopes.js';
+import { createMockCollection } from '../fixtures/mock-collection.js';
 
 const NOW = Date.parse('2026-10-24T12:00:00Z');
 const iso = (d) => new Date(NOW + d).toISOString();
@@ -61,4 +64,28 @@ test('requestFeatureFlags memoises per request, not per workspace', async () => 
   assert.equal(calls, 2);
   setRunControlsResolver(null);
   assert.equal((await requestFeatureFlags({ workspace: ws, session: {} })).runControls, false);
+});
+
+// The e2e seed (routes/test.js seedRunnerKey) mints through mintGrantBootstrap
+// and exchanges the bootstrap once. Pin that the resulting working token is what
+// the resolver counts, and that the spent bootstrap is not counted twice.
+test('a runner key minted and exchanged through the real store is live; once revoked it is not', async () => {
+  const store = new ProxyTokenStore({ collection: createMockCollection() });
+  store.setOwnerCheck(async () => ({ status: 'owner' }));
+  const resolver = createRunControlsResolver({
+    ownerCheck: async () => ({ status: 'owner' }),
+    proxyTokenStore: store,
+    dispatchTokenStore: { listTokens: async () => [] }
+  });
+  const ask = () => resolver({ workspace: ws, accountId: 'a1' });
+  assert.deepEqual(await ask(), { runControls: false, runSetup: true });
+
+  const bootstrap = await store.mintGrantBootstrap({ urlKey: 'acme', workspaceId: 'w1', ownerAccountId: 'a1', grants: RUNNER_GRANTS });
+  assert.equal((await ask()).runControls, true, 'an unexchanged bootstrap counts');
+  const working = await store.exchangeBootstrapToken(bootstrap.token);
+  assert.ok(working);
+  assert.equal((await ask()).runControls, true, 'the exchanged working token counts');
+
+  await store.clear('acme');
+  assert.deepEqual(await ask(), { runControls: false, runSetup: true }, 'revoked = row deleted = no controls');
 });

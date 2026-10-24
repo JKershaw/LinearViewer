@@ -74,7 +74,7 @@ async function watch(request, id) {
 }
 
 test.beforeEach(async ({ page, request }) => {
-  const seeded = await seedLocalWorkspace(page, null, { urlKey: 'runner-kit-loop', append: true, features: { proxy: true } });
+  const seeded = await seedLocalWorkspace(page, null, { urlKey: 'runner-kit-loop', append: true });
   urlKey = seeded.urlKey;
   // LIN-3409: the stop-halt test below halts through the proxy, which is owner-only.
   await seedWorkspaceOwnership(page, urlKey, 'owner');
@@ -174,8 +174,9 @@ test.describe('runner kit local loop (LIN-3098 S2)', () => {
       // LIN-3136 (ledger A6): the stranger is a non-owner MEMBER of this urlKey
       // and enqueues through the session dispatch route; a non-owner cannot hold
       // an enqueue-capable proxy token any more.
-      const features = encodeURIComponent(JSON.stringify({ dispatch: true }));
-      expect((await other.get(`/test/set-session?urlKey=${urlKey}&features=${features}`)).ok()).toBe(true);
+      // LIN-3849: the stranger needs no switch; they are not the owner, so run
+      // controls stay off for them whatever keys the workspace holds.
+      expect((await other.get(`/test/set-session?urlKey=${urlKey}`)).ok()).toBe(true);
       const strangerId = (await (await other.get('/test/session-account')).json()).accountId;
       expect(strangerId).toBeTruthy();
       expect(strangerId).not.toBe(ownerAccountId);

@@ -19,7 +19,7 @@ let urlKey;
 let api;
 
 test.beforeEach(async ({ page }) => {
-  const seeded = await seedLocalWorkspace(page, null, { urlKey: KEY, append: true, features: { dispatch: true } });
+  const seeded = await seedLocalWorkspace(page, null, { urlKey: KEY, append: true, runnerKey: true });
   urlKey = seeded.urlKey;
   api = `/workspace/${urlKey}/api/dispatch`;
   await page.goto(`/test/clear-dispatch-queue?urlKey=${urlKey}`);

@@ -66,6 +66,9 @@ export function featuresParam(features) {
 export async function createSession(page, overrides = {}) {
   const params = new URLSearchParams()
   for (const [key, value] of Object.entries(overrides)) {
+    // LIN-3849: `runnerKey` is tri-state (omitted leaves the stores alone, true mints
+    // a live runner key for the owner, false clears every key), so false is sent.
+    if (key === 'runnerKey') { if (value != null) params.set('runnerKey', value ? '1' : '0'); continue }
     if (key === 'features' || value == null || value === false) continue
     params.set(key, value === true ? 'true' : String(value))
   }

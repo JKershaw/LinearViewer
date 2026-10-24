@@ -27,11 +27,11 @@ import { defaultJiraSeed, JIRA_SITE } from '../fixtures/jira-harness.js';
 // as `extraBindings`.
 
 test.describe('Swipe recap / brief / recommend on a non-active (Jira) binding (LIN-2046)', () => {
-  async function seedAndGoto(page, seedLocal, identifier, features) {
+  async function seedAndGoto(page, seedLocal, identifier, runnerKey) {
     await page.request.post('/test/set-jira-session', { data: { seed: defaultJiraSeed } });
     const { urlKey } = await seedLocal(null, {
       openRouterConnected: true, // hasAI, so the __ai__ (AI Recommend) button renders
-      features,
+      runnerKey,
       extraBindings: [
         { provider: 'jira', scope: JIRA_SITE, credentials: { token: 'jira-api-token', email: 'ada@example.com', tokenExpiresAt: Number.MAX_SAFE_INTEGER } },
       ],
@@ -86,7 +86,7 @@ test.describe('Swipe recap / brief / recommend on a non-active (Jira) binding (L
   test('template-prompt and Autopilot requests for a Jira row carry source=jira (LIN-1916 rows 1-2)', async ({ page, seedLocal }) => {
     // LIN-3341: Go dispatches directly and fetches the kickoff; it needs the
     // dispatch feature (and proxy, which is hasAutopilot) to be ready.
-    await seedAndGoto(page, seedLocal, 'ENG-1', { proxy: true, dispatch: true });
+    await seedAndGoto(page, seedLocal, 'ENG-1', true);
     await expect(page.locator('.swipe-card-title')).toContainText('Jira task to do');
 
     await page.locator('.swipe-accordion-header[data-accordion="prompts"]').first().click();

@@ -155,7 +155,7 @@ test.describe('Flight Companion Page (experimental)', () => {
       // This one test also needs the proxy flag, layered locally without
       // perturbing the shared beforeEach's flag-on-only session for the rest
       // of this block.
-      await page.goto(`/test/set-session?${featuresParam({ flightCompanion: true, proxy: true })}&urlKey=${URL_KEY}`);
+      await page.goto(`/test/set-session?${featuresParam({ flightCompanion: true })}&urlKey=${URL_KEY}`);
       await page.goto(PAGE_URL);
       await page.waitForLoadState('networkidle');
 

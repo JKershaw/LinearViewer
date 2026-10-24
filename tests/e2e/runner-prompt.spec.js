@@ -20,7 +20,7 @@ async function cookieHeader(page) {
 }
 
 test.beforeEach(async ({ page }) => {
-  const seeded = await seedLocalWorkspace(page, null, { urlKey: 'runner-prompt', append: true, features: { proxy: true } });
+  const seeded = await seedLocalWorkspace(page, null, { urlKey: 'runner-prompt', append: true });
   urlKey = seeded.urlKey;
   await page.goto(`/test/clear-proxy-tokens?urlKey=${urlKey}`);
   header = await cookieHeader(page);

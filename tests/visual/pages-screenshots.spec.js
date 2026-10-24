@@ -30,10 +30,11 @@ const URL_KEY = 'test-workspace';
 const DIR = 'tests/screenshots/pages';
 
 // Pages live behind their feature flags; enable the ones whose pages we capture
-// (dispatch / roadmap / proxy). Encoded once for the set-session call.
-const FEATURES = encodeURIComponent(
-  JSON.stringify({ dispatch: true, roadmap: true, proxy: true })
-);
+// (roadmap). Dispatch needs a runner key (LIN-3849: `runnerKey=1`, appended below);
+// Proxy is always on. Encoded once for the set-session call.
+const FEATURES = `${encodeURIComponent(
+  JSON.stringify({ roadmap: true })
+)}&runnerKey=1`;
 
 const DESKTOP = { width: 1400, height: 1000 };
 const MOBILE = { width: 390, height: 844 };

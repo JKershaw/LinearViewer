@@ -36,8 +36,8 @@ async function dispatch(page, key, promptName, count) {
 test.beforeEach(async ({ page, localWorkerUrlKey }) => {
   keyA = localWorkerUrlKey;
   keyB = `${localWorkerUrlKey}-b`;
-  await seedLocalWorkspace(page, null, { urlKey: keyA, features: { dispatch: true } });
-  await seedLocalWorkspace(page, null, { urlKey: keyB, append: true, features: { dispatch: true } });
+  await seedLocalWorkspace(page, null, { urlKey: keyA, runnerKey: true });
+  await seedLocalWorkspace(page, null, { urlKey: keyB, append: true, runnerKey: true });
   await clearBoth(page);
 });
 

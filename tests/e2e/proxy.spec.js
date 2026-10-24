@@ -22,7 +22,7 @@ test.describe('Proxy Page', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto(`/test/clear-proxy-tokens?urlKey=${URL_KEY}`);
     await page.goto(`/test/clear-proxy-events?urlKey=${URL_KEY}`);
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}&urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
   });
 
   test('proxy page loads with all sections', async ({ page }) => {
@@ -37,12 +37,6 @@ test.describe('Proxy Page', () => {
     await expect(page.getByRole('heading', { name: 'Tokens' })).toBeVisible();
     await expect(page.locator('text=Examples')).toBeVisible();
     await expect(page.locator('text=Event Log')).toBeVisible();
-  });
-
-  test('proxy page redirects to settings when feature is disabled', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: false }))}&urlKey=${URL_KEY}`);
-    await page.goto(PROXY_PAGE_URL);
-    await expect(page).toHaveURL(/\/settings$/);
   });
 
   test('token list and event log are collapsed by default', async ({ page }) => {
@@ -91,7 +85,7 @@ test.describe('Proxy Page', () => {
     for (let i = 0; i < 7; i++) {
       await page.goto(`/test/create-proxy-token?label=seed-${i}&urlKey=${URL_KEY}`);
     }
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}&urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
 
     await page.goto(PROXY_PAGE_URL);
     await page.waitForLoadState('networkidle');
@@ -122,12 +116,12 @@ test.describe('Proxy API - Token Management', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto(`/test/clear-proxy-tokens?urlKey=${URL_KEY}`);
     await page.goto(`/test/clear-proxy-events?urlKey=${URL_KEY}`);
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}&urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
   });
 
   test('create, list, and revoke tokens via API', async ({ request, page }) => {
     // Need session first
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}&urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     const cookies = await page.context().cookies();
     const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
 
@@ -165,7 +159,7 @@ test.describe('Proxy API - Token Management', () => {
   });
 
   test('created tokens get a default expiry', async ({ request, page }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}&urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     const cookies = await page.context().cookies();
     const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
 
@@ -189,7 +183,7 @@ test.describe('Proxy API - Token Management', () => {
   });
 
   test('tokens list is sorted newest-first', async ({ request, page }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}&urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     const cookies = await page.context().cookies();
     const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
 
@@ -824,7 +818,7 @@ test.describe('Proxy API - Event Logging', () => {
     });
 
     // Set session and check events API
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}&urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     const cookies = await page.context().cookies();
     const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
 
@@ -880,7 +874,7 @@ test.describe('Proxy API - Dispatch', () => {
     const writeResp = await page.goto(`/test/create-proxy-token?scope=readWrite&label=dispatch-write&urlKey=${URL_KEY}`);
     writeToken = (await writeResp.json()).token;
     // fixture:LIN-3136: enqueue requires the dispatch grant, so the writer is the owner's driver copy
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}&urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     writeToken = (await mintDriverWriter(page, URL_KEY)).token;
     // /fixture:LIN-3136
 
@@ -1829,7 +1823,7 @@ test.describe('Proxy API - Recommend-and-Dispatch (fused verb, LIN-321)', () => 
     const writeResp = await page.goto(`/test/create-proxy-token?scope=readWrite&label=fused-write&urlKey=${URL_KEY}`);
     writeToken = (await writeResp.json()).token;
     // fixture:LIN-3136: enqueue requires the dispatch grant, so the writer is the owner's driver copy
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}&urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     writeToken = (await mintDriverWriter(page, URL_KEY)).token;
     // /fixture:LIN-3136
   });
@@ -2216,7 +2210,7 @@ test.describe('Proxy API - Autopilot kickoff (fused launch verb, LIN-569)', () =
     const writeResp = await page.goto(`/test/create-proxy-token?scope=readWrite&label=autopilot-write&urlKey=${URL_KEY}`);
     writeToken = (await writeResp.json()).token;
     // fixture:LIN-3136: the kickoff declares the dispatch grant for its child (M1), owner-checked in the caller token's workspace, so the writer is the owner's driver copy
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}&urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     writeToken = (await mintDriverWriter(page, URL_KEY)).token;
     // /fixture:LIN-3136
   });
@@ -2384,14 +2378,6 @@ test.describe('Proxy token mint — feature gate + prompt-proxy TTL (LIN-525)', 
     await page.goto(`/test/clear-proxy-tokens?urlKey=${URL_KEY}`);
   });
 
-  test('mint is rejected (403) when the proxy feature is disabled', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: false }))}&urlKey=${URL_KEY}`);
-    const resp = await page.request.post(mintUrl(), {
-      data: { label: 'prompt-proxy', scope: 'readWrite', singleUse: false }
-    });
-    expect(resp.status()).toBe(403);
-  });
-
   // expiresAt isn't echoed in the create response, so read it back from the
   // token list (which carries it) by label.
   async function expiresAtFor(page, label) {
@@ -2404,7 +2390,7 @@ test.describe('Proxy token mint — feature gate + prompt-proxy TTL (LIN-525)', 
   }
 
   test('prompt-proxy token is minted with a short (~48h) TTL', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}&urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     const resp = await page.request.post(mintUrl(), {
       data: { label: 'prompt-proxy', scope: 'readWrite', singleUse: false }
     });
@@ -2415,7 +2401,7 @@ test.describe('Proxy token mint — feature gate + prompt-proxy TTL (LIN-525)', 
   });
 
   test('a normal (non prompt-proxy) token keeps the long default TTL', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}&urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     const resp = await page.request.post(mintUrl(), {
       data: { label: 'manual-token', scope: 'readWrite' }
     });
@@ -2443,8 +2429,6 @@ const OWNERLESS_NOTE = 'token_ownerless';
 const FREE_TIER_NOTE = 'free-tier fallback: no paid/OAuth key resolved';
 
 test.describe('Proxy credential-fault visibility (LIN-1586)', () => {
-  const featuresOn = () => `features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`;
-  const featuresOff = () => `features=${encodeURIComponent(JSON.stringify({ proxy: false }))}`;
 
   // Seed one audit row. Defaults to a row that is inert for the predicate so a
   // test only has to name the part it cares about.
@@ -2465,7 +2449,7 @@ test.describe('Proxy credential-fault visibility (LIN-1586)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto(`/test/clear-proxy-tokens?urlKey=${URL_KEY}`);
     await page.goto(`/test/clear-proxy-events?urlKey=${URL_KEY}`);
-    await page.goto(`/test/set-session?${featuresOn()}&urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
   });
 
   test.describe('B1 — the note reaches the event row', () => {
@@ -2509,7 +2493,7 @@ test.describe('Proxy credential-fault visibility (LIN-1586)', () => {
   test.describe('B2/B3 — the ownerless badge on the proxy token list', () => {
     test('an ownerless token wears the same "no owner · re-issue" badge as the dispatch list', async ({ page }) => {
       await page.goto(`/test/create-proxy-token?label=legacy-runner&ownerless=true&urlKey=${URL_KEY}`);
-      await page.goto(`/test/set-session?${featuresOn()}&urlKey=${URL_KEY}`);
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
 
       await page.goto(PROXY_PAGE_URL);
       await page.click('#proxy-tokens-collapsible summary');
@@ -2520,7 +2504,7 @@ test.describe('Proxy credential-fault visibility (LIN-1586)', () => {
 
     test('an owned token wears no badge', async ({ page }) => {
       await page.goto(`/test/create-proxy-token?label=owned-runner&urlKey=${URL_KEY}`);
-      await page.goto(`/test/set-session?${featuresOn()}&urlKey=${URL_KEY}`);
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
 
       await page.goto(PROXY_PAGE_URL);
       await page.click('#proxy-tokens-collapsible summary');
@@ -2533,7 +2517,7 @@ test.describe('Proxy credential-fault visibility (LIN-1586)', () => {
     test('the tokens API reports hasOwner as a verdict, never the account id', async ({ page }) => {
       await page.goto(`/test/create-proxy-token?label=legacy-runner&ownerless=true&urlKey=${URL_KEY}`);
       await page.goto(`/test/create-proxy-token?label=owned-runner&urlKey=${URL_KEY}`);
-      await page.goto(`/test/set-session?${featuresOn()}&urlKey=${URL_KEY}`);
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
 
       const resp = await page.request.get(`${API_PREFIX}/tokens`);
       expect(resp.status()).toBe(200);
@@ -2672,16 +2656,6 @@ test.describe('Proxy credential-fault visibility (LIN-1586)', () => {
         .toHaveText('No credential faults in the last 15 min');
     });
 
-    test('the panel is not visible when the proxy flag is off (the page redirects)', async ({ page }) => {
-      // Beat 1 ships behind the flag the Proxy page already hard-redirects on.
-      // Un-gating is Beat 2's Live Console job, not a side effect of this work.
-      await seedDeadCredential(page);
-      await page.goto(`/test/set-session?${featuresOff()}&urlKey=${URL_KEY}`);
-
-      await page.goto(PROXY_PAGE_URL);
-      await expect(page).toHaveURL(/\/settings$/);
-      await expect(page.locator('#proxy-health-panel')).toHaveCount(0);
-    });
   });
 });
 
@@ -2721,7 +2695,7 @@ test.describe('Proxy API - North Star (real-server wiring, LIN-1810)', () => {
     // Establish the session (and, through the production seam, the canonical
     // test accountId) BEFORE minting, so the token's createdBy is that same
     // account rather than the mint route's identity fallback.
-    const features = encodeURIComponent(JSON.stringify({ roadmap: true, proxy: true }));
+    const features = encodeURIComponent(JSON.stringify({ roadmap: true }));
     await request.get(`/test/set-session?features=${features}&urlKey=${URL_KEY}`);
 
     const minted = await request.get(`/test/create-proxy-token?scope=read&label=north-star-e2e&urlKey=${URL_KEY}`);
@@ -2874,7 +2848,7 @@ test.describe('Proxy API - Periodicals (real-server wiring, LIN-1829)', () => {
     const writeResp = await page.goto(`/test/create-proxy-token?scope=readWrite&label=periodicals-write&urlKey=${URL_KEY}`);
     writeToken = (await writeResp.json()).token;
     // fixture:LIN-3136: enqueue requires the dispatch grant, so the writer is the owner's driver copy
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}&urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     writeToken = (await mintDriverWriter(page, URL_KEY)).token;
     // /fixture:LIN-3136
 
@@ -2996,7 +2970,7 @@ test.describe('Proxy API - Periodicals (real-server wiring, LIN-1829)', () => {
     const otherConsumer = await (await page.goto(`/test/create-dispatch-token?label=periodicals-runner-b&urlKey=${secondWorkerUrlKey}`)).json();
     const otherRead = await (await page.goto(`/test/create-proxy-token?scope=read&label=periodicals-read-b&urlKey=${secondWorkerUrlKey}`)).json();
     // fixture:LIN-3136: workspace B's writer is B's owner's driver copy (enqueue requires the dispatch grant)
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}&urlKey=${secondWorkerUrlKey}`);
+    await page.goto(`/test/set-session?urlKey=${secondWorkerUrlKey}`);
     otherWrite.token = (await mintDriverWriter(page, secondWorkerUrlKey)).token;
     // /fixture:LIN-3136
 

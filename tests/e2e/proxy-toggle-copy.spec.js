@@ -14,7 +14,7 @@ import { test, expect } from '../fixtures/test-base.js';
 // swipe nav, and the proxy-token mint all address this worker's partition.
 let URL_KEY;
 const BLOCKED_ISSUE_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
-const PROXY_FEAT = encodeURIComponent(JSON.stringify({ proxy: true }));
+const PROXY_FEAT = encodeURIComponent(JSON.stringify({}));
 const PROXY_MARKER = 'Workspace API access';
 // LIN-2944 P3: the toggle state is the session's `proxyDefault` (unset means on),
 // not localStorage. Set it explicitly through the test seam.
@@ -331,31 +331,6 @@ test.describe('+proxy gate — flag-off surface never injects (LIN-525 #2)', () 
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   });
 
-  test('copy does not append or mint when the feature is off, even with the toggle on', async ({ page }) => {
-    let mintAttempted = false;
-    await page.route('**/api/proxy/tokens', route => {
-      if (route.request().method() === 'POST') mintAttempted = true;
-      return route.continue();
-    });
-
-    // LIN-2944 P3: proxy now defaults on, so an explicit proxy:false is required
-    // to exercise the flag-off surface.
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: false }))}&urlKey=${URL_KEY}${PROXY_ON}`);
-    await page.goto(`/workspace/${URL_KEY}/`);
-    await page.waitForLoadState('networkidle');
-
-    const container = await selectDashboardPrompt(page);
-    // No +proxy button renders when the feature is off.
-    await expect(container.locator('.prompt-proxy-toggle')).toHaveCount(0);
-
-    await container.locator('.swipe-prompt-copy').click();
-    await expect(container.locator('.swipe-prompt-copy')).toHaveText('copied!');
-
-    const clip = await page.evaluate(() => navigator.clipboard.readText());
-    expect(clip.length).toBeGreaterThan(0);
-    expect(clip).not.toContain(PROXY_MARKER);
-    expect(mintAttempted).toBe(false);
-  });
 });
 
 // LIN-2944 P3 (review a6be902a R2): turning +proxy OFF persists server-side.

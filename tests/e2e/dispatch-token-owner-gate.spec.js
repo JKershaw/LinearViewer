@@ -22,7 +22,7 @@ test.beforeEach(async ({ page }) => {
   const seeded = await seedLocalWorkspace(page, null, {
     urlKey: OWNER_GATE_KEY,
     append: true,
-    features: { dispatch: true }
+    runnerKey: true
   });
   urlKey = seeded.urlKey;
   mintUrl = `/workspace/${urlKey}/api/dispatch/tokens`;
@@ -99,7 +99,7 @@ test.describe('LIN-3137 — owner-only dispatch-token mint gate (e2e)', () => {
   test('a session with no accountId → 503 GRANT_OWNERLESS, no token is minted', async ({ page }) => {
     const before = await tokenCount(page);
     await page.goto(
-      `/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}&noLinearUser=1&urlKey=${urlKey}`
+      `/test/set-session?runnerKey=1&noLinearUser=1&urlKey=${urlKey}`
     );
 
     const res = await mint(page, {});
