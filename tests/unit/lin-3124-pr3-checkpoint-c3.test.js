@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { createConnectionAccess } from '../../lib/connection-credential.js';
 import { fingerprintCredential } from '../../lib/credential-diagnostics.js';
+import { workspaceApiUnitFiles } from './lib/workspace-api-unit.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
@@ -105,6 +106,52 @@ describe('LIN-3124 PR3 checkpoint C3 — source-text pins', () => {
     assert.match(CREDENTIAL_SRC, /async function adoptConnectionCredential\(/);
     assert.match(WORKSPACE_API_SRC, /from '\.\.\/lib\/connection-binding\.js'/);
     assert.doesNotMatch(WORKSPACE_API_SRC, /from '\.\.\/lib\/connection-(?:credential|store|lifecycle|access)\.js'/);
+  });
+
+  // LIN-3861: the workspace-API half of the pin above, judged over the whole unit
+  // (routes/workspace-api.js and routes/workspace-api-*.js) instead of one file name,
+  // so the route groups can move. A pure check over a `{rel: src}` map: the live
+  // test reads the unit through workspaceApiUnitFiles, the witnesses plant violations in a
+  // synthetic map (never in live text).
+  const CONNECTION_SEAM_IMPORT = /from '\.\.\/lib\/connection-(?:credential|store|lifecycle|access)\.js'/;
+  const CONNECTION_BINDING_IMPORT = /from '\.\.\/lib\/connection-binding\.js'/;
+  function workspaceApiConnectionImportProblems(unit) {
+    const problems = [];
+    for (const [rel, src] of Object.entries(unit)) {
+      if (CONNECTION_SEAM_IMPORT.test(src)) problems.push(`${rel} imports a connection seam`);
+    }
+    if (!Object.values(unit).some(src => CONNECTION_BINDING_IMPORT.test(src))) {
+      problems.push('no workspace-API unit file imports ../lib/connection-binding.js');
+    }
+    return problems;
+  }
+
+  test('LIN-3861 W rule: no workspace-API unit file imports a connection seam, and one imports connection-binding', () => {
+    const root = join(__dirname, '../..');
+    const unit = Object.fromEntries(workspaceApiUnitFiles(root).map(rel => [rel, readFileSync(join(root, rel), 'utf8')]));
+    assert.ok(Object.keys(unit).length >= 4, 'the unit is listed');
+    assert.deepEqual(workspaceApiConnectionImportProblems(unit), []);
+  });
+
+  describe('LIN-3861 W rule witnesses (synthetic unit files)', () => {
+    const binding = "import { activeConnectionBackedBinding } from '../lib/connection-binding.js';\n";
+    test('a clean unit passes, with the binding import in any one file', () => {
+      assert.deepEqual(workspaceApiConnectionImportProblems({ 'routes/workspace-api.js': 'export {};\n', 'routes/workspace-api-x.js': binding }), []);
+      assert.deepEqual(workspaceApiConnectionImportProblems({ 'routes/workspace-api.js': binding }), []);
+    });
+    for (const seam of ['credential', 'store', 'lifecycle', 'access']) {
+      test(`a connection-${seam} import planted in routes/workspace-api-x.js fails`, () => {
+        const problems = workspaceApiConnectionImportProblems({
+          'routes/workspace-api.js': binding,
+          'routes/workspace-api-x.js': `import { y } from '../lib/connection-${seam}.js';\n`,
+        });
+        assert.deepEqual(problems, ['routes/workspace-api-x.js imports a connection seam']);
+      });
+    }
+    test('the connection-binding import removed from every unit file fails', () => {
+      assert.deepEqual(workspaceApiConnectionImportProblems({ 'routes/workspace-api.js': 'export {};\n', 'routes/workspace-api-x.js': 'export {};\n' }),
+        ['no workspace-API unit file imports ../lib/connection-binding.js']);
+    });
   });
 
   test('N1: the Linear reuse-grace constant is defined once (shared via token-refresh.js)', () => {
