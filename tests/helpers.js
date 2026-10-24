@@ -106,7 +106,35 @@ export const SELECTORS = {
     /** Feature-toggle line by feature key, e.g. 'dispatch', 'roadmap'. */
     toggle: (key) => `[data-testid="settings-toggle-${key}"]`,
     logout: '[data-testid="settings-logout"]',
+    /** Every switch row (LIN-3888); filter by `hasText` for one by its label. */
+    switchRows: '[data-testid^="settings-toggle-"]',
+    /** A feature switch's button: the row's form submit (LIN-3888, the `toggleFeature` precedent). Its text is `● on` / `○ off`, its state `aria-checked`. */
+    switch: (key) => `[data-testid="settings-toggle-${key}"] button[type="submit"]`,
+    /** Every group heading that carries a title test id; filter by `hasText` for one by its words. */
+    groupTitles: '[data-testid^="settings-section-"][data-testid$="-title"]',
+    /** One group's heading, by its section slug (LIN-3888). */
+    groupTitle: (name) => `[data-testid="settings-section-${name}-title"]`,
+    /** Every group's frame (LIN-3888): the section slug prefix. */
+    sections: '[data-testid^="settings-section-"]',
+    /** The page frame beside the list, on a phone and on desktop (LIN-3888). */
+    pane: '[data-testid="settings-pane"]',
+    /** A sidebar state's dot, by area (LIN-3888). */
+    dot: (area) => `[data-testid="settings-dot-${area}"]`,
+    /** Account's OpenRouter row: the status word, and its connect and disconnect controls (LIN-3888). */
+    openRouterStatus: '[data-testid="settings-openrouter-status"]',
+    openRouterConnect: '[data-testid="settings-openrouter-connect"]',
+    openRouterDisconnect: '[data-testid="settings-openrouter-disconnect"]',
+    /** An experimental view's link on Settings › Features, by flag key (LIN-3888): `settings-open-{key}`. */
+    openLink: (key) => `[data-testid="settings-open-${key}"]`,
+    /** The active source's marker on a binding row (LIN-3888). */
+    providerActive: '[data-testid="settings-provider-active"]',
+    /** A key row in Settings › Agent access (LIN-3888): its test id is `settings-key-{source}`. Absent from the Proxy and Dispatch pages. */
+    keyRows: '[data-testid^="settings-key-"]',
+    /** The new Proxy key's name input (LIN-3888). */
+    newKeyLabel: '[data-testid="settings-newkey-label"]',
   },
+  /** A Dispatch page section by its name: send-prompt | halt | queue | tokens | guide | history (LIN-3888). */
+  dispatchSection: (name) => `[data-testid="dispatch-section-${name}"]`,
   /** A project card by name (replaces `.project:has-text(name)`). */
   project: (name) => `[data-testid="project"][data-project-name="${name}"]`,
   /** An issue row by id (pairs the testid with the existing data-id hook). */

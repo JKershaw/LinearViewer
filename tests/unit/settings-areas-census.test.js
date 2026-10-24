@@ -148,7 +148,7 @@ describe('sidebar states', () => {
     const states = Object.fromEntries(AREAS.map(a => [a.id, a.state(ctx)]));
     const html = page('account', { states });
     for (const a of AREAS) assert.match(html, new RegExp(`data-testid="settings-state-${a.id}"`));
-    assert.match(html, /settings-dot/, 'the red dot is drawn for a state that needs fixing');
+    assert.match(html, /data-testid="settings-dot-/, 'the red dot is drawn for a state that needs fixing');
   });
 });
 

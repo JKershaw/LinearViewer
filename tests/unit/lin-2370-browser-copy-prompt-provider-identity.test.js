@@ -245,7 +245,8 @@ async function runCopyButton(providerDisplayName) {
   const tokenList = el({ dataset: { urlKey: 'acme' } });
 
   const byId = { 'proxy-generate-btn': generateBtn, 'proxy-prompt-output': promptOutput, 'proxy-create-token-form': tokenList };
-  const bySelector = { '.proxy-token-list': tokenList };
+  // LIN-3888: no public script queries a proxy-token-list any more, so no selector maps to the list.
+  const bySelector = {};
 
   const sandbox = {
     window: {

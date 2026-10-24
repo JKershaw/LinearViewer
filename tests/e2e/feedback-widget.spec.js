@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js'
+import { SELECTORS } from '../helpers.js'
 import { sweepFixedOverlaps, describeHits, expectSweepNotVacuous } from '../fixed-overlay-sweep.js'
 
 // Feedback widget client UX (LIN-635). Seeding rides the provider harness
@@ -539,8 +540,8 @@ async function enableWidget(page, urlKey) {
   // response, so waiting on '● on' waits on the saved flag.
   await page.goto(`/workspace/${urlKey}/settings/features`)
   await page.waitForLoadState('networkidle')
-  await page.locator('[data-feature="feedbackWidget"] .toggle-btn').click()
-  await expect(page.locator('[data-feature="feedbackWidget"] .toggle-state')).toHaveText('● on')
+  await page.locator(SELECTORS.settings.switch('feedbackWidget')).click()
+  await expect(page.locator(SELECTORS.settings.switch('feedbackWidget'))).toHaveText('● on')
   await page.goto(`/workspace/${urlKey}/`)
   await page.waitForLoadState('networkidle')
   await expect(page.getByTestId('nav-feedback-trigger')).toBeEnabled()

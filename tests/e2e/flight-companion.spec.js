@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 import { renderSSEFrames } from '../fixtures/flight-companion-sse-frames.js';
 
 // LIN-971: Flight Companion route-gating + settings exposure, plus the
@@ -101,7 +102,7 @@ test.describe('Flight Companion Page (experimental)', () => {
       await page.waitForLoadState('networkidle');
 
       // Positive control — the Experimental section actually rendered.
-      await expect(page.locator('.settings-header:has-text("Views")')).toBeVisible();
+      await expect(page.locator(SELECTORS.settings.groupTitles, { hasText: 'Views' })).toBeVisible();
 
       // lib/render-settings.js emits data-feature="<key>" from TWO distinct
       // renderers (renderFeatureToggle + renderWorkspaceFeatureToggle) — pin
@@ -109,7 +110,7 @@ test.describe('Flight Companion Page (experimental)', () => {
       const toggle = page.locator('[data-feature="flightCompanion"]');
       await expect(toggle).toHaveCount(1);
       await expect(toggle).toBeVisible();
-      await expect(toggle.locator('.toggle-state')).toContainText('off');
+      await expect(page.locator(SELECTORS.settings.switch('flightCompanion'))).toContainText('off');
     });
 
     test('settings link is hidden when off, visible when on', async ({ page }) => {
@@ -120,12 +121,12 @@ test.describe('Flight Companion Page (experimental)', () => {
       // Positive control — Settings actually rendered, so the zero-count
       // check below is not vacuous.
       await expect(page.locator('[data-testid="settings-section-experimental"]')).toBeVisible();
-      await expect(page.locator('.settings-action:has-text("open the flight companion")')).toHaveCount(0);
+      await expect(page.locator(SELECTORS.settings.openLink('flightCompanion'))).toHaveCount(0);
 
       await page.goto(`/test/set-session?${featuresParam({ flightCompanion: true })}&urlKey=${URL_KEY}`);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
-      await expect(page.locator('.settings-action:has-text("open the flight companion")')).toBeVisible();
+      await expect(page.locator(SELECTORS.settings.openLink('flightCompanion'))).toBeVisible();
     });
   });
 

@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 import { sweepFixedOverlaps, describeHits, expectSweepNotVacuous } from '../fixed-overlay-sweep.js';
 
 // Experimental Live Console — an ambient, generation-free feed of the whole
@@ -189,22 +190,22 @@ test.describe('Live Console (experimental)', () => {
       await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
-      await expect(page.locator('.settings-header:has-text("Views")')).toBeVisible();
+      await expect(page.locator(SELECTORS.settings.groupTitles, { hasText: 'Views' })).toBeVisible();
       const toggle = page.locator('[data-feature="liveConsole"]');
       await expect(toggle).toBeVisible();
-      await expect(toggle.locator('.toggle-state')).toContainText('off');
+      await expect(page.locator(SELECTORS.settings.switch('liveConsole'))).toContainText('off');
     });
 
     test('settings link to the page appears only when the flag is on', async ({ page }) => {
       await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
-      await expect(page.locator('.settings-action:has-text("open the live console")')).toHaveCount(0);
+      await expect(page.locator(SELECTORS.settings.openLink('liveConsole'))).toHaveCount(0);
 
       await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
-      await expect(page.locator('.settings-action:has-text("open the live console")')).toBeVisible();
+      await expect(page.locator(SELECTORS.settings.openLink('liveConsole'))).toBeVisible();
     });
   });
 

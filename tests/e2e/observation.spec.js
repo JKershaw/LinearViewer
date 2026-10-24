@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
-import { featuresParam } from '../helpers.js';
+import { SELECTORS, featuresParam } from '../helpers.js';
 import { sweepFixedOverlaps, describeHits, expectSweepNotVacuous } from '../fixed-overlay-sweep.js';
 
 // LIN-595: the first-class autopilot Observation page
@@ -83,8 +83,10 @@ test.describe('Autopilot Observation page (first-class)', () => {
       await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
+      await expect(page.locator(SELECTORS.settings.area('features'))).toBeVisible();
+      await expect(page.locator(SELECTORS.settings.toggle('roadmap'))).toBeVisible();
       await expect(page.locator('[data-feature="dashboard"]')).toHaveCount(0);
-      await expect(page.locator('.settings-action:has-text("open the autopilot dashboard")')).toHaveCount(0);
+      await expect(page.locator(SELECTORS.settings.openLink('dashboard'))).toHaveCount(0);
     });
   });
 

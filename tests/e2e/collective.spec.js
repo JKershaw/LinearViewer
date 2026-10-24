@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 
 // LIN-450: the experimental Collective page. Seeds via /test/set-session (the
@@ -52,22 +53,22 @@ test.describe('Collective Page (experimental)', () => {
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
 
-      await expect(page.locator('.settings-header:has-text("Views")')).toBeVisible();
+      await expect(page.locator(SELECTORS.settings.groupTitles, { hasText: 'Views' })).toBeVisible();
       const toggle = page.locator('[data-feature="collective"]');
       await expect(toggle).toBeVisible();
-      await expect(toggle.locator('.toggle-state')).toContainText('off');
+      await expect(page.locator(SELECTORS.settings.switch('collective'))).toContainText('off');
     });
 
     test('settings link to the page appears only when the flag is on', async ({ page }) => {
       await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
-      await expect(page.locator('.settings-action:has-text("open the discussion page")')).toHaveCount(0);
+      await expect(page.locator(SELECTORS.settings.openLink('collective'))).toHaveCount(0);
 
       await page.goto(`/test/set-session?urlKey=${URL_KEY}&${featuresParam({ collective: true })}`);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
-      await expect(page.locator('.settings-action:has-text("open the discussion page")')).toBeVisible();
+      await expect(page.locator(SELECTORS.settings.openLink('collective'))).toBeVisible();
     });
   });
 

@@ -12,7 +12,7 @@
  */
 import { test, expect } from '../fixtures/test-base.js';
 import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
-import { settings, expectNoClippedOverflow } from '../helpers.js';
+import { SELECTORS, settings, expectNoClippedOverflow } from '../helpers.js';
 
 const AREAS = ['sources', 'models', 'running', 'agent-access', 'health', 'change-log', 'features', 'account'];
 const VIEWPORTS = { desktop: { width: 1280, height: 900 }, phone: { width: 375, height: 812 } };
@@ -51,7 +51,7 @@ test.describe('Settings areas: layout', () => {
     await page.setViewportSize(VIEWPORTS.phone);
     await page.goto(`/workspace/${urlKey}/settings`);
     await expect(page.getByTestId('settings-nav')).toBeVisible();
-    await expect(page.locator('.settings-pane')).toBeHidden();
+    await expect(page.locator(SELECTORS.settings.pane)).toBeHidden();
     await settings(page).navRow('features').click();
     await expect(settings(page).area('features')).toBeVisible();
     await expect(page.getByTestId('settings-nav')).toBeHidden();
@@ -95,7 +95,7 @@ test.describe('Settings areas: everyone-changes ask why, are logged, and can be 
     const row = page.locator('[data-testid="settings-change-workspace"]', { hasText: reason });
     await expect(row).toContainText('Runs paused');
 
-    await row.locator('details.settings-ask summary').click();
+    await row.locator('[data-testid^="settings-undo-"] summary').click();
     await row.locator('textarea[name="reason"]').fill('Window is over');
     await row.getByRole('button', { name: 'Undo this change' }).click();
     await expect(page.getByTestId('settings-flash')).toContainText('Change undone');
@@ -137,7 +137,7 @@ test.describe('Settings areas: keys and the theme', () => {
     await settings(page).gotoArea(urlKey, 'agent-access');
 
     await page.getByTestId('settings-newkey').locator('summary').click();
-    await page.locator('.settings-newkey-label').fill('ci-reader');
+    await page.locator(SELECTORS.settings.newKeyLabel).fill('ci-reader');
     await page.getByTestId('settings-newkey-submit').click();
     await expect(page.getByTestId('settings-newkey-secret')).toContainText('shown once');
 

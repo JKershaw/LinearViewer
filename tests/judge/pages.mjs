@@ -25,8 +25,8 @@ export const AREAS = ['sources', 'models', 'running', 'agent-access', 'health', 
 // the browser clock, and `formatWhen` prints proportional digits, so a one-minute tick can move the
 // row's width. The CONTAINING ROW is masked, never the inline span.
 const TIME_MASKS = {
-  key: { selector: '.settings-row[data-testid^="settings-key-"]', reason: 'key expiry and last used are server-rendered times' },
-  change: { selector: '.settings-change-row', reason: 'the change-log meta line carries a server-rendered time (WorkspaceChangeLogStore.record stamps new Date())' },
+  key: { selector: '[data-testid="settings-key-proxy"], [data-testid="settings-key-dispatch"]', reason: 'key expiry and last used are server-rendered times' },
+  change: { selector: '[data-change-id]', reason: 'the change-log meta line carries a server-rendered time (WorkspaceChangeLogStore.record stamps new Date())' },
   poll: { selector: '[data-testid="settings-runner-last-poll"]', reason: 'Last poll is a server-rendered time' },
 };
 

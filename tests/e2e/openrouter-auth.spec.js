@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 
 // Workspace URL key used in test session. Bound per-test from the per-worker key
 // (LIN-628) so session + nav + API calls all address this worker's partition.
@@ -60,15 +61,15 @@ test.describe('OpenRouter OAuth Flow', () => {
     await page.goto(SETTINGS_URL);
 
     // Should see settings section (AI Configuration)
-    await expect(page.locator('.settings-section').first()).toBeVisible();
+    await expect(page.locator(SELECTORS.settings.sections).first()).toBeVisible();
 
     // Should show OpenRouter as not connected
-    const disconnectedStatus = page.locator('.settings-value.disconnected');
+    const disconnectedStatus = page.locator(SELECTORS.settings.openRouterStatus);
     await expect(disconnectedStatus).toBeVisible();
     await expect(disconnectedStatus).toHaveText('○ not connected');
 
     // Should have a connect link
-    const connectLink = page.locator('.action-btn.connect');
+    const connectLink = page.locator(SELECTORS.settings.openRouterConnect);
     await expect(connectLink).toBeVisible();
     await expect(connectLink).toHaveAttribute('href', '/auth/openrouter');
   });
@@ -79,15 +80,15 @@ test.describe('OpenRouter OAuth Flow', () => {
     await page.goto(SETTINGS_URL);
 
     // Should see settings section (AI Configuration)
-    await expect(page.locator('.settings-section').first()).toBeVisible();
+    await expect(page.locator(SELECTORS.settings.sections).first()).toBeVisible();
 
     // Should show OpenRouter as connected
-    const connectedStatus = page.locator('.settings-value.connected');
+    const connectedStatus = page.locator(SELECTORS.settings.openRouterStatus);
     await expect(connectedStatus).toBeVisible();
     await expect(connectedStatus).toHaveText('● connected');
 
     // Should have a disconnect button
-    const disconnectBtn = page.locator('.action-btn.disconnect');
+    const disconnectBtn = page.locator(SELECTORS.settings.openRouterDisconnect);
     await expect(disconnectBtn).toBeVisible();
     await expect(disconnectBtn).toHaveText('disconnect');
   });

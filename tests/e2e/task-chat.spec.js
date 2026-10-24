@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 import { renderSSEFrames } from '../fixtures/flight-companion-sse-frames.js';
 
 // Experimental "talk to a task" page. Seeds via /test/set-session (the test-token
@@ -44,22 +45,22 @@ test.describe('Task Chat Page (experimental)', () => {
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
 
-      await expect(page.locator('.settings-header:has-text("Views")')).toBeVisible();
+      await expect(page.locator(SELECTORS.settings.groupTitles, { hasText: 'Views' })).toBeVisible();
       const toggle = page.locator('[data-feature="taskChat"]');
       await expect(toggle).toBeVisible();
-      await expect(toggle.locator('.toggle-state')).toContainText('off');
+      await expect(page.locator(SELECTORS.settings.switch('taskChat'))).toContainText('off');
     });
 
     test('settings link to the page appears only when the flag is on', async ({ page }) => {
       await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
-      await expect(page.locator('.settings-action:has-text("open the task chat page")')).toHaveCount(0);
+      await expect(page.locator(SELECTORS.settings.openLink('taskChat'))).toHaveCount(0);
 
       await page.goto(`/test/set-session?${featuresParam({ taskChat: true })}&urlKey=${URL_KEY}`);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
-      await expect(page.locator('.settings-action:has-text("open the task chat page")')).toBeVisible();
+      await expect(page.locator(SELECTORS.settings.openLink('taskChat'))).toBeVisible();
     });
   });
 

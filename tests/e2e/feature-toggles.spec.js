@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 import {
   workspaceApiLocalSeed,
 } from '../fixtures/local-harness.js';
@@ -27,12 +28,12 @@ test.describe('Feature Toggle Settings', () => {
     await page.waitForLoadState('networkidle');
 
     // AI and Workflow section headers should be visible
-    await expect(page.locator('.settings-header:text-is("Views · for you")')).toBeVisible();
-    await expect(page.locator('.settings-header:text-is("Feedback · for you")')).toBeVisible();
+    await expect(page.locator(SELECTORS.settings.groupTitle('experimental'))).toHaveText('Views · for you');
+    await expect(page.locator(SELECTORS.settings.groupTitle('workflow'))).toHaveText('Feedback · for you');
 
     // All feature toggle labels should be present (split across sections)
     // LIN-3849: no Dispatch queue or Linear API proxy toggle any more.
-    await expect(page.locator('.feature-toggle-label:has-text("Narrative roadmap")')).toBeVisible();
+    await expect(page.locator(SELECTORS.settings.switchRows, { hasText: 'Narrative roadmap' })).toBeVisible();
   });
 
   test('shows correct default toggle states', async ({ page, localWorkerUrlKey }) => {
@@ -40,7 +41,7 @@ test.describe('Feature Toggle Settings', () => {
     await page.waitForLoadState('networkidle');
 
     // Defaults: roadmap OFF
-    await expect(page.locator('[data-feature="roadmap"] .toggle-state')).toHaveText('○ off');
+    await expect(page.locator(SELECTORS.settings.switch('roadmap'))).toHaveText('○ off');
   });
 
   // LIN-3848: nine switches that did nothing or were superseded are gone.
@@ -59,7 +60,7 @@ test.describe('Feature Toggle Settings', () => {
     await page.waitForLoadState('networkidle');
 
     // roadmap should start OFF
-    await expect(page.locator('[data-feature="roadmap"] .toggle-state')).toHaveText('○ off');
+    await expect(page.locator(SELECTORS.settings.switch('roadmap'))).toHaveText('○ off');
 
     // LIN-3401: the bound click handler must be what saves, not the button's native
     // form submit (which also persists the toggle and would mask a missing handler).
@@ -71,17 +72,17 @@ test.describe('Feature Toggle Settings', () => {
     );
 
     // Click the toggle button to turn it on (AJAX — no page reload)
-    await page.locator('[data-feature="roadmap"] .toggle-btn').click();
+    await page.locator(SELECTORS.settings.switch('roadmap')).click();
     await ajaxPost;
 
     // Should update inline via AJAX
-    await expect(page.locator('[data-feature="roadmap"] .toggle-state')).toHaveText('● on');
+    await expect(page.locator(SELECTORS.settings.switch('roadmap'))).toHaveText('● on');
     expect(navigated, 'the toggle saved in place, not by a full-page form submit').toBe(false);
 
     // Reload page — state should persist (stored in session)
     await page.reload();
     await page.waitForLoadState('networkidle');
-    await expect(page.locator('[data-feature="roadmap"] .toggle-state')).toHaveText('● on');
+    await expect(page.locator(SELECTORS.settings.switch('roadmap'))).toHaveText('● on');
   });
 
   test('toggling one feature does not affect others', async ({ page, localWorkerUrlKey }) => {
@@ -89,11 +90,11 @@ test.describe('Feature Toggle Settings', () => {
     await page.waitForLoadState('networkidle');
 
     // Turn on roadmap (AJAX — no page reload)
-    await page.locator('[data-feature="roadmap"] .toggle-btn').click();
+    await page.locator(SELECTORS.settings.switch('roadmap')).click();
 
     // roadmap should be on, but others unchanged
-    await expect(page.locator('[data-feature="roadmap"] .toggle-state')).toHaveText('● on');
-    await expect(page.locator('[data-feature="feedbackWidget"] .toggle-state')).toHaveText('○ off');
+    await expect(page.locator(SELECTORS.settings.switch('roadmap'))).toHaveText('● on');
+    await expect(page.locator(SELECTORS.settings.switch('feedbackWidget'))).toHaveText('○ off');
   });
 
   // =========================================================================
@@ -125,9 +126,10 @@ test.describe('Feature Toggle Settings', () => {
     await page.goto(`/workspace/${localWorkerUrlKey}/settings/features`);
     await page.waitForLoadState('networkidle');
 
-    await expect(page.locator('.settings-header:text-is("Feedback · for you")')).toBeVisible();
+    await expect(page.locator(SELECTORS.settings.groupTitle('workflow'))).toHaveText('Feedback · for you');
     await expect(page.locator('[data-feature="featureBranches"]')).toHaveCount(0);
-    await expect(page.locator('.feature-toggle-label:has-text("Feature branch workflow")')).toHaveCount(0);
+    await expect(page.locator(SELECTORS.settings.area('features'))).toBeVisible();
+    await expect(page.locator(SELECTORS.settings.area('features'))).not.toContainText('Feature branch workflow');
   });
 
   test('plan prompt has no git workflow', async ({ page, localWorkerUrlKey }) => {
@@ -172,7 +174,11 @@ test.describe('Feature Toggle Settings', () => {
     await page.waitForLoadState('networkidle');
 
     // Dispatch section should not be visible
-    await expect(page.locator('.settings-header:text-is("Dispatch")')).toHaveCount(0);
+    await expect(page.locator(SELECTORS.settings.groupTitles).first()).toBeVisible();
+    // Scoped to the Features area, so an untagged "Dispatch" group (no test id) is caught too.
+    const features = page.locator(SELECTORS.settings.area('features'));
+    await expect(features).toBeVisible();
+    await expect(features.locator('h2', { hasText: /^Dispatch$/ })).toHaveCount(0);
   });
 
   test('dispatch link visible in header switcher with run controls', async ({ page, seedLocal, localWorkerUrlKey }) => {
@@ -191,8 +197,9 @@ test.describe('Feature Toggle Settings', () => {
 
     await expect(page.locator('[data-feature="dispatch"]')).toHaveCount(0);
     await expect(page.locator('[data-feature="proxy"]')).toHaveCount(0);
-    await expect(page.locator('.feature-toggle-label:has-text("Linear API proxy")')).toHaveCount(0);
-    await expect(page.locator('.feature-toggle-label:has-text("Dispatch queue")')).toHaveCount(0);
+    await expect(page.locator(SELECTORS.settings.area('features'))).toBeVisible();
+    await expect(page.locator(SELECTORS.settings.area('features'))).not.toContainText('Linear API proxy');
+    await expect(page.locator(SELECTORS.settings.area('features'))).not.toContainText('Dispatch queue');
   });
 
   test('prompts section is always visible (LIN-3848: promptButtons switch removed)', async ({ page, localWorkerUrlKey }) => {
