@@ -716,6 +716,14 @@
   margin-bottom: var(--space-2);
 }
 
+/* The ask's Confirm and Cancel sit side by side, Confirm first (LIN-3890). */
+.settings-ask-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .settings-ask-reason,
 .settings-newkey-label {
   display: block;
@@ -770,7 +778,7 @@
   display: inline;
 }
 
-.settings-undo {
+[data-settings-undo] {
   background: none;
   border: 0;
   color: var(--brand-dim);

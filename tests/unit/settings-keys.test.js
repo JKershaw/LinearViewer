@@ -62,8 +62,8 @@ describe('revoke uses today\'s DELETE routes and their owner rules', () => {
     const member = agentAccessBody({ urlKey: 'acme', keys: buildKeyList({ proxyRows, dispatchRows, isOwner: false, urlKey: 'acme' }) });
     const owner = agentAccessBody({ urlKey: 'acme', keys: buildKeyList({ proxyRows, dispatchRows, isOwner: true, urlKey: 'acme' }) });
     assert.equal((member.match(/settings-key-owner-only/g) || []).length, 2);
-    assert.equal((member.match(/data-revoke-route/g) || []).length, 1);
-    assert.equal((owner.match(/data-revoke-route/g) || []).length, 3);
+    assert.equal((member.match(/data-settings-ask-route/g) || []).length, 1);
+    assert.equal((owner.match(/data-settings-ask-route/g) || []).length, 3);
     assert.doesNotMatch(owner, /settings-key-owner-only/);
   });
 });

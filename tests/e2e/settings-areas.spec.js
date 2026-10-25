@@ -12,7 +12,7 @@
  */
 import { test, expect } from '../fixtures/test-base.js';
 import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
-import { SELECTORS, settings, expectNoClippedOverflow } from '../helpers.js';
+import { SELECTORS, settings, expectNoClippedOverflow, revokeKeyInPlace } from '../helpers.js';
 
 const AREAS = ['sources', 'models', 'running', 'agent-access', 'health', 'change-log', 'features', 'account'];
 const VIEWPORTS = { desktop: { width: 1280, height: 900 }, phone: { width: 375, height: 812 } };
@@ -83,7 +83,7 @@ test.describe('Settings areas: everyone-changes ask why, are logged, and can be 
     // Nothing pops up: the form is inside the opened row.
     const pause = page.getByTestId('settings-halt-pause');
     await expect(page.getByTestId('settings-halt-pause-confirm')).toBeHidden();
-    await pause.locator('summary').click();
+    await pause.locator(':scope > summary').click();
     await expect(page.getByTestId('settings-halt-pause-confirm')).toBeVisible();
     await page.getByTestId('settings-halt-pause-reason').fill(reason);
     await page.getByTestId('settings-halt-pause-confirm').click();
@@ -108,7 +108,7 @@ test.describe('Settings areas: everyone-changes ask why, are logged, and can be 
     await settings(page).gotoArea(localWorkerUrlKey, 'running');
     const row = page.getByTestId('settings-toggle-periodicals');
     const before = await page.getByTestId('settings-periodicals-state').innerText();
-    await row.locator('summary').click();
+    await row.locator(':scope > summary').click();
     // The browser refuses an empty required reason, so the form does not submit.
     await row.locator('[data-testid$="-confirm"]').click();
     await expect(page).toHaveURL(/\/settings\/running$/);
@@ -136,7 +136,7 @@ test.describe('Settings areas: keys and the theme', () => {
     await seedWorkspaceOwnership(page, urlKey);
     await settings(page).gotoArea(urlKey, 'agent-access');
 
-    await page.getByTestId('settings-newkey').locator('summary').click();
+    await page.getByTestId('settings-newkey').locator(':scope > summary').click();
     await page.locator(SELECTORS.settings.newKeyLabel).fill('ci-reader');
     await page.getByTestId('settings-newkey-submit').click();
     await expect(page.getByTestId('settings-newkey-secret')).toContainText('shown once');
@@ -144,9 +144,9 @@ test.describe('Settings areas: keys and the theme', () => {
     await page.reload();
     const key = page.getByTestId('settings-key-proxy').filter({ hasText: 'ci-reader' });
     await expect(key).toHaveCount(1);
-    await key.locator('summary').click();
+    await key.locator(':scope > summary').click();
     await expect(key).toContainText(/expires in \d+d/);
-    await key.getByTestId('settings-key-revoke').click();
+    await revokeKeyInPlace(key);
     await expect(page.getByTestId('settings-key-proxy').filter({ hasText: 'ci-reader' })).toHaveCount(0);
   });
 

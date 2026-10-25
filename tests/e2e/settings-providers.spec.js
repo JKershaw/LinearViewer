@@ -6,6 +6,13 @@ import { SELECTORS } from '../helpers.js'
 // inspect/remove/refresh — navigation drives off the urlKey seedLocal returns
 // (parallel-aware caller discipline, LIN-625).
 
+// LIN-3890: a source row opens in place (its make-active, test and remove actions sit in its
+// body), and so does the remove ask inside it. Open one only if it is still closed.
+async function openInPlace(summaryOwner) {
+  const open = await summaryOwner.evaluate((el) => el.open)
+  if (!open) await summaryOwner.locator(':scope > summary').click()
+}
+
 test.describe('Settings — Providers section (LIN-634)', () => {
   let urlKey
 
@@ -30,22 +37,14 @@ test.describe('Settings — Providers section (LIN-634)', () => {
   // end-to-end proof of LIN-761 root cause C (the settings promise must match what
   // /auth/github can deliver). The live-when-configured path is covered by the
   // render-settings unit tests (githubEnabled: true).
-  test('disables the GitHub add source with an honest reason when GitHub is unconfigured (LIN-761)', async ({ page }) => {
-    const githubAdd = page.locator('[data-testid="settings-provider-add-github"]')
-    await expect(githubAdd).toBeVisible()
-    await expect(githubAdd).toHaveClass(/provider-add-blocked/)
-    await expect(githubAdd).toContainText('not configured on this server')
-    // No live add button — a blocked row carries no form/button.
-    await expect(githubAdd.locator('button')).toHaveCount(0)
-  })
-
-  test('disables the GitHub Projects add source with an honest reason when GitHub is unconfigured (LIN-761)', async ({ page }) => {
-    const projectsAdd = page.locator('[data-testid="settings-provider-add-github-projects"]')
-    await expect(projectsAdd).toBeVisible()
-    await expect(projectsAdd).toContainText('GitHub Projects')
-    await expect(projectsAdd).toHaveClass(/provider-add-blocked/)
-    await expect(projectsAdd).toContainText('not configured on this server')
-    await expect(projectsAdd.locator('button')).toHaveCount(0)
+  // LIN-3890 outcome 1: Sources lists only the sources this server can add, so an unconfigured
+  // GitHub source is absent (it was a blocked row before). Linear, which GitHub's flag does not
+  // gate, stays listed.
+  test('lists no GitHub add source when GitHub is unconfigured (LIN-761, LIN-3890)', async ({ page }) => {
+    await expect(page.locator('[data-testid="settings-provider-add-github"]')).toHaveCount(0)
+    await expect(page.locator('[data-testid="settings-provider-add-github-projects"]')).toHaveCount(0)
+    await expect(page.locator('[data-testid="settings-section-providers-add"]')).not.toContainText('not configured on this server')
+    await expect(page.locator('[data-testid="settings-provider-add-linear"]')).toBeVisible()
   })
 
   test('offers a LIVE Linear add-source affordance with honest copy (LIN-1351)', async ({ page }) => {
@@ -184,7 +183,9 @@ test.describe('Settings — Providers section (LIN-634)', () => {
   })
 
   test('refresh / test validates the binding and reports success', async ({ page }) => {
-    await page.locator('[data-testid="settings-provider-binding"][data-provider="local"] [data-testid="settings-provider-refresh"]').click()
+    const localBinding = page.locator('[data-testid="settings-provider-binding"][data-provider="local"]')
+    await openInPlace(localBinding)
+    await localBinding.locator('[data-testid="settings-provider-refresh"]').click()
     await page.waitForLoadState('networkidle')
     const notice = page.locator('[data-testid="settings-provider-notice"]')
     await expect(notice).toBeVisible()
@@ -207,6 +208,7 @@ test.describe('Settings — Providers section (LIN-634)', () => {
     // Both bindings coexist; local is active (●), GitHub offers "make active".
     await expect(localBinding.locator(SELECTORS.settings.providerActive)).toBeVisible()
     await expect(githubBinding.locator(SELECTORS.settings.providerActive)).toHaveCount(0)
+    await openInPlace(githubBinding)
     await expect(githubBinding.locator('[data-testid="settings-provider-activate"]')).toBeVisible()
 
     // Switch the active provider to GitHub.
@@ -217,6 +219,7 @@ test.describe('Settings — Providers section (LIN-634)', () => {
     // Active marker now tracks GitHub; local exposes the switch instead.
     await expect(githubBinding.locator(SELECTORS.settings.providerActive)).toBeVisible()
     await expect(localBinding.locator(SELECTORS.settings.providerActive)).toHaveCount(0)
+    await openInPlace(localBinding)
     await expect(localBinding.locator('[data-testid="settings-provider-activate"]')).toBeVisible()
 
     // Persisted: a fresh load keeps GitHub active.
@@ -277,9 +280,11 @@ test.describe('Settings — Providers section (LIN-634)', () => {
   })
 
   test('remove unlinks the binding and persists across reload', async ({ page }) => {
-    await page.locator('[data-testid="settings-provider-binding"][data-provider="local"] [data-testid="settings-provider-remove"]').click()
+    const localBinding = page.locator('[data-testid="settings-provider-binding"][data-provider="local"]')
+    await openInPlace(localBinding)
     // LIN-3846: removing asks first, in place; the confirm button is inside the opened row.
-    await page.locator('[data-testid="settings-provider-binding"][data-provider="local"] [data-testid="settings-provider-remove-confirm"]').click()
+    await openInPlace(localBinding.locator('[data-testid="settings-provider-remove"]'))
+    await localBinding.locator('[data-testid="settings-provider-remove-confirm"]').click()
     await page.waitForLoadState('networkidle')
 
     // Notice confirms removal and the binding is gone.

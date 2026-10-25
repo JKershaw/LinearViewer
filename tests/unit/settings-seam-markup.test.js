@@ -108,11 +108,10 @@ describe('the rows that Settings renders in place of class checks', () => {
     assert.match(html, /<input [^>]*data-testid="settings-newkey-label"/);
   });
 
-  test('a blocked GitHub add row is found by its test id and says why', () => {
+  test('an unconfigured GitHub source is not listed at all (LIN-3890 outcome 1)', () => {
     const html = renderSettingsPage('Acme', { ...BASE, githubEnabled: false });
-    const row = html.match(/<div[^>]*data-testid="settings-provider-add-github"[^]*?<\/div>/);
-    assert.ok(row, 'expected a github add row');
-    assert.match(row[0], /not configured on this server/);
+    assert.doesNotMatch(html, /data-testid="settings-provider-add-github"/);
+    assert.doesNotMatch(html, /not configured on this server/);
   });
 
   test('the Sources heading for your own sources is a title test id', () => {

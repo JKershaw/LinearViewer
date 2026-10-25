@@ -297,6 +297,17 @@ export function settings(page) {
  * Dashboard page object — project lookup without `:has-text()`.
  * @param {import('@playwright/test').Page} page
  */
+/**
+ * LIN-3890: a key row opens in place, and Revoke is an ask with its own Confirm
+ * (script transport, the existing DELETE route). Opens the row if it is closed,
+ * then Revoke, then Confirm. The row's locator is the `settings-key-*` element.
+ */
+export async function revokeKeyInPlace(row) {
+  if (!(await row.evaluate((el) => el.open))) await row.locator(':scope > summary').click()
+  await row.getByTestId('settings-key-revoke').locator(':scope > summary').click()
+  await row.getByTestId('settings-key-revoke-confirm').click()
+}
+
 export function dashboard(page) {
   return {
     getProject: (name) => page.locator(SELECTORS.project(name)),

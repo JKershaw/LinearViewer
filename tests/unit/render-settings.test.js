@@ -214,7 +214,7 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
     assert.match(html, /data-testid="settings-provider-binding"/);
     assert.match(html, /data-provider="linear"/);
     assert.match(html, /data-scope="org-123"/);
-    assert.match(html, /Linear:/);
+    assert.match(html, /<span class="settings-row-label">Linear</);
     // Masked token: only last 4 chars shown, secret hidden.
     assert.match(html, /••••9999/);
     assert.doesNotMatch(html, /lin_api_secret9999/);
@@ -251,7 +251,8 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
     assert.match(html, /\/settings\/providers\/switch/);
     // The active binding carries the ● marker, the inactive one the switch.
     const ghRow = html.slice(html.indexOf('data-provider="github"'));
-    assert.match(ghRow.slice(0, 600), /settings-provider-activate/);
+    // The row opens in place (LIN-3890), so the switch sits inside the github row's body.
+    assert.match(ghRow.slice(0, ghRow.indexOf('</details>')), /settings-provider-activate/);
   });
 
   test('no "make active" switch when the only binding is already active (LIN-717)', () => {
@@ -291,7 +292,7 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
   test('offers a working add affordance for Jira (unblocked, LIN-1885)', () => {
     const html = renderSettingsPage('Acme', BASE);
     assert.match(html, /data-testid="settings-provider-add-jira"/);
-    assert.match(html, /\+ Jira:/);
+    assert.match(html, /<span class="settings-row-label">Jira</);
   });
 
   // LIN-1885 research: server.js:2173 resolves a bound row's displayName via
@@ -312,8 +313,8 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
         { provider: 'jira', scope: 'https://acme.atlassian.net', displayName: jiraDisplayName, token: 'fake_jira_api_token1234', active: true },
       ],
     });
-    assert.match(html, /Jira:/);
-    assert.doesNotMatch(html, />jira:/, 'must never render the lowercase machine name as the visible label');
+    assert.match(html, /<span class="settings-row-label">Jira</);
+    assert.doesNotMatch(html, /settings-row-label">jira</, 'must never render the lowercase machine name as the visible label');
   });
 
   test('GitHub add affordances default to enabled when githubEnabled is omitted (LIN-761)', () => {
@@ -324,21 +325,15 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
     assert.doesNotMatch(html, /GitHub is not configured on this server/);
   });
 
-  test('disables BOTH GitHub add affordances with an honest reason when githubEnabled is false (LIN-761)', () => {
+  test('lists no GitHub add row when githubEnabled is false, and says nothing about it (LIN-761, LIN-3890 outcome 1)', () => {
     const html = renderSettingsPage('Acme', { ...BASE, githubEnabled: false });
-    // Both rows still render (data-testid preserved) but as blocked affordances,
-    // not live add buttons — one shared flag gates Issues + Projects, so the honest
-    // reason appears exactly twice (once per GitHub row).
-    assert.match(html, /data-testid="settings-provider-add-github"/);
-    assert.match(html, /data-testid="settings-provider-add-github-projects"/);
-    const reasonCount = (html.match(/GitHub is not configured on this server/g) || []).length;
-    assert.strictEqual(reasonCount, 2);
-    // Each GitHub row uses the blocked presentation. Linear is NOT gated by the
-    // GitHub config flag (LIN-1351 made its add-source live), so with GitHub
-    // disabled the ONLY live add button left is Linear's.
+    // Sources lists only what this server can add (LIN-3890): an unconfigured GitHub row is absent,
+    // not a blocked row. Linear is NOT gated by the GitHub config flag (LIN-1351), so it stays listed.
+    assert.doesNotMatch(html, /data-testid="settings-provider-add-github"/);
+    assert.doesNotMatch(html, /data-testid="settings-provider-add-github-projects"/);
+    assert.doesNotMatch(html, /GitHub is not configured on this server/);
     assert.match(html, /data-testid="settings-provider-add-linear"/);
     assert.match(html, /settings-provider-add-btn/);
-    // Honest reason, not a stale ticket-blocked message.
     assert.doesNotMatch(html, /blocked on LIN-541/);
   });
 
@@ -417,7 +412,8 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
 
   test('shows an empty state when there are no bindings', () => {
     const html = renderSettingsPage('Acme', { ...BASE, providerBindings: [] });
-    assert.match(html, /no provider bindings/);
+    assert.match(html, /settings-provider-empty/);
+    assert.match(html, /none yet/);
   });
 
   test('renders a provider notice when supplied (and escapes it)', () => {
@@ -470,7 +466,7 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
     });
     // Provider forms carry the dedicated `provider-form` class, never the
     // `feature-form` hook app.js delegates XHR toggles through.
-    assert.match(html, /class="settings-form provider-form"/);
+    assert.match(html, /class="settings-form settings-row-form"/);
     // The provider binding row must not expose the data-feature toggle hook.
     const bindingRow = html.slice(html.indexOf('settings-provider-binding'));
     const rowEnd = bindingRow.indexOf('</div>\n          </div>');

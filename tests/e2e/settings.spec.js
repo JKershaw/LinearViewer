@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/test-base.js'
 import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js'
-import { SELECTORS, nav, settings } from '../helpers.js'
+import { SELECTORS, nav, settings, revokeKeyInPlace } from '../helpers.js'
 
 // Proof-of-pattern spec for LIN-215: brittle `:has-text()` / class / href
 // selectors here are migrated to the stable `data-testid` selectors and page
@@ -272,7 +272,7 @@ test.describe('Token Management', () => {
     // Token should be in the key list on Settings › Agent access
     await openKeys(page, localWorkerUrlKey)
     await expect(keyRows(page)).toHaveCount(1)
-    await keyRows(page).locator('summary').click()
+    await keyRows(page).locator(':scope > summary').click()
     await expect(keyRows(page)).toContainText('listed-token')
     // LIN-3618: a new token carries a 90-day expiry and the list shows it
     await expect(keyRows(page)).toContainText(/expires in \d+d/)
@@ -289,8 +289,8 @@ test.describe('Token Management', () => {
     await expect(keyRows(page)).toHaveCount(1)
 
     // Revoke it: the button lives inside the opened row (the in-place confirmation, no dialog)
-    await keyRows(page).locator('summary').click()
-    await keyRows(page).getByTestId('settings-key-revoke').click()
+    await keyRows(page).locator(':scope > summary').click()
+    await revokeKeyInPlace(keyRows(page))
 
     // The list no longer has it
     await expect(keyRows(page)).toHaveCount(0)
@@ -371,8 +371,8 @@ test.describe('Token API Integration', () => {
     // Revoke via UI (the button is inside the opened row; the owner may revoke a queue token)
     await seedWorkspaceOwnership(page, localWorkerUrlKey)
     await page.goto(`/workspace/${localWorkerUrlKey}/settings/agent-access`)
-    await page.getByTestId('settings-key-dispatch').locator('summary').click()
-    await page.getByTestId('settings-key-dispatch').getByTestId('settings-key-revoke').click()
+    await page.getByTestId('settings-key-dispatch').locator(':scope > summary').click()
+    await revokeKeyInPlace(page.getByTestId('settings-key-dispatch'))
 
     // Wait for revoke to complete
     await expect(page.getByTestId('settings-key-dispatch')).toHaveCount(0)

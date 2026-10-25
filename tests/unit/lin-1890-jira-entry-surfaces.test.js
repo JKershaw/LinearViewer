@@ -303,16 +303,11 @@ describe('LIN-2010 step 9 — Settings add-row gate (F1, unit-level proof ahead 
     assert.ok(!settingsHtml(true).includes('data-testid="settings-provider-add-local"'));
   });
 
-  test('an unconfigured server blocks BOTH github and github-projects rows — exact class/copy tests/e2e/settings-providers.spec.js pins', () => {
+  test('an unconfigured server lists NEITHER github nor github-projects (LIN-3890: only what this server can add)', () => {
     unconfigureGithub();
     const html = settingsHtml(isGitHubConfigured());
-
-    const githubRowMatch = html.match(/<div[^>]*data-testid="settings-provider-add-github"[^]*?<\/div>/);
-    assert.ok(githubRowMatch, 'expected a blocked github row');
-    assert.match(githubRowMatch[0], /not configured on this server/);
-
-    const projectsRowMatch = html.match(/<div[^>]*data-testid="settings-provider-add-github-projects"[^]*?<\/div>/);
-    assert.ok(projectsRowMatch, 'expected a blocked github-projects row');
-    assert.match(projectsRowMatch[0], /not configured on this server/);
+    assert.doesNotMatch(html, /data-testid="settings-provider-add-github"/);
+    assert.doesNotMatch(html, /data-testid="settings-provider-add-github-projects"/);
+    assert.doesNotMatch(html, /not configured on this server/);
   });
 });

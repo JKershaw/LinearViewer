@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
-import { SELECTORS } from '../helpers.js';
+import { SELECTORS, revokeKeyInPlace } from '../helpers.js';
 import { seedLocalWorkspace } from '../fixtures/local-harness.js';
 import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 
@@ -938,7 +938,7 @@ test.describe('Dispatch Page', () => {
       await page.getByTestId('dispatch-keys-link').click();
       const tokenItem = page.getByTestId('settings-key-dispatch');
       await expect(tokenItem).toBeVisible();
-      await tokenItem.locator('summary').click();
+      await tokenItem.locator(':scope > summary').click();
       await expect(tokenItem).toContainText('List Token');
     });
 
@@ -953,8 +953,8 @@ test.describe('Dispatch Page', () => {
 
       // Revoke the token from the key list (the button is inside the opened row)
       await page.getByTestId('dispatch-keys-link').click();
-      await page.getByTestId('settings-key-dispatch').locator('summary').click();
-      await page.getByTestId('settings-key-dispatch').getByTestId('settings-key-revoke').click();
+      await page.getByTestId('settings-key-dispatch').locator(':scope > summary').click();
+      await revokeKeyInPlace(page.getByTestId('settings-key-dispatch'));
 
       // Token should be removed
       await expect(page.getByTestId('settings-key-dispatch')).toHaveCount(0);
