@@ -188,3 +188,164 @@ describe('GET /api/image proxy — provider guard on the auth header (LIN-1899)'
     assert.strictEqual('Authorization' in (sawInit.headers || {}), false);
   });
 });
+
+// =============================================================================
+// LIN-3873 — behaviour pins for the input and fetch guards with no witness
+// =============================================================================
+//
+// Each case drives the real route through buildApp() and records every outbound
+// fetch instead of letting it reach the network. A removed or weakened guard
+// must turn its case red by a changed status, message, or recorded upstream
+// call, never by a live request. The mutation witnesses for these guards are
+// recorded in the PR.
+
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
+
+// Upstream Response stub with an optional advertised Content-Length.
+function upstreamResponse({ contentLength = null, body = PNG } = {}) {
+  return {
+    ok: true,
+    status: 200,
+    headers: {
+      get: (name) => {
+        const key = name.toLowerCase();
+        if (key === 'content-type') return 'image/png';
+        if (key === 'content-length') return contentLength === null ? null : String(contentLength);
+        return null;
+      },
+    },
+    async arrayBuffer() { return body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength); },
+  };
+}
+
+async function getImageRaw(app, search) {
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise(r => server.once('listening', r));
+  const { port } = server.address();
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/workspace/ws/api/image${search}`);
+    return { status: res.status, body: Buffer.from(await res.arrayBuffer()) };
+  } finally {
+    server.close();
+  }
+}
+
+describe('GET /api/image proxy — input and fetch guards (LIN-3873)', () => {
+  let realFetch;
+  let upstream;
+  let upstreamCalls;
+  let upstreamInit;
+
+  beforeEach(() => {
+    realFetch = globalThis.fetch;
+    upstreamCalls = [];
+    upstreamInit = null;
+    upstream = () => Promise.resolve(upstreamResponse());
+    globalThis.fetch = (input, init) => {
+      const u = typeof input === 'string' ? input : input?.url || '';
+      if (u.startsWith('http://127.0.0.1')) return realFetch(input, init);
+      // Any other outbound call is recorded, so a removed guard shows up as an
+      // upstream call instead of a request to a live host.
+      upstreamCalls.push(u);
+      upstreamInit = init;
+      return upstream(u, init);
+    };
+  });
+
+  afterEach(() => { globalThis.fetch = realFetch; });
+
+  const errorOf = (res) => JSON.parse(res.body.toString('utf8')).error;
+
+  test('a request with no url, or an empty url, answers 400 Missing url parameter and makes no fetch', async () => {
+    for (const search of ['', '?url=']) {
+      const res = await getImageRaw(buildApp(), search);
+
+      assert.strictEqual(res.status, 400, `status for "${search}"`);
+      assert.strictEqual(errorOf(res), 'Missing url parameter', `message for "${search}"`);
+    }
+    assert.deepStrictEqual(upstreamCalls, []);
+  });
+
+  test('a non-HTTPS url answers 400 and makes no fetch (https-only)', async () => {
+    // Widening startsWith('https://') to http leaves every other case green, so
+    // this one is the pin: an http URL on an allowed host must still be refused.
+    const res = await getImage(buildApp(), 'http://uploads.linear.app/abc/shot.png');
+
+    assert.strictEqual(res.status, 400);
+    assert.strictEqual(errorOf(res), 'Invalid image URL: must be HTTPS');
+    assert.deepStrictEqual(upstreamCalls, []);
+  });
+
+  test('a url whose pathname contains .. answers 400 path traversal and makes no fetch', async () => {
+    // WHATWG URL already collapses real dot-segments, so the check only sees a
+    // literal `..` substring in the parsed pathname. That substring is what is pinned.
+    const res = await getImage(buildApp(), 'https://uploads.linear.app/abc/evil..png');
+
+    assert.strictEqual(res.status, 400);
+    assert.strictEqual(errorOf(res), 'Invalid image URL: path traversal not allowed');
+    assert.deepStrictEqual(upstreamCalls, []);
+  });
+
+  test('an unparsable https url answers 400 Invalid image URL format and makes no fetch', async () => {
+    // Both pass the https:// prefix check, so only the URL parse rejects them.
+    for (const bad of ['https://', 'https://uploads.linear.app:99999/abc/shot.png']) {
+      const res = await getImage(buildApp(), bad);
+
+      assert.strictEqual(res.status, 400, `status for ${bad}`);
+      assert.strictEqual(errorOf(res), 'Invalid image URL format', `message for ${bad}`);
+    }
+    assert.deepStrictEqual(upstreamCalls, []);
+  });
+
+  test('the upstream fetch refuses redirects, and a redirect error answers 400 Redirects not allowed', async () => {
+    upstream = () => Promise.reject(new TypeError('unexpected redirect'));
+
+    const res = await getImage(buildApp(), 'https://uploads.linear.app/abc/shot.png');
+
+    assert.strictEqual(upstreamInit.redirect, 'error', 'fetch must be called with redirect: error');
+    assert.strictEqual(res.status, 400);
+    assert.strictEqual(errorOf(res), 'Redirects not allowed');
+  });
+
+  test('a too-many-redirects cause is also reported as Redirects not allowed', async () => {
+    upstream = () => Promise.reject(Object.assign(new TypeError('fetch failed'), {
+      cause: { code: 'ERR_FR_TOO_MANY_REDIRECTS' },
+    }));
+
+    const res = await getImage(buildApp(), 'https://uploads.linear.app/abc/shot.png');
+
+    assert.strictEqual(res.status, 400);
+    assert.strictEqual(errorOf(res), 'Redirects not allowed');
+  });
+
+  test('an upstream that advertises more than 10 MB in Content-Length answers 413 and relays nothing', async () => {
+    upstream = () => Promise.resolve(upstreamResponse({ contentLength: MAX_IMAGE_SIZE + 1 }));
+
+    const res = await getImage(buildApp(), 'https://uploads.linear.app/abc/huge.png');
+
+    assert.strictEqual(res.status, 413);
+    assert.strictEqual(errorOf(res), 'Image too large');
+    assert.ok(!res.body.equals(PNG), 'no image bytes are relayed');
+  });
+
+  test('an upstream body over 10 MB with no Content-Length answers 413 and relays nothing', async () => {
+    // The advertised size is absent, so only the byte-length check can catch this.
+    const oversized = Buffer.concat([PNG, Buffer.alloc(MAX_IMAGE_SIZE + 1 - PNG.length)]);
+    upstream = () => Promise.resolve(upstreamResponse({ body: oversized }));
+
+    const res = await getImage(buildApp(), 'https://uploads.linear.app/abc/huge.png');
+
+    assert.strictEqual(res.status, 413);
+    assert.strictEqual(errorOf(res), 'Image too large');
+  });
+
+  test('an image of exactly 10 MB is still served (the limit is inclusive)', async () => {
+    const atLimit = Buffer.concat([PNG, Buffer.alloc(MAX_IMAGE_SIZE - PNG.length)]);
+    upstream = () => Promise.resolve(upstreamResponse({ contentLength: MAX_IMAGE_SIZE, body: atLimit }));
+
+    const res = await getImage(buildApp(), 'https://uploads.linear.app/abc/edge.png');
+
+    assert.strictEqual(res.status, 200);
+    assert.ok(res.body.equals(atLimit));
+  });
+});
