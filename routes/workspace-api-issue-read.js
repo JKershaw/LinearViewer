@@ -245,8 +245,12 @@ export function registerIssueReadRoutes(router, { workspaceFromUrl, getOpenRoute
       res.set('Cache-Control', 'private, max-age=3600');
       res.send(buffer);
     } catch (error) {
-      // Handle redirect errors specifically
-      if (error.cause?.code === 'ERR_FR_TOO_MANY_REDIRECTS' || error.message?.includes('redirect')) {
+      // Handle redirect errors specifically. The real undici error for
+      // `redirect: 'error'` is `TypeError('fetch failed')` whose cause says
+      // 'unexpected redirect' (LIN-3873; same shape as routes/proxy-reads.js, LIN-3569).
+      if (error.cause?.code === 'ERR_FR_TOO_MANY_REDIRECTS'
+        || error.cause?.message === 'unexpected redirect'
+        || error.message?.includes('redirect')) {
         return badRequest.json(res, 'Redirects not allowed');
       }
       console.error('Image proxy error:', error);

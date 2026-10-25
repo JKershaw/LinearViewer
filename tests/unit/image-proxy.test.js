@@ -298,7 +298,11 @@ describe('GET /api/image proxy — input and fetch guards (LIN-3873)', () => {
   });
 
   test('the upstream fetch refuses redirects, and a redirect error answers 400 Redirects not allowed', async () => {
-    upstream = () => Promise.reject(new TypeError('unexpected redirect'));
+    // The real undici shape for `redirect: 'error'`: the message is only
+    // 'fetch failed' and the reason sits on the cause (as routes/proxy-reads.js
+    // notes for LIN-3569). A fake that puts 'redirect' in the message hid that
+    // this route answered 500 for a real redirect.
+    upstream = () => Promise.reject(new TypeError('fetch failed', { cause: new Error('unexpected redirect') }));
 
     const res = await getImage(buildApp(), 'https://uploads.linear.app/abc/shot.png');
 
@@ -307,15 +311,19 @@ describe('GET /api/image proxy — input and fetch guards (LIN-3873)', () => {
     assert.strictEqual(errorOf(res), 'Redirects not allowed');
   });
 
-  test('a too-many-redirects cause is also reported as Redirects not allowed', async () => {
-    upstream = () => Promise.reject(Object.assign(new TypeError('fetch failed'), {
-      cause: { code: 'ERR_FR_TOO_MANY_REDIRECTS' },
-    }));
+  test('a too-many-redirects cause, or redirect in the message, is also reported as Redirects not allowed', async () => {
+    const shapes = [
+      Object.assign(new TypeError('fetch failed'), { cause: { code: 'ERR_FR_TOO_MANY_REDIRECTS' } }),
+      new TypeError('redirect mode is set to error'),
+    ];
+    for (const error of shapes) {
+      upstream = () => Promise.reject(error);
 
-    const res = await getImage(buildApp(), 'https://uploads.linear.app/abc/shot.png');
+      const res = await getImage(buildApp(), 'https://uploads.linear.app/abc/shot.png');
 
-    assert.strictEqual(res.status, 400);
-    assert.strictEqual(errorOf(res), 'Redirects not allowed');
+      assert.strictEqual(res.status, 400, `status for ${error.message}`);
+      assert.strictEqual(errorOf(res), 'Redirects not allowed', `message for ${error.message}`);
+    }
   });
 
   test('an upstream that advertises more than 10 MB in Content-Length answers 413 and relays nothing', async () => {
