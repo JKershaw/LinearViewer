@@ -135,7 +135,8 @@ async function makeWorld() {
     dispatchQueueStore: dispatchStore,
     dispatchTokenStore: dispatchTokens,
     workspaceFromUrl: (req, _res, next) => {
-      req.workspace = { urlKey: req.params.urlKey || URL_KEY, id: POSTER_WORKSPACE, provider: 'linear' };
+      // The test token keeps the decision panel's model catalog on its mock path (lib/should-mock-ai.js): no live OpenRouter call.
+      req.workspace = { urlKey: req.params.urlKey || URL_KEY, id: POSTER_WORKSPACE, provider: 'linear', accessToken: 'test-token' };
       req.session = { accountId };
       next();
     },
