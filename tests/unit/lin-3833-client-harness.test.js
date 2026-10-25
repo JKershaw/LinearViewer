@@ -10,6 +10,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { withHarnessModels } from '../fixtures/harness-models.js';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
@@ -32,7 +33,7 @@ function loadCommon() {
     clearTimeout,
   };
   vm.createContext(sandbox);
-  vm.runInContext(readFileSync(join(__dirname, '../../public/common.js'), 'utf8'), sandbox, { filename: 'common.js' });
+  vm.runInContext(withHarnessModels(readFileSync(join(__dirname, '../../public/common.js'), 'utf8')), sandbox, { filename: 'common.js' });
   sandbox.window.api = async (url, opts) => { calls.api.push({ url, opts }); return { ok: true }; };
   return { win: sandbox.window, calls };
 }
