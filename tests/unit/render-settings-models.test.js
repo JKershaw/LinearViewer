@@ -48,6 +48,12 @@ describe('what a row says', () => {
     assert.match(html, /data-testid="models-job-review"[\s\S]*?no runs/);
   });
 
+  test('the no-runs flag is its own tag after the job name, so the two never run together (LIN-3855 review)', () => {
+    const html = body(emptyTable());
+    assert.match(html, /settings-row-label">Review<span class="settings-row-flags"><span class="settings-row-flag">no runs<\/span><\/span><\/span>/);
+    assert.doesNotMatch(html, /Reviewno runs/);
+  });
+
   test('a Harbour job is on the Harbour surface, with no harness or effort field', () => {
     const html = body(emptyTable());
     const row = html.slice(html.indexOf('data-testid="models-job-brief"'), html.indexOf('data-testid="models-job-brief"') + 4000);
@@ -83,6 +89,31 @@ describe('the option set a row offers', () => {
   test('a row naming no harness offers both, so an OpenRouter-only pick is possible', () => {
     const ids = agentOptions(null, []).map((o) => o.id);
     assert.ok(ids.includes('sonnet') && ids.includes('openai/gpt-5.5'));
+  });
+});
+
+describe('the blank option on a group and the No job row', () => {
+  // One change panel, from its testid to its closing div: a match cannot run on into the next row's panel.
+  const panelOf = (html, testid) => {
+    const start = html.indexOf(`data-testid="${testid}"`);
+    assert.notEqual(start, -1, testid);
+    return html.slice(start, html.indexOf('</div>', start));
+  };
+
+  test('an agent group with no setting reads "Not set": nothing above it fills the blank (LIN-3855 ruling)', () => {
+    const html = body(emptyTable());
+    assert.match(panelOf(html, 'models-panel-group-agent-session-make'), /<option value=""[^>]*>Not set<\/option>/);
+  });
+
+  test('the No job row reads "Not set" too: it is the suggestion, and no group sits above it', () => {
+    const html = body(emptyTable());
+    assert.match(panelOf(html, 'models-panel-default-agent-session-default'), /<option value=""[^>]*>Not set<\/option>/);
+  });
+
+  test('no blank option on the page says "Inherit the default": a blank group reads nothing above it (agent and Harbour alike)', () => {
+    const html = body(emptyTable());
+    assert.match(panelOf(html, 'models-panel-group-harbour-call-make'), /<option value=""[^>]*>Not set<\/option>/);
+    assert.doesNotMatch(html, /Inherit the default/);
   });
 });
 

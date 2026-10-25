@@ -806,11 +806,29 @@
   text-decoration: underline;
 }
 
+/* The save blocks sit between the Models groups: a gap on both sides, and the reason labels in the sans
+   the other Settings labels use (LIN-3855 review). */
 .models-save,
 .models-preset-save {
   display: grid;
   gap: var(--space-2);
-  margin-top: var(--space-4);
+  margin: var(--space-4) 0;
+}
+
+.models-save .settings-ask-label,
+.models-preset-save .settings-ask-label {
+  font-family: var(--font-content);
+}
+
+/* A job row's flag (no runs) is a tag after its name, not part of it (LIN-3855 review). */
+.models-form .settings-row-flags {
+  margin-left: var(--space-2);
+}
+
+.models-form .settings-row-flag {
+  color: var(--muted);
+  font-family: var(--font-content);
+  font-size: 0.85em;
 }
 
 @media (max-width: 640px) {
