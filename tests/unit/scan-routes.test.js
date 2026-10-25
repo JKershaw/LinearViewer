@@ -13,7 +13,7 @@
  *
  * Run with: node --test tests/unit/scan-routes.test.js
  */
-import { test, describe, before, beforeEach } from 'node:test';
+import { test, describe, before, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'http';
 import express from 'express';
@@ -24,6 +24,11 @@ import { createSessionsFeedCache } from '../../lib/sessions-feed-cache.js';
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
 import { dueBasisHashFromContext } from '../../lib/scan-fingerprint.js';
 import { testMockData } from '../../lib/sample-data/mock-data.js';
+import { buildMockRecapContext } from '../../lib/workspace-api-mocks.js';
+import { setFetchImpl } from '../../lib/openrouter.js';
+import { registerProvider } from '../../lib/providers/registry.js';
+import { emptyTable } from '../../lib/model-routing.js';
+import { loadContext } from '../../routes/workspace-api-steps.js';
 
 before(() => { process.env.NODE_ENV = 'test'; });
 
@@ -1006,5 +1011,137 @@ describe('LIN-2755: ruling-write cache invalidation (RED until beat 3)', () => {
       const result = await postLocal(app, `/workspace/${CACHE_URL_KEY}/api/scan/${ZERO_FINDING_ISSUE}/unretire`, { id: stamped.id });
       assert.equal(result.status, 200, 'the unretire itself must succeed');
     });
+  });
+});
+
+// LIN-3879: the retire route resolves its model with `opKind: 'scan-retire'`
+// (routes/workspace-api-scan.js). The default harness cannot see it: under the
+// test token the AI mock never reads `model`. So this drives the real streamChat
+// path on a non-mock workspace, with a fake provider for the context and the
+// OpenRouter transport seam (`setFetchImpl`) recording each request's model.
+const RETIRE_FAKE_PROVIDER = 'lin-3879-fake-provider';
+const RETIRE_SESSION_KEY = 'sk-or-lin-3879';
+const SCAN_MODEL = 'test/scan-model';
+const RETIRE_MODEL = 'test/retire-model';
+
+describe('LIN-3879: retire resolves the scan-retire model (routes/workspace-api-scan.js)', () => {
+  let requestedModels;
+
+  // `scan` and `scan-retire` get different models. Built by hand: tableFromPreferences
+  // seeds scan-retire from scan (lib/model-routing.js), so it cannot tell them apart.
+  function distinctRoutingTable() {
+    const table = emptyTable();
+    table.jobs.scan = { model: SCAN_MODEL };
+    table.jobs['scan-retire'] = { model: RETIRE_MODEL };
+    return table;
+  }
+
+  // A minimal SSE reply (the shape openrouter.test.js uses) carrying a zero-finding scan.
+  function zeroFindingStream() {
+    const enc = new TextEncoder();
+    const blocks = [
+      `data: ${JSON.stringify({ choices: [{ delta: { content: '{"has_decision":false}' }, finish_reason: null }] })}\n\n`,
+      `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }] })}\n\n`,
+      'data: [DONE]\n\n'
+    ];
+    return { ok: true, body: (async function* () { for (const b of blocks) yield enc.encode(b); })() };
+  }
+
+  beforeEach(() => {
+    requestedModels = [];
+    // The registry has no unregister; the name is unique to this file, so no other test resolves it.
+    registerProvider({
+      name: RETIRE_FAKE_PROVIDER,
+      supports: () => true,
+      fetchRecommendationContext: async () => buildMockRecapContext(ZERO_FINDING_ISSUE)
+    });
+    setFetchImpl(async (_url, init) => {
+      requestedModels.push(JSON.parse(init.body).model);
+      return zeroFindingStream();
+    });
+    app = buildApp({
+      workspaceFromUrl: (req, _res, next) => {
+        req.workspace = { accessToken: 'real-token', provider: RETIRE_FAKE_PROVIDER, urlKey: 'test-workspace' };
+        req.session = { openRouterApiKey: RETIRE_SESSION_KEY };
+        next();
+      },
+      workspacePreferencesStore: { getRoutingTable: async () => distinctRoutingTable() }
+    });
+  });
+
+  afterEach(() => { setFetchImpl(null); });
+
+  test('retire sends the scan-retire model, not the scan model, on the real streamChat path', async () => {
+    const seeded = await seedRow(CANONICAL_ZERO_FINDING_ISSUE_ID, 'seed-hash-lin-3879'.padEnd(64, '0'));
+    const result = await post(`/workspace/test-workspace/api/scan/${ZERO_FINDING_ISSUE}/retire`, { id: seeded.id });
+
+    assert.equal(result.status, 200);
+    assert.equal(result.body.retired, true, 'sanity: the zero-finding re-scan retires the row');
+    assert.equal(requestedModels.length, 1, 'exactly one OpenRouter request: the retire re-scan');
+    assert.equal(requestedModels[0], RETIRE_MODEL);
+  });
+
+  test('control: POST scan on the same table sends the scan model, so the fixture really distinguishes the two', async () => {
+    const posted = await post(`/workspace/test-workspace/api/scan/${ZERO_FINDING_ISSUE}`);
+
+    assert.equal(posted.status, 200);
+    assert.equal(requestedModels.length, 1, 'exactly one OpenRouter request: the scan');
+    assert.equal(requestedModels[0], SCAN_MODEL);
+  });
+});
+
+// LIN-3879: POST scan trims `issueSource` before storing it (routes/workspace-api-scan.js, LIN-3335).
+describe('LIN-3879: POST scan stores a trimmed issueSource', () => {
+  test('a padded ?source is stored trimmed', async () => {
+    const posted = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}?source=%20local%20`);
+
+    assert.equal(posted.status, 200);
+    const row = collection._docs.find(d => d._id === posted.body.id);
+    assert.equal(row.issueSource, 'local');
+  });
+
+  test('a whitespace-only ?source stores no issueSource key at all', async () => {
+    const posted = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}?source=%20%20`);
+
+    assert.equal(posted.status, 200);
+    const row = collection._docs.find(d => d._id === posted.body.id);
+    assert.equal('issueSource' in row, false, 'sparse: a blank source adds no key');
+  });
+
+  test('an absent ?source stores no issueSource key', async () => {
+    const posted = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
+
+    assert.equal(posted.status, 200);
+    const row = collection._docs.find(d => d._id === posted.body.id);
+    assert.equal('issueSource' in row, false, 'sparse: a legacy scan adds no key');
+  });
+});
+
+// LIN-3879: loadContext's `missing: !context` arm (routes/workspace-api-steps.js). One unit
+// test covers every caller (scan GET/POST/retire, recap, brief); the route test pins the
+// scan POST 404 consumer-visible effect.
+describe('LIN-3879: loadContext missing arm', () => {
+  const workspace = { accessToken: 'test-token', urlKey: 'test-workspace' };
+
+  test('an issue absent from the fixtures resolves missing: true with no context', async () => {
+    const { context, missing } = await loadContext(workspace, 'TEST-NOPE', {});
+
+    assert.equal(context, null);
+    assert.equal(missing, true);
+  });
+
+  test('a fixture issue resolves missing: false with its context', async () => {
+    const { context, missing } = await loadContext(workspace, ZERO_FINDING_ISSUE, {});
+
+    assert.equal(missing, false);
+    assert.equal(context.issue.id, CANONICAL_ZERO_FINDING_ISSUE_ID);
+  });
+
+  test('POST scan on an absent issue replies 404 and persists nothing', async () => {
+    const posted = await post('/workspace/test-workspace/api/scan/TEST-NOPE');
+
+    assert.equal(posted.status, 404);
+    assert.deepEqual(posted.body, { error: 'Issue not found' });
+    assert.equal(collection._docs.length, 0);
   });
 });
