@@ -176,7 +176,7 @@ The class is "a rule written in 2 or more places that Settings shares". Two repr
 ### 11. Key row
 
 - **Decides:** one issued key in a list.
-- **Authority:** `keyRow` (`lib/render-settings-workspace.js:95`), built on `drillRow`.
+- **Authority:** `keyRow` (`lib/components/settings-key-row.js`), built on `drillRow` and `askInPlace`.
 - **Reason, and why this is not an open question:** the ticket named the token list shared by Proxy and Dispatch (`common-actions.css:92-152`) as a second claimant. At base **nothing emits it**: `.token-list`, `.proxy-token-list`, `.token-item`, `.token-info`, `.token-label-text`, `.token-meta` and `.token-revoke` appear in no file under `lib/`, `public/*.js`, `routes/` or `server.js` (`git grep` returns only CSS, tests and docs). Only `.token-ownerless` (`proxy.js:270`) is live, plus the mint form and modal (`token-form`, `token-modal`, `token-copy-btn`, `token-display`, `token-usage-hint`, `token-label-input`). So Settings' `keyRow` is the only live key row.
 - **If this reading is wrong** (a runtime emitter built by string concatenation that the grep cannot see), `keyRow` still stands and the list becomes **open question 2**.
 - **Counting rule:** a site is a rule or builder that renders one key.
@@ -305,7 +305,7 @@ The Rebuild PR builds every non-Models Settings area from the shared pieces (`li
 | 8 Ask in place | `askInPlace` in `lib/components/settings-ask.js`: Confirm, Cancel, `form` transport (POST only) and `script` transport (DELETE, one generic handler in `public/settings.js`) | done. The dispatch halt buttons and Models' preset delete stay out (open questions 4 and 5) |
 | 9 Note | `groupNote` / `.settings-note` | done; notes fit one line in the 600px pane at 1280px (the consent blast-radius copy is shared with `/auth/openrouter` and stays as it was) |
 | 10 Group title | `group()` in `lib/components/settings-group.js` | done |
-| 11 Key row | `keyRow` (name first, then kind, relative expiry and last use; the flag on the row; Revoke is an ask with `transport: 'script'`) | done |
+| 11 Key row | `keyRow` in `lib/components/settings-key-row.js` (name first, then kind, relative expiry and last use; the flag on the row; Revoke is an ask with `transport: 'script'`) | done |
 | 12 Area frame | `renderSettingsShell` in `lib/components/settings-frame.js` (the page header inside the frame, hidden on a phone area view; one purpose line; the phone index paints no selection, the desktop index keeps the first area current) | done |
 | status line | `statusLine` in `lib/components/settings-group.js` (`settings-flash` and `settings-flash-error` kept) | new at head |
 | sidebar state | `SIDEBAR_TONES` in `lib/settings-areas.js` (`ok`, `warn`, `bad`) | done (amber for paused and stopped) |

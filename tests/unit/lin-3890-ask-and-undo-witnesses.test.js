@@ -78,3 +78,17 @@ test('"(experimental)" is said once, in the experiments group, never on a row', 
   assert.match(html, /Experiments · for you/);
   assert.match(html, /data-testid="settings-section-views"/);
 });
+
+test('a change-log entry with an Undo names its change: "Undo: <summary>", never a bare "Undo"', () => {
+  const rows = [{ source: 'workspace', setting: 'periodicals', id: 'p1', undoable: true, summary: 'Periodic reviews on', at: '2026-10-25T11:00:00.000Z', actorName: 'Ann' }];
+  const html = changeLogBody({ urlKey: 'w', rows, isOwner: true, now: Date.parse('2026-10-25T12:00:00.000Z') });
+  assert.match(html, /data-testid="settings-undo-p1"/);
+  assert.match(html, /Undo: Periodic reviews on/);
+});
+
+test('the Agent access note says agents cannot change the switch, not the old "No proxy endpoint … may change it" wording', () => {
+  const html = agentAccessBody({ urlKey: 'w', keys: [], now: Date.parse('2026-10-25T12:00:00.000Z') });
+  assert.match(html, /Agents cannot change this switch/);
+  assert.doesNotMatch(html, /No proxy endpoint/);
+  assert.doesNotMatch(html, /may change it/);
+});

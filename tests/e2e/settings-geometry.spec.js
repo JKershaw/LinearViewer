@@ -90,7 +90,7 @@ test.describe('Settings geometry (LIN-3890)', () => {
 
     await settings(page).gotoArea(urlKey, 'sources');
     // The page header is hidden on the phone area view, so "‹ Settings" is the first thing on the page.
-    await expect(page.locator('.settings-page-head')).toBeHidden();
+    await expect(page.locator('[data-testid="settings-page-head"]')).toBeHidden();
     const top = async (selector) => (await page.locator(selector).first().boundingBox()).y;
     const back = await top('[data-testid="settings-back"]');
     const title = await top('.settings-area-title');

@@ -441,6 +441,7 @@
 
 .provider-active {
   color: var(--green);
+  margin-left: var(--space-1);
 }
 
 /* De-emphasized coverage-limitation sub-label (LIN-2357 provider-context disclosure). */
@@ -871,5 +872,12 @@
 
   .settings-pane {
     max-width: none;
+  }
+}
+
+/* Models' body keeps the page's small-phone size until LIN-3855 rebuilds it (the Settings root is 1rem on a phone). */
+@media (max-width: 400px) {
+  .settings-shell[data-area="models"] .settings-pane > .settings-section {
+    font-size: 13px;
   }
 }

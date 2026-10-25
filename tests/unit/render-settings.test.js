@@ -1045,7 +1045,8 @@ describe('renderSettingsPage — OpenRouter unattended-use consent (LIN-2412)', 
 
   test('LIN-3846: the free tier says the limit is on new runs, resets at midnight UTC, and prompts are not limited (one line, LIN-3890 outcome 5)', () => {
     const html = renderSettingsPage('Acme', { ...BASE, openRouterSource: 'free' });
-    assert.match(html, /new runs per account reset at midnight UTC/);
+    assert.match(html, /limit on new runs/);
+    assert.match(html, /reset at midnight UTC/);
     assert.match(html, /Prompts are not limited/);
   });
 
