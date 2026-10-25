@@ -1261,6 +1261,19 @@ describe('collectUnansweredDecisions — worker/autopilot join (LIN-3959)', () =
     }
   });
 
+  test('a non-autopilot loop that holds the sessionId never joins: the kind guard is what keeps the rows apart', () => {
+    // `lead-1` carries the same decision on the same ticket, so it forms its own
+    // group; only the `kind === 'autopilot'` check on the resolved loop keeps it
+    // from joining the worker (LIN-3959 review item 4).
+    const lead = loop({
+      loopId: 'lead-1', lineageId: 'lead-1', kind: 'build', issueIdentifier: 'LIN-900',
+      decision: decision('d-1'), wakeMarker: 'blocked', dispatchedAt: T_AP
+    });
+    const rows = rowsFor([worker({ sessionId: 'lead-1' }), lead]);
+    assert.strictEqual(rows.length, 2);
+    assert.ok(rows.every(r => r.stampLoopIds === undefined), 'neither row is joined');
+  });
+
   test('the same decision_id on a different ticket stays a separate row', () => {
     const rows = rowsFor([autopilot(), worker({ issueIdentifier: 'LIN-901' })]);
     assert.strictEqual(rows.length, 2);
@@ -1290,6 +1303,21 @@ describe('collectUnansweredDecisions — worker/autopilot join (LIN-3959)', () =
     const rows = rowsFor([autopilot(), worker(), worker({ loopId: 'wk-2', lineageId: 'wk-2', dispatchedAt: T_WK })]);
     assert.strictEqual(rows.length, 1);
     assert.strictEqual(rows[0].stampLoopIds.length, 3, 'every member is stamped');
+  });
+
+  test('a cluster larger than MAX_STAMP_LOOP_IDS caps stampLoopIds at the bound, chosen side first', () => {
+    // Nine workers and one autopilot: ten copies. The list the row hands the
+    // client must be one the stamp routes accept (LIN-3959 review item 6).
+    const workers = Array.from({ length: 9 }, (_, i) => worker({
+      loopId: `wk-${i + 1}`, lineageId: `wk-${i + 1}`,
+      dispatchedAt: new Date(Date.parse(T_WK) + i * 60000).toISOString()
+    }));
+    const rows = rowsFor([autopilot(), ...workers]);
+    assert.strictEqual(rows.length, 1);
+    assert.strictEqual(rows[0].stampLoopIds.length, MAX_STAMP_LOOP_IDS);
+    assert.strictEqual(rows[0].stampLoopIds[0], rows[0].stampLoopId, 'the chosen side stays first');
+    assert.strictEqual(new Set(rows[0].stampLoopIds).size, MAX_STAMP_LOOP_IDS);
+    assert.notStrictEqual(parseStampLoopIds(rows[0].stampLoopIds), null, 'the routes accept the capped list');
   });
 
   test('resume choice: worker resumable → the worker is resumed (the autopilot is not)', () => {
