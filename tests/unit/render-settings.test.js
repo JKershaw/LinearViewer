@@ -941,9 +941,9 @@ describe('renderSettingsPage — areas and their groups (LIN-3846, replaces the 
   // workspace and "You". The sidebar is on every page.
   const page = (area, extra = {}) => renderSettingsPage('Acme', { ...BASE, area, ...extra });
 
-  test('the sidebar lists every area in two groups on every page', () => {
+  test('the sidebar lists every area in two groups on every page (the workspace group is titled with its name, LIN-3890)', () => {
     const html = page('account');
-    assert.match(html, />Workspace</);
+    assert.match(html, />Acme</);
     assert.match(html, />You</);
     for (const id of ['sources', 'models', 'running', 'agent-access', 'health', 'change-log', 'features', 'account']) {
       assert.match(html, new RegExp(`data-testid="settings-nav-${id}"`), `nav row for ${id}`);

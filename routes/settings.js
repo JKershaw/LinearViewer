@@ -244,7 +244,8 @@ export function createSettingsRouter(deps) {
       providerBindings,
       defaultModelName: modelDisplayName(currentModel, AVAILABLE_MODELS),
       haltMode, hasRunner,
-      keyCount: keys.length,
+      // Person-made live keys only: per-run keys are a separate row (LIN-3890).
+      keyCount: keys.filter(k => !k.run).length,
       healthProblems: problems.length,
       changeLogCount: changeRows.length,
       featuresOn: Object.keys(FEATURE_DEFAULTS).filter(k => featureFlags[k] ?? FEATURE_DEFAULTS[k]).length + (proxyDefault ? 1 : 0),
@@ -331,6 +332,7 @@ export function createSettingsRouter(deps) {
       keys,
       health: { problems, lastPoll },
       changeLogRows: changeRows,
+      viewerAccountId: req.session?.accountId || null,
       // Gate the GitHub add affordance on the SAME shared predicate the
       // /auth/github route guard and landing hero use (LIN-761).
       githubEnabled: getProvider('github').entryCta.isConfigured(),

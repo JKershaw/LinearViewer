@@ -69,10 +69,12 @@ describe('revoke uses today\'s DELETE routes and their owner rules', () => {
 });
 
 describe('the list shows what a person needs', () => {
-  test('expiry, last use, and "no owner · re-issue" for an ownerless key', () => {
-    const html = agentAccessBody({ urlKey: 'acme', keys: buildKeyList({ proxyRows: [proxy({ tokenId: 'x', hasOwner: false, lastUsedAt: iso(NOW - 6e4) })], dispatchRows: [], isOwner: true, urlKey: 'acme' }) });
-    assert.match(html, /expires 2026-10-25/);
-    assert.match(html, /last used 2026-10-24 11:59 UTC/);
+  test('expiry and last use are relative (LIN-3890), and "no owner · re-issue" for an ownerless key', () => {
+    // The renderer reads the real clock, so this test builds its times from it.
+    const now = Date.now();
+    const html = agentAccessBody({ urlKey: 'acme', keys: buildKeyList({ proxyRows: [proxy({ tokenId: 'x', hasOwner: false, expiresAt: iso(now + 2 * 864e5), lastUsedAt: iso(now - 6e4) })], dispatchRows: [], isOwner: true, urlKey: 'acme' }) });
+    assert.match(html, /expires in 2d/);
+    assert.match(html, /last used 1m ago/);
     assert.match(html, /no owner · re-issue/);
   });
 

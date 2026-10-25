@@ -599,6 +599,10 @@
   white-space: nowrap;
 }
 
+.settings-state-warn {
+  color: var(--amber-dim);
+}
+
 .settings-state-bad {
   color: var(--red-dim, var(--red));
 }

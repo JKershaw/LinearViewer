@@ -82,9 +82,9 @@ lib/
   render-landing.js    Bespoke unauthenticated home showcase (LIN-980): Harbour top area (hero + loop) + fake-data glimpses of real surfaces (observation feed, swim board, grounded prompt) + providers strip + distinct Harbour OS section; composes D's shared nav (renderNavBar isLanding); NOT the project-tree renderer. Styles in public/landing.css
   render-audit.js      Operator dashboard page renderer
   render-settings.js   Settings page renderer: one area at a time (`area` option); Sources, Models (the legacy forms until LIN-3855) and Health (LIN-3846)
-  render-settings-shell.js  Settings sidebar + page frame and the three row kinds (switch, drill-in, action) plus `askInPlace` (LIN-3846)
   render-settings-you.js  Settings › Account and Features (theme, consent on/off, +proxy default) (LIN-3846)
   render-settings-workspace.js  Settings › Running, Agent access and Change log (LIN-3846)
+  components/settings-row.js, settings-ask.js, settings-group.js, settings-frame.js  Settings pieces (LIN-3890, moved from the shell): switch, value and action rows; ask in place; group and note; sidebar and page frame
   settings-areas.js    The one census table of Settings areas: which settings and routes each holds, and the sidebar state word (LIN-3846; tests/unit/settings-areas-census.test.js)
   settings-keys.js     The one key list from both token stores, kinds by what a key can do (LIN-3846)
   workspace-change-log.js  Everyone-changes outside model routing (periodic reviews, run halt): `workspace-change-log` collection, reason + actor + before/after, Undo refuses on a conflict; `mergeChangeLog` lists it beside `model-routing-log` (LIN-3846)

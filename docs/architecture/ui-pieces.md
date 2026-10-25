@@ -14,7 +14,7 @@ A decision belongs to the area that would have to change if its rule changed. It
 2. **Each shared component's style** goes in one place, with its markup in `lib/components/`. Extend or rebuild what is there instead of adding a third system.
 3. **Page CSS keeps only page layout.**
 
-Earlier convergence already gave sections, page headers and fields a canonical home (LIN-461, LIN-462, LIN-463; comments at `style.css:3060-3133`). Build on that. Today the Settings shell (`lib/render-settings-shell.js`) imports nothing from `lib/components/`: its row, group, note and ask builders are local to it.
+Earlier convergence already gave sections, page headers and fields a canonical home (LIN-461, LIN-462, LIN-463; comments at `style.css:3060-3133`). Build on that. Today the Settings shell (`lib/components/settings-*.js` (moved here by LIN-3890)) imports nothing from `lib/components/`: its row, group, note and ask builders are local to it.
 
 **Counting.** A *site* is one place that writes the decision's rule itself. A use of the authority (a `var(--space-2)`, a class name in markup) is not a site. Each row below states its own counting rule, the sites at base by `file:line`, the copies Consolidate deletes, any deliberate variant, and each difference between copies with a provisional class: **fix** (a bug or drift), **variant** (deliberate, named), **harmless**, or **unclear**.
 
@@ -85,7 +85,7 @@ The class is "a rule written in 2 or more places that Settings shares". Two repr
 - **Sites at base:** `settings.css` 4 (443, 509, 524, 839; two are fallbacks `var(--red, #c0392b)`, one is `var(--bg, #fff)`), `proxy.css` 1, `common-actions.css` 1 (162), `dispatch.css` 0, `audit.css` 0, `style.css` 101 (mostly the token definitions themselves).
 - **Variant (named, deliberate):** the landing's own dark copy under `prefers-color-scheme` (`style.css:2335`, `body.is-landing`). Its comment says this is deliberate; `/styleguide` follows the same media-query palette, which is why the judge emulates both the cookie and the media query.
 - **Consolidate deletes:** the hex fallbacks in `settings.css` (509, 524, 839) once the token is guaranteed.
-- **Differences:** Settings' sidebar states have only two tones, `ok` and `bad` (`lib/settings-areas.js` `ok`/`bad`; `render-settings-shell.js:132`; `settings.css:647-662`), so **Paused shows red** next to Stopped. Class: **unclear**.
+- **Differences:** Settings' sidebar states have only two tones, `ok` and `bad` (`lib/settings-areas.js` `ok`/`bad`; `lib/components/settings-*.js` (moved here by LIN-3890); `settings.css:647-662`), so **Paused shows red** next to Stopped. Class: **unclear**.
 - **Open question 1** (below): whether paused gets its own tone.
 
 ### 4. Breakpoints
@@ -106,18 +106,18 @@ The class is "a rule written in 2 or more places that Settings shares". Two repr
 - **Counting rule:** a site is a rule whose body is that byte-identical declaration block (`--dup-blocks` body #10).
 - **Sites at base (4):** `style.css:3133` `.field` (the authority), `dispatch.css:19` `.dispatch-section .line`, `proxy.css:104` `.proxy-section .line`, `settings.css:45` `.settings-section .line`.
 - **Consolidate deletes:** the three `.X-section .line` blocks (done, LIN-3889). The 640px wrap moves to `.field`.
-- **Same-name collision, not a copy:** the dashboard tree's own `.line` (`style.css:1222`, and the phone override at `:1931`) is a different rule (`align-items: baseline`, `padding: 4px 0`). It is scoped to the tree in intent and **harmless**, except that new Settings rows also carry the class `line` (`render-settings-shell.js:37`, `render-settings-workspace.js:20` and `:188`, `render-settings-you.js:60`, `:80`, `:95`, `:107`, `:115` and `:144`), so the bare `.line` at `style.css:1222` also matches them. Class: **unclear**; Rebuild must drop the `line` class from Settings rows or scope the tree rule.
+- **Same-name collision, not a copy:** the dashboard tree's own `.line` (`style.css:1222`, and the phone override at `:1931`) is a different rule (`align-items: baseline`, `padding: 4px 0`). It is scoped to the tree in intent and **harmless**, except that new Settings rows also carry the class `line` (`lib/components/settings-*.js` (moved here by LIN-3890), `render-settings-workspace.js:20` and `:188`, `render-settings-you.js:60`, `:80`, `:95`, `:107`, `:115` and `:144`), so the bare `.line` at `style.css:1222` also matches them. Class: **unclear**; Rebuild must drop the `line` class from Settings rows or scope the tree rule.
 - **Differences:** the three `.X-section .line` copies wrap at 640px and `.field` does not (`dispatch.css:486`, `proxy.css:424`, `settings.css:543`, each `flex-wrap: wrap`). Class: **fix** (provisional): a field row that cannot wrap overflows on a phone; give `.field` the wrap. Done (LIN-3889): the wrap moved to `.field`, the only place pixels move.
 - **Variant:** none. (Corrected by LIN-3889: `.dispatch-prompt-line { align-items: flex-start }` never applied, because the copy's 0,2,0 selector set `align-items` first. It is deleted with the copy, at 0 px.)
 
 ### 5b. Interactive row
 
 - **Decides:** the tappable row inside a group: switch, drill, action, ask.
-- **Authority:** `.settings-row` (`settings.css:696`) and its builders `switchRow` (`render-settings-shell.js:34`), `drillRow` (:51), `actionRow` (:70), with `group` (:93), all in `lib/render-settings-shell.js`.
+- **Authority:** `.settings-row` (`settings.css:696`) and its builders `switchRow` (`lib/components/settings-*.js` (moved here by LIN-3890)), `drillRow` (:51), `actionRow` (:70), with `group` (:93), all in `lib/components/settings-*.js` (moved here by LIN-3890).
 - **Reason:** LIN-3846 built it for exactly this and every Settings area uses it.
 - **Counting rule:** a site is a row builder or a hand-written `<... class="settings-row ...">` in `lib/`.
 - **Sites at base:** the three builders; hand-written rows at `render-settings.js:866` (`settings-row settings-row-drill`), `render-settings-workspace.js:20` (`staticRow`, module-local), `render-settings-workspace.js:177` and `:188` (the change-log rows inside `changeRow`; `:188` is the static one), `render-settings-you.js:60`, `:80`, `:95`, `:107`, `:115` (static rows written out by hand), `render-settings-you.js:110` (an action row written out by hand: `settings-row settings-row-action settings-action-teal`, a copy of `actionRow`) and `render-settings-you.js:144-147` (a switch written out by hand).
-- **Consolidate deletes:** the hand-written copies at `render-settings-you.js:144-147`, `render-settings-you.js:110` (replaced by `actionRow`) and `render-settings.js:866`, replaced by the builders. (Partly, LIN-3889: the Theme, Email, Runs and change-log rows keep their own markup minus `line`; see the status table.) The five static rows in `render-settings-you.js` (`:60`, `:80`, `:95`, `:107`, `:115`) and the one at `render-settings-workspace.js:188` are hand-written copies of `staticRow` (`render-settings-workspace.js:20`). **`staticRow` becomes a shared builder** in `render-settings-shell.js` beside `switchRow`, `drillRow` and `actionRow`, and those six are replaced by it: it is the same markup six times over, and a second private copy is how the count got short. The change-log row at `:177` stays a `changeRow` concern.
+- **Consolidate deletes:** the hand-written copies at `render-settings-you.js:144-147`, `render-settings-you.js:110` (replaced by `actionRow`) and `render-settings.js:866`, replaced by the builders. (Partly, LIN-3889: the Theme, Email, Runs and change-log rows keep their own markup minus `line`; see the status table.) The five static rows in `render-settings-you.js` (`:60`, `:80`, `:95`, `:107`, `:115`) and the one at `render-settings-workspace.js:188` are hand-written copies of `staticRow` (`render-settings-workspace.js:20`). **`staticRow` becomes a shared builder** in `lib/components/settings-*.js` (moved here by LIN-3890) beside `switchRow`, `drillRow` and `actionRow`, and those six are replaced by it: it is the same markup six times over, and a second private copy is how the count got short. The change-log row at `:177` stays a `changeRow` concern.
 - **Differences:** `.settings-row` has its own spacing (`0.7rem 0.8rem`) and size (`0.95em`) that match neither the scale nor `.field`. Class: **variant** (a row in a card is not a bare field), recorded here as the named variant "row in a card".
 - **Variant:** `settings-row-static` (a read-only row), `settings-row-drill`, `settings-row-action`, `settings-row-switch`.
 
@@ -137,9 +137,9 @@ The class is "a rule written in 2 or more places that Settings shares". Two repr
 ### 7. Switch
 
 - **Decides:** an on/off control.
-- **Authority:** `.toggle-btn` (`settings.css:429-456`) with `switchRow` (`render-settings-shell.js:34`). `.feature-toggle` (`settings.css:417`) and `.feature-toggle-label` (:421) are the row wrapper, so they stay under *Interactive row*.
+- **Authority:** `.toggle-btn` (`settings.css:429-456`) with `switchRow` (`lib/components/settings-*.js` (moved here by LIN-3890)). `.feature-toggle` (`settings.css:417`) and `.feature-toggle-label` (:421) are the row wrapper, so they stay under *Interactive row*.
 - **Counting rule:** a site is markup that writes `class="toggle-btn"`.
-- **Sites at base (2):** `render-settings-shell.js:37-42` (the builder) and `render-settings-you.js:144-147` (a hand-written copy with an extra `settings-json-toggle` class). The sweep found no other switch in `lib/` or `public/`.
+- **Sites at base (2):** `lib/components/settings-*.js` (moved here by LIN-3890) (the builder) and `render-settings-you.js:144-147` (a hand-written copy with an extra `settings-json-toggle` class). The sweep found no other switch in `lib/` or `public/`.
 - **Consolidate deletes:** the hand-written copy.
 - **Differences:** `.toggle-btn` carries its own hover (`rgba(0,0,0,0.03)`, `settings.css:443`, which does not rebind in dark). Class: **fix** (provisional).
 - **Variant:** none named.
@@ -147,7 +147,7 @@ The class is "a rule written in 2 or more places that Settings shares". Two repr
 ### 8. Asking in place (confirming a change)
 
 - **Decides:** how a change is confirmed. **Decided by John on 24 October: confirmation happens in place.** See "Decisions made".
-- **Authority:** `askInPlace` (`render-settings-shell.js:106`) and `.settings-ask*` (`settings.css:741-766`). The confirm is a bare `.action-btn`.
+- **Authority:** `askInPlace` (`lib/components/settings-*.js` (moved here by LIN-3890)) and `.settings-ask*` (`settings.css:741-766`). The confirm is a bare `.action-btn`.
 - **Counting rule:** a site is a `askInPlace(...)` call, or a hand-written ask form.
 - **Sites at base:** the builder, and calls at `render-settings-workspace.js:57` (halt), `:67` (periodic reviews), `:146` (agents can change models), `:178` (the change-log undo, inside `changeRow`) and `render-settings.js:703` (remove source). One hand-written confirm-in-place: the key revoke, `render-settings-workspace.js:100` (a red `.action-btn` and "cannot be undone" text inside the opened key row, no Cancel, wired by `public/settings.js:313`).
 - **Consolidate deletes:** nothing here. `docs/ui-divergences.md` needs updating to match; **Consolidate makes that edit** (this PR does not touch it).
@@ -157,7 +157,7 @@ The class is "a rule written in 2 or more places that Settings shares". Two repr
 ### 9. Note
 
 - **Decides:** secondary text under or beside a row or group.
-- **Authority:** `groupNote` (`render-settings-shell.js:84`) with `.settings-note` (`settings.css:791`) for notes under a group.
+- **Authority:** `groupNote` (`lib/components/settings-*.js` (moved here by LIN-3890)) with `.settings-note` (`settings.css:791`) for notes under a group.
 - **Counting rule:** a site is a rule styling small secondary text: `.settings-row-note`, `.settings-note`, `.settings-group-subtitle`, `.settings-subtitle`, `.page-header__subtitle`.
 - **Sites at base:** `.settings-row-note` (`settings.css:716`, 0.85em, block), `.settings-note` (`settings.css:791`, 0.85em, margin-top), `.settings-group-subtitle` (`settings.css:33`, 0.9em), `.settings-subtitle` (`settings.css:184`, byte-identical to `.page-header__subtitle`, `style.css:3114`; `--dup-blocks` #6), `.page-header__subtitle`.
 - **Consolidate deletes:** `.settings-subtitle` (a copy of the page-header subtitle; emitted at `render-settings.js:319, 468, 587, 831, 862`). Done (LIN-3889): the emitters use `.page-header__subtitle`.
@@ -166,7 +166,7 @@ The class is "a rule written in 2 or more places that Settings shares". Two repr
 ### 10. Group title
 
 - **Decides:** the heading over a group of rows.
-- **Authority:** `.settings-group-title` (`settings.css:675`, 0.8em, uppercase, letter-spacing 0.05em) via `group()` (`render-settings-shell.js:93`) for Settings; `.section .section-header` (`style.css:3087`) for sections elsewhere.
+- **Authority:** `.settings-group-title` (`settings.css:675`, 0.8em, uppercase, letter-spacing 0.05em) via `group()` (`lib/components/settings-*.js` (moved here by LIN-3890)) for Settings; `.section .section-header` (`style.css:3087`) for sections elsewhere.
 - **Reason:** these are two real heading styles for two shapes (a card of rows versus a boxed section); both keep an owner.
 - **Counting rule:** a site is a rule styling a heading over a group.
 - **Sites at base:** `.settings-group-title` (`settings.css:675`), `.settings-nav-title` (`settings.css:610`, 0.75em, 0.06em), `.settings-group-header` (`settings.css:25`, 1.2em, legacy Models body), `.settings-header` (`audit.css:27`, byte-identical to `.section .section-header`; `--dup-blocks` #26), `.section .section-header` (`style.css:3087`).
@@ -186,7 +186,7 @@ The class is "a rule written in 2 or more places that Settings shares". Two repr
 ### 12. Area page frame
 
 - **Decides:** the layout around one Settings area.
-- **Authority:** `renderSettingsShell` (`render-settings-shell.js:151`), `.settings-shell` and `.settings-pane` (`settings.css:576-590`), `.settings-back` (`settings.css:592`), and the page header (`lib/components/page-header.js`).
+- **Authority:** `renderSettingsShell` (`lib/components/settings-*.js` (moved here by LIN-3890)), `.settings-shell` and `.settings-pane` (`settings.css:576-590`), `.settings-back` (`settings.css:592`), and the page header (`lib/components/page-header.js`).
 - **Counting rule:** a site is a page frame (grid plus pane plus back) written for a page.
 - **Sites at base:** the shell above; `settings.css:853` is its only breakpoint.
 - **Consolidate deletes:** nothing.
@@ -244,7 +244,7 @@ Layout only. For the pages Settings shares pieces with:
 
 ## Decisions made
 
-1. **Confirming a change: confirmation in place.** John, asked on 24 October whether LIN-511's native `confirm()` or Settings' ask in place should win: "On the page is best, I think." Authority: `askInPlace` with its confirm and Cancel, as built today. It **supersedes LIN-511's native `confirm()` rule** (`docs/ui-divergences.md`). That doc needs updating to match; Consolidate makes the edit and this PR does not touch it. `tests/unit/render-settings-shell.test.js:88-94` asserts the new Settings code has no `confirm(`; that stays true.
+1. **Confirming a change: confirmation in place.** John, asked on 24 October whether LIN-511's native `confirm()` or Settings' ask in place should win: "On the page is best, I think." Authority: `askInPlace` with its confirm and Cancel, as built today. It **supersedes LIN-511's native `confirm()` rule** (`docs/ui-divergences.md`). That doc needs updating to match; Consolidate makes the edit and this PR does not touch it. `tests/unit/settings-components.test.js` (renamed by LIN-3890 from `render-settings-shell.test.js`) asserts the new Settings code has no `confirm(`; that stays true.
 
    **Native `confirm()` sites still in the code (follow-up; outside what LIN-3886 migrates unless a site is on a page these tickets already touch).** `docs/ui-divergences.md` lists four sites; the code has the seven below, verified at base:
    - `public/common.js:2737`, the `form[data-confirm]` submit guard (comment at 2734), used by `lib/components/navbar.js:466` to remove a workspace;
@@ -298,7 +298,7 @@ Button-like classes rose by four because the canonical tone names (`btn--quiet`,
 
 Each keeps today's behaviour until answered.
 
-1. **Does a paused workspace get its own state colour?** Today Settings has two tones, `bad` and `ok`, so Paused shows red like Stopped (`lib/settings-areas.js`, `render-settings-shell.js:132`, `settings.css:647-662`). Options: (a) keep two tones; (b) add an amber tone using the existing `--amber` / `--amber-dim`. **Recommendation: (b).** Pausing is a deliberate owner action, not a failure, and the palette already carries the meaning (`--amber` is "running", `style.css:128`). Rebuild would add the tone.
+1. **Does a paused workspace get its own state colour?** Today Settings has two tones, `bad` and `ok`, so Paused shows red like Stopped (`lib/settings-areas.js`, `lib/components/settings-*.js` (moved here by LIN-3890), `settings.css:647-662`). Options: (a) keep two tones; (b) add an amber tone using the existing `--amber` / `--amber-dim`. **Recommendation: (b).** Pausing is a deliberate owner action, not a failure, and the palette already carries the meaning (`--amber` is "running", `style.css:128`). Rebuild would add the tone.
 2. **Key row** (only if the reading in decision 11 is wrong). Today there is one live key row, so none is open. If a second live emitter turns up, the options are `keyRow` or the token list; the recommendation is `keyRow`, which is built on the Settings row and already carries the owner-only revoke and the expiry.
 
 ## For the tickets that follow

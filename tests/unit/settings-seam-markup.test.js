@@ -1,6 +1,6 @@
 /**
  * LIN-3888 (Free the seam): Settings markup checked through data attributes, test ids, element
- * and role, never a style class. These replace the class-string pins in render-settings-shell,
+ * and role, never a style class. These replace the class-string pins in the shell (now lib/components/settings-*.js),
  * render-settings, lin-1890-jira-entry-surfaces and settings-areas-census, so Consolidate and the
  * Rebuild can move the classes without silently breaking the checks.
  *

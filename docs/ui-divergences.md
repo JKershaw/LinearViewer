@@ -10,7 +10,7 @@ divergence that was decided on purpose.
 ## Destructive-action confirmation: in place (LIN-3889; supersedes LIN-511)
 
 **Decision (current):** a destructive or everyone-affecting change is confirmed **on the page**,
-in place: the Settings ask (`askInPlace`, `lib/render-settings-shell.js`) opens a panel that says
+in place: the Settings ask (`askInPlace`, `lib/components/settings-*.js` (moved here by LIN-3890)) opens a panel that says
 what will happen, asks why where the change is for everyone, and confirms with a real filled
 tone of `.btn` (`btn--red` for halt, remove and revoke; `btn--teal` for turn on and undo). The key
 revoke is the one exception: the opened key row is the confirmation, with no Cancel.
