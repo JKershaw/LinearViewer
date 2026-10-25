@@ -12,8 +12,7 @@ import { anchorFor as taskCostAnchorFor, buildTaskCost } from '../lib/task-cost.
 import { resolveChatCredential, isAiUnavailable } from '../lib/chat-request.js';
 import { resolveRecommendation } from '../lib/recommend-recurse.js';
 import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
-import { resolveNorthStarSignal, resolveRoadmapNarrative, classifyReportFreshness, ROADMAP_REPORT_MAX_AGE_DAYS } from '../lib/next-run.js';
-import { getNorthStarDocVersion } from '../lib/north-star-resolver.js';
+import { resolveNorthStarSignal, resolveRoadmapNarrative, classifyReportFreshness, ROADMAP_REPORT_MAX_AGE_DAYS, getNorthStarDocVersion } from '../lib/north-star-resolver.js';
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
 import { hashContext } from '../lib/recap-cache.js';
@@ -726,7 +725,7 @@ export function createComputeRoutes({
    * workspace, plus a freshness-gated alignment reading and the latest
    * roadmap digest — composed off ONE reportHistoryStore.getLatest() fetch so
    * the two readings cannot drift relative to each other (mirrors
-   * generateGoalSuggestions, lib/next-run.js:900-910).
+   * generateGoalSuggestions, LIN-603, now retired).
    *
    * Harbour-local-only: no resolveWorkspaceAccess, no provider fetch — the
    * north star and report history are both Harbour-local stores, not
@@ -784,8 +783,8 @@ export function createComputeRoutes({
           : Promise.resolve(null)
       ]);
 
-      // One report fetch feeds both resolvers, exactly as lib/next-run.js:905-910
-      // composes them for generateGoalSuggestions — the two readings cannot
+      // One report fetch feeds both resolvers, exactly as the retired Next run
+      // suggester composed them (LIN-603) — the two readings cannot
       // disagree about which report is "latest".
       const signal = resolveNorthStarSignal(northStar, report);
       const narrative = resolveRoadmapNarrative(report);
