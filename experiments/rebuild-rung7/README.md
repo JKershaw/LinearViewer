@@ -151,6 +151,11 @@ Self-check on HEAD (`reports/selfcheck-lin3934.json/.log`): exit 0; identity ×2
 is the autopilot-prompt bodies (606-698, 738-746): LIN-3849 removed the `proxy` feature flag, so on
 the HEAD lib the pinned `featureFlags.proxy !== true` gate always answers 403.
 
+With the sub-router pinned, the OLD-vs-HEAD replay now really compares the prompt routes: on fcf2a53d
+it reports `GET …/autopilot-prompt` and `…/autopilot-prompt/:issueId` differing (OLD 403 from the
+`proxy` gate LIN-3849 removed), 801/6702 differing vs 549/6672 before — those routes had been
+compared against the `--lib` copy on both sides.
+
 ## Source-text tests that read this file (keep green; `livetests.mjs` runs all of them)
 Found by grep over `tests/unit` and confirmed live (`livetests.mjs` with the comment-stripped,
 `const`→`let` copy in `variant-text/` — behaviour-identical, the replay shows 0 differences — fails

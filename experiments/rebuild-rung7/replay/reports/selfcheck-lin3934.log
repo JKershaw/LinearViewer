@@ -31,4 +31,4 @@ coverage seed1 workspace-api.js: 96.73% (2724/2816); uncovered: 468, 469, 470, 4
 coverage seed7 workspace-api-prompts.js: 97.44% (76/78); uncovered: 33, 34
 coverage seed7 workspace-api.js: 96.73% (2724/2816); uncovered: 468, 469, 470, 471, 550, 551, 606, 607, 608, 626, 627, 628, 629, 630, 631, 633, 636, 637, 638, 639, 640, 641, 642, 643, 644, 645, 646, 647, 648, 649, 650, 651, 652, 653, 654, 655, 656, 657, 658, 659, 660, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 676, 690, 691, 692, 693, 694, 695, 696, 697, 698, 738, 739, 740, 741, 742, 743, 744, 746, 756, 763, 764, 765, 1725, 2128, 2129, 2361, 2362, 2363, 2364, 2367, 2368, 2369, 2370, 2371, 3874, 3875, 3991, 3992, 4324, 4325, 4326
 min requests per route: 55; thin status pairs (<5): 0
-self-check report: /Users/work/development/simple-dispatcher-workspaces/03766614-53e8-4c8d-a2ab-8195eb453fb2/LinearViewer/experiments/rebuild-rung7/replay/reports/selfcheck-lin3934.json
+self-check report: /Users/work/development/simple-dispatcher-workspaces/658a32fb-ff4a-43f9-9c2b-966181f81bf0/LinearViewer/experiments/rebuild-rung7/replay/reports/selfcheck-lin3934.json

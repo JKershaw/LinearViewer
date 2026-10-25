@@ -1,6 +1,6 @@
 {
-  "base": "/Users/work/development/simple-dispatcher-workspaces/03766614-53e8-4c8d-a2ab-8195eb453fb2/LinearViewer/experiments/rebuild-rung7/replay/pinned/origin-main",
-  "lib": "../../..",
+  "base": "/Users/work/development/simple-dispatcher-workspaces/658a32fb-ff4a-43f9-9c2b-966181f81bf0/LinearViewer/experiments/rebuild-rung7/replay/pinned/origin-main",
+  "lib": ".",
   "n": 3000,
   "mutantN": 1500,
   "seeds": [
@@ -29,7 +29,7 @@
       },
       "differing": 0,
       "groups": [],
-      "ms": 42942
+      "ms": 49319
     },
     {
       "id": "identity-seed7",
@@ -52,7 +52,7 @@
       },
       "differing": 0,
       "groups": [],
-      "ms": 42824
+      "ms": 49196
     },
     {
       "id": "w1-vacuity-stale-fakes",
@@ -75,7 +75,7 @@
         "GET /workspace/:urlKey/api/image [egressFetch] x29"
       ],
       "offTarget": [],
-      "ms": 36428
+      "ms": 42555
     },
     {
       "id": "m02-attribution",
@@ -93,7 +93,7 @@
         "POST /workspace/:urlKey/api/comments/:issueId [body] x104"
       ],
       "offTarget": [],
-      "ms": 44130
+      "ms": 40959
     },
     {
       "id": "m03-owner-gate",
@@ -119,7 +119,7 @@
         "POST /workspace/:urlKey/api/feedback [console] x1"
       ],
       "offTarget": [],
-      "ms": 45323
+      "ms": 40653
     },
     {
       "id": "m04-page-size",
@@ -133,7 +133,7 @@
         "GET /workspace/:urlKey/api/scan-due [store:taskDecisionsStore] x67"
       ],
       "offTarget": [],
-      "ms": 46232
+      "ms": 40256
     },
     {
       "id": "m05-order",
@@ -148,7 +148,7 @@
         "GET /workspace/:urlKey/api/sessions/:identifier [body] x4"
       ],
       "offTarget": [],
-      "ms": 47512
+      "ms": 40343
     },
     {
       "id": "m06-code",
@@ -164,7 +164,7 @@
         "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/close-out-press [body] x12"
       ],
       "offTarget": [],
-      "ms": 64247
+      "ms": 42400
     },
     {
       "id": "m07-fire-and-forget",
@@ -180,7 +180,7 @@
         "PATCH /workspace/:urlKey/api/issues/:issueId [console] x1"
       ],
       "offTarget": [],
-      "ms": 66835
+      "ms": 42353
     },
     {
       "id": "m08-sse",
@@ -195,7 +195,7 @@
         "GET /workspace/:urlKey/api/recommend/:issueId/stream [serverResponse] x13"
       ],
       "offTarget": [],
-      "ms": 66133
+      "ms": 41745
     },
     {
       "id": "m09-capability",
@@ -210,7 +210,7 @@
         "GET /workspace/:urlKey/api/audit [body] x24"
       ],
       "offTarget": [],
-      "ms": 65598
+      "ms": 41867
     },
     {
       "id": "m10-free-clamp",
@@ -231,7 +231,7 @@
         "POST /workspace/:urlKey/api/recap/:issueId [body] x2"
       ],
       "offTarget": [],
-      "ms": 51826
+      "ms": 35943
     },
     {
       "id": "m11-store-arg",
@@ -249,7 +249,7 @@
         "POST /workspace/:urlKey/api/scan/:issueId/retire [header-derived:etag] x26"
       ],
       "offTarget": [],
-      "ms": 50602
+      "ms": 36151
     },
     {
       "id": "m12-header",
@@ -263,7 +263,7 @@
         "GET /workspace/:urlKey/api/image [header:cache-control] x36"
       ],
       "offTarget": [],
-      "ms": 48717
+      "ms": 36071
     },
     {
       "id": "m13-whitelist",
@@ -281,7 +281,7 @@
         "GET /workspace/:urlKey/api/detail/:issueId [body] x6"
       ],
       "offTarget": [],
-      "ms": 48411
+      "ms": 36298
     },
     {
       "id": "m14-stamp-arg",
@@ -295,7 +295,7 @@
         "POST /workspace/:urlKey/api/comments/:issueId [store:dispatchQueueStore] x4"
       ],
       "offTarget": [],
-      "ms": 37727
+      "ms": 40720
     },
     {
       "id": "m15-session",
@@ -309,7 +309,7 @@
         "POST /workspace/:urlKey/api/comments/:issueId [session] x7"
       ],
       "offTarget": [],
-      "ms": 37027
+      "ms": 41271
     },
     {
       "id": "m16-scan-model",
@@ -327,7 +327,7 @@
         "POST /workspace/:urlKey/api/scan/:issueId [header-derived:etag] x3"
       ],
       "offTarget": [],
-      "ms": 36001
+      "ms": 41422
     },
     {
       "id": "m17-scan-stamp",
@@ -343,7 +343,7 @@
         "POST /workspace/:urlKey/api/scan/:issueId [header-derived:etag] x58"
       ],
       "offTarget": [],
-      "ms": 36067
+      "ms": 41428
     },
     {
       "id": "m18-scan-p0-arm",
@@ -359,7 +359,7 @@
         "POST /workspace/:urlKey/api/scan/:issueId [body] x8"
       ],
       "offTarget": [],
-      "ms": 36919
+      "ms": 38372
     },
     {
       "id": "m19-retire-p0-arm",
@@ -375,7 +375,7 @@
         "POST /workspace/:urlKey/api/scan/:issueId/retire [body] x4"
       ],
       "offTarget": [],
-      "ms": 37164
+      "ms": 38054
     },
     {
       "id": "m20-brief-model",
@@ -393,7 +393,7 @@
         "POST /workspace/:urlKey/api/brief/:issueId [seamCalls] x2"
       ],
       "offTarget": [],
-      "ms": 37779
+      "ms": 36595
     },
     {
       "id": "m21-recommend-model",
@@ -407,7 +407,7 @@
         "GET /workspace/:urlKey/api/recommend/:issueId [seamCalls] x9"
       ],
       "offTarget": [],
-      "ms": 38205
+      "ms": 36530
     },
     {
       "id": "m22-recap-unconfigured",
@@ -423,7 +423,7 @@
         "POST /workspace/:urlKey/api/recap/:issueId [body] x13"
       ],
       "offTarget": [],
-      "ms": 41286
+      "ms": 33711
     },
     {
       "id": "m23-brief-unconfigured",
@@ -439,7 +439,7 @@
         "POST /workspace/:urlKey/api/brief/:issueId [body] x14"
       ],
       "offTarget": [],
-      "ms": 41032
+      "ms": 33345
     },
     {
       "id": "m24-scan-unconfigured",
@@ -455,7 +455,7 @@
         "POST /workspace/:urlKey/api/scan/:issueId [body] x14"
       ],
       "offTarget": [],
-      "ms": 40843
+      "ms": 33438
     }
   ],
   "coverage": {
