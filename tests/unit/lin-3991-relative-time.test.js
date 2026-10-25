@@ -84,12 +84,12 @@ describe('LIN-3991 — sentenceAt is the moment the sentence names', () => {
 
 describe('LIN-3991 — the page renders the exact time beside the sentence, zoned, outside the sentence', () => {
   test('a sentence with a moment carries a zoned time element after it', () => {
-    const html = renderTaskStatus({ status: 'failed', sentence: 'Review failed 30 minutes ago', sentenceAt: '2026-10-25T13:30:00.000Z' });
+    const html = renderTaskStatus({ status: 'failed', sentence: 'Review failed 30 minutes ago', sentenceAt: '2026-10-25T13:30:00.000Z' }, { now: NOW });
     assert.match(html, /<p class="task-sentence" data-testid="task-page-sentence">Review failed 30 minutes ago<\/p>\s*<time class="task-sentence-at" data-testid="task-page-sentence-at" datetime="2026-10-25T13:30:00\.000Z" data-local-time="zoned">25 Oct, 13:30 UTC<\/time>/);
   });
 
   test('a sentence with no moment renders no time element', () => {
-    const html = renderTaskStatus({ status: 'waiting', sentence: 'Approved. PR #41 is ready to merge.', sentenceAt: null });
+    const html = renderTaskStatus({ status: 'waiting', sentence: 'Approved. PR #41 is ready to merge.', sentenceAt: null }, { now: NOW });
     assert.doesNotMatch(html, /task-sentence-at/);
   });
 });
