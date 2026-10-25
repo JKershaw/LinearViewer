@@ -195,6 +195,18 @@
   // Dismiss a decision card: stamp via the existing dashboard route, then apply
   // condition C2 (the follow-up is sent only for a `resumable` decision, from
   // window.ReplyDelivery). Remove the card on success; it never comes back.
+  // LIN-3959: the joined row's copies, written onto the card as JSON by
+  // lib/question-card.js. Undefined when absent or unreadable, so the request
+  // falls back to the single primary stamp exactly as before.
+  function readStampLoopIds(card) {
+    try {
+      var ids = JSON.parse(card.dataset.stampLoopIds || 'null');
+      return Array.isArray(ids) ? ids : undefined;
+    } catch (e) {
+      return undefined;
+    }
+  }
+
   function dismissQuestionCard(card, dismissBtn, answerBtn, feedback) {
     var urlKey = card.dataset.urlKey;
     if (dismissBtn) dismissBtn.disabled = true;
@@ -204,6 +216,7 @@
     window.ReplyDelivery.dismissRuling({
       urlKey: urlKey,
       stampLoopId: card.dataset.stampLoopId,
+      stampLoopIds: readStampLoopIds(card),
       decisionId: card.dataset.decisionId,
       followUpTo: card.dataset.loopId,
       target: card.dataset.target === 'web' ? 'web' : 'cli',
@@ -260,6 +273,7 @@
           issueIdentifier: issueIdentifier,
           issueless: !issueIdentifier,
           decisionLoopId: decisionId ? card.dataset.stampLoopId : null,
+          decisionLoopIds: decisionId ? readStampLoopIds(card) : undefined,
           decisionId: decisionId,
           // LIN-3126 residual: the ruling anchor's source (rendered onto the
           // card by lib/render-session.js), forwarded to the shared answer

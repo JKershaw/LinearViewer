@@ -4458,3 +4458,65 @@ describe('renderRulings — a poll keeps unsent input (LIN-3631)', () => {
     assert.equal(fresh.querySelector('.obs-ruling-answer-input').value, 'keep me');
   });
 });
+
+// LIN-3959 review item 2: a joined row's copies (`stampLoopIds`) must reach the
+// stamp routes as `decisionLoopIds`, on every press the rulings page offers.
+describe('a joined row forwards stampLoopIds as decisionLoopIds (LIN-3959)', () => {
+  const settle = async () => { for (let i = 0; i < 4; i++) await new Promise((r) => setImmediate(r)); };
+
+  test('resumable reply: deliverReply gets decisionLoopIds when the row has stampLoopIds, and none otherwise', () => {
+    const seen = [];
+    const { module } = makeSandbox({
+      deliverReply: (opts, prompt, handlers) => { seen.push(opts); handlers.onDispatchOk(); }
+    });
+    const { deliverRulingReply } = module.exports;
+
+    deliverRulingReply(makeResumableRow({ decision: { decision_id: 'd-join-4' }, stampLoopId: 'wk', stampLoopIds: ['wk', 'ap'] }), 'Approve', makeLi());
+    deliverRulingReply(makeResumableRow({ decision: { decision_id: 'd-join-5' } }), 'Approve', makeLi());
+
+    assert.equal(seen.length, 2);
+    assert.deepEqual(seen[0].decisionLoopIds, ['wk', 'ap']);
+    assert.equal(seen[1].decisionLoopIds, undefined);
+  });
+
+  for (const [label, rowOver] of [
+    ['gone/dispatch reply', {}],
+    ['record reply', { effect: 'record', alternate: null }]
+  ]) {
+    test(`${label}: the comment carries decisionLoopIds when the row has stampLoopIds, and no key when it does not`, async () => {
+      const extras = [];
+      const { module } = makeSandbox({
+        postComment: async (urlKey, issueId, body, extra) => { extras.push(extra); return { ok: true, status: 201, data: {} }; },
+        dispatchPrompt: async () => ({ id: 'dispatched-1' }),
+        api: nonTerminalHydrateApi()
+      });
+      const { deliverRulingReply } = module.exports;
+
+      deliverRulingReply(makeRow({ ...rowOver, decision: { decision_id: 'd-join-1' }, stampLoopId: 'wk', stampLoopIds: ['wk', 'ap'] }), 'Approve', makeLi());
+      await settle();
+      deliverRulingReply(makeRow({ ...rowOver, decision: { decision_id: 'd-join-2' } }), 'Approve', makeLi());
+      await settle();
+
+      assert.equal(extras.length, 2, 'both presses wrote a comment');
+      assert.deepEqual(extras[0].decisionLoopIds, ['wk', 'ap']);
+      assert.equal(extras[1].decisionLoopIds, undefined, 'a non-joined row sends no decisionLoopIds');
+    });
+  }
+
+  test('Agree posts decisionLoopIds on the dismiss body when the row has stampLoopIds, and none otherwise', async () => {
+    const bodies = [];
+    const { module } = makeSandbox({
+      api: async (url, opts) => { bodies.push(JSON.parse(opts.body)); return { success: true }; }
+    });
+    const { agreeRulingRow } = module.exports;
+
+    agreeRulingRow(makeRow({ stampLoopId: 'wk', stampLoopIds: ['wk', 'ap'] }), makeLi());
+    await settle();
+    agreeRulingRow(makeRow({ decision: { decision_id: 'd-join-3' } }), makeLi());
+    await settle();
+
+    assert.equal(bodies.length, 2);
+    assert.deepEqual(bodies[0].decisionLoopIds, ['wk', 'ap']);
+    assert.equal('decisionLoopIds' in bodies[1], false, 'a non-joined row sends no decisionLoopIds key');
+  });
+});

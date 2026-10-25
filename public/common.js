@@ -919,6 +919,12 @@ window.ReplyDelivery = (function () {
     if (decision && decision.decisionLoopId && decision.decisionId) {
       body.decisionLoopId = decision.decisionLoopId;
       body.decisionId = decision.decisionId;
+      // LIN-3959: a joined ruling's other copies (the row's stampLoopIds), so the
+      // route stamps every copy and the autopilot's includeResolved check sees
+      // the question answered. Only the primary resumes; this list never does.
+      if (Array.isArray(decision.decisionLoopIds) && decision.decisionLoopIds.length) {
+        body.decisionLoopIds = decision.decisionLoopIds;
+      }
     }
     if (decision && decision.taskDecisionId && decision.taskDecisionIssueId) {
       body.taskDecisionId = decision.taskDecisionId;
@@ -1053,7 +1059,7 @@ window.ReplyDelivery = (function () {
         onCommentFailed(new Error('cannot record an answer with no linked issue'));
         return Promise.resolve();
       }
-      return postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, optionId: opts.optionId, source: opts.source }).then(
+      return postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionLoopIds: opts.decisionLoopIds, decisionId: opts.decisionId, optionId: opts.optionId, source: opts.source }).then(
         function (commentResult) {
           if (!commentResult.ok) { onCommentFailed(errorFromResult(commentResult)); return; }
           onDispatchOk();
@@ -1081,7 +1087,7 @@ window.ReplyDelivery = (function () {
     // literal built here rather than the rest of `opts`, so this stays the
     // one place a caller's `opts.optionId` (when set) actually reaches
     // `postComment`'s own allowlist.
-    return postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, optionId: opts.optionId, source: opts.source }).then(function (commentResult) {
+    return postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionLoopIds: opts.decisionLoopIds, decisionId: opts.decisionId, optionId: opts.optionId, source: opts.source }).then(function (commentResult) {
       if (!commentResult.ok) {
         onCommentFailed(errorFromResult(commentResult));
         return;
@@ -1124,7 +1130,8 @@ window.ReplyDelivery = (function () {
    * @returns {Promise<void>}
    */
   function dismissRuling(opts, handlers) {
-    var body = { decisionLoopId: opts.stampLoopId || opts.followUpTo, decisionId: opts.decisionId };
+    // LIN-3959: `stampLoopIds` (the joined row's copies) rides the stamp only.
+    var body = { decisionLoopId: opts.stampLoopId || opts.followUpTo, decisionLoopIds: opts.stampLoopIds, decisionId: opts.decisionId };
     return fetch('/workspace/' + encodeURIComponent(opts.urlKey) + '/api/dashboard/rulings/dismiss', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1250,7 +1257,7 @@ window.ReplyDelivery = (function () {
           if (typeof handlers.onNoTarget === 'function') handlers.onNoTarget();
           return;
         }
-        return window.ReplyDelivery.postComment(opts.urlKey, targetId, opts.prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, optionId: opts.optionId, source: opts.source })
+        return window.ReplyDelivery.postComment(opts.urlKey, targetId, opts.prompt, { decisionLoopId: opts.decisionLoopId, decisionLoopIds: opts.decisionLoopIds, decisionId: opts.decisionId, optionId: opts.optionId, source: opts.source })
           .then(function (commentResult) {
             if (!commentResult.ok) { handlers.onCommentFailed(errorFromResult(commentResult)); return; }
             var recordOnNote = resolved.note
@@ -1302,7 +1309,7 @@ window.ReplyDelivery = (function () {
           return deliverRulingRecord(Object.assign({}, opts, { downgradeNote: PRESS_TIME_DOWNGRADE_NOTE }), handlers);
         }
 
-        return window.ReplyDelivery.postComment(opts.urlKey, opts.issueId || opts.issueIdentifier, opts.prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, optionId: opts.optionId, source: opts.source })
+        return window.ReplyDelivery.postComment(opts.urlKey, opts.issueId || opts.issueIdentifier, opts.prompt, { decisionLoopId: opts.decisionLoopId, decisionLoopIds: opts.decisionLoopIds, decisionId: opts.decisionId, optionId: opts.optionId, source: opts.source })
           .then(function (commentResult) {
             if (!commentResult.ok) { handlers.onCommentFailed(errorFromResult(commentResult)); return; }
             function startRun() {

@@ -2372,7 +2372,8 @@ function rulingRowControls(li) {
 // (routes/dashboard.js), which tags the same decision-answer stamp
 // `outcome: 'dismissed'`. Neither path posts a comment. Returns the pending
 // request promise; the caller owns the pending-guard/restore/feedback wiring.
-function issueDismissRequest(anchor, decisionId, stampLoopId) {
+// LIN-3959: `stampLoopIds` is the joined row's copies; the dismiss stamps each.
+function issueDismissRequest(anchor, decisionId, stampLoopId, stampLoopIds) {
   const isTaskBound = !anchor?.loopId && !!anchor?.taskDecisionId;
   // LIN-3126 residual: the task-bound dismiss carries the anchor's source
   // so the scan dismiss route resolves the issue's provider, not the active one.
@@ -2391,7 +2392,7 @@ function issueDismissRequest(anchor, decisionId, stampLoopId) {
         on401: false,
         // LIN-2991/LIN-3022 §4/D3: the STAMP target, never the reply target
         // alone — see deliverRulingReply's own note on the same distinction.
-        body: JSON.stringify({ decisionLoopId: stampLoopId ?? anchor.loopId, decisionId })
+        body: JSON.stringify({ decisionLoopId: stampLoopId ?? anchor.loopId, decisionLoopIds: stampLoopIds, decisionId })
       });
 }
 
@@ -2422,7 +2423,7 @@ function dismissRulingRow(row, li) {
   };
   const refreshBadge = () => { if (pageUrlKey && typeof window.updateRulingsBadge === 'function') window.updateRulingsBadge(pageUrlKey); };
 
-  issueDismissRequest(anchor, decisionId, row?.stampLoopId).then(() => {
+  issueDismissRequest(anchor, decisionId, row?.stampLoopId, row?.stampLoopIds).then(() => {
     restore();
     setFeedback('dismissed', false);
     // Same class as F6/F7 (review): the selection seam #1432 ships is what
@@ -2495,7 +2496,7 @@ function agreeRulingRow(row, li) {
     };
     const refreshBadge = () => { if (pageUrlKey && typeof window.updateRulingsBadge === 'function') window.updateRulingsBadge(pageUrlKey); };
 
-    return issueDismissRequest(anchor, decisionId, row?.stampLoopId).then(() => {
+    return issueDismissRequest(anchor, decisionId, row?.stampLoopId, row?.stampLoopIds).then(() => {
       rulingsPending.delete(key);
       setFeedback('dismissed as proposed', false);
       // Review F6: clear selection at the moment of success, exactly as
@@ -2924,7 +2925,7 @@ function bulkAgreeRow(key, row, li) {
       feedback.classList.toggle('obs-ruling-feedback--error', !!isError);
     };
 
-    return issueDismissRequest(anchor, decisionId, row?.stampLoopId).then(() => {
+    return issueDismissRequest(anchor, decisionId, row?.stampLoopId, row?.stampLoopIds).then(() => {
       rulingsPending.delete(key);
       setFeedback('dismissed as proposed', false);
       rulingsSelected.delete(key);
@@ -3172,6 +3173,8 @@ function deliverRulingReply(row, prompt, li, optionId, { bulkAgree = false } = {
   // The RESUME target (`followUpTo`, below) stays `anchor.loopId` — the loop
   // a reply is actually delivered to is unchanged by this.
   const decisionLoopId = row?.stampLoopId ?? anchor?.loopId;
+  // LIN-3959: the joined row's copies; absent on a non-joined row.
+  const decisionLoopIds = row?.stampLoopIds;
   const feedback = li.querySelector('.obs-ruling-feedback');
   // A task-bound row (LIN-2197 Phase 3) has no dispatch item behind it, so
   // `anchor.loopId`/`decisionLoopId` is always null by design — admit
@@ -3318,6 +3321,7 @@ function deliverRulingReply(row, prompt, li, optionId, { bulkAgree = false } = {
         force: false,
         target: anchor.target || 'cli',
         decisionLoopId,
+        decisionLoopIds,
         decisionId,
         optionId,
         // LIN-3126 residual: the ruling anchor's own source (beat 2) so the
@@ -3372,6 +3376,7 @@ function deliverRulingReply(row, prompt, li, optionId, { bulkAgree = false } = {
       issueId: anchor.issueId || null,
       issueIdentifier: anchor.issueIdentifier || null,
       decisionLoopId,
+      decisionLoopIds,
       decisionId,
       optionId,
       recordOn: decision?.on_answer?.record_on || null,
@@ -3403,6 +3408,7 @@ function deliverRulingReply(row, prompt, li, optionId, { bulkAgree = false } = {
       issueIdentifier: anchor.issueIdentifier,
       target: anchor.target || 'cli',
       decisionLoopId,
+      decisionLoopIds,
       decisionId,
       optionId,
       prompt,

@@ -1045,3 +1045,20 @@ test('dismissRuling resume forwards opts.source to the follow-up comment (mutati
   assert.ok(comment, 'the resumable dismiss wrote its follow-up comment');
   assert.match(String(comment.url), /\?source=github$/);
 });
+
+test('dismissRuling forwards stampLoopIds as decisionLoopIds on the dismiss body, and omits the key without it (LIN-3959)', async () => {
+  const { window, calls } = makeSandbox((url) => {
+    if (String(url).includes('/api/dashboard/rulings/dismiss')) return jsonResponse(true, 200, { success: true });
+    throw new Error('unexpected fetch: ' + url);
+  });
+  const { handlers } = trackedHandlers();
+  const base = { urlKey: 'w', stampLoopId: 'wk', followUpTo: 'wk', target: 'cli', issueId: 'i1', disposition: 'gone', prompt: 'p' };
+
+  await window.ReplyDelivery.dismissRuling({ ...base, decisionId: 'd-1', stampLoopIds: ['wk', 'ap'] }, handlers);
+  await window.ReplyDelivery.dismissRuling({ ...base, decisionId: 'd-2' }, handlers);
+
+  const bodies = calls.filter(c => String(c.url).includes('/api/dashboard/rulings/dismiss')).map(c => JSON.parse(c.opts.body));
+  assert.equal(bodies.length, 2);
+  assert.deepEqual(bodies[0], { decisionLoopId: 'wk', decisionLoopIds: ['wk', 'ap'], decisionId: 'd-1' });
+  assert.deepEqual(bodies[1], { decisionLoopId: 'wk', decisionId: 'd-2' });
+});

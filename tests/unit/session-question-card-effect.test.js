@@ -17,6 +17,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { withHarnessModels } from '../fixtures/harness-models.js';
+import { renderDecisionCard } from '../../lib/question-card.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const QUESTION_CARDS_JS_SRC = readFileSync(join(__dirname, '../../public/question-cards.js'), 'utf8');
@@ -266,3 +267,47 @@ test('the card answer forwards its data-source to the shared helper', async () =
   assert.equal('bindingScope' in opts, false, 'no bindingScope on the answer opts');
 });
 
+
+// LIN-3959: a joined card carries every copy of its ruling; the answer's comment
+// write stamps each one, and the resume still goes to the card's own loop.
+test('LIN-3959 card-level: a joined card sends every copy on the comment write', async () => {
+  const fixture = makeCard({ effect: 'resume', typed: 'go ahead' });
+  fixture.card.dataset.stampLoopIds = JSON.stringify(['sp', 'copy-2']);
+  const { sandbox, calls } = makeRealDeliverySandbox([fixture]);
+  sandbox.module.exports.initQuestionCards();
+  fixture.btn.click();
+  await flush();
+
+  const comment = calls.find(c => c.url.includes('/api/comments/'));
+  assert.ok(comment, 'the answer writes its comment');
+  const body = JSON.parse(comment.opts.body);
+  assert.equal(body.decisionLoopId, 'sp', 'the primary stamp is unchanged');
+  assert.deepEqual(body.decisionLoopIds, ['sp', 'copy-2']);
+});
+
+test('LIN-3959 card-level: a non-joined card sends no decisionLoopIds at all', async () => {
+  const fixture = makeCard({ effect: 'resume', typed: 'go ahead' });
+  const { sandbox, calls } = makeRealDeliverySandbox([fixture]);
+  sandbox.module.exports.initQuestionCards();
+  fixture.btn.click();
+  await flush();
+
+  const comment = calls.find(c => c.url.includes('/api/comments/'));
+  assert.ok(comment, 'the answer writes its comment');
+  assert.ok(!('decisionLoopIds' in JSON.parse(comment.opts.body)));
+});
+
+test('LIN-3959 render: a joined row renders every copy as data-stamp-loop-ids; a non-joined row renders none', () => {
+  const row = (extra) => ({
+    decision: { decision_id: 'd1', question: 'Ship?' },
+    anchor: { loopId: 'wk', issueIdentifier: 'LIN-1', workspaceUrlKey: 'w', target: 'cli' },
+    stampLoopId: 'wk', disposition: 'resumable', effect: 'resume', canReply: true, decisionCase: [],
+    ...extra
+  });
+  const opts = { urlKey: 'w', canReply: true, sessionTerminal: false, sessionWaiting: false };
+  const joined = renderDecisionCard(row({ stampLoopIds: ['wk', 'ap'] }), opts);
+  const m = joined.match(/data-stamp-loop-ids="([^"]*)"/);
+  assert.ok(m, 'the attribute is rendered on a joined card');
+  assert.deepEqual(JSON.parse(m[1].replace(/&quot;/g, '"')), ['wk', 'ap']);
+  assert.ok(!/data-stamp-loop-ids/.test(renderDecisionCard(row({}), opts)), 'a non-joined card carries no attribute');
+});
