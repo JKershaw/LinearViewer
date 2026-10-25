@@ -8,7 +8,8 @@ test('the page list holds the pages and states the ticket asks for (LIN-3889 add
   const ids = PAGES.map((p) => p.id);
   assert.equal(new Set(ids).size, ids.length);
   for (const id of ['home', 'task', 'dispatch', 'proxy', 'audit', 'settings-index', 'styleguide', 'privacy', 'terms', ...AREAS.map((a) => `settings-${a}`)]) assert.ok(ids.includes(id), id);
-  assert.deepEqual(PAGES.filter((p) => p.state).map((p) => p.state).sort(), ['ask-open', 'audit-report', 'change-log-entry', 'home-run-panel-open', 'key-open', 'models-panel-open', 'models-staged', 'paused', 'swipe-dispatch-open']);
+  assert.deepEqual(PAGES.filter((p) => p.state).map((p) => p.state).sort(), ['ask-open', 'audit-report', 'change-log-entry', 'email-signin', 'home-run-panel-open', 'key-open', 'models-panel-open', 'models-staged', 'paused', 'swipe-dispatch-open']);
+  for (const id of ['account-home', 'workspace-not-found']) assert.ok(ids.includes(id), id);
   assert.equal(AREAS.length, 8);
 });
 

@@ -39,6 +39,7 @@ const TIME_MASKS = {
 //   models-staged     the same row, with one model picked: the staged-change count shows (head only)
 //   home-run-panel-open  Home's Change panel open (LIN-3962): the shared decision panel the server renders
 //   swipe-dispatch-open  Swipe's Dispatch ▾ disclosure open: expected to show no difference (Swipe has no run panel)
+//   email-signin      a zero-workspace account: no local seed; signs in by email (one address per shot)
 // `urlKey` is fixed per entry and identical on both sides. States that write data get their own
 // urlKey so their writes never reach another page's sidebar counts.
 // `renderers` are the files that emit the page, for the changed-stylesheet check below.
@@ -60,6 +61,9 @@ export const PAGES = [
   // LIN-3950: the Legal pages on the Plain layout (brand shape). Public, so the path ignores the workspace.
   { id: 'privacy', urlKey: 'judge', path: () => '/privacy', renderers: ['lib/render-legal.js'] },
   { id: 'terms', urlKey: 'judge', path: () => '/terms', renderers: ['lib/render-legal.js'] },
+  // LIN-3956: the not-found page (a bad urlKey, a 404 the judge still captures) carries the workspace-create
+  // form, which moved onto the shared form markup. Its session is the seeded judge session.
+  { id: 'workspace-not-found', urlKey: 'judge', path: () => '/workspace/judge-missing/', renderers: ['lib/render-pages.js'] },
   // States
   { id: 'running-ask-open', urlKey: 'judge', path: (k) => `/workspace/${k}/settings/running`, state: 'ask-open', renderers: ['lib/render-settings.js'] },
   { id: 'agent-access-key-open', urlKey: 'judge-key', path: (k) => `/workspace/${k}/settings/agent-access`, state: 'key-open', masks: [TIME_MASKS.key], renderers: ['lib/render-settings.js'] },
@@ -79,6 +83,11 @@ export const PAGES = [
   // which keeps its own exec controls. Both are conditional on the seed showing the control; a side without it is not claimed.
   { id: 'home-run-panel-open', urlKey: 'judge', path: (k) => `/workspace/${k}/`, state: 'home-run-panel-open', renderers: ['lib/render.js', 'lib/components/decision-panel.js', 'public/decision-panel.js'] },
   { id: 'swipe-dispatch-open', urlKey: 'judge', path: (k) => `/workspace/${k}/swipe`, state: 'swipe-dispatch-open', renderers: ['lib/render-swipe.js'] },
+  // LIN-3956: Account home, the first Plain page with rows and a form. It needs a zero-workspace account,
+  // which no local seed can make, so the spec signs in by email. The judge's server runs the capture
+  // transport (visual-replay.mjs), the same as Playwright's. Settings › Account then shows "Add email →"
+  // on both sides, so it is identical on both and adds no difference.
+  { id: 'account-home', urlKey: 'judge', path: () => '/account', state: 'email-signin', renderers: ['lib/render-account-home.js'] },
 ];
 
 // Stated, not assumed: what the seed cannot reach.

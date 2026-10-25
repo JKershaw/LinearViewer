@@ -83,14 +83,15 @@ test('the styleguide prose classes take the sans face in styleguide.css', () => 
   assert.match(css, /\.sg-settings-anatomy dt,\s*\.sg-settings-anatomy dd \{[^}]*font-family: var\(--font-content\);/);
 });
 
-// LIN-3958: /styleguide's Plain sample is .plain-page AND .settings-shell, so both phone roots land on one
-// element. Both are rem, not em, so they do not compound: the sample takes 1rem, not 1rem squared.
+// LIN-3958: both phone roots are rem, not em, so they do not compound. LIN-3956: the Plain sample is
+// .plain-page alone (no .settings-shell wrapper), and .plain-page is the phone root its rows need.
 test('the Plain and Settings phone roots are both rem, so the styleguide sample does not compound', () => {
   const plainCss = readFileSync(new URL('../../public/style.css', import.meta.url), 'utf8');
   const settingsCss = readFileSync(new URL('../../public/settings.css', import.meta.url), 'utf8');
   assert.match(plainCss, /@media \(max-width: 400px\) \{\s*\.plain-page \{\s*font-size: 1rem;\s*\}\s*\}/);
   assert.match(settingsCss, /\.settings-shell \{[^}]*font-size: 1rem;/);
-  assert.match(renderStyleguide(), /<div class="plain-page settings-shell sg-settings-sample sg-plain-sample" inert>/);
+  assert.match(renderStyleguide(), /<div class="plain-page sg-settings-sample sg-plain-sample" inert>/);
+  assert.match(renderStyleguide(), /<div class="settings-shell sg-settings-sample" inert>/, 'the Settings samples keep their wrapper');
 });
 
 test('the /styleguide title carries the Plain title class', () => {
@@ -102,11 +103,12 @@ test('the /styleguide title carries the Plain title class', () => {
 test('/styleguide is a Plain page, with every section kind sampled in the page and both theme panels', () => {
   const html = renderStyleguide();
   assert.match(html, /<main class="plain-page styleguide-content">/);
-  const plain = '<div class="plain-page settings-shell sg-settings-sample sg-plain-sample" inert>';
+  const plain = '<div class="plain-page sg-settings-sample sg-plain-sample" inert>';
   assert.equal(html.split(plain).length - 1, 3, 'one Plain sample in the section and one per theme panel');
   const sample = html.split(plain)[1];
   assert.match(sample, /class="field"/, 'fields kind');
-  assert.match(sample, /class="settings-group-block /, 'rows kind');
+  assert.match(sample, /<section class="section">\s*<h3 class="section-header">Rows<\/h3>\s*<div class="settings-rows">/, 'rows kind: a Plain section under an h3, not a group heading');
+  assert.doesNotMatch(sample, /settings-group-block/, 'rows do not go through group()');
   assert.match(sample, /class="plain-form"/, 'form kind');
   assert.match(sample, /class="emptyState"/, 'empty kind');
 });

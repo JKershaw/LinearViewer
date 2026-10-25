@@ -67,11 +67,19 @@ jobs:
       # an escape, even on loopback, so a proxy-aware client reaching for the
       # network shows up here rather than reading as a local server. Cheap
       # (~35s) and it is the arm that would otherwise never be run.
+      #
+      # LIN-3949: this arm alone runs with the clock shifted +400 days, so a
+      # unit test that pins a fixture date and reads the wall clock goes red in
+      # the PR that introduces it, not on main after the date passes (LIN-1535,
+      # LIN-2732, settings-keys). `test:hermetic` above stays on the real clock,
+      # so a failure in one arm and not the other names the cause: clock rot or
+      # a real bug. Costs no extra CI time. Local run: npm run test:clock-shift.
       - name: Run unit tests (hermetic, proxy env set)
         run: npm run test:hermetic:proxy
         env:
           CI: true
           MONGODB_TEST_URI: mongodb://localhost:27017
+          CLOCK_SHIFT_DAYS: 400
 
   e2e:
     name: E2E shard ${{ matrix.shard }}/${{ strategy.job-total }}

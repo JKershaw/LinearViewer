@@ -28,6 +28,7 @@ const AUDIT_FIXTURE = fileURLToPath(new URL('./audit-report.fixture.json', impor
 
 const isLoopback = (url) => /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(url) || url.startsWith('data:') || url.startsWith('blob:');
 
+// `urlKey` null means no local seed: the account is a zero-workspace one, signed in by email (LIN-3956).
 async function openContext(browser, baseURL, viewport, theme, urlKey) {
   const context = await browser.newContext({
     baseURL, viewport: { width: viewport.width, height: viewport.height },
@@ -36,9 +37,11 @@ async function openContext(browser, baseURL, viewport, theme, urlKey) {
   await context.route('**/*', (route) => (isLoopback(route.request().url()) ? route.continue() : route.abort()));
   await context.addCookies([{ name: 'theme', value: theme, url: baseURL }]);
   await context.clock.setFixedTime(new Date(FROZEN_TIME));
-  const seed = { ...defaultLocalSeed(urlKey), urlKey, runnerKey: false };
-  const resp = await context.request.post('/test/set-local-session', { data: seed });
-  if (!resp.ok()) throw new Error(`seed failed on ${baseURL}: ${resp.status()} ${await resp.text()}`);
+  if (urlKey) {
+    const seed = { ...defaultLocalSeed(urlKey), urlKey, runnerKey: false };
+    const resp = await context.request.post('/test/set-local-session', { data: seed });
+    if (!resp.ok()) throw new Error(`seed failed on ${baseURL}: ${resp.status()} ${await resp.text()}`);
+  }
   return context;
 }
 
@@ -55,8 +58,24 @@ async function settle(page) {
 }
 
 // Per-state set-up: identical on both sides, driven by the page's own markup.
-async function prepare(page, context, entry) {
+async function prepare(page, context, entry, viewport, theme) {
   const url = entry.path(entry.urlKey);
+  if (entry.state === 'email-signin') {
+    // One address per shot, the same on both sides: the send throttle is per address (3 per 15 minutes),
+    // and the judge takes at most ATTEMPTS (3) tries per shot. The link is read from the capture outbox.
+    const email = `judge-${viewport.name}-${theme}@example.test`;
+    await page.goto('/auth/email');
+    await page.getByTestId('email-signin-address').fill(email);
+    await page.getByTestId('email-signin-submit').click();
+    await page.getByTestId('email-check-inbox').waitFor();
+    const sent = await context.request.get(`/test/email-outbox?to=${encodeURIComponent(email)}`);
+    if (!sent.ok()) throw new Error(`no sign-in email for ${email}: ${sent.status()}`);
+    const link = (await sent.json()).text.match(/https?:\/\/[^\s]+(\/auth\/email\/confirm\?t=[A-Za-z0-9_-]+)/);
+    if (!link) throw new Error(`the sign-in email for ${email} carries no confirm link`);
+    await page.goto(link[1]);
+    await page.getByTestId('email-confirm-submit').click();
+    await page.waitForURL(/\/account$/);
+  }
   if (entry.state === 'key-open') {
     const minted = await context.request.get(`/test/create-proxy-token?urlKey=${entry.urlKey}&label=judge-key&scope=read`);
     if (!minted.ok()) throw new Error(`mint failed: ${minted.status()}`);
@@ -126,10 +145,10 @@ async function prepare(page, context, entry) {
 }
 
 async function shoot(browser, baseURL, viewport, theme, entry) {
-  const context = await openContext(browser, baseURL, viewport, theme, entry.urlKey);
+  const context = await openContext(browser, baseURL, viewport, theme, entry.state === 'email-signin' ? null : entry.urlKey);
   try {
     const page = await context.newPage();
-    await prepare(page, context, entry);
+    await prepare(page, context, entry, viewport, theme);
     await settle(page);
     // Rewrite per-run text (see NORMALISE in pages.mjs) in text nodes, before the screenshot.
     await page.evaluate((rules) => {
