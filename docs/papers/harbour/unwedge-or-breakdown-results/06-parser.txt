@@ -1,0 +1,8 @@
+comments whose first line is a "Plan Review Verdict" heading: 682
+read as zero verdicts by assemblePlanReviewFacts: 6 (0.9%)
+  LIN-2511 2026-09-04T07:46
+  LIN-2511 2026-09-04T08:05
+  LIN-2670 2026-09-10T07:59
+  LIN-2670 2026-09-10T08:33
+  LIN-3102 2026-09-26T20:43
+  LIN-3142 2026-10-01T06:57

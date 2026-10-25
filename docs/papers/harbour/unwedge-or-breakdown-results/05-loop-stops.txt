@@ -1,0 +1,20 @@
+plan-loop stops replayed under the rule in force on each verdict: 116
+  on or after 25 Sep (the rulings store starts): 41
+  research spike's 24 tickets recovered by the replay: 22 of 24
+  research tickets the replay does not stop: LIN-3102 LIN-3142
+  replay stops since 25 Sep that the research did not list: LIN-2932 LIN-2954 LIN-2995 LIN-3033 LIN-3134 LIN-3157 LIN-3285 LIN-3309 LIN-3332 LIN-3333 LIN-3341 LIN-3358 LIN-3366 LIN-3373 LIN-3382 LIN-3398 LIN-3423 LIN-3453 LIN-3519
+
+next move by era/kind (rule-coded; see code-next-moves.mjs):
+  one-cycle/one-cycle         built=55  child-filed=5  stalled=6  breakdown=18  cancelled=2  built-after-ruling=7  unwedge-after-ruling=1
+  bound-3/bound               breakdown=3  built=7  child-filed=1  built-after-ruling=3
+  ceiling-5/not-converging    built=1  built-after-ruling=5
+  ceiling-5/ceiling           built=1  built-after-ruling=1
+
+next move, all stops:
+  built               64
+  child-filed         6
+  stalled             6
+  breakdown           21
+  cancelled           2
+  built-after-ruling  16
+  unwedge-after-ruling1
