@@ -11,7 +11,8 @@ import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPIL
 import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
 import { buildPassageRunnerKickoff } from '../lib/prompts/passage-runner-kickoff.js';
 import { enterKickoff } from '../lib/dispatch-entrance.js';
-import { publicOrigin } from '../lib/public-origin.js';
+import { requestOriginOrNull, ORIGIN_UNRESOLVED_REFUSAL } from '../lib/public-origin.js';
+import { jsonError } from '../lib/errors.js';
 
 /**
  * @param {Object} deps
@@ -69,7 +70,13 @@ export function createKickoffRoutes({
    * beat-stepping disposition.
    */
   router.get('/api/proxy/autopilot/kickoff', proxyLimiter, authenticateProxyToken, async (req, res) => {
-    const baseUrl = publicOrigin(req);
+    // LIN-3931: the kickoff text names this request's origin as its proxy base. With no Host and no
+    // PUBLIC_ORIGIN that would read `http://undefined`, so refuse the preview instead of serving it.
+    const baseUrl = requestOriginOrNull(req);
+    if (baseUrl === null) {
+      logEvent(req, '/api/proxy/autopilot/kickoff', 400);
+      return jsonError(res, 400, ORIGIN_UNRESOLVED_REFUSAL.message, { code: ORIGIN_UNRESOLVED_REFUSAL.code, retryable: ORIGIN_UNRESOLVED_REFUSAL.retryable });
+    }
     const mode = AUTOPILOT_MODES.includes(req.query.mode) ? req.query.mode : AUTOPILOT_MODE_DEFAULT;
     const variant = AUTOPILOT_VARIANTS.includes(req.query.variant) ? req.query.variant : AUTOPILOT_VARIANT_DEFAULT;
     // LIN-2818: unlike the POST body's goal cap (now 100000), this preview-only

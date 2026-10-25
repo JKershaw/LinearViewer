@@ -37,7 +37,7 @@ import {
   CHARACTER_FIELDS,
 } from '../lib/prompts/collective-participant.js';
 import { SESSION_TARGETS } from '../lib/dispatch-targets.js';
-import { publicOrigin } from '../lib/public-origin.js';
+import { publicOrigin, requestOriginOrNull, ORIGIN_UNRESOLVED_REFUSAL } from '../lib/public-origin.js';
 
 // Substrate is DECIDED (John, 2026-06-13): full Claude Code sessions only.
 // `dash` is pure-code-change execution and `local`/Harbour OS isn't a fan-out
@@ -204,7 +204,15 @@ export function createCollectiveRoutes({
       ? rawTopic.trim().slice(0, 500)
       : DEFAULT_COLLECTIVE_TOPIC;
 
-    const proxyBaseUrl = publicOrigin(req);
+    // LIN-3931: a prose participant embeds this origin in its prompt (beside its minted bootstrap),
+    // so with no Host and no PUBLIC_ORIGIN it would read `http://undefined`. Refuse the whole start
+    // here, before any participant is queued: a refusal part-way through the fan-out would leave a
+    // half-started collective. Claude-code participants would not embed it; that is the PR's open
+    // question, since the harness is only known per participant, inside the fan-out.
+    const proxyBaseUrl = requestOriginOrNull(req);
+    if (proxyBaseUrl === null) {
+      return jsonError(res, 400, ORIGIN_UNRESOLVED_REFUSAL.message, { code: ORIGIN_UNRESOLVED_REFUSAL.code, retryable: ORIGIN_UNRESOLVED_REFUSAL.retryable });
+    }
     const yapBaseUrl = yapClient?.baseUrl || process.env.YAP_BASE_URL || '';
     const yapPassword = process.env.YAP_PASSWORD || null;
 
