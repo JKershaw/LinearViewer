@@ -134,6 +134,55 @@ test('verbatim: the default file set is the in-scope files changed between the c
   assert.deepEqual(explicit.json.regions.map((x) => x.region), ['routes']);
 });
 
+test('retention: lists the dropped refs, where they were cited at head, and exits 0', () => {
+  const r2 = makeRepo();
+  try {
+    const base = r2.commit({
+      'lib/a.js': '// LIN-12 keeps the retry\nexport const a = 1;\n',
+      'routes/keep.js': '// LIN-12 reason now lives here\nexport const k = 1;\n',
+    }, '2026-01-01T00:00:00Z');
+    const head = r2.commit({ 'lib/a.js': 'export const a = 1;\n', 'lib/bad.js': 'export const b = (\n' }, '2026-01-02T00:00:00Z');
+    const r = cli('retention.mjs', [r2.dir, base, head]);
+    assert.equal(r.status, 0, 'report only: a non-empty list does not fail the run');
+    assert.deepEqual(r.json.dropped.map((d) => [d.ref, d.baseFiles, d.citedElsewhereAtHead]), [['LIN-12', ['lib/a.js'], ['routes/keep.js']]]);
+    assert.deepEqual(r.json.parseFailures, [{ path: 'lib/bad.js', side: 'head' }]);
+    assert.match(r.stderr, /^retention [0-9a-f]{8}→[0-9a-f]{8}: /);
+    const back = cli('retention.mjs', [r2.dir, head, base]);
+    assert.equal(back.status, 0);
+    assert.deepEqual(back.json.dropped, [], 'a ref that comes back is not a drop');
+  } finally { r2.cleanup(); }
+});
+
+test('retention: tests are out of scope by default; --exclude \'^$\' brings them back', () => {
+  const r2 = makeRepo();
+  try {
+    const base = r2.commit({ 'tests/t.test.js': '// LIN-50 keeps the fixture\nexport const t = 1;\n' }, '2026-01-01T00:00:00Z');
+    const head = r2.commit({ 'tests/t.test.js': 'export const t = 1;\n' }, '2026-01-02T00:00:00Z');
+    assert.deepEqual(cli('retention.mjs', [r2.dir, base, head]).json.dropped, []);
+    assert.deepEqual(cli('retention.mjs', [r2.dir, base, head, '--exclude', '^$']).json.dropped.map((d) => d.ref), ['LIN-50']);
+    assert.deepEqual(cli('retention.mjs', [r2.dir, base, head, '--include', '^lib/']).json.dropped, []);
+  } finally { r2.cleanup(); }
+});
+
+test('retention: a moved file is a delete plus an add, so a ref dropped inside it is still reported (--no-renames)', () => {
+  const r2 = makeRepo();
+  try {
+    // Enough unchanged code that git's rename detection would pair the two paths if it were asked to.
+    const body = 'export const a = 1;\nexport const b = 2;\nexport const c = 3;\nexport const d = 4;\nexport const e = 5;\n';
+    const base = r2.commit({ 'lib/a.js': `// LIN-77 keeps the retry\n// LIN-78 keeps the backoff\n${body}` }, '2026-01-01T00:00:00Z');
+    const head = r2.commit({ 'lib/a.js': null, 'lib/moved.js': `// LIN-77 keeps the retry\n${body}` }, '2026-01-02T00:00:00Z');
+    const r = cli('retention.mjs', [r2.dir, base, head]);
+    assert.equal(r.status, 0, r.stderr);
+    assert.deepEqual(r.json.dropped.map((d) => [d.ref, d.baseFiles]), [['LIN-78', ['lib/a.js']]], 'LIN-77 moved with the file (pooled); LIN-78 is gone');
+  } finally { r2.cleanup(); }
+});
+
+test('retention: usage errors exit 2 — missing arguments, unknown commit, unknown flag', () => {
+  assert.equal(cli('retention.mjs', [repo.dir, first]).status, 2);
+  assert.equal(cli('retention.mjs', [repo.dir, first, 'no-such-commit']).status, 2);
+  assert.equal(cli('retention.mjs', [repo.dir, first, second, '--nope']).status, 2);
+});
+
 // A tiny test that reads the target as text: it fails only when the comment is gone.
 const PROBE_FILES = {
   'lib/target.js': '// marker: keep me\nexport const value = 1;\n',
@@ -211,7 +260,7 @@ test('without acorn each CLI that parses code prints "run npm install" and exits
   const dir = mkdtempSync(join(tmpdir(), 'code-shape-noacorn-'));
   try {
     cpSync(KIT, dir, { recursive: true, filter: (p) => !p.endsWith('.test.mjs') });
-    for (const [script, args] of [['census.mjs', [repo.dir, third]], ['shape.mjs', [repo.dir, third]], ['probe.mjs', [repo.dir, third, '--target', 'lib/a.js', '--test-cmd', 'true']]]) {
+    for (const [script, args] of [['census.mjs', [repo.dir, third]], ['shape.mjs', [repo.dir, third]], ['probe.mjs', [repo.dir, third, '--target', 'lib/a.js', '--test-cmd', 'true']], ['retention.mjs', [repo.dir, first, second]]]) {
       const r = cli(script, args, { kit: dir });
       assert.equal(r.status, 2, `${script}: ${r.stderr}`);
       assert.match(r.stderr, /run npm install/, script);

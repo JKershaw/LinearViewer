@@ -1,8 +1,10 @@
 /**
- * LIN-3853: the three old Settings forms write through the model-routing store.
- * After each POST the store holds the saved value, the job's effective setting reads it,
- * the log has exactly one entry with the form's fixed reason, and the section renders the
- * store's value. (On main there is no store or log, so each of these fails.)
+ * LIN-3855: the Settings › Models page's writes (routes/settings-model.js), through the store.
+ *
+ * The three legacy forms are retired: their POSTs answer 404 and write nothing. The page's own writes
+ * are one staged save (one reason, one log entry, the version checked, the runnable check on every
+ * changed job), the routing presets (save, and apply through the same check), and the undo (a refused
+ * undo says why and writes nothing).
  *
  * Run with: node --test tests/unit/settings-model-routes.test.js
  */
@@ -11,21 +13,19 @@ process.env.NODE_ENV = 'test';
 import { test, describe, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
-import { createSettingsModelRoutes, LEGACY_FORM_REASONS } from '../../routes/settings-model.js';
-import { renderAllAreas as renderSettingsPage } from '../helpers/render-settings-areas.js';
-import { projectLegacy } from '../../lib/model-routing.js';
-import { DEFAULT_MODEL } from '../../lib/openrouter.js';
+import { createSettingsModelRoutes } from '../../routes/settings-model.js';
 import { routingFixture } from './helpers/routing-fakes.js';
 
 const URL_KEY = 'acme';
+const MAKE_MODEL = 'c__group__agent-session__make__model';
+const MAKE_HARNESS = 'c__group__agent-session__make__harness';
 
-describe('the old Settings forms, through the store', () => {
+describe('the Models page writes (LIN-3855)', () => {
   let server, base, fx;
   before(async () => {
     const app = express();
     app.use(express.urlencoded({ extended: false }));
     app.use((req, _res, next) => { req.session = { accountId: 'acct-1' }; next(); });
-    app.use((req, res, next) => (fx ? next() : res.status(500).end()));
     const workspaceFromUrl = (req, _res, next) => { req.workspace = { urlKey: req.params.urlKey, name: 'Acme' }; next(); };
     app.use((req, res, next) => createSettingsModelRoutes({ workspaceFromUrl, modelRoutingStore: fx.routingStore })(req, res, next));
     await new Promise((resolve) => { server = app.listen(0, '127.0.0.1', resolve); });
@@ -40,97 +40,112 @@ describe('the old Settings forms, through the store', () => {
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams(body).toString()
   });
-  const jobs = async () => Object.fromEntries((await fx.routingStore.getEffectiveTable(URL_KEY, { defaultModel: DEFAULT_MODEL })).jobs.map((j) => [j.id, j]));
-  const page = async () => {
-    const legacy = projectLegacy(await fx.preferencesStore.getRoutingTable(URL_KEY));
-    return renderSettingsPage('Acme', { urlKey: URL_KEY, currentModel: legacy.modelId || DEFAULT_MODEL, dispatchDefaults: legacy.dispatchDefaults, aiModelOverrides: legacy.aiModelOverrides });
-  };
-  const onlyEntry = async (reason) => {
-    const log = await fx.routingStore.getLog(URL_KEY);
-    assert.equal(log.length, 1, 'exactly one log entry');
-    assert.equal(log[0].reason, reason);
-    assert.deepEqual([log[0].actor.via, log[0].actor.id], ['page', 'acct-1']);
-    return log[0];
-  };
+  const location = (res) => res.headers.get('location');
+  const logOf = () => fx.routingStore.getLog(URL_KEY);
+  const version = async () => (await fx.routingStore.getTable(URL_KEY)).version;
+  const snapshot = () => JSON.stringify([fx.collections.routing._docs, fx.collections.log._docs, fx.collections.presets._docs]);
 
-  test('POST /settings/model sets every Harbour job\'s model, logs once, and the section shows it', async () => {
-    const res = await post('model', { modelId: 'anthropic/claude-sonnet-4' });
-    assert.equal(res.status, 302);
-    const j = await jobs();
-    for (const id of ['recommend', 'roadmap', 'feedback-title', 'observer-pass']) assert.equal(j[id].model, 'anthropic/claude-sonnet-4', id);
-    await onlyEntry(LEGACY_FORM_REASONS.model);
-    assert.match(await page(), /anthropic\/claude-sonnet-4/);
-    // the old preference field is no longer written
-    assert.equal(fx.prefs._docs.length, 0);
-  });
-
-  test('POST /settings/model keeps its validation redirects and writes nothing when refused', async () => {
-    for (const [body, error] of [[{ modelId: '' }, 'empty'], [{ modelId: 'no-slash' }, 'invalid-format'], [{ modelId: 'a/b..c' }, 'invalid-format']]) {
-      const res = await post('model', body);
-      assert.equal(res.headers.get('location'), `/workspace/${URL_KEY}/settings/models?error=${error}`);
+  describe('the retired forms', () => {
+    for (const path of ['model', 'dispatch-defaults', 'ai-model-overrides']) {
+      test(`POST /settings/${path} is gone: 404, and it writes nothing`, async () => {
+        await fx.routingStore.getTable(URL_KEY);
+        const before = snapshot();
+        const res = await post(path, { modelId: 'anthropic/claude-sonnet-4', reason: 'x' });
+        assert.equal(res.status, 404);
+        assert.equal(snapshot(), before);
+      });
     }
-    assert.deepEqual(await fx.routingStore.getLog(URL_KEY), []);
   });
 
-  test('POST /settings/dispatch-defaults: the top row sets every agent group, per-kind rows set that job, one entry', async () => {
-    const res = await post('dispatch-defaults', {
-      defaultModel: 'top-m', defaultHarnessSelect: 'claude-code', defaultEffort: 'high',
-      kind__review__Model: 'rev-m', kind__autopilot__HarnessSelect: 'opencode'
+  describe('the staged save', () => {
+    test('one save, one reason, one log entry; the fields it posted are the changes', async () => {
+      const v = await version();
+      const res = await post('models/changes', { version: String(v), reason: 'cheaper make', [MAKE_MODEL]: 'anthropic/claude-sonnet-5' });
+      assert.equal(res.status, 302);
+      assert.match(location(res), /\/settings\/models\?changed=1$/);
+      const log = await logOf();
+      assert.equal(log.length, 1);
+      assert.equal(log[0].reason, 'cheaper make');
+      assert.deepEqual(log[0].changes.map((c) => [c.scope, c.key, c.field, c.to]), [['group', 'make', 'model', 'anthropic/claude-sonnet-5']]);
+      assert.equal(log[0].actor.via, 'page');
+      assert.equal(log[0].actor.id, 'acct-1');
     });
-    assert.equal(res.status, 302);
-    const j = await jobs();
-    assert.deepEqual([j.implementation.model, j.implementation.harness, j.implementation.effort, j.implementation.source.model], ['top-m', 'claude-code', 'high', 'group']);
-    assert.deepEqual([j.review.model, j.review.source.model, j.review.harness], ['rev-m', 'job', 'claude-code']);
-    assert.deepEqual([j.autopilot.harness, j.autopilot.source.harness, j.autopilot.model], ['opencode', 'job', 'top-m']);
-    const entry = await onlyEntry(LEGACY_FORM_REASONS.dispatchDefaults);
-    assert.ok(entry.changes.length > 0);
-    const html = await page();
-    assert.match(html, /top-m/);
-    assert.match(html, /rev-m/);
+
+    test('two edits in one save make one entry', async () => {
+      const v = await version();
+      await post('models/changes', { version: String(v), reason: 'both', [MAKE_MODEL]: 'anthropic/claude-sonnet-5', [MAKE_HARNESS]: 'claude-code' });
+      assert.equal((await logOf()).length, 1);
+    });
+
+    test('a save with nothing changed writes nothing', async () => {
+      const v = await version();
+      const res = await post('models/changes', { version: String(v), reason: 'nothing', [MAKE_MODEL]: '' });
+      assert.match(location(res), /nothing=1/);
+      assert.equal((await logOf()).length, 0);
+    });
+
+    test('no reason: refused in place, the staged values are kept, nothing is written', async () => {
+      const v = await version();
+      const before = snapshot();
+      const res = await post('models/changes', { version: String(v), reason: '   ', [MAKE_MODEL]: 'anthropic/claude-sonnet-5' });
+      assert.match(location(res), /\/settings\/models$/);
+      assert.equal(snapshot(), before);
+    });
+
+    test('a stale version is CONFLICT: the save is refused, nothing is overwritten', async () => {
+      const v = await version();
+      await post('models/changes', { version: String(v), reason: 'first', [MAKE_MODEL]: 'anthropic/claude-sonnet-5' });
+      const before = snapshot();
+      const res = await post('models/changes', { version: String(v), reason: 'second', [MAKE_MODEL]: 'anthropic/claude-opus-5' });
+      assert.match(location(res), /\/settings\/models$/);
+      assert.equal(snapshot(), before, 'the stale save wrote nothing');
+    });
+
+    test('a group move to a model its harness cannot run is refused, naming the jobs, and writes nothing', async () => {
+      const v = await version();
+      const before = snapshot();
+      await post('models/changes', { version: String(v), reason: 'move make', [MAKE_MODEL]: 'openai/gpt-6.1-sol' });
+      assert.equal(snapshot(), before);
+    });
+
+    test('the same move with OpenCode named on the group is accepted', async () => {
+      const v = await version();
+      await post('models/changes', { version: String(v), reason: 'move make', [MAKE_MODEL]: 'openai/gpt-6.1-sol', [MAKE_HARNESS]: 'opencode' });
+      const log = await logOf();
+      assert.equal(log.length, 1);
+      assert.deepEqual(log[0].changes.map((c) => c.field).sort(), ['harness', 'model']);
+    });
+
+    test('a field the page does not own is refused', async () => {
+      const v = await version();
+      const before = snapshot();
+      const res = await post('models/changes', { version: String(v), reason: 'bad', c__group__agent_session__make__model: 'x/y' });
+      assert.equal(res.status, 302);
+      assert.equal(snapshot(), before);
+    });
   });
 
-  test('POST /settings/dispatch-defaults: a blank per-kind field clears it so the job follows its group again', async () => {
-    await post('dispatch-defaults', { defaultModel: 'top-m', kind__review__Model: 'rev-m' });
-    await post('dispatch-defaults', { defaultModel: 'top-m' });
-    assert.equal((await jobs()).review.source.model, 'group');
-    assert.equal((await fx.routingStore.getLog(URL_KEY)).length, 2);
-  });
+  describe('routing presets', () => {
+    test('save a preset: one log entry, the table unchanged', async () => {
+      await post('models/changes', { version: String(await version()), reason: 'set', [MAKE_MODEL]: 'anthropic/claude-sonnet-5' });
+      const table = JSON.stringify((await fx.routingStore.getTable(URL_KEY)).jobs);
+      const res = await post('models/presets', { name: 'the cheap one', reason: 'keep this' });
+      assert.match(location(res), /saved=1/);
+      assert.equal((await fx.routingStore.listPresets(URL_KEY)).length, 1);
+      assert.equal(JSON.stringify((await fx.routingStore.getTable(URL_KEY)).jobs), table);
+      assert.equal((await logOf())[0].kind, 'preset-save');
+    });
 
-  test('POST /settings/dispatch-defaults: an invalid field redirects with the error and writes nothing', async () => {
-    const res = await post('dispatch-defaults', { defaultModel: 'x'.repeat(5000) });
-    assert.match(res.headers.get('location'), /dispatchDefaultsError=invalid-field$/);
-    assert.deepEqual(await fx.routingStore.getLog(URL_KEY), []);
-  });
-
-  test('POST /settings/ai-model-overrides: sets the job\'s own model, scan also sets scan-retire, one entry', async () => {
-    const res = await post('ai-model-overrides', { byKind__recap__model: 'anthropic/recap-m', byKind__scan__modelCustom: 'anthropic/scan-m' });
-    assert.equal(res.status, 302);
-    const j = await jobs();
-    assert.deepEqual([j.recap.model, j.scan.model, j['scan-retire'].model, j.brief.source.model], ['anthropic/recap-m', 'anthropic/scan-m', 'anthropic/scan-m', 'none']);
-    await onlyEntry(LEGACY_FORM_REASONS.aiOverrides);
-    assert.match(await page(), /anthropic\/recap-m/);
-  });
-
-  test('POST /settings/ai-model-overrides: invalid format redirects with the error and writes nothing', async () => {
-    const res = await post('ai-model-overrides', { byKind__recap__model: 'nope' });
-    assert.match(res.headers.get('location'), /aiOverridesError=invalid-format$/);
-    assert.deepEqual(await fx.routingStore.getLog(URL_KEY), []);
-  });
-
-  test('a store failure renders the original settings error page (500), not a redirect', async () => {
-    fx.routingStore.collection.updateOne = async () => { throw new Error('db down'); };
-    const silenced = console.error;
-    console.error = () => {};
-    try {
-      assert.equal((await post('model', { modelId: 'a/b' })).status, 500);
-    } finally { console.error = silenced; }
-  });
-
-  test('each form\'s write is undoable from the log it left', async () => {
-    await post('model', { modelId: 'a/one' });
-    await post('model', { modelId: 'a/two' });
-    const [latest] = await fx.routingStore.getLog(URL_KEY);
-    await fx.routingStore.undo(latest._id, { urlKey: URL_KEY, reason: 'oops', actor: { via: 'page', id: 'acct-1' } });
-    assert.equal((await jobs()).recommend.model, 'a/one');
+    test('apply a preset: refused for a snapshot the runnable check rejects, and nothing is written', async () => {
+      // A snapshot written through the proxy's shape-only path can hold a model its harness cannot run.
+      await fx.routingStore.changeGroup('agent-session', 'make', { model: 'openai/gpt-6.1-sol' }, { urlKey: URL_KEY, reason: 'proxy-style', actor: { via: 'proxy' } });
+      await post('models/presets', { name: 'bad', reason: 'keep' });
+      const [preset] = await fx.routingStore.listPresets(URL_KEY);
+      await fx.routingStore.changeGroup('agent-session', 'make', { harness: null, model: null }, { urlKey: URL_KEY, reason: 'clear', actor: { via: 'proxy' } });
+      const before = snapshot();
+      const res = await post(`models/presets/${preset._id}/apply`, { reason: 'apply it' });
+      assert.match(location(res), /\/settings\/models$/);
+      assert.equal(snapshot(), before);
+    });
   });
 });

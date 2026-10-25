@@ -39,9 +39,6 @@ const DISPLAY_ONLY = new Set([
   // routes/workspace-api.js — reportHistoryStore.save metadata (no LLM call)
   // (LIN-3853: now resolved as the `roadmap` job; still no LLM call, so still unclamped)
   'const model = await resolveAiOperationModel({ urlKey: req.workspace.urlKey, workspacePreferencesStore, opKind: \'roadmap\' });',
-  // routes/settings.js — Settings model label (defaultModelName / currentModel render data, no LLM call).
-  // LIN-3841: this site was not in the old FILES list; the tree scan finds it.
-  'const currentModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore });'
 ]);
 
 // Billed, but never against the shared free-tier key, so there is no `isFreeTier`

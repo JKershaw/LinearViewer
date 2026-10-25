@@ -59,13 +59,14 @@ test.describe('Settings areas: layout', () => {
     await expect(page.getByTestId('settings-nav')).toBeVisible();
   });
 
-  test('Models keeps its slot and the legacy forms, with the presets anchor', async ({ page, seedLocal }) => {
+  test('Models keeps its slot, with the staged page and the presets anchor (LIN-3855)', async ({ page, seedLocal }) => {
     const { urlKey } = await seedLocal();
     await page.setViewportSize(VIEWPORTS.desktop);
     await settings(page).gotoArea(urlKey, 'models');
+    await expect(page.locator('[data-testid="models-changes-form"]')).toBeVisible();
     await expect(page.locator('#dispatch-presets')).toBeVisible();
-    await expect(settings(page).section('ai-model')).toBeVisible();
-    await expect(settings(page).section('dispatch-defaults')).toBeVisible();
+    await expect(settings(page).section('ai-model')).toHaveCount(0);
+    await expect(settings(page).section('dispatch-defaults')).toHaveCount(0);
   });
 });
 

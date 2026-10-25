@@ -39,17 +39,16 @@ test.describe('Dispatch presets settings UI', () => {
     await request.get(`/test/clear-dispatch-presets?urlKey=${localWorkerUrlKey}`);
   });
 
-  test('settings page shows the Dispatch presets section as a sibling of Dispatch defaults', async ({ page, localWorkerUrlKey }) => {
+  test('settings page shows the Dispatch presets section beside the Models body, at its anchor (LIN-3855)', async ({ page, localWorkerUrlKey }) => {
     await page.goto(`/workspace/${localWorkerUrlKey}/settings/models`);
     await page.waitForLoadState('networkidle');
 
     const section = page.locator('[data-testid="settings-section-dispatch-presets"]');
     await expect(section).toBeVisible();
     await expect(section.locator(SELECTORS.settings.groupTitle('dispatch-presets'))).toHaveText('Dispatch presets');
-
-    // Sibling of Dispatch defaults, not nested inside it.
-    const defaultsSection = page.locator('[data-testid="settings-section-dispatch-defaults"]');
-    await expect(defaultsSection.locator('[data-testid="settings-section-dispatch-presets"]')).toHaveCount(0);
+    await expect(page.locator('#dispatch-presets')).toBeVisible();
+    // Not nested inside the Models form: its fields never post with the staged save.
+    await expect(page.locator('[data-testid="models-changes-form"] [data-testid="settings-section-dispatch-presets"]')).toHaveCount(0);
   });
 
   test('shows an empty state with no saved presets', async ({ page, localWorkerUrlKey }) => {
@@ -148,8 +147,10 @@ test.describe('Dispatch presets settings UI', () => {
     const item = page.locator('.dispatch-preset-item', { has: page.locator('.dispatch-preset-name-input[value="To be deleted"]') });
     await expect(item).toBeVisible();
 
-    page.once('dialog', dialog => dialog.accept());
-    await clickAndAwaitReload(page, item.locator('.dispatch-preset-delete-btn'));
+    // The delete asks in place (LIN-3855): open its panel, then confirm. No native dialog.
+    const id = await item.getAttribute('data-preset-id');
+    await page.locator(`[data-testid="dispatch-preset-delete-${id}"] > summary`).click();
+    await clickAndAwaitReload(page, page.locator(`[data-testid="dispatch-preset-delete-${id}-confirm"]`));
 
     await expect(page.locator('.dispatch-preset-name-input[value="To be deleted"]')).toHaveCount(0);
     await expect(page.locator('[data-testid="dispatch-presets-empty"]')).toBeVisible();
@@ -300,5 +301,42 @@ test.describe('Dispatch presets settings UI', () => {
     const link = page.getByTestId(`dispatch-preset-use-${presetId}`);
     await expect(link).toBeVisible();
     await expect(link).toHaveAttribute('href', `/workspace/${localWorkerUrlKey}/dispatch?preset=${presetId}`);
+  });
+
+  // LIN-3855: three witnesses moved here from dispatch-defaults.spec.js, which retired with its form. They read
+  // the preset rows, which keep the same option sets and the same catalog snapshot.
+  test('a preset row swaps its model option set when its harness changes (LIN-1282)', async ({ page, localWorkerUrlKey, request }) => {
+    await request.post(`/test/seed-dispatch-preset?urlKey=${localWorkerUrlKey}`, { data: { name: 'Swap harness', config: {} } });
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/models`);
+    await page.waitForLoadState('networkidle');
+    const item = page.locator('.dispatch-preset-item', { has: page.locator('.dispatch-preset-name-input[value="Swap harness"]') });
+    const harness = item.locator('.dispatch-preset-toplevel-config select.harness-select');
+    const model = item.locator('.dispatch-preset-toplevel-config select.dispatch-model-input').first();
+
+    await harness.selectOption('claude-code');
+    await expect(model.locator('option[value="sonnet"]')).toHaveCount(1);
+    await expect(model.locator('option[value^="openai/"]')).toHaveCount(0);
+
+    await harness.selectOption('opencode');
+    await expect(model.locator('option[value="openai/gpt-5.5"]')).toHaveCount(1);
+  });
+
+  test('a preset row merges the live OpenRouter catalog into its OpenCode option set (LIN-1111 Session 2)', async ({ page, localWorkerUrlKey, request }) => {
+    await request.post(`/test/seed-dispatch-preset?urlKey=${localWorkerUrlKey}`, { data: { name: 'Catalog merge', config: { harness: 'opencode' } } });
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/models`);
+    await page.waitForLoadState('networkidle');
+    const item = page.locator('.dispatch-preset-item', { has: page.locator('.dispatch-preset-name-input[value="Catalog merge"]') });
+    const model = item.locator('.dispatch-preset-toplevel-config select.dispatch-model-input').first();
+    // The curated list is ten ids; the mocked catalog adds more, and they arrive on the row without a reload.
+    const count = await model.locator('option').count();
+    expect(count).toBeGreaterThan(12);
+  });
+
+  test('a free catalog model on a preset row is marked on its option (LIN-2719)', async ({ page, localWorkerUrlKey, request }) => {
+    await request.post(`/test/seed-dispatch-preset?urlKey=${localWorkerUrlKey}`, { data: { name: 'Free marker', config: { harness: 'opencode' } } });
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/models`);
+    await page.waitForLoadState('networkidle');
+    const item = page.locator('.dispatch-preset-item', { has: page.locator('.dispatch-preset-name-input[value="Free marker"]') });
+    await expect(item.locator('.dispatch-preset-toplevel-config select.dispatch-model-input option[data-free="true"]').first()).toHaveCount(1);
   });
 });

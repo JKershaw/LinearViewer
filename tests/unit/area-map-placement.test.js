@@ -44,6 +44,15 @@ describe('code-shape area map placement (LIN-3729)', () => {
     assert.strictEqual(areaOf('lib/llm-call-log.js'), 'LLM & prompts');
   });
 
+  // LIN-3829: the retention checker is a new production file in the code-shape kit. Its pattern is
+  // narrow: a directory-wide pattern would re-file the kit's existing files and change cochange pair counts.
+  test('the retention checker lands in Reports & operator tools; its siblings stay unmapped', () => {
+    assert.strictEqual(areaOf('scripts/code-shape/retention.mjs'), 'Reports & operator tools');
+    assert.strictEqual(areaOf('scripts/code-shape/retention-core.mjs'), 'Reports & operator tools');
+    assert.strictEqual(areaOf('scripts/code-shape/verbatim.mjs'), undefined);
+    assert.strictEqual(areaOf('scripts/code-shape/code-shape-lib.mjs'), undefined);
+  });
+
   // LIN-3754: the task board view model composes the ordering rules for the
   // three boards. It is filed with the pages because each board's composition is
   // a page choice; under Task model it would add a new "pages ⇄ Task model" pair.

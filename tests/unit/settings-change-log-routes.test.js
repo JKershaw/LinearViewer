@@ -18,7 +18,7 @@ import { createSettingsRouter } from '../../routes/settings.js';
 import { WorkspaceChangeLogStore } from '../../lib/workspace-change-log.js';
 import { WorkspaceHaltStore } from '../../lib/workspace-halt.js';
 import { getWorkspaceFeatures, setWorkspaceFeature, resolveWorkspaceModel } from '../../lib/workspace-preferences.js';
-import { projectLegacy } from '../../lib/model-routing.js';
+import { projectLegacy, currentValue } from '../../lib/model-routing.js';
 import { getProvider, getProviderForWorkspace } from '../../lib/providers/registry.js';
 import '../../lib/providers/index.js';
 import { memoryCollection, routingFixture } from './helpers/routing-fakes.js';
@@ -46,7 +46,8 @@ before(async () => {
       getDeployInfo: () => ({}),
       userPreferencesStore: { getOpenRouterConsent: async () => null },
       workspacePreferencesStore: fx.preferencesStore,
-      llmCallLogStore: { summarize: async () => ({}) },
+      llmCallLogStore: { summarize: async () => ({}), listInHorizon: async () => state.callDocs },
+      dispatchStore: { listHistoryWithBodies: async (urlKey, opts) => { state.historyReads.push({ urlKey, opts }); return state.history; } },
       promptTraceStore: { summarizeProviderContext: async () => ({}) },
       accountStore: { listEmailIdentities: async () => [] },
       requestFeatureFlags: async () => ({}),
@@ -86,7 +87,7 @@ beforeEach(() => {
   // The same wiring as server.js: every halt writer lands in the log through the store's hook.
   haltStore.setOnChange(({ urlKey, from, to, via, setBy, reason }) =>
     logStore.record({ urlKey, setting: 'halt', from, to, reason: reason || 'Changed outside Settings (Dispatch page or API)', actor: { via, ...(setBy ? { id: setBy } : {}) } }));
-  state = { accountId: OWNER, ownerCheck, proxyRows: [], dispatchRows: [] };
+  state = { accountId: OWNER, ownerCheck, proxyRows: [], dispatchRows: [], history: { items: [], total: 0 }, historyReads: [], callDocs: [] };
 });
 
 const post = (path, body) => fetch(`${base}/workspace/alpha/settings/${path}`, {
@@ -137,6 +138,9 @@ describe('periodic reviews: for everyone, so it asks why and is logged', () => {
   test('Undo refuses when the value has changed since, and a second Undo is refused', async () => {
     await post('workspace-features', { feature: 'periodicals', enabled: 'true', reason: 'on' });
     const [first] = await logStore.getLog('alpha');
+    // The log orders by `at` (milliseconds): a second change in the same millisecond ties the first, and the
+    // newest-first read then keeps insertion order. Let the clock move so "newest" means the second change.
+    await new Promise((resolve) => setTimeout(resolve, 5));
     await post('workspace-features', { feature: 'periodicals', enabled: 'false', reason: 'off again' });
     const conflict = await post(`change-log/workspace/${first._id}/undo`, { reason: 'undo the first' });
     assert.equal(conflict.headers.get('location'), '/workspace/alpha/settings/change-log?error=conflict');
@@ -284,6 +288,71 @@ describe('the Change log shows model-routing-log beside the others and undoes it
     await fx.routingStore.changeJob('recommend', { model: 'a/two' }, { urlKey: 'alpha', reason: 'two', actor: { via: 'page' } });
     const res = await post(`change-log/model/${first._id}/undo`, { reason: 'undo one' });
     assert.match(res.headers.get('location'), /error=conflict/);
+  });
+});
+
+describe('a model undo is judged by the runnable check (LIN-3855)', () => {
+  // A and B go through the store with no guard, as the proxy writes them. A moves Make to OpenCode; B moves
+  // Make to a model only OpenCode runs. Undoing A would leave Make on the default harness with that model,
+  // so the undo is refused, and the refusal writes nothing.
+  const ctx = (reason) => ({ urlKey: 'alpha', reason, actor: { via: 'proxy' } });
+  const entry = async (reason) => (await fx.routingStore.getLog('alpha')).find((r) => r.reason === reason);
+  const undoEntry = async (reason) => post(`change-log/model/${(await entry(reason))._id}/undo`, { reason: `undo ${reason}` });
+  const snapshot = () => JSON.stringify([fx.collections.routing._docs, fx.collections.log._docs]);
+
+  test('undoing A is refused INVALID when B leaves Make unable to run its model: nothing is written', async () => {
+    await fx.routingStore.changeGroup('agent-session', 'make', { harness: 'opencode' }, ctx('A'));
+    await fx.routingStore.changeGroup('agent-session', 'make', { model: 'openai/gpt-6.1-sol' }, ctx('B'));
+    const before = snapshot();
+    const res = await undoEntry('A');
+    assert.equal(res.headers.get('location'), '/workspace/alpha/settings/change-log?error=invalid');
+    assert.equal(snapshot(), before, 'the table, its version and the log are untouched');
+  });
+
+  test('the same undo with no B is allowed: the guard refuses only what would not run', async () => {
+    await fx.routingStore.changeGroup('agent-session', 'make', { harness: 'opencode' }, ctx('A'));
+    const res = await undoEntry('A');
+    assert.equal(res.headers.get('location'), '/workspace/alpha/settings/change-log?undone=1');
+    const table = await fx.routingStore.getTable('alpha');
+    assert.equal(currentValue(table, { scope: 'group', surface: 'agent-session', key: 'make', field: 'harness' }), null);
+  });
+});
+
+describe('the Models page is fed spend by the route (LIN-3855: jobs are ordered by spend)', () => {
+  // The same reads the page makes in production: the dispatch history and the call log, through the real router.
+  // `implementation` sorts after `review` in the registry, so only the spend can put it first.
+  const usageRow = (id, kind, costUsd) => ({
+    id, status: 'taken', kind, dispatchedAt: '2026-10-20T10:00:00Z', rootItemId: id,
+    feedback: [{ kind: 'usage', timestamp: '2026-10-20T10:01:00Z', message: `[usage] ${JSON.stringify({ model: 'anthropic/claude-sonnet-5', harness: 'claude-code', costUsd })}` }]
+  });
+  const jobIds = (html) => [...new Set([...html.matchAll(/data-testid="models-job-([a-z-]+)"/g)].map((m) => m[1]))];
+  const row = (html, id) => html.split(`data-testid="models-job-${id}"`)[1]?.split('data-testid="models-job-')[0] || '';
+  const models = async () => (await fetch(`${base}/workspace/alpha/settings/models`)).text();
+
+  test('the dispatch history and the call log reach the page: spend orders the jobs, no priced job reads "no runs"', async () => {
+    state.history = { items: [usageRow('r1', 'review', 1), usageRow('i1', 'implementation', 5)], total: 2 };
+    state.callDocs = [{ feature: 'recap', model: 'openai/gpt-5.4-mini', cost: 0.4 }];
+    const html = await models();
+
+    const ids = jobIds(html);
+    assert.ok(ids.indexOf('implementation') < ids.indexOf('review'), 'implementation ($5) lists before review ($1), against the registry order');
+    assert.ok(ids.indexOf('review') < ids.indexOf('bug'), 'a job with spend lists before one with no runs');
+    assert.ok(ids.indexOf('recap') < ids.indexOf('recommend'), 'the priced Harbour call lists before the one the registry puts first');
+    assert.deepEqual(state.historyReads.map((r) => r.urlKey), ['alpha'], 'one history read, for this workspace');
+
+    for (const id of ['implementation', 'review', 'recap']) assert.doesNotMatch(row(html, id), /no runs/, `${id} has runs`);
+    assert.match(row(html, 'bug'), /no runs/, 'a job with no runs still says so');
+    assert.match(row(html, 'implementation'), /\$5\.00/);
+    assert.match(row(html, 'review'), /\$1\.00/);
+    assert.match(row(html, 'recap'), /\$0\.40/);
+  });
+
+  test('the coverage line comes from the same read: it appears when the history read hit its cap, not otherwise', async () => {
+    const items = [usageRow('r1', 'review', 1), usageRow('i1', 'implementation', 5)];
+    state.history = { items, total: 2 };
+    assert.doesNotMatch(await models(), /Spend covers the newest/);
+    state.history = { items, total: 9 };
+    assert.match(await models(), /Spend covers the newest 2 runs in the last 30 days/);
   });
 });
 

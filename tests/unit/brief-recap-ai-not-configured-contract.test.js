@@ -42,6 +42,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
+import { withHarnessModels } from '../fixtures/harness-models.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -155,7 +156,7 @@ function loadWiredSection(file, globalName, origin) {
   };
   const ctx = vm.createContext(sandbox);
   // Real window.api — the hop the ledger flagged as read-verified only.
-  vm.runInContext(readFileSync(join(__dirname, '../../public/common.js'), 'utf8'), ctx);
+  vm.runInContext(withHarnessModels(readFileSync(join(__dirname, '../../public/common.js'), 'utf8')), ctx);
   assert.equal(typeof window.api, 'function', 'the real window.api loaded');
   vm.runInContext(readFileSync(join(__dirname, '../../public', file), 'utf8'), ctx);
   return window[globalName];

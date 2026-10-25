@@ -15,6 +15,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import { taskPageHref, sourceQuery } from '../../lib/task-page-href.js';
+import { withHarnessModels } from '../fixtures/harness-models.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const read = (p) => readFileSync(join(__dirname, '../..', p), 'utf8');
@@ -32,7 +33,7 @@ function loadClient() {
   };
   ctx.window.window = ctx.window;
   vm.createContext(ctx);
-  vm.runInContext(read('public/common.js'), ctx, { filename: 'common.js' });
+  vm.runInContext(withHarnessModels(read('public/common.js')), ctx, { filename: 'common.js' });
   return ctx.window;
 }
 

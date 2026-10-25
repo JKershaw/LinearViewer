@@ -162,19 +162,6 @@ async function saveDispatchPreset(urlKey, presetId, row) {
 /**
  * Delete a dispatch preset, then reload.
  */
-async function deleteDispatchPreset(urlKey, presetId) {
-  try {
-    await api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/presets/${encodeURIComponent(presetId)}`, {
-      method: 'DELETE',
-      on401: false
-    })
-    window.location.reload()
-  } catch (e) {
-    console.error('Failed to delete dispatch preset:', e)
-    toast('Failed to delete preset: ' + e.message, { type: 'error' })
-  }
-}
-
 /**
  * Wire up the Dispatch presets section: create button, and delegated
  * save/delete handlers on every existing preset row.
@@ -204,15 +191,6 @@ function initDispatchPresets() {
       return
     }
 
-    const deleteBtn = e.target.closest('.dispatch-preset-delete-btn')
-    if (deleteBtn) {
-      e.preventDefault()
-      // Native confirm() is the ratified destructive-action primitive
-      // (LIN-511); see docs/ui-divergences.md.
-      if (confirm('Delete this preset? Dispatches already made from it are unaffected.')) {
-        deleteDispatchPreset(urlKey, deleteBtn.dataset.presetId)
-      }
-    }
   })
 }
 

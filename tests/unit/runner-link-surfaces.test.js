@@ -25,6 +25,7 @@ import { renderSwimPage } from '../../lib/render-swim.js';
 import { renderRunnerLink, runnerSetupHref } from '../../lib/components/runner-link.js';
 // Side-effect import: registers the Linear provider so the render fallbacks resolve.
 import '../../lib/providers/linear/index.js';
+import { withHarnessModels } from '../fixtures/harness-models.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROMPT_SECTION_SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
@@ -196,7 +197,7 @@ function renderSwipeCard(swipeData) {
   sandbox.window = sandbox;
   vm.createContext(sandbox);
   // The real common.js, as the page loads it first: it owns the terminal-state set swipe.js reads.
-  vm.runInContext(COMMON_SRC, sandbox);
+  vm.runInContext(withHarnessModels(COMMON_SRC), sandbox);
   vm.runInContext(PROMPT_SECTION_SRC, sandbox);
   vm.runInContext(SWIPE_SRC, sandbox);
   return el('#swipe-card').innerHTML;
