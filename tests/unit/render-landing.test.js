@@ -4,6 +4,11 @@ import { renderLandingPage } from '../../lib/render-landing.js';
 import { DEFAULT_MODEL, AVAILABLE_MODELS, formatModelPricing } from '../../lib/openrouter.js';
 import { START_HERE } from '../../lib/library-metadata.js';
 import { escapeHtml } from '../../lib/utils/html.js';
+import { existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // LIN-980: the bespoke Harbour showcase landing. These lock the composition
 // contract — the top area, the fake-data glimpses of real surfaces, the distinct
@@ -69,8 +74,8 @@ test('has an archive section linking the latest Harbour Archive edition', () => 
 });
 
 // LIN-3345: the Library section — the homepage's discoverability link into the
-// Library. Item 1 goes to the Archive, the other five to their catalogued
-// documents; the section sits immediately above the Archive section.
+// Library. It lists the catalogued documents (LIN-3980 moved the Archive item
+// out of it); the section sits immediately above the Archive section.
 test('has a Library section above the Archive, driven by START_HERE', () => {
   const html = renderLandingPage({});
   const libIdx = html.indexOf('data-testid="landing-library"');
@@ -79,13 +84,14 @@ test('has a Library section above the Archive, driven by START_HERE', () => {
   assert.ok(libIdx < archiveIdx, 'Library sits above the Archive');
   assert.match(html, /<a href="\/library" class="lx-library__cta" data-testid="landing-library-link">/);
 
-  // Item 1 → Archive; every other item → its Library document, from the data.
+  // LIN-3980: the Library lists the catalog documents only; the Archive item is
+  // not repeated here, so the landing never leads with the document the Archive
+  // section links to.
   const section = html.slice(libIdx, archiveIdx);
   const hrefs = [...section.matchAll(/<a class="lx-library__link" href="([^"]+)"/g)].map(m => m[1]);
-  assert.equal(hrefs.length, 6);
-  assert.equal(hrefs[0], '/archive/2');
-  assert.deepEqual(hrefs.slice(1), START_HERE.filter(i => i.slug).map(i => `/library/${i.slug}`));
-  for (const item of START_HERE) assert.ok(section.includes(escapeHtml(item.note)), `note: ${item.title}`);
+  assert.deepEqual(hrefs, START_HERE.filter(i => i.slug).map(i => `/library/${i.slug}`));
+  assert.ok(!hrefs.includes('/archive/2'), 'Library does not lead with the Archive edition');
+  for (const item of START_HERE.filter(i => i.slug)) assert.ok(section.includes(escapeHtml(item.note)), `note: ${item.title}`);
 });
 
 test('does NOT render the fake project-tree structure', () => {
@@ -206,4 +212,20 @@ test('the loop and section copy drops the insider words (LIN-3980 outcome 3)', (
   for (const word of ['frontier', 'cohort', 'HEAD', 'grounded', 're-grounded', 'control plane', 'cockpit', 'first foreign backend', 'read-only V1', 'the original backend']) {
     assert.ok(!copy.includes(word), `no insider word: ${word}`);
   }
+});
+
+// LIN-3980 outcome 5: the Archive link resolves to a real edition, and the
+// Library list does not lead with the document the Archive section links to.
+// (Ruling lin3980-archive-library: the literal "the landing and START_HERE[0]
+// don't link the same document" cannot hold while the Archive section links
+// /archive/2 and START_HERE[0] is /archive/2, so the check reads "Library and
+// Archive don't both lead with the same document".)
+test('the Archive link target exists, and the Library list does not repeat it', () => {
+  const html = renderLandingPage({});
+  const archive = html.match(/href="\/archive\/(\d+)" class="lx-archive__link"/);
+  assert.ok(archive, 'archive link present');
+  assert.ok(existsSync(join(__dirname, '../../docs/archive', `${archive[1]}.html`)), `docs/archive/${archive[1]}.html exists`);
+  const libIdx = html.indexOf('data-testid="landing-library"');
+  const libSection = html.slice(libIdx, html.indexOf('data-testid="landing-archive"'));
+  assert.ok(!libSection.includes(`href="/archive/${archive[1]}"`), 'Library does not lead with the Archive edition');
 });

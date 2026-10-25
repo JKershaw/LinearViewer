@@ -155,8 +155,10 @@ test.describe('Landing Page (bespoke showcase)', () => {
   test('footer shows cross-view navigation and the GitHub link', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('.page-footer')).toBeVisible();
-    // projects is the current landing view — bold, not a link.
-    await expect(page.locator('.footer-actions strong.footer-current')).toHaveText('projects');
+    // LIN-3980: a visitor on / is in no view, so nothing in the row is current;
+    // the row names the signed-out previews.
+    await expect(page.locator('.footer-actions strong.footer-current')).toHaveCount(0);
+    await expect(page.locator('.footer-actions')).toContainText('previews:');
     await expect(page.locator('.footer-actions a[href="/swipe"]')).toBeVisible();
     await expect(page.locator('.footer-actions a[href="/swim"]')).toBeVisible();
     const footerLink = page.locator('.footer-link');
