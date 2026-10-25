@@ -46,14 +46,17 @@ async function runnerToken(page) {
   return (await resp.json()).token;
 }
 
-/** Enqueue a session on TOP; take it unless `take:false`; post its feedback (a `[done]` or `[failed]` line ends it). */
-async function seedSession(page, token, { kind, feedback = [], take = true }) {
+/**
+ * Enqueue a session on TOP; take it unless `take:false`; post its feedback (a `[done]` or `[failed]` line ends it).
+ * `extra` adds dispatch fields (an abort names its target with `abort`/`abortTo`). Returns the row's id.
+ */
+async function seedSession(page, token, { kind, feedback = [], take = true, extra = {} }) {
   const res = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
-    data: { prompt: `${kind} prompt`, promptName: kind, kind, issueIdentifier: TOP, issueTitle: 'Home polish task', target: 'cli' },
+    data: { prompt: `${kind} prompt`, promptName: kind, kind, issueIdentifier: TOP, issueTitle: 'Home polish task', target: 'cli', ...extra },
   });
   expect(res.status(), `dispatch seed failed: ${await res.text()}`).toBe(201);
   const itemId = (await res.json()).item.id;
-  if (!take) return;
+  if (!take) return itemId;
   const taken = await page.request.post(`/api/dispatch/take/${itemId}`, { headers: { Authorization: `Bearer ${token}` } });
   expect(taken.status(), `take failed: ${await taken.text()}`).toBe(200);
   for (const message of feedback) {
@@ -63,6 +66,7 @@ async function seedSession(page, token, { kind, feedback = [], take = true }) {
     });
     expect(fb.status(), `feedback failed: ${await fb.text()}`).toBe(200);
   }
+  return itemId;
 }
 
 /** Plan and Build done, Review failed: the case the ticket names. */
@@ -160,6 +164,24 @@ test.describe('Home: a failed stage can be run again (LIN-3968 DECISION, option 
     const resp = await posted;
     expect(resp.status(), 'a failed stage is not a duplicate of itself').toBe(201);
     // The run is queued (a refused dispatch is a 409, which fails above), so the run block names it as queued.
+    await expect(block.locator('[data-testid="opened-task-run"]')).toContainText('Queued');
+  });
+
+  test('Run Review after Home\'s Stop on a Review that started moments ago is accepted, not refused as "Started."', async ({ page }) => {
+    await seedTask(page);
+    const token = await runnerToken(page);
+    await seedSession(page, token, { kind: 'plan', feedback: ['[done] planned it'] });
+    await seedSession(page, token, { kind: 'implementation', feedback: ['[done] built it'] });
+    const review = await seedSession(page, token, { kind: 'review', feedback: ['[started] review running'] });
+    // Home's Stop sends an abort row that names the Review. The runner posts [aborted] on that abort row, not on the Review.
+    await seedSession(page, token, { kind: 'review', feedback: ['[aborted] Stopped by the person'], extra: { abort: true, abortTo: review } });
+    await gotoHome(page);
+    const block = await openTopTask(page);
+
+    const posted = page.waitForResponse((r) => r.request().method() === 'POST' && /\/api\/dispatch$/.test(new URL(r.url()).pathname));
+    await block.getByTestId('opened-task-go').click();
+    const resp = await posted;
+    expect(resp.status(), 'a Review that Stop ended is not a duplicate of itself').toBe(201);
     await expect(block.locator('[data-testid="opened-task-run"]')).toContainText('Queued');
   });
 });
