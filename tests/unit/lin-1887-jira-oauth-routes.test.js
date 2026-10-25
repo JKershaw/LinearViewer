@@ -177,7 +177,9 @@ describe('LIN-1887 Step 4 — GET /auth/jira/oauth (begin)', () => {
     const app = makeApp({ session: makeSession(), store: makeStore(), provider: fakeProvider() });
     const res = await request(app, { path: '/auth/jira/oauth?mode=add-source&workspace=acme' });
     assert.equal(res.status, 503);
-    assert.match(res.text, /JIRA_CLIENT_SECRET/);
+    // LIN-3980: the page says the sign-in is not set up and names no variable; the name goes to the log.
+    assert.match(res.text, /Jira sign-in is not set up/);
+    assert.doesNotMatch(res.text, /JIRA_CLIENT_SECRET/);
   });
 
   test('add-source only: an unknown workspace is refused before any redirect', async () => {
