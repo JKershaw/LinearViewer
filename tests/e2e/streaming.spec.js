@@ -279,9 +279,8 @@ test.describe('Streaming AI Recommendations - Free Tier', () => {
  * Helper to expand Prompts section for an issue
  */
 async function expandPromptsSection(page, containerSelector, issueId) {
-  const details = page.locator(`${containerSelector} .details[data-details-for="${issueId}"]`);
-  const promptsToggle = details.locator('.detail-toggle[data-toggle="prompts"]');
-  await promptsToggle.click();
+  // LIN-3833: no Prompts fold; the opened task's control is part of the task once the row is open.
+  await page.locator(`${containerSelector} .details[data-details-for="${issueId}"] .prompt-section`).first().waitFor({ state: 'visible' });
 }
 
 test.describe('Streaming AI Recommendations - UI', () => {
@@ -293,13 +292,17 @@ test.describe('Streaming AI Recommendations - UI', () => {
     await page.waitForLoadState('networkidle');
   });
 
-  /** Expand the blocked issue's Prompts section and press ✦ next step. */
+  /**
+   * Open the blocked task and press its ✦. LIN-3833: a copy-first viewer's ✦ is "✦ Write the prompt"
+   * (opened-task-write); a viewer who can run has the run block's "✦ ask Harbour" (run-ask-harbour).
+   */
   async function pressGo(page) {
     await page.locator('.in-progress-items .line:has-text("Blocked on external API")').click();
     await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
     const component = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .prompt-section`);
     await expect(component).toBeVisible();
-    await component.locator('[data-testid="opened-task-next-step"]').click();
+    const aiPrimary = component.locator('[data-testid="opened-task-write"]').or(component.locator('[data-testid="run-ask-harbour"]'));
+    await aiPrimary.click();
     return component;
   }
 
@@ -337,7 +340,7 @@ test.describe('Streaming AI Recommendations - UI', () => {
     await expect(component).toHaveAttribute('data-phase', 'fresh', { timeout: 10000 });
     await expect(component.locator('[data-prompt-body]')).toContainText('Help me with task');
 
-    await component.locator('.swipe-prompt-copy').click();
+    await component.locator('[data-testid="opened-task-copy"]').click();
     const clip = await page.evaluate(() => navigator.clipboard.readText());
     expect(clip).toContain('Help me with task');
   });
@@ -360,44 +363,17 @@ test.describe('Streaming AI Recommendations - UI', () => {
     const component = await pressGo(page);
     await expect(component).toHaveAttribute('data-phase', 'generating');
     // While generating there is no actionable copy affordance.
-    await expect(component.locator('.swipe-prompt-copy')).toHaveCount(0);
+    await expect(component.locator('[data-testid="opened-task-copy"]')).toHaveCount(0);
 
     release();
     await expect(component).toHaveAttribute('data-phase', 'fresh', { timeout: 10000 });
-    await expect(component.locator('.swipe-prompt-copy')).toBeEnabled();
-    await expect(component.locator('[data-testid="opened-task-ladder"] [data-rung="run-step"]')).toBeEnabled();
+    await expect(component.locator('[data-testid="opened-task-copy"]')).toBeEnabled();
+    // LIN-3833: the run block's main action is the run (not the ladder rung): enabled once the prompt is ready.
+    await expect(component.locator('[data-testid="opened-task-go"]')).toBeEnabled();
   });
 
-  test('↻ change cancels an in-flight stream back to idle', async ({ page }) => {
-    // Gate the shared reader: emit the reasoning, then hold until the test acts.
-    await page.evaluate(() => {
-      let release;
-      const gate = new Promise((resolve) => { release = resolve; });
-      window.__releaseStream = () => release();
-      window.readSSEStream = async (response, onEvent) => {
-        if (response.body) response.body.cancel().catch(() => {});
-        onEvent('message', { phase: 'reasoning' });
-        onEvent('message', { section: 'reasoning', content: 'Working it out.\n' });
-        await gate;
-      };
-    });
+  // LIN-3833: Home's opened task has no "↻ change" control (Swipe's card keeps its own).
 
-    const component = await pressGo(page);
-    await expect(component).toHaveClass(/streaming/);
-    // Mid-stream the reasoning streams INTO the body ([data-prompt-body]).
-    await expect(component.locator('[data-prompt-body]')).toContainText('Working it out');
+  // LIN-3833: Home's opened task has no "↻ change" control (Swipe's card keeps its own).
 
-    // ↻ change mid-stream aborts the request and returns to idle.
-    await component.locator('[data-action="change"]').first().click();
-    await expect(component).toHaveAttribute('data-phase', 'idle');
-    await expect(component).not.toHaveClass(/streaming/);
-  });
-
-  test('↻ change dismisses the generated prompt back to idle', async ({ page }) => {
-    const component = await pressGo(page);
-    await expect(component).toHaveAttribute('data-phase', 'fresh', { timeout: 10000 });
-
-    await component.locator('[data-action="change"]').first().click();
-    await expect(component).toHaveAttribute('data-phase', 'idle');
-  });
 });

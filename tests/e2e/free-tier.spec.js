@@ -48,10 +48,10 @@ async function openPrompts(page) {
   await expect(page.locator('.prompt-section').first()).toBeVisible();
 }
 
-/** Expand the Prompts accordion for an issue on a tree surface (Home). */
+/** Wait for the opened task's control on a tree surface (Home). LIN-3833: there is no Prompts fold to open. */
 async function expandPromptsSection(page, containerSelector, issueId) {
   const details = page.locator(`${containerSelector} .details[data-details-for="${issueId}"]`);
-  await details.locator('.detail-toggle[data-toggle="prompts"]').click();
+  await details.locator('.prompt-section').first().waitFor({ state: 'visible' });
 }
 
 // =============================================================================
@@ -146,7 +146,7 @@ test.describe('Free Tier run contract (ladder)', () => {
     await expect(go).toBeEnabled();
     await expect(go).not.toContainText(/run limit/i);
 
-    // ✦ generation stays enabled regardless of the run allowance.
+    // ✦ generation stays enabled regardless of the run allowance (LIN-3833: the run block's "ask Harbour").
     await expect(component.locator('[data-testid="opened-task-next-step"]')).toBeEnabled();
   });
 
@@ -196,13 +196,13 @@ test.describe('Free Tier UI', () => {
     await page.waitForLoadState('networkidle');
   });
 
-  test('shows the ✦ next step enabled for free tier users', async ({ page }) => {
+  test('shows the ✦ write enabled for free tier users', async ({ page }) => {
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
     await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
     // Free tier acts like having a key: the ✦ next step is runnable.
-    const next = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] [data-testid="opened-task-next-step"]`);
+    const next = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] [data-testid="opened-task-write"]`);
     await expect(next).toBeVisible();
     await expect(next).toBeEnabled();
   });
@@ -218,7 +218,11 @@ test.describe('Free Tier UI', () => {
   // Ledger item 1: #1720 put Home on the shared component, so the LIN-3239 run
   // allowance now renders there too. This is the Home witness that the ladder
   // quota renders (the Swipe ladder owns the N=0 / rung-disabled cases).
-  test('Home renders the run allowance and no retired daily-prompt meter', async ({ page, localWorkerUrlKey }) => {
+  test('Home renders the run allowance and no retired daily-prompt meter', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    // LIN-3833: the run allowance is on the run block, which a viewer with a runner sees.
+    await seedLocal(workspaceApiLocalSeed, { freeTierEnabled: true, runnerKey: true });
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
+    await page.waitForLoadState('networkidle');
     const { limit, remaining } = await readQuota(page, localWorkerUrlKey);
 
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
@@ -231,7 +235,7 @@ test.describe('Free Tier UI', () => {
 
     // Generating a prompt still works, and the retired free-tier prompt meter
     // (the old daily-prompt allowance) never appears (LIN-3239).
-    await component.locator('[data-testid="opened-task-next-step"]').click();
+    await component.locator('[data-testid="run-ask-harbour"]').click();
     await expect(component).toHaveAttribute('data-phase', 'fresh', { timeout: 15000 });
     await expect(component.locator('[data-prompt-body]')).not.toBeEmpty();
     await expect(page.locator('[data-testid="free-tier-info"]')).toHaveCount(0);
@@ -267,8 +271,8 @@ test.describe('Free Tier UI', () => {
     await expect(go).toContainText(/run limit reached/i);
 
     // Generation is NOT gated by run state, and the retired prompt-quota reason
-    // is nowhere on the component (LIN-3239).
-    await expect(component.locator('[data-testid="opened-task-next-step"]')).toBeEnabled();
+    // is nowhere on the component (LIN-3239). LIN-3833: the run block's "✦ ask Harbour" is the generator.
+    await expect(component.locator('[data-testid="run-ask-harbour"]')).toBeEnabled();
     await expect(component).not.toContainText(/daily free-tier limit reached/i);
   });
 });

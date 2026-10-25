@@ -202,15 +202,15 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator(SELECTORS.settings.area('features'))).not.toContainText('Dispatch queue');
   });
 
-  test('prompts section is always visible (LIN-3848: promptButtons switch removed)', async ({ page, localWorkerUrlKey }) => {
+  test('the opened task\'s control is always visible (LIN-3848: promptButtons switch removed; LIN-3833: no Prompts fold)', async ({ page, localWorkerUrlKey }) => {
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
     await page.locator('.in-progress-items .line.expandable').first().click();
-    await page.locator('.in-progress-items .detail-toggle[data-toggle="prompts"]').first().click();
     const component = page.locator('.in-progress-items .prompt-section').first();
     await expect(component).toBeVisible();
-    await expect(component.locator('[data-testid="other-prompts"]')).toBeVisible();
+    // LIN-3833: a viewer with no runner gets the copy-first step; its "✦ Write the prompt" is always there.
+    await expect(component.locator('[data-testid="opened-task-write"]').or(component.locator('[data-testid="opened-task-go"]'))).toBeVisible();
   });
 
   test('the ✦ primary is always shown (LIN-3848: aiRecommendations switch removed)', async ({ page, localWorkerUrlKey }) => {
@@ -218,8 +218,8 @@ test.describe('Feature Toggle Settings', () => {
     await page.waitForLoadState('networkidle');
 
     await page.locator('.in-progress-items .line.expandable').first().click();
-    await page.locator('.in-progress-items .detail-toggle[data-toggle="prompts"]').first().click();
-    const go = page.locator('.in-progress-items .prompt-section [data-testid="opened-task-next-step"]').first();
+    // LIN-3833: the ✦ is "Write the prompt" (copy-first) or the run block's "ask Harbour" (a viewer who can run).
+    const go = page.locator('.in-progress-items .prompt-section [data-testid="opened-task-write"], .in-progress-items .prompt-section [data-testid="run-ask-harbour"]').first();
     await expect(go).toBeVisible();
   });
 
@@ -286,12 +286,12 @@ test.describe('Feature Toggle Settings', () => {
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
-    // Expand an in-progress issue and open its Prompts section (the shared
-    // component mounts there), then pick a default template so the action cluster
-    // — which owns the +proxy toggle — renders.
-    await page.locator('.in-progress-items .line.expandable').first().click();
-    await page.locator('.in-progress-items .detail-toggle[data-toggle="prompts"]').first().click();
-    const component = page.locator('.in-progress-items .prompt-section').first();
+    // LIN-3833: the Home opened task's copy-first view carries the account's task-key checkbox instead of the
+    // +proxy button; the +proxy button is Swipe's card (which keeps its classic component). Pick a template
+    // there so the action cluster renders.
+    await page.goto(`/workspace/${localWorkerUrlKey}/swipe/TEST-11`);
+    await page.locator('#swipe-card .swipe-accordion-header[data-accordion="prompts"]').click();
+    const component = page.locator('#swipe-card .prompt-section').first();
     await expect(component).toBeVisible();
     await component.locator('[data-testid="other-prompts"] .swipe-prompt-btn').first().click();
     await expect(component).toHaveAttribute('data-phase', 'fresh');
