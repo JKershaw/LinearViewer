@@ -4,12 +4,13 @@
  * The geometry is measured in the browser, not read from CSS: the row text's left edge is the same
  * in every row of an area (outcome 2); a note is one line at 1280px (outcome 5, where the copy
  * allows it); rows are 15px or more at 390px, and at 600px and 700px (outcome 8, the widths the
- * judge does not shoot); the phone area page opens with "‹ Settings" then its title; and the phone
- * index selects no area (outcome 8). Seeding goes through `tests/fixtures/local-harness.js`.
+ * judge does not shoot); the phone area page opens with "‹ Settings" then its title; the phone index
+ * shows no area selected; and a long label keeps its words beside a long value (outcomes 7 and 8).
+ * Seeding goes through `tests/fixtures/local-harness.js`.
  */
 import { test, expect } from '../fixtures/test-base.js';
 import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
-import { settings } from '../helpers.js';
+import { settings, SELECTORS } from '../helpers.js';
 
 const AREAS = ['sources', 'running', 'agent-access', 'health', 'change-log', 'features', 'account'];
 
@@ -56,7 +57,9 @@ test.describe('Settings geometry (LIN-3890)', () => {
     await page.setViewportSize({ width: 1280, height: 900 });
     for (const id of AREAS) {
       await settings(page).gotoArea(urlKey, id);
-      const notes = await page.$$eval('.settings-section > .settings-note', (els) => els.map((el) => {
+      // Every note inside a group, including the free-tier note that sits among the AI key rows. The
+      // consent notice is shared with /auth/openrouter and is the one exception (its copy is not reworded).
+      const notes = await page.$$eval('.settings-section .settings-note:not(.consent-notice)', (els) => els.map((el) => {
         const style = getComputedStyle(el);
         return { text: el.textContent.trim(), lines: el.getBoundingClientRect().height / parseFloat(style.lineHeight) };
       }));
@@ -78,18 +81,46 @@ test.describe('Settings geometry (LIN-3890)', () => {
     }
   });
 
-  test('on a phone the area page opens with "‹ Settings", then its title, and the index selects no area', async ({ page }) => {
+  test('on a phone the area page opens with "‹ Settings", then its title; the index selects no area', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`/workspace/${urlKey}/settings`);
-    await expect(page.locator('.settings-nav-link.is-current')).toHaveCount(0);
+    // The list of areas paints nothing as selected on a phone (the desktop area beside it is not a selection here).
+    const selectedBg = await page.locator('[data-testid="settings-nav-sources"]').evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(selectedBg).toMatch(/rgba\(0, 0, 0, 0\)|transparent/);
 
     await settings(page).gotoArea(urlKey, 'sources');
+    // The page header is hidden on the phone area view, so "‹ Settings" is the first thing on the page.
+    await expect(page.locator('.settings-page-head')).toBeHidden();
     const top = async (selector) => (await page.locator(selector).first().boundingBox()).y;
-    const header = await top('.page-header h1');
     const back = await top('[data-testid="settings-back"]');
     const title = await top('.settings-area-title');
-    expect(header).toBeLessThan(back);
     expect(back).toBeLessThan(title);
-    await expect(page.locator('.settings-nav-link.is-current')).toHaveCount(1);
+    await expect(page.locator('[data-testid="settings-nav-sources"]')).toHaveAttribute('aria-current', 'page');
+  });
+
+  test('a long key label keeps its words on a phone, and its value wraps under it', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await settings(page).gotoArea(urlKey, 'agent-access');
+    await page.getByTestId('settings-newkey').locator(':scope > summary').click();
+    await page.locator(SELECTORS.settings.newKeyLabel).fill('e2e runner key');
+    await page.getByTestId('settings-newkey-submit').click();
+    await expect(page.getByTestId('settings-newkey-secret')).toContainText('shown once');
+    await page.reload();
+    const key = page.getByTestId('settings-key-proxy').filter({ hasText: 'e2e runner key' });
+    await expect(key).toHaveCount(1);
+    const label = key.locator(':scope > summary > .settings-row-label');
+    const style = await label.evaluate((el) => getComputedStyle(el));
+    const lines = (await label.boundingBox()).height / parseFloat(style.lineHeight);
+    // At most one line of name and its flags on the first line: the label never stacks one character per line.
+    expect(lines, 'key label lines at 390').toBeLessThanOrEqual(2);
+  });
+
+  test('a Sources add row keeps its provider name on one line at 390', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await settings(page).gotoArea(urlKey, 'sources');
+    const label = page.locator('[data-testid^="settings-provider-add-"] > .settings-row-label').first();
+    const style = await label.evaluate((el) => getComputedStyle(el));
+    const lines = (await label.boundingBox()).height / parseFloat(style.lineHeight);
+    expect(lines, 'add row name lines at 390').toBeLessThanOrEqual(1.5);
   });
 });

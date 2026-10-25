@@ -1043,11 +1043,10 @@ describe('renderSettingsPage — OpenRouter unattended-use consent (LIN-2412)', 
     assert.doesNotMatch(html, /consent\/clear/);
   });
 
-  test('LIN-3846: the free tier says the limit is on new runs, resets at midnight UTC, and prompts are not limited', () => {
+  test('LIN-3846: the free tier says the limit is on new runs, resets at midnight UTC, and prompts are not limited (one line, LIN-3890 outcome 5)', () => {
     const html = renderSettingsPage('Acme', { ...BASE, openRouterSource: 'free' });
-    assert.match(html, /new runs per account per UTC day/);
-    assert.match(html, /midnight UTC/);
-    assert.match(html, /prompts are not limited/);
+    assert.match(html, /new runs per account reset at midnight UTC/);
+    assert.match(html, /Prompts are not limited/);
   });
 
   test('not connected: connect link is present alongside the blast-radius notice (no consent grant form — there is no key yet)', () => {

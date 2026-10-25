@@ -518,6 +518,11 @@
   align-items: start;
 }
 
+/* The page header spans both columns, above the list and the page (LIN-3890 outcome 8). */
+.settings-page-head {
+  grid-column: 1 / -1;
+}
+
 .settings-pane {
   min-width: 0;
   max-width: 600px;
@@ -712,6 +717,11 @@
   margin-bottom: var(--space-2);
 }
 
+/* Cancel is a link styled as a quiet button with no tone, so it takes the muted text colour, not the link blue. */
+.settings-ask-cancel {
+  color: var(--muted);
+}
+
 /* The ask's Confirm and Cancel sit side by side, Confirm first (LIN-3890). */
 .settings-ask-actions {
   display: flex;
@@ -827,6 +837,32 @@
 
   .settings-shell[data-view="area"] .settings-nav {
     display: none;
+  }
+
+  /* The phone area view opens with "‹ Settings" then its title; the page header stays on the list. */
+  .settings-shell[data-view="area"] > .settings-page-head {
+    display: none;
+  }
+
+  /* The phone list selects nothing (the desktop area beside it is the only current one). */
+  .settings-shell[data-view="index"] .settings-nav-link.is-current {
+    background: none;
+  }
+
+  /* A label keeps its words: it takes the width its text needs, and a long value wraps to its own line
+     under the label, not in a one-character column beside it (LIN-3890, the key row and the add row). */
+  .settings-row-label {
+    flex-basis: auto;
+  }
+
+  .settings-row-summary {
+    flex-wrap: wrap;
+  }
+
+  .settings-row-summary > .settings-row-value {
+    flex: 1 0 100%;
+    min-width: 0;
+    order: 2;
   }
 
   .settings-back {

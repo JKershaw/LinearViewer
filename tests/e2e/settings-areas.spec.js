@@ -108,10 +108,12 @@ test.describe('Settings areas: everyone-changes ask why, are logged, and can be 
     const row = page.locator('[data-testid="settings-change-workspace"]', { hasText: reason });
     await expect(row).toContainText('Runs paused');
 
-    await row.locator('[data-testid^="settings-undo-"] summary').click();
-    await row.locator('textarea[name="reason"]').fill('Window is over');
-    await row.getByRole('button', { name: 'Undo this change' }).click();
-    await expect(page.getByTestId('settings-flash')).toContainText('Change undone');
+    // The Undo is an ask on the row after the change it undoes (LIN-3890 outcome 4): no flash bar.
+    const undo = page.locator('[data-testid^="settings-undo-"]').first();
+    await undo.locator(':scope > summary').click();
+    await undo.locator('textarea[name="reason"]').fill('Window is over');
+    await undo.getByRole('button', { name: 'Undo this change' }).click();
+    await expect(page.getByTestId('settings-flash')).toHaveCount(0);
 
     await settings(page).gotoArea(localWorkerUrlKey, 'running');
     await expect(page.getByTestId('settings-halt-state')).toContainText('Running');
