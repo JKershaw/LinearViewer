@@ -960,8 +960,9 @@ async function createDispatchToken(urlKey, label) {
 /**
  * LIN-3618: the mint modal's body, pure so it can run under test. Shows the
  * token's expiry ("expires <date>" / "never expires") beside the one-time token.
+ * `now` is injectable for tests, as in formatDispatchTokenExpiry (LIN-3949).
  */
-function dispatchTokenModalBody(token, expiresAt) {
+function dispatchTokenModalBody(token, expiresAt, now = new Date()) {
   return `
     <p>Copy this token now - it won't be shown again:</p>
     <div class="token-display">
@@ -969,7 +970,7 @@ function dispatchTokenModalBody(token, expiresAt) {
       <button class="token-copy-btn">copy</button>
     </div>
     <div class="token-usage-hint">
-      This token ${formatDispatchTokenExpiry(expiresAt)}.<br>
+      This token ${formatDispatchTokenExpiry(expiresAt, now)}.<br>
       Use in Authorization header:<br>
       <code>Authorization: Bearer &lt;token&gt;</code>
     </div>

@@ -288,6 +288,12 @@
       html += `<button class="opened-task-go opened-task-go--limited" data-testid="opened-task-go" data-rung="run-task" disabled title="${runLimitTitle}">Go <span class="opened-task-setup">${runLimitTitle}</span></button>`;
     } else if (g.status === 'starting') {
       html += '<button class="opened-task-go" data-testid="opened-task-go" data-rung="run-task" disabled>starting\u2026</button>';
+    } else if (opts.surface === 'home') {
+      // LIN-3833: Home's one main action names what it does: the step the sessions name, else Run to PR.
+      const step = runStepOfState(state);
+      html += step
+        ? `<button class="opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-step" data-action="run-step-next">Run ${esc(step.label)}</button>`
+        : '<button class="opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-task" data-action="go">Run to PR</button>';
     } else {
       html += '<button class="opened-task-go" data-testid="opened-task-go" data-rung="run-task" data-action="go">Go</button>';
     }
@@ -490,6 +496,86 @@
    * starts the run), the ✦ next-step secondary, the ladder, and the templates
    * under "other prompts" (LIN-2944, LIN-3341).
    */
+  // LIN-3833: the copy-first view (no runner). The step comes from the task's status alone (Todo: Plan,
+  // Backlog: Scoping; In Progress: the selector generates the next prompt, with no name given, John 24 Oct
+  // answer 1). Unknown or finished status: the next prompt, generated.
+  const COPY_STEPS = Object.freeze({
+    unstarted: Object.freeze({ label: 'plan', name: 'Plan', why: 'the first step for a task in Todo' }),
+    backlog: Object.freeze({ label: 'scoping', name: 'Scoping', why: 'the first step for a task in Backlog' }),
+  });
+  const COPY_NEXT = Object.freeze({ label: '__ai__', name: null, why: 'generate the next prompt for this task' });
+  function copyStepOf(opts) {
+    return COPY_STEPS[opts.issue && opts.issue.stateType] || COPY_NEXT;
+  }
+
+  // The last copy on this task, read from the task-mode record (the mount read) or set by a copy just made.
+  function renderLastCopy(state) {
+    const c = state.lastCopy;
+    if (!c) return '';
+    const age = formatGeneratedAge(c.at ? Date.parse(c.at) : Date.now()) || 'just now';
+    const what = c.label ? `the ${esc(c.label)} prompt` : 'a prompt';
+    return `<div class="opened-task-last-copy" data-testid="opened-task-last-copy">You copied ${what} ${esc(age)}</div>`;
+  }
+
+  function renderCopyIdle(opts, state) {
+    const step = copyStepOf(opts);
+    // The AI gate applies to the selector's own write only; a template step needs no AI.
+    const gateReason = step.label === '__ai__' ? primaryDisabledReason(opts, state) : null;
+    const disabled = gateReason ? ` disabled title="${esc(gateReason)}"` : '';
+    const name = step.name ? `<span class="opened-task-step-name">${esc(step.name)}</span> \u00b7 ` : '';
+    const reason = gateReason ? ` <span class="opened-task-primary-reason" data-testid="opened-task-primary-reason">${esc(gateReason)}</span>` : '';
+    return `<div class="opened-task-step" data-testid="opened-task-step">${name}${esc(step.why)}</div>`
+      + `<button class="opened-task-write" data-testid="opened-task-write" data-prompt="${esc(step.label)}"${disabled}>\u2726 Write the prompt</button>${reason}`;
+  }
+
+  // The written prompt: Copy, the bounded box, Rewrite and Download (both views).
+  function renderPromptBox(state, opts) {
+    const { html, warning, label, reasoning } = state.result;
+    const warningBanner = warning ? `<div class="swipe-prompt-warning">\u26A0 ${esc(warning)}</div>` : '';
+    // LIN-2944 reverses LIN-70: the model's reasoning stays visible beside the prompt.
+    const reasoningBlock = reasoning ? `<div class="swipe-reasoning opened-task-reasoning" data-testid="opened-task-reasoning">${renderReasoning(reasoning)}</div>` : '';
+    // LIN-2944 F2: Rewrite re-runs the same label, so it obeys the same gate as the primary.
+    const gateReason = primaryDisabledReason(opts, state);
+    const rewriteDisabled = label === '__ai__' ? gateReason : null;
+    return `
+      <button class="opened-task-copy" data-testid="opened-task-copy" data-action="copy">Copy prompt</button>
+      ${renderProxyLimitNotice(state)}
+      ${warningBanner}
+      ${reasoningBlock}
+      <div class="opened-task-box"><div class="swipe-prompt-text" data-prompt-body>${html}</div></div>
+      <div class="opened-task-box-actions">
+        <button class="opened-task-regenerate" data-prompt="${esc(label || '')}"${rewriteDisabled ? ` disabled title="${esc(rewriteDisabled)}"` : ''}>Rewrite</button>
+        <button class="opened-task-download" data-action="download" title="Download prompt as a .md file">Download</button>
+      </div>`;
+  }
+
+  function renderCopyFresh(state, opts) {
+    const { name, label } = state.result;
+    const age = formatGeneratedAge(state.result.generatedAt);
+    const keyOn = !!(window.ProxyToggle && typeof window.ProxyToggle.isActive === 'function' && window.ProxyToggle.isActive());
+    return `
+      <div class="opened-task-step" data-testid="opened-task-step"><span class="opened-task-step-name">${esc(name || copyStepOf(opts).name || 'Next prompt')}</span>${age ? ` \u00b7 generated ${esc(age)}` : ''}</div>
+      ${renderPromptBox(state, opts)}
+      <label class="opened-task-progress-key"><input type="checkbox" data-testid="opened-task-progress-key"${keyOn ? ' checked' : ''}> Let your agent post progress to this task</label>
+      <p class="opened-task-key-note">The key lasts 48 hours. Without it, your agent can still do the work, but Harbour won\u2019t see its progress. Turning it off here sets it for every task.</p>
+      <p class="opened-task-paste">Copy it, then paste it into Claude Code, Codex or any coding agent.</p>`;
+  }
+
+  // LIN-3833: the step a run would start, from the state (a step chosen for this run, else the one the
+  // sessions name as next). Shared by the main button (renderGo) and the run block.
+  function runStepOfState(state) {
+    return (state.run && state.run.step) || (state.opened && state.opened.sessions && state.opened.sessions.next) || null;
+  }
+
+  // LIN-3833: the run control's vocabulary. The targets are the dispatch targets Home offers (`dash` is not
+  // offered; LIN-3833 ruling, John 24 Oct); `local` only on localhost. Stop is offered only for a target a
+  // runner polls (lib/dispatch-targets.js POLLED_TARGETS).
+  const TARGET_WORDS = Object.freeze({ cli: 'your runner', web: 'Claude Code on the web', local: 'Harbour OS' });
+  const POLLED_RUN_TARGETS = Object.freeze(['cli', 'web', 'dash']);
+  function runChoiceDefaults() {
+    return { presetId: null, model: null, harness: null, effort: null, target: 'cli', agentAccess: null };
+  }
+
   function renderIdle(opts, state) {
     let html = '<div class="swipe-prompt-header"><span class="swipe-prompt-name">next step</span>';
     html += renderEditSlot(opts);
@@ -538,7 +624,9 @@
         toggleClass: 'swipe-prompt-dispatch-toggle disclosure-toggle',
         panelClass: 'swipe-prompt-options',
         buttonClass: 'swipe-prompt-dispatch',
-        buttonDataAction: 'dispatch'
+        buttonDataAction: 'dispatch',
+        // LIN-3833: nothing pre-selected, so an untouched harness is null and the server settles it.
+        harnessDefault: ''
       });
     }
     html += '<button class="swipe-prompt-change" data-action="change" title="Choose another prompt">\u21BB change</button>';
@@ -642,6 +730,9 @@
     const issue = opts.issue;
     const issueId = issue.id;
     container.classList.add('prompt-section');
+    // LIN-3833: the state block and the copy-first view are Home's. Swipe's card keeps its own Edit slot and
+    // change affordances, which the state-first layout does not replace (the PR says so).
+    const homeView = opts.surface === 'home';
 
     const state = {
       phase: 'idle',
@@ -663,7 +754,17 @@
       // the refusal notice survive every re-render and every stream settle.
       // status: 'ready' | 'starting' | 'started' | 'running'; headerHtml is the
       // task-page state endpoint's own sentence; notice is our plain-words line.
-      go: { status: 'ready', headerHtml: null, notice: null }
+      go: { status: 'ready', headerHtml: null, notice: null },
+      // LIN-3833: the stored-data task state the state block shows (the state endpoint's body: header,
+      // stage strip and session summary). Null until the mount read lands; a poll refreshes it.
+      opened: null,
+      // LIN-3833: the run control's own state (Home, dispatch on). `choice` is what this run will use once
+      // "Use for this run" is pressed; `draft` is what the Change panel is editing. Nothing is pre-selected:
+      // the harness starts null, and the resolved setting is shown on the Runs-on line from the preview.
+      run: {
+        step: null, choice: runChoiceDefaults(), draft: null, preview: null, changeOpen: false, presets: null,
+        anotherOpen: false, moreOpen: false, item: null, confirmStop: false, busy: false
+      }
     };
     let abortController = null;
     let destroyed = false;
@@ -712,15 +813,422 @@
 
     function render() {
       if (destroyed) return;
+      const stateBlock = renderOpenedState();
+      // LIN-3833: a viewer with no runner (no dispatch) gets the copy-first view: the step, then the prompt
+      // to copy. Everything that runs, costs or names a session is absent from it.
+      const copyFirst = homeView && !opts.dispatchEnabled;
+      const runFirst = runControlOn();
       if (state.phase === 'idle') {
-        applyState(container, renderIdle(opts, state), 'idle');
+        const idle = runFirst ? renderRunBlock() : (copyFirst ? renderCopyIdle(opts, state) : renderIdle(opts, state));
+        applyState(container, stateBlock + idle, 'idle');
       } else if (state.phase === 'generating') {
-        applyState(container, renderGenerating(state, opts), 'generating');
+        applyState(container, stateBlock + (runFirst ? renderRunBlock() : '') + renderGenerating(state, opts), 'generating');
       } else if (state.phase === 'fresh') {
-        applyState(container, renderFresh(state, opts), 'fresh');
+        let fresh;
+        if (runFirst) fresh = renderRunBlock() + renderPromptBox(state, opts);
+        else fresh = copyFirst ? renderCopyFresh(state, opts) : renderFresh(state, opts);
+        applyState(container, stateBlock + fresh, 'fresh');
       } else if (state.phase === 'error') {
-        applyState(container, renderError(state, opts), 'error');
+        applyState(container, stateBlock + renderError(state, opts), 'error');
       }
+    }
+
+    // LIN-3833: the state block above the control. The task's pill and sentence and its stage strip are
+    // the state endpoint's own HTML (the task page's renderers); the last session and "All N" come from
+    // its session summary. Always a slot, so a state repaint is `paintState` alone and never rebuilds a
+    // prompt body or a streamed reply.
+    function renderOpenedState() {
+      if (!homeView) return '';
+      const opened = state.opened;
+      if (!opened) {
+        const copied = !opts.dispatchEnabled ? renderLastCopy(state) : '';
+        return `<div class="opened-task-state" data-state-slot data-testid="opened-task-state">${copied}</div>`;
+      }
+      if (!opts.dispatchEnabled) {
+        // Copy-first: the task's own sentence and what was last copied. No stage strip, no sessions.
+        return `<div class="opened-task-state" data-state-slot data-testid="opened-task-state">`
+          + `${opened.headerHtml || ''}${renderLastCopy(state)}</div>`;
+      }
+      const sessions = opened.sessions || { count: 0, last: null };
+      const last = sessions.last;
+      const lastLine = sessions.count && last
+        ? `<div class="opened-task-last" data-testid="opened-task-last">Last: ${esc(last.label || 'session')} ${esc(last.state || '')}`
+          + `${last.at ? ` \u00b7 ${esc(formatGeneratedAge(Date.parse(last.at)) || '')}` : ''}`
+          + ` \u00b7 <button class="opened-task-all" data-action="all-sessions" data-testid="opened-task-all">All ${sessions.count}</button></div>`
+        : '';
+      return `<div class="opened-task-state" data-state-slot data-testid="opened-task-state">`
+        + `${opened.headerHtml || ''}${opened.trackHtml || ''}${renderSubtaskNeedsYou()}${lastLine}</div>`;
+    }
+
+    // LIN-3833: one line naming a subtask that needs you, with an Open link to its task page. Home passes the
+    // opened row's own subtask, from the same row states as the In Progress rows (run-control viewers only).
+    function renderSubtaskNeedsYou() {
+      const sub = opts.subtaskNeedsYou;
+      if (!sub || !sub.identifier) return '';
+      const name = `${esc(sub.identifier)}${sub.title ? ` ${esc(sub.title)}` : ''}`;
+      return `<div class="opened-task-needs-you" data-testid="opened-task-needs-you">`
+        + `A subtask needs you: <span class="opened-task-needs-you-name">${name}</span>`
+        + ` <a class="btn btn--quiet opened-task-needs-you-open" data-testid="opened-task-needs-you-open" href="${esc(sub.href || '#')}">Open</a></div>`;
+    }
+
+    // Repaint only the state slot (a poll or the mount read). Falls back to a full render when the slot is
+    // absent, as paintGo does for the Go slot.
+    function paintState() {
+      if (destroyed || !homeView) return;
+      // Once the state shows a session running, the queued item from this page is no longer the thing to undo.
+      if (state.opened && state.opened.sessions && state.opened.sessions.running) state.run.item = null;
+      const slot = container.querySelector && container.querySelector('[data-state-slot]');
+      if (slot) slot.outerHTML = renderOpenedState();
+      else render();
+    }
+
+    // ── LIN-3833: the run control (Home, dispatch on) ───────────────────────────
+    // The step the run is for: a step chosen for this run, else the one the sessions name as next.
+    function runStepOf() {
+      return runStepOfState(state);
+    }
+
+    // The run control is Home's, for a viewer who can run (dispatch on). The rest of the component is unchanged.
+    function runControlOn() {
+      return homeView && !!opts.dispatchEnabled;
+    }
+
+    // Repaint only the run block (the preview and Change panel write here), never the prompt body.
+    function paintRun() {
+      if (destroyed || !runControlOn()) return;
+      const slot = container.querySelector && container.querySelector('[data-run-slot]');
+      if (slot) slot.outerHTML = renderRunBlock();
+      else render();
+    }
+
+    // The resolved setting for the step the run would start, from the server's own resolution
+    // (routes/dispatch.js preview). Read-only; the browser resolves nothing itself.
+    function refreshRunPreview() {
+      if (!runControlOn() || !opts.urlKey || typeof window.api !== 'function') return;
+      const step = runStepOf();
+      const params = new URLSearchParams({ promptName: step ? step.kind : 'autopilot', surface: opts.surface });
+      const c = state.run.choice;
+      if (c.presetId) params.set('presetId', c.presetId);
+      if (c.model) params.set('model', c.model);
+      if (c.harness) params.set('harness', c.harness);
+      if (c.effort) params.set('effort', c.effort);
+      window.api(`/workspace/${encodeURIComponent(opts.urlKey)}/api/dispatch/preview?${params.toString()}`, { on401: false })
+        .then((preview) => {
+          if (destroyed) return;
+          state.run.preview = preview || null;
+          paintRun();
+        })
+        .catch(() => {});
+    }
+
+    // The words for where a value came from, from the preview's sources (LIN-3833, "say where every value
+    // comes from"). `none` says nothing.
+    function sourceWordOf(field, preview) {
+      const from = preview && preview.sources ? preview.sources[field] : null;
+      const group = preview && preview.group ? preview.group.charAt(0).toUpperCase() + preview.group.slice(1) : null;
+      if (from === 'explicit') return 'chosen for this run';
+      if (from === 'preset') return `preset ${preview.presetName || ''}, this run only`;
+      if (from === 'job') return `set for ${preview.stepLabel || 'this step'} in Models`;
+      if (from === 'group') return `from the ${group || 'step'} group in Models`;
+      if (from === 'default') return 'from the workspace default in Models';
+      if (from === 'anchor') return 'from the parent task';
+      if (from === 'fallback') return 'Claude Code, the default';
+      return null;
+    }
+
+    function renderRunsOn(preview) {
+      if (!preview) return '<div class="opened-task-runs-on" data-testid="opened-task-runs-on">Working out what this run will use\u2026</div>';
+      const target = state.run.choice.target || 'cli';
+      const model = preview.model || 'the default model';
+      const bits = [model];
+      if (preview.harness && preview.harness !== 'claude-code') bits.push(preview.harness);
+      if (preview.effort) bits.push(`effort ${preview.effort}`);
+      const words = [...new Set(['model', 'harness', 'effort'].map((f) => sourceWordOf(f, preview)).filter(Boolean))];
+      return `<div class="opened-task-runs-on" data-testid="opened-task-runs-on">`
+        + `Runs on <span class="opened-task-runs-on-what" data-testid="run-on-what">${esc(bits.join(' \u00b7 '))}</span>`
+        + ` \u00b7 ${esc(TARGET_WORDS[target] || target)}`
+        + `${words.length ? ` <span class="opened-task-source" data-testid="run-source">\u2014 ${esc(words.join(', '))}</span>` : ''}`
+        + ` <button class="opened-task-change" data-action="change-run" data-testid="run-change">Change</button></div>`;
+    }
+
+    // The step line: the name and why it is next. ✦ write prompt writes this step's prompt (it does not replace the why).
+    function renderStepLine(step) {
+      const last = state.opened && state.opened.sessions && state.opened.sessions.last;
+      let why = 'the next step for this task';
+      if (state.run.step) why = 'chosen for this run';
+      else if (step && last) why = `usually next after ${last.label || 'the last session'}`;
+      const name = step ? esc(step.label) : 'Run to PR';
+      return `<div class="opened-task-step" data-testid="opened-task-step"><span class="opened-task-step-name">${name}</span> \u00b7 ${esc(why)}`
+        + ` <button class="opened-task-ask" data-action="ask-harbour" data-testid="run-ask-harbour">\u2726 write prompt</button></div>`;
+    }
+
+    // Undo for a run queued from here (until the runner takes it); Watch and Stop once a session runs.
+    function renderAfterRun() {
+      const summary = (state.opened && state.opened.sessions) || {};
+      // A queued session is not running yet: it reads as queued (with Undo), like a run queued from here.
+      const running = summary.running && summary.running.state !== 'queued' ? summary.running : null;
+      const next = summary.next || null;
+      if (running) {
+        const since = running.since ? ` since ${esc(formatGeneratedAge(Date.parse(running.since)) || '')}` : '';
+        const polled = POLLED_RUN_TARGETS.includes(running.target);
+        let html = `<div class="opened-task-running" data-testid="opened-task-running">${esc(running.label || 'A step')} running${since}`;
+        if (next) html += ` \u00b7 Next: ${esc(next.label)}, once ${esc(running.label || 'this')} finishes`;
+        if (state.run.confirmStop) {
+          html += ` <span class="opened-task-confirm">Stop this run? The session is cancelled and the task stays where it is.`
+            + ` <button data-action="stop-run-confirm" data-testid="run-stop-confirm">Stop</button>`
+            + ` <button data-action="stop-run-cancel">Cancel</button></span>`;
+        } else if (polled) {
+          html += ` <button class="opened-task-stop" data-action="stop-run" data-testid="run-stop">Stop</button>`;
+        }
+        return `${html}</div>`;
+      }
+      if (state.run.item || (summary.running && summary.running.state === 'queued')) {
+        return `<div class="opened-task-queued" data-testid="opened-task-queued">Queued, waiting for a runner`
+          + ` <button class="opened-task-undo" data-action="undo-run" data-testid="run-undo">Undo</button></div>`;
+      }
+      return '';
+    }
+
+    // LIN-3833 (ruling `lin3833-fit-rule-loop`, comment f9fa6bd7, option c): a step is left out only when the
+    // task cannot take it: the steps never offered as a next step (`summary.excluded`, retro), and every step once
+    // the task is finished. Every other step always fits, so Build and Review stay on the list after a Review
+    // session. The rule does not read the stage order. Before the state is read nothing is left out.
+    const FINISHED_STATE_TYPES = ['completed', 'canceled', 'duplicate'];
+    function stepFits(kind, summary, stateType) {
+      if (!summary) return true;
+      if ((summary.excluded || []).includes(kind)) return false;
+      if (FINISHED_STATE_TYPES.includes(stateType)) return false;
+      return true;
+    }
+
+    // Another step (a list in place) and See prompt. The four default steps show, in order; the rest sit behind
+    // "Show N more". Steps that do not fit the task's state are left out, and the count says how many.
+    function renderRunMore(step) {
+      const meta = opts.promptMeta || {};
+      const defaults = opts.defaultPromptKeys || [];
+      const more = (opts.morePromptKeys || []).filter((k) => !defaults.includes(k));
+      const summary = state.opened && state.opened.sessions;
+      const fits = (k) => stepFits(k, summary, issue.stateType);
+      const shownDefaults = defaults.filter(fits);
+      const shownMore = more.filter(fits);
+      const leftOut = [...defaults, ...more].filter((k) => !fits(k)).length;
+      const item = (k) => `<button class="opened-task-another-item" data-action="run-pick" data-kind="${esc(k)}" data-label="${esc(meta[k] || k)}" data-testid="run-another-item">${esc(meta[k] || k)}</button>`;
+      let html = '<div class="opened-task-more">';
+      if (step) html += `<button class="opened-task-see" data-action="see-prompt" data-testid="run-see-prompt">See prompt \u2726</button>`;
+      html += `<button class="opened-task-another" data-action="run-another" data-testid="run-another" aria-expanded="${state.run.anotherOpen ? 'true' : 'false'}">Another step \u25BE</button>`;
+      if (state.run.anotherOpen) {
+        html += `<div class="opened-task-another-list" data-testid="run-another-list">${shownDefaults.map(item).join('')}`;
+        if (shownMore.length) {
+          html += state.run.moreOpen
+            ? shownMore.map(item).join('')
+            : `<button class="opened-task-another-more" data-action="run-more" data-testid="run-another-more">Show ${shownMore.length} more</button>`;
+        }
+        if (leftOut) {
+          html += `<p class="opened-task-left-out" data-testid="run-another-left-out">${leftOut} ${leftOut === 1 ? 'step' : 'steps'} left out: ${leftOut === 1 ? 'it does' : 'they do'} not fit this task's state.</p>`;
+        }
+        html += '</div>';
+      }
+      return `${html}</div>`;
+    }
+
+    // The Change panel: only what this decision needs. Edits go to a draft; "Use for this run" applies it.
+    function renderChangePanel(preview) {
+      const d = state.run.draft || state.run.choice;
+      const presets = state.run.presets || [];
+      const harness = d.harness || '';
+      const showEffort = harness !== 'opencode';
+      const presetButtons = presets.map((p) => `<button class="opened-task-preset${d.presetId === p.id ? ' is-chosen' : ''}" data-action="run-preset" data-preset-id="${esc(p.id)}" data-testid="run-preset">${esc(p.name || p.id)}</button>`).join('');
+      const targets = ['cli', ...(harness === 'opencode' ? [] : ['web']), ...(opts.isLocalhost ? ['local'] : [])];
+      const targetButtons = targets.map((t) => `<button class="opened-task-target${d.target === t ? ' is-chosen' : ''}" data-action="run-target" data-target="${esc(t)}" data-testid="run-target-${esc(t)}">${esc(TARGET_WORDS[t])}</button>`).join('');
+      const effortOptions = ['', 'low', 'medium', 'high', 'xhigh', 'max'].map((e) => `<option value="${e}"${(d.effort || '') === e ? ' selected' : ''}>${e || 'from Models'}</option>`).join('');
+      const agent = d.agentAccess == null ? (window.ProxyToggle && window.ProxyToggle.isActive ? window.ProxyToggle.isActive() : true) : d.agentAccess;
+      const summary = [d.model || 'the model from Models', harness || 'the harness from Models', showEffort && d.effort ? `effort ${d.effort}` : null, TARGET_WORDS[d.target] || d.target].filter(Boolean).join(' \u00b7 ');
+      return `<div class="opened-task-change-panel" data-testid="run-change-panel">`
+        + `<div class="opened-task-change-head">This run only${preview ? ` \u00b7 default: ${esc(preview.model || 'from Models')}` : ''}`
+        + `<button class="opened-task-change-x" data-action="close-change" aria-label="Close" data-testid="run-change-x">\u00d7</button></div>`
+        + (presetButtons ? `<div class="opened-task-change-row"><span class="opened-task-change-label">Preset</span>${presetButtons}</div>` : '')
+        + `<div class="opened-task-change-row"><span class="opened-task-change-label">Harness</span>`
+        + `<select data-testid="run-harness" aria-label="Harness">`
+        + `<option value="">from Models</option><option value="claude-code"${harness === 'claude-code' ? ' selected' : ''}>claude-code</option><option value="opencode"${harness === 'opencode' ? ' selected' : ''}>opencode</option>`
+        + `</select></div>`
+        + `<div class="opened-task-change-row"><span class="opened-task-change-label">Model</span>`
+        + `<input type="text" data-testid="run-model" maxlength="200" placeholder="from Models" value="${esc(d.model || '')}" aria-label="Model"></div>`
+        + (showEffort ? `<div class="opened-task-change-row"><span class="opened-task-change-label">Effort</span><select data-testid="run-effort" aria-label="Effort">${effortOptions}</select></div>` : '')
+        + `<div class="opened-task-change-row"><span class="opened-task-change-label">Runs on</span>${targetButtons}</div>`
+        + `<label class="opened-task-change-row"><input type="checkbox" data-testid="run-agent-access"${agent ? ' checked' : ''}> Your agent may read and update this task</label>`
+        + `<p class="opened-task-change-summary" data-testid="run-will-use">This run will use ${esc(summary)}.</p>`
+        + `<div class="opened-task-change-row">`
+        + `<button class="opened-task-use" data-action="use-run" data-testid="run-use">Use for this run</button>`
+        + `<button data-action="reset-run" data-testid="run-reset">Reset</button>`
+        + `<button data-action="close-change">Close</button>`
+        + `<a class="opened-task-settings-link" href="/workspace/${encodeURIComponent(opts.urlKey || '')}/settings/models">Settings \u203A Models</a>`
+        + `</div><p class="opened-task-change-note">A change here is for this run only. The default is set in Settings \u203A Models.</p>`
+        + `</div>`;
+    }
+
+    // The whole run block: the step, what it runs on, the one main action, the after-run line, and More.
+    function renderRunBlock() {
+      const step = runStepOf();
+      const parts = [
+        renderStepLine(step),
+        renderRunsOn(state.run.preview),
+        state.run.changeOpen ? renderChangePanel(state.run.preview) : '',
+        renderGo(opts, state),
+        renderAfterRun(),
+        renderRunMore(step)
+      ];
+      return `<div class="opened-task-run" data-run-slot data-testid="opened-task-run">${parts.join('')}</div>`;
+    }
+
+    // Run a step now: fetch its prompt, then dispatch it with this run's choice (the one press, LIN-3446's
+    // press-time read applies to Go; a step has no live-task gate of its own).
+    async function runStepNow(step) {
+      if (!step || state.run.busy || destroyed) return;
+      state.run.busy = true;
+      try {
+        const prompt = await window.api(`/workspace/${encodeURIComponent(opts.urlKey)}/api/prompt/${issueId}/${encodeURIComponent(step.kind)}${issue.source ? `?source=${encodeURIComponent(issue.source)}` : ''}`, { on401: false });
+        if (destroyed) return;
+        const c = state.run.choice;
+        const result = await window.dispatchPrompt({
+          urlKey: opts.urlKey,
+          prompt: prompt.prompt,
+          promptName: prompt.promptName || step.label,
+          kind: step.kind,
+          issue,
+          target: c.target || 'cli',
+          model: c.model || undefined,
+          harness: c.harness || undefined,
+          effort: c.effort || undefined,
+          presetId: c.presetId || undefined,
+          appendProxyContext: c.agentAccess !== false,
+          entryRung: 'run-step',
+          surface: opts.surface,
+          on401: false
+        });
+        if (destroyed) return;
+        state.run.item = { id: result && result.item ? result.item.id : null, kind: step.kind, label: step.label, target: c.target || 'cli' };
+        state.go = { status: 'started', headerHtml: null, notice: null, noticeLink: null, noticeLinkLabel: null };
+        paintRun();
+        startPoll();
+      } catch (error) {
+        if (destroyed) return;
+        // LIN-3494: one place words a run refusal, shared with Go (applyGoRefusal).
+        applyGoRefusal(error);
+      } finally {
+        state.run.busy = false;
+      }
+    }
+
+    // The run control's clicks. Returns true when it handled the button.
+    function handleRunAction(action, btn) {
+      if (!runControlOn()) return false;
+      const d = () => state.run.draft || (state.run.draft = { ...state.run.choice });
+      switch (action) {
+        case 'change-run':
+          state.run.changeOpen = true;
+          state.run.draft = { ...state.run.choice };
+          if (!state.run.presets) {
+            window.api(`/workspace/${encodeURIComponent(opts.urlKey)}/api/dispatch/presets`, { on401: false })
+              .then((r) => { state.run.presets = (r && r.presets) || []; paintRun(); })
+              .catch(() => { state.run.presets = []; paintRun(); });
+          }
+          paintRun();
+          return true;
+        case 'close-change':
+          state.run.changeOpen = false;
+          state.run.draft = null;
+          paintRun();
+          return true;
+        case 'run-preset':
+          d().presetId = d().presetId === btn.dataset.presetId ? null : btn.dataset.presetId;
+          paintRun();
+          return true;
+        case 'run-target':
+          d().target = btn.dataset.target;
+          paintRun();
+          return true;
+        case 'use-run':
+          state.run.choice = { ...state.run.draft };
+          state.run.changeOpen = false;
+          state.run.draft = null;
+          refreshRunPreview();
+          return true;
+        case 'reset-run':
+          state.run.choice = runChoiceDefaults();
+          state.run.draft = null;
+          state.run.step = null;
+          refreshRunPreview();
+          return true;
+        case 'ask-harbour':
+          fetchPrompt('__ai__');
+          return true;
+        case 'see-prompt': {
+          const step = runStepOf();
+          if (step) fetchPrompt(step.kind);
+          return true;
+        }
+        case 'run-another':
+          state.run.anotherOpen = !state.run.anotherOpen;
+          paintRun();
+          return true;
+        case 'run-more':
+          state.run.moreOpen = true;
+          paintRun();
+          return true;
+        case 'run-pick':
+          state.run.step = { kind: btn.dataset.kind, label: btn.dataset.label || btn.dataset.kind };
+          state.run.anotherOpen = false;
+          state.run.moreOpen = false;
+          refreshRunPreview();
+          return true;
+        case 'run-step-next':
+          runStepNow(runStepOf());
+          return true;
+        case 'undo-run': {
+          const id = state.run.item && state.run.item.id;
+          if (!id) return true;
+          window.api(`/workspace/${encodeURIComponent(opts.urlKey)}/api/dispatch/${encodeURIComponent(id)}`, { method: 'DELETE', on401: false })
+            .then(() => { state.run.item = null; paintRun(); })
+            .catch((err) => { if (typeof window.toast === 'function') window.toast(err.message, { type: 'error' }); });
+          return true;
+        }
+        case 'stop-run':
+          state.run.confirmStop = true;
+          paintRun();
+          return true;
+        case 'stop-run-cancel':
+          state.run.confirmStop = false;
+          paintRun();
+          return true;
+        case 'stop-run-confirm':
+          stopRunNow();
+          return true;
+        default:
+          return false;
+      }
+    }
+
+    // Stop: an abort aimed at the running session's own target (the server checks the abort item's target,
+    // not the session's, so a non-polled target is never offered Stop, see renderAfterRun).
+    function stopRunNow() {
+      const running = state.opened && state.opened.sessions && state.opened.sessions.running;
+      state.run.confirmStop = false;
+      if (!running || !running.loopId || !POLLED_RUN_TARGETS.includes(running.target)) { paintRun(); return; }
+      window.api(`/workspace/${encodeURIComponent(opts.urlKey)}/api/dispatch`, {
+        method: 'POST',
+        body: JSON.stringify({
+          abort: true,
+          abortTo: running.loopId,
+          cascade: true,
+          target: running.target,
+          issueId: issueId,
+          issueIdentifier: issue.identifier
+        }),
+        headers: { 'Content-Type': 'application/json' },
+        on401: false
+      })
+        .then(() => { state.go = { status: 'running', headerHtml: null, notice: null, noticeLink: null, noticeLinkLabel: null }; startPoll(); })
+        .catch((err) => { if (typeof window.toast === 'function') window.toast(err.message, { type: 'error' }); });
     }
 
     // LIN-3341: repaint ONLY the Go slot. A full render() during the ✦ stream
@@ -1048,6 +1556,8 @@
           return;
         }
         pollFailures = 0;
+        state.opened = data;
+        paintState();
         if (data.headerHtml) {
           state.go = { status: 'running', headerHtml: data.headerHtml, notice: null, noticeLink: null, noticeLinkLabel: null };
           paintGo();
@@ -1113,25 +1623,30 @@
           on401: false
         });
         if (destroyed) return;
-        const panel = container.querySelector('.swipe-prompt-options');
-        const { model, harness: panelHarness } = window.readDispatchExecControls(panel);
+        // LIN-3833: Home's run choice (what "Use for this run" set; nothing when untouched). A blank harness is
+        // not sent, so the server settles it: the table's harness for this job, else claude-code. Swipe's card
+        // keeps reading its own panel (its Change affordances are not replaced here).
+        const panelNow = container.querySelector('.swipe-prompt-options');
+        const panelChoice = window.readDispatchExecControls(panelNow);
+        const c = runControlOn() ? state.run.choice : { ...runChoiceDefaults(), model: panelChoice.model, harness: panelChoice.harness };
         const result = await window.dispatchPrompt({
           urlKey: opts.urlKey,
           prompt: kickoff.prompt,
           promptName: kickoff.promptName || 'Autopilot',
           kind: kickoff.kind || 'autopilot',
           issue,
-          target: 'cli',
-          model,
-          // LIN-3211: a blank harness falls back to claude-code, so the item
-          // carries the structured bootstrap token, never a token in prose.
-          harness: (panelHarness || 'claude-code'),
+          target: c.target || 'cli',
+          model: c.model,
+          harness: c.harness,
+          effort: c.effort,
+          presetId: c.presetId,
           proxyForce: true,
           entryRung: 'run-task',
           stopAt: 'pr',
           variant: 'standard',
           surface: opts.surface
         });
+        if (runControlOn()) state.run.item = { id: result && result.item ? result.item.id : null, kind: 'autopilot', label: 'Run to PR', target: c.target || 'cli' };
         if (destroyed) return;
         // The 201's no-runner warning (routes/dispatch.js) is our own plain-words
         // line, never the server's string (FC call bf44d014).
@@ -1163,6 +1678,9 @@
 
       const action = btn.dataset.action;
       const promptLabel = btn.dataset.prompt;
+
+      // LIN-3833: the run control's own buttons (Change, the run itself, Undo, Stop, Another step, See prompt).
+      if (action && handleRunAction(action, btn)) return;
 
       if (promptLabel === '__more__') {
         state.moreVisible = !state.moreVisible;
@@ -1223,6 +1741,14 @@
         return;
       }
 
+      if (action === 'all-sessions') {
+        // LIN-3833: "All N" opens the Sessions fold in place, through the same toggle a click on it uses.
+        const toggle = container.closest('.details')?.querySelector('.detail-toggle[data-toggle="sessions"]');
+        const content = container.closest('.details')?.querySelector('.detail-content[data-content="sessions"]');
+        if (toggle && content && content.classList.contains('hidden')) toggle.click();
+        return;
+      }
+
       if (action === 'reasoning-toggle') {
         const content = container.querySelector('.swipe-reasoning-content');
         if (content) {
@@ -1272,7 +1798,13 @@
         const text = await window.ProxyToggle.maybeAppend(raw, opts.urlKey, { force });
         applyProxyLimitNotice();
         await navigator.clipboard.writeText(text);
-        recordTaskMode({ rung: isAutopilotResult() ? 'run-task' : 'copy', ready: true, needs: null, act: 'copy' });
+        // LIN-3833: which prompt was copied (the kind the copy-first view reads back as "You copied the …").
+        const copiedKind = state.result.label && state.result.label !== '__ai__' ? state.result.label : (state.result.kind || null);
+        recordTaskMode({ rung: isAutopilotResult() ? 'run-task' : 'copy', ready: true, needs: null, act: 'copy', kind: copiedKind });
+        if (homeView && !opts.dispatchEnabled) {
+          state.lastCopy = { label: state.result.name || null, kind: copiedKind, at: new Date().toISOString() };
+          paintState();
+        }
         btn.textContent = 'copied!';
         btn.classList.add('copied');
         setTimeout(() => {
@@ -1329,12 +1861,11 @@
         // (LIN-1137). Exec controls (LIN-1096) still live in the dispatch options panel.
         const isRunStep = btn.dataset.action === 'run-step';
         // LIN-3211: the run-step rung sits in the ladder, outside the panel, so
-        // `closest` finds nothing there. It reads its own card's panel instead,
-        // and a blank harness falls back to claude-code, so the item carries the
-        // structured bootstrapToken rather than a token in prompt prose.
+        // `closest` finds nothing there. It reads its own card's panel instead.
+        // LIN-3833 (Q1): a blank harness is no longer forced here. The server settles it
+        // for an opened-task run (the table's harness, else claude-code, `surface` below).
         const panel = isRunStep ? container.querySelector('.swipe-prompt-options') : btn.closest('.swipe-prompt-options');
-        const { model, harness: panelHarness } = window.readDispatchExecControls(panel);
-        const harness = isRunStep ? (panelHarness || 'claude-code') : panelHarness;
+        const { model, harness } = window.readDispatchExecControls(panel);
         // `issue` is the full card object (id/identifier/title/url) — passing it
         // through is what ties Swipe-dispatched sessions back to their task.
         await window.dispatchPrompt({
@@ -1387,7 +1918,50 @@
     }
 
     container.addEventListener('click', handleClick);
+    // LIN-3833: the copy-first "Let your agent post progress" checkbox sets the account's task-key default
+    // (ProxyToggle.setActive persists it, as the +proxy button does).
+    const onRunInput = (e) => {
+      const el = e.target;
+      if (!el || !el.dataset || !container.contains(el) || !runControlOn() || !el.dataset.testid) return;
+      const draft = state.run.draft || (state.run.draft = { ...state.run.choice });
+      switch (el.dataset.testid) {
+        case 'run-harness': draft.harness = el.value || null; paintRun(); break;
+        case 'run-model': draft.model = el.value.trim() || null; break;
+        case 'run-effort': draft.effort = el.value || null; paintRun(); break;
+        case 'run-agent-access': draft.agentAccess = el.checked === true; break;
+        default: break;
+      }
+    };
+    container.addEventListener('input', onRunInput);
+    container.addEventListener('change', (e) => {
+      const box = e.target && e.target.closest && e.target.closest('[data-testid="opened-task-progress-key"]');
+      if (box && container.contains(box) && window.ProxyToggle && typeof window.ProxyToggle.setActive === 'function') {
+        window.ProxyToggle.setActive(box.checked === true);
+        return;
+      }
+      onRunInput(e);
+    });
     render();
+    // LIN-3833: the mount read is the one state read: it paints the state block (every viewer) and is the
+    // Go gate's read below (dispatch-enabled viewers). Best-effort: a failed read leaves the block empty.
+    const mountRead = (opts.urlKey && issueId && issue.identifier && typeof window.api === 'function')
+      ? readTaskState().then((data) => {
+        if (destroyed || !data) return null;
+        state.opened = data;
+        paintState();
+        if (runControlOn()) refreshRunPreview();
+        return data;
+      })
+      : null;
+    if (homeView && !opts.dispatchEnabled && opts.urlKey && issue.identifier && typeof window.api === 'function') {
+      window.api(`/workspace/${encodeURIComponent(opts.urlKey)}/api/task-mode/${encodeURIComponent(issue.identifier)}`, { on401: false })
+        .then((mode) => {
+          if (destroyed || !mode || !mode.lastCopy) return;
+          state.lastCopy = mode.lastCopy;
+          paintState();
+        })
+        .catch(() => {});
+    }
 
     // LIN-3239: the caller's run allowance must be known at load so the ladder
     // can show "N of <limit> runs left today" before Go and disable only the run
@@ -1432,9 +2006,8 @@
     // this task, so a reopened task shows the running/waiting line instead of a
     // pressable Go. Best-effort and guarded exactly like the quota read, so a
     // unit with no window.api makes no network call and no unhandled rejection.
-    if (goReady(opts) && typeof window.api === 'function'
-      && opts.urlKey && issue.identifier && issueId) {
-      readTaskState().then((data) => {
+    if (goReady(opts) && mountRead) {
+      mountRead.then((data) => {
         if (destroyed) return;
         if (!goInProgress(data)) return;
         if (!state.go || state.go.status !== 'ready') return; // a press already won

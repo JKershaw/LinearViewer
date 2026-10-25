@@ -65,7 +65,16 @@ const RELATION_TYPES = ['blocks', 'blocked-by', 'duplicate', 'related'];
 // body is already parsed by the global parser by the time it gets here —
 // body-parser no-ops on an already-parsed body — so it keeps the 250kb
 // ceiling and this exception cannot leak to other routes.
-const ATTACHMENT_UPLOAD_BODY_LIMIT = '14mb'; // ~4/3 base64 expansion of MAX_ATTACHMENT_BYTES + JSON overhead
+// LIN-3933: derived from the decoded cap, as the feedback route is (LIN-3907), not a literal.
+// Base64 of the cap, plus headroom for the rest of the body: a caption of
+// MAX_DESCRIPTION_LENGTH characters (the longest `body` either target accepts)
+// at its worst JSON escape (\uXXXX, six bytes a character), then 96 KiB for the
+// JSON wrapper, the data-URL prefix and an optional `filename` (not length-bounded
+// by parseFeedbackImage). That lands within 1 KiB of the old 14mb literal.
+// While this stays above the cap's base64 size, the 'image too large' arm answers
+// before the parser does.
+export const ATTACHMENT_BODY_HEADROOM = 6 * MAX_DESCRIPTION_LENGTH + 96 * 1024;
+export const ATTACHMENT_UPLOAD_BODY_LIMIT = Math.ceil(MAX_ATTACHMENT_BYTES * 4 / 3) + ATTACHMENT_BODY_HEADROOM;
 // Stand-in for the `![](assetUrl)` markdown before the real assetUrl exists
 // (it's only returned by uploadFile itself): comfortably covers "![]()" (4
 // chars) plus a real Linear asset URL, so the pre-upload estimate never passes
@@ -555,7 +564,7 @@ export function createProxyWriteRoutes({
     // invalidates every prior dedupe entry in it.
     //
     // LIN-2154: this stays a 4-argument call. Padding it to 5 (to match the human
-    // lane's salted call in routes/workspace-api.js) would change ITS OWN digest
+    // lane's salted call in routes/workspace-api-issue-write.js) would change ITS OWN digest
     // stream shape relative to every entry it has ever produced, silently
     // invalidating this lane's live dedupe window.
     const key = dedupeKey(req.proxyUrlKey, issueId, body, commentDedupeGenerations.current(req.proxyUrlKey));

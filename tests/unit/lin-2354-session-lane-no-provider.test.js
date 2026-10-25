@@ -146,10 +146,10 @@ describe('LIN-2354 F1 — dispatch lane (routes/dispatch.js)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Lane 2 — routes/workspace-api.js (feedback triage :2906 and autopilot :2983)
+// Lane 2 — routes/workspace-api-feedback.js (feedback triage and autopilot)
 // ---------------------------------------------------------------------------
 
-describe('LIN-2354 F1 — feedback-triage/autopilot lane (routes/workspace-api.js)', () => {
+describe('LIN-2354 F1 — feedback-triage/autopilot lane (routes/workspace-api-feedback.js)', () => {
   function buildApp(workspace) {
     const dispatch = { items: [] };
     const app = express();

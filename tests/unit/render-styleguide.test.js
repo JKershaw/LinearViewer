@@ -77,12 +77,20 @@ test('carries no deploy info (stable visual-regression baseline)', () => {
 
 test('renders the leaf button/input components with the shared stylesheet', () => {
   const html = renderStyleguide();
-  // Real shared components must carry their live styles, so the page links the
-  // shared action/token stylesheet rather than re-encoding the button look.
+  // The token input still has no builder, so the page keeps linking the shared token stylesheet.
   assert.match(html, /<link rel="stylesheet" href="\/common-actions.css">/);
-  assert.match(html, /class="action-btn save"/);
-  assert.match(html, /class="action-btn disconnect"/);
   assert.match(html, /class="token-label-input"/);
+});
+
+test('renders the Buttons section and the theme panels from renderButton (LIN-3950)', () => {
+  const html = renderStyleguide();
+  // Each live look is the builder's own class string: the quiet look without `btn`, the tones, and
+  // the bordered red confirm. No hand-written `action-btn` sample remains on the page.
+  for (const cls of ['btn', 'btn btn--primary', 'btn btn--ghost', 'btn btn--red', 'btn--quiet',
+    'btn--quiet btn--green', 'btn--quiet btn--blue', 'btn--quiet btn--red']) {
+    assert.match(html, new RegExp(`class="${cls}"`), `missing the ${cls} look`);
+  }
+  assert.doesNotMatch(html, /class="action-btn/);
 });
 
 test('renders the dark theme side-by-side via the .theme-* hook', () => {

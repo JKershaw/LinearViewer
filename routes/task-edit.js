@@ -12,7 +12,7 @@
  * the tree's collapsed Details panel.
  *
  * It owns no write path: the page's script submits to the existing session-auth
- * `PATCH /workspace/:urlKey/api/issues/:issueId` (routes/workspace-api.js),
+ * `PATCH /workspace/:urlKey/api/issues/:issueId` (routes/workspace-api-issue-write.js),
  * unchanged. This module is a read + render seam only.
  *
  * `:issueId` accepts a UUID OR an identifier (e.g. `LIN-123`) with no resolver

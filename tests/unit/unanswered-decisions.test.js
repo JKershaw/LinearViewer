@@ -7,7 +7,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { collectUnansweredDecisions, resolveDisposition, resolveEffect, isDecisionAnswered, isDecisionWithdrawn, buildRulingRef } from '../../lib/unanswered-decisions.js';
+import { collectUnansweredDecisions, resolveDisposition, resolveEffect, isDecisionAnswered, isDecisionWithdrawn, buildRulingRef, parseStampLoopIds, MAX_STAMP_LOOP_IDS } from '../../lib/unanswered-decisions.js';
 
 const NOW = new Date('2026-08-22T12:00:00.000Z');
 const REAP_INACTIVITY_MS = 21600000; // 6h, mirrors simple-dispatcher's config.js
@@ -1199,5 +1199,332 @@ describe('buildRulingRef (LIN-3021: extracted from the inline shelfByKey/shelfGa
     for (const ref of nullCases) {
       assert.strictEqual(ref, null, 'no partial/bare/two-part string is ever returned — only null');
     }
+  });
+});
+
+// LIN-3959: one question, one row, one resume. A worker and the autopilot that
+// dispatched it each raise the same decision_id; the worker's `sessionId` is the
+// autopilot's loopId (LIN-591) and a fresh dispatch is its own lineage root, so
+// the two copies only meet through the join in collectUnansweredDecisions.
+describe('collectUnansweredDecisions — worker/autopilot join (LIN-3959)', () => {
+  const T_AP = '2026-08-22T10:00:00.000Z';
+  const T_WK = '2026-08-22T10:30:00.000Z';
+  const GONE = {
+    terminalStatus: 'done',
+    terminalCompletedAt: new Date(NOW.getTime() - 7 * 3600000).toISOString(),
+    wakeMarker: null
+  };
+
+  function autopilot(overrides = {}) {
+    return loop({
+      loopId: 'ap-1', lineageId: 'ap-1', kind: 'autopilot', issueIdentifier: 'LIN-900',
+      decision: decision('d-1'), wakeMarker: 'blocked', dispatchedAt: T_AP, ...overrides
+    });
+  }
+
+  function worker(overrides = {}) {
+    return loop({
+      loopId: 'wk-1', lineageId: 'wk-1', kind: 'build', sessionId: 'ap-1', issueIdentifier: 'LIN-900',
+      decision: decision('d-1'), wakeMarker: 'blocked', dispatchedAt: T_WK, ...overrides
+    });
+  }
+
+  // `shelvedRulings` is an input field; `includeResolved` is an option.
+  const rowsFor = (loops, { includeResolved = false, shelvedRulings = [] } = {}) =>
+    collectUnansweredDecisions({ loops, shelvedRulings }, { now: NOW, includeResolved });
+  // Asserts exactly one row, then returns it: a destructured [row] alone passes on two rows.
+  const oneRow = (loops, opts = {}) => {
+    const rows = rowsFor(loops, opts);
+    assert.strictEqual(rows.length, 1, 'expected exactly one row');
+    return rows[0];
+  };
+
+  test('a worker row and its autopilot row with the same decision_id read as one row, in either array order', () => {
+    for (const loops of [[autopilot(), worker()], [worker(), autopilot()]]) {
+      const rows = rowsFor(loops);
+      assert.strictEqual(rows.length, 1, 'one question, one row');
+      assert.strictEqual(rows[0].decision.decision_id, 'd-1');
+    }
+  });
+
+  test('the join is symmetric over raise order: the autopilot raising first or the worker raising first is the same single row', () => {
+    const workerFirst = rowsFor([worker({ dispatchedAt: T_AP }), autopilot({ dispatchedAt: T_WK })]);
+    assert.strictEqual(workerFirst.length, 1);
+    assert.strictEqual(workerFirst[0].decision.decision_id, 'd-1');
+  });
+
+  test('a placeholder, unknown or non-autopilot sessionId resolves to nothing, so the two rows stay separate', () => {
+    const lead = loop({ loopId: 'lead-1', lineageId: 'lead-1', kind: 'build', decision: null, dispatchedAt: T_AP });
+    for (const sessionId of [null, 'no-such-session', 'lead-1']) {
+      const rows = rowsFor([autopilot(), worker({ sessionId }), lead]);
+      assert.strictEqual(rows.length, 2, `sessionId ${sessionId} must not join`);
+    }
+  });
+
+  test('a non-autopilot loop that holds the sessionId never joins: the kind guard is what keeps the rows apart', () => {
+    // `lead-1` carries the same decision on the same ticket, so it forms its own
+    // group; only the `kind === 'autopilot'` check on the resolved loop keeps it
+    // from joining the worker (LIN-3959 review item 4).
+    const lead = loop({
+      loopId: 'lead-1', lineageId: 'lead-1', kind: 'build', issueIdentifier: 'LIN-900',
+      decision: decision('d-1'), wakeMarker: 'blocked', dispatchedAt: T_AP
+    });
+    const rows = rowsFor([worker({ sessionId: 'lead-1' }), lead]);
+    assert.strictEqual(rows.length, 2);
+    assert.ok(rows.every(r => r.stampLoopIds === undefined), 'neither row is joined');
+  });
+
+  test('the same decision_id on a different ticket stays a separate row', () => {
+    const rows = rowsFor([autopilot(), worker({ issueIdentifier: 'LIN-901' })]);
+    assert.strictEqual(rows.length, 2);
+  });
+
+  test('a missing issueIdentifier on either side fails closed: no join', () => {
+    assert.strictEqual(rowsFor([autopilot({ issueIdentifier: null }), worker()]).length, 2);
+    assert.strictEqual(rowsFor([autopilot(), worker({ issueIdentifier: null })]).length, 2);
+  });
+
+  test('a different decision_id on the same loops stays a separate row', () => {
+    const rows = rowsFor([autopilot(), worker({ decision: decision('d-2') })]);
+    assert.strictEqual(rows.length, 2);
+  });
+
+  test('an unrelated autopilot with the same decision_id stays separate: each autopilot keeps its own row', () => {
+    const other = autopilot({ loopId: 'ap-2', lineageId: 'ap-2' });
+    const rows = rowsFor([autopilot(), other, worker({ sessionId: 'ap-2' })]);
+    assert.strictEqual(rows.length, 2);
+    // The ap-2 pair joins and the worker is the chosen side; ap-1 stays its own row.
+    assert.deepStrictEqual(rows.map(r => r.anchor.loopId).sort(), ['ap-1', 'wk-1']);
+    const joined = rows.find(r => r.anchor.loopId === 'wk-1');
+    assert.deepStrictEqual(joined.stampLoopIds, ['wk-1', 'ap-2'], 'the ap-2 pair joined; ap-1 did not join into it');
+  });
+
+  test('several workers under one autopilot with the same decision_id join into one cluster', () => {
+    const rows = rowsFor([autopilot(), worker(), worker({ loopId: 'wk-2', lineageId: 'wk-2', dispatchedAt: T_WK })]);
+    assert.strictEqual(rows.length, 1);
+    assert.strictEqual(rows[0].stampLoopIds.length, 3, 'every member is stamped');
+  });
+
+  test('a cluster larger than MAX_STAMP_LOOP_IDS caps stampLoopIds at the bound, chosen side first', () => {
+    // Nine workers and one autopilot: ten copies. The list the row hands the
+    // client must be one the stamp routes accept (LIN-3959 review item 6).
+    const workers = Array.from({ length: 9 }, (_, i) => worker({
+      loopId: `wk-${i + 1}`, lineageId: `wk-${i + 1}`,
+      dispatchedAt: new Date(Date.parse(T_WK) + i * 60000).toISOString()
+    }));
+    const rows = rowsFor([autopilot(), ...workers]);
+    assert.strictEqual(rows.length, 1);
+    assert.strictEqual(rows[0].stampLoopIds.length, MAX_STAMP_LOOP_IDS);
+    assert.strictEqual(rows[0].stampLoopIds[0], rows[0].stampLoopId, 'the chosen side stays first');
+    assert.strictEqual(new Set(rows[0].stampLoopIds).size, MAX_STAMP_LOOP_IDS);
+    assert.notStrictEqual(parseStampLoopIds(rows[0].stampLoopIds), null, 'the routes accept the capped list');
+  });
+
+  test('resume choice: worker resumable → the worker is resumed (the autopilot is not)', () => {
+    const row = oneRow([autopilot(), worker()]);
+    assert.strictEqual(row.anchor.loopId, 'wk-1');
+    assert.strictEqual(row.stampLoopId, 'wk-1');
+    assert.strictEqual(row.disposition, 'resumable');
+    assert.strictEqual(row.effect, 'resume');
+  });
+
+  test('resume choice: worker gone and autopilot resumable → the autopilot is resumed', () => {
+    const row = oneRow([autopilot(), worker(GONE)]);
+    assert.strictEqual(row.anchor.loopId, 'ap-1');
+    assert.strictEqual(row.stampLoopId, 'ap-1');
+    assert.strictEqual(row.disposition, 'resumable');
+    assert.strictEqual(row.effect, 'resume');
+  });
+
+  test('resume choice: worker and autopilot both gone → the worker row, today’s effect', () => {
+    const row = oneRow([autopilot(GONE), worker(GONE)]);
+    assert.strictEqual(row.anchor.loopId, 'wk-1');
+    assert.strictEqual(row.disposition, 'gone');
+  });
+
+  test('resume choice: worker mid-turn with a resumable autopilot → the worker row, read-only (no autopilot resume while a worker is live)', () => {
+    const row = oneRow([autopilot(), worker({ wakeMarker: null, agentState: 'running' })]);
+    assert.strictEqual(row.anchor.loopId, 'wk-1', 'deviation from the ticket’s literal rule, recorded in the PR');
+    assert.strictEqual(row.disposition, 'mid-turn');
+    assert.strictEqual(row.effect, null);
+    assert.strictEqual(row.canReply, false);
+  });
+
+  test('resume choice: worker indeterminate with a resumable autopilot → the worker row, read-only', () => {
+    const row = oneRow([autopilot(), worker({ wakeMarker: null })]);
+    assert.strictEqual(row.anchor.loopId, 'wk-1');
+    assert.strictEqual(row.disposition, 'indeterminate');
+  });
+
+  test('an autopilot-only row (no worker copy) is a cluster of one and resumes the autopilot as before', () => {
+    const rows = rowsFor([autopilot()]);
+    assert.strictEqual(rows.length, 1);
+    assert.strictEqual(rows[0].anchor.loopId, 'ap-1');
+    assert.ok(!('stampLoopIds' in rows[0]), 'a non-joined row carries no stampLoopIds');
+  });
+
+  test('a non-joined worker row carries no stampLoopIds either (the field is sparse)', () => {
+    const rows = rowsFor([worker({ sessionId: null })]);
+    assert.ok(!('stampLoopIds' in rows[0]));
+  });
+
+  test('a stamp on the autopilot copy alone discharges the joined row by default', () => {
+    assert.deepStrictEqual(rowsFor([autopilot({ answeredDecisions: answered('d-1') }), worker()]), []);
+  });
+
+  test('a stamp on the worker copy alone discharges the joined row by default', () => {
+    assert.deepStrictEqual(rowsFor([autopilot(), worker({ answeredDecisions: answered('d-1') })]), []);
+  });
+
+  test('includeResolved returns the joined row once, with its resolution', () => {
+    const rows = rowsFor([autopilot({ answeredDecisions: answered('d-1') }), worker()], { includeResolved: true });
+    assert.strictEqual(rows.length, 1);
+    assert.strictEqual(rows[0].resolution.decisionId, 'd-1');
+    assert.strictEqual(rows[0].resolution.outcome, 'answered');
+  });
+
+  test('withdrawal on one side only: the row stays open and resumes the other side', () => {
+    const withdrawal = { decisionId: 'd-1', reason: 'no longer needed', timestamp: T_WK };
+    const row = oneRow([autopilot(), worker({ withdrawal })]);
+    assert.strictEqual(row.anchor.loopId, 'ap-1', 'the withdrawn worker is not a candidate');
+    assert.strictEqual(row.resolution, undefined);
+  });
+
+  test('withdrawal on the autopilot side only: the row stays open on the worker', () => {
+    const withdrawal = { decisionId: 'd-1', reason: 'no longer needed', timestamp: T_AP };
+    const row = oneRow([autopilot({ withdrawal }), worker()]);
+    assert.strictEqual(row.anchor.loopId, 'wk-1');
+  });
+
+  test('withdrawn on both sides is resolved: hidden by default, reported as withdrawn under includeResolved', () => {
+    const w = (ts) => ({ decisionId: 'd-1', reason: 'no longer needed', timestamp: ts });
+    const loops = [autopilot({ withdrawal: w(T_AP) }), worker({ withdrawal: w(T_WK) })];
+    assert.deepStrictEqual(rowsFor(loops), []);
+    const row = oneRow(loops, { includeResolved: true });
+    assert.strictEqual(row.resolution.outcome, 'withdrawn');
+  });
+
+  test('a shelf on the worker anchor hides the joined row', () => {
+    const shelvedRulings = [{ urlKey: 'acme', decisionId: 'd-1', decisionLoopId: 'wk-1', resurfaceAt: new Date(NOW.getTime() + 3600000).toISOString(), lapseCount: 0 }];
+    assert.deepStrictEqual(rowsFor([autopilot(), worker()], { shelvedRulings }), []);
+  });
+
+  test('a shelf on the autopilot anchor hides the joined row, even though the worker is the chosen side', () => {
+    const shelvedRulings = [{ urlKey: 'acme', decisionId: 'd-1', decisionLoopId: 'ap-1', resurfaceAt: new Date(NOW.getTime() + 3600000).toISOString(), lapseCount: 0 }];
+    assert.deepStrictEqual(rowsFor([autopilot(), worker()], { shelvedRulings }), []);
+  });
+
+  test('a lapsed shelf on the chosen anchor returns the joined row with its lapse count', () => {
+    const shelvedRulings = [{ urlKey: 'acme', decisionId: 'd-1', decisionLoopId: 'wk-1', resurfaceAt: new Date(NOW.getTime() - 3600000).toISOString(), lapseCount: 2 }];
+    const row = oneRow([autopilot(), worker()], { shelvedRulings });
+    assert.strictEqual(row.shelvedLapseCount, 2);
+  });
+
+  test('a superseded worker is dropped as a candidate; the autopilot side still carries the row', () => {
+    const followUp = loop({ loopId: 'wk-2', lineageId: 'wk-1', followUpTo: 'wk-1', decision: null });
+    const rows = rowsFor([autopilot(), worker(), followUp]);
+    assert.strictEqual(rows.length, 1);
+    assert.strictEqual(rows[0].anchor.loopId, 'ap-1');
+  });
+
+  test('both sides superseded: the joined row is skipped entirely', () => {
+    const apFollowUp = loop({ loopId: 'ap-2', lineageId: 'ap-1', followUpTo: 'ap-1', decision: null });
+    const wkFollowUp = loop({ loopId: 'wk-2', lineageId: 'wk-1', followUpTo: 'wk-1', decision: null });
+    assert.deepStrictEqual(rowsFor([autopilot(), worker(), apFollowUp, wkFollowUp]), []);
+  });
+
+  test('stampLoopIds on a joined row lists every member’s content loop, chosen first', () => {
+    const byWorker = oneRow([autopilot(), worker()]);
+    assert.deepStrictEqual(byWorker.stampLoopIds, ['wk-1', 'ap-1']);
+    const byAutopilot = oneRow([autopilot(), worker(GONE)]);
+    assert.deepStrictEqual(byAutopilot.stampLoopIds, ['ap-1', 'wk-1']);
+  });
+});
+
+// LIN-3959 replay: the three duplicated rulings the ticket names. Ids, sessionIds,
+// kinds, identifiers and dispatch times are the proxy's own values (GET
+// /dispatch?issueIdentifier=LIN-3833|LIN-3855 and GET /rulings?includeResolved=true,
+// read 25 Oct). The answer state is rebuilt as UNANSWERED at raise time, and both
+// sides are taken as waiting (`blocked`), since the question is what the read
+// shows for a copy that was open, not what it shows after the answer.
+describe('collectUnansweredDecisions — LIN-3959 replay of the three duplicated rulings', () => {
+  const REPLAY_NOW = new Date('2026-10-25T14:00:00.000Z');
+  const rowsOf = (loops) => collectUnansweredDecisions({ loops }, { now: REPLAY_NOW });
+  const copyOf = (overrides) => loop({ workspaceUrlKey: 'linearviewer', target: 'cli', wakeMarker: 'blocked', ...overrides });
+
+  test('lin-3855-no-job-effort (523a1c14 worker, 7b25c7fa autopilot): one row, one resume target, both copies stamped', () => {
+    const AP = '7b25c7fa-70e0-42e8-b859-aeedc5956629';
+    const WK = '523a1c14-d9ce-4480-b0b1-5bbb23e9bef0';
+    const rows = rowsOf([
+      copyOf({ loopId: AP, lineageId: AP, kind: 'autopilot', issueIdentifier: 'LIN-3855', dispatchedAt: '2026-10-25T08:32:03.620Z', decision: decision('lin-3855-no-job-effort') }),
+      copyOf({ loopId: WK, lineageId: WK, kind: 'implementation', sessionId: AP, issueIdentifier: 'LIN-3855', dispatchedAt: '2026-10-25T10:29:37.697Z', decision: decision('lin-3855-no-job-effort') })
+    ]);
+    assert.strictEqual(rows.length, 1, 'before this change: two rows');
+    assert.strictEqual(rows[0].anchor.loopId, WK, 'the worker resumes');
+    assert.strictEqual(rows[0].effect, 'resume');
+    assert.deepStrictEqual(rows[0].stampLoopIds, [WK, AP]);
+  });
+
+  test('lin3833-another-step-ruling (700b51ae worker, 06af8513 autopilot, cb3976c9 wake copy): one row, the worker resumes', () => {
+    const AP = '06af8513-d489-4942-81b1-003e22326d54';
+    const WK = '700b51ae-8077-4a96-91e0-377b9eba2624';
+    const WAKE = 'cb3976c9-e8a8-4201-80c5-b82deb0e5f47';
+    const rows = rowsOf([
+      copyOf({ loopId: AP, lineageId: AP, kind: 'autopilot', issueIdentifier: 'LIN-3833', dispatchedAt: '2026-10-25T08:32:04.310Z' }),
+      copyOf({ loopId: WAKE, lineageId: AP, kind: 'wake', sessionId: AP, issueIdentifier: 'LIN-3833', dispatchedAt: '2026-10-25T13:36:07.915Z', decision: decision('lin3833-another-step-ruling') }),
+      copyOf({ loopId: WK, lineageId: WK, kind: 'implementation', sessionId: AP, issueIdentifier: 'LIN-3833', dispatchedAt: '2026-10-25T12:44:30.996Z', decision: decision('lin3833-another-step-ruling') })
+    ]);
+    assert.strictEqual(rows.length, 1, 'before this change: two rows');
+    assert.strictEqual(rows[0].decision.decision_id, 'lin3833-another-step-ruling');
+    assert.strictEqual(rows[0].anchor.loopId, WK);
+    assert.deepStrictEqual(rows[0].stampLoopIds, [WK, WAKE]);
+  });
+
+  test('lin3833-review-unbuilt (35ff8eb6 review worker, 06af8513 autopilot, 7b8a6e73 wake copy): one row, the worker resumes', () => {
+    const AP = '06af8513-d489-4942-81b1-003e22326d54';
+    const WK = '35ff8eb6-2a42-4501-b60b-a298d6702539';
+    const WAKE = '7b8a6e73-e850-43f2-85f5-3339efd42a55';
+    const rows = rowsOf([
+      copyOf({ loopId: AP, lineageId: AP, kind: 'autopilot', issueIdentifier: 'LIN-3833', dispatchedAt: '2026-10-25T08:32:04.310Z' }),
+      copyOf({ loopId: WAKE, lineageId: AP, kind: 'wake', sessionId: AP, issueIdentifier: 'LIN-3833', dispatchedAt: '2026-10-25T12:19:50.375Z', decision: decision('lin3833-review-unbuilt') }),
+      copyOf({ loopId: WK, lineageId: WK, kind: 'review', sessionId: AP, issueIdentifier: 'LIN-3833', dispatchedAt: '2026-10-25T12:16:30.348Z', decision: decision('lin3833-review-unbuilt') })
+    ]);
+    assert.strictEqual(rows.length, 1, 'before this change: two rows');
+    assert.strictEqual(rows[0].anchor.loopId, WK);
+    assert.deepStrictEqual(rows[0].stampLoopIds, [WK, WAKE]);
+  });
+
+  test('the replay’s unrelated ruling on the same ticket (lin3833-branch-conflict, a single loop) is not joined', () => {
+    const CONFLICT = 'dc670393-c9c6-47a5-893f-8e5d03631e4c';
+    const rows = rowsOf([
+      copyOf({ loopId: CONFLICT, lineageId: CONFLICT, kind: 'implementation', sessionId: '06af8513-d489-4942-81b1-003e22326d54', issueIdentifier: 'LIN-3833', decision: decision('lin3833-branch-conflict') }),
+      copyOf({ loopId: '06af8513-d489-4942-81b1-003e22326d54', lineageId: '06af8513-d489-4942-81b1-003e22326d54', kind: 'autopilot', issueIdentifier: 'LIN-3833' })
+    ]);
+    assert.strictEqual(rows.length, 1);
+    assert.ok(!('stampLoopIds' in rows[0]));
+  });
+});
+
+describe('parseStampLoopIds (LIN-3959: the decisionLoopIds contract the write routes share)', () => {
+  test('an omitted or null list is empty, never a refusal', () => {
+    assert.deepStrictEqual(parseStampLoopIds(undefined), []);
+    assert.deepStrictEqual(parseStampLoopIds(null), []);
+  });
+
+  test('an array of non-empty strings comes back deduplicated, in order', () => {
+    assert.deepStrictEqual(parseStampLoopIds(['wk-1', 'ap-1', 'wk-1']), ['wk-1', 'ap-1']);
+  });
+
+  test('a malformed value is null: a non-array, a non-string or empty entry, or over the cap', () => {
+    assert.strictEqual(parseStampLoopIds('ap-1'), null);
+    assert.strictEqual(parseStampLoopIds({ 0: 'ap-1' }), null);
+    assert.strictEqual(parseStampLoopIds([42]), null);
+    assert.strictEqual(parseStampLoopIds(['']), null);
+    assert.strictEqual(parseStampLoopIds(Array.from({ length: MAX_STAMP_LOOP_IDS + 1 }, (_, i) => `loop-${i}`)), null);
+  });
+
+  test('exactly the cap is accepted', () => {
+    const ids = Array.from({ length: MAX_STAMP_LOOP_IDS }, (_, i) => `loop-${i}`);
+    assert.strictEqual(parseStampLoopIds(ids).length, MAX_STAMP_LOOP_IDS);
   });
 });

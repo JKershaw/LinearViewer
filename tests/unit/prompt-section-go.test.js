@@ -215,7 +215,8 @@ describe('LIN-3341 — Go is one press', () => {
     assert.equal(d.proxyForce, true);
     assert.equal(d.target, 'cli');
     assert.equal(d.surface, 'swipe');
-    assert.equal(d.harness, 'claude-code', 'a blank panel harness falls back to claude-code');
+    // LIN-3833 (Q1): no harness is forced on the client; the server settles a blank one for an opened-task run.
+    assert.equal(d.harness, null, 'an untouched panel sends no harness (was claude-code, LIN-3211)');
     assert.match(m.container.innerHTML, /data-testid="opened-task-started"/, 'the started line is shown');
     assert.match(m.container.innerHTML, /href="\/workspace\/ws\/task\/LIN-42"[^>]*data-testid="opened-task-started-link"/, 'with a task-page link');
   });
@@ -459,9 +460,12 @@ describe('LIN-3341 — Go is one press', () => {
       assert.equal(m.calls.dispatch.length, 0);
     });
 
-    test('no read when Go is not set up, when urlKey/identifier is missing, or when window.api is absent', async () => {
+    test('no Go read when Go is not set up, and no read at all when urlKey/identifier is missing or window.api is absent', async () => {
+      // LIN-3833: the one mount read also paints the state block for every viewer, so a viewer with no
+      // dispatch still reads once. What is gated is Go: no Go button and no press-time dispatch.
       const notReady = await mount({}, { dispatchEnabled: false });
-      assert.equal(notReady.calls.api.some((u) => String(u).includes('/api/task/')), false);
+      assert.equal(notReady.calls.dispatch.length, 0);
+      assert.equal(notReady.calls.api.filter((u) => String(u).includes('/api/task/')).length, 1, 'one display read, and no Go read');
 
       const noKey = loadPromptSection();
       noKey.window.PromptSection.init(makeContainer(), baseOpts({ urlKey: '' }));

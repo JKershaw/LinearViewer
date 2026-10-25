@@ -1,7 +1,7 @@
 /**
  * Sessions Section — shared client renderer.
  *
- * Renders the "Dispatched Sessions" list (pipeline Loops for one issue) inside a
+ * Renders the "Dispatched Sessions" list (the loops for one issue) inside a
  * container. Lazy-loaded when the Swipe accordion opens; fetches from
  * GET /workspace/:urlKey/api/sessions/:identifier and shows one of:
  *   - loading:  fetch in flight
@@ -10,8 +10,7 @@
  *   - error:    fetch failed (retryable)
  *
  * Exposed as a global `SessionsSection` since the Swipe page is a plain script
- * (no module loader / build step). Visual language mirrors the pipeline overlay
- * loop history (public/pipeline.js renderLoopEntry).
+ * (no module loader / build step).
  */
 (function () {
   'use strict';

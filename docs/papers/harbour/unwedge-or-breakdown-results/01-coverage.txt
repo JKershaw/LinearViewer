@@ -1,0 +1,27 @@
+tickets read (LIN-1500..LIN-3932, minus unresolved): 2429
+unresolved (400 "Could not find referenced Issue"): LIN-2173 LIN-2174 LIN-3652 LIN-3653
+tickets with any /cost worker session: 590
+tickets with /cost noLineage: 1839
+lowest-numbered ticket with a /cost session: LIN-1550
+relevant rows in census.json: 2243
+session kinds across /cost (lineage roots):
+  implementation        691
+  review                675
+  close-out             589
+  autopilot             509
+  plan                  457
+  plan-review           390
+  wake                  181
+  research              171
+  custom                88
+  blocked               46
+  breakdown             23
+  design                14
+  bug                   12
+  retrospective-audit   10
+  triage                5
+  context               3
+  look-into             1
+  retro                 1
+  spike                 1
+  scoping               1

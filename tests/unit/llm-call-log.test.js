@@ -172,6 +172,15 @@ describe('LlmCallLogStore.listCalls (real MangoDB tmpdir, LIN-3162 A2)', () => {
     assert.ok(items.every(i => i.model && typeof i.timestamp === 'string'));
   });
 
+  test('lists each row with its via marker, null when the call carried none (LIN-3864)', async () => {
+    const now = Date.now();
+    await seed({ _id: 'PRE', feature: 'session-summary', via: 'precompute', timestamp: new Date(now) });
+    await seed({ _id: 'DEMAND', feature: 'session-summary', timestamp: new Date(now - 1000) });
+
+    const { items } = await store.listCalls('acme');
+    assert.deepStrictEqual(items.map(i => [i.id, i.via]), [['PRE', 'precompute'], ['DEMAND', null]]);
+  });
+
   test('honours limit and offset', async () => {
     for (let i = 0; i < 5; i++) {
       await seed({ _id: `x${i}`, timestamp: new Date(Date.now() - i * 1000) });

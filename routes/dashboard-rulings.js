@@ -22,7 +22,7 @@
 import { Router, json } from 'express';
 import { jsonError, keepaliveError, replyStoreFault } from '../lib/errors.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
-import { collectUnansweredDecisions } from '../lib/unanswered-decisions.js';
+import { collectUnansweredDecisions, parseStampLoopIds, STAMP_LOOP_IDS_MESSAGE } from '../lib/unanswered-decisions.js';
 import { attachStandingSuggestions } from '../lib/dismissal-suggestions-store.js';
 import { connectedWorkspaces, liveOnAnchor } from './dashboard-session-state.js';
 
@@ -192,13 +192,25 @@ const validateLoopDecision = ({ decisionLoopId, decisionId }) =>
     ? null
     : 'decisionLoopId and decisionId are both required';
 
+// LIN-3959: a dismissal of a joined row dismisses every copy, so `decisionLoopIds`
+// (the row's `stampLoopIds`) is stamped too. `decisionLoopId` is still the
+// required, primary stamp and still the one that decides the 404. The other
+// copies are best-effort: one with no match is logged, not a 404, because the
+// primary already discharged the ruling.
 function dismissSpec({ dispatchQueueStore }) {
   return {
     path: '/workspace/:urlKey/api/dashboard/rulings/dismiss',
-    validate: validateLoopDecision,
-    run: async (workspace, { decisionLoopId, decisionId }) => {
+    validate: (body) => validateLoopDecision(body)
+      ?? (parseStampLoopIds(body.decisionLoopIds) === null ? STAMP_LOOP_IDS_MESSAGE : null),
+    run: async (workspace, { decisionLoopId, decisionId, decisionLoopIds }) => {
       const stamped = await dispatchQueueStore.markDecisionAnswered(decisionLoopId, workspace.urlKey, decisionId, 'dismissed');
-      return stamped ? { ok: { success: true } } : { fail: [404, 'No matching ruling to dismiss'] };
+      if (!stamped) return { fail: [404, 'No matching ruling to dismiss'] };
+      for (const loopId of parseStampLoopIds(decisionLoopIds)) {
+        if (loopId === decisionLoopId) continue;
+        const copy = await dispatchQueueStore.markDecisionAnswered(loopId, workspace.urlKey, decisionId, 'dismissed');
+        if (!copy) console.error(`Ruling dismiss: copy ${loopId} not stamped (no matching item in workspace ${workspace.urlKey})`);
+      }
+      return { ok: { success: true } };
     },
     logLabel: 'Ruling dismiss error:',
     failure: 'Failed to dismiss ruling',
@@ -243,7 +255,7 @@ function reverseWithdrawalSpec({ dispatchQueueStore }) {
 // run, and resumes nothing.
 //
 // No canonical-id re-resolution: every `taskDecisionsStore` row's `issueId`
-// is canonical by construction (`routes/workspace-api.js`'s scan/dismiss
+// is canonical by construction (`routes/workspace-api-scan.js`'s scan/dismiss
 // routes only ever write a UUID there), and `taskDecisionAnchor`
 // (`lib/unanswered-decisions.js`) hands this route's caller that same
 // already-canonical id unchanged — `markOutcome`'s own canonical-UUID guard

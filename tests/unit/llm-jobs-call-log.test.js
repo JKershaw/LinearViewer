@@ -132,6 +132,14 @@ describe('LIN-3852: every Harbour LLM call writes a row listCalls(urlKey) return
     return items.map((r) => r.feature);
   }
 
+  // The `via` marker each listed row carries (LIN-3864): precompute rows say
+  // 'precompute'; on-demand rows carry none, so they read null.
+  async function viaListed() {
+    await Promise.all(pending);
+    const { items } = await store.listCalls(URL_KEY);
+    return items.map((r) => r.via);
+  }
+
   test('run summary', async () => {
     const handler = getHandler(makeSummariesRouter(), 'post', '/workspace/:urlKey/api/dashboard/run-summary/:loopId');
     const { req, res } = makeReqRes({ loopId: 'run-1' });
@@ -147,6 +155,7 @@ describe('LIN-3852: every Harbour LLM call writes a row listCalls(urlKey) return
     await handler(req, res);
     assert.equal(res.statusCode, 200, JSON.stringify(res.jsonBody));
     assert.deepEqual(await featuresListed(), ['session-summary']);
+    assert.deepEqual(await viaListed(), [null], 'the on-demand row carries no precompute marker (LIN-3864)');
   });
 
   test('session-summary precompute logs as session-summary (it has no job of its own)', async () => {
@@ -158,6 +167,7 @@ describe('LIN-3852: every Harbour LLM call writes a row listCalls(urlKey) return
     });
     await precompute(URL_KEY, TERMINAL_SESSION, { apiKey: 'test-key-never-sent' });
     assert.deepEqual(await featuresListed(), ['session-summary']);
+    assert.deepEqual(await viaListed(), ['precompute'], 'the precompute row is told apart from on-demand (LIN-3864)');
   });
 
   test('run paragraph', async () => {

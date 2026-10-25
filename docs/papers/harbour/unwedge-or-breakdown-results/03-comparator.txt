@@ -1,0 +1,43 @@
+Same-size comparator for the cost-known breakdown trees. Pool: non-breakdown, non-carve tickets
+whose next move after a plan-loop stop was a build, with /cost sessions, in the same change-size
+band and created in the same month. Sessions exclude wake and autopilot. A pool under three is
+not a comparison; it is printed so the reader can see how thin the control is.
+
+tree      band   month    pool  pool median sess  tree sessions
+LIN-1539  large  2026-07  0     n/a               3
+LIN-1952  large  2026-08  0     n/a               9
+LIN-2149  large  2026-08  0     n/a               78
+LIN-2649  large  2026-09  2     14                6
+LIN-2809  large  2026-09  2     14                8
+LIN-2884  large  2026-09  2     14                54
+LIN-2919  none   2026-09  1     2                 9
+LIN-2948  large  2026-09  2     14                47
+LIN-2949  large  2026-09  2     14                26
+LIN-2950  large  2026-09  2     14                20
+LIN-2954  large  2026-09  2     14                93
+LIN-2955  large  2026-09  2     14                24
+LIN-2995  large  2026-09  2     14                39
+LIN-3057  large  2026-09  2     14                13
+LIN-3059  large  2026-09  2     14                26
+LIN-3073  large  2026-09  2     14                22
+LIN-3105  large  2026-09  2     14                15
+LIN-3126  large  2026-09  2     14                33
+LIN-3134  large  2026-09  2     14                29
+LIN-3157  large  2026-09  2     14                42
+LIN-3197  large  2026-10  14    12.5              23
+LIN-3201  large  2026-10  14    12.5              31
+LIN-3278  large  2026-10  14    12.5              12
+LIN-3332  large  2026-10  14    12.5              24
+LIN-3342  large  2026-10  14    12.5              17
+LIN-3353  none   2026-10  2     16                10
+LIN-3363  large  2026-10  14    12.5              11
+LIN-3449  large  2026-10  14    12.5              137
+LIN-3451  large  2026-10  14    12.5              9
+LIN-3519  none   2026-10  2     16                18
+LIN-3573  large  2026-10  14    12.5              18
+LIN-3613  large  2026-10  14    12.5              191
+LIN-3706  large  2026-10  14    12.5              9
+LIN-3747  large  2026-10  14    12.5              30
+LIN-3765  large  2026-10  14    12.5              14
+LIN-3861  large  2026-10  14    12.5              14
+LIN-3916  small  2026-10  2     11.5              7

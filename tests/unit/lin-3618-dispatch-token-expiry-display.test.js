@@ -46,12 +46,15 @@ test('formatDispatchTokenExpiry: null/absent never expires, future expires, past
   assert.equal(s.formatDispatchTokenExpiry(PAST, NOW), `expired ${day(PAST)}`);
 });
 
-test('the mint modal body shows "expires <date>" or "never expires" and still shows the token', () => {
+test('the mint modal body shows "expires <date>", "expired <date>" or "never expires" and still shows the token', () => {
   const s = makeSandbox();
-  const withExpiry = s.dispatchTokenModalBody('tok-123', FUTURE);
+  // The clock is pinned (LIN-3949): the modal reads `now`, not the wall clock, so FUTURE stays future.
+  const withExpiry = s.dispatchTokenModalBody('tok-123', FUTURE, NOW);
   assert.ok(withExpiry.includes('tok-123'));
   assert.ok(withExpiry.includes(`expires ${day(FUTURE)}`));
-  const forever = s.dispatchTokenModalBody('tok-123', null);
+  const expired = s.dispatchTokenModalBody('tok-123', PAST, NOW);
+  assert.ok(expired.includes(`expired ${day(PAST)}`));
+  const forever = s.dispatchTokenModalBody('tok-123', null, NOW);
   assert.ok(forever.includes('never expires'));
   assert.ok(forever.includes('Authorization: Bearer'));
 });

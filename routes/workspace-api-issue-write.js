@@ -28,6 +28,7 @@ import {
 import { PartialWriteError } from '../lib/partial-write-error.js';
 import { isTrashed } from '../lib/trashed-signal.js';
 import { validateIssueWriteFields, isValidPriority, validateCommentBody, MAX_COMMENT_LENGTH } from '../lib/issue-write-validation.js';
+import { parseStampLoopIds, STAMP_LOOP_IDS_MESSAGE } from '../lib/unanswered-decisions.js';
 // LIN-2154: the session-auth (human-lane) comment write shares the agent-lane's
 // dedupe cache instances (routes/proxy.js) rather than a fresh pair that would
 // miss workspace-wide generation bumps, and its key-building primitive.
@@ -70,16 +71,24 @@ async function stampDecisionAnswers(workspace, decision, { dispatchQueueStore, t
   // to the "not applied" log line when it matched nothing. A throw is logged
   // under the attempt's own `failure` label.
   const attempts = [];
+  // LIN-3959: `decisionLoopId` is stamped first and is still the required one.
+  // `decisionLoopIds` carries the other copies of a joined ruling (the worker
+  // and the autopilot that dispatched it), each stamped through the same
+  // ownership-gated write. A malformed list is refused before the comment is
+  // written (see the route), so `?? []` here is only a type guard.
   if (given(d.decisionLoopId) && given(d.decisionId)) {
-    attempts.push({
-      failure: 'Decision-answer stamp failed:',
-      // LIN-2792: `optionId` rides this stamp with an undefined `outcome` (never
-      // reached for a dismissal, so it cannot leak onto one) — the 5th argument
-      // `markDecisionAnswered` gained in LIN-2754 Track B.
-      run: async () => (await dispatchQueueStore.markDecisionAnswered(d.decisionLoopId, urlKey, d.decisionId, undefined, d.optionId))
-        ? null
-        : `Decision-answer stamp not applied: no matching item ${d.decisionLoopId} in workspace ${urlKey}`
-    });
+    const loopIds = [...new Set([d.decisionLoopId, ...(parseStampLoopIds(d.decisionLoopIds) ?? [])])];
+    for (const loopId of loopIds) {
+      attempts.push({
+        failure: 'Decision-answer stamp failed:',
+        // LIN-2792: `optionId` rides this stamp with an undefined `outcome` (never
+        // reached for a dismissal, so it cannot leak onto one) — the 5th argument
+        // `markDecisionAnswered` gained in LIN-2754 Track B.
+        run: async () => (await dispatchQueueStore.markDecisionAnswered(loopId, urlKey, d.decisionId, undefined, d.optionId))
+          ? null
+          : `Decision-answer stamp not applied: no matching item ${loopId} in workspace ${urlKey}`
+      });
+    }
   }
   if (taskDecisionsStore && given(d.taskDecisionId) && given(d.taskDecisionIssueId)) {
     attempts.push({
@@ -239,7 +248,7 @@ function partialWriteFailed(res, err) {
  * Register the three issue-write routes, in order: comment write, issue create, issue patch.
  * @param {import('express').Router} router - the composer's router
  */
-export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQueueStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, adoptConnectionCredential, onTicketWrite }) {
+export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQueueStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, adoptConnectionCredential, onTicketWrite, recordPipelineMerge = null }) {
   /**
    * Add a human comment to an issue (LIN-2154) — the session-auth twin of the
    * agent-lane `POST /api/proxy/issues/:issueId/comments` (routes/proxy.js).
@@ -257,7 +266,7 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQue
    * named V1 limitation; LIN-2188 owns closing that gap.
    *
    * @route POST /workspace/:urlKey/api/comments/:issueId
-   * Body: { body: string, decisionLoopId?: string, decisionId?: string, taskDecisionId?: string, taskDecisionIssueId?: string }
+   * Body: { body: string, decisionLoopId?: string, decisionLoopIds?: string[], decisionId?: string, taskDecisionId?: string, taskDecisionIssueId?: string }
    * @returns 201 { success: true, comment } | 200 { success: true, comment, deduped: true }
    *
    * LIN-1728 Phase 2: an optional `{decisionLoopId, decisionId}` pair, both
@@ -308,6 +317,11 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQue
     }
     if (body.length > MAX_COMMENT_LENGTH) {
       return badRequest.json(res, `body exceeds maximum length of ${MAX_COMMENT_LENGTH}`);
+    }
+    // LIN-3959: refuse a malformed stamp list before the comment is written, so a
+    // bad list never leaves a comment posted with only some copies stamped.
+    if (parseStampLoopIds(req.body?.decisionLoopIds) === null) {
+      return badRequest.json(res, STAMP_LOOP_IDS_MESSAGE);
     }
 
     // test-token/testMockData branch (matches the codebase-wide `isTestMode`
@@ -596,12 +610,13 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQue
   // POST  /workspace/:urlKey/api/issues            → create → 201 {success, issue}
   // PATCH /workspace/:urlKey/api/issues/:issueId    → update → 200 {success, issue}
   //
-  // Backend only (no UI). Modeled on POST /workspace/:urlKey/api/feedback above:
+  // Backend for the in-app task UI (`public/task-create.js`, `public/task-edit.js`).
+  // Modeled on POST /workspace/:urlKey/api/feedback (routes/workspace-api-feedback.js):
   // resolve the workspace provider, take the call-scope token, gate the
   // capability with a clean 422 (never 500), validate fields through the shared
   // seam (lib/issue-write-validation.js), resolve symbolic refs via the shared
   // proxy ref-resolver primitives, perform the provider write, and map a failed
-  // write to 502. This is the surface the in-app UI (Session B) will call.
+  // write to 502. The in-app UI calls this surface.
   // ===========================================================================
 
   /**
@@ -729,6 +744,16 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQue
         void Promise.resolve()
           .then(() => onTicketWrite({ urlKey: req.workspace.urlKey, written: updated.issue, readBack: () => provider.fetchIssueContext(token, issueId) }))
           .catch(e => console.error('[ticket-closer] seam 2 failure:', e?.message || e));
+      }
+
+      // LIN-3863: a person's Done records the merged PR, as the pipeline's Done does
+      // (seam 1, proxy-writes.js), with `by: 'person'`. The recorder gates on a
+      // completed ticket and a GitHub token itself, and never throws; the catch
+      // only keeps a bad injection from surfacing as an unhandled rejection.
+      if (recordPipelineMerge && stateRef) {
+        void Promise.resolve()
+          .then(() => recordPipelineMerge({ urlKey: req.workspace.urlKey, workspaceId: req.workspace.id, accountId: req.session.accountId, provider, callScope: token, source: req.query.source, written: updated.issue, readBack: () => provider.fetchIssueContext(token, issueId), writer: 'person' }))
+          .catch(e => console.error('[close-out-merges] seam 2 failure:', e?.message || e));
       }
     } catch (err) {
       if (issueRefResolutionFailed(res, err) || partialWriteFailed(res, err)) return;

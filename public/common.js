@@ -507,9 +507,6 @@ window.renderMarkdown = function(text, opts, keepWholeFence) {
  * ("Jan 5"). Polymorphic input: accepts either an ISO/parseable date string or a
  * millisecond-epoch number. Returns '' for falsy or unparseable input.
  *
- * Note: pipeline.js deliberately keeps its own 30-day-cap variant and is NOT a
- * consumer of this helper.
- *
  * @global
  * @param {string|number} value  ISO date string or millisecond epoch
  * @returns {string} Human-readable relative time, or '' when input is empty/invalid.
@@ -725,9 +722,9 @@ window.readSSEStream = async function readSSEStream(response, onEvent) {
 /**
  * Unified client-side dispatch to POST /api/dispatch.
  *
- * Every dispatch surface (dashboard tree, dispatch page, swipe/recap/brief,
- * pipeline overlay) funnels through here so the payload contract is assembled
- * in exactly one place — no surface can silently drop the issue link again.
+ * Every dispatch surface (dashboard tree, dispatch page, session page,
+ * close-out box, prompt sections, swipe/recap/brief) funnels through here so
+ * the payload contract is assembled in exactly one place — no surface can silently drop the issue link again.
  * The dispatch history these records become is joined back to tasks by
  * `issueIdentifier` (see lib/pipeline-loops.js), so it is required by default.
  *
@@ -773,7 +770,7 @@ window.readSSEStream = async function readSSEStream(response, onEvent) {
  *                 error carries `.status` so callers can branch (e.g. 401).
  */
 window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
-  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind, periodicalId, model, harness, appendProxyContext = true, proxyForce = false, followUpTo, force, presetId, maxTasks, composedRunMarker, entryRung, stopAt, variant, surface } = opts;
+  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind, periodicalId, model, harness, effort, appendProxyContext = true, proxyForce = false, followUpTo, force, presetId, maxTasks, composedRunMarker, entryRung, stopAt, variant, surface } = opts;
 
   if (!urlKey) throw new Error('dispatchPrompt: urlKey is required');
   if (!prompt) throw new Error('dispatchPrompt: prompt is required');
@@ -820,6 +817,9 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
   // (LIN-1094) — never send a value that overrides a real default with "".
   if (model) payload.model = model;
   if (harness) payload.harness = harness;
+  // LIN-3833: the effort the run control chose for this run (the server accepts it; dispatch-validation).
+  // Truthy gate, like model: a blank effort is not sent, so the resolution applies.
+  if (effort) payload.effort = effort;
   if (followUpTo) payload.followUpTo = followUpTo;
   if (force !== undefined) payload.force = force;
   if (presetId) payload.presetId = presetId;
@@ -919,6 +919,12 @@ window.ReplyDelivery = (function () {
     if (decision && decision.decisionLoopId && decision.decisionId) {
       body.decisionLoopId = decision.decisionLoopId;
       body.decisionId = decision.decisionId;
+      // LIN-3959: a joined ruling's other copies (the row's stampLoopIds), so the
+      // route stamps every copy and the autopilot's includeResolved check sees
+      // the question answered. Only the primary resumes; this list never does.
+      if (Array.isArray(decision.decisionLoopIds) && decision.decisionLoopIds.length) {
+        body.decisionLoopIds = decision.decisionLoopIds;
+      }
     }
     if (decision && decision.taskDecisionId && decision.taskDecisionIssueId) {
       body.taskDecisionId = decision.taskDecisionId;
@@ -1053,7 +1059,7 @@ window.ReplyDelivery = (function () {
         onCommentFailed(new Error('cannot record an answer with no linked issue'));
         return Promise.resolve();
       }
-      return postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, optionId: opts.optionId, source: opts.source }).then(
+      return postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionLoopIds: opts.decisionLoopIds, decisionId: opts.decisionId, optionId: opts.optionId, source: opts.source }).then(
         function (commentResult) {
           if (!commentResult.ok) { onCommentFailed(errorFromResult(commentResult)); return; }
           onDispatchOk();
@@ -1081,7 +1087,7 @@ window.ReplyDelivery = (function () {
     // literal built here rather than the rest of `opts`, so this stays the
     // one place a caller's `opts.optionId` (when set) actually reaches
     // `postComment`'s own allowlist.
-    return postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, optionId: opts.optionId, source: opts.source }).then(function (commentResult) {
+    return postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionLoopIds: opts.decisionLoopIds, decisionId: opts.decisionId, optionId: opts.optionId, source: opts.source }).then(function (commentResult) {
       if (!commentResult.ok) {
         onCommentFailed(errorFromResult(commentResult));
         return;
@@ -1124,7 +1130,8 @@ window.ReplyDelivery = (function () {
    * @returns {Promise<void>}
    */
   function dismissRuling(opts, handlers) {
-    var body = { decisionLoopId: opts.stampLoopId || opts.followUpTo, decisionId: opts.decisionId };
+    // LIN-3959: `stampLoopIds` (the joined row's copies) rides the stamp only.
+    var body = { decisionLoopId: opts.stampLoopId || opts.followUpTo, decisionLoopIds: opts.stampLoopIds, decisionId: opts.decisionId };
     return fetch('/workspace/' + encodeURIComponent(opts.urlKey) + '/api/dashboard/rulings/dismiss', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1250,7 +1257,7 @@ window.ReplyDelivery = (function () {
           if (typeof handlers.onNoTarget === 'function') handlers.onNoTarget();
           return;
         }
-        return window.ReplyDelivery.postComment(opts.urlKey, targetId, opts.prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, optionId: opts.optionId, source: opts.source })
+        return window.ReplyDelivery.postComment(opts.urlKey, targetId, opts.prompt, { decisionLoopId: opts.decisionLoopId, decisionLoopIds: opts.decisionLoopIds, decisionId: opts.decisionId, optionId: opts.optionId, source: opts.source })
           .then(function (commentResult) {
             if (!commentResult.ok) { handlers.onCommentFailed(errorFromResult(commentResult)); return; }
             var recordOnNote = resolved.note
@@ -1302,7 +1309,7 @@ window.ReplyDelivery = (function () {
           return deliverRulingRecord(Object.assign({}, opts, { downgradeNote: PRESS_TIME_DOWNGRADE_NOTE }), handlers);
         }
 
-        return window.ReplyDelivery.postComment(opts.urlKey, opts.issueId || opts.issueIdentifier, opts.prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, optionId: opts.optionId, source: opts.source })
+        return window.ReplyDelivery.postComment(opts.urlKey, opts.issueId || opts.issueIdentifier, opts.prompt, { decisionLoopId: opts.decisionLoopId, decisionLoopIds: opts.decisionLoopIds, decisionId: opts.decisionId, optionId: opts.optionId, source: opts.source })
           .then(function (commentResult) {
             if (!commentResult.ok) { handlers.onCommentFailed(errorFromResult(commentResult)); return; }
             function startRun() {
@@ -1591,7 +1598,7 @@ window.fetchDispatchModelCatalog = function fetchDispatchModelCatalog(urlKey) {
  * @param {Object} [opts]
  * @param {string} [opts.modelPlaceholder] - Blank-option label used when `modelDefault` is absent (UX-only, LIN-1096)
  * @param {string} [opts.modelDefault] - The workspace's actual resolved default model id, raw (LIN-2719 HARD RULE 4) — rendered into the blank option's label, never pre-selected
- * @param {string} [opts.harnessDefault] - The workspace's actual resolved default harness, when the caller knows it (LIN-1111; only the Dispatch page threads this today, via data-default-harness). When given and it matches a known suggestion, it wins over the static DEFAULT_HARNESS so a configured non-Claude default (e.g. 'opencode') still pre-selects correctly instead of being silently shadowed. When given but NOT a known suggestion, nothing is pre-selected — a `<select>` can't represent an arbitrary value.
+ * @param {string} [opts.harnessDefault] - The workspace's actual resolved default harness, when the caller knows it (LIN-1111; only the Dispatch page threads this today, via data-default-harness). When given and it matches a known suggestion, it wins over the static DEFAULT_HARNESS so a configured non-Claude default (e.g. 'opencode') still pre-selects correctly instead of being silently shadowed. When given but NOT a known suggestion, nothing is pre-selected — a `<select>` can't represent an arbitrary value. LIN-3833: the opened task passes `''`, so nothing is pre-selected and an untouched control reads back `harness: null`; the run's harness then comes from the table, else the server's fallback.
  * @returns {string} HTML for the control pair
  */
 window.renderDispatchExecControls = function renderDispatchExecControls(idPrefix, opts = {}) {
@@ -1628,9 +1635,10 @@ window.renderDispatchExecControls = function renderDispatchExecControls(idPrefix
  * Reads the current `{model, harness}` values back out of a container holding
  * a `.dispatch-exec-controls` block (or that block itself). The harness is the
  * select's value (the free-text "custom harness" input was removed in LIN-1282).
- * The harness select pre-selects `claude-code` (LIN-1111), so an untouched
- * control reads back `harness: 'claude-code'` rather than null — pick the blank
- * "—" option to still send null explicitly. The model select has no such
+ * The harness select pre-selects `claude-code` (LIN-1111) unless the caller passes
+ * `harnessDefault: ''` (LIN-3833: the opened task does), so an untouched control
+ * reads back `harness: 'claude-code'` rather than null — pick the blank "—" option
+ * to still send null explicitly. The model select has no such
  * default (HARD RULE 1, LIN-2719), so a blank model still resolves to `null`,
  * and `window.dispatchPrompt` omits it so the consumer's own default
  * resolution applies (LIN-1094). When the model select is on the `other…`
@@ -1788,7 +1796,7 @@ if (typeof document !== 'undefined' && document.addEventListener) {
  * @param {string} [opts.buttonDataAction=''] - Value for `data-action` attribute on dispatch buttons (swipe uses 'dispatch')
  * @returns {string} HTML for the disclosure toggle + hidden options panel
  */
-window.renderDispatchDisclosure = function renderDispatchDisclosure({ idPrefix, isLocalhost = false, toggleClass = 'dispatch-disclosure disclosure-toggle', panelClass = 'prompt-options', buttonClass = 'prompt-dispatch dispatch-btn', buttonDataAction = '' } = {}) {
+window.renderDispatchDisclosure = function renderDispatchDisclosure({ idPrefix, isLocalhost = false, toggleClass = 'dispatch-disclosure disclosure-toggle', panelClass = 'prompt-options', buttonClass = 'prompt-dispatch dispatch-btn', buttonDataAction = '', harnessDefault } = {}) {
   const prefix = idPrefix ? window.escapeHtml(String(idPrefix)) : 'unknown';
   const panelId = `dispatch-options-${prefix}`;
   const localButton = isLocalhost
@@ -1798,7 +1806,7 @@ window.renderDispatchDisclosure = function renderDispatchDisclosure({ idPrefix, 
 
   return `<button class="${toggleClass}" aria-expanded="false" aria-haspopup="true" aria-controls="${panelId}">Dispatch ▾</button>` +
     `<span class="${panelClass} hidden" id="${panelId}">` +
-    window.renderDispatchExecControls(panelId) +
+    window.renderDispatchExecControls(panelId, harnessDefault === undefined ? {} : { harnessDefault }) +
     `<button class="${buttonClass}" data-target="cli"${dataActionAttr}>cli</button>` +
     `<button class="${buttonClass}" data-target="web"${dataActionAttr}>web</button>` +
     `<button class="${buttonClass}" data-target="dash"${dataActionAttr}>dash</button>` +
@@ -2369,8 +2377,7 @@ let activeModalClose = null;
  * inside it) via the returned `modal` element.
  *
  * Behaviour standardised from the dispatch token modal: close on overlay click,
- * close button, and Escape. The pipeline overlay is intentionally NOT built on
- * this helper — it is a persistent polling singleton, a different primitive.
+ * close button, and Escape.
  *
  * @global
  * @param {Object} opts

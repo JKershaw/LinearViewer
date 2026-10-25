@@ -29,74 +29,27 @@ async function openIssueDetails(page) {
 
   // Details block is lazy-loaded from /api/detail; the Details toggle appears
   // once the fetch lands, then we expand it to reveal the nested toggles.
-  const detailsToggle = details.locator('.detail-toggle[data-toggle="details"]');
+  const detailsToggle = details.locator('.detail-toggle[data-toggle="description"]');
   await expect(detailsToggle).toBeVisible();
   await detailsToggle.click();
 
   return details;
 }
 
-test.describe('Tree view: Brief / Recap sections (LIN-522)', () => {
+test.describe('Tree view: Brief / Recap / Context leave Home (LIN-522, LIN-3833)', () => {
   test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal();
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.evaluate(() => localStorage.clear());
   });
 
-  for (const section of ['brief', 'recap']) {
-    test(`${section} toggle appears nested inside Details`, async ({ page }) => {
+  // LIN-3833 (Q4): the state-first opened task on Home has no Brief, Recap, Scan or Context folds. They stay on
+  // Swipe, where the card keeps them.
+  for (const section of ['brief', 'recap', 'context']) {
+    test(`${section} is not a fold of the opened task on Home`, async ({ page }) => {
       const details = await openIssueDetails(page);
-      const toggle = details.locator(`.detail-toggle[data-toggle="${section}"]`);
-      await expect(toggle).toBeVisible();
-      await expect(toggle).toContainText(section === 'brief' ? 'Brief' : 'Recap');
-    });
-
-    test(`${section} content starts hidden and lazy-mounts on first expand`, async ({ page }) => {
-      const details = await openIssueDetails(page);
-      const toggle = details.locator(`.detail-toggle[data-toggle="${section}"]`);
-      const content = details.locator(`.detail-content[data-content="${section}"]`);
-      const sectionEl = content.locator(`.${section}-section`);
-
-      // Hidden, and the shared module has NOT been initialised yet (placeholder
-      // still present, no data-state).
-      await expect(content).toHaveClass(/hidden/);
-      await expect(sectionEl).toHaveAttribute(`data-${section}-placeholder`, '1');
-      await expect(sectionEl).not.toHaveAttribute('data-state', /.+/);
-
-      // First expand initialises the module.
-      await toggle.click();
-      await expect(content).not.toHaveClass(/hidden/);
-      await expect(toggle).toContainText('▼');
-      await expect(sectionEl).not.toHaveAttribute(`data-${section}-placeholder`, '1');
-      // The shared renderer always stamps a data-state; settles off 'loading'.
-      await expect(sectionEl).toHaveAttribute('data-state', /missing|fresh|stale|generating|error/, { timeout: 5000 });
-    });
-
-    test(`${section} toggle arrow flips on expand/collapse`, async ({ page }) => {
-      const details = await openIssueDetails(page);
-      const toggle = details.locator(`.detail-toggle[data-toggle="${section}"]`);
-
-      await expect(toggle).toContainText('▶');
-      await toggle.click();
-      await expect(toggle).toContainText('▼');
-      await toggle.click();
-      await expect(toggle).toContainText('▶');
-    });
-
-    test(`${section} mounts only once (cached across collapse/expand)`, async ({ page }) => {
-      const details = await openIssueDetails(page);
-      const toggle = details.locator(`.detail-toggle[data-toggle="${section}"]`);
-      const content = details.locator(`.detail-content[data-content="${section}"]`);
-      const sectionEl = content.locator(`.${section}-section`);
-
-      await toggle.click();
-      await expect(sectionEl).toHaveAttribute('data-state', /missing|fresh|stale|generating|error/, { timeout: 5000 });
-      // Collapse then re-expand: content is marked loaded, so it is not re-mounted.
-      await toggle.click();
-      await expect(content).toHaveClass(/hidden/);
-      await expect(content).toHaveAttribute('data-loaded', 'true');
-      await toggle.click();
-      await expect(content).not.toHaveClass(/hidden/);
+      await expect(details.locator('.prompt-section')).toBeVisible();
+      await expect(details.locator(`.detail-toggle[data-toggle="${section}"]`)).toHaveCount(0);
     });
   }
 
@@ -114,81 +67,28 @@ test.describe('Tree view: Brief / Recap sections (LIN-522)', () => {
 });
 
 // ============================================================================
-// Context section (LIN-572) — relationship diagram, nested inside Details.
-// Reuses the same lazy-toggle plumbing as Brief/Recap; the section is
-// deterministic (no AI), so it settles directly to data-state="loaded".
-// LOCAL-1 (the first project issue) is the parent of LOCAL-2, so the diagram
-// renders the root node and a Children lane.
+// Dispatched Sessions fold (LIN-522). LIN-3833: the Sessions fold stays on Home, for a viewer who can run.
 // ============================================================================
-test.describe('Tree view: Context section (LIN-572)', () => {
+async function clearSessions(page, urlKey) {
+  await page.goto(`/test/clear-dispatch-queue?urlKey=${urlKey}`);
+  await page.goto(`/test/clear-dispatch-history?urlKey=${urlKey}`);
+  await page.goto(`/test/clear-dispatch-tokens?urlKey=${urlKey}`);
+}
+
+async function dispatchForIssue(page, urlKey, issueIdentifier, promptName = 'implementation') {
+  const resp = await page.request.post(`/workspace/${urlKey}/api/dispatch`, {
+    data: { prompt: `Work on ${issueIdentifier}`, promptName, issueIdentifier, target: 'cli' }
+  });
+  expect(resp.status(), `dispatch failed: ${await resp.text()}`).toBe(201);
+  return (await resp.json()).item;
+}
+
+test.describe('Tree view: Dispatched Sessions (LIN-522)', () => {
   test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal();
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.evaluate(() => localStorage.clear());
   });
-
-  test('context toggle appears nested inside Details', async ({ page }) => {
-    const details = await openIssueDetails(page);
-    const toggle = details.locator('.detail-toggle[data-toggle="context"]');
-    await expect(toggle).toBeVisible();
-    await expect(toggle).toContainText('Context');
-  });
-
-  test('context content starts hidden and lazy-mounts the diagram on first expand', async ({ page }) => {
-    const details = await openIssueDetails(page);
-    const toggle = details.locator('.detail-toggle[data-toggle="context"]');
-    const content = details.locator('.detail-content[data-content="context"]');
-    const sectionEl = content.locator('.context-section');
-
-    await expect(content).toHaveClass(/hidden/);
-    await expect(sectionEl).toHaveAttribute('data-context-placeholder', '1');
-    await expect(sectionEl).not.toHaveAttribute('data-state', /.+/);
-
-    await toggle.click();
-    await expect(content).not.toHaveClass(/hidden/);
-    await expect(toggle).toContainText('▼');
-    await expect(sectionEl).not.toHaveAttribute('data-context-placeholder', '1');
-    await expect(sectionEl).toHaveAttribute('data-state', 'loaded', { timeout: 5000 });
-
-    // The root node always renders; LOCAL-1's child LOCAL-2 appears as a node.
-    await expect(sectionEl.locator('.context-node--root')).toBeVisible();
-    await expect(sectionEl.locator('.context-node[data-context-nav="LOCAL-2"]')).toBeVisible();
-  });
-
-  test('context mounts only once (cached across collapse/expand)', async ({ page }) => {
-    const details = await openIssueDetails(page);
-    const toggle = details.locator('.detail-toggle[data-toggle="context"]');
-    const content = details.locator('.detail-content[data-content="context"]');
-    const sectionEl = content.locator('.context-section');
-
-    await toggle.click();
-    await expect(sectionEl).toHaveAttribute('data-state', 'loaded', { timeout: 5000 });
-    await toggle.click();
-    await expect(content).toHaveClass(/hidden/);
-    await expect(content).toHaveAttribute('data-loaded', 'true');
-    await toggle.click();
-    await expect(content).not.toHaveClass(/hidden/);
-  });
-});
-
-// ============================================================================
-// Dispatched Sessions — gated behind the dispatch feature flag.
-// Seeds real sessions by acting as a dispatch consumer (mirrors swipe.spec.js).
-// ============================================================================
-test.describe('Tree view: Dispatched Sessions (LIN-522)', () => {
-  async function clearSessions(page, urlKey) {
-    await page.goto(`/test/clear-dispatch-queue?urlKey=${urlKey}`);
-    await page.goto(`/test/clear-dispatch-history?urlKey=${urlKey}`);
-    await page.goto(`/test/clear-dispatch-tokens?urlKey=${urlKey}`);
-  }
-
-  async function dispatchForIssue(page, urlKey, issueIdentifier, promptName = 'implementation') {
-    const resp = await page.request.post(`/workspace/${urlKey}/api/dispatch`, {
-      data: { prompt: `Work on ${issueIdentifier}`, promptName, issueIdentifier, target: 'cli' }
-    });
-    expect(resp.status(), `dispatch failed: ${await resp.text()}`).toBe(201);
-    return (await resp.json()).item;
-  }
 
   test('sessions toggle is absent when the dispatch flag is off', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(undefined, { runnerKey: false });
@@ -213,7 +113,7 @@ test.describe('Tree view: Dispatched Sessions (LIN-522)', () => {
     const toggle = details.locator('.detail-toggle[data-toggle="sessions"]');
     const content = details.locator('.detail-content[data-content="sessions"]');
     await expect(toggle).toBeVisible();
-    await expect(toggle).toContainText('Dispatched Sessions');
+    await expect(toggle).toContainText('Sessions');
 
     await toggle.click();
     await expect(content).not.toHaveClass(/hidden/);

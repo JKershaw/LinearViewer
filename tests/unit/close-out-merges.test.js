@@ -82,6 +82,36 @@ describe('createPipelineMergeRecorder', () => {
     assert.equal((await rows(c)).length, 1);
   });
 
+  test('a person Done (writer: person) on an ordinary task records by person, once, with both forge times', async () => {
+    const c = setup();
+    const first = await c.run({ writer: 'person' });
+    assert.equal(first.recorded.length, 1);
+    const [ev] = await rows(c);
+    assert.equal(ev.by, 'person');
+    assert.equal(ev.merged, true);
+    assert.equal(new Date(ev.prOpenedAt).toISOString(), '2026-10-20T10:00:00.000Z');
+    assert.equal(new Date(ev.prMergedAt).toISOString(), '2026-10-20T12:30:00.000Z');
+    assert.ok(!ev.doneAt, 'an ordinary task is not stamped: only a stop-at-PR merge reads doneAt');
+    const repeat = await c.run({ writer: 'person' });
+    assert.equal((await rows(c)).length, 1, 'a repeat person Done writes nothing new');
+    assert.deepEqual(repeat.recorded.map(r => r.id), first.recorded.map(r => r.id));
+  });
+
+  test('a person Done with no GitHub token records nothing and never reads the PR', async () => {
+    const c = setup({ token: null });
+    await c.run({ writer: 'person' });
+    assert.equal((await rows(c)).length, 0);
+    assert.equal(c.reads.length, 0);
+  });
+
+  test('a person Done on a stop-at-PR task records by person and stamps doneAt', async () => {
+    const c = setup({ stopAt: 'pr' });
+    await c.run({ writer: 'person' });
+    const [ev] = await rows(c);
+    assert.equal(ev.by, 'person');
+    assert.ok(ev.doneAt, 'doneAt is stamped so a later person check does not write Done again');
+  });
+
   test('a non-completed write records nothing and reads nothing', async () => {
     const c = setup();
     await c.run({ written: { ...doneIssue, state: { type: 'canceled' } } });

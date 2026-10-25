@@ -18,7 +18,8 @@
  *   - inside `createWorkspaceApiRoutes`, where they close over the injected stores.
  * The AI pre-flight calls (`resolveChatCredential`, `checkFreeTierGate`, the
  * `forceDefault` model clamp) are deliberately NOT shared: each route names its own,
- * because the source-text censuses scan this file for every one of them.
+ * because the source-text censuses scan the workspace-API unit (this file and
+ * routes/workspace-api-*.js) for every one of them.
  *
  * Test-mode builders (mock recommendation, recap, brief, scan, audit data, ...) live
  * in lib/workspace-api-mocks.js.
@@ -186,7 +187,7 @@ function streamMockFixture(res, mockIssue) {
  * @param {Object} [options.closeOut] - LIN-3248 test seam for the check/press routes: optional `{ resolveProvider, readPrStatus, githubFetch, isStopAtRun, runnerReady, markDone }` overrides
  * @returns {Router} Express router
  */
-export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore = null, sessionsFeedCache = null, ownerCredentialStore = null, adoptConnectionCredential = null, accountStore = null, runEvidence = null, closeOutEventsStore = null, closeOut = null, workspaceOwnerCheck = null, onTicketWrite = null, installationTokenFor = null }) {
+export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore = null, sessionsFeedCache = null, ownerCredentialStore = null, adoptConnectionCredential = null, accountStore = null, runEvidence = null, closeOutEventsStore = null, closeOut = null, workspaceOwnerCheck = null, onTicketWrite = null, recordPipelineMerge = null, installationTokenFor = null }) {
   const router = Router();
 
   // The test-token DATA mock charges the free tier on its own (the AI-gate above it is
@@ -600,7 +601,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
 
   // The issue-write routes (POST comments, POST issues, PATCH issues) moved to workspace-api-issue-write.js
   // (LIN-3876); they register on this router directly after the reads, so the three paths keep one router (and one OPTIONS `Allow`).
-  registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQueueStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, adoptConnectionCredential, onTicketWrite });
+  registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQueueStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, adoptConnectionCredential, onTicketWrite, recordPipelineMerge });
 
   // The sessions route (LIN-3894): registered on this router, here, so the route table's order is unchanged.
   registerSessionsRoutes(router, { workspaceFromUrl, dispatchQueueStore, agentStatusStore });

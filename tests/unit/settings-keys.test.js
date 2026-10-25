@@ -10,9 +10,10 @@ import { agentAccessBody } from '../../lib/render-settings-workspace.js';
 import { hasLiveRunnerKey, hasLiveQueueToken } from '../../lib/run-controls.js';
 
 const iso = (ms) => new Date(ms).toISOString();
-// The run's own clock, not a date: a key expires 1 day after NOW and `buildKeyList` / `isLiveKey` default `now` to
-// Date.now(), so a fixed date made these fixtures expire (2026-10-25T12:00Z) and fail the suite from then on.
-const NOW = Date.now();
+// A pinned clock, and every call passes it: a key expires 1 day after NOW, and `buildKeyList` / `agentAccessBody`
+// default `now` to the wall clock. NOW is pinned in the past on purpose, so a call that misses `now: NOW` fails at
+// once instead of on the day the fixtures' expiry passes (LIN-3949).
+const NOW = Date.parse('2026-10-24T12:00:00Z');
 const proxy = (over) => ({ tokenId: 'p', label: '', scope: 'read', kind: 'standard', consumed: false, hasOwner: true, grants: [], createdAt: iso(NOW - 1e3), lastUsedAt: null, expiresAt: iso(NOW + 864e5), ...over });
 const queue = (over) => ({ tokenId: 'd', label: 'legacy', hasOwner: true, createdAt: iso(NOW - 1e3), lastUsedAt: null, expiresAt: iso(NOW + 864e5), ...over });
 
@@ -25,7 +26,7 @@ describe('kinds describe what a key can do, never where it came from', () => {
       proxy({ tokenId: 'rw', scope: 'readWrite' }),
       proxy({ tokenId: 'ro', scope: 'read' })
     ],
-    dispatchRows: [queue({ tokenId: 'q' })], isOwner: true, urlKey: 'acme'
+    dispatchRows: [queue({ tokenId: 'q' })], isOwner: true, urlKey: 'acme', now: NOW
   });
   const kind = (id) => rows.find(r => r.id === id).kind;
 
@@ -44,25 +45,25 @@ describe('revoke uses today\'s DELETE routes and their owner rules', () => {
   const dispatchRows = [queue({ tokenId: 'q' })];
 
   test('a member may revoke an ordinary key only; grant-bearing keys and every queue token are owner-only', () => {
-    const rows = buildKeyList({ proxyRows, dispatchRows, isOwner: false, urlKey: 'acme' });
+    const rows = buildKeyList({ proxyRows, dispatchRows, isOwner: false, urlKey: 'acme', now: NOW });
     const allowed = Object.fromEntries(rows.map(r => [r.id, r.revoke.allowed]));
     assert.deepEqual(allowed, { plain: true, grants: false, q: false });
     assert.match(rows.find(r => r.id === 'q').revoke.ownerOnlyNote, /owner/);
   });
 
   test('the owner may revoke all of them', () => {
-    assert.ok(buildKeyList({ proxyRows, dispatchRows, isOwner: true, urlKey: 'acme' }).every(r => r.revoke.allowed));
+    assert.ok(buildKeyList({ proxyRows, dispatchRows, isOwner: true, urlKey: 'acme', now: NOW }).every(r => r.revoke.allowed));
   });
 
   test('the routes are the existing ones, per store', () => {
-    const rows = buildKeyList({ proxyRows, dispatchRows, isOwner: true, urlKey: 'acme' });
+    const rows = buildKeyList({ proxyRows, dispatchRows, isOwner: true, urlKey: 'acme', now: NOW });
     assert.equal(rows.find(r => r.id === 'plain').revoke.route, '/workspace/acme/api/proxy/tokens/plain');
     assert.equal(rows.find(r => r.id === 'q').revoke.route, '/workspace/acme/api/dispatch/tokens/q');
   });
 
   test('a member sees "owner only" in place of the button, an owner the button', () => {
-    const member = agentAccessBody({ urlKey: 'acme', keys: buildKeyList({ proxyRows, dispatchRows, isOwner: false, urlKey: 'acme' }) });
-    const owner = agentAccessBody({ urlKey: 'acme', keys: buildKeyList({ proxyRows, dispatchRows, isOwner: true, urlKey: 'acme' }) });
+    const member = agentAccessBody({ urlKey: 'acme', keys: buildKeyList({ proxyRows, dispatchRows, isOwner: false, urlKey: 'acme', now: NOW }), now: NOW });
+    const owner = agentAccessBody({ urlKey: 'acme', keys: buildKeyList({ proxyRows, dispatchRows, isOwner: true, urlKey: 'acme', now: NOW }), now: NOW });
     assert.equal((member.match(/settings-key-owner-only/g) || []).length, 2);
     assert.equal((member.match(/data-settings-ask-route/g) || []).length, 1);
     assert.equal((owner.match(/data-settings-ask-route/g) || []).length, 3);
@@ -73,16 +74,15 @@ describe('revoke uses today\'s DELETE routes and their owner rules', () => {
 describe('the list shows what a person needs', () => {
   test('expiry and last use are relative (LIN-3890), and "no owner · re-issue" for an ownerless key', () => {
     // The clock is injected (LIN-3890): the renderer formats against `now`, not a second read of Date.now().
-    const now = Date.now();
-    const keys = buildKeyList({ proxyRows: [proxy({ tokenId: 'x', hasOwner: false, expiresAt: iso(now + 2 * 864e5), lastUsedAt: iso(now - 6e4) })], dispatchRows: [], isOwner: true, urlKey: 'acme', now });
-    const html = agentAccessBody({ urlKey: 'acme', keys, now });
+    const keys = buildKeyList({ proxyRows: [proxy({ tokenId: 'x', hasOwner: false, expiresAt: iso(NOW + 2 * 864e5), lastUsedAt: iso(NOW - 6e4) })], dispatchRows: [], isOwner: true, urlKey: 'acme', now: NOW });
+    const html = agentAccessBody({ urlKey: 'acme', keys, now: NOW });
     assert.match(html, /expires in 2d/);
     assert.match(html, /last used 1m ago/);
     assert.match(html, /no owner · re-issue/);
   });
 
   test('New key is read, or read and update; 90 days; shown once; run keys come from the owner', () => {
-    const html = agentAccessBody({ urlKey: 'acme', keys: [] });
+    const html = agentAccessBody({ urlKey: 'acme', keys: [], now: NOW });
     assert.match(html, /name="scope" value="read" checked/);
     assert.match(html, /name="scope" value="readWrite"/);
     assert.match(html, /90 days and is shown once/);
@@ -92,7 +92,7 @@ describe('the list shows what a person needs', () => {
   });
 
   test('links to the event log and the agent prompt', () => {
-    const html = agentAccessBody({ urlKey: 'acme', keys: [] });
+    const html = agentAccessBody({ urlKey: 'acme', keys: [], now: NOW });
     assert.match(html, /settings-link-events/);
     assert.match(html, /settings-link-agent-prompt/);
   });

@@ -6663,3 +6663,69 @@ describe('GET /observation/session/:sessionId — run-facts stopAt (LIN-3722)', 
     assert.equal(facts.variant, 'unknown');
   });
 });
+
+// LIN-3959: a joined ruling's copies. `decisionLoopIds` (the row's `stampLoopIds`)
+// dismisses every copy; `decisionLoopId` stays the primary, required stamp.
+describe('POST /api/dashboard/rulings/dismiss — joined-copy stamps (LIN-3959)', () => {
+  function makeJoinedDismissRouter(stampResult = () => ({ success: true, feedbackCount: 1 })) {
+    const calls = [];
+    const router = createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore: {
+        async listItems() { return []; },
+        async listHistory() { return { items: [] }; },
+        async markDecisionAnswered(itemId, urlKey, decisionId, outcome) {
+          calls.push({ itemId, urlKey, decisionId, outcome });
+          return stampResult(itemId);
+        }
+      },
+      agentStatusStore: { async listStatus() { return { items: [] }; } },
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({})
+    });
+    return { handler: getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/dismiss'), calls };
+  }
+
+  test('dismisses every copy: the primary and each entry of decisionLoopIds, each stamped dismissed once', async () => {
+    const { handler, calls } = makeJoinedDismissRouter();
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { decisionLoopId: 'wk-1', decisionLoopIds: ['wk-1', 'ap-1'], decisionId: 'd-1' };
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(calls.map(c => c.itemId), ['wk-1', 'ap-1'], 'the primary first, the duplicate primary not re-stamped');
+    assert.ok(calls.every(c => c.urlKey === 'ws-a' && c.decisionId === 'd-1' && c.outcome === 'dismissed'));
+  });
+
+  test('a malformed decisionLoopIds is refused 400 before any stamp, fail closed', async () => {
+    for (const decisionLoopIds of ['ap-1', [42], [''], Array.from({ length: 9 }, (_, i) => `loop-${i}`)]) {
+      const { handler, calls } = makeJoinedDismissRouter();
+      const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+      req.body = { decisionLoopId: 'wk-1', decisionLoopIds, decisionId: 'd-1' };
+      await handler(req, res);
+      assert.equal(res.statusCode, 400, `refused: ${JSON.stringify(decisionLoopIds).slice(0, 40)}`);
+      assert.equal(calls.length, 0, 'no copy is stamped from a refused request');
+    }
+  });
+
+  test('a primary with no match is still a 404, and the copies are not attempted', async () => {
+    const { handler, calls } = makeJoinedDismissRouter(() => null);
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { decisionLoopId: 'wk-1', decisionLoopIds: ['wk-1', 'ap-1'], decisionId: 'd-1' };
+    await handler(req, res);
+    assert.equal(res.statusCode, 404);
+    assert.deepEqual(calls.map(c => c.itemId), ['wk-1']);
+  });
+
+  test('a copy with no match is logged, not a 404: the primary already discharged the ruling', async () => {
+    const { handler } = makeJoinedDismissRouter(itemId => (itemId === 'ap-1' ? null : { success: true }));
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { decisionLoopId: 'wk-1', decisionLoopIds: ['wk-1', 'ap-1'], decisionId: 'd-1' };
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+  });
+});
