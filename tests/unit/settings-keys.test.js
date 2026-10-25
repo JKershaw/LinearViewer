@@ -10,7 +10,9 @@ import { agentAccessBody } from '../../lib/render-settings-workspace.js';
 import { hasLiveRunnerKey, hasLiveQueueToken } from '../../lib/run-controls.js';
 
 const iso = (ms) => new Date(ms).toISOString();
-const NOW = Date.parse('2026-10-24T12:00:00Z');
+// Anchored at load, not pinned: a fixed date expires these fixtures once the wall clock passes it,
+// and buildKeyList defaults `now` to Date.now().
+const NOW = Date.now();
 const proxy = (over) => ({ tokenId: 'p', label: '', scope: 'read', kind: 'standard', consumed: false, hasOwner: true, grants: [], createdAt: iso(NOW - 1e3), lastUsedAt: null, expiresAt: iso(NOW + 864e5), ...over });
 const queue = (over) => ({ tokenId: 'd', label: 'legacy', hasOwner: true, createdAt: iso(NOW - 1e3), lastUsedAt: null, expiresAt: iso(NOW + 864e5), ...over });
 
