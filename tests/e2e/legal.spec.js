@@ -105,4 +105,72 @@ test.describe('Legal Pages', () => {
       await expect(footer.locator('a.footer-legal[href="/terms"]')).toBeVisible();
     });
   });
+
+  // LIN-3958: the Plain layout's measures, at the two widths the visual replay uses. node --test cannot
+  // compute layout, so these read the rendered page.
+  test.describe('Layout', () => {
+    const WIDTHS = [
+      { width: 1280, height: 900 },
+      { width: 390, height: 844 },
+    ];
+
+    for (const { width, height } of WIDTHS) {
+      for (const path of ['/privacy', '/terms']) {
+        test(`${path} at ${width}px: the title and heading step up from the prose, and the measure holds`, async ({ page }) => {
+          await page.setViewportSize({ width, height });
+          await page.goto(path);
+          const m = await page.evaluate(() => {
+            const px = (el) => parseFloat(getComputedStyle(el).fontSize);
+            const title = document.querySelector('main.plain-page .plain-title');
+            const heading = document.querySelector('main.plain-page .section .section-header');
+            const para = document.querySelector('main.plain-page .section p:not([class])');
+            return {
+              title: px(title),
+              heading: px(heading),
+              prose: px(para),
+              proseWidth: para.getBoundingClientRect().width,
+              measure: px(para) * 40,
+            };
+          });
+          expect(m.heading).toBeGreaterThanOrEqual(1.2 * m.prose);
+          expect(m.title).toBeGreaterThan(m.heading);
+          expect(m.proseWidth).toBeLessThanOrEqual(m.measure + 0.5);
+          if (width === 390) expect(m.prose).toBeGreaterThanOrEqual(15);
+        });
+      }
+
+      test(`/privacy at ${width}px: list text is the prose face, and at phone width it clears the bullet`, async ({ page }) => {
+        await page.setViewportSize({ width, height });
+        await page.goto('/privacy');
+        const m = await page.evaluate(() => {
+          const li = document.querySelector('main.plain-page .section li');
+          const para = document.querySelector('main.plain-page .section p:not([class])');
+          const main = document.querySelector('main.plain-page');
+          return {
+            liFace: getComputedStyle(li).fontFamily,
+            paraFace: getComputedStyle(para).fontFamily,
+            liFontSize: parseFloat(getComputedStyle(li).fontSize),
+            gutter: li.getBoundingClientRect().left - main.getBoundingClientRect().left,
+          };
+        });
+        expect(m.liFace).toContain('Inter');
+        expect(m.liFace).toBe(m.paraFace);
+        if (width === 390) expect(m.gutter).toBeGreaterThanOrEqual(1.25 * m.liFontSize);
+      });
+    }
+
+    test('/styleguide at 390px: no zero-width list is visible', async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto('/styleguide');
+      const visibleEmpty = await page.evaluate(() => {
+        const hidden = (el) => {
+          for (let n = el; n; n = n.parentElement) if (getComputedStyle(n).display === 'none') return true;
+          return false;
+        };
+        return [...document.querySelectorAll('main ul')]
+          .filter((ul) => ul.getBoundingClientRect().width === 0 && !hidden(ul)).length;
+      });
+      expect(visibleEmpty).toBe(0);
+    });
+  });
 });
