@@ -28,7 +28,9 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { spawnClaudeSession } from '../lib/harbour-spawn.js';
-import { DISPATCH_DEFAULT_KINDS } from '../lib/prompt-templates.js';
+import { DISPATCH_DEFAULT_KINDS, deriveDispatchKind } from '../lib/prompt-templates.js';
+import { resolveRoutingWithSources } from '../lib/dispatch-factory.js';
+import { SURFACES } from '../lib/task-mode-store.js';
 import { effortNotAppliedForConfig } from '../lib/workspace-preferences.js';
 import { isPositiveInteger } from '../lib/dispatch-fields.js';
 import { enterSessionDispatch, opaqueFieldError } from '../lib/dispatch-entrance.js';
@@ -574,6 +576,52 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       return res.json(quotaAnswer(plan, await freeTierStore.getRunUsage(accountIds)));
     } catch (err) {
       return reportFailure(res, 'Read dispatch quota error:', err, 'Failed to read dispatch quota');
+    }
+  });
+
+  /**
+   * GET /workspace/:urlKey/api/dispatch/preview
+   * LIN-3833: the setting a run with these fields would stamp, read-only, from the resolution the
+   * dispatch itself uses (`resolveRoutingWithSources`, the same inputs `createDispatchItem` gives it).
+   * `kind` is derived the entrance's way (an explicit `kind`, else `deriveDispatchKind(promptName)`).
+   * `surface` takes the same opened-task default the session lane takes. Owner-only: the run control
+   * that calls it is the owner's, and it names the workspace's routing. `sources` says, per field,
+   * which tier answered, so the browser shows what the server resolved and never resolves it itself.
+   */
+  router.get('/workspace/:urlKey/api/dispatch/preview', workspaceFromUrl, async (req, res) => {
+    try {
+      const refusal = await resolveOwnerMintRefusal({
+        ownerCheck: workspaceOwnerCheck,
+        workspaceId: req.workspace.id,
+        accountId: req.session?.accountId,
+        ownerOnlyCode: 'PREVIEW_OWNER_ONLY'
+      });
+      if (refusal) return res.status(refusal.status).json({ error: refusal.error, code: refusal.code });
+      const text = (value) => (typeof value === 'string' && value.trim() ? value : null);
+      const surface = text(req.query.surface);
+      if (surface !== null && !SURFACES.includes(surface)) {
+        return res.status(400).json({ error: `surface must be one of: ${SURFACES.join(', ')}` });
+      }
+      const presetId = text(req.query.presetId);
+      const preset = (presetId && dispatchPresetsStore)
+        ? await Promise.resolve(dispatchPresetsStore.get(req.workspace.urlKey, presetId)).catch(() => null)
+        : null;
+      const kind = text(req.query.kind) || deriveDispatchKind(text(req.query.promptName) || undefined);
+      const routing = await resolveRoutingWithSources({
+        urlKey: req.workspace.urlKey,
+        kind,
+        model: text(req.query.model),
+        harness: text(req.query.harness),
+        effort: text(req.query.effort),
+        preset,
+        anchor: null,
+        workspacePreferencesStore,
+        applyDefaultHarness: surface !== null,
+        settleHarness: surface !== null
+      });
+      res.json({ kind, presetId: preset ? presetId : null, presetName: preset?.name ?? null, ...routing });
+    } catch (err) {
+      return reportFailure(res, 'Preview dispatch routing error:', err, 'Failed to preview dispatch routing');
     }
   });
 

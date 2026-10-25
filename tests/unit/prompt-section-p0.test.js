@@ -929,7 +929,7 @@ describe('P0 re-review N4: a set-up press updates only the notice slot', () => {
 // LIN-1094 behaviour change: the panel choice is honoured, not overridden.
 // ---------------------------------------------------------------------------
 
-describe('LIN-3211: the run-step rung sends the card panel\'s harness, else claude-code', () => {
+describe('LIN-3211 / LIN-3833: the run-step rung sends only a chosen harness; a blank one goes to the server', () => {
   // `panelHarness`: what the card's panel selector holds ('' = the blank "—"
   // option). `panel: false`: no panel rendered in the card at all.
   async function pressRung({ panelHarness = 'claude-code', panel = true } = {}) {
@@ -969,7 +969,10 @@ describe('LIN-3211: the run-step rung sends the card panel\'s harness, else clau
     return calls.dispatch[0];
   }
 
-  test('default panel (claude-code preselected) → claude-code', async () => {
+  // LIN-3833 (Q1): the client no longer forces claude-code. An untouched or blank control sends no
+  // harness, and the server settles it for an opened-task run (`surface`, asserted in
+  // lin-3833-run-sources.test.js). The structured-token half of LIN-3211 moved there with it.
+  test('a chosen claude-code is sent as chosen', async () => {
     assert.equal((await pressRung({ panelHarness: 'claude-code' })).harness, 'claude-code');
   });
 
@@ -977,12 +980,12 @@ describe('LIN-3211: the run-step rung sends the card panel\'s harness, else clau
     assert.equal((await pressRung({ panelHarness: 'opencode' })).harness, 'opencode');
   });
 
-  test('panel blank ("—") → claude-code', async () => {
-    assert.equal((await pressRung({ panelHarness: '' })).harness, 'claude-code');
+  test('panel blank ("—") → no harness sent (LIN-3833, was claude-code)', async () => {
+    assert.equal((await pressRung({ panelHarness: '' })).harness, null);
   });
 
-  test('no panel in the card → claude-code', async () => {
-    assert.equal((await pressRung({ panel: false })).harness, 'claude-code');
+  test('no panel in the card → no harness sent (LIN-3833, was claude-code)', async () => {
+    assert.equal((await pressRung({ panel: false })).harness, null);
   });
 });
 

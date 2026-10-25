@@ -215,7 +215,8 @@ describe('LIN-3341 — Go is one press', () => {
     assert.equal(d.proxyForce, true);
     assert.equal(d.target, 'cli');
     assert.equal(d.surface, 'swipe');
-    assert.equal(d.harness, 'claude-code', 'a blank panel harness falls back to claude-code');
+    // LIN-3833 (Q1): no harness is forced on the client; the server settles a blank one for an opened-task run.
+    assert.equal(d.harness, null, 'an untouched panel sends no harness (was claude-code, LIN-3211)');
     assert.match(m.container.innerHTML, /data-testid="opened-task-started"/, 'the started line is shown');
     assert.match(m.container.innerHTML, /href="\/workspace\/ws\/task\/LIN-42"[^>]*data-testid="opened-task-started-link"/, 'with a task-page link');
   });

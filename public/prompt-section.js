@@ -538,7 +538,9 @@
         toggleClass: 'swipe-prompt-dispatch-toggle disclosure-toggle',
         panelClass: 'swipe-prompt-options',
         buttonClass: 'swipe-prompt-dispatch',
-        buttonDataAction: 'dispatch'
+        buttonDataAction: 'dispatch',
+        // LIN-3833: nothing pre-selected, so an untouched harness is null and the server settles it.
+        harnessDefault: ''
       });
     }
     html += '<button class="swipe-prompt-change" data-action="change" title="Choose another prompt">\u21BB change</button>';
@@ -1114,7 +1116,7 @@
         });
         if (destroyed) return;
         const panel = container.querySelector('.swipe-prompt-options');
-        const { model, harness: panelHarness } = window.readDispatchExecControls(panel);
+        const { model, harness } = window.readDispatchExecControls(panel);
         const result = await window.dispatchPrompt({
           urlKey: opts.urlKey,
           prompt: kickoff.prompt,
@@ -1123,9 +1125,10 @@
           issue,
           target: 'cli',
           model,
-          // LIN-3211: a blank harness falls back to claude-code, so the item
-          // carries the structured bootstrap token, never a token in prose.
-          harness: (panelHarness || 'claude-code'),
+          // LIN-3833 (Q1): no harness is forced here. A blank one goes to the server, which takes the
+          // workspace table's harness for this job, else claude-code, and settles model against it.
+          // LIN-3211 still holds: the resolved harness is never blank, so the structured token is carried.
+          harness,
           proxyForce: true,
           entryRung: 'run-task',
           stopAt: 'pr',
@@ -1329,12 +1332,11 @@
         // (LIN-1137). Exec controls (LIN-1096) still live in the dispatch options panel.
         const isRunStep = btn.dataset.action === 'run-step';
         // LIN-3211: the run-step rung sits in the ladder, outside the panel, so
-        // `closest` finds nothing there. It reads its own card's panel instead,
-        // and a blank harness falls back to claude-code, so the item carries the
-        // structured bootstrapToken rather than a token in prompt prose.
+        // `closest` finds nothing there. It reads its own card's panel instead.
+        // LIN-3833 (Q1): a blank harness is no longer forced here. The server settles it
+        // for an opened-task run (the table's harness, else claude-code, `surface` below).
         const panel = isRunStep ? container.querySelector('.swipe-prompt-options') : btn.closest('.swipe-prompt-options');
-        const { model, harness: panelHarness } = window.readDispatchExecControls(panel);
-        const harness = isRunStep ? (panelHarness || 'claude-code') : panelHarness;
+        const { model, harness } = window.readDispatchExecControls(panel);
         // `issue` is the full card object (id/identifier/title/url) — passing it
         // through is what ties Swipe-dispatched sessions back to their task.
         await window.dispatchPrompt({

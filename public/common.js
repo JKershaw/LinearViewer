@@ -773,7 +773,7 @@ window.readSSEStream = async function readSSEStream(response, onEvent) {
  *                 error carries `.status` so callers can branch (e.g. 401).
  */
 window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
-  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind, periodicalId, model, harness, appendProxyContext = true, proxyForce = false, followUpTo, force, presetId, maxTasks, composedRunMarker, entryRung, stopAt, variant, surface } = opts;
+  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind, periodicalId, model, harness, effort, appendProxyContext = true, proxyForce = false, followUpTo, force, presetId, maxTasks, composedRunMarker, entryRung, stopAt, variant, surface } = opts;
 
   if (!urlKey) throw new Error('dispatchPrompt: urlKey is required');
   if (!prompt) throw new Error('dispatchPrompt: prompt is required');
@@ -820,6 +820,9 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
   // (LIN-1094) — never send a value that overrides a real default with "".
   if (model) payload.model = model;
   if (harness) payload.harness = harness;
+  // LIN-3833: the effort the run control chose for this run (the server accepts it; dispatch-validation).
+  // Truthy gate, like model: a blank effort is not sent, so the resolution applies.
+  if (effort) payload.effort = effort;
   if (followUpTo) payload.followUpTo = followUpTo;
   if (force !== undefined) payload.force = force;
   if (presetId) payload.presetId = presetId;
@@ -1623,7 +1626,7 @@ window.fetchDispatchModelCatalog = function fetchDispatchModelCatalog(urlKey) {
  * @param {Object} [opts]
  * @param {string} [opts.modelPlaceholder] - Blank-option label used when `modelDefault` is absent (UX-only, LIN-1096)
  * @param {string} [opts.modelDefault] - The workspace's actual resolved default model id, raw (LIN-2719 HARD RULE 4) — rendered into the blank option's label, never pre-selected
- * @param {string} [opts.harnessDefault] - The workspace's actual resolved default harness, when the caller knows it (LIN-1111; only the Dispatch page threads this today, via data-default-harness). When given and it matches a known suggestion, it wins over the static DEFAULT_HARNESS so a configured non-Claude default (e.g. 'opencode') still pre-selects correctly instead of being silently shadowed. When given but NOT a known suggestion, nothing is pre-selected — a `<select>` can't represent an arbitrary value.
+ * @param {string} [opts.harnessDefault] - The workspace's actual resolved default harness, when the caller knows it (LIN-1111; only the Dispatch page threads this today, via data-default-harness). When given and it matches a known suggestion, it wins over the static DEFAULT_HARNESS so a configured non-Claude default (e.g. 'opencode') still pre-selects correctly instead of being silently shadowed. When given but NOT a known suggestion, nothing is pre-selected — a `<select>` can't represent an arbitrary value. LIN-3833: the opened task passes `''`, so nothing is pre-selected and an untouched control reads back `harness: null`; the run's harness then comes from the table, else the server's fallback.
  * @returns {string} HTML for the control pair
  */
 window.renderDispatchExecControls = function renderDispatchExecControls(idPrefix, opts = {}) {
@@ -1660,9 +1663,10 @@ window.renderDispatchExecControls = function renderDispatchExecControls(idPrefix
  * Reads the current `{model, harness}` values back out of a container holding
  * a `.dispatch-exec-controls` block (or that block itself). The harness is the
  * select's value (the free-text "custom harness" input was removed in LIN-1282).
- * The harness select pre-selects `claude-code` (LIN-1111), so an untouched
- * control reads back `harness: 'claude-code'` rather than null — pick the blank
- * "—" option to still send null explicitly. The model select has no such
+ * The harness select pre-selects `claude-code` (LIN-1111) unless the caller passes
+ * `harnessDefault: ''` (LIN-3833: the opened task does), so an untouched control
+ * reads back `harness: 'claude-code'` rather than null — pick the blank "—" option
+ * to still send null explicitly. The model select has no such
  * default (HARD RULE 1, LIN-2719), so a blank model still resolves to `null`,
  * and `window.dispatchPrompt` omits it so the consumer's own default
  * resolution applies (LIN-1094). When the model select is on the `other…`
@@ -1843,7 +1847,7 @@ if (typeof document !== 'undefined' && document.addEventListener) {
  * @param {string} [opts.buttonDataAction=''] - Value for `data-action` attribute on dispatch buttons (swipe uses 'dispatch')
  * @returns {string} HTML for the disclosure toggle + hidden options panel
  */
-window.renderDispatchDisclosure = function renderDispatchDisclosure({ idPrefix, isLocalhost = false, toggleClass = 'dispatch-disclosure disclosure-toggle', panelClass = 'prompt-options', buttonClass = 'prompt-dispatch dispatch-btn', buttonDataAction = '' } = {}) {
+window.renderDispatchDisclosure = function renderDispatchDisclosure({ idPrefix, isLocalhost = false, toggleClass = 'dispatch-disclosure disclosure-toggle', panelClass = 'prompt-options', buttonClass = 'prompt-dispatch dispatch-btn', buttonDataAction = '', harnessDefault } = {}) {
   const prefix = idPrefix ? window.escapeHtml(String(idPrefix)) : 'unknown';
   const panelId = `dispatch-options-${prefix}`;
   const localButton = isLocalhost
@@ -1853,7 +1857,7 @@ window.renderDispatchDisclosure = function renderDispatchDisclosure({ idPrefix, 
 
   return `<button class="${toggleClass}" aria-expanded="false" aria-haspopup="true" aria-controls="${panelId}">Dispatch ▾</button>` +
     `<span class="${panelClass} hidden" id="${panelId}">` +
-    window.renderDispatchExecControls(panelId) +
+    window.renderDispatchExecControls(panelId, harnessDefault === undefined ? {} : { harnessDefault }) +
     `<button class="${buttonClass}" data-target="cli"${dataActionAttr}>cli</button>` +
     `<button class="${buttonClass}" data-target="web"${dataActionAttr}>web</button>` +
     `<button class="${buttonClass}" data-target="dash"${dataActionAttr}>dash</button>` +
