@@ -1,9 +1,10 @@
 /**
- * LIN-3833 — "Another step" fits the task's state (John's ruling: fixed default order, fit by the next-stage rule).
+ * LIN-3833 — "Another step" leaves out only the steps a task cannot take (ruling `lin3833-fit-rule-loop`,
+ * comment f9fa6bd7: leave out only finished tasks and retro; every other step always fits).
  *
- * The client keeps a step when it fits, and reads what it needs from the state endpoint's sessions summary.
- * These pin that summary: the stages still ahead (the next-stage rule), every usual stage, and the steps the
- * list never offers (`excluded`, the AI-recommendation exclusions).
+ * The client reads what it needs from the state endpoint's sessions summary. These pin that summary: the
+ * steps never offered as a next step (`excluded`) and the next step the sessions name. The stage-order fields
+ * this PR once carried (`ahead`, `usual`) are gone, and nothing reads them.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,30 +16,29 @@ describe('LIN-3833 sessionSummaryOf — the fit inputs for "Another step"', () =
   // A session as the task page's model holds one: its kind and state, and the loop it belongs to.
   const session = (kind, state) => ({ kind, state, label: kind, loop: { dispatchedAt: '2026-10-25T10:00:00Z' } });
 
-  test('a task with no sessions has every usual stage ahead, and names the excluded steps', () => {
+  test('a task with no sessions names the excluded steps, and no stage-order fields', () => {
     const summary = sessionSummaryOf({ sessions: [], guesses: [...USUAL_STAGES] });
-    assert.deepEqual(summary.ahead, USUAL_STAGES);
-    assert.deepEqual(summary.usual, USUAL_STAGES);
     assert.deepEqual(summary.excluded, [...EXCLUDED_FROM_AI_RECOMMENDATION]);
     assert.ok(summary.excluded.includes('retro'), 'retro is never offered as a next step');
+    assert.equal('ahead' in summary, false);
+    assert.equal('usual' in summary, false);
   });
 
-  test('a plan that has run takes research and plan out of the stages ahead', () => {
+  test('the next step is the first guess, whatever stages have run', () => {
     const sessions = [session('plan', 'done')];
     const summary = sessionSummaryOf({ sessions, guesses: ['implementation', 'review', 'close-out'] });
-    assert.deepEqual(summary.ahead, ['implementation', 'review', 'close-out']);
     assert.equal(summary.next.kind, 'implementation');
+    assert.equal(summary.count, 1);
   });
 
-  test('a finished task has nothing ahead', () => {
+  test('a finished task names no next step', () => {
     const summary = sessionSummaryOf({ sessions: [session('close-out', 'done')], guesses: [] });
-    assert.deepEqual(summary.ahead, []);
     assert.equal(summary.next, null);
   });
 
   test('the summary copies its lists, so a caller cannot change the shared constants', () => {
     const summary = sessionSummaryOf({ sessions: [], guesses: [...USUAL_STAGES] });
-    summary.usual.push('x');
-    assert.equal(USUAL_STAGES.includes('x'), false);
+    summary.excluded.push('x');
+    assert.equal(EXCLUDED_FROM_AI_RECOMMENDATION.has('x'), false);
   });
 });

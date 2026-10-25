@@ -242,3 +242,36 @@ describe('LIN-3833 — a subtask that needs you is named on any opened Home task
     assert.equal(c.innerHTML.includes('opened-task-needs-you'), false);
   });
 });
+
+describe('LIN-3833 — "Another step" leaves out only what the task cannot take (ruling f9fa6bd7, option c)', () => {
+  // Retro is in the more list so the excluded step is counted, as Home's prompt options carry it.
+  const LIST = { morePromptKeys: ['review', 'scoping', 'retro'], promptMeta: { ...HOME.promptMeta, retro: 'Retro' } };
+  // A task after Plan, Build and Review (the review asked for changes). `ahead` and `usual` are the stage-order
+  // fields this PR removed from the summary; they are set here on purpose, so the rule is seen to ignore them.
+  const REVIEWED = {
+    count: 3, next: { kind: 'close-out', label: 'Close-out' }, last: { label: 'Review', state: 'done', at: null }, running: null,
+    excluded: ['retro'], ahead: ['close-out'], usual: ['research', 'plan', 'implementation', 'review', 'close-out'],
+  };
+  const open = async (c) => {
+    await c.click({ action: 'run-another' });
+    await c.click({ action: 'run-more' });
+  };
+
+  test('after a Review session, Build and Review stay on the list; only retro is left out and counted', async () => {
+    const { c } = await mount(LIST, { opened: { status: 'idle', live: false, headerHtml: '', trackHtml: '', sessions: REVIEWED } });
+    await open(c);
+    assert.match(c.innerHTML, /data-kind="implementation"/);
+    assert.match(c.innerHTML, /data-kind="review"/);
+    assert.match(c.innerHTML, /data-kind="research"/);
+    assert.equal(c.innerHTML.includes('data-kind="retro"'), false);
+    assert.match(c.innerHTML, /data-testid="run-another-left-out"[^>]*>1 step left out: it does not fit this task's state\./);
+  });
+
+  test('a finished task lists no step; every step is left out and counted', async () => {
+    const issue = { ...HOME.issue, stateType: 'completed' };
+    const { c } = await mount({ ...LIST, issue }, { opened: { status: 'idle', live: false, headerHtml: '', trackHtml: '', sessions: REVIEWED } });
+    await open(c);
+    assert.equal(c.innerHTML.includes('data-testid="run-another-item"'), false);
+    assert.match(c.innerHTML, /7 steps left out: they do not fit this task's state\./);
+  });
+});

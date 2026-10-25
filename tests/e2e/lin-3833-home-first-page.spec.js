@@ -155,7 +155,7 @@ test.describe('Home first page — a run from each source stamps the row the con
   });
 });
 
-// LIN-3833 (ruling: fixed default order, fit by the next-stage rule). A fresh top task has every usual stage ahead,
+// LIN-3833 (ruling f9fa6bd7, option c: leave out only finished tasks and retro). A fresh top task is not finished,
 // so only the AI-excluded step (retro) does not fit: the list says one step is left out. The step line's ✦ button
 // writes the prompt; it does not replace the why line.
 test.describe('Home first page — "Another step" fits the task (LIN-3833)', () => {

@@ -989,16 +989,15 @@
       return '';
     }
 
-    // LIN-3833 (ruling: fixed default order, fit by the next-stage rule). The task's state comes from its
-    // sessions summary (`ahead`, `usual`, `excluded`, from the state endpoint). A usual stage fits only while
-    // the next-stage rule has it ahead; any other step fits unless the task is finished or the step is excluded
-    // from AI recommendation. Before the state is read nothing is left out.
+    // LIN-3833 (ruling `lin3833-fit-rule-loop`, comment f9fa6bd7, option c): a step is left out only when the
+    // task cannot take it: the steps never offered as a next step (`summary.excluded`, retro), and every step once
+    // the task is finished. Every other step always fits, so Build and Review stay on the list after a Review
+    // session. The rule does not read the stage order. Before the state is read nothing is left out.
     const FINISHED_STATE_TYPES = ['completed', 'canceled', 'duplicate'];
     function stepFits(kind, summary, stateType) {
       if (!summary) return true;
       if ((summary.excluded || []).includes(kind)) return false;
       if (FINISHED_STATE_TYPES.includes(stateType)) return false;
-      if ((summary.usual || []).includes(kind)) return (summary.ahead || []).includes(kind);
       return true;
     }
 
