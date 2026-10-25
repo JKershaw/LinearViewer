@@ -12,6 +12,9 @@
  *    is accounted for in CALL_PATHS, and its `callMeta` carries `urlKey`, because
  *    every reader of the call log filters by `urlKey` and a row without one is
  *    written and never listed;
+ *  - every model call's `callMeta` names a job (`feature` or `opKind`), unless it is a
+ *    passthrough wrapper, and a non-literal `callMeta` is excused only when its options
+ *    come from a builder CALL_PATHS names (LIN-3870);
  *  - every `feature:` / `opKind:` string literal is a registered job id, and every
  *    Harbour-call job is used by at least one of them;
  *  - the wrappers that take their `callMeta` from the caller (brief, recap, scan,
@@ -135,6 +138,16 @@ function describeObject(obj) {
   return { keys, spreads };
 }
 
+/** Whether a callMeta's keys name a job: a `feature` or an `opKind` (LIN-3870). */
+const namesJob = (keys) => keys.has('feature') || keys.has('opKind');
+
+/** What a named builder's callMeta must carry, as problems (empty = clean). */
+function builderProblems(path, name, meta) {
+  if (!meta || !meta.keys.has('urlKey')) return [`${path}: builder ${name}() does not put urlKey in its callMeta`];
+  if (!namesJob(meta.keys)) return [`${path}: builder ${name}() does not put feature or opKind in its callMeta`];
+  return [];
+}
+
 function analyse(path, src) {
   const ast = parse(src, { ecmaVersion: 'latest', sourceType: 'module', allowHashBang: true });
   const consts = new Map(); // name -> ObjectExpression, for `const callMeta = {...}`
@@ -146,11 +159,15 @@ function analyse(path, src) {
   const aliases = new Map(); // local name -> LLM_FNS name, for `import { streamChat as sc2 }`
   const namespaces = new Set(); // local name, for `import * as o`
   const wrapperAliases = new Map(); // local name -> WRAPPERS name, for `import { generateBrief as gb }` (any source)
+  const builderBindings = new Map(); // local name -> callee, for `const opts = recommendCallOptions(...)` (LIN-3870)
+  const imports = []; // { name, source } for every named or default import binding (LIN-3870)
 
   visit(ast, (n) => {
     if (n.type === 'VariableDeclarator' && n.id.type === 'Identifier' && n.init?.type === 'ObjectExpression') consts.set(n.id.name, n.init);
+    if (n.type === 'VariableDeclarator' && n.id.type === 'Identifier' && n.init?.type === 'CallExpression' && n.init.callee.type === 'Identifier') builderBindings.set(n.id.name, n.init.callee.name);
     if (n.type === 'FunctionDeclaration' && n.id) functions.set(n.id.name, n);
     if (n.type === 'ImportDeclaration') {
+      for (const s of n.specifiers) imports.push({ name: s.local.name, source: n.source.value });
       for (const s of n.specifiers) {
         if (s.type === 'ImportSpecifier' && Object.hasOwn(WRAPPERS, s.imported.name) && WRAPPERS[s.imported.name]) wrapperAliases.set(s.local.name, s.imported.name);
       }
@@ -170,21 +187,44 @@ function analyse(path, src) {
     }
   });
 
+  // The functions an argument's options may come from: the callee of a call expression
+  // (`recommendCallOptions(...)`), the builder an identifier is bound to, or, for a spread of
+  // a same-file function (`...await modelCallArgs(...)`), that function plus the calls in the
+  // argument list it returns. Empty for anything else (LIN-3870).
+  const optionBuilders = (arg) => {
+    let node = arg.type === 'SpreadElement' ? arg.argument : arg;
+    if (node.type === 'AwaitExpression') node = node.argument;
+    if (node.type === 'Identifier') return builderBindings.has(node.name) ? [builderBindings.get(node.name)] : [];
+    if (node.type !== 'CallExpression' || node.callee.type !== 'Identifier') return [];
+    const names = [node.callee.name];
+    const fn = functions.get(node.callee.name);
+    if (fn) {
+      visit(fn, (n) => {
+        if (n.type !== 'ReturnStatement' || n.argument?.type !== 'ArrayExpression') return;
+        for (const el of n.argument.elements) if (el?.type === 'CallExpression' && el.callee.type === 'Identifier') names.push(el.callee.name);
+      });
+    }
+    return names;
+  };
+
   // The callMeta a call passes: the first `callMeta` property in its arguments.
   const callMetaOf = (call) => {
+    // 'unresolved' carries the functions the options may come from (`builders`), which
+    // checkCensus matches against the entry's named builders (LIN-3870).
+    const unresolved = () => ({ state: 'unresolved', builders: call.arguments.flatMap(optionBuilders) });
     let found = null;
     for (const arg of call.arguments) {
       visit(arg, (n) => {
         if (found || n.type !== 'Property' || propName(n) !== 'callMeta') return;
         if (n.value.type === 'ObjectExpression') found = { state: 'literal', ...describeObject(n.value) };
         else if (n.value.type === 'Identifier' && consts.has(n.value.name)) found = { state: 'literal', ...describeObject(consts.get(n.value.name)) };
-        else found = { state: 'unresolved' };
+        else found = { state: 'unresolved', builders: [] }; // written at the site, so no builder produced it
       });
     }
     if (found) return found;
-    // No callMeta anywhere: 'none' when the options are an object literal here,
-    // 'unresolved' when they come from elsewhere (a builder, a spread).
-    return { state: call.arguments.some((a) => a.type === 'ObjectExpression') ? 'none' : 'unresolved' };
+    // No callMeta anywhere: 'none' when the options are an object literal here, else unresolved.
+    if (call.arguments.some((a) => a.type === 'ObjectExpression')) return { state: 'none' };
+    return unresolved();
   };
 
   visit(ast, (n) => {
@@ -209,7 +249,7 @@ function analyse(path, src) {
     }
   });
 
-  return { path, functions, labels, sites, wrapperCalls, cachedDocCalls, consts };
+  return { path, functions, labels, sites, wrapperCalls, cachedDocCalls, consts, imports };
 }
 
 /** Everything the census asserts, as a list of problems (empty = clean). */
@@ -262,14 +302,23 @@ export function checkCensus({ sources, dispatchKinds, aiOperationKinds, jobs }) 
       const m = s.meta;
       if (m.state === 'none') problems.push(`${s.file}:${s.line} ${s.name}() passes no callMeta, so its row has no urlKey and no log reader returns it`);
       else if (m.state === 'literal' && !m.keys.has('urlKey') && !(m.spreads && entry?.passthrough)) problems.push(`${s.file}:${s.line} ${s.name}() callMeta has no urlKey, so its row is never listed`);
-      else if (m.state === 'unresolved' && !entry?.builders?.length) problems.push(`${s.file}:${s.line} ${s.name}() takes its options from a builder that CALL_PATHS does not name`);
+      else if (m.state === 'literal' && !namesJob(m.keys) && !(m.spreads && entry?.passthrough)) problems.push(`${s.file}:${s.line} ${s.name}() callMeta names no feature or opKind, so its row has no job`);
+      // LIN-3870: a non-literal callMeta is excused only when the options come from a named builder.
+      else if (m.state === 'unresolved' && !m.builders.some((b) => entry?.builders?.includes(b))) problems.push(`${s.file}:${s.line} ${s.name}() takes its options from something other than a CALL_PATHS builder`);
+    }
+    // LIN-3870: the builder excuse matches by callee name, so a same-named function imported from
+    // outside the unit (or, for a single-file entry, from anywhere) would be excused without being the builder.
+    for (const imp of f.imports) {
+      if (!entry?.builders?.includes(imp.name)) continue;
+      if (isWorkspaceApiUnitFile(f.path) && isWorkspaceApiUnitFile(`routes/${imp.source.split('/').pop()}`)) continue;
+      problems.push(`${f.path}: imports "${imp.name}" from ${imp.source}, the name of a CALL_PATHS builder, so a call to it would be excused without being that builder`);
     }
     for (const b of isWorkspaceApiUnitFile(f.path) ? [] : entry?.builders || []) {
       const fn = f.functions.get(b);
       let meta = null;
       if (fn) visit(fn, (n) => { if (!meta && n.type === 'Property' && propName(n) === 'callMeta' && n.value.type === 'ObjectExpression') meta = describeObject(n.value); });
       if (!fn) problems.push(`${f.path}: builder ${b}() named in CALL_PATHS does not exist`);
-      else if (!meta || !meta.keys.has('urlKey')) problems.push(`${f.path}: builder ${b}() does not put urlKey in its callMeta`);
+      else problems.push(...builderProblems(f.path, b, meta));
     }
   }
   for (const b of CALL_PATHS[WORKSPACE_API_UNIT].builders) {
@@ -277,7 +326,7 @@ export function checkCensus({ sources, dispatchKinds, aiOperationKinds, jobs }) 
     if (holders.length !== 1) { problems.push(`${WORKSPACE_API_UNIT}: builder ${b}() is defined in ${holders.length} unit files, expected 1`); continue; }
     let meta = null;
     visit(holders[0].functions.get(b), (n) => { if (!meta && n.type === 'Property' && propName(n) === 'callMeta' && n.value.type === 'ObjectExpression') meta = describeObject(n.value); });
-    if (!meta || !meta.keys.has('urlKey')) problems.push(`${holders[0].path}: builder ${b}() does not put urlKey in its callMeta`);
+    problems.push(...builderProblems(holders[0].path, b, meta));
   }
   if (!unitFiles.length) problems.push(`CALL_PATHS names the ${WORKSPACE_API_UNIT}, which has no file in the scanned tree`);
   for (const path of Object.keys(CALL_PATHS)) if (path !== WORKSPACE_API_UNIT && !byPath.has(path)) problems.push(`CALL_PATHS names ${path}, which is not in the scanned tree`);
@@ -427,5 +476,76 @@ describe('LIN-3852: every LLM use is a registered job', () => {
   test('a registered Harbour-call job that nothing uses fails', () => {
     const problems = checkCensus({ ...inputs, jobs: [...JOBS, { id: 'fixture-unused', surface: SURFACES.HARBOUR_CALL, group: 'tell', description: 'Unused.' }] });
     assert.deepEqual(problems, ['harbour-call job "fixture-unused" is used by no feature/opKind label']);
+  });
+
+  // LIN-3870 hole 1: a literal callMeta must name a job (feature or opKind), not just a urlKey.
+  test('a call whose callMeta has a urlKey but no feature or opKind fails, naming the site (LIN-3870)', () => {
+    const edited = OBSERVER_SITE + "export const f = (o) => streamChat([], { callMeta: { urlKey: o.urlKey } }, () => {});\n";
+    const problems = checkCensus({ ...inputs, sources: { ...sources, 'lib/observer-pass.js': edited } });
+    const sites = problems.filter((p) => p.startsWith('lib/observer-pass.js:'));
+    assert.equal(sites.length, 1, problems.join('\n'));
+    assert.match(sites[0], /^lib\/observer-pass\.js:\d+ streamChat\(\) callMeta names no feature or opKind/);
+  });
+
+  // LIN-3870 hole 2: an unresolved callMeta in the workspace-API unit is excused only when its
+  // options come from the named builder. The unit is rebuilt as one synthetic file of seven sites
+  // and one builder, so the count stays at the real tree's 7 and only the site under test changes.
+  // The three shapes the unit uses to reach the builder are the direct call, a bound identifier,
+  // and a spread of a same-file function that returns the builder's call in its argument list.
+  const UNIT_FIXTURE = 'routes/workspace-api-fixture.js';
+  const unitSiteFixture = ({ fourthHead = '[]', fourth = "{ callMeta: { urlKey: w.urlKey, feature: 'roadmap-chat' } }", builderCallMeta = "urlKey: w.urlKey, feature: 'recommend'" } = {}) => [
+    "import { streamChat, getRecommendation } from '../lib/openrouter.js';",
+    `function recommendCallOptions(w) { return { apiKey: w.apiKey, callMeta: { ${builderCallMeta} } }; }`,
+    "function modelCallArgs(w) { return [w.issue, 'input', recommendCallOptions(w)]; }",
+    'export async function sites(w) {',
+    '  await streamChat([], recommendCallOptions(w), () => {});',
+    '  const bound = recommendCallOptions(w);',
+    '  await streamChat([], bound, () => {});',
+    '  await getRecommendation(...await modelCallArgs(w));',
+    `  await streamChat(${fourthHead}, ${fourth}, () => {});`,
+    "  await streamChat([], { callMeta: { urlKey: w.urlKey, feature: 'roadmap-chat' } }, () => {});",
+    "  await streamChat([], { callMeta: { urlKey: w.urlKey, feature: 'roadmap-chat' } }, () => {});",
+    '}',
+    '',
+  ].join('\n');
+  const unitProblems = (fixture) => checkCensus({ ...inputs, sources: { ...withoutUnit, [UNIT_FIXTURE]: fixture } })
+    .filter((p) => p.startsWith(`${UNIT_FIXTURE}:`));
+
+  test('the unit fixture with every site legitimately resolved raises no site problem (positive control)', () => {
+    assert.deepEqual(unitProblems(unitSiteFixture()), []);
+  });
+
+  test('a unit call whose options are a non-literal expression no named builder produces fails, naming file:line (LIN-3870)', () => {
+    const problems = unitProblems(unitSiteFixture({ fourth: "Object.assign({}, { urlKey: w.urlKey, feature: 'roadmap-chat' })" }));
+    assert.equal(problems.length, 1, problems.join('\n'));
+    assert.match(problems[0], /^routes\/workspace-api-fixture\.js:\d+ streamChat\(\) takes its options from/);
+  });
+
+  // Review of PR #2125: the excuse must depend on the options argument itself. A callMeta property
+  // written in an object literal at the site can never come from a builder, so a builder call in
+  // another argument must not excuse it.
+  test('a non-literal callMeta property beside a builder call in another argument fails (LIN-3870)', () => {
+    const problems = unitProblems(unitSiteFixture({ fourthHead: 'recommendCallOptions(w)', fourth: "{ callMeta: Object.assign({}, { urlKey: w.urlKey, feature: 'roadmap-chat' }) }" }));
+    assert.equal(problems.length, 1, problems.join('\n'));
+    assert.match(problems[0], /^routes\/workspace-api-fixture\.js:\d+ streamChat\(\) takes its options from/);
+  });
+
+  test('a unit file importing a function named like the builder from outside the unit fails (LIN-3870)', () => {
+    const problems = checkCensus({ ...inputs, sources: { ...withoutUnit, [UNIT_FIXTURE]: unitSiteFixture(), 'routes/workspace-api-other.js': "import { recommendCallOptions } from '../lib/elsewhere.js';\nexport const x = recommendCallOptions;\n" } })
+      .filter((p) => p.startsWith('routes/workspace-api-other.js:'));
+    assert.equal(problems.length, 1, problems.join('\n'));
+    assert.match(problems[0], /imports "recommendCallOptions" from \.\.\/lib\/elsewhere\.js/);
+  });
+
+  test('importing the builder from another unit file raises no import problem (positive control)', () => {
+    const problems = checkCensus({ ...inputs, sources: { ...withoutUnit, [UNIT_FIXTURE]: unitSiteFixture(), 'routes/workspace-api-other.js': "import { recommendCallOptions } from './workspace-api-fixture.js';\nexport const x = recommendCallOptions;\n" } })
+      .filter((p) => p.startsWith('routes/workspace-api-other.js:'));
+    assert.deepEqual(problems, []);
+  });
+
+  test('a builder whose callMeta names no feature or opKind fails, naming the builder (LIN-3870)', () => {
+    const problems = unitProblems(unitSiteFixture({ builderCallMeta: 'urlKey: w.urlKey' }));
+    assert.equal(problems.length, 1, problems.join('\n'));
+    assert.match(problems[0], /^routes\/workspace-api-fixture\.js: builder recommendCallOptions\(\) does not put feature or opKind in its callMeta/);
   });
 });
