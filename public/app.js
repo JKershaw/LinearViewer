@@ -236,6 +236,20 @@ function loadLazySection(type, toggle, content) {
   }
 }
 
+/** LIN-3833: wire the copy-first card's "Got it" to its own button (no delegated listener). */
+function bindCopyFirstCardDismiss() {
+  const button = document.querySelector('[data-testid="home-copy-first-dismiss"]')
+  if (!button) return
+  button.addEventListener('click', () => {
+    const urlKey = window.location.pathname.match(/^\/workspace\/([^/]+)/)
+    if (!urlKey) return
+    button.disabled = true
+    window.api(`/workspace/${encodeURIComponent(decodeURIComponent(urlKey[1]))}/settings/copy-first-card`, { method: 'POST', on401: false })
+      .then(() => { const card = button.closest('[data-testid="home-copy-first-card"]'); if (card) card.remove() })
+      .catch(() => { button.disabled = false })
+  })
+}
+
 /**
  * Load and inject an issue's detail block on first expand.
  * LIN-442: the dashboard ships collapsed lines only; the detail block
@@ -314,7 +328,9 @@ function mountHomePromptSections(root) {
       url: el.dataset.url || '',
       // LIN-1904/LIN-1910: thread the resolved provider so the template and
       // Autopilot fetches resolve THIS issue's own provider, exactly as before.
-      source: el.dataset.source || undefined
+      source: el.dataset.source || undefined,
+      // LIN-3833: the task's tracker state type (unstarted, backlog, started, ...) names the copy-first step.
+      stateType: el.dataset.stateType || ''
     }
     el.dataset.mounted = 'true'
     el._promptSectionHandle = window.PromptSection.init(el, {
@@ -340,24 +356,7 @@ function mountHomePromptSections(root) {
       // issue in In Progress AND its project tree gets disjoint panel ids.
       idPrefix: el.dataset.instanceKey || `home-${id}`
     })
-    // LIN-2944 P1 R2: the marked top task's Prompts section opens by default, so
-    // the Home flow is open the top row → ✦ next step → copy (3 clicks). Other
-    // rows stay collapsed. The ✦ primary is still click-gated, so this spends
-    // nothing.
-    if (el.dataset.nodeKey === page.topTaskId) {
-      expandPromptsSection(el)
-    }
   })
-}
-
-/** Expand a detail fragment's Prompts disclosure (R2) without a click. */
-function expandPromptsSection(mountEl) {
-  const details = mountEl.closest('.details')
-  const toggle = details?.querySelector('.detail-toggle[data-toggle="prompts"]')
-  const content = details?.querySelector('.detail-content[data-content="prompts"]')
-  if (!toggle || !content) return
-  content.classList.remove('hidden')
-  toggle.textContent = toggle.textContent.replace('\u25B6', '\u25BC')
 }
 
 /** Tear down any mounted opened-task component under `root` (before re-fetch). */
@@ -785,6 +784,11 @@ function init() {
   // ==========================================================================
   // Delegated click handler - replaces individual event listeners
   // ==========================================================================
+  // LIN-3833: "Got it" on Home's copy-first card dismisses it for good; the card is removed at once. The
+  // button is bound directly, because the card is server-rendered once per page.
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindCopyFirstCardDismiss)
+  else bindCopyFirstCardDismiss()
+
   // Using event delegation: one listener on document handles all interactive
   // elements. Order matters - check more specific selectors first.
   document.addEventListener('click', (e) => {
@@ -883,7 +887,7 @@ function init() {
     const detailToggle = e.target.closest('.detail-toggle')
     if (detailToggle) {
       e.stopPropagation()
-      const toggleType = detailToggle.dataset.toggle // 'details', 'prompts', or 'comments'
+      const toggleType = detailToggle.dataset.toggle // a fold: 'description', 'comments', 'attachments' or 'sessions'
       const detailsContainer = detailToggle.closest('.details')
       const content = detailsContainer?.querySelector(`[data-content="${toggleType}"]`)
 

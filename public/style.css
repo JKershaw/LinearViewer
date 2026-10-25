@@ -1113,6 +1113,34 @@ a.wordmark:hover {
   white-space: nowrap;
 }
 
+/* LIN-3833: the opened task on Home, state first: the facts line, the state block above the control, the
+   one links row. Plain text sizes; the controls below keep their own styles. */
+.opened-task-facts {
+  color: var(--fg-dim);
+  font-size: 0.9em;
+  font-family: var(--font-content);
+  padding: 2px 0 6px;
+}
+
+.opened-task-state {
+  margin-bottom: 8px;
+}
+
+.opened-task-last {
+  color: var(--fg-dim);
+  font-size: 0.9em;
+  font-family: var(--font-content);
+  padding-top: 4px;
+}
+
+.opened-task-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.2em;
+  padding: 6px 0;
+  font-family: var(--font-content);
+}
+
 /* LIN-3833: the count line under the In Progress heading (3 in progress · 1 needs you). */
 .in-progress-count {
   color: var(--fg-dim);

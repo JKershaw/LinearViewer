@@ -2004,6 +2004,7 @@ async function renderDashboardAfterRefresh(workspace, session, teamId, assigneeS
     selectedTeamId,
     availableAssignees,
     rowStates,
+    copyFirstCard: featureFlags.runControls !== true && session.copyFirstCardDismissed !== true,
     // LIN-2550: same applied-not-requested labelling rule as the primary
     // dashboard route above — this post-401 re-render carries the assignee
     // state forward (F2), so it must carry the correction with it.
@@ -3493,6 +3494,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       selectedTeamId,
       availableAssignees,
       rowStates,
+      copyFirstCard: featureFlags.runControls !== true && req.session.copyFirstCardDismissed !== true,
       // LIN-2550: label the selector off the filter the render APPLIED. An
       // unmatched name (a stale `?assignee=` carried across a team change by
       // buildFilterUrl, `me` for a viewer with nothing assigned, an old
@@ -4085,6 +4087,26 @@ app.post('/workspace/:urlKey/settings/theme', workspaceFromUrl, async (req, res)
  * (addendum 16), so this route only ever records an explicit choice.
  */
 app.use(createProxyDefaultRoute({ workspaceFromUrl, userPreferencesStore, saveSession }));
+
+// LIN-3833: "Got it" on Home's copy-first card. A per-account flag, dismissed for good: the session carries
+// it at once and the durable preference follows (best-effort, as the proxy default's is).
+app.post('/workspace/:urlKey/settings/copy-first-card', workspaceFromUrl, async (req, res) => {
+  req.session.copyFirstCardDismissed = true;
+  try {
+    await saveSession(req.session);
+  } catch (err) {
+    console.error('Failed to save copy-first card dismissal:', err);
+    return res.status(500).json({ error: 'Failed to save' });
+  }
+  if (req.session.accountId) {
+    try {
+      await userPreferencesStore.setCopyFirstCardDismissed(req.session.accountId, true);
+    } catch (err) {
+      console.error('Failed to persist copy-first card dismissal:', err);
+    }
+  }
+  res.json({ ok: true });
+});
 
 // =============================================================================
 // Provider management (LIN-634)

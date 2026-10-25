@@ -490,6 +490,59 @@
    * starts the run), the ✦ next-step secondary, the ladder, and the templates
    * under "other prompts" (LIN-2944, LIN-3341).
    */
+  // LIN-3833: the copy-first view (no runner). The step comes from the task's status alone (Todo: Plan,
+  // Backlog: Scoping; In Progress: the selector generates the next prompt, with no name given, John 24 Oct
+  // answer 1). Unknown or finished status: the next prompt, generated.
+  const COPY_STEPS = Object.freeze({
+    unstarted: Object.freeze({ label: 'plan', name: 'Plan', why: 'the first step for a task in Todo' }),
+    backlog: Object.freeze({ label: 'scoping', name: 'Scoping', why: 'the first step for a task in Backlog' }),
+  });
+  const COPY_NEXT = Object.freeze({ label: '__ai__', name: null, why: 'generate the next prompt for this task' });
+  function copyStepOf(opts) {
+    return COPY_STEPS[opts.issue && opts.issue.stateType] || COPY_NEXT;
+  }
+
+  // The last copy on this task, read from the task-mode record (the mount read) or set by a copy just made.
+  function renderLastCopy(state) {
+    const c = state.lastCopy;
+    if (!c) return '';
+    const age = formatGeneratedAge(c.at ? Date.parse(c.at) : Date.now()) || 'just now';
+    const what = c.label ? `the ${esc(c.label)} prompt` : 'a prompt';
+    return `<div class="opened-task-last-copy" data-testid="opened-task-last-copy">You copied ${what} ${esc(age)}</div>`;
+  }
+
+  function renderCopyIdle(opts, state) {
+    const step = copyStepOf(opts);
+    const gateReason = primaryDisabledReason(opts, state);
+    const disabled = gateReason ? ` disabled title="${esc(gateReason)}"` : '';
+    const name = step.name ? `<span class="opened-task-step-name">${esc(step.name)}</span> \u00b7 ` : '';
+    return `<div class="opened-task-step" data-testid="opened-task-step">${name}${esc(step.why)}</div>`
+      + `<button class="opened-task-write" data-testid="opened-task-write" data-prompt="${esc(step.label)}"${disabled}>\u2726 Write the prompt</button>`;
+  }
+
+  function renderCopyFresh(state, opts) {
+    const { name, html, warning, label } = state.result;
+    const age = formatGeneratedAge(state.result.generatedAt);
+    const warningBanner = warning ? `<div class="swipe-prompt-warning">\u26A0 ${esc(warning)}</div>` : '';
+    const keyOn = !!(window.ProxyToggle && typeof window.ProxyToggle.isActive === 'function' && window.ProxyToggle.isActive());
+    // LIN-2944 F2: Rewrite re-runs the same label, so it obeys the same gate as the primary.
+    const gateReason = primaryDisabledReason(opts, state);
+    const rewriteDisabled = label === '__ai__' ? gateReason : null;
+    return `
+      <div class="opened-task-step" data-testid="opened-task-step"><span class="opened-task-step-name">${esc(name || copyStepOf(opts).name || 'Next prompt')}</span>${age ? ` \u00b7 generated ${esc(age)}` : ''}</div>
+      <button class="opened-task-copy" data-testid="opened-task-copy" data-action="copy">Copy prompt</button>
+      ${renderProxyLimitNotice(state)}
+      ${warningBanner}
+      <div class="opened-task-box"><div class="swipe-prompt-text" data-prompt-body>${html}</div></div>
+      <div class="opened-task-box-actions">
+        <button class="opened-task-regenerate" data-prompt="${esc(label || '')}"${rewriteDisabled ? ` disabled title="${esc(rewriteDisabled)}"` : ''}>Rewrite</button>
+        <button class="opened-task-download" data-action="download" title="Download prompt as a .md file">Download</button>
+      </div>
+      <label class="opened-task-progress-key"><input type="checkbox" data-testid="opened-task-progress-key"${keyOn ? ' checked' : ''}> Let your agent post progress to this task</label>
+      <p class="opened-task-key-note">The key lasts 48 hours. Without it, your agent can still do the work, but Harbour won\u2019t see its progress. Turning it off here sets it for every task.</p>
+      <p class="opened-task-paste">Copy it, then paste it into Claude Code, Codex or any coding agent.</p>`;
+  }
+
   function renderIdle(opts, state) {
     let html = '<div class="swipe-prompt-header"><span class="swipe-prompt-name">next step</span>';
     html += renderEditSlot(opts);
@@ -644,6 +697,9 @@
     const issue = opts.issue;
     const issueId = issue.id;
     container.classList.add('prompt-section');
+    // LIN-3833: the state block and the copy-first view are Home's. Swipe's card keeps its own Edit slot and
+    // change affordances, which the state-first layout does not replace (the PR says so).
+    const homeView = opts.surface === 'home';
 
     const state = {
       phase: 'idle',
@@ -665,7 +721,10 @@
       // the refusal notice survive every re-render and every stream settle.
       // status: 'ready' | 'starting' | 'started' | 'running'; headerHtml is the
       // task-page state endpoint's own sentence; notice is our plain-words line.
-      go: { status: 'ready', headerHtml: null, notice: null }
+      go: { status: 'ready', headerHtml: null, notice: null },
+      // LIN-3833: the stored-data task state the state block shows (the state endpoint's body: header,
+      // stage strip and session summary). Null until the mount read lands; a poll refreshes it.
+      opened: null
     };
     let abortController = null;
     let destroyed = false;
@@ -714,15 +773,55 @@
 
     function render() {
       if (destroyed) return;
+      const stateBlock = renderOpenedState();
+      // LIN-3833: a viewer with no runner (no dispatch) gets the copy-first view: the step, then the prompt
+      // to copy. Everything that runs, costs or names a session is absent from it.
+      const copyFirst = homeView && !opts.dispatchEnabled;
       if (state.phase === 'idle') {
-        applyState(container, renderIdle(opts, state), 'idle');
+        applyState(container, stateBlock + (copyFirst ? renderCopyIdle(opts, state) : renderIdle(opts, state)), 'idle');
       } else if (state.phase === 'generating') {
-        applyState(container, renderGenerating(state, opts), 'generating');
+        applyState(container, stateBlock + renderGenerating(state, opts), 'generating');
       } else if (state.phase === 'fresh') {
-        applyState(container, renderFresh(state, opts), 'fresh');
+        applyState(container, stateBlock + (copyFirst ? renderCopyFresh(state, opts) : renderFresh(state, opts)), 'fresh');
       } else if (state.phase === 'error') {
-        applyState(container, renderError(state, opts), 'error');
+        applyState(container, stateBlock + renderError(state, opts), 'error');
       }
+    }
+
+    // LIN-3833: the state block above the control. The task's pill and sentence and its stage strip are
+    // the state endpoint's own HTML (the task page's renderers); the last session and "All N" come from
+    // its session summary. Always a slot, so a state repaint is `paintState` alone and never rebuilds a
+    // prompt body or a streamed reply.
+    function renderOpenedState() {
+      if (!homeView) return '';
+      const opened = state.opened;
+      if (!opened) {
+        const copied = !opts.dispatchEnabled ? renderLastCopy(state) : '';
+        return `<div class="opened-task-state" data-state-slot data-testid="opened-task-state">${copied}</div>`;
+      }
+      if (!opts.dispatchEnabled) {
+        // Copy-first: the task's own sentence and what was last copied. No stage strip, no sessions.
+        return `<div class="opened-task-state" data-state-slot data-testid="opened-task-state">`
+          + `${opened.headerHtml || ''}${renderLastCopy(state)}</div>`;
+      }
+      const sessions = opened.sessions || { count: 0, last: null };
+      const last = sessions.last;
+      const lastLine = sessions.count && last
+        ? `<div class="opened-task-last" data-testid="opened-task-last">Last: ${esc(last.label || 'session')} ${esc(last.state || '')}`
+          + `${last.at ? ` \u00b7 ${esc(formatGeneratedAge(Date.parse(last.at)) || '')}` : ''}`
+          + ` \u00b7 <button class="opened-task-all" data-action="all-sessions" data-testid="opened-task-all">All ${sessions.count}</button></div>`
+        : '';
+      return `<div class="opened-task-state" data-state-slot data-testid="opened-task-state">`
+        + `${opened.headerHtml || ''}${opened.trackHtml || ''}${lastLine}</div>`;
+    }
+
+    // Repaint only the state slot (a poll or the mount read). Falls back to a full render when the slot is
+    // absent, as paintGo does for the Go slot.
+    function paintState() {
+      if (destroyed || !homeView) return;
+      const slot = container.querySelector && container.querySelector('[data-state-slot]');
+      if (slot) slot.outerHTML = renderOpenedState();
+      else render();
     }
 
     // LIN-3341: repaint ONLY the Go slot. A full render() during the ✦ stream
@@ -1050,6 +1149,8 @@
           return;
         }
         pollFailures = 0;
+        state.opened = data;
+        paintState();
         if (data.headerHtml) {
           state.go = { status: 'running', headerHtml: data.headerHtml, notice: null, noticeLink: null, noticeLinkLabel: null };
           paintGo();
@@ -1226,6 +1327,14 @@
         return;
       }
 
+      if (action === 'all-sessions') {
+        // LIN-3833: "All N" opens the Sessions fold in place, through the same toggle a click on it uses.
+        const toggle = container.closest('.details')?.querySelector('.detail-toggle[data-toggle="sessions"]');
+        const content = container.closest('.details')?.querySelector('.detail-content[data-content="sessions"]');
+        if (toggle && content && content.classList.contains('hidden')) toggle.click();
+        return;
+      }
+
       if (action === 'reasoning-toggle') {
         const content = container.querySelector('.swipe-reasoning-content');
         if (content) {
@@ -1275,7 +1384,13 @@
         const text = await window.ProxyToggle.maybeAppend(raw, opts.urlKey, { force });
         applyProxyLimitNotice();
         await navigator.clipboard.writeText(text);
-        recordTaskMode({ rung: isAutopilotResult() ? 'run-task' : 'copy', ready: true, needs: null, act: 'copy' });
+        // LIN-3833: which prompt was copied (the kind the copy-first view reads back as "You copied the …").
+        const copiedKind = state.result.label && state.result.label !== '__ai__' ? state.result.label : (state.result.kind || null);
+        recordTaskMode({ rung: isAutopilotResult() ? 'run-task' : 'copy', ready: true, needs: null, act: 'copy', kind: copiedKind });
+        if (homeView && !opts.dispatchEnabled) {
+          state.lastCopy = { label: state.result.name || null, kind: copiedKind, at: new Date().toISOString() };
+          paintState();
+        }
         btn.textContent = 'copied!';
         btn.classList.add('copied');
         setTimeout(() => {
@@ -1389,7 +1504,33 @@
     }
 
     container.addEventListener('click', handleClick);
+    // LIN-3833: the copy-first "Let your agent post progress" checkbox sets the account's task-key default
+    // (ProxyToggle.setActive persists it, as the +proxy button does).
+    container.addEventListener('change', (e) => {
+      const box = e.target && e.target.closest && e.target.closest('[data-testid="opened-task-progress-key"]');
+      if (!box || !container.contains(box) || !window.ProxyToggle) return;
+      if (typeof window.ProxyToggle.setActive === 'function') window.ProxyToggle.setActive(box.checked === true);
+    });
     render();
+    // LIN-3833: the mount read is the one state read: it paints the state block (every viewer) and is the
+    // Go gate's read below (dispatch-enabled viewers). Best-effort: a failed read leaves the block empty.
+    const mountRead = (opts.urlKey && issueId && issue.identifier && typeof window.api === 'function')
+      ? readTaskState().then((data) => {
+        if (destroyed || !data) return null;
+        state.opened = data;
+        paintState();
+        return data;
+      })
+      : null;
+    if (homeView && !opts.dispatchEnabled && opts.urlKey && issue.identifier && typeof window.api === 'function') {
+      window.api(`/workspace/${encodeURIComponent(opts.urlKey)}/api/task-mode/${encodeURIComponent(issue.identifier)}`, { on401: false })
+        .then((mode) => {
+          if (destroyed || !mode || !mode.lastCopy) return;
+          state.lastCopy = mode.lastCopy;
+          paintState();
+        })
+        .catch(() => {});
+    }
 
     // LIN-3239: the caller's run allowance must be known at load so the ladder
     // can show "N of <limit> runs left today" before Go and disable only the run
@@ -1434,9 +1575,8 @@
     // this task, so a reopened task shows the running/waiting line instead of a
     // pressable Go. Best-effort and guarded exactly like the quota read, so a
     // unit with no window.api makes no network call and no unhandled rejection.
-    if (goReady(opts) && typeof window.api === 'function'
-      && opts.urlKey && issue.identifier && issueId) {
-      readTaskState().then((data) => {
+    if (goReady(opts) && mountRead) {
+      mountRead.then((data) => {
         if (destroyed) return;
         if (!goInProgress(data)) return;
         if (!state.go || state.go.status !== 'ready') return; // a press already won

@@ -259,8 +259,10 @@ describe('P0 addendum 1: source is threaded on the template and Autopilot fetche
     await container.click({ prompt: 'implementation' });
     await flush();
 
-    assert.equal(calls.api.length, 1);
-    assert.match(calls.api[0].url, /\?source=jira$/);
+    // LIN-3833: the mount's state read is a display read; only the template request is under test here.
+    const promptCalls = calls.api.filter((c) => !/\/api\/task\//.test(c.url));
+    assert.equal(promptCalls.length, 1);
+    assert.match(promptCalls[0].url, /\?source=jira$/);
   });
 
   test('template prompt URL has no query when issue.source is absent', async () => {
@@ -270,8 +272,9 @@ describe('P0 addendum 1: source is threaded on the template and Autopilot fetche
     await container.click({ prompt: 'implementation' });
     await flush();
 
-    assert.equal(calls.api.length, 1);
-    assert.equal(calls.api[0].url, '/workspace/ws/api/prompt/issue-2/implementation');
+    const promptCalls = calls.api.filter((c) => !/\/api\/task\//.test(c.url));
+    assert.equal(promptCalls.length, 1);
+    assert.equal(promptCalls[0].url, '/workspace/ws/api/prompt/issue-2/implementation');
   });
 
   test('Autopilot kickoff is passed source=jira when issue.source is set', async () => {

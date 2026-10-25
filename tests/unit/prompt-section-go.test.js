@@ -460,9 +460,12 @@ describe('LIN-3341 — Go is one press', () => {
       assert.equal(m.calls.dispatch.length, 0);
     });
 
-    test('no read when Go is not set up, when urlKey/identifier is missing, or when window.api is absent', async () => {
+    test('no Go read when Go is not set up, and no read at all when urlKey/identifier is missing or window.api is absent', async () => {
+      // LIN-3833: the one mount read also paints the state block for every viewer, so a viewer with no
+      // dispatch still reads once. What is gated is Go: no Go button and no press-time dispatch.
       const notReady = await mount({}, { dispatchEnabled: false });
-      assert.equal(notReady.calls.api.some((u) => String(u).includes('/api/task/')), false);
+      assert.equal(notReady.calls.dispatch.length, 0);
+      assert.equal(notReady.calls.api.filter((u) => String(u).includes('/api/task/')).length, 1, 'one display read, and no Go read');
 
       const noKey = loadPromptSection();
       noKey.window.PromptSection.init(makeContainer(), baseOpts({ urlKey: '' }));

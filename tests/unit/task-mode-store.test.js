@@ -109,7 +109,7 @@ describe('TaskModeStore.record', () => {
     const doc = await store.record(dispatchAct('run-step', 'd-1', { surface: 'swipe' }));
     const [stored] = await db.collection('task-mode-events').find({}).toArray();
     assert.deepStrictEqual(Object.keys(stored).sort(), [
-      '_id', 'accountId', 'act', 'at', 'dispatchId', 'issueId', 'issueIdentifier', 'needs', 'ready', 'rung', 'surface', 'urlKey'
+      '_id', 'accountId', 'act', 'at', 'dispatchId', 'issueId', 'issueIdentifier', 'kind', 'needs', 'ready', 'rung', 'surface', 'urlKey'
     ]);
     assert.strictEqual(stored._id, doc._id);
     assert.strictEqual(stored.accountId, 'acct-1');
@@ -178,7 +178,7 @@ describe('TaskModeStore.getTaskMode', () => {
       'run-task/press', 'run-step/press', 'copy/copy', 'run-step/dispatch'
     ]);
     assert.deepStrictEqual(mode.events[3], {
-      rung: 'run-step', ready: true, needs: null, act: 'dispatch', dispatchId: 'd-9', surface: null, at: mode.events[3].at
+      rung: 'run-step', ready: true, needs: null, act: 'dispatch', dispatchId: 'd-9', surface: null, kind: null, at: mode.events[3].at
     });
     assert.deepStrictEqual(mode.coverage, { surfaces: ['swipe', 'home'] });
   });
