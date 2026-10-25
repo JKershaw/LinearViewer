@@ -121,6 +121,13 @@ function scanFile(rel, src) {
   }
   const lines = src.split('\n');
   visit(ast, (node) => {
+    // The census judges calls by name, so a judged function imported under another
+    // local name would escape it. Report the import rather than chase the alias.
+    if (node.type === 'ImportSpecifier' && (RESOLVER_FNS.has(node.imported.name) || node.imported.name === TURN_CORE_FN) && node.local.name !== node.imported.name) {
+      const line = src.slice(0, node.start).split('\n').length;
+      out.problems.push(`${rel}:${line} imports ${node.imported.name} as ${node.local.name}: the census judges calls by name`);
+      return;
+    }
     if (node.type !== 'CallExpression') return;
     const name = calleeName(node);
     if (name !== TURN_CORE_FN && !RESOLVER_FNS.has(name)) return;
@@ -319,6 +326,7 @@ test('LIN-3841 witness: a clamp that is false, negated, spread away, or missing 
     "const m = await resolveAiOperationModel({ urlKey, workspacePreferencesStore, forceDefault: !isFreeTier, opKind: 'x' });",
     'const m = await resolveAiOperationModel({ ...opts });',
     'const m = await resolveAiOperationModel(opts);',
+    "const m = await deps.resolveAiOperationModel({ urlKey, opKind: 'x' });",
   ]) {
     assert.equal(scan({ 'lib/x.js': call }).problems.length, 1, call);
   }
@@ -339,6 +347,17 @@ test('LIN-3841 witness: a runAgentTurn call without isFreeTier fails; shorthand 
     assert.equal(problems.length, 1, opt);
     assert.ok(problems[0].startsWith('routes/x.js:1 calls runAgentTurn without isFreeTier'), problems[0]);
   }
+});
+
+test('LIN-3841 witness: importing a judged function under another name fails, naming the alias', () => {
+  const resolver = "import { resolveAiOperationModel as pick } from './m.js';\nconst m = await pick({ urlKey, opKind: 'x' });";
+  const turn = "import { runAgentTurn as turn } from './t.js';\nawait turn({});";
+  const p1 = scan({ 'lib/x.js': resolver }).problems;
+  assert.ok(p1.some((p) => p.startsWith('lib/x.js:1 imports resolveAiOperationModel as pick:')), p1.join('\n'));
+  const p2 = scan({ 'lib/y.js': turn }).problems;
+  assert.ok(p2.some((p) => p.startsWith('lib/y.js:1 imports runAgentTurn as turn:')), p2.join('\n'));
+  // A plain named import is not an alias.
+  assert.deepEqual(scan({ 'lib/z.js': "import { runAgentTurn } from './t.js';\nawait runAgentTurn({ isFreeTier });" }).problems, []);
 });
 
 test('LIN-3841 witness: an allow-list entry that matches no call is reported as stale', () => {
