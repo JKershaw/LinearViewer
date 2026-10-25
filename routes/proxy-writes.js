@@ -57,7 +57,7 @@ const COMMENT_TOO_LONG = `body exceeds maximum length of ${MAX_COMMENT_LENGTH}`;
 const RELATION_TYPES = ['blocks', 'blocked-by', 'duplicate', 'related'];
 
 // Body-size exception, scoped to the attachments route only (mirrors the feedback
-// route's own parser, routes/workspace-api.js): the global
+// route's own parser, routes/workspace-api-feedback.js): the global
 // `express.json({ limit: '250kb' })` (server.js) only matches
 // `application/json`, so a caller sending the base64 image payload with a
 // non-JSON content type (e.g. `text/plain`) passes through it unparsed; this

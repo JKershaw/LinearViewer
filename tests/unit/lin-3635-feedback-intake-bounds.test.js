@@ -92,7 +92,7 @@ describe('feedback body parser is text/plain only (LIN-3635)', () => {
     });
   }
 
-  test('text/plain over 12mb is refused 413', async () => {
+  test('text/plain over the body limit (13 MiB message) is refused 413', async () => {
     const calls = [];
     await withServer(buildApp(calls), async (base) => {
       const r = await post(base, 'text/plain', JSON.stringify({ message: 'x'.repeat(13 * 1024 * 1024) }));
