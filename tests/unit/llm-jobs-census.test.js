@@ -160,12 +160,14 @@ function analyse(path, src) {
   const namespaces = new Set(); // local name, for `import * as o`
   const wrapperAliases = new Map(); // local name -> WRAPPERS name, for `import { generateBrief as gb }` (any source)
   const builderBindings = new Map(); // local name -> callee, for `const opts = recommendCallOptions(...)` (LIN-3870)
+  const imports = []; // { name, source } for every named or default import binding (LIN-3870)
 
   visit(ast, (n) => {
     if (n.type === 'VariableDeclarator' && n.id.type === 'Identifier' && n.init?.type === 'ObjectExpression') consts.set(n.id.name, n.init);
     if (n.type === 'VariableDeclarator' && n.id.type === 'Identifier' && n.init?.type === 'CallExpression' && n.init.callee.type === 'Identifier') builderBindings.set(n.id.name, n.init.callee.name);
     if (n.type === 'FunctionDeclaration' && n.id) functions.set(n.id.name, n);
     if (n.type === 'ImportDeclaration') {
+      for (const s of n.specifiers) imports.push({ name: s.local.name, source: n.source.value });
       for (const s of n.specifiers) {
         if (s.type === 'ImportSpecifier' && Object.hasOwn(WRAPPERS, s.imported.name) && WRAPPERS[s.imported.name]) wrapperAliases.set(s.local.name, s.imported.name);
       }
@@ -216,7 +218,7 @@ function analyse(path, src) {
         if (found || n.type !== 'Property' || propName(n) !== 'callMeta') return;
         if (n.value.type === 'ObjectExpression') found = { state: 'literal', ...describeObject(n.value) };
         else if (n.value.type === 'Identifier' && consts.has(n.value.name)) found = { state: 'literal', ...describeObject(consts.get(n.value.name)) };
-        else found = unresolved();
+        else found = { state: 'unresolved', builders: [] }; // written at the site, so no builder produced it
       });
     }
     if (found) return found;
@@ -247,7 +249,7 @@ function analyse(path, src) {
     }
   });
 
-  return { path, functions, labels, sites, wrapperCalls, cachedDocCalls, consts };
+  return { path, functions, labels, sites, wrapperCalls, cachedDocCalls, consts, imports };
 }
 
 /** Everything the census asserts, as a list of problems (empty = clean). */
@@ -303,6 +305,13 @@ export function checkCensus({ sources, dispatchKinds, aiOperationKinds, jobs }) 
       else if (m.state === 'literal' && !namesJob(m.keys) && !(m.spreads && entry?.passthrough)) problems.push(`${s.file}:${s.line} ${s.name}() callMeta names no feature or opKind, so its row has no job`);
       // LIN-3870: a non-literal callMeta is excused only when the options come from a named builder.
       else if (m.state === 'unresolved' && !m.builders.some((b) => entry?.builders?.includes(b))) problems.push(`${s.file}:${s.line} ${s.name}() takes its options from something other than a CALL_PATHS builder`);
+    }
+    // LIN-3870: the builder excuse matches by callee name, so a same-named function imported from
+    // outside the unit (or, for a single-file entry, from anywhere) would be excused without being the builder.
+    for (const imp of f.imports) {
+      if (!entry?.builders?.includes(imp.name)) continue;
+      if (isWorkspaceApiUnitFile(f.path) && isWorkspaceApiUnitFile(`routes/${imp.source.split('/').pop()}`)) continue;
+      problems.push(`${f.path}: imports "${imp.name}" from ${imp.source}, the name of a CALL_PATHS builder, so a call to it would be excused without being that builder`);
     }
     for (const b of isWorkspaceApiUnitFile(f.path) ? [] : entry?.builders || []) {
       const fn = f.functions.get(b);
@@ -484,7 +493,7 @@ describe('LIN-3852: every LLM use is a registered job', () => {
   // The three shapes the unit uses to reach the builder are the direct call, a bound identifier,
   // and a spread of a same-file function that returns the builder's call in its argument list.
   const UNIT_FIXTURE = 'routes/workspace-api-fixture.js';
-  const unitSiteFixture = ({ fourth = "{ callMeta: { urlKey: w.urlKey, feature: 'roadmap-chat' } }", builderCallMeta = "urlKey: w.urlKey, feature: 'recommend'" } = {}) => [
+  const unitSiteFixture = ({ fourthHead = '[]', fourth = "{ callMeta: { urlKey: w.urlKey, feature: 'roadmap-chat' } }", builderCallMeta = "urlKey: w.urlKey, feature: 'recommend'" } = {}) => [
     "import { streamChat, getRecommendation } from '../lib/openrouter.js';",
     `function recommendCallOptions(w) { return { apiKey: w.apiKey, callMeta: { ${builderCallMeta} } }; }`,
     "function modelCallArgs(w) { return [w.issue, 'input', recommendCallOptions(w)]; }",
@@ -493,7 +502,7 @@ describe('LIN-3852: every LLM use is a registered job', () => {
     '  const bound = recommendCallOptions(w);',
     '  await streamChat([], bound, () => {});',
     '  await getRecommendation(...await modelCallArgs(w));',
-    `  await streamChat([], ${fourth}, () => {});`,
+    `  await streamChat(${fourthHead}, ${fourth}, () => {});`,
     "  await streamChat([], { callMeta: { urlKey: w.urlKey, feature: 'roadmap-chat' } }, () => {});",
     "  await streamChat([], { callMeta: { urlKey: w.urlKey, feature: 'roadmap-chat' } }, () => {});",
     '}',
@@ -510,6 +519,28 @@ describe('LIN-3852: every LLM use is a registered job', () => {
     const problems = unitProblems(unitSiteFixture({ fourth: "Object.assign({}, { urlKey: w.urlKey, feature: 'roadmap-chat' })" }));
     assert.equal(problems.length, 1, problems.join('\n'));
     assert.match(problems[0], /^routes\/workspace-api-fixture\.js:\d+ streamChat\(\) takes its options from/);
+  });
+
+  // Review of PR #2125: the excuse must depend on the options argument itself. A callMeta property
+  // written in an object literal at the site can never come from a builder, so a builder call in
+  // another argument must not excuse it.
+  test('a non-literal callMeta property beside a builder call in another argument fails (LIN-3870)', () => {
+    const problems = unitProblems(unitSiteFixture({ fourthHead: 'recommendCallOptions(w)', fourth: "{ callMeta: Object.assign({}, { urlKey: w.urlKey, feature: 'roadmap-chat' }) }" }));
+    assert.equal(problems.length, 1, problems.join('\n'));
+    assert.match(problems[0], /^routes\/workspace-api-fixture\.js:\d+ streamChat\(\) takes its options from/);
+  });
+
+  test('a unit file importing a function named like the builder from outside the unit fails (LIN-3870)', () => {
+    const problems = checkCensus({ ...inputs, sources: { ...withoutUnit, [UNIT_FIXTURE]: unitSiteFixture(), 'routes/workspace-api-other.js': "import { recommendCallOptions } from '../lib/elsewhere.js';\nexport const x = recommendCallOptions;\n" } })
+      .filter((p) => p.startsWith('routes/workspace-api-other.js:'));
+    assert.equal(problems.length, 1, problems.join('\n'));
+    assert.match(problems[0], /imports "recommendCallOptions" from \.\.\/lib\/elsewhere\.js/);
+  });
+
+  test('importing the builder from another unit file raises no import problem (positive control)', () => {
+    const problems = checkCensus({ ...inputs, sources: { ...withoutUnit, [UNIT_FIXTURE]: unitSiteFixture(), 'routes/workspace-api-other.js': "import { recommendCallOptions } from './workspace-api-fixture.js';\nexport const x = recommendCallOptions;\n" } })
+      .filter((p) => p.startsWith('routes/workspace-api-other.js:'));
+    assert.deepEqual(problems, []);
   });
 
   test('a builder whose callMeta names no feature or opKind fails, naming the builder (LIN-3870)', () => {
