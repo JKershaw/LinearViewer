@@ -25,6 +25,7 @@ import {
   STARTED, UNSTARTED, BACKLOG, COMPLETED, CANCELED, DUPLICATE,
   TERMINAL_TYPES, STATE_ORDER,
 } from '../../lib/providers/models.js';
+import { withHarnessModels } from '../fixtures/harness-models.js';
 
 const ALL_TYPES = [STARTED, UNSTARTED, BACKLOG, COMPLETED, CANCELED, DUPLICATE];
 
@@ -155,7 +156,7 @@ describe('browser terminal-state predicate (public/common.js)', () => {
   const sandbox = { console, document: { addEventListener() {} }, location: { search: '', href: '' } };
   sandbox.window = sandbox;
   vm.createContext(sandbox);
-  vm.runInContext(src, sandbox, { filename: 'common.js' });
+  vm.runInContext(withHarnessModels(src), sandbox, { filename: 'common.js' });
 
   for (const type of ['completed', 'canceled', 'duplicate', 'started', 'unstarted', 'backlog', 'triage', undefined, null]) {
     test(`agrees with isTerminalState for ${String(type)}`, () => {
@@ -172,7 +173,7 @@ describe('context panel state glyphs (public/context.js)', () => {
   const sandbox = { console, document: { addEventListener() {}, querySelector() { return null; } }, location: { search: '', href: '' } };
   sandbox.window = sandbox;
   vm.createContext(sandbox);
-  vm.runInContext(load('common.js'), sandbox, { filename: 'common.js' });
+  vm.runInContext(withHarnessModels(load('common.js')), sandbox, { filename: 'common.js' });
   vm.runInContext(load('context.js'), sandbox, { filename: 'context.js' });
 
   const expected = [

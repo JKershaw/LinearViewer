@@ -44,6 +44,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
+import { withHarnessModels } from '../fixtures/harness-models.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TOKENS_PATH = '/workspace/acme/api/proxy/tokens';
@@ -184,7 +185,7 @@ function loadProxyToggle() {
     fetch() { throw new Error('fetch should not be called'); },
   };
   vm.createContext(sandbox);
-  vm.runInContext(readFileSync(join(__dirname, '../../public/common.js'), 'utf8'),
+  vm.runInContext(withHarnessModels(readFileSync(join(__dirname, '../../public/common.js'), 'utf8')),
     sandbox, { filename: 'common.js' });
   return sandbox.window.ProxyToggle;
 }

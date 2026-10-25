@@ -16,6 +16,7 @@ import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { withHarnessModels } from '../fixtures/harness-models.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const QUESTION_CARDS_JS_SRC = readFileSync(join(__dirname, '../../public/question-cards.js'), 'utf8');
@@ -132,7 +133,7 @@ function makeRealDeliverySandbox(cards, { hydrate, commentOk = true } = {}) {
     console
   };
   vm.createContext(sandbox);
-  vm.runInContext(COMMON_JS_SRC, sandbox, { filename: 'common.js' });
+  vm.runInContext(withHarnessModels(COMMON_JS_SRC), sandbox, { filename: 'common.js' });
   // Override the shared helper's network seam after common.js has defined it.
   sandbox.window.api = async () => hydrate || { hydrated: false };
   const dispatched = [];

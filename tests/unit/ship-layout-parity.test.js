@@ -34,6 +34,7 @@ import {
   computeProximityRings as libComputeProximityRings,
   computeShipReachableIds as libComputeShipReachableIds
 } from '../../lib/ship-layout.js';
+import { withHarnessModels } from '../fixtures/harness-models.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -52,7 +53,7 @@ const sandbox = {
 };
 // The real common.js first, as the page loads it: it owns the terminal-state set ship.js reads.
 vm.createContext(sandbox);
-vm.runInContext(readFileSync(join(__dirname, '../../public/common.js'), 'utf8'), sandbox, {
+vm.runInContext(withHarnessModels(readFileSync(join(__dirname, '../../public/common.js'), 'utf8')), sandbox, {
   filename: 'common.js'
 });
 vm.runInContext(readFileSync(join(__dirname, '../../public/ship.js'), 'utf8'), sandbox, {

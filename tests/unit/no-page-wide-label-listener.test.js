@@ -49,7 +49,6 @@ const DELEGATED_ALLOW = {
   'app.js:[data-queue-badge]': 'UI-only: opens the queue panel (dashboard)',
   'app.js:.queue-panel-close': 'UI-only: closes the queue panel (dashboard)',
   'common.js:.dispatch-exec-harness-select, .harness-select': 'UI-only: syncs a model list on change',
-  'common.js:.dispatch-defaults-form': 'settings page form; adds an <option> before its own native submit',
   'common.js:.disclosure-toggle': 'UI-only: opens a disclosure',
   'common.js:form[data-confirm]': 'asks confirm() before a native submit; can only cancel one',
   'observation.js:.obs-run-gen': 'UI-only: expands rows (observation page)',

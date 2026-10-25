@@ -4,7 +4,7 @@
  * Allows tests to bypass OAuth and use predictable mock data.
  * Only mounted when NODE_ENV === 'test'.
  */
-import { Router } from 'express';
+import express, { Router } from 'express';
 import crypto from 'crypto';
 import { getWorkspaceByUrlKey } from '../lib/workspace.js';
 import { RUNNER_GRANTS } from '../lib/proxy-scopes.js';
@@ -37,6 +37,7 @@ import { convertToConnectionBacked, isConnectionBacked } from '../lib/connection
 import { primeFailOpenPrStatus, clearFailOpenPrStatus } from '../lib/github-pr-status.js';
 import { primePrStateCache, clearPrStateCache, prStateUpstreamFetchCount } from './dashboard.js';
 import { setLinearFetchImpl } from '../lib/linear-fetch.js';
+import { harbourModelChanges } from '../lib/model-routing.js';
 
 // LIN-3798: the e2e server's Linear transport. `/test/set-session` workspaces carry
 // the fake `test-token`, and any Linear read the mock short-circuits miss (the
@@ -1386,6 +1387,18 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     }
   });
 
+  // LIN-3855: seed model-routing changes through the store, as one logged change (the Models page's own
+  // write path, minus the form). Body: { urlKey, reason, changes: [{ scope, surface, key, field, to }] }.
+  router.post('/test/model-routing', express.json(), async (req, res) => {
+    try {
+      const { urlKey = 'test-workspace', reason = 'Seeded by /test/model-routing', changes = [] } = req.body || {};
+      await modelRoutingStore.applyChanges(changes, { urlKey, reason, actor: { via: 'page' } });
+      res.json({ ok: true });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Endpoint to seed/clear the workspace model preference for tests.
   // Query params: ?modelId=<id>  → save, or omit/empty → delete
   //
@@ -1399,7 +1412,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       const urlKey = req.query.urlKey || 'test-workspace';
       const modelId = req.query.modelId || '';
       if (modelId) {
-        await modelRoutingStore.saveHarbourModel(modelId, { urlKey, reason: 'Seeded by /test/set-workspace-model', actor: { via: 'page' } });
+        await modelRoutingStore.applyChanges(harbourModelChanges(modelId), { urlKey, reason: 'Seeded by /test/set-workspace-model', actor: { via: 'page' } });
       } else {
         await workspacePreferencesStore.deleteWorkspacePreferences(urlKey);
         await modelRoutingStore.deleteWorkspace(urlKey);

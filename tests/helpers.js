@@ -96,7 +96,7 @@ export const SELECTORS = {
     view: (name) => `.nav-views [data-testid="nav-view-${name}"]`,
   },
   settings: {
-    /** Settings group by slug (LIN-3846 kept the survivors): account | providers | ai-model | dispatch-defaults | dispatch-presets | ai-usage | workspace-features | experimental | workflow. */
+    /** Settings group by slug (LIN-3846 kept the survivors; LIN-3855 retired ai-model and dispatch-defaults): account | providers | dispatch-presets | ai-usage | workspace-features | experimental | workflow. */
     section: (name) => `[data-testid="settings-section-${name}"]`,
     /** An area's page frame (LIN-3846): sources | models | running | agent-access | health | change-log | features | account. */
     area: (id) => `[data-testid="settings-area-${id}"]`,

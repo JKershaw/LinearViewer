@@ -40,8 +40,8 @@ import { jsonError } from '../lib/errors.js';
 import { WORKSPACE_FEATURES } from '../lib/feature-defaults.js';
 import { isWorkspaceFeatureEnabled } from '../lib/workspace-preferences.js';
 import { GROUPS, SURFACES, getJob } from '../lib/llm-jobs.js';
-import { FIELDS, MAX_REASON_LENGTH, MODEL_ID_PATTERN, RoutingError, effortNotAppliedForChanges } from '../lib/model-routing.js';
-import { validateOpaqueDispatchField, MAX_NAME_LENGTH } from '../lib/dispatch-validation.js';
+import { RoutingError, effortNotAppliedForChanges } from '../lib/model-routing.js';
+import { readPatch, readReason } from '../lib/model-routing-validate.js';
 import { DEFAULT_MODEL } from '../lib/openrouter.js';
 
 const BASE = '/api/proxy/model-routing';
@@ -49,42 +49,8 @@ export const MODEL_ROUTING_WRITES_DISABLED = 'MODEL_ROUTING_WRITES_DISABLED';
 const SETTING = WORKSPACE_FEATURES.MODEL_ROUTING_PROXY_WRITES;
 const DEFAULT_LOG_LIMIT = 50;
 const MAX_LOG_LIMIT = 200;
-const MAX_HARBOUR_MODEL_LENGTH = 100;
 
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
-
-/** Validate the settings in a body for one surface. Returns { patch } or { error }. */
-function readPatch(body, surface) {
-  const allowed = FIELDS[surface];
-  const patch = {};
-  for (const [key, value] of Object.entries(body)) {
-    if (key === 'reason' || key === 'surface') continue;
-    if (!allowed.includes(key)) return { error: `${surface} settings have no "${key}" field; allowed: ${allowed.join(', ')}` };
-    if (value === undefined) continue;
-    if (value !== null && typeof value !== 'string') return { error: `${key} must be a string, or null to clear it` };
-    if (value !== null) {
-      if (surface === SURFACES.HARBOUR_CALL) {
-        if (value.length > MAX_HARBOUR_MODEL_LENGTH || value.includes('..') || !MODEL_ID_PATTERN.test(value)) {
-          return { error: 'model must look like provider/model (for example anthropic/claude-sonnet-4)' };
-        }
-      } else {
-        if (value.trim() === '') return { error: `${key} must not be blank; send null to clear it` };
-        const bad = validateOpaqueDispatchField(value, key, { maxLength: MAX_NAME_LENGTH });
-        if (bad) return { error: bad.error };
-      }
-    }
-    patch[key] = value;
-  }
-  if (Object.keys(patch).length === 0) return { error: `nothing to change: send at least one of ${allowed.join(', ')}` };
-  return { patch };
-}
-
-function readReason(body) {
-  const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
-  if (!reason) return { error: 'reason is required: say why the model is changing' };
-  if (reason.length > MAX_REASON_LENGTH) return { error: `reason is at most ${MAX_REASON_LENGTH} characters` };
-  return { reason };
-}
 
 /** A log row as the proxy shows it: the actor's name and token id, never the account id. */
 function publicEntry(row) {
