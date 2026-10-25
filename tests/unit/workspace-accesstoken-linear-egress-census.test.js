@@ -57,6 +57,17 @@ function count(source, pattern) {
   return (source.match(pattern) || []).length;
 }
 
+/**
+ * `runAudit(` occurrences in code, not prose: whole-line comments (`//`, `*`, `/*`) are skipped, so
+ * rewording, blanking or deleting a comment cannot move the count (LIN-3868).
+ */
+function runAuditCodeOccurrences(source) {
+  return source
+    .split('\n')
+    .filter(line => !/^\s*(\/\/|\*|\/\*)/.test(line))
+    .reduce((n, line) => n + count(line, /runAudit\(/g), 0);
+}
+
 // =============================================================================
 // Counter (a) — credential-bearing, statically Linear-bound EGRESS MECHANISMS
 // =============================================================================
@@ -159,34 +170,20 @@ describe('LIN-1899 census (a) — credential-bearing Linear egress mechanisms', 
 
 describe('LIN-1899 census (b) — scalar feeds, by owner', () => {
   test('routes/ has exactly 1 runAudit call site (LIN-1899, guarded)', () => {
-    // NOTE the two-part count. A bare /runAudit\(/ match over raw source returns
-    // 2 at this HEAD: the call itself plus the prose mention inside the
-    // test-mock comment above it ("runAudit() goes straight to GraphQL"). The
-    // eviction-census template counts with a bare regex, which would pin a
-    // number that is really "1 call + 1 comment" and drift the moment either
-    // moves. So the call sites are counted on non-comment lines only, and the
-    // total is asserted alongside it to keep the raw grep honest.
-    // LIN-3861: both counts are exact over the workspace-API unit (routes/workspace-api.js and
-    // routes/workspace-api-*.js). Reported, not fixed: the raw count pins a comment, so blanking
-    // comments would fail it.
+    // Counted over code only (runAuditCodeOccurrences), across the workspace-API unit
+    // (routes/workspace-api.js and routes/workspace-api-*.js). The comment mention beside the call
+    // (routes/workspace-api-audit.js) is prose, so it is not pinned: rewording or deleting it cannot
+    // fail this test (LIN-3868). A second non-comment caller still fails, and needs its own guard.
     const source = workspaceApiUnitFiles(repoRoot).map(read).join('\n');
-    const callSites = source
-      .split('\n')
-      .filter(line => /runAudit\(/.test(line) && !/^\s*(\/\/|\*|\/\*)/.test(line));
+    const callSites = runAuditCodeOccurrences(source);
 
     assert.equal(
-      callSites.length,
+      callSites,
       1,
-      `Found ${callSites.length} runAudit call site(s) in the workspace-API unit, expected exactly 1 ` +
+      `Found ${callSites} runAudit call site(s) in the workspace-API unit, expected exactly 1 ` +
       '(GET /workspace/:urlKey/api/audit). runAudit goes straight to a Linear GraphQL client, so a SECOND ' +
       'caller needs its own isActiveProviderLinear(workspace) guard — otherwise a Jira-active workspace ' +
       'discloses its raw API token to api.linear.app (LIN-1899).'
-    );
-    assert.equal(
-      count(source, /runAudit\(/g),
-      2,
-      'expected 2 raw runAudit( occurrences in the workspace-API unit: 1 call site + 1 mention in the ' +
-      'test-mock comment. If this drifts, re-check which of the two moved before touching the pinned counts.'
     );
   });
 
@@ -347,15 +344,10 @@ function providerGuardProblems(unit) {
   return total === 2 ? [] : [`found ${total} isActiveProviderLinear(workspace) guard(s) across the workspace-API unit, expected exactly 2`];
 }
 
-/** `runAudit(` : exactly 1 non-comment call site and 2 raw occurrences (1 call + 1 comment mention) across the unit. */
+/** `runAudit(` : exactly 1 code call site across the unit; comment prose does not count (LIN-3868). */
 function runAuditProblems(unit) {
-  const problems = [];
-  const callSites = Object.entries(unit).flatMap(([rel, src]) => src.split('\n')
-    .filter(line => /runAudit\(/.test(line) && !/^\s*(\/\/|\*|\/\*)/.test(line)).map(() => rel));
-  if (callSites.length !== 1) problems.push(`found ${callSites.length} runAudit( call site(s) across the workspace-API unit, expected exactly 1`);
-  const raw = sumOver(unit, /runAudit\(/g);
-  if (raw !== 2) problems.push(`found ${raw} raw runAudit( occurrence(s) across the workspace-API unit, expected 2 (1 call + 1 comment mention)`);
-  return problems;
+  const callSites = Object.values(unit).reduce((n, src) => n + runAuditCodeOccurrences(src), 0);
+  return callSites === 1 ? [] : [`found ${callSites} runAudit( call site(s) across the workspace-API unit, expected exactly 1`];
 }
 
 /** The raw-mirror Bearer template: 1 in total, the unit contributing one summed key. */
@@ -405,14 +397,18 @@ describe('LIN-3861 census — the workspace-API unit (each rule with planted-vio
     assert.deepEqual(providerGuardProblems({ 'routes/workspace-api.js': GUARD, 'routes/workspace-api-x.js': GUARD }), []);
   });
 
-  test('exactly 1 non-comment runAudit( call site and 2 raw occurrences across the unit', () => {
-    // Reported, not fixed: the raw count pins a comment, so blanking comments would fail it.
+  test('exactly 1 code runAudit( call site across the unit (comment prose is not pinned, LIN-3868)', () => {
     assert.deepEqual(runAuditProblems(readW()), []);
   });
   test('witness: a second runAudit( call in a W file fails; the call and its mention split across W files stay clean', () => {
-    assert.equal(runAuditProblems({ 'routes/workspace-api.js': AUDIT_CALL + AUDIT_MENTION, 'routes/workspace-api-x.js': AUDIT_CALL }).length, 2);
+    assert.equal(runAuditProblems({ 'routes/workspace-api.js': AUDIT_CALL + AUDIT_MENTION, 'routes/workspace-api-x.js': AUDIT_CALL }).length, 1);
     assert.deepEqual(runAuditProblems({ 'routes/workspace-api.js': AUDIT_MENTION, 'routes/workspace-api-x.js': AUDIT_CALL }), []);
-    assert.equal(runAuditProblems({ 'routes/workspace-api.js': AUDIT_MENTION }).length, 2, 'no call site fails both counts');
+    assert.equal(runAuditProblems({ 'routes/workspace-api.js': AUDIT_MENTION }).length, 1, 'no call site fails');
+  });
+  test('witness: rewording, blanking or deleting the comment beside the call stays clean', () => {
+    assert.deepEqual(runAuditProblems({ 'routes/workspace-api.js': AUDIT_CALL + '// the audit client goes straight to GraphQL\n' }), []);
+    assert.deepEqual(runAuditProblems({ 'routes/workspace-api.js': AUDIT_CALL + '\n' }), []);
+    assert.deepEqual(runAuditProblems({ 'routes/workspace-api.js': AUDIT_CALL + '/* runAudit() */\n' }), []);
   });
 
   test('the raw-mirror Bearer template totals 1 with the workspace-API unit summed under one key', () => {
