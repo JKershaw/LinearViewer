@@ -176,3 +176,34 @@ test('the plain definition is on the landing, under the tagline', () => {
   const html = renderLandingPage({});
   assert.match(html, /data-testid="landing-plain"/);
 });
+
+// LIN-3980 outcome 2: the glimpses show the product as it is and stay true. No
+// model id, no calendar year and no hand-typed stage word may sit inside a
+// role="img" glimpse. Stage and model words come from the shared sources.
+test('glimpses carry no model ids, no calendar years and no hand-typed stage words (LIN-3980)', () => {
+  const html = renderLandingPage({});
+  const glimpses = [...html.matchAll(/role="img"[\s\S]*?<\/section>/g)].map((m) => m[0]);
+  assert.equal(glimpses.length, 4, 'observation, swim, prompt and Harbour OS glimpses');
+  for (const g of glimpses) {
+    assert.doesNotMatch(g, /claude-[a-z0-9.-]+/);
+    assert.doesNotMatch(g, /\b20\d{2}\b/);
+    assert.doesNotMatch(g, />implement</);
+    assert.doesNotMatch(g, /\bimplement\b/);
+  }
+  assert.match(html, /lx-run__label">Build</, 'the implementation stage reads as STAGE_LABELS sets it');
+  assert.match(html, /Opus/, 'a model shows its family name');
+});
+
+test('the landing states no template count, so none can drift (LIN-3980)', () => {
+  const html = renderLandingPage({});
+  assert.doesNotMatch(html, /\b17 deterministic\b/);
+  assert.doesNotMatch(html, /\bdeterministic templates\b/);
+});
+
+test('the loop and section copy drops the insider words (LIN-3980 outcome 3)', () => {
+  const html = renderLandingPage({});
+  const copy = html.replace(/<[^>]+>/g, ' ');
+  for (const word of ['frontier', 'cohort', 'HEAD', 'grounded', 're-grounded', 'control plane', 'cockpit', 'first foreign backend', 'read-only V1', 'the original backend']) {
+    assert.ok(!copy.includes(word), `no insider word: ${word}`);
+  }
+});
