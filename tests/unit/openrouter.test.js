@@ -1669,3 +1669,29 @@ describe('stage descriptions: approved-parent-plan child exemption (LIN-3049)', 
     assert.match(stage('plan-review').whenNot, /breakdown child covered by its parent's approving plan-review/);
   });
 });
+
+// LIN-3962: getModelDisplayName is extended in place. Curated first (unchanged), then the catalog's name, then
+// an alias's family in title case (with "ran as" only from the job's own runs), then the provider-stripped slug.
+describe('getModelDisplayName: one name per model (LIN-3962)', () => {
+  test('a curated id keeps its curated name', () => {
+    assert.equal(getModelDisplayName('openai/gpt-5.4-mini'), 'GPT-5.4 Mini');
+  });
+
+  test('a bare alias shows its family in title case', () => {
+    assert.equal(getModelDisplayName('opus'), 'Opus');
+    assert.equal(getModelDisplayName('haiku'), 'Haiku');
+  });
+
+  test('an alias that ran as a known model says so, only when the caller passes ranOn', () => {
+    assert.equal(getModelDisplayName('opus', { ranOn: 'openai/gpt-5.4-mini' }), 'Opus · ran as GPT-5.4 Mini');
+    assert.equal(getModelDisplayName('opus', {}), 'Opus');
+  });
+
+  test('an uncurated, uncatalogued id falls back to its provider-stripped slug', () => {
+    assert.equal(getModelDisplayName('someone/unknown-model-x'), 'unknown-model-x');
+  });
+
+  test('a falsy id still yields the default model\'s name', () => {
+    assert.equal(getModelDisplayName(''), getModelDisplayName(DEFAULT_MODEL));
+  });
+});

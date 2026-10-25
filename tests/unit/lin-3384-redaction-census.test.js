@@ -145,7 +145,8 @@ const TABLE = {
   // dashboard-redaction-canary-sweep.test.js.
   'lib/dispatch-session-read.js :: pointReadSession': [SRV, 3], // LIN-3812: lifted from routes/dashboard.js
   // LIN-3855: the Models page's 30-day agent spend, reduced to numbers in the route (no row is returned).
-  'routes/settings.js :: readModelsHistory': [SRV, 1],
+  // LIN-3962: the one shared read (Settings › Models and Home's decision panel), moved into lib/model-routing-history.js.
+  'lib/model-routing-history.js :: readModelsHistory': [SRV, 1],
   // routes — explicit allow-list / projection
   'routes/proxy-dispatch.js :: /api/proxy/dispatch': [PRJ, 3],
   'routes/proxy-dispatch.js :: /api/proxy/dispatch/:id': [PRJ, 1],

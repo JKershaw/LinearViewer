@@ -23,6 +23,7 @@ const EXPECTED = [
   'settings-row-open',     // key-row: keyRow (drillRow, opened in place)
   'settings-pane',         // area-frame: renderSettingsShell
   'settings-state-warn',   // sidebar-state: renderSettingsNav
+  'decision-panel',        // decision-panel: decisionPanel (LIN-3962)
 ];
 
 test('every Settings piece has one live sample, in an inert phone-root wrapper', () => {

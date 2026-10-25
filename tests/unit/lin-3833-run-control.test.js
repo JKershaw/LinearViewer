@@ -14,6 +14,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
+import { decisionPanel } from '../../lib/components/decision-panel.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
@@ -45,7 +46,20 @@ function makeContainer() {
   return container;
 }
 
-function load({ opened = null, previewFor = () => null, presets = [], kickoff = { prompt: 'AUTOPILOT PROMPT', promptName: 'Autopilot', kind: 'autopilot' } } = {}) {
+// The server's panel for the choice it is asked about (routes/dispatch.js decision-panel), built by the same component.
+const serverPanel = (q) => ({
+  kind: 'plan',
+  html: decisionPanel({
+    testid: 'run-decision-panel',
+    fieldAttrs: (field) => `data-testid="run-${field}"`,
+    numbers: null,
+    harness: { value: q.get('harness'), inForce: q.get('harness') || 'claude-code', follow: 'As Settings \u203a Models sets it for this step: claude-code' },
+    model: { value: q.get('model'), follow: 'As Settings \u203a Models sets it for this step: the default model', lists: { any: [] }, suggestions: {} },
+    effort: { value: q.get('effort'), follow: 'As Settings \u203a Models sets it for this step: none' }
+  })
+});
+
+function load({ opened = null, previewFor = () => null, panelFor = serverPanel, presets = [], kickoff = { prompt: 'AUTOPILOT PROMPT', promptName: 'Autopilot', kind: 'autopilot' } } = {}) {
   const calls = { api: [], dispatch: [], kickoff: [] };
   const window = {
     escapeHtml: (s) => (s == null ? '' : String(s)),
@@ -56,6 +70,7 @@ function load({ opened = null, previewFor = () => null, presets = [], kickoff = 
       if (url.includes('/api/task/')) return opened;
       if (url.includes('/api/task-mode/')) return { lastCopy: null };
       if (url.includes('/api/dispatch/preview')) return previewFor(new URL(url, 'http://x').searchParams);
+      if (url.includes('/api/dispatch/decision-panel')) return panelFor(new URL(url, 'http://x').searchParams);
       if (url.includes('/api/dispatch/presets')) return { presets };
       if (url.includes('/api/prompt/')) return { prompt: `PROMPT ${decodeURIComponent(url.split('/').pop().split('?')[0])}`, promptName: 'Plan' };
       return { success: true, item: { id: 'd-1' } };
@@ -133,13 +148,22 @@ describe('LIN-3833 — Runs on says where each value comes from, from the server
     assert.match(c.innerHTML, /from the Plan group in Models/);
   });
 
-  test('a Change panel starts with nothing chosen: the harness is from Models, and no option is selected', async () => {
-    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT } });
+  test('a Change panel starts with nothing chosen: the harness follows Settings › Models, and no option is selected', async () => {
+    const { c, calls } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT } });
     await c.click({ action: 'change-run' });
     await flush();
     assert.match(c.innerHTML, /data-testid="run-change-panel"/);
-    assert.match(c.innerHTML, /<option value="">from Models<\/option>/);
+    assert.match(c.innerHTML, /<option value=""[^>]*>As Settings \u203a Models sets it for this step: claude-code<\/option>/);
     assert.equal(/<option value="claude-code" selected>|<option value="opencode" selected>/.test(c.innerHTML), false, 'nothing is pre-selected');
+    assert.ok(calls.api.some((a) => a.url.includes('/api/dispatch/decision-panel')), 'the shared panel is read from the server when Change opens');
+  });
+
+  test('the panel\'s fields are the server\'s, so Use stays off until the panel has loaded, and says so when it cannot load', async () => {
+    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, panelFor: () => { throw new Error('down'); } });
+    await c.click({ action: 'change-run' });
+    await flush();
+    assert.match(c.innerHTML, /data-testid="run-panel-failed"/);
+    assert.match(c.innerHTML, /data-testid="run-use"[^>]*disabled/);
   });
 });
 
@@ -161,6 +185,7 @@ describe('LIN-3833 — the choice for this run goes through the preview, and the
   test('Run to PR dispatches the autopilot kickoff with the run choice, not a harness forced on the client', async () => {
     const { c, calls } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: { count: 0, next: null, last: null, running: null } } });
     await c.click({ action: 'change-run' });
+    await flush();
     await c.fire('change', { dataset: { testid: 'run-model' }, value: 'deepseek-v4-pro' });
     await c.click({ action: 'use-run' });
     await c.click({ action: 'go', rung: 'run-task' });

@@ -1247,6 +1247,106 @@ a.wordmark:hover {
   margin: 0;
 }
 
+/* LIN-3962: the decision panel (lib/components/decision-panel.js), the one harness, model and effort panel Models and
+   Home both show. Its markup is the server's; these rules are its look, on both pages and in /styleguide. Tokens only. */
+.decision-panel {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.decision-panel-numbers {
+  display: grid;
+  gap: var(--space-1);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.decision-panel-heading {
+  margin: 0;
+  font-size: 0.9em;
+  color: var(--fg-dim);
+}
+
+.decision-panel-figures {
+  margin: 0;
+  font-family: var(--font-structural);
+}
+
+.decision-panel-field {
+  display: grid;
+  grid-template-columns: minmax(8ch, 12ch) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.decision-panel-field[hidden],
+.decision-panel-suggestion[hidden] {
+  display: none;
+}
+
+.decision-panel-label {
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  color: var(--fg-dim);
+}
+
+.decision-panel-control {
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--fg-vdim);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.decision-panel-control:focus {
+  border-color: var(--blue);
+}
+
+/* The suggestions run the full width under the model field they belong to. */
+.decision-panel-suggestions {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9em;
+}
+
+.decision-panel-suggestion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+}
+
+.decision-panel-pick {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--blue);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.decision-panel-reason,
+.decision-panel-price,
+.decision-panel-typical {
+  color: var(--fg-dim);
+}
+
+.decision-panel-price,
+.decision-panel-typical {
+  font-family: var(--font-structural);
+}
+
 .opened-task-more {
   display: flex;
   flex-wrap: wrap;

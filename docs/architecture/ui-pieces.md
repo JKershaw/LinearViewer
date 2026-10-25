@@ -363,10 +363,19 @@ The judge's list gained `privacy` and `terms` (`tests/judge/pages.mjs`, `rendere
 
 The Models body is `lib/render-settings-models.js`: one staged form for every job and group (`lib/model-routing-edit.js` turns the posted fields into one logged change with one reason and one version check), the routing presets, and the change log with Undo. Its pieces are built once and listed here:
 
-- **Change panel** (`lib/components/settings-change-panel.js`): the harness, model and effort fields of one job or group, each with a "follow the group" blank. The field names are `c__<scope>__<surface>__<key>__<field>`. `public/settings-models.js` keeps the model options to the row's own harness and clears effort where a harness has none; the server judges every save.
+- **Decision panel** (`lib/components/decision-panel.js`, LIN-3962; see the next section): the harness, model and effort of one job or group. The field names are `c__<scope>__<surface>__<key>__<field>`. `public/decision-panel.js` toggles the suggestions and effort for the harness in force; the server judges every save.
 - **Spend bar** (`lib/components/settings-spend-bar.js`): a native `<progress>`, no inline style.
-- **Phone sheet:** the open job row is a full-screen `details` at phone width (`public/settings.css:834`, the Models block). A focus trap and an Escape handler run on it (`public/settings-models.js:71-97`): Escape closes the sheet and returns focus to its summary.
+- **Phone sheet:** the open job row is a full-screen `details` at phone width (the Models block of `public/settings.css`). A focus trap and an Escape handler run on it (`public/settings-models.js`): Escape closes the sheet and returns focus to its summary.
 - **Shared list:** the harness list is one copy in `lib/model-routing-harnesses.js`. `renderPage` embeds it as `window.__HARNESS_MODELS__` on every page that loads `/common.js`.
+
+## Decision panel and model display name (LIN-3962): one authority each
+
+Two rows, one authority each. A new panel or name rule goes into these, not beside them.
+
+- **Decision panel** (`lib/components/decision-panel.js`): the one choice of harness, model and effort, server-rendered for both Settings › Models (each job and group row, and the No job row) and Home's run panel (`GET /workspace/:urlKey/api/dispatch/decision-panel`, owner-only, read when Change opens). The order is always the numbers first, then harness, model (suggestions, then the search list), then effort. Effort is `DISPATCH_EFFORT_LEVELS` with "follow" first, and a stored value outside it is shown and kept. The page supplies its own field names and attributes, and nothing else; Models posts the staged fields and Home keeps its draft. The client is `public/decision-panel.js`, a classic script that toggles the markup and never builds it. Its styles are `.decision-panel*` in `public/style.css`. Its numbers come only through `agentSpendByJob` and `typicalByModel` in `lib/model-routing-spend.js`, read from `lib/model-routing-history.js` (one 30-day window, one cap, shared by both pages).
+- **Model display name** (`getModelDisplayName`, `lib/openrouter.js`): curated name, then the live catalog's name, then a bare Claude Code alias's family in title case (with "ran as <model>" only when the job's own runs reported exactly one model of that family), then the provider-stripped slug. The older rules in `modelNamer` and the sidebar summary are LIN-3952's to convert.
+
+Where Home and Models differ on purpose: Home's blank field says "As Settings › Models sets it for this step: <resolved>" and Models' says "Follow <Group> (<resolved>)"; Home has no OpenRouter-only auto-switch (the harness does not follow a model pick there); Models' model field is a search input, where it was a select. Swipe has no run panel and its Dispatch ▾ exec controls are not this panel.
 
 ## Open questions for John
 

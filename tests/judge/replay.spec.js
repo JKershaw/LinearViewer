@@ -101,8 +101,21 @@ async function prepare(page, context, entry) {
     const row = page.locator('[data-testid="models-job-implementation"]');
     if (await row.count()) {
       await row.locator(':scope > summary').click();
-      if (entry.state === 'models-staged') await row.locator('select[data-models-field="model"]').selectOption('sonnet');
+      if (entry.state === 'models-staged') await row.locator('input[data-models-field="model"]').fill('sonnet');
     }
+  }
+  if (entry.state === 'home-run-panel-open') {
+    // LIN-3962: Home's Change panel, opened the way a viewer opens it. The control exists only for a viewer who can run.
+    const change = page.getByTestId('run-change');
+    if (await change.count()) {
+      await change.click();
+      await page.getByTestId('run-decision-panel').waitFor();
+    }
+  }
+  if (entry.state === 'swipe-dispatch-open') {
+    // LIN-3962: Swipe's Dispatch ▾ disclosure. Its exec controls are not the decision panel, so this must show no difference.
+    const disclosure = page.locator('.dispatch-disclosure').first();
+    if (await disclosure.count()) await disclosure.click();
   }
   if (entry.state === 'audit-report') {
     // Both sides answer the same fixture, so the report is identical and the request never leaves the browser.

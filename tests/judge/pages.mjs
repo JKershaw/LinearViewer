@@ -37,6 +37,8 @@ const TIME_MASKS = {
 //   paused            mint a queue token (a runner), pause runs in place; Running shows the Runs row and Resume
 //   models-panel-open open a job row's change panel on Settings › Models (head only; base's forms have no row)
 //   models-staged     the same row, with one model picked: the staged-change count shows (head only)
+//   home-run-panel-open  Home's Change panel open (LIN-3962): the shared decision panel the server renders
+//   swipe-dispatch-open  Swipe's Dispatch ▾ disclosure open: expected to show no difference (Swipe has no run panel)
 // `urlKey` is fixed per entry and identical on both sides. States that write data get their own
 // urlKey so their writes never reach another page's sidebar counts.
 // `renderers` are the files that emit the page, for the changed-stylesheet check below.
@@ -71,8 +73,12 @@ export const PAGES = [
   { id: 'audit-report', urlKey: 'judge', path: (k) => `/workspace/${k}/audit`, state: 'audit-report', renderers: ['lib/render-audit.js'] },
   // LIN-3855: Settings › Models. At the phone viewport the open row is the full-screen sheet, so 'models-panel-open'
   // covers the sheet at 390px and the panel at 1280px. Both are read-only set-ups on the seeded 'judge' workspace.
-  { id: 'models-panel-open', urlKey: 'judge', path: (k) => `/workspace/${k}/settings/models`, state: 'models-panel-open', renderers: ['lib/render-settings-models.js'] },
-  { id: 'models-staged', urlKey: 'judge', path: (k) => `/workspace/${k}/settings/models`, state: 'models-staged', renderers: ['lib/render-settings-models.js'] },
+  { id: 'models-panel-open', urlKey: 'judge', path: (k) => `/workspace/${k}/settings/models`, state: 'models-panel-open', renderers: ['lib/render-settings-models.js', 'lib/components/decision-panel.js'] },
+  { id: 'models-staged', urlKey: 'judge', path: (k) => `/workspace/${k}/settings/models`, state: 'models-staged', renderers: ['lib/render-settings-models.js', 'lib/components/decision-panel.js'] },
+  // LIN-3962: the one decision panel on Home (desktop, and phone via the viewport pair) and Swipe's Dispatch ▾ disclosure,
+  // which keeps its own exec controls. Both are conditional on the seed showing the control; a side without it is not claimed.
+  { id: 'home-run-panel-open', urlKey: 'judge', path: (k) => `/workspace/${k}/`, state: 'home-run-panel-open', renderers: ['lib/render.js', 'lib/components/decision-panel.js', 'public/decision-panel.js'] },
+  { id: 'swipe-dispatch-open', urlKey: 'judge', path: (k) => `/workspace/${k}/swipe`, state: 'swipe-dispatch-open', renderers: ['lib/render-swipe.js'] },
 ];
 
 // Stated, not assumed: what the seed cannot reach.
