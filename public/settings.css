@@ -642,6 +642,12 @@
   border-top: 1px solid var(--line);
 }
 
+/* LIN-3889: non-row children of a row list (Account's consent notice and logout link) take the rows' inset; at base the whole card sat flush to the edge, and the row padding alone left these two out of line. */
+.settings-rows > .consent-notice,
+.settings-rows > .settings-action-red:not(.settings-row) {
+  margin-inline: 0.8rem;
+}
+
 .settings-row {
   display: flex;
   align-items: center;
