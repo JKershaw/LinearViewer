@@ -24,7 +24,11 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
+import { ATTACHMENT_UPLOAD_BODY_LIMIT } from '../../routes/proxy-writes.js';
 import { ProviderInterface } from '../../lib/providers/interface.js';
+import { MAX_ATTACHMENT_BYTES } from '../../lib/proxy-wire.js';
+import { MAX_DESCRIPTION_LENGTH } from '../../lib/issue-write-validation.js';
+import { clientErrorStatus, clientErrorMessage } from '../../lib/errors.js';
 
 const ISSUE_ID = '11111111-1111-1111-1111-111111111111';
 
@@ -95,6 +99,14 @@ function buildApp({ token = 'ws-token', reason = 'ok', provider, scope = 'readWr
     freeTierStore: { tryUse: async () => ({ allowed: true }) },
     ...(provider ? { provider } : {}),
   }));
+  // Mirrors the real server.js catch-all's client-error branch: a body-parser 413 is
+  // answered as JSON (LIN-1158), so a parser refusal and a handler refusal can be told apart by body.
+  app.use((err, req, res, next) => {
+    if (res.headersSent) return next(err);
+    const status = clientErrorStatus(err);
+    if (status !== null) return res.status(status).json({ error: clientErrorMessage(status, err) });
+    next(err);
+  });
   return app;
 }
 
@@ -177,10 +189,34 @@ describe('POST /api/proxy/issues/:issueId/attachments (LIN-891)', () => {
     const provider = new FakeUploadProvider();
     const oversized = Buffer.concat([PNG_BYTES, Buffer.alloc(10 * 1024 * 1024)]);
     const oversizedDataUrl = `data:image/png;base64,${oversized.toString('base64')}`;
-    const { status } = await postAttachment(buildApp({ provider }), { image: oversizedDataUrl }, {
+    const { status, body } = await postAttachment(buildApp({ provider }), { image: oversizedDataUrl }, {
       headers: { 'Content-Type': 'text/plain' },
     });
     assert.equal(status, 413);
+    // The handler's own arm, not the parser's generic 413 (LIN-3933).
+    assert.equal(body.error, 'image too large');
+    assert.equal(provider.calls.uploadFile.length, 0);
+  });
+
+  test('an image of exactly MAX_ATTACHMENT_BYTES reaches the handler and is accepted (inclusive cap, LIN-3933)', async () => {
+    const provider = new FakeUploadProvider();
+    const atCap = Buffer.concat([PNG_BYTES, Buffer.alloc(MAX_ATTACHMENT_BYTES - PNG_BYTES.length)]);
+    const { status } = await postAttachment(buildApp({ provider }), { image: `data:image/png;base64,${atCap.toString('base64')}` }, {
+      headers: { 'Content-Type': 'text/plain' },
+    });
+    assert.equal(status, 201);
+    assert.equal(provider.calls.uploadFile.length, 1);
+    assert.equal(provider.calls.uploadFile[0].bytes.length, MAX_ATTACHMENT_BYTES);
+  });
+
+  test('an image past the parser limit is refused by the parser with its generic body, never reaching the handler (LIN-3933)', async () => {
+    const provider = new FakeUploadProvider();
+    const pastLimit = Buffer.concat([PNG_BYTES, Buffer.alloc(11 * 1024 * 1024)]);
+    const { status, body } = await postAttachment(buildApp({ provider }), { image: `data:image/png;base64,${pastLimit.toString('base64')}` }, {
+      headers: { 'Content-Type': 'text/plain' },
+    });
+    assert.equal(status, 413);
+    assert.equal(body.error, 'Request body too large');
     assert.equal(provider.calls.uploadFile.length, 0);
   });
 
@@ -282,5 +318,24 @@ describe('POST /api/proxy/issues/:issueId/attachments (LIN-891)', () => {
     const { status } = await postAttachment(buildApp({ provider }), { image: PNG_DATA_URL, target: 'description' });
     assert.equal(status, 404);
     assert.equal(provider.calls.uploadFile.length, 0);
+  });
+});
+
+// LIN-3933: the parser limit is derived from the decoded cap, mirroring the feedback
+// route's pinned derivation (tests/unit/lin-3907-feedback-image-size.test.js).
+describe('the attachment parser limit is derived from the image cap (LIN-3933)', () => {
+  test('a cap-sized base64 image plus a worst-case description caption fits under the limit', () => {
+    const floor = Math.ceil(MAX_ATTACHMENT_BYTES * 4 / 3) + 6 * MAX_DESCRIPTION_LENGTH;
+    assert.strictEqual(typeof ATTACHMENT_UPLOAD_BODY_LIMIT, 'number');
+    assert.ok(ATTACHMENT_UPLOAD_BODY_LIMIT >= floor, `limit ${ATTACHMENT_UPLOAD_BODY_LIMIT} too small for cap ${MAX_ATTACHMENT_BYTES}`);
+  });
+
+  test('and no more than 1 MiB above that, so the buffer stays near the cap (LIN-669 M3)', () => {
+    const ceiling = Math.ceil(MAX_ATTACHMENT_BYTES * 4 / 3) + 1024 * 1024;
+    assert.ok(ATTACHMENT_UPLOAD_BODY_LIMIT <= ceiling, `limit ${ATTACHMENT_UPLOAD_BODY_LIMIT} buffers well past cap ${MAX_ATTACHMENT_BYTES}`);
+  });
+
+  test('and no larger than the 14mb literal it replaces, so no body the old parser refused is now admitted', () => {
+    assert.ok(ATTACHMENT_UPLOAD_BODY_LIMIT <= 14 * 1024 * 1024);
   });
 });
