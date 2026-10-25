@@ -131,4 +131,4 @@ The grep is a bound on where cost words appear, not a site count: most matches a
 
 ## 8. Seams
 
-`node scripts/code-shape/seams.mjs . 4a6a4e50`: 9 area pairs, 1 group (acorn present, exit 0). The judge lives under `experiments/`, outside the seams scope (`server.js|lib|routes|public`), so the count cannot move. Head: see the PR.
+`node scripts/code-shape/seams.mjs . 4a6a4e50`: 9 area pairs, 1 group (acorn present, exit 0). The judge lives under `experiments/`, outside the seams scope (`server.js|lib|routes|public`), so the count cannot move. Head `d183c779`: 9 area pairs, 1 group (exit 0), unchanged.

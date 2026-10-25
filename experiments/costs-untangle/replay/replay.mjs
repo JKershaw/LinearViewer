@@ -5,6 +5,7 @@
 // each side runs in its own node process under TZ=UTC with V8 coverage on.
 // Exit: 0 = every surface identical; 1 = some surface differs; 2 = tool failure.
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -14,7 +15,10 @@ import { edgeScenarios } from './edge.mjs';
 import { SURFACE_IDS } from './surfaces.mjs';
 
 export const HERE = path.dirname(fileURLToPath(import.meta.url));
-export const WORK = path.join(HERE, 'work');
+// Snapshots and mutant trees are kept OUTSIDE the checkout: the repo's own tests
+// walk every source file under the repo root, and a mutant copy of docs/ would be
+// judged as if it were real documentation.
+export const WORK = process.env.COSTS_REPLAY_WORK || path.join(os.tmpdir(), 'costs-untangle-replay');
 
 export function parseArgs(argv) {
   const out = { seed: 7, n: 2000 };
