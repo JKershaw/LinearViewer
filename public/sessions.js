@@ -10,8 +10,7 @@
  *   - error:    fetch failed (retryable)
  *
  * Exposed as a global `SessionsSection` since the Swipe page is a plain script
- * (no module loader / build step). Visual language mirrors the swipe page's
- * loop history.
+ * (no module loader / build step).
  */
 (function () {
   'use strict';

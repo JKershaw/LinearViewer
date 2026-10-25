@@ -1300,7 +1300,7 @@ a.obs-task-ident:hover { text-decoration: underline; }
 .obs-archive-more[disabled] { cursor: default; opacity: 0.6; }
 .obs-archive-more[hidden] { display: none; }
 
-/* New-row arrival pulse (shared idiom with the dashboard). */
+/* New-row arrival pulse. */
 .obs-session.cell-new { animation: obs-cell-new 1.2s ease-out; }
 @keyframes obs-cell-new {
   0% { background: var(--inset); }

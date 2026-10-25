@@ -1425,7 +1425,7 @@
       if (timerId) { clearTimeout(timerId); timerId = null; timerDelayMs = null; }
       // LIN-2771: no timer is armed — the stored anchor must say so, or a
       // reload would resume a wake the stopped cadence had cancelled. The
-      // the stop REASON is persisted separately (`stoppedReason`); here the
+      // stop REASON is persisted separately (`stoppedReason`); here the
       // record simply drops the anchor so a reload starts as today.
       persistCadence();
       if (nextCheckInEl) nextCheckInEl.textContent = 'next check-in: —';
