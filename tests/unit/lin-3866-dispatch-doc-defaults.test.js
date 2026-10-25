@@ -42,7 +42,7 @@ const fieldRows = docSource.split('\n').filter(line => /^\|\s*`(model|harness|ef
 
 // The phrasing this ticket removes. Matches "keep(s) the consumer's current default",
 // "keep(s) the consumer's own default", "... own default/precedence chain", and "omitted ⇒ consumer default".
-const STALE = /keeps? the consumer's (?:current|own) default|omitted ⇒ consumer default/;
+const STALE = /keeps? the consumer's (?:(?:current|own) )?default|omitted ⇒ consumer default/;
 
 describe('LIN-3866 — blank model/harness/effort no longer "keeps the consumer\'s default"', () => {
   test('the model section has no stale consumer-default claim', () => {

@@ -912,7 +912,8 @@ session lane stops at the workspace defaults. See the proxy-lane bullet below.
   conflict.
 - **Proxy-lane fill (LIN-3866).** On `POST /api/proxy/dispatch` and
   `POST /api/proxy/recommend-and-dispatch`, a blank `harness` is filled server-side in this
-  order: the explicit value; then, on a `followUpTo`, the anchor's harness, so a resume runs on
+  order: the explicit value; then, on a `followUpTo` to an `autopilot` anchor, the anchor's
+  frozen preset snapshot; then, on any `followUpTo`, the anchor's harness, so a resume runs on
   the harness of the session it resumes; then the workspace's dispatch defaults; then
   `"claude-code"`. The session lane (`POST /api/dispatch`) stops after the workspace defaults:
   a blank harness there stays `null` and the consumer's own default applies, because the
