@@ -875,7 +875,14 @@
   }
 }
 
-/* Models' body keeps the page's small-phone size until LIN-3855 rebuilds it (the Settings root is 1rem on a phone). */
+/* Models' body keeps the page's small-phone sizes until LIN-3855 rebuilds it (the Settings root is 1rem on a phone,
+   but style.css sets the body to 14px at 640px and below and 13px at 400px and below). */
+@media (max-width: 640px) {
+  .settings-shell[data-area="models"] .settings-pane > .settings-section {
+    font-size: 14px;
+  }
+}
+
 @media (max-width: 400px) {
   .settings-shell[data-area="models"] .settings-pane > .settings-section {
     font-size: 13px;
