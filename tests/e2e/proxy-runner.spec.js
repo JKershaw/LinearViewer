@@ -89,7 +89,8 @@ test.describe('Proxy page - Runner credentials (LIN-3131 S2b.3)', () => {
     const keys = page.getByTestId('settings-key-proxy').filter({ hasText: 'Runner key' });
     await expect(keys).toHaveCount(1);
     await keys.locator('summary').click();
-    await expect(keys).toContainText(/expires 2/);
+    // The runner working token lives 24h, so its relative expiry is in hours (LIN-3890).
+    await expect(keys).toContainText(/expires in \d+h/);
 
     // Revoke from the opened row (lineage revoke by the live row's own id, the owner's DELETE route).
     await keys.getByTestId('settings-key-revoke').click();
@@ -111,7 +112,7 @@ test.describe('Proxy page - Runner credentials (LIN-3131 S2b.3)', () => {
     const row = page.getByTestId('settings-key-proxy').filter({ hasText: 'Runner key' }).first();
     await expect(row).toContainText('waiting to be used');
     await row.locator('summary').click();
-    await expect(row).toContainText(/expires 2/);
+    await expect(row).toContainText(/expires in \d+m/);
   });
 });
 

@@ -275,7 +275,7 @@ test.describe('Token Management', () => {
     await keyRows(page).locator('summary').click()
     await expect(keyRows(page)).toContainText('listed-token')
     // LIN-3618: a new token carries a 90-day expiry and the list shows it
-    await expect(keyRows(page)).toContainText('expires 2')
+    await expect(keyRows(page)).toContainText(/expires in \d+d/)
   })
 
   test('can revoke a token', async ({ page, localWorkerUrlKey }) => {

@@ -145,7 +145,7 @@ test.describe('Settings areas: keys and the theme', () => {
     const key = page.getByTestId('settings-key-proxy').filter({ hasText: 'ci-reader' });
     await expect(key).toHaveCount(1);
     await key.locator('summary').click();
-    await expect(key).toContainText('expires 2');
+    await expect(key).toContainText(/expires in \d+d/);
     await key.getByTestId('settings-key-revoke').click();
     await expect(page.getByTestId('settings-key-proxy').filter({ hasText: 'ci-reader' })).toHaveCount(0);
   });
