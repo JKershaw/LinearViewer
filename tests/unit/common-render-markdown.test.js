@@ -32,6 +32,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { vendorAssetPath } from '../../lib/vendor-assets.js';
+import { withHarnessModels } from '../fixtures/harness-models.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const COMMON_SRC = readFileSync(join(__dirname, '../../public/common.js'), 'utf8');
@@ -57,7 +58,7 @@ function makeSandbox() {
   // Identity stub — sanitisation itself is untouched by this change and is
   // covered for real (with real DOMPurify) in the e2e suite.
   sandbox.DOMPurify = { sanitize: (html) => html };
-  vm.runInContext(COMMON_SRC, sandbox, { filename: 'common.js' });
+  vm.runInContext(withHarnessModels(COMMON_SRC), sandbox, { filename: 'common.js' });
   return sandbox;
 }
 
@@ -135,7 +136,7 @@ describe('ProxyToggle binds the button itself (LIN-3401)', () => {
     vm.createContext(sandbox);
     vm.runInContext(MARKED_SRC, sandbox, { filename: 'marked.min.js' });
     sandbox.DOMPurify = { sanitize: (h) => h };
-    vm.runInContext(COMMON_SRC, sandbox, { filename: 'common.js' });
+    vm.runInContext(withHarnessModels(COMMON_SRC), sandbox, { filename: 'common.js' });
     return { sandbox, docListeners };
   }
   const fakeBtn = () => {

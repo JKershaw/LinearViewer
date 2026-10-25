@@ -46,6 +46,7 @@ import { dirname, join } from 'node:path';
 import express from 'express';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { registerProvider } from '../../lib/providers/registry.js';
+import { withHarnessModels } from '../fixtures/harness-models.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const COMMON_JS_SRC = readFileSync(join(__dirname, '../../public/common.js'), 'utf8');
@@ -147,7 +148,7 @@ function makeSandbox(origin) {
     },
   };
   vm.createContext(sandbox);
-  vm.runInContext(COMMON_JS_SRC, sandbox, { filename: 'common.js' });
+  vm.runInContext(withHarnessModels(COMMON_JS_SRC), sandbox, { filename: 'common.js' });
   vm.runInContext(OBSERVATION_JS_SRC, sandbox, { filename: 'observation.js' });
   return sandbox;
 }

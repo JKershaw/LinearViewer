@@ -15,6 +15,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
+import { withHarnessModels } from '../fixtures/harness-models.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -36,7 +37,7 @@ function loadCommon() {
   };
   sandbox.window.ProxyToggle = { shouldAppend: () => false };
   vm.createContext(sandbox);
-  vm.runInContext(readFileSync(join(__dirname, '../../public/common.js'), 'utf8'), sandbox, { filename: 'common.js' });
+  vm.runInContext(withHarnessModels(readFileSync(join(__dirname, '../../public/common.js'), 'utf8')), sandbox, { filename: 'common.js' });
   // common.js defines its own window.api (the shared fetch wrapper); override it
   // AFTER load so the harness captures the POST the shipped dispatchPrompt makes.
   sandbox.window.api = async (url, opts) => { calls.api.push({ url, opts }); return { ok: true }; };

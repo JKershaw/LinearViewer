@@ -21,6 +21,7 @@ import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { withHarnessModels } from '../fixtures/harness-models.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const COMMON_SRC = readFileSync(join(__dirname, '../../public/common.js'), 'utf8');
@@ -42,7 +43,7 @@ function load(apiImpl, { toggleOn = false } = {}) {
     fetch() { throw new Error('fetch should not be called'); }
   };
   vm.createContext(sandbox);
-  vm.runInContext(COMMON_SRC, sandbox, { filename: 'common.js' });
+  vm.runInContext(withHarnessModels(COMMON_SRC), sandbox, { filename: 'common.js' });
   sandbox.window.api = async (url, opts) => {
     calls.push({ url, body: JSON.parse(opts.body), on401: opts.on401 });
     return apiImpl(url, opts);

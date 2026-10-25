@@ -1401,57 +1401,25 @@ window.ReplyDelivery = (function () {
 // LIN-1095) with its own class names, since settings.css isn't loaded on these
 // surfaces. Harness stays an opaque string everywhere (LIN-1084/LIN-438) — this
 // suggestion list is UI-only, not a registry.
-const DISPATCH_HARNESS_SUGGESTIONS = ['claude-code', 'opencode'];
-
-// UI-only default (LIN-1111): the harness select below pre-selects this value
-// so a user dispatching without touching the control explicitly sends
-// 'claude-code' instead of blank. This is purely client-side — it does not
-// touch routes/dispatch.js resolution or the null-passthrough contract for
-// consumers who bypass this UI (proxy/API omitting harness still means
-// "apply your own default" on the server).
-const DEFAULT_HARNESS = 'claude-code';
-
-// Small, distinctly-named recommended-models list for the dispatch-EXECUTION
-// model inputs (LIN-1111) — deliberately separate from AVAILABLE_MODELS in
-// lib/openrouter.js, which recommends models for the unrelated Workspace AI
-// Model selector (the model that WRITES prompts, not the one a dispatched
-// agent executes with). Rendered as a real <select> (LIN-2719) — curated ids
-// plus the live catalog, harness-scoped, a `data-free` marker where the
-// catalog reports $0, and an `other…` free-text escape hatch
-// (DISPATCH_MODEL_OTHER_VALUE below) so a model outside both lists is still
-// reachable and blank still resolves to null.
-const DISPATCH_MODEL_SUGGESTIONS = [
-  'anthropic/claude-sonnet-4.6',
-  'anthropic/claude-opus-4.8',
-  'openai/gpt-5.4-mini',
-  'openai/gpt-5.5',
-  'openai/gpt-5.5-pro',
-  'anthropic/claude-sonnet-5',
-  'anthropic/claude-opus-5',
-  'anthropic/claude-fable-5',
-  'anthropic/claude-haiku-4.5',
-  'openai/gpt-5.6-sol'
-];
-
-// Claude Code's model presets (LIN-1282, `fable` added LIN-1763). Unlike OpenCode —
-// which reaches the full OpenRouter-derived DISPATCH_MODEL_SUGGESTIONS list above
-// plus the live catalog — Claude Code only offers Haiku / Sonnet / Opus / Fable.
-// These are the Claude Code `--model` aliases, so they stay stable across model generations (the
-// Simple Dispatcher launch-with-model wiring is a separate follow-up; the `other…`
-// escape hatch below is what actually reaches Simple Dispatcher's wider
-// CLAUDE_MAPPABLE_MODEL_FAMILIES substring-matched acceptance, e.g. `default` or a
-// version-pinned `claude-…` id). The model select's option set swaps between this
-// list and the OpenCode one based on the selected harness (syncHarnessModelList,
-// below); the live catalog is merged only into the OpenCode option set.
-const DISPATCH_CLAUDE_MODEL_SUGGESTIONS = ['haiku', 'sonnet', 'opus', 'fable'];
-
-// Sentinel <option> value for the model select's free-text escape hatch
-// (LIN-2719, HARD RULE 3). Exposed on window so public/settings.js and
-// public/dispatch.js (same runtime, different files) share the exact literal
-// rather than each hand-typing it; mirrored server-side in
-// lib/render-settings.js as a plain string constant (the two runtimes can't
-// share a module, so the string IS the contract).
-const DISPATCH_MODEL_OTHER_VALUE = '__other__';
+// The harness list is one copy, served by the server (lib/model-routing-harnesses.js, LIN-3855):
+// renderPage embeds it as window.__HARNESS_MODELS__ on every page that loads this file, so Dispatch,
+// the feedback widget and Settings offer the same models, and a page write is checked against the
+// same list. Bound here under the names the code below uses; nothing is hand-copied.
+const _harnessModels = window.__HARNESS_MODELS__;
+if (!_harnessModels) throw new Error('common.js: window.__HARNESS_MODELS__ is missing; the page must render through renderPage');
+// The harnesses a dispatch can name (LIN-1095, LIN-1084: harness stays an opaque string).
+const DISPATCH_HARNESS_SUGGESTIONS = _harnessModels.harnesses;
+// UI-only default (LIN-1111): the harness select pre-selects this so a user dispatching without
+// touching the control explicitly sends 'claude-code' instead of blank. Client-side only; the
+// server's null-harness default is separate (routes/dispatch.js).
+const DEFAULT_HARNESS = _harnessModels.defaultHarness;
+// Claude Code's `--model` presets (LIN-1282). Claude Code offers only these; the `other…` escape
+// hatch below reaches Simple Dispatcher's wider acceptance.
+const DISPATCH_CLAUDE_MODEL_SUGGESTIONS = _harnessModels.curated['claude-code'];
+// OpenCode's recommended OpenRouter ids, merged with the live catalog in buildDispatchModelOptionDescriptors.
+const DISPATCH_MODEL_SUGGESTIONS = _harnessModels.curated.opencode;
+// Sentinel <option> value for the model select's free-text escape hatch (LIN-2719, HARD RULE 3).
+const DISPATCH_MODEL_OTHER_VALUE = _harnessModels.otherValue;
 window.DISPATCH_MODEL_OTHER_VALUE = DISPATCH_MODEL_OTHER_VALUE;
 
 // =============================================================================
@@ -1525,7 +1493,7 @@ function buildDispatchModelOptionsHtml(harness, selectedValue, catalog = _dispat
 
 // Settings dispatch-defaults/preset rows are server-rendered directly (never
 // through renderDispatchExecControls/fetchDispatchModelCatalog), so they
-// carry their own catalog snapshot on `.dispatch-defaults-form[data-model-catalog]`
+// carry their own catalog snapshot on `.dispatch-presets-catalog[data-model-catalog]` (LIN-3855)
 // (lib/render-settings.js) — the SAME {id, name, free} wire shape the live
 // endpoint returns, so it feeds the exact same merge function above. Parsed
 // once and cached; without this, a client-side harness switch on Settings
@@ -1534,7 +1502,7 @@ function buildDispatchModelOptionsHtml(harness, selectedValue, catalog = _dispat
 let _settingsModelCatalogCache = null;
 function getSettingsModelCatalog() {
   if (_settingsModelCatalogCache !== null) return _settingsModelCatalogCache;
-  const form = document.querySelector('.dispatch-defaults-form[data-model-catalog]');
+  const form = document.querySelector('.dispatch-presets-catalog[data-model-catalog]');
   try {
     _settingsModelCatalogCache = form ? (JSON.parse(form.dataset.modelCatalog) || []) : [];
   } catch (e) {
