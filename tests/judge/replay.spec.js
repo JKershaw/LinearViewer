@@ -64,8 +64,15 @@ async function settle(page) {
 // Per-state set-up: identical on both sides, driven by the page's own markup.
 // LIN-3968: Home's opened task. The sessions are seeded through the consumer API (on both sides), then Home is
 // opened and its top task clicked. The write is the fixed stream, so the request never leaves the browser.
-async function prepareHome(page, context, entry) {
-  if (hasHomeSessions(entry.state)) await seedHomeSessions(context.request, entry.urlKey, entry.state);
+// Seeded once per server and state: the dispatch guard refuses the same kind on the same task for five minutes, so
+// a second shoot of the same state would be refused. Sessions persist on the server, so later contexts see them too.
+const seeded = new Set();
+async function prepareHome(page, context, entry, baseURL) {
+  const key = `${baseURL}|${entry.urlKey}`;
+  if (hasHomeSessions(entry.state) && !seeded.has(key)) {
+    await seedHomeSessions(context.request, entry.urlKey, entry.state);
+    seeded.add(key);
+  }
   if (entry.state === 'home-copy-written') {
     await page.route('**/api/recommend/*/stream*', (route) => route.fulfill({ status: 200, contentType: 'text/event-stream', body: HOME_WRITE_SSE }));
   }
@@ -78,13 +85,14 @@ async function prepareHome(page, context, entry) {
   if (await block.count()) await block.waitFor();
   if (entry.state === 'home-copy-written' && await page.locator('[data-testid="opened-task-write"]').count()) {
     await page.locator('[data-testid="opened-task-write"]').click();
-    await page.locator('[data-testid="opened-task-target"]').waitFor();
+    // Both sides show the write's result (head: the target line; base: no target line), so wait for the Copy button.
+    await page.getByRole('button', { name: 'Copy prompt' }).waitFor();
   }
 }
 
-async function prepare(page, context, entry, viewport, theme) {
+async function prepare(page, context, entry, viewport, theme, baseURL) {
   const url = entry.path(entry.urlKey);
-  if (entry.state?.startsWith('home-')) return prepareHome(page, context, entry);
+  if (entry.state?.startsWith('home-')) return prepareHome(page, context, entry, baseURL);
   if (entry.state === 'email-signin') {
     // One address per shot, the same on both sides: the send throttle is per address (3 per 15 minutes),
     // and the judge takes at most ATTEMPTS (3) tries per shot. The link is read from the capture outbox.
@@ -160,7 +168,7 @@ async function shoot(browser, baseURL, viewport, theme, entry) {
   const context = await openContext(browser, baseURL, viewport, theme, entry);
   try {
     const page = await context.newPage();
-    await prepare(page, context, entry, viewport, theme);
+    await prepare(page, context, entry, viewport, theme, baseURL);
     await settle(page);
     // Rewrite per-run text (see NORMALISE in pages.mjs) in text nodes, before the screenshot.
     await page.evaluate((rules) => {
