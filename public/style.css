@@ -1268,6 +1268,12 @@ a.wordmark:hover {
   color: var(--fg-dim);
 }
 
+/* The spend bar and its visible caption: the caption says what the bar measures. */
+.decision-panel-share {
+  display: grid;
+  gap: var(--space-1);
+}
+
 .decision-panel-figures {
   margin: 0;
   font-family: var(--font-structural);
@@ -1319,11 +1325,13 @@ a.wordmark:hover {
   font-size: 0.9em;
 }
 
+/* One suggestion: the name, its reason on the line under it, then its costs on a line of their own. Stacked, so the
+   price never runs into the reason at any width (LIN-3962 review). */
 .decision-panel-suggestion {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-1) var(--space-2);
+  display: grid;
+  justify-items: start;
+  gap: var(--space-1);
+  min-width: 0;
 }
 
 .decision-panel-pick {
@@ -1336,15 +1344,17 @@ a.wordmark:hover {
   cursor: pointer;
 }
 
-.decision-panel-reason,
-.decision-panel-price,
-.decision-panel-typical {
+.decision-panel-reason {
   color: var(--fg-dim);
+  overflow-wrap: anywhere;
 }
 
-.decision-panel-price,
-.decision-panel-typical {
+.decision-panel-costs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
   font-family: var(--font-structural);
+  color: var(--fg-dim);
 }
 
 .opened-task-more {

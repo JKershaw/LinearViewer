@@ -52,6 +52,17 @@ test('the switch-row sample is the switchRow builder\'s exact output', () => {
   );
 });
 
+// LIN-3962 (operator visual judge): the decision panel's two samples each carry a caption saying which state they
+// show, and each caption sits above its own panel, so the two never read as one panel.
+test('the decision-panel samples are two captioned samples, each caption above its own panel', () => {
+  const html = renderStyleguide();
+  const captions = [...html.matchAll(/class="sg-decision-caption">[^<]+</g)].map((m) => m.index);
+  assert.equal(captions.length, 2, 'one caption per sample');
+  const models = html.indexOf('data-testid="sg-decision-models"');
+  const home = html.indexOf('data-testid="sg-decision-home"');
+  assert.ok(captions[0] < models && models < captions[1] && captions[1] < home, 'Models\' caption, Models\' panel, Home\'s caption, Home\'s panel, in order');
+});
+
 // Two renders made milliseconds apart cannot see a wall-clock dependency, so render under two clocks
 // 400 days apart: the key row's "expires in ..." / "last used ..." text would differ if it read the clock.
 test('the page is byte-stable across renders (the key row is given a fixed clock)', (t) => {

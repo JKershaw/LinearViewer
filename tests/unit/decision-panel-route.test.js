@@ -85,7 +85,7 @@ describe('GET /api/dispatch/decision-panel: the numbers are the derived kind\'s 
   test('a priced run shows its runs and typical cost in the panel', async () => {
     const history = [taken('implementation', 'a', [usage({ costUsd: 1.5 })]), taken('implementation', 'b', [usage({ costUsd: 0.5 })])];
     const { body } = await get(buildApp({ history }), `${PANEL}?promptName=implementation`);
-    assert.match(body.html, /\$2\.00 · typical \$1\.000 a run/);
+    assert.match(body.html, /\$2\.00 · typical \$1\.00 a run/);
     assert.equal(body.numbers.runs, 2);
   });
 

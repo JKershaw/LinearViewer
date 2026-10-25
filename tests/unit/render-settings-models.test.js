@@ -187,7 +187,7 @@ describe('the spend', () => {
     const html = body(emptyTable(), {
       agentSpend: [{ id: 'bug', runs: 2, priced: 2, unpriced: 0, noTelemetry: 0, spendUsd: 1.5, typicalUsd: 0.75, models: ['sonnet'] }]
     });
-    assert.match(html, /\$1\.50 · typical \$0\.750 a run/);
+    assert.match(html, /\$1\.50 · typical \$0\.75 a run/);
   });
 
   test('the spend bar is a native progress element, with the share as its value', () => {

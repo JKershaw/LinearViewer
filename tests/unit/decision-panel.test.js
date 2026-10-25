@@ -23,7 +23,7 @@ const LISTS = {
   any: [{ id: 'sonnet', label: 'sonnet', free: false }, { id: 'openai/gpt-5.5', label: 'GPT-5.5', free: false }]
 };
 const SUGGEST = {
-  'claude-code': [{ id: 'sonnet', name: 'Sonnet', reason: 'A mid-size Claude model', price: 'price unknown', typical: '$0.750 a run' }],
+  'claude-code': [{ id: 'sonnet', name: 'Sonnet', reason: 'A mid-size Claude model', price: 'price unknown', typical: '$0.75 a run' }],
   opencode: [{ id: 'openai/gpt-5.5', name: 'GPT-5.5', reason: 'OpenAI model', price: '$5 / $30 per 1M tokens', typical: null }]
 };
 
@@ -117,7 +117,19 @@ describe('the same inputs give the same structure on both pages', () => {
 describe('the numbers block', () => {
   test('priced spend is shown to the cent, with its typical run', () => {
     const html = panel();
-    assert.match(html, /\$1\.50 · typical \$0\.750 a run/);
+    assert.match(html, /\$1\.50 · typical \$0\.75 a run/);
+  });
+
+  test('a typical or total under half a cent reads <$0.01, never $0.00', () => {
+    const html = panel({ numbers: { ...NUMBERS, spendUsd: 0.003, typicalUsd: 0.003 } });
+    assert.match(html, /&lt;\$0\.01 · typical &lt;\$0\.01 a run/);
+    assert.doesNotMatch(html, /\$0\.00/);
+  });
+
+  test('the spend bar has its words on the page, not only in aria-label', () => {
+    const html = panel();
+    assert.match(html, /<p class="decision-panel-heading">50% of all priced spend in 30 days<\/p>/);
+    assert.match(html, /<progress class="settings-spend-bar"[^>]*aria-label="50% of all priced spend in 30 days"/);
   });
 
   test('a job with no priced runs shows unknown, never $0', () => {
@@ -144,6 +156,11 @@ describe('suggested models belong to the harness in force', () => {
     assert.match(html, /data-decision-harness="opencode"[^>]*hidden/);
     assert.match(html, /A mid-size Claude model/);
     assert.match(html, /price unknown/);
+  });
+
+  test('a suggestion\'s price and typical cost sit in their own line, apart from its reason', () => {
+    const html = panel();
+    assert.match(html, /<span class="decision-panel-reason">A mid-size Claude model<\/span>\s*<span class="decision-panel-costs">\s*<span class="decision-panel-price">price unknown<\/span>\s*<span class="decision-panel-typical">\$0\.75 a run<\/span>/);
   });
 
   test('the search list is one datalist per harness, and the input starts on the harness in force', () => {
@@ -184,7 +201,7 @@ describe('decisionSuggestions: what a suggested row says, from the job\'s own ru
   test('an alias that ran as exactly one model shows that model, with its typical cost', () => {
     const [opus] = decisionSuggestions({ harness: 'claude-code', typicals: rows(taken('claude-opus-5', 2), taken('claude-opus-5', 4)) }).filter((s) => s.id === 'opus');
     assert.match(opus.name, /^Opus · ran as claude-opus-5$/);
-    assert.equal(opus.typical, '$3.000 a run');
+    assert.equal(opus.typical, '$3.00 a run');
   });
 
   test('an alias the job never ran shows its family and "price unknown", and no cost', () => {
@@ -203,6 +220,6 @@ describe('decisionSuggestions: what a suggested row says, from the job\'s own ru
   test('the opencode suggestions are full ids, and their cost matches the exact model only', () => {
     const list = decisionSuggestions({ harness: 'opencode', typicals: rows(taken('openai/gpt-5.5', 0.2)) });
     assert.ok(list.length > 0 && list.every((s) => s.id.includes('/')));
-    assert.equal(list.find((s) => s.id === 'openai/gpt-5.5').typical, '$0.200 a run');
+    assert.equal(list.find((s) => s.id === 'openai/gpt-5.5').typical, '$0.20 a run');
   });
 });
