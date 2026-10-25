@@ -99,6 +99,13 @@ describe('key tools render with no flag set', () => {
 
 describe('the Dispatch page is read-only for a member', () => {
   const page = (featureFlags) => renderDispatchPage('Acme', { urlKey: 'acme', featureFlags });
+  // LIN-3889 (B3): the token form's submit button, found inside its own form and not by its class,
+  // so a change to the button's classes (the Button decision) does not move the gate's pin.
+  const tokenSubmit = (html) => {
+    const form = html.match(/<form\b[^>]*id="create-token-form"[\s\S]*?<\/form>/);
+    assert.ok(form, 'the token form is on the page');
+    return form[0].match(/<button\b[^>]*type="submit"[^>]*>/)?.[0] ?? '';
+  };
 
   test('a member gets no halt buttons but keeps the halt status, and the token form is disabled', () => {
     const html = page({});
@@ -112,7 +119,7 @@ describe('the Dispatch page is read-only for a member', () => {
     assert.ok(!html.includes('data-halt-form'), 'no halt form');
     // The form element stays: public/dispatch.js returns early without it and the token list would not load.
     assert.match(html, /id="create-token-form"/);
-    assert.match(html, /<button type="submit" class="action-btn save" disabled>/);
+    assert.match(tokenSubmit(html), /<button\b[^>]*\bdisabled\b/, 'the member\'s token submit is disabled');
     assert.ok(html.includes('only the workspace owner can make a queue token'));
     // LIN-3846: the queue-token list moved to Settings › Agent access, which owns the owner-only revoke.
     assert.ok(html.includes('data-testid="dispatch-keys-link"'));
@@ -124,7 +131,8 @@ describe('the Dispatch page is read-only for a member', () => {
       const html = page(flags);
       assert.ok(html.includes('data-testid="dispatch-halt-pause"'));
       assert.ok(html.includes('data-testid="dispatch-halt-resume"'));
-      assert.match(html, /<button type="submit" class="action-btn save">/);
+      assert.match(tokenSubmit(html), /<button\b[^>]*type="submit"/);
+      assert.doesNotMatch(tokenSubmit(html), /\bdisabled\b/, 'the owner\'s token submit is enabled');
       assert.ok(!html.includes('only the workspace owner can make a queue token'));
       assert.ok(html.includes('data-testid="dispatch-keys-link"'));
     });

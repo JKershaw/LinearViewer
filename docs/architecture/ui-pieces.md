@@ -107,7 +107,7 @@ The class is "a rule written in 2 or more places that Settings shares". Two repr
 - **Sites at base (4):** `style.css:3133` `.field` (the authority), `dispatch.css:19` `.dispatch-section .line`, `proxy.css:104` `.proxy-section .line`, `settings.css:45` `.settings-section .line`.
 - **Consolidate deletes:** the three `.X-section .line` blocks (done, LIN-3889). The 640px wrap moves to `.field`.
 - **Same-name collision, not a copy:** the dashboard tree's own `.line` (`style.css:1222`, and the phone override at `:1931`) is a different rule (`align-items: baseline`, `padding: 4px 0`). It is scoped to the tree in intent and **harmless**, except that new Settings rows also carry the class `line` (`render-settings-shell.js:37`, `render-settings-workspace.js:20` and `:188`, `render-settings-you.js:60`, `:80`, `:95`, `:107`, `:115` and `:144`), so the bare `.line` at `style.css:1222` also matches them. Class: **unclear**; Rebuild must drop the `line` class from Settings rows or scope the tree rule.
-- **Differences:** the three `.X-section .line` copies wrap at 640px and `.field` does not (`dispatch.css:486`, `proxy.css:424`, `settings.css:543`, each `flex-wrap: wrap`). Class: **fix** (provisional): a field row that cannot wrap overflows on a phone; give `.field` the wrap. Not changed here.
+- **Differences:** the three `.X-section .line` copies wrap at 640px and `.field` does not (`dispatch.css:486`, `proxy.css:424`, `settings.css:543`, each `flex-wrap: wrap`). Class: **fix** (provisional): a field row that cannot wrap overflows on a phone; give `.field` the wrap. Done (LIN-3889): the wrap moved to `.field`, the only place pixels move.
 - **Variant:** none. (Corrected by LIN-3889: `.dispatch-prompt-line { align-items: flex-start }` never applied, because the copy's 0,2,0 selector set `align-items` first. It is deleted with the copy, at 0 px.)
 
 ### 5b. Interactive row
@@ -117,7 +117,7 @@ The class is "a rule written in 2 or more places that Settings shares". Two repr
 - **Reason:** LIN-3846 built it for exactly this and every Settings area uses it.
 - **Counting rule:** a site is a row builder or a hand-written `<... class="settings-row ...">` in `lib/`.
 - **Sites at base:** the three builders; hand-written rows at `render-settings.js:866` (`settings-row settings-row-drill`), `render-settings-workspace.js:20` (`staticRow`, module-local), `render-settings-workspace.js:177` and `:188` (the change-log rows inside `changeRow`; `:188` is the static one), `render-settings-you.js:60`, `:80`, `:95`, `:107`, `:115` (static rows written out by hand), `render-settings-you.js:110` (an action row written out by hand: `settings-row settings-row-action settings-action-teal`, a copy of `actionRow`) and `render-settings-you.js:144-147` (a switch written out by hand).
-- **Consolidate deletes:** the hand-written copies at `render-settings-you.js:144-147`, `render-settings-you.js:110` (replaced by `actionRow`) and `render-settings.js:866`, replaced by the builders. (Done, LIN-3889.) The five static rows in `render-settings-you.js` (`:60`, `:80`, `:95`, `:107`, `:115`) and the one at `render-settings-workspace.js:188` are hand-written copies of `staticRow` (`render-settings-workspace.js:20`). **`staticRow` becomes a shared builder** in `render-settings-shell.js` beside `switchRow`, `drillRow` and `actionRow`, and those six are replaced by it: it is the same markup six times over, and a second private copy is how the count got short. The change-log row at `:177` stays a `changeRow` concern.
+- **Consolidate deletes:** the hand-written copies at `render-settings-you.js:144-147`, `render-settings-you.js:110` (replaced by `actionRow`) and `render-settings.js:866`, replaced by the builders. (Partly, LIN-3889: the Theme, Email, Runs and change-log rows keep their own markup minus `line`; see the status table.) The five static rows in `render-settings-you.js` (`:60`, `:80`, `:95`, `:107`, `:115`) and the one at `render-settings-workspace.js:188` are hand-written copies of `staticRow` (`render-settings-workspace.js:20`). **`staticRow` becomes a shared builder** in `render-settings-shell.js` beside `switchRow`, `drillRow` and `actionRow`, and those six are replaced by it: it is the same markup six times over, and a second private copy is how the count got short. The change-log row at `:177` stays a `changeRow` concern.
 - **Differences:** `.settings-row` has its own spacing (`0.7rem 0.8rem`) and size (`0.95em`) that match neither the scale nor `.field`. Class: **variant** (a row in a card is not a bare field), recorded here as the named variant "row in a card".
 - **Variant:** `settings-row-static` (a read-only row), `settings-row-drill`, `settings-row-action`, `settings-row-switch`.
 
@@ -180,7 +180,7 @@ The class is "a rule written in 2 or more places that Settings shares". Two repr
 - **If this reading is wrong** (a runtime emitter built by string concatenation that the grep cannot see), `keyRow` still stands and the list becomes **open question 2**.
 - **Counting rule:** a site is a rule or builder that renders one key.
 - **Sites at base:** `render-settings-workspace.js:95` (live); `common-actions.css:92-152` (no emitter); tests naming the dead classes: `tests/e2e/dispatch-page.spec.js`, `tests/e2e/proxy.spec.js`, `tests/e2e/settings.spec.js`, `tests/unit/lin-2370-browser-copy-prompt-provider-identity.test.js`, `tests/unit/lin-3131-runner-settings-render.test.js`, `tests/unit/run-controls-render.test.js` (LIN-3888 must check whether they assert presence or absence).
-- **Consolidate deletes:** the seven dead token-list rules, once LIN-3888 has moved the tests that name them.
+- **Consolidate deletes:** the seven dead token-list rules in `common-actions.css` (done, LIN-3889), and the dead `.token-list` rules in `dispatch.css` and `.proxy-token-list` in `proxy.css` (done, LIN-3889: no renderer emits them).
 
 ### 12. Area page frame
 
@@ -202,10 +202,10 @@ The class is "a rule written in 2 or more places that Settings shares". Two repr
 ### 14. Back link
 
 - **Decides:** the "‹ back" breadcrumb above a page title.
-- **Authority:** none yet. **Provisional:** `.sess-back` (`session.css:22`) as the shared body, because three pages already write it byte-identically; `.settings-back` is a different rule.
+- **Authority:** one selector list, `.sess-back, .task-create-back, .task-edit-back` in `style.css` (LIN-3889). `.settings-back` (`settings.css`) is a different rule and stays a named variant.
 - **Counting rule:** a site is a rule styling a page's back link.
 - **Sites at base (4):** `session.css:22` `.sess-back`, `task-create.css:20` `.task-create-back`, `task-edit.css:29` `.task-edit-back` (byte-identical; `--dup-blocks` #19), `settings.css:592` `.settings-back` (differs: `color: var(--brand-dim)`, `display: none` until 760px, `settings.css:866`).
-- **Consolidate deletes:** two of the three identical copies once a shared home is chosen.
+- **Consolidate deletes:** the three identical page copies (done, LIN-3889: `session.css`, `task-create.css`, `task-edit.css`). The task page's back link reuses `.sess-back`. The judge seeds the task create and edit pages and the not-found session page (which renders the same link); the populated session page is not covered (its run data is not seeded).
 - **Differences:** `.settings-back` is brand-coloured and phone-only. Class: **variant** (Settings shows it only when the list is hidden).
 
 ### 15. Text control

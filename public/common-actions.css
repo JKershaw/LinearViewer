@@ -5,52 +5,7 @@
  * Provides unified button variants and token management UI.
  */
 
-/* =============================================================================
-   Action Buttons
-   ============================================================================= */
-.action-btn {
-  background: none;
-  border: none;
-  padding: 0.2rem var(--space-2);
-  font-family: var(--font-content);
-  font-size: var(--font-size-sm);
-  cursor: pointer;
-  border-radius: var(--radius-sm);
-  text-decoration: none;
-}
-
-/* Green - primary/save actions. Fills derive from the status token via
-   color-mix so they rebind under .theme-dark (LIN-786 dark-mode cleanup). */
-.action-btn.save {
-  color: var(--green);
-  background: color-mix(in srgb, var(--green) 12%, transparent);
-}
-
-.action-btn.save:hover {
-  background: color-mix(in srgb, var(--green) 22%, transparent);
-}
-
-/* Blue - connect/link actions */
-.action-btn.connect {
-  color: var(--blue);
-  background: color-mix(in srgb, var(--blue) 12%, transparent);
-}
-
-.action-btn.connect:hover {
-  background: color-mix(in srgb, var(--blue) 22%, transparent);
-}
-
-/* Red - destructive actions */
-.action-btn.disconnect,
-.action-btn.logout {
-  color: var(--red);
-  background: color-mix(in srgb, var(--red) 12%, transparent);
-}
-
-.action-btn.disconnect:hover,
-.action-btn.logout:hover {
-  background: color-mix(in srgb, var(--red) 22%, transparent);
-}
+/* Action buttons (.action-btn and its tones) live in style.css with the Button (LIN-3889, decision 6). */
 
 /* =============================================================================
    Token Form

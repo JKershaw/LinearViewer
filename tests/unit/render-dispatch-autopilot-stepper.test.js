@@ -15,7 +15,7 @@ import { renderDispatchPage } from '../../lib/render-dispatch.js';
 test('a stepper load button sits beside the classic one', () => {
   const html = renderDispatchPage('WS', { featureFlags: {} });
   // Classic control still present and still variant-less.
-  assert.ok(html.includes('class="action-btn dispatch-load-autopilot" title='),
+  assert.ok(html.includes('class="btn--quiet dispatch-load-autopilot" title='),
     'classic "load Autopilot" button unchanged');
   // Stepper sibling: same class, carries the variant marker + visible label.
   assert.ok(html.includes('dispatch-load-autopilot" data-variant="stepper"'),
@@ -23,12 +23,12 @@ test('a stepper load button sits beside the classic one', () => {
   assert.ok(html.includes('>load Autopilot · stepped</button>'),
     'stepper sibling shows the stepped label');
   // Exactly two load buttons.
-  assert.equal((html.match(/class="action-btn dispatch-load-autopilot"/g) || []).length, 2);
+  assert.equal((html.match(/class="btn--quiet dispatch-load-autopilot"/g) || []).length, 2);
 });
 
 test('the cluster renders whatever the stale stored switches say (LIN-3849)', () => {
   const html = renderDispatchPage('WS', { featureFlags: { proxy: false, dispatch: false } });
-  assert.equal((html.match(/class="action-btn dispatch-load-autopilot"/g) || []).length, 2);
+  assert.equal((html.match(/class="btn--quiet dispatch-load-autopilot"/g) || []).length, 2);
   assert.ok(html.includes('dispatch-continue-until-stopped'));
   assert.ok(html.includes('prompt-proxy-toggle'));
   assert.ok(!html.includes('data-proxy-feature'));

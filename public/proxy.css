@@ -325,10 +325,6 @@
   text-align: center;
 }
 
-.proxy-events-pager .action-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
 
 /* =============================================================================
    Runner credentials (LIN-3131 S2b.3)

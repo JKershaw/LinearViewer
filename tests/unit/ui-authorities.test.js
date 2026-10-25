@@ -75,7 +75,21 @@ describe('one authority per decision', () => {
 
 describe('the button decision: .btn is the authority, with tone variants', () => {
   test('.btn and its tone variants are defined in style.css', () => {
-    for (const sel of ['.btn', '.btn--red', '.btn--teal']) assert.deepEqual(rulesFor(sel), ['style.css'], sel);
+    for (const sel of ['.btn', '.btn--red', '.btn--teal', '.btn--quiet']) assert.deepEqual(rulesFor(sel), ['style.css'], sel);
+    // `.action-btn` is the alias body; flight-companion.css has a contextual override (`.fc-chat-composer .action-btn`), which is not a copy.
+    assert.match(css['style.css'], /\.action-btn,\s*\.btn--quiet\s*\{/, 'the quiet body is one selector list in style.css');
+  });
+
+  test('each `.action-btn` alias shares its canonical tone\'s rule body (one selector list, one body)', () => {
+    const body = css['style.css'];
+    for (const [alias, tone] of [['.action-btn.save', '.btn--green'], ['.action-btn.connect', '.btn--blue'], ['.action-btn.disconnect', '.btn--red']]) {
+      const list = new RegExp(`${alias.replace(/\./g, '\\.')},\\s*(?:[^{]*,\\s*)?${tone.replace(/\./g, '\\.')}\\s*\\{`);
+      assert.match(body, list, `${alias} and ${tone} share one body`);
+    }
+  });
+
+  test('the rest of the button family is in common-actions.css: none (the token and modal rules stay)', () => {
+    assert.deepEqual(rulesFor('.action-btn').filter(f => f === 'common-actions.css'), []);
   });
 });
 

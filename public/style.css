@@ -3432,19 +3432,75 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 }
 .btn--ghost:hover { background: var(--card-h); color: var(--text); border-color: transparent; }
 
-/* Tone variants (LIN-3889): the ask-in-place confirm and the key revoke. A filled-tint button in the
-   tone, with the AA-safe -dim token for its text (the same text Settings' red and teal rows already
-   use). Tinted, not solid: whether Rebuild wants a solid fill is an open question in the PR.
-   Both sit after `.btn:hover`, so the tint wins on hover too (`:hover` pairs below). */
+/* Tones and the quiet label (LIN-3889, decision 6). One rule body per look, shared by the canonical
+   names and the `.action-btn` aliases the tail still uses, so the look lives here once:
+     .btn--quiet + tone   the chromeless tinted label (today's `.action-btn`). Used on its own, not with
+                          `.btn`: its geometry is the label's, which these surfaces were drawn with.
+     .btn + .btn--red/teal  the ask-in-place confirm and the key revoke: the bordered `.btn` in a tone.
+   `.btn--teal` has no alias, so it stays here as the confirm's only tone. Tints derive from the
+   status token via color-mix, so they rebind under .theme-dark (LIN-786 dark-mode cleanup). */
+.action-btn,
+.btn--quiet {
+  background: none;
+  border: none;
+  padding: 0.2rem var(--space-2);
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+}
+
+/* Disabled: faded, not clickable (proxy's event pager; now every quiet button, see the PR). */
+.action-btn:disabled,
+.btn--quiet:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Green: primary / save actions. */
+.action-btn.save,
+.btn--green {
+  color: var(--green);
+  background: color-mix(in srgb, var(--green) 12%, transparent);
+}
+.action-btn.save:hover,
+.btn--green:hover {
+  background: color-mix(in srgb, var(--green) 22%, transparent);
+}
+
+/* Blue: connect / link actions. */
+.action-btn.connect,
+.btn--blue {
+  color: var(--blue);
+  background: color-mix(in srgb, var(--blue) 12%, transparent);
+}
+.action-btn.connect:hover,
+.btn--blue:hover {
+  background: color-mix(in srgb, var(--blue) 22%, transparent);
+}
+
+/* Red: destructive actions. Quiet, so the text is --red (the confirm below is the dim text). */
+.action-btn.disconnect,
+.action-btn.logout,
 .btn--red {
-  color: var(--red-dim, var(--red));
-  border-color: var(--red);
+  color: var(--red);
   background: color-mix(in srgb, var(--red) 12%, transparent);
 }
+.action-btn.disconnect:hover,
+.action-btn.logout:hover,
 .btn--red:hover {
   background: color-mix(in srgb, var(--red) 22%, transparent);
+}
+
+/* The bordered confirm (ask in place) and key revoke: `.btn` in a tone. The dim text is the AA-safe
+   token the Settings red and teal rows already use. Tinted, not solid: whether Rebuild wants a solid
+   fill is an open question in the PR. These sit after `.btn:hover`, so the tint wins on hover too. */
+.btn.btn--red {
+  color: var(--red-dim, var(--red));
   border-color: var(--red);
 }
+.btn.btn--red:hover { border-color: var(--red); }
 .btn--teal {
   color: var(--brand-dim);
   border-color: var(--brand);

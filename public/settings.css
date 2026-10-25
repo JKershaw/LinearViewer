@@ -95,7 +95,7 @@
   margin: 0;
 }
 
-/* Action buttons: see common-actions.css (.action-btn). `.settings-link` is in style.css (LIN-3889). */
+/* Action buttons: see style.css (.btn--quiet and its tones). `.settings-link` is in style.css (LIN-3889). */
 
 /* =============================================================================
    Model Selector

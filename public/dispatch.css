@@ -34,7 +34,7 @@
   margin: 0;
 }
 
-/* Action buttons: see common-actions.css (.action-btn) */
+/* Action buttons: see style.css (.btn--quiet and its tones, with the .action-btn aliases) */
 
 /* =============================================================================
    Dispatch Prompt
@@ -88,7 +88,7 @@
   border-color: var(--blue);
 }
 
-/* Disclosure trigger reuses the .action-btn / .action-btn.save look */
+/* Disclosure trigger reuses the .btn--quiet.btn--green look */
 .dispatch-toggle {
   user-select: none;
 }
@@ -462,7 +462,8 @@
   border: 1px solid var(--fg-vdim);
 }
 
-.halt-form .action-btn {
+/* The halt component's own button class (lib/components/halt-controls.js), not the shared Button's. */
+.halt-form .halt-control {
   margin-right: var(--space-2);
 }
 

@@ -20,7 +20,7 @@ describe('the buttons presentation (Dispatch)', () => {
     assert.match(html, /<form [^>]*data-halt-form/);
     assert.match(html, /data-url-key="acme"/);
     for (const [mode, label] of [['pause', 'Pause'], ['stop', 'Stop'], ['resume', 'Resume']]) {
-      assert.match(html, new RegExp(`<button type="button" class="action-btn halt-${mode}" data-halt-mode="${mode}" data-testid="dispatch-halt-${mode}">${label}</button>`));
+      assert.match(html, new RegExp(`<button type="button" class="btn--quiet halt-control halt-${mode}" data-halt-mode="${mode}" data-testid="dispatch-halt-${mode}">${label}</button>`));
     }
   });
 
