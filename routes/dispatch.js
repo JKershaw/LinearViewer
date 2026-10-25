@@ -683,7 +683,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // A failed read says so. It never reads as "no runs": that would be a false figure about the store.
       const spend = history ? agentSpendByJob(history.items, { jobs: [kind] })[0] : null;
       const typicals = history ? typicalByModel(history.items, { job: kind }) : [];
-      const follow = (value) => `As Settings › Models sets it for this step: ${value}`;
+      // The blank option stays short (a 390px select clips a long one); what it resolves to reads on a hint line under the field.
+      const follow = 'As Settings › Models sets it';
+      const hint = (value) => `Right now: ${value}`;
       const numbers = spend && {
         runs: spend.runs, priced: spend.priced, unpriced: spend.unpriced, noTelemetry: spend.noTelemetry,
         spendUsd: spend.spendUsd, typicalUsd: spend.typicalUsd
@@ -694,12 +696,12 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         numbers: {
           ...(numbers || { unavailable: true }), testid: 'run-numbers', shareTestid: 'run-share', heading: 'This step, last 30 days', share: null
         },
-        harness: { value: choice.harness, inForce: choice.harness || routing.harness || null, follow: follow(routing.harness || 'no harness') },
+        harness: { value: choice.harness, inForce: choice.harness || routing.harness || null, follow, hint: hint(routing.harness || 'no harness') },
         model: {
-          value: choice.model, follow: follow(routing.model || 'the default model'),
+          value: choice.model, follow, hint: hint(routing.model || 'the default model'),
           lists: agentLists(catalog), suggestions: suggestionsByHarness(typicals)
         },
-        effort: { value: choice.effort, follow: follow(routing.effort || 'none') }
+        effort: { value: choice.effort, follow, hint: hint(routing.effort || 'none') }
       });
       // The harnesses that take no effort. The panel hides effort by this list; Home's summary judges its draft's harness by it.
       res.json({ kind, html, numbers: numbers || null, withoutEffort: HARNESSES_WITHOUT_EFFORT });

@@ -115,7 +115,10 @@ describe('GET /api/dispatch/decision-panel: what the panel says about the harnes
 
   test('a blank field says what Settings › Models sets it to for this step', async () => {
     const { body } = await get(buildApp(), `${PANEL}?promptName=implementation&surface=home`);
-    assert.match(body.html, /As Settings › Models sets it for this step:/);
+    assert.match(body.html, /<option value=""[^>]*>As Settings › Models sets it<\/option>/, 'the option stays short; a 390px select clips a long one');
+    assert.match(body.html, /data-decision-hint="harness">Right now: /);
+    assert.match(body.html, /data-decision-hint="model">Right now: /);
+    assert.match(body.html, /data-decision-hint="effort">Right now: /);
   });
 
   test('the Home panel has no name attributes: it is a client page, and the draft is not a form post', async () => {

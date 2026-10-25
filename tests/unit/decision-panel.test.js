@@ -92,6 +92,21 @@ describe('effort is a fixed set: follow, then DISPATCH_EFFORT_LEVELS', () => {
     assert.match(html, /data-harness-in-force="opencode"/);
   });
 
+  test('a blank field\'s hint reads on its own line under the field, and a chosen value hides it (390px: the option is not clipped)', () => {
+    const hinted = (value) => panel({
+      harness: { value, inForce: 'opencode', follow: 'As Settings › Models sets it', hint: 'Right now: opencode' },
+      model: { value: null, follow: 'As Settings › Models sets it', hint: 'Right now: the default model', lists: LISTS, suggestions: SUGGEST },
+      effort: { value: null, follow: 'As Settings › Models sets it', hint: 'Right now: none' }
+    });
+    const blank = hinted(null);
+    assert.match(blank, /<option value=""[^>]*>As Settings › Models sets it<\/option>/);
+    assert.match(blank, /<span class="decision-panel-hint" data-decision-hint="harness">Right now: opencode<\/span>/);
+    assert.match(blank, /<span class="decision-panel-hint" data-decision-hint="model">Right now: the default model<\/span>/);
+    assert.match(blank, /<span class="decision-panel-hint" data-decision-hint="effort">Right now: none<\/span>/);
+    assert.match(hinted('claude-code'), /data-decision-hint="harness" hidden>/, 'a chosen harness needs no hint');
+    assert.doesNotMatch(panel(), /data-decision-hint/, 'a page that gives no hint (Models) gets none');
+  });
+
   test('without effort on the panel, no effort control is written at all', () => {
     assert.doesNotMatch(panel({ withEffort: false }), /data-decision-field="effort"/);
   });

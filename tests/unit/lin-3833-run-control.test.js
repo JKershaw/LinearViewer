@@ -78,9 +78,9 @@ const serverPanel = (q) => ({
     testid: 'run-decision-panel',
     fieldAttrs: (field) => `data-testid="run-${field}"`,
     numbers: null,
-    harness: { value: q.get('harness'), inForce: q.get('harness') || 'claude-code', follow: 'As Settings \u203a Models sets it for this step: claude-code' },
-    model: { value: q.get('model'), follow: 'As Settings \u203a Models sets it for this step: the default model', lists: { any: [] }, suggestions: {} },
-    effort: { value: q.get('effort'), follow: 'As Settings \u203a Models sets it for this step: none' }
+    harness: { value: q.get('harness'), inForce: q.get('harness') || 'claude-code', follow: 'As Settings \u203a Models sets it', hint: 'Right now: claude-code' },
+    model: { value: q.get('model'), follow: 'As Settings \u203a Models sets it', hint: 'Right now: the default model', lists: { any: [] }, suggestions: {} },
+    effort: { value: q.get('effort'), follow: 'As Settings \u203a Models sets it', hint: 'Right now: none' }
   })
 });
 
@@ -178,7 +178,8 @@ describe('LIN-3833 — Runs on says where each value comes from, from the server
     await c.click({ action: 'change-run' });
     await flush();
     assert.match(c.innerHTML, /data-testid="run-change-panel"/);
-    assert.match(c.innerHTML, /<option value=""[^>]*>As Settings \u203a Models sets it for this step: claude-code<\/option>/);
+    assert.match(c.innerHTML, /<option value=""[^>]*>As Settings \u203a Models sets it<\/option>/, 'the blank option is short, so a 390px select does not clip it');
+    assert.match(c.innerHTML, /data-decision-hint="harness">Right now: claude-code</, 'what the blank resolves to reads on its own line');
     assert.equal(/<option value="claude-code" selected>|<option value="opencode" selected>/.test(c.innerHTML), false, 'nothing is pre-selected');
     assert.ok(calls.api.some((a) => a.url.includes('/api/dispatch/decision-panel')), 'the shared panel is read from the server when Change opens');
   });

@@ -11,6 +11,14 @@
 (function () {
   const field = (root, name) => root.querySelector(`[data-decision-field="${name}"]`);
 
+  /** A hint reads only while its field is blank: a chosen value says for itself what runs. */
+  function syncHints(root) {
+    root.querySelectorAll('[data-decision-hint]').forEach((hint) => {
+      const control = field(root, hint.getAttribute('data-decision-hint'));
+      hint.hidden = !!(control && control.value);
+    });
+  }
+
   /** Show what the harness in force needs: its suggestions, its effort, and its search list. */
   function sync(root) {
     const harness = field(root, 'harness');
@@ -36,6 +44,7 @@
         || root.querySelector('datalist[data-decision-list="any"]');
       if (list) model.setAttribute('list', list.id);
     }
+    syncHints(root);
   }
 
   // A suggestion's button sets the model input, then tells the page the value changed, as a typed value would.
@@ -56,6 +65,7 @@
     if (!root) return;
     const which = el.getAttribute('data-decision-field');
     if (which === 'harness') sync(root);
+    else if (which) syncHints(root);
     if (which !== 'model' || !el.value || !root.hasAttribute('data-decision-autoswitch')) return;
     // A model OpenRouter offers but Claude Code does not (only reachable from a row that names no harness) means
     // OpenCode: the harness switches, and effort goes with it. The change event tells the page's own listeners.
@@ -65,6 +75,12 @@
       harness.value = 'opencode';
       harness.dispatchEvent(new Event('change', { bubbles: true }));
     }
+  });
+
+  // A typed model changes the hint as it is typed, not only when the field loses focus.
+  document.addEventListener('input', (event) => {
+    const root = event.target.closest && event.target.closest('[data-decision-panel]');
+    if (root && event.target.getAttribute('data-decision-field')) syncHints(root);
   });
 
   window.DecisionPanel = { sync };

@@ -1314,6 +1314,18 @@ a.wordmark:hover {
   border-color: var(--blue);
 }
 
+/* What a blank field resolves to, on its own line under the control (a long option is clipped on a phone). */
+.decision-panel-hint {
+  grid-column: 2;
+  font-size: var(--font-size-sm);
+  color: var(--fg-dim);
+  overflow-wrap: anywhere;
+}
+
+.decision-panel-hint[hidden] {
+  display: none;
+}
+
 /* The suggestions run the full width under the model field they belong to. */
 .decision-panel-suggestions {
   grid-column: 1 / -1;
