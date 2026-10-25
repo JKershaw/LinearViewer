@@ -240,3 +240,30 @@
 .sg-icon-cell .sg-name {
   font-size: var(--font-size-sm);
 }
+
+/* Settings pieces anatomy (LIN-3890): one definition list per piece. */
+.sg-settings-anatomy-list {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.sg-settings-piece-name {
+  margin: 0 0 var(--space-2);
+}
+
+.sg-settings-anatomy {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+}
+
+.sg-settings-anatomy dt {
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+  color: var(--fg-dim);
+}
+
+.sg-settings-anatomy dd {
+  margin: 0;
+}
