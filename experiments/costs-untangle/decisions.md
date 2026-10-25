@@ -1,6 +1,6 @@
 # LIN-3937: where each cost decision lives
 
-Grounded at `origin/main` `f1190392`, which includes LIN-3855 (Settings › Models, merged at `d53bb5bc`). Every file:line below was re-derived at that sha by finding each site by its own text and checking the symbol it sits in. The earlier lines from `4a6a4e50` are superseded. The design note is `docs/plans/costs.md` (LIN-3936).
+Grounded at `origin/main` `f1190392`, which includes LIN-3855 (Settings › Models, merged at `d53bb5bc`), and re-checked at `64a53753` (main when this PR was last merged): of the cited files only comments moved, plus two lines in `LlmCallLogStore.listCalls` (LIN-3864), so the `llm-call-log.js` lines below are at `64a53753`. Every file:line below was re-derived by finding each site by its own text and checking the symbol it sits in. The earlier lines from `4a6a4e50` are superseded. The design note is `docs/plans/costs.md` (LIN-3936).
 
 ## 1. Rules
 
@@ -19,18 +19,18 @@ Grounded at `origin/main` `f1190392`, which includes LIN-3855 (Settings › Mode
 
 | # | Surface | Entry → cost code |
 |---|---|---|
-| S1 | `GET /api/proxy/issues/:id/cost` | `routes/proxy-compute.js:706` → `lib/task-cost.js` `buildTaskCost`; `lib/llm-call-log.js:252` |
-| S2 | Settings › Health, "Harbour's AI calls" | `routes/settings.js:290` → `lib/llm-call-log.js:161`; `lib/render-settings.js:369` (`llmStatsRows`), `:85` (`formatCost`) |
+| S1 | `GET /api/proxy/issues/:id/cost` | `routes/proxy-compute.js:706` → `lib/task-cost.js` `buildTaskCost`; `lib/llm-call-log.js:255` |
+| S2 | Settings › Health, "Harbour's AI calls" | `routes/settings.js:290` → `lib/llm-call-log.js:164`; `lib/render-settings.js:369` (`llmStatsRows`), `:85` (`formatCost`) |
 | S3 | `/kpis` "Cost per finished task" | `lib/kpi-stats.js:1136` (`computeTerminalMarkedTaskCost`); `:1355` → `publicCost` at `:1304`; `lib/render-kpis.js:161` |
 | S4 | Observation feed: a session's derived cost | `lib/session-telemetry.js:473` → stored by `lib/observation-sessions-store.js` (`BUILDER_VERSION` at `:192`) |
 | S5 | Model picker display prices | `lib/openrouter.js:250,260,273` → `lib/model-pricing.js:203` (`getDisplayPricing`), plus the cached catalog |
-| S6 | Settings › Models: spend per job (LIN-3855, merged) | `routes/settings.js:308–327` → `lib/model-routing-spend.js` (`agentSpendByJob` `:60`, `harbourSpendByJob` `:69`, `byJobSpend` `:82`) and `LlmCallLogStore.listInHorizon` (`lib/llm-call-log.js:338`); rendered by `lib/render-settings-models.js` (`rowsBody`, totals at `:123–124`) |
+| S6 | Settings › Models: spend per job (LIN-3855, merged) | `routes/settings.js:308–327` → `lib/model-routing-spend.js` (`agentSpendByJob` `:60`, `harbourSpendByJob` `:69`, `byJobSpend` `:82`) and `LlmCallLogStore.listInHorizon` (`lib/llm-call-log.js:341`); rendered by `lib/render-settings-models.js` (`rowsBody`, totals at `:123–124`) |
 | S7 | Workspace KPIs "API-equivalent cost" per day | `routes/workspace-kpis.js:32` → `lib/workspace-kpi-stats.js:83` → `lib/weekly-budget.js:121` (`windowedSpend`); `lib/render-workspace-kpis.js:46,150` |
 | S8 | Effort read-out: cost per kind and per group | `routes/dashboard-effort.js:174` → `lib/effort-readout.js` `computeEffortReadout` (sums at `:333`, `:466`); `lib/render-effort-readout.js:20,132` |
 | S9 | Run page: step cost and header total | `lib/run-view.js:206` (`lineageCost`), `:378` (header total) → `lib/render-session.js:271,343`, `lib/render-run-steps.js:270` |
-| S10 | Observation "due scan" cost estimate | `routes/dashboard-feed.js:630` → `lib/llm-call-log.js:307`; `lib/render-observation.js:66` (copy), `public/observation.js:3625` |
+| S10 | Observation "due scan" cost estimate | `routes/dashboard-feed.js:630` → `lib/llm-call-log.js:310`; `lib/render-observation.js:66` (copy), `public/observation.js:3631` |
 | S11 | Flight Companion per-tab check-in cost | `public/flight-companion.js:427` (browser; sums `usage.cost` from SSE) |
-| S12 | Ship biscuit "Weather" input | `routes/ship-biscuit.js:155` → `lib/llm-call-log.js:161` → `lib/ship-biscuit.js` |
+| S12 | Ship biscuit "Weather" input | `routes/ship-biscuit.js:155` → `lib/llm-call-log.js:164` → `lib/ship-biscuit.js` |
 | S13 | Weekly-budget gauge | `lib/kpi-stats.js:1142` → `lib/weekly-budget.js:160`. Computed on every `/kpis` build, dropped from the public stats |
 
 ## 3. Decisions, sites, counts, owners
@@ -56,10 +56,10 @@ Each row is a decision–site pair. The "Judge" column names the planted fault i
 | | `lib/run-view.js:206` `lineageCost` (`CUMULATIVE_HARNESS` at `:187`) | Runs & dispatch | `D3b-run-view-lineageCost` |
 | | `lib/model-pricing.js:367` override gate (`harness !== 'opencode'`) | LLM & prompts | `D3b-model-pricing-override-harness` |
 | **D4 A call's cost** | `lib/openrouter.js:478` `extractUsage` (billed cost) | LLM & prompts | `D4-openrouter-extractUsage` |
-| | `lib/llm-call-log.js:68` `record` (`cost: num(call.cost)`) | LLM & prompts | `D4-llm-call-log-record` |
-| | `lib/llm-call-log.js:161` `summarize` (missing → $0) | LLM & prompts | `D4-summarize-missing-zero` |
-| | `lib/llm-call-log.js:252` `summarizeByIssue` (missing → unpriced) | LLM & prompts | `D4-summarizeByIssue-unpriced` |
-| | `lib/llm-call-log.js:307` `summarizeByFeature` (missing → out of the mean) | LLM & prompts | `D4-summarizeByFeature-mean` |
+| | `lib/llm-call-log.js:69` `record` (`cost: num(call.cost)`) | LLM & prompts | `D4-llm-call-log-record` |
+| | `lib/llm-call-log.js:164` `summarize` (missing → $0) | LLM & prompts | `D4-summarize-missing-zero` |
+| | `lib/llm-call-log.js:255` `summarizeByIssue` (missing → unpriced) | LLM & prompts | `D4-summarizeByIssue-unpriced` |
+| | `lib/llm-call-log.js:310` `summarizeByFeature` (missing → out of the mean) | LLM & prompts | `D4-summarizeByFeature-mean` |
 | | `lib/model-routing-spend.js:23` `summarise` (no-telemetry arm, unpriced arm) | LLM & prompts | `D4-model-routing-summarise-no-telemetry` |
 | | `lib/model-routing-spend.js:69` `harbourSpendByJob` (a missing call cost stays null, `:73`) | LLM & prompts | `D4-harbour-spend-null-rule` |
 | | `public/flight-companion.js:425,1911` (missing → $0; tab total) | Front end: browser code | *named exception* (`D4-flight-companion-cost`) |
@@ -72,7 +72,7 @@ Each row is a decision–site pair. The "Judge" column names the planted fault i
 | | `lib/weekly-budget.js:160` `computeWeeklyBudgetGauge` (checkpoint basis) | Runs & dispatch | `D6-gauge-checkpoint` |
 | | `lib/effort-readout.js:333` group cost sum | Runs & dispatch | `D6-effort-readout-priced-filter-a` |
 | | `lib/effort-readout.js:466` per-kind cost sum | Runs & dispatch | `D6-effort-readout-priced-filter-b` |
-| | `lib/llm-call-log.js:161` 30-day total (`:168`; a second use of `summarize`) | LLM & prompts | `D6-summarize-30-day-window` |
+| | `lib/llm-call-log.js:164` 30-day total (`:171`; a second use of `summarize`) | LLM & prompts | `D6-summarize-30-day-window` |
 | | `lib/run-view.js:378` header total (all lineages cumulative and priced) | Runs & dispatch | `D6-run-view-header-total` |
 | | `lib/model-routing-spend.js:33` `summarise` sum (priced spend per job) | LLM & prompts | `D6-model-routing-summarise-sum` |
 | | `lib/model-routing-spend.js:82` `byJobSpend` (largest priced spend first) | LLM & prompts | `D6-by-job-order` |
@@ -83,10 +83,10 @@ Each row is a decision–site pair. The "Judge" column names the planted fault i
 | | `lib/dispatch-lineage.js:19` `OUTCOME_WINDOW_DAYS` (independent constant) | Runs & dispatch | `D8-outcome-window` |
 | | `lib/workspace-kpi-stats.js:44` `LONG_WINDOW_DAYS` | Reports & operator tools | `D8-workspace-kpi-long-window` |
 | | `lib/render-observation.js:66` the "30-day historical mean" copy | Front end: server-rendered pages | `D8-observation-copy` |
-| | `lib/llm-call-log.js:338` `listInHorizon` (re-applies the read window) | LLM & prompts | `D8-call-log-horizon-listing` |
-| *D9 Showing a USD figure (not counted)* | `lib/render-settings.js:85` `formatCost`; `lib/render-settings-models.js:101–102`; `lib/render-workspace-kpis.js:46`; `lib/render-effort-readout.js:20`; `lib/render-kpis.js:132`; `lib/render-run-steps.js:270`; `lib/openrouter.js:260`; `public/observation.js:3625`; `public/flight-companion.js:427` | Front end (server-rendered; LLM & prompts for `openrouter.js`; browser for `public/`) | `D9-health-format-cost`, `D9-effort-format-usd` (the rendered-HTML surfaces catch the rest) |
+| | `lib/llm-call-log.js:341` `listInHorizon` (re-applies the read window) | LLM & prompts | `D8-call-log-horizon-listing` |
+| *D9 Showing a USD figure (not counted)* | `lib/render-settings.js:85` `formatCost`; `lib/render-settings-models.js:101–102`; `lib/render-workspace-kpis.js:46`; `lib/render-effort-readout.js:20`; `lib/render-kpis.js:132`; `lib/render-run-steps.js:270`; `lib/openrouter.js:260`; `public/observation.js:3631`; `public/flight-companion.js:427` | Front end (server-rendered; LLM & prompts for `openrouter.js`; browser for `public/`) | `D9-health-format-cost`, `D9-effort-format-usd` (the rendered-HTML surfaces catch the rest) |
 
-**Totals.** D1 5 · D2 4 · D3a 2 · D3b 5 · D4 8 · D5 5 · D6 9 · D7 2 · D8 5 = **45 decision–site pairs**. Three locations serve two decisions each (`lib/model-routing-spend.js:23` as D4 and D6; `:69` as D4 and D5; `lib/llm-call-log.js:161` as D4 and D6), so there are **42 distinct locations**.
+**Totals.** D1 5 · D2 4 · D3a 2 · D3b 5 · D4 8 · D5 5 · D6 9 · D7 2 · D8 5 = **45 decision–site pairs**. Three locations serve two decisions each (`lib/model-routing-spend.js:23` as D4 and D6; `:69` as D4 and D5; `lib/llm-call-log.js:164` as D4 and D6), so there are **42 distinct locations**.
 
 Of the 45 pairs, 44 have a planted fault in the judge (`replay/mutants.mjs`). The one not reachable from node is the browser code for D4 (`public/flight-companion.js`), a named exception: it is a browser script with no exports and it needs a DOM, so node cannot import it. The two excluded sites (§1) are not in the 45.
 
@@ -95,7 +95,7 @@ Of the 45 pairs, 44 have a planted fault in the judge (`replay/mutants.mjs`). Th
 ## 4. Reconciliation with the research and the first draft
 
 - The research (`50e1412a`) stated 36 sites. The first draft applied the rule to 39 pairs (its D1 counted six). This draft has **45 pairs**: the research's 36 and the first draft's three extra D1/D3a/D4 rows are reconciled as follows: −2 excluded (the sweep, the status anchor), +8 from LIN-3855 (`summarise` under D4 and D6, `harbourSpendByJob` under D4 and D5, `agentSpendByJob` under D5, `byJobSpend` under D6, the Models totals under D6, `listInHorizon` under D8).
-- Line numbers at the first draft's base are superseded. The moves that matter: `effort-readout` sums `331/464 → 333/466`; `proxy-compute` siblings `686 → 687`; `fullyPriced` `175 → 177`; `formatCost` `209 → 85` (LIN-3855 split `render-settings.js`); the `llm-call-log.js` 30-day window `:161` is now the function line, the window itself `:168`.
+- Line numbers at the first draft's base are superseded. The moves that matter: `effort-readout` sums `331/464 → 333/466`; `proxy-compute` siblings `686 → 687`; `fullyPriced` `175 → 177`; `formatCost` `209 → 85` (LIN-3855 split `render-settings.js`); the `llm-call-log.js` 30-day window `:161` is now the function line, the window itself `:171`.
 - The first draft's surface list is unchanged except S6, which is merged.
 - The reproducible grep bound (research plan step 2), at `f1190392`: `grep -rniEc 'cost|usd|pric' server.js lib routes public` gives **1,249** matching lines (1,222 at `4a6a4e50`; the difference is LIN-3855). The largest per-file counts are `lib/terminal-marked-task-cost.js` 166, `lib/model-pricing.js` 67, `lib/pricing-conformance-sweep.js` 50, `lib/llm-call-log.js` 46. The grep bounds where cost words appear; it is not a site count. The sites are the §3 list, each found by its own text.
 
@@ -113,7 +113,7 @@ Of the 45 pairs, 44 have a planted fault in the judge (`replay/mutants.mjs`). Th
 
 See `experiments/costs-untangle/replay/README.md` for the method and the figures. In short: every §3 pair except the browser code has a planted fault, and each fault is caught at the surfaces its site reaches (`replay/mutants.mjs`, `expect`). The coverage denominator is every function that holds a §3 site (`replay/coverage.mjs`, `INVENTORIED`).
 
-**Not run from node:** `public/flight-companion.js` (D4, S11) and the browser formatter `public/observation.js:3625` (D9). Both are browser scripts; they are blind spots, named, not passes.
+**Not run from node:** `public/flight-companion.js` (D4, S11) and the browser formatter `public/observation.js:3631` (D9). Both are browser scripts; they are blind spots, named, not passes.
 
 **Production row population is unbounded.** How many OpenCode multi-turn lineages exist, and so how much divergence 1 moves real figures, needs a live read, which this ticket does not make. It is a follow-up.
 
