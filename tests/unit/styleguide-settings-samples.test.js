@@ -62,14 +62,34 @@ test('the page is byte-stable across renders (the key row is given a fixed clock
   assert.equal(second, first);
 });
 
-// Review F1/F2 (LIN-3950): /styleguide is a Plain page whose blocks hold live builder output, so the
-// Plain prose rules reach only unclassed prose (a classed <p>/<a> keeps its own component look), and
-// the page title wears the Plain title class.
-test('Plain prose rules are scoped to unclassed p and a, so builder samples keep their own look', () => {
+// Review F1/F2 (LIN-3950), narrowed by LIN-3958 (review finding 1): /styleguide is a Plain page whose blocks
+// hold live builder output, so the Plain prose rules reach only unclassed prose: unclassed paragraphs, the
+// items of unclassed lists, and the terms of unclassed definition lists. A classed element keeps its own
+// look, and the page title wears the Plain title class.
+test('Plain prose reaches only unclassed p, list items, dd and dt under .plain-page, and links stay unclassed', () => {
   const css = readFileSync(new URL('../../public/style.css', import.meta.url), 'utf8');
-  assert.match(css, /\.plain-page \.section p:not\(\[class\]\)\s*\{/);
+  assert.match(css, /\.plain-page \.section p:not\(\[class\]\),\s*\.plain-page \.section :is\(ul, ol\):not\(\[class\]\) > li,\s*\.plain-page \.section dl:not\(\[class\]\) > :is\(dd, dt\)\s*\{/);
   assert.match(css, /\.plain-page \.section a:not\(\[class\]\)\s*\{/);
+  assert.doesNotMatch(css, /\.plain-page \.section :is\(p, li, dd, dt\)/, 'no classed-reaching prose selector remains');
   assert.doesNotMatch(css, /\.plain-page \.section [pa]\s*\{/, 'no bare descendant p/a rule remains');
+});
+
+// LIN-3958 (review finding 1): with the Plain rules no longer reaching classed prose, the styleguide's own
+// prose classes (the .sg-intro lede and the anatomy labels, which sit in a classed dl) take the sans face here.
+test('the styleguide prose classes take the sans face in styleguide.css', () => {
+  const css = readFileSync(new URL('../../public/styleguide.css', import.meta.url), 'utf8');
+  assert.match(css, /\.styleguide-content \.sg-intro \{[^}]*font-family: var\(--font-content\);/);
+  assert.match(css, /\.sg-settings-anatomy dt,\s*\.sg-settings-anatomy dd \{[^}]*font-family: var\(--font-content\);/);
+});
+
+// LIN-3958: /styleguide's Plain sample is .plain-page AND .settings-shell, so both phone roots land on one
+// element. Both are rem, not em, so they do not compound: the sample takes 1rem, not 1rem squared.
+test('the Plain and Settings phone roots are both rem, so the styleguide sample does not compound', () => {
+  const plainCss = readFileSync(new URL('../../public/style.css', import.meta.url), 'utf8');
+  const settingsCss = readFileSync(new URL('../../public/settings.css', import.meta.url), 'utf8');
+  assert.match(plainCss, /@media \(max-width: 400px\) \{\s*\.plain-page \{\s*font-size: 1rem;\s*\}\s*\}/);
+  assert.match(settingsCss, /\.settings-shell \{[^}]*font-size: 1rem;/);
+  assert.match(renderStyleguide(), /<div class="plain-page settings-shell sg-settings-sample sg-plain-sample" inert>/);
 });
 
 test('the /styleguide title carries the Plain title class', () => {
