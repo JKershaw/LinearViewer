@@ -12,8 +12,9 @@
  *    is accounted for in CALL_PATHS, and its `callMeta` carries `urlKey`, because
  *    every reader of the call log filters by `urlKey` and a row without one is
  *    written and never listed;
- *  - every model call's `callMeta` names a job (`feature` or `opKind`), unless it is a
- *    passthrough wrapper, and a non-literal `callMeta` is excused only when its options
+ *  - every model call's `callMeta` names a job (`feature` or `opKind`), passthrough wrappers
+ *    included, and a passthrough wrapper's missing `urlKey` is excused only by a spread of the
+ *    caller's `callMeta` (LIN-3929); a non-literal `callMeta` is excused only when its options
  *    come from a builder CALL_PATHS names (LIN-3870);
  *  - every `feature:` / `opKind:` string literal is a registered job id, and every
  *    Harbour-call job is used by at least one of them;
@@ -23,7 +24,9 @@
  * It reads the LITERAL provenance. A caller can still override `feature` through the
  * `...(options.callMeta || {})` spread at run time (as brief, recap and scan always
  * could); a static test cannot see values, so a `urlKey` that is present in code but
- * falsy at run time (`urlKey || null` in the roadmap routes) is the residual.
+ * falsy at run time (`urlKey || null` in the roadmap routes) is the residual. The caller's-callMeta
+ * test (LIN-3929) matches the spread's argument by name too: `...(other.callMeta || {})` in a
+ * passthrough wrapper passes, as does a later `urlKey: null` override.
  * Callees are matched by name, including a renamed import (`streamChat as sc2`, a wrapper
  * `as gb`) and a namespace member (`o.streamChat`, `o['streamChat']`). A call that
  * reaches one without a name in the file (a dynamic-import or namespace destructure, a
@@ -71,7 +74,7 @@ const WRAPPERS = {
 // build the `callMeta` for the ones that take their options from a builder. A site
 // is 'inline' when its own `callMeta` literal carries urlKey, 'passthrough' (marked
 // `passthrough: true`; the only files where a spread may stand in for urlKey) when it
-// spreads the caller's callMeta over a feature default (covered by WRAPPERS), and
+// spreads the caller's callMeta over a feature default (covered by WRAPPERS; LIN-3929), and
 // 'builder' when the options come from a named function (checked by name).
 const WORKSPACE_API_UNIT = 'workspace-API unit';
 const CALL_PATHS = {
@@ -127,12 +130,24 @@ function visit(node, fn) {
 const propName = (p) => (p.key?.type === 'Identifier' ? p.key.name : p.key?.type === 'Literal' ? String(p.key.value) : null);
 const lineOf = (src, node) => src.slice(0, node.start).split('\n').length;
 
-/** What a `callMeta` object literal carries: its keys and whether it spreads. */
-function describeObject(obj) {
+/**
+ * Whether a spread's argument is the caller's callMeta (LIN-3929): `<id>.callMeta` or a bare
+ * `callMeta`, optionally `|| {}` / `?? {}`. Any other spread is a different option, so a
+ * passthrough site's missing urlKey is not excused by it.
+ */
+function isCallerCallMeta(arg) {
+  let node = arg;
+  if (node.type === 'LogicalExpression' && (node.operator === '||' || node.operator === '??') && node.right.type === 'ObjectExpression' && !node.right.properties.length) node = node.left;
+  if (node.type === 'MemberExpression' && !node.computed && node.object.type === 'Identifier' && node.property.name === 'callMeta') return true;
+  return node.type === 'Identifier' && node.name === 'callMeta';
+}
+
+/** What a `callMeta` object literal carries: its keys, and each spread with its source and whether it is the caller's callMeta. */
+function describeObject(obj, src) {
   const keys = new Set();
-  let spreads = false;
+  const spreads = [];
   for (const p of obj.properties) {
-    if (p.type === 'SpreadElement') spreads = true;
+    if (p.type === 'SpreadElement') spreads.push({ text: src.slice(p.start, p.end), caller: isCallerCallMeta(p.argument) });
     else { const n = propName(p); if (n) keys.add(n); }
   }
   return { keys, spreads };
@@ -216,8 +231,8 @@ function analyse(path, src) {
     for (const arg of call.arguments) {
       visit(arg, (n) => {
         if (found || n.type !== 'Property' || propName(n) !== 'callMeta') return;
-        if (n.value.type === 'ObjectExpression') found = { state: 'literal', ...describeObject(n.value) };
-        else if (n.value.type === 'Identifier' && consts.has(n.value.name)) found = { state: 'literal', ...describeObject(consts.get(n.value.name)) };
+        if (n.value.type === 'ObjectExpression') found = { state: 'literal', ...describeObject(n.value, src) };
+        else if (n.value.type === 'Identifier' && consts.has(n.value.name)) found = { state: 'literal', ...describeObject(consts.get(n.value.name), src) };
         else found = { state: 'unresolved', builders: [] }; // written at the site, so no builder produced it
       });
     }
@@ -249,7 +264,7 @@ function analyse(path, src) {
     }
   });
 
-  return { path, functions, labels, sites, wrapperCalls, cachedDocCalls, consts, imports };
+  return { path, src, functions, labels, sites, wrapperCalls, cachedDocCalls, consts, imports };
 }
 
 /** Everything the census asserts, as a list of problems (empty = clean). */
@@ -300,9 +315,17 @@ export function checkCensus({ sources, dispatchKinds, aiOperationKinds, jobs }) 
     }
     for (const s of f.sites) {
       const m = s.meta;
+      // LIN-3929: at a passthrough site, only the caller's callMeta spread may stand in for urlKey, and
+      // no spread stands in for feature/opKind. Any other spread is named, since it drops the caller's urlKey.
+      const spreads = m.spreads || [];
+      const callerSpread = spreads.some((sp) => sp.caller);
+      const otherSpread = spreads.find((sp) => !sp.caller);
       if (m.state === 'none') problems.push(`${s.file}:${s.line} ${s.name}() passes no callMeta, so its row has no urlKey and no log reader returns it`);
-      else if (m.state === 'literal' && !m.keys.has('urlKey') && !(m.spreads && entry?.passthrough)) problems.push(`${s.file}:${s.line} ${s.name}() callMeta has no urlKey, so its row is never listed`);
-      else if (m.state === 'literal' && !namesJob(m.keys) && !(m.spreads && entry?.passthrough)) problems.push(`${s.file}:${s.line} ${s.name}() callMeta names no feature or opKind, so its row has no job`);
+      else if (m.state === 'literal' && !m.keys.has('urlKey') && !(entry?.passthrough && callerSpread)) {
+        if (entry?.passthrough && otherSpread) problems.push(`${s.file}:${s.line} ${s.name}() passthrough callMeta spreads ${otherSpread.text}, not the caller's callMeta, so the caller's urlKey is dropped`);
+        else problems.push(`${s.file}:${s.line} ${s.name}() callMeta has no urlKey, so its row is never listed`);
+      }
+      else if (m.state === 'literal' && !namesJob(m.keys)) problems.push(`${s.file}:${s.line} ${s.name}() callMeta names no feature or opKind, so its row has no job`);
       // LIN-3870: a non-literal callMeta is excused only when the options come from a named builder.
       else if (m.state === 'unresolved' && !m.builders.some((b) => entry?.builders?.includes(b))) problems.push(`${s.file}:${s.line} ${s.name}() takes its options from something other than a CALL_PATHS builder`);
     }
@@ -316,7 +339,7 @@ export function checkCensus({ sources, dispatchKinds, aiOperationKinds, jobs }) 
     for (const b of isWorkspaceApiUnitFile(f.path) ? [] : entry?.builders || []) {
       const fn = f.functions.get(b);
       let meta = null;
-      if (fn) visit(fn, (n) => { if (!meta && n.type === 'Property' && propName(n) === 'callMeta' && n.value.type === 'ObjectExpression') meta = describeObject(n.value); });
+      if (fn) visit(fn, (n) => { if (!meta && n.type === 'Property' && propName(n) === 'callMeta' && n.value.type === 'ObjectExpression') meta = describeObject(n.value, f.src); });
       if (!fn) problems.push(`${f.path}: builder ${b}() named in CALL_PATHS does not exist`);
       else problems.push(...builderProblems(f.path, b, meta));
     }
@@ -325,7 +348,7 @@ export function checkCensus({ sources, dispatchKinds, aiOperationKinds, jobs }) 
     const holders = unitFiles.filter((f) => f.functions.has(b));
     if (holders.length !== 1) { problems.push(`${WORKSPACE_API_UNIT}: builder ${b}() is defined in ${holders.length} unit files, expected 1`); continue; }
     let meta = null;
-    visit(holders[0].functions.get(b), (n) => { if (!meta && n.type === 'Property' && propName(n) === 'callMeta' && n.value.type === 'ObjectExpression') meta = describeObject(n.value); });
+    visit(holders[0].functions.get(b), (n) => { if (!meta && n.type === 'Property' && propName(n) === 'callMeta' && n.value.type === 'ObjectExpression') meta = describeObject(n.value, holders[0].src); });
     problems.push(...builderProblems(holders[0].path, b, meta));
   }
   if (!unitFiles.length) problems.push(`CALL_PATHS names the ${WORKSPACE_API_UNIT}, which has no file in the scanned tree`);
@@ -547,5 +570,34 @@ describe('LIN-3852: every LLM use is a registered job', () => {
     const problems = unitProblems(unitSiteFixture({ builderCallMeta: 'urlKey: w.urlKey' }));
     assert.equal(problems.length, 1, problems.join('\n'));
     assert.match(problems[0], /^routes\/workspace-api-fixture\.js: builder recommendCallOptions\(\) does not put feature or opKind in its callMeta/);
+  });
+
+  // LIN-3929: a passthrough wrapper's spread stands in for the caller's urlKey only when it is the
+  // caller's callMeta. Synthetic brief.js sites, so moving the real file does not move the witnesses.
+  const briefFixture = (callMeta) => `import { streamChat } from './openrouter.js';\nexport const generateBrief = (options) => streamChat([], { callMeta: ${callMeta} }, () => {});\n`;
+  const briefProblems = (callMeta) => checkCensus({ ...inputs, sources: { ...sources, 'lib/brief.js': briefFixture(callMeta) } })
+    .filter((p) => p.startsWith('lib/brief.js:'));
+
+  test('a passthrough wrapper spreading options.meta, not the caller callMeta, fails naming the spread (LIN-3929)', () => {
+    const problems = briefProblems("{ feature: 'brief', issueIdentifier: 'X', ...(options.meta || {}) }");
+    assert.equal(problems.length, 1, problems.join('\n'));
+    assert.match(problems[0], /^lib\/brief\.js:\d+ streamChat\(\) passthrough callMeta spreads \.\.\.\(options\.meta \|\| \{\}\), not the caller's callMeta, so the caller's urlKey is dropped/);
+  });
+
+  test('a passthrough wrapper spreading options.callMeta raises no problem (positive control, LIN-3929)', () => {
+    assert.deepEqual(briefProblems("{ feature: 'brief', issueIdentifier: 'X', ...(options.callMeta || {}) }"), []);
+  });
+
+  test('a passthrough wrapper spreading a destructured callMeta raises no problem (positive control, LIN-3929)', () => {
+    const runParagraph = "import { streamChat } from './openrouter.js';\nexport const generateRunParagraph = (runView, { callMeta } = {}) => streamChat([], { callMeta: { feature: 'run-paragraph', ...(callMeta || {}) } }, () => {});\n";
+    const problems = checkCensus({ ...inputs, sources: { ...sources, 'lib/run-paragraph.js': runParagraph } })
+      .filter((p) => p.startsWith('lib/run-paragraph.js:'));
+    assert.deepEqual(problems, []);
+  });
+
+  test('a passthrough callMeta that is the caller spread but names no feature or opKind fails (LIN-3929)', () => {
+    const problems = briefProblems("{ issueIdentifier: 'X', ...(options.callMeta || {}) }");
+    assert.equal(problems.length, 1, problems.join('\n'));
+    assert.match(problems[0], /^lib\/brief\.js:\d+ streamChat\(\) callMeta names no feature or opKind/);
   });
 });
