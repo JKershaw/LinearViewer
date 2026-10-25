@@ -46,7 +46,8 @@ before(async () => {
       getDeployInfo: () => ({}),
       userPreferencesStore: { getOpenRouterConsent: async () => null },
       workspacePreferencesStore: fx.preferencesStore,
-      llmCallLogStore: { summarize: async () => ({}) },
+      llmCallLogStore: { summarize: async () => ({}), listInHorizon: async () => state.callDocs },
+      dispatchStore: { listHistoryWithBodies: async (urlKey, opts) => { state.historyReads.push({ urlKey, opts }); return state.history; } },
       promptTraceStore: { summarizeProviderContext: async () => ({}) },
       accountStore: { listEmailIdentities: async () => [] },
       requestFeatureFlags: async () => ({}),
@@ -86,7 +87,7 @@ beforeEach(() => {
   // The same wiring as server.js: every halt writer lands in the log through the store's hook.
   haltStore.setOnChange(({ urlKey, from, to, via, setBy, reason }) =>
     logStore.record({ urlKey, setting: 'halt', from, to, reason: reason || 'Changed outside Settings (Dispatch page or API)', actor: { via, ...(setBy ? { id: setBy } : {}) } }));
-  state = { accountId: OWNER, ownerCheck, proxyRows: [], dispatchRows: [] };
+  state = { accountId: OWNER, ownerCheck, proxyRows: [], dispatchRows: [], history: { items: [], total: 0 }, historyReads: [], callDocs: [] };
 });
 
 const post = (path, body) => fetch(`${base}/workspace/alpha/settings/${path}`, {
@@ -314,6 +315,44 @@ describe('a model undo is judged by the runnable check (LIN-3855)', () => {
     assert.equal(res.headers.get('location'), '/workspace/alpha/settings/change-log?undone=1');
     const table = await fx.routingStore.getTable('alpha');
     assert.equal(currentValue(table, { scope: 'group', surface: 'agent-session', key: 'make', field: 'harness' }), null);
+  });
+});
+
+describe('the Models page is fed spend by the route (LIN-3855: jobs are ordered by spend)', () => {
+  // The same reads the page makes in production: the dispatch history and the call log, through the real router.
+  // `implementation` sorts after `review` in the registry, so only the spend can put it first.
+  const usageRow = (id, kind, costUsd) => ({
+    id, status: 'taken', kind, dispatchedAt: '2026-10-20T10:00:00Z', rootItemId: id,
+    feedback: [{ kind: 'usage', timestamp: '2026-10-20T10:01:00Z', message: `[usage] ${JSON.stringify({ model: 'anthropic/claude-sonnet-5', harness: 'claude-code', costUsd })}` }]
+  });
+  const jobIds = (html) => [...new Set([...html.matchAll(/data-testid="models-job-([a-z-]+)"/g)].map((m) => m[1]))];
+  const row = (html, id) => html.split(`data-testid="models-job-${id}"`)[1]?.split('data-testid="models-job-')[0] || '';
+  const models = async () => (await fetch(`${base}/workspace/alpha/settings/models`)).text();
+
+  test('the dispatch history and the call log reach the page: spend orders the jobs, no priced job reads "no runs"', async () => {
+    state.history = { items: [usageRow('r1', 'review', 1), usageRow('i1', 'implementation', 5)], total: 2 };
+    state.callDocs = [{ feature: 'recap', model: 'openai/gpt-5.4-mini', cost: 0.4 }];
+    const html = await models();
+
+    const ids = jobIds(html);
+    assert.ok(ids.indexOf('implementation') < ids.indexOf('review'), 'implementation ($5) lists before review ($1), against the registry order');
+    assert.ok(ids.indexOf('review') < ids.indexOf('bug'), 'a job with spend lists before one with no runs');
+    assert.ok(ids.indexOf('recap') < ids.indexOf('recommend'), 'the priced Harbour call lists before the one the registry puts first');
+    assert.deepEqual(state.historyReads.map((r) => r.urlKey), ['alpha'], 'one history read, for this workspace');
+
+    for (const id of ['implementation', 'review', 'recap']) assert.doesNotMatch(row(html, id), /no runs/, `${id} has runs`);
+    assert.match(row(html, 'bug'), /no runs/, 'a job with no runs still says so');
+    assert.match(row(html, 'implementation'), /\$5\.00/);
+    assert.match(row(html, 'review'), /\$1\.00/);
+    assert.match(row(html, 'recap'), /\$0\.40/);
+  });
+
+  test('the coverage line comes from the same read: it appears when the history read hit its cap, not otherwise', async () => {
+    const items = [usageRow('r1', 'review', 1), usageRow('i1', 'implementation', 5)];
+    state.history = { items, total: 2 };
+    assert.doesNotMatch(await models(), /Spend covers the newest/);
+    state.history = { items, total: 9 };
+    assert.match(await models(), /Spend covers the newest 2 runs in the last 30 days/);
   });
 });
 
