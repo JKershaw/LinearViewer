@@ -161,6 +161,31 @@ test.describe('Home first page — a run from each source stamps the row the con
   });
 });
 
+// LIN-3969: a preview answer repaints the run block. One that landed while the model was being typed replaced the
+// Model input, so the rest of the typing was lost and the run went out on a cut-off model ("chose"). The reset's
+// preview is held until the typing is under way, so the repaint lands mid-word on every run.
+test.describe('Home first page — the Change panel keeps what is typed across a repaint (LIN-3969)', () => {
+  test('a preview landing mid-typing does not cut the chosen model short', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, runnerKey: true });
+    await gotoHome(page, localWorkerUrlKey);
+    const component = await openTopTask(page);
+    await expect(component.locator('[data-testid="run-on-what"]')).toHaveText('the default model');
+    await component.locator('[data-testid="run-change"]').click();
+    await expect(component.locator('[data-testid="run-change-panel"]')).toBeVisible();
+    await page.waitForLoadState('networkidle');
+
+    let hold = true;
+    await page.route('**/api/dispatch/preview**', async (route) => {
+      if (hold) { hold = false; await new Promise((resolve) => setTimeout(resolve, 300)); }
+      await route.continue();
+    });
+    await component.locator('[data-testid="run-reset"]').click();
+    await component.locator('[data-testid="run-model"]').pressSequentially('chosen-model-x', { delay: 60 });
+    await component.locator('[data-testid="run-use"]').click();
+    await expect(component.locator('[data-testid="run-on-what"]')).toHaveText('chosen-model-x');
+  });
+});
+
 // LIN-3833 (ruling f9fa6bd7, option c: leave out only finished tasks and retro). A fresh top task is not finished,
 // so only the AI-excluded step (retro) does not fit: the list says one step is left out. The step line's ✦ button
 // writes the prompt; it does not replace the why line.
