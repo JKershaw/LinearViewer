@@ -258,11 +258,11 @@ Layout only. For the pages Settings shares pieces with:
 
 ## Consolidate (LIN-3889): status at head
 
-Measured at `12b3d428` (the CSS is unchanged in the commits after it). Each decision's authority, its losing copies, and its sites at base and head by the note's own counting rule: the base sites the note lists by `file:line`, and the rule bodies or render sites that still write the decision.
+Measured at `55149a37` (the last commit that changed CSS). Each decision's authority, its losing copies, and its sites at base and head by the note's own counting rule: the base sites the note lists by `file:line`, and the rule bodies or render sites that still write the decision.
 
 | Decision | Authority at head | Copies deleted | Status | Sites base → head |
 | -- | -- | -- | -- | -- |
-| 1 Spacing | `--space-N` | token-equal literals in the sheets this PR edits | scoped; off-scale values stay (Rebuild) | literal 904 → 889 (measure) |
+| 1 Spacing | `--space-N` | token-equal literals in the sheets this PR edits | scoped; off-scale values stay (Rebuild) | literal 904 → 890 (measure) |
 | 2 Type | `--font-size-*` | token-equal `1em` and `0.85em` in the same sheets | scoped; `0.9em` vs `0.85em` open | declarations 810 → 798 (measure) |
 | 3 State colours | `:root` tokens | the three `var(--red, #c0392b)` / `var(--bg, #fff)` fallbacks in settings.css | done; Paused still red (open question 1) | 4 → 1 (the `:443` hover `rgba`, decision 7) |
 | 4 Breakpoints | the written list (13) | none; the test pins the list | done | 13 → 13 |
@@ -281,10 +281,10 @@ Measured at `12b3d428` (the CSS is unchanged in the commits after it). Each deci
 
 **Count rule at head** (`node tests/measures/css-measures.mjs . <rev>`; the base is `22f6942d`, and `--dup-blocks` as the script defines it):
 
-| Measure | Base `22f6942d` | Head `12b3d428` |
+| Measure | Base `22f6942d` | Head `55149a37` |
 | -- | -- | -- |
-| CSS lines | 19,888 | 19,744 |
-| Spacing, literal | 904 | 889 |
+| CSS lines | 19,888 | 19,750 |
+| Spacing, literal | 904 | 890 |
 | Spacing, token | 676 | 665 |
 | Distinct font sizes (declarations) | 74 (810) | 74 (798) |
 | Button-like classes | 37 | 41 |
