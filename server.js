@@ -3216,8 +3216,9 @@ const onTicketWrite = createOnTicketWrite({
   sessionsFeedCache,
   agentStatusStore
 })
-// LIN-3756: records a pipeline merge on its Done write. Given to the proxy only,
-// so the task-page check route (seam 3) records exactly as it did.
+// LIN-3756: records a merge on a Done write. Given to seam 1 (the proxy) and seam 2
+// (the person's Done, LIN-3863); the task-page check route (seam 3) records itself,
+// stop-at-PR only, as it did.
 const recordPipelineMerge = createPipelineMergeRecorder({
   closeOutEventsStore,
   dispatchStore: dispatchQueueStore,
@@ -3234,7 +3235,7 @@ app.use(createRunnerKitRoutes())
 // LIN-3383: workspace-api, collective, dashboard, task-chat and flight-companion
 // all receive the ONE hoisted `workspaceOwnerCheck` (never a second
 // createWorkspaceOwnerCheck) for the owner-only runner enqueue gate.
-app.use(createWorkspaceApiRoutes({ installationTokenFor, workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, accountStore, adoptConnectionCredential: (args) => connectionAccess.adoptConnectionCredential(args), closeOutEventsStore, workspaceOwnerCheck, onTicketWrite }))
+app.use(createWorkspaceApiRoutes({ installationTokenFor, workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, accountStore, adoptConnectionCredential: (args) => connectionAccess.adoptConnectionCredential(args), closeOutEventsStore, workspaceOwnerCheck, onTicketWrite, recordPipelineMerge }))
 
 // Mount collective routes (experimental cross-project discussion — LIN-450).
 // yapClient falls back to DEFAULT_YAP_BASE_URL (lib/yap-client.js) when YAP_BASE_URL is unset.
