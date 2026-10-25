@@ -2675,50 +2675,25 @@ body.is-landing {
   gap: 0.75rem;
 }
 
-.landing-cta {
-  display: inline-block;
+/* The sign-in buttons are the shared .btn (renderButton), Linear as .btn--primary
+   (LIN-3980 outcome 9). `.landing-cta` sets only the hero's size. It is scoped
+   under .landing-ctas so it beats .btn's own padding and height. */
+.landing-ctas .landing-cta {
   padding: 0.75rem 1.5rem;
-  border-radius: 4px;
-  text-decoration: none;
-  font-family: var(--font-content);
   font-size: 1.05rem;
-  border: 1px solid transparent;
 }
 
-/* Linear: the filled, primary action. The ink is --on-brand, which clears AA on
-   the teal fill in both themes (LIN-3980). */
-.landing-cta-linear {
-  background: var(--teal);
+/* Linear keeps the shared primary fill and takes the landing's ink: --on-brand
+   clears AA on the teal fill in both themes, where .btn--primary's own ink does not. */
+.landing-ctas .landing-cta-linear {
   color: var(--on-brand);
-  font-weight: 500;
-}
-
-.landing-cta-linear:hover {
-  background: color-mix(in srgb, var(--teal) 85%, black);
-}
-
-/* GitHub, Jira and email (LIN-1892): co-equal CTAs, visually quieter as a teal
-   outline — the same treatment for each, so another auth option reads as part
-   of the set rather than introducing its own visual weight. */
-.landing-cta-github,
-.landing-cta-jira,
-.landing-cta-email {
-  background: transparent;
-  color: var(--teal);
-  border-color: var(--teal);
-}
-
-.landing-cta-github:hover,
-.landing-cta-jira:hover,
-.landing-cta-email:hover {
-  background: var(--teal-soft);
 }
 
 @media (max-width: 480px) {
   .landing-ctas {
     flex-direction: column;
   }
-  .landing-cta {
+  .landing-ctas .landing-cta {
     width: 100%;
     max-width: 18rem;
   }

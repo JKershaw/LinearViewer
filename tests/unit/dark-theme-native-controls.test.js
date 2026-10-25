@@ -96,7 +96,7 @@ test('renderers still emit the hooks the CSS targets', () => {
 // teal, just under AA). Its ink now resolves through the `--on-brand` token,
 // which clears AA on the --teal fill in both themes.
 test('the hero CTA ink resolves through --on-brand and clears AA on the teal fill', () => {
-  const linear = rule('.landing-cta-linear');
+  const linear = rule('.landing-ctas .landing-cta-linear');
   assert.match(linear, /color:\s*var\(--on-brand\)/);
   assert.doesNotMatch(linear, /color:\s*#/);
   const onBrand = token(rule(':root'), 'on-brand');

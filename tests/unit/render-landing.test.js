@@ -82,7 +82,7 @@ test('has a Library section above the Archive, driven by START_HERE', () => {
   const archiveIdx = html.indexOf('data-testid="landing-archive"');
   assert.ok(libIdx !== -1, 'has landing-library');
   assert.ok(libIdx < archiveIdx, 'Library sits above the Archive');
-  assert.match(html, /<a href="\/library" class="lx-library__cta" data-testid="landing-library-link">/);
+  assert.match(html, /<a class="btn[^"]*" href="\/library" data-testid="landing-library-link"><span class="btn__label">Visit the Library/);
 
   // LIN-3980: the Library lists the catalog documents only; the Archive item is
   // not repeated here, so the landing never leads with the document the Archive
@@ -158,7 +158,7 @@ test('defaults to the BYOK lead line when freeTierEnabled is false', () => {
 // LIN-3980 outcome 4: "Try it yourself" offers the same sign-in buttons as the
 // hero, under the same configuration rules: Linear always, the rest when set.
 function signInLabels(fragment) {
-  return [...fragment.matchAll(/<a href="([^"]+)" class="landing-cta[^"]*" data-testid="([^"]+)">([^<]+)<\/a>/g)]
+  return [...fragment.matchAll(/<a class="btn [^"]*landing-cta[^"]*" href="([^"]+)" data-testid="([^"]+)"><span class="btn__label">([^<]+)<\/span><\/a>/g)]
     .map(([, href, , label]) => `${href}|${label}`);
 }
 const SIGN_IN_CONFIGS = [
@@ -222,7 +222,7 @@ test('the loop and section copy drops the insider words (LIN-3980 outcome 3)', (
 // Archive don't both lead with the same document".)
 test('the Archive link target exists, and the Library list does not repeat it', () => {
   const html = renderLandingPage({});
-  const archive = html.match(/href="\/archive\/(\d+)" class="lx-archive__link"/);
+  const archive = html.match(/href="\/archive\/(\d+)" data-testid="landing-archive-link"/);
   assert.ok(archive, 'archive link present');
   assert.ok(existsSync(join(__dirname, '../../docs/archive', `${archive[1]}.html`)), `docs/archive/${archive[1]}.html exists`);
   const libIdx = html.indexOf('data-testid="landing-library"');
