@@ -49,12 +49,14 @@ Issues are wrapped in nested `.node` containers:
 .node[data-id="{id}"]           - node container
   .line[data-id="{id}"]         - task row (keyboard-operable: role=button, tabindex=0, aria-expanded)
   .details[data-details-for]    - details panel (hidden by default; the row's opened task on Home, LIN-3833)
+    [data-testid="opened-task"] - the contained block around the opened task, set apart from the rows (LIN-3968)
     [data-testid="opened-task-facts"] - the facts line: ID, project, when it was last updated
     .home-prompt-mount[data-prompt-mount] - the opened task's control, always visible when the row is open (no Prompts fold)
-      [data-testid="opened-task-state"] - the state block: the task's pill and sentence; dispatch on, also its stage strip and a "Last: … · All N" line that opens the Sessions fold. A copy-first viewer gets the sentence and "You copied the … prompt …" A subtask that needs you: `opened-task-needs-you`, with `opened-task-needs-you-open` ("Open", its task page).
-      [data-testid="opened-task-run"] - the run block (dispatch on): the step line (`opened-task-step`), the Runs-on line (`opened-task-runs-on`, `run-on-what`, `run-source`), `run-change`, the main action (`opened-task-go`: "Run to PR", or "Run <step>" when the sessions name one), the after-run line (`opened-task-queued` with `run-undo`; `opened-task-running` with `run-stop` on a polled target), and More (`run-see-prompt`, `run-another`)
+      [data-testid="opened-task-state"] - the state block: the task's pill and sentence; dispatch on, also its stage strip (`task-page-strip`, one chip per stage in `task-strip-chip`, the offered step marked `data-offered="true"`; LIN-3968) and a "Last: … · All N" line that opens the Sessions fold. A copy-first viewer gets the sentence and "You copied the … prompt …" A subtask that needs you: `opened-task-needs-you`, with `opened-task-needs-you-open` ("Open", its task page).
+      [data-testid="opened-task-run"] - the run block (dispatch on): the step line (`opened-task-step`), the Runs-on line (`opened-task-runs-on`, `run-on-what`, `run-source`), `run-change`, the main action (`opened-task-go`: "Run <step>" for the step the sessions offer, a failed stage again; "Run to PR" only when nothing is running; none while a stage runs), the after-run line (`opened-task-queued` with `run-undo`; `opened-task-running` with `run-stop` on a polled target), and More (`run-see-prompt`, `run-another`)
       [data-testid="run-change-panel"] - the Change panel for this run only: presets, `run-harness`, `run-model`, `run-effort` (not for opencode), `run-target-{cli|web|local}`, `run-agent-access`, `run-use` ("Use for this run"), `run-reset` `run-change-x` (×) closes it; under 640px it is a full-screen sheet.
-      [data-testid="opened-task-write"] - "✦ Write the prompt" (copy-first); then `opened-task-copy` "Copy prompt", the bounded box, `opened-task-regenerate` (Rewrite) and `opened-task-download`
+      [data-testid="opened-task-write"] - "✦ Write the prompt" (copy-first); then `opened-task-copy` "Copy prompt", the bounded box (`.opened-task-box` > `.opened-task-text`: the prompt as the text that will be pasted), `opened-task-regenerate` (Rewrite) and `opened-task-download`
+      [data-testid="opened-task-target"] - "This prompt is for LIN-N <title>, a subtask of LIN-M…" when Harbour wrote the prompt for a subtask (copy-first; absent for the opened task itself; LIN-3968)
       [data-testid="opened-task-progress-key"] - "Let your agent post progress to this task" (copy-first; the account's task-key default)
       [data-testid="home-copy-first-card"] - the first-visit card above Home's list (no runner, not yet dismissed); `home-copy-first-dismiss` ("Got it", the shared button) dismisses it for good.
     .detail-toggle[data-toggle="sessions"] - "Sessions ▶" fold (run controls only; lazy, `sessions-toggle`)
@@ -63,7 +65,7 @@ Issues are wrapped in nested `.node` containers:
       .detail-toggle[data-toggle="comments"] - "Comments ▶" toggle (auth only, nested)
       .detail-toggle[data-toggle="attachments"] - "Attachments (N) ▶" toggle (auth only, nested; image gallery via /api/image relay, attachment-capable providers only)
     [data-testid="issue-task-page-link"] - "Task page ›" (Home's links row); `issue-chat-link` "Chat ↗" (taskChat flag); `issue-provider-link` - "Open in {provider} ↗" (provider name is dynamic, e.g. "Open in Linear")
-    [data-testid="opened-task-runner-link"] - "run on my machine ›" link to /workspace/{urlKey}/runner (copy-first viewers only: a run-controls viewer already has a runner)
+    [data-testid="opened-task-runner-link"] - "Harbour can also run steps for you, on your own machine. Set up a runner ›" (link to /workspace/{urlKey}/runner) (copy-first viewers only: a run-controls viewer already has a runner)
   .children                     - container for nested child nodes
     .node[data-id="{child-id}"] - child node (same structure)
 ```
@@ -75,7 +77,7 @@ When a task is expanded on Home, its opened task leads with its state and one co
 - **Sessions ▶**: The task's sessions, in place (run controls only)
 - **Comments ▶** and **Attachments (N) ▶**: as before (authenticated users only)
 - **Task page ›**, **Chat ↗**, **Open in {provider} ↗**: the links row (provider name is dynamic, e.g. "Open in Linear")
-- **run on my machine ›**: the runner setup line (copy-first viewers only)
+- **Set up a runner ›**: the runner setup line, after "Harbour can also run steps for you, on your own machine." (copy-first viewers only)
 
 Toggle behavior:
 - Both sections start collapsed (▶ arrow)

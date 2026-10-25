@@ -1114,6 +1114,18 @@ a.wordmark:hover {
   white-space: nowrap;
 }
 
+/* LIN-3968: the opened task is one contained block, so the eye can tell where its own content ends and the
+   next row begins, at both widths. The sans face is set on the whole block: the body is monospace
+   (style.css body rule), so without it the copy-first key note and paste line leaked into mono. */
+.opened-task {
+  font-family: var(--font-content);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  margin: var(--space-2) 0;
+}
+
 /* LIN-3833: the opened task on Home, state first: the facts line, the state block above the control, the
    one links row. Plain text sizes; the controls below keep their own styles. */
 .opened-task-facts {
@@ -1279,6 +1291,20 @@ a.wordmark:hover {
   padding: 8px 10px;
   max-height: 22em;
   overflow: auto;
+}
+
+/* LIN-3968: the prompt is the text that will be pasted, so it keeps its line breaks and is set in the sans face
+   (human prose; CLAUDE.md), not rendered markdown. */
+.opened-task-text {
+  font-family: var(--font-content);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.opened-task-target {
+  margin: 0 0 var(--space-2);
+  color: var(--fg-dim);
+  font-size: 0.9em;
 }
 
 .opened-task-box-actions,

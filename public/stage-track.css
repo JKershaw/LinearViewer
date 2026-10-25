@@ -1,0 +1,151 @@
+/* The stage track (LIN-3968): one bar per stage, shared by the task page and Home.
+ *
+ * Home pastes the task page's stage piece into its opened task, and it loads this sheet, so the
+ * piece is styled in one place (docs/architecture/ui-pieces.md, "The rule"). Moved byte-for-byte from
+ * task-page.css. Tokens only; the open stage reads the `sess-run--expanded` hook from session.css.
+ */
+
+/* ── Stages: one bar per stage (LIN-3356) ─────────────────────────────────── */
+.task-stages-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.task-stage { min-width: 0; }
+.task-stage-head {
+  display: grid;
+  gap: 0.35rem;
+  width: 100%;
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  text-align: left;
+  font: inherit;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.task-stage-head--ahead { cursor: default; }
+.task-stage-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2rem 0.6rem;
+  font-family: var(--font-content);
+  font-size: 0.95rem;
+}
+.task-stage-name { font-weight: 600; }
+.task-stage-attempts,
+.task-stage-state,
+.task-stage-time { font-size: 0.8rem; color: var(--muted); }
+.task-stage-time { font-family: var(--font-content); }
+/* LIN-3407: the live timers keep a steady slot. Left-aligned and side by side,
+   a ticking timer whose text changes length (59s -> 1m, 9m -> 10m) used to nudge
+   its neighbour sideways. Tabular figures keep every digit one width; the
+   min-width (in `ch`, sized to the longest usual form, "started 12m 30s ago" /
+   "running 12m 30s") keeps the slot from shrinking when the text does. */
+.task-stage-ago,
+.task-stage-took {
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+}
+.task-stage-ago { min-width: 20ch; }
+.task-stage-took { min-width: 16ch; }
+.task-stage-state { margin-left: auto; }
+.task-stage[data-tone="error"] .task-stage-state { color: var(--red-dim, var(--red)); }
+.task-stage[data-tone="waiting"] .task-stage-state { color: var(--amber-dim); }
+.task-stage-bar {
+  display: block;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--faint);
+  overflow: hidden;
+}
+.task-stage-fill { display: block; height: 100%; width: 100%; border-radius: inherit; }
+.task-stage[data-tone="done"] .task-stage-fill { background: var(--green); }
+.task-stage[data-tone="error"] .task-stage-fill { background: var(--red); }
+.task-stage[data-tone="queued"] .task-stage-fill { background: var(--slate); width: 15%; }
+.task-stage[data-tone="neutral"] .task-stage-fill { background: var(--slate); }
+.task-stage[data-tone="waiting"] .task-stage-fill { background: var(--amber); width: 60%; }
+/* Running has no honest denominator: an indeterminate sweep, never a made-up %. */
+.task-stage[data-tone="running"] .task-stage-fill {
+  background: var(--amber);
+  width: 35%;
+  animation: task-stage-sweep 1.8s ease-in-out infinite alternate;
+}
+@keyframes task-stage-sweep {
+  from { transform: translateX(0); }
+  to { transform: translateX(185%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .task-stage[data-tone="running"] .task-stage-fill { animation: none; width: 60%; }
+}
+/* Still ahead: a grey dotted-out bar, quiet, a guess not a promise. */
+.task-stage--ahead .task-stage-head {
+  background: transparent;
+  border-style: dashed;
+  color: var(--muted);
+}
+.task-stage--ahead .task-stage-bar { background: transparent; border: 1px dashed var(--line); }
+.task-stage-body {
+  display: none;
+  padding: 0.5rem 0.75rem 0.25rem;
+  font-family: var(--font-content);
+}
+.task-stage.sess-run--expanded .task-stage-body { display: block; }
+.task-stage-sessions { list-style: none; margin: 0; padding: 0; }
+.task-stage-session { padding: 0.4rem 0; border-top: 1px solid var(--line); }
+.task-stage-session:first-child { border-top: 0; }
+.task-stage-session-line { font-size: 0.8rem; color: var(--muted); }
+.task-stage-session[data-state="waiting"] .task-stage-session-line { color: var(--amber-dim); }
+.task-stage-message {
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.task-stage-links {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  font-family: var(--font-structural);
+  font-size: 0.8rem;
+}
+.task-stage-links li { overflow-wrap: anywhere; }
+.task-checkins { margin: 0.4rem 0; font-size: 0.8rem; color: var(--muted); }
+.task-checkins summary { cursor: pointer; }
+.task-checkin-list { list-style: none; margin: 0.3rem 0 0; padding: 0 0 0 0.75rem; border-left: 2px solid var(--line); }
+.task-checkin { padding: 0.15rem 0; overflow-wrap: anywhere; }
+.task-checkin-message { display: block; color: var(--muted); }
+
+/* ── Stage strip: every stage on one row, Home's opened task (LIN-3968) ─────
+   One chip per stage. The row never scrolls sideways: chips share the width and their words cut
+   with an ellipsis, so a phone at 390px keeps the five on one line too. */
+.task-strip {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--space-1);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+.task-strip-chip {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--text);
+  font-size: 0.9em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.task-strip-name { font-weight: 600; }
+.task-strip-state { color: var(--muted); }
+.task-strip-chip[data-tone="done"] { border-color: var(--green); }
+.task-strip-chip[data-tone="running"] { border-color: var(--brand); }
+.task-strip-chip[data-tone="waiting"] { border-color: var(--amber); }
+.task-strip-chip[data-tone="error"] { border-color: var(--red); }
+.task-strip-chip[data-tone="ahead"] { border-style: dashed; color: var(--muted); }
+.task-strip-chip[data-offered="true"] { box-shadow: inset 0 0 0 1px var(--brand); }

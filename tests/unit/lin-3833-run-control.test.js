@@ -93,7 +93,8 @@ const HOME = {
   issue: { id: 'uuid-42', identifier: 'LIN-42', title: 'T', url: '', stateType: 'started' },
 };
 
-const PLAN_NEXT = { count: 1, next: { kind: 'plan', label: 'Plan' }, last: { label: 'Research', state: 'done', at: null }, running: null };
+// `offered` is the step the server offers (LIN-3968); `next` is the "comes next" wording. Nothing runs, so they agree.
+const PLAN_NEXT = { count: 1, next: { kind: 'plan', label: 'Plan' }, offered: { kind: 'plan', label: 'Plan', why: 'usual', failed: false }, last: { label: 'Research', state: 'done', at: null }, running: null };
 
 async function mount(over = {}, loadOver = {}) {
   const env = load(loadOver);
@@ -249,7 +250,7 @@ describe('LIN-3833 — "Another step" leaves out only what the task cannot take 
   // A task after Plan, Build and Review (the review asked for changes). `ahead` and `usual` are the stage-order
   // fields this PR removed from the summary; they are set here on purpose, so the rule is seen to ignore them.
   const REVIEWED = {
-    count: 3, next: { kind: 'close-out', label: 'Close-out' }, last: { label: 'Review', state: 'done', at: null }, running: null,
+    count: 3, next: { kind: 'close-out', label: 'Close-out' }, offered: { kind: 'close-out', label: 'Close-out', why: 'usual', failed: false }, last: { label: 'Review', state: 'done', at: null }, running: null,
     excluded: ['retro'], ahead: ['close-out'], usual: ['research', 'plan', 'implementation', 'review', 'close-out'],
   };
   const open = async (c) => {

@@ -101,6 +101,8 @@ function recommendCallOptions({ apiKey, model, session, provider, workspace, ide
 function toHopRecord(ctx, r) {
   return {
     identifier: ctx.issue.identifier,
+    // LIN-3968: the target's title rides on `done`, so the copy-first view can say which task the prompt is for.
+    title: ctx.issue.title || null,
     reasoning: r.reasoning,
     prompt: r.prompt,
     truncated: r.truncated,
@@ -157,7 +159,7 @@ function streamMockFixture(res, mockIssue) {
     sendSSE(res, 'done', {
       truncated: false, completionTokens: null,
       issueUrl: terminal.url,
-      identifier: idOf(terminal), deferredVia, deferTruncated: false
+      identifier: idOf(terminal), title: terminal.title || null, deferredVia, deferTruncated: false
     });
     res.end();
     return;
@@ -353,7 +355,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       // shipped as a defer. The terminal hop's reasoning already streamed live.
       emit('error', { error: 'Recommendation did not resolve to an actionable task', deferredVia, deferTruncated, deferStopReason });
     } else {
-      emit('done', { truncated: rec.truncated, completionTokens: rec.completionTokens, issueUrl: rec.issueUrl, identifier: rec.identifier, deferredVia, deferTruncated, deferStopReason });
+      emit('done', { truncated: rec.truncated, completionTokens: rec.completionTokens, issueUrl: rec.issueUrl, identifier: rec.identifier, title: rec.title || null, deferredVia, deferTruncated, deferStopReason });
     }
     // The caller's `finally` ends the response again; the descent has always ended
     // it itself first, and the double end is what a client's socket sees today.

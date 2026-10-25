@@ -35,6 +35,7 @@ const TOGGLE_VERDICTS = {
 
 // data-testid hooks the Home layout may emit, each with its verdict.
 const TESTID_VERDICTS = {
+  'opened-task': 'the contained block around the opened task (LIN-3968: set apart from the rows)',
   'opened-task-facts': 'the facts line (ID, project, updated)',
   'issue-description-toggle': 'the Description fold toggle',
   'issue-edit-link': 'Edit, in the Description fold (inline-edit providers only)',

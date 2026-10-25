@@ -34,6 +34,7 @@ import {
   renderTaskNotFoundPage,
   renderTaskStatus,
   renderTaskTrack,
+  renderStageStrip,
   renderTaskContext,
   contextSignature,
 } from '../lib/render-task-page.js';
@@ -145,6 +146,8 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         live: model.live,
         headerHtml: renderTaskStatus(model),
         trackHtml: renderTaskTrack(model, { now: now() }),
+        // LIN-3968: the one-row stage strip Home's opened task pastes; the task page keeps trackHtml.
+        stripHtml: renderStageStrip(model, { now: now() }),
         // LIN-3833: the sessions the state block and the run control read (count, last, running).
         sessions: sessionSummaryOf(model),
       };

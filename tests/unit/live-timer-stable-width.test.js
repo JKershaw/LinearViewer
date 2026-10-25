@@ -22,7 +22,8 @@ function rulesFor(css, selector) {
   return out.join('\n');
 }
 
-const taskCss = readFileSync(join(pub, 'task-page.css'), 'utf8');
+// LIN-3968: the stage track's rules moved to stage-track.css (shared with Home); the task page's own sheet is read too.
+const taskCss = readFileSync(join(pub, 'stage-track.css'), 'utf8') + readFileSync(join(pub, 'task-page.css'), 'utf8');
 const sessCss = readFileSync(join(pub, 'session.css'), 'utf8');
 
 for (const sel of ['.task-stage-ago', '.task-stage-took']) {
