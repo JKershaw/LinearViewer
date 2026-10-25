@@ -857,7 +857,18 @@
           + ` \u00b7 <button class="opened-task-all" data-action="all-sessions" data-testid="opened-task-all">All ${sessions.count}</button></div>`
         : '';
       return `<div class="opened-task-state" data-state-slot data-testid="opened-task-state">`
-        + `${opened.headerHtml || ''}${opened.trackHtml || ''}${lastLine}</div>`;
+        + `${opened.headerHtml || ''}${opened.trackHtml || ''}${renderSubtaskNeedsYou()}${lastLine}</div>`;
+    }
+
+    // LIN-3833: one line naming a subtask that needs you, with an Open link to its task page. Home passes it
+    // only for the top task, from the same row states as the In Progress rows (run-control viewers only).
+    function renderSubtaskNeedsYou() {
+      const sub = opts.subtaskNeedsYou;
+      if (!sub || !sub.identifier) return '';
+      const name = `${esc(sub.identifier)}${sub.title ? ` ${esc(sub.title)}` : ''}`;
+      return `<div class="opened-task-needs-you" data-testid="opened-task-needs-you">`
+        + `A subtask needs you: <span class="opened-task-needs-you-name">${name}</span>`
+        + ` <a class="btn btn--quiet opened-task-needs-you-open" data-testid="opened-task-needs-you-open" href="${esc(sub.href || '#')}">Open</a></div>`;
     }
 
     // Repaint only the state slot (a poll or the mount read). Falls back to a full render when the slot is
@@ -1012,7 +1023,8 @@
       const agent = d.agentAccess == null ? (window.ProxyToggle && window.ProxyToggle.isActive ? window.ProxyToggle.isActive() : true) : d.agentAccess;
       const summary = [d.model || 'the model from Models', harness || 'the harness from Models', showEffort && d.effort ? `effort ${d.effort}` : null, TARGET_WORDS[d.target] || d.target].filter(Boolean).join(' \u00b7 ');
       return `<div class="opened-task-change-panel" data-testid="run-change-panel">`
-        + `<div class="opened-task-change-head">This run only${preview ? ` \u00b7 default: ${esc(preview.model || 'from Models')}` : ''}</div>`
+        + `<div class="opened-task-change-head">This run only${preview ? ` \u00b7 default: ${esc(preview.model || 'from Models')}` : ''}`
+        + `<button class="opened-task-change-x" data-action="close-change" aria-label="Close" data-testid="run-change-x">\u00d7</button></div>`
         + (presetButtons ? `<div class="opened-task-change-row"><span class="opened-task-change-label">Preset</span>${presetButtons}</div>` : '')
         + `<div class="opened-task-change-row"><span class="opened-task-change-label">Harness</span>`
         + `<select data-testid="run-harness" aria-label="Harness">`

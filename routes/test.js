@@ -878,7 +878,14 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       const itemId = req.query.itemId
       if (!itemId) return res.status(400).json({ error: 'itemId is required' })
       const item = await dispatchQueueStore.getItemFeedback(urlKey, itemId)
-      res.json({ ok: true, feedback: item?.feedback || [] })
+      // LIN-3833: the stamped routing of the row, so a run-source twin can compare it with what the control showed.
+      const rows = await dispatchQueueStore.listItems(urlKey)
+      const row = (Array.isArray(rows) ? rows : []).find((r) => String(r._id ?? r.id) === String(itemId))
+      res.json({
+        ok: true,
+        feedback: item?.feedback || [],
+        row: row ? { harness: row.harness ?? null, model: row.model ?? null, effort: row.effort ?? null, presetName: row.presetName ?? null } : null
+      })
     } catch (err) {
       res.status(500).json({ error: err.message })
     }

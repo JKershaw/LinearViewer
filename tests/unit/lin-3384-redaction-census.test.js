@@ -151,7 +151,8 @@ const TABLE = {
   'routes/proxy-compute.js :: /api/proxy/issues/:identifier/snapshots/diff': [PRJ, 3],
   'routes/proxy-compute.js :: /api/proxy/periodicals': [PRJ, 2],
   // routes — test only
-  'routes/test.js :: /test/dispatch-item': [TST, 1],
+  // LIN-3833: the same route also reads the row (`listItems`) so the run-source twin can compare the stamp with the control.
+  'routes/test.js :: /test/dispatch-item': [TST, 2],
   // lib readers — results feed in-process derivations
   'lib/dispatch-factory.js :: anchor': [SRV, 1],
   'lib/dispatch-factory.js :: defaultFetchPilotPrFiles': [SRV, 2],

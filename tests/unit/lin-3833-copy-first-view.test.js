@@ -189,7 +189,16 @@ describe('LIN-3833 — the copy-first card on Home', () => {
   test('shown once, in the onboarding slot, with "Got it"', () => {
     const html = fixture({ copyFirstCard: true });
     assert.match(html, /class="home-onboarding-hint home-copy-first-card" data-testid="home-copy-first-card"/);
-    assert.match(html, /data-testid="home-copy-first-dismiss"[^>]*>Got it</);
+    assert.match(html, /<button class="btn home-copy-first-dismiss" type="button" data-testid="home-copy-first-dismiss"><span class="btn__label">Got it<\/span><\/button>/);
+  });
+
+  test('the "Got it" button is the shared Button piece, never a browser-default button', () => {
+    // The visual judge flagged the raw <button> (grey bevel, system font, no padding). The shared
+    // `.btn` family carries its own look, so the card adds no styling of its own.
+    const html = fixture({ copyFirstCard: true });
+    const buttons = html.match(/<button[^>]*home-copy-first-dismiss[^>]*>/g) || [];
+    assert.equal(buttons.length, 1);
+    assert.match(buttons[0], /class="btn /);
   });
 
   test('gone once dismissed, and never shown to a run-controls viewer (the caller passes false)', () => {

@@ -974,7 +974,8 @@ describe('LIN-3211 / LIN-3833: the run-step rung sends only a chosen harness; a 
 
   // LIN-3833 (Q1): the client no longer forces claude-code. An untouched or blank control sends no
   // harness, and the server settles it for an opened-task run (`surface`, asserted in
-  // lin-3833-run-sources.test.js). The structured-token half of LIN-3211 moved there with it.
+  // lin-3833-run-sources.test.js and, through enterSessionDispatch, in lin-3833-session-harness-wiring.test.js,
+  // which also carries the structured-token half of LIN-3211).
   test('a chosen claude-code is sent as chosen', async () => {
     assert.equal((await pressRung({ panelHarness: 'claude-code' })).harness, 'claude-code');
   });

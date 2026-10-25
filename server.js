@@ -131,6 +131,7 @@ import { createTaskModeRoutes } from './routes/task-mode.js'
 import { createPipelineMergeRecorder, createSessionWorkspaceIdResolver } from './lib/close-out-merges.js'
 import { createProxyRoutes, commentDedupe } from './routes/proxy.js'
 import { createProxyDefaultRoute } from './lib/settings-proxy-default.js'
+import { createCopyFirstCardRoute } from './lib/settings-copy-first-card.js'
 import { createMilestoneFunnelRoutes } from './routes/milestone-funnel.js'
 import { createRunnerKitRoutes } from './routes/runner-kit.js'
 import { createTestRoutes, installTestTokenLinearTransport } from './routes/test.js'
@@ -154,6 +155,7 @@ import { renderPromptsPage } from './lib/render-prompts.js'
 import { renderCustomPromptsPage } from './lib/render-custom-prompts.js'
 import { renderDispatchPage } from './lib/render-dispatch.js'
 import { renderSwipePage, orderIssuesForSwipe } from './lib/render-swipe.js'
+import { subtaskNeedingYouOf } from './lib/task-board-view.js'
 import { renderSwimPage } from './lib/render-swim.js'
 import { renderShipPage } from './lib/render-ship.js'
 import { createCollectiveRoutes } from './routes/collective.js'
@@ -2004,6 +2006,7 @@ async function renderDashboardAfterRefresh(workspace, session, teamId, assigneeS
     selectedTeamId,
     availableAssignees,
     rowStates,
+    topTaskSubtask: subtaskNeedingYouOf({ urlKey: workspace.urlKey, topTask: homeTopTask, rowStates }),
     copyFirstCard: featureFlags.runControls !== true && session.copyFirstCardDismissed !== true,
     // LIN-2550: same applied-not-requested labelling rule as the primary
     // dashboard route above — this post-401 re-render carries the assignee
@@ -3494,6 +3497,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       selectedTeamId,
       availableAssignees,
       rowStates,
+      topTaskSubtask: subtaskNeedingYouOf({ urlKey: workspace.urlKey, topTask: homeTopTask, rowStates }),
       copyFirstCard: featureFlags.runControls !== true && req.session.copyFirstCardDismissed !== true,
       // LIN-2550: label the selector off the filter the render APPLIED. An
       // unmatched name (a stale `?assignee=` carried across a team change by
@@ -4088,25 +4092,8 @@ app.post('/workspace/:urlKey/settings/theme', workspaceFromUrl, async (req, res)
  */
 app.use(createProxyDefaultRoute({ workspaceFromUrl, userPreferencesStore, saveSession }));
 
-// LIN-3833: "Got it" on Home's copy-first card. A per-account flag, dismissed for good: the session carries
-// it at once and the durable preference follows (best-effort, as the proxy default's is).
-app.post('/workspace/:urlKey/settings/copy-first-card', workspaceFromUrl, async (req, res) => {
-  req.session.copyFirstCardDismissed = true;
-  try {
-    await saveSession(req.session);
-  } catch (err) {
-    console.error('Failed to save copy-first card dismissal:', err);
-    return res.status(500).json({ error: 'Failed to save' });
-  }
-  if (req.session.accountId) {
-    try {
-      await userPreferencesStore.setCopyFirstCardDismissed(req.session.accountId, true);
-    } catch (err) {
-      console.error('Failed to persist copy-first card dismissal:', err);
-    }
-  }
-  res.json({ ok: true });
-});
+// LIN-3833: "Got it" on Home's copy-first card. A per-account flag, dismissed for good (lib/settings-copy-first-card.js).
+app.use(createCopyFirstCardRoute({ workspaceFromUrl, userPreferencesStore, saveSession }));
 
 // =============================================================================
 // Provider management (LIN-634)

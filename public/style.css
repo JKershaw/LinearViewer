@@ -1189,6 +1189,35 @@ a.wordmark:hover {
 
 .opened-task-change-head {
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* The close × is the phone sheet's dismiss; on desktop the panel closes with its Close button. */
+.opened-task-change-x {
+  display: none;
+}
+
+/* LIN-3833: on a phone the Change panel is a full-screen sheet, not an inline block. */
+@media (max-width: 640px) {
+  .opened-task-change-panel {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    border: 0;
+    border-radius: 0;
+    padding: 16px;
+    overflow-y: auto;
+  }
+
+  .opened-task-change-x {
+    display: inline-block;
+    font-size: 1.4em;
+    line-height: 1;
+    padding: 4px 10px;
+  }
 }
 
 .opened-task-change-row {
