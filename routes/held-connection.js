@@ -24,7 +24,8 @@
  *     stashed on `heldEntry.offered` — only offered scopes can be POSTed;
  *   - rendered through the LIN-2820 renderer via the new `formAction` option.
  *
- * POST (add-source; `mode=new` is beat 4):
+ * POST (add-source; `mode=new` is the fresh-workspace path, with no existing
+ * workspace looked up):
  *   - D11 re-check; `scope` must be in the offer map (or already bound);
  *   - the connection row is re-read + authorized via the injected reader
  *     (a deleted/racing/foreign connection ⇒ 409, no partial binding);

@@ -507,7 +507,7 @@ window.renderMarkdown = function(text, opts, keepWholeFence) {
  * ("Jan 5"). Polymorphic input: accepts either an ISO/parseable date string or a
  * millisecond-epoch number. Returns '' for falsy or unparseable input.
  *
- * Note: pipeline.js deliberately keeps its own 30-day-cap variant and is NOT a
+ * Note: the Observation page keeps its own 30-day-cap variant and is NOT a
  * consumer of this helper.
  *
  * @global
@@ -726,7 +726,7 @@ window.readSSEStream = async function readSSEStream(response, onEvent) {
  * Unified client-side dispatch to POST /api/dispatch.
  *
  * Every dispatch surface (dashboard tree, dispatch page, swipe/recap/brief,
- * pipeline overlay) funnels through here so the payload contract is assembled
+ * observation page) funnels through here so the payload contract is assembled
  * in exactly one place — no surface can silently drop the issue link again.
  * The dispatch history these records become is joined back to tasks by
  * `issueIdentifier` (see lib/pipeline-loops.js), so it is required by default.
@@ -2376,7 +2376,7 @@ let activeModalClose = null;
  * inside it) via the returned `modal` element.
  *
  * Behaviour standardised from the dispatch token modal: close on overlay click,
- * close button, and Escape. The pipeline overlay is intentionally NOT built on
+ * close button, and Escape. The observation poll is intentionally NOT built on
  * this helper — it is a persistent polling singleton, a different primitive.
  *
  * @global

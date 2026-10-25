@@ -23,8 +23,9 @@
  * (it is not bound there), so the factory default applies. `sessionsFeedCache`
  * is defaulted too.
  *
- * The routes land DORMANT: no production path can mint a `take` grant until
- * S2b, so a token reaching these handlers is already grant-bearing. There is no
+ * The path-scoped `requireGrant('take')` gate refuses any token without the
+ * grant. Only a runner copy carries it: `routes/proxy-tokens-admin.js` mints
+ * `RUNNER_GRANTS` for that purpose. There is no
  * `resolveProviderAccess` call site here (no provider lane, no credential
  * fingerprint) — the runner talks to the dispatch stores directly.
  *

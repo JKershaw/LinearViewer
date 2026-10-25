@@ -7,7 +7,7 @@
  *   - fresh:      cached and matches current context
  *   - generating: POST in flight
  *
- * Exposed as a global `RecapSection` since the swipe and pipeline pages
+ * Exposed as a global `RecapSection` since the swipe and recap pages
  * are plain scripts (no module loader / build step).
  */
 (function () {

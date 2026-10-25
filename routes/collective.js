@@ -2,7 +2,7 @@
  * Collective routes — the experimental cross-project discussion (LIN-450, V1).
  *
  * Anchored at /workspace/:urlKey/collective (reusing workspaceFromUrl + the
- * pipeline feature-gate-redirect-to-settings pattern), the page is *anchored* to
+ * experimental feature-gate-redirect-to-settings pattern), the page is *anchored* to
  * one workspace for auth/navbar/gate but *operates* over the user-selected subset
  * of `session.workspaces`: it fans a participant prompt out to each selected
  * workspace's unchanged dispatch route, and fronts a thin Yap proxy to render the
@@ -102,7 +102,7 @@ export function createCollectiveRoutes({
     const workspace = req.workspace;
     const featureFlags = await requestFeatureFlags(req);
 
-    // Gate: experimental feature must be enabled (mirrors pipeline).
+    // Gate: experimental feature must be enabled (mirrors the task-chat gate).
     if (featureFlags.collective !== true) {
       return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings/features`);
     }
@@ -114,8 +114,7 @@ export function createCollectiveRoutes({
         : [];
 
       // Built-in + custom preset meetings for this anchor workspace (LIN-1050).
-      // Not yet consumed by the renderer — wiring the picker UI is the next beat;
-      // this only gets the data there.
+      // The renderer lists these in the preset picker (`lib/render-collective.js`).
       const presets = collectivePresetsStore
         ? await collectivePresetsStore.list(workspace.urlKey)
         : [];
@@ -465,9 +464,8 @@ export function createCollectiveRoutes({
   });
 
   // ─── Presets: custom preset meeting CRUD (LIN-1050, S4) ──────────────────────
-  // Backend-only for this ticket — no picker/authoring UI yet (that's a later
-  // beat, and a dedicated "save as preset" form has no named consumer in the
-  // ticket text). These routes exist so the store is usable end-to-end and so
+  // No authoring UI: the picker only lists and launches presets, and a dedicated
+  // "save as preset" form has no named consumer in the ticket text. These routes exist so the store is usable end-to-end and so
   // a future feature (e.g. LIN-1051) can save a generated meeting as a preset.
   // Presets are repo-agnostic by design (beat 1) — no repo/workspace-binding
   // validation belongs here; that happens only at LAUNCH time (client-side,
