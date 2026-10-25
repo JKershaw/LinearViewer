@@ -1701,3 +1701,16 @@ describe('getModelDisplayName: one name per model (LIN-3962)', () => {
     assert.equal(getModelDisplayName(''), getModelDisplayName(DEFAULT_MODEL));
   });
 });
+
+// LIN-3987: a bare Claude Code alias has the rate of the model it runs, through the same resolution a run is priced by.
+describe('getModelPricingHint: a bare Claude Code alias prices as the model it runs (LIN-3987)', () => {
+  test('an alias has the rate of its mapped model, in the same form as the opencode suggestions', () => {
+    assert.equal(getModelPricingHint('sonnet'), '$2.00 in / $10.00 out per 1M tokens');
+    assert.equal(getModelPricingHint('opus'), '$4.00 in / $20.00 out per 1M tokens');
+  });
+
+  test('a prototype name is not an alias, and an id with no row has no rate', () => {
+    assert.equal(getModelPricingHint('constructor'), null);
+    assert.equal(getModelPricingHint('someone/unknown-model-x'), null);
+  });
+});
