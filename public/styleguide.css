@@ -137,6 +137,11 @@
   gap: var(--space-3);
 }
 
+/* A live Settings sample (LIN-3950): the piece's own builder, drawn as a block, not a grid. */
+.settings-shell.sg-settings-sample {
+  display: block;
+}
+
 /* One button look and its class string (LIN-3950): the caption sits under the sample. */
 .sg-button-look {
   display: inline-flex;
