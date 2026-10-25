@@ -353,7 +353,7 @@ The first Plain move. The helper is `lib/components/plain-page.js`; decision 17 
 | Workspace shape | `renderPlainPage`, the page-header h1 with its lede | shipped; no page yet (the next Plain moves) |
 | `html` section | `renderSection` | done: Legal |
 | `fields` section | `renderField` | shipped; sampled on `/styleguide` only |
-| `rows` section | `renderSection` over `rowsList` (`settings-group.js`), the rows Settings uses | shipped; Account home (LIN-3956) and `/styleguide`, which link `settings.css` through the document entry. Settings `group()` shares the rows list |
+| `rows` section | `renderSection` over `rowsList` (`settings-group.js`), the rows Settings uses | shipped; Account home (LIN-3956), which links `settings.css` through the document entry, and `/styleguide`, which links it by hand. Settings `group()` shares the rows list |
 | `form` section | `plainFormHtml`: `renderField` with a text input (`token-label-input`, `aria-label`, placeholder, maxlength), and a primary `renderButton` | shipped; Account home (LIN-3956) and the workspace-not-found CTA (`LOCAL_WORKSPACE_FORM`), and `/styleguide` |
 | `empty` section | `renderEmptyState` | shipped; sampled on `/styleguide` only |
 | Document entry | `renderPlainDocument`: settings.css when there are rows, `after` markup (a footer) | done: Legal and Account home (LIN-3956) |
