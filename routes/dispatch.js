@@ -30,6 +30,8 @@ import os from 'os';
 import { spawnClaudeSession } from '../lib/harbour-spawn.js';
 import { DISPATCH_DEFAULT_KINDS, deriveDispatchKind } from '../lib/prompt-templates.js';
 import { resolveRoutingWithSources } from '../lib/dispatch-factory.js';
+import { getJob } from '../lib/llm-jobs.js';
+import { stageLabel } from '../lib/task-page-loader.js';
 import { SURFACES } from '../lib/task-mode-store.js';
 import { effortNotAppliedForConfig } from '../lib/workspace-preferences.js';
 import { isPositiveInteger } from '../lib/dispatch-fields.js';
@@ -619,7 +621,16 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         applyDefaultHarness: surface !== null,
         settleHarness: surface !== null
       });
-      res.json({ kind, presetId: preset ? presetId : null, presetName: preset?.name ?? null, ...routing });
+      // LIN-3833: the words the run control shows beside the sources: the step's name and its group.
+      const job = getJob(kind);
+      res.json({
+        kind,
+        stepLabel: stageLabel(kind),
+        group: job?.group || null,
+        presetId: preset ? presetId : null,
+        presetName: preset?.name ?? null,
+        ...routing
+      });
     } catch (err) {
       return reportFailure(res, 'Preview dispatch routing error:', err, 'Failed to preview dispatch routing');
     }

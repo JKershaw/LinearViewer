@@ -1141,6 +1141,138 @@ a.wordmark:hover {
   font-family: var(--font-content);
 }
 
+/* LIN-3833: the run control on Home (one main action, what it runs on, the Change panel for this run only,
+   Undo and Stop). The block is one slot; the prompt box and the copy-first view sit beside it. */
+.opened-task-run {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 6px 0 10px;
+  font-family: var(--font-content);
+}
+
+.opened-task-step {
+  color: var(--fg);
+}
+
+.opened-task-step-name {
+  font-weight: 600;
+}
+
+.opened-task-runs-on,
+.opened-task-running,
+.opened-task-queued,
+.opened-task-last-copy {
+  color: var(--fg-dim);
+  font-size: 0.9em;
+}
+
+.opened-task-ask,
+.opened-task-change,
+.opened-task-another,
+.opened-task-see,
+.opened-task-undo,
+.opened-task-stop {
+  margin-left: 0.6em;
+  font-size: 0.9em;
+}
+
+.opened-task-change-panel {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--card);
+}
+
+.opened-task-change-head {
+  font-weight: 600;
+}
+
+.opened-task-change-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.opened-task-change-label {
+  color: var(--fg-dim);
+  min-width: 5.5em;
+  font-size: 0.9em;
+}
+
+.opened-task-preset.is-chosen,
+.opened-task-target.is-chosen {
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.opened-task-change-summary,
+.opened-task-change-note {
+  color: var(--fg-dim);
+  font-size: 0.9em;
+  margin: 0;
+}
+
+.opened-task-more {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.opened-task-another-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+}
+
+.opened-task-go--main {
+  align-self: flex-start;
+}
+
+.opened-task-copy {
+  align-self: flex-start;
+}
+
+.opened-task-write {
+  align-self: flex-start;
+}
+
+.opened-task-box {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  max-height: 22em;
+  overflow: auto;
+}
+
+.opened-task-box-actions,
+.opened-task-progress-key,
+.opened-task-key-note,
+.opened-task-paste {
+  font-size: 0.9em;
+}
+
+.opened-task-box-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.opened-task-key-note,
+.opened-task-paste {
+  color: var(--fg-dim);
+  margin: 0;
+}
+
+.opened-task-confirm {
+  color: var(--fg);
+}
+
 /* LIN-3833: the count line under the In Progress heading (3 in progress · 1 needs you). */
 .in-progress-count {
   color: var(--fg-dim);
