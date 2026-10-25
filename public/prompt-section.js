@@ -992,6 +992,8 @@
       let why = 'the next step for this task';
       if (state.run.step) why = 'chosen for this run';
       else if (step && step.failed) why = 'failed last time, so it runs again';
+      // LIN-3968 ruling (option a): an undone stage is offered again, without calling it a failure.
+      else if (step && step.why === 'again') why = 'cancelled last time, so it is offered again';
       else if (step && last) why = `usually next after ${last.label || 'the last session'}`;
       const name = step ? esc(step.label) : 'Run to PR';
       return `<div class="opened-task-step" data-testid="opened-task-step"><span class="opened-task-step-name">${name}</span> \u00b7 ${esc(why)}`

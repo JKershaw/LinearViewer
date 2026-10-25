@@ -270,6 +270,23 @@ describe('LIN-3968 — run control: one step at a time, a failed stage offered a
     assert.match(c.innerHTML, /failed last time, so it runs again/);
   });
 
+  test('a cancelled Review is offered again, and says why without calling it a failure', async () => {
+    const undone = state({
+      count: 3, next: { kind: 'review', label: 'Review' },
+      offered: { kind: 'review', label: 'Review', why: 'again', failed: false },
+      last: { label: 'Review', state: 'cancelled', at: null },
+    });
+    const { PromptSection } = load({ stateBody: undone });
+    const c = makeContainer();
+    PromptSection.init(c, RUN);
+    await flush();
+    await flush();
+    assert.match(c.innerHTML, /data-action="run-step-next"[^>]*>Run Review</);
+    assert.match(c.innerHTML, /cancelled last time, so it is offered again/);
+    assert.doesNotMatch(c.innerHTML, /usually next after Review/, 'not "next after" itself');
+    assert.doesNotMatch(c.innerHTML, /failed last time/);
+  });
+
   test('the state block pastes the one-row strip, not the log track', async () => {
     const withStrip = state({});
     withStrip.headerHtml = '<p class="task-sentence">Idle</p>';

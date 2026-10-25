@@ -212,3 +212,24 @@ test('findRecentFreshDispatch returns null when its required inputs are missing'
   assert.equal(await store.findRecentFreshDispatch(null, { issueIdentifier: 'LIN-1', kind: 'plan', since: new Date(0) }), null);
   assert.equal(mainQueries.length, 0, 'an unkeyable lookup must not issue a query at all');
 });
+
+test('findRecentFreshDispatch: a cancelled row (an Undo) does not block the same stage again (LIN-3968 ruling)', async () => {
+  const { store, mainQueries, historyQueries } = makeStore();
+  const base = new Date('2026-10-25T12:00:00.000Z');
+  const row = (id, extra) => ({
+    _id: id, urlKey: 'acme', issueIdentifier: 'LIN-1', kind: 'review',
+    followUpTo: null, abort: false, prompt: 'x', dispatchedAt: base, ...extra
+  });
+  await store.historyCollection.insertOne(row('undone', { status: 'cancelled' }));
+  const since = new Date(base.getTime() - 1000);
+
+  assert.equal(await store.findRecentFreshDispatch('acme', { issueIdentifier: 'LIN-1', kind: 'review', since }), null,
+    'the person undid it; nothing ran, so re-running the stage is not a duplicate');
+  for (const query of [mainQueries[0], historyQueries[0]]) {
+    assert.deepEqual(query.status, { $ne: 'cancelled' }, 'the exemption rides into both reads');
+  }
+
+  // Every other archived row still counts: taken (the LIN-1594 pile included) and expired.
+  await store.historyCollection.insertOne(row('taken', { status: 'taken' }));
+  assert.equal((await store.findRecentFreshDispatch('acme', { issueIdentifier: 'LIN-1', kind: 'review', since })).id, 'taken');
+});

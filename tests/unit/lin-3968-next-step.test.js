@@ -1,8 +1,9 @@
 /**
  * LIN-3968 item 2: the next step after a failed stage, from one rule in the loader.
  *
- * Witnesses: a stage whose latest session failed (failed, aborted, cancelled, expired) is not
- * "reached", so the stage is offered again, not the one after it; a later success of the same
+ * Witnesses: a stage whose latest session failed (failed, aborted, expired) is not "reached",
+ * so the stage is offered again, not the one after it; a cancelled stage (an Undo) is offered
+ * again too, but is not a failure and does not need you (LIN-3968 ruling, option a); a later success of the same
  * stage clears it; `closed` is bookkeeping, not failure (LIN-3364); no step is offered while any
  * session runs or waits; the task page (`buildTaskPageModel`), the row words (`buildRowStates`)
  * and the state block (`sessionSummaryOf`) all read the one `nextStepOf` result.
@@ -34,8 +35,14 @@ describe('LIN-3968 — guessStages: a failed stage is offered again, not passed 
     assert.deepEqual(guessStages(sessions, 'started'), ['close-out']);
   });
 
-  test('a cancelled session (an Undo or a Stop) is not a failure: it counts as reached, as before', () => {
+  test('a cancelled stage (an Undo) is offered again, but not as a failure (LIN-3968 ruling, option a)', () => {
     const sessions = [sess('plan', 'done'), sess('implementation', 'done'), sess('review', 'cancelled')];
+    assert.deepEqual(guessStages(sessions, 'started'), ['review', 'close-out'], 'the undone stage is not passed over');
+    assert.deepEqual(nextStepOf(sessions, 'started'), { kind: 'review', label: 'Review', why: 'again', failed: false });
+  });
+
+  test('a cancelled stage run again and done clears it', () => {
+    const sessions = [sess('plan', 'done'), sess('implementation', 'done'), sess('review', 'cancelled', { n: 1 }), sess('review', 'done', { n: 2 })];
     assert.deepEqual(guessStages(sessions, 'started'), ['close-out']);
     assert.deepEqual(nextStepOf(sessions, 'started'), { kind: 'close-out', label: 'Close-out', why: 'usual', failed: false });
   });
@@ -83,6 +90,12 @@ describe('LIN-3968 — buildTaskStages: the failed stage stands for the step ahe
     const stages = buildTaskStages([sess('plan', 'done'), sess('implementation', 'done'), sess('review', 'failed')], { trackerType: 'started' });
     assert.deepEqual(stages.filter(s => s.state === 'ahead').map(s => s.kind), ['close-out']);
     assert.equal(stages.find(s => s.kind === 'review').state, 'failed');
+  });
+
+  test('the cancelled Review row is not repeated as "usually next" either', () => {
+    const stages = buildTaskStages([sess('plan', 'done'), sess('implementation', 'done'), sess('review', 'cancelled')], { trackerType: 'started' });
+    assert.deepEqual(stages.filter(s => s.state === 'ahead').map(s => s.kind), ['close-out']);
+    assert.equal(stages.find(s => s.kind === 'review').state, 'cancelled');
   });
 });
 
@@ -136,6 +149,14 @@ describe('LIN-3968 — row words: a failed stage needs you, and says which stage
     assert.equal(row.words, 'Review failed');
     assert.equal(row.needsYou, true);
     assert.equal(row.rank, 0);
+  });
+
+  test('a cancelled Review does not need you: the row says Review is next', () => {
+    const build = loop({ loopId: 'l0', lineageId: 'l0', kind: 'implementation', agentState: 'complete', terminalStatus: 'done', dispatchedAt: '2026-10-25T12:00:00.000Z' });
+    const undone = loop({ historyStatus: 'cancelled', agentState: 'complete', terminalStatus: null, terminalCompletedAt: null, takenAt: null });
+    const row = states([build, undone]).get('LIN-60');
+    assert.equal(row.needsYou, false);
+    assert.equal(row.words, 'Review next');
   });
 
   test('a copy-first viewer, who sees no sessions, still gets the tracker word only', () => {
