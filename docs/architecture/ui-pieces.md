@@ -83,7 +83,7 @@ The class is "a rule written in 2 or more places that Settings shares". Two repr
 - **Authority:** the status palette in `:root` (`style.css:20`; `--green` :27, `--red` :31, `--brand` :118, `--amber` :128, `--red-dim` :130, each with a `-dim` text companion), overridden by `.theme-dark` (`style.css:215`).
 - **Counting rule:** a site is a raw colour literal (hex or `rgb[a]()`) in a rule instead of a token.
 - **Sites at base:** `settings.css` 4 (443, 509, 524, 839; two are fallbacks `var(--red, #c0392b)`, one is `var(--bg, #fff)`), `proxy.css` 1, `common-actions.css` 1 (162), `dispatch.css` 0, `audit.css` 0, `style.css` 101 (mostly the token definitions themselves).
-- **Variant (named, deliberate):** the landing's own dark copy under `prefers-color-scheme` (`style.css:2335`, `body.is-landing`). Its comment says this is deliberate; `/styleguide` follows the same media-query palette, which is why the judge emulates both the cookie and the media query.
+- **Variant (named, deliberate):** pages that use the `body.is-landing` class (the landing, Library, legal, KPIs, templates, `/styleguide`, the signed-out previews) follow the system scheme when no theme is stored. They opt in with `renderPage({ followSystemTheme })`, and the shared pre-paint script applies `.theme-dark` (LIN-3980). There is no second copy of the dark tokens; `tests/unit/theme-prepaint.test.js` guards the opt-in. The judge emulates both the cookie and the media query.
 - **Consolidate deletes:** the hex fallbacks in `settings.css` (509, 524, 839) once the token is guaranteed.
 - **Differences:** Settings' sidebar states have only two tones, `ok` and `bad` (`lib/settings-areas.js` `ok`/`bad`; at base the sidebar was in `lib/render-settings-shell.js:132`; `settings.css:647-662` at base), so **Paused shows red** next to Stopped. Class: **unclear** at base (resolved at head, see open question 1).
 - **Open question 1** (below): whether paused gets its own tone. Resolved at head: amber shipped in LIN-3890.
@@ -407,3 +407,14 @@ Three things to expect when reading the judge's output:
 - **Retakes.** A differing pair is retaken up to 3 times at zero tolerance, and the count is printed. Two identical exports sometimes paint a sub-pixel apart; the source was not found. Seen so far (dated; counted when the list had 72 shots): 1 of 72 in the author's run and 2 of 72 in the reviewer's, none in the base-against-base self-check. A run whose retake count rises above that should be read as suspect.
 - **Shared-stylesheet coverage guard.** The guard finds the renderers that link a sheet with `git grep -F <name>.css` over `lib/`, which matches mentions as well as links (`style.css` returns 47 files at head, including comment mentions in `lib/components/*`; `common-actions.css` 22). The first Consolidate change to either sheet therefore prints NOT ZERO-CLAIMABLE until the judge's page list grows to cover them. That is the ticket's page-list rule failing safe, not a fault in the change.
 - **Failed server start.** When a server fails to start, the driver keeps its work directory and prints its path, so the `server.log` the error cites still exists. The directory is removed on success.
+
+## Landing (LIN-3980): what it shows
+
+The signed-out landing (`lib/render-landing.js`, `lib/components/landing-hero.js`) reuses shared pieces, so a later change to one of them reaches the landing:
+
+- **Status pill** (`renderStatusPill`): the Observation and Swim glimpses.
+- **Stage words and model names**: `STAGE_LABELS` (`lib/run-view.js`) and `getModelDisplayName` (`lib/openrouter.js`). The glimpses show family names, never raw ids.
+- **Head metadata** (`lib/components/head-meta.js`): description, canonical and social-preview tags, shared with the Library.
+- **Dark mode**: the pre-paint script in `lib/components/page.js`, opted in with `followSystemTheme`.
+
+The landing's own link and button styles (`.landing-cta*`, `.lx-os__cta`, `.lx-library__cta`, `.lx-archive__link`) are not yet decision 6 (button) or decision 13 (link). Moving them is open; it is the next step on this page.

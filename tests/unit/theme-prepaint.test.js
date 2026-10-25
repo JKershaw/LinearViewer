@@ -10,8 +10,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { renderPage, themePrepaintScriptHash, THEME_PREPAINT_SCRIPT_BODY } from '../../lib/components/page.js';
 import { scriptBodyHash } from '../../lib/components/page.js';
+
+const LIB = join(dirname(fileURLToPath(import.meta.url)), '../../lib');
 
 function runPrepaint({ cookie = '', systemDark = false, optedIn = false }) {
   const classes = new Set();
@@ -58,4 +63,18 @@ test('every page emits the same pre-paint script, so one CSP hash covers all', (
   assert.equal(themePrepaintScriptHash(), hash);
   assert.ok(renderPage({ title: 'x', followSystemTheme: true }).includes(`<script>${body}</script>`));
   assert.ok(renderPage({ title: 'x' }).includes(`<script>${body}</script>`));
+});
+
+// body.is-landing once carried a dark remap that every page using the class
+// inherited (the landing, Library, legal, KPIs, templates, styleguide and the
+// signed-out previews). Those pages now opt in explicitly. A page that adds the
+// class without opting in would silently lose system dark, so the guard is here.
+test('every page that uses the is-landing body class opts in to the system theme', () => {
+  const offenders = readdirSync(LIB)
+    .filter((f) => f.endsWith('.js'))
+    .filter((f) => {
+      const src = readFileSync(join(LIB, f), 'utf8');
+      return /bodyClass:\s*(?:isLanding \? )?'is-landing/.test(src) && !/followSystemTheme/.test(src);
+    });
+  assert.deepEqual(offenders, []);
 });
