@@ -33,6 +33,10 @@
  *   node scripts/assert-unit-suite-hermetic.mjs          # runs the unit suite
  *   node scripts/assert-unit-suite-hermetic.mjs --proxy  # same, with proxy env set
  *
+ * CLOCK_SHIFT_DAYS=N (LIN-3949) also loads tests/fixtures/clock-shift.js into
+ * every test process, so the same run sees the clock N days ahead. Unset, the
+ * run is on the real clock.
+ *
  * Exit 0 when the run is hermetic, 1 when it is not (or when the suite itself
  * fails — a red suite makes the socket count meaningless, so it is not reported
  * as a hermeticity pass).
@@ -114,9 +118,22 @@ process.on('exit', () => {
 `);
 
 const withProxy = process.argv.includes('--proxy');
+// LIN-3949: the same NODE_OPTIONS channel carries the clock shift, so every
+// `node --test` child is shifted, not only this wrapper. Unset or 0 adds nothing.
+const clockShiftDays = Number(process.env.CLOCK_SHIFT_DAYS || 0);
+const clockShiftPath = join(ROOT, 'tests', 'fixtures', 'clock-shift.js');
 const env = {
   ...process.env,
-  NODE_OPTIONS: [process.env.NODE_OPTIONS, `--import ${JSON.stringify(watcherPath)}`].filter(Boolean).join(' '),
+  NODE_OPTIONS: [
+    process.env.NODE_OPTIONS,
+    `--import ${JSON.stringify(watcherPath)}`,
+    clockShiftDays ? `--import ${JSON.stringify(clockShiftPath)}` : null,
+  ].filter(Boolean).join(' '),
+  // npm's update check compares its cache with Date.now(). Shifted, the cache
+  // looks stale, npm fetches the registry through the dead proxy, and the
+  // watcher counts that as an escape. It is npm's request, not the suite's, so
+  // a shifted run switches it off. Seen locally without CI=true (LIN-3949).
+  ...(clockShiftDays ? { npm_config_update_notifier: 'false' } : {}),
 };
 if (withProxy) {
   // Deliberately a dead loopback port. Since LIN-2992 the watcher recognizes a
@@ -131,6 +148,7 @@ if (withProxy) {
 }
 
 console.log(`[hermetic] running the unit suite${withProxy ? ' with proxy env set' : ''}…`);
+if (clockShiftDays) console.log(`[hermetic] clock shifted +${clockShiftDays}d (CLOCK_SHIFT_DAYS)`);
 
 const child = spawn('npm', ['run', 'test:unit'], { cwd: ROOT, env, stdio: 'inherit' });
 

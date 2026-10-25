@@ -423,7 +423,7 @@ describe('LIN-2942 — POST and GET /workspace/:urlKey/api/task-mode', () => {
   test('GET for a task with no events returns the empty mode', async () => {
     const res = await call(buildTaskModeApp({ taskModeStore: store }), 'get', `${TASK_MODE_PATH}/LIN-404`);
     assert.equal(res.status, 200, res.text);
-    assert.deepEqual(res.body, { entry: null, taken: null, furthest: null, events: [], coverage: { surfaces: ['swipe', 'home'] } });
+    assert.deepEqual(res.body, { entry: null, taken: null, furthest: null, events: [], coverage: { surfaces: ['swipe', 'home'] }, lastCopy: null });
   });
 });
 

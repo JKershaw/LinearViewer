@@ -25,13 +25,17 @@ test.beforeEach(({ workerUrlKey }) => {
   URL_KEY = workerUrlKey;
 });
 
-/** Reveal a preexisting (template) prompt for the blocked task on the dashboard. */
+/**
+ * Reveal a preexisting (template) prompt for the blocked task. LIN-3833: Home's opened task is the copy-first
+ * view (no template list), so the template path runs on the Swipe card, which keeps its classic component. The
+ * copy path under test (ProxyToggle.maybeAppend) is the same function both views call.
+ */
 async function selectDashboardPrompt(page) {
-  const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
-  await taskLine.click();
-  const details = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"]`);
-  await details.locator('.detail-toggle[data-toggle="prompts"]').click();
-  const component = details.locator('.prompt-section');
+  await page.goto(`/workspace/${URL_KEY}/swipe/TEST-11`);
+  const card = page.locator('#swipe-card');
+  await expect(card).toBeVisible();
+  await card.locator('.swipe-accordion-header[data-accordion="prompts"]').click();
+  const component = card.locator('.prompt-section');
   await expect(component).toBeVisible();
   // Pick the "blocked" template from "other prompts" (reveal the more-group first).
   const other = component.locator('[data-testid="other-prompts"]');

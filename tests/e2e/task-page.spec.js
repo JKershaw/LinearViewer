@@ -358,7 +358,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await seedTasks(page);
     await page.goto(`/workspace/${URL_KEY}/`);
     await page.locator('.in-progress-items .line', { hasText: 'A task with a running build' }).first().click();
-    await page.locator('.detail-toggle[data-toggle="details"]').first().click();
+    await page.locator('.detail-toggle[data-toggle="description"]').first().click();
 
     const link = page.locator('[data-testid="issue-task-page-link"]').first();
     await expect(link).toBeVisible();
@@ -390,7 +390,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
 
     const jiraNode = page.locator('.node').filter({ has: page.locator('.line:has-text("Jira task to do")') }).first();
     await jiraNode.locator('.line').first().click();
-    await jiraNode.locator('.detail-toggle[data-toggle="details"]').first().click();
+    await jiraNode.locator('.detail-toggle[data-toggle="description"]').first().click();
 
     const link = jiraNode.locator('[data-testid="issue-task-page-link"]').first();
     await expect(link).toBeVisible();

@@ -51,10 +51,10 @@ test.describe('Detail drill-down on a non-active binding (LIN-1903)', () => {
 
     // Positive proof the rendered detail is sourced from the JIRA binding:
     // the provider-aware link label and the ADF→Markdown-converted body.
-    await expect(jiraNode.locator('.detail-link', { hasText: 'View in Jira' }).first()).toBeAttached();
-    await expect(jiraNode.locator('.detail-link', { hasText: 'View in Linear' })).toHaveCount(0);
-    await jiraNode.locator('[data-toggle="details"]').first().click();
-    await expect(jiraNode.locator('.detail-content[data-content="details"]', { hasText: 'A todo Jira issue.' }).first()).toBeAttached();
+    await expect(jiraNode.locator('.detail-link', { hasText: 'Open in Jira' }).first()).toBeAttached();
+    await expect(jiraNode.locator('.detail-link', { hasText: 'Open in Linear' })).toHaveCount(0);
+    await jiraNode.locator('[data-toggle="description"]').first().click();
+    await expect(jiraNode.locator('.detail-content[data-content="description"]', { hasText: 'A todo Jira issue.' }).first()).toBeAttached();
   });
 
   test('regression control: the ACTIVE (local) binding\'s own rows are unaffected on the same multi-binding workspace', async ({ page, seedLocal }) => {
@@ -104,18 +104,21 @@ test.describe('Sibling id-scoped routes on a non-active (Jira) binding (LIN-1904
     // that populates the Details/Prompts toggles below; skipping it leaves
     // the fragment empty and every nested locator times out.
     await jiraRow.click();
-    await jiraNode.locator('[data-toggle="details"]').first().click();
+    await jiraNode.locator('[data-toggle="description"]').first().click();
 
     // Prompt: click the always-visible "implementation" prompt button and
     // assert the generated prompt embeds the JIRA issue's own title — pre-fix,
     // this request carried no provenance and fetched the ACTIVE (local)
     // provider's issue context for this id, either 404ing or embedding the
     // wrong issue's title.
-    await jiraNode.locator('[data-toggle="prompts"]').first().click();
-    const component = jiraNode.locator('.prompt-section').first();
+    // LIN-3833: the copy-first view writes the step. ENG-1 ("Jira task to do") is Todo, so its step is Plan,
+    // which needs no AI; the prompt must embed the JIRA issue's own title.
+    const todoNode = page.locator('.node').filter({ has: page.locator('.line:has-text("Jira task to do")') }).first();
+    await todoNode.locator('.line').first().click();
+    const component = todoNode.locator('.prompt-section').first();
     await expect(component).toBeVisible();
-    await component.locator('[data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="implementation"]').click();
-    await expect(component.locator('[data-prompt-body]')).toContainText('Jira task in progress');
+    await component.locator('[data-testid="opened-task-write"]').click();
+    await expect(component.locator('[data-prompt-body]')).toContainText('Jira task to do');
 
     // Comments: expand the nested Comments toggle and assert the JIRA
     // comment body is present — proof the fetch reached the Jira binding's
@@ -154,12 +157,12 @@ test.describe('Sibling id-scoped routes on a non-active (Jira) binding (LIN-1904
     const jiraRow = jiraNode.locator('.line').first();
     await expect(jiraRow).toBeAttached();
     await jiraRow.click();
-    await jiraNode.locator('[data-toggle="details"]').first().click();
+    await jiraNode.locator('[data-toggle="description"]').first().click();
 
     // The Details panel is populated (proves the fragment actually rendered,
     // not just an empty/failed fetch) and now carries an Edit affordance
     // stamped with the row's OWN provider.
-    await expect(jiraNode.locator('.detail-content[data-content="details"]')).toContainText('A todo Jira issue.');
+    await expect(jiraNode.locator('.detail-content[data-content="description"]')).toContainText('A todo Jira issue.');
     const editLink = jiraNode.locator('[data-testid="issue-edit-link"]');
     await expect(editLink).toBeAttached();
     await expect(editLink).toHaveAttribute('href', /\/edit\?source=jira$/);
@@ -203,7 +206,7 @@ test.describe('Edit-link → task-edit → PATCH provenance chain, foreign write
     // Expand the row first — the lazy /api/detail fetch that populates the
     // Details toggle (and the Edit link inside it) below.
     await githubRow.click();
-    await githubNode.locator('[data-toggle="details"]').first().click();
+    await githubNode.locator('[data-toggle="description"]').first().click();
 
     // The Edit link carries `?source=github` — the row's OWN provider, not the
     // active local one — so the drill-down and its PATCH resolve the same
@@ -257,20 +260,25 @@ test.describe('Recap / Brief / Recommend / Task Chat on a non-active (Jira) bind
     await page.waitForLoadState('networkidle');
   }
 
+  // LIN-3833: Brief and Recap are Swipe's folds now (Home's opened task has neither). The card for the task is
+  // opened by identifier and its accordion expanded.
+  async function openSwipeAccordion(page, identifier, name) {
+    const urlKey = page.url().match(/\/workspace\/([^/]+)\//)[1];
+    await page.goto(`/workspace/${urlKey}/swipe/${identifier}`);
+    const card = page.locator('#swipe-card');
+    await expect(card).toBeVisible();
+    await card.locator(`.swipe-accordion-header[data-accordion="${name}"]`).click();
+    return card.locator(`.swipe-accordion-body[data-accordion-body="${name}"]`);
+  }
+
   test('recap and brief render Jira-grounded content for a Jira row, not the active binding\'s', async ({ page, seedLocal }) => {
     await seedAndGoto(page, seedLocal);
 
     // ENG-2 ("Jira task in progress") carries a description, a comment, and
     // one open subtask (ENG-4) — enough surface for both mock builders to
     // embed Jira-specific content, not generic filler.
-    const jiraNode = page.locator('.node').filter({ has: page.locator('.line:has-text("Jira task in progress")') }).first();
-    const jiraRow = jiraNode.locator('.line').first();
-    await expect(jiraRow).toBeAttached();
-    await jiraRow.click();
-    await jiraNode.locator('[data-toggle="details"]').first().click();
-
-    await jiraNode.locator('[data-toggle="brief"]').first().click();
-    const brief = jiraNode.locator('[data-content="brief"] .brief-section');
+    const body = await openSwipeAccordion(page, 'ENG-2', 'brief');
+    const brief = body.locator('.brief-section');
     // LIN-2944 P2: a section no longer spends AI when it opens, so the Jira
     // row's (missing) brief renders the ✦ generate placeholder. Click it to
     // provoke the POST, then assert the Jira-grounded content.
@@ -278,8 +286,8 @@ test.describe('Recap / Brief / Recommend / Task Chat on a non-active (Jira) bind
     await expect(brief).toContainText('Jira task in progress', { timeout: 5000 });
     await expect(brief).toContainText('ENG-4', { timeout: 5000 });
 
-    await jiraNode.locator('[data-toggle="recap"]').first().click();
-    const recap = jiraNode.locator('[data-content="recap"] .recap-section');
+    const recapBody = await openSwipeAccordion(page, 'ENG-2', 'recap');
+    const recap = recapBody.locator('.recap-section');
     await recap.locator('[data-recap-refresh]').first().click();
     await expect(recap).toContainText('ENG-4', { timeout: 5000 });
   });
@@ -294,10 +302,10 @@ test.describe('Recap / Brief / Recommend / Task Chat on a non-active (Jira) bind
     const jiraRow = jiraNode.locator('.line').first();
     await expect(jiraRow).toBeAttached();
     await jiraRow.click();
-    await jiraNode.locator('[data-toggle="prompts"]').first().click();
+    // LIN-3833: the copy-first view writes the step; a Todo task's step is Plan, which needs no AI.
     const component = jiraNode.locator('.prompt-section').first();
     await expect(component).toBeVisible();
-    await component.locator('[data-testid="opened-task-next-step"]').click();
+    await component.locator('[data-testid="opened-task-write"]').click();
     await expect(component.locator('[data-prompt-body]')).toContainText('ENG-1', { timeout: 5000 });
   });
 
@@ -308,7 +316,7 @@ test.describe('Recap / Brief / Recommend / Task Chat on a non-active (Jira) bind
     const jiraRow = jiraNode.locator('.line').first();
     await expect(jiraRow).toBeAttached();
     await jiraRow.click();
-    await jiraNode.locator('[data-toggle="details"]').first().click();
+    await jiraNode.locator('[data-toggle="description"]').first().click();
 
     const chatLink = jiraNode.locator('[data-testid="issue-chat-link"]');
     await expect(chatLink).toHaveAttribute('href', /\/task-chat\?task=ENG-1&source=jira$/);
@@ -334,15 +342,9 @@ test.describe('Recap / Brief / Recommend / Task Chat on a non-active (Jira) bind
   test('regression control: a local-active row\'s brief is unaffected', async ({ page, seedLocal }) => {
     await seedAndGoto(page, seedLocal);
 
-    const localNode = page.locator('.node').filter({ has: page.locator('.line:has-text("Local parent task")') }).first();
-    const localRow = localNode.locator('.line').first();
-    await expect(localRow).toBeAttached();
-    await localRow.click();
-    await localNode.locator('[data-toggle="details"]').first().click();
-    await localNode.locator('[data-toggle="brief"]').first().click();
-
-    const brief = localNode.locator('[data-content="brief"] .brief-section');
-    // LIN-2944 P2: click ✦ generate rather than relying on open-time spend.
+    // LIN-3833: Brief is Swipe's fold; the local parent (LOCAL-1) is opened on its card.
+    const body = await openSwipeAccordion(page, 'LOCAL-1', 'brief');
+    const brief = body.locator('.brief-section');
     await brief.locator('[data-brief-refresh]').first().click();
     await expect(brief).toContainText('Local parent task', { timeout: 5000 });
     await expect(brief).not.toContainText('Jira task');

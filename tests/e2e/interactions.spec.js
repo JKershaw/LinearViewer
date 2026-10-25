@@ -160,7 +160,7 @@ test.describe('Detail Section Toggles', () => {
     await page.evaluate(() => localStorage.clear());
   });
 
-  test('Details toggle shows/hides description and metadata', async ({ page }) => {
+  test('Description fold shows/hides description and metadata', async ({ page }) => {
     // Find and expand an issue in project section
     const project = page.locator('.project').first();
     const issueLine = project.locator('.line.expandable').first();
@@ -168,80 +168,58 @@ test.describe('Detail Section Toggles', () => {
 
     const issueId = await issueLine.getAttribute('data-id');
     const details = project.locator(`.details[data-details-for="${issueId}"]`);
-    const detailsToggle = details.locator('.detail-toggle[data-toggle="details"]');
-    const detailsContent = details.locator('.detail-content[data-content="details"]');
+    const detailsToggle = details.locator('.detail-toggle[data-toggle="description"]');
+    const detailsContent = details.locator('.detail-content[data-content="description"]');
 
     // Details content should be hidden initially
     await expect(detailsToggle).toBeVisible();
-    await expect(detailsToggle).toContainText('Details ▶');
+    await expect(detailsToggle).toContainText('Description ▶');
     await expect(detailsContent).toHaveClass(/hidden/);
 
     // Click to expand
     await detailsToggle.click();
     await expect(detailsContent).not.toHaveClass(/hidden/);
-    await expect(detailsToggle).toContainText('Details ▼');
+    await expect(detailsToggle).toContainText('Description ▼');
 
     // Click to collapse
     await detailsToggle.click();
     await expect(detailsContent).toHaveClass(/hidden/);
-    await expect(detailsToggle).toContainText('Details ▶');
+    await expect(detailsToggle).toContainText('Description ▶');
   });
 
-  test('Prompts toggle shows/hides prompt buttons', async ({ page }) => {
-    // Find and expand a NON-top issue: the marked top task's Prompts section
-    // opens by default (LIN-2944 P1 R2), so this pins the collapsed default on
-    // every other row.
+  test('the opened task shows its control directly, with no Prompts fold', async ({ page }) => {
+    // LIN-3833: the state-first opened task has no Prompts toggle. Its control is part of the task, shown
+    // once the row is open (the marked top task included).
     const project = page.locator('.project').first();
     const issueLine = project.locator('.line.expandable:not([data-top-task="1"])').first();
     await issueLine.click();
 
     const issueId = await issueLine.getAttribute('data-id');
     const details = project.locator(`.details[data-details-for="${issueId}"]`);
-    const promptsToggle = details.locator('.detail-toggle[data-toggle="prompts"]');
-    const promptsContent = details.locator('.detail-content[data-content="prompts"]');
-
-    // Prompts content should be hidden initially
-    await expect(promptsToggle).toBeVisible();
-    await expect(promptsToggle).toContainText('Prompts ▶');
-    await expect(promptsContent).toHaveClass(/hidden/);
-
-    // Click to expand
-    await promptsToggle.click();
-    await expect(promptsContent).not.toHaveClass(/hidden/);
-    await expect(promptsToggle).toContainText('Prompts ▼');
-
-    // The shared opened-task component (and its template picker) is visible inside.
-    await expect(promptsContent.locator('.prompt-section')).toBeVisible();
-    await expect(promptsContent.locator('[data-testid="other-prompts"] .swipe-prompt-btn').first()).toBeVisible();
+    await expect(details.locator('.prompt-section')).toBeVisible();
+    await expect(details.locator('[data-toggle="prompts"]')).toHaveCount(0);
   });
 
-  test('Details and Prompts toggles work independently', async ({ page }) => {
-    // A non-top issue (the top task's Prompts opens by default per R2).
+  test('the Description and Comments folds work independently', async ({ page }) => {
+    // A non-top issue (the marked top task is the same shape, LIN-3833).
     const project = page.locator('.project').first();
     const issueLine = project.locator('.line.expandable:not([data-top-task="1"])').first();
     await issueLine.click();
 
     const issueId = await issueLine.getAttribute('data-id');
     const details = project.locator(`.details[data-details-for="${issueId}"]`);
-    const detailsToggle = details.locator('.detail-toggle[data-toggle="details"]');
-    const detailsContent = details.locator('.detail-content[data-content="details"]');
-    const promptsToggle = details.locator('.detail-toggle[data-toggle="prompts"]');
-    const promptsContent = details.locator('.detail-content[data-content="prompts"]');
+    const descriptionToggle = details.locator('.detail-toggle[data-toggle="description"]');
+    const descriptionContent = details.locator('.detail-content[data-content="description"]');
+    const commentsContent = details.locator('.detail-content[data-content="comments"]');
 
-    // Expand Details only
-    await detailsToggle.click();
-    await expect(detailsContent).not.toHaveClass(/hidden/);
-    await expect(promptsContent).toHaveClass(/hidden/);
+    // Expand the Description fold only
+    await descriptionToggle.click();
+    await expect(descriptionContent).not.toHaveClass(/hidden/);
+    await expect(commentsContent).toHaveClass(/hidden/);
 
-    // Expand Prompts too
-    await promptsToggle.click();
-    await expect(detailsContent).not.toHaveClass(/hidden/);
-    await expect(promptsContent).not.toHaveClass(/hidden/);
-
-    // Collapse Details, Prompts stays open
-    await detailsToggle.click();
-    await expect(detailsContent).toHaveClass(/hidden/);
-    await expect(promptsContent).not.toHaveClass(/hidden/);
+    // Collapse it again
+    await descriptionToggle.click();
+    await expect(descriptionContent).toHaveClass(/hidden/);
   });
 
   test('same issue in different sections has independent toggles', async ({ page }) => {
@@ -260,11 +238,11 @@ test.describe('Detail Section Toggles', () => {
     // Expand in In Progress section
     await inProgressLine.click();
     const inProgressDetails = inProgressItems.locator(`.details[data-details-for="${issueId}"]`);
-    const inProgressDetailsToggle = inProgressDetails.locator('.detail-toggle[data-toggle="details"]');
+    const inProgressDetailsToggle = inProgressDetails.locator('.detail-toggle[data-toggle="description"]');
 
     // Expand Details in In Progress section
     await inProgressDetailsToggle.click();
-    const inProgressDetailsContent = inProgressDetails.locator('.detail-content[data-content="details"]');
+    const inProgressDetailsContent = inProgressDetails.locator('.detail-content[data-content="description"]');
     await expect(inProgressDetailsContent).not.toHaveClass(/hidden/);
 
     // Find same issue in project section (if it exists there)
@@ -277,7 +255,7 @@ test.describe('Detail Section Toggles', () => {
     }
   });
 
-  test('View in <provider> link remains visible outside toggles', async ({ page }) => {
+  test('Open in <provider> link remains visible outside folds', async ({ page }) => {
     // Find and expand an issue with a URL
     const project = page.locator('.project').first();
     const issueLine = project.locator('.line.expandable').first();
@@ -285,12 +263,12 @@ test.describe('Detail Section Toggles', () => {
 
     const issueId = await issueLine.getAttribute('data-id');
     const details = project.locator(`.details[data-details-for="${issueId}"]`);
-    const viewLink = details.locator('.detail-link');
+    const viewLink = details.locator('[data-testid="issue-provider-link"]');
 
     // Link should be visible immediately (not inside a toggle), labelled with
     // the provider's displayName (LIN-177 S3).
     await expect(viewLink).toBeVisible();
-    await expect(viewLink).toContainText('View in Local');
+    await expect(viewLink).toContainText('Open in Local');
   });
 
   test('Create task affordance is a click-through to the dedicated /task/new page (LIN-1553/LIN-1973)', async ({ page }) => {
@@ -379,7 +357,7 @@ test.describe('Description Expansion (LIN-156)', () => {
       const details = page.locator(`.project .details[data-details-for="${issueId}"]`).first();
 
       // LIN-158: Comments is now nested inside Details, so expand Details first
-      const detailsToggle = details.locator('.detail-toggle[data-toggle="details"]');
+      const detailsToggle = details.locator('.detail-toggle[data-toggle="description"]');
       await expect(detailsToggle).toBeVisible();
       await detailsToggle.click();
 
@@ -401,7 +379,7 @@ test.describe('Description Expansion (LIN-156)', () => {
       const details = page.locator(`.project .details[data-details-for="${issueId}"]`).first();
 
       // LIN-158: Comments is now nested inside Details, so expand Details first
-      const detailsToggle = details.locator('.detail-toggle[data-toggle="details"]');
+      const detailsToggle = details.locator('.detail-toggle[data-toggle="description"]');
       await detailsToggle.click();
 
       const commentsToggle = details.locator('.detail-toggle[data-toggle="comments"]');
@@ -443,7 +421,7 @@ test.describe('Description Expansion (LIN-156)', () => {
       const details = page.locator(`.project .details[data-details-for="${issueId}"]`).first();
 
       // LIN-158: Comments is now nested inside Details, so expand Details first
-      const detailsToggle = details.locator('.detail-toggle[data-toggle="details"]');
+      const detailsToggle = details.locator('.detail-toggle[data-toggle="description"]');
       await detailsToggle.click();
 
       const commentsToggle = details.locator('.detail-toggle[data-toggle="comments"]');
@@ -469,7 +447,7 @@ test.describe('Description Expansion (LIN-156)', () => {
       const details = page.locator(`.project .details[data-details-for="${issueId}"]`).first();
 
       // LIN-158: Comments is now nested inside Details, so expand Details first
-      const detailsToggle = details.locator('.detail-toggle[data-toggle="details"]');
+      const detailsToggle = details.locator('.detail-toggle[data-toggle="description"]');
       await detailsToggle.click();
 
       const commentsToggle = details.locator('.detail-toggle[data-toggle="comments"]');

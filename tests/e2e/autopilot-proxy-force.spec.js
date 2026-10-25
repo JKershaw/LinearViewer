@@ -43,25 +43,13 @@ async function setSession(page) {
   // /fixture:LIN-3136
 }
 
-/** Open the home task's shared component and load the Autopilot kickoff. */
+/**
+ * LIN-3833: the Home opened task has no template list, so the "Autopilot · stepped" result (a forced-proxy
+ * Autopilot kickoff loaded into the fresh body) is loaded on the Swipe card, which keeps its classic component.
+ * Home's own forced run is Run to PR (covered in opened-task-first-screen and lin-3833-run-control).
+ */
 async function revealHomeAutopilot(page) {
-  await page.goto(`/workspace/${URL_KEY}/`);
-  await page.waitForLoadState('networkidle');
-
-  const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
-  await taskLine.click();
-  const details = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"]`);
-  await details.locator('.detail-toggle[data-toggle="prompts"]').click();
-  const component = details.locator('.prompt-section');
-  await expect(component).toBeVisible();
-
-  // LIN-3341: the standard Autopilot kickoff is Go now (one press dispatches it,
-  // no result is loaded). The "Autopilot · stepped" sibling still loads an
-  // Autopilot kickoff into the fresh body (its two-step shape is unchanged), so
-  // the forced-proxy copy/download/dispatch cases use it.
-  await component.locator('[data-testid="other-prompts"] [data-prompt="__autopilot_stepper__"]').click();
-  await expect(component).toHaveAttribute('data-phase', 'fresh', { timeout: 10000 });
-  return component;
+  return revealSwipeAutopilot(page);
 }
 
 /** Open the Swipe Autopilot result and wait for it to render fresh. */

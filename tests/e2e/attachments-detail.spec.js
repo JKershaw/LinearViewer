@@ -60,7 +60,7 @@ test.describe('Attachments gallery — task detail (LIN-652)', () => {
     await line.click();
 
     const details = project.locator('.details[data-details-for="issue-1"]');
-    const detailsToggle = details.locator('.detail-toggle[data-toggle="details"]');
+    const detailsToggle = details.locator('.detail-toggle[data-toggle="description"]');
     await expect(detailsToggle).toBeVisible();
     await detailsToggle.click();
 
