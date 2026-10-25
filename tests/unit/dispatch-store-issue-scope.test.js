@@ -353,3 +353,25 @@ test('findRecentFreshDispatch: a Review whose lineage ended in a failed follow-u
   ] } });
   assert.equal((await find()).id, 'rev1', 'the lineage finished, so the stage ran and counts');
 });
+
+// LIN-3968 review (fourth), finding 1: the root's OWN last marker is `[failed]`, but a
+// follow-up of the same lineage finished `[done]` later, so Home reads the stage as done
+// (and offers Close-out). Ruling (a): a row that ended done still trips the guard, so the
+// own-row `[failed]` must not drop the candidate before the lineage read judges it.
+test('findRecentFreshDispatch: a failed Review whose follow-up later finished [done] still blocks it again (LIN-3968 finding 1, own [failed] then lineage [done])', async () => {
+  const { store } = makeStore();
+  const base = new Date('2026-10-25T12:00:00.000Z');
+  const since = new Date(base.getTime() - 1000);
+  await store.collection.insertOne({
+    _id: 'rev1', urlKey: 'acme', issueIdentifier: 'LIN-1', kind: 'review', rootItemId: 'rev1',
+    followUpTo: null, abort: false, prompt: 'x', dispatchedAt: base, status: 'taken',
+    feedback: [{ message: '[failed] Review could not finish', timestamp: new Date(base.getTime() + 1000), rootItemId: 'rev1' }]
+  });
+  await store.collection.insertOne({
+    _id: 'fu1', urlKey: 'acme', issueIdentifier: 'LIN-1', kind: 'review', rootItemId: 'rev1',
+    followUpTo: 'rev1', abort: false, prompt: 'x', dispatchedAt: new Date(base.getTime() + 60_000), status: 'taken',
+    feedback: [{ message: '[done] Review written', timestamp: new Date(base.getTime() + 120_000), rootItemId: 'rev1' }]
+  });
+  assert.equal((await store.findRecentFreshDispatch('acme', { issueIdentifier: 'LIN-1', kind: 'review', since })).id, 'rev1',
+    'the lineage finished done, so the stage ran and a second Review is a duplicate');
+});
