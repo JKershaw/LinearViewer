@@ -104,8 +104,8 @@ describe('settings routes: each placed once', () => {
     assert.match(src, /\/auth\/openrouter\/consent\/clear/);
   });
 
-  test('the three model routes count as placed in Models', () => {
-    assert.deepEqual(getArea('models').routes.sort(), ['POST /settings/ai-model-overrides', 'POST /settings/dispatch-defaults', 'POST /settings/model']);
+  test('the Models page writes count as placed in Models; the three retired form routes are gone (LIN-3855)', () => {
+    assert.deepEqual(getArea('models').routes.sort(), ['POST /settings/models/changes', 'POST /settings/models/presets', 'POST /settings/models/presets/:presetId/apply']);
   });
 
   test('witness: an unplaced route is reported', () => {
@@ -117,7 +117,7 @@ describe('settings routes: each placed once', () => {
 });
 
 describe('sidebar states', () => {
-  const ctx = { providerBindings: [{ displayName: 'Linear', active: true }], defaultModelName: 'Sonnet 5.5', haltMode: 'none', hasRunner: true, keyCount: 3, healthProblems: 1, changeLogCount: 2, featuresOn: 4, openRouterSource: 'oauth' };
+  const ctx = { providerBindings: [{ displayName: 'Linear', active: true }], modelsSummary: 'Sonnet 5.5', haltMode: 'none', hasRunner: true, keyCount: 3, healthProblems: 1, changeLogCount: 2, featuresOn: 4, openRouterSource: 'oauth' };
 
   test('every area has a short state, at most the cap, and tone', () => {
     for (const a of AREAS) {
@@ -142,7 +142,7 @@ describe('sidebar states', () => {
   });
 
   test('a long model name is clipped to the cap', () => {
-    assert.ok(getArea('models').state({ defaultModelName: 'A very long model display name' }).text.length <= STATE_MAX_LENGTH);
+    assert.ok(getArea('models').state({ modelsSummary: 'A very long model display name' }).text.length <= STATE_MAX_LENGTH);
   });
 
   test('every state renders in the sidebar of every page with its testid', () => {

@@ -23,13 +23,20 @@
 import { Router } from 'express';
 import { renderSettingsPage } from '../lib/render-settings.js';
 import { renderErrorPage } from '../lib/render.js';
-import { AREAS, getArea, settingsAreaUrl } from '../lib/settings-areas.js';
+import { AREAS, getArea, settingsAreaUrl, STATE_MAX_LENGTH } from '../lib/settings-areas.js';
 import { FEATURE_DEFAULTS, isValidWorkspaceFeatureKey } from '../lib/feature-defaults.js';
 import { buildKeyList, latestRunnerPoll } from '../lib/settings-keys.js';
 import { hasLiveRunnerKey, hasLiveQueueToken } from '../lib/run-controls.js';
 import { readOwnerSeamStatus } from '../lib/workspace-owner.js';
 import { resolveRunnerOwnerRefusal, sendRunnerRefusal } from '../lib/runner-owner-gate.js';
 import { mergeChangeLog, ChangeLogError, UNKNOWN_VALUE } from '../lib/workspace-change-log.js';
+import { getCachedCatalogModel } from '../lib/openrouter-catalog.js';
+import { DEFAULT_MODEL } from '../lib/openrouter.js';
+import { AGENT_JOB_IDS, HARBOUR_JOB_IDS, effectiveTable, resolveAgentFromTable, prefillDefaults } from '../lib/model-routing.js';
+import { agentSpendByJob, harbourSpendByJob } from '../lib/model-routing-spend.js';
+import { summariseRouting } from '../lib/model-routing-summary.js';
+import { runnableGuard } from '../lib/model-routing-edit.js';
+import { readHorizonStart } from '../lib/read-horizon.js';
 import { HALT_MODES, HALT_MODE_ERROR } from '../lib/workspace-halt.js';
 import { CREDENTIAL_DEAD_VERDICT } from '../lib/credential-state.js';
 import { badRequest, serverError } from '../lib/errors.js';
@@ -76,8 +83,12 @@ export function providerNoticeFromQuery(query = {}, flash = null, getProvider = 
 
 const PROVIDER_QUERY_KEYS = ['provider_ok', 'provider_fail', 'provider_error', 'provider_removed', 'provider_switched', 'provider_blocked'];
 
+/** The largest history read the Models spend takes; a read at the cap says so on the page. */
+const MODELS_HISTORY_CAP = 2000;
+
 /** Short messages for the `?error=` codes the change-log redirects carry (never a reflected string). */
 const CHANGE_ERRORS = {
+  invalid: 'That change could not be made: a model would not run on its harness. Nothing was changed.',
   reason: 'A reason is needed (up to 500 characters).',
   conflict: 'That setting has changed since, so undo would overwrite it. Nothing was changed.',
   not_found: 'That change is not in the log.',
@@ -101,20 +112,34 @@ function cookieTheme(req) {
   return m ? m[1] : 'light';
 }
 
-function modelDisplayName(modelId, availableModels = []) {
-  const known = availableModels.find(m => m.id === modelId);
-  if (known?.name) return known.name;
-  return String(modelId || '').split('/').pop() || 'Default';
+/**
+ * The dispatch rows the Models page's agent spend is priced from: the 30-day window, bounded by a row cap the
+ * page reports when it is hit. Read for the owner's page and reduced to numbers there; no row is returned.
+ */
+function readModelsHistory(dispatchStore, urlKey) {
+  return safeRead(() => (dispatchStore
+    ? dispatchStore.listHistoryWithBodies(urlKey, { since: readHorizonStart(), limit: MODELS_HISTORY_CAP, projection: { prompt: 0 } })
+    : { items: [], total: 0 }), { items: [], total: 0 });
+}
+
+/** A read the page can do without: its failure is logged and the page shows what it has (LIN-3855). */
+async function safeRead(read, fallback) {
+  try {
+    return await read();
+  } catch (err) {
+    console.error('Settings › Models read error:', err.message);
+    return fallback;
+  }
 }
 
 export function createSettingsRouter(deps) {
   const {
     workspaceFromUrl, getOpenRouterSource, getDeployInfo, userPreferencesStore, workspacePreferencesStore,
-    llmCallLogStore, promptTraceStore, accountStore, requestFeatureFlags, resolveWorkspaceModel,
-    getWorkspaceFeatures, setWorkspaceFeature, projectLegacy, getModelCatalog, shouldMockAi, AVAILABLE_MODELS,
+    llmCallLogStore, promptTraceStore, accountStore, requestFeatureFlags,
+    getWorkspaceFeatures, setWorkspaceFeature, getModelCatalog, shouldMockAi, AVAILABLE_MODELS,
     getProvider, getProviderForWorkspace, getBindingsForWorkspace, getBindingCredentials, isActiveBinding,
     dispatchPresetsStore, proxyTokenStore, dispatchTokenStore, proxyEventStore, workspaceHaltStore,
-    workspaceChangeLogStore, modelRoutingStore, workspaceOwnerCheck
+    workspaceChangeLogStore, modelRoutingStore, workspaceOwnerCheck, dispatchStore
   } = deps;
   const router = Router();
 
@@ -209,7 +234,12 @@ export function createSettingsRouter(deps) {
       ? await userPreferencesStore.getOpenRouterConsent(req.session.accountId)
       : null;
 
-    const currentModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore });
+    // LIN-3855: the Models summary reads the effective table (what jobs run on), not the job-less default
+    // that no running call reads. One read for every area: the sidebar names every area's state.
+    const table = await modelRoutingStore.getTable(workspace.urlKey);
+    const effective = effectiveTable(table, { defaultModel: DEFAULT_MODEL });
+    const modelsSummary = summariseRouting(effective.jobs, (id) => getCachedCatalogModel(id)?.name
+      || AVAILABLE_MODELS.find((m) => m.id === id)?.name || id.split('/').pop(), { width: STATE_MAX_LENGTH });
     const workspaceFeatures = await getWorkspaceFeatures({ urlKey: workspace.urlKey, store: workspacePreferencesStore });
     const featureFlags = await requestFeatureFlags(req);
 
@@ -242,7 +272,7 @@ export function createSettingsRouter(deps) {
     const states = {};
     const stateCtx = {
       providerBindings,
-      defaultModelName: modelDisplayName(currentModel, AVAILABLE_MODELS),
+      modelsSummary,
       haltMode, hasRunner,
       // Person-made live keys only: per-run keys are a separate row (LIN-3890).
       keyCount: keys.filter(k => !k.run).length,
@@ -267,22 +297,46 @@ export function createSettingsRouter(deps) {
     }
 
     let dispatchDefaults = {};
-    let aiModelOverrides = {};
     let dispatchPresets = [];
     let dispatchModelCatalog = [];
+    let modelsData = null;
     if (bodyAreaId === 'models') {
-      // LIN-3853: the routing table, projected back to the shape the legacy forms render.
-      const prefs = projectLegacy(await workspacePreferencesStore.getRoutingTable(workspace.urlKey));
-      dispatchDefaults = prefs.dispatchDefaults || {};
-      aiModelOverrides = prefs.aiModelOverrides || {};
+      // The Models page reads the effective table (above) and its spend: the dispatch history and the call log,
+      // one read each for the 30-day window. A read that fails shows an empty spend, never a page error.
+      const [history, callDocs, log, presets] = await Promise.all([
+        readModelsHistory(dispatchStore, workspace.urlKey),
+        safeRead(() => (llmCallLogStore?.listInHorizon ? llmCallLogStore.listInHorizon(workspace.urlKey) : []), []),
+        modelRoutingStore.getLog(workspace.urlKey, { limit: 50 }),
+        modelRoutingStore.listPresets(workspace.urlKey)
+      ]);
+      // Live OpenRouter catalog, mocked by the same predicate as the AI mock so
+      // automated runs never make a live network call.
+      dispatchModelCatalog = await getModelCatalog({ mock: shouldMockAi(workspace) });
       try {
         dispatchPresets = dispatchPresetsStore ? await dispatchPresetsStore.list(workspace.urlKey) : [];
       } catch (e) {
         // Non-fatal: the section renders empty.
       }
-      // Live OpenRouter catalog, mocked by the same predicate as the AI mock so
-      // automated runs never make a live network call.
-      dispatchModelCatalog = await getModelCatalog({ mock: shouldMockAi(workspace) });
+      const flash = req.session?.modelsFlash || null;
+      if (req.session) delete req.session.modelsFlash;
+      modelsData = {
+        urlKey: workspace.urlKey,
+        table,
+        effective,
+        agentSpend: agentSpendByJob(history.items, { jobs: AGENT_JOB_IDS }),
+        harbourSpend: harbourSpendByJob(callDocs, { jobs: HARBOUR_JOB_IDS }),
+        coverage: { windowRuns: history.items.length, capped: history.total > history.items.length },
+        presets,
+        log,
+        catalog: dispatchModelCatalog,
+        availableModels: AVAILABLE_MODELS,
+        filter: req.query.filter === 'set' ? 'set' : 'all',
+        // A refused save comes back in the session (its values kept); a refused undo comes back in `?error=`.
+        flash: flash ? { message: flash.message, values: flash.values } : (CHANGE_ERRORS[req.query.error] ? { message: CHANGE_ERRORS[req.query.error], values: null } : null),
+        notice: req.query.changed ? 'Saved.' : req.query.saved ? 'Preset saved.' : req.query.applied ? 'Preset applied.' : req.query.nothing ? 'Nothing to change.' : null
+      };
+      // What the footer's dispatch hint reads: the agent default, as a dispatch would resolve it.
+      dispatchDefaults = prefillDefaults(resolveAgentFromTable(effective, null));
     }
 
     // The account's own email identity, read fresh (canonicalised) — never from req.session.
@@ -305,10 +359,6 @@ export function createSettingsRouter(deps) {
       openRouterSource,
       openRouterConsentedAt,
       deployInfo,
-      currentModel,
-      availableModels: AVAILABLE_MODELS,
-      // The legacy model forms redirect back with `?error=<code>` (routes/settings-model.js).
-      modelError: bodyAreaId === 'models' ? errorCode : null,
       urlKey: workspace.urlKey,
       workspaces: req.session.workspaces,
       featureFlags,
@@ -318,11 +368,9 @@ export function createSettingsRouter(deps) {
       providerBindings,
       providerNotice,
       dispatchDefaults,
-      dispatchDefaultsError: req.query.dispatchDefaultsError || null,
-      dispatchModelCatalog,
-      aiModelOverrides,
-      aiOverridesError: req.query.aiOverridesError || null,
+      modelsData,
       dispatchPresets,
+      dispatchModelCatalog,
       accountEmails,
       theme: cookieTheme(req),
       proxyDefault,
@@ -445,19 +493,22 @@ export function createSettingsRouter(deps) {
   router.post('/workspace/:urlKey/settings/change-log/:source/:id/undo', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
     const { source, id } = req.params;
-    const toLog = (code) => res.redirect(backTo(workspace, 'change-log', { error: code }));
+    // LIN-3855: a model undo can be made from the Models page too; `back` names where to land (a whitelist, never a path).
+    const back = req.body?.back === 'models' ? 'models' : 'change-log';
+    const toLog = (code) => res.redirect(backTo(workspace, back, { error: code }));
     const reason = reasonOf(req);
 
     if (source === 'model') {
       if (!reasonOk(reason)) return toLog('reason');
       try {
-        await modelRoutingStore.undo(id, { urlKey: workspace.urlKey, reason, actor: actorOf(req) });
+        // The runnable check runs on the undo too: undoing one change can leave a later one's model unable to run.
+        await modelRoutingStore.undo(id, { urlKey: workspace.urlKey, reason, actor: actorOf(req) }, runnableGuard());
       } catch (err) {
-        const code = { CONFLICT: 'conflict', NOT_FOUND: 'not_found', NOT_UNDOABLE: 'not_undoable', REASON_REQUIRED: 'reason' }[err?.code];
+        const code = { CONFLICT: 'conflict', NOT_FOUND: 'not_found', NOT_UNDOABLE: 'not_undoable', REASON_REQUIRED: 'reason', INVALID: 'invalid' }[err?.code];
         if (!code) throw err;
         return toLog(code);
       }
-      return res.redirect(backTo(workspace, 'change-log', { undone: '1' }));
+      return res.redirect(backTo(workspace, back, { undone: '1' }));
     }
     if (source !== 'workspace') return badRequest.json(res, 'Unknown log');
 

@@ -53,6 +53,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { DISPATCH_KINDS } from '../../lib/prompt-templates.js';
+import { withHarnessModels } from '../fixtures/harness-models.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OBSERVATION_JS_SRC = readFileSync(join(__dirname, '../../public/observation.js'), 'utf8');
@@ -253,7 +254,7 @@ function makeSandbox({ postComment, dispatchPrompt, deliverReply, api, elements 
   // deliverRulingDispatch) is the same shared code the run-page card uses —
   // then the per-test fetch seams are overridden on top, keeping every
   // existing assertion about the calls actually made meaningful.
-  vm.runInContext(COMMON_JS_SRC, sandbox, { filename: 'common.js' });
+  vm.runInContext(withHarnessModels(COMMON_JS_SRC), sandbox, { filename: 'common.js' });
   sandbox.window.ReplyDelivery.postComment = postComment;
   sandbox.window.ReplyDelivery.deliverReply = deliverReply;
   sandbox.window.ReplyDelivery.errorFromResult = (r) => new Error((r.data && r.data.error) || `HTTP ${r.status}`);

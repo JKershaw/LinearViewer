@@ -252,7 +252,6 @@ Layout only. For the pages Settings shares pieces with:
    - `public/observation.js:3041` (bulk agree);
    - `public/scan.js:389` and `:424` (retire, unretire);
    - `public/session.js:36` (`window.confirm`);
-   - `public/settings.js:212`, deleting a preset (Settings › Models body, left alone until LIN-3855).
 
 2. **Dispatch's halt controls: keep both** (inventory in decision 16).
 
@@ -301,8 +300,8 @@ The Rebuild PR builds every non-Models Settings area from the shared pieces (`li
 | Decision | Authority at head | Status |
 | -- | -- | -- |
 | 5b Interactive row | `switchRow`, `drillRow` (with `flagHtml`, `attrs`), `actionRow`, `staticRow` in `lib/components/settings-row.js` | done for every non-Models area, including the Theme and Email rows (hand-written before this PR) |
-| 6 Button | `btn btn--primary` (confirm, make active, Undo), `btn btn--red` (stop, remove, revoke), `btn--quiet` (Cancel, test, add) | done for Settings. `action-btn` stays for Models' forms and the other pages' emitters (LIN-3855; open question 3) |
-| 8 Ask in place | `askInPlace` in `lib/components/settings-ask.js`: Confirm, Cancel, `form` transport (POST only) and `script` transport (DELETE, one generic handler in `public/settings.js`) | done. The dispatch halt buttons and Models' preset delete stay out (open questions 4 and 5) |
+| 6 Button | `btn btn--primary` (confirm, make active, Undo), `btn btn--red` (stop, remove, revoke), `btn--quiet` (Cancel, test, add) | done for Settings, Models included (LIN-3855). `action-btn` stays for the other pages' emitters |
+| 8 Ask in place | `askInPlace` in `lib/components/settings-ask.js`: Confirm, Cancel, `form` transport (POST only) and `script` transport (DELETE, one generic handler in `public/settings.js`) | done. The dispatch halt buttons stay out; Models' preset delete is a `script` ask (LIN-3855) (open questions 4 and 5) |
 | 9 Note | `groupNote` / `.settings-note` | done; notes fit one line in the 600px pane at 1280px (the consent blast-radius copy is shared with `/auth/openrouter` and stays as it was) |
 | 10 Group title | `group()` in `lib/components/settings-group.js` | done |
 | 11 Key row | `keyRow` in `lib/components/settings-key-row.js` (name first, then kind, relative expiry and last use; the flag on the row; Revoke is an ask with `transport: 'script'`) | done |
@@ -329,6 +328,15 @@ The button count went 41 → 36 by retiring the five classes nothing emits: `btn
 The verbatim share of the Settings renderers, `scripts/code-shape/verbatim.mjs` from `2c836676` to head over `lib/render-settings*.js`, `lib/components/settings-*.js` and `halt-controls.js`, is 69% of the new lines (68.9%). That figure counts Models' untouched body (`render-settings.js`, about 380 lines that do not change), so it is not a copy measure for the rebuilt areas. The matched runs are mostly the shell's builders, moved intact into `lib/components/` (a move, which the ticket asks for, not a copy), and Models' body, which this PR does not change. The question it prompts, answered: a different split was not skipped. The rebuilt areas call the shared pieces, and the old builders are deleted rather than kept beside them.
 
 Outcome 11 (one model-routing move is one change-log entry) is a follow-up: LIN-3925, filed next to LIN-3855. Cause: each job is its own proxy request, and no batch id reaches the store.
+
+## Models (LIN-3855): status at head
+
+The Models body is `lib/render-settings-models.js`: one staged form for every job and group (`lib/model-routing-edit.js` turns the posted fields into one logged change with one reason and one version check), the routing presets, and the change log with Undo. Its pieces are built once and listed here:
+
+- **Change panel** (`lib/components/settings-change-panel.js`): the harness, model and effort fields of one job or group, each with a "follow the group" blank. The field names are `c__<scope>__<surface>__<key>__<field>`. `public/settings-models.js` keeps the model options to the row's own harness and clears effort where a harness has none; the server judges every save.
+- **Spend bar** (`lib/components/settings-spend-bar.js`): a native `<progress>`, no inline style.
+- **Phone sheet:** the open job row is a full-screen `details` at phone width (`public/settings.css`, the Models block). There is no focus trap and no Escape handler yet; the row's own summary closes it.
+- **Shared list:** the harness list is one copy in `lib/model-routing-harnesses.js`. `renderPage` embeds it as `window.__HARNESS_MODELS__` on every page that loads `/common.js`.
 
 ## Open questions for John
 

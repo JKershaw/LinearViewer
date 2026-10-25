@@ -96,6 +96,14 @@ async function prepare(page, context, entry) {
   await settle(page);
   if (entry.state === 'ask-open') await page.getByTestId('settings-toggle-periodicals').locator('summary').click();
   if (entry.state === 'key-open') await page.locator('[data-testid="settings-key-proxy"], [data-testid="settings-key-dispatch"]').locator('summary').first().click();
+  if (entry.state === 'models-panel-open' || entry.state === 'models-staged') {
+    // Head's job rows open in place. Base has the legacy forms and no such row, so these steps are conditional there.
+    const row = page.locator('[data-testid="models-job-implementation"]');
+    if (await row.count()) {
+      await row.locator(':scope > summary').click();
+      if (entry.state === 'models-staged') await row.locator('select[data-models-field="model"]').selectOption('sonnet');
+    }
+  }
   if (entry.state === 'audit-report') {
     // Both sides answer the same fixture, so the report is identical and the request never leaves the browser.
     await page.route('**/api/audit', (route) => route.fulfill({ path: AUDIT_FIXTURE, contentType: 'application/json' }));

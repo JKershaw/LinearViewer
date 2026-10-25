@@ -83,60 +83,6 @@ test.describe('Settings Page', () => {
 
     await expect(settings(page).toggle('roadmap')).toContainText('● on')
   })
-
-  test('model pricing hint updates with the selected model (LIN-993)', async ({ page }) => {
-    await openArea(page, 'models')
-    const price = page.locator('[data-model-price]')
-    const select = page.locator('.model-select')
-    await expect(price).toBeVisible()
-    // Default model → its rate. Pricing lives in the hint, never in option text.
-    await expect(price).toContainText('per 1M tokens')
-    await expect(select.locator('option', { hasText: 'per 1M tokens' })).toHaveCount(0)
-
-    // Switching the selector updates the hint from the option's data-pricing.
-    await select.selectOption('openai/gpt-5.5-pro')
-    await expect(price).toContainText('$30.00 in / $180.00 out per 1M tokens')
-  })
-
-  // LIN-2623 acceptance: "the companion override row round-trips (same shape
-  // as the existing per-operation rows)". AI_OPERATION_KINDS (beat 1) already
-  // renders a flight-companion row automatically — this proves the ROUND TRIP
-  // (set -> save -> persisted -> re-rendered selected), which no pre-existing
-  // spec covered for any of the seven original per-operation rows either.
-  test('the flight-companion per-operation override row round-trips (LIN-2623)', async ({ page }) => {
-    // Deliberately does NOT assert a pristine starting value — the shared
-    // per-worker workspace (seedLocal reseeds issues/projects, never
-    // workspacePreferencesStore) can carry a leftover override from an
-    // earlier run of this very test. The round trip is proven by SETTING a
-    // value and observing it persist, not by assuming an empty start.
-    await openArea(page, 'models')
-    async function setOverrideAndSave(value) {
-      const details = page.locator('[data-testid="ai-kind-overrides"]')
-      const select = page.locator('[data-testid="ai-override-row-flight-companion"] select')
-      // The <details> starts closed whenever there is no override — set
-      // `.open` directly rather than clicking the <summary> (native browser
-      // disclosure behaviour either way, so this reaches the identical end
-      // state without a synthetic click racing this page's other listeners,
-      // e.g. queue-badge polling, wired the instant the page loads).
-      await details.evaluate(el => { el.open = true })
-      await expect(select).toBeVisible()
-      await select.selectOption(value)
-      await page.locator('.ai-overrides-submit button[type="submit"]').click()
-      await page.waitForLoadState('networkidle')
-    }
-
-    await setOverrideAndSave('anthropic/claude-opus-5')
-    // Same shape as the existing rows: persisted, and the <details> now
-    // starts OPEN (hasOverride) rather than requiring a re-open.
-    await expect(page.locator('[data-testid="ai-kind-overrides"]')).toHaveJSProperty('open', true)
-    await expect(page.locator('[data-testid="ai-override-row-flight-companion"] select')).toHaveValue('anthropic/claude-opus-5')
-
-    // Clean up (also proves clearing round-trips the same way — "— inherit"
-    // is value ""), so a later run of this same test starts fresh again
-    // rather than accumulating state in the shared local dev workspace.
-    await setOverrideAndSave('')
-    await expect(page.locator('[data-testid="ai-override-row-flight-companion"] select')).toHaveValue('')
-  })
 })
 
 // LIN-1892 S3-3 / G3 (round-3): the Settings email surface is threaded from the

@@ -14,6 +14,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
+import { withHarnessModels } from '../fixtures/harness-models.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (p) => readFileSync(join(ROOT, p), 'utf8');
@@ -73,7 +74,7 @@ function sandboxWithCommon(extra = {}) {
   };
   sandbox.window = sandbox;
   vm.createContext(sandbox);
-  vm.runInContext(COMMON_SRC, sandbox, { filename: 'common.js' });
+  vm.runInContext(withHarnessModels(COMMON_SRC), sandbox, { filename: 'common.js' });
   return { sandbox, el };
 }
 

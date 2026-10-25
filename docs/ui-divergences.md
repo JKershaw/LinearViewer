@@ -32,7 +32,6 @@ is changed for another reason.
 - `public/observation.js` (bulk agree);
 - `public/scan.js` (retire and unretire);
 - `public/session.js` (`window.confirm`);
-- `public/settings.js` (deleting a preset: Settings › Models body, left alone until LIN-3855).
 
 An entry here is removed when its site moves in place. The four sites the LIN-511 rule named
 (`public/proxy.js` and `public/dispatch.js` token revokes) no longer exist: token revoke is on

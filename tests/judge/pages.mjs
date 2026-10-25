@@ -35,6 +35,8 @@ const TIME_MASKS = {
 //   key-open          mint a token, open its key row
 //   change-log-entry  really submit the periodic-reviews ask once, so the log has one entry
 //   paused            mint a queue token (a runner), pause runs in place; Running shows the Runs row and Resume
+//   models-panel-open open a job row's change panel on Settings › Models (head only; base's forms have no row)
+//   models-staged     the same row, with one model picked: the staged-change count shows (head only)
 // `urlKey` is fixed per entry and identical on both sides. States that write data get their own
 // urlKey so their writes never reach another page's sidebar counts.
 // `renderers` are the files that emit the page, for the changed-stylesheet check below.
@@ -64,13 +66,17 @@ export const PAGES = [
   // LIN-3889: Audit's report, with the rows the client builds with `.field` (teams, queue items,
   // projects). The fixture answers `/api/audit` on both sides, so the request never leaves the browser.
   { id: 'audit-report', urlKey: 'judge', path: (k) => `/workspace/${k}/audit`, state: 'audit-report', renderers: ['lib/render-audit.js'] },
+  // LIN-3855: Settings › Models. At the phone viewport the open row is the full-screen sheet, so 'models-panel-open'
+  // covers the sheet at 390px and the panel at 1280px. Both are read-only set-ups on the seeded 'judge' workspace.
+  { id: 'models-panel-open', urlKey: 'judge', path: (k) => `/workspace/${k}/settings/models`, state: 'models-panel-open', renderers: ['lib/render-settings-models.js'] },
+  { id: 'models-staged', urlKey: 'judge', path: (k) => `/workspace/${k}/settings/models`, state: 'models-staged', renderers: ['lib/render-settings-models.js'] },
 ];
 
 // Stated, not assumed: what the seed cannot reach.
 export const NOT_COVERED = [
   'Running with a runner (Last poll row, Pause and Stop): needs a runner key, whose time is server-rendered; the judge runs the no-runner state and the paused state (a queue token is the runner)',
   'A change-log entry with a fixed time: the time is server-rendered and so masked, not seeded',
-  'Models body (LIN-3855) and Home content (LIN-3833): listed pages only, not their later states',
+  'Home content (LIN-3833): listed pages only, not its later states',
   'Session with a run (the populated session page and its run view): needs a session record the local seed does not write; the not-found branch is judged instead, and renders the same back link',
   'Pages with no Settings-shared pieces (swim, swipe, ship, roadmap, library, KPIs, landing)',
 ];
