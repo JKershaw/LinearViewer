@@ -15,7 +15,9 @@ process.env.NODE_ENV = 'test';
 
 import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import express from 'express';
 import { requestWithoutHost } from './lib/raw-http.js';
+import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { ACME, BASE_DEPS, buildApp, call } from './lib/proxy-fake-deps.js';
 
 const ORIGIN_EXPECTED_CODE = 'ORIGIN_UNRESOLVED';
@@ -135,6 +137,44 @@ describe('LIN-3931 — prose-harness runs are refused before minting when the or
     assert.notEqual(r.body?.code, ORIGIN_EXPECTED_CODE, JSON.stringify(r.body));
     assert.equal(r.status, 201, JSON.stringify(r.body));
     assert.equal(enqueued.length, 1);
+  });
+
+  test('session lane: a prose attach with no Host is relayed as ORIGIN_UNRESOLVED, not a 500', async () => {
+    const enqueued = [], minted = [];
+    const app = express(); app.use(express.json());
+    app.use(createDispatchRoutes({
+      workspaceOwnerCheck: async () => ({ status: 'owner' }),
+      dispatchQueueStore: { addItem: async (u, item) => { enqueued.push(item); return { _id: 'd1', dispatchedAt: 'x', ...item }; } },
+      dispatchTokenStore: {},
+      proxyTokenStore: { createToken: async (...a) => { minted.push(a); return { token: 'bt' }; }, mintGrantBootstrap: async (...a) => { minted.push(a); return { token: 'bt' }; } },
+      workspaceFromUrl: (req, res, next) => { req.workspace = { urlKey: req.params.urlKey }; req.session = { accountId: 'u1', linearUserId: 'u1' }; next(); },
+      userPreferencesStore: {}, harbourFeedbackTokenStore: null
+    }));
+    const r = await requestWithoutHost(app, 'POST', '/workspace/acme/api/dispatch', { body: { prompt: 'run me', target: 'cli', attachProxy: true, harness: 'opencode', issueIdentifier: 'TEST-7' } });
+    assert.equal(r.status, 400, JSON.stringify(r.body));
+    assert.equal(r.body.code, ORIGIN_EXPECTED_CODE);
+    assert.equal(r.body.retryable, false);
+    assert.equal(enqueued.length, 0);
+    assert.equal(minted.length, 0);
+  });
+
+  test('a prose follow-up with no Host is refused before the resume credential is provisioned', async () => {
+    const PARENT = '6f1c2b3a-0d4e-4f5a-9b8c-7d6e5f4a3b2c';
+    const parent = { _id: PARENT, urlKey: ACME, status: 'completed', harness: 'opencode', createdBy: 'u1', issueIdentifier: 'TEST-1' };
+    const enqueued = [], minted = [];
+    const app = buildApp({
+      proxyTokenStore: { ...BASE_DEPS().proxyTokenStore,
+        validateToken: async () => ({ tokenId: 't1', urlKey: ACME, label: 'test', scope: 'readWrite', createdBy: 'u1', grants: ['take', 'dispatch'], workspaceId: 'ws-acme' }),
+        createToken: async (...a) => { minted.push(a); return { token: 'bt' }; }, mintGrantBootstrap: async (...a) => { minted.push(a); return { token: 'bt' }; } },
+      dispatchQueueStore: { ...BASE_DEPS().dispatchQueueStore, getItemStatus: async () => parent, getItem: async () => parent,
+        addItem: async (u, item) => { enqueued.push(item); return { _id: 'd2', ...item }; } },
+      workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
+    });
+    const r = await requestWithoutHost(app, 'POST', RUN_PATH, { body: { prompt: 'next beat', followUpTo: PARENT, harness: 'opencode', appendProxyContext: true, issueIdentifier: 'TEST-1', target: 'cli' } });
+    assert.equal(r.status, 400, JSON.stringify(r.body));
+    assert.equal(r.body.code, ORIGIN_EXPECTED_CODE);
+    assert.equal(enqueued.length, 0);
+    assert.equal(minted.length, 0);
   });
 });
 
