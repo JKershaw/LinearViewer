@@ -51,7 +51,10 @@ export function runSide({ tree, scenariosFile, label, coverageDir }) {
     encoding: 'utf8', maxBuffer: 256 << 20,
   });
   if (r.status !== 0) throw new Error(`side ${label} failed (exit ${r.status}): ${(r.stderr || '').slice(-2000)}`);
-  return JSON.parse(fs.readFileSync(outFile, 'utf8'));
+  const out = JSON.parse(fs.readFileSync(outFile, 'utf8'));
+  // A transport failure is no evidence about the code: the run is a tool failure, not a difference.
+  if (out.transportErrors) throw new Error(`side ${label}: ${out.transportErrors} transport failure(s), e.g. ${out.transportSample[0]}`);
+  return out;
 }
 
 /** Compare two sides' outputs surface by surface, scenario by scenario. */
@@ -97,4 +100,11 @@ function main() {
   process.exit(report.differing === 0 ? 0 : 1);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  try {
+    main();
+  } catch (err) {
+    console.error(`replay: tool failure: ${err.message}`);
+    process.exit(2);
+  }
+}

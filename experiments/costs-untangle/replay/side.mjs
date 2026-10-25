@@ -20,10 +20,11 @@ if (!args.tree || !args.scenarios || !args.out) {
 
 pinEnv();
 installNetworkGuard();
-const { loadTree, SYNC_SURFACES, ASYNC_SURFACES } = await import('./surfaces.mjs');
+const { loadTree, SYNC_SURFACES, ASYNC_SURFACES, closeCostHarness, TransportError } = await import('./surfaces.mjs');
 const mods = await loadTree(path.resolve(args.tree));
 
 const scenarios = JSON.parse(fs.readFileSync(args.scenarios, 'utf8'));
+const transportErrors = [];
 const out = Object.fromEntries([...Object.keys(SYNC_SURFACES), ...Object.keys(ASYNC_SURFACES)].map(id => [id, []]));
 
 for (const sc of scenarios) {
@@ -48,9 +49,11 @@ async function runOneAsync(f) {
   try {
     return canon(await f());
   } catch (err) {
+    if (err instanceof TransportError) { transportErrors.push(err.message); return canon({ $transport: 1 }); }
     return canon({ $threw: String(err && err.message ? err.message : err) });
   }
 }
 
-fs.writeFileSync(args.out, JSON.stringify({ tree: path.resolve(args.tree), count: scenarios.length, networkAttempts: networkAttempts.length, out }));
+await closeCostHarness(mods);
+fs.writeFileSync(args.out, JSON.stringify({ tree: path.resolve(args.tree), count: scenarios.length, networkAttempts: networkAttempts.length, transportErrors: transportErrors.length, transportSample: transportErrors.slice(0, 3), out }));
 process.exit(0);

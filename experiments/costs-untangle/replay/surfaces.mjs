@@ -129,11 +129,19 @@ function dispatchStoreOver(sc, now, since) {
   };
 }
 
-/** The /cost endpoint over HTTP through the same proxy app the proxy cost-route test builds. */
-async function costOverHttp(m, sc, ticket) {
+/**
+ * One proxy app and one listening server per side process, shared by every
+ * scenario. The app's stores delegate to the scenario currently being judged, so
+ * the route's own code is what runs. One server per request exhausted macOS
+ * ephemeral ports (EADDRNOTAVAIL) over a full run, so a server is not per request.
+ * A transport failure is a TransportError, never a compared figure.
+ */
+export class TransportError extends Error {}
+
+async function costHarness(m) {
+  if (m.__cost) return m.__cost;
   const express = (await import('express')).default;
-  const dispatchQueueStore = dispatchStoreOver(sc, sc.now, null);
-  const llmCallLogStore = storeOver(m, sc);
+  const cur = { sc: null, dispatch: null, llm: null };
   const app = express();
   app.use(express.json());
   app.use(m.proxy.createProxyRoutes({
@@ -145,23 +153,45 @@ async function costOverHttp(m, sc, ticket) {
     agentStatusStore: {},
     recapCacheStore: { get: async () => null, set: async () => {} },
     briefCacheStore: { get: async () => null, set: async () => {} },
-    dispatchQueueStore,
-    llmCallLogStore,
+    dispatchQueueStore: {
+      listItems: (...a) => cur.dispatch.listItems(...a),
+      listHistory: (...a) => cur.dispatch.listHistory(...a),
+    },
+    llmCallLogStore: new Proxy({}, { get: (_t, key) => (...a) => cur.llm[key](...a) }),
     workspaceFromUrl: (req, res, next) => next(),
     freeTierStore: { tryUse: async () => ({ allowed: true }) },
   }));
   const server = app.listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
-  const { port } = server.address();
+  const harness = {
+    cur,
+    base: `http://127.0.0.1:${server.address().port}`,
+    close: () => new Promise(resolve => { server.closeAllConnections?.(); server.close(() => resolve()); }),
+  };
+  m.__cost = harness;
+  return harness;
+}
+
+/** Close the side's /cost server, if one was started (called once, after the run). */
+export async function closeCostHarness(m) {
+  if (m.__cost) { await m.__cost.close(); m.__cost = null; }
+}
+
+async function costOverHttp(m, sc, ticket) {
+  const h = await costHarness(m);
+  h.cur.sc = sc;
+  h.cur.dispatch = dispatchStoreOver(sc, sc.now, null);
+  h.cur.llm = storeOver(m, sc);
+  let res;
   try {
-    const res = await fetch(`http://127.0.0.1:${port}/api/proxy/issues/${ticket}/cost`, { headers: { Authorization: 'Bearer judge' } });
-    const text = await res.text();
-    let body;
-    try { body = JSON.parse(text); } catch { body = { $raw: text }; }
-    return { status: res.status, body };
-  } finally {
-    await new Promise(resolve => server.close(resolve));
+    res = await fetch(`${h.base}/api/proxy/issues/${ticket}/cost`, { headers: { Authorization: 'Bearer judge' } });
+  } catch (err) {
+    throw new TransportError(`GET /cost ${ticket}: ${err.message}${err.cause ? ` (${err.cause.code || err.cause.message})` : ''}`);
   }
+  const text = await res.text();
+  let body;
+  try { body = JSON.parse(text); } catch { body = { $raw: text }; }
+  return { status: res.status, body };
 }
 
 // Judge the route's JSON only; the body is what a caller reads.
