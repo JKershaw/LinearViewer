@@ -294,6 +294,40 @@ Measured at `55149a37` (the last commit that changed CSS). Each decision's autho
 
 Button-like classes rose by four because the canonical tone names (`btn--quiet`, `btn--green`, `btn--blue`, plus the existing `btn--red`/`btn--teal`) are new class names, and the aliases remain. The Rebuild gate will see that rise, and the reason is the alias tail, not a second look. The spacing token count fell (676 to 665) although 9 literals became tokens: the copies deleted held more token uses than that, so the net is down. The plan's 680 to 700 prediction was wrong on that point; the literal count is inside its range.
 
+## Rebuild (LIN-3890): status at head
+
+The Rebuild PR builds every non-Models Settings area from the shared pieces (`lib/components/settings-*.js`, `halt-controls.js`), styles stay in `public/settings.css`, and the old tree/node/field builders are gone from those areas (`tests/unit/lin-3890-no-old-builders.test.js`). Decisions 8 (ask in place), 6 (button) and 9 (note) have new authorities; the rest of the table above stands.
+
+| Decision | Authority at head | Status |
+| -- | -- | -- |
+| 5b Interactive row | `switchRow`, `drillRow` (with `flagHtml`, `attrs`), `actionRow`, `staticRow` in `lib/components/settings-row.js` | done for every non-Models area, including the Theme and Email rows (hand-written before this PR) |
+| 6 Button | `btn btn--primary` (confirm, make active, Undo), `btn btn--red` (stop, remove, revoke), `btn--quiet` (Cancel, test, add) | done for Settings. `action-btn` stays for Models' forms and the other pages' emitters (LIN-3855; open question 3) |
+| 8 Ask in place | `askInPlace` in `lib/components/settings-ask.js`: Confirm, Cancel, `form` transport (POST only) and `script` transport (DELETE, one generic handler in `public/settings.js`) | done. The dispatch halt buttons and Models' preset delete stay out (open questions 4 and 5) |
+| 9 Note | `groupNote` / `.settings-note` | done; notes fit one line in the 600px pane at 1280px (the consent blast-radius copy is shared with `/auth/openrouter` and stays as it was) |
+| 10 Group title | `group()` in `lib/components/settings-group.js` | done |
+| 11 Key row | `keyRow` (name first, then kind, relative expiry and last use; the flag on the row; Revoke is an ask with `transport: 'script'`) | done |
+| 12 Area frame | `renderSettingsShell` in `lib/components/settings-frame.js` (one purpose line; the phone index selects no area) | done |
+| status line | `statusLine` in `lib/components/settings-group.js` (`settings-flash` and `settings-flash-error` kept) | new at head |
+| sidebar state | `SIDEBAR_TONES` in `lib/settings-areas.js` (`ok`, `warn`, `bad`) | done (amber for paused and stopped) |
+
+Measures at head, from `node tests/measures/css-measures.mjs . <rev>` (the series base is `a32c14a3`; the PR rebased onto `2c836676` on 25 October):
+
+| Measure | Series base `a32c14a3` | This PR's base `2c836676` | Head | Gate |
+| -- | -- | -- | -- | -- |
+| CSS lines | 19,888 | 19,329 | 19,337 | ≤ 19,888 |
+| Spacing, literal | 904 | 882 | 882 | ≤ 904 |
+| Spacing, token | 676 | 640 | 645 | (no gate) |
+| Distinct font sizes (declarations) | 74 (810) | 74 (777) | 74 (780) | ≤ 74 |
+| Button-like classes | 37 | 41 | 36 | ≤ 37 |
+| Breakpoints | 13 | 13 | 13 | ≤ 13 |
+| Area pairs (`seams.mjs`) | 10 | 9 | 9 | (reported) |
+
+The button count went 41 → 36 by retiring the five classes nothing emits: `btn--teal` (the ask's confirm is `btn--primary`), `provider-add-btn`, `provider-remove-btn`, `roadmap-generate-btn` and `ai-btn`. `tests/unit/lin-3890-dead-button-classes.test.js` checks each name against every production emitter, so a deletion cannot take a live element's look with it. The series base's `action-btn` tail is not renamed (decision 4).
+
+The verbatim share of the Settings renderers, `scripts/code-shape/verbatim.mjs` from `2c836676` to head over `lib/render-settings*.js`, `lib/components/settings-*.js` and `halt-controls.js`, is 73% of the new lines. That figure counts Models' untouched body (`render-settings.js`, about 380 lines that do not change), so it is not a copy measure for the rebuilt areas. The question it prompts: the Running, Agent access and Change log renderers kept their row structure and changed rows, so a different split was not available without also rebuilding Models (LIN-3855).
+
+Outcome 11 (one model-routing move is one change-log entry) is a follow-up: LIN-3925, filed next to LIN-3855. Cause: each job is its own proxy request, and no batch id reaches the store.
+
 ## Open questions for John
 
 Each keeps today's behaviour until answered.

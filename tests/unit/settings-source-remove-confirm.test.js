@@ -36,7 +36,7 @@ describe('Sources: remove asks in place', () => {
 
   test('sources are labelled as yours, not as for everyone', () => {
     const html = sources([binding()]);
-    assert.match(html, /Sources are yours/);
+    assert.match(html, /They follow your account/);
     assert.match(html, /data-testid="settings-section-providers-title"[^>]*>Yours<\/h2>/);
     assert.doesNotMatch(html, /For everyone/);
   });

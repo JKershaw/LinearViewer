@@ -201,7 +201,7 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
     assert.match(html, /data-testid="settings-section-providers"/);
     // LIN-3846: sources are labelled as yours (they follow the account, not everyone).
     assert.match(html, /Yours/);
-    assert.match(html, /Sources are yours/);
+    assert.match(html, /They follow your account/);
   });
 
   test('renders a row per binding with displayName, scope, masked token and remove/refresh forms', () => {
