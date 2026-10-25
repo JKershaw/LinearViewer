@@ -143,8 +143,9 @@ describe('privacy page', () => {
   });
 
   test('keeps header, wrapper and footer behaviour', () => {
-    assert.match(html, /<h2>Privacy Policy<\/h2>/);
-    assert.match(html, /class="legal-content"/);
+    // LIN-3950: the title is the Plain layout's one h2 and the wrapper is its main element.
+    assert.match(html, /<h2 class="plain-title">Privacy Policy<\/h2>/);
+    assert.match(html, /<main class="plain-page">/);
     assert.match(html, /footer-current[^>]*>\s*privacy/);
   });
 });

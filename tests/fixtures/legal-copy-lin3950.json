@@ -1,0 +1,64 @@
+{
+  "privacy": {
+    "heading": "Privacy Policy",
+    "sections": [
+      {
+        "title": "What Harbour stores",
+        "body": "The text of the tasks you work on: titles, descriptions, comments and labels, as read from your tracker.The prompts Harbour writes for you and the AI’s full reply, every time.The history of each run: the prompt, the agent’s progress messages and excerpts of its output (up to 2,000 characters each), and the decisions you make. Agent messages and prompts can quote code from your repository. Harbour does not keep a copy of the repository itself.Summaries, briefs and chats you save.Your account: your email address if you sign in by email, and the ids of your Linear, GitHub or Jira accounts.Server logs that carry workspace names and task ids.If you run a dispatch consumer, it reports its kind, a random per-process id, its platform, uptime, CPU count, load averages, free and total memory, its active and held session counts, when it last polled Harbour, and the names of any workspaces it has paused because Harbour rejected their token, about once a minute. It reports no hostname, username, file path or run content."
+      },
+      {
+        "title": "Sign-in tokens",
+        "body": "Linear and Jira: the access and refresh tokens from signing in, so Harbour can work for you while you are away. Stored unencrypted in Harbour’s database.Jira API token (if you link Jira with an email and API token instead of signing in): kept only in your session, unencrypted, and it never expires.OpenRouter API key, if you connect OpenRouter: stored unencrypted with your account.GitHub: Harbour keeps only the app’s installation id. The GitHub tokens it uses expire within about an hour, and your personal GitHub sign-in token is used once to identify you and is not kept.Harbour’s own tokens (API tokens, runner tokens, share links, email sign-in links) are stored only as a one-way hash."
+      },
+      {
+        "title": "Cookies",
+        "body": "Harbour sets exactly two cookies:connect.sid: keeps you signed in. Lasts 30 days.theme: remembers light or dark mode. Lasts 1 year.There are no tracking or analytics cookies. Some display settings are kept in your browser’s local storage and are never sent to Harbour."
+      },
+      {
+        "title": "Who processes it",
+        "body": "Linear, GitHub and Jira (Atlassian): your tracker, the source of your data. Harbour also writes comments, labels and status changes back when you ask it to.Railway: hosts Harbour, its database and its server logs. Log retention is set by Railway, not by Harbour.OpenRouter: receives task text and prompts for AI features, and routes each request to an AI model provider. Harbour does not restrict which provider OpenRouter uses.Resend: sends email sign-in links, so it receives your email address.Yap: carries Collective chat (yap.jkershaw.com). Collective is off by default, but any user can switch it on.The workspace owner's own machine and its AI coding tool: runs happen there, through the tool the owner runs (for example Claude Code, which sends code and prompts to Anthropic). That machine, not Harbour, keeps the run's transcript and repository copy."
+      },
+      {
+        "title": "Who can see it",
+        "body": "Access comes from your tracker. People who connect Harbour to the same Linear organisation, GitHub App installation or Jira site share that workspace’s tasks, runs and history. Harbour checks this when you connect, not on every visit. A GitHub installation can cover more than one repository, and access to a repository is not re-checked afterwards.Harbour restricts the workspace’s runner to its owner, whose own machine is the runner: starting work, halting and resuming, deleting or trimming queued work, and creating or revoking runner credentials. This is not yet airtight: runner tokens issued before these checks keep working until they expire or are revoked, and we have not swept every path that could reach the runner.A task link (/t/&hellip;) you share, and API or runner tokens you create, give access to whoever holds them until they expire or you revoke them. Task links do not expire on their own. Removing a workspace revokes the API tokens, dispatch tokens and task links that you made for it, and revokes the runner credentials you made for it only if you own the workspace. Signing out, a removal you did not make, and unlinking one provider from a workspace revoke none of these.Harbour’s operator can see everything in the database.The public statistics page (/kpis) shows totals and counts only: a count below 5 shows as &ldquo;fewer than 5&rdquo;, and it never shows names, workspace keys or content."
+      },
+      {
+        "title": "How long it is kept",
+        "body": "Task text, prompts, AI replies and run history are kept for the life of the service, except what a deletion request removes (see Getting your data deleted). This is on purpose: it is the record of what Harbour did.Saved chats are kept until you delete them (up to 50 each). Summaries stop being served after 7 days, though the stored copy can remain until it is next read.A consumer heartbeat is replaced by the next one and stops being served 15 minutes after the last; the expired record is deleted by an hourly cleanup.Sign-in tokens are kept until you remove the workspace, unlink the provider or ask for deletion. A session stops working after 30 days, but the expired session record, with its tokens, is deleted by an hourly cleanup."
+      },
+      {
+        "title": "Getting your data deleted",
+        "body": "Deletion is by request, not a button: write to privacy@harbour.cat and choose a level. Removing a workspace deletes its stored sign-in tokens, not its history. What else it revokes is set out under &ldquo;Who can see it&rdquo;.Standard removes your account, your email address, your sign-in identities and sessions, and the tokens and credentials you own. The history of your workspaces (tasks, prompts, AI replies and run records) stays as the workspace’s record. That history keeps an internal id that no longer belongs to an account, and the history of a workspace you owned alone stays visible to anyone who later connects the same tracker workspace.Full wipe does everything Standard does and also deletes the history of workspaces you own alone. In workspaces shared with other people, the account id on your history is replaced by one placeholder shared by everyone who has asked, so it can no longer be tied to you; text you wrote and names you gave tokens stay.Neither level reaches your tracker’s own copies, the services under &ldquo;Who processes it&rdquo;, server logs, host backups, or the confirmation email we send you.You should also revoke Harbour’s access in Linear, GitHub or Atlassian, because removing a workspace does not do that for you."
+      }
+    ]
+  },
+  "terms": {
+    "heading": "Terms of Service",
+    "sections": [
+      {
+        "title": "Service Description",
+        "body": "Harbour is a web application for viewing and orchestrating work across your issue tracker. It supports Linear, GitHub, GitHub Projects, Jira and a local workspace, and you can sign in with Linear, GitHub or Jira, or with an email sign-in link, where this server offers them. Your data and how it is handled are described in the Privacy Policy."
+      },
+      {
+        "title": "No Warranty",
+        "body": "This service is provided \"as is\" without warranty of any kind. We make no guarantees about availability, accuracy, or fitness for any particular purpose."
+      },
+      {
+        "title": "Your Responsibilities",
+        "body": "You are responsible for the security of the accounts you connect to Harbour and for any activity that occurs through your authenticated session. You are also responsible for the API tokens, runner tokens and task share links you create: whoever holds one has access until it expires or is revoked."
+      },
+      {
+        "title": "Limitation of Liability",
+        "body": "To the fullest extent permitted by law, we are not liable for any damages arising from your use of this service."
+      },
+      {
+        "title": "Changes to Terms",
+        "body": "We may update these terms at any time. Continued use of the service constitutes acceptance of any changes."
+      },
+      {
+        "title": "Contact",
+        "body": "For questions about these terms, open an issue at github.com/JKershaw/LinearViewer/issues."
+      }
+    ]
+  }
+}

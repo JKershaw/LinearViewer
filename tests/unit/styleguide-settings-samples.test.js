@@ -43,3 +43,17 @@ test('each sample is built by its piece\'s builder', () => {
 test('the page is byte-stable across renders (the key row is given a fixed clock)', () => {
   assert.equal(renderStyleguide(), renderStyleguide());
 });
+
+// LIN-3950: /styleguide is itself a Plain page, and shows the Plain layout with one sample of every
+// section kind, in the Plain section and in each theme panel (light and dark).
+test('/styleguide is a Plain page, with every section kind sampled in the page and both theme panels', () => {
+  const html = renderStyleguide();
+  assert.match(html, /<main class="plain-page styleguide-content">/);
+  const plain = '<div class="plain-page settings-shell sg-settings-sample sg-plain-sample" inert>';
+  assert.equal(html.split(plain).length - 1, 3, 'one Plain sample in the section and one per theme panel');
+  const sample = html.split(plain)[1];
+  assert.match(sample, /class="field"/, 'fields kind');
+  assert.match(sample, /class="settings-group-block /, 'rows kind');
+  assert.match(sample, /class="plain-form"/, 'form kind');
+  assert.match(sample, /class="emptyState"/, 'empty kind');
+});
