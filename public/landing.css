@@ -346,6 +346,12 @@
   margin: 0;
 }
 
+/* The sign-in buttons at the end of the page (LIN-3980): the hero's own row,
+   with a little air above it. */
+.lx-try__ctas {
+  margin-top: var(--space-4);
+}
+
 /* ---- Providers strip ----------------------------------------------------- */
 .lx-provider-list {
   list-style: none;

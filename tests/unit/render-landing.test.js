@@ -148,3 +148,31 @@ test('defaults to the BYOK lead line when freeTierEnabled is false', () => {
   assert.match(section, /connect OpenRouter/i);
   assert.match(section, /own OpenRouter tokens/);
 });
+
+// LIN-3980 outcome 4: "Try it yourself" offers the same sign-in buttons as the
+// hero, under the same configuration rules: Linear always, the rest when set.
+function signInLabels(fragment) {
+  return [...fragment.matchAll(/<a href="([^"]+)" class="landing-cta[^"]*" data-testid="([^"]+)">([^<]+)<\/a>/g)]
+    .map(([, href, , label]) => `${href}|${label}`);
+}
+const SIGN_IN_CONFIGS = [
+  {},
+  { githubEnabled: true },
+  { jiraEnabled: true },
+  { emailEnabled: true },
+  { githubEnabled: true, jiraEnabled: true, emailEnabled: true },
+];
+for (const cfg of SIGN_IN_CONFIGS) {
+  test(`the try section has the hero's sign-in buttons, configured as ${JSON.stringify(cfg)}`, () => {
+    const html = renderLandingPage(cfg);
+    const heroRow = html.slice(html.indexOf('class="landing-ctas"'), html.indexOf('</header>'));
+    const tryRow = html.slice(html.indexOf('data-testid="landing-try-ctas"'), html.indexOf('data-testid="landing-providers"'));
+    assert.deepEqual(signInLabels(tryRow), signInLabels(heroRow));
+    assert.ok(signInLabels(tryRow).length >= 1, 'Linear is always offered');
+  });
+}
+
+test('the plain definition is on the landing, under the tagline', () => {
+  const html = renderLandingPage({});
+  assert.match(html, /data-testid="landing-plain"/);
+});

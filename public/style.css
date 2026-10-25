@@ -2657,6 +2657,16 @@ body.is-landing {
   margin: var(--space-2) 0 var(--space-4);
 }
 
+/* The plain definition under the tagline (LIN-3980): the sentence a cold
+   visitor reads first, so it takes the text colour, not the dim tagline's. */
+.landing-plain {
+  font-family: var(--font-content);
+  color: var(--fg);
+  max-width: 34rem;
+  margin: 0 auto var(--space-4);
+  line-height: 1.5;
+}
+
 .landing-ctas {
   display: flex;
   flex-wrap: wrap;
