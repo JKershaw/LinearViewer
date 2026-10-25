@@ -260,6 +260,8 @@
     const g = state.go || { status: 'ready' };
     const ready = goReady(opts);
     const { quota, quotaKnown, runsExhausted, runLimitTitle } = runQuotaView(state);
+    // LIN-3987: Home's Go takes the shared button classes. Swipe's card draws this same Go, and it keeps its own look (no change there).
+    const homeBtn = opts.surface === 'home' ? 'btn ' : '';
 
     let html = '<div class="opened-task-primary" data-go-slot>';
 
@@ -284,12 +286,12 @@
       // anyone else gets no run control at all (copy-first view, LIN-3833, is
       // not built yet, so this is today's non-run view).
       if (opts.runSetup) {
-        html += `<button class="btn opened-task-go opened-task-go--setup" data-testid="opened-task-go" data-rung="run-task" data-action="setup" data-setup-needs="dispatch">Go <span class="opened-task-setup">\u25CB set up \u203A</span></button>`;
+        html += `<button class="${homeBtn}opened-task-go opened-task-go--setup" data-testid="opened-task-go" data-rung="run-task" data-action="setup" data-setup-needs="dispatch">Go <span class="opened-task-setup">\u25CB set up \u203A</span></button>`;
       }
     } else if (runsExhausted) {
-      html += `<button class="btn opened-task-go opened-task-go--limited" data-testid="opened-task-go" data-rung="run-task" disabled title="${runLimitTitle}">Go <span class="opened-task-setup">${runLimitTitle}</span></button>`;
+      html += `<button class="${homeBtn}opened-task-go opened-task-go--limited" data-testid="opened-task-go" data-rung="run-task" disabled title="${runLimitTitle}">Go <span class="opened-task-setup">${runLimitTitle}</span></button>`;
     } else if (g.status === 'starting') {
-      html += '<button class="btn opened-task-go" data-testid="opened-task-go" data-rung="run-task" disabled>starting\u2026</button>';
+      html += `<button class="${homeBtn}opened-task-go" data-testid="opened-task-go" data-rung="run-task" disabled>starting\u2026</button>`;
     } else if (opts.surface === 'home') {
       // LIN-3833: Home's one main action names what it does: the step the sessions name, else Run to PR.
       // While a stage runs or is queued, no other step is offered as an action (LIN-3968); Stop and the
@@ -298,7 +300,7 @@
       if (step) html += `<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-step" data-action="run-step-next">Run ${esc(step.label)}</button>`;
       else if (state.opened && !stageBusy(state)) html += '<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-task" data-action="go">Run to PR</button>';
     } else {
-      html += '<button class="btn opened-task-go" data-testid="opened-task-go" data-rung="run-task" data-action="go">Go</button>';
+      html += `<button class="opened-task-go" data-testid="opened-task-go" data-rung="run-task" data-action="go">Go</button>`;
     }
 
     // The allowance sits beside Go, the control it governs — shown only when the

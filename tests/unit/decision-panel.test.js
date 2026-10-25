@@ -95,12 +95,12 @@ describe('effort is a fixed set: follow, then DISPATCH_EFFORT_LEVELS', () => {
 
   test('a blank field\'s hint reads on its own line under the field, and a chosen value hides it (390px: the option is not clipped)', () => {
     const hinted = (value) => panel({
-      harness: { value, inForce: 'opencode', follow: 'As Settings › Models sets it', hint: 'Right now: opencode' },
-      model: { value: null, follow: 'As Settings › Models sets it', hint: 'Right now: the default model', lists: LISTS, suggestions: SUGGEST },
-      effort: { value: null, follow: 'As Settings › Models sets it', hint: 'Right now: none' }
+      harness: { value, inForce: 'opencode', follow: 'From Models', hint: 'Right now: opencode' },
+      model: { value: null, follow: 'From Models', hint: 'Right now: the default model', lists: LISTS, suggestions: SUGGEST },
+      effort: { value: null, follow: 'From Models', hint: 'Right now: none' }
     });
     const blank = hinted(null);
-    assert.match(blank, /<option value=""[^>]*>As Settings › Models sets it<\/option>/);
+    assert.match(blank, /<option value=""[^>]*>From Models<\/option>/);
     assert.match(blank, /<span class="decision-panel-hint" data-decision-hint="harness">Right now: opencode<\/span>/);
     assert.match(blank, /<span class="decision-panel-hint" data-decision-hint="model">Right now: the default model<\/span>/);
     assert.match(blank, /<span class="decision-panel-hint" data-decision-hint="effort">Right now: none<\/span>/);
@@ -188,14 +188,15 @@ describe('suggested models belong to the harness in force', () => {
     assert.doesNotMatch(html, /decision-panel-price/);
   });
 
-  test('Claude Code\'s rates carry one note: they are for comparison, and a subscription may cover them', () => {
+  test('Claude Code\'s rates carry one note: what the rates are, where an alias\'s rate comes from, and that a subscription may cover them', () => {
     const html = panel();
-    assert.match(html, /<p class="decision-panel-note" data-decision-harness="claude-code">Rates are per 1M tokens, for comparison\. A Claude Code subscription may cover the cost\.<\/p>/);
-    assert.doesNotMatch(html, /<p class="decision-panel-note" data-decision-harness="opencode">Rates/);
+    assert.match(html, /<p class="decision-panel-note" data-decision-harness="claude-code">Per 1M tokens, for comparison\. Each alias uses the model its runs reported, else the newest it names\. A subscription may cover the cost\.<\/p>/);
+    assert.doesNotMatch(html, /<p class="decision-panel-note" data-decision-harness="opencode">Per 1M/);
   });
 
-  test('a suggestion that ran or is mapped says which, in words', () => {
-    assert.match(panel(), /decision-panel-source">Mapped to this model</);
+  test('a mapped rate is said once, in the note, and a rate the job ran decides is marked on its row', () => {
+    const mapped = panel();
+    assert.doesNotMatch(mapped, /decision-panel-source/, 'no row repeats the mapping');
     const ran = { 'claude-code': [{ id: 'sonnet', name: 'Claude Sonnet 5.5', reason: 'r', price: '$2.00 in / $10.00 out per 1M tokens', typical: null, source: 'ran' }], opencode: [] };
     assert.match(panel({ model: { value: 'sonnet', follow: 'Follow', lists: LISTS, suggestions: ran } }), /decision-panel-source">Ran as this model</);
   });

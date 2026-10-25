@@ -11,8 +11,10 @@ import { join, relative, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   DISPATCH_HARNESS_SUGGESTIONS, DEFAULT_HARNESS, DISPATCH_CLAUDE_MODEL_SUGGESTIONS, DISPATCH_MODEL_SUGGESTIONS,
-  DISPATCH_MODEL_OTHER_VALUE, isModelRunnableOn, harnessInForce, runnabilityProblems, harnessModelsBlock, curatedModelIds
+  DISPATCH_MODEL_OTHER_VALUE, DISPATCH_CLAUDE_ALIAS_MODELS, claudeAliasModel, isModelRunnableOn, harnessInForce,
+  runnabilityProblems, harnessModelsBlock, curatedModelIds
 } from '../../lib/model-routing-harnesses.js';
+import { resolveWorkerModelId, getModelRate } from '../../lib/model-pricing.js';
 import { emptyTable, applyChangesToTable } from '../../lib/model-routing.js';
 import { JOBS, SURFACES } from '../../lib/llm-jobs.js';
 import { renderPage } from '../../lib/components/page.js';
@@ -182,5 +184,28 @@ describe('renderPage embeds the list once, on pages that load common.js', () => 
     const html = renderPage({ title: 't', scripts: ['/x.js'] });
     assert.equal(count(html, 'type="application/json"'), 0);
     assert.equal(count(html, LOADER), 0);
+  });
+});
+
+// LIN-3987: a Claude Code alias is priced as the model it runs. The mapping is the one place that says which model,
+// so an alias with no mapping, or a mapping with no rate row, fails here (never as "price unknown" on a screen).
+describe('the Claude Code alias mapping prices every alias (LIN-3987)', () => {
+  test('every alias in the suggestion list maps to a model that resolves to a rate', () => {
+    for (const alias of DISPATCH_CLAUDE_MODEL_SUGGESTIONS) {
+      const mapped = claudeAliasModel(alias);
+      assert.ok(mapped, `${alias} has a mapping`);
+      assert.ok(getModelRate(resolveWorkerModelId(mapped)), `${alias} runs ${mapped}, which has a rate row`);
+    }
+  });
+
+  test('the mapping holds exactly the suggestion list, in the form Claude Code reports (no bare alias)', () => {
+    assert.deepEqual(Object.keys(DISPATCH_CLAUDE_ALIAS_MODELS).sort(), [...DISPATCH_CLAUDE_MODEL_SUGGESTIONS].sort());
+    for (const mapped of Object.values(DISPATCH_CLAUDE_ALIAS_MODELS)) assert.match(mapped, /^claude-[a-z]+-\d+-\d+$/);
+  });
+
+  test('an own-property check: a prototype name is not an alias, and a non-alias id maps to nothing', () => {
+    assert.equal(claudeAliasModel('constructor'), null);
+    assert.equal(claudeAliasModel('toString'), null);
+    assert.equal(claudeAliasModel('claude-sonnet-5-5'), null);
   });
 });

@@ -115,7 +115,7 @@ describe('GET /api/dispatch/decision-panel: what the panel says about the harnes
 
   test('a blank field says what Settings › Models sets it to for this step', async () => {
     const { body } = await get(buildApp(), `${PANEL}?promptName=implementation&surface=home`);
-    assert.match(body.html, /<option value=""[^>]*>As Settings › Models sets it<\/option>/, 'the option stays short; a 390px select clips a long one');
+    assert.match(body.html, /<option value=""[^>]*>From Models<\/option>/, 'the option stays short; a 390px select clips a long one');
     assert.match(body.html, /data-decision-hint="harness">Right now: /);
     assert.match(body.html, /data-decision-hint="model">Right now: /);
     assert.match(body.html, /data-decision-hint="effort">Right now: /);
@@ -159,3 +159,35 @@ describe('GET /api/dispatch/decision-panel: refusals', () => {
     assert.equal(body.code, 'PREVIEW_OWNER_ONLY');
   });
 });
+
+// LIN-3987: the words a blank field resolves to name whose default applies, in words, never a raw id or "none".
+describe('GET /api/dispatch/decision-panel: the words for what a blank resolves to (LIN-3987)', () => {
+  test('under Claude Code the hints say Claude Code, its own model and its own effort', async () => {
+    const { body } = await get(buildApp(), `${PANEL}?promptName=implementation&surface=home`);
+    assert.match(body.html, /data-decision-hint="harness">Right now: Claude Code<\/span>/);
+    assert.match(body.html, /data-decision-hint="model">Right now: Claude Code&#039;s own model<\/span>/);
+    assert.match(body.html, /data-decision-hint="effort">Right now: Claude Code&#039;s own effort<\/span>/);
+    assert.deepEqual(body.words, { harness: 'Claude Code', model: "Claude Code's own model", effort: "Claude Code's own effort" });
+  });
+
+  test('under opencode the hints say opencode through OpenRouter, its default model, and that effort is not used', async () => {
+    const table = emptyTable();
+    table.jobs.implementation = { harness: 'opencode' };
+    const { body } = await get(buildApp({ table }), `${PANEL}?promptName=implementation&surface=home`);
+    assert.match(body.html, /data-decision-hint="harness">Right now: opencode through OpenRouter<\/span>/);
+    assert.match(body.html, /data-decision-hint="model">Right now: opencode&#039;s default model<\/span>/);
+    assert.match(body.html, /data-decision-hint="effort">Right now: not used<\/span>/);
+    assert.equal(body.words.effort, 'not used');
+  });
+
+  test('no hint, heading or words names a raw harness id, a bare alias or "none"', async () => {
+    const table = emptyTable();
+    table.jobs.implementation = { harness: 'opencode', model: 'openai/gpt-5.5' };
+    const { body } = await get(buildApp({ table }), `${PANEL}?promptName=implementation`);
+    const hints = [...body.html.matchAll(/data-decision-hint="[a-z]+">([^<]*)</g)].map((m) => m[1]).join(' | ');
+    // The harness's name is "opencode through OpenRouter"; a bare `opencode` (the id) is what must not appear.
+    assert.doesNotMatch(hints, /\bclaude-code\b|\bopencode(?! through)\b|\bnone\b|\bsonnet\b|\bopus\b|\bhaiku\b|\bfable\b/);
+    assert.doesNotMatch(JSON.stringify(body.words), /\bclaude-code\b|\bopencode(?! through)\b|\bnone\b/);
+  });
+});
+

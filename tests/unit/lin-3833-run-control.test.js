@@ -14,7 +14,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
-import { decisionPanel, routingWords } from '../../lib/components/decision-panel.js';
+import { decisionPanel, routingWords, agentLists } from '../../lib/components/decision-panel.js';
 import { HARNESSES_WITHOUT_EFFORT } from '../../lib/model-routing.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -71,15 +71,17 @@ function makeContainer() {
 }
 
 // The server's panel for the choice it is asked about (routes/dispatch.js decision-panel), built by the same component.
+// The lists are the real ones (LIN-3987), so a typed alias is named by its display name, as it is on the server.
 const serverPanel = (q) => ({
   kind: 'plan',
   withoutEffort: HARNESSES_WITHOUT_EFFORT,
+  words: routingWords({ harness: q.get('harness') || null, model: null, effort: null }),
   html: decisionPanel({
     testid: 'run-decision-panel',
     fieldAttrs: (field) => `data-testid="run-${field}"`,
     numbers: null,
-    harness: { value: q.get('harness'), inForce: q.get('harness') || 'claude-code', follow: 'As Settings \u203a Models sets it', hint: 'Right now: claude-code' },
-    model: { value: q.get('model'), follow: 'As Settings \u203a Models sets it', hint: 'Right now: the default model', lists: { any: [] }, suggestions: {} },
+    harness: { value: q.get('harness'), inForce: q.get('harness') || 'claude-code', follow: 'As Settings \u203a Models sets it', hint: 'Right now: Claude Code' },
+    model: { value: q.get('model'), follow: 'As Settings \u203a Models sets it', hint: 'Right now: Claude Code\'s own model', lists: agentLists([]), suggestions: {} },
     effort: { value: q.get('effort'), follow: 'As Settings \u203a Models sets it', hint: 'Right now: none' }
   })
 });
@@ -186,7 +188,7 @@ describe('LIN-3833 — Runs on says where each value comes from, from the server
     await flush();
     assert.match(c.innerHTML, /data-testid="run-change-panel"/);
     assert.match(c.innerHTML, /<option value=""[^>]*>As Settings \u203a Models sets it<\/option>/, 'the blank option is short, so a 390px select does not clip it');
-    assert.match(c.innerHTML, /data-decision-hint="harness">Right now: claude-code</, 'what the blank resolves to reads on its own line');
+    assert.match(c.innerHTML, /data-decision-hint="harness">Right now: Claude Code</, 'what the blank resolves to reads on its own line, in words (LIN-3987)');
     assert.equal(/<option value="claude-code" selected>|<option value="opencode" selected>/.test(c.innerHTML), false, 'nothing is pre-selected');
     assert.ok(calls.api.some((a) => a.url.includes('/api/dispatch/decision-panel')), 'the shared panel is read from the server when Change opens');
   });
@@ -476,3 +478,71 @@ describe('LIN-3833 — "Another step" leaves out only what the task cannot take 
     assert.match(c.innerHTML, /7 steps left out: they do not fit this task's state\./);
   });
 });
+
+// LIN-3987: Home's controls are real buttons with a shared class, a chosen choice is marked, a choice the harness cannot
+// run is not kept, and the words name what runs. The button tags are read from the markup the run block paints.
+describe('LIN-3987 — Home\'s run controls are shared buttons, marked when chosen, and say their words', () => {
+  const RUN_ACTIONS = ['change-run', 'ask-harbour', 'run-target', 'run-preset', 'use-run', 'reset-run', 'close-change', 'see-prompt', 'run-another', 'run-pick', 'run-more', 'stop-run', 'stop-run-confirm', 'stop-run-cancel', 'undo-run', 'run-step-next', 'run-step', 'go', 'setup'];
+  const SHARED = /class="[^"]*\bbtn(?:--[a-z]+)?\b/;
+  // The button's own opening tag, found by its test id (its attributes come in any order).
+  const tagOf = (html, testid) => new RegExp(`<button\\b[^>]*data-testid="${testid}"[^>]*>`).exec(html)[0];
+  const runButtons = (html) => [...html.matchAll(/<button\b[^>]*>/g)].map((m) => m[0])
+    .filter((tag) => /data-testid="(run-[a-z-]+|opened-task-go)"/.test(tag) || RUN_ACTIONS.some((a) => tag.includes(`data-action="${a}"`)));
+
+  test('every button in the run block, with the Change panel open, carries a shared button class', async () => {
+    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor: () => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: null, harness: 'claude-code', effort: null, sources: {} }) });
+    await c.click({ action: 'change-run' });
+    await flush();
+    await c.click({ action: 'run-another' });
+    await flush();
+    const tags = runButtons(c.innerHTML);
+    assert.ok(tags.length >= 8, `the run block has its buttons (${tags.length})`);
+    for (const tag of tags) assert.match(tag, SHARED, `shared class on ${tag}`);
+  });
+
+  test('a chosen Runs-on target is marked aria-pressed, and is not marked by bold or underline', async () => {
+    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor: () => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: null, harness: 'claude-code', effort: null, sources: {} }) });
+    await c.click({ action: 'change-run' });
+    await flush();
+    await c.click({ action: 'run-target', target: 'web' });
+    await flush();
+    assert.equal(tagOf(c.innerHTML, 'run-target-web').includes('aria-pressed="true"'), true);
+    assert.equal(tagOf(c.innerHTML, 'run-target-cli').includes('aria-pressed="false"'), true);
+  });
+
+  test('with opencode chosen, Claude Code on the web is not offered and says why; a web draft falls back to the runner', async () => {
+    const { c, calls } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: { count: 0, next: null, last: null, running: null } }, previewFor: () => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: null, harness: 'claude-code', effort: null, sources: {} }) });
+    await c.click({ action: 'change-run' });
+    await flush();
+    await c.click({ action: 'run-target', target: 'web' });
+    await c.fire('change', { dataset: { testid: 'run-harness' }, value: 'opencode' });
+    await flush();
+    assert.doesNotMatch(c.innerHTML, /data-testid="run-target-web"/, 'no web choice under opencode');
+    assert.match(c.innerHTML, /data-testid="run-web-unavailable"[^>]*>Claude Code on the web needs Claude Code, so it is not offered with opencode through OpenRouter\./);
+    assert.equal(tagOf(c.innerHTML, 'run-target-cli').includes('aria-pressed="true"'), true, 'the draft falls back to the runner');
+    await c.click({ action: 'use-run' });
+    await c.click({ action: 'go', rung: 'run-task' });
+    await flush();
+    await flush();
+    assert.equal(calls.dispatch.length, 1);
+    assert.equal(calls.dispatch[0].target, 'cli', 'the run goes to the runner, never to a web target the harness cannot run');
+  });
+
+  test('the Runs-on line, the heading and the summary name models and harnesses in words, never a raw id or alias', async () => {
+    const previewFor = (q) => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: q.get('model') || null, harness: q.get('harness') || 'claude-code', effort: null, sources: {}, words: routingWords({ harness: q.get('harness') || 'claude-code', model: q.get('model') || null, effort: null }) });
+    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor });
+    await c.click({ action: 'change-run' });
+    await flush();
+    // The model field repaints nothing as it is typed (LIN-3969, so the caret stays); a target choice repaints the block.
+    await c.fire('change', { dataset: { testid: 'run-model' }, value: 'sonnet' });
+    await c.click({ action: 'run-target', target: 'cli' });
+    await flush();
+    const runsOn = /data-testid="run-on-what">([^<]*)</.exec(c.innerHTML)[1];
+    const summary = /data-testid="run-will-use">([^<]*)</.exec(c.innerHTML)[1];
+    const heading = /opened-task-change-head">([^<]*)</.exec(c.innerHTML)[1];
+    assert.match(summary, /^This run will use Claude Sonnet 5\.5 · Claude Code/, summary);
+    assert.match(heading, /^This run only · default: Claude Code(?:&#039;|')s own model/, heading);
+    for (const text of [runsOn, summary, heading]) assert.doesNotMatch(text, /\bclaude-code\b|\bsonnet\b|\bnone\b|from Models/, text);
+  });
+});
+

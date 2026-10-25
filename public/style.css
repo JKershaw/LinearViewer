@@ -1375,6 +1375,8 @@ a.wordmark:hover {
 .decision-panel-pick {
   max-width: 100%;
   text-align: left;
+  /* Tighter than .btn's, so the name and its rate fit one line on a phone (LIN-3987). */
+  padding-inline: var(--space-2);
 }
 
 .decision-panel-reason {
@@ -1382,11 +1384,13 @@ a.wordmark:hover {
   overflow-wrap: anywhere;
 }
 
+/* The costs are the small line beside the name: a phone fits the name and its rate on one line at this size (LIN-3987). */
 .decision-panel-costs {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-1) var(--space-3);
   font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
   color: var(--fg-dim);
 }
 
@@ -1397,6 +1401,7 @@ a.wordmark:hover {
 
 /* The notes the panel says once: the rates are for comparison, which suggestion has no rate, and why Effort is not shown. */
 .decision-panel-note {
+  grid-column: 1 / -1;
   margin: 0;
   font-size: var(--font-size-sm);
   color: var(--fg-dim);

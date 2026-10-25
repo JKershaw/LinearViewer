@@ -687,7 +687,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       const typicals = history ? typicalByModel(history.items, { job: kind }) : [];
       // The blank option stays short (a 390px select clips a long one); what it resolves to reads on a hint line under the field.
       // LIN-3987: what it resolves to is said in words (routingWords), so the hint and the heading never print an id.
-      const follow = 'As Settings › Models sets it';
+      const follow = 'From Models';
       const words = routingWords({ harness: routing.harness, model: routing.model, effort: routing.effort });
       const hint = (value) => `Right now: ${value}`;
       const numbers = spend && {
