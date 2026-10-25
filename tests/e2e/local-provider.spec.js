@@ -33,9 +33,9 @@ test.describe('Local provider (no test-token mock)', () => {
     // render.js interpolates provider.ui.displayName ('Local') into the link.
     // LIN-442: the detail block is lazy — expand an issue to load it first.
     await page.locator('.line.expandable').first().click();
-    await expect(page.locator('.detail-link', { hasText: 'View in Local' }).first()).toBeAttached();
+    await expect(page.locator('.detail-link', { hasText: 'Open in Local' }).first()).toBeAttached();
     // No dashboard detail link should still say "View in Linear" for this workspace.
-    await expect(page.locator('.detail-link', { hasText: 'View in Linear' })).toHaveCount(0);
+    await expect(page.locator('.detail-link', { hasText: 'Open in Linear' })).toHaveCount(0);
   });
 
   test('swim popover link is provider-aware (E2E proof of the F1 fix)', async ({ page, localWorkerUrlKey }) => {
@@ -176,7 +176,7 @@ test.describe('Local provider (no test-token mock)', () => {
     // Expand the seeded In Progress parent, then open its Details section (the
     // edit link lives inside the collapsed Details content, beside Comments).
     await page.locator('.in-progress-items .line', { hasText: 'Local parent task' }).first().click();
-    await page.locator('.detail-toggle[data-toggle="details"]').first().click();
+    await page.locator('.detail-toggle[data-toggle="description"]').first().click();
 
     // One click: the link navigates to the task's own edit page.
     await page.locator('[data-testid="issue-edit-link"]').first().click();
@@ -216,7 +216,7 @@ test.describe('Local provider (no test-token mock)', () => {
   // also proves render/round-trip work for the common no-Markdown-syntax case.
   test('description Preview renders live and saving round-trips the untouched doc unchanged', async ({ page }) => {
     await page.locator('.in-progress-items .line', { hasText: 'Local parent task' }).first().click();
-    await page.locator('.detail-toggle[data-toggle="details"]').first().click();
+    await page.locator('.detail-toggle[data-toggle="description"]').first().click();
     await page.locator('[data-testid="issue-edit-link"]').first().click();
 
     const form = page.locator('[data-testid="task-edit-form"]');
@@ -292,7 +292,7 @@ test.describe('Local provider (no test-token mock)', () => {
 
   test('description Preview renders real Markdown, styles it, and saving from Preview round-trips the raw source', async ({ page }) => {
     await page.locator('.in-progress-items .line', { hasText: 'Local parent task' }).first().click();
-    await page.locator('.detail-toggle[data-toggle="details"]').first().click();
+    await page.locator('.detail-toggle[data-toggle="description"]').first().click();
     await page.locator('[data-testid="issue-edit-link"]').first().click();
 
     const form = page.locator('[data-testid="task-edit-form"]');

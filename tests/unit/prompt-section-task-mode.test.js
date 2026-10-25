@@ -194,8 +194,9 @@ describe('LIN-2942 client hooks in PromptSection', () => {
     assert.equal(url, '/workspace/ws/api/task-mode');
     assert.equal(opts.method, 'POST');
     assert.equal(opts.keepalive, true);
+    // LIN-3833: the copy names which prompt it was (the copy-first view reads it back as "You copied …").
     assert.deepEqual(body, {
-      rung: 'copy', ready: true, needs: null, act: 'copy',
+      rung: 'copy', ready: true, needs: null, act: 'copy', kind: 'implementation',
       surface: 'swipe', issueId: 'uuid-42', issueIdentifier: 'LIN-42',
     });
     assert.equal(validateTaskModeEvent({ ...body, accountId: 'a', urlKey: 'ws' }), null);

@@ -290,10 +290,9 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
       expect(body.issueIdentifier).toBe(identifier);
       expect(body.target).toBe('cli');
       expect(body.prompt).toBeTruthy();
-      // LIN-3211: the rung sends the card panel's harness (claude-code by
-      // default), so the item carries the structured bootstrapToken rather than
-      // a token in prompt prose. HEAD sent none (the rung sits outside the panel).
-      expect(body.harness).toBe('claude-code');
+      // LIN-3211 / LIN-3833 (Q1): the client no longer forces claude-code; an untouched harness is not
+      // sent, and the server settles it for an opened-task run (lin-3833-run-sources pins the settle).
+      expect(body.harness == null).toBe(true);
     });
 
     test('a remembered AI prompt disables regenerate and spends nothing when AI is unconfigured', async ({ page, seedLocal, localWorkerUrlKey }) => {
@@ -614,7 +613,7 @@ test.describe('LIN-2944 P1 — Home top-task mark', () => {
 // =============================================================================
 
 test.describe('LIN-2944 P1 — Home first-screen witness (R1/R2)', () => {
-  test('top task shows why + Go, streams a TEST-13 prompt with reasoning, and copies in 3 clicks with no spend before Go', async ({ page, context, seedLocal, localWorkerUrlKey }) => {
+  test('top task opens to its copy-first control; writing its step and copying names TEST-13 in three clicks, with no AI spend (LIN-3833)', async ({ page, context, seedLocal, localWorkerUrlKey }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, proxyDefault: false });
 
@@ -628,26 +627,24 @@ test.describe('LIN-2944 P1 — Home first-screen witness (R1/R2)', () => {
     const topRow = page.locator('[data-top-task="1"]');
     await expect(topRow).toHaveCount(1);
 
-    // Click 1: open the marked top row. Its Prompts section is open by default (R2).
+    // Click 1: open the marked top row. Its opened task leads with the state and the step's control.
     await click(topRow);
     const component = page.locator('.prompt-section').first();
     await expect(component).toBeVisible();
-    await expect(component.locator('[data-testid="opened-task-why"]')).toContainText('bug');
-    const go = component.locator('[data-testid="opened-task-next-step"]');
+    const go = component.locator('[data-testid="opened-task-write"]');
     await expect(go).toBeVisible();
     await expect(go).toBeEnabled();
 
     // Zero recommend spend before the click.
     expect(spend).toEqual([]);
 
-    // Click 2: ✦ next step streams a tailored prompt with visible reasoning.
+    // Click 2: "✦ Write the prompt" writes the step's prompt (Todo: Plan, which needs no AI).
     await click(go);
     await expect(component).toHaveAttribute('data-phase', 'fresh', { timeout: 15000 });
-    await expect(component.locator('[data-testid="opened-task-reasoning"]')).toBeVisible();
     await expect(component.locator('[data-prompt-body]')).toContainText('TEST-13');
 
     // Click 3: copy the prompt.
-    await click(component.locator('.swipe-prompt-copy'));
+    await click(component.locator('[data-testid="opened-task-copy"]'));
     const clip = await page.evaluate(() => navigator.clipboard.readText());
     expect(clip).toContain('TEST-13');
 

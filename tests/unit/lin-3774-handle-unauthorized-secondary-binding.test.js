@@ -105,6 +105,10 @@ function harness({ degraded = [], remintFails = false, fetchThrows = null, fetch
     getDeployInfo: () => ({}),
     getProviderForWorkspace: () => ({ supports: () => false }),
     getFeatureFlags: () => ({}),
+    // LIN-3833: the Home row states; these sandboxes render no In Progress rows.
+    homeRowStates: async () => null,
+    // LIN-3833: the subtasks that need you by row; these sandboxes render no In Progress rows.
+    subtaskNeedingYouByNodeKey: () => ({}),
     requestFeatureFlags: async () => ({}),
     resolveRunControls: async () => ({ runControls: false, runSetup: false }),
     fetchAndPrepareProjects: async (...args) => {

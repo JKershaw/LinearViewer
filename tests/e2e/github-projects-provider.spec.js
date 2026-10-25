@@ -44,7 +44,7 @@ test.describe('GitHub Projects provider (no test-token mock)', () => {
     // detail block is lazy — expand an issue to load it first.
     await page.locator('.line.expandable').first().click();
     await expect(page.locator('.detail-link', { hasText: 'View in GitHub Projects' }).first()).toBeAttached();
-    await expect(page.locator('.detail-link', { hasText: 'View in Linear' })).toHaveCount(0);
+    await expect(page.locator('.detail-link', { hasText: 'Open in Linear' })).toHaveCount(0);
   });
 });
 

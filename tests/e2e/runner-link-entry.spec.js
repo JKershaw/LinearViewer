@@ -40,17 +40,24 @@ async function openTreeTask(page, urlKey) {
 
 test.describe('run on my machine › wherever a task opens (LIN-3098 S4b, phone)', () => {
   for (const { name, runnerKey } of FLAG_STATES) {
-    test(`tree view (${name}): visible in the viewport as the task opens, and reaches /runner`, async ({ page }) => {
+    test(`tree view (${name}): ${runnerKey ? 'no runner line for a viewer who can run (LIN-3833)' : 'visible in the viewport as the task opens, and reaches /runner'}`, async ({ page }) => {
       const urlKey = await seedOwner(page, `runner-entry-tree-${name}`, runnerKey);
       const details = await openTreeTask(page, urlKey);
+      // Nothing was expanded to reach the control: the state-first task shows its control with the row open.
+      await expect(details.locator('[data-content="description"]')).toBeHidden();
+      await expect(details.locator('.home-prompt-mount')).toBeVisible();
       const link = details.getByTestId('opened-task-runner-link');
+      if (runnerKey) {
+        // LIN-3833: a viewer with a runner has no set-up line; the run control is the task's action.
+        await expect(link).toHaveCount(0);
+        await expect(details.getByTestId('opened-task-run')).toBeVisible();
+        await page.screenshot({ path: `${SHOTS}/tree-${name}.png` });
+        return;
+      }
       await expect(link).toBeVisible();
       await expect(link).toBeInViewport();
       await expect(link).toHaveText('run on my machine ›');
       await expect(link).toHaveAttribute('href', `/workspace/${urlKey}/runner`);
-      // Nothing was expanded to reach it.
-      await expect(details.locator('[data-content="details"]')).toBeHidden();
-      await expect(details.locator('[data-content="prompts"]')).toBeHidden();
       await page.screenshot({ path: `${SHOTS}/tree-${name}.png` });
       await link.tap();
       await expect(page).toHaveURL(new RegExp(`/workspace/${urlKey}/runner$`));

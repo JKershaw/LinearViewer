@@ -775,7 +775,7 @@ describe('the contract is stated where callers read it', () => {
     // Routes that never reach a converted store member, each with its reason.
     const exempt = [
       [/\/heartbeat$/, 'heartbeat ingest: its own store, not the dispatch queue'],
-      [/\/dispatch\/(tokens|presets|halt|recent-prompts|favorite-prompts|quota)/, 'token/preset/preference/halt/quota stores, not the dispatch queue members'],
+      [/\/dispatch\/(tokens|presets|halt|recent-prompts|favorite-prompts|quota|preview)/, 'token/preset/preference/halt/quota stores, and the LIN-3833 preview (routing table and presets reads), not the dispatch queue members'],
       [/\/api\/proxy\/dispatch\/halt$/, 'halt flag store'],
       [/\/api\/proxy\/wake-shadow$/, 'wake-shadow tally, a different member'],
       [/\/api\/proxy\/runner\/prompt$/, 'static runner prompt text, no store read']

@@ -19,13 +19,15 @@ test.beforeEach(({ workerUrlKey }) => {
 const BLOCKED_ISSUE_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 
 /**
- * Helper to expand Prompts section for an issue
- * Use after clicking the task line to expand details
+ * LIN-3833: the dispatch machinery (Dispatch ▾ targets, exec controls, the queue) is Swipe's card, which keeps
+ * its classic prompt component. Home's opened task now leads with its run control, so these specs open the
+ * blocked task (TEST-11) on the Swipe card and expand its Prompts accordion.
  */
-async function expandPromptsSection(page, containerSelector, issueId) {
-  const details = page.locator(`${containerSelector} .details[data-details-for="${issueId}"]`);
-  const promptsToggle = details.locator('.detail-toggle[data-toggle="prompts"]');
-  await promptsToggle.click();
+async function expandPromptsSection(page) {
+  await page.goto(`/workspace/${URL_KEY}/swipe/TEST-11`);
+  await page.locator('#swipe-card').waitFor({ state: 'visible' });
+  await page.locator('#swipe-card .swipe-accordion-header[data-accordion="prompts"]').first().click();
+  await page.locator('#swipe-card .prompt-section').first().waitFor({ state: 'visible' });
 }
 
 /**
@@ -78,21 +80,19 @@ test.describe('Dispatch Queue', () => {
 
   test('three dispatch buttons appear in prompt container with correct targets', async ({ page }) => {
     // Find and expand a task with prompts
-    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
-    await taskLine.click();
 
     // Expand Prompts section to reveal prompt buttons
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    await expandPromptsSection(page);
 
     // Reveal hidden prompts (blocked is behind "more")
-    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    await clickMoreToggle(page, '#swipe-card', BLOCKED_ISSUE_ID);
 
     // Click the promptable label to show prompt
-    const labelLink = page.locator(`.in-progress-items .prompt-section [data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="blocked"]`);
+    const labelLink = page.locator(`#swipe-card .prompt-section [data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="blocked"]`);
     await labelLink.click();
 
     // Wait for prompt container to appear
-    const promptContainer = page.locator(`.in-progress-items .prompt-section`);
+    const promptContainer = page.locator(`#swipe-card .prompt-section`);
     await expect(promptContainer).toBeVisible();
 
     // Wait for prompt to load
@@ -124,21 +124,19 @@ test.describe('Dispatch Queue', () => {
 
   test('clicking dispatch adds item to queue and shows feedback', async ({ page }) => {
     // Find and expand a task with prompts
-    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
-    await taskLine.click();
 
     // Expand Prompts section to reveal prompt buttons
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    await expandPromptsSection(page);
 
     // Reveal hidden prompts (blocked is behind "more")
-    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    await clickMoreToggle(page, '#swipe-card', BLOCKED_ISSUE_ID);
 
     // Click the promptable label to show prompt
-    const labelLink = page.locator(`.in-progress-items .prompt-section [data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="blocked"]`);
+    const labelLink = page.locator(`#swipe-card .prompt-section [data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="blocked"]`);
     await labelLink.click();
 
     // Wait for prompt to load
-    const promptContainer = page.locator(`.in-progress-items .prompt-section`);
+    const promptContainer = page.locator(`#swipe-card .prompt-section`);
     await expect(promptContainer.locator('[data-prompt-body]')).not.toContainText('Loading', { timeout: 10000 });
 
     // Dispatch targets are now collapsed behind a "Dispatch ▾" disclosure.
@@ -161,21 +159,19 @@ test.describe('Dispatch Queue', () => {
     const { token } = await tokenResponse.json();
 
     // Find and expand a task with prompts
-    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
-    await taskLine.click();
 
     // Expand Prompts section to reveal prompt buttons
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    await expandPromptsSection(page);
 
     // Reveal hidden prompts (blocked is behind "more")
-    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    await clickMoreToggle(page, '#swipe-card', BLOCKED_ISSUE_ID);
 
     // Click the promptable label to show prompt
-    const labelLink = page.locator(`.in-progress-items .prompt-section [data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="blocked"]`);
+    const labelLink = page.locator(`#swipe-card .prompt-section [data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="blocked"]`);
     await labelLink.click();
 
     // Wait for prompt to load
-    const promptContainer = page.locator(`.in-progress-items .prompt-section`);
+    const promptContainer = page.locator(`#swipe-card .prompt-section`);
     await expect(promptContainer.locator('[data-prompt-body]')).not.toContainText('Loading', { timeout: 10000 });
 
     // Dispatch targets are now collapsed behind a "Dispatch ▾" disclosure.
@@ -203,20 +199,18 @@ test.describe('Dispatch Queue', () => {
     await expect(badge).toHaveClass(/hidden/);
 
     // Find and expand a task with prompts
-    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
-    await taskLine.click();
 
     // Expand Prompts section to reveal prompt buttons
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    await expandPromptsSection(page);
 
     // Reveal hidden prompts (blocked is behind "more")
-    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    await clickMoreToggle(page, '#swipe-card', BLOCKED_ISSUE_ID);
 
     // Click the promptable label and dispatch
-    const labelLink = page.locator(`.in-progress-items .prompt-section [data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="blocked"]`);
+    const labelLink = page.locator(`#swipe-card .prompt-section [data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="blocked"]`);
     await labelLink.click();
 
-    const promptContainer = page.locator(`.in-progress-items .prompt-section`);
+    const promptContainer = page.locator(`#swipe-card .prompt-section`);
     await expect(promptContainer.locator('[data-prompt-body]')).not.toContainText('Loading', { timeout: 10000 });
 
     // Dispatch targets are now collapsed behind a "Dispatch ▾" disclosure.
@@ -228,6 +222,9 @@ test.describe('Dispatch Queue', () => {
     // Wait for dispatch to complete
     await expect(dispatchBtn).toHaveText('✓');
 
+    // LIN-3833: the badge is on Home's nav; the Swipe dispatch above is read back there.
+    await page.goto(WORKSPACE_URL);
+    await page.waitForLoadState('networkidle');
     // Badge should now be visible (wait for async badge update)
     await expect(badge).not.toHaveClass(/hidden/, { timeout: 10000 });
     await expect(badge.locator('.queue-count')).toHaveText('1');
@@ -235,19 +232,17 @@ test.describe('Dispatch Queue', () => {
 
   test('clicking queue badge shows queue panel', async ({ page }) => {
     // First dispatch something to have items in queue
-    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
-    await taskLine.click();
 
     // Expand Prompts section to reveal prompt buttons
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    await expandPromptsSection(page);
 
     // Reveal hidden prompts (blocked is behind "more")
-    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    await clickMoreToggle(page, '#swipe-card', BLOCKED_ISSUE_ID);
 
-    const labelLink = page.locator(`.in-progress-items .prompt-section [data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="blocked"]`);
+    const labelLink = page.locator(`#swipe-card .prompt-section [data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="blocked"]`);
     await labelLink.click();
 
-    const promptContainer = page.locator(`.in-progress-items .prompt-section`);
+    const promptContainer = page.locator(`#swipe-card .prompt-section`);
     await expect(promptContainer.locator('[data-prompt-body]')).not.toContainText('Loading', { timeout: 10000 });
 
     // Dispatch targets are now collapsed behind a "Dispatch ▾" disclosure.
@@ -257,6 +252,9 @@ test.describe('Dispatch Queue', () => {
     await dispatchBtn.click();
     await expect(dispatchBtn).toHaveText('✓');
 
+    // LIN-3833: the badge is on Home's nav; the Swipe dispatch above is read back there.
+    await page.goto(WORKSPACE_URL);
+    await page.waitForLoadState('networkidle');
     // Click the queue badge (wait for async badge update)
     const badge = page.locator('[data-queue-badge]');
     await expect(badge).not.toHaveClass(/hidden/, { timeout: 10000 });
@@ -318,19 +316,17 @@ test.describe('Dispatch Queue', () => {
 
   test('can remove item from queue panel', async ({ page }) => {
     // First dispatch something
-    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
-    await taskLine.click();
 
     // Expand Prompts section to reveal prompt buttons
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    await expandPromptsSection(page);
 
     // Reveal hidden prompts (blocked is behind "more")
-    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    await clickMoreToggle(page, '#swipe-card', BLOCKED_ISSUE_ID);
 
-    const labelLink = page.locator(`.in-progress-items .prompt-section [data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="blocked"]`);
+    const labelLink = page.locator(`#swipe-card .prompt-section [data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="blocked"]`);
     await labelLink.click();
 
-    const promptContainer = page.locator(`.in-progress-items .prompt-section`);
+    const promptContainer = page.locator(`#swipe-card .prompt-section`);
     await expect(promptContainer.locator('[data-prompt-body]')).not.toContainText('Loading', { timeout: 10000 });
 
     // Dispatch targets are now collapsed behind a "Dispatch ▾" disclosure.
@@ -340,6 +336,12 @@ test.describe('Dispatch Queue', () => {
     await dispatchBtn.click();
     await expect(dispatchBtn).toHaveText('✓');
 
+    // LIN-3833: the badge is on Home's nav; the Swipe dispatch above is read back there.
+    await page.goto(WORKSPACE_URL);
+    await page.waitForLoadState('networkidle');
+    // LIN-3833: the badge is on Home's nav; the Swipe dispatch above is read back there.
+    await page.goto(WORKSPACE_URL);
+    await page.waitForLoadState('networkidle');
     // Open queue panel (wait for async badge update)
     const badge = page.locator('[data-queue-badge]');
     await expect(badge).not.toHaveClass(/hidden/, { timeout: 10000 });
@@ -364,19 +366,17 @@ test.describe('Dispatch Queue', () => {
 
   test('can close queue panel with close button', async ({ page }) => {
     // Dispatch something first
-    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
-    await taskLine.click();
 
     // Expand Prompts section to reveal prompt buttons
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    await expandPromptsSection(page);
 
     // Reveal hidden prompts (blocked is behind "more")
-    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    await clickMoreToggle(page, '#swipe-card', BLOCKED_ISSUE_ID);
 
-    const labelLink = page.locator(`.in-progress-items .prompt-section [data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="blocked"]`);
+    const labelLink = page.locator(`#swipe-card .prompt-section [data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="blocked"]`);
     await labelLink.click();
 
-    const promptContainer = page.locator(`.in-progress-items .prompt-section`);
+    const promptContainer = page.locator(`#swipe-card .prompt-section`);
     await expect(promptContainer.locator('[data-prompt-body]')).not.toContainText('Loading', { timeout: 10000 });
 
     // Dispatch targets are now collapsed behind a "Dispatch ▾" disclosure.
@@ -384,6 +384,9 @@ test.describe('Dispatch Queue', () => {
 
     await promptContainer.locator('.swipe-prompt-dispatch[data-target="cli"]').click();
 
+    // LIN-3833: the badge is on Home's nav; the Swipe dispatch above is read back there.
+    await page.goto(WORKSPACE_URL);
+    await page.waitForLoadState('networkidle');
     // Open panel (wait for async badge update)
     const badge = page.locator('[data-queue-badge]');
     await expect(badge).not.toHaveClass(/hidden/, { timeout: 10000 });
@@ -405,21 +408,19 @@ test.describe('Dispatch Queue', () => {
     const { token } = await tokenResponse.json();
 
     // Find and expand a task with prompts
-    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
-    await taskLine.click();
 
     // Expand Prompts section to reveal prompt buttons
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    await expandPromptsSection(page);
 
     // Reveal hidden prompts (blocked is behind "more")
-    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    await clickMoreToggle(page, '#swipe-card', BLOCKED_ISSUE_ID);
 
     // Click the promptable label to show prompt
-    const labelLink = page.locator(`.in-progress-items .prompt-section [data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="blocked"]`);
+    const labelLink = page.locator(`#swipe-card .prompt-section [data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="blocked"]`);
     await labelLink.click();
 
     // Wait for prompt to load and dispatch
-    const promptContainer = page.locator(`.in-progress-items .prompt-section`);
+    const promptContainer = page.locator(`#swipe-card .prompt-section`);
     await expect(promptContainer.locator('[data-prompt-body]')).not.toContainText('Loading', { timeout: 10000 });
 
     // Dispatch targets are now collapsed behind a "Dispatch ▾" disclosure.
@@ -429,6 +430,9 @@ test.describe('Dispatch Queue', () => {
     await dispatchBtn.click();
     await expect(dispatchBtn).toHaveText('✓');
 
+    // LIN-3833: the badge is on Home's nav; the Swipe dispatch above is read back there.
+    await page.goto(WORKSPACE_URL);
+    await page.waitForLoadState('networkidle');
     // Badge should show 1 queued
     const badge = page.locator('[data-queue-badge]');
     await expect(badge).not.toHaveClass(/hidden/, { timeout: 10000 });
@@ -456,13 +460,11 @@ test.describe('Dispatch Queue', () => {
   // Reveal a loaded prompt container for the blocked issue (without opening the
   // dispatch panel — these tests drive the disclosure explicitly).
   async function revealPrompt(page) {
-    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
-    await taskLine.click();
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-    const labelLink = page.locator(`.in-progress-items .prompt-section [data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="blocked"]`);
+    await expandPromptsSection(page);
+    await clickMoreToggle(page, '#swipe-card', BLOCKED_ISSUE_ID);
+    const labelLink = page.locator(`#swipe-card .prompt-section [data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="blocked"]`);
     await labelLink.click();
-    const promptContainer = page.locator(`.in-progress-items .prompt-section`);
+    const promptContainer = page.locator(`#swipe-card .prompt-section`);
     await expect(promptContainer.locator('[data-prompt-body]')).not.toContainText('Loading', { timeout: 10000 });
     return promptContainer;
   }
@@ -540,7 +542,7 @@ test.describe('Dispatch Queue', () => {
     expect(body.model).toBe('anthropic/claude-opus-4.8');
   });
 
-  test('untouched exec controls send the pre-selected claude-code harness and omit model (LIN-1111)', async ({ page }) => {
+  test('untouched exec controls send no harness (the server settles it) and omit model (LIN-1111, LIN-3833)', async ({ page }) => {
     const promptContainer = await revealPrompt(page);
     await openDispatchOptions(promptContainer);
 
@@ -551,7 +553,8 @@ test.describe('Dispatch Queue', () => {
     const req = await dispatchReq;
     const body = JSON.parse(req.postData() || '{}');
     expect(body.model == null).toBe(true);
-    expect(body.harness).toBe('claude-code');
+    // LIN-3833 (Q1): the control no longer pre-selects claude-code, so an untouched harness is not sent.
+    expect(body.harness == null).toBe(true);
   });
 
   test('explicitly selecting the blank harness option still sends null (LIN-1111)', async ({ page }) => {

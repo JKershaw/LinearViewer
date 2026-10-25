@@ -346,99 +346,10 @@ test.describe('Custom Prompts Page', () => {
 });
 
 // ==========================================================================
-// Custom Prompts on Dashboard
+// Custom Prompts on Dashboard: retired (LIN-3833). Home's opened task has no template list; a viewer who can
+// run picks a step under "Another step", and a copy-first viewer gets the status step. The workspace's custom
+// prompt templates are still listed on the Swipe card, covered below.
 // ==========================================================================
-
-test.describe('Custom Prompts on Dashboard', () => {
-  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(workspaceApiLocalSeed);
-    await page.request.get(`/test/clear-custom-prompts?urlKey=${localWorkerUrlKey}`);
-  });
-
-  test('custom prompt templates appear under "other prompts" on the dashboard', async ({ page, localWorkerUrlKey }) => {
-    // Create a custom prompt via API
-    await page.request.post(`/workspace/${localWorkerUrlKey}/api/prompts/custom`, {
-      data: { name: 'My Dashboard Prompt', template: 'Analyze {{title}}' }
-    });
-
-    // Navigate to dashboard
-    await page.goto(`/workspace/${localWorkerUrlKey}/`);
-    await page.waitForLoadState('networkidle');
-
-    // Click an issue to expand it
-    const issueLine = page.locator('.in-progress-items .line.expandable').first();
-    await issueLine.click();
-
-    const issueId = await issueLine.getAttribute('data-id');
-    const details = page.locator(`.in-progress-items .details[data-details-for="${issueId}"]`);
-
-    // Expand Prompts section; the shared component owns the templates.
-    await details.locator('.detail-toggle[data-toggle="prompts"]').click();
-    const component = details.locator('.prompt-section');
-    await expect(component).toBeVisible();
-
-    // Custom prompts live under "other prompts", behind the more toggle.
-    const other = component.locator('[data-testid="other-prompts"]');
-    await other.locator('[data-prompt="__more__"]').click();
-    const customBtn = other.locator('.swipe-prompt-btn.custom-prompt-btn');
-    await expect(customBtn).toBeVisible();
-    await expect(customBtn).toHaveText('My Dashboard Prompt');
-  });
-
-  test('clicking custom prompt button generates prompt on dashboard', async ({ page, localWorkerUrlKey }) => {
-    // Create a custom prompt with a variable
-    const createRes = await page.request.post(`/workspace/${localWorkerUrlKey}/api/prompts/custom`, {
-      data: { name: 'Title Prompt', template: 'Work on: {{title}}' }
-    });
-    const { prompt } = await createRes.json();
-
-    // Navigate to dashboard
-    await page.goto(`/workspace/${localWorkerUrlKey}/`);
-    await page.waitForLoadState('networkidle');
-
-    // Click an issue to expand it
-    const issueLine = page.locator('.in-progress-items .line.expandable').first();
-    await issueLine.click();
-
-    const issueId = await issueLine.getAttribute('data-id');
-    const details = page.locator(`.in-progress-items .details[data-details-for="${issueId}"]`);
-
-    // Expand Prompts section
-    await details.locator('.detail-toggle[data-toggle="prompts"]').click();
-    const component = details.locator('.prompt-section');
-    await expect(component).toBeVisible();
-
-    // Reveal the custom prompt under "other prompts" and click it.
-    const other = component.locator('[data-testid="other-prompts"]');
-    await other.locator('[data-prompt="__more__"]').click();
-    await other.locator(`.swipe-prompt-btn[data-prompt="custom:${prompt.id}"]`).click();
-    await expect(component).toHaveAttribute('data-phase', 'fresh');
-
-    // Verify the prompt name and variable substitution.
-    await expect(component.locator('.swipe-prompt-name')).toHaveText('Title Prompt');
-    await expect(component.locator('[data-prompt-body]')).toContainText('Work on:');
-  });
-
-  test('no custom prompt templates when none exist', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/`);
-    await page.waitForLoadState('networkidle');
-
-    // Expand an issue
-    const issueLine = page.locator('.in-progress-items .line.expandable').first();
-    await issueLine.click();
-
-    const issueId = await issueLine.getAttribute('data-id');
-    const details = page.locator(`.in-progress-items .details[data-details-for="${issueId}"]`);
-
-    // Expand Prompts section
-    await details.locator('.detail-toggle[data-toggle="prompts"]').click();
-    const component = details.locator('.prompt-section');
-    await expect(component).toBeVisible();
-
-    // No custom prompt templates should exist.
-    await expect(component.locator('.swipe-prompt-btn.custom-prompt-btn')).toHaveCount(0);
-  });
-});
 
 // ==========================================================================
 // Custom Prompts on Swipe Page

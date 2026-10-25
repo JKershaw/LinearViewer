@@ -60,7 +60,7 @@ test.describe('Jira provider (no test-token mock)', () => {
     // detail block is lazy — expand an issue to load it first.
     await page.locator('.line.expandable').first().click();
     await expect(page.locator('.detail-link', { hasText: 'View in Jira' }).first()).toBeAttached();
-    await expect(page.locator('.detail-link', { hasText: 'View in Linear' })).toHaveCount(0);
+    await expect(page.locator('.detail-link', { hasText: 'Open in Linear' })).toHaveCount(0);
   });
 
   test('the project "View in Jira" link is a browsable /browse/ URL, never the raw REST resource URL (LIN-1885 beat 2 review finding #4)', async ({ page }) => {
@@ -96,14 +96,14 @@ test.describe('Jira provider (no test-token mock)', () => {
     // (< 3 lines / 300 chars) renders as a plain .detail-line, not the
     // truncating .issue-description wrapper — either way it must be the
     // converted Markdown text, never the raw ADF document.
-    await page.locator('[data-toggle="details"]').first().click();
-    await expect(page.locator('.detail-content[data-content="details"]', { hasText: 'A todo Jira issue.' }).first()).toBeAttached();
+    await page.locator('[data-toggle="description"]').first().click();
+    await expect(page.locator('.detail-content[data-content="description"]', { hasText: 'A todo Jira issue.' }).first()).toBeAttached();
     await expect(page.locator('body')).not.toContainText('"type":"doc"');
   });
 
   test('a comment on the in-progress issue renders via the fake client (fetchIssueComments)', async ({ page }) => {
     await page.locator('.line:has-text("Jira task in progress")').first().click();
-    await page.locator('[data-toggle="details"]').first().click();
+    await page.locator('[data-toggle="description"]').first().click();
     await page.locator('[data-toggle="comments"]').first().click();
     await expect(page.locator('.comment-body', { hasText: 'Investigating.' }).first()).toBeAttached();
   });
@@ -231,21 +231,22 @@ test.describe('LIN-1890 — a Jira-only session on an OAuth binding', () => {
   });
 
   test('the PROMPT leg works — the half with no prior coverage', async ({ page }) => {
-    const row = page.locator('.line:has-text("Jira task in progress")').first();
+    // LIN-3833: the copy-first view writes the step's prompt. A Todo task names Plan, which needs no AI
+    // (an In Progress task's write is the AI step, which this Jira-only session does not configure).
+    const row = page.locator('.line:has-text("Jira task to do")').first();
     await row.click();
-    await page.locator('[data-toggle="details"]').first().click();
-    await page.locator('[data-toggle="prompts"]').first().click();
-    // LIN-2944 P1: the opened task is the shared PromptSection component.
+    // The opened task is the shared PromptSection component; its control is part of the task.
     const component = page.locator('.prompt-section').first();
     await expect(component).toBeVisible();
-    await component.locator('[data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="implementation"]').click();
-    await expect(component.locator('[data-prompt-body]')).toContainText('Jira task in progress');
+    await component.locator('[data-testid="opened-task-write"]').click();
+    await expect(component).toHaveAttribute('data-phase', 'fresh');
+    await expect(component.locator('[data-prompt-body]')).toContainText('Jira task to do');
   });
 
   test('the detail surface stays provider-aware for a Jira-only session', async ({ page }) => {
     await page.locator('.line.expandable').first().click();
     await expect(page.locator('.detail-link', { hasText: 'View in Jira' }).first()).toBeAttached();
-    await expect(page.locator('.detail-link', { hasText: 'View in Linear' })).toHaveCount(0);
+    await expect(page.locator('.detail-link', { hasText: 'Open in Linear' })).toHaveCount(0);
   });
 });
 
@@ -275,7 +276,7 @@ test.describe('Jira provider — browser write lane (LIN-1942)', () => {
 
   test('a benign field write persists and reads back through the UI after a fresh dashboard render', async ({ page }) => {
     await page.locator('.line:has-text("Jira task to do")').first().click();
-    await page.locator('[data-toggle="details"]').first().click();
+    await page.locator('[data-toggle="description"]').first().click();
     await page.locator('[data-testid="issue-edit-link"]').first().click();
 
     const form = page.locator('[data-testid="task-edit-form"]');
@@ -301,7 +302,7 @@ test.describe('Jira provider — browser write lane (LIN-1942)', () => {
 
   test('a status transition moves the issue, rendered by outcome (status pill + section), not a synthetic id', async ({ page }) => {
     await page.locator('.line:has-text("Jira task to do")').first().click();
-    await page.locator('[data-toggle="details"]').first().click();
+    await page.locator('[data-toggle="description"]').first().click();
     await page.locator('[data-testid="issue-edit-link"]').first().click();
 
     const form = page.locator('[data-testid="task-edit-form"]');
@@ -328,7 +329,7 @@ test.describe('Jira provider — browser write lane (LIN-1942)', () => {
     // (adfHasUnrenderableContent) refuses any write while it stands, since the
     // check runs against the CURRENT stored ADF, not the incoming patch.
     await page.locator('.line:has-text("Issue with an underline mark in its description")').first().click();
-    await page.locator('[data-toggle="details"]').first().click();
+    await page.locator('[data-toggle="description"]').first().click();
     await page.locator('[data-testid="issue-edit-link"]').first().click();
 
     const form = page.locator('[data-testid="task-edit-form"]');
