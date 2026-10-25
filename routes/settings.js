@@ -23,7 +23,7 @@
 import { Router } from 'express';
 import { renderSettingsPage } from '../lib/render-settings.js';
 import { renderErrorPage } from '../lib/render.js';
-import { AREAS, getArea, settingsAreaUrl } from '../lib/settings-areas.js';
+import { AREAS, getArea, settingsAreaUrl, STATE_MAX_LENGTH } from '../lib/settings-areas.js';
 import { FEATURE_DEFAULTS, isValidWorkspaceFeatureKey } from '../lib/feature-defaults.js';
 import { buildKeyList, latestRunnerPoll } from '../lib/settings-keys.js';
 import { hasLiveRunnerKey, hasLiveQueueToken } from '../lib/run-controls.js';
@@ -239,7 +239,7 @@ export function createSettingsRouter(deps) {
     const table = await modelRoutingStore.getTable(workspace.urlKey);
     const effective = effectiveTable(table, { defaultModel: DEFAULT_MODEL });
     const modelsSummary = summariseRouting(effective.jobs, (id) => getCachedCatalogModel(id)?.name
-      || AVAILABLE_MODELS.find((m) => m.id === id)?.name || id.split('/').pop());
+      || AVAILABLE_MODELS.find((m) => m.id === id)?.name || id.split('/').pop(), { width: STATE_MAX_LENGTH });
     const workspaceFeatures = await getWorkspaceFeatures({ urlKey: workspace.urlKey, store: workspacePreferencesStore });
     const featureFlags = await requestFeatureFlags(req);
 
