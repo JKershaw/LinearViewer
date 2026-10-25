@@ -1,0 +1,1158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Settings › Costs</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0}
+.c-root{--bg:#ffffff;--card:#f8f9fa;--line:#dddddd;--text:#1a1a1a;--muted:#666666;--faint:#e6e6e6;--brand:#0d9488;--brand-dim:#0f766e;--amber-dim:#8a5a00;--good:#15803d;--focus:#0d6efd;--hover:rgba(0,0,0,0.035);--tip:#1a1a1a;--tip-text:#ffffff;--ink:#6b7280;--ink-soft:#cbd5e1;--fee:#6250d6;--trend:#334155;--trend-dot:#94a3b8;--fin:#a3adbb;--band:rgba(13,148,136,0.08);
+  background:var(--bg);color:var(--text);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:16px;line-height:1.45;min-height:100vh;box-sizing:border-box}
+.c-root.dark{--bg:#16181d;--card:#1f222a;--line:#2c313a;--text:#e6e6e6;--muted:#9aa0a6;--faint:#2c313a;--brand:#2dd4bf;--brand-dim:#2dd4bf;--amber-dim:#f0b955;--good:#4ade80;--focus:#6ea8fe;--hover:rgba(255,255,255,0.05);--tip:#e6e6e6;--tip-text:#16181d;--ink:#9aa0a6;--ink-soft:#3d4450;--fee:#9085e9;--trend:#e2e8f0;--trend-dot:#6b7789;--fin:#566173;--band:rgba(45,212,191,0.09)}
+.c-root *{box-sizing:border-box}
+.mono{font-family:'JetBrains Mono','SF Mono',Consolas,monospace}
+a{color:var(--brand-dim)}a:hover{color:var(--text)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.topbar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:12px 24px;border-bottom:1px solid var(--line)}
+.wordmark{color:var(--brand-dim);font-weight:600;font-size:17px}
+.ws{color:var(--muted);font-size:14px}
+.toplinks{margin-left:auto;display:flex;gap:16px;font-size:14px}
+.toplinks a{color:var(--muted);text-decoration:none}
+.toplinks a[aria-current]{color:var(--text)}
+.wrap{max-width:1240px;margin:0 auto;padding:24px}
+.shell{display:grid;grid-template-columns:minmax(200px,240px) minmax(0,1fr);gap:28px;align-items:start}
+.navtitle{font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin:0 0 4px}
+.navgroup{margin-bottom:16px}
+.navlink{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:5px;color:var(--text);text-decoration:none;font-size:15px}
+.navlink:hover,.navlink.cur{background:var(--card);color:var(--text)}
+.navlabel{flex:1;min-width:0}
+.navstate{color:var(--muted);font-size:13px;white-space:nowrap}
+.chev{color:var(--muted)}
+.back{display:none;color:var(--brand-dim);text-decoration:none;margin-bottom:8px}
+.areatitle{font-size:22px;font-weight:600;margin:0 0 6px}
+.period{display:inline-flex;gap:8px;align-items:center;font-size:13px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:3px 10px}
+.hero{margin:18px 0 26px}
+.story{font-size:21px;line-height:1.45;margin:0 0 16px;max-width:780px;font-weight:400}
+.story b{font-weight:600}
+.pair{display:grid;grid-template-columns:110px minmax(0,1fr) 92px;gap:8px 12px;align-items:center;max-width:780px}
+.plabel{font-size:14px;color:var(--muted)}
+.ptrack{height:22px;border-radius:4px;background:transparent;position:relative}
+.pbar{height:22px;border-radius:0 4px 4px 0;min-width:3px}
+.pval{font-size:15px;font-weight:600;text-align:right}
+.chiprow{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.tchip{display:inline-flex;gap:6px;align-items:center;font-size:13.5px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;color:var(--muted)}
+.up{color:var(--amber-dim)}.down{color:var(--good)}
+.section{margin-bottom:34px}
+.stitle{font-size:17px;font-weight:600;margin:0 0 2px}
+.sq{font-size:14px;color:var(--muted);margin:0 0 12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px}
+.note{color:var(--muted);font-size:13.5px;margin:8px 0 0}
+.worth{display:grid;gap:10px;margin-bottom:34px}
+.witem{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-left-width:1px}
+.witem svg{flex:none;margin-top:3px;color:var(--brand-dim)}
+.wtext{flex:1;min-width:0;font-size:14.5px}
+.wtext b{font-weight:600}
+.wlabel{display:block;font-size:11.5px;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:2px}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--brand);background:var(--bg);color:var(--brand-dim);border-radius:6px;padding:7px 14px;cursor:pointer;font-size:14px;min-height:38px;text-decoration:none;white-space:nowrap}
+.btn:hover{background:var(--hover)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.tile{padding:14px 16px}
+.tlabel{font-size:13.5px;color:var(--muted)}
+.tvalue{font-size:28px;font-weight:600;letter-spacing:-0.01em;margin:2px 0 10px}
+.cmp{display:grid;grid-template-columns:52px minmax(0,1fr) 62px;gap:4px 8px;align-items:center;font-size:12px;color:var(--muted)}
+.ctrack{height:8px}
+.cbar{height:8px;border-radius:0 4px 4px 0;min-width:2px}
+.cval{text-align:right}
+.parts{display:flex;gap:2px;height:30px;border-radius:4px;overflow:hidden}
+.part{height:30px;min-width:3px}
+.partlabels{display:flex;gap:2px;margin-top:6px}
+.plab{font-size:12.5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.plab b{font-weight:600}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;margin-top:10px}
+.lk{display:inline-flex;align-items:center;gap:6px}
+.sw{width:10px;height:10px;border-radius:3px;display:inline-block;flex:none}
+.lval{color:var(--muted)}
+.subhead{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin:18px 0 8px}
+.subtitle{font-size:14.5px;font-weight:600;margin:0}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{background:var(--bg);border:0;padding:5px 11px;font-size:13px;cursor:pointer;color:var(--muted);min-height:32px}
+.seg button + button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--card);color:var(--text);font-weight:600}
+.chartcard{padding:14px 16px 10px}
+.plot{position:relative;height:200px;margin-left:44px}
+.grid{position:absolute;left:0;right:0;height:0;border-top:1px solid var(--faint)}
+.glabel{position:absolute;left:-44px;width:38px;text-align:right;font-size:11px;color:var(--muted);transform:translateY(-50%)}
+.cols{position:absolute;inset:0;display:flex;align-items:flex-end;gap:10px;padding:0 4px}
+.col{flex:1;height:100%;display:flex;align-items:flex-end;justify-content:center;background:none;border:0;padding:0;cursor:default;border-radius:4px}
+.col:hover,.col:focus-visible{background:var(--hover)}
+.stack{width:70%;max-width:52px;display:flex;flex-direction:column-reverse;gap:2px;border-radius:4px 4px 0 0;overflow:hidden}
+.segm{width:100%;flex:none}
+.xlabels{display:flex;gap:10px;padding:0 4px;margin:6px 0 0 44px}
+.xl{flex:1;text-align:center;font-size:11px;color:var(--muted);white-space:nowrap}
+.mark{position:absolute;top:-4px;bottom:0;width:0;border-left:1.5px dashed var(--brand)}
+.marktag{position:absolute;top:-22px;transform:translateX(-100%);font-size:11px;white-space:nowrap;color:var(--brand-dim);padding:2px 4px;text-decoration:none}
+.tip{position:absolute;top:6px;z-index:5;background:var(--tip);color:var(--tip-text);border-radius:6px;padding:8px 10px;font-size:12.5px;min-width:170px;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,0.18)}
+.tiprow{display:flex;gap:8px;align-items:center;justify-content:space-between}
+.tipname{display:inline-flex;gap:6px;align-items:center}
+details.numbers{margin-top:8px;font-size:13.5px}
+details.numbers summary{cursor:pointer;color:var(--brand-dim)}
+.ntable{display:grid;margin-top:6px;overflow-x:auto;font-size:12.5px}
+.nrow{display:grid;grid-template-columns:1.2fr repeat(6,minmax(64px,1fr));border-bottom:1px solid var(--faint);padding:3px 0}
+.nrow span{text-align:right}
+.nrow span:first-child{text-align:left}
+.nhead{color:var(--muted)}
+.tbox{overflow-x:auto}
+.jtable{min-width:640px}
+.jrow{display:grid;grid-template-columns:minmax(150px,1.5fr) minmax(170px,1.6fr) 64px 84px 92px minmax(90px,1fr);gap:10px;align-items:center;padding:9px 16px;border-top:1px solid var(--line);font-size:14px}
+.jrow.jhead{border-top:0;font-size:12px;color:var(--muted);padding-top:10px;padding-bottom:6px}
+.num{text-align:right}
+.jname{display:inline-flex;gap:8px;align-items:center}
+.ran{font-size:13px}
+.now{display:block;font-size:12px;color:var(--brand-dim)}
+.kind{display:block;font-size:11.5px;color:var(--muted)}
+.bar{height:8px;border-radius:4px;opacity:0.85}
+.barwrap{background:var(--faint);border-radius:4px;height:8px;overflow:hidden}
+.more{display:block;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);padding:10px 16px;color:var(--brand-dim);cursor:pointer;font-size:14px;min-height:44px}
+.timeline{position:relative;padding-left:22px}
+.timeline:before{content:"";position:absolute;left:6px;top:6px;bottom:6px;border-left:2px solid var(--faint)}
+.tl{position:relative;margin-bottom:14px;padding:12px 14px}
+.tl:last-child{margin-bottom:0}
+.dot{position:absolute;left:-21px;top:16px;width:12px;height:12px;border-radius:999px;background:var(--brand);border:2px solid var(--bg)}
+.tlhead{display:flex;flex-wrap:wrap;gap:2px 12px;align-items:baseline;margin-bottom:10px}
+.tlwhat{font-weight:600;font-size:15px}
+.tlwhen{font-size:12.5px;color:var(--muted)}
+.measures{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px 24px}
+.mname{font-size:13px;color:var(--muted);margin-bottom:4px}
+.ba{display:grid;grid-template-columns:48px minmax(0,1fr) 92px;gap:4px 8px;align-items:center;font-size:12.5px}
+.batrack{height:10px}
+.babar{height:10px;border-radius:0 4px 4px 0;min-width:2px}
+.baval{text-align:right}
+.unpriced{font-size:12.5px;color:var(--amber-dim);display:inline-flex;gap:5px;align-items:center}
+.pay{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:16px;align-items:start}
+.rows .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:11px 13px;font-size:15px;width:100%;background:none;border:0;text-align:left;color:var(--text);min-height:46px}
+.rows > * + *{border-top:1px solid var(--line)}
+.rowbtn{cursor:pointer}
+.rowbtn:hover{background:var(--hover)}
+.rlab{flex:1;min-width:0}
+.rnote{display:block;color:var(--muted);font-size:13px}
+.rval{color:var(--muted);font-size:13.5px;text-align:right}
+.order{display:inline-flex;width:22px;height:22px;border-radius:999px;border:1px solid var(--line);align-items:center;justify-content:center;font-size:12px;color:var(--muted);flex:none}
+.kchip{display:inline-block;font-size:11.5px;border:1px solid var(--line);border-radius:999px;padding:0 8px;margin-left:6px;color:var(--muted);vertical-align:1px}
+.rbody{padding:4px 13px 14px 43px}
+.field{display:flex;flex-direction:column;gap:4px;margin:8px 0 12px;font-size:14px}
+.field select{font:inherit;font-size:14px;padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);max-width:320px;min-height:38px}
+.danger{color:#b91c1c;border-color:#b91c1c}
+.c-root.dark .danger{color:#ff6b6b;border-color:#ff6b6b}
+.presets{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;padding:4px 13px 14px}
+.preset{display:block;text-align:left;border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:9px 11px;cursor:pointer;min-height:44px}
+.preset:hover{border-color:var(--brand)}
+.pname{display:block;font-weight:600;font-size:14px}
+.pmeta{display:block;font-size:12.5px;color:var(--muted)}
+.wf{position:relative;height:200px;margin-top:22px}
+.wfcols{position:absolute;inset:0;display:flex;gap:8px;align-items:stretch}
+.wfcol{flex:1;position:relative;min-width:0}
+.wfbar{position:absolute;left:14%;right:14%;border-radius:3px;min-height:2px}
+.wfval{position:absolute;left:-6px;right:-6px;text-align:center;font-size:11.5px;font-weight:600;white-space:nowrap}
+.wfx{display:flex;gap:8px;margin-top:6px}
+.wfxl{flex:1;text-align:center;font-size:11.5px;color:var(--muted);line-height:1.25;min-width:0;overflow-wrap:anywhere}
+.wfbase{position:absolute;left:0;right:0;bottom:0;border-top:1px solid var(--line)}
+.rcpt{padding:12px 14px;font-size:13px;margin-top:8px}
+.rline{display:flex;align-items:baseline;gap:8px;padding:2px 0}
+.rlabel{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.rfill{flex:1;border-bottom:1px dotted var(--line);transform:translateY(-4px);min-width:12px}
+.ramt{white-space:nowrap}
+.rsub{color:var(--muted)}
+.rhead{font-weight:600;margin-top:8px}
+.rhead:first-child{margin-top:0}
+.rtotal{font-weight:600}
+details.more-detail{border:1px solid var(--line);border-radius:8px;background:var(--card);margin-bottom:10px}
+details.more-detail summary{cursor:pointer;padding:12px 14px;font-size:15px;display:flex;gap:8px;align-items:center;list-style:none}
+details.more-detail summary::-webkit-details-marker{display:none}
+.dbody{padding:0 14px 14px}
+.hist{position:relative;height:150px;margin-top:4px}
+.hcols{position:absolute;inset:0;display:flex;align-items:flex-end;gap:12px}
+.hcol{flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;background:none;border:0;padding:0;border-radius:4px;cursor:default}
+.hcol:hover,.hcol:focus-visible{background:var(--hover)}
+.hbar{width:70%;max-width:72px;border-radius:4px 4px 0 0;background:var(--brand)}
+.hx{display:flex;gap:12px;margin-top:6px}
+.hxl{flex:1;text-align:center;font-size:11.5px;color:var(--muted)}
+.facts{display:flex;flex-wrap:wrap;gap:6px 20px;margin-top:12px;font-size:13.5px}
+.facts b{font-weight:600}
+.warnlabel{color:var(--amber-dim);font-weight:600}
+.trendcard{padding:14px 16px 10px}
+.tstory{font-size:14.5px;margin:0 0 14px;max-width:700px}
+.tstory b{font-weight:600}
+.tstack{position:relative}
+.tlab{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;font-size:12.5px;color:var(--muted);margin:0 48px 8px 44px}
+.tlab b{font-weight:600;color:var(--text)}
+.tkey{display:inline-flex;gap:5px;align-items:center}
+.kdot{width:8px;height:8px;border-radius:999px;display:inline-block}
+.kline{width:16px;height:2px;border-radius:1px;display:inline-block}
+.kdot.kover{background:transparent;border:2px solid var(--trend-dot)}
+.kmark{width:0;height:12px;border-left:1.5px dashed var(--brand);display:inline-block}
+.tplot{position:relative;height:180px;margin:0 48px 0 44px}
+.fplot{position:relative;height:64px;margin:0 48px 0 44px}
+.flab{margin-top:14px}
+.band{position:absolute;top:0;bottom:0;background:var(--band);border-radius:4px}
+.bandtag{position:absolute;top:3px;left:6px;font-size:11px;color:var(--muted);white-space:nowrap}
+.tline{position:absolute;left:0;top:0;width:100%;height:180px;overflow:visible}
+.tdot{position:absolute;width:8px;height:8px;border-radius:999px;transform:translate(-50%,50%);box-shadow:0 0 0 2px var(--card)}
+.tdot.over{background:var(--card);border:2px solid var(--trend-dot)}
+.tdot.cur{width:10px;height:10px}
+.tval{position:absolute;font-size:12px;font-weight:600;white-space:nowrap;color:var(--text);text-shadow:0 0 3px var(--card),0 0 3px var(--card),0 0 3px var(--card)}
+.fbars{position:absolute;inset:0;display:flex;align-items:flex-end}
+.fslot{flex:1;display:flex;justify-content:center;align-items:flex-end;height:100%}
+.fbar{width:58%;max-width:14px;border-radius:3px 3px 0 0;background:var(--fin)}
+.fbar.hot{background:var(--trend)}
+.tmark{position:absolute;top:0;bottom:0;width:0;border-left:1.5px dashed var(--brand)}
+.tover{position:absolute;top:0;bottom:0;left:44px;right:48px}
+.thits{position:absolute;inset:0;display:flex}
+.thit{flex:1;height:100%;background:none;border:0;padding:0;cursor:default;min-width:0}
+.thit:focus-visible{outline:2px solid var(--focus);outline-offset:-2px;border-radius:3px}
+.xhair{position:absolute;top:0;bottom:0;width:0;border-left:1px solid var(--muted);pointer-events:none}
+.ttip{top:34px}
+.txlabels{position:relative;height:16px;margin:6px 48px 0 44px}
+.txl{position:absolute;transform:translateX(-50%);font-size:11px;color:var(--muted);white-space:nowrap}
+.nrow.t5{grid-template-columns:1fr repeat(4,minmax(70px,1fr))}
+@media (max-width:900px){
+  .pay{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:760px){
+  .shell{grid-template-columns:minmax(0,1fr)}
+  .side{display:none}
+  .back{display:inline-block}
+  .wrap{padding:16px}
+  .topbar{padding:10px 16px;gap:10px}
+  .toplinks{gap:12px}
+  .story{font-size:18px}
+  .pair{grid-template-columns:84px minmax(0,1fr) 72px;gap:8px}
+  .pval{font-size:14px}
+  .tvalue{font-size:24px}
+  .plot{margin-left:36px}
+  .glabel{left:-36px;width:32px}
+  .xlabels{margin-left:36px}
+  .cols,.xlabels{gap:4px}
+  .stack{width:80%}
+  .xl{font-size:10px}
+  .tlab{margin-left:36px;margin-right:36px}
+  .tplot,.fplot,.txlabels{margin-left:36px;margin-right:36px}
+  .tover{left:36px;right:36px}
+  .trendcard{padding:12px 10px 10px}
+  .hcols,.hx{gap:6px}
+  .wfcols,.wfx{gap:4px}
+  .wfxl{font-size:10.5px}
+  .wfval{font-size:10.5px}
+  .rbody{padding-left:13px}
+  .witem{flex-wrap:wrap}
+}
+</style>
+</helmet>
+<div class="{{rootClass}}">
+  <header class="topbar">
+    <span class="mono wordmark">harbour</span>
+    <span class="mono ws">linearviewer ▾</span>
+    <nav class="toplinks" aria-label="Main navigation">
+      <a href="#">tasks</a>
+      <a href="#">dispatch</a>
+      <a href="#" aria-current="page">settings</a>
+    </nav>
+  </header>
+  <main class="wrap">
+    <div class="shell">
+      <nav class="side" aria-label="Settings areas">
+        <div class="navgroup">
+          <h2 class="navtitle">Workspace</h2>
+          <a class="navlink" href="#"><span class="navlabel">Sources</span><span class="navstate">Linear</span><span class="chev" aria-hidden="true">›</span></a>
+          <a class="navlink" href="#"><span class="navlabel">Models</span><span class="navstate">GPT-6.1 Sol</span><span class="chev" aria-hidden="true">›</span></a>
+          <a class="navlink cur" href="#" aria-current="page"><span class="navlabel">Costs</span><span class="navstate">{{navState}}</span><span class="chev" aria-hidden="true">›</span></a>
+          <a class="navlink" href="#"><span class="navlabel">Running</span><span class="navstate">Runner ready</span><span class="chev" aria-hidden="true">›</span></a>
+          <a class="navlink" href="#"><span class="navlabel">Agent access</span><span class="navstate">Keys</span><span class="chev" aria-hidden="true">›</span></a>
+          <a class="navlink" href="#"><span class="navlabel">Health</span><span class="navstate">All clear</span><span class="chev" aria-hidden="true">›</span></a>
+          <a class="navlink" href="#"><span class="navlabel">Change log</span><span class="navstate">Recent</span><span class="chev" aria-hidden="true">›</span></a>
+        </div>
+        <div class="navgroup">
+          <h2 class="navtitle">You</h2>
+          <a class="navlink" href="#"><span class="navlabel">Features</span><span class="navstate">On</span><span class="chev" aria-hidden="true">›</span></a>
+          <a class="navlink" href="#"><span class="navlabel">Account</span><span class="navstate">Server key</span><span class="chev" aria-hidden="true">›</span></a>
+        </div>
+      </nav>
+
+      <div class="pane">
+        <a class="back" href="#">‹ Settings</a>
+        <h1 class="areatitle">Costs</h1>
+        <span class="period mono">{{periodLabel}} · compared with {{prevLabel}}</span>
+
+        <section class="hero" aria-label="Summary">
+          <p class="story">{{storyA}} <b class="mono">{{tokenShort}}</b>. <sc-if value="{{hasSources}}" hint-placeholder-val="{{ true }}">You paid <b class="mono">{{paidShort}}</b>: {{storyC}}</sc-if><sc-if value="{{noSources}}" hint-placeholder-val="{{ false }}">Nothing is set up yet, so everything counts at list price.</sc-if></p>
+          <div class="pair" role="img" aria-label="{{pairLabel}}">
+            <span class="plabel">Token cost</span>
+            <span class="ptrack"><span class="pbar" style="display: block; width: 100%; background: var(--ink-soft)"></span></span>
+            <span class="pval mono">{{tokenShort}}</span>
+            <span class="plabel">You paid</span>
+            <span class="ptrack"><span class="pbar" style="display: block; width: {{paidW}}%; background: var(--brand)"></span></span>
+            <span class="pval mono" style="color: var(--brand-dim)">{{paidShort}}</span>
+          </div>
+          <div class="chiprow">
+            <span class="tchip"><span class="{{trendClass}}">{{trendText}}</span> token cost per finished task</span>
+            <span class="tchip"><span class="down">▲ {{finDelta}}</span> more tasks finished</span>
+          </div>
+        </section>
+
+        <section class="worth" aria-label="Worth a look">
+          <sc-if value="{{noSources}}" hint-placeholder-val="{{ false }}">
+            <div class="card witem" style="border-color: var(--brand)">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v8"></path><path d="M8 12h8"></path></svg>
+              <span class="wtext"><span class="wlabel">Start here</span><b>Tell Harbour how you pay.</b> Add your plans, and this page shows what you actually spent, not just the list price.</span>
+              <a class="btn" href="#how-you-pay" onClick="{{openAdd}}">Add how you pay</a>
+            </div>
+          </sc-if>
+          <sc-for list="{{worth}}" as="w" hint-placeholder-count="2">
+            <div class="card witem">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"></path></svg>
+              <span class="wtext"><span class="wlabel">{{w.label}}</span><b>{{w.title}}</b> {{w.text}}</span>
+              <sc-if value="{{w.hasAction}}" hint-placeholder-val="{{ false }}"><button type="button" class="btn" onClick="{{w.act}}">{{w.action}}</button></sc-if>
+              <sc-if value="{{w.hasLink}}" hint-placeholder-val="{{ false }}"><a class="btn" href="#">{{w.link}}</a></sc-if>
+            </div>
+          </sc-for>
+        </section>
+
+        <section class="section" aria-labelledby="h-got">
+          <h2 class="stitle" id="h-got">What you got</h2>
+          <p class="sq">Work finished, and what each finished task cost.</p>
+          <div class="tiles">
+            <sc-for list="{{tiles}}" as="t" hint-placeholder-count="3">
+              <div class="card tile">
+                <div class="tlabel">{{t.label}}</div>
+                <div class="tvalue mono">{{t.value}}</div>
+                <div class="cmp" role="img" aria-label="{{t.aria}}">
+                  <span>{{prevShort}}</span><span class="ctrack"><span class="cbar" style="display: block; width: {{t.prevW}}%; background: var(--ink-soft)"></span></span><span class="cval mono">{{t.prev}}</span>
+                  <span>{{curShort}}</span><span class="ctrack"><span class="cbar" style="display: block; width: {{t.curW}}%; background: var(--brand)"></span></span><span class="cval mono" style="color: var(--text)">{{t.cur}}</span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+          <p class="note">Per finished task is the period's cost divided by the tasks finished in it.</p>
+
+          <div class="subhead">
+            <h3 class="subtitle">Day by day <span class="mono" style="font-weight: 400; font-size: 13px; color: var(--muted)">{{trendRange}}</span></h3>
+            <div class="seg" role="group" aria-label="Per finished task, show">
+              <button type="button" aria-pressed="{{tTokenPressed}}" onClick="{{tShowToken}}">Token cost</button>
+              <button type="button" aria-pressed="{{tPaidPressed}}" onClick="{{tShowPaid}}">What you paid</button>
+            </div>
+          </div>
+          <div class="card trendcard">
+            <p class="tstory">{{trendStory}}</p>
+            <div class="tstack">
+              <div class="tlab"><b>{{trendMetric}} per finished task</b><span class="tkey"><span class="kdot" style="background: {{tDotColor}}"></span>each day</span><span class="tkey"><span class="kline" style="background: {{tLineColor}}"></span>7-day average</span><sc-if value="{{tHasOver}}" hint-placeholder-val="{{ true }}"><span class="tkey"><span class="kdot kover" style="border-color: {{tDotColor}}"></span>above the scale</span></sc-if><span class="tkey"><span class="kmark"></span>model change</span></div>
+              <div class="tplot" role="img" aria-label="{{trendLabel}}">
+                <sc-for list="{{tTicks}}" as="t" hint-placeholder-count="4">
+                  <div class="grid" style="bottom: {{t.bottom}}px"><span class="glabel mono">{{t.label}}</span></div>
+                </sc-for>
+                <div class="band" style="left: {{band.left}}%; width: {{band.width}}%"><span class="bandtag">this period</span></div>
+                <sc-for list="{{tMarks}}" as="k" hint-placeholder-count="1">
+                  <div class="tmark" style="left: {{k.left}}%"></div>
+                </sc-for>
+                <svg class="tline" viewBox="0 0 1000 180" preserveAspectRatio="none" aria-hidden="true"><path d="{{tPath}}" fill="none" stroke="{{tLineColor}}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"></path></svg>
+                <sc-for list="{{tDots}}" as="p" hint-placeholder-count="20">
+                  <span class="tdot {{p.cls}}" style="left: {{p.left}}%; bottom: {{p.bottom}}px; background: {{p.bg}}; border-color: {{p.color}}"></span>
+                </sc-for>
+                <sc-for list="{{tVals}}" as="v" hint-placeholder-count="2">
+                  <span class="tval mono" style="left: {{v.left}}%; bottom: {{v.bottom}}px; transform: {{v.tx}}">{{v.label}}</span>
+                </sc-for>
+              </div>
+              <div class="tlab flab"><b>Tasks finished</b></div>
+              <div class="fplot" role="img" aria-label="{{finLabel}}">
+                <sc-for list="{{fTicks}}" as="t" hint-placeholder-count="2">
+                  <div class="grid" style="bottom: {{t.bottom}}px"><span class="glabel mono">{{t.label}}</span></div>
+                </sc-for>
+                <div class="band" style="left: {{band.left}}%; width: {{band.width}}%"></div>
+                <div class="fbars">
+                  <sc-for list="{{fBars}}" as="b" hint-placeholder-count="20">
+                    <span class="fslot"><span class="fbar {{b.cls}}" style="height: {{b.h}}px"></span></span>
+                  </sc-for>
+                </div>
+              </div>
+              <div class="tover">
+                <sc-if value="{{tHoverOn}}" hint-placeholder-val="{{ false }}">
+                  <div class="xhair" style="left: {{tHov.left}}%"></div>
+                  <div class="tip ttip" style="left: {{tHov.left}}%; right: auto; transform: {{tHov.tx}}">
+                    <div class="tiprow" style="margin-bottom: 4px"><b>{{tHov.date}}</b></div>
+                    <sc-for list="{{tHov.lines}}" as="tl" hint-placeholder-count="4">
+                      <div class="tiprow"><span>{{tl.name}}</span><span class="mono">{{tl.value}}</span></div>
+                    </sc-for>
+                  </div>
+                </sc-if>
+                <div class="thits">
+                  <sc-for list="{{tHits}}" as="h" hint-placeholder-count="20">
+                    <button type="button" class="thit" aria-label="{{h.aria}}" onMouseEnter="{{h.enter}}" onMouseLeave="{{h.leave}}" onFocus="{{h.enter}}" onBlur="{{h.leave}}"></button>
+                  </sc-for>
+                </div>
+              </div>
+            </div>
+            <div class="txlabels" aria-hidden="true">
+              <sc-for list="{{tX}}" as="x" hint-placeholder-count="5">
+                <span class="txl mono" style="left: {{x.left}}%">{{x.label}}</span>
+              </sc-for>
+            </div>
+            <details class="numbers">
+              <summary>Show the numbers</summary>
+              <div class="ntable mono">
+                <div class="nrow t5 nhead"><span>Day</span><span>Finished</span><span>{{trendMetric}}</span><span>Per task</span><span>7-day</span></div>
+                <sc-for list="{{tRows}}" as="n" hint-placeholder-count="20">
+                  <div class="nrow t5"><span>{{n.label}}</span><span>{{n.fin}}</span><span>{{n.v}}</span><span>{{n.per}}</span><span>{{n.avg}}</span></div>
+                </sc-for>
+              </div>
+            </details>
+          </div>
+          <p class="note">{{trendNote}}</p>
+        </section>
+
+        <section class="section" aria-labelledby="h-where">
+          <h2 class="stitle" id="h-where">Where it goes</h2>
+          <p class="sq">Token cost by kind of work, then by day and by job.</p>
+          <div class="card chartcard">
+            <div class="parts" role="img" aria-label="{{partsLabel}}">
+              <sc-for list="{{parts}}" as="p" hint-placeholder-count="5">
+                <span class="part" style="width: {{p.w}}%; background: {{p.color}}"></span>
+              </sc-for>
+            </div>
+            <div class="partlabels" aria-hidden="true">
+              <sc-for list="{{parts}}" as="p" hint-placeholder-count="5">
+                <span class="plab" style="width: {{p.w}}%"><sc-if value="{{p.labelled}}" hint-placeholder-val="{{ true }}"><b>{{p.name}}</b> {{p.pct}}</sc-if></span>
+              </sc-for>
+            </div>
+            <div class="legend">
+              <sc-for list="{{parts}}" as="p" hint-placeholder-count="5">
+                <span class="lk"><span class="sw" style="background: {{p.color}}"></span>{{p.name}} <span class="lval mono">{{p.value}} · {{p.pct}}</span></span>
+              </sc-for>
+            </div>
+          </div>
+
+          <div class="subhead">
+            <h3 class="subtitle">By day</h3>
+            <div class="seg" role="group" aria-label="Show">
+              <button type="button" aria-pressed="{{lensTokenPressed}}" onClick="{{showToken}}">Token cost</button>
+              <button type="button" aria-pressed="{{lensPaidPressed}}" onClick="{{showPaid}}">What you paid</button>
+            </div>
+          </div>
+          <div class="card chartcard">
+            <div class="plot" role="img" aria-label="{{chartLabel}}">
+              <sc-for list="{{ticks}}" as="t" hint-placeholder-count="5">
+                <div class="grid" style="bottom: {{t.bottom}}px"><span class="glabel mono">{{t.label}}</span></div>
+              </sc-for>
+              <div class="cols">
+                <sc-for list="{{cols}}" as="c" hint-placeholder-count="8">
+                  <button type="button" class="col" aria-label="{{c.aria}}" onMouseEnter="{{c.enter}}" onMouseLeave="{{c.leave}}" onFocus="{{c.enter}}" onBlur="{{c.leave}}">
+                    <span class="stack">
+                      <sc-for list="{{c.segs}}" as="s" hint-placeholder-count="4">
+                        <span class="segm" style="height: {{s.h}}px; background: {{s.color}}"></span>
+                      </sc-for>
+                    </span>
+                  </button>
+                </sc-for>
+              </div>
+              <sc-if value="{{lensToken}}" hint-placeholder-val="{{ true }}">
+                <div class="mark" style="right: 4px"></div>
+                <a class="marktag mono" style="left: calc(100% - 4px)" href="#h-changed">◆ model changes</a>
+              </sc-if>
+              <sc-if value="{{tipOn}}" hint-placeholder-val="{{ false }}">
+                <div class="tip" style="left: {{tip.left}}; right: {{tip.right}}; transform: {{tip.tx}}">
+                  <div class="tiprow" style="margin-bottom: 4px"><b>{{tip.date}}</b><span class="mono">{{tip.total}}</span></div>
+                  <sc-for list="{{tip.lines}}" as="tl" hint-placeholder-count="4">
+                    <div class="tiprow"><span class="tipname"><span class="sw" style="background: {{tl.color}}"></span>{{tl.name}}</span><span class="mono">{{tl.value}}</span></div>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+            <div class="xlabels">
+              <sc-for list="{{cols}}" as="c" hint-placeholder-count="8">
+                <span class="xl mono">{{c.label}}</span>
+              </sc-for>
+            </div>
+            <div class="legend">
+              <sc-for list="{{legend}}" as="l" hint-placeholder-count="4">
+                <span class="lk"><span class="sw" style="background: {{l.color}}"></span>{{l.name}} <span class="lval mono">{{l.total}}</span></span>
+              </sc-for>
+            </div>
+            <details class="numbers">
+              <summary>Show the numbers</summary>
+              <div class="ntable mono">
+                <div class="nrow nhead"><span>Day</span><sc-for list="{{legend}}" as="l" hint-placeholder-count="4"><span>{{l.name}}</span></sc-for><span>Total</span></div>
+                <sc-for list="{{numberRows}}" as="n" hint-placeholder-count="8">
+                  <div class="nrow"><span>{{n.label}}</span><sc-for list="{{n.cells}}" as="cell" hint-placeholder-count="4"><span>{{cell}}</span></sc-for><span>{{n.total}}</span></div>
+                </sc-for>
+              </div>
+            </details>
+          </div>
+          <p class="note">{{chartNote}}</p>
+
+          <div class="subhead"><h3 class="subtitle">By job</h3></div>
+          <div class="card">
+            <div class="tbox">
+              <div class="jtable">
+                <div class="jrow jhead"><span>Job</span><span>Ran on</span><span class="num">Runs</span><span class="num">Typical run</span><span class="num">Token cost</span><span>Share</span></div>
+                <sc-for list="{{jobs}}" as="j" hint-placeholder-count="5">
+                  <div class="jrow">
+                    <span class="jname"><span class="sw" style="background: {{j.color}}"></span><span>{{j.name}}<span class="kind">{{j.group}} · {{j.kind}}</span></span></span>
+                    <span class="ran">{{j.ran}}<sc-if value="{{j.hasNow}}" hint-placeholder-val="{{ false }}"><span class="now">now {{j.now}}</span></sc-if></span>
+                    <span class="num mono">{{j.runs}}</span>
+                    <span class="num mono">{{j.typical}}</span>
+                    <span class="num mono">{{j.cost}}</span>
+                    <span class="barwrap"><span class="bar" style="display: block; width: {{j.barW}}%; background: {{j.color}}"></span></span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <button type="button" class="more" onClick="{{toggleAll}}" aria-expanded="{{showAll}}">{{moreLabel}}</button>
+          </div>
+          <p class="note">A run's model is the one it actually ran on; "now" is what the model table says today. Harbour-call rows carry ≈: the 30-day call log scaled to this period.</p>
+        </section>
+
+        <section class="section" aria-labelledby="h-changed">
+          <h2 class="stitle" id="h-changed">What changed</h2>
+          <p class="sq">Each model change, and what it did to cost and to rework.</p>
+          <div class="timeline">
+            <div class="card tl">
+              <span class="dot" aria-hidden="true"></span>
+              <div class="tlhead"><span class="tlwhat">Harbour calls: GPT-5.6 Sol → GPT-6.1 Sol</span><span class="tlwhen mono">24 Oct 17:04–20:08 · entries 7–19</span></div>
+              <div class="measures">
+                <div>
+                  <div class="mname">recommend, cost a call</div>
+                  <div class="ba" role="img" aria-label="recommend cost a call: $0.035 before, $0.021 since, from 10 calls">
+                    <span>before</span><span class="batrack"><span class="babar" style="display: block; width: 100%; background: var(--ink-soft)"></span></span><span class="baval mono">$0.035</span>
+                    <span>since</span><span class="batrack"><span class="babar" style="display: block; width: 60%; background: var(--brand)"></span></span><span class="baval mono">$0.021</span>
+                  </div>
+                  <p class="note" style="margin-top: 4px">From 10 calls: too few to call yet.</p>
+                </div>
+              </div>
+            </div>
+            <div class="card tl">
+              <span class="dot" aria-hidden="true"></span>
+              <div class="tlhead"><span class="tlwhat">implementation: Sonnet 5.5 → Haiku 5.5</span><span class="tlwhen mono">24 Oct 20:21 · entry 20 · high effort from 25 Oct 07:23 (entry 21)</span></div>
+              <div class="measures">
+                <div>
+                  <div class="mname">Cost a run</div>
+                  <div class="ba" role="img" aria-label="implementation cost a run: $1.90 before; since, not priced yet">
+                    <span>before</span><span class="batrack"><span class="babar" style="display: block; width: 100%; background: var(--ink-soft)"></span></span><span class="baval mono">$1.90</span>
+                    <span>since</span><span class="batrack" style="border: 1px dashed var(--amber-dim); border-radius: 3px"></span><span class="baval unpriced">not priced</span>
+                  </div>
+                  <p class="note" style="margin-top: 4px">19 runs. Harbour has no working rate for Haiku 5.5 sessions yet.</p>
+                </div>
+                <div>
+                  <div class="mname">Tasks sent back for a second round</div>
+                  <div class="ba" role="img" aria-label="tasks sent back for a second round: 17% before, 33% since (4 of 12)">
+                    <span>before</span><span class="batrack"><span class="babar" style="display: block; width: 50%; background: var(--ink-soft)"></span></span><span class="baval mono">17%</span>
+                    <span>since</span><span class="batrack"><span class="babar" style="display: block; width: 100%; background: var(--amber-dim)"></span></span><span class="baval mono">33% · 4/12</span>
+                  </div>
+                  <p class="note" style="margin-top: 4px">3 of 8 at medium effort, 1 of 4 at high.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="note">Changes by people and by agents both show here, with their reasons in the <a href="#">Change log ›</a></p>
+        </section>
+
+        <section class="section" id="how-you-pay" aria-labelledby="h-pay">
+          <h2 class="stitle" id="h-pay">How you pay</h2>
+          <p class="sq">Your plans and offers take the token cost down to what you actually paid.</p>
+          <div class="pay">
+            <div>
+              <div class="card rows">
+                <sc-for list="{{srcRows}}" as="r" hint-placeholder-count="2">
+                  <button type="button" class="row rowbtn" onClick="{{r.toggle}}" aria-expanded="{{r.open}}">
+                    <span class="order mono">{{r.n}}</span>
+                    <span class="rlab">{{r.name}}<span class="kchip">{{r.kind}}</span><span class="rnote">{{r.terms}} · covers {{r.covers}}</span></span>
+                    <span class="chev" aria-hidden="true">›</span>
+                  </button>
+                  <sc-if value="{{r.open}}" hint-placeholder-val="{{ false }}">
+                    <div class="rbody">
+                      <p class="note" style="margin: 0 0 6px"><span class="mono">{{r.effect}}</span></p>
+                      <sc-if value="{{r.isSub}}" hint-placeholder-val="{{ false }}">
+                        <label class="field">Count against Harbour
+                          <select value="{{r.share}}" onChange="{{r.onShare}}">
+                            <option value="100">All of it</option>
+                            <option value="75">75%</option>
+                            <option value="50">Half</option>
+                            <option value="25">A quarter</option>
+                          </select>
+                        </label>
+                      </sc-if>
+                      <sc-if value="{{r.isDiscount}}" hint-placeholder-val="{{ false }}">
+                        <label class="field">Discount
+                          <select value="{{r.pct}}" onChange="{{r.onPct}}">
+                            <option value="10">10% off</option>
+                            <option value="20">20% off</option>
+                            <option value="30">30% off</option>
+                            <option value="50">50% off</option>
+                          </select>
+                        </label>
+                      </sc-if>
+                      <p class="note" style="margin-bottom: 10px">{{r.explain}}</p>
+                      <button type="button" class="btn danger" onClick="{{r.remove}}">Remove</button>
+                    </div>
+                  </sc-if>
+                </sc-for>
+                <div class="row">
+                  <span class="order mono">{{paygN}}</span>
+                  <span class="rlab">Pay as you go<span class="kchip">at list</span><span class="rnote">Whatever nothing above covers</span></span>
+                </div>
+                <button type="button" class="row rowbtn" onClick="{{toggleAdd}}" aria-expanded="{{addOpen}}" style="color: var(--brand-dim)">
+                  <span class="order" aria-hidden="true">+</span><span class="rlab">{{addLabel}}</span><span class="chev" aria-hidden="true">›</span>
+                </button>
+                <sc-if value="{{addOpen}}" hint-placeholder-val="{{ false }}">
+                  <div class="presets">
+                    <sc-for list="{{presetRows}}" as="p" hint-placeholder-count="4">
+                      <button type="button" class="preset" onClick="{{p.add}}"><span class="pname">{{p.name}}</span><span class="pmeta">{{p.kind}} · {{p.terms}}</span><span class="pmeta">covers {{p.covers}}</span></button>
+                    </sc-for>
+                  </div>
+                </sc-if>
+              </div>
+              <p class="note">{{payNote}}</p>
+            </div>
+
+            <div class="card chartcard">
+              <h3 class="subtitle">From token cost to what you paid</h3>
+              <div class="wf" role="img" aria-label="{{wfLabel}}">
+                <div class="wfcols">
+                  <sc-for list="{{wf}}" as="b" hint-placeholder-count="5">
+                    <div class="wfcol">
+                      <span class="wfbar" style="bottom: {{b.bottom}}px; height: {{b.h}}px; background: {{b.color}}"></span>
+                      <span class="wfval mono" style="bottom: {{b.labelAt}}px; color: {{b.textColor}}">{{b.value}}</span>
+                    </div>
+                  </sc-for>
+                </div>
+                <div class="wfbase"></div>
+              </div>
+              <div class="wfx">
+                <sc-for list="{{wf}}" as="b" hint-placeholder-count="5">
+                  <span class="wfxl">{{b.label}}</span>
+                </sc-for>
+              </div>
+              <sc-if value="{{hasGot}}" hint-placeholder-val="{{ true }}"><p class="note">{{gotLine}}</p></sc-if>
+              <details class="numbers">
+                <summary>Show the receipt</summary>
+                <div class="rcpt mono">
+                  <div class="rline rhead"><span class="rlabel">Token cost, at list price</span><span class="rfill"></span><span class="ramt">{{tokenFull}}</span></div>
+                  <sc-for list="{{trafficLines}}" as="t" hint-placeholder-count="2">
+                    <div class="rline rsub"><span class="rlabel">{{t.label}}</span><span class="rfill"></span><span class="ramt">{{t.amount}}</span></div>
+                  </sc-for>
+                  <div class="rline rhead"><span class="rlabel">Discounts</span><span class="rfill"></span><span class="ramt">{{discFull}}</span></div>
+                  <sc-for list="{{discLines}}" as="d" hint-placeholder-count="2">
+                    <div class="rline rsub"><span class="rlabel">{{d.label}}</span><span class="rfill"></span><span class="ramt">{{d.amount}}</span></div>
+                  </sc-for>
+                  <div class="rline rhead"><span class="rlabel">Charges</span><span class="rfill"></span><span class="ramt">{{paidFull}}</span></div>
+                  <sc-for list="{{chargeLines}}" as="c" hint-placeholder-count="2">
+                    <div class="rline rsub"><span class="rlabel">{{c.label}}</span><span class="rfill"></span><span class="ramt">{{c.amount}}</span></div>
+                  </sc-for>
+                  <div class="rline rtotal" style="margin-top: 8px"><span class="rlabel">You paid</span><span class="rfill"></span><span class="ramt">{{paidFull}}</span></div>
+                </div>
+              </details>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="h-more">
+          <h2 class="stitle" id="h-more">More detail</h2>
+          <details class="more-detail">
+            <summary><span class="rlab">What a finished task costs</span><span class="rval mono">median {{median}}</span><span class="chev" aria-hidden="true">›</span></summary>
+            <div class="dbody">
+              <div class="hist" role="img" aria-label="{{histLabel}}">
+                <div class="hcols">
+                  <sc-for list="{{bins}}" as="b" hint-placeholder-count="6">
+                    <button type="button" class="hcol" aria-label="{{b.aria}}" onMouseEnter="{{b.enter}}" onMouseLeave="{{b.leave}}" onFocus="{{b.enter}}" onBlur="{{b.leave}}">
+                      <span class="hbar" style="height: {{b.h}}px"></span>
+                    </button>
+                  </sc-for>
+                </div>
+                <sc-if value="{{histTipOn}}" hint-placeholder-val="{{ false }}">
+                  <div class="tip" style="left: {{histTip.left}}; right: {{histTip.right}}; transform: {{histTip.tx}}"><b>{{histTip.title}}</b><div>{{histTip.body}}</div></div>
+                </sc-if>
+              </div>
+              <div class="hx">
+                <sc-for list="{{bins}}" as="b" hint-placeholder-count="6">
+                  <span class="hxl mono">{{b.label}}</span>
+                </sc-for>
+              </div>
+              <div class="facts">
+                <span>Median <b class="mono">{{median}}</b></span>
+                <span>9 in 10 under <b class="mono">{{p90}}</b></span>
+                <span>Highest <b class="mono">{{maxTask}}</b></span>
+              </div>
+              <p class="note">Each finished task's whole token cost: every session it ever ran, including before this period.</p>
+            </div>
+          </details>
+          <details class="more-detail">
+            <summary><span class="rlab"><span class="warnlabel">Not counted</span></span><span class="rval">28 sessions sent no usage</span><span class="chev" aria-hidden="true">›</span></summary>
+            <div class="dbody"><p class="note" style="margin-top: 0">Their token cost is unknown, so it is left out of every figure above, not counted as zero. Haiku 5.5 sessions since 24 Oct are listed here too until Harbour can price them. <a href="#">Which sessions ›</a></p></div>
+          </details>
+          <details class="more-detail">
+            <summary><span class="rlab">For agents</span><span class="rval mono">GET /api/proxy/costs</span><span class="chev" aria-hidden="true">›</span></summary>
+            <div class="dbody"><p class="note" style="margin-top: 0">The same numbers as data: token cost by job, model and day, how each way you pay applied, and each model change with its before and after. An agent that changes a model gives a reason, and the change appears under What changed.</p></div>
+          </details>
+        </section>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"firstVisit":{"editor":"boolean","default":false},"scope":{"editor":"enum","options":["Full design","Phase 1 only"],"default":"Full design"},"$preview":{"width":1280,"height":3950}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { sources: this.startSources(props), open: -1, addOpen: false, lens: 'token', hover: -1, hist: -1, showAll: false, nextId: 10, whatIf: false, tlens: 'token', thover: -1 };
+  }
+
+  startSources(props) {
+    if (props && props.firstVisit) return [];
+    return [{ id: 1, preset: 'claude-max20', share: '100', pct: '20' }];
+  }
+
+  componentDidUpdate(prev) {
+    if (prev.firstVisit !== this.props.firstVisit || prev.scope !== this.props.scope) {
+      this.setState({ sources: this.startSources(this.props), open: -1, addOpen: false, whatIf: false });
+    }
+  }
+
+  money(n, dp) {
+    const d = dp === undefined ? 2 : dp;
+    const sign = n < 0 ? '−' : '';
+    return sign + '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+  }
+
+  niceAxis(max) {
+    const raw = Math.max(max, 1) / 5;
+    const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const norm = raw / mag;
+    const step = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * mag;
+    const top = Math.ceil(max / step) * step;
+    const ticks = [];
+    for (let v = 0; v <= top + step / 2; v += step) ticks.push(v);
+    return { top: top, ticks: ticks };
+  }
+
+  renderVals() {
+    const s = this.state;
+    const dark = !!this.props.dark;
+    const phase1 = this.props.scope === 'Phase 1 only';
+    const m = (n, d) => this.money(n, d);
+
+    // ---- The period's data (sample: Harbour's own workspace, tickets LIN-3300 onward) ----
+    const P = {
+      label: '17–24 Oct', prevLabel: '9–16 Oct', prevShort: '9–16', curShort: '17–24', days: 8, monthDays: 31,
+      finished: 238, prevFinished: 114, prevAgent: 1290.65, prevCalls: 40.99,
+      median: 6.41, p90: 22.57, maxTask: 47.64,
+      bins: [2, 74, 80, 36, 15, 12]
+    };
+    const CALLS = 40.99;
+    // Token cost by traffic: what ran, and where. Rules match traffic, never a provider by name.
+    const TRAFFIC = [
+      { id: 'claude-code', label: 'Claude Code sessions', cost: 1987.53 },
+      { id: 'openrouter-openai', label: 'Harbour calls · OpenRouter · OpenAI ≈', cost: s.whatIf ? 0 : CALLS },
+      { id: 'openrouter-anthropic', label: 'Harbour calls · OpenRouter · Anthropic ≈ (what if)', cost: s.whatIf ? CALLS : 0 },
+      { id: 'opencode-openai', label: 'opencode · OpenAI', cost: 0 }
+    ];
+    const DAYS = [
+      { label: '17 Oct', judge: 45.59, plan: 20.92, make: 79.64, steer: 22.89 },
+      { label: '18 Oct', judge: 120.54, plan: 54.40, make: 82.99, steer: 91.45 },
+      { label: '19 Oct', judge: 98.28, plan: 32.27, make: 94.42, steer: 89.33 },
+      { label: '20 Oct', judge: 41.24, plan: 19.09, make: 54.92, steer: 46.61 },
+      { label: '21 Oct', judge: 24.05, plan: 24.01, make: 36.48, steer: 29.04 },
+      { label: '22 Oct', judge: 0, plan: 0, make: 0, steer: 6.20 },
+      { label: '23 Oct', judge: 128.59, plan: 109.62, make: 113.24, steer: 100.53 },
+      { label: '24 Oct', judge: 137.87, plan: 66.81, make: 159.45, steer: 57.06 }
+    ];
+    // Known plans are data. Four kinds: subscription, allowance, discount, and pay as you go (always last).
+    const PRESETS = {
+      'claude-max20': { name: 'Claude Max 20x', kind: 'subscription', price: 200, covers: ['claude-code'], coversLabel: 'Claude Code sessions' },
+      'claude-max5': { name: 'Claude Max 5x', kind: 'subscription', price: 100, covers: ['claude-code'], coversLabel: 'Claude Code sessions' },
+      'claude-pro': { name: 'Claude Pro', kind: 'subscription', price: 20, covers: ['claude-code'], coversLabel: 'Claude Code sessions' },
+      'chatgpt-plus': { name: 'ChatGPT Plus', kind: 'subscription', price: 20, covers: ['opencode-openai'], coversLabel: 'opencode on OpenAI models (reported)' },
+      'claude-credit': { name: 'Claude API credit', kind: 'allowance', price: 0, amount: 200, covers: ['openrouter-anthropic'], coversLabel: 'Anthropic models by API key or OpenRouter BYOK', terms: '$200 a month, included with Max 20x', phase: 2 },
+      'custom-discount': { name: 'Negotiated discount', kind: 'discount', covers: ['openrouter-openai'], coversLabel: 'OpenRouter calls on OpenAI models', phase: 2 }
+    };
+    const termsOf = (pr, src) => pr.kind === 'subscription' ? '$' + pr.price + ' a month'
+      : pr.kind === 'allowance' ? pr.terms
+      : src.pct + '% off';
+
+    // ---- Apply the ways you pay, top to bottom ----
+    const remaining = {};
+    TRAFFIC.forEach(t => { remaining[t.id] = t.cost; });
+    const applied = s.sources.map(src => {
+      const pr = PRESETS[src.preset];
+      const covered = pr.covers.reduce((a, id) => a + (remaining[id] || 0), 0);
+      let disc = 0, charge = 0;
+      if (pr.kind === 'subscription') {
+        disc = covered;
+        pr.covers.forEach(id => { remaining[id] = 0; });
+        charge = pr.price * P.days / P.monthDays * Number(src.share) / 100;
+      } else if (pr.kind === 'allowance') {
+        disc = Math.min(pr.amount, covered);
+        const f = covered > 0 ? (covered - disc) / covered : 1;
+        pr.covers.forEach(id => { remaining[id] = (remaining[id] || 0) * f; });
+        charge = pr.price;
+      } else {
+        const pct = Number(src.pct) / 100;
+        disc = covered * pct;
+        pr.covers.forEach(id => { remaining[id] = (remaining[id] || 0) * (1 - pct); });
+      }
+      return { src: src, pr: pr, disc: disc, charge: charge };
+    });
+    const token = TRAFFIC.reduce((a, t) => a + t.cost, 0);
+    const payg = TRAFFIC.reduce((a, t) => a + remaining[t.id], 0);
+    const discTotal = applied.reduce((a, x) => a + x.disc, 0);
+    const fees = applied.reduce((a, x) => a + x.charge, 0);
+    const paid = fees + payg;
+    const paidPct = Math.max(1, Math.round(paid / token * 100));
+    const hasSources = s.sources.length > 0;
+
+    // ---- What you got: this period against the last, under today's setup ----
+    const ccLeftAmt = remaining['claude-code'];
+    const prevToken = P.prevAgent + P.prevCalls;
+    const prevPaid = fees + ccLeftAmt / TRAFFIC[0].cost * P.prevAgent + (payg - ccLeftAmt) / CALLS * P.prevCalls;
+    const tpt = token / P.finished, prevTpt = prevToken / P.prevFinished;
+    const ppt = paid / P.finished, prevPpt = prevPaid / P.prevFinished;
+    const change = (tpt - prevTpt) / prevTpt * 100;
+    const pair = (a, b) => { const mx = Math.max(a, b); return [a / mx * 100, b / mx * 100]; };
+    const tw1 = pair(P.prevFinished, P.finished), tw2 = pair(prevTpt, tpt), tw3 = pair(prevPpt, ppt);
+    const tiles = [
+      { label: 'Tasks finished', value: String(P.finished), prev: String(P.prevFinished), cur: String(P.finished), prevW: tw1[0].toFixed(1), curW: tw1[1].toFixed(1), aria: 'Tasks finished: ' + P.prevFinished + ' on ' + P.prevLabel + ', ' + P.finished + ' on ' + P.label },
+      { label: 'Token cost per finished task', value: m(tpt), prev: m(prevTpt), cur: m(tpt), prevW: tw2[0].toFixed(1), curW: tw2[1].toFixed(1), aria: 'Token cost per finished task: ' + m(prevTpt) + ' then ' + m(tpt) },
+      { label: 'You paid per finished task', value: m(ppt), prev: m(prevPpt), cur: m(ppt), prevW: tw3[0].toFixed(1), curW: tw3[1].toFixed(1), aria: 'You paid per finished task: ' + m(prevPpt) + ' then ' + m(ppt) + ', with today’s setup' }
+    ];
+
+    // ---- Colours ----
+    const C = dark
+      ? { judge: '#3987e5', plan: '#d95926', make: '#199e70', steer: '#c98500', calls: '#8b95a5', fees: '#9085e9', cash: '#d55181', none: '#5c6370', disc: '#2dd4bf', total: '#9aa0a6' }
+      : { judge: '#2a78d6', plan: '#eb6834', make: '#1baf7a', steer: '#eda100', calls: '#64748b', fees: '#6250d6', cash: '#e87ba4', none: '#bbbbbb', disc: '#0d9488', total: '#6b7280' };
+
+    // ---- Where it goes: part to whole ----
+    const GROUP_TOTALS = [
+      { id: 'make', name: 'Make', v: 621.14 }, { id: 'judge', name: 'Judge', v: 596.15 },
+      { id: 'steer', name: 'Steer', v: 443.12 }, { id: 'plan', name: 'Plan', v: 327.11 }, { id: 'calls', name: 'Harbour calls', v: CALLS }
+    ];
+    const gsum = GROUP_TOTALS.reduce((a, g) => a + g.v, 0);
+    const parts = GROUP_TOTALS.map(g => {
+      const pct = g.v / gsum * 100;
+      return { name: g.name, color: C[g.id], w: pct.toFixed(2), pct: Math.round(pct) + '%', value: m(g.v, 0), labelled: pct >= 9 };
+    });
+    const partsLabel = 'Token cost by kind of work: ' + parts.map(p => p.name + ' ' + p.pct).join(', ') + '.';
+
+    // ---- By day ----
+    const GROUPS = [{ id: 'judge', name: 'Judge' }, { id: 'plan', name: 'Plan' }, { id: 'make', name: 'Make' }, { id: 'steer', name: 'Steer' }];
+    const lensToken = s.lens === 'token';
+    const ccLeft = remaining['claude-code'] / TRAFFIC[0].cost;
+    const callsLeft = (remaining['openrouter-openai'] + remaining['openrouter-anthropic']) / CALLS;
+    const callsDay = CALLS / P.days;
+    const series = lensToken
+      ? GROUPS.map(g => ({ key: g.id, name: g.name, color: C[g.id] })).concat([{ key: 'calls', name: 'Harbour calls', color: C.calls }])
+      : [{ key: 'fees', name: 'Plan fees', color: C.fees }, { key: 'cash', name: 'Pay as you go', color: C.cash }];
+    const rowsD = DAYS.map(d => {
+      const agentDay = d.judge + d.plan + d.make + d.steer;
+      const v = lensToken
+        ? { judge: d.judge, plan: d.plan, make: d.make, steer: d.steer, calls: callsDay }
+        : { fees: fees / P.days, cash: agentDay * ccLeft + callsDay * callsLeft };
+      return { d: d, v: v };
+    });
+    const totals = rowsD.map(r => series.reduce((a, se) => a + (r.v[se.key] || 0), 0));
+    const axis = this.niceAxis(Math.max.apply(null, totals));
+    const CH = 190;
+    const scale = v => Math.round(v / axis.top * CH * 10) / 10;
+    const cols = rowsD.map((r, i) => ({
+      label: r.d.label, aria: r.d.label + ': ' + m(totals[i]),
+      segs: series.filter(se => (r.v[se.key] || 0) > 0).map(se => ({ h: Math.max(scale(r.v[se.key]), 1), color: se.color })),
+      enter: () => this.setState({ hover: i }), leave: () => this.setState({ hover: -1 })
+    }));
+    const ticks = axis.ticks.map(v => ({ bottom: scale(v), label: v === 0 ? '$0' : (axis.top >= 1000 ? '$' + (v / 1000) + 'k' : '$' + v) }));
+    const legend = series.map(se => ({ name: se.name, color: se.color, total: m(rowsD.reduce((a, r) => a + (r.v[se.key] || 0), 0), 0) }));
+    const numberRows = rowsD.map((r, i) => ({ label: r.d.label, cells: series.map(se => m(r.v[se.key] || 0)), total: m(totals[i]) }));
+    const place = (i, n) => {
+      if (i === 0) return { left: '0', right: 'auto', tx: 'none' };
+      if (i === n - 1) return { left: 'auto', right: '0', tx: 'none' };
+      return { left: ((i + 0.5) / n * 100).toFixed(2) + '%', right: 'auto', tx: 'translateX(-50%)' };
+    };
+    const tipOn = s.hover >= 0;
+    let tip = { left: '0', right: 'auto', tx: 'none', date: '', total: '', lines: [] };
+    if (tipOn) {
+      const i = s.hover, at = place(i, DAYS.length);
+      tip = { left: at.left, right: at.right, tx: at.tx, date: rowsD[i].d.label, total: m(totals[i]),
+        lines: series.filter(se => (rowsD[i].v[se.key] || 0) > 0).map(se => ({ name: se.name, color: se.color, value: m(rowsD[i].v[se.key]) })) };
+    }
+    const hi = totals.indexOf(Math.max.apply(null, totals)), lo = totals.indexOf(Math.min.apply(null, totals));
+    const chartLabel = (lensToken ? 'Token cost by day, stacked by kind of work. ' : 'What you paid by day: plan fees spread evenly, plus pay as you go. ')
+      + 'Highest ' + DAYS[hi].label + ' at ' + m(totals[hi]) + '; lowest ' + DAYS[lo].label + ' at ' + m(totals[lo]) + '.';
+    const chartNote = lensToken
+      ? 'Harbour calls are too small to see at this scale (' + m(callsDay) + ' a day). Hover a day, or show the numbers.'
+      : (fees > 0 ? 'A plan costs the same every day whatever runs, so this is nearly flat. Only pay as you go moves with the work.' : 'With nothing set up, you pay as you go at list, so this follows the token cost.');
+
+    // ---- Day by day: what a finished task cost, over time ----
+    // [day, tasks finished, agent-session token cost]. Harbour calls are spread evenly, as above.
+    const TREND = [
+      ['26 Sep', 13, 884.07], ['27 Sep', 13, 403.61], ['28 Sep', 2, 262.78], ['29 Sep', 8, 562.60], ['30 Sep', 30, 293.43],
+      ['1 Oct', 37, 904.29], ['2 Oct', 24, 647.19], ['3 Oct', 12, 134.28], ['4 Oct', 5, 45.55], ['5 Oct', 6, 70.97],
+      ['6 Oct', 6, 36.31], ['7 Oct', 9, 32.44], ['8 Oct', 26, 349.97], ['9 Oct', 24, 260.30], ['10 Oct', 12, 111.01],
+      ['11 Oct', 27, 448.27], ['12 Oct', 28, 144.72], ['13 Oct', 3, 33.56], ['14 Oct', 0, 0], ['15 Oct', 3, 32.86],
+      ['16 Oct', 17, 259.93], ['17 Oct', 10, 169.04], ['18 Oct', 33, 349.38], ['19 Oct', 62, 314.30], ['20 Oct', 31, 161.86],
+      ['21 Oct', 10, 113.58], ['22 Oct', 0, 6.20], ['23 Oct', 50, 451.98], ['24 Oct', 42, 421.19]
+    ];
+    const TMARKS = ['24 Oct'];
+    const tPaid = s.tlens === 'paid';
+    const TN = TREND.length, TCH = 166, FCH = 58;
+    const dayV = TREND.map(r => tPaid ? fees / P.days + r[2] * ccLeft + callsDay * callsLeft : r[2] + callsDay);
+    const per = TREND.map((r, i) => r[1] > 0 ? dayV[i] / r[1] : null);
+    const avg = TREND.map((r, i) => {
+      if (i < 6) return null;
+      let v = 0, f = 0;
+      for (let k = i - 6; k <= i; k++) { v += dayV[k]; f += TREND[k][1]; }
+      return f > 0 ? v / f : null;
+    });
+    const fin7 = i => { let f = 0; for (let k = i - 6; k <= i; k++) f += TREND[k][1]; return f / 7; };
+    const firstI = avg.findIndex(v => v !== null);
+    let lastI = TN - 1;
+    while (avg[lastI] === null) lastI--;
+    const tAxis = this.niceAxis(Math.max.apply(null, avg.filter(v => v !== null)) * 1.6);
+    const tx = i => (i + 0.5) / TN * 100;
+    const ty = v => Math.min(v, tAxis.top) / tAxis.top * TCH;
+    const lineColor = tPaid ? 'var(--brand)' : 'var(--trend)';
+    const dotColor = tPaid ? (dark ? '#1f8a80' : '#7fc9c1') : 'var(--trend-dot)';
+    const tDots = [];
+    per.forEach((v, i) => {
+      if (v === null) return;
+      const over = v > tAxis.top;
+      tDots.push({ left: tx(i).toFixed(2), bottom: ty(v).toFixed(1), cls: (over ? 'over' : '') + (i === s.thover ? ' cur' : ''), bg: over ? 'var(--card)' : dotColor, color: dotColor });
+    });
+    let tPath = '', pen = false;
+    avg.forEach((v, i) => {
+      if (v === null) { pen = false; return; }
+      tPath += (pen ? ' L' : 'M') + ((i + 0.5) / TN * 1000).toFixed(1) + ' ' + (180 - ty(v)).toFixed(1);
+      pen = true;
+    });
+    const tVals = [
+      { left: tx(firstI).toFixed(2), bottom: (ty(avg[firstI]) + 9).toFixed(1), tx: 'translateX(-50%)', label: m(avg[firstI]) },
+      { left: tx(lastI).toFixed(2), bottom: (ty(avg[lastI]) + 14).toFixed(1), tx: 'translateX(calc(-100% - 6px))', label: m(avg[lastI]) }
+    ];
+    const tHasOver = tDots.some(p => p.cls.indexOf('over') >= 0);
+    const curFrom = TREND.findIndex(r => r[0] === '17 Oct'), curTo = TREND.findIndex(r => r[0] === '24 Oct');
+    const band = { left: (curFrom / TN * 100).toFixed(2), width: ((curTo - curFrom + 1) / TN * 100).toFixed(2) };
+    const tMarks = TMARKS.map(d => ({ left: tx(TREND.findIndex(r => r[0] === d)).toFixed(2) }));
+    const tTicks = tAxis.ticks.map(v => ({ bottom: (v / tAxis.top * TCH).toFixed(1), label: v === 0 ? '$0' : (tAxis.top < 5 ? m(v) : '$' + v) }));
+    const fAxis = this.niceAxis(Math.max.apply(null, TREND.map(r => r[1])));
+    const fTicks = [0, fAxis.top / 2, fAxis.top].map(v => ({ bottom: (v / fAxis.top * FCH).toFixed(1), label: String(v) }));
+    const fBars = TREND.map((r, i) => ({ h: r[1] ? Math.max(2, r[1] / fAxis.top * FCH).toFixed(1) : '0', cls: i === s.thover ? 'hot' : '' }));
+    const tHits = TREND.map((r, i) => ({
+      aria: r[0] + ': ' + r[1] + ' finished, ' + (per[i] === null ? 'none finished' : m(per[i]) + ' a finished task') + (avg[i] === null ? '' : ', 7-day average ' + m(avg[i])),
+      enter: () => this.setState({ thover: i }), leave: () => this.setState({ thover: -1 })
+    }));
+    const th = s.thover, tHoverOn = th >= 0;
+    let tHov = { left: '0', tx: 'none', date: '', lines: [] };
+    if (tHoverOn) {
+      const xl = tx(th);
+      tHov = {
+        left: xl.toFixed(2), tx: xl > 55 ? 'translateX(calc(-100% - 10px))' : 'translateX(10px)',
+        date: TREND[th][0] + (TMARKS.indexOf(TREND[th][0]) >= 0 ? ' · model change' : ''),
+        lines: [
+          { name: 'Per finished task', value: per[th] === null ? 'none finished' : m(per[th]) },
+          { name: '7-day average', value: avg[th] === null ? '—' : m(avg[th]) },
+          { name: 'Tasks finished', value: String(TREND[th][1]) },
+          { name: tPaid ? 'You paid' : 'Token cost', value: m(dayV[th]) }
+        ]
+      };
+    }
+    const tX = [];
+    for (let i = TN - 1; i >= 0; i -= 7) tX.unshift({ left: tx(i).toFixed(2), label: TREND[i][0] });
+    const tRows = TREND.map((r, i) => ({ label: r[0], fin: String(r[1]), v: m(dayV[i]), per: per[i] === null ? '—' : m(per[i]), avg: avg[i] === null ? '—' : m(avg[i]) }));
+    const a0 = avg[firstI], a1 = avg[lastI], tChange = Math.round((a1 - a0) / a0 * 100);
+    const f0 = Math.round(fin7(firstI)), f1 = Math.round(fin7(lastI));
+    const moved = Math.abs(tChange) < 3 ? 'held near ' + m(a1) : (tChange < 0 ? 'fell' : 'rose') + ' from ' + m(a0) + ' to ' + m(a1);
+    const trendMetric = tPaid ? 'What you paid' : 'Token cost';
+    const trendStory = 'Since ' + TREND[firstI][0] + ', ' + (tPaid ? 'what you paid' : 'token cost') + ' per finished task ' + moved + ' (7-day average)'
+      + (f1 !== f0 ? ', while finished tasks went from ' + f0 + ' to ' + f1 + ' a day.' : '.')
+      + (tPaid && fees > 0 ? ' A plan costs the same every day, so the more you finish, the less each task costs you.' : '');
+    const trendLabel = trendMetric + ' per finished task by day, ' + TREND[0][0] + ' to ' + TREND[TN - 1][0] + '. 7-day average ' + m(a0) + ' on ' + TREND[firstI][0] + ', ' + m(a1) + ' on ' + TREND[lastI][0] + '.';
+    const finHi = TREND.reduce((b, r, i) => r[1] > TREND[b][1] ? i : b, 0);
+    const finLabel = 'Tasks finished by day: ' + f0 + ' a day in the first week, ' + f1 + ' in the last; the most was ' + TREND[finHi][1] + ' on ' + TREND[finHi][0] + '.';
+    const trendNote = tPaid
+      ? 'Each day, what you paid with today’s setup (plan fees spread evenly, plus pay as you go) divided by the tasks finished that day.'
+      : 'Each day’s token cost divided by the tasks finished that day. Work on tasks still open counts too, so a quiet day looks dear; the 7-day average evens that out. Shows up to 90 days.';
+
+    // ---- By job ----
+    const JOBS = [
+      { name: 'implementation', kind: 'agent session', group: 'Make', g: 'make', ran: 'Sonnet 5.5 · medium', now: 'Haiku 5.5 · high', runs: '231', typical: 1.90, cost: 437.81 },
+      { name: 'autopilot', kind: 'agent session', group: 'Steer', g: 'steer', ran: 'Opus 5.5 · high', now: 'Sonnet 5.5 · high', runs: '205', typical: 1.88, cost: 385.27 },
+      { name: 'review', kind: 'agent session', group: 'Judge', g: 'judge', ran: 'Opus 5.5 · medium', now: '', runs: '232', typical: 1.32, cost: 305.65 },
+      { name: 'plan-review', kind: 'agent session', group: 'Judge', g: 'judge', ran: 'Opus 5.5 · high', now: '', runs: '161', typical: 1.75, cost: 282.55 },
+      { name: 'research', kind: 'agent session', group: 'Plan', g: 'plan', ran: 'Opus 5.5 · high', now: '', runs: '46', typical: 3.73, cost: 171.60 },
+      { name: 'close-out', kind: 'agent session', group: 'Make', g: 'make', ran: 'Sonnet 5.5 · high', now: '', runs: '217', typical: 0.79, cost: 170.46 },
+      { name: 'plan', kind: 'agent session', group: 'Plan', g: 'plan', ran: 'Sonnet 5.5 · high', now: '', runs: '177', typical: 0.79, cost: 140.32 },
+      { name: 'recommend', kind: 'Harbour call', group: 'Steer', g: 'calls', ran: 'GPT-5.6 Sol', now: 'GPT-6.1 Sol', runs: '≈887', typical: 0.034, cost: 29.99, approx: true },
+      { name: 'wake', kind: 'continued sessions', group: 'Steer', g: 'steer', ran: 'Opus 5.5 · high', now: '', runs: '3', typical: 8.14, cost: 24.42 },
+      { name: 'blocked', kind: 'agent session', group: 'Steer', g: 'steer', ran: 'Opus 5.5 · high', now: '', runs: '15', typical: 1.38, cost: 20.77 },
+      { name: 'bug', kind: 'agent session', group: 'Make', g: 'make', ran: 'Opus 5.5 · high', now: '', runs: '3', typical: 4.29, cost: 12.87 },
+      { name: 'design', kind: 'agent session', group: 'Plan', g: 'plan', ran: 'Opus 5.5 · high', now: '', runs: '7', typical: 1.80, cost: 12.62 },
+      { name: 'custom', kind: 'agent session', group: 'Steer', g: 'steer', ran: 'Opus 5.5 · high', now: '', runs: '4', typical: 3.12, cost: 12.49 },
+      { name: 'brief', kind: 'Harbour call', group: 'Tell', g: 'calls', ran: 'GPT-5.4 Mini', now: '', runs: '≈820', typical: 0.013, cost: 10.73, approx: true },
+      { name: 'retrospective-audit', kind: 'agent session', group: 'Judge', g: 'judge', ran: 'Opus 5.5 · high', now: '', runs: '4', typical: 1.99, cost: 7.95 },
+      { name: 'breakdown', kind: 'agent session', group: 'Plan', g: 'plan', ran: 'Opus 5.5 · high', now: '', runs: '3', typical: 0.86, cost: 2.58 },
+      { name: 'triage', kind: 'agent session', group: 'Sort', g: 'none', ran: 'Sonnet 5.5 · medium', now: '', runs: '1', typical: 0.18, cost: 0.18 },
+      { name: 'recap', kind: 'Harbour call', group: 'Tell', g: 'calls', ran: 'GPT-5.4 Mini', now: '', runs: '≈27', typical: 0.006, cost: 0.17, approx: true }
+    ];
+    const maxJob = JOBS[0].cost;
+    const jobs = (s.showAll ? JOBS : JOBS.slice(0, 5)).map(j => ({
+      name: j.name, kind: j.kind, group: j.group, color: C[j.g] || C.none, ran: j.ran, now: j.now, hasNow: !!j.now, runs: j.runs,
+      typical: (j.approx ? '≈' : '') + m(j.typical, j.typical < 0.1 ? 3 : 2), cost: (j.approx ? '≈' : '') + m(j.cost),
+      barW: Math.max(0.6, j.cost / maxJob * 100).toFixed(1)
+    }));
+
+    // ---- Worth a look: at most two, the biggest lever first ----
+    const has = (key) => s.sources.some(o => o.preset === key);
+    const creditX = applied.filter(x => x.src.preset === 'claude-credit')[0];
+    const worth = [{
+      label: 'Biggest share not yet changed', title: 'Judging is 29% of token cost, all on Opus 5.5.',
+      text: 'Review, plan-review and retro came to $596 this period.', hasAction: false, act: null, action: '', hasLink: true, link: 'Models ›'
+    }];
+    if (!phase1) {
+      if (s.whatIf) {
+        worth.push({ label: 'What if', title: 'Harbour’s calls on Anthropic models.', text: 'The same calls at the same list price, through OpenRouter with your own key. ' + (creditX ? 'Your Claude API credit covers them, apart from OpenRouter’s 5% BYOK fee.' : 'Add your Claude API credit to see it cover them.') + ' Moving them is a model change: run the routing and brief checks first.', hasAction: true, action: 'Back to what ran', act: () => this.setState({ whatIf: false }), hasLink: false, link: '' });
+      } else if (has('claude-max20') && !has('claude-credit')) {
+        worth.push({ label: 'Included, not used', title: 'Claude Max 20x includes $200 a month of Claude API credit.', text: 'Nothing here uses it yet, and it expires each month unspent.', hasAction: true, action: 'Add the credit', act: () => this.setState({ sources: s.sources.concat([{ id: s.nextId, preset: 'claude-credit', share: '100', pct: '20' }]), nextId: s.nextId + 1 }), hasLink: false, link: '' });
+      } else if (creditX && creditX.disc === 0 && CALLS > 0) {
+        worth.push({ label: 'Included, not used', title: 'Your Claude API credit covered nothing this period.', text: 'Harbour’s own calls ran on OpenAI models (≈' + m(CALLS) + ' here). On Anthropic models, the credit would cover them, up to $200 a month.', hasAction: true, action: 'See it with Anthropic models', act: () => this.setState({ whatIf: true }), hasLink: false, link: '' });
+      }
+    }
+
+    // ---- How you pay ----
+    const srcRows = applied.map((x, i) => {
+      const id = x.src.id;
+      const set = (patch) => this.setState({ sources: s.sources.map(o => o.id === id ? Object.assign({}, o, patch) : o) });
+      const effect = x.pr.kind === 'subscription'
+        ? 'This period: took ' + m(x.disc) + ' off, and cost ' + m(x.charge) + '.'
+        : 'This period: took ' + m(x.disc) + ' off.';
+      const explain = x.pr.kind === 'subscription'
+        ? 'Covers ' + x.pr.coversLabel + ' in full, and costs its price for the days in the period whether or not anything ran. Use the plan outside Harbour too? Count only Harbour’s share. Harbour doesn’t measure the plan’s limits.'
+        : x.pr.kind === 'allowance'
+          ? 'Takes up to its amount off ' + x.pr.coversLabel + ' each month; anything beyond it carries on down the list.'
+          : 'Takes a percentage off ' + x.pr.coversLabel + '. It costs nothing itself.';
+      return {
+        n: String(i + 1), name: x.pr.name, kind: x.pr.kind, terms: termsOf(x.pr, x.src), covers: x.pr.coversLabel,
+        effect: effect, open: s.open === id, isSub: x.pr.kind === 'subscription', isDiscount: x.pr.kind === 'discount',
+        share: x.src.share, pct: x.src.pct, explain: explain,
+        toggle: () => this.setState({ open: s.open === id ? -1 : id, addOpen: false }),
+        onShare: (e) => set({ share: e.target.value }),
+        onPct: (e) => set({ pct: e.target.value }),
+        remove: () => this.setState({ sources: s.sources.filter(o => o.id !== id), open: -1 })
+      };
+    });
+    const presetRows = Object.keys(PRESETS).filter(k => !(phase1 && PRESETS[k].phase === 2)).map(key => {
+      const pr = PRESETS[key];
+      return {
+        name: pr.name, kind: pr.kind, terms: pr.kind === 'discount' ? 'a percentage off' : termsOf(pr, { pct: 20 }), covers: pr.coversLabel,
+        add: () => this.setState({ sources: s.sources.concat([{ id: s.nextId, preset: key, share: '100', pct: '20' }]), nextId: s.nextId + 1, addOpen: false, open: s.nextId })
+      };
+    });
+
+    // ---- Waterfall: token cost, minus discounts, plus charges ----
+    const WH = 170;
+    const wscale = v => v / token * WH;
+    const wf = [];
+    const label = (v, sign) => (sign || '') + m(v, v < 100 ? 2 : 0);
+    wf.push({ label: 'Token cost', bottom: 0, h: Math.max(wscale(token), 2), color: C.total, value: label(token), top: wscale(token) });
+    let level = token;
+    applied.filter(x => x.disc > 0 || x.pr.kind !== 'subscription').forEach(x => {
+      const nl = level - x.disc;
+      wf.push({ label: '− ' + x.pr.name, bottom: wscale(nl), h: Math.max(wscale(x.disc), 2), color: C.disc, value: label(x.disc, '−'), top: wscale(level) });
+      level = nl;
+    });
+    wf.push({ label: 'Left at list', bottom: 0, h: Math.max(wscale(payg), 2), color: C.total, value: label(payg), top: wscale(payg) });
+    level = payg;
+    applied.filter(x => x.charge > 0).forEach(x => {
+      wf.push({ label: '+ ' + x.pr.name + ' fee', bottom: wscale(level), h: Math.max(wscale(x.charge), 2), color: C.fees, value: label(x.charge, '+'), top: wscale(level + x.charge) });
+      level += x.charge;
+    });
+    wf.push({ label: 'You paid', bottom: 0, h: Math.max(wscale(paid), 2), color: dark ? '#2dd4bf' : '#0d9488', value: label(paid), top: wscale(paid) });
+    const wfOut = wf.map(b => ({ label: b.label, bottom: b.bottom.toFixed(1), h: b.h.toFixed(1), color: b.color, value: b.value, labelAt: (Math.max(b.top, b.bottom + b.h) + 4).toFixed(1), textColor: 'var(--text)' }));
+    const wfLabel = 'From token cost to what you paid: ' + wf.map(b => b.label + ' ' + b.value).join(', ') + '.';
+
+    // ---- Receipt (behind Show the receipt) ----
+    const shown = TRAFFIC.filter(t => t.cost > 0);
+    const trafficLines = shown.map((t, i) => ({ label: (i === shown.length - 1 ? '└─ ' : '├─ ') + t.label, amount: m(t.cost) }));
+    const dl = applied.length ? applied : [];
+    const discLines = dl.length
+      ? dl.map((x, i) => ({ label: (i === dl.length - 1 ? '└─ ' : '├─ ') + x.pr.name + (x.disc === 0 ? ' · nothing it covers ran' : ''), amount: m(-x.disc) }))
+      : [{ label: '└─ none set up', amount: m(0) }];
+    const chargeItems = applied.filter(x => x.pr.kind === 'subscription' || x.charge > 0).map(x => ({
+      label: x.pr.name + (x.pr.kind === 'subscription' ? ', ' + P.days + ' of ' + P.monthDays + ' days' + (Number(x.src.share) < 100 ? ' × ' + x.src.share + '%' : '') : ''),
+      amount: m(x.charge)
+    }));
+    chargeItems.push({ label: 'Pay as you go, what was left at list', amount: m(payg) });
+    const chargeLines = chargeItems.map((c, i) => ({ label: (i === chargeItems.length - 1 ? '└─ ' : '├─ ') + c.label, amount: c.amount }));
+    const unused = applied.filter(x => x.pr.kind === 'subscription' && x.disc === 0);
+    const best = applied.filter(x => x.pr.kind === 'subscription' && x.disc > 0 && x.charge > 0)[0];
+    let gotLine = '';
+    if (best) gotLine = 'For ' + m(best.charge) + ' of ' + best.pr.name + ', Harbour ran ' + m(best.disc) + ' of work at list price: ' + Math.round(best.disc / best.charge) + '× what it cost you.';
+    if (unused.length) gotLine += (gotLine ? ' ' : '') + unused.map(x => x.pr.name).join(', ') + ' cost you ' + m(unused.reduce((a, x) => a + x.charge, 0)) + ' and covered nothing this period.';
+
+    // ---- Per-task distribution ----
+    const BIN_LABELS = ['< $2', '$2–5', '$5–10', '$10–20', '$20–30', '$30+'];
+    const BIN_RANGES = ['under $2', '$2 to $5', '$5 to $10', '$10 to $20', '$20 to $30', 'over $30'];
+    const binMax = Math.max.apply(null, P.bins);
+    const bins = P.bins.map((count, i) => ({
+      label: BIN_LABELS[i], h: Math.round(count / binMax * 130), aria: count + ' finished tasks with a token cost ' + BIN_RANGES[i],
+      enter: () => this.setState({ hist: i }), leave: () => this.setState({ hist: -1 })
+    }));
+    const histTipOn = s.hist >= 0;
+    let histTip = { left: '0', right: 'auto', tx: 'none', title: '', body: '' };
+    if (histTipOn) {
+      const at = place(s.hist, P.bins.length);
+      histTip = { left: at.left, right: at.right, tx: at.tx, title: P.bins[s.hist] + ' tasks', body: 'token cost ' + BIN_RANGES[s.hist] };
+    }
+
+    return {
+      rootClass: 'c-root' + (dark ? ' dark' : ''),
+      navState: hasSources ? paidPct + '% of list' : 'At list price',
+      periodLabel: P.label, prevLabel: P.prevLabel, prevShort: P.prevShort, curShort: P.curShort,
+      storyA: (s.whatIf ? 'What if · ' : '') + P.label + ': ' + P.finished + ' tasks finished. At list price the work cost',
+      storyC: paidPct + '% of list, or ' + m(ppt) + ' a finished task.',
+      hasSources: hasSources, noSources: !hasSources,
+      tokenShort: m(token, 0), paidShort: m(paid, 0),
+      paidW: Math.max(0.4, paid / token * 100).toFixed(2),
+      pairLabel: 'Token cost ' + m(token, 0) + ' against what you paid, ' + m(paid, 0) + '.',
+      trendText: Math.abs(change) < 1 ? 'Level' : (change > 0 ? '▲ ' : '▼ ') + Math.abs(Math.round(change)) + '%',
+      trendClass: Math.abs(change) < 1 ? '' : (change > 0 ? 'up' : 'down'),
+      finDelta: String(P.finished - P.prevFinished),
+      worth: worth,
+      openAdd: () => this.setState({ addOpen: true, open: -1 }),
+      tiles: tiles,
+      parts: parts, partsLabel: partsLabel,
+      lensToken: lensToken, lensTokenPressed: lensToken ? 'true' : 'false', lensPaidPressed: lensToken ? 'false' : 'true',
+      showToken: () => this.setState({ lens: 'token', hover: -1 }), showPaid: () => this.setState({ lens: 'paid', hover: -1 }),
+      legend: legend, ticks: ticks, cols: cols, tipOn: tipOn, tip: tip, chartLabel: chartLabel, chartNote: chartNote, numberRows: numberRows,
+      trendRange: TREND[0][0] + ' – ' + TREND[TN - 1][0], trendStory: trendStory, trendMetric: trendMetric, trendLabel: trendLabel, finLabel: finLabel, trendNote: trendNote,
+      tTokenPressed: tPaid ? 'false' : 'true', tPaidPressed: tPaid ? 'true' : 'false',
+      tShowToken: () => this.setState({ tlens: 'token', thover: -1 }), tShowPaid: () => this.setState({ tlens: 'paid', thover: -1 }),
+      tLineColor: lineColor, tDotColor: dotColor, tHasOver: tHasOver, tTicks: tTicks, band: band, tMarks: tMarks, tPath: tPath, tDots: tDots, tVals: tVals,
+      fTicks: fTicks, fBars: fBars, tHoverOn: tHoverOn, tHov: tHov, tHits: tHits, tX: tX, tRows: tRows,
+      jobs: jobs, showAll: s.showAll ? 'true' : 'false', moreLabel: s.showAll ? 'Show the top 5' : 'Show all ' + JOBS.length + ' jobs',
+      toggleAll: () => this.setState({ showAll: !s.showAll }),
+      srcRows: srcRows, paygN: String(s.sources.length + 1),
+      addOpen: s.addOpen, toggleAdd: () => this.setState({ addOpen: !s.addOpen, open: -1 }), presetRows: presetRows,
+      addLabel: phase1 ? 'Add a plan' : 'Add a plan, credit or discount',
+      payNote: phase1 ? 'Applied top to bottom. Phase 1 handles subscriptions; anything they don’t cover is paid as you go.' : 'Applied top to bottom. Each known plan is a row of data: its kind, its price and what it covers.',
+      wf: wfOut, wfLabel: wfLabel,
+      hasGot: gotLine !== '', gotLine: gotLine,
+      tokenFull: m(token), trafficLines: trafficLines, discFull: m(-discTotal), discLines: discLines,
+      chargeLines: chargeLines, paidFull: m(paid),
+      median: m(P.median), p90: m(P.p90), maxTask: m(P.maxTask),
+      bins: bins, histTipOn: histTipOn, histTip: histTip,
+      histLabel: 'Token cost per finished task: ' + P.bins.map((c, i) => c + ' ' + BIN_RANGES[i]).join(', ') + '.'
+    };
+  }
+}
+</script>
+</body>
+</html>
