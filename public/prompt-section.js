@@ -763,7 +763,7 @@
       // the harness starts null, and the resolved setting is shown on the Runs-on line from the preview.
       run: {
         step: null, choice: runChoiceDefaults(), draft: null, preview: null, changeOpen: false, presets: null,
-        panelHtml: null, panelFailed: false, panelEffortApplies: true,
+        panelHtml: null, panelFailed: false, withoutEffort: [],
         anotherOpen: false, moreOpen: false, item: null, confirmStop: false, busy: false
       }
     };
@@ -1040,9 +1040,10 @@
       const d = state.run.draft || state.run.choice;
       const presets = state.run.presets || [];
       const harness = d.harness || '';
-      // Effort is judged by the harness in force, so a blank harness that Settings resolves to opencode hides it too.
+      // Effort is judged by the harness in force (the draft's, else the one Settings resolves a blank to), against the
+      // server's list of harnesses that take none. A blank harness with nothing resolved keeps effort, as effortAppliesTo does.
       const inForce = harness || (preview && preview.harness) || '';
-      const showEffort = state.run.panelEffortApplies !== false;
+      const showEffort = !state.run.withoutEffort.includes(inForce);
       const presetButtons = presets.map((p) => `<button class="opened-task-preset${d.presetId === p.id ? ' is-chosen' : ''}" data-action="run-preset" data-preset-id="${esc(p.id)}" data-testid="run-preset">${esc(p.name || p.id)}</button>`).join('');
       const targets = ['cli', ...(harness === 'opencode' ? [] : ['web']), ...(opts.isLocalhost ? ['local'] : [])];
       const targetButtons = targets.map((t) => `<button class="opened-task-target${d.target === t ? ' is-chosen' : ''}" data-action="run-target" data-target="${esc(t)}" data-testid="run-target-${esc(t)}">${esc(TARGET_WORDS[t])}</button>`).join('');
@@ -1083,7 +1084,7 @@
         .then((r) => {
           if (destroyed) return;
           state.run.panelHtml = (r && r.html) || null;
-          state.run.panelEffortApplies = !r || r.effortApplies !== false;
+          state.run.withoutEffort = (r && r.withoutEffort) || [];
           state.run.panelFailed = !state.run.panelHtml;
           paintRun();
         })

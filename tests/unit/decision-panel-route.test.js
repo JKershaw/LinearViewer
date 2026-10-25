@@ -105,7 +105,7 @@ describe('GET /api/dispatch/decision-panel: what the panel says about the harnes
     const { body } = await get(buildApp({ table }), `${PANEL}?promptName=implementation&surface=home`);
     assert.match(body.html, /data-harness-in-force="opencode"/);
     assert.match(body.html, /data-decision-effort hidden/);
-    assert.equal(body.effortApplies, false, 'Home\'s summary hides effort on the same rule');
+    assert.ok(body.withoutEffort.includes('opencode'), 'Home\'s summary judges effort by the same list, for the draft\'s harness');
   });
 
   test('a stored effort outside the set is shown as itself and kept', async () => {

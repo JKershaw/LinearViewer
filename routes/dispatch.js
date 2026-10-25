@@ -51,7 +51,7 @@ import { resolveOwnerMintRefusal } from '../lib/owner-mint-refusals.js';
 import { resolveRunnerOwnerRefusal, sendRunnerRefusal } from '../lib/runner-owner-gate.js';
 import { readPlanFacts } from '../lib/chat-request.js';
 import { readModelsHistory } from '../lib/model-routing-history.js';
-import { effortAppliesTo } from '../lib/model-routing.js';
+import { HARNESSES_WITHOUT_EFFORT } from '../lib/model-routing.js';
 import { agentSpendByJob, typicalByModel } from '../lib/model-routing-spend.js';
 import { decisionPanel, agentLists, suggestionsByHarness } from '../lib/components/decision-panel.js';
 import { getModelCatalog } from '../lib/openrouter-catalog.js';
@@ -247,7 +247,6 @@ function presetBodyCheck({ model, harness, effort, byKind }) {
     || opaqueFieldError(effort, 'effort', { maxLength: MAX_NAME_LENGTH });
   return error ? { error } : normalizeDispatchPresetByKind(byKind);
 }
-
 
 /** A query value as text, or null when it is absent or blank (LIN-3833, shared by the preview and LIN-3962's panel). */
 const queryText = (value) => (typeof value === 'string' && value.trim() ? value : null);
@@ -702,8 +701,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         },
         effort: { value: choice.effort, follow: follow(routing.effort || 'none') }
       });
-      // Whether the harness in force takes effort: the panel hides effort on the same rule, and so does Home's summary.
-      res.json({ kind, html, numbers: numbers || null, effortApplies: effortAppliesTo(choice.harness || routing.harness || null) });
+      // The harnesses that take no effort. The panel hides effort by this list; Home's summary judges its draft's harness by it.
+      res.json({ kind, html, numbers: numbers || null, withoutEffort: HARNESSES_WITHOUT_EFFORT });
     } catch (err) {
       return reportFailure(res, 'Decision panel error:', err, 'Failed to load the decision panel');
     }

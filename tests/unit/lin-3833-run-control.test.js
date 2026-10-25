@@ -15,21 +15,45 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 import { decisionPanel } from '../../lib/components/decision-panel.js';
+import { HARNESSES_WITHOUT_EFFORT } from '../../lib/model-routing.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
-// A container that records every listener by type, so a test can fire input and change as well as click.
+// A container that records every listener by type, so a test can fire input and change as well as click. It reads its
+// own markup back the way applyPanelDraft does: the decision panel by its attribute, its fields by data-testid. A value
+// written to a field lives until the markup is replaced, as a control's value does.
 function makeContainer() {
   const listeners = {};
+  let html = '';
+  let written = {};
+  const markupValue = (testid) => {
+    const tag = new RegExp(`<(input|select)\\b[^>]*data-testid="${testid}"[^>]*>`).exec(html);
+    if (!tag) return undefined;
+    if (tag[1] === 'input') return /\svalue="([^"]*)"/.exec(tag[0])?.[1] ?? '';
+    const block = html.slice(tag.index, html.indexOf('</select>', tag.index));
+    return /<option value="([^"]*)"[^>]*\sselected/.exec(block)?.[1] ?? '';
+  };
+  const panelRoot = {
+    querySelector(sel) {
+      const m = /^\[data-testid="([^"]+)"\]$/.exec(sel);
+      if (!m || markupValue(m[1]) === undefined) return null;
+      const testid = m[1];
+      return {
+        get value() { return testid in written ? written[testid] : markupValue(testid); },
+        set value(v) { written[testid] = v; }
+      };
+    }
+  };
   const container = {
-    innerHTML: '',
+    get innerHTML() { return html; },
+    set innerHTML(v) { html = v; written = {}; },
     dataset: {},
     classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
     setAttribute() {},
     getAttribute() { return null; },
-    querySelector() { return null; },
+    querySelector(sel) { return sel === '[data-decision-panel]' && html.includes('data-decision-panel') ? panelRoot : null; },
     contains() { return true; },
     addEventListener(type, fn) { (listeners[type] = listeners[type] || []).push(fn); },
     removeEventListener() {},
@@ -49,6 +73,7 @@ function makeContainer() {
 // The server's panel for the choice it is asked about (routes/dispatch.js decision-panel), built by the same component.
 const serverPanel = (q) => ({
   kind: 'plan',
+  withoutEffort: HARNESSES_WITHOUT_EFFORT,
   html: decisionPanel({
     testid: 'run-decision-panel',
     fieldAttrs: (field) => `data-testid="run-${field}"`,
@@ -164,6 +189,31 @@ describe('LIN-3833 — Runs on says where each value comes from, from the server
     await flush();
     assert.match(c.innerHTML, /data-testid="run-panel-failed"/);
     assert.match(c.innerHTML, /data-testid="run-use"[^>]*disabled/);
+  });
+
+  test('a repaint of the cached panel keeps the draft: a model typed and a harness picked both survive it (LIN-3962)', async () => {
+    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT } });
+    await c.click({ action: 'change-run' });
+    await flush();
+    await c.fire('input', { dataset: { testid: 'run-model' }, value: 'x/y' });
+    // The harness change repaints the run block from the cached panel, which holds the choice and not the draft.
+    await c.fire('change', { dataset: { testid: 'run-harness' }, value: 'opencode' });
+    await flush();
+    const root = c.querySelector('[data-decision-panel]');
+    assert.equal(root.querySelector('[data-testid="run-harness"]').value, 'opencode', 'the picked harness is shown');
+    assert.equal(root.querySelector('[data-testid="run-model"]').value, 'x/y', 'the typed model is shown');
+  });
+
+  test('the summary says no effort once the draft harness is opencode, which takes none (LIN-3962)', async () => {
+    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT } });
+    await c.click({ action: 'change-run' });
+    await flush();
+    await c.fire('change', { dataset: { testid: 'run-effort' }, value: 'high' });
+    await c.fire('change', { dataset: { testid: 'run-harness' }, value: 'opencode' });
+    await flush();
+    const summary = /data-testid="run-will-use">([^<]*)</.exec(c.innerHTML)[1];
+    assert.match(summary, /opencode/);
+    assert.equal(summary.includes('effort'), false, `no effort in: ${summary}`);
   });
 });
 
