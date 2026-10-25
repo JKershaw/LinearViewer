@@ -7,7 +7,7 @@ This is for an agent asked to run a cycle of improvements on Harbour as the oper
 A cycle has three parts.
 
 1. **Known round.** A batch of improvements already identified. Lead with priority: the path to the first invited users (`docs/v1.md`), then the process frictions that cost a person's attention. Existing tickets run after a readiness check. New tickets get a fresh reader before filing.
-2. **Find-and-fix round.** Read the standing measures fresh. These are the Drift & Coherence Review (it now runs the census of copies, LIN-3629) and Seams & Tangles (the import map). Fix the top finds with the moves of the long version. Favour areas the next known round will work in.
+2. **Find-and-fix round.** Read the standing measures fresh. These are the Drift & Coherence Review (it now runs the census of copies, LIN-3629) and Seams & Tangles (the import map of links and knots, and change coupling: the area pairs that land in the same change). Fix the top finds with the moves of the long version. Favour areas the next known round will work in.
 3. **Cycle note.** One comment on LIN-3613: what landed, what it cost in rulings, what the measures moved, and the next known list.
 
 Each cycle also moves one of your own steps into a committed script, a Periodical or Harbour's pipeline, or deletes it. Count your steps and the owner's presses per merge. Both should fall.
