@@ -118,7 +118,7 @@ export const STAGE_ROUTER_SOURCE_CEILING = 8069; // LIN-3378: -46, Why clauses o
  * selector sends 9555. It also catches growth in the stage options and the facts code
  * renders (lib/recommendation-facts.js), which no source ceiling covers.
  */
-export const ROUTER_PROMPT_RENDERED_CEILING = 9701; // LIN-3279: +156 (9545), research and design whenNot say a filer's own fix is not completed prep. Earlier: // LIN-3378: -10 net of b and g
+export const ROUTER_PROMPT_RENDERED_CEILING = 9798; // LIN-3906: +97 (9701), implementation's whenNot names a review Approve (close-out makes its fixes) and breakdown's names one PR in ordered commits (LIN-3854, LIN-3861). Not code or a test: the selector reads the verdict and the commits as judgement, and no code path routes on them; no equal-length cut in the routing prompt's stage texts was found that keeps both not-whens. Earlier: // LIN-3279: +156 (9545), research and design whenNot say a filer's own fix is not completed prep. Earlier: // LIN-3378: -10 net of b and g
 
 /**
  * Every stage's Scope and Authority lines, source bytes (lib/prompts/stage-intent.js).
@@ -150,7 +150,7 @@ export const RUNNER_PROMPT_RENDERED_CEILING = 15953; // LIN-3669: +164 (15789), 
  * LIN-3326 lowered it again (364994 -> 342621): close-out and review shed the authoring
  * bound and the pre-merge risk gates (-22455), less close-out's Scope and Authority line (+82).
  */
-export const FROZEN_TOTAL_BYTES = 344712; // LIN-3903: +232 (344480), close-out ceiling +232; review is -12 under its unchanged ceiling. Earlier: // LIN-3279: +1195 (343285), defs +655, close-out +192, retrospective-audit +192, router +156. Earlier: // LIN-3669: +328 (342957), runner prompt source +164 and rendered +164. Earlier: // LIN-3651: +365 (342592), contract source +232 and plan-review rendered +133. Earlier: // LIN-3612: +15 (342577), prompt-templates.js import path. Earlier: // LIN-3615: -22 (342599), net of plan-review -99, review +88, defs -11. Earlier: // LIN-3614: -2 (342601), net of review -521, close-out +520, defs -1. Earlier: // LIN-3378: -20 (342621)
+export const FROZEN_TOTAL_BYTES = 344809; // LIN-3906: +97 (344809), the routing prompt's ceiling +97. Earlier: // LIN-3903: +232 (344480), close-out ceiling +232; review is -12 under its unchanged ceiling. Earlier: // LIN-3279: +1195 (343285), defs +655, close-out +192, retrospective-audit +192, router +156. Earlier: // LIN-3669: +328 (342957), runner prompt source +164 and rendered +164. Earlier: // LIN-3651: +365 (342592), contract source +232 and plan-review rendered +133. Earlier: // LIN-3612: +15 (342577), prompt-templates.js import path. Earlier: // LIN-3615: -22 (342599), net of plan-review -99, review +88, defs -11. Earlier: // LIN-3614: -2 (342601), net of review -521, close-out +520, defs -1. Earlier: // LIN-3378: -20 (342621)
 
 const BASE_URL = 'https://harbour.example';
 
