@@ -16,8 +16,9 @@ node $S/replay/capture-tests.mjs                             # re-record pinned/
 ```
 `--new` takes the rebuilt file, or a folder holding `workspace-api.js` (+ any helper modules it
 imports relatively — they become part of the new side; sibling route files present in that folder
-are taken from it too). `--lib` defaults to the origin/main snapshot
-`../replay-kit/snapshots/16e7ae77` (lib/, routes/, docs/ …). Exit 0 same / 1 different (or export
+are taken from it too). `--lib` defaults to the repo root (HEAD: lib/, routes/, docs/ …) and must be a
+tree with `lib/model-routing.js` (LIN-3853 or later); the `16e7ae77` snapshot predates it and the
+replay exits 4 on it (LIN-3880). Exit 0 same / 1 different (or export
 surface changed) / 2 tool failure. Run both `replay.mjs` and `livetests.mjs` on a rebuild.
 
 Files: `requirements-notes.md` (every route, middleware, calls, responses, errors, logs, side

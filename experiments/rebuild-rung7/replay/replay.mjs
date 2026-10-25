@@ -15,13 +15,12 @@ import * as gen from './lib/gen.mjs';
 import * as edge from './lib/edge.mjs';
 
 const TOOL_DIR = path.dirname(fileURLToPath(import.meta.url));
-const SNAPSHOT = path.join(TOOL_DIR, '../../replay-kit/snapshots/16e7ae77');
 
 await runRouterReplay({
   name: 'workspace-api router behavioural replay (rung 7)',
   toolDir: TOOL_DIR,
   defaultOld: path.join(TOOL_DIR, 'pinned', 'origin-main'),
-  defaultLib: SNAPSHOT,
+  defaultLib: path.join(TOOL_DIR, '../../..'), // repo root: loadSideLibs needs lib/model-routing.js (LIN-3853), which the 16e7ae77 snapshot lacks (LIN-3880)
   fallbackRoot: '/home/user/LinearViewer',
   defaultN: 3000,
   subdir: 'routes',

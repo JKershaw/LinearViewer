@@ -12,6 +12,8 @@ node selfcheck.mjs [--n 3000] [--seeds 1,7] [--mutant-n 1500] [--jobs 4] [--lib 
 node capture-tests.mjs [--repo <snapshot>] [--jobs 6]
 ```
 
+`--lib` defaults to the repo root and must be a tree with `lib/model-routing.js` (LIN-3853 or later); the 16e7ae77 snapshot predates it and exits 4.
+
 | file | role |
 |---|---|
 | `replay.mjs` | cfg for `runRouterReplay`: slot, seams (openrouter ×4, audit.runAudit), managed env, app variants, server.js middleware + final error handler transcriptions, statusKey, tags |
