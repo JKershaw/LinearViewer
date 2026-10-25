@@ -49,7 +49,7 @@ Every claim below was read at the anchors. Lines are Harbour unless marked SD.
 There are 25 call sites. All go through four functions in `lib/openrouter.js` (`getRecommendation`, `getRecommendationStream`, `streamChat`, `streamChatWithTools`), and every one falls back to `DEFAULT_MODEL` (`:31`).
 
 - **Resolver.** `resolveAiOperationModel` (`lib/workspace-preferences.js:229-241`): `forceDefault` → `resolveFreeTierModel()`, else `byKind[opKind].model || prefs.modelId || DEFAULT_MODEL`. `resolveWorkspaceModel` (`:174-185`) is the same without the per-kind step.
-- **`AI_OPERATION_KINDS`** (`:209`): `recommend, recap, brief, scan, run-summary, session-summary, next-run, flight-companion, ship-biscuit, task-chat`.
+- **`AI_OPERATION_KINDS`** (`:209`): `recommend, recap, brief, scan, run-summary, session-summary, flight-companion, ship-biscuit, task-chat` (`next-run` removed by LIN-3912).
 - **Outside that list but logged:** `scan-retire` (shares `scan`'s override), `feedback-title`, `roadmap` (six layers), `roadmap-orientation`, `roadmap-chat`, `observer-pass`. These take the workspace model; roadmap and flight-companion also accept a per-request model.
 - **Hard-coded, not resolved at all:** the session-summary precompute (`lib/session-materializer-precompute.js:71`) and the run paragraph (`lib/run-paragraph.js:203-206`). Both use `DEFAULT_MODEL` and a key that falls back to the free-tier key (`lib/run-paragraph-hook.js:30-37`). **They skip the free-tier clamp.**
 - **The clamp is a convention, not a gate.** Each call site must pass `forceDefault: isFreeTier` itself. `PLANS[].clampsModel` exists but nothing reads it (`lib/plan-allowance.js:91-108`).
@@ -100,7 +100,7 @@ Placements:
   - Steer: autopilot, blocked, periodical, custom.
   - Sort: triage.
 - **Harbour calls:**
-  - Steer: recommend, next-run, task-chat, flight-companion.
+  - Steer: recommend, task-chat, flight-companion.
   - Sort: scan, scan-retire.
   - Tell: brief, recap, run-summary, session-summary, run-paragraph, ship-biscuit, roadmap (and its orientation and chat), feedback-title, observer-pass.
 

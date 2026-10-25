@@ -4,7 +4,7 @@
  *
  * Anchored at /workspace/:urlKey/live-console (reusing workspaceFromUrl + the
  * experimental feature-gate-redirect-to-settings pattern shared by
- * collective/task-chat/next-run). The page is a provider-free shell; the client
+ * collective/task-chat). The page is a provider-free shell; the client
  * polls a generation-free events endpoint that merges, across every connected
  * workspace:
  *   - the agent-status log → the discrete step stream, and

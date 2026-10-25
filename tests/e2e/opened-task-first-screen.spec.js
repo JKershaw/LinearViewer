@@ -130,6 +130,10 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
 
       await page.goto(`/test/set-session?openRouterConnected=true`);
       await seedGitHubWorkspace(page);
+      // The owner's "set up" rung needs the owner edge on this shared key. Seed
+      // it explicitly rather than inheriting whatever an earlier spec in the
+      // same worker left behind (LIN-3137 J5).
+      await seedWorkspaceOwnership(page, GITHUB_WORKSPACE_URL_KEY, 'owner');
 
       await page.goto(`/workspace/${GITHUB_WORKSPACE_URL_KEY}/swipe`);
       await page.waitForLoadState('networkidle');

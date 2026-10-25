@@ -1,6 +1,6 @@
 /**
  * LIN-1737 Beat 1, seam #3 — GET /workspace/:urlKey/api/autopilot-prompt (the
- * general, stack-walk kickoff next-run's dial calls through fetchAutopilotKickoff)
+ * general, stack-walk kickoff the retired next-run dial called through fetchAutopilotKickoff)
  * accepts an optional `?maxTasks=` query param, validates it (integer >= 1, same
  * rule/error text as every other maxTasks entry point — LIN-1737 D3), and forwards
  * it to buildAutopilotKickoff so the kickoff prose states the bound. Query params

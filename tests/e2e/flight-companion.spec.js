@@ -4,7 +4,7 @@ import { renderSSEFrames } from '../fixtures/flight-companion-sse-frames.js';
 
 // LIN-971: Flight Companion route-gating + settings exposure, plus the
 // LIN-2443-ledger layout/client behaviours routed into this ticket. Mirrors
-// tests/e2e/next-run.spec.js / task-chat.spec.js in shape (local featuresParam
+// tests/e2e/task-chat.spec.js in shape (local featuresParam
 // helper, workerUrlKey per-worker isolation, no teardown/clear calls).
 //
 // Deliberately NOT covered here (owned elsewhere, do not duplicate):
@@ -14,7 +14,7 @@ import { renderSSEFrames } from '../fixtures/flight-companion-sse-frames.js';
 //     recorded on LIN-971 (LIN-2432/LIN-2443 close-outs), no new obligation here.
 //
 // No model calls anywhere in this file: the turn endpoint has no server-side
-// mock seam (unlike task-chat/next-run/ship-biscuit's shouldMockAi), so the
+// mock seam (unlike task-chat/ship-biscuit's shouldMockAi), so the
 // completed-pill and silent-auto-wake tests intercept the turn POST in the
 // browser via page.route before it ever reaches Express (mockTurn below).
 

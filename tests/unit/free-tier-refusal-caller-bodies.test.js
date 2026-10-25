@@ -13,7 +13,7 @@
  * run/session summaries (dashboard-routes.test.js), Task Chat
  * (task-chat-route.test.js), Ship's Biscuit (ship-biscuit-route.test.js) and the
  * Flight Companion (flight-companion-*-route.test.js). The rest are here:
- * next-run, roadmap generate and chat, and workspace-api's `refuseFreeTier`
+ * roadmap generate and chat, and workspace-api's `refuseFreeTier`
  * (recap) and `keepaliveError` mock-path (recommend) sites.
  *
  * The recommend routes' AI-mock charge (LIN-405) is the one place the session
@@ -23,7 +23,6 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { createNextRunRoutes } from '../../routes/next-run.js';
 import { createRoadmapRoutes } from '../../routes/workspace-api-roadmap.js';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { registerProvider } from '../../lib/providers/registry.js';
@@ -99,18 +98,6 @@ async function assertRefused(handler, req, store, urlKey) {
   assert.strictEqual(JSON.stringify(res.jsonBody), DENIED_429_BODY);
   assert.deepStrictEqual(store.calls, [urlKey], 'the gate charged the store once for the workspace');
 }
-
-describe('LIN-3658: next-run suggest 429s a free-tier denial with the exact body', () => {
-  test('POST /api/next-run/suggest', async () => {
-    await withEnv(FREE_TIER_ENV, async () => {
-      const store = deniedStore();
-      const router = createNextRunRoutes({ workspaceFromUrl: (req, res, next) => next(), freeTierStore: store, workspacePreferencesStore: null, getOpenRouterSource: () => 'free', getDeployInfo: () => ({}), reportHistoryStore: null });
-      const handler = getHandler(router, 'post', '/workspace/:urlKey/api/next-run/suggest');
-      const req = { workspace: { urlKey: 'ws-a', provider: PROVIDER_NAME, accessToken: 'tok' }, session: { features: { nextRun: true } }, params: { urlKey: 'ws-a' }, query: {}, body: {} };
-      await assertRefused(handler, req, store, 'ws-a');
-    });
-  });
-});
 
 describe('LIN-3658: roadmap generate and chat 429 a free-tier denial with the exact body', () => {
   function roadmapRouter(store) {

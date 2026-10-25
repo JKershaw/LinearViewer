@@ -173,7 +173,6 @@ import { TaskShareStore } from './lib/task-share-store.js'
 import { createWorkspaceRemovalRevoker } from './lib/workspace-removal-revocation.js'
 import { createGuestTaskAccess } from './lib/task-share-access.js'
 import { isTokenRefreshExempt } from './lib/guest-task-path.js'
-import { createNextRunRoutes } from './routes/next-run.js'
 import { createLiveConsoleRoutes } from './routes/live-console.js'
 import { createShipJourneyRoutes } from './routes/ship-journey.js'
 import { createFlightCompanionRoutes } from './routes/flight-companion.js'
@@ -3294,9 +3293,6 @@ app.use(createTaskShareRoutes({
   getDeployInfo,
 }))
 
-// Mount next-run routes (experimental "suggest the next autopilot run" — LIN-603).
-app.use(createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, reportHistoryStore }))
-
 // Mount flight-companion routes (experimental prototype for LIN-751 realtime chat — LIN-922).
 // LIN-2432 §A.12: mirrors createTaskChatRoutes' set above, minus savedChatStore
 // (§A.11/LIN-2437's own concern — see routes/flight-companion.js's JSDoc for why
@@ -3326,7 +3322,7 @@ app.use(createShipJourneyRoutes({ workspaceFromUrl, reportHistoryStore, fetchWor
 
 // The Ship's Biscuit (experimental, LIN-818): flag-gated LLM-set newspaper — a
 // deterministic edition model over the wired event stores + one editor-in-chief
-// call → durable front page + index. Mirrors next-run's free-tier/model wiring.
+// call → durable front page + index. Mirrors the free-tier/model wiring of the other gated AI routes.
 app.use(createShipBiscuitRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, observationSessionsStore, agentStatusStore, llmCallLogStore, taskSnapshotStore, reportHistoryStore, shipBiscuitHistoryStore }))
 
 /**

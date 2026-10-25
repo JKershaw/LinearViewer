@@ -210,7 +210,7 @@ describe('GET /api/proxy/north-star', () => {
   test('an unparseable generatedAt reads "absent" on both blocks while reportGeneratedAt echoes the stored value', async () => {
     // Pins the composed response for a corrupt timestamp (LIN-1810 close-out,
     // review finding 2 / ledger item 4). classifyReportFreshness is unit-tested
-    // for this in next-run.test.js; this is the route-level contract, and it is
+    // for this in north-star-resolver.test.js; this is the route-level contract, and it is
     // the one documented case where reportGeneratedAt is non-null next to
     // "absent" — there is no age the gate can trust, which is a different
     // signal from "stale" (a usable timestamp that fails the gate).

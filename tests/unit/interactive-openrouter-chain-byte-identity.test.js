@@ -12,7 +12,7 @@
  * shipping alongside this ticket's real (additive) changes.
  *
  * The six families (research §L5 / plan §A.10, corrected to six by F3):
- * routes/task-chat.js, routes/next-run.js, routes/ship-biscuit.js,
+ * routes/task-chat.js, routes/ship-biscuit.js,
  * routes/workspace-api-roadmap.js (two call sites), routes/workspace-api.js,
  * and routes/dashboard.js (two call sites, a distinct shape from the other
  * five — no explicit apiKeyToUse, relies on streamChat's own env default).
@@ -83,7 +83,7 @@
  *     `!apiKey` is true in exactly the rows the old guard refused).
  *     `resolveChatCredential` is now called exactly twice in the file, and
  *     `hasPaidEnvKey` is fully dead there (dropped from the import).
- *   - `routes/next-run.js` and `routes/ship-biscuit.js` also adopted (full
+ *   - `routes/ship-biscuit.js` also adopted (full
  *     adopt, gate stays exactly where each site's own guard already put it)
  *     — their old counts of the shared inline expression (1 each) now fold
  *     into the repo-wide sweep above rather than a per-file allow-list entry.
@@ -144,7 +144,6 @@ const SHARED_CHAIN_EXPR = 'sessionApiKey || getPaidEnvKey() || freeTierKey';
 // routes/workspace-api.js, which carries six (recommend GET/SSE, recap,
 // brief, scan, scan-retire) in one file.
 const expectedGateCalls = {
-  'routes/next-run.js': 1,
   'routes/ship-biscuit.js': 1,
   // LIN-3861: the routes/workspace-api.js row (7: six full-adopt sites + the feedback-title live call,
   // LIN-3635) is gone. The workspace-API unit (routes/workspace-api.js and routes/workspace-api-*.js)
