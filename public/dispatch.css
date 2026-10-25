@@ -206,34 +206,29 @@
 /* =============================================================================
    Themed surfaces (LIN-853)
    Queue entries and token rows render on the shared Card primitive (.card).
-   .queue-item / .token-item ride alongside as JS + E2E hooks; their base list
-   rules live in shared CSS (style.css / common-actions.css) used by the navbar
-   and settings/proxy pages, so we don't touch those — instead we re-assert the
-   card chrome here (dispatch.css loads last) so shared-rule load order can't
-   defeat it, and route factual meta to the mono --font-structural token.
+   .queue-item rides alongside as a JS + E2E hook; its base list rule lives in
+   shared CSS (style.css / common-actions.css) used by the navbar and settings/proxy
+   pages, so we don't touch those — instead we re-assert the card chrome here
+   (dispatch.css loads last) so shared-rule load order can't defeat it, and route
+   factual meta to the mono --font-structural token.
+   LIN-3889: the `.token-list` (.token-item.card, .token-meta) rules were dead (no
+   renderer emits `token-list`, `token-item` or `token-meta`) and are deleted.
    ============================================================================= */
-.queue-list .queue-item.card,
-.token-list .token-item.card {
+.queue-list .queue-item.card {
   padding: var(--space-3);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   margin-bottom: var(--space-3);
 }
 
-.queue-list .queue-item.card:last-child,
-.token-list .token-item.card:last-child {
+.queue-list .queue-item.card:last-child {
   margin-bottom: 0;
 }
 
 /* Facts (identifiers, targets, dates) stay mono; human titles/labels stay sans. */
-.queue-list .queue-item-meta,
-.token-list .token-meta {
+.queue-list .queue-item-meta {
   font-family: var(--font-structural);
 }
-
-/* LIN-1448's `.token-ownerless` rule moved to common-actions.css (LIN-1586) —
-   the shared home of `.token-item`/`.token-meta`, which both this page and the
-   proxy page load. Same declaration, one copy; nothing here overrides it. */
 
 /* =============================================================================
    Integration Guide

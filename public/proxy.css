@@ -84,24 +84,6 @@
   color: var(--fg);
 }
 
-/* Token list base: see common-actions.css (.proxy-token-list, .token-item).
-   LIN-854: proxy token rows now also carry the shared `.surface` primitive, so
-   stack them as gapped cards and let the surface own the row's box — drop the
-   legacy in-list divider + vertical padding (page-scoped; leaves dispatch's
-   plain `.token-item` list untouched). */
-.proxy-token-list,
-.proxy-token-list .token-items-extra:not([hidden]) {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.proxy-token-list .token-item {
-  border-bottom: none;
-  padding: 0;
-}
-
-
 /* =============================================================================
    Curl Examples
    ============================================================================= */
