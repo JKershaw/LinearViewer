@@ -29,8 +29,9 @@ const AUDIT_FIXTURE = fileURLToPath(new URL('./audit-report.fixture.json', impor
 
 const isLoopback = (url) => /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(url) || url.startsWith('data:') || url.startsWith('blob:');
 
+// `urlKey` null means no local seed: the account is a zero-workspace one, signed in by email (LIN-3956).
 async function openContext(browser, baseURL, viewport, theme, entry) {
-  const { urlKey } = entry;
+  const urlKey = entry.state === 'email-signin' ? null : entry.urlKey;
   const context = await browser.newContext({
     baseURL, viewport: { width: viewport.width, height: viewport.height },
     colorScheme: theme, deviceScaleFactor: 1, reducedMotion: 'reduce',
@@ -38,11 +39,13 @@ async function openContext(browser, baseURL, viewport, theme, entry) {
   await context.route('**/*', (route) => (isLoopback(route.request().url()) ? route.continue() : route.abort()));
   await context.addCookies([{ name: 'theme', value: theme, url: baseURL }]);
   await context.clock.setFixedTime(new Date(FROZEN_TIME));
-  // LIN-3968: Home's states seed their own workspace; the run control shows only where the entry has a runner.
-  const base = entry.state?.startsWith('home-') ? homeSeed(urlKey) : defaultLocalSeed(urlKey);
-  const seed = { ...base, urlKey, runnerKey: entry.runner === true };
-  const resp = await context.request.post('/test/set-local-session', { data: seed });
-  if (!resp.ok()) throw new Error(`seed failed on ${baseURL}: ${resp.status()} ${await resp.text()}`);
+  if (urlKey) {
+    // LIN-3968: Home's states seed their own workspace; the run control shows only where the entry has a runner.
+    const base = entry.state?.startsWith('home-') ? homeSeed(urlKey) : defaultLocalSeed(urlKey);
+    const seed = { ...base, urlKey, runnerKey: entry.runner === true };
+    const resp = await context.request.post('/test/set-local-session', { data: seed });
+    if (!resp.ok()) throw new Error(`seed failed on ${baseURL}: ${resp.status()} ${await resp.text()}`);
+  }
   return context;
 }
 
@@ -79,9 +82,25 @@ async function prepareHome(page, context, entry) {
   }
 }
 
-async function prepare(page, context, entry) {
+async function prepare(page, context, entry, viewport, theme) {
   const url = entry.path(entry.urlKey);
   if (entry.state?.startsWith('home-')) return prepareHome(page, context, entry);
+  if (entry.state === 'email-signin') {
+    // One address per shot, the same on both sides: the send throttle is per address (3 per 15 minutes),
+    // and the judge takes at most ATTEMPTS (3) tries per shot. The link is read from the capture outbox.
+    const email = `judge-${viewport.name}-${theme}@example.test`;
+    await page.goto('/auth/email');
+    await page.getByTestId('email-signin-address').fill(email);
+    await page.getByTestId('email-signin-submit').click();
+    await page.getByTestId('email-check-inbox').waitFor();
+    const sent = await context.request.get(`/test/email-outbox?to=${encodeURIComponent(email)}`);
+    if (!sent.ok()) throw new Error(`no sign-in email for ${email}: ${sent.status()}`);
+    const link = (await sent.json()).text.match(/https?:\/\/[^\s]+(\/auth\/email\/confirm\?t=[A-Za-z0-9_-]+)/);
+    if (!link) throw new Error(`the sign-in email for ${email} carries no confirm link`);
+    await page.goto(link[1]);
+    await page.getByTestId('email-confirm-submit').click();
+    await page.waitForURL(/\/account$/);
+  }
   if (entry.state === 'key-open') {
     const minted = await context.request.get(`/test/create-proxy-token?urlKey=${entry.urlKey}&label=judge-key&scope=read`);
     if (!minted.ok()) throw new Error(`mint failed: ${minted.status()}`);
@@ -141,7 +160,7 @@ async function shoot(browser, baseURL, viewport, theme, entry) {
   const context = await openContext(browser, baseURL, viewport, theme, entry);
   try {
     const page = await context.newPage();
-    await prepare(page, context, entry);
+    await prepare(page, context, entry, viewport, theme);
     await settle(page);
     // Rewrite per-run text (see NORMALISE in pages.mjs) in text nodes, before the screenshot.
     await page.evaluate((rules) => {

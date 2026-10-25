@@ -34,7 +34,7 @@ import { routingFixture } from './helpers/routing-fakes.js';
  * The D2 rows are built from D2_EXPECT below, a hand table (not a pattern that only exempts).
  */
 export const INTENDED_DIFFERENCES = [];
-const PERMITTED_TICKETS = ['D2', 'D3'];
+const PERMITTED_TICKETS = ['D2', 'D3', 'LIN-3966'];
 
 // ---- the matrix of stored preferences --------------------------------------
 
@@ -163,6 +163,24 @@ const D3_RULE = {
 };
 INTENDED_DIFFERENCES.push(D3_RULE);
 let d3RuleHits = 0;
+// LIN-3966: the one other rule. A claude-code row's effort no longer crosses onto the opencode harness
+// the rows state (the LIN-1694 crossed pair): the effort that runs is null, and there is nothing to
+// report, because that effort was never set for opencode. Its `applies` is disjoint from D3_RULE, which
+// needs the report to be there. The model is unchanged in every matched cell. Hand-counted below: the
+// agent matrix and the bare resolver each change cells, and a cell beyond the expected count is a finding.
+const LIN3966_RULE = {
+  ticket: 'LIN-3966',
+  cell: 'agent-and-bare/*/crossed-effort',
+  reason: 'the crossed effort from a claude-code row no longer lands on the opencode harness the rows state; the effort that runs is null and nothing is reported',
+  applies: (old, next) => old.harness === 'opencode' && Boolean(old.effort) && next.effort === null && !next.effortNotApplied,
+  expect: (old) => ({ ...old, effort: null })
+};
+INTENDED_DIFFERENCES.push(LIN3966_RULE);
+let lin3966Hits = 0;
+const agentCrossedCells = [];
+const bareCrossedCells = [];
+const LIN3966_AGENT_CELLS = 8;
+const LIN3966_BARE_CELLS = 1;
 const diffFor = (cell) => INTENDED_DIFFERENCES.find((d) => d.cell === cell);
 
 describe('witness: the store answers as the resolvers did at 6ea1371e', () => {
@@ -225,7 +243,11 @@ describe('witness: the store answers as the resolvers did at 6ea1371e', () => {
                 const old = await frozen.resolveRouting({ ...args, workspacePreferencesStore: fx.oldStore });
                 const next = await resolveRouting({ ...args, workspacePreferencesStore: fx.preferencesStore });
                 hit(kind);
-                if (D3_RULE.applies(old)) {
+                if (LIN3966_RULE.applies(old, next)) {
+                  lin3966Hits++;
+                  agentCrossedCells.push(cell);
+                  assert.deepEqual(next, LIN3966_RULE.expect(old), cell);
+                } else if (D3_RULE.applies(old)) {
                   d3RuleHits++;
                   const want = D3_RULE.expect(old);
                   const { layer, ...reported } = next.effortNotApplied || {};
@@ -244,7 +266,14 @@ describe('witness: the store answers as the resolvers did at 6ea1371e', () => {
         for (const harnessInForce of [null, 'claude-code', 'opencode']) {
           const old = await frozen.resolveDispatchDefaults({ urlKey: fx.urlKey, kind, store: fx.oldStore, harnessInForce });
           const next = await resolveDispatchDefaults({ urlKey: fx.urlKey, kind, store: fx.preferencesStore, harnessInForce });
-          assert.deepEqual(next, old, `dispatch-defaults/${kind}/${name}/${harnessInForce}`);
+          const cell = `dispatch-defaults/${kind}/${name}/${harnessInForce}`;
+          if (LIN3966_RULE.applies(old, next)) {
+            lin3966Hits++;
+            bareCrossedCells.push(cell);
+            assert.deepEqual(next, LIN3966_RULE.expect(old), cell);
+          } else {
+            assert.deepEqual(next, old, cell);
+          }
         }
       }
     }
@@ -346,6 +375,17 @@ describe('witness: the store answers as the resolvers did at 6ea1371e', () => {
   // LIN-3857: the D3 rule is not vacuous, and the matrix holds the preset/anchor cell the plan review found.
   test('the D3 rule matched opencode cells in the matrix', () => {
     assert.ok(d3RuleHits > 0, 'the D3 opencode-effort rule matched nothing');
+  });
+
+  // LIN-3966: exactly the cells the fix changes, no more. Eight agent cells on the autopilot job of
+  // `everything set` (explicit fields x anchor x default harness) and the one bare-resolver cell for the
+  // same job; the bare cell is the one the first failing assertion masked in the research and review spikes.
+  test('the LIN-3966 rule matched exactly the nine cells the fix changes', () => {
+    assert.equal(agentCrossedCells.length, LIN3966_AGENT_CELLS, agentCrossedCells.join('\n'));
+    assert.equal(bareCrossedCells.length, LIN3966_BARE_CELLS, bareCrossedCells.join('\n'));
+    assert.equal(lin3966Hits, LIN3966_AGENT_CELLS + LIN3966_BARE_CELLS);
+    for (const cell of agentCrossedCells) assert.ok(cell.startsWith('agent/autopilot/everything set/'), cell);
+    for (const cell of bareCrossedCells) assert.equal(cell, 'dispatch-defaults/autopilot/everything set/null');
   });
 
   // Last on purpose: it reads the counters the matrix tests filled in.

@@ -45,7 +45,7 @@ function makeContainer() {
   return container;
 }
 
-function load({ opened = null, previewFor = () => null, presets = [], kickoff = { prompt: 'AUTOPILOT PROMPT', promptName: 'Autopilot', kind: 'autopilot' } } = {}) {
+function load({ opened = null, previewFor = () => null, presets = [], kickoff = { prompt: 'AUTOPILOT PROMPT', promptName: 'Autopilot', kind: 'autopilot' }, document = null } = {}) {
   const calls = { api: [], dispatch: [], kickoff: [] };
   const window = {
     escapeHtml: (s) => (s == null ? '' : String(s)),
@@ -71,7 +71,7 @@ function load({ opened = null, previewFor = () => null, presets = [], kickoff = 
   };
   const sandbox = {
     window, AbortController, URLSearchParams, TextDecoder, TextEncoder, Blob: class {}, URL,
-    document: { createElement: () => ({ click() {} }), body: { appendChild() {}, removeChild() {} } },
+    document: document || { createElement: () => ({ click() {} }), body: { appendChild() {}, removeChild() {} } },
     requestAnimationFrame: (cb) => { cb(); return 1; },
     // The Go poll schedules its own timers; unref them so a finished test does not hold the process open.
     setTimeout: (fn, ms) => { const t = globalThis.setTimeout(fn, ms); if (t && t.unref) t.unref(); return t; },
@@ -96,9 +96,9 @@ const HOME = {
 // `offered` is the step the server offers (LIN-3968); `next` is the "comes next" wording. Nothing runs, so they agree.
 const PLAN_NEXT = { count: 1, next: { kind: 'plan', label: 'Plan' }, offered: { kind: 'plan', label: 'Plan', why: 'usual', failed: false }, last: { label: 'Research', state: 'done', at: null }, running: null };
 
-async function mount(over = {}, loadOver = {}) {
+async function mount(over = {}, loadOver = {}, container = null) {
   const env = load(loadOver);
-  const c = makeContainer();
+  const c = container || makeContainer();
   env.PromptSection.init(c, { ...HOME, ...over });
   await flush();
   return { ...env, c };
@@ -187,6 +187,124 @@ describe('LIN-3833 — the choice for this run goes through the preview, and the
     assert.equal(d.kind, 'plan');
     assert.equal(d.entryRung, 'run-step');
     assert.equal(d.prompt, 'PROMPT plan');
+  });
+});
+
+// LIN-3969: Reset then "Use for this run" sends two preview reads back to back. When the first (the reset
+// choice: no model) answered after the second, the stale answer overwrote the Runs-on line, which then read
+// "the default model" for a run that would go out on the chosen model (CI run 40220361851). The preview is
+// held until the test releases it, so the answers arrive in the order the test chooses.
+describe('LIN-3969 — the Runs-on line shows the answer to the latest preview read, whatever order they arrive in', () => {
+  const held = () => {
+    const pending = [];
+    const previewFor = (q) => new Promise((resolve) => {
+      pending.push(() => resolve({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: q.get('model') || null, harness: 'claude-code', effort: null, sources: { model: q.get('model') ? 'explicit' : 'none', harness: 'fallback', effort: 'none' } }));
+    });
+    return { pending, previewFor };
+  };
+
+  test('Reset, then a chosen model: the reset read answering last does not undo the chosen model', async () => {
+    const { pending, previewFor } = held();
+    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor });
+    pending.shift()();
+    await flush();
+    await c.click({ action: 'change-run' });
+    await c.click({ action: 'reset-run' });
+    await c.fire('input', { dataset: { testid: 'run-model' }, value: 'chosen-model-x' });
+    await c.click({ action: 'use-run' });
+    assert.equal(pending.length, 2, 'two preview reads are in flight: the reset one, then the chosen one');
+    pending[1]();
+    await flush();
+    assert.match(c.innerHTML, /data-testid="run-on-what">chosen-model-x</);
+    pending[0]();
+    await flush();
+    assert.match(c.innerHTML, /data-testid="run-on-what">chosen-model-x</, 'the stale reset answer is dropped');
+  });
+
+  test('the mount read answering after a chosen model does not undo it', async () => {
+    const { pending, previewFor } = held();
+    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor });
+    await c.click({ action: 'change-run' });
+    await c.fire('input', { dataset: { testid: 'run-model' }, value: 'chosen-model-x' });
+    await c.click({ action: 'use-run' });
+    assert.equal(pending.length, 2, 'the mount read and the chosen read are both in flight');
+    pending[1]();
+    await flush();
+    pending[0]();
+    await flush();
+    assert.match(c.innerHTML, /data-testid="run-on-what">chosen-model-x</);
+  });
+});
+
+// LIN-3969: a preview or presets answer repaints the run block, which replaces the Change panel's Model input.
+// Typing in it then went to a removed input: focus and every later keystroke were lost, and "Use for this run"
+// applied a cut-off model or none (the browser repro ran on "chose" for "chosen-model-x"). The repaint keeps the
+// focused control: the same control in the new block is focused, with the typed value and the caret.
+describe('LIN-3969 — a run-block repaint keeps the control being typed in', () => {
+  // A run slot whose repaint is observable: `outerHTML = …` replaces the slot, and the new slot's controls are
+  // fresh objects, like a real outerHTML swap.
+  function slotContainer(doc) {
+    const c = makeContainer();
+    const control = (testid) => ({
+      dataset: { testid }, type: testid === 'run-model' ? 'text' : undefined, value: '', selectionStart: null, selectionEnd: null, focused: false,
+      focus() { this.focused = true; doc.activeElement = this; },
+      setSelectionRange(a, b) { this.selectionStart = a; this.selectionEnd = b; },
+    });
+    let slot = null;
+    const newSlot = () => {
+      const controls = {};
+      const s = {
+        controls,
+        contains: (el) => Object.values(controls).includes(el),
+        querySelector: (sel) => {
+          const m = sel.match(/data-testid="([^"]+)"/);
+          if (!m) return null;
+          return controls[m[1]] || (controls[m[1]] = control(m[1]));
+        },
+        set outerHTML(html) {
+          c.innerHTML = c.innerHTML.replace(/<div class="opened-task-run"[\s\S]*$/, html);
+          slot = newSlot();
+        },
+      };
+      return s;
+    };
+    c.querySelector = (sel) => {
+      if (!/data-run-slot/.test(sel)) return null;
+      if (!/opened-task-run/.test(c.innerHTML)) return null;
+      if (!slot) slot = newSlot();
+      const inner = sel.replace(/^\[data-run-slot\]\s*/, '');
+      return inner === sel || inner === '' ? slot : slot.querySelector(inner);
+    };
+    c.slot = () => slot;
+    return c;
+  }
+
+  test('a preview landing mid-typing leaves the Model input focused, with its value and caret', async () => {
+    const pending = [];
+    const previewFor = () => new Promise((resolve) => { pending.push(() => resolve({ kind: 'plan', stepLabel: 'Plan', model: null, harness: 'claude-code', effort: null, sources: { model: 'none', harness: 'fallback', effort: 'none' } })); });
+    const doc = { activeElement: null, createElement: () => ({ click() {} }), body: { appendChild() {}, removeChild() {} } };
+    const c = slotContainer(doc);
+    await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor, document: doc }, c);
+    pending.shift()();
+    await flush();
+    await c.click({ action: 'change-run' });
+    await flush();
+    await c.click({ action: 'reset-run' });
+    // The viewer is typing: "chose" so far, caret at the end.
+    const input = c.slot().querySelector('[data-testid="run-model"]');
+    input.focus();
+    input.value = 'chose';
+    input.selectionStart = 5;
+    input.selectionEnd = 5;
+    await c.fire('input', input);
+    // The reset preview lands and the run block repaints.
+    pending.shift()();
+    await flush();
+    const again = c.slot().querySelector('[data-testid="run-model"]');
+    assert.notEqual(again, input, 'the repaint replaced the input');
+    assert.equal(doc.activeElement, again, 'the new Model input has the focus, so the next keystroke lands in it');
+    assert.equal(again.value, 'chose');
+    assert.deepEqual([again.selectionStart, again.selectionEnd], [5, 5]);
   });
 });
 

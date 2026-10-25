@@ -927,17 +927,39 @@
     }
 
     // Repaint only the run block (the preview and Change panel write here), never the prompt body.
+    // LIN-3969: a preview or presets answer can land while the viewer is typing in the Change panel. The
+    // repaint replaces every control in the block, so the control that had the focus is focused again in the
+    // new block, with its live value and caret; otherwise the rest of the typing went nowhere and "Use for
+    // this run" applied a cut-off model, or none.
     function paintRun() {
       if (destroyed || !runControlOn()) return;
       const slot = container.querySelector && container.querySelector('[data-run-slot]');
-      if (slot) slot.outerHTML = renderRunBlock();
-      else render();
+      if (!slot) { render(); return; }
+      const active = typeof document !== 'undefined' ? document.activeElement : null;
+      const testid = active && active.dataset && slot.contains && slot.contains(active) ? active.dataset.testid : null;
+      const typed = testid && typeof active.value === 'string'
+        ? { value: active.value, start: active.selectionStart, end: active.selectionEnd }
+        : null;
+      slot.outerHTML = renderRunBlock();
+      if (!testid) return;
+      const again = container.querySelector(`[data-run-slot] [data-testid="${testid}"]`);
+      if (!again || typeof again.focus !== 'function') return;
+      again.focus();
+      if (typed && again.type === 'text') {
+        again.value = typed.value;
+        if (typed.start != null && typeof again.setSelectionRange === 'function') again.setSelectionRange(typed.start, typed.end);
+      }
     }
 
     // The resolved setting for the step the run would start, from the server's own resolution
     // (routes/dispatch.js preview). Read-only; the browser resolves nothing itself.
+    // LIN-3969: reads can overlap (Reset then "Use for this run", or the mount read still out when a
+    // choice is used), and their answers can arrive in either order. Only the latest read may paint, so a
+    // stale answer never puts the Runs-on line back to a choice that is no longer this run's.
+    let runPreviewSeq = 0;
     function refreshRunPreview() {
       if (!runControlOn() || !opts.urlKey || typeof window.api !== 'function') return;
+      const seq = ++runPreviewSeq;
       const step = runStepOf();
       const params = new URLSearchParams({ promptName: step ? step.kind : 'autopilot', surface: opts.surface });
       const c = state.run.choice;
@@ -947,7 +969,7 @@
       if (c.effort) params.set('effort', c.effort);
       window.api(`/workspace/${encodeURIComponent(opts.urlKey)}/api/dispatch/preview?${params.toString()}`, { on401: false })
         .then((preview) => {
-          if (destroyed) return;
+          if (destroyed || seq !== runPreviewSeq) return;
           state.run.preview = preview || null;
           paintRun();
         })

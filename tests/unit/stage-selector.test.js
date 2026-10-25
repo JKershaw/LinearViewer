@@ -155,6 +155,20 @@ describe('the selector prompt (LIN-3300)', () => {
     }
   });
 
+  // LIN-3906: a review Approve belongs to close-out (LIN-3854 picked implementation after
+  // "Approve, conditional on close-out"), and one PR in ordered commits is not a breakdown (LIN-3861).
+  test('implementation\'s not-when sends a review Approve, plain or conditional, to close-out', () => {
+    const impl = getSelectableStages().find(s => s.key === 'implementation');
+    assert.match(impl.whenNot, /a review Approve, plain or conditional: close-out makes its fixes/);
+    assert.ok(prompt().includes(impl.whenNot), 'the routing prompt carries the not-when verbatim');
+  });
+
+  test('breakdown\'s not-when names one PR in ordered commits as not a breakdown', () => {
+    const breakdown = getSelectableStages().find(s => s.key === 'breakdown');
+    assert.match(breakdown.whenNot, /one PR in ordered commits/);
+    assert.ok(prompt().includes(breakdown.whenNot), 'the routing prompt carries the not-when verbatim');
+  });
+
   test('a ruling older than the latest comments still reaches the selector', () => {
     const comments = [
       { user: 'John', createdAt: '2026-10-01T00:00:00Z', body: `Dispatch implement for N4.\n\n${RULING_MARK}` },

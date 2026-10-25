@@ -75,12 +75,16 @@ describe('resolveRoutingWithSources — values match resolveRouting, with a sour
 });
 
 describe('the LIN-1694 crossed pair — settled for the opened task, unchanged for everyone else', () => {
-  test('without the settle (a proxy-style caller) the steer row still donates its model across claude-code', async () => {
+  // LIN-3966: this used to pin the residue (the steer row donated its model across claude-code). The
+  // resolver now reads model and effort against the harness the rows state for every caller, so the
+  // proxy-style caller no longer crosses. The settle still names the same answer (the test below).
+  test('without the settle (a proxy-style caller) the steer row does not donate its model across claude-code', async () => {
     const routing = await resolveRoutingWithSources({
       urlKey: 'acme', kind: 'autopilot', workspacePreferencesStore: storeWith(crossedTable()), applyDefaultHarness: true
     });
     assert.equal(routing.harness, 'claude-code');
-    assert.equal(routing.model, 'deepseek-v4-pro', 'the pre-existing crossed pair stays for callers that do not settle');
+    assert.equal(routing.model, null, 'the crossed pair is gone for every caller (LIN-3966)');
+    assert.equal(routing.sources.model, 'none');
   });
 
   test('with the settle the harness in force is claude-code and the opencode row cannot donate its model', async () => {
