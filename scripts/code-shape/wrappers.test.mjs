@@ -164,6 +164,19 @@ test('retention: tests are out of scope by default; --exclude \'^$\' brings them
   } finally { r2.cleanup(); }
 });
 
+test('retention: a moved file is a delete plus an add, so a ref dropped inside it is still reported (--no-renames)', () => {
+  const r2 = makeRepo();
+  try {
+    // Enough unchanged code that git's rename detection would pair the two paths if it were asked to.
+    const body = 'export const a = 1;\nexport const b = 2;\nexport const c = 3;\nexport const d = 4;\nexport const e = 5;\n';
+    const base = r2.commit({ 'lib/a.js': `// LIN-77 keeps the retry\n// LIN-78 keeps the backoff\n${body}` }, '2026-01-01T00:00:00Z');
+    const head = r2.commit({ 'lib/a.js': null, 'lib/moved.js': `// LIN-77 keeps the retry\n${body}` }, '2026-01-02T00:00:00Z');
+    const r = cli('retention.mjs', [r2.dir, base, head]);
+    assert.equal(r.status, 0, r.stderr);
+    assert.deepEqual(r.json.dropped.map((d) => [d.ref, d.baseFiles]), [['LIN-78', ['lib/a.js']]], 'LIN-77 moved with the file (pooled); LIN-78 is gone');
+  } finally { r2.cleanup(); }
+});
+
 test('retention: usage errors exit 2 — missing arguments, unknown commit, unknown flag', () => {
   assert.equal(cli('retention.mjs', [repo.dir, first]).status, 2);
   assert.equal(cli('retention.mjs', [repo.dir, first, 'no-such-commit']).status, 2);
