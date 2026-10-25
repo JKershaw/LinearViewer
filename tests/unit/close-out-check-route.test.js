@@ -693,3 +693,50 @@ describe('LIN-3657: close-out-press on a head-moved close-out', () => {
     });
   });
 });
+
+// LIN-3913: the proxyUrlKey arm of isPersonSession, and the 100-char identifier bound,
+// pinned on the check and press routes (the only other callers of validCloseOutIdentifier).
+describe('LIN-3913: person-session and identifier guards on check and press', () => {
+  const mergedComments = () => [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')];
+
+  test('a proxyUrlKey-only caller (no proxyTokenId) is refused 403 on check and never sets Done', async () => {
+    const built = makeRouter({ comments: mergedComments(), statuses: { 41: mergedStatus(41) } });
+    const res = await check(built, baseReq({ proxyUrlKey: 'ws' }));
+    assert.equal(res.statusCode, 403);
+    assert.equal(res.jsonBody.code, 'PERSON_SESSION_REQUIRED');
+    assert.equal((await rows(built.collection)).length, 0);
+    assert.equal(built.calls.markDone, 0);
+  });
+
+  test('a proxyUrlKey-only caller is refused 403 on press and records nothing', async () => {
+    const built = makeRouter({ comments: mergedComments(), statuses: { 41: mergedStatus(41) } });
+    const res = await press(built, baseReq({ proxyUrlKey: 'ws', body: { prUrl: PR_A, headSha: 'abc1234', dispatchId: 'd-9' } }));
+    assert.equal(res.statusCode, 403);
+    assert.equal(res.jsonBody.code, 'PERSON_SESSION_REQUIRED');
+    assert.equal((await rows(built.collection)).length, 0);
+  });
+
+  test('identifier bound on check: 100 chars is accepted, 101 is refused 400 with nothing recorded', async () => {
+    const built = makeRouter({ comments: mergedComments(), statuses: { 41: mergedStatus(41) } });
+    const params = (issueIdentifier) => ({ urlKey: 'ws', issueIdentifier });
+    const atBound = await check(built, baseReq({ params: params('L'.repeat(100)) }));
+    assert.notEqual(atBound.statusCode, 400);
+
+    const overBound = await check(built, baseReq({ params: params('L'.repeat(101)) }));
+    assert.equal(overBound.statusCode, 400);
+    assert.equal(overBound.jsonBody.error, 'Invalid issue identifier');
+    assert.equal(built.calls.markDone, 1, 'only the at-bound call reached the Done write');
+  });
+
+  test('identifier bound on press: 100 chars is accepted, 101 is refused 400 with nothing recorded', async () => {
+    const built = makeRouter({ comments: mergedComments(), statuses: { 41: mergedStatus(41) } });
+    const body = { prUrl: PR_A, headSha: 'abc1234', dispatchId: 'd-9' };
+    const overBound = await press(built, baseReq({ params: { urlKey: 'ws', issueIdentifier: 'L'.repeat(101) }, body }));
+    assert.equal(overBound.statusCode, 400);
+    assert.equal(overBound.jsonBody.error, 'Invalid issue identifier');
+    assert.equal((await rows(built.collection)).length, 0);
+
+    const atBound = await press(built, baseReq({ params: { urlKey: 'ws', issueIdentifier: 'L'.repeat(100) }, body }));
+    assert.notEqual(atBound.statusCode, 400);
+  });
+});
