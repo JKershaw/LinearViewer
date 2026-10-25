@@ -159,8 +159,21 @@ function queueDefaults(mem) {
     getGrantDeclaration: () => ({ state: 'none' }),
     listItems: () => [],
     listHistory: () => ({ items: [], total: 0 }),
+    // LIN-3812: the non-lean loop builders (sessions) read listItemsWithPrompt /
+    // listHistoryWithBodies, the same rows as listItems / listHistory plus the
+    // prompt and feedback. The recording store answers every op, so without these
+    // a scenario's listItems/listHistory never reached the sessions route and
+    // every session list was empty (m05 undetected, LIN-3934).
+    listItemsWithPrompt: (args, c, n) => sameRowsAs(c, 'listItems', n) ?? [],
+    listHistoryWithBodies: (args, c, n) => sameRowsAs(c, 'listHistory', n) ?? { items: [], total: 0 },
     countItems: () => 0,
   };
+}
+
+/** The scenario's answer for the lean twin of a dispatch-store read, as a behaviour. */
+function sameRowsAs(c, op, n) {
+  const b = pickBehaviour(c.sc.stores?.dispatchQueueStore?.[op], n);
+  return b ? { __behaviour: b } : undefined;
 }
 
 /**
