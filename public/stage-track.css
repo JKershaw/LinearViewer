@@ -117,8 +117,8 @@
 .task-checkin-message { display: block; color: var(--muted); }
 
 /* ── Stage strip: every stage on one row, Home's opened task (LIN-3968) ─────
-   One chip per stage. The row never scrolls sideways: chips share the width and their words cut
-   with an ellipsis, so a phone at 390px keeps the five on one line too. */
+   One chip per stage. The row never scrolls sideways: chips share the width, and a name wraps inside
+   its chip, so a phone at 390px keeps the five on one line too (nothing is cut). */
 .task-strip {
   display: flex;
   flex-wrap: nowrap;

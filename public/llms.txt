@@ -65,7 +65,7 @@ Issues are wrapped in nested `.node` containers:
       .detail-toggle[data-toggle="comments"] - "Comments ▶" toggle (auth only, nested)
       .detail-toggle[data-toggle="attachments"] - "Attachments (N) ▶" toggle (auth only, nested; image gallery via /api/image relay, attachment-capable providers only)
     [data-testid="issue-task-page-link"] - "Task page ›" (Home's links row); `issue-chat-link` "Chat ↗" (taskChat flag); `issue-provider-link` - "Open in {provider} ↗" (provider name is dynamic, e.g. "Open in Linear")
-    [data-testid="opened-task-runner-link"] - "Harbour can also run steps for you, on your own machine. Set up a runner ›" (link to /workspace/{urlKey}/runner) (copy-first viewers only: a run-controls viewer already has a runner)
+    [data-testid="opened-task-runner-link"] - "Harbour can also run steps for you, on your own machine. Set up a runner ›" (link to /workspace/{urlKey}/runner) (copy-first viewers only: a run-controls viewer already has a runner); its block is `.opened-task-runner-line`, one run of prose and link, the link at the sentence size (LIN-3968)
   .children                     - container for nested child nodes
     .node[data-id="{child-id}"] - child node (same structure)
 ```

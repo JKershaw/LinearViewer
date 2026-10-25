@@ -4782,6 +4782,30 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
   font-size: 12px;
 }
 
+/* LIN-3968: Home's runner line is one run of prose and link, so it is a block, not the flex detail line (flex
+   collapsed the space before the link). The link takes the sentence's size here; Swipe's card does the same
+   in swipe.css. */
+.opened-task-runner-line {
+  margin-top: 0.2rem;
+}
+
+.opened-task-runner-line .opened-task-runner-link {
+  margin-top: 0;
+  font-size: inherit;
+}
+
+/* LIN-3968: on Home, Rewrite is the same button as Download beside it. swipe.css keeps its own 10px look for
+   the Swipe card, so this rule is scoped to the opened task. */
+.opened-task .btn.opened-task-regenerate {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--raised);
+  color: var(--text);
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+}
+
 .opened-task-runner-link:hover,
 .opened-task-setup-runner-link:hover {
   text-decoration: underline;

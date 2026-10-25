@@ -296,7 +296,7 @@
       // after-run line stay in the run block.
       const step = runStepOfState(state);
       if (step) html += `<button class="opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-step" data-action="run-step-next">Run ${esc(step.label)}</button>`;
-      else if (!stageBusy(state)) html += '<button class="opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-task" data-action="go">Run to PR</button>';
+      else if (state.opened && !stageBusy(state)) html += '<button class="opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-task" data-action="go">Run to PR</button>';
     } else {
       html += '<button class="opened-task-go" data-testid="opened-task-go" data-rung="run-task" data-action="go">Go</button>';
     }
@@ -1009,8 +1009,9 @@
     // The step line: the name and why it is next. ✦ write prompt writes this step's prompt (it does not replace the why).
     function renderStepLine(step) {
       const last = state.opened && state.opened.sessions && state.opened.sessions.last;
-      // LIN-3968: a running stage offers no step; the after-run line names what runs and what comes next.
-      if (!state.run.step && stageBusy(state)) return '';
+      // LIN-3968: a running stage offers no step; the after-run line names what runs and what comes next. Before
+      // the state read lands, the step is not known, so no step is offered either (not "Run to PR").
+      if (!state.run.step && (!state.opened || stageBusy(state))) return '';
       let why = 'the next step for this task';
       if (state.run.step) why = 'chosen for this run';
       else if (step && step.failed) why = 'failed last time, so it runs again';
@@ -2016,7 +2017,9 @@
         if (destroyed || !data) return null;
         state.opened = data;
         paintState();
-        if (runControlOn()) refreshRunPreview();
+        // LIN-3968: the run block is repainted from the state at once, so the step is never guessed while the
+        // preview is still out (the preview's answer repaints it again, in refreshRunPreview).
+        if (runControlOn()) { paintRun(); refreshRunPreview(); }
         return data;
       })
       : null;

@@ -229,7 +229,50 @@ test('findRecentFreshDispatch: a cancelled row (an Undo) does not block the same
     assert.deepEqual(query.status, { $ne: 'cancelled' }, 'the exemption rides into both reads');
   }
 
-  // Every other archived row still counts: taken (the LIN-1594 pile included) and expired.
+  // Every other archived row still counts: taken (the LIN-1594 pile included).
   await store.historyCollection.insertOne(row('taken', { status: 'taken' }));
   assert.equal((await store.findRecentFreshDispatch('acme', { issueIdentifier: 'LIN-1', kind: 'review', since })).id, 'taken');
+});
+
+test('findRecentFreshDispatch: a row whose session ended failed, aborted or expired does not block the stage again (LIN-3968 DECISION, option a)', async () => {
+  const { store } = makeStore();
+  const base = new Date('2026-10-25T12:00:00.000Z');
+  const since = new Date(base.getTime() - 1000);
+  const row = (id, extra) => ({
+    _id: id, urlKey: 'acme', issueIdentifier: 'LIN-1', kind: 'review',
+    followUpTo: null, abort: false, prompt: 'x', dispatchedAt: base, ...extra
+  });
+  const find = () => store.findRecentFreshDispatch('acme', { issueIdentifier: 'LIN-1', kind: 'review', since });
+
+  // Ended rows: the archived status says so.
+  for (const status of ['failed', 'aborted', 'expired']) {
+    await store.historyCollection.insertOne(row(`status-${status}`, { status }));
+    assert.equal(await find(), null, `a ${status} row ran no work to duplicate`);
+  }
+
+  // The LIN-1594 pile: a row still `taken` whose runner posted a terminal failure marker. Only the feedback says it ended.
+  const failedMarker = [{ message: '[failed] Review could not finish', timestamp: base }];
+  await store.historyCollection.insertOne(row('taken-failed', { status: 'taken', feedback: failedMarker }));
+  assert.equal(await find(), null, 'a taken row whose latest terminal marker is [failed] is an ended session');
+  await store.historyCollection.insertOne(row('taken-aborted', { status: 'taken', feedback: [{ message: '[aborted] Stopped by the person', timestamp: base }] }));
+  assert.equal(await find(), null, 'a taken row whose latest terminal marker is [aborted] is an ended session');
+
+  // A session that completed still counts: its stage ran, so a second run is a duplicate.
+  await store.historyCollection.insertOne(row('taken-done', { status: 'taken', feedback: [{ message: '[done] Review written', timestamp: base }] }));
+  assert.equal((await find()).id, 'taken-done');
+});
+
+test('findRecentFreshDispatch: a row still in flight keeps counting, even after a failed one (LIN-3968)', async () => {
+  const { store } = makeStore();
+  const base = new Date('2026-10-25T12:00:00.000Z');
+  const since = new Date(base.getTime() - 1000);
+  const row = (id, extra) => ({
+    _id: id, urlKey: 'acme', issueIdentifier: 'LIN-1', kind: 'review',
+    followUpTo: null, abort: false, prompt: 'x', dispatchedAt: base, ...extra
+  });
+  await store.historyCollection.insertOne(row('failed-earlier', { status: 'failed' }));
+  await store.collection.insertOne(row('queued-now', {}));
+
+  assert.equal((await store.findRecentFreshDispatch('acme', { issueIdentifier: 'LIN-1', kind: 'review', since })).id, 'queued-now',
+    'a queued row has not ended; the guard protects it');
 });

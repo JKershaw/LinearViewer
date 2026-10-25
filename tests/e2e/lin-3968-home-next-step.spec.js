@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId } from '../fixtures/local-harness.js';
+import { facelessButtons } from '../fixtures/house-face.js';
 
 // LIN-3968: Home's opened task, with seeded sessions. Witnesses in a real browser, for an owner with a runner:
 // a failed stage counts as needing you and is offered again (not the stage after it); a running stage offers no
@@ -120,6 +121,47 @@ test.describe('Home: a running stage offers no other step (LIN-3968)', () => {
     await expect(block.locator('[data-offered="true"]')).toHaveCount(0);
     await expect(block.getByRole('button', { name: /^Run / })).toHaveCount(0);
   });
+
+  test('while Build runs and the run preview is still out, the run block offers no step either (not "Run to PR")', async ({ page }) => {
+    await seedTask(page);
+    const token = await runnerToken(page);
+    await seedSession(page, token, { kind: 'plan', feedback: ['[done] planned it'] });
+    await seedSession(page, token, { kind: 'implementation' });
+    // Hold the run preview until the assertions have run: the state block already names the running stage.
+    let releasePreview;
+    const held = new Promise((resolve) => { releasePreview = resolve; });
+    await page.route('**/api/dispatch/preview*', async (route) => { await held; await route.continue(); });
+    try {
+      await gotoHome(page);
+      const block = await openTopTask(page);
+      await expect(chip(block, 'implementation')).toHaveAttribute('data-state', 'running');
+
+      const run = block.locator('[data-testid="opened-task-run"]');
+      await expect(run.getByTestId('run-ask-harbour')).toHaveCount(0);
+      await expect(run).not.toContainText('Run to PR');
+      await expect(run).not.toContainText('write prompt');
+    } finally {
+      releasePreview();
+    }
+  });
+});
+
+test.describe('Home: a failed stage can be run again (LIN-3968 DECISION, option a)', () => {
+  test.use({ viewport: DESKTOP });
+
+  test('Run Review on a Review that failed moments ago is accepted and queued, not refused as a duplicate', async ({ page }) => {
+    await seedTask(page);
+    await seedFailedReview(page);
+    await gotoHome(page);
+    const block = await openTopTask(page);
+
+    const posted = page.waitForResponse((r) => r.request().method() === 'POST' && /\/api\/dispatch$/.test(new URL(r.url()).pathname));
+    await block.getByTestId('opened-task-go').click();
+    const resp = await posted;
+    expect(resp.status(), 'a failed stage is not a duplicate of itself').toBe(201);
+    // The run is queued (a refused dispatch is a 409, which fails above), so the run block names it as queued.
+    await expect(block.locator('[data-testid="opened-task-run"]')).toContainText('Queued');
+  });
 });
 
 test.describe('Home: the stage strip is one row and styled (LIN-3968)', () => {
@@ -185,15 +227,15 @@ test.describe('Home: the copy-first view names its step and the task a written p
     const header = block.locator('.opened-task-step-name');
     await expect(header).not.toHaveText('AI Recommendation');
     await expect(header).toHaveText('Next prompt');
-    // Every button in the opened task now written has a face, including Copy, Rewrite and Download.
-    const faceless = await block.evaluate((root) => [...root.querySelectorAll('button')]
-      .filter((b) => !b.closest('.opened-task-run'))
-      .filter((b) => {
-        const cs = getComputedStyle(b);
-        const transparent = (c) => c === 'transparent' || c === 'rgba(0, 0, 0, 0)';
-        return transparent(cs.backgroundColor) && (cs.borderTopStyle === 'none' || transparent(cs.borderTopColor));
-      })
-      .map((b) => b.outerHTML.slice(0, 120)));
-    expect(faceless, 'every button in the written copy-first view has a face').toEqual([]);
+    // Every button in the opened task now written has a house face, including Copy, Rewrite and Download.
+    const faceless = await facelessButtons(block);
+    expect(faceless, 'every button in the written copy-first view has a house colour for its face').toEqual([]);
+    // Rewrite sits beside Download and matches it on Home (style.css, scoped to the opened task); Swipe keeps its own.
+    const sized = (selector) => block.locator(selector).first().evaluate((el) => {
+      const cs = getComputedStyle(el);
+      return { font: cs.fontSize, padding: cs.padding, background: cs.backgroundColor, color: cs.color };
+    });
+    expect(await sized('button.btn.opened-task-regenerate'), 'Rewrite matches Download on Home')
+      .toEqual(await sized('button.opened-task-download'));
   });
 });

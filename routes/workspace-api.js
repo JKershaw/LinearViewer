@@ -139,7 +139,7 @@ function sendMockSections(res, { reasoning, prompt }) {
 }
 
 /** The test-token stream over a fixture issue (LIN-185): a container descends (LIN-327), a leaf streams its mock. */
-function streamMockFixture(res, mockIssue) {
+export function streamMockFixture(res, mockIssue) {
   const descent = planMockDescent(mockIssue);
 
   // Node-shaped mock issue (LIN-327): mirror the live node path — stream a
