@@ -63,6 +63,8 @@ async function startServer(dir, dataDir) {
       ...process.env, NODE_ENV: 'test', PORT: String(port), SESSION_SECRET: 'test-secret-for-playwright',
       LINEAR_ACCESS_TOKEN: '', OPENROUTER_API_KEY: '', OPENROUTER_FREE_TIER_KEY: '', MONGODB_URI: '',
       HARBOUR_DATA_DIR: path.join(dataDir, 'data'),
+      // The same email env as playwright.config.js: the capture transport, so `account-home` can sign in (LIN-3956).
+      EMAIL_TRANSPORT: 'capture', EMAIL_LINK_ORIGIN: '', PUBLIC_ORIGIN: '',
     },
   });
   servers.push(child);
