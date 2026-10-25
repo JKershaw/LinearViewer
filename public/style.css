@@ -4786,7 +4786,7 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
    collapsed the space before the link). The link takes the sentence's size here; Swipe's card does the same
    in swipe.css. */
 .opened-task-runner-line {
-  margin-top: 0.2rem;
+  margin-top: var(--space-1);
 }
 
 .opened-task-runner-line .opened-task-runner-link {
