@@ -574,12 +574,13 @@
       </div>`;
   }
 
+  // LIN-3968: the header names the step this view offers (Plan, Scoping, or the next prompt), not the
+  // result's `AI Recommendation` name, which Swipe and prompt memory share.
   function renderCopyFresh(state, opts) {
-    const { name, label } = state.result;
     const age = formatGeneratedAge(state.result.generatedAt);
     const keyOn = !!(window.ProxyToggle && typeof window.ProxyToggle.isActive === 'function' && window.ProxyToggle.isActive());
     return `
-      <div class="opened-task-step" data-testid="opened-task-step"><span class="opened-task-step-name">${esc(name || copyStepOf(opts).name || 'Next prompt')}</span>${age ? ` \u00b7 generated ${esc(age)}` : ''}</div>
+      <div class="opened-task-step" data-testid="opened-task-step"><span class="opened-task-step-name">${esc(copyStepOf(opts).name || 'Next prompt')}</span>${age ? ` \u00b7 generated ${esc(age)}` : ''}</div>
       ${renderTargetLine(state, opts)}
       ${renderPromptBox(state, opts)}
       <label class="opened-task-progress-key"><input type="checkbox" data-testid="opened-task-progress-key"${keyOn ? ' checked' : ''}> Let your agent post progress to this task</label>

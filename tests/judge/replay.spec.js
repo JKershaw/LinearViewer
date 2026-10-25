@@ -16,6 +16,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defaultLocalSeed } from '../fixtures/local-harness.js';
 import { PAGES, VIEWPORTS, THEMES, FROZEN_TIME, NORMALISE, parsePixelDiff } from './pages.mjs';
+import { homeSeed, hasHomeSessions, seedHomeSessions, HOME_WRITE_SSE } from './home-states.mjs';
 
 const BASE_URL = process.env.JUDGE_BASE_URL;
 const HEAD_URL = process.env.JUDGE_HEAD_URL;
@@ -28,7 +29,8 @@ const AUDIT_FIXTURE = fileURLToPath(new URL('./audit-report.fixture.json', impor
 
 const isLoopback = (url) => /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(url) || url.startsWith('data:') || url.startsWith('blob:');
 
-async function openContext(browser, baseURL, viewport, theme, urlKey) {
+async function openContext(browser, baseURL, viewport, theme, entry) {
+  const { urlKey } = entry;
   const context = await browser.newContext({
     baseURL, viewport: { width: viewport.width, height: viewport.height },
     colorScheme: theme, deviceScaleFactor: 1, reducedMotion: 'reduce',
@@ -36,7 +38,9 @@ async function openContext(browser, baseURL, viewport, theme, urlKey) {
   await context.route('**/*', (route) => (isLoopback(route.request().url()) ? route.continue() : route.abort()));
   await context.addCookies([{ name: 'theme', value: theme, url: baseURL }]);
   await context.clock.setFixedTime(new Date(FROZEN_TIME));
-  const seed = { ...defaultLocalSeed(urlKey), urlKey, runnerKey: false };
+  // LIN-3968: Home's states seed their own workspace; the run control shows only where the entry has a runner.
+  const base = entry.state?.startsWith('home-') ? homeSeed(urlKey) : defaultLocalSeed(urlKey);
+  const seed = { ...base, urlKey, runnerKey: entry.runner === true };
   const resp = await context.request.post('/test/set-local-session', { data: seed });
   if (!resp.ok()) throw new Error(`seed failed on ${baseURL}: ${resp.status()} ${await resp.text()}`);
   return context;
@@ -55,8 +59,27 @@ async function settle(page) {
 }
 
 // Per-state set-up: identical on both sides, driven by the page's own markup.
+// LIN-3968: Home's opened task. The sessions are seeded through the consumer API (on both sides), then Home is
+// opened and its top task clicked. The write is the fixed stream, so the request never leaves the browser.
+async function prepareHome(page, context, entry) {
+  if (hasHomeSessions(entry.state)) await seedHomeSessions(context.request, entry.urlKey, entry.state);
+  if (entry.state === 'home-copy-written') {
+    await page.route('**/api/recommend/*/stream*', (route) => route.fulfill({ status: 200, contentType: 'text/event-stream', body: HOME_WRITE_SSE }));
+  }
+  await page.goto(entry.path(entry.urlKey));
+  await settle(page);
+  const block = page.locator('.opened-task').first();
+  if (!(await block.isVisible())) await page.locator('[data-top-task="1"]').click();
+  await block.waitFor();
+  if (entry.state === 'home-copy-written') {
+    await page.locator('[data-testid="opened-task-write"]').click();
+    await page.locator('[data-testid="opened-task-target"]').waitFor();
+  }
+}
+
 async function prepare(page, context, entry) {
   const url = entry.path(entry.urlKey);
+  if (entry.state?.startsWith('home-')) return prepareHome(page, context, entry);
   if (entry.state === 'key-open') {
     const minted = await context.request.get(`/test/create-proxy-token?urlKey=${entry.urlKey}&label=judge-key&scope=read`);
     if (!minted.ok()) throw new Error(`mint failed: ${minted.status()}`);
@@ -113,7 +136,7 @@ async function prepare(page, context, entry) {
 }
 
 async function shoot(browser, baseURL, viewport, theme, entry) {
-  const context = await openContext(browser, baseURL, viewport, theme, entry.urlKey);
+  const context = await openContext(browser, baseURL, viewport, theme, entry);
   try {
     const page = await context.newPage();
     await prepare(page, context, entry);

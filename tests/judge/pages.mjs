@@ -73,13 +73,21 @@ export const PAGES = [
   // covers the sheet at 390px and the panel at 1280px. Both are read-only set-ups on the seeded 'judge' workspace.
   { id: 'models-panel-open', urlKey: 'judge', path: (k) => `/workspace/${k}/settings/models`, state: 'models-panel-open', renderers: ['lib/render-settings-models.js'] },
   { id: 'models-staged', urlKey: 'judge', path: (k) => `/workspace/${k}/settings/models`, state: 'models-staged', renderers: ['lib/render-settings-models.js'] },
+  // LIN-3968: Home's opened task. The stage states have a runner (the strip and run control show) and seed their
+  // sessions through the consumer API; the copy-first pair has no runner, and its write is a fixed stream. Each
+  // state has its own urlKey, so one state's sessions or prompt memory never reach another.
+  { id: 'home-stages-done', urlKey: 'judge-home-done', path: (k) => `/workspace/${k}/`, state: 'home-stages-done', runner: true, renderers: ['lib/render.js'] },
+  { id: 'home-running', urlKey: 'judge-home-run', path: (k) => `/workspace/${k}/`, state: 'home-running', runner: true, renderers: ['lib/render.js'] },
+  { id: 'home-failed', urlKey: 'judge-home-fail', path: (k) => `/workspace/${k}/`, state: 'home-failed', runner: true, renderers: ['lib/render.js'] },
+  { id: 'home-copy-first', urlKey: 'judge-home-copy', path: (k) => `/workspace/${k}/`, state: 'home-copy-first', renderers: ['lib/render.js'] },
+  { id: 'home-copy-written', urlKey: 'judge-home-write', path: (k) => `/workspace/${k}/`, state: 'home-copy-written', renderers: ['lib/render.js'] },
 ];
 
 // Stated, not assumed: what the seed cannot reach.
 export const NOT_COVERED = [
   'Running with a runner (Last poll row, Pause and Stop): needs a runner key, whose time is server-rendered; the judge runs the no-runner state and the paused state (a queue token is the runner)',
   'A change-log entry with a fixed time: the time is server-rendered and so masked, not seeded',
-  'Home content (LIN-3833): listed pages only, not its later states',
+  'Home\'s run panel (See prompt, Another step, Change, Stop, the run-control repeats): LIN-3962 replaces it, so the stage states judge the opened task above it only',
   'Session with a run (the populated session page and its run view): needs a session record the local seed does not write; the not-found branch is judged instead, and renders the same back link',
   'Pages with no Settings-shared pieces (swim, swipe, ship, roadmap, library, KPIs, landing)',
 ];

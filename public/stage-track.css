@@ -137,9 +137,9 @@
   background: var(--card);
   color: var(--text);
   font-size: 0.9em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* LIN-3968: a 390px phone fits five chips in one row, so a name wraps inside its chip rather than being cut. */
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .task-strip-name { font-weight: 600; }
 .task-strip-state { color: var(--muted); }
