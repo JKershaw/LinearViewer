@@ -17,7 +17,9 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { ConnectionStore } from '../../lib/connection-store.js';
+import { workspaceApiUnitFiles } from './lib/workspace-api-unit.js';
 import {
+  REPO_ROOT,
   loadRawSources,
   loadStrippedSources,
   stripComments,
@@ -73,11 +75,15 @@ const LIFECYCLE_ALLOWED_IMPORTERS = ['server.js', 'routes/workspace.js', 'routes
 const ACCESS_ALLOWED_IMPORTERS = ['lib/connection-credential.js'];
 const READ_ALLOWED_MODULES = ['lib/connection-store.js', 'lib/connection-credential.js', 'lib/connection-lifecycle.js'];
 
+// LIN-3910: the workspace-API routes are derived from the unit helper, not named
+// file by file, so a LIN-2246 split (routes/workspace-api-<name>.js) is protected
+// the moment it lands. No unit member is omitted; an intentional omission would
+// be filtered out here with its reason recorded beside the filter.
 const PROTECTED_MODULES = [
   'lib/workspace-token-resolver.js',
   'lib/workspace-token-refresh.js',
   'lib/credential-invariant-sweep.js',
-  'routes/workspace-api.js',
+  ...workspaceApiUnitFiles(REPO_ROOT),
   'lib/workspace.js',
   'lib/workspace-title-resolver.js',
   'lib/suspect-credential-refresh.js',
@@ -430,6 +436,13 @@ describe('LIN-3124 PR1 T4 — retired no-read-switch assertions are subsumed', (
   });
   test('(c) a protected module importing the store still fails', () => {
     assert.ok(protectedImportOffenders(withFile(REAL, 'lib/workspace.js', `${REAL.get('lib/workspace.js')}\n${STORE_IMPORT}`), PROTECTED_MODULES).length > 0);
+  });
+  test('(c) a connection import in a split workspace-API module fails (LIN-3910)', () => {
+    for (const rel of ['routes/workspace-api-feedback.js', 'routes/workspace-api-issue-write.js']) {
+      assert.ok(PROTECTED_MODULES.includes(rel), `${rel} is outside arm c`);
+      const mutant = withFile(REAL, rel, `${REAL.get(rel)}\n${CRED_IMPORT}`);
+      assert.deepEqual(protectedImportOffenders(mutant, PROTECTED_MODULES), [rel]);
+    }
   });
   test('(d) a provider index importing the store still fails', () => {
     assert.ok(providerIndexImportOffenders(withFile(REAL, 'lib/providers/linear/index.js', `${REAL.get('lib/providers/linear/index.js')}\n${STORE_IMPORT}`)).length > 0);
