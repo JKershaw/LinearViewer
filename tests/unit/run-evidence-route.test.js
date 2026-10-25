@@ -40,9 +40,9 @@ function makeRouter({ comments = [], readPrStatus = null, owner = true } = {}) {
   });
 }
 
-async function callRoute(router) {
+async function callRoute(router, issueIdentifier = 'LIN-1') {
   const handler = getHandler(router, 'get', PATH);
-  const req = { session: {}, workspace: { urlKey: 'ws', accessToken: 't' }, params: { urlKey: 'ws', issueIdentifier: 'LIN-1' }, query: {} };
+  const req = { session: {}, workspace: { urlKey: 'ws', accessToken: 't' }, params: { urlKey: 'ws', issueIdentifier }, query: {} };
   const res = {
     statusCode: 200, jsonBody: null,
     status(code) { this.statusCode = code; return this; },
@@ -105,5 +105,16 @@ describe('GET /api/run-evidence/:issueIdentifier', () => {
   test('a non-owner viewer gets closeOut.owner=false (the box will be omitted)', async () => {
     const res = await callRoute(makeRouter({ owner: false }));
     assert.equal(res.jsonBody.closeOut.owner, false);
+  });
+
+  // LIN-3913: validCloseOutIdentifier's `<= 100` bound, pinned on the GET route.
+  test('identifier bound: 100 chars is read, 101 chars is refused with 400 (LIN-3913)', async () => {
+    const atBound = await callRoute(makeRouter(), 'L'.repeat(100));
+    assert.equal(atBound.statusCode, 200);
+    assert.equal(atBound.jsonBody.state.status, 'no-pr');
+
+    const overBound = await callRoute(makeRouter(), 'L'.repeat(101));
+    assert.equal(overBound.statusCode, 400);
+    assert.equal(overBound.jsonBody.error, 'Invalid issue identifier');
   });
 });
