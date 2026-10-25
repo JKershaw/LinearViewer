@@ -47,13 +47,20 @@ import { buildMockFeedbackTitle } from '../lib/workspace-api-mocks.js';
 // non-JSON content type (e.g. text/plain) passes through it unparsed; the
 // per-route parser below (raised limit) then parses it. LIN-3635: that parser
 // matches `text/plain` ONLY — the one type the widget sends — rather than every
-// content type, so an arbitrary-type 12mb body is no longer buffered. Small
+// content type, so an arbitrary-type body of any size is no longer buffered. Small
 // `application/json` bodies are already parsed by the global parser (larger
 // ones are refused 413 there), so they keep the 250kb ceiling — the exception
 // cannot leak to other routes.
-// Open question (LIN-3635): the widget caps images at 7 MB (~9.4 MB base64), so
-// this could drop to ~10mb; left at 12mb to preserve current behaviour.
-const FEEDBACK_BODY_LIMIT = '12mb';
+// Open question (LIN-3635) settled by LIN-3907: the image cap is the one stated
+// policy, and the body limit is derived from it. base64 turns the cap into
+// ceil(cap * 4 / 3) bytes; the 512 KiB headroom covers the message (<= 10k
+// characters, JSON-escaped up to ~60 KB), the title, and the url / userAgent
+// fields, which validation does not bound. The 'image too large' arm below is
+// reachable only while this limit stays above the cap's base64 size: at a lower
+// limit the parser refuses first, as it did at 12mb (LIN-3907). The smaller
+// buffer also answers LIN-669 M3 (a raw body and its decoded image held together).
+export const MAX_FEEDBACK_IMAGE_BYTES = 7 * 1024 * 1024; // LIN-636 / LIN-3907: the single image policy, equal to the widget cap (LIN-635)
+export const FEEDBACK_BODY_LIMIT = Math.ceil(MAX_FEEDBACK_IMAGE_BYTES * 4 / 3) + 512 * 1024;
 
 // LIN-3635 (June review M3): per-ACCOUNT request budget on feedback intake, IP
 // fallback when there is no session account (same keying as
@@ -75,7 +82,6 @@ export const feedbackSubmitLimiter = rateLimit({
     : ipKeyGenerator(req.ip),
   skip: () => process.env.NODE_ENV === 'test'
 });
-const MAX_FEEDBACK_IMAGE_BYTES = 10 * 1024 * 1024; // matches the image-proxy ceiling
 const MAX_FEEDBACK_MESSAGE_LENGTH = 10_000;
 const MAX_FEEDBACK_CONTEXT_LENGTH = 2_000; // url / userAgent clamp
 

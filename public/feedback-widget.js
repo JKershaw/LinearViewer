@@ -37,8 +37,10 @@
     { value: 3, label: 'Medium' },
     { value: 4, label: 'Low' }
   ];
-  // Keep client-side intake within the route's 10mb image ceiling, leaving room
-  // for base64 inflation (~4/3) under the route's 12mb body limit.
+  // The server's single image policy (LIN-3907: MAX_FEEDBACK_IMAGE_BYTES in
+  // routes/workspace-api-feedback.js, pinned to this literal by
+  // tests/unit/lin-3907-feedback-image-size.test.js). The route's body limit is
+  // derived from it, so a file at this cap still fits after base64 inflation.
   const MAX_IMAGE_BYTES = 7 * 1024 * 1024;
 
   const esc = (s) => (window.escapeHtml ? window.escapeHtml(s) : String(s == null ? '' : s));
