@@ -8,7 +8,9 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { switchRow, drillRow, group, renderSettingsShell } from '../../lib/render-settings-shell.js';
+import { switchRow, drillRow } from '../../lib/components/settings-row.js';
+import { group } from '../../lib/components/settings-group.js';
+import { renderSettingsShell } from '../../lib/components/settings-frame.js';
 import { getArea, AREAS } from '../../lib/settings-areas.js';
 import { renderSettingsPage } from '../../lib/render-settings.js';
 import { agentAccessBody } from '../../lib/render-settings-workspace.js';

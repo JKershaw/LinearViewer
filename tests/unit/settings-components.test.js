@@ -1,14 +1,17 @@
 /**
  * LIN-3846: the three row kinds, ask-in-place, and "nothing pops up".
  *
- * Run with: node --test tests/unit/render-settings-shell.test.js
+ * Run with: node --test tests/unit/settings-components.test.js
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { switchRow, drillRow, actionRow, askInPlace, group, renderSettingsShell, REASON_MAX_LENGTH } from '../../lib/render-settings-shell.js';
+import { switchRow, drillRow, actionRow } from '../../lib/components/settings-row.js';
+import { askInPlace, REASON_MAX_LENGTH } from '../../lib/components/settings-ask.js';
+import { group } from '../../lib/components/settings-group.js';
+import { renderSettingsShell } from '../../lib/components/settings-frame.js';
 import { getArea } from '../../lib/settings-areas.js';
 import { renderSettingsPage } from '../../lib/render-settings.js';
 
