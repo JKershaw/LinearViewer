@@ -38,7 +38,7 @@ const TIME_MASKS = {
 //   models-panel-open open a job row's change panel on Settings › Models (head only; base's forms have no row)
 //   models-staged     the same row, with one model picked: the staged-change count shows (head only)
 //   home-run-panel-open  Home's Change panel open (LIN-3962): the shared decision panel the server renders; `seed` gives run controls
-//   swipe-dispatch-open  Swipe's Dispatch ▾ disclosure open: expected to show no difference (Swipe has no run panel)
+//   swipe-dispatch-open  Swipe's card with Prompts open: expected to show no difference (Swipe has no run panel)
 //   email-signin      a zero-workspace account: no local seed; signs in by email (one address per shot)
 // `urlKey` is fixed per entry and identical on both sides. States that write data get their own
 // urlKey so their writes never reach another page's sidebar counts.
@@ -79,11 +79,11 @@ export const PAGES = [
   // covers the sheet at 390px and the panel at 1280px. Both are read-only set-ups on the seeded 'judge' workspace.
   { id: 'models-panel-open', urlKey: 'judge', path: (k) => `/workspace/${k}/settings/models`, state: 'models-panel-open', renderers: ['lib/render-settings-models.js', 'lib/components/decision-panel.js'] },
   { id: 'models-staged', urlKey: 'judge', path: (k) => `/workspace/${k}/settings/models`, state: 'models-staged', renderers: ['lib/render-settings-models.js', 'lib/components/decision-panel.js'] },
-  // LIN-3962: the one decision panel on Home (desktop, and phone via the viewport pair) and Swipe's Dispatch ▾ disclosure,
-  // which keeps its own exec controls. Home's seed gives run controls with a queue token (no runner credential). It writes
-  // that token, so it has its own urlKey; the head must show the Change control, or the state fails.
+  // LIN-3962: the one decision panel on Home (desktop, and phone via the viewport pair) and Swipe's card with Prompts open.
+  // Both seeds give run controls with a queue token (no runner credential). A queue token is a write, so each has its own
+  // urlKey; the head must show the Change control, or the Home state fails.
   { id: 'home-run-panel-open', urlKey: 'judge-run', path: (k) => `/workspace/${k}/`, state: 'home-run-panel-open', seed: { openRouterConnected: true, queueToken: true }, renderers: ['lib/render.js', 'lib/components/decision-panel.js', 'public/decision-panel.js'] },
-  { id: 'swipe-dispatch-open', urlKey: 'judge', path: (k) => `/workspace/${k}/swipe`, state: 'swipe-dispatch-open', renderers: ['lib/render-swipe.js'] },
+  { id: 'swipe-dispatch-open', urlKey: 'judge-swipe', path: (k) => `/workspace/${k}/swipe`, state: 'swipe-dispatch-open', seed: { openRouterConnected: true, queueToken: true }, renderers: ['lib/render-swipe.js'] },
   // LIN-3956: Account home, the first Plain page with rows and a form. It needs a zero-workspace account,
   // which no local seed can make, so the spec signs in by email. The judge's server runs the capture
   // transport (visual-replay.mjs), the same as Playwright's. Settings › Account then shows "Add email →"

@@ -129,11 +129,11 @@ async function prepare(page, context, entry, viewport, theme, side) {
     }
   }
   if (entry.state === 'home-run-panel-open') {
-    // LIN-3962: Home's Change panel, opened the way a viewer opens it: the top task, then Change. The seed gives this
-    // page its run controls, so head must show Change; a head without it fails here rather than being skipped.
-    // Base's panel is the old one, so base may come up without the control and is shot as it is.
-    const top = page.locator('[data-top-task="1"]');
-    if (await top.count()) await top.click();
+    // LIN-3962: Home's Change panel, opened the way a viewer opens it: the In Progress row (visible; the marked top task
+    // sits under a collapsed parent in this seed), then Change. The seed gives this page its run controls, so head must
+    // show Change; a head without it fails here rather than being skipped. Base's panel is the old one, so base may come
+    // up without the control and is shot as it is.
+    await page.locator('[data-section="in-progress"][data-identifier="LOCAL-1"]').first().click();
     const change = page.getByTestId('run-change');
     if (side === 'head') await change.waitFor();
     if (await change.count()) {
@@ -142,11 +142,11 @@ async function prepare(page, context, entry, viewport, theme, side) {
     }
   }
   if (entry.state === 'swipe-dispatch-open') {
-    // LIN-3962: Swipe's Dispatch ▾ disclosure, which must open. Its exec controls are not the decision panel, so this
-    // must show no difference.
-    const disclosure = page.locator('.dispatch-disclosure').first();
-    await disclosure.click();
-    await expect(disclosure).toHaveAttribute('aria-expanded', 'true');
+    // LIN-3962: Swipe's card with its Prompts section open, where its exec controls live. The Dispatch ▾ disclosure
+    // appears only on a generated prompt, which this seed does not make, so it is not claimed here. Swipe has no run
+    // panel, so this state must show no difference.
+    await page.getByText(/Prompts/).first().click();
+    await page.getByText('next step').first().waitFor();
   }
   if (entry.state === 'audit-report') {
     // Both sides answer the same fixture, so the report is identical and the request never leaves the browser.
