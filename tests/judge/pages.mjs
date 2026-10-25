@@ -34,8 +34,6 @@ const TIME_MASKS = {
 //   ask-open          open the periodic-reviews ask in place (a change that affects everyone)
 //   key-open          mint a token, open its key row
 //   change-log-entry  really submit the periodic-reviews ask once, so the log has one entry
-//   remove-open       open the one source's row, then its remove ask (LIN-3890: asks in place)
-//   revoke-open       mint a key, open its row, then its revoke ask (a script-transport ask)
 //   paused            mint a queue token (a runner), pause runs in place; Running shows the Runs row and Resume
 // `urlKey` is fixed per entry and identical on both sides. States that write data get their own
 // urlKey so their writes never reach another page's sidebar counts.
@@ -59,10 +57,9 @@ export const PAGES = [
   { id: 'running-ask-open', urlKey: 'judge', path: (k) => `/workspace/${k}/settings/running`, state: 'ask-open', renderers: ['lib/render-settings.js'] },
   { id: 'agent-access-key-open', urlKey: 'judge-key', path: (k) => `/workspace/${k}/settings/agent-access`, state: 'key-open', masks: [TIME_MASKS.key], renderers: ['lib/render-settings.js'] },
   { id: 'change-log-entry', urlKey: 'judge-log', path: (k) => `/workspace/${k}/settings/change-log`, state: 'change-log-entry', masks: [TIME_MASKS.change], renderers: ['lib/render-settings.js'] },
-  // LIN-3890: the in-place asks the rebuild added (Sources' remove, Agent access' revoke) and a halted
-  // Running page (Runs row, Resume only). Each writes data, so each has its own urlKey.
-  { id: 'sources-remove-open', urlKey: 'judge', path: (k) => `/workspace/${k}/settings/sources`, state: 'remove-open', renderers: ['lib/render-settings.js'] },
-  { id: 'agent-access-revoke-open', urlKey: 'judge-revoke', path: (k) => `/workspace/${k}/settings/agent-access`, state: 'revoke-open', masks: [TIME_MASKS.key], renderers: ['lib/render-settings.js'] },
+  // LIN-3890: a halted Running page (Runs row, Resume only). It writes data, so it has its own urlKey.
+  // The remove and revoke asks have no base-side set-up (the base has no in-place panel), so they are
+  // covered by tests/e2e/settings-providers.spec.js and settings-areas.spec.js, not by this comparison.
   { id: 'running-paused', urlKey: 'judge-halt', path: (k) => `/workspace/${k}/settings/running`, state: 'paused', renderers: ['lib/render-settings.js'] },
   // LIN-3889: Audit's report, with the rows the client builds with `.field` (teams, queue items,
   // projects). The fixture answers `/api/audit` on both sides, so the request never leaves the browser.
