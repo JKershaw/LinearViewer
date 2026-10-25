@@ -85,7 +85,7 @@ The class is "a rule written in 2 or more places that Settings shares". Two repr
 - **Sites at base:** `settings.css` 4 (443, 509, 524, 839; two are fallbacks `var(--red, #c0392b)`, one is `var(--bg, #fff)`), `proxy.css` 1, `common-actions.css` 1 (162), `dispatch.css` 0, `audit.css` 0, `style.css` 101 (mostly the token definitions themselves).
 - **Variant (named, deliberate):** the landing's own dark copy under `prefers-color-scheme` (`style.css:2335`, `body.is-landing`). Its comment says this is deliberate; `/styleguide` follows the same media-query palette, which is why the judge emulates both the cookie and the media query.
 - **Consolidate deletes:** the hex fallbacks in `settings.css` (509, 524, 839) once the token is guaranteed.
-- **Differences:** Settings' sidebar states have only two tones, `ok` and `bad` (`lib/settings-areas.js` `ok`/`bad`; at base the sidebar was in `lib/render-settings-shell.js`; `settings.css:647-662` at base), so **Paused shows red** next to Stopped. Class: **unclear** at base (resolved at head, see open question 1).
+- **Differences:** Settings' sidebar states have only two tones, `ok` and `bad` (`lib/settings-areas.js` `ok`/`bad`; at base the sidebar was in `lib/render-settings-shell.js:132`; `settings.css:647-662` at base), so **Paused shows red** next to Stopped. Class: **unclear** at base (resolved at head, see open question 1).
 - **Open question 1** (below): whether paused gets its own tone. Resolved at head: amber shipped in LIN-3890.
 
 ### 4. Breakpoints
@@ -106,7 +106,7 @@ The class is "a rule written in 2 or more places that Settings shares". Two repr
 - **Counting rule:** a site is a rule whose body is that byte-identical declaration block (`--dup-blocks` body #10).
 - **Sites at base (4):** `style.css:3133` `.field` (the authority), `dispatch.css:19` `.dispatch-section .line`, `proxy.css:104` `.proxy-section .line`, `settings.css:45` `.settings-section .line`.
 - **Consolidate deletes:** the three `.X-section .line` blocks (done, LIN-3889). The 640px wrap moves to `.field`.
-- **Same-name collision, not a copy:** the dashboard tree's own `.line` (`style.css:1222`, and the phone override at `:1931`) is a different rule (`align-items: baseline`, `padding: 4px 0`). It is scoped to the tree in intent and **harmless**, except that new Settings rows also carry the class `line` (at base: `lib/render-settings-shell.js`, `render-settings-workspace.js:20` and `:188`, `render-settings-you.js:60`, `:80`, `:95`, `:107`, `:115` and `:144`), so the bare `.line` at `style.css:1222` also matches them. Class: **unclear**; Rebuild must drop the `line` class from Settings rows or scope the tree rule.
+- **Same-name collision, not a copy:** the dashboard tree's own `.line` (`style.css:1222`, and the phone override at `:1931`) is a different rule (`align-items: baseline`, `padding: 4px 0`). It is scoped to the tree in intent and **harmless**, except that new Settings rows also carry the class `line` (at base: `lib/render-settings-shell.js:37`, `render-settings-workspace.js:20` and `:188`, `render-settings-you.js:60`, `:80`, `:95`, `:107`, `:115` and `:144`), so the bare `.line` at `style.css:1222` also matches them. Class: **unclear**; Rebuild must drop the `line` class from Settings rows or scope the tree rule.
 - **Differences:** the three `.X-section .line` copies wrap at 640px and `.field` does not (`dispatch.css:486`, `proxy.css:424`, `settings.css:543`, each `flex-wrap: wrap`). Class: **fix** (provisional): a field row that cannot wrap overflows on a phone; give `.field` the wrap. Done (LIN-3889): the wrap moved to `.field`, the only place pixels move.
 - **Variant:** none. (Corrected by LIN-3889: `.dispatch-prompt-line { align-items: flex-start }` never applied, because the copy's 0,2,0 selector set `align-items` first. It is deleted with the copy, at 0 px.)
 
@@ -139,7 +139,7 @@ The class is "a rule written in 2 or more places that Settings shares". Two repr
 - **Decides:** an on/off control.
 - **Authority:** `.settings-switch` (`settings.css:249`, renamed from `.toggle-btn` by LIN-3889) with `switchRow` (`lib/components/settings-row.js:34`). The row wrapper, `.feature-toggle` and `.feature-toggle-label` (`settings.css:417` and `:421` at base), is gone at head and stays under *Interactive row*.
 - **Counting rule:** a site is markup that writes `class="toggle-btn"`.
-- **Sites at base (2):** the builder (`switchRow`, now `lib/components/settings-row.js:34`) and `render-settings-you.js:144-147` (a hand-written copy with an extra `settings-json-toggle` class). The sweep found no other switch in `lib/` or `public/`.
+- **Sites at base (2):** `render-settings-shell.js:37-42` (the builder, `switchRow`; at head `lib/components/settings-row.js:34`) and `render-settings-you.js:144-147` (a hand-written copy with an extra `settings-json-toggle` class). The sweep found no other switch in `lib/` or `public/`.
 - **Consolidate deletes:** the hand-written copy.
 - **Differences:** `.toggle-btn` carries its own hover (`rgba(0,0,0,0.03)`, `settings.css:443`, which does not rebind in dark). Class: **fix** (provisional).
 - **Variant:** none named.
