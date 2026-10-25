@@ -172,5 +172,43 @@ test.describe('Legal Pages', () => {
       });
       expect(visibleEmpty).toBe(0);
     });
+
+    // LIN-3958 (review finding 1): the Plain prose rules reach only unclassed prose, so /styleguide's builder
+    // samples keep the face and colour of the live pieces. The sans prose it does take is named here too.
+    for (const { width, height } of WIDTHS) {
+      test(`/styleguide at ${width}px: builder samples keep their own face and colour, and its prose is sans`, async ({ page }) => {
+        await page.setViewportSize({ width, height });
+        await page.goto('/styleguide');
+        const m = await page.evaluate(() => {
+          const probe = document.createElement('span');
+          probe.style.color = 'var(--fg)';
+          document.body.appendChild(probe);
+          const fg = getComputedStyle(probe).color;
+          probe.remove();
+          const look = (sel) => {
+            const el = document.querySelector(sel);
+            if (!el) return null;
+            const cs = getComputedStyle(el);
+            return { face: cs.fontFamily, color: cs.color };
+          };
+          return {
+            fg,
+            fontSample: look('main p.sg-font-sample[style*="font-size"]'),
+            emptyState: look('main p.emptyState'),
+            navItem: look('main .settings-nav-list li'),
+            intro: look('main p.sg-intro'),
+            anatomyLabel: look('main .sg-settings-anatomy dt'),
+          };
+        });
+        expect(m.fontSample).not.toBeNull();
+        expect(m.fontSample.face).toContain('JetBrains Mono');
+        expect(m.fontSample.color).toBe(m.fg);
+        expect(m.emptyState.face).toContain('JetBrains Mono');
+        expect(m.navItem.face).toContain('JetBrains Mono');
+        expect(m.navItem.color).toBe(m.fg);
+        expect(m.intro.face).toContain('Inter');
+        expect(m.anatomyLabel.face).toContain('Inter');
+      });
+    }
   });
 });

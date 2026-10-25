@@ -3705,27 +3705,32 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   margin-bottom: 0.75rem;
 }
 
-/* LIN-3958: one voice on a Plain page. Prose is the sans face in --fg-dim: paragraphs (classed ones too,
-   which LIN-3950's :not([class]) skipped), list items, dd and dt. Inline code keeps the browser's
-   monospace, since its UA rule sets the face on the element itself. */
-.plain-page .section :is(p, li, dd, dt) {
+/* LIN-3958: one voice on a Plain page. Unclassed prose is the sans face in --fg-dim: paragraphs, the items
+   of unclassed lists, and the terms of unclassed definition lists. Classed prose keeps its own look, since
+   a /styleguide builder sample (a font specimen, an empty state, a Settings nav item) is a component, not
+   Plain prose; the styleguide's own prose classes are set in styleguide.css. Inline code keeps the
+   browser's monospace, since its UA rule sets the face on the element itself. */
+.plain-page .section p:not([class]),
+.plain-page .section :is(ul, ol):not([class]) > li,
+.plain-page .section dl:not([class]) > :is(dd, dt) {
   color: var(--fg-dim);
   font-family: var(--font-content);
 }
 
 /* LIN-3958: a readable measure for running text. 40em (about 65 characters) rather than 70ch, because
    Inter's "0" is about 0.6em wide, so 70ch comes to about 42em. Rows, fields and forms are not capped,
-   and neither are classed lists or definition lists (settings-nav-list is a layout list). */
-.plain-page .section p,
+   nor are classed paragraphs, lists or definition lists (settings-nav-list is a layout list). */
+.plain-page .section p:not([class]),
 .plain-page .section :is(ul, ol, dl):not([class]) {
   max-width: 40em;
 }
 
 /* LIN-3958: the list gutter. The global reset zeroes padding, so the text sat at the content edge and
-   a phone's bullet fell at x=0 and was clipped. 1.5em clears the 1.25em bar. Classed lists keep their
-   own padding (settings-nav-list is padding 0), so the rule takes only unclassed lists. */
+   a phone's bullet fell at x=0 and was clipped. 1.5rem (--space-4, 24px at the 1rem root Plain prose uses)
+   clears the 1.25em bar. Classed lists keep their own padding (settings-nav-list is padding 0), so the
+   rule takes only unclassed lists. */
 .plain-page .section :is(ul, ol):not([class]) {
-  padding-left: 1.5em;
+  padding-left: var(--space-4);
 }
 
 .plain-page .section a:not([class]) {

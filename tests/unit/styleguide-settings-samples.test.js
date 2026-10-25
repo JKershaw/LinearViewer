@@ -62,15 +62,24 @@ test('the page is byte-stable across renders (the key row is given a fixed clock
   assert.equal(second, first);
 });
 
-// Review F1/F2 (LIN-3950), narrowed by LIN-3958: /styleguide is a Plain page whose blocks hold live builder
-// output. The Plain prose rule covers paragraphs (classed ones too, the .sg-intro lede is prose), list items,
-// dd and dt. Links stay unclassed-only, so a builder's own link keeps its look, and the page title wears
-// the Plain title class.
-test('Plain prose is scoped to p, li, dd and dt under .plain-page, and links stay unclassed', () => {
+// Review F1/F2 (LIN-3950), narrowed by LIN-3958 (review finding 1): /styleguide is a Plain page whose blocks
+// hold live builder output, so the Plain prose rules reach only unclassed prose: unclassed paragraphs, the
+// items of unclassed lists, and the terms of unclassed definition lists. A classed element keeps its own
+// look, and the page title wears the Plain title class.
+test('Plain prose reaches only unclassed p, list items, dd and dt under .plain-page, and links stay unclassed', () => {
   const css = readFileSync(new URL('../../public/style.css', import.meta.url), 'utf8');
-  assert.match(css, /\.plain-page \.section :is\(p, li, dd, dt\)\s*\{/);
+  assert.match(css, /\.plain-page \.section p:not\(\[class\]\),\s*\.plain-page \.section :is\(ul, ol\):not\(\[class\]\) > li,\s*\.plain-page \.section dl:not\(\[class\]\) > :is\(dd, dt\)\s*\{/);
   assert.match(css, /\.plain-page \.section a:not\(\[class\]\)\s*\{/);
+  assert.doesNotMatch(css, /\.plain-page \.section :is\(p, li, dd, dt\)/, 'no classed-reaching prose selector remains');
   assert.doesNotMatch(css, /\.plain-page \.section [pa]\s*\{/, 'no bare descendant p/a rule remains');
+});
+
+// LIN-3958 (review finding 1): with the Plain rules no longer reaching classed prose, the styleguide's own
+// prose classes (the .sg-intro lede and the anatomy labels, which sit in a classed dl) take the sans face here.
+test('the styleguide prose classes take the sans face in styleguide.css', () => {
+  const css = readFileSync(new URL('../../public/styleguide.css', import.meta.url), 'utf8');
+  assert.match(css, /\.styleguide-content \.sg-intro \{[^}]*font-family: var\(--font-content\);/);
+  assert.match(css, /\.sg-settings-anatomy dt,\s*\.sg-settings-anatomy dd \{[^}]*font-family: var\(--font-content\);/);
 });
 
 // LIN-3958: /styleguide's Plain sample is .plain-page AND .settings-shell, so both phone roots land on one

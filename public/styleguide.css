@@ -8,6 +8,10 @@
 
 .styleguide-content .sg-intro {
   margin-bottom: var(--space-5);
+  /* LIN-3958: the lede is human prose, so the sans face in --fg-dim. The Plain prose rule does not reach it
+     (it is classed), so the face is set here. */
+  font-family: var(--font-content);
+  color: var(--fg-dim);
 }
 
 .sg-name {
@@ -274,9 +278,15 @@
   margin: 0;
 }
 
-/* LIN-3958: the labels (Purpose, Parts, Sizes…) are human labels, so the Plain prose rule sets their face (sans). */
+/* LIN-3958: the labels (Purpose, Parts, Sizes…) and their text are human prose, so the sans face in --fg-dim.
+   The list is classed, so the Plain prose rule does not reach it and the face is set here. */
 .sg-settings-anatomy dt {
   font-size: var(--font-size-sm);
+}
+
+.sg-settings-anatomy dt,
+.sg-settings-anatomy dd {
+  font-family: var(--font-content);
   color: var(--fg-dim);
 }
 

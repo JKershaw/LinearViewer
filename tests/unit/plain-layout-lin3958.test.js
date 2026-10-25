@@ -58,26 +58,20 @@ test('the heading steps up from the prose: --font-size-lg, weight 600, body colo
   assert.match(plainBlock(), /\.plain-page \.section \.section-header \{\s*font-size: var\(--font-size-lg\);\s*font-weight: 600;\s*color: var\(--fg\);\s*\}/);
 });
 
-test('paragraphs, list items, dd and dt are the sans face in --fg-dim, classed paragraphs included', () => {
-  assert.match(plainBlock(), /\.plain-page \.section :is\(p, li, dd, dt\) \{\s*color: var\(--fg-dim\);\s*font-family: var\(--font-content\);\s*\}/);
+test('unclassed paragraphs, list items, dd and dt are the sans face in --fg-dim; classed prose keeps its own look', () => {
+  assert.match(plainBlock(), /\.plain-page \.section p:not\(\[class\]\),\s*\.plain-page \.section :is\(ul, ol\):not\(\[class\]\) > li,\s*\.plain-page \.section dl:not\(\[class\]\) > :is\(dd, dt\) \{\s*color: var\(--fg-dim\);\s*font-family: var\(--font-content\);\s*\}/);
 });
 
-test('lists take a 1.5em gutter for the bullet, and classed lists keep their own padding', () => {
-  assert.match(plainBlock(), /\.plain-page \.section :is\(ul, ol\):not\(\[class\]\) \{\s*padding-left: 1\.5em;\s*\}/);
+test('lists take a 1.5rem gutter for the bullet (the --space-4 token), and classed lists keep their own padding', () => {
+  assert.match(plainBlock(), /\.plain-page \.section :is\(ul, ol\):not\(\[class\]\) \{\s*padding-left: var\(--space-4\);\s*\}/);
 });
 
 test('running text (unclassed paragraphs, lists and definition lists) takes a 40em measure', () => {
-  assert.match(plainBlock(), /\.plain-page \.section p,\s*\.plain-page \.section :is\(ul, ol, dl\):not\(\[class\]\) \{\s*max-width: 40em;\s*\}/);
+  assert.match(plainBlock(), /\.plain-page \.section p:not\(\[class\]\),\s*\.plain-page \.section :is\(ul, ol, dl\):not\(\[class\]\) \{\s*max-width: 40em;\s*\}/);
 });
 
 test('at 400px the Plain page takes a 1rem root, the same root Settings uses', () => {
   const settings = readFileSync(new URL('../../public/settings.css', import.meta.url), 'utf8');
   assert.match(stripComments(style), /@media \(max-width: 400px\) \{\s*\.plain-page \{\s*font-size: 1rem;\s*\}\s*\}/);
   assert.match(stripComments(settings), /\.settings-shell \{\s*grid-template-columns: minmax\(0, 1fr\);\s*font-size: 1rem;\s*\}/);
-});
-
-test('the /styleguide anatomy labels are sans: their dt rule sets no face', () => {
-  const dt = stripComments(styleguide).match(/\.sg-settings-anatomy dt \{([^}]*)\}/);
-  assert.ok(dt, 'the anatomy dt rule is in styleguide.css');
-  assert.doesNotMatch(dt[1], /font-family/);
 });
