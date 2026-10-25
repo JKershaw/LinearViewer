@@ -14,7 +14,6 @@ import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { BASE_DEPS, buildApp, call } from './lib/proxy-fake-deps.js';
-import { createNextRunRoutes } from '../../routes/next-run.js';
 import { createTaskChatRoutes } from '../../routes/task-chat.js';
 import { createShipBiscuitRoutes } from '../../routes/ship-biscuit.js';
 
@@ -87,7 +86,7 @@ describe('proxy-family availability gate (no key anywhere)', () => {
   });
 });
 
-// The `aiConfigured` renders (next-run, task-chat, ship-biscuit) read
+// The `aiConfigured` renders (task-chat, ship-biscuit) read
 // `resolveChatCredential(...).available`; each page prints a
 // `data-ai-unconfigured` warning exactly when no key resolves.
 describe('aiConfigured page renders', () => {
@@ -103,7 +102,7 @@ describe('aiConfigured page renders', () => {
   function pageApp(router) {
     const app = express();
     app.use((req, res, next) => {
-      req.session = { features: { nextRun: true, taskChat: true, shipBiscuit: true }, workspaces: [workspace] };
+      req.session = { features: { taskChat: true, shipBiscuit: true }, workspaces: [workspace] };
       next();
     });
     app.use(router);
@@ -111,7 +110,6 @@ describe('aiConfigured page renders', () => {
   }
 
   const PAGES = [
-    { name: 'next-run', path: '/workspace/acme/next-run', build: () => createNextRunRoutes(stubs) },
     { name: 'task-chat', path: '/workspace/acme/task-chat', build: () => createTaskChatRoutes(stubs) },
     { name: 'ship-biscuit', path: '/workspace/acme/ship-biscuit', build: () => createShipBiscuitRoutes(stubs) },
   ];

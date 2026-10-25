@@ -83,7 +83,7 @@ test('missing urlKey or store still returns DEFAULT_MODEL (unchanged guard)', as
 // =============================================================================
 
 test('AI_OPERATION_KINDS covers the scoped operations, including flight-companion, ship-biscuit and task-chat (LIN-2623, LIN-2966; LIN-3300 removed recommend-write with the brief writer)', () => {
-  assert.deepEqual(AI_OPERATION_KINDS, ['recommend', 'recap', 'brief', 'scan', 'run-summary', 'session-summary', 'next-run', 'flight-companion', 'ship-biscuit', 'task-chat']);
+  assert.deepEqual(AI_OPERATION_KINDS, ['recommend', 'recap', 'brief', 'scan', 'run-summary', 'session-summary', 'flight-companion', 'ship-biscuit', 'task-chat']);
 });
 
 // R2 (LIN-2623 review, PR #1442): pins the settings label map to the class rather
@@ -157,7 +157,7 @@ test('resolveAiOperationModel: each operation kind resolves independently', asyn
   assert.equal(await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: store, opKind: 'brief' }), 'openai/gpt-5.4-mini');
   assert.equal(await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: store, opKind: 'run-summary' }), 'openai/gpt-5.4-mini');
   assert.equal(await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: store, opKind: 'session-summary' }), 'openai/gpt-5.4-mini');
-  assert.equal(await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: store, opKind: 'next-run' }), 'openai/gpt-5.4-mini');
+  assert.equal(await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: store, opKind: 'task-chat' }), 'openai/gpt-5.4-mini');
   assert.equal(await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: store, opKind: 'flight-companion' }), 'openai/gpt-5.4-mini');
   assert.equal(await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: store, opKind: 'ship-biscuit' }), 'openai/gpt-5.4-mini');
 });

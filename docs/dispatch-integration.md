@@ -985,8 +985,7 @@ own `effort` independently through the same per-`kind` chain above, plus ordinar
 Every user-facing surface that can dispatch a prompt exposes the same `model`/`harness`
 controls (LIN-1096) — a harness select-or-custom pair plus a free-text model input — so a
 one-off override doesn't require a trip through Settings first: the Dispatch page, the
-dashboard tree's per-task Dispatch disclosure, the shared prompt-compose section (Swipe),
-and the Suggested-next-run accept flow. Leaving both fields blank omits them from the
+dashboard tree's per-task Dispatch disclosure, the shared prompt-compose section (Swipe). Leaving both fields blank omits them from the
 payload entirely, so the Harbour-side default tier above (and then the consumer's own
 defaulting) applies exactly as if the fields were never shown. Where a workspace-wide
 default is already resolved server-side (currently: the Dispatch page), the controls'

@@ -65,7 +65,7 @@ test.describe('Header view switcher (LIN-978)', () => {
   test('experimental views appear in the header ONLY when their flag is on (gated, LIN-1247)', async ({ page, seedLocal, localWorkerUrlKey }) => {
     // Policy reversal (LIN-1247): experimental views used to be Settings-only and
     // never in the switcher. They are now gated-included in the `⋯ more` overflow.
-    const experimentalViews = ['collective', 'task-chat', 'ship', 'next-run', 'flight-companion', 'passage-planner', 'ship-biscuit'];
+    const experimentalViews = ['collective', 'task-chat', 'ship', 'flight-companion', 'passage-planner', 'ship-biscuit'];
 
     // Flags off → none of the experimental views are in the switcher.
     await seedLocal(swimLocalSeed, { features: {} });
@@ -78,7 +78,7 @@ test.describe('Header view switcher (LIN-978)', () => {
     // Every experimental flag on → each view is surfaced (emitted as its kebab
     // route key, whether inline or collapsed in the overflow group).
     await seedLocal(swimLocalSeed, {
-      features: { collective: true, taskChat: true, ship: true, nextRun: true, flightCompanion: true, passagePlanner: true, shipBiscuit: true }
+      features: { collective: true, taskChat: true, ship: true, flightCompanion: true, passagePlanner: true, shipBiscuit: true }
     });
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
@@ -86,9 +86,23 @@ test.describe('Header view switcher (LIN-978)', () => {
       await expect(nav(page).getView(view)).toHaveCount(1);
     }
     // The camelCase gating flags must NOT leak in as nav keys.
-    for (const flag of ['taskChat', 'nextRun', 'flightCompanion', 'passagePlanner', 'shipBiscuit']) {
+    for (const flag of ['taskChat', 'flightCompanion', 'passagePlanner', 'shipBiscuit']) {
       await expect(nav(page).getView(flag)).toHaveCount(0);
     }
+  });
+
+  // LIN-3912: the Next run page, its suggest endpoint and its flag are retired. A stored
+  // `nextRun: true` is dropped by the feature-flag filter, and both retired URLs fall
+  // through to Express's default 404 (LIN-877 precedent: unmounted, no redirect).
+  test('the retired next-run URLs 404, and no next-run view appears even with the old flag stored (LIN-3912)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(swimLocalSeed, { features: { ...FLAGS, nextRun: true, flightCompanion: true } });
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
+    await page.waitForLoadState('networkidle');
+    await expect(nav(page).getView('next-run')).toHaveCount(0);
+    const page404 = await page.request.get(`/workspace/${localWorkerUrlKey}/next-run`);
+    expect(page404.status()).toBe(404);
+    const suggest404 = await page.request.post(`/workspace/${localWorkerUrlKey}/api/next-run/suggest`, { data: {} });
+    expect(suggest404.status()).toBe(404);
   });
 
   test('collapses flag-gated views behind ⋯ more at 390px, first-class six stay inline (LIN-1058, LIN-3689)', async ({ page, localWorkerUrlKey }) => {
@@ -160,9 +174,9 @@ test.describe('Desktop nav overflow (LIN-1286)', () => {
   const WIDE_FLAGS = {
     roadmap: true,
     collective: true, taskChat: true, ship: true,
-    nextRun: true, flightCompanion: true, shipBiscuit: true
+    flightCompanion: true, shipBiscuit: true
   };
-  const FLAG_GATED = ['roadmap', 'dispatch', 'proxy', 'collective', 'task-chat', 'ship', 'next-run', 'flight-companion', 'ship-biscuit'];
+  const FLAG_GATED = ['roadmap', 'dispatch', 'proxy', 'collective', 'task-chat', 'ship', 'flight-companion', 'ship-biscuit'];
 
   const stripScrolls = (page) =>
     page.locator('.nav-views').evaluate(el => el.scrollWidth > el.clientWidth + 1);
@@ -378,7 +392,7 @@ test.describe('Sticky header pin + clearance (LIN-1068)', () => {
 test.describe('Mobile nav-strip density sweep (LIN-2179)', () => {
   const ALL_EXPERIMENTAL_FLAGS = {
     roadmap: true,
-    collective: true, taskChat: true, ship: true, nextRun: true,
+    collective: true, taskChat: true, ship: true,
     flightCompanion: true, passagePlanner: true, shipBiscuit: true,
     liveConsole: true, shipJourney: true
   };

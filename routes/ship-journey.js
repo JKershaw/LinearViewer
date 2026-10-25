@@ -3,7 +3,7 @@
  *
  * Anchored at /workspace/:urlKey/ship-journey (reusing workspaceFromUrl + the
  * experimental feature-gate-redirect-to-settings pattern shared by
- * collective/task-chat/next-run/live-console). Pure read, no LLM call on page
+ * collective/task-chat/live-console). Pure read, no LLM call on page
  * load (matching the /ship contract, LIN-298/301): the route reads the
  * workspace's full retained report history (reportHistoryStore.listFull, P1 —
  * LIN-1683) plus current issue state (fetchWorkspaceIssues), derives the

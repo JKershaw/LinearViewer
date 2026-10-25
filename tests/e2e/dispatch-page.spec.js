@@ -1350,7 +1350,7 @@ test.describe('Dispatch Page', () => {
       await expect(textarea).toHaveAttribute('data-prompt-name', 'Autopilot (stack walk)');
     });
 
-    // LIN-603: the next-run suggester hands off a chosen goal via ?goal=; the
+    // LIN-603: the retired next-run suggester handed off a chosen goal via ?goal=; the
     // dispatch page prefills the goal textarea from it.
     test('prefills the goal textarea from ?goal=', async ({ page }) => {
       const goal = 'Push the roadmap milestone to done';

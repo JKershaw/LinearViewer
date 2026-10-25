@@ -324,7 +324,7 @@ class, which needs its own re-grounding (its premise is stale at HEAD).
 
 ## 6. Corrections and outcomes from the prototype passes (beats 2–4)
 
-The prototypes are `prototypes/lin-1412-chat/` — see that README. Three things in the contract
+The prototypes are `prototypes/lin-1412-chat/` — see that README (deleted in this ticket; in git history at ab481a49dd14f548b3ddd00b4f7b6f28707c9771). Three things in the contract
 above changed because building it disproved them.
 
 **§9.3 was wrong as first written.** I specified the streaming pin as "latched once at

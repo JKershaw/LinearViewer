@@ -3,7 +3,7 @@
  * chat interface for work in flight" (LIN-922).
  *
  * Anchored at /workspace/:urlKey/flight-companion, reusing workspaceFromUrl + the
- * collective/task-chat/next-run feature-gate-redirect-to-settings pattern.
+ * collective/task-chat feature-gate-redirect-to-settings pattern.
  *
  * LIN-2435 (Phase A §A.8) made this a live, in-page chat surface (below) —
  * the page is no longer just a stub. It ALSO still serves the original, older
@@ -401,7 +401,7 @@ export function createFlightCompanionRoutes({
     const workspace = req.workspace;
     const featureFlags = await requestFeatureFlags(req);
 
-    // Gate: experimental feature must be enabled (mirrors collective/task-chat/next-run).
+    // Gate: experimental feature must be enabled (mirrors collective/task-chat).
     if (featureFlags.flightCompanion !== true) {
       return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings/features`);
     }

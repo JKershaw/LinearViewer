@@ -145,7 +145,8 @@ describe('source scans (LIN-3692)', () => {
   // The 7 localhost-only reads (no URL is built from them). LIN-3861: the workspace-API reads are summed
   // under one key over routes/workspace-api.js and routes/workspace-api-*.js (exactly 1: the detail route's
   // localhost read, wherever it sits); the witnesses are the describe at the end of this file.
-  const LOCAL_ONLY = { 'lib/dispatch-entrance.js': 1, 'routes/next-run.js': 1, 'workspace-API unit': 1, 'server.js': 5 };
+
+  const LOCAL_ONLY = { 'lib/dispatch-entrance.js': 1, 'workspace-API unit': 1, 'server.js': 5 };
 
   test('only publicOrigin, the redirect and the localhost-only reads touch Host or protocol', () => {
     const found = {};
@@ -181,7 +182,8 @@ describe('source scans (LIN-3692)', () => {
 describe('source scans (LIN-3692), workspace-API unit rule (LIN-3861)', () => {
   const HOST_READ = /req\.protocol|req\.hostname|req\.host\b|get\(['"]host['"]\)|headers\.host|headers\[['"]host|x-forwarded-host/gi;
   const UNIT_KEY = 'workspace-API unit';
-  const LOCAL_ONLY = { 'lib/dispatch-entrance.js': 1, 'routes/next-run.js': 1, [UNIT_KEY]: 1, 'server.js': 5 };
+
+  const LOCAL_ONLY = { 'lib/dispatch-entrance.js': 1, [UNIT_KEY]: 1, 'server.js': 5 };
 
   function hostReadProblems(sources) {
     const found = {};
@@ -206,7 +208,6 @@ describe('source scans (LIN-3692), workspace-API unit rule (LIN-3861)', () => {
   const tree = (unit) => ({
     'lib/public-origin.js': 'const a = req.protocol; const b = req.get("host");\n',
     'lib/dispatch-entrance.js': READ,
-    'routes/next-run.js': READ,
     'server.js': READ.repeat(5),
     ...unit,
   });

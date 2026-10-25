@@ -22,7 +22,6 @@ const ALLOWED_SYNC = {
   'routes/collective.js': [4, 'JSON gates on `collective`; the page render uses requestFeatureFlags'],
   'routes/flight-companion.js': [4, 'JSON / SSE gates on `flightCompanion`'],
   'routes/live-console.js': [1, 'JSON gate on `liveConsole`'],
-  'routes/next-run.js': [1, 'JSON gate on `nextRun`'],
   'routes/ship-biscuit.js': [1, 'JSON gate on `shipBiscuit` (a keepalive test pins it is not delayed)'],
   'routes/task-chat.js': [2, 'JSON gates on `taskChat`'],
   'routes/workspace-api-prompts.js': [2, 'prompt generation reads the stored flags, no nav'],

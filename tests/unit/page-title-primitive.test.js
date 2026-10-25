@@ -17,7 +17,6 @@ import { renderObservationPage } from '../../lib/render-observation.js';
 import { renderRoadmapPage } from '../../lib/render-roadmap.js';
 import { renderCollectivePage } from '../../lib/render-collective.js';
 import { renderTaskChatPage } from '../../lib/render-task-chat.js';
-import { renderNextRunPage } from '../../lib/render-next-run.js';
 import { renderFlightCompanionPage } from '../../lib/render-flight-companion.js';
 import { renderPassagePlannerPage } from '../../lib/render-passage-planner.js';
 
@@ -68,11 +67,6 @@ const CASES = [
     html: () => renderTaskChatPage({}, { urlKey: 'ws' }),
   },
   {
-    name: 'next-run',
-    title: 'Suggested Next Run',
-    html: () => renderNextRunPage({}, { urlKey: 'ws' }),
-  },
-  {
     name: 'flight-companion',
     title: 'Flight Companion',
     html: () => renderFlightCompanionPage({}, { urlKey: 'ws' }),
@@ -107,7 +101,6 @@ describe('LIN-975: page titles route through renderPageHeader', () => {
     const stale = [
       ['collective', renderCollectivePage({ workspaces: [], defaultChannel: '#c' }, { urlKey: 'ws' }), 'collective-header'],
       ['task-chat', renderTaskChatPage({}, { urlKey: 'ws' }), 'task-chat-header'],
-      ['next-run', renderNextRunPage({}, { urlKey: 'ws' }), 'next-run-header'],
       ['flight-companion', renderFlightCompanionPage({}, { urlKey: 'ws' }), 'flight-companion-header'],
       ['passage-planner', renderPassagePlannerPage({}, { urlKey: 'ws' }), 'passage-planner-header'],
       ['roadmap', renderRoadmapPage({ roadmapModel: {} }, { urlKey: 'ws' }), 'roadmap-page-title'],

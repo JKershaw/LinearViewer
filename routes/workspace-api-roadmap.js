@@ -485,7 +485,7 @@ export function createRoadmapRoutes({ workspaceFromUrl, freeTierStore, userPrefe
    * block plus a complete prompt". We keep this as an independent roadmap-local
    * value (not an import) so the two budgets don't silently move together, and
    * deliberately NOT a change to the shared `streamChat` default, which would
-   * also move recap/brief/next-run/chat. Orientation keeps its own
+   * also move recap/brief/chat. Orientation keeps its own
    * candidate-count scaling (`orientationMaxTokens`) and is untouched.
    */
   const ROADMAP_LAYER_MAX_TOKENS = 8000;

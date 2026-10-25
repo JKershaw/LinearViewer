@@ -39,7 +39,6 @@ const FILES = [
   'routes/proxy.js',
   'routes/proxy-compute.js',
   'routes/task-chat.js',
-  'routes/next-run.js',
   // LIN-3840: the dashboard unit (routes/dashboard.js and routes/dashboard-*.js), not one file.
   ...dashboardUnitFiles(root)
 ];

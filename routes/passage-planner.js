@@ -3,7 +3,7 @@
  * Companion parity (LIN-922 + LIN-1764).
  *
  * Anchored at /workspace/:urlKey/passage-planner, reusing workspaceFromUrl +
- * the collective/task-chat/next-run/flight-companion feature-gate-redirect
+ * the collective/task-chat/flight-companion feature-gate-redirect
  * pattern. The page serves the validated Passage Planner kickoff prompt
  * (buildPassagePlannerKickoff — `docs/passage-planner-prompt.md` at HEAD,
  * preamble stripped) with a fresh single-use proxy bootstrap token appended
@@ -36,7 +36,7 @@ export function createPassagePlannerRoutes({ workspaceFromUrl, getOpenRouterSour
     const workspace = req.workspace;
     const featureFlags = await requestFeatureFlags(req);
 
-    // Gate: experimental feature must be enabled (mirrors collective/task-chat/next-run/flight-companion).
+    // Gate: experimental feature must be enabled (mirrors collective/task-chat/flight-companion).
     if (featureFlags.passagePlanner !== true) {
       return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings/features`);
     }

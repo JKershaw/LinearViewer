@@ -3,7 +3,7 @@
  * newspaper (LIN-818, V1: front page + index only).
  *
  * Anchored at /workspace/:urlKey/ship-biscuit, reusing workspaceFromUrl + the
- * collective/task-chat/next-run/flight-companion feature-gate-redirect-to-settings
+ * collective/task-chat/flight-companion feature-gate-redirect-to-settings
  * pattern (`createShipBiscuitRoutes(...)` factory, per the plan's store=class /
  * router=factory convention).
  *
@@ -18,7 +18,7 @@
  *
  * §C — free-tier + model override: `chargeRoadmapLayer` is private to
  * createWorkspaceApiRoutes, so this router carries its own 2-line free-tier guard
- * (exactly as routes/next-run.js does). The charge fires ONLY on the real LLM path —
+ * (exactly as the retired next-run route did). The charge fires ONLY on the real LLM path —
  * a quiet edition makes no call, so it isn't charged.
  */
 
@@ -86,7 +86,7 @@ export function createShipBiscuitRoutes({
     const workspace = req.workspace;
     const featureFlags = await requestFeatureFlags(req);
 
-    // Gate: experimental feature must be enabled (mirrors flight-companion/next-run).
+    // Gate: experimental feature must be enabled (mirrors flight-companion).
     if (featureFlags.shipBiscuit !== true) {
       return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings/features`);
     }

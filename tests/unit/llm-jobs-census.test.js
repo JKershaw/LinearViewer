@@ -67,7 +67,6 @@ const CALL_PATHS = {
   'lib/agent-turn.js': { sites: 2 },
   'lib/brief.js': { sites: 1, passthrough: true },
   'lib/feedback-title.js': { sites: 1, passthrough: true },
-  'lib/next-run.js': { sites: 1 },
   'lib/observer-pass.js': { sites: 1 },
   'lib/recap.js': { sites: 1, passthrough: true },
   'lib/run-paragraph.js': { sites: 1, passthrough: true },
@@ -293,9 +292,9 @@ describe('LIN-3852: every LLM use is a registered job', () => {
     assert.deepEqual(checkCensus(inputs), []);
   });
 
-  test('the registry has the 20 agent-session and 17 Harbour-call jobs of the design note', () => {
+  test('the registry has the 20 agent-session and 16 Harbour-call jobs of the design note', () => {
     assert.equal(JOBS.filter((j) => j.surface === SURFACES.AGENT_SESSION).length, 20);
-    assert.equal(JOBS.filter((j) => j.surface === SURFACES.HARBOUR_CALL).length, 17);
+    assert.equal(JOBS.filter((j) => j.surface === SURFACES.HARBOUR_CALL).length, 16);
   });
 
   // ─── Failure witnesses: the checker names what it finds ───────────────────
@@ -317,20 +316,22 @@ describe('LIN-3852: every LLM use is a registered job', () => {
     assert.deepEqual(problems, ['agent-session job "triage" is not a dispatch kind']);
   });
 
+  // The witnesses swap a registered call site's text for a synthetic one (the next-run
+  // site they used to edit is retired). observer-pass is a one-site streamChat unit.
+  const OBSERVER_SITE = "import { streamChat } from './openrouter.js';\n";
+
   test('a call whose callMeta has a feature but no urlKey fails, naming the site', () => {
-    const edited = sources['lib/next-run.js'].replace("urlKey: options.urlKey || null, feature: 'next-run'", "feature: 'next-run'");
-    assert.notEqual(edited, sources['lib/next-run.js'], 'fixture edit applied');
-    const problems = checkCensus({ ...inputs, sources: { ...sources, 'lib/next-run.js': edited } });
+    const edited = OBSERVER_SITE + "export const f = (options) => streamChat([], { callMeta: { feature: 'observer-pass' } }, () => {});\n";
+    const problems = checkCensus({ ...inputs, sources: { ...sources, 'lib/observer-pass.js': edited } });
     assert.equal(problems.length, 1, problems.join('\n'));
-    assert.match(problems[0], /^lib\/next-run\.js:\d+ streamChat\(\) callMeta has no urlKey/);
+    assert.match(problems[0], /^lib\/observer-pass\.js:\d+ streamChat\(\) callMeta has no urlKey/);
   });
 
   test('a spread in callMeta does not excuse a missing urlKey outside a marked passthrough wrapper', () => {
-    const edited = sources['lib/next-run.js'].replace("urlKey: options.urlKey || null, feature: 'next-run'", "feature: 'next-run', ...(options.extraMeta || {})");
-    assert.notEqual(edited, sources['lib/next-run.js'], 'fixture edit applied');
-    const problems = checkCensus({ ...inputs, sources: { ...sources, 'lib/next-run.js': edited } });
+    const edited = OBSERVER_SITE + "export const f = (options) => streamChat([], { callMeta: { feature: 'observer-pass', ...(options.extraMeta || {}) } }, () => {});\n";
+    const problems = checkCensus({ ...inputs, sources: { ...sources, 'lib/observer-pass.js': edited } });
     assert.equal(problems.length, 1, problems.join('\n'));
-    assert.match(problems[0], /^lib\/next-run\.js:\d+ streamChat\(\) callMeta has no urlKey/);
+    assert.match(problems[0], /^lib\/observer-pass\.js:\d+ streamChat\(\) callMeta has no urlKey/);
   });
 
   // Built from a synthetic unit file, not the live text of a file that is free to move.

@@ -15,7 +15,7 @@
  * be caught by this guard alone.
  *
  * This is the acceptance witness the investigation calls for: a green test
- * can still leak a live request (see next-run.test.js's "an LLM failure still
+ * can still leak a live request (see the retired next-run tests' "an LLM failure still
  * yields the size-guaranteed set with no grouping"), so pass/fail alone is
  * not sufficient — callers must additionally assert zero attempts. But the
  * inverse also holds: zero attempts here does not by itself prove no request
@@ -207,7 +207,7 @@ function parseProxyEndpoint(spec) {
 /**
  * The set of proxy endpoints ("host:port" strings) the process is currently
  * configured to route through, read at CALL TIME rather than cached — tests
- * mutate `HTTPS_PROXY`/etc. in-process (`next-run`, `openrouter`,
+ * mutate `HTTPS_PROXY`/etc. in-process (`openrouter`,
  * `proxy-attachment-relay`, `recommend-*`), and a cached read would go stale
  * the moment the first such test ran after this module loaded.
  *
