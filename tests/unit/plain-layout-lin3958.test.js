@@ -54,8 +54,8 @@ test('the title is an explicit 1.5rem, the step above the heading', () => {
   assert.match(plainBlock(), /\.plain-title \{[^}]*font-size: 1\.5rem;/);
 });
 
-test('the heading steps up from the prose: --font-size-lg, weight 600, body colour, scoped to .plain-page', () => {
-  assert.match(plainBlock(), /\.plain-page \.section \.section-header \{\s*font-size: var\(--font-size-lg\);\s*font-weight: 600;\s*color: var\(--fg\);\s*\}/);
+test('the heading steps up from the prose: --font-size-lg, weight 600, body colour, direct children of .plain-page only',() => {
+  assert.match(plainBlock(), /\.plain-page > \.section > \.section-header \{\s*font-size: var\(--font-size-lg\);\s*font-weight: 600;\s*color: var\(--fg\);\s*\}/);
 });
 
 test('unclassed paragraphs, list items, dd and dt are the sans face in --fg-dim; classed prose keeps its own look', () => {

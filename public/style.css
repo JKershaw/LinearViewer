@@ -3694,8 +3694,10 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 }
 
 /* LIN-3958: the heading steps up from the 1em prose (1.25em, so 20px over 16px), at weight 600 in --fg.
-   Scoped to .plain-page: the shared .section .section-header rule above it stays byte-identical. */
-.plain-page .section .section-header {
+   Scoped to .plain-page: the shared .section .section-header rule above it stays byte-identical. Direct
+   children only: a section nested in another (the /styleguide "Section component" specimens) is a component
+   and keeps the canonical heading. */
+.plain-page > .section > .section-header {
   font-size: var(--font-size-lg);
   font-weight: 600;
   color: var(--fg);

@@ -198,6 +198,11 @@ test.describe('Legal Pages', () => {
             navItem: look('main .settings-nav-list li'),
             intro: look('main p.sg-intro'),
             anatomyLabel: look('main .sg-settings-anatomy dt'),
+            // The two "Section component" specimens are nested in a section: components, not Plain headings.
+            nested: [...document.querySelectorAll('main section.section > section.section > .section-header')].map((el) => {
+              const cs = getComputedStyle(el);
+              return { ruled: el.classList.contains('section-header--ruled'), weight: cs.fontWeight, size: parseFloat(cs.fontSize) };
+            }),
           };
         });
         expect(m.fontSample).not.toBeNull();
@@ -208,6 +213,13 @@ test.describe('Legal Pages', () => {
         expect(m.navItem.color).toBe(m.fg);
         expect(m.intro.face).toContain('Inter');
         expect(m.anatomyLabel.face).toContain('Inter');
+        // LIN-3958 (review round 2): the Plain heading step reaches only the page's own section headings, so the
+        // nested specimens keep the canonical weight, and the ruled one stays 1.1x the boxed one.
+        expect(m.nested).toHaveLength(2);
+        for (const h of m.nested) expect(h.weight).toBe('500');
+        const boxed = m.nested.find((h) => !h.ruled);
+        const ruled = m.nested.find((h) => h.ruled);
+        expect(ruled.size / boxed.size).toBeCloseTo(1.1, 2);
       });
     }
   });
