@@ -116,12 +116,12 @@
 .task-checkin { padding: 0.15rem 0; overflow-wrap: anywhere; }
 .task-checkin-message { display: block; color: var(--muted); }
 
-/* ── Stage strip: every stage on one row, Home's opened task (LIN-3968) ─────
-   One chip per stage. The row never scrolls sideways: chips share the width, and a name wraps inside
-   its chip, so a phone at 390px keeps the five on one line too (nothing is cut). */
+/* ── Stage strip: one chip per stage, Home's opened task (LIN-3968) ─────────
+   The row never scrolls sideways. Chips share the width on one line, and wrap onto a second line when a phone
+   cannot fit them (LIN-3991); a chip never shrinks below its longest word, so no name is cut or broken. */
 .task-strip {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: var(--space-1);
   margin: var(--space-2) 0 0;
   padding: 0;
@@ -129,17 +129,19 @@
   min-width: 0;
 }
 .task-strip-chip {
-  flex: 1 1 0;
-  min-width: 0;
+  flex: 1 1 5.5rem;
+  min-width: min-content;
   padding: var(--space-1) var(--space-2);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--card);
   color: var(--text);
   font-size: 0.9em;
-  /* LIN-3968: a 390px phone fits five chips in one row, so a name wraps inside its chip rather than being cut. */
+  /* LIN-3991: the row wraps to a second line on a phone, and a chip never shrinks below its longest word, so no
+     stage name or state word breaks inside a word (a hyphen break, as in "Close-out", is fine). `overflow-wrap: anywhere`
+     shrinks min-content and broke "Revie w" at 390px (LIN-3968's regression), so it stays off. */
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 .task-strip-name { font-weight: 600; }
 .task-strip-state { color: var(--muted); }
@@ -149,3 +151,10 @@
 .task-strip-chip[data-tone="error"] { border-color: var(--red); }
 .task-strip-chip[data-tone="ahead"] { border-style: dashed; color: var(--muted); }
 .task-strip-chip[data-offered="true"] { box-shadow: inset 0 0 0 1px var(--brand); }
+
+/* LIN-3991: the exact time beside a state sentence (Home and the task page both load this sheet). Mono: a machine fact. */
+.task-sentence-at {
+  display: block;
+  font-family: var(--font-structural);
+  color: var(--muted);
+}

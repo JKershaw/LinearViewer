@@ -400,7 +400,9 @@ describe('task page structure', () => {
   test('header answers running / waiting / done', () => {
     assert.match(renderTaskStatus(model('running-blocked-repeat')), /data-status="running"[\s\S]*Review running for 58 minutes\./);
     assert.match(renderTaskStatus(model('waiting')), /data-status="waiting"[\s\S]*task-page-sentence">which API key\?</, 'the [blocked] marker is not in the sentence');
-    assert.match(renderTaskStatus(model('done')), /data-status="done"[\s\S]*Finished 6 Oct, 12:00 UTC\./);
+    // LIN-3991: the sentence is relative; the exact time sits beside it, outside the sentence.
+    assert.match(renderTaskStatus(model('done')), /data-status="done"[\s\S]*task-page-sentence">Finished 3 hours ago\.<\/p>/);
+    assert.match(renderTaskStatus(model('done')), /data-testid="task-page-sentence-at" datetime="2026-10-06T12:00:00\.000Z" data-local-time="zoned">6 Oct, 12:00 UTC</);
     assert.doesNotMatch(render('running-blocked-repeat'), /Tracker details unavailable|data-tracker=/, 'no stored-only remnant');
   });
 });

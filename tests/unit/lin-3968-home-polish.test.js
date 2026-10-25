@@ -301,3 +301,36 @@ describe('LIN-3968 — run control: one step at a time, a failed stage offered a
     assert.doesNotMatch(c.innerHTML, /TRACK-IS-NOT-SHOWN/);
   });
 });
+
+describe('LIN-3991 — copy-first: the target line names the task by identifier, and the copy instruction sits with Copy', () => {
+  test('the route\'s real done payload (the parent named by its identifier, as resolveRecommendation now sends it) reads as identifiers only', async () => {
+    // The route sends `deferredVia` from resolveRecommendation, whose first entry is the node's own identifier (LIN-3991).
+    const events = [
+      ['delta', { section: 'prompt', content: 'Build the child.' }],
+      ['done', { truncated: false, identifier: 'LIN-3821', title: 'Child work', deferredVia: ['LIN-3820', 'LIN-3821'] }],
+    ];
+    const { PromptSection } = load({ events });
+    const c = makeContainer();
+    PromptSection.init(c, COPY_FIRST);
+    await flush();
+    await c.click({ prompt: '__ai__' });
+    await flush();
+    await flush();
+    const line = c.innerHTML.match(/<p class="opened-task-target"[^>]*>([^<]*)<\/p>/);
+    assert.ok(line, 'the target line is shown');
+    assert.match(line[1], /LIN-3821 Child work, a subtask of LIN-3820\./);
+    assert.doesNotMatch(line[1], /--/, 'no internal id');
+  });
+
+  test('"Copy it, then paste it" is in the same row as Copy prompt, before the progress key', async () => {
+    const { PromptSection } = load({ events: [['delta', { section: 'prompt', content: 'Do it.' }], ['done', { truncated: false, identifier: 'LIN-42', deferredVia: [] }]] });
+    const c = makeContainer();
+    PromptSection.init(c, COPY_FIRST);
+    await flush();
+    await c.click({ prompt: '__ai__' });
+    await flush();
+    await flush();
+    assert.match(c.innerHTML, /class="opened-task-copy-row">\s*<button[^>]*opened-task-copy[^>]*>Copy prompt<\/button>\s*<p class="opened-task-paste">Copy it, then paste it into Claude Code, Codex or any coding agent\.<\/p>\s*<\/div>/);
+    assert.ok(c.innerHTML.indexOf('opened-task-paste') < c.innerHTML.indexOf('opened-task-progress-key'), 'the instruction is not left below the key');
+  });
+});

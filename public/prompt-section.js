@@ -275,8 +275,10 @@
       const link = href
         ? ` <a class="opened-task-started-link" href="${esc(href)}" data-testid="opened-task-started-link">watch on the task page \u203A</a>`
         : '';
+      // LIN-3991 (item 5): on Home the state block above already says the running sentence once, so the Go
+      // slot keeps only the watch link; "Started." stays until the first state read lands.
       const body = g.headerHtml
-        ? g.headerHtml
+        ? (opts.surface === 'home' ? '' : g.headerHtml)
         : '<p class="task-sentence" data-testid="opened-task-sentence">Started.</p>';
       html += `<div class="opened-task-started" data-testid="opened-task-started" data-go-status="${esc(g.status)}">${body}${link}</div>`;
     } else if (!ready) {
@@ -552,8 +554,9 @@
     return line ? `<p class="opened-task-target" data-testid="opened-task-target">${esc(line)}</p>` : '';
   }
 
-  // The written prompt: Copy, the bounded box, Rewrite and Download (both views).
-  function renderPromptBox(state, opts) {
+  // The written prompt: Copy, the bounded box, Rewrite and Download (both views). `note` sits beside Copy (LIN-3991:
+  // the copy-first instruction is where the person acts on it); the run-first view passes none.
+  function renderPromptBox(state, opts, note = '') {
     const { raw, warning, label, reasoning } = state.result;
     const warningBanner = warning ? `<div class="swipe-prompt-warning">\u26A0 ${esc(warning)}</div>` : '';
     // LIN-2944 reverses LIN-70: the model's reasoning stays visible beside the prompt.
@@ -563,7 +566,10 @@
     const gateReason = primaryDisabledReason(opts, state);
     const rewriteDisabled = label === '__ai__' ? gateReason : null;
     return `
-      <button class="btn btn--primary opened-task-copy" data-testid="opened-task-copy" data-action="copy">Copy prompt</button>
+      <div class="opened-task-copy-row">
+        <button class="btn btn--primary opened-task-copy" data-testid="opened-task-copy" data-action="copy">Copy prompt</button>
+        ${note ? `<p class="opened-task-paste">${esc(note)}</p>` : ''}
+      </div>
       ${renderProxyLimitNotice(state)}
       ${warningBanner}
       ${reasoningBlock}
@@ -582,10 +588,9 @@
     return `
       <div class="opened-task-step" data-testid="opened-task-step"><span class="opened-task-step-name">${esc(copyStepOf(opts).name || 'Next prompt')}</span>${age ? ` \u00b7 generated ${esc(age)}` : ''}</div>
       ${renderTargetLine(state, opts)}
-      ${renderPromptBox(state, opts)}
+      ${renderPromptBox(state, opts, 'Copy it, then paste it into Claude Code, Codex or any coding agent.')}
       <label class="opened-task-progress-key"><input type="checkbox" data-testid="opened-task-progress-key"${keyOn ? ' checked' : ''}> Let your agent post progress to this task</label>
-      <p class="opened-task-key-note">The key lasts 48 hours. Without it, your agent can still do the work, but Harbour won\u2019t see its progress. Turning it off here sets it for every task.</p>
-      <p class="opened-task-paste">Copy it, then paste it into Claude Code, Codex or any coding agent.</p>`;
+      <p class="opened-task-key-note">The key lasts 48 hours. Without it, your agent can still do the work, but Harbour won\u2019t see its progress. Turning it off here sets it for every task.</p>`;
   }
 
   // LIN-3833: the step a run would start, from the state (a step chosen for this run, else the one the
@@ -736,6 +741,8 @@
   function applyState(container, html, phase) {
     container.innerHTML = html;
     container.setAttribute('data-phase', phase);
+    // LIN-3991: the exact time beside a state sentence is painted in the reader's zone.
+    if (typeof window.initLocalTimes === 'function') window.initLocalTimes(container);
     // LIN-3401: the +proxy toggle is bound to itself at the moment it is inserted
     // (there is no delegated listener). The direct-child chain is the header
     // template above; the markdown sinks sit elsewhere, so a look-alike in them
@@ -914,6 +921,7 @@
       const slot = container.querySelector && container.querySelector('[data-state-slot]');
       if (slot) slot.outerHTML = renderOpenedState();
       else render();
+      if (typeof window.initLocalTimes === 'function') window.initLocalTimes(container);
     }
 
     // ── LIN-3833: the run control (Home, dispatch on) ───────────────────────────
@@ -1033,10 +1041,9 @@
       const running = summary.running && summary.running.state !== 'queued' ? summary.running : null;
       const next = summary.next || null;
       if (running) {
-        const since = running.since ? ` since ${esc(formatGeneratedAge(Date.parse(running.since)) || '')}` : '';
+        // LIN-3991 (item 5): the state block above says the run's state once; this line keeps only what is its own.
         const polled = POLLED_RUN_TARGETS.includes(running.target);
-        let html = `<div class="opened-task-running" data-testid="opened-task-running">${esc(running.label || 'A step')} running${since}`;
-        if (next) html += ` \u00b7 Next: ${esc(next.label)}, once ${esc(running.label || 'this')} finishes`;
+        let html = next ? `Next: ${esc(next.label)}, once ${esc(running.label || 'this')} finishes` : '';
         if (state.run.confirmStop) {
           html += ` <span class="opened-task-confirm">Stop this run? The session is cancelled and the task stays where it is.`
             + ` <button data-action="stop-run-confirm" data-testid="run-stop-confirm">Stop</button>`
@@ -1044,7 +1051,7 @@
         } else if (polled) {
           html += ` <button class="opened-task-stop" data-action="stop-run" data-testid="run-stop">Stop</button>`;
         }
-        return `${html}</div>`;
+        return html.trim() ? `<div class="opened-task-running" data-testid="opened-task-running">${html.trim()}</div>` : '';
       }
       if (state.run.item || (summary.running && summary.running.state === 'queued')) {
         return `<div class="opened-task-queued" data-testid="opened-task-queued">Queued, waiting for a runner`
@@ -1359,6 +1366,7 @@
       const slot = container.querySelector && container.querySelector('[data-go-slot]');
       if (slot) slot.outerHTML = renderGo(opts, state);
       else render();
+      if (typeof window.initLocalTimes === 'function') window.initLocalTimes(container);
     }
 
     // LIN-3267: the ladder twin of paintGo(). A post-press quota read changes only

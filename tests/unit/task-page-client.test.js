@@ -209,6 +209,11 @@ describe('poll safety (LIN-3340)', () => {
     assert.equal(paintsReadyHeader(null, 'idle'), false);
   });
 
+  test('LIN-3991: a failed poll keeps the ready header too, since ready outranks failed on the load', () => {
+    assert.equal(paintsReadyHeader('true', 'failed'), true, 'the load shows ready, so the poll must not repaint red failed over it');
+    assert.equal(paintsReadyHeader('false', 'failed'), false);
+  });
+
   test('the context mount repaints only on a changed signature, and never once widgets mount', () => {
     assert.equal(contextNeedsRepaint(undefined, 'abc', false), true, 'no sig: repaint');
     assert.equal(contextNeedsRepaint('abc', 'abc', false), false, 'unchanged brief is not repainted');
@@ -495,6 +500,16 @@ describe('apply(): the header after a session ends on a merge-ready page (LIN-34
     assert.equal(page.attrs['data-merge-ready'], 'false');
     assert.equal(page.attrs['data-status'], 'idle');
     assert.equal(page.reloads.length, 0);
+  });
+
+  test('(h) LIN-3991: load merge-ready, poll failed: the ready sentence is kept, and the running -> failed edge still checks', async () => {
+    const FAILED = statusHtml('failed', 'Close-out failed 25 Oct: tests red.');
+    const page = makePage({ loadStatus: 'waiting', polls: [poll('running', RUNNING), poll('failed', FAILED)] });
+    await page.pollOnce();
+    await page.pollOnce();
+    assert.equal(page.answer.innerHTML, READY, 'the failed poll does not repaint the red header over ready');
+    assert.equal(page.attrs['data-status'], 'waiting');
+    assert.equal(page.runCheckSpy.length, 1, 'a run that ends failed re-checks the close-out box');
   });
 
   test('(g) a ready load seeds the edge as not-running: the first idle poll fires no check', async () => {

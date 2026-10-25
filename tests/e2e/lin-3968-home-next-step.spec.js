@@ -110,6 +110,24 @@ test.describe('Home: a failed stage is needs-you and offered again (LIN-3968)', 
   });
 });
 
+test.describe('Home: a Review that failed as the only stage (LIN-3991)', () => {
+  test.use({ viewport: DESKTOP });
+
+  test('the strip starts at the failed stage: Review failed and Close-out, nothing before it', async ({ page }) => {
+    await seedTask(page);
+    const token = await runnerToken(page);
+    await seedSession(page, token, { kind: 'review', feedback: ['[failed] review could not finish'] });
+    await gotoHome(page);
+    const block = await openTopTask(page);
+
+    await expect(chips(block)).toHaveCount(2);
+    await expect(chip(block, 'review')).toHaveAttribute('data-state', 'failed');
+    await expect(chip(block, 'close-out')).toHaveAttribute('data-state', 'ahead');
+    await expect(chip(block, 'research')).toHaveCount(0);
+    await expect(chip(block, 'plan')).toHaveCount(0);
+  });
+});
+
 test.describe('Home: a running stage offers no other step (LIN-3968)', () => {
   test.use({ viewport: DESKTOP });
 
@@ -201,7 +219,8 @@ test.describe('Home: the stage strip is one row and styled (LIN-3968)', () => {
     expect(tops.length, 'one chip per stage reached or still ahead').toBeGreaterThanOrEqual(3);
     expect(new Set(tops).size, 'all chips share one row').toBe(1);
     // Witness for the shared stylesheet: Home loads stage-track.css, so a chip has its own border (absent unstyled).
-    await expect(block.locator('.task-strip')).toHaveCSS('flex-wrap', 'nowrap');
+    // LIN-3991: the row wraps on a phone, so only the desktop row is pinned to one line here.
+    await expect(block.locator('.task-strip')).toHaveCSS('flex-wrap', 'wrap');
     await expect(chip(block, 'plan')).toHaveCSS('border-top-style', 'solid');
   });
 });
@@ -221,6 +240,28 @@ test.describe('Home: no stage name is clipped on a phone (LIN-3968)', () => {
       .filter((el) => el.scrollWidth > el.clientWidth + 1)
       .map((el) => el.textContent.trim()));
     expect(clipped, 'no chip cuts its text').toEqual([]);
+  });
+
+  // LIN-3991: no stage name or state word breaks inside a word; a hyphen break ("Close-out") is fine.
+  test('every chip name and state word sit on no more lines than they have words at 390px (LIN-3991)', async ({ page }) => {
+    await seedTask(page);
+    const token = await runnerToken(page);
+    // Research and Plan done: the strip shows all five cells, with "Research" the longest label (the ticket's case).
+    await seedSession(page, token, { kind: 'research', feedback: ['[done] researched it'] });
+    await seedSession(page, token, { kind: 'plan', feedback: ['[done] planned it'] });
+    await gotoHome(page);
+    const block = await openTopTask(page);
+
+    const broken = await chips(block).evaluateAll((els) => els.flatMap((el) => ['.task-strip-name', '.task-strip-state']
+      .map((sel) => el.querySelector(sel))
+      .filter(Boolean)
+      .map((part) => {
+        const words = part.textContent.trim().split(/[\s-]+/).filter(Boolean).length;
+        const lines = part.getClientRects().length;
+        return { text: part.textContent.trim(), words, lines };
+      })
+      .filter((part) => part.lines > part.words)));
+    expect(broken, 'no chip word breaks mid-word').toEqual([]);
   });
 });
 
