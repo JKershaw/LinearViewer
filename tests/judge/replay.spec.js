@@ -83,6 +83,9 @@ async function prepare(page, context, entry) {
       await page.locator('.token-modal-close').click();
       await page.goto(url);
     }
+    // The Runs row opens in place (head); base has no such row, so this step is conditional.
+    const runs = page.getByTestId('settings-halt-state');
+    if (await runs.locator(':scope > summary').count()) await runs.locator(':scope > summary').click();
     if (await page.getByTestId('settings-halt-pause').count()) {
       await page.getByTestId('settings-halt-pause').locator(':scope > summary').click();
       await page.getByTestId('settings-halt-pause-reason').fill('Judge fixture');
