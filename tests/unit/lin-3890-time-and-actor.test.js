@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { formatRelativeTime } from '../../lib/render.js';
 import { changeLogBody } from '../../lib/render-settings-workspace.js';
-import { mergeChangeLog } from '../../lib/workspace-change-log.js';
+import { mergeChangeLog, UNNAMED_MEMBER } from '../../lib/workspace-change-log.js';
 
 const NOW = Date.parse('2026-10-25T12:00:00.000Z');
 const ago = (ms) => new Date(NOW - ms).toISOString();
@@ -61,4 +61,21 @@ test('mergeChangeLog carries the actor id and via to the renderer', () => {
   ], []);
   assert.equal(row.actorId, ACCOUNT_ID);
   assert.equal(row.actorVia, 'page');
+});
+
+test('a proxy change made with a key the viewer minted reads "You, via an agent key", not plain "You" (review finding 4)', () => {
+  const merged = mergeChangeLog([], [
+    { _id: 'e', at: new Date(NOW - MIN), actor: { via: 'proxy', id: ACCOUNT_ID, name: 'Ada' }, kind: 'job', changes: [{}], reason: 'r' }
+  ]);
+  const html = renderLog(merged);
+  assert.match(html, /You, via an agent key · /);
+  assert.doesNotMatch(html, />[^<]*Ada, via/);
+});
+
+test('the unnamed-member fallback is the constant the server writes, so "via an agent key" survives a rename', () => {
+  assert.equal(UNNAMED_MEMBER, 'a member');
+  const merged = mergeChangeLog([], [
+    { _id: 'f', at: new Date(NOW - MIN), actor: { via: 'proxy', id: 'other', name: UNNAMED_MEMBER }, kind: 'job', changes: [{}], reason: 'r' }
+  ]);
+  assert.match(renderLog(merged), /via an agent key · /);
 });

@@ -5,7 +5,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildKeyList, latestRunnerPoll, isExpired } from '../../lib/settings-keys.js';
+import { buildKeyList, latestRunnerPoll, isLiveKey } from '../../lib/settings-keys.js';
 import { agentAccessBody } from '../../lib/render-settings-workspace.js';
 import { hasLiveRunnerKey, hasLiveQueueToken } from '../../lib/run-controls.js';
 
@@ -70,9 +70,10 @@ describe('revoke uses today\'s DELETE routes and their owner rules', () => {
 
 describe('the list shows what a person needs', () => {
   test('expiry and last use are relative (LIN-3890), and "no owner · re-issue" for an ownerless key', () => {
-    // The renderer reads the real clock, so this test builds its times from it.
+    // The clock is injected (LIN-3890): the renderer formats against `now`, not a second read of Date.now().
     const now = Date.now();
-    const html = agentAccessBody({ urlKey: 'acme', keys: buildKeyList({ proxyRows: [proxy({ tokenId: 'x', hasOwner: false, expiresAt: iso(now + 2 * 864e5), lastUsedAt: iso(now - 6e4) })], dispatchRows: [], isOwner: true, urlKey: 'acme' }) });
+    const keys = buildKeyList({ proxyRows: [proxy({ tokenId: 'x', hasOwner: false, expiresAt: iso(now + 2 * 864e5), lastUsedAt: iso(now - 6e4) })], dispatchRows: [], isOwner: true, urlKey: 'acme', now });
+    const html = agentAccessBody({ urlKey: 'acme', keys, now });
     assert.match(html, /expires in 2d/);
     assert.match(html, /last used 1m ago/);
     assert.match(html, /no owner · re-issue/);
@@ -109,7 +110,8 @@ describe('"has a runner" is the house predicate, so Settings and Dispatch cannot
     });
     assert.deepEqual(poll, { at: iso(NOW - 6e4), kind: 'queue token' });
     assert.equal(latestRunnerPoll({ proxyRows: [proxy({ grants: ['take'] })], dispatchRows: [], now: NOW }), null, 'never used: no poll, and no liveness claim');
-    assert.equal(isExpired(iso(NOW - 1), NOW), true);
-    assert.equal(isExpired(null, NOW), false);
+    // The one liveness predicate (LIN-3890) replaces the old isExpired: a past expiry is not live, a null one is.
+    assert.equal(isLiveKey({ expiresAt: iso(NOW - 1) }, NOW), false);
+    assert.equal(isLiveKey({ expiresAt: null }, NOW), true);
   });
 });
