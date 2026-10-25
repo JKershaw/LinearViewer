@@ -45,11 +45,11 @@ describe('renderSettingsPage — AI usage section', () => {
     });
     assert.match(html, /\$0\.0350/);          // small total → 4 decimals
     assert.match(html, /12,345/);             // tokens with thousands separator
-    assert.match(html, /recommend:/);
+    assert.match(html, />By feature · recommend</);
     assert.match(html, /2 calls · \$0\.0300/);
-    assert.match(html, /brief:/);
+    assert.match(html, />By feature · brief</);
     assert.match(html, /1 call · \$0\.0050/); // singular "call"
-    assert.match(html, /2026-06-15T20:00:00/);
+    assert.match(html, />Last call</);
   });
 
   test('formats totals over $1 with 2 decimals', () => {
@@ -78,10 +78,9 @@ describe('renderSettingsPage — AI usage section', () => {
         ]
       }
     });
-    assert.match(html, /latency \(feature × model\):/);
-    assert.match(html, /recommend · openai\/gpt-5\.4-mini:/);
+    assert.match(html, />recommend · openai\/gpt-5\.4-mini</);
     assert.match(html, /2 calls · p50 1200ms · p90 1800ms · max 2000ms/);
-    assert.match(html, /brief · anthropic\/claude-opus-5:/);
+    assert.match(html, />brief · anthropic\/claude-opus-5</);
     assert.match(html, /1 call · p50 500ms · p90 500ms · max 500ms/); // singular "call"
     assert.match(html, /end-to-end response time/);
     assert.match(html, /not time-to-first-token/);
@@ -96,11 +95,11 @@ describe('renderSettingsPage — AI usage section', () => {
       byFeature: [{ feature: 'recommend', calls: 1, cost: 0.01 }]
     };
     const htmlAbsent = renderSettingsPage('Acme', { ...BASE, llmStats: base });
-    assert.doesNotMatch(htmlAbsent, /latency \(feature × model\):/);
+    assert.doesNotMatch(htmlAbsent, /data-testid="settings-health-latency"|not time-to-first-token/);
     assert.doesNotMatch(htmlAbsent, /end-to-end response time/);
 
     const htmlEmpty = renderSettingsPage('Acme', { ...BASE, llmStats: { ...base, latencyByFeatureModel: [] } });
-    assert.doesNotMatch(htmlEmpty, /latency \(feature × model\):/);
+    assert.doesNotMatch(htmlEmpty, /not time-to-first-token/);
     assert.doesNotMatch(htmlEmpty, /end-to-end response time/);
   });
 });
@@ -110,7 +109,7 @@ describe('renderSettingsPage — provider context disclosure (LIN-2357)', () => 
 
   test('renders an empty state when providerContextSummary is omitted', () => {
     const html = renderSettingsPage('Acme', BASE);
-    assert.match(html, /provider context:/);
+    assert.match(html, />Provider context</);
     assert.match(html, /no prompt traces recorded yet/);
   });
 
@@ -135,7 +134,8 @@ describe('renderSettingsPage — provider context disclosure (LIN-2357)', () => 
     assert.match(html, /3 of 10 traces missing/);
     assert.match(html, /2 divergent/);
     assert.match(html, /1 benign/);
-    assert.match(html, /2026-08-20T12:00:00/);
+    assert.match(html, />Most recent untraced</);
+    assert.doesNotMatch(html, /2026-08-20T12:00:00/, 'a raw UTC stamp is not shown (LIN-3890)');
   });
 
   test('a benign-only (Linear) render does not read as an alarm: zero divergent, still states the count', () => {
@@ -161,7 +161,7 @@ describe('renderSettingsPage — provider context disclosure (LIN-2357)', () => 
       }
     });
     assert.match(html, /0 of 4 traces missing/);
-    assert.doesNotMatch(html, /most recent:/);
+    assert.doesNotMatch(html, />Most recent untraced</);
   });
 
   test('does not throw when providerContextSummary is omitted', () => {

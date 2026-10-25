@@ -69,11 +69,23 @@ test.describe('Settings areas: layout', () => {
   });
 });
 
+// LIN-3890 outcome 6: Pause, Stop and Resume are offered only when a runner can apply them, and a
+// queue token counts as one. Mint one on the Dispatch page the way an owner does.
+async function mintQueueToken(page, urlKey) {
+  await page.goto(`/workspace/${urlKey}/dispatch`);
+  await page.waitForLoadState('networkidle');
+  await page.fill('.token-label-input', 'runner');
+  await page.click('#create-token-form button[type="submit"]');
+  await expect(page.locator('.token-modal')).toBeVisible();
+  await page.locator('.token-modal-close').click();
+}
+
 test.describe('Settings areas: everyone-changes ask why, are logged, and can be undone', () => {
   test.beforeEach(async ({ page, seedLocal }) => {
     const { urlKey } = await seedLocal();
     await seedWorkspaceOwnership(page, urlKey);
     await page.request.get(`/test/clear-workspace-halt?urlKey=${urlKey}`);
+    await mintQueueToken(page, urlKey);
   });
 
   test('pause from Running asks in place, shows in the change log, and Undo resumes', async ({ page, localWorkerUrlKey }) => {
