@@ -142,13 +142,13 @@
 }
 
 /* One button look and its class string (LIN-3950): the caption sits under the sample. */
-.sg-button-look {
+.sg-look-sample {
   display: inline-flex;
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-1);
 }
-.sg-button-look code {
+.sg-look-sample code {
   font-size: var(--font-size-sm);
   color: var(--muted);
 }

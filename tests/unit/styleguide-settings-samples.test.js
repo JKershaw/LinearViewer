@@ -1,10 +1,12 @@
 // LIN-3950: each Settings piece on /styleguide carries a live sample rendered by its own builder,
 // beside its anatomy. The sample sits in an `inert` wrapper (its forms and links do nothing) that
-// takes the phone root (`.settings-shell`, settings.css), and the page is byte-stable: two renders
-// are identical, so the samples cannot drift between runs.
-import { test } from 'node:test';
+// takes the phone root (`.settings-shell`, settings.css), and the page is byte-stable: renders under two
+// different clocks are identical, so the samples cannot drift between runs.
+import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { renderStyleguide, SETTINGS_PIECES } from '../../lib/render-styleguide.js';
+import { switchRow } from '../../lib/components/settings-row.js';
 
 const WRAPPER = '<div class="settings-shell sg-settings-sample" inert>';
 const SAMPLE_END = '<!-- /sg-settings-sample -->';
@@ -40,8 +42,38 @@ test('each sample is built by its piece\'s builder', () => {
   });
 });
 
-test('the page is byte-stable across renders (the key row is given a fixed clock)', () => {
-  assert.equal(renderStyleguide(), renderStyleguide());
+// The switch-row sample is exactly the builder's output, not hand-written markup carrying its class.
+test('the switch-row sample is the switchRow builder\'s exact output', () => {
+  const sample = renderStyleguide().split(WRAPPER)[1].split(SAMPLE_END)[0];
+  assert.ok(
+    sample.includes(switchRow({ key: 'sample', label: 'Keep a copy of changes', on: true, action: '#' })),
+    'the sample holds switchRow()\'s output verbatim',
+  );
+});
+
+// Two renders made milliseconds apart cannot see a wall-clock dependency, so render under two clocks
+// 400 days apart: the key row's "expires in ..." / "last used ..." text would differ if it read the clock.
+test('the page is byte-stable across renders (the key row is given a fixed clock)', (t) => {
+  const T1 = Date.parse('2026-03-01T00:00:00.000Z');
+  t.mock.timers.enable({ apis: ['Date'], now: T1 });
+  const first = renderStyleguide();
+  t.mock.timers.setTime(T1 + 400 * 24 * 60 * 60 * 1000);
+  const second = renderStyleguide();
+  assert.equal(second, first);
+});
+
+// Review F1/F2 (LIN-3950): /styleguide is a Plain page whose blocks hold live builder output, so the
+// Plain prose rules reach only unclassed prose (a classed <p>/<a> keeps its own component look), and
+// the page title wears the Plain title class.
+test('Plain prose rules are scoped to unclassed p and a, so builder samples keep their own look', () => {
+  const css = readFileSync(new URL('../../public/style.css', import.meta.url), 'utf8');
+  assert.match(css, /\.plain-page \.section p:not\(\[class\]\)\s*\{/);
+  assert.match(css, /\.plain-page \.section a:not\(\[class\]\)\s*\{/);
+  assert.doesNotMatch(css, /\.plain-page \.section [pa]\s*\{/, 'no bare descendant p/a rule remains');
+});
+
+test('the /styleguide title carries the Plain title class', () => {
+  assert.match(renderStyleguide(), /<h2 class="plain-title">Style Guide<\/h2>/);
 });
 
 // LIN-3950: /styleguide is itself a Plain page, and shows the Plain layout with one sample of every

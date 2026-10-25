@@ -3690,13 +3690,13 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   text-align: center;
 }
 
-.plain-page .section p {
+.plain-page .section p:not([class]) {
   color: var(--fg-dim);
   margin-bottom: 0.75rem;
   font-family: var(--font-content);
 }
 
-.plain-page .section a {
+.plain-page .section a:not([class]) {
   color: var(--blue);
 }
 
