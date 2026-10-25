@@ -276,6 +276,38 @@ describe('GET /workspace/:urlKey/api/autopilot-prompt/:issueId — binding-scope
   });
 });
 
+// LIN-1904 (LIN-3850): `/api/prompt/:issueId/:labelName` resolves the issue's own
+// binding from `?source=` the same way `/api/autopilot-prompt/:issueId` does. The
+// route moved to routes/workspace-api-prompts.js in LIN-3842 with no test pinning
+// this, so a mutant that resolves the active provider instead went unseen.
+describe('GET /workspace/:urlKey/api/prompt/:issueId/:labelName — binding-scoped provider resolution', () => {
+  test('`source` matching the NON-active binding fetches the issue context from that binding\'s provider, not the active one', async () => {
+    const activeContextScopes = [];
+    const secondaryContextScopes = [];
+    const activeName = fakeProvider(ACTIVE_ISSUE, { seenContextScopes: activeContextScopes });
+    const secondaryName = fakeProvider(SECONDARY_ISSUE, { seenContextScopes: secondaryContextScopes });
+    const workspace = {
+      urlKey: 'test-workspace',
+      provider: activeName,
+      accessToken: 'active-token',
+      bindings: [
+        { provider: activeName, scope: 'active-scope', credentials: { token: 'active-token' } },
+        { provider: secondaryName, scope: 'secondary-scope', credentials: { token: 'secondary-token' } },
+      ],
+    };
+    const app = buildApp(workspace);
+    const { status, body } = await withServer(app, get => get(`/workspace/test-workspace/api/prompt/${SECONDARY_ISSUE.id}/blocked?source=${secondaryName}`));
+    // The security-critical assertions come first: the ACTIVE provider was never
+    // asked for the issue, and the secondary provider received ITS OWN binding's
+    // scope. A mutant that resolves the active provider fails on these, not on
+    // the 404 that follows from the active provider not holding this issue.
+    assert.deepEqual(activeContextScopes, []);
+    assert.deepEqual(secondaryContextScopes, ['secondary-token']);
+    assert.equal(status, 200);
+    assert.ok(body.prompt.includes(SECONDARY_ISSUE.identifier));
+  });
+});
+
 // LIN-3240 (LIN-3126 slice 1) strict-mode extension: on a CONNECTION-BACKED
 // LIN-3335: the pair-era same-provider disambiguation tests (a bare `source`
 // refusing BINDING_REQUIRED, `source`+`bindingScope` selecting a repo, an

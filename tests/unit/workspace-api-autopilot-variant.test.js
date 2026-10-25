@@ -227,3 +227,25 @@ describe('issue-scoped autopilot-prompt route — stopAt (LIN-3246)', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// General endpoint: ?goal= cap (LIN-2818, pinned here by LIN-3850)
+// ---------------------------------------------------------------------------
+// The route slices `goal` to 1,000 chars before it reaches the kickoff. Nothing
+// else pins that: a mutant that drops the slice leaves every other test green.
+// The tail marker sits past the 1,000th character, so it survives only if the cut
+// is removed. `promptName` shows just the first 60 characters of the goal, so the
+// prompt body is the witness for the 1,000 cap; promptName pins its own 60-char cut.
+describe('general autopilot-prompt route — goal cap (LIN-2818)', () => {
+  test('a 1,001+ character goal is cut to 1,000 in the prompt and to 60 in promptName', async () => {
+    const head = 'g'.repeat(1000);
+    const goal = `${head}OVERFLOW_TAIL`;
+    const { status, body } = await request(buildApp(), `/workspace/test-workspace/api/autopilot-prompt?goal=${encodeURIComponent(goal)}`);
+    assert.equal(status, 200);
+    const goalLine = body.prompt.match(/\*\*Goal from the human:\*\* (.*)/);
+    assert.ok(goalLine, 'the kickoff carries the goal block');
+    assert.equal(goalLine[1], head, 'the goal in the prompt is exactly the first 1,000 characters');
+    assert.doesNotMatch(body.prompt, /OVERFLOW_TAIL/);
+    assert.equal(body.promptName, `Autopilot — ${'g'.repeat(60)}`);
+  });
+});
