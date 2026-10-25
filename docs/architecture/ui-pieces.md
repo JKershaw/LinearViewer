@@ -306,15 +306,15 @@ The Rebuild PR builds every non-Models Settings area from the shared pieces (`li
 | 9 Note | `groupNote` / `.settings-note` | done; notes fit one line in the 600px pane at 1280px (the consent blast-radius copy is shared with `/auth/openrouter` and stays as it was) |
 | 10 Group title | `group()` in `lib/components/settings-group.js` | done |
 | 11 Key row | `keyRow` (name first, then kind, relative expiry and last use; the flag on the row; Revoke is an ask with `transport: 'script'`) | done |
-| 12 Area frame | `renderSettingsShell` in `lib/components/settings-frame.js` (one purpose line; the phone index selects no area) | done |
+| 12 Area frame | `renderSettingsShell` in `lib/components/settings-frame.js` (the page header inside the frame, hidden on a phone area view; one purpose line; the phone index paints no selection, the desktop index keeps the first area current) | done |
 | status line | `statusLine` in `lib/components/settings-group.js` (`settings-flash` and `settings-flash-error` kept) | new at head |
 | sidebar state | `SIDEBAR_TONES` in `lib/settings-areas.js` (`ok`, `warn`, `bad`) | done (amber for paused and stopped) |
 
-Measures at head, from `node tests/measures/css-measures.mjs . <rev>` (the series base is `a32c14a3`; the PR rebased onto `2c836676` on 25 October):
+Measures at head (`e1eafd82`, review round 2), from `node tests/measures/css-measures.mjs . <rev>` (the series base is `a32c14a3`; the PR rebased onto `2c836676` on 25 October):
 
 | Measure | Series base `a32c14a3` | This PR's base `2c836676` | Head | Gate |
 | -- | -- | -- | -- | -- |
-| CSS lines | 19,888 | 19,329 | 19,337 | ≤ 19,888 |
+| CSS lines | 19,888 | 19,329 | 19,373 | ≤ 19,888 |
 | Spacing, literal | 904 | 882 | 882 | ≤ 904 |
 | Spacing, token | 676 | 640 | 645 | (no gate) |
 | Distinct font sizes (declarations) | 74 (810) | 74 (777) | 74 (780) | ≤ 74 |
@@ -322,9 +322,11 @@ Measures at head, from `node tests/measures/css-measures.mjs . <rev>` (the serie
 | Breakpoints | 13 | 13 | 13 | ≤ 13 |
 | Area pairs (`seams.mjs`) | 10 | 9 | 9 | (reported) |
 
+The CSS line count rose by 44 from base, all in `settings.css`: the phone label and summary rules, the page-header and phone-selection rules, the Cancel colour, and their comments (under the 19,888 gate).
+
 The button count went 41 → 36 by retiring the five classes nothing emits: `btn--teal` (the ask's confirm is `btn--primary`), `provider-add-btn`, `provider-remove-btn`, `roadmap-generate-btn` and `ai-btn`. `tests/unit/lin-3890-dead-button-classes.test.js` checks each name against every production emitter, so a deletion cannot take a live element's look with it. The series base's `action-btn` tail is not renamed (decision 4).
 
-The verbatim share of the Settings renderers, `scripts/code-shape/verbatim.mjs` from `2c836676` to head over `lib/render-settings*.js`, `lib/components/settings-*.js` and `halt-controls.js`, is 73% of the new lines. That figure counts Models' untouched body (`render-settings.js`, about 380 lines that do not change), so it is not a copy measure for the rebuilt areas. The question it prompts: the Running, Agent access and Change log renderers kept their row structure and changed rows, so a different split was not available without also rebuilding Models (LIN-3855).
+The verbatim share of the Settings renderers, `scripts/code-shape/verbatim.mjs` from `2c836676` to head over `lib/render-settings*.js`, `lib/components/settings-*.js` and `halt-controls.js`, is 69% of the new lines (68.9%). That figure counts Models' untouched body (`render-settings.js`, about 380 lines that do not change), so it is not a copy measure for the rebuilt areas. The matched runs are mostly the shell's builders, moved intact into `lib/components/` (a move, which the ticket asks for, not a copy), and Models' body, which this PR does not change. The question it prompts, answered: a different split was not skipped. The rebuilt areas call the shared pieces, and the old builders are deleted rather than kept beside them.
 
 Outcome 11 (one model-routing move is one change-log entry) is a follow-up: LIN-3925, filed next to LIN-3855. Cause: each job is its own proxy request, and no batch id reaches the store.
 
