@@ -281,6 +281,7 @@ describe('routed surfaces: one routing call, then code assembles the stage promp
     assert.equal(streamedPrompt(events), handwritten('review', CHILD));
     const done = events.find(e => e.type === 'done');
     assert.equal(done?.data.identifier, CHILD.identifier);
+    assert.equal(done?.data.title, CHILD.title, 'LIN-3968: the target title rides on done for the copy-first line');
   });
 
   test('UI buffered GET: one routing call; the prompt is generatePrompt', async () => {

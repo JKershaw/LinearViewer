@@ -235,7 +235,7 @@ describe('"run on my machine ›": the shared markup, and no longer beside the l
     const { PromptSection } = loadPromptSection();
     assert.equal(
       PromptSection.runnerLinkHtml('ws'),
-      '<a class="opened-task-runner-link" href="/workspace/ws/runner" data-testid="opened-task-runner-link">run on my machine \u203A</a>',
+      'Harbour can also run steps for you, on your own machine. <a class="opened-task-runner-link" href="/workspace/ws/runner" data-testid="opened-task-runner-link">Set up a runner \u203A</a>',
     );
   });
 

@@ -137,7 +137,7 @@ test.describe('runner setup page (LIN-3098 S4, phone)', () => {
     // longer carries a second copy.
     const link = page.locator('#swipe-card').getByTestId('opened-task-runner-link');
     await expect(link).toBeVisible();
-    await expect(link).toHaveText('run on my machine ›');
+    await expect(link).toHaveText('Set up a runner ›');
     await openPrompts(page);
     await expect(page.locator('.prompt-section').first().getByTestId('opened-task-runner-link')).toHaveCount(0);
     await page.screenshot({ path: `${SHOTS}/e-card-link.png`, fullPage: true });

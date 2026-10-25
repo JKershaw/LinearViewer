@@ -111,7 +111,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await page.goto(`/workspace/${URL_KEY}/task/LOCAL-TP1`);
     await expect(page.locator('[data-testid="task-page-title"]')).toHaveText('A task with a running build');
     await expect(page.locator('[data-testid="task-page-status"]')).toHaveAttribute('data-status', 'running');
-    await expect(page.locator('[data-testid="task-page-sentence"]')).toContainText('Build running since');
+    await expect(page.locator('[data-testid="task-page-sentence"]')).toContainText('Build running for');  // LIN-3968: relative, as the row says it
 
     // Oldest-first, the running row open, the finished one closed.
     await expect(page.locator('[data-testid="task-page-stage"]')).toHaveCount(2);

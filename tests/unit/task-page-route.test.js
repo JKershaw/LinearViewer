@@ -175,7 +175,8 @@ describe('GET /workspace/:urlKey/api/task/:identifier/state', () => {
     assert.deepEqual(calls, [], 'the state endpoint never touches the provider');
     // LIN-3373: the state read holds no verified brief/recap, so it sends no context.
     // LIN-3833: the state endpoint also carries the session summary the opened task's state block reads.
-    assert.deepEqual(Object.keys(res.jsonBody).sort(), ['headerHtml', 'live', 'sessions', 'status', 'trackHtml']);
+    // LIN-3968: `stripHtml` is the one-row stage strip Home pastes; `trackHtml` stays for the task page.
+    assert.deepEqual(Object.keys(res.jsonBody).sort(), ['headerHtml', 'live', 'sessions', 'status', 'stripHtml', 'trackHtml']);
     assert.equal(res.jsonBody.status, 'running');
     assert.equal(res.jsonBody.live, true);
     assert.match(res.jsonBody.headerHtml, /data-testid="task-page-status"/);
