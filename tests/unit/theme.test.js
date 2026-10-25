@@ -71,30 +71,13 @@ test('.theme-dark re-binds the semantic + status tokens (dark values)', () => {
   }
 });
 
-// LIN-2247: the landing page re-declares the dark vocabulary under its own
-// `@media (prefers-color-scheme: dark) body.is-landing` block (style.css) rather
-// than inheriting `.theme-dark`, and its header comment claims that block
-// "Mirrors the FULL .theme-dark vocabulary". Nothing enforced that claim — three
-// tokens (`--accent`, `--ok`, `--red-hover`) had drifted out of it, a latent trap
-// for the next landing rule that reaches for one of them. Assert set membership,
-// not just that each token is *defined somewhere* — `ruleBody` on the bare
-// selector `body.is-landing` would match the wrong occurrence (the file has a
-// light-mode `body.is-landing { background-image: ... }` rule, and even a
-// mention of the string in a comment, both of which precede the dark rule), so
-// scope the search to after the dark media query starts.
-function tokenNames(body) {
-  return [...body.matchAll(/(--[a-z0-9-]+)\s*:/g)].map(m => m[1]).sort();
-}
-
-test('the landing dark remap mirrors the full .theme-dark token vocabulary (LIN-2247)', () => {
-  const mediaStart = STYLE_CSS.indexOf('@media (prefers-color-scheme: dark)');
-  assert.notEqual(mediaStart, -1, 'expected the landing dark media query in the stylesheet');
-  const landingDark = ruleBody(STYLE_CSS.slice(mediaStart), 'body.is-landing');
-  assert.deepEqual(
-    tokenNames(landingDark),
-    tokenNames(ruleBody(STYLE_CSS, '.theme-dark')),
-    'body.is-landing (dark) must declare exactly the same token names as .theme-dark'
-  );
+// LIN-2247 guarded the landing's second copy of the dark tokens by a sync test.
+// LIN-3980 removes the copy: the landing follows `prefers-color-scheme` through
+// the one shared pre-paint script, so the stronger claim is that no media-query
+// remap of the dark vocabulary exists in the stylesheet at all.
+test('the stylesheet has no second dark-token copy (LIN-3980)', () => {
+  assert.doesNotMatch(STYLE_CSS, /@media \(prefers-color-scheme: dark\)/,
+    'dark tokens come from .theme-dark only; the system scheme is applied pre-paint by lib/components/page.js');
 });
 
 test('--brand is teal (per LIN-782) in both themes', () => {

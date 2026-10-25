@@ -8,8 +8,8 @@
  *
  * Dark-safe rule: every colour is a semantic token (--text/--muted/--card/
  * --line/--brand/--amber/--green/--slate …). No raw hex — the same declarations
- * flip correctly under both `.theme-dark` and the landing's
- * `@media (prefers-color-scheme: dark)` remap. Type rides the shared split:
+ * flip correctly under `.theme-dark`, which the landing reaches by following
+ * `prefers-color-scheme` through the shared pre-paint script (LIN-3980). Type rides the shared split:
  * --font-structural (mono) for machine facts / eyebrows / terminals,
  * --font-content (sans) for headings and prose.
  * Mobile-first: single column by default, multi-column at ≥760px.
