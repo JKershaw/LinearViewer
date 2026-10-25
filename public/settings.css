@@ -734,17 +734,10 @@
    Models page (LIN-3855)
 
    The rows are the shared settings rows (lib/components/settings-row.js). The
-   change panel (settings-change-panel.js), the spend bar (settings-spend-bar.js)
+   decision panel is styled in style.css (LIN-3962); the spend bar (settings-spend-bar.js)
    and the filter are the page's own pieces. On a phone the open row is a
    full-screen sheet and nothing scrolls sideways.
    ============================================================================= */
-.settings-change-panel {
-  display: grid;
-  gap: var(--space-2);
-  padding: var(--space-2) 0;
-  min-width: 0;
-}
-
 .settings-field {
   display: grid;
   grid-template-columns: minmax(8ch, 12ch) minmax(0, 1fr);

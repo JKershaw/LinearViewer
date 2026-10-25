@@ -54,6 +54,10 @@ const DELEGATED_ALLOW = {
   'observation.js:.obs-run-gen': 'UI-only: expands rows (observation page)',
   'ship.js:.swim-box': 'UI-only: opens a popover (ship page)',
   'swim.js:.swim-box': 'UI-only: closes a popover (swim page)',
+  // LIN-3962: the decision panel's own controls. A suggestion sets the model field (a value the viewer still saves or
+  // uses); the change listener keeps the panel's toggles in step with its fields. Neither sends a request or writes a setting.
+  'decision-panel.js:[data-decision-pick]': 'UI-only: a suggestion sets the model field, a value the viewer still saves or uses; no request',
+  'decision-panel.js:[data-decision-panel]': 'UI-only: keeps the panel\'s suggestions, effort and OpenRouter-only switch in step with its fields; no request',
 };
 
 function delegatedSites() {

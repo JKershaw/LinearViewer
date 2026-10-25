@@ -795,6 +795,7 @@
       // the harness starts null, and the resolved setting is shown on the Runs-on line from the preview.
       run: {
         step: null, choice: runChoiceDefaults(), draft: null, preview: null, changeOpen: false, presets: null,
+        panelHtml: null, panelFailed: false, withoutEffort: [],
         anotherOpen: false, moreOpen: false, item: null, confirmStop: false, busy: false
       }
     };
@@ -934,13 +935,15 @@
     function paintRun() {
       if (destroyed || !runControlOn()) return;
       const slot = container.querySelector && container.querySelector('[data-run-slot]');
-      if (!slot) { render(); return; }
+      if (!slot) { render(); applyPanelDraft(); return; }
       const active = typeof document !== 'undefined' ? document.activeElement : null;
       const testid = active && active.dataset && slot.contains && slot.contains(active) ? active.dataset.testid : null;
       const typed = testid && typeof active.value === 'string'
         ? { value: active.value, start: active.selectionStart, end: active.selectionEnd }
         : null;
       slot.outerHTML = renderRunBlock();
+      // The panel's draft goes back into the new controls first; a focused control then keeps its live value and caret.
+      applyPanelDraft();
       if (!testid) return;
       const again = container.querySelector(`[data-run-slot] [data-testid="${testid}"]`);
       if (!again || typeof again.focus !== 'function') return;
@@ -1092,39 +1095,85 @@
       return `${html}</div>`;
     }
 
-    // The Change panel: only what this decision needs. Edits go to a draft; "Use for this run" applies it.
+    // The Change panel (LIN-3962): Home's extras (the preset, Runs on, agent access, the summary, Use/Reset/Close) around
+    // the one decision panel the server renders (lib/components/decision-panel.js), which holds the harness, model and
+    // effort. Edits go to a draft; "Use for this run" applies it. The panel's HTML is read when the panel opens.
     function renderChangePanel(preview) {
       const d = state.run.draft || state.run.choice;
       const presets = state.run.presets || [];
       const harness = d.harness || '';
-      const showEffort = harness !== 'opencode';
+      // Effort is judged by the harness in force (the draft's, else the one Settings resolves a blank to), against the
+      // server's list of harnesses that take none. A blank harness with nothing resolved keeps effort, as effortAppliesTo does.
+      const inForce = harness || (preview && preview.harness) || '';
+      const showEffort = !state.run.withoutEffort.includes(inForce);
       const presetButtons = presets.map((p) => `<button class="opened-task-preset${d.presetId === p.id ? ' is-chosen' : ''}" data-action="run-preset" data-preset-id="${esc(p.id)}" data-testid="run-preset">${esc(p.name || p.id)}</button>`).join('');
       const targets = ['cli', ...(harness === 'opencode' ? [] : ['web']), ...(opts.isLocalhost ? ['local'] : [])];
       const targetButtons = targets.map((t) => `<button class="opened-task-target${d.target === t ? ' is-chosen' : ''}" data-action="run-target" data-target="${esc(t)}" data-testid="run-target-${esc(t)}">${esc(TARGET_WORDS[t])}</button>`).join('');
-      const effortOptions = ['', 'low', 'medium', 'high', 'xhigh', 'max'].map((e) => `<option value="${e}"${(d.effort || '') === e ? ' selected' : ''}>${e || 'from Models'}</option>`).join('');
       const agent = d.agentAccess == null ? (window.ProxyToggle && window.ProxyToggle.isActive ? window.ProxyToggle.isActive() : true) : d.agentAccess;
-      const summary = [d.model || 'the model from Models', harness || 'the harness from Models', showEffort && d.effort ? `effort ${d.effort}` : null, TARGET_WORDS[d.target] || d.target].filter(Boolean).join(' \u00b7 ');
+      const summary = [d.model || 'the model from Models', inForce || 'the harness from Models', showEffort && d.effort ? `effort ${d.effort}` : null, TARGET_WORDS[d.target] || d.target].filter(Boolean).join(' \u00b7 ');
+      const panelBody = state.run.panelHtml
+        || (state.run.panelFailed
+          ? '<p class="opened-task-change-note" data-testid="run-panel-failed">The choices could not load. Use for this run stays off until they do.</p>'
+          : '<p class="opened-task-change-note" data-testid="run-panel-loading">Loading the choices\u2026</p>');
       return `<div class="opened-task-change-panel" data-testid="run-change-panel">`
         + `<div class="opened-task-change-head">This run only${preview ? ` \u00b7 default: ${esc(preview.model || 'from Models')}` : ''}`
         + `<button class="opened-task-change-x" data-action="close-change" aria-label="Close" data-testid="run-change-x">\u00d7</button></div>`
         + (presetButtons ? `<div class="opened-task-change-row"><span class="opened-task-change-label">Preset</span>${presetButtons}</div>` : '')
-        + `<div class="opened-task-change-row"><span class="opened-task-change-label">Harness</span>`
-        + `<select data-testid="run-harness" aria-label="Harness">`
-        + `<option value="">from Models</option><option value="claude-code"${harness === 'claude-code' ? ' selected' : ''}>claude-code</option><option value="opencode"${harness === 'opencode' ? ' selected' : ''}>opencode</option>`
-        + `</select></div>`
-        + `<div class="opened-task-change-row"><span class="opened-task-change-label">Model</span>`
-        + `<input type="text" data-testid="run-model" maxlength="200" placeholder="from Models" value="${esc(d.model || '')}" aria-label="Model"></div>`
-        + (showEffort ? `<div class="opened-task-change-row"><span class="opened-task-change-label">Effort</span><select data-testid="run-effort" aria-label="Effort">${effortOptions}</select></div>` : '')
+        + panelBody
         + `<div class="opened-task-change-row"><span class="opened-task-change-label">Runs on</span>${targetButtons}</div>`
         + `<label class="opened-task-change-row"><input type="checkbox" data-testid="run-agent-access"${agent ? ' checked' : ''}> Your agent may read and update this task</label>`
         + `<p class="opened-task-change-summary" data-testid="run-will-use">This run will use ${esc(summary)}.</p>`
         + `<div class="opened-task-change-row">`
-        + `<button class="opened-task-use" data-action="use-run" data-testid="run-use">Use for this run</button>`
+        + `<button class="opened-task-use" data-action="use-run" data-testid="run-use"${state.run.panelFailed || !state.run.panelHtml ? ' disabled' : ''}>Use for this run</button>`
         + `<button data-action="reset-run" data-testid="run-reset">Reset</button>`
         + `<button data-action="close-change">Close</button>`
         + `<a class="opened-task-settings-link" href="/workspace/${encodeURIComponent(opts.urlKey || '')}/settings/models">Settings \u203A Models</a>`
         + `</div><p class="opened-task-change-note">A change here is for this run only. The default is set in Settings \u203A Models.</p>`
         + `</div>`;
+    }
+
+    // The decision panel for the choice this run would use: the server's panel (routes/dispatch.js decision-panel), read
+    // when the Change panel opens and again after the choice changes. A repaint re-applies the draft to it (applyPanelDraft).
+    function fetchRunPanel() {
+      if (!runControlOn() || !opts.urlKey || typeof window.api !== 'function') return;
+      const step = runStepOf();
+      const params = new URLSearchParams({ promptName: step ? step.kind : 'autopilot', surface: opts.surface });
+      const c = state.run.choice;
+      if (c.harness) params.set('harness', c.harness);
+      if (c.model) params.set('model', c.model);
+      if (c.effort) params.set('effort', c.effort);
+      window.api(`/workspace/${encodeURIComponent(opts.urlKey)}/api/dispatch/decision-panel?${params.toString()}`, { on401: false })
+        .then((r) => {
+          if (destroyed) return;
+          state.run.panelHtml = (r && r.html) || null;
+          state.run.withoutEffort = (r && r.withoutEffort) || [];
+          state.run.panelFailed = !state.run.panelHtml;
+          paintRun();
+        })
+        .catch(() => {
+          if (destroyed) return;
+          state.run.panelHtml = null;
+          state.run.panelFailed = true;
+          paintRun();
+        });
+    }
+
+    // A repaint re-inserts the cached panel, which holds the choice it was read for. This puts the draft in progress back
+    // into its controls, then lets the shared panel's own script settle the suggestions and effort for that harness.
+    function applyPanelDraft() {
+      const root = container.querySelector && container.querySelector('[data-decision-panel]');
+      if (!root) return;
+      const d = state.run.draft;
+      if (d) {
+        const set = (testid, value) => {
+          const el = root.querySelector(`[data-testid="${testid}"]`);
+          if (el) el.value = value || '';
+        };
+        set('run-harness', d.harness);
+        set('run-model', d.model);
+        set('run-effort', d.effort);
+      }
+      if (window.DecisionPanel) window.DecisionPanel.sync(root);
     }
 
     // The whole run block: the step, what it runs on, the one main action, the after-run line, and More.
@@ -1188,6 +1237,9 @@
         case 'change-run':
           state.run.changeOpen = true;
           state.run.draft = { ...state.run.choice };
+          state.run.panelHtml = null;
+          state.run.panelFailed = false;
+          fetchRunPanel();
           if (!state.run.presets) {
             window.api(`/workspace/${encodeURIComponent(opts.urlKey)}/api/dispatch/presets`, { on401: false })
               .then((r) => { state.run.presets = (r && r.presets) || []; paintRun(); })
@@ -1209,15 +1261,21 @@
           paintRun();
           return true;
         case 'use-run':
+          // Blank fields are not sent, and with no panel there is nothing to send from: Use stays off until it loads.
+          if (state.run.panelFailed || !state.run.panelHtml) return true;
           state.run.choice = { ...state.run.draft };
           state.run.changeOpen = false;
           state.run.draft = null;
+          state.run.panelHtml = null;
           refreshRunPreview();
           return true;
         case 'reset-run':
           state.run.choice = runChoiceDefaults();
           state.run.draft = null;
           state.run.step = null;
+          state.run.panelHtml = null;
+          state.run.panelFailed = false;
+          if (state.run.changeOpen) fetchRunPanel();
           refreshRunPreview();
           return true;
         case 'ask-harbour':

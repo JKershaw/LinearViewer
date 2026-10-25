@@ -27,11 +27,12 @@ const ONLY = process.env.JUDGE_ONLY ? new RegExp(process.env.JUDGE_ONLY) : null;
 
 const AUDIT_FIXTURE = fileURLToPath(new URL('./audit-report.fixture.json', import.meta.url));
 
+// LIN-3968: Home's opened-task states (the five that seed sessions or write a prompt). The LIN-3962 states are not these.
+const isOpenedTaskState = (state) => /^home-(stages-done|running|failed|copy-first|copy-written)$/.test(state ?? '');
 const isLoopback = (url) => /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(url) || url.startsWith('data:') || url.startsWith('blob:');
 
 // `urlKey` null means no local seed: the account is a zero-workspace one, signed in by email (LIN-3956).
-async function openContext(browser, baseURL, viewport, theme, entry) {
-  const urlKey = entry.state === 'email-signin' ? null : entry.urlKey;
+async function openContext(browser, baseURL, viewport, theme, urlKey, seed = {}, base = null) {
   const context = await browser.newContext({
     baseURL, viewport: { width: viewport.width, height: viewport.height },
     colorScheme: theme, deviceScaleFactor: 1, reducedMotion: 'reduce',
@@ -40,10 +41,9 @@ async function openContext(browser, baseURL, viewport, theme, entry) {
   await context.addCookies([{ name: 'theme', value: theme, url: baseURL }]);
   await context.clock.setFixedTime(new Date(FROZEN_TIME));
   if (urlKey) {
-    // LIN-3968: Home's states seed their own workspace; the run control shows only where the entry has a runner.
-    const base = entry.state?.startsWith('home-') ? homeSeed(urlKey) : defaultLocalSeed(urlKey);
-    const seed = { ...base, urlKey, runnerKey: entry.runner === true };
-    const resp = await context.request.post('/test/set-local-session', { data: seed });
+    // LIN-3968: Home's opened-task states seed their own workspace (homeSeed); the run control shows only where the entry has a runner.
+    const data = { ...(base || defaultLocalSeed(urlKey)), urlKey, runnerKey: false, ...seed };
+    const resp = await context.request.post('/test/set-local-session', { data });
     if (!resp.ok()) throw new Error(`seed failed on ${baseURL}: ${resp.status()} ${await resp.text()}`);
   }
   return context;
@@ -90,9 +90,9 @@ async function prepareHome(page, context, entry, baseURL) {
   }
 }
 
-async function prepare(page, context, entry, viewport, theme, baseURL) {
+async function prepare(page, context, entry, viewport, theme, side, baseURL) {
   const url = entry.path(entry.urlKey);
-  if (entry.state?.startsWith('home-')) return prepareHome(page, context, entry, baseURL);
+  if (isOpenedTaskState(entry.state)) return prepareHome(page, context, entry, baseURL);
   if (entry.state === 'email-signin') {
     // One address per shot, the same on both sides: the send throttle is per address (3 per 15 minutes),
     // and the judge takes at most ATTEMPTS (3) tries per shot. The link is read from the capture outbox.
@@ -153,8 +153,33 @@ async function prepare(page, context, entry, viewport, theme, baseURL) {
     const row = page.locator('[data-testid="models-job-implementation"]');
     if (await row.count()) {
       await row.locator(':scope > summary').click();
-      if (entry.state === 'models-staged') await row.locator('select[data-models-field="model"]').selectOption('sonnet');
+      if (entry.state === 'models-staged') {
+        // Base's model is a select, head's is the decision panel's input (LIN-3962): choose by the element's kind.
+        const model = row.locator('[data-models-field="model"]');
+        if ((await model.evaluate((el) => el.tagName)) === 'SELECT') await model.selectOption('sonnet');
+        else await model.fill('sonnet');
+      }
     }
+  }
+  if (entry.state === 'home-run-panel-open') {
+    // LIN-3962: Home's Change panel, opened the way a viewer opens it: the In Progress row (visible; the marked top task
+    // sits under a collapsed parent in this seed), then Change. The seed gives this page its run controls, so head must
+    // show Change; a head without it fails here rather than being skipped. Base's panel is the old one, so base may come
+    // up without the control and is shot as it is.
+    await page.locator('[data-section="in-progress"][data-identifier="LOCAL-1"]').first().click();
+    const change = page.getByTestId('run-change');
+    if (side === 'head') await change.waitFor();
+    if (await change.count()) {
+      await change.click();
+      await page.getByTestId(side === 'head' ? 'run-decision-panel' : 'run-change-panel').waitFor();
+    }
+  }
+  if (entry.state === 'swipe-dispatch-open') {
+    // LIN-3962: Swipe's card with its Prompts section open, where its exec controls live. The Dispatch ▾ disclosure
+    // appears only on a generated prompt, which this seed does not make, so it is not claimed here. Swipe has no run
+    // panel, so this state must show no difference.
+    await page.getByText(/Prompts/).first().click();
+    await page.getByText('next step').first().waitFor();
   }
   if (entry.state === 'audit-report') {
     // Both sides answer the same fixture, so the report is identical and the request never leaves the browser.
@@ -164,11 +189,13 @@ async function prepare(page, context, entry, viewport, theme, baseURL) {
   }
 }
 
-async function shoot(browser, baseURL, viewport, theme, entry) {
-  const context = await openContext(browser, baseURL, viewport, theme, entry);
+async function shoot(browser, baseURL, viewport, theme, entry, side) {
+  const openedTask = isOpenedTaskState(entry.state);
+  const context = await openContext(browser, baseURL, viewport, theme, entry.state === 'email-signin' ? null : entry.urlKey,
+    openedTask ? { runnerKey: entry.runner === true } : entry.seed, openedTask ? homeSeed(entry.urlKey) : null);
   try {
     const page = await context.newPage();
-    await prepare(page, context, entry, viewport, theme, baseURL);
+    await prepare(page, context, entry, viewport, theme, side, baseURL);
     await settle(page);
     // Rewrite per-run text (see NORMALISE in pages.mjs) in text nodes, before the screenshot.
     await page.evaluate((rules) => {
@@ -229,8 +256,8 @@ for (const entry of PAGES) {
         let attempts = 0;
         do {
           attempts++;
-          base = await shoot(browser, BASE_URL, viewport, theme, entry);
-          head = await shoot(browser, HEAD_URL, viewport, theme, entry);
+          base = await shoot(browser, BASE_URL, viewport, theme, entry, 'base');
+          head = await shoot(browser, HEAD_URL, viewport, theme, entry, 'head');
         } while (!base.buffer.equals(head.buffer) && attempts < ATTEMPTS);
         const row = { page: entry.id, viewport: viewport.name, theme, masked: base.masked, probe: base.probe, attempts };
         if (base.buffer.equals(head.buffer)) {
