@@ -6,9 +6,9 @@
  */
 
 /* Section styling is canonical now (.section / .section--boxed / .section-header
-   in style.css, LIN-461). `.dispatch-section` survives only as a hook:
-   dispatch.js reaches the send panel via `.closest('.dispatch-section')` and the
-   `.dispatch-section .line` rule below scopes on it. */
+   in style.css, LIN-461). `.dispatch-section` survives only as a styling hook;
+   dispatch.js reaches the send panel via [data-send-panel] (LIN-3889). Key/value
+   tree rows are `.field` (style.css), so this file no longer restates that row. */
 
 /* `.dispatch-subtitle` is now a no-style E2E hook (dispatch-page.spec.js);
    canonical styling lives in `.page-header__subtitle` (style.css, LIN-462). */
@@ -16,18 +16,9 @@
 /* =============================================================================
    Dispatch Nodes (tree items)
    ============================================================================= */
-.dispatch-section .line {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.4rem 0;
-  font-family: var(--font-content);
-  font-size: 0.9em;
-}
-
-.dispatch-prompt-line {
-  align-items: flex-start;
-}
+/* LIN-3889: `.dispatch-section .line` (a byte copy of `.field`) and `.dispatch-prompt-line`
+   (`align-items: flex-start`) are gone. The copy's 0,2,0 specificity hid the variant, so it
+   never applied; with the copy removed it would, so the dead declaration goes with it (0 px). */
 
 .dispatch-prompt-wrapper {
   flex: 1;
@@ -43,7 +34,7 @@
   margin: 0;
 }
 
-/* Action buttons: see common-actions.css (.action-btn) */
+/* Action buttons: see style.css (.btn--quiet and its tones, with the .action-btn aliases) */
 
 /* =============================================================================
    Dispatch Prompt
@@ -67,8 +58,9 @@
   border-color: var(--blue);
 }
 
+/* LIN-3889: the `gap` that was here (var(--space-2)) never applied: `.dispatch-section .line`
+   (0,2,0) set the row gap. With that copy gone it would flip, so it is dropped (0 px). */
 .dispatch-prompt-actions {
-  gap: var(--space-2);
   flex-wrap: wrap;
 }
 
@@ -96,7 +88,7 @@
   border-color: var(--blue);
 }
 
-/* Disclosure trigger reuses the .action-btn / .action-btn.save look */
+/* Disclosure trigger reuses the .btn--quiet.btn--green look */
 .dispatch-toggle {
   user-select: none;
 }
@@ -176,7 +168,7 @@
   padding: 0;
   cursor: pointer;
   font-family: var(--font-structural);
-  font-size: 1em;
+  font-size: var(--font-size-base);
   line-height: 1;
   color: var(--fg-dim);
 }
@@ -214,34 +206,29 @@
 /* =============================================================================
    Themed surfaces (LIN-853)
    Queue entries and token rows render on the shared Card primitive (.card).
-   .queue-item / .token-item ride alongside as JS + E2E hooks; their base list
-   rules live in shared CSS (style.css / common-actions.css) used by the navbar
-   and settings/proxy pages, so we don't touch those — instead we re-assert the
-   card chrome here (dispatch.css loads last) so shared-rule load order can't
-   defeat it, and route factual meta to the mono --font-structural token.
+   .queue-item rides alongside as a JS + E2E hook; its base list rule lives in
+   shared CSS (style.css / common-actions.css) used by the navbar and settings/proxy
+   pages, so we don't touch those — instead we re-assert the card chrome here
+   (dispatch.css loads last) so shared-rule load order can't defeat it, and route
+   factual meta to the mono --font-structural token.
+   LIN-3889: the `.token-list` (.token-item.card, .token-meta) rules were dead (no
+   renderer emits `token-list`, `token-item` or `token-meta`) and are deleted.
    ============================================================================= */
-.queue-list .queue-item.card,
-.token-list .token-item.card {
+.queue-list .queue-item.card {
   padding: var(--space-3);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   margin-bottom: var(--space-3);
 }
 
-.queue-list .queue-item.card:last-child,
-.token-list .token-item.card:last-child {
+.queue-list .queue-item.card:last-child {
   margin-bottom: 0;
 }
 
 /* Facts (identifiers, targets, dates) stay mono; human titles/labels stay sans. */
-.queue-list .queue-item-meta,
-.token-list .token-meta {
+.queue-list .queue-item-meta {
   font-family: var(--font-structural);
 }
-
-/* LIN-1448's `.token-ownerless` rule moved to common-actions.css (LIN-1586) —
-   the shared home of `.token-item`/`.token-meta`, which both this page and the
-   proxy page load. Same declaration, one copy; nothing here overrides it. */
 
 /* =============================================================================
    Integration Guide
@@ -447,7 +434,7 @@
 .halt-status {
   font-family: var(--font-content);
   font-size: 0.9em;
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-2);
 }
 
 .halt-status code {
@@ -461,7 +448,7 @@
 
 .halt-disclaimer {
   font-family: var(--font-content);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   color: var(--fg-dim);
   margin: 0 0 0.75rem 0;
 }
@@ -475,17 +462,14 @@
   border: 1px solid var(--fg-vdim);
 }
 
-.halt-form .action-btn {
-  margin-right: 0.5rem;
+/* The halt component's own button class (lib/components/halt-controls.js), not the shared Button's. */
+.halt-form .halt-control {
+  margin-right: var(--space-2);
 }
 
 /* =============================================================================
    Responsive
    ============================================================================= */
 @media (max-width: 640px) {
-  .dispatch-section .line {
-    flex-wrap: wrap;
-  }
-
   /* Token responsive: see common-actions.css */
 }

@@ -105,10 +105,10 @@ The class is "a rule written in 2 or more places that Settings shares". Two repr
 - **Reason:** it is the component home; the other three say in their own comments that they are the same rule.
 - **Counting rule:** a site is a rule whose body is that byte-identical declaration block (`--dup-blocks` body #10).
 - **Sites at base (4):** `style.css:3133` `.field` (the authority), `dispatch.css:19` `.dispatch-section .line`, `proxy.css:104` `.proxy-section .line`, `settings.css:45` `.settings-section .line`.
-- **Consolidate deletes:** the three `.X-section .line` blocks.
+- **Consolidate deletes:** the three `.X-section .line` blocks (done, LIN-3889). The 640px wrap moves to `.field`.
 - **Same-name collision, not a copy:** the dashboard tree's own `.line` (`style.css:1222`, and the phone override at `:1931`) is a different rule (`align-items: baseline`, `padding: 4px 0`). It is scoped to the tree in intent and **harmless**, except that new Settings rows also carry the class `line` (`render-settings-shell.js:37`, `render-settings-workspace.js:20` and `:188`, `render-settings-you.js:60`, `:80`, `:95`, `:107`, `:115` and `:144`), so the bare `.line` at `style.css:1222` also matches them. Class: **unclear**; Rebuild must drop the `line` class from Settings rows or scope the tree rule.
-- **Differences:** the three `.X-section .line` copies wrap at 640px and `.field` does not (`dispatch.css:486`, `proxy.css:424`, `settings.css:543`, each `flex-wrap: wrap`). Class: **fix** (provisional): a field row that cannot wrap overflows on a phone; give `.field` the wrap. Not changed here.
-- **Variant:** `.dispatch-prompt-line { align-items: flex-start }` (`dispatch.css:28`), kept as a named variant.
+- **Differences:** the three `.X-section .line` copies wrap at 640px and `.field` does not (`dispatch.css:486`, `proxy.css:424`, `settings.css:543`, each `flex-wrap: wrap`). Class: **fix** (provisional): a field row that cannot wrap overflows on a phone; give `.field` the wrap. Done (LIN-3889): the wrap moved to `.field`, the only place pixels move.
+- **Variant:** none. (Corrected by LIN-3889: `.dispatch-prompt-line { align-items: flex-start }` never applied, because the copy's 0,2,0 selector set `align-items` first. It is deleted with the copy, at 0 px.)
 
 ### 5b. Interactive row
 
@@ -117,7 +117,7 @@ The class is "a rule written in 2 or more places that Settings shares". Two repr
 - **Reason:** LIN-3846 built it for exactly this and every Settings area uses it.
 - **Counting rule:** a site is a row builder or a hand-written `<... class="settings-row ...">` in `lib/`.
 - **Sites at base:** the three builders; hand-written rows at `render-settings.js:866` (`settings-row settings-row-drill`), `render-settings-workspace.js:20` (`staticRow`, module-local), `render-settings-workspace.js:177` and `:188` (the change-log rows inside `changeRow`; `:188` is the static one), `render-settings-you.js:60`, `:80`, `:95`, `:107`, `:115` (static rows written out by hand), `render-settings-you.js:110` (an action row written out by hand: `settings-row settings-row-action settings-action-teal`, a copy of `actionRow`) and `render-settings-you.js:144-147` (a switch written out by hand).
-- **Consolidate deletes:** the hand-written copies at `render-settings-you.js:144-147`, `render-settings-you.js:110` (replaced by `actionRow`) and `render-settings.js:866`, replaced by the builders. The five static rows in `render-settings-you.js` (`:60`, `:80`, `:95`, `:107`, `:115`) and the one at `render-settings-workspace.js:188` are hand-written copies of `staticRow` (`render-settings-workspace.js:20`). **`staticRow` becomes a shared builder** in `render-settings-shell.js` beside `switchRow`, `drillRow` and `actionRow`, and those six are replaced by it: it is the same markup six times over, and a second private copy is how the count got short. The change-log row at `:177` stays a `changeRow` concern.
+- **Consolidate deletes:** the hand-written copies at `render-settings-you.js:144-147`, `render-settings-you.js:110` (replaced by `actionRow`) and `render-settings.js:866`, replaced by the builders. (Partly, LIN-3889: the Theme, Email, Runs and change-log rows keep their own markup minus `line`; see the status table.) The five static rows in `render-settings-you.js` (`:60`, `:80`, `:95`, `:107`, `:115`) and the one at `render-settings-workspace.js:188` are hand-written copies of `staticRow` (`render-settings-workspace.js:20`). **`staticRow` becomes a shared builder** in `render-settings-shell.js` beside `switchRow`, `drillRow` and `actionRow`, and those six are replaced by it: it is the same markup six times over, and a second private copy is how the count got short. The change-log row at `:177` stays a `changeRow` concern.
 - **Differences:** `.settings-row` has its own spacing (`0.7rem 0.8rem`) and size (`0.95em`) that match neither the scale nor `.field`. Class: **variant** (a row in a card is not a bare field), recorded here as the named variant "row in a card".
 - **Variant:** `settings-row-static` (a read-only row), `settings-row-drill`, `settings-row-action`, `settings-row-switch`.
 
@@ -129,7 +129,8 @@ The class is "a rule written in 2 or more places that Settings shares". Two repr
 - **Cost, recorded:** `.btn` has **one production caller**, `lib/render-styleguide.js:25`. `action-btn` appears in **24 JS files** under `lib/` and `public/`.
 - **Counting rule:** a site is a rule that gives a button its own box (background, border, padding, radius). Restyling a button from a page sheet counts.
 - **Sites at base:** 37 button-like class names (list via the script's `buttonClasses.names`). The `.btn` family 3 (+ `btn__icon`), `action-btn` 1, `toggle-btn` 1 (Switch), `token-copy-btn`, `icon-btn*`, plus per-feature ones (`fc-start-btn`, `ship-mode-btn`, `roadmap-generate-btn`, ...).
-- **Consolidate deletes:** the page-sheet restyles of `.action-btn` (`dispatch.css:478`, `flight-companion.css:369`) once callers move; `.action-btn`'s variants map onto named `.btn` variants first.
+- **Consolidate deletes (LIN-3889, strategy A):** the `.action-btn` block in common-actions.css, which is now one selector list per look in style.css, shared with the named tones `.btn--quiet` + `.btn--green/blue/red`. The `.halt-form .action-btn` restyle (`dispatch.css`) and the proxy pager's disabled rule are folded into the shared rules. `flight-companion.css:369` is layout (`flex: 0 0 auto`), not a button box, and stays.
+- **Not done (open question):** the 17 alias files and `render-settings.js` still say `action-btn`; they render the same body, so the look is one.
 - **Variants to map:** `action-btn.save` (green), `.connect` (blue), `.disconnect`/`.logout`/`.token-revoke` (red), and Settings' `settings-action-teal` / `settings-action-red` tones.
 - **Differences:** `.btn` is a bordered 32px control, `.action-btn` a chromeless tinted label. Class: **unclear**; this is a design decision for Rebuild's `/styleguide` step.
 
@@ -159,7 +160,7 @@ The class is "a rule written in 2 or more places that Settings shares". Two repr
 - **Authority:** `groupNote` (`render-settings-shell.js:84`) with `.settings-note` (`settings.css:791`) for notes under a group.
 - **Counting rule:** a site is a rule styling small secondary text: `.settings-row-note`, `.settings-note`, `.settings-group-subtitle`, `.settings-subtitle`, `.page-header__subtitle`.
 - **Sites at base:** `.settings-row-note` (`settings.css:716`, 0.85em, block), `.settings-note` (`settings.css:791`, 0.85em, margin-top), `.settings-group-subtitle` (`settings.css:33`, 0.9em), `.settings-subtitle` (`settings.css:184`, byte-identical to `.page-header__subtitle`, `style.css:3114`; `--dup-blocks` #6), `.page-header__subtitle`.
-- **Consolidate deletes:** `.settings-subtitle` (a copy of the page-header subtitle; emitted at `render-settings.js:319, 468, 587, 831, 862`).
+- **Consolidate deletes:** `.settings-subtitle` (a copy of the page-header subtitle; emitted at `render-settings.js:319, 468, 587, 831, 862`). Done (LIN-3889): the emitters use `.page-header__subtitle`.
 - **Differences:** `0.85em` for notes against `0.9em` for subtitles is two sizes for one idea. Class: **unclear**.
 
 ### 10. Group title
@@ -180,7 +181,7 @@ The class is "a rule written in 2 or more places that Settings shares". Two repr
 - **If this reading is wrong** (a runtime emitter built by string concatenation that the grep cannot see), `keyRow` still stands and the list becomes **open question 2**.
 - **Counting rule:** a site is a rule or builder that renders one key.
 - **Sites at base:** `render-settings-workspace.js:95` (live); `common-actions.css:92-152` (no emitter); tests naming the dead classes: `tests/e2e/dispatch-page.spec.js`, `tests/e2e/proxy.spec.js`, `tests/e2e/settings.spec.js`, `tests/unit/lin-2370-browser-copy-prompt-provider-identity.test.js`, `tests/unit/lin-3131-runner-settings-render.test.js`, `tests/unit/run-controls-render.test.js` (LIN-3888 must check whether they assert presence or absence).
-- **Consolidate deletes:** the seven dead token-list rules, once LIN-3888 has moved the tests that name them.
+- **Consolidate deletes:** the seven dead token-list rules in `common-actions.css` (done, LIN-3889), and the dead `.token-list` rules in `dispatch.css` and `.proxy-token-list` in `proxy.css` (done, LIN-3889: no renderer emits them).
 
 ### 12. Area page frame
 
@@ -197,15 +198,15 @@ The class is "a rule written in 2 or more places that Settings shares". Two repr
 - **Authority:** `.settings-link` as written at `settings.css:105`, until Consolidate moves it to a shared home (it is not Settings-specific).
 - **Counting rule:** a site is a rule whose body is that link block (`--dup-blocks` #5).
 - **Sites at base (2):** `audit.css:82`, `settings.css:105` (byte-identical). Emitted at `render-settings.js:249`.
-- **Consolidate deletes:** `audit.css:82`.
+- **Consolidate deletes:** `audit.css:82`. Done (LIN-3889): one rule, `.settings-link`, in style.css.
 
 ### 14. Back link
 
 - **Decides:** the "‹ back" breadcrumb above a page title.
-- **Authority:** none yet. **Provisional:** `.sess-back` (`session.css:22`) as the shared body, because three pages already write it byte-identically; `.settings-back` is a different rule.
+- **Authority:** one selector list, `.sess-back, .task-create-back, .task-edit-back` in `style.css` (LIN-3889). `.settings-back` (`settings.css`) is a different rule and stays a named variant.
 - **Counting rule:** a site is a rule styling a page's back link.
 - **Sites at base (4):** `session.css:22` `.sess-back`, `task-create.css:20` `.task-create-back`, `task-edit.css:29` `.task-edit-back` (byte-identical; `--dup-blocks` #19), `settings.css:592` `.settings-back` (differs: `color: var(--brand-dim)`, `display: none` until 760px, `settings.css:866`).
-- **Consolidate deletes:** two of the three identical copies once a shared home is chosen.
+- **Consolidate deletes:** the three identical page copies (done, LIN-3889: `session.css`, `task-create.css`, `task-edit.css`). The task page's back link reuses `.sess-back`. The judge seeds the task create and edit pages and the not-found session page (which renders the same link); the populated session page is not covered (its run data is not seeded).
 - **Differences:** `.settings-back` is brand-coloured and phone-only. Class: **variant** (Settings shows it only when the list is hidden).
 
 ### 15. Text control
@@ -214,10 +215,12 @@ The class is "a rule written in 2 or more places that Settings shares". Two repr
 - **Authority:** `.model-select` / `.model-input` (`settings.css:126, 147`) for Settings forms, until Consolidate picks a shared home.
 - **Counting rule:** a site is a rule styling a text control with the same body (`--dup-blocks` #23).
 - **Sites at base (3):** `audit.css:101` `.model-select`, `common-actions.css:64` `.token-label-input`, `settings.css:126` `.model-select` (byte-identical bodies; a fourth style is `.settings-ask-reason`, `settings.css:760`).
-- **Consolidate deletes:** `audit.css:101`.
+- **Consolidate deletes:** `audit.css:101`. Done (LIN-3889): one body for `.model-select` and `.token-label-input` in style.css.
 - **Differences:** `:focus` differs. `.model-select:focus` removes the outline and recolours the border `var(--blue)` (`settings.css:137`); `.token-label-input:focus` uses `:focus-visible` (`common-actions.css:75-81`). Class: **fix** (provisional: removing the outline is an accessibility regression).
 
 ### 16. Dispatch's halt controls (decided: keep both)
+
+**Status (LIN-3889): one implementation.** `lib/components/halt-controls.js` renders both surfaces. Its `buttons` presentation is Dispatch's form, and its `ask` presentation is Settings › Running's asks, with the matching control hidden. The owner gate stays at each call site (LIN-3849). `routes/` is byte-unchanged: both routes keep their own gated write, and the LIN-3383 census still pins them.
 
 **Decided by John on 24 October: "Keep both".** Dispatch keeps its own Pause, Stop and Resume; Settings › Running keeps its own. Where both render the controls, they share **one implementation, not copies**.
 
@@ -252,6 +255,44 @@ Layout only. For the pages Settings shares pieces with:
    - `public/settings.js:212`, deleting a preset (Settings › Models body, left alone until LIN-3855).
 
 2. **Dispatch's halt controls: keep both** (inventory in decision 16).
+
+## Consolidate (LIN-3889): status at head
+
+Measured at `55149a37` (the last commit that changed CSS). Each decision's authority, its losing copies, and its sites at base and head by the note's own counting rule: the base sites the note lists by `file:line`, and the rule bodies or render sites that still write the decision.
+
+| Decision | Authority at head | Copies deleted | Status | Sites base → head |
+| -- | -- | -- | -- | -- |
+| 1 Spacing | `--space-N` | token-equal literals in the sheets this PR edits | scoped; off-scale values stay (Rebuild) | literal 904 → 890 (measure) |
+| 2 Type | `--font-size-*` | token-equal `1em` and `0.85em` in the same sheets | scoped; `0.9em` vs `0.85em` open | declarations 810 → 798 (measure) |
+| 3 State colours | `:root` tokens | the three `var(--red, #c0392b)` / `var(--bg, #fff)` fallbacks in settings.css | done; Paused still red (open question 1) | 4 → 1 (the `:443` hover `rgba`, decision 7) |
+| 4 Breakpoints | the written list (13) | none; the test pins the list | done | 13 → 13 |
+| 5a Key/value row | `.field` (+ its 640px wrap) | `.dispatch-section .line`, `.proxy-section .line`, `.settings-section .line` and their wraps; six dead flip declarations | done. Flip sweep: `.dispatch-prompt-line`, `.dispatch-prompt-actions`, `.ai-override-row`, `.dispatch-default-row`, `.dispatch-preset-name-line`, `.provider-binding/-add/-add-blocked` (`gap: var(--space-sm)`, a token defined nowhere) | 4 → 1 |
+| 5b Interactive row | `switchRow`, `drillRow`, `actionRow`, `staticRow` (shell) | hand-written static rows, `-you.js:110` action, `render-settings.js:866` drill, the JSON switch | partly: the Theme, Email and Runs rows and the change row keep their own markup minus `line` | about 11 hand-written → 4 |
+| 6 Button | `.action-btn` and `.btn--quiet` plus tones (`.btn--green/blue/red`), one rule body per look in style.css; `.btn.btn--red` / `.btn--teal` for the bordered confirm | the `.action-btn` block in common-actions.css; `.halt-form .action-btn`; the proxy pager's disabled rule | partly: callers moved to the canonical names in render-dispatch, render-proxy, render-settings-you, render-settings-workspace and the halt component. 17 files and render-settings.js stay on the alias, with the same body (open question) | button-like classes 37 → 41 (measure: the canonical tone names are new, so the gate sees +4); rule bodies naming `.action-btn` or `.btn--*` 10 → 13, the same bodies, one per look |
+| 7 Switch | `.settings-switch` | `.toggle-btn`, `.feature-toggle`, `.feature-toggle-label`, `.settings-json-toggle`; the hover `rgba` is `var(--bg-alt)` | done | 2 → 1 |
+| 8 Ask in place | `askInPlace`; confirm `btn btn--red` / `btn--teal` | the bare `.action-btn` confirm | done. Key revoke is a named variant with the same bordered confirm | confirm styles 2 → 1 |
+| 9 Note | `.page-header__subtitle` | `.settings-subtitle` | done | 5 → 4 |
+| 10 Group title | `.settings-group-title` (Settings), `.section .section-header` (elsewhere) | `audit.css` `.settings-header` (no emitter on Audit) | done | 5 → 4 |
+| 11 Key row | `keyRow` | the seven dead token-list rules in common-actions.css; `.token-list` and `.token-meta` in dispatch.css; `.proxy-token-list` in proxy.css | done | 7 dead → 0 |
+| 13 Link | `.settings-link` (style.css) | `audit.css` copy and the `settings.css` copy | done | 2 → 1 |
+| 14 Back link | `.sess-back, .task-create-back, .task-edit-back` (style.css); `.settings-back` is a named variant | the three page copies (session, task create, task edit) | done | 4 → 2 |
+| 15 Text control | `.model-select`, `.token-label-input` (style.css) | `audit.css` `.model-select`, the `settings.css` body, the `common-actions.css` body | done. `.model-select:focus` no longer removes the ring for keyboard focus (`:focus-visible`) | 3 → 2 |
+| 16 Halt controls | `lib/components/halt-controls.js` | the second Dispatch and Running markup | done; `routes/` is byte-unchanged | 2 render sites → 1 |
+
+**Count rule at head** (`node tests/measures/css-measures.mjs . <rev>`; the base is `22f6942d`, and `--dup-blocks` as the script defines it):
+
+| Measure | Base `22f6942d` | Head `55149a37` |
+| -- | -- | -- |
+| CSS lines | 19,888 | 19,750 |
+| Spacing, literal | 904 | 890 |
+| Spacing, token | 676 | 665 |
+| Distinct font sizes (declarations) | 74 (810) | 74 (798) |
+| Button-like classes | 37 | 41 |
+| Breakpoints | 13 | 13 |
+| Byte-identical bodies (`--dup-blocks`) | 35 | 29 |
+| Area pairs (`seams.mjs`) | 10 | 10 |
+
+Button-like classes rose by four because the canonical tone names (`btn--quiet`, `btn--green`, `btn--blue`, plus the existing `btn--red`/`btn--teal`) are new class names, and the aliases remain. The Rebuild gate will see that rise, and the reason is the alias tail, not a second look. The spacing token count fell (676 to 665) although 9 literals became tokens: the copies deleted held more token uses than that, so the net is down. The plan's 680 to 700 prediction was wrong on that point; the literal count is inside its range.
 
 ## Open questions for John
 

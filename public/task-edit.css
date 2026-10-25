@@ -24,18 +24,6 @@
   overflow-x: hidden;
 }
 
-/* Breadcrumb back-link above the title, matching the session page's rhythm so
-   drill-down pages open with the same orientation cue. */
-.task-edit-back {
-  display: inline-block;
-  margin: 0.25rem 0 0.5rem;
-  font-family: var(--font-content);
-  font-size: 0.85rem;
-  color: var(--muted);
-  text-decoration: none;
-}
-.task-edit-back:hover { color: var(--brand); }
-
 /* Left-aligned page header with a hairline rule (overriding the global centered
    `header`), same as the sibling drill-down page. */
 .task-edit-header {

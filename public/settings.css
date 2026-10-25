@@ -8,9 +8,10 @@
 
 /* Section styling is canonical now (.section / .section--boxed / .section-header
    in style.css, LIN-461). `.settings-section` / `.settings-header` survive only
-   as hooks: app.js delegates toggles via `.settings-section .toggle-btn`, the
-   `.settings-section .line` rule below scopes on it, and several E2E specs
-   assert on `.settings-section` / `.settings-header`. */
+   as hooks: app.js delegates toggles via `[data-feature]` + `role="switch"`, and
+   several E2E specs assert on `.settings-section` / `.settings-header`. Key/value
+   rows are `.field` (style.css); the `.line` copy this comment once named is gone
+   (LIN-3889). */
 
 /* =============================================================================
    Settings Groups (LIN-1399)
@@ -41,15 +42,9 @@
    Settings Nodes (tree items)
    ============================================================================= */
 
-/* Override .line within settings tree for appropriate spacing */
-.settings-section .line {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.4rem 0;
-  font-family: var(--font-content);
-  font-size: 0.9em;
-}
+/* LIN-3889: `.settings-section .line` (a byte copy of `.field`, 0,2,0) is gone. Tree rows here
+   are `.field` (style.css). The rows that were `.line` lose the copy's padding and size with it:
+   the listed, intended difference on Features, Account, Running, Agent access and Change log. */
 
 /* The dim-label + value row converged onto the canonical `.field` component
    (style.css, LIN-463): `.settings-label`/`.settings-value` were byte-identical
@@ -100,19 +95,7 @@
   margin: 0;
 }
 
-/* Action buttons: see common-actions.css (.action-btn) */
-
-.settings-link {
-  color: var(--blue);
-  font-family: var(--font-content);
-  font-size: var(--font-size-sm);
-  text-decoration: none;
-  margin-left: var(--space-2);
-}
-
-.settings-link:hover {
-  text-decoration: underline;
-}
+/* Action buttons: see style.css (.btn--quiet and its tones). `.settings-link` is in style.css (LIN-3889). */
 
 /* =============================================================================
    Model Selector
@@ -123,21 +106,7 @@
   gap: var(--space-2);
 }
 
-.model-select {
-  font-family: var(--font-content);
-  font-size: 0.9em;
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--fg-vdim);
-  border-radius: var(--radius-sm);
-  background: var(--bg);
-  color: var(--fg);
-  min-width: 18ch;
-}
-
-.model-select:focus {
-  outline: none;
-  border-color: var(--blue);
-}
+/* `.model-select` body and focus: style.css, with `.token-label-input` (LIN-3889). */
 
 .model-or {
   color: var(--fg-dim);
@@ -178,15 +147,8 @@
   color: var(--fg-dim);
 }
 
-/* In-content section description (the "Workspace features" note). The page
-   header's subtitle moved to the canonical `.page-header__subtitle` (LIN-462);
-   this rule survives only for that one in-section paragraph. */
-.settings-subtitle {
-  color: var(--fg-dim);
-  font-family: var(--font-content);
-  font-size: 0.9em;
-  margin-top: var(--space-2);
-}
+/* The in-content note (the "Workspace features" paragraph) is `.page-header__subtitle` now
+   (style.css, LIN-462, LIN-3889): byte-identical to the copy that was here. */
 
 .nav-value-static {
   font-family: var(--font-content);
@@ -201,9 +163,9 @@
    mirroring the dispatch defaults pattern but for the prompt-generation model.
    No pricing hints on override rows per scoping decision.
    ============================================================================= */
+/* LIN-3889: `gap` dropped here and on the two rows below: it never applied (0 px). */
 .ai-override-row {
   flex-wrap: wrap;
-  gap: var(--space-2);
 }
 
 .ai-override-row .field-label {
@@ -270,7 +232,6 @@
    ============================================================================= */
 .dispatch-default-row {
   flex-wrap: wrap;
-  gap: var(--space-2);
 }
 
 .dispatch-default-row .field-label {
@@ -334,7 +295,7 @@
 /* Free-marker hint line (LIN-2719) — never option text, matching the
    Workspace AI Model pricing hint's convention above. */
 .dispatch-model-hint {
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   color: var(--fg-dim);
 }
 
@@ -379,7 +340,6 @@
    ============================================================================= */
 .dispatch-preset-name-line {
   flex-wrap: wrap;
-  gap: var(--space-2);
 }
 
 .dispatch-preset-name-input {
@@ -412,21 +372,15 @@
 }
 
 /* =============================================================================
-   Feature Toggles
+   Feature Toggles (the switch: LIN-3889 renamed `.toggle-btn` to `.settings-switch`)
+   The row's `.feature-toggle` and `.feature-toggle-label` rules are gone: their
+   gap and min-width never applied, since the row's `.line` copy outranked them.
    ============================================================================= */
-.feature-toggle {
-  gap: var(--space-2);
-}
-
-.feature-toggle-label {
-  min-width: 14ch;
-}
-
 .feature-form {
   display: inline-flex;
 }
 
-.toggle-btn {
+.settings-switch {
   font-family: var(--font-structural);
   font-size: 0.85rem;
   min-width: 5ch;
@@ -439,19 +393,21 @@
   text-align: center;
 }
 
-.toggle-btn:hover {
-  background: rgba(0, 0, 0, 0.03);
+/* LIN-3889: the hover was a literal rgba that did not rebind in dark mode (a fix); it is the
+   subtle-tint token now, which does. */
+.settings-switch:hover {
+  background: var(--bg-alt);
 }
 
-.toggle-btn.toggle-on {
+.settings-switch.toggle-on {
   border-color: var(--green);
 }
 
-.toggle-btn.toggle-on .toggle-state {
+.settings-switch.toggle-on .toggle-state {
   color: var(--green);
 }
 
-.toggle-btn.toggle-off .toggle-state {
+.settings-switch.toggle-off .toggle-state {
   color: var(--fg-dim);
 }
 
@@ -470,11 +426,8 @@
 /* =============================================================================
    Providers section (LIN-634)
    ============================================================================= */
-.provider-binding,
-.provider-add,
-.provider-add-blocked {
-  gap: var(--space-sm);
-}
+/* LIN-3889: the rule that was here set `gap: var(--space-sm)`, a token defined nowhere, and
+   never applied (0,2,0 `.settings-section .line` won). Deleted (0 px). */
 
 .provider-scope {
   font-family: var(--font-content);
@@ -506,7 +459,7 @@
 }
 
 .provider-notice-fail .field-value {
-  color: var(--red, #c0392b);
+  color: var(--red);
 }
 
 .provider-notice-blocked .field-value {
@@ -521,7 +474,7 @@
 }
 
 .provider-remove-btn {
-  color: var(--red, #c0392b);
+  color: var(--red);
 }
 
 /* Inline save feedback */
@@ -540,10 +493,6 @@
    Responsive
    ============================================================================= */
 @media (max-width: 640px) {
-  .settings-section .line {
-    flex-wrap: wrap;
-  }
-
   .model-form {
     flex-wrap: wrap;
   }
@@ -646,7 +595,7 @@
 
 .settings-state {
   color: var(--muted);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   white-space: nowrap;
 }
 
@@ -693,6 +642,12 @@
   border-top: 1px solid var(--line);
 }
 
+/* LIN-3889: non-row children of a row list (Account's consent notice and logout link) take the rows' inset; at base the whole card sat flush to the edge, and the row padding alone left these two out of line. */
+.settings-rows > .consent-notice,
+.settings-rows > .settings-action-red:not(.settings-row) {
+  margin-inline: 0.8rem;
+}
+
 .settings-row {
   display: flex;
   align-items: center;
@@ -716,7 +671,7 @@
 .settings-row-note {
   display: block;
   color: var(--muted);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
 }
 
 .settings-row-value {
@@ -791,7 +746,7 @@
 .settings-note {
   color: var(--muted);
   font-family: var(--font-content);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   margin: var(--space-1) 0 0 0;
 }
 
@@ -836,7 +791,7 @@
 
 .settings-theme-choice.is-selected {
   background: var(--brand);
-  color: var(--bg, #fff);
+  color: var(--bg);
   border-color: var(--brand);
 }
 

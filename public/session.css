@@ -16,19 +16,6 @@
   overflow-x: hidden;
 }
 
-/* Breadcrumb back-link, promoted above the title (LIN-1225) so the page opens
-   with an orientation cue, matching the deliberate top-of-page rhythm of the
-   sibling glow-up pages. */
-.sess-back {
-  display: inline-block;
-  margin: 0.25rem 0 0.5rem;
-  font-family: var(--font-content);
-  font-size: 0.85rem;
-  color: var(--muted);
-  text-decoration: none;
-}
-.sess-back:hover { color: var(--brand); }
-
 /* Page header (LIN-1225): left-aligned (override the global centered `header`)
    with a hairline rule, so the session page leads with the same intentional
    header rhythm as the Observation feed and Roadmap rather than a lonely

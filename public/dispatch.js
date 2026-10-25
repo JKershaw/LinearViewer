@@ -354,7 +354,8 @@ function initDispatchPagePrompt() {
   textarea.dataset.initialized = 'true'
 
   const urlKey = textarea.dataset.urlKey
-  const section = textarea.closest('.dispatch-section')
+  // LIN-3889: the send panel is found by its attribute, not the section's style class.
+  const section = textarea.closest('[data-send-panel]')
   const recentsContainer = section.querySelector('.dispatch-recents-container')
   const favoritesContainer = section.querySelector('.dispatch-favorites-container')
   const feedbackEl = section.querySelector('.dispatch-prompt-feedback')
@@ -892,18 +893,21 @@ function initWorkspaceHalt() {
   // `<form>` never fires a submit event, so it cannot be picked up by
   // #create-token-form's id-scoped submit handler (or any other form's).
   // Click delegation only, matching the queue list's remove-button pattern.
-  const form = document.querySelector('.halt-form')
+  // LIN-3889: the form and its buttons are found by data attributes (`data-halt-form`,
+  // `data-halt-mode`), not the button style classes, so the button look can move. A member's
+  // page has no halt form, so `form` is null there and no listener is registered (LIN-3849).
+  const form = document.querySelector('[data-halt-form]')
   if (form) {
     form.addEventListener('click', async (e) => {
-      const btn = e.target.closest('.action-btn')
+      const btn = e.target.closest('[data-halt-mode]')
       if (!btn) return
       e.preventDefault()
 
-      if (btn.classList.contains('halt-pause')) {
+      if (btn.dataset.haltMode === 'pause') {
         await requestWorkspaceHalt(urlKey, 'pause')
-      } else if (btn.classList.contains('halt-stop')) {
+      } else if (btn.dataset.haltMode === 'stop') {
         await requestWorkspaceHalt(urlKey, 'stop')
-      } else if (btn.classList.contains('halt-resume')) {
+      } else if (btn.dataset.haltMode === 'resume') {
         await resumeWorkspaceHalt(urlKey)
       }
     })

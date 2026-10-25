@@ -3149,6 +3149,76 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   color: var(--fg);
 }
 
+/* =============================================================================
+   Inline link and text control (LIN-3889)
+   One body each. `.settings-link` was byte-identical in settings.css and audit.css; the text
+   control was `.model-select` (settings.css, audit.css) and `.token-label-input` (common-actions.css).
+   ============================================================================= */
+.settings-link {
+  color: var(--blue);
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  text-decoration: none;
+  margin-left: var(--space-2);
+}
+
+.settings-link:hover {
+  text-decoration: underline;
+}
+
+/* LIN-3889: the breadcrumb back-link, one body for the three drill-down pages. Session's was
+   promoted above the title (LIN-1225) so the page opens with an orientation cue; Task edit and
+   create match its rhythm so drill-down pages open the same way. Task page's back link reuses
+   `.sess-back`. `.settings-back` (settings.css) is a named variant of this decision. */
+.sess-back,
+.task-create-back,
+.task-edit-back {
+  display: inline-block;
+  margin: 0.25rem 0 0.5rem;
+  font-family: var(--font-content);
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-decoration: none;
+}
+.sess-back:hover,
+.task-create-back:hover,
+.task-edit-back:hover { color: var(--brand); }
+
+.model-select,
+.token-label-input {
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--fg-vdim);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+  min-width: 18ch;
+}
+
+/* One focus rule for both: the border turns blue on focus, and the default ring is kept for
+   keyboard focus (LIN-786: never kill focus outright). `.model-select:focus` used to remove the
+   outline for every focus, mouse or keyboard; that was the difference, and it is now the fix. */
+.model-select:focus,
+.token-label-input:focus {
+  border-color: var(--blue);
+}
+
+.model-select:focus:not(:focus-visible),
+.token-label-input:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* LIN-3889 (Consolidate): the phone wrap for every key/value row. The three per-section `.line`
+   copies (dispatch.css, proxy.css, settings.css) each carried it at 640px; bare `.field` rows,
+   which are Dispatch's, /styleguide's and Audit's client-built rows, did not wrap. Tree rows that
+   wrapped already get it from the `.line` phone rule below, so only bare `.field` changes. */
+@media (max-width: 640px) {
+  .field {
+    flex-wrap: wrap;
+  }
+}
+
 /* =========================================================================
    Card (LIN-468, Phase A.4)
    Canonical slot-based content card, rendered by renderCard()
@@ -3361,6 +3431,85 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   color: var(--muted);
 }
 .btn--ghost:hover { background: var(--card-h); color: var(--text); border-color: transparent; }
+
+/* Tones and the quiet label (LIN-3889, decision 6). One rule body per look, shared by the canonical
+   names and the `.action-btn` aliases the tail still uses, so the look lives here once:
+     .btn--quiet + tone   the chromeless tinted label (today's `.action-btn`). Used on its own, not with
+                          `.btn`: its geometry is the label's, which these surfaces were drawn with.
+     .btn + .btn--red/teal  the ask-in-place confirm and the key revoke: the bordered `.btn` in a tone.
+   `.btn--teal` has no alias, so it stays here as the confirm's only tone. Tints derive from the
+   status token via color-mix, so they rebind under .theme-dark (LIN-786 dark-mode cleanup). */
+.action-btn,
+.btn--quiet {
+  background: none;
+  border: none;
+  padding: 0.2rem var(--space-2);
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+}
+
+/* Disabled: faded, not clickable (proxy's event pager; now every quiet button, see the PR). */
+.action-btn:disabled,
+.btn--quiet:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Green: primary / save actions. */
+.action-btn.save,
+.btn--green {
+  color: var(--green);
+  background: color-mix(in srgb, var(--green) 12%, transparent);
+}
+.action-btn.save:hover,
+.btn--green:hover {
+  background: color-mix(in srgb, var(--green) 22%, transparent);
+}
+
+/* Blue: connect / link actions. */
+.action-btn.connect,
+.btn--blue {
+  color: var(--blue);
+  background: color-mix(in srgb, var(--blue) 12%, transparent);
+}
+.action-btn.connect:hover,
+.btn--blue:hover {
+  background: color-mix(in srgb, var(--blue) 22%, transparent);
+}
+
+/* Red: destructive actions. Quiet, so the text is --red (the confirm below is the dim text). */
+.action-btn.disconnect,
+.action-btn.logout,
+.btn--red {
+  color: var(--red);
+  background: color-mix(in srgb, var(--red) 12%, transparent);
+}
+.action-btn.disconnect:hover,
+.action-btn.logout:hover,
+.btn--red:hover {
+  background: color-mix(in srgb, var(--red) 22%, transparent);
+}
+
+/* The bordered confirm (ask in place) and key revoke: `.btn` in a tone. The dim text is the AA-safe
+   token the Settings red and teal rows already use. Tinted, not solid: whether Rebuild wants a solid
+   fill is an open question in the PR. These sit after `.btn:hover`, so the tint wins on hover too. */
+.btn.btn--red {
+  color: var(--red-dim, var(--red));
+  border-color: var(--red);
+}
+.btn.btn--red:hover { border-color: var(--red); }
+.btn--teal {
+  color: var(--brand-dim);
+  border-color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+}
+.btn--teal:hover {
+  background: color-mix(in srgb, var(--brand) 22%, transparent);
+  border-color: var(--brand);
+}
 
 .btn__icon { display: inline-flex; }
 

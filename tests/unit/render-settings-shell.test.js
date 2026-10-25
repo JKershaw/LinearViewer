@@ -15,6 +15,12 @@ import { renderSettingsPage } from '../../lib/render-settings.js';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 describe('the three row kinds', () => {
+  test('a feature switch escapes its key into the hidden input (LIN-3889 F6: a key with a quote cannot break out of the attribute)', () => {
+    const html = switchRow({ key: 'a"><b>x', label: 'Hostile', on: true, action: '/x' });
+    assert.ok(html.includes('value="a&quot;&gt;&lt;b&gt;x"'), 'the key is escaped in value=');
+    assert.ok(!html.includes('<b>x'), 'no raw tag from the key reaches the markup');
+  });
+
   test('a switch row posts the opposite of its state and keeps the toggle client\'s hooks', () => {
     const on = switchRow({ key: 'roadmap', label: 'Narrative roadmap', on: true, action: '/x' });
     assert.match(on, /name="enabled" value="false"/);

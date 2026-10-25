@@ -6,8 +6,8 @@
  */
 
 /* Section styling is canonical now (.section / .section--boxed / .section-header
-   in style.css, LIN-461). `.proxy-section` survives only as a hook for the
-   `.proxy-section .line` descendant rule below. */
+   in style.css, LIN-461). `.proxy-section` survives only as a hook. Its key/value
+   rows are `.field` (style.css); the `.proxy-section .line` copy is gone (LIN-3889). */
 
 .proxy-hint {
   color: var(--fg-dim);
@@ -82,32 +82,6 @@
 
 .proxy-prompt-output.has-prompt {
   color: var(--fg);
-}
-
-/* Token list base: see common-actions.css (.proxy-token-list, .token-item).
-   LIN-854: proxy token rows now also carry the shared `.surface` primitive, so
-   stack them as gapped cards and let the surface own the row's box — drop the
-   legacy in-list divider + vertical padding (page-scoped; leaves dispatch's
-   plain `.token-item` list untouched). */
-.proxy-token-list,
-.proxy-token-list .token-items-extra:not([hidden]) {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.proxy-token-list .token-item {
-  border-bottom: none;
-  padding: 0;
-}
-
-.proxy-section .line {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.4rem 0;
-  font-family: var(--font-content);
-  font-size: 0.9em;
 }
 
 /* =============================================================================
@@ -351,10 +325,6 @@
   text-align: center;
 }
 
-.proxy-events-pager .action-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
 
 /* =============================================================================
    Runner credentials (LIN-3131 S2b.3)
@@ -380,7 +350,7 @@
 .runner-credential-label {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
   font-family: var(--font-content);
   font-weight: 500;
   color: var(--fg);
@@ -419,10 +389,6 @@
   .proxy-prompt-controls {
     flex-direction: column;
     align-items: flex-start;
-  }
-
-  .proxy-section .line {
-    flex-wrap: wrap;
   }
 
   .proxy-event-item {

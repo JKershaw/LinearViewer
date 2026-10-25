@@ -274,7 +274,7 @@ function initThemeChoices() {
 function initJsonToggles() {
   document.querySelectorAll('form[data-settings-json]').forEach((form) => {
     const btn = form.querySelector('button')
-    const row = form.closest('.feature-toggle')
+    const row = form.closest('[data-feature]')
     const field = form.dataset.settingsJson
     const paint = (on) => {
       form.dataset.value = on ? 'true' : 'false'

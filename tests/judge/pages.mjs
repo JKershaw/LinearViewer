@@ -43,6 +43,10 @@ export const PAGES = [
   { id: 'dispatch', urlKey: 'judge', path: (k) => `/workspace/${k}/dispatch`, renderers: ['lib/render-dispatch.js'] },
   { id: 'proxy', urlKey: 'judge', path: (k) => `/workspace/${k}/proxy`, renderers: ['lib/render-proxy.js'] },
   { id: 'audit', urlKey: 'judge', path: (k) => `/workspace/${k}/audit`, renderers: ['lib/render-audit.js'] },
+  // Back links (LIN-3889, decision 14). The task edit id is the seeded local id (localSeedId).
+  { id: 'task-create', urlKey: 'judge', path: (k) => `/workspace/${k}/task/new`, renderers: ['lib/render-task-create.js'] },
+  { id: 'task-edit', urlKey: 'judge', path: (k) => `/workspace/${k}/task/${encodeURIComponent(`${k}--local-issue-1`)}/edit`, renderers: ['lib/render-task-edit.js'] },
+  { id: 'session-missing', urlKey: 'judge', path: (k) => `/workspace/${k}/observation/session/judge-no-such-session`, renderers: ['lib/render-session.js'] },
   { id: 'settings-index', urlKey: 'judge', path: (k) => `/workspace/${k}/settings`, renderers: ['lib/render-settings.js'] },
   ...AREAS.map((area) => ({
     id: `settings-${area}`, urlKey: 'judge', path: (k) => `/workspace/${k}/settings/${area}`, renderers: ['lib/render-settings.js'],
@@ -52,6 +56,9 @@ export const PAGES = [
   { id: 'running-ask-open', urlKey: 'judge', path: (k) => `/workspace/${k}/settings/running`, state: 'ask-open', renderers: ['lib/render-settings.js'] },
   { id: 'agent-access-key-open', urlKey: 'judge-key', path: (k) => `/workspace/${k}/settings/agent-access`, state: 'key-open', masks: [TIME_MASKS.key], renderers: ['lib/render-settings.js'] },
   { id: 'change-log-entry', urlKey: 'judge-log', path: (k) => `/workspace/${k}/settings/change-log`, state: 'change-log-entry', masks: [TIME_MASKS.change], renderers: ['lib/render-settings.js'] },
+  // LIN-3889: Audit's report, with the rows the client builds with `.field` (teams, queue items,
+  // projects). The fixture answers `/api/audit` on both sides, so the request never leaves the browser.
+  { id: 'audit-report', urlKey: 'judge', path: (k) => `/workspace/${k}/audit`, state: 'audit-report', renderers: ['lib/render-audit.js'] },
 ];
 
 // Stated, not assumed: what the seed cannot reach.
@@ -59,6 +66,7 @@ export const NOT_COVERED = [
   'Running with a runner (Last poll row, run controls): needs a runner key, whose time is server-rendered; this judge runs the no-runner state only',
   'A change-log entry with a fixed time: the time is server-rendered and so masked, not seeded',
   'Models body (LIN-3855) and Home content (LIN-3833): listed pages only, not their later states',
+  'Session with a run (the populated session page and its run view): needs a session record the local seed does not write; the not-found branch is judged instead, and renders the same back link',
   'Pages with no Settings-shared pieces (swim, swipe, ship, roadmap, library, KPIs, landing)',
 ];
 

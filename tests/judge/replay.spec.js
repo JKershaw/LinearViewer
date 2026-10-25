@@ -13,6 +13,7 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defaultLocalSeed } from '../fixtures/local-harness.js';
 import { PAGES, VIEWPORTS, THEMES, FROZEN_TIME, NORMALISE, parsePixelDiff } from './pages.mjs';
 
@@ -22,6 +23,8 @@ const RESULTS = process.env.JUDGE_RESULTS;
 const PROBE = process.env.JUDGE_PROBE_SELECTOR || '';
 const ATTEMPTS = 3;
 const ONLY = process.env.JUDGE_ONLY ? new RegExp(process.env.JUDGE_ONLY) : null;
+
+const AUDIT_FIXTURE = fileURLToPath(new URL('./audit-report.fixture.json', import.meta.url));
 
 const isLoopback = (url) => /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(url) || url.startsWith('data:') || url.startsWith('blob:');
 
@@ -73,6 +76,12 @@ async function prepare(page, context, entry) {
   await settle(page);
   if (entry.state === 'ask-open') await page.getByTestId('settings-toggle-periodicals').locator('summary').click();
   if (entry.state === 'key-open') await page.locator('[data-testid="settings-key-proxy"], [data-testid="settings-key-dispatch"]').locator('summary').first().click();
+  if (entry.state === 'audit-report') {
+    // Both sides answer the same fixture, so the report is identical and the request never leaves the browser.
+    await page.route('**/api/audit', (route) => route.fulfill({ path: AUDIT_FIXTURE, contentType: 'application/json' }));
+    await page.locator('#run-audit').click();
+    await page.locator('.report-timestamp').waitFor();
+  }
 }
 
 async function shoot(browser, baseURL, viewport, theme, entry) {

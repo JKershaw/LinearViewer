@@ -24,13 +24,8 @@
   border-radius: 4px;
 }
 
-.settings-header {
-  font-family: var(--font-content);
-  font-size: var(--font-size-base);
-  font-weight: 500;
-  color: var(--fg);
-  margin: 0 0 0.75rem 0;
-}
+/* LIN-3889: `.settings-header` (a byte copy of `.section .section-header`) is gone: nothing on
+   Audit emits it, and the group title it styled is settings.css's (`.settings-group-title`). */
 
 .settings-item {
   display: flex;
@@ -77,19 +72,7 @@
   margin: 0;
 }
 
-/* Action buttons: see common-actions.css (.action-btn) */
-
-.settings-link {
-  color: var(--blue);
-  font-family: var(--font-content);
-  font-size: var(--font-size-sm);
-  text-decoration: none;
-  margin-left: var(--space-2);
-}
-
-.settings-link:hover {
-  text-decoration: underline;
-}
+/* LIN-3889: `.settings-link` is style.css's now; Audit emits none. */
 
 /* Model Selector */
 .model-form {
@@ -98,21 +81,7 @@
   gap: var(--space-2);
 }
 
-.model-select {
-  font-family: var(--font-content);
-  font-size: 0.9em;
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--fg-vdim);
-  border-radius: var(--radius-sm);
-  background: var(--bg);
-  color: var(--fg);
-  min-width: 18ch;
-}
-
-.model-select:focus {
-  outline: none;
-  border-color: var(--blue);
-}
+/* LIN-3889: `.model-select` is style.css's now (with `.token-label-input`); Audit emits none. */
 
 .model-input {
   font-family: var(--font-content);

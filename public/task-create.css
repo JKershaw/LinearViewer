@@ -17,16 +17,6 @@
   overflow-x: hidden;
 }
 
-.task-create-back {
-  display: inline-block;
-  margin: 0.25rem 0 0.5rem;
-  font-family: var(--font-content);
-  font-size: 0.85rem;
-  color: var(--muted);
-  text-decoration: none;
-}
-.task-create-back:hover { color: var(--brand); }
-
 .task-create-header {
   text-align: left;
   padding: 0 0 0.7rem;

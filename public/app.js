@@ -1495,7 +1495,10 @@ async function removeQueueItem(urlKey, itemId) {
  * without a full page reload. Falls back to standard form POST on error.
  */
 function initFeatureToggles() {
-  const toggleBtns = document.querySelectorAll('.settings-section .toggle-btn:not(.settings-json-toggle)')
+  // LIN-3889: selected by data attributes and role, not style classes. Scoped under [data-feature]
+  // because app.js loads on 11 renderers and only Settings' switch rows carry it; the +proxy JSON
+  // switch is excluded by its form (data-settings-json), which settings.js handles.
+  const toggleBtns = document.querySelectorAll('[data-feature] form:not([data-settings-json]) [role="switch"]')
   if (!toggleBtns.length) return // Not on settings page
 
   // LIN-3401: bound to the buttons the settings page rendered, at load.
@@ -1530,7 +1533,7 @@ function initFeatureToggles() {
 
       // Toggle visual state inline
       const stateSpan = btn.querySelector('.toggle-state')
-      const featureLine = btn.closest('.feature-toggle')
+      const featureLine = btn.closest('[data-feature]')
       const hiddenEnabled = form.querySelector('input[name="enabled"]')
 
       if (hiddenEnabled.value === 'true') {
