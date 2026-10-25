@@ -125,6 +125,15 @@ function cases(K) {
   add('prompt:sources', 5, (sc, k) => { R.prompt(sc, ISSUE_UUID, 'triage', `?source=${['github', 'jira', 'linear', 'nope', 'local'][k]}`); }, 'mixed');
   add('prompt:providers', 6, (sc) => R.prompt(sc), null);
   add('prompt:custom', 5, (sc) => R.prompt(sc, ISSUE_UUID, 'custom:cp-1'));
+
+  // --- custom prompts: the error arms of the pinned 16e7ae77 sub-router (LIN-3934) ---
+  const cpErr = (message) => ({ kind: 'plain', message });
+  add('custom:create400', 5, (sc, k) => { R.customCreate(sc); sc.stores.customPromptsStore = { create: { throw: cpErr(['Name is required', 'Template exceeds maximum length', 'Name must be 100 characters or fewer', 'Template is required', 'maximum of 50 prompts'][k]) } }; });
+  add('custom:create500', 5, (sc) => { R.customCreate(sc); sc.stores.customPromptsStore = { create: { throw: ERR.boom } }; });
+  add('custom:updateBlank', 5, (sc, k) => { R.customUpdate(sc); sc.body = json([{ name: '  ' }, { template: '' }, { name: 5 }, { template: ' \n' }, { name: '', template: 'T' }][k]); });
+  add('custom:update400', 5, (sc) => { R.customUpdate(sc); sc.stores.customPromptsStore = { update: { throw: cpErr('Template must be 5000 characters or fewer') } }; });
+  add('custom:update500', 5, (sc) => { R.customUpdate(sc); sc.stores.customPromptsStore = { update: { throw: ERR.boom } }; });
+  add('custom:delete500', 5, (sc) => { R.customDelete(sc); sc.stores.customPromptsStore = { delete: { throw: ERR.boom } }; });
   add('prompt:customMissing', 5, (sc) => R.prompt(sc, ISSUE_UUID, 'custom:nope'));
   add('prompt:noTemplate', 5, (sc) => R.prompt(sc, ISSUE_UUID, 'nolabel'));
   add('prompt:badId', 5, (sc) => R.prompt(sc, 'bad%20id'));
@@ -246,7 +255,7 @@ function cases(K) {
   add('detail:500', 5, (sc) => { R.detail(sc); sc.prov.fetchIssueFields = { throw: ERR.boom }; });
 
   // --- sessions --------------------------------------------------------------------
-  add('sessions:ok', 5, (sc, k) => { R.sessions(sc, ['LIN-7', 'x', 'LIN-7%20a', 'ü', 'LIN-8'][k]); sc.stores.dispatchQueueStore = { listItems: { ret: [{ _id: `d${k}`, id: `d${k}`, issueIdentifier: 'LIN-7', kind: 'implementation', status: 'taken', dispatchedAt: { __date: new Date(sc.clockBase - 7_200_000).toISOString() }, sessionId: 's1', target: 'cli', promptName: 'Impl' }, { _id: `e${k}`, id: `e${k}`, issueIdentifier: 'LIN-7', kind: 'review', status: 'queued', dispatchedAt: { __date: new Date(sc.clockBase - 3_600_000).toISOString() }, target: 'web', promptName: 'Review' }] }, listHistory: { ret: { items: [{ _id: `h${k}`, id: `h${k}`, issueIdentifier: 'LIN-7', kind: 'plan', status: 'done', dispatchedAt: { __date: new Date(sc.clockBase - 86_400_000).toISOString() }, promptName: 'Plan' }], total: 1 } } }; sc.stores.agentStatusStore = { listStatus: { ret: [{ sessionId: 's1', status: 'working', updatedAt: { __date: new Date(sc.clockBase - 7_000_000).toISOString() } }] } }; });
+  add('sessions:ok', 5, (sc, k) => { R.sessions(sc, ['LIN-7', 'x', 'LIN-7%20a', 'ü', 'LIN-8'][k]); sc.stores.dispatchQueueStore = { listItems: { ret: [{ _id: `d${k}`, id: `d${k}`, issueIdentifier: 'LIN-7', kind: 'implementation', status: 'taken', dispatchedAt: { __date: new Date(sc.clockBase - 7_200_000).toISOString() }, sessionId: 's1', target: 'cli', promptName: 'Impl' }, { _id: `e${k}`, id: `e${k}`, issueIdentifier: 'LIN-7', kind: 'review', status: 'queued', dispatchedAt: { __date: new Date(sc.clockBase - 3_600_000).toISOString() }, target: 'web', promptName: 'Review' }] }, listHistory: { ret: { items: [{ _id: `h${k}`, id: `h${k}`, issueIdentifier: 'LIN-7', kind: 'plan', status: 'done', dispatchedAt: { __date: new Date(sc.clockBase - 86_400_000).toISOString() }, promptName: 'Plan' }], total: 1 } } }; sc.stores.agentStatusStore = { listStatus: { ret: { items: [{ sessionId: 's1', status: 'working', updatedAt: { __date: new Date(sc.clockBase - 7_000_000).toISOString() } }], total: 1 } } }; }); // listStatus answers { items, total } (lib/agent-status-store.js); a bare array read as no status rows (LIN-3934)
   add('sessions:tooLong', 5, (sc) => R.sessions(sc, 'x'.repeat(101)));
   add('sessions:noStores', 5, (sc) => { sc.variant = 'sparse'; R.sessions(sc); });
   add('sessions:500', 5, (sc) => { R.sessions(sc); sc.stores.agentStatusStore = { listStatus: { throw: ERR.boom } }; });

@@ -129,6 +129,28 @@ result on the pre-change kit from `git archive HEAD`, 0 differing), and **line c
 pinned file is 90.87 % (88.25 % on the pre-change kit) against the 95 % floor. The selfcheck exits 1
 for those two; no floor was loosened.
 
+### Green again under `--lib .` (LIN-3934)
+Both failures were the pinned 16e7ae77 file running against a HEAD lib that had moved on; no floor
+or mutant was changed.
+
+- **m05**: since LIN-3812 the loop builders read `listItemsWithPrompt`/`listHistoryWithBodies` when
+  the store has them. The recording store answers every op, so the scenario's `listItems`/`listHistory`
+  never reached the sessions route and every session list was empty: nothing to reorder. The fake
+  dispatch store now answers those two reads from the scenario's lean answers (the real store returns
+  the same rows plus the prompt and feedback). Reverting only that alias takes m05 from 4 differing
+  back to 0. The edge `sessions:ok` agent-status answer is now `{ items, total }`, the shape the store
+  returns (a bare array read as no status rows).
+- **Coverage**: the pinned file imports `./workspace-api-prompts.js`, which resolved to the `--lib`
+  copy. Since LIN-3842 that copy registers the prompt-generation routes and is mounted first, so the
+  pinned handlers (lines 418-765) never ran. `pinned/origin-main/workspace-api-prompts.js` is now
+  that sub-router at 16e7ae77 (byte-identical), and six edge cases reach its error arms.
+
+Self-check on HEAD (`reports/selfcheck-lin3934.json/.log`): exit 0; identity ×2, the witness and all
+24 mutants pass (m05: body ×4). Coverage: `workspace-api.js` 96.73 % (2,724/2,816),
+`workspace-api-prompts.js` 97.44 % (76/78). The remaining gap from the 98.79 % snapshot-lib record
+is the autopilot-prompt bodies (606-698, 738-746): LIN-3849 removed the `proxy` feature flag, so on
+the HEAD lib the pinned `featureFlags.proxy !== true` gate always answers 403.
+
 ## Source-text tests that read this file (keep green; `livetests.mjs` runs all of them)
 Found by grep over `tests/unit` and confirmed live (`livetests.mjs` with the comment-stripped,
 `const`→`let` copy in `variant-text/` — behaviour-identical, the replay shows 0 differences — fails
