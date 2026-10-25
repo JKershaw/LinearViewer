@@ -5,9 +5,9 @@ Checked at Harbour origin/main `87a766b`. Sample figures are Harbour's own works
 
 ## Why
 
-John, 24–25 Oct: Harbour should give people "a centralised cost management centre", "a lovely, simple, tidy way for people to easily understand costs, in a way that makes optimisation both easy and safe for an average user". Token cost at list price is the primary figure, because it "stays constant irrespective of how much the subscription was used"; discounts and subscriptions are "a layer on top", kept cleanly separate and "flexible enough we can add support for all the various other discounts and subscriptions out there". Agents do the optimising (trials, judges, reverting); the page shows the evidence.
+John, 25 Oct, asked: "Is there a world where Harbour has a lovely, simple, tidy way for people to easily understand costs, in a way that makes optimisation both easy and safe for an average user?" Of the first design: "It's giving a user a centralised cost management centre." Token cost at list price is the primary figure, because it "stays constant irrespective of how much the subscription was used"; discounts and subscriptions are "a layer on top", kept cleanly separate and "flexible enough we can add support for all the various other discounts and subscriptions out there". Reverting is left to agents ("as agents are likely controlling, they'll handle that"), and judges are out ("too complex"). The page shows the evidence; a later step helps the user "optimise around subscriptions and offers".
 
-Today cost is computed in five places, each its own way, and the totals do not reconcile: "figures not matching is a smell of complexity and tangles in the underlying code". That makes cost a scattered decision in the Theseus method's sense (`docs/theseus-method-long.md`), and the charter's frame for the UI applies. John, 21 Oct: "it's worth taking what we've learned, making prototypes etc. and before then, getting the associated seams really tidy. Essentially flanking the code." The prototype exists. The seam comes next, then the page. John, 25 Oct: "We can change behaviour if it's an improvement. We just tidy first."
+Today cost is computed in five places, each its own way, and the totals do not reconcile. John, 25 Oct: "figures not matching is a smell of complexity and tangles in the underlying code". That makes cost a scattered decision in the Theseus method's sense (`docs/theseus-method-long.md`), and the charter's frame for the UI applies. John, 21 Oct: "it's worth taking what we've learned, making prototypes etc. and before then, getting the associated seams really tidy. Essentially flanking the code." The prototype exists. The seam comes next, then the page. John, 25 Oct: "We can change behaviour [if] it's an improvement. We just tidy first."
 
 This note fixes what the page shows and what must be true underneath it. It does not choose files, functions or schemas; the build tickets' plan stages do.
 
@@ -46,7 +46,7 @@ Phone: the same order in one column.
 
 ### 2. Finished task
 
-A **finished task** is a ticket that reached a completed state, counted on the UTC day of the provider's `completedAt`. Per-task figures divide a period's cost by the tickets finished in it, so work on tickets still open counts and a quiet day looks dear. The 7-day figure divides 7 days' cost by 7 days' tickets (a ratio of sums), never a mean of daily ratios. Rework measures come later and are out of scope.
+A **finished task** is a ticket that reached a completed state, counted on the UTC day of the provider's `completedAt`. Per-task figures divide a period's cost by the tickets finished in it, so work on tickets still open counts and a quiet day looks dear. The 7-day figure divides 7 days' cost by 7 days' tickets (a ratio of sums), never a mean of daily ratios. Rework measures come later and are out of scope. John, 25 Oct: "Tickets moved to done [is] fine for now. Later reports into rework can be folded in another day."
 
 ### 3. Pricing
 
@@ -104,7 +104,7 @@ Each part closes on a run that watched it, not on reading the code. Tickets make
 - **The read model:** every session in the window is either priced or listed as not counted, and none is silently zero. Every reader returns identical figures for the same period.
 - **History:** the backfilled days for Harbour match a direct recount of the stored rows for three sample days.
 - **Page:** end-to-end on a seeded workspace: the headline, tiles and charts match the seed; adding, reordering or removing a way of paying changes what you paid and never changes token cost; a workspace with nothing set up shows list price throughout; a workspace with no history shows the empty state.
-- **Reconciliation, a check for John in production:** for 30 whole UTC days, Harbour's instance-wide OpenRouter call total against OpenRouter's own figure, with the gap named. It needs a scoped OpenRouter key; John, 25 Oct: "I can see about adding a scoped OR key when we need it." Until then the tickets record Harbour's side, ready to compare.
+- **Reconciliation, a production check** (listed under the charter's checks in production, since a ticket makes no outside calls): for 30 whole UTC days, Harbour's instance-wide OpenRouter call total against OpenRouter's own figure, with the gap named. It needs a scoped OpenRouter key; John, 25 Oct: "I can see about adding a scoped OR key when we need it." Until then the tickets record Harbour's side, ready to compare.
 
 ## Order of work
 
@@ -120,7 +120,7 @@ Tidy first, in the Theseus moves, then build. Each move gets the charter's predi
 
 ## Not in scope
 
-Window or limit calibration for subscriptions; trials, judges and reverting (agents do these); rework and second-round measures; per-person costs; currencies other than US dollars; changing what the public `/kpis` page counts, unless John rules it (Open questions); modelling long-context price tiers for cumulative sessions (after the charter).
+Window or limit calibration for subscriptions; judges; reverting (left to agents); rework and second-round measures; per-person costs; currencies other than US dollars; changing what the public `/kpis` page counts, unless John rules it (Open questions); modelling long-context price tiers for cumulative sessions (after the charter).
 
 ## Open questions
 
@@ -128,5 +128,5 @@ Each has a recommendation; a ticket that reaches one asks John for a ruling, pre
 
 - **Label clash.** `/kpis` already says "Cost per finished task" for `[done]`-marked lineages. This page counts tickets set Done. Recommendation: keep the label here with its definition one click away; when Consolidate makes `/kpis` a reader of the authority, ask whether `/kpis` moves to tickets too, so both agree.
 - **The period.** The prototype compares 8 days with the 8 before. Recommendation: this month so far against the same days last month by default, because plans and allowances reset monthly, with last 7 and last 30 days as options.
-- **Tickets with no Harbour work.** 19 of the 238 tickets finished in the sample had no priced session. Recommendation: count them, as decided (John, 25 Oct: "Tickets moved to done [is] fine for now."), and revisit with the rework measures.
+- **Tickets with no Harbour work.** 19 of the 238 tickets finished in the sample had no priced session. Recommendation: count them, for simplicity, and revisit with the rework measures.
 - **Estimating sessions that never reported usage** (114 in the sample's 29 days) is a Paper, not this build.
