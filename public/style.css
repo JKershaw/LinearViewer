@@ -1102,6 +1102,25 @@ a.wordmark:hover {
   font-family: var(--font-content);
 }
 
+/* LIN-3833: a task's state words (Build running · 5m, needs you, backlog), right of the title on
+   desktop; the phone rule below moves them under it. */
+.row-state {
+  color: var(--fg-dim);
+  margin-left: auto;
+  padding-left: 1ch;
+  font-size: 0.9em;
+  font-family: var(--font-content);
+  white-space: nowrap;
+}
+
+/* LIN-3833: the count line under the In Progress heading (3 in progress · 1 needs you). */
+.in-progress-count {
+  color: var(--fg-dim);
+  font-size: 0.9em;
+  font-family: var(--font-content);
+  padding-bottom: var(--space-2);
+}
+
 /* Activity time/kind shown in the Recent activity section */
 .completed-time {
   color: var(--fg-dim);
@@ -1944,6 +1963,15 @@ a.wordmark:hover {
     flex-basis: 100%;
     order: 1;
     margin-left: 2.4ch;
+  }
+
+  /* LIN-3833: the state words take the same line under the title, aligned as the project badge is. */
+  .row-state {
+    flex-basis: 100%;
+    order: 1;
+    margin-left: 2.4ch;
+    padding-left: 0;
+    white-space: normal;
   }
 
   .project-header {

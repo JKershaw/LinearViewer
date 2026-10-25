@@ -72,6 +72,8 @@ async function runRenderDashboardAfterRefresh({ fetchResult, topTask = null }) {
       return '<html/>';
     },
     getFeatureFlags: () => ({}),
+    // LIN-3833: the Home row states; these sandboxes render no In Progress rows.
+    homeRowStates: async () => null,
     requestFeatureFlags: async () => ({}),
     resolveRunControls: async () => ({ runControls: false, runSetup: false }),
     // LIN-2526: renderDashboardAfterRefresh now derives a provider off the
@@ -176,6 +178,8 @@ async function runPrimaryDashboardRoute({ fetchResult }) {
       return '<html/>';
     },
     getFeatureFlags: () => ({}),
+    // LIN-3833: the Home row states; these sandboxes render no In Progress rows.
+    homeRowStates: async () => null,
     requestFeatureFlags: async () => ({}),
     resolveRunControls: async () => ({ runControls: false, runSetup: false }),
     isAuthError: () => false,

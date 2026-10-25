@@ -103,6 +103,8 @@ function baseContext(calls, appliedAssigneeName, assigneeState) {
       return '<html/>';
     },
     getFeatureFlags: () => ({}),
+    // LIN-3833: the Home row states; these sandboxes render no In Progress rows.
+    homeRowStates: async () => null,
     requestFeatureFlags: async () => ({}),
     resolveRunControls: async () => ({ runControls: false, runSetup: false }),
     isAuthError: () => false,
