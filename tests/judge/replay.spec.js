@@ -70,8 +70,10 @@ async function prepareHome(page, context, entry) {
   await settle(page);
   const block = page.locator('.opened-task').first();
   if (!(await block.isVisible())) await page.locator('[data-top-task="1"]').click();
-  await block.waitFor();
-  if (entry.state === 'home-copy-written') {
+  // LIN-3968 adds the `.opened-task` wrapper: base (33e5dc6e) has none, so base is judged after its lazy detail settles.
+  await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+  if (await block.count()) await block.waitFor();
+  if (entry.state === 'home-copy-written' && await page.locator('[data-testid="opened-task-write"]').count()) {
     await page.locator('[data-testid="opened-task-write"]').click();
     await page.locator('[data-testid="opened-task-target"]').waitFor();
   }
