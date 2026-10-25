@@ -8,11 +8,13 @@ import { fileURLToPath } from 'node:url';
 
 export const DEFAULT_AREAS = fileURLToPath(new URL('./areas.json', import.meta.url));
 
-// Defaults: JavaScript minus dependencies, vendored dirs, minified files, tests and pinned replay snapshots.
+// Defaults: JavaScript minus dependencies, vendored dirs, minified files, tests, and pinned replay snapshots and work copies.
 // Pinned snapshots are frozen copies of live code: a live file whose size changed paired with its own old
-// copy and the census reported that as a clone (LIN-3881). Every default-scope consumer gets the same answer.
+// copy and the census reported that as a clone (LIN-3881). Replay work copies (the replay tool's committed workDir
+// output, e.g. work/run-*/old/routes/workspace-api.js) are the same frozen copies under another path (LIN-3881).
+// Every default-scope consumer gets the same answer.
 export const DEFAULT_INCLUDE = '\\.(js|mjs|cjs)$';
-export const DEFAULT_EXCLUDE = '(^|/)node_modules/|(^|/)vendor(ed)?/|\\.min\\.js$|(^|/)(tests?|__tests__)/|\\.(test|spec)\\.|^experiments/[^/]+/replay/pinned/';
+export const DEFAULT_EXCLUDE = '(^|/)node_modules/|(^|/)vendor(ed)?/|\\.min\\.js$|(^|/)(tests?|__tests__)/|\\.(test|spec)\\.|^experiments/[^/]+/replay/(pinned|work)/';
 
 // --include / --exclude each replace only their own default; they never stack onto it.
 export const compileScope = ({ include, exclude } = {}) => {

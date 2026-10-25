@@ -13,10 +13,11 @@ test('default scope: JavaScript minus node_modules, vendored dirs, minified file
     'tests/a.js', 'test/a.js', 'lib/__tests__/a.js', 'lib/a.test.js', 'lib/a.spec.mjs']) assert.ok(!inScope(p), p);
 });
 
-test('default scope: pinned replay snapshots are out (LIN-3881); live experiments and a pinned/ dir elsewhere are not', () => {
+test('default scope: pinned replay snapshots and work copies are out (LIN-3881); live experiments and a pinned/ dir elsewhere are not', () => {
   const inScope = compileScope();
   assert.ok(!inScope('experiments/rebuild-rung7/replay/pinned/origin-main/workspace-api.js'));
   assert.ok(!inScope('experiments/rebuild-rung5b/replay/pinned/origin-main/render.js'));
+  assert.ok(!inScope('experiments/rebuild-rung7/replay/work/run-52969/old/routes/workspace-api.js'), 'replay work copies are the same frozen replicas');
   assert.ok(inScope('experiments/rebuild-rung7/replay/run.js'), 'the live replay harness stays in scope');
   assert.ok(inScope('experiments/rebuild-rung7/lib/pinned/a.js'), 'only the replay snapshot path is excluded');
   assert.ok(inScope('lib/pinned/a.js'));
