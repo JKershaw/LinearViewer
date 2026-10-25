@@ -268,19 +268,15 @@
 /* LIN-3351: figures are <img> SVGs carrying their own prefers-color-scheme rule
    (scripts/lib/figure-theme.mjs). An <img> SVG follows the embedding element's
    color-scheme, so declare it per dark path: the theme=dark cookie
-   (html.theme-dark) and the OS scheme on landing pages (body.is-landing).
-   Scoped to Library figures, not app-wide. WebKit ignores it and keeps the
-   light figure. */
+   (html.theme-dark), which the pre-paint script also sets when the system is
+   dark and no theme cookie is stored (LIN-3980). One mechanism, so a stored
+   light preference keeps light figures on a dark system too. Scoped to Library
+   figures, not app-wide. WebKit ignores it and keeps the light figure. */
 .library-doc__body img {
   color-scheme: light;
 }
 .theme-dark .library-doc__body img {
   color-scheme: dark;
-}
-@media (prefers-color-scheme: dark) {
-  body.is-landing .library-doc__body img {
-    color-scheme: dark;
-  }
 }
 
 /* Light-only figures (LIGHT_ONLY in scripts/lib/figure-theme.mjs): a caption names a
@@ -288,11 +284,6 @@
    it so the white block sits softer on the dark panel. Scoped to that one image. */
 .theme-dark .library-doc__body img[src$="/steady-base-menu/menu-size-vs-risk.svg"] {
   filter: brightness(0.85);
-}
-@media (prefers-color-scheme: dark) {
-  body.is-landing .library-doc__body img[src$="/steady-base-menu/menu-size-vs-risk.svg"] {
-    filter: brightness(0.85);
-  }
 }
 
 /* A figure spans the full panel width and clears the floated aside, so a wide

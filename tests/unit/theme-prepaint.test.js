@@ -78,3 +78,16 @@ test('every page that uses the is-landing body class opts in to the system theme
     });
   assert.deepEqual(offenders, []);
 });
+
+// LIN-3980 finding: the landing's dark tokens were a second copy, and library.css
+// still had a `body.is-landing` system-dark rule beside the `.theme-dark` one, so a
+// stored light preference lost on a dark system. Dark follows the one mechanism
+// (the pre-paint script on `.theme-dark`), so no stylesheet may key a system-scheme
+// rule on the landing's body class.
+test('no stylesheet keys a prefers-color-scheme rule on body.is-landing', () => {
+  const PUBLIC = join(LIB, '..', 'public');
+  const offenders = readdirSync(PUBLIC)
+    .filter((f) => f.endsWith('.css'))
+    .filter((f) => /@media\s*\([^)]*prefers-color-scheme[^)]*\)\s*\{\s*body\.is-landing/.test(readFileSync(join(PUBLIC, f), 'utf8')));
+  assert.deepEqual(offenders, []);
+});

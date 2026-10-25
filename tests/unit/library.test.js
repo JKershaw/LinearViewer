@@ -493,14 +493,16 @@ describe('figure dark-mode theme (LIN-3351)', () => {
     assert.equal(themeSvg(out, LIGHT_ONLY[0]), out);
   });
 
-  test('library.css sets the figure color-scheme for both dark paths, scoped to Library figures', () => {
+  // LIN-3980: the OS-dark path reaches the figures through the one dark mechanism
+  // (the pre-paint script adds theme-dark), so library.css keeps no second
+  // body.is-landing copy of the figure rules.
+  test('library.css sets the figure color-scheme through the one .theme-dark mechanism, scoped to Library figures', () => {
     const css = readFileSync(join(import.meta.dirname, '..', '..', 'public', 'library.css'), 'utf8');
     assert.match(css, /\.library-doc__body img\s*\{\s*color-scheme:\s*light;/);
     assert.match(css, /\.theme-dark \.library-doc__body img\s*\{\s*color-scheme:\s*dark;/);
-    assert.match(css, /@media \(prefers-color-scheme: dark\)\s*\{\s*body\.is-landing \.library-doc__body img\s*\{\s*color-scheme:\s*dark;/);
-    // The light-only figure is dimmed on both dark paths, by exact src.
+    assert.doesNotMatch(css, /body\.is-landing/);
+    // The light-only figure is dimmed on the dark path, by exact src.
     assert.match(css, /\.theme-dark \.library-doc__body img\[src\$="\/steady-base-menu\/menu-size-vs-risk\.svg"\]\s*\{\s*filter:\s*brightness\(0\.85\)/);
-    assert.match(css, /body\.is-landing \.library-doc__body img\[src\$="\/steady-base-menu\/menu-size-vs-risk\.svg"\]\s*\{\s*filter:\s*brightness\(0\.85\)/);
   });
 
   // LIN-3761 — wide tables need their own scroll box (root is overflow-x: clip).
