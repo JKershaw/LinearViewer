@@ -8,6 +8,11 @@ import { workspaceApiLocalSeed } from '../fixtures/local-harness.js';
 
 const PHONE = { width: 390, height: 844 };
 
+// LIN-3969: the copy-first view needs a workspace with no run controls. A default seed clears runner keys but
+// keeps queue tokens (LIN-3849), and specs earlier on this worker's urlKey leave queue tokens behind, so the copy-first
+// tests say `runnerKey: false`, which clears both.
+const COPY_FIRST = { runnerKey: false };
+
 /** Light is the default; dark is the opt-in `.theme-dark` hook on <html> (see CLAUDE.md, Design Principles). */
 async function setTheme(page, theme) {
   await page.evaluate((dark) => document.documentElement.classList.toggle('theme-dark', dark), theme === 'dark');
@@ -33,7 +38,7 @@ async function gotoHome(page, urlKey) {
 
 test.describe('Home first page — the copy-first card (LIN-3833)', () => {
   test('"Got it" is the shared Button piece, and the card stays dismissed after a reload', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(workspaceApiLocalSeed);
+    await seedLocal(workspaceApiLocalSeed, COPY_FIRST);
     await gotoHome(page, localWorkerUrlKey);
 
     const card = page.locator('[data-testid="home-copy-first-card"]');
@@ -57,7 +62,7 @@ test.describe('Home first page — the layout holds on a phone (LIN-3833)', () =
 
   for (const theme of ['light', 'dark']) {
     test(`copy-first view, ${theme}: no horizontal scrolling at 390px`, async ({ page, seedLocal, localWorkerUrlKey }) => {
-      await seedLocal(workspaceApiLocalSeed);
+      await seedLocal(workspaceApiLocalSeed, COPY_FIRST);
       await gotoHome(page, localWorkerUrlKey);
       await setTheme(page, theme);
       await openTopTask(page);
@@ -90,12 +95,10 @@ test.describe('Home first page — the Change panel is a full-screen sheet on a 
 
     // The sheet fills the page's client area. Headless Chromium draws a classic scrollbar, which a phone does not, so
     // the client area (not the window) is the screen the sheet must cover.
+    // LIN-3969: the run block repaints when the presets read (and the preview) land, which replaces the panel's
+    // node; a box read from the node being replaced is null. Poll until a read lands on the painted panel.
     const screen = await page.evaluate(() => ({ width: document.documentElement.clientWidth, height: document.documentElement.clientHeight }));
-    const box = await panel.boundingBox();
-    expect(box.x).toBe(0);
-    expect(box.y).toBe(0);
-    expect(box.width).toBe(screen.width);
-    expect(box.height).toBe(screen.height);
+    await expect.poll(() => panel.boundingBox()).toEqual({ x: 0, y: 0, width: screen.width, height: screen.height });
 
     await component.locator('[data-testid="run-change-x"]').click();
     await expect(panel).toHaveCount(0);
@@ -109,6 +112,9 @@ test.describe('Home first page — a run from each source stamps the row the con
   test('default, preset and chosen for this run', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, runnerKey: true });
     const key = localWorkerUrlKey;
+    // LIN-3969: presets live in the shared store and outlast the attempt that made them, so a retry (or any
+    // second run on this worker's urlKey) saw two, then three "Careful" buttons. Start with none.
+    await page.request.get(`/test/clear-dispatch-presets?urlKey=${key}`);
     const preset = await page.request.post(`/workspace/${key}/api/dispatch/presets`, { data: { name: 'Careful', model: 'preset-model-careful' } });
     expect(preset.ok()).toBe(true);
 
@@ -152,6 +158,31 @@ test.describe('Home first page — a run from each source stamps the row the con
     await component.locator('[data-testid="run-use"]').click();
     const chosenRow = await runFrom('chosen', 'chosen-model-x');
     expect(chosenRow.model).toBe('chosen-model-x');
+  });
+});
+
+// LIN-3969: a preview answer repaints the run block. One that landed while the model was being typed replaced the
+// Model input, so the rest of the typing was lost and the run went out on a cut-off model ("chose"). The reset's
+// preview is held until the typing is under way, so the repaint lands mid-word on every run.
+test.describe('Home first page — the Change panel keeps what is typed across a repaint (LIN-3969)', () => {
+  test('a preview landing mid-typing does not cut the chosen model short', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, runnerKey: true });
+    await gotoHome(page, localWorkerUrlKey);
+    const component = await openTopTask(page);
+    await expect(component.locator('[data-testid="run-on-what"]')).toHaveText('the default model');
+    await component.locator('[data-testid="run-change"]').click();
+    await expect(component.locator('[data-testid="run-change-panel"]')).toBeVisible();
+    await page.waitForLoadState('networkidle');
+
+    let hold = true;
+    await page.route('**/api/dispatch/preview**', async (route) => {
+      if (hold) { hold = false; await new Promise((resolve) => setTimeout(resolve, 300)); }
+      await route.continue();
+    });
+    await component.locator('[data-testid="run-reset"]').click();
+    await component.locator('[data-testid="run-model"]').pressSequentially('chosen-model-x', { delay: 60 });
+    await component.locator('[data-testid="run-use"]').click();
+    await expect(component.locator('[data-testid="run-on-what"]')).toHaveText('chosen-model-x');
   });
 });
 
