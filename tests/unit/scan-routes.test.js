@@ -1036,15 +1036,22 @@ describe('LIN-3879: retire resolves the scan-retire model (routes/workspace-api-
     return table;
   }
 
-  // A minimal SSE reply (the shape openrouter.test.js uses) carrying a zero-finding scan.
-  function zeroFindingStream() {
-    const enc = new TextEncoder();
-    const blocks = [
-      `data: ${JSON.stringify({ choices: [{ delta: { content: '{"has_decision":false}' }, finish_reason: null }] })}\n\n`,
+  // streamChat has two branches: a streaming call (`stream: true`) when no proxy is configured,
+  // and one non-streaming JSON call when HTTPS_PROXY/HTTP_PROXY is set (the CI proxy job). The
+  // fake answers in whichever shape the request asked for, with the same zero-finding scan.
+  function zeroFindingReply(stream) {
+    const text = '{"has_decision":false}';
+    if (!stream) {
+      return new Response(JSON.stringify({ model: SCAN_MODEL, choices: [{ message: { content: text }, finish_reason: 'stop' }] }), {
+        headers: { 'content-type': 'application/json' }
+      });
+    }
+    const sse = [
+      `data: ${JSON.stringify({ choices: [{ delta: { content: text }, finish_reason: null }] })}\n\n`,
       `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }] })}\n\n`,
       'data: [DONE]\n\n'
-    ];
-    return { ok: true, body: (async function* () { for (const b of blocks) yield enc.encode(b); })() };
+    ].join('');
+    return new Response(sse);
   }
 
   beforeEach(() => {
@@ -1056,8 +1063,9 @@ describe('LIN-3879: retire resolves the scan-retire model (routes/workspace-api-
       fetchRecommendationContext: async () => buildMockRecapContext(ZERO_FINDING_ISSUE)
     });
     setFetchImpl(async (_url, init) => {
-      requestedModels.push(JSON.parse(init.body).model);
-      return zeroFindingStream();
+      const { model, stream } = JSON.parse(init.body);
+      requestedModels.push(model);
+      return zeroFindingReply(stream === true);
     });
     app = buildApp({
       workspaceFromUrl: (req, _res, next) => {
