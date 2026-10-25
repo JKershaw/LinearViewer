@@ -18,7 +18,7 @@ import { createSettingsRouter } from '../../routes/settings.js';
 import { WorkspaceChangeLogStore } from '../../lib/workspace-change-log.js';
 import { WorkspaceHaltStore } from '../../lib/workspace-halt.js';
 import { getWorkspaceFeatures, setWorkspaceFeature, resolveWorkspaceModel } from '../../lib/workspace-preferences.js';
-import { projectLegacy } from '../../lib/model-routing.js';
+import { projectLegacy, currentValue } from '../../lib/model-routing.js';
 import { getProvider, getProviderForWorkspace } from '../../lib/providers/registry.js';
 import '../../lib/providers/index.js';
 import { memoryCollection, routingFixture } from './helpers/routing-fakes.js';
@@ -287,6 +287,33 @@ describe('the Change log shows model-routing-log beside the others and undoes it
     await fx.routingStore.changeJob('recommend', { model: 'a/two' }, { urlKey: 'alpha', reason: 'two', actor: { via: 'page' } });
     const res = await post(`change-log/model/${first._id}/undo`, { reason: 'undo one' });
     assert.match(res.headers.get('location'), /error=conflict/);
+  });
+});
+
+describe('a model undo is judged by the runnable check (LIN-3855)', () => {
+  // A and B go through the store with no guard, as the proxy writes them. A moves Make to OpenCode; B moves
+  // Make to a model only OpenCode runs. Undoing A would leave Make on the default harness with that model,
+  // so the undo is refused, and the refusal writes nothing.
+  const ctx = (reason) => ({ urlKey: 'alpha', reason, actor: { via: 'proxy' } });
+  const entry = async (reason) => (await fx.routingStore.getLog('alpha')).find((r) => r.reason === reason);
+  const undoEntry = async (reason) => post(`change-log/model/${(await entry(reason))._id}/undo`, { reason: `undo ${reason}` });
+  const snapshot = () => JSON.stringify([fx.collections.routing._docs, fx.collections.log._docs]);
+
+  test('undoing A is refused INVALID when B leaves Make unable to run its model: nothing is written', async () => {
+    await fx.routingStore.changeGroup('agent-session', 'make', { harness: 'opencode' }, ctx('A'));
+    await fx.routingStore.changeGroup('agent-session', 'make', { model: 'openai/gpt-6.1-sol' }, ctx('B'));
+    const before = snapshot();
+    const res = await undoEntry('A');
+    assert.equal(res.headers.get('location'), '/workspace/alpha/settings/change-log?error=invalid');
+    assert.equal(snapshot(), before, 'the table, its version and the log are untouched');
+  });
+
+  test('the same undo with no B is allowed: the guard refuses only what would not run', async () => {
+    await fx.routingStore.changeGroup('agent-session', 'make', { harness: 'opencode' }, ctx('A'));
+    const res = await undoEntry('A');
+    assert.equal(res.headers.get('location'), '/workspace/alpha/settings/change-log?undone=1');
+    const table = await fx.routingStore.getTable('alpha');
+    assert.equal(currentValue(table, { scope: 'group', surface: 'agent-session', key: 'make', field: 'harness' }), null);
   });
 });
 

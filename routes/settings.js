@@ -83,10 +83,10 @@ export function providerNoticeFromQuery(query = {}, flash = null, getProvider = 
 
 const PROVIDER_QUERY_KEYS = ['provider_ok', 'provider_fail', 'provider_error', 'provider_removed', 'provider_switched', 'provider_blocked'];
 
-/** Short messages for the `?error=` codes the change-log redirects carry (never a reflected string). */
 /** The largest history read the Models spend takes; a read at the cap says so on the page. */
 const MODELS_HISTORY_CAP = 2000;
 
+/** Short messages for the `?error=` codes the change-log redirects carry (never a reflected string). */
 const CHANGE_ERRORS = {
   invalid: 'That change could not be made: a model would not run on its harness. Nothing was changed.',
   reason: 'A reason is needed (up to 500 characters).',

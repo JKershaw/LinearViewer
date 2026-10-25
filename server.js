@@ -3919,8 +3919,8 @@ app.get('/workspace/:urlKey/proxy', workspaceFromUrl, async (req, res) => {
   res.send(html);
 });
 
-// The three old model forms (POST /settings/model, /settings/dispatch-defaults, /settings/ai-model-overrides)
-// live in routes/settings-model.js and write through the model-routing store (LIN-3853).
+// The Models page's writes (POST …/settings/models/changes, …/presets and …/presets/:id/apply) live in
+// routes/settings-model.js and write through the model-routing store (LIN-3853, LIN-3855).
 app.use(createSettingsModelRoutes({ workspaceFromUrl, modelRoutingStore }))
 app.use(createSettingsRouter({
   workspaceFromUrl, getOpenRouterSource, getDeployInfo, userPreferencesStore, workspacePreferencesStore,

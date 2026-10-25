@@ -2,8 +2,8 @@
  * Settings › Models, the client (LIN-3855). The page works without this file: every field is a plain form
  * control, and the server judges every save (lib/model-routing-edit.js). This file only keeps the choices
  * honest as a row changes: the model options follow the harness the row names, an OpenRouter-only pick
- * switches the harness to OpenCode and clears effort (which OpenCode does not take), and the page says
- * how many fields are staged.
+ * switches the harness to OpenCode and clears effort (which OpenCode does not take), the page says
+ * how many fields are staged, and at phone width an open row's sheet traps Tab and closes on Escape.
  *
  * Loads after common.js: it uses buildDispatchModelOptionDescriptors and getSettingsModelCatalog from there,
  * so the option set is the one the Dispatch page offers, merged with the same live catalog.
@@ -66,6 +66,37 @@
     });
     if (staged) staged.textContent = n ? `${n} change${n === 1 ? '' : 's'} staged. Save to make them one change.` : 'No changes yet.';
   }
+
+  // At phone width an open row is a full-screen sheet (settings.css) laid over the page, so Tab must not
+  // reach the rows behind it. Escape closes the sheet and hands focus back to its row. Desktop is untouched.
+  const phone = window.matchMedia('(max-width: 640px)');
+  const openSheet = () => (phone.matches ? form.querySelector('details.settings-row-open[open]') : null);
+  const sheetFocusables = (sheet) => [...sheet.querySelectorAll('summary, a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled])')];
+
+  document.addEventListener('keydown', (event) => {
+    const sheet = openSheet();
+    if (!sheet) return;
+    if (event.key === 'Escape') {
+      sheet.open = false;
+      sheet.querySelector(':scope > summary').focus();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const items = sheetFocusables(sheet);
+    if (!items.length) return;
+    const first = items[0];
+    const last = items[items.length - 1];
+    if (!sheet.contains(document.activeElement)) {
+      event.preventDefault();
+      first.focus();
+    } else if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
 
   form.addEventListener('change', (event) => {
     const el = event.target;

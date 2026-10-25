@@ -176,3 +176,29 @@ describe('the page', () => {
     assert.equal(name(null), 'Default');
   });
 });
+
+describe('the page lists jobs by spend (LIN-3855 done-when)', () => {
+  // A taken dispatch row of a job's kind, carrying the runner's `[usage]` entry. Omit `costUsd` for an unpriced run.
+  const usageRow = (id, kind, costUsd) => ({
+    id, status: 'taken', kind, dispatchedAt: '2026-10-20T10:00:00Z', rootItemId: id,
+    feedback: [{ kind: 'usage', timestamp: '2026-10-20T10:01:00Z', message: `[usage] ${JSON.stringify({ model: 'anthropic/claude-sonnet-5', harness: 'claude-code', costUsd })}` }]
+  });
+  const agentJobRowIds = (html) => [...new Set([...html.matchAll(/data-testid="models-job-([a-z-]+)"/g)].map((m) => m[1]))]
+    .filter((id) => AGENT_JOB_IDS.includes(id));
+
+  test('the most spent job is first, then the next, then an unpriced run, and a job with no runs is last', () => {
+    const rows = [
+      usageRow('r1', 'review', 5),
+      usageRow('i1', 'implementation', 0.5),
+      usageRow('i2', 'implementation', 1.5),
+      usageRow('b1', 'bug', undefined)
+    ];
+    const html = body(emptyTable(), { agentSpend: agentSpendByJob(rows, { jobs: AGENT_JOB_IDS }) });
+    const ids = agentJobRowIds(html);
+    assert.deepEqual(ids.slice(0, 3), ['review', 'implementation', 'bug'], 'priced spend first, then runs, by spend');
+    const noRuns = AGENT_JOB_IDS.filter((id) => !['review', 'implementation', 'bug'].includes(id));
+    assert.deepEqual(ids.slice(3), noRuns, 'the jobs with no runs follow, in the registry order');
+    assert.match(html, /data-testid="models-job-review"[\s\S]*?\$5\.00/, 'the spend is the priced sum on the row');
+    assert.match(html, /data-testid="models-job-bug"[\s\S]*?unknown/, 'an unpriced run is unknown, not $0');
+  });
+});

@@ -142,6 +142,28 @@ test.describe('Settings › Models (LIN-3855)', () => {
     expect(overflow).toBeLessThanOrEqual(0)
   })
 
+  test('at phone width Tab stays inside the open sheet, and Escape closes it and returns focus to its row', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await openModels(page)
+    const row = await openRow(page, 'implementation')
+    const focusInRow = () => page.evaluate(() => !!document.activeElement.closest('[data-testid="models-job-implementation"]'))
+
+    // Shift+Tab from the first control (the row's own summary) wraps to the last field inside the sheet.
+    await page.keyboard.press('Shift+Tab')
+    expect(await focusInRow()).toBe(true)
+    // Tab through the sheet and past its last field, several times round: focus never leaves it.
+    const stayed = []
+    for (let i = 0; i < 40; i++) {
+      await page.keyboard.press('Tab')
+      stayed.push(await focusInRow())
+    }
+    expect(stayed.every(Boolean)).toBe(true)
+
+    await page.keyboard.press('Escape')
+    expect(await row.evaluate((el) => el.open)).toBe(false)
+    expect(await page.evaluate(() => document.activeElement.matches('[data-testid="models-job-implementation"] > summary'))).toBe(true)
+  })
+
   test('the sidebar names what jobs run on, and a group move changes it', async ({ page, request }) => {
     await openModels(page)
     const before = await stateOf(page).textContent()
@@ -169,15 +191,19 @@ test.describe('Settings › Models (LIN-3855)', () => {
     await openModels(page)
     await expect(logEntries(page)).toHaveCount(0)
   })
-  test('the No job (Dispatch suggestion) row saves its model with a reason and reads it back', async ({ page }) => {
+
+  test('the No job (Dispatch suggestion) row saves its model and effort with a reason and reads them back', async ({ page }) => {
     await openModels(page)
     const row = page.locator('[data-testid="models-default-agent"]')
     await row.locator(':scope > summary').click()
     await row.locator('select[data-models-field="model"]').selectOption('sonnet')
+    await row.locator('select[data-models-field="harness"]').selectOption('claude-code')
+    await row.locator('input[data-models-field="effort"]').fill('high')
     await reasonBox(page).fill('suggest sonnet on Dispatch')
     await saveButton(page).click()
 
     await expect(page.locator('[data-testid="models-notice"]')).toContainText('Saved.')
     await expect(page.locator('[data-testid="models-default-agent"] > summary')).toContainText('sonnet')
+    await expect(page.locator('[data-testid="models-default-agent"] input[data-models-field="effort"]')).toHaveValue('high')
   })
 })
