@@ -342,8 +342,9 @@ function mountHomePromptSections(root) {
       // ranking reason; every other opened task renders no why line. N2: match on
       // the binding-aware node key, not the raw id.
       why: el.dataset.nodeKey === page.topTaskId ? (page.topTaskWhy || []) : [],
-      // LIN-3833: the top task's subtask that needs you, named in the state block with an Open link.
-      subtaskNeedsYou: el.dataset.nodeKey === page.topTaskId ? (page.topTaskSubtask || null) : null,
+      // LIN-3833: this row's subtask that needs you, named in the state block with an Open link (any row, not
+      // only the top task; the server keys the map by node key).
+      subtaskNeedsYou: (page.subtaskNeedsYouById || {})[el.dataset.nodeKey] || null,
       hasAI: page.hasAI,
       aiState: page.aiState,
       freeTier: page.freeTier,

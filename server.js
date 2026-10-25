@@ -155,7 +155,7 @@ import { renderPromptsPage } from './lib/render-prompts.js'
 import { renderCustomPromptsPage } from './lib/render-custom-prompts.js'
 import { renderDispatchPage } from './lib/render-dispatch.js'
 import { renderSwipePage, orderIssuesForSwipe } from './lib/render-swipe.js'
-import { subtaskNeedingYouOf } from './lib/task-board-view.js'
+import { subtaskNeedingYouByNodeKey } from './lib/task-board-view.js'
 import { renderSwimPage } from './lib/render-swim.js'
 import { renderShipPage } from './lib/render-ship.js'
 import { createCollectiveRoutes } from './routes/collective.js'
@@ -2000,13 +2000,13 @@ async function renderDashboardAfterRefresh(workspace, session, teamId, assigneeS
   const seedOnlyHome = orderedHome.length > 0 && orderedHome.every((issue) => issue.isSeed);
   // LIN-3849: no `req` on this post-401 path, so call the resolver directly.
   const featureFlags = { ...getFeatureFlags(session), ...(await resolveRunControls({ workspace, accountId: session.accountId })) };
-  const rowStates = await homeRowStates({ workspace, inProgressTrees, runControls: featureFlags.runControls === true });
+  const rowStates = await homeRowStates({ workspace, inProgressTrees, recentActivityTrees, projectTrees: trees, runControls: featureFlags.runControls === true });
   const html = renderPage(trees, inProgressTrees, recentActivityTrees, organizationName, {
     teams,
     selectedTeamId,
     availableAssignees,
     rowStates,
-    topTaskSubtask: subtaskNeedingYouOf({ urlKey: workspace.urlKey, topTask: homeTopTask, rowStates }),
+    subtaskNeedsYouById: subtaskNeedingYouByNodeKey({ urlKey: workspace.urlKey, inProgressTrees, recentActivityTrees, projectTrees: trees, rowStates }),
     copyFirstCard: featureFlags.runControls !== true && session.copyFirstCardDismissed !== true,
     // LIN-2550: same applied-not-requested labelling rule as the primary
     // dashboard route above — this post-401 re-render carries the assignee
@@ -3433,10 +3433,16 @@ async function resolveAssigneeSelection(req, provider, scope) {
  * workspace, grouped by task, the read Swipe makes. A viewer who sees no sessions (copy-first, no
  * `runControls`) reads nothing and gets the tracker words alone. A failure leaves the rows plain:
  * a store hiccup must never break the page.
+ * LIN-3833: the states also cover the Recent and project rows, so a subtask that needs you is named on
+ * any opened row. In Progress's own states win for a task in both, so its ranking does not change.
  */
-async function homeRowStates({ workspace, inProgressTrees, runControls }) {
+async function homeRowStates({ workspace, inProgressTrees, recentActivityTrees, projectTrees, runControls }) {
   try {
     const roots = (inProgressTrees || []).flatMap(({ roots: trees }) => trees);
+    const otherRoots = [
+      ...(recentActivityTrees || []).flatMap(({ roots: trees }) => trees),
+      ...(projectTrees || []).flatMap(({ incomplete = [], completed = [] }) => [...incomplete, ...completed])
+    ];
     const loopsByIdentifier = new Map();
     if (runControls) {
       const loops = await getLoopsForWorkspace(workspace.urlKey, { dispatchStore: dispatchQueueStore, agentStatusStore, lean: true }).catch(() => []);
@@ -3446,7 +3452,12 @@ async function homeRowStates({ workspace, inProgressTrees, runControls }) {
         loopsByIdentifier.get(loop.issueIdentifier).push(loop);
       }
     }
-    return buildRowStates({ roots, loopsByIdentifier, enrichLoop, deriveSessionWaiting, sessionsVisible: runControls });
+    const states = buildRowStates({ roots, loopsByIdentifier, enrichLoop, deriveSessionWaiting, sessionsVisible: runControls });
+    const otherStates = buildRowStates({ roots: otherRoots, loopsByIdentifier, enrichLoop, deriveSessionWaiting, sessionsVisible: runControls });
+    for (const [identifier, state] of otherStates) {
+      if (!states.has(identifier)) states.set(identifier, state);
+    }
+    return states;
   } catch (err) {
     console.error('Home row states error:', err.message);
     return null;
@@ -3491,13 +3502,13 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
     const homeTopTask = orderedHome.find((issue) => !issue.isSeed) || null;
     const seedOnlyHome = orderedHome.length > 0 && orderedHome.every((issue) => issue.isSeed);
     const featureFlags = await requestFeatureFlags(req);
-    const rowStates = await homeRowStates({ workspace, inProgressTrees, runControls: featureFlags.runControls === true });
+    const rowStates = await homeRowStates({ workspace, inProgressTrees, recentActivityTrees, projectTrees: trees, runControls: featureFlags.runControls === true });
     const html = renderPage(trees, inProgressTrees, recentActivityTrees, organizationName, {
       teams,
       selectedTeamId,
       availableAssignees,
       rowStates,
-      topTaskSubtask: subtaskNeedingYouOf({ urlKey: workspace.urlKey, topTask: homeTopTask, rowStates }),
+      subtaskNeedsYouById: subtaskNeedingYouByNodeKey({ urlKey: workspace.urlKey, inProgressTrees, recentActivityTrees, projectTrees: trees, rowStates }),
       copyFirstCard: featureFlags.runControls !== true && req.session.copyFirstCardDismissed !== true,
       // LIN-2550: label the selector off the filter the render APPLIED. An
       // unmatched name (a stale `?assignee=` carried across a team change by

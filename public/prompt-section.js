@@ -860,8 +860,8 @@
         + `${opened.headerHtml || ''}${opened.trackHtml || ''}${renderSubtaskNeedsYou()}${lastLine}</div>`;
     }
 
-    // LIN-3833: one line naming a subtask that needs you, with an Open link to its task page. Home passes it
-    // only for the top task, from the same row states as the In Progress rows (run-control viewers only).
+    // LIN-3833: one line naming a subtask that needs you, with an Open link to its task page. Home passes the
+    // opened row's own subtask, from the same row states as the In Progress rows (run-control viewers only).
     function renderSubtaskNeedsYou() {
       const sub = opts.subtaskNeedsYou;
       if (!sub || !sub.identifier) return '';

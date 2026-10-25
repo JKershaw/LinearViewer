@@ -226,3 +226,19 @@ describe('LIN-3833 — Undo and Stop after a run', () => {
     assert.equal(abort.body.cascade, true);
   });
 });
+
+describe('LIN-3833 — a subtask that needs you is named on any opened Home task, with an Open link', () => {
+  const WAITING = { identifier: 'LIN-22', title: 'Waiting child', href: '/workspace/acme/task/LIN-22?source=linear' };
+  const OPENED = { status: 'idle', live: false, headerHtml: '', trackHtml: '', sessions: PLAN_NEXT };
+
+  test('the line names the subtask and its Open button links to its task page', async () => {
+    const { c } = await mount({ subtaskNeedsYou: WAITING }, { opened: OPENED });
+    assert.match(c.innerHTML, /data-testid="opened-task-needs-you"[^>]*>A subtask needs you: <span[^>]*>LIN-22 Waiting child<\/span>/);
+    assert.match(c.innerHTML, /data-testid="opened-task-needs-you-open"[^>]*href="\/workspace\/acme\/task\/LIN-22\?source=linear"/);
+  });
+
+  test('no subtask needing you: no line', async () => {
+    const { c } = await mount({ subtaskNeedsYou: null }, { opened: OPENED });
+    assert.equal(c.innerHTML.includes('opened-task-needs-you'), false);
+  });
+});
