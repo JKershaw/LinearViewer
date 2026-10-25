@@ -555,7 +555,7 @@ export function createProxyWriteRoutes({
     // invalidates every prior dedupe entry in it.
     //
     // LIN-2154: this stays a 4-argument call. Padding it to 5 (to match the human
-    // lane's salted call in routes/workspace-api.js) would change ITS OWN digest
+    // lane's salted call in routes/workspace-api-issue-write.js) would change ITS OWN digest
     // stream shape relative to every entry it has ever produced, silently
     // invalidating this lane's live dedupe window.
     const key = dedupeKey(req.proxyUrlKey, issueId, body, commentDedupeGenerations.current(req.proxyUrlKey));

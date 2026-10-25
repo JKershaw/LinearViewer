@@ -184,7 +184,7 @@ async function resolvePromptIssueContext(provider, accessToken, identifier, isTe
 // consumer that retries after a lost response gets the original back.
 //
 // Exported (LIN-2154) so the session-auth human-lane comment route
-// (routes/workspace-api.js) shares this SAME cache instance rather than a
+// (routes/workspace-api-issue-write.js) shares this SAME cache instance rather than a
 // fresh one that would miss workspace-wide generation bumps below.
 export const commentDedupe = createDedupeCache();
 

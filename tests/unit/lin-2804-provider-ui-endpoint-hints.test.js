@@ -11,7 +11,7 @@
  *     (lib/proxy-graphql-errors.js) — exercised here via the scoped
  *     `POST /api/proxy/autopilot/kickoff` route.
  *   - workspace-scoped session routes: `getProvider(workspace.provider)?.ui`,
- *     exercised here via `enqueueFeedbackTriage` (routes/workspace-api.js),
+ *     exercised here via `enqueueFeedbackTriage` (routes/workspace-api-feedback.js),
  *     the same call site tests/unit/lin-2353-feedback-triage-provider-ui.test.js
  *     already covers for `providerDisplayName`.
  *

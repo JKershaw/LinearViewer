@@ -18,7 +18,8 @@
  *   - inside `createWorkspaceApiRoutes`, where they close over the injected stores.
  * The AI pre-flight calls (`resolveChatCredential`, `checkFreeTierGate`, the
  * `forceDefault` model clamp) are deliberately NOT shared: each route names its own,
- * because the source-text censuses scan this file for every one of them.
+ * because the source-text censuses scan the workspace-API unit (this file and
+ * routes/workspace-api-*.js) for every one of them.
  *
  * Test-mode builders (mock recommendation, recap, brief, scan, audit data, ...) live
  * in lib/workspace-api-mocks.js.

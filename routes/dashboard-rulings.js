@@ -255,7 +255,7 @@ function reverseWithdrawalSpec({ dispatchQueueStore }) {
 // run, and resumes nothing.
 //
 // No canonical-id re-resolution: every `taskDecisionsStore` row's `issueId`
-// is canonical by construction (`routes/workspace-api.js`'s scan/dismiss
+// is canonical by construction (`routes/workspace-api-scan.js`'s scan/dismiss
 // routes only ever write a UUID there), and `taskDecisionAnchor`
 // (`lib/unanswered-decisions.js`) hands this route's caller that same
 // already-canonical id unchanged — `markOutcome`'s own canonical-UUID guard
