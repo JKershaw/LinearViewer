@@ -14,7 +14,7 @@
     "setup": "bash scripts/setup.sh",
     "test:hermetic": "node scripts/assert-unit-suite-hermetic.mjs",
     "test:hermetic:proxy": "node scripts/assert-unit-suite-hermetic.mjs --proxy",
-    "test:clock-shift": "CLOCK_SHIFT_DAYS=400 NODE_OPTIONS=--import=$PWD/tests/fixtures/clock-shift.js npm run test:unit",
+    "test:clock-shift": "CLOCK_SHIFT_DAYS=400 npm_config_update_notifier=false NODE_OPTIONS=\"--import=$PWD/tests/fixtures/clock-shift.js\" npm run test:unit",
     "secret-scan": "node scripts/secret-scan.mjs",
     "scan:public-pages": "node scripts/scan-public-pages.mjs",
     "figures:theme": "node scripts/figure-theme.mjs"

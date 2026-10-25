@@ -28,7 +28,7 @@ describe('kinds describe what a key can do, never where it came from', () => {
     ],
     dispatchRows: [queue({ tokenId: 'q' })], isOwner: true, urlKey: 'acme', now: NOW
   });
-  const kind =(id) => rows.find(r => r.id === id).kind;
+  const kind = (id) => rows.find(r => r.id === id).kind;
 
   test('runner key, can start runs, read and update, read, queue token', () => {
     assert.deepEqual(['r', 'a', 'd2', 'rw', 'ro', 'q'].map(kind), ['Runner key', 'Can start runs', 'Can start runs', 'Read and update', 'Read', 'Queue token (legacy)']);
