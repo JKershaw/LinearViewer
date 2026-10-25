@@ -17,6 +17,7 @@
 import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
+import { connect } from 'node:net';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { registerProvider } from '../../lib/providers/registry.js';
 
@@ -1015,5 +1016,99 @@ describe('feedback submit — owner-only lanes (LIN-3383)', () => {
       assert.strictEqual(dispatch.items.length, 1, action);
       if (kind) assert.strictEqual(dispatch.items[0].item.kind, kind);
     }
+  });
+});
+
+// LIN-3908: a request with no Host header has no origin of its own. publicOrigin()
+// then yields `http://undefined`, and a run queued with that base URL can never call
+// back. Without PUBLIC_ORIGIN the lane must be refused and say why, not enqueued.
+describe('feedback lanes with no Host header (LIN-3908)', () => {
+  let savedPublicOrigin;
+  beforeEach(() => { savedPublicOrigin = process.env.PUBLIC_ORIGIN; delete process.env.PUBLIC_ORIGIN; });
+  afterEach(() => { if (savedPublicOrigin === undefined) delete process.env.PUBLIC_ORIGIN; else process.env.PUBLIC_ORIGIN = savedPublicOrigin; });
+
+  // HTTP/1.1 requires a Host header, and Node's parser answers a Host-less 1.1
+  // request with an empty 400 before Express runs. HTTP/1.0 does not require
+  // one, so a raw 1.0 request is the only wire form that reaches the route
+  // without a Host.
+  async function submitWithoutHost(app, urlKey, payload) {
+    const server = app.listen(0, '127.0.0.1');
+    await new Promise(r => server.once('listening', r));
+    const { port } = server.address();
+    const json = JSON.stringify(payload);
+    try {
+      const raw = await new Promise((resolve, reject) => {
+        const socket = connect(port, '127.0.0.1', () => {
+          socket.write(`POST /workspace/${urlKey}/api/feedback HTTP/1.0\r\nContent-Type: text/plain\r\nContent-Length: ${Buffer.byteLength(json)}\r\n\r\n${json}`);
+        });
+        let data = '';
+        socket.on('data', (chunk) => { data += chunk; });
+        socket.on('end', () => resolve(data));
+        socket.on('error', reject);
+      });
+      const [head, ...rest] = raw.split('\r\n\r\n');
+      return { status: Number(head.split(' ')[1]), body: JSON.parse(rest.join('\r\n\r\n')) };
+    } finally {
+      await new Promise(r => server.close(r));
+    }
+  }
+
+  test('autopilot with no Host and no PUBLIC_ORIGIN: the ticket files, the lane is refused with a reason, nothing is enqueued or minted', async () => {
+    const { provider, calls } = makeFakeProvider();
+    const dispatch = capturingDispatchStore();
+    const proxyTokenStore = fakeProxyTokenStore();
+    const app = buildApp({ provider, dispatchQueueStore: dispatch, proxyTokenStore });
+
+    const { status, body } = await submitWithoutHost(app, 'acme', { message: 'run it', action: 'autopilot' });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(calls.createIssue.length, 1);
+    assert.strictEqual(body.autopilot.launched, false);
+    assert.strictEqual(body.autopilot.code, 'ORIGIN_UNRESOLVED');
+    assert.strictEqual(body.autopilot.retryable, false);
+    assert.match(body.autopilot.message, /PUBLIC_ORIGIN/);
+    assert.strictEqual(dispatch.items.length, 0, 'nothing enqueued');
+    assert.strictEqual(proxyTokenStore.grantCalls.length, 0, 'nothing minted');
+  });
+
+  test('triage with no Host and no PUBLIC_ORIGIN is refused the same way', async () => {
+    const { provider } = makeFakeProvider();
+    const dispatch = capturingDispatchStore();
+    const app = buildApp({ provider, dispatchQueueStore: dispatch, proxyTokenStore: fakeProxyTokenStore() });
+
+    const { status, body } = await submitWithoutHost(app, 'acme', { message: 'triage it', action: 'triage' });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(body.triage.launched, false);
+    assert.strictEqual(body.triage.code, 'ORIGIN_UNRESOLVED');
+    assert.strictEqual(dispatch.items.length, 0, 'nothing enqueued');
+  });
+
+  test('with PUBLIC_ORIGIN set, a Host-less autopilot launches on the configured origin', async () => {
+    process.env.PUBLIC_ORIGIN = 'https://harbour.example';
+    const { provider } = makeFakeProvider();
+    const dispatch = capturingDispatchStore();
+    const app = buildApp({ provider, dispatchQueueStore: dispatch, proxyTokenStore: fakeProxyTokenStore() });
+
+    const { status, body } = await submitWithoutHost(app, 'acme', { message: 'run it', action: 'autopilot' });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(body.autopilot, undefined, 'a launched run keeps the response unchanged');
+    assert.strictEqual(dispatch.items.length, 1);
+    assert.match(dispatch.items[0].item.prompt, /https:\/\/harbour\.example/);
+    assert.doesNotMatch(dispatch.items[0].item.prompt, /http:\/\/undefined/);
+  });
+
+  test('save with no Host files the ticket and reports no lane at all', async () => {
+    const { provider, calls } = makeFakeProvider();
+    const dispatch = capturingDispatchStore();
+    const app = buildApp({ provider, dispatchQueueStore: dispatch, proxyTokenStore: fakeProxyTokenStore() });
+
+    const { status, body } = await submitWithoutHost(app, 'acme', { message: 'just file it', action: 'save' });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(calls.createIssue.length, 1);
+    assert.strictEqual('triage' in body || 'autopilot' in body, false);
+    assert.strictEqual(dispatch.items.length, 0);
   });
 });

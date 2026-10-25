@@ -7,7 +7,7 @@ import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert';
 import express from 'express';
 import { request } from 'node:http';
-import { publicOrigin } from '../../lib/public-origin.js';
+import { publicOrigin, requestOriginOrNull } from '../../lib/public-origin.js';
 
 const NONE = {};
 const fakeReq = (host, protocol = 'https') => ({ protocol, get: (name) => (name.toLowerCase() === 'host' ? host : undefined) });
@@ -15,6 +15,15 @@ const fakeReq = (host, protocol = 'https') => ({ protocol, get: (name) => (name.
 // Neither variable may leak in from the runner's environment.
 delete process.env.PUBLIC_ORIGIN;
 delete process.env.EMAIL_LINK_ORIGIN;
+
+describe('requestOriginOrNull (LIN-3908)', () => {
+  test('null only when neither a configured origin nor a Host header exists', () => {
+    assert.strictEqual(requestOriginOrNull(fakeReq(undefined), { env: NONE }), null);
+    assert.strictEqual(requestOriginOrNull(fakeReq(''), { env: NONE }), null);
+    assert.strictEqual(requestOriginOrNull(fakeReq(undefined), { env: { PUBLIC_ORIGIN: 'https://harbour.example' } }), 'https://harbour.example');
+    assert.strictEqual(requestOriginOrNull(fakeReq('h.example'), { env: NONE }), 'https://h.example');
+  });
+});
 
 describe('publicOrigin (LIN-3692)', () => {
   test('unset and empty are Host-derived, with no trailing slash', () => {

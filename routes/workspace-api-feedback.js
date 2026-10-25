@@ -28,7 +28,7 @@ import { generateFeedbackTitle } from '../lib/feedback-title.js';
 import { resolveIssueBinding } from '../lib/workspace.js';
 import { resolveRunnerOwnerRefusal } from '../lib/runner-owner-gate.js';
 import { shouldMockAi } from '../lib/should-mock-ai.js';
-import { publicOrigin } from '../lib/public-origin.js';
+import { requestOriginOrNull } from '../lib/public-origin.js';
 import { buildMockFeedbackTitle } from '../lib/workspace-api-mocks.js';
 
 // ===========================================================================
@@ -181,6 +181,15 @@ function feedbackCaptureBlock({ url, userAgent }) {
   return bullets.length ? `\n\n---\n${bullets.join('\n')}` : '';
 }
 
+// LIN-3908: a feedback lane's run calls back to this workspace, so it needs an
+// origin. With no PUBLIC_ORIGIN and no Host header there is none, and the lane is
+// refused here, where the widget reports it, instead of queued with `http://undefined`.
+const ORIGIN_UNRESOLVED_REFUSAL = {
+  code: 'ORIGIN_UNRESOLVED',
+  retryable: false,
+  message: 'This request has no Host header and PUBLIC_ORIGIN is not set, so a run could not call back to this workspace.',
+};
+
 export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore, workspacePreferencesStore, dispatchQueueStore, proxyTokenStore, accountStore, workspaceOwnerCheck }) {
   // ===========================================================================
   // Feedback intake (LIN-636 route / LIN-635 widget) — constants above
@@ -294,8 +303,10 @@ export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore
   // submitting session. Resolves `{ launched: true }`, or `{ launched: false,
   // code, retryable, message }` when the run limit or that owner-checked mint
   // refuses (no grant-less fallback); every other failure is swallowed as null.
+  // `baseUrl` is a real origin: the submit route refuses the lane first when none
+  // resolves (LIN-3908), so there is no silent null guard here.
   async function enqueueFeedbackAutopilot(workspace, issue, session, baseUrl, overrides = {}) {
-    if (!dispatchQueueStore || !issue?.identifier || !baseUrl) return null;
+    if (!dispatchQueueStore || !issue?.identifier) return null;
     try {
       const kickoff = buildAutopilotKickoff({
         baseUrl,
@@ -494,7 +505,8 @@ export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore
       // 'triage' always enqueues triage, 'autopilot' enqueues a scoped autopilot run
       // carrying the feedback-origin brief. With none (the legacy plain send) the
       // ticket is filed only (LIN-3848).
-      const baseUrl = publicOrigin(req);
+      // LIN-3908: null when neither PUBLIC_ORIGIN nor a Host header gives an origin.
+      const baseUrl = requestOriginOrNull(req);
       // LIN-3238 Q10 free-tier run gate: the title step's `isFreeTier` is scoped to
       // it, so re-derive it at the dispatch point. It goes to both enqueue helpers
       // through `overrides`; a refusal leaves the filed ticket intact and reports
@@ -527,6 +539,8 @@ export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore
       let launch = null;
       if (laneRefusal) {
         launch = { launched: false, code: laneRefusal.code, retryable: laneRefusal.retryable, message: laneRefusal.error };
+      } else if (lane && !baseUrl) {
+        launch = { launched: false, ...ORIGIN_UNRESOLVED_REFUSAL };
       } else if (lane === 'triage') {
         launch = await enqueueFeedbackTriage(workspace, created.issue, priority, req.session, baseUrl, overrides);
       } else if (lane === 'autopilot') {
