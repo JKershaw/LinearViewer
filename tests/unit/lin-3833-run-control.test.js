@@ -189,6 +189,52 @@ describe('LIN-3833 — the choice for this run goes through the preview, and the
   });
 });
 
+// LIN-3969: Reset then "Use for this run" sends two preview reads back to back. When the first (the reset
+// choice: no model) answered after the second, the stale answer overwrote the Runs-on line, which then read
+// "the default model" for a run that would go out on the chosen model (CI run 40220361851). The preview is
+// held until the test releases it, so the answers arrive in the order the test chooses.
+describe('LIN-3969 — the Runs-on line shows the answer to the latest preview read, whatever order they arrive in', () => {
+  const held = () => {
+    const pending = [];
+    const previewFor = (q) => new Promise((resolve) => {
+      pending.push(() => resolve({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: q.get('model') || null, harness: 'claude-code', effort: null, sources: { model: q.get('model') ? 'explicit' : 'none', harness: 'fallback', effort: 'none' } }));
+    });
+    return { pending, previewFor };
+  };
+
+  test('Reset, then a chosen model: the reset read answering last does not undo the chosen model', async () => {
+    const { pending, previewFor } = held();
+    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor });
+    pending.shift()();
+    await flush();
+    await c.click({ action: 'change-run' });
+    await c.click({ action: 'reset-run' });
+    await c.fire('input', { dataset: { testid: 'run-model' }, value: 'chosen-model-x' });
+    await c.click({ action: 'use-run' });
+    assert.equal(pending.length, 2, 'two preview reads are in flight: the reset one, then the chosen one');
+    pending[1]();
+    await flush();
+    assert.match(c.innerHTML, /data-testid="run-on-what">chosen-model-x</);
+    pending[0]();
+    await flush();
+    assert.match(c.innerHTML, /data-testid="run-on-what">chosen-model-x</, 'the stale reset answer is dropped');
+  });
+
+  test('the mount read answering after a chosen model does not undo it', async () => {
+    const { pending, previewFor } = held();
+    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor });
+    await c.click({ action: 'change-run' });
+    await c.fire('input', { dataset: { testid: 'run-model' }, value: 'chosen-model-x' });
+    await c.click({ action: 'use-run' });
+    assert.equal(pending.length, 2, 'the mount read and the chosen read are both in flight');
+    pending[1]();
+    await flush();
+    pending[0]();
+    await flush();
+    assert.match(c.innerHTML, /data-testid="run-on-what">chosen-model-x</);
+  });
+});
+
 describe('LIN-3833 — Undo and Stop after a run', () => {
   test('a queued run offers Undo, which deletes that queued item', async () => {
     const { c, calls } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT } });

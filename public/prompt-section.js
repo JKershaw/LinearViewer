@@ -903,8 +903,13 @@
 
     // The resolved setting for the step the run would start, from the server's own resolution
     // (routes/dispatch.js preview). Read-only; the browser resolves nothing itself.
+    // LIN-3969: reads can overlap (Reset then "Use for this run", or the mount read still out when a
+    // choice is used), and their answers can arrive in either order. Only the latest read may paint, so a
+    // stale answer never puts the Runs-on line back to a choice that is no longer this run's.
+    let runPreviewSeq = 0;
     function refreshRunPreview() {
       if (!runControlOn() || !opts.urlKey || typeof window.api !== 'function') return;
+      const seq = ++runPreviewSeq;
       const step = runStepOf();
       const params = new URLSearchParams({ promptName: step ? step.kind : 'autopilot', surface: opts.surface });
       const c = state.run.choice;
@@ -914,7 +919,7 @@
       if (c.effort) params.set('effort', c.effort);
       window.api(`/workspace/${encodeURIComponent(opts.urlKey)}/api/dispatch/preview?${params.toString()}`, { on401: false })
         .then((preview) => {
-          if (destroyed) return;
+          if (destroyed || seq !== runPreviewSeq) return;
           state.run.preview = preview || null;
           paintRun();
         })
