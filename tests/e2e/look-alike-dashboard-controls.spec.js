@@ -25,6 +25,9 @@ function watchForbidden(page, current) {
   page.on('request', (r) => {
     const u = new URL(r.url());
     const p = u.pathname + u.search;
+    // The queue badge polls GET /api/dispatch/count on a one-second timer (public/app.js updateQueueBadge).
+    // It is read-only and the page makes it on its own, so it is not a look-alike driving a control.
+    if (r.method() === 'GET' && /\/api\/dispatch\/count$/.test(u.pathname)) return;
     if (FORBIDDEN.some((re) => re.test(p))) seen.push(`[${current.label}] ${r.method()} ${p}`);
   });
   return seen;
