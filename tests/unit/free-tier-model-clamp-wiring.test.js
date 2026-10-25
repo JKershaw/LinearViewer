@@ -36,7 +36,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const DISPLAY_ONLY = new Set([
   // routes/workspace-api.js — footer model label (no LLM call)
   'const model = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: \'recommend\' })',
-  // routes/workspace-api.js — reportHistoryStore.save metadata (no LLM call)
+  // routes/workspace-api-roadmap.js — reportHistoryStore.save metadata (no LLM call)
   // (LIN-3853: now resolved as the `roadmap` job; still no LLM call, so still unclamped)
   'const model = await resolveAiOperationModel({ urlKey: req.workspace.urlKey, workspacePreferencesStore, opKind: \'roadmap\' });',
 ]);
@@ -261,11 +261,6 @@ test('LIN-3840 witness: dropping forceDefault: isFreeTier from the run-summary s
 // The same rule over the whole workspace-API unit (routes/workspace-api.js and
 // routes/workspace-api-*.js; tests/unit/lib/workspace-api-unit.js). A billed call
 // anywhere in the unit is scanned.
-//
-// Reported, not fixed here: the DISPLAY_ONLY comment above says the metadata line
-// (`reportHistoryStore.save` metadata) is in routes/workspace-api.js, but that line lives in
-// routes/workspace-api-roadmap.js. Both display-only lines are matched by their exact content, not
-// their location, so the allow-list is unaffected. No ticket identified.
 const readUnit = () => Object.fromEntries(workspaceApiUnitFiles(root).map(rel => [rel, readFileSync(join(root, rel), 'utf8')]));
 
 test('LIN-3861: every billed call in the workspace-API unit threads forceDefault: isFreeTier', () => {
