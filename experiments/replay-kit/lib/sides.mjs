@@ -2,7 +2,7 @@
 // generalised over the target file name and the "repo lib" the unchanged
 // modules resolve into (here: an origin/main SNAPSHOT, so both sides share
 // one instance of every unchanged module at the pinned SHA, independent of
-// whatever /home/user/LinearViewer has checked out).
+// whatever this checkout has checked out).
 //
 //   - `--old/--new` take a folder holding <main> (directly or under lib/), or a file.
 //   - The main file and every relative import that exists inside the side's
@@ -21,7 +21,9 @@ import { execFileSync } from 'node:child_process';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 
-export const REPO = '/home/user/LinearViewer';
+// The checkout this kit lives in (experiments/replay-kit/lib → repo root), not a
+// fixed machine path: a replay must run in any clone (LIN-3937).
+export const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const SPEC_RE = /(\bfrom\s*|\bimport\s*\(\s*|\bimport\s+|\bexport\s*\*\s*from\s*)(['"])([^'"]+)\2/g;
 
 export function resolveSideMain(spec, main) {

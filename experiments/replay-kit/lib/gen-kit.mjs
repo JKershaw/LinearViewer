@@ -14,7 +14,7 @@
 //     plus a `mock` flavour shaped like the unit tests' hand-rolled mocks.
 import { mulberry32, hash32 } from './hermetic.mjs';
 import { markDep } from './canon.mjs';
-import { MangoCollection } from '/home/user/LinearViewer/node_modules/@jkershaw/mangodb/dist/collection.js';
+import { MangoCollection } from '../../../node_modules/@jkershaw/mangodb/dist/collection.js';
 
 export class Rng {
   constructor(seed, tier, index) { this.r = mulberry32(hash32(`${seed}|${tier}|${index}`)); }
