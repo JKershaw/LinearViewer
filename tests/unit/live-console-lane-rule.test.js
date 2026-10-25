@@ -146,6 +146,17 @@ test('LIN-3986 (witness): a stale loop lane does not hide a fresh status-only la
   assert.equal(feed.lanes[0].sinceMs, Date.parse(at(5)), 'the fresh status-only lane is the one shown');
 });
 
+test('LIN-3986 (witness, e2e regression): a fresh loop lane keeps its key over a status-only lane, even when the status row is newer than the dispatch', () => {
+  // The status-only lane is the fallback for a task with no live loop (deriveLanes).
+  // Its status row is usually newer than the loop's dispatch, so recency alone must
+  // not let it take the key: the loop lane's heartbeat and credential would vanish.
+  const dispatched = run({ loopId: 'l-e2e', issueIdentifier: 'LIN-1588B', dispatchedAt: at(10), agentTimestamp: at(2), agentTokenId: 'tok-dead' });
+  const status = statusItem({ id: 's-e2e', taskIdentifier: 'LIN-1588B', timestamp: at(2) });
+  const feed = buildConsoleFeed({ statusItems: [status], loops: [dispatched] }, { now: NOW, credentialByToken: { 'tok-dead': 'credential_dead' } });
+  assert.equal(feed.lanes.length, 1);
+  assert.equal(feed.lanes[0].credential.state, 'dead', 'the loop lane, with its credential, shows');
+});
+
 // ─── 6. Pins: independent tasks never merge; a lone lane is unchanged ────────
 
 test('LIN-3986 (pin): a reply naming a different issue, or a different workspace, does not fold', () => {
@@ -249,6 +260,13 @@ test('LIN-3986 (witness, tie-break): equal activity falls to the newer sinceMs',
   const later = cand('working', { ago: 5, since: 30, id: 'LATER' });
   assert.equal(pick([earlier, later]), 'LATER');
   assert.equal(pick([later, earlier]), 'LATER');
+});
+
+test('LIN-3986 (witness, tie-break): a loop lane beats a status-only lane even when the status lane is more recently active', () => {
+  const loopLane = cand('working', { ago: 20, since: 20, id: 'LOOP' });
+  const statusLane = cand('working', { ago: 2, since: 2, origin: 'status', id: 'STATUS' });
+  assert.equal(pick([statusLane, loopLane]), 'LOOP');
+  assert.equal(pick([loopLane, statusLane]), 'LOOP');
 });
 
 test('LIN-3986 (witness, tie-break): equal activity and dispatch — a loop lane beats a status-only lane, then input order decides', () => {
