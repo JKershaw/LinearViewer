@@ -29,7 +29,7 @@ const AUDIT_FIXTURE = fileURLToPath(new URL('./audit-report.fixture.json', impor
 const isLoopback = (url) => /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(url) || url.startsWith('data:') || url.startsWith('blob:');
 
 // `urlKey` null means no local seed: the account is a zero-workspace one, signed in by email (LIN-3956).
-async function openContext(browser, baseURL, viewport, theme, urlKey) {
+async function openContext(browser, baseURL, viewport, theme, urlKey, seed = {}) {
   const context = await browser.newContext({
     baseURL, viewport: { width: viewport.width, height: viewport.height },
     colorScheme: theme, deviceScaleFactor: 1, reducedMotion: 'reduce',
@@ -38,8 +38,8 @@ async function openContext(browser, baseURL, viewport, theme, urlKey) {
   await context.addCookies([{ name: 'theme', value: theme, url: baseURL }]);
   await context.clock.setFixedTime(new Date(FROZEN_TIME));
   if (urlKey) {
-    const seed = { ...defaultLocalSeed(urlKey), urlKey, runnerKey: false };
-    const resp = await context.request.post('/test/set-local-session', { data: seed });
+    const data = { ...defaultLocalSeed(urlKey), urlKey, runnerKey: false, ...seed };
+    const resp = await context.request.post('/test/set-local-session', { data });
     if (!resp.ok()) throw new Error(`seed failed on ${baseURL}: ${resp.status()} ${await resp.text()}`);
   }
   return context;
@@ -58,7 +58,7 @@ async function settle(page) {
 }
 
 // Per-state set-up: identical on both sides, driven by the page's own markup.
-async function prepare(page, context, entry, viewport, theme) {
+async function prepare(page, context, entry, viewport, theme, side) {
   const url = entry.path(entry.urlKey);
   if (entry.state === 'email-signin') {
     // One address per shot, the same on both sides: the send throttle is per address (3 per 15 minutes),
@@ -120,21 +120,33 @@ async function prepare(page, context, entry, viewport, theme) {
     const row = page.locator('[data-testid="models-job-implementation"]');
     if (await row.count()) {
       await row.locator(':scope > summary').click();
-      if (entry.state === 'models-staged') await row.locator('input[data-models-field="model"]').fill('sonnet');
+      if (entry.state === 'models-staged') {
+        // Base's model is a select, head's is the decision panel's input (LIN-3962): choose by the element's kind.
+        const model = row.locator('[data-models-field="model"]');
+        if ((await model.evaluate((el) => el.tagName)) === 'SELECT') await model.selectOption('sonnet');
+        else await model.fill('sonnet');
+      }
     }
   }
   if (entry.state === 'home-run-panel-open') {
-    // LIN-3962: Home's Change panel, opened the way a viewer opens it. The control exists only for a viewer who can run.
+    // LIN-3962: Home's Change panel, opened the way a viewer opens it: the top task, then Change. The seed gives this
+    // page its run controls, so head must show Change; a head without it fails here rather than being skipped.
+    // Base's panel is the old one, so base may come up without the control and is shot as it is.
+    const top = page.locator('[data-top-task="1"]');
+    if (await top.count()) await top.click();
     const change = page.getByTestId('run-change');
+    if (side === 'head') await change.waitFor();
     if (await change.count()) {
       await change.click();
-      await page.getByTestId('run-decision-panel').waitFor();
+      await page.getByTestId(side === 'head' ? 'run-decision-panel' : 'run-change-panel').waitFor();
     }
   }
   if (entry.state === 'swipe-dispatch-open') {
-    // LIN-3962: Swipe's Dispatch ▾ disclosure. Its exec controls are not the decision panel, so this must show no difference.
+    // LIN-3962: Swipe's Dispatch ▾ disclosure, which must open. Its exec controls are not the decision panel, so this
+    // must show no difference.
     const disclosure = page.locator('.dispatch-disclosure').first();
-    if (await disclosure.count()) await disclosure.click();
+    await disclosure.click();
+    await expect(disclosure).toHaveAttribute('aria-expanded', 'true');
   }
   if (entry.state === 'audit-report') {
     // Both sides answer the same fixture, so the report is identical and the request never leaves the browser.
@@ -144,11 +156,11 @@ async function prepare(page, context, entry, viewport, theme) {
   }
 }
 
-async function shoot(browser, baseURL, viewport, theme, entry) {
-  const context = await openContext(browser, baseURL, viewport, theme, entry.state === 'email-signin' ? null : entry.urlKey);
+async function shoot(browser, baseURL, viewport, theme, entry, side) {
+  const context = await openContext(browser, baseURL, viewport, theme, entry.state === 'email-signin' ? null : entry.urlKey, entry.seed);
   try {
     const page = await context.newPage();
-    await prepare(page, context, entry, viewport, theme);
+    await prepare(page, context, entry, viewport, theme, side);
     await settle(page);
     // Rewrite per-run text (see NORMALISE in pages.mjs) in text nodes, before the screenshot.
     await page.evaluate((rules) => {
@@ -209,8 +221,8 @@ for (const entry of PAGES) {
         let attempts = 0;
         do {
           attempts++;
-          base = await shoot(browser, BASE_URL, viewport, theme, entry);
-          head = await shoot(browser, HEAD_URL, viewport, theme, entry);
+          base = await shoot(browser, BASE_URL, viewport, theme, entry, 'base');
+          head = await shoot(browser, HEAD_URL, viewport, theme, entry, 'head');
         } while (!base.buffer.equals(head.buffer) && attempts < ATTEMPTS);
         const row = { page: entry.id, viewport: viewport.name, theme, masked: base.masked, probe: base.probe, attempts };
         if (base.buffer.equals(head.buffer)) {

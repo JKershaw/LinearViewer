@@ -15,7 +15,7 @@ test('the page list holds the pages and states the ticket asks for (LIN-3889 add
 
 test('states that write data never share an urlKey with a plain page', () => {
   const plain = new Set(PAGES.filter((p) => !p.state).map((p) => p.urlKey));
-  for (const p of PAGES.filter((q) => q.state === 'key-open' || q.state === 'change-log-entry')) assert.ok(!plain.has(p.urlKey), p.id);
+  for (const p of PAGES.filter((q) => q.state === 'key-open' || q.state === 'change-log-entry' || q.state === 'home-run-panel-open')) assert.ok(!plain.has(p.urlKey), p.id);
 });
 
 test('every mask names a reason', () => {
