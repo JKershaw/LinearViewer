@@ -14,7 +14,9 @@ cites: [lib/recommendation-facts.js@ea4c6f88:373-439, docs/papers/harbour/root-t
 The record cannot tell, and not because unwedging never happens. A census of 2,429 tickets
 (LIN-1500 to LIN-3932) finds one clean unwedge. LIN-2720's plan went round plan-review twice
 and stopped; John ruled that a refactor should land first; LIN-2735 was filed as its blocker,
-finished, and LIN-2720 was re-planned on top of it and built. That is one case. Breakdown has
+finished, and LIN-2720 was re-planned on top of it and built. That is one case, and its blocker
+was the refactor its research had already called for, so it is as much a refactor-required
+prerequisite filed late as a new practice (Findings). Breakdown has
 68 units and 424 children to be weighed against it, and no comparison of cost or correctness
 between the two can be drawn from one. The research spike's expectation of zero was wrong on
 the record as it now reads, but the answer is still not there: a 20-case trial, measured on
@@ -49,7 +51,19 @@ which is the one-cycle stop. John's ruling, which the ticket records as "Worth a
 advance.", was applied at 21:02, and LIN-2735 was filed at 21:01. LIN-2735 was Done at 03:02 on
 11 September. LIN-2720's Revision 3 was planned on the landed seam, approved at 06:54, and built
 from simple-dispatcher PR #230 at 07:13 on 11 September. The size of that build is not
-measured here: its PR is in another repository (Limits). The loose reading, which takes the
+measured here: its PR is in another repository (Limits).
+
+**Refactor-required prerequisites (LIN-397) are a neighbour, not the same thing.** The census
+finds 11 tickets with LIN-397-style refactor-required titles (6 of the research's 8 seeds match
+by title). Such a ticket is filed by the plan stage from a research verdict, before any
+plan-review; an unwedge is filed after plan-review stops, from its findings. LIN-2720 sits on the
+border: its blocker is the refactor that its research had already called for, as the ruling
+comment says ("The refactor research named as `Surface Assessment: refactor required` ... is
+done FIRST, as its own ticket that blocks this one"), executed only after the loop stopped, by
+ruling. So the one strict case is as much a refactor-required prerequisite filed late as a new
+practice.
+
+The loose reading, which takes the
 first PR link posted after the plan as the start of implementation, finds eight pairs over six
 blocked tasks. Seven of them are the Flight Companion cluster of 5 September, in which
 LIN-2631 (whose opening reads "Filed 2026-09-05 as a blocking subtask from plan-review findings"), LIN-2632
@@ -146,8 +160,9 @@ fault.
 `classify.mjs`, `census.mjs`, `stop-features.mjs`, `code-next-moves.mjs`, `sizebands.mjs`,
 `analyse.mjs`. Derived data: `unwedge-or-breakdown-data/` (`census.json`, `sizes.json`,
 `next-moves.json`). Tables that the text reads from: `unwedge-or-breakdown-results/`, one file
-per table. Re-running them against a fresh cache reproduces every number above; the cache
-itself is not committed.
+per table. Re-running them against the session's cache reproduces every table byte for byte (checked at
+review); a fresh fetch has not been re-run, and live tickets may have moved since 25 October. The
+cache itself is not committed.
 
 ## Limits
 
@@ -186,8 +201,8 @@ Settle the question with a trial, and keep unwedging beside breakdown rather tha
 until the trial is in. The stage would need a trigger, a bound, and a rule for choosing the small
 task:
 
-- **Trigger:** a plan-loop stop (the second Request Changes under the one-cycle rule, or the third
-  under the bound of three) whose blocking findings all name one seam, as in LIN-3833's last two
+- **Trigger:** a plan-loop stop as `reviewLoopStop` returns it today (`'not-converging'` at three
+  without narrowing, or `'ceiling'` at five) whose blocking findings all name one seam, as in LIN-3833's last two
   rounds. Session fit, not the loop, is still breakdown's trigger.
 - **Bound:** one or two small tasks, then one re-plan on the landed seam, then the existing
   bounds apply again.
