@@ -1,0 +1,73 @@
+breakdown cases: B1 (a /cost breakdown session) 23; B2 (a parent with a carve child, root-task-ratio rule) 57; union 68; both 12
+carve children of the union: 198
+trees with any /cost session (post-LIN-2750 telemetry): 37 of 68
+
+tree      state      B1  B2  kids  done  cancl  never  sess  rev  pRev  close  follow  lines   band   title
+LIN-1501  completed      y   2     2     0      0      n/a   n/a  n/a   no     4       8890    large  Phase 3 — Durable owner-scoped Linear credential
+LIN-1504  completed      y   7     6     1      0      n/a   n/a  n/a   no     22      12365   large  Task CRUD operations
+LIN-1539  completed      y   6     6     0      0      3     1    0     no     7       6943    large  WORKSPACE_NOT_CONNECTED: dispatched workers break when the o
+LIN-1577  completed      y   4     4     0      0      n/a   n/a  n/a   yes    6       4956    large  No detection for per-session credential death: workspace hea
+LIN-1600  completed      y   3     3     0      0      n/a   n/a  n/a   yes    8       8184    large  Feedback: Add a plan-review step between plan and implementa
+LIN-1601  completed      y   2     2     0      0      n/a   n/a  n/a   yes    6       5058    large  LIN-1600 Phase 0: baseline the follow-on task ratio before t
+LIN-1625  completed      y   2     2     0      0      n/a   n/a  n/a   yes    7       5628    large  Path P0.1 · Derive cost-per-verified-task from existing capt
+LIN-1666  completed      y   2     2     0      0      n/a   n/a  n/a   yes    10      6091    large  Review "new task" ui
+LIN-1720  completed      y   4     4     0      0      n/a   n/a  n/a   yes    8       4364    large  Live Console: swimlane timeline of the last 24h of work
+LIN-1721  unstarted      y   41    29    2      10     n/a   n/a  n/a   no     60      51588   large  Add an operator decision queue for pending rulings
+LIN-1725  completed      y   8     8     0      0      n/a   n/a  n/a   no     10      8725    large  LIN-1721: structured escalation payload — OPTIONS grammar + 
+LIN-1785  unstarted      y   2     0     0      2      n/a   n/a  n/a   no     3       0       none   Provisioning script for the Linux dispatcher box
+LIN-1788  unstarted      y   4     2     0      2      n/a   n/a  n/a   no     9       1766    large  Surface host + per-session resource usage, so dispatcher siz
+LIN-1792  backlog        y   7     0     0      6      n/a   n/a  n/a   no     7       0       none   Fleet: running more than one dispatcher box — work placement
+LIN-1870  completed      y   6     6     0      0      n/a   n/a  n/a   yes    7       2856    large  Passage Runner: kickoff generator + pinning test + page/rout
+LIN-1883  completed      y   8     7     0      1      n/a   n/a  n/a   yes    11      16506   large  Fast instrument: plan-review round trips per ticket — read a
+LIN-1908  completed      y   2     2     0      0      n/a   n/a  n/a   yes    7       1857    large  Improve real-time flow bar and dense session Gantt visualiza
+LIN-1952  completed  y       0     0     0      0      9     1    2     yes    2       2163    large  Consumer heartbeat: any dispatch consumer reports host load 
+LIN-2018  completed      y   1     1     0      0      n/a   n/a  n/a   yes    5       3492    large  Jira canonical remap (LIN-2007 ruling, Option 2): project → 
+LIN-2114  unstarted      y   11    9     0      2      n/a   n/a  n/a   no     24      17118   large  Move observation-type sessions out of Claude Code into a sim
+LIN-2149  completed  y   y   6     5     1      0      78    16   14    no     14      41564   large  Account → Connection → Workspace: add any number of sources 
+LIN-2231  completed      y   5     5     0      0      n/a   n/a  n/a   no     10      6521    large  One human, many accounts: identity is minted per sign-in sur
+LIN-2241  completed      y   4     4     0      0      n/a   n/a  n/a   yes    22      15209   large  Scan-due surfacing + bulk scan, and rescan to clear self-res
+LIN-2322  unstarted      y   1     0     0      1      n/a   n/a  n/a   no     1       0       none   Tags: let agents create and manage labels as first-class con
+LIN-2566  completed      y   3     3     0      0      n/a   n/a  n/a   yes    12      2183    large  Dispatch effort axis (Harbour half): forward `effort` per di
+LIN-2569  unstarted      y   18    3     0      15     n/a   n/a  n/a   no     18      2824    large  Operating model · path hub — invariants beneath the north st
+LIN-2604  completed      y   2     2     0      0      n/a   n/a  n/a   no     3       2479    large  Phase 1 — land `effort` end-to-end in Harbour: validation, a
+LIN-2633  completed      y   3     3     0      0      n/a   n/a  n/a   yes    3       5932    large  Fleet bookkeeping pass: retire ancient silent and blocked lo
+LIN-2649  completed      y   8     7     0      1      6     2    0     yes    8       8968    large  LIN-2241 WS2 — cross-task scan-due list: stored due-basis, b
+LIN-2651  completed      y   3     3     0      0      n/a   n/a  n/a   yes    9       7367    large  LIN-2241 WS3 — bulk scan over the due set: pre-run count + c
+LIN-2701  completed      y   2     2     0      0      n/a   n/a  n/a   yes    7       6604    large  LIN-2651 Phase 3 — Scan-due tab integration: selection UI, p
+LIN-2737  completed      y   10    10    0      0      n/a   n/a  n/a   no     10      0       none   SD LIN-2735 C2 — adopt the liveness seam across the opencode
+LIN-2759  completed      y   6     3     0      3      n/a   n/a  n/a   yes    13      5110    large  Rulings: an answer carries no declared consequence — the row
+LIN-2809  unstarted      y   7     3     0      4      8     3    0     no     18      3437    large  Rulings: the inbox accumulates outdated asks — only rulings 
+LIN-2884  completed  y   y   5     5     0      0      54    7    11    no     8       12937   large  A dispatch scope on proxy tokens: 'run code on my machine' i
+LIN-2887  completed      y   4     2     2      0      n/a   n/a  n/a   yes    5       2373    large  Scope the CLAUDE.md read: shrink both repos' CLAUDE.md to a 
+LIN-2889  completed      y   1     1     0      0      n/a   n/a  n/a   yes    1       1509    large  LIN-2809 Step 1: traceable answers that name the question th
+LIN-2919  backlog    y   y   5     1     0      4      9     1    2     no     5       0       none   Review class check in LIN-1871 form: bound and diff, never a
+LIN-2948  canceled       y   7     6     0      0      47    17   1     yes    21      15714   large  The run experience: watch one task from Go to PR
+LIN-2949  canceled       y   6     4     2      0      26    10   1     yes    7       9874    large  The PR with its evidence, and close-out is the user's to sen
+LIN-2950  canceled   y   y   5     2     2      0      20    4    3     no     5       31552   large  Share link: one run, one URL, readable by whoever holds it
+LIN-2954  completed  y   y   15    11    2      2      93    16   19    yes    29      18908   large  Hardening pass on the golden path before the first invitatio
+LIN-2955  completed  y   y   5     4     1      0      24    6    2     yes    6       10130   large  Free tier for runs: from prompts per day to runs per day, pe
+LIN-2995  completed      y   7     7     0      0      39    12   0     yes    9       1697    large  simple-dispatcher: honour a halt without depending on Harbou
+LIN-3057  backlog        y   21    2     0      19     13    2    3     no     25      3538    large  Lighthouse: agent-run Harbour (feature requests from the fir
+LIN-3059  completed  y   y   4     4     0      0      26    8    3     yes    4       11211   large  One agent credential: cover dispatch, proxy and the session-
+LIN-3073  completed  y       3     3     0      0      22    7    2     yes    4       16606   large  Share link, part 1: a read-only view of a task collection (a
+LIN-3105  completed  y       3     3     0      0      15    4    2     yes    3       1086    large  Integration & Surface Maturity Review (periodical run, third
+LIN-3126  canceled   y   y   5     5     0      0      33    12   2     yes    6       26017   large  Multi-binding reads: dispatch/proxy/drill-down honour every 
+LIN-3134  completed  y   y   2     2     0      0      29    8    4     yes    2       10649   large  LIN-2884 T2: declared-mint mechanism — declaration persisten
+LIN-3157  completed  y   y   4     4     0      0      42    13   3     yes    5       10991   large  Keep Harbour's evidence for the project's lifetime (dispatch
+LIN-3197  completed  y       3     3     0      0      23    6    2     yes    6       916     large  Runner honesty: retry a failed completion post (never log it
+LIN-3201  canceled   y       6     3     3      0      31    6    4     no     7       1797    large  Test pins: replace census pins with an import-graph check; l
+LIN-3278  completed      y   1     1     0      0      12    2    1     yes    2       24299   large  Proxy calls to Linear switch between 401 and 200: make the c
+LIN-3332  completed  y       3     3     0      0      24    6    3     yes    3       28249   large  One ticket source per kind: a task link carries just its ID
+LIN-3342  completed      y   2     2     0      0      17    4    2     yes    4       4562    large  Harbour Library: a public, searchable home for the papers an
+LIN-3353  completed      y   2     1     0      1      10    3    0     no     2       0       none   SD: judge OpenCode sessions on progress, not elapsed time, l
+LIN-3363  completed      y   2     2     0      0      11    2    3     yes    4       1300    large  Flight Companion: find a model by search over the Settings m
+LIN-3449  unstarted      y   32    24    1      6      137   26   24    no     50      12506   large  Coherence loop: bring scattered decisions down to one place,
+LIN-3451  completed  y       0     0     0      0      9     1    2     yes    3       703     large  Runner kit ↔ SD: one meaning for halt / target / repo / mark
+LIN-3519  canceled   y   y   8     1     7      0      18    2    5     no     8       0       none   LV tests: one way to get a collection — real MangoDB via man
+LIN-3573  completed      y   3     3     0      0      18    3    2     yes    4       9084    large  Rebuild the Agent API's write and rulings routes (routes/pro
+LIN-3613  backlog        y   50    40    2      8      191   42   20    no     85      19753   large  Cycles: known improvements, then find and fix (operator's re
+LIN-3706  completed  y       0     0     0      0      9     1    2     yes    0       1762    large  Rebuild the free-tier plan and allowance as one seam, design
+LIN-3747  completed  y       6     6     0      0      30    8    2     yes    9       169208  large  Design & Interface Review — periodical run (ninth): re-measu
+LIN-3765  completed  y   y   3     3     0      0      14    2    3     no     3       9105    large  Integration & Surface Maturity Review (periodical run, fourt
+LIN-3861  completed  y       1     1     0      0      14    3    2     yes    5       1602    large  Free the seam: turn the source-text pins on the workspace-AP
+LIN-3916  completed  y       0     0     0      0      7     1    1     yes    0       173     small  Price rows for Haiku 5.5, DeepSeek V4.1 Flash 1017, GLM-5.3 

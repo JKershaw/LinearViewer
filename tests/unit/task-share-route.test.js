@@ -549,8 +549,12 @@ describe('render-time secret masking (LIN-3389)', () => {
       pageOptions: { deployInfo: {}, workspaces: [], featureFlags: {}, openRouterSource: null },
     });
     const inline = (html.match(/<script\b(?![^>]*\bsrc=)[^>]*>/gi) || []);
-    assert.equal(inline.length, 1,
-      'maskSecretsInHtml skips <script> bodies because the only inline script is the static theme pre-paint; a new inline script or embeddedData carrying runtime text forces a masking decision');
+    // LIN-3855: a page that loads /common.js also carries the static harness list (`__HARNESS_MODELS__`)
+    // and the one data loader it reads through. None of the three carries runtime text, so the masker still
+    // skips them all; a new inline script or embeddedData with runtime text would force a masking decision.
+    assert.equal(inline.length, 3,
+      'maskSecretsInHtml skips <script> bodies because the inline scripts are the static theme pre-paint, the static data loader and the static harness list (lib/model-routing-harnesses.js); a new inline script or embeddedData carrying runtime text forces a masking decision');
+    assert.equal(inline.filter(t => /type="application\/json"/.test(t)).length, 1, 'the one data block is the static harness list');
   });
 
   test('a clean page is byte-identical to the unmasked render', async () => {

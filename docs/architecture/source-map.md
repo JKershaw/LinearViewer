@@ -81,7 +81,7 @@ lib/
   render-pages.js      Standalone page renderers (login, error, workspace-not-found)
   render-landing.js    Bespoke unauthenticated home showcase (LIN-980): Harbour top area (hero + loop) + fake-data glimpses of real surfaces (observation feed, swim board, grounded prompt) + providers strip + distinct Harbour OS section; composes D's shared nav (renderNavBar isLanding); NOT the project-tree renderer. Styles in public/landing.css
   render-audit.js      Operator dashboard page renderer
-  render-settings.js   Settings page renderer: one area at a time (`area` option); Sources, Models (the legacy forms until LIN-3855) and Health (LIN-3846)
+  render-settings.js   Settings page renderer: one area at a time (`area` option); Sources, Models (lib/render-settings-models.js, LIN-3855) and Health (LIN-3846)
   render-settings-you.js  Settings › Account and Features (theme, consent on/off, +proxy default) (LIN-3846)
   render-settings-workspace.js  Settings › Running, Agent access and Change log (LIN-3846)
   components/settings-row.js, settings-ask.js, settings-group.js, settings-key-row.js, settings-frame.js  Settings pieces (LIN-3890, moved from the shell): switch, value and action rows; ask in place; group and note; sidebar and page frame

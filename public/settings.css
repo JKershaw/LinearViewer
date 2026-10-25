@@ -23,14 +23,6 @@
   margin-bottom: var(--space-5);
 }
 
-.settings-group-header {
-  font-family: var(--font-content);
-  font-size: 1.2em;
-  font-weight: 600;
-  color: var(--fg);
-  margin: 0 0 var(--space-1) 0;
-}
-
 .settings-group-subtitle {
   color: var(--fg-dim);
   font-family: var(--font-content);
@@ -97,127 +89,10 @@
 
 /* Action buttons: see style.css (.btn--quiet and its tones). `.settings-link` is in style.css (LIN-3889). */
 
-/* =============================================================================
-   Model Selector
-   ============================================================================= */
-.model-form {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-/* `.model-select` body and focus: style.css, with `.token-label-input` (LIN-3889). */
-
-.model-or {
-  color: var(--fg-dim);
-  font-size: var(--font-size-sm);
-}
-
-.model-input {
-  font-family: var(--font-content);
-  font-size: 0.9em;
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--fg-vdim);
-  border-radius: var(--radius-sm);
-  background: var(--bg);
-  color: var(--fg);
-  min-width: 16ch;
-}
-
-.model-input:focus {
-  outline: none;
-  border-color: var(--blue);
-}
-
-.model-input::placeholder {
-  color: var(--fg-dim);
-}
-
-.model-id {
-  font-family: var(--font-structural);
-  font-size: var(--font-size-sm);
-  color: var(--fg-dim);
-}
-
-/* Per-model pricing hint (LIN-993): machine facts → structural (mono) font,
-   mirroring .model-id. Point-in-time rates from AVAILABLE_MODELS.pricing. */
-.model-price {
-  font-family: var(--font-structural);
-  font-size: var(--font-size-sm);
-  color: var(--fg-dim);
-}
-
-/* The in-content note (the "Workspace features" paragraph) is `.page-header__subtitle` now
-   (style.css, LIN-462, LIN-3889): byte-identical to the copy that was here. */
-
 .nav-value-static {
   font-family: var(--font-content);
   font-size: 0.9em;
   color: var(--fg);
-}
-
-/* =============================================================================
-   AI model overrides (LIN-1145)
-
-   Per-operation model override rows — select + "or" + custom input,
-   mirroring the dispatch defaults pattern but for the prompt-generation model.
-   No pricing hints on override rows per scoping decision.
-   ============================================================================= */
-/* LIN-3889: `gap` dropped here and on the two rows below: it never applied (0 px). */
-.ai-override-row {
-  flex-wrap: wrap;
-}
-
-.ai-override-row .field-label {
-  min-width: 14ch;
-}
-
-.ai-override-select,
-.ai-override-input {
-  font-family: var(--font-content);
-  font-size: 0.9em;
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--fg-vdim);
-  border-radius: var(--radius-sm);
-  background: var(--bg);
-  color: var(--fg);
-}
-
-.ai-override-select {
-  min-width: 18ch;
-}
-
-.ai-override-input {
-  min-width: 16ch;
-}
-
-.ai-override-select:focus,
-.ai-override-input:focus {
-  outline: none;
-  border-color: var(--blue);
-}
-
-.ai-override-input::placeholder {
-  color: var(--fg-dim);
-}
-
-.ai-overrides-form {
-  display: block;
-}
-
-.ai-kind-overrides-summary {
-  cursor: pointer;
-  font-family: var(--font-content);
-  font-size: 0.9em;
-  color: var(--fg);
-}
-
-.ai-kind-overrides .children {
-  margin-top: var(--space-2);
-}
-
-.ai-overrides-submit {
-  margin-top: var(--space-3);
 }
 
 /* =============================================================================
@@ -307,10 +182,6 @@
   flex: 1 1 14ch;
 }
 
-.dispatch-defaults-form {
-  display: block;
-}
-
 /* Progressive disclosure for the 15 per-kind override rows (LIN-1111) —
    collapsed by default (auto-expanded server-side when a row already has an
    override, see renderDispatchDefaultsSection), so the common case of "just
@@ -322,13 +193,8 @@
   color: var(--fg);
 }
 
-.dispatch-kind-overrides .children,
 .dispatch-preset-kind-overrides .children {
   margin-top: var(--space-2);
-}
-
-.dispatch-defaults-submit {
-  margin-top: var(--space-3);
 }
 
 /* =============================================================================
@@ -483,21 +349,10 @@
    Responsive
    ============================================================================= */
 @media (max-width: 640px) {
-  .model-form {
-    flex-wrap: wrap;
-  }
-
-  .model-select,
-  .model-input {
-    min-width: 100%;
-  }
-
   .harness-select,
   .dispatch-model-input,
   .dispatch-model-input-other,
-  .dispatch-effort-input,
-  .ai-override-select,
-  .ai-override-input {
+  .dispatch-effort-input {
     min-width: 100%;
   }
 
@@ -877,14 +732,120 @@
 
 /* Models' body keeps the page's small-phone sizes until LIN-3855 rebuilds it (the Settings root is 1rem on a phone,
    but style.css sets the body to 14px at 640px and below and 13px at 400px and below). */
-@media (max-width: 640px) {
-  .settings-shell[data-area="models"] .settings-pane > .settings-section {
-    font-size: 14px;
-  }
+
+/* =============================================================================
+   Models page (LIN-3855)
+
+   The rows are the shared settings rows (lib/components/settings-row.js). The
+   change panel (settings-change-panel.js), the spend bar (settings-spend-bar.js)
+   and the filter are the page's own pieces. On a phone the open row is a
+   full-screen sheet and nothing scrolls sideways.
+   ============================================================================= */
+.settings-change-panel {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  min-width: 0;
 }
 
-@media (max-width: 400px) {
-  .settings-shell[data-area="models"] .settings-pane > .settings-section {
-    font-size: 13px;
+.settings-field {
+  display: grid;
+  grid-template-columns: minmax(8ch, 12ch) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.settings-field[hidden] {
+  display: none;
+}
+
+.settings-field-label {
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  color: var(--fg-dim);
+}
+
+.settings-field-control {
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--fg-vdim);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.settings-field-control:focus {
+  border-color: var(--blue);
+}
+
+.settings-spend-bar {
+  display: block;
+  width: 100%;
+  height: 0.5em;
+  margin-top: var(--space-1);
+  accent-color: var(--blue);
+}
+
+.settings-filter {
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  color: var(--fg-dim);
+  margin-bottom: var(--space-3);
+}
+
+.settings-filter-link {
+  color: var(--fg-dim);
+}
+
+.settings-filter-link.is-current {
+  color: var(--fg);
+  text-decoration: underline;
+}
+
+/* The save blocks sit between the Models groups: a gap on both sides, and the reason labels in the sans
+   the other Settings labels use (LIN-3855 review). */
+.models-save,
+.models-preset-save {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-4) 0;
+}
+
+.models-save .settings-ask-label,
+.models-preset-save .settings-ask-label {
+  font-family: var(--font-content);
+}
+
+/* A job row's flag (no runs) is a tag after its name, not part of it (LIN-3855 review). */
+.models-form .settings-row-flags {
+  margin-left: var(--space-2);
+}
+
+.models-form .settings-row-flag {
+  color: var(--muted);
+  font-family: var(--font-content);
+  font-size: 0.85em;
+}
+
+@media (max-width: 640px) {
+  .models-form details.settings-row-open[open] {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    overflow-y: auto;
+    background: var(--bg);
+    padding: var(--space-4);
+  }
+
+  .settings-field {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-field-control {
+    width: 100%;
   }
 }

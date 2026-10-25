@@ -711,7 +711,9 @@ export function createComputeRoutes({
       };
 
       logEvent(req, '/api/proxy/cost', 200);
-      res.json({ identifier, ...result, window });
+      // LIN-3855: `telemetry` is for the Models page's spend read; it is stripped here so this
+      // response is byte-identical to what it was before (the key order is the result's own).
+      res.json({ identifier, ...result, workerSessions: result.workerSessions.map(({ telemetry, ...session }) => session), window });
     } catch (err) {
       logEvent(req, '/api/proxy/cost', 500);
       jsonError(res, 500, 'Failed to compute task cost');

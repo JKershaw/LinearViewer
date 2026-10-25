@@ -26,7 +26,7 @@ import { appendGroundingSections } from '../../lib/prompt-formatters.js';
 import { STAGE_INTENT } from '../../lib/prompts/stage-intent.js';
 import { AI_OPERATION_KINDS } from '../../lib/workspace-preferences.js';
 import { WORKSPACE_FEATURE_KEYS } from '../../lib/feature-defaults.js';
-import { AI_OPERATION_LABELS } from '../../lib/render-settings.js';
+import { getJob } from '../../lib/llm-jobs.js';
 
 const ISSUE = {
   id: 'issue-w', identifier: 'LIN-3300', title: 'One-path fixture', description: 'Make the thing work.',
@@ -75,7 +75,7 @@ describe('the deleted experiment leaves nothing behind', () => {
   test('no briefWriter workspace feature, no recommend-write model role', () => {
     assert.ok(!WORKSPACE_FEATURE_KEYS.includes('briefWriter'));
     assert.ok(!AI_OPERATION_KINDS.includes('recommend-write'));
-    assert.ok(!('recommend-write' in AI_OPERATION_LABELS));
+    assert.ok(!getJob('recommend-write'));
   });
 
   test('a workspace with the old option still set gets the one path: the option is ignored', async () => {

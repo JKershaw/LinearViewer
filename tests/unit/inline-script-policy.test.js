@@ -75,11 +75,11 @@ describe('rendered inline code is covered by APP_CSP', () => {
     assertCovered('repo picker', html);
   });
 
-  test('settings page: the model-pricing listener is hashed', () => {
+  test('settings page: no model-pricing script (retired with the forms, LIN-3855); every inline script is covered', () => {
     const html = renderSettingsPage('Acme', {
-      urlKey: 'acme', workspaces: [], currentModel: AVAILABLE_MODELS[0].id, availableModels: AVAILABLE_MODELS,
+      urlKey: 'acme', workspaces: [], availableModels: AVAILABLE_MODELS,
     });
-    assert.ok(inlineScriptBodies(html).some(b => b.includes('data-model-price')), 'pricing script rendered');
+    assert.ok(!inlineScriptBodies(html).some(b => b.includes('data-model-price')), 'no pricing script');
     assertCovered('settings', html);
   });
 

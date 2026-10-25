@@ -1,0 +1,44 @@
+candidate pairs (an inverse blocks relation, Y blocks X): 545
+  with X dated from /cost (session telemetry): 76
+  with X dated from the comment trail: 15
+  with X undated (neither source): 454; these can still be P, sibling or own-child, which need no X dates
+
+strict reading (implementation = a comment saying "implemented" with a PR link, or a session):
+  sibling     307
+  undated     152
+  P           61
+  own-child   11
+  null        7
+  after-impl  6
+  U           1
+
+pairs and distinct blocked tasks, strict reading:
+  U           1 pairs, 1 blocked tasks
+  P           61 pairs, 40 blocked tasks
+  sibling     307 pairs, 232 blocked tasks
+  own-child   11 pairs, 9 blocked tasks
+  after-impl  6 pairs, 5 blocked tasks
+  P pairs with the blocker outside the blocked task's parent (or X has none): 49 of 61
+
+loose reading (implementation = the first PR link posted after the plan; an upper bound):
+  sibling     307
+  undated     140
+  P           61
+  own-child   11
+  after-impl  11
+  U           8
+  null        7
+
+U, strict (1):
+  LIN-2720  <- LIN-2735  Y created 2026-09-10T21:01:41.633Z, Y done 2026-09-11T03:02:50.450Z; X plan 2026-09-10T17:46:43.701Z, X impl 2026-09-11T07:13:09.761Z (comments)
+U, loose (8):
+  LIN-2620  <- LIN-2631  Y created 2026-09-05T08:27:04.633Z, Y done 2026-09-05T16:20:24.779Z; X plan 2026-09-05T08:15:54.156Z (none)
+  LIN-2621  <- LIN-2632  Y created 2026-09-05T08:27:06.761Z, Y done 2026-09-05T14:32:08.235Z; X plan 2026-09-05T08:15:56.118Z (none)
+  LIN-2622  <- LIN-2661  Y created 2026-09-05T16:20:55.382Z, Y done 2026-09-05T18:01:02.307Z; X plan 2026-09-05T08:15:58.296Z (none)
+  LIN-2622  <- LIN-2632  Y created 2026-09-05T08:27:06.761Z, Y done 2026-09-05T14:32:08.235Z; X plan 2026-09-05T08:15:58.296Z (none)
+  LIN-2622  <- LIN-2631  Y created 2026-09-05T08:27:04.633Z, Y done 2026-09-05T16:20:24.779Z; X plan 2026-09-05T08:15:58.296Z (none)
+  LIN-2623  <- LIN-2631  Y created 2026-09-05T08:27:04.633Z, Y done 2026-09-05T16:20:24.779Z; X plan 2026-09-05T08:16:00.281Z (none)
+  LIN-2625  <- LIN-2631  Y created 2026-09-05T08:27:04.633Z, Y done 2026-09-05T16:20:24.779Z; X plan 2026-09-05T08:16:04.563Z (none)
+  LIN-2720  <- LIN-2735  Y created 2026-09-10T21:01:41.633Z, Y done 2026-09-11T03:02:50.450Z; X plan 2026-09-10T17:46:43.701Z (comments)
+
+R (LIN-397-style titles, census-wide): 11; of the research seeds, title-matched: 6 of 8
