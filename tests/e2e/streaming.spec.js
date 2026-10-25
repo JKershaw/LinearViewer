@@ -294,7 +294,7 @@ test.describe('Streaming AI Recommendations - UI', () => {
 
   /**
    * Open the blocked task and press its ✦. LIN-3833: a copy-first viewer's ✦ is "✦ Write the prompt"
-   * (opened-task-write); a viewer who can run has the run block's "✦ ask Harbour" (run-ask-harbour).
+   * (opened-task-write); a viewer who can run has the run block's "✦ write prompt" (run-ask-harbour).
    */
   async function pressGo(page) {
     await page.locator('.in-progress-items .line:has-text("Blocked on external API")').click();

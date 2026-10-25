@@ -154,3 +154,27 @@ test.describe('Home first page — a run from each source stamps the row the con
     expect(chosenRow.model).toBe('chosen-model-x');
   });
 });
+
+// LIN-3833 (ruling: fixed default order, fit by the next-stage rule). A fresh top task has every usual stage ahead,
+// so only the AI-excluded step (retro) does not fit: the list says one step is left out. The step line's ✦ button
+// writes the prompt; it does not replace the why line.
+test.describe('Home first page — "Another step" fits the task (LIN-3833)', () => {
+  test('the four default steps are listed in order, the excluded step is left out and counted, and the button writes a prompt', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, runnerKey: true });
+    // Workers share one workspace, so earlier runs' sessions would move the task's next-stage rule. Start with none.
+    for (const reset of ['clear-dispatch-queue', 'clear-dispatch-history', 'clear-agent-status']) {
+      await page.request.get(`/test/${reset}?urlKey=${localWorkerUrlKey}`);
+    }
+    await gotoHome(page, localWorkerUrlKey);
+
+    const component = await openTopTask(page);
+    await expect(component.locator('[data-testid="run-ask-harbour"]')).toHaveText('✦ write prompt');
+    await component.locator('[data-testid="run-another"]').click();
+
+    const items = component.locator('[data-testid="run-another-list"] [data-testid="run-another-item"]');
+    await expect(items.nth(3)).toBeVisible();
+    const labels = await items.allInnerTexts();
+    expect(labels.slice(0, 4)).toEqual(['look into', 'research', 'plan', 'implement']);
+    await expect(component.locator('[data-testid="run-another-left-out"]')).toHaveText("1 step left out: it does not fit this task's state.");
+  });
+});

@@ -218,7 +218,7 @@ test.describe('Feature Toggle Settings', () => {
     await page.waitForLoadState('networkidle');
 
     await page.locator('.in-progress-items .line.expandable').first().click();
-    // LIN-3833: the ✦ is "Write the prompt" (copy-first) or the run block's "ask Harbour" (a viewer who can run).
+    // LIN-3833: the ✦ is "Write the prompt" (copy-first) or the run block's "write prompt" (a viewer who can run).
     const go = page.locator('.in-progress-items .prompt-section [data-testid="opened-task-write"], .in-progress-items .prompt-section [data-testid="run-ask-harbour"]').first();
     await expect(go).toBeVisible();
   });

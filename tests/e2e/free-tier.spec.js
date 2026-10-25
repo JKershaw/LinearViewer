@@ -146,7 +146,7 @@ test.describe('Free Tier run contract (ladder)', () => {
     await expect(go).toBeEnabled();
     await expect(go).not.toContainText(/run limit/i);
 
-    // ✦ generation stays enabled regardless of the run allowance (LIN-3833: the run block's "ask Harbour").
+    // ✦ generation stays enabled regardless of the run allowance (LIN-3833: the run block's "write prompt").
     await expect(component.locator('[data-testid="opened-task-next-step"]')).toBeEnabled();
   });
 
@@ -271,7 +271,7 @@ test.describe('Free Tier UI', () => {
     await expect(go).toContainText(/run limit reached/i);
 
     // Generation is NOT gated by run state, and the retired prompt-quota reason
-    // is nowhere on the component (LIN-3239). LIN-3833: the run block's "✦ ask Harbour" is the generator.
+    // is nowhere on the component (LIN-3239). LIN-3833: the run block's "✦ write prompt" is the generator.
     await expect(component.locator('[data-testid="run-ask-harbour"]')).toBeEnabled();
     await expect(component).not.toContainText(/daily free-tier limit reached/i);
   });

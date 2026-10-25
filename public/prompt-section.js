@@ -951,7 +951,7 @@
         + ` <button class="opened-task-change" data-action="change-run" data-testid="run-change">Change</button></div>`;
     }
 
-    // The step line: the name, why it is next, and ✦ ask Harbour for the selector's view.
+    // The step line: the name and why it is next. ✦ write prompt writes this step's prompt (it does not replace the why).
     function renderStepLine(step) {
       const last = state.opened && state.opened.sessions && state.opened.sessions.last;
       let why = 'the next step for this task';
@@ -959,7 +959,7 @@
       else if (step && last) why = `usually next after ${last.label || 'the last session'}`;
       const name = step ? esc(step.label) : 'Run to PR';
       return `<div class="opened-task-step" data-testid="opened-task-step"><span class="opened-task-step-name">${name}</span> \u00b7 ${esc(why)}`
-        + ` <button class="opened-task-ask" data-action="ask-harbour" data-testid="run-ask-harbour">\u2726 ask Harbour</button></div>`;
+        + ` <button class="opened-task-ask" data-action="ask-harbour" data-testid="run-ask-harbour">\u2726 write prompt</button></div>`;
     }
 
     // Undo for a run queued from here (until the runner takes it); Watch and Stop once a session runs.
@@ -989,21 +989,43 @@
       return '';
     }
 
-    // Another step (a list in place) and See prompt. The four default steps show; the rest sit behind "Show more".
+    // LIN-3833 (ruling: fixed default order, fit by the next-stage rule). The task's state comes from its
+    // sessions summary (`ahead`, `usual`, `excluded`, from the state endpoint). A usual stage fits only while
+    // the next-stage rule has it ahead; any other step fits unless the task is finished or the step is excluded
+    // from AI recommendation. Before the state is read nothing is left out.
+    const FINISHED_STATE_TYPES = ['completed', 'canceled', 'duplicate'];
+    function stepFits(kind, summary, stateType) {
+      if (!summary) return true;
+      if ((summary.excluded || []).includes(kind)) return false;
+      if (FINISHED_STATE_TYPES.includes(stateType)) return false;
+      if ((summary.usual || []).includes(kind)) return (summary.ahead || []).includes(kind);
+      return true;
+    }
+
+    // Another step (a list in place) and See prompt. The four default steps show, in order; the rest sit behind
+    // "Show N more". Steps that do not fit the task's state are left out, and the count says how many.
     function renderRunMore(step) {
       const meta = opts.promptMeta || {};
       const defaults = opts.defaultPromptKeys || [];
       const more = (opts.morePromptKeys || []).filter((k) => !defaults.includes(k));
+      const summary = state.opened && state.opened.sessions;
+      const fits = (k) => stepFits(k, summary, issue.stateType);
+      const shownDefaults = defaults.filter(fits);
+      const shownMore = more.filter(fits);
+      const leftOut = [...defaults, ...more].filter((k) => !fits(k)).length;
       const item = (k) => `<button class="opened-task-another-item" data-action="run-pick" data-kind="${esc(k)}" data-label="${esc(meta[k] || k)}" data-testid="run-another-item">${esc(meta[k] || k)}</button>`;
       let html = '<div class="opened-task-more">';
       if (step) html += `<button class="opened-task-see" data-action="see-prompt" data-testid="run-see-prompt">See prompt \u2726</button>`;
       html += `<button class="opened-task-another" data-action="run-another" data-testid="run-another" aria-expanded="${state.run.anotherOpen ? 'true' : 'false'}">Another step \u25BE</button>`;
       if (state.run.anotherOpen) {
-        html += `<div class="opened-task-another-list" data-testid="run-another-list">${defaults.map(item).join('')}`;
-        if (more.length) {
+        html += `<div class="opened-task-another-list" data-testid="run-another-list">${shownDefaults.map(item).join('')}`;
+        if (shownMore.length) {
           html += state.run.moreOpen
-            ? more.map(item).join('')
-            : `<button class="opened-task-another-more" data-action="run-more" data-testid="run-another-more">Show ${more.length} more</button>`;
+            ? shownMore.map(item).join('')
+            : `<button class="opened-task-another-more" data-action="run-more" data-testid="run-another-more">Show ${shownMore.length} more</button>`;
+        }
+        if (leftOut) {
+          html += `<p class="opened-task-left-out" data-testid="run-another-left-out">${leftOut} ${leftOut === 1 ? 'step' : 'steps'} left out: ${leftOut === 1 ? 'it does' : 'they do'} not fit this task's state.</p>`;
         }
         html += '</div>';
       }
