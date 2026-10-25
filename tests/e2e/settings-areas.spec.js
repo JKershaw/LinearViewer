@@ -92,7 +92,8 @@ test.describe('Settings areas: everyone-changes ask why, are logged, and can be 
     const reason = `Deploy window ${Date.now()}`;
     await settings(page).gotoArea(localWorkerUrlKey, 'running');
 
-    // Nothing pops up: the form is inside the opened row.
+    // Nothing pops up: the asks are inside the Runs row, which opens in place (LIN-3890 outcome 3).
+    await page.getByTestId('settings-halt-state').locator(':scope > summary').click();
     const pause = page.getByTestId('settings-halt-pause');
     await expect(page.getByTestId('settings-halt-pause-confirm')).toBeHidden();
     await pause.locator(':scope > summary').click();

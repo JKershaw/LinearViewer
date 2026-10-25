@@ -75,7 +75,8 @@ describe('one authority per decision', () => {
 
 describe('the button decision: .btn is the authority, with tone variants', () => {
   test('.btn and its tone variants are defined in style.css', () => {
-    for (const sel of ['.btn', '.btn--red', '.btn--teal', '.btn--quiet']) assert.deepEqual(rulesFor(sel), ['style.css'], sel);
+    // `.btn--teal` is retired (LIN-3890): the ask's teal confirm is `.btn--primary`.
+    for (const sel of ['.btn', '.btn--red', '.btn--quiet']) assert.deepEqual(rulesFor(sel), ['style.css'], sel);
     // `.action-btn` is the alias body; flight-companion.css has a contextual override (`.fc-chat-composer .action-btn`), which is not a copy.
     assert.match(css['style.css'], /\.action-btn,\s*\.btn--quiet\s*\{/, 'the quiet body is one selector list in style.css');
   });

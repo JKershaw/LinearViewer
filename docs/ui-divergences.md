@@ -12,8 +12,9 @@ divergence that was decided on purpose.
 **Decision (current):** a destructive or everyone-affecting change is confirmed **on the page**,
 in place: the Settings ask (`askInPlace`, `lib/components/settings-*.js` (moved here by LIN-3890)) opens a panel that says
 what will happen, asks why where the change is for everyone, and confirms with a real filled
-tone of `.btn` (`btn--red` for halt, remove and revoke; `btn--teal` for turn on and undo). The key
-revoke is the one exception: the opened key row is the confirmation, with no Cancel.
+tone of `.btn` (`btn--red` for halt, remove and revoke; `btn--primary` for turn on and undo), with a
+real Cancel (`btn--quiet`). Key revoke uses the same panel with the script transport (LIN-3890): its
+Confirm sends the DELETE to the existing route, and it renders no Confirm for a non-owner.
 
 John decided this on 24 October, asked whether LIN-511's native `confirm()` or the in-place ask
 should win: "On the page is best, I think." The earlier LIN-511 rule below no longer reads as
