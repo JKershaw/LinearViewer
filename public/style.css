@@ -3166,6 +3166,24 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   text-decoration: underline;
 }
 
+/* LIN-3889: the breadcrumb back-link, one body for the three drill-down pages. Session's was
+   promoted above the title (LIN-1225) so the page opens with an orientation cue; Task edit and
+   create match its rhythm so drill-down pages open the same way. Task page's back link reuses
+   `.sess-back`. `.settings-back` (settings.css) is a named variant of this decision. */
+.sess-back,
+.task-create-back,
+.task-edit-back {
+  display: inline-block;
+  margin: 0.25rem 0 0.5rem;
+  font-family: var(--font-content);
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-decoration: none;
+}
+.sess-back:hover,
+.task-create-back:hover,
+.task-edit-back:hover { color: var(--brand); }
+
 .model-select,
 .token-label-input {
   font-family: var(--font-content);
