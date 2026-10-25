@@ -14,7 +14,7 @@
  * a fixed form (LIN-1504 Option A: refusal over lossy success). It replaces the
  * inline create form LIN-1553 shipped (`renderInlineCreateForm`, removed from
  * `lib/render.js` in this same landing) and submits to the unchanged session-auth
- * `POST /workspace/:urlKey/api/issues` (routes/workspace-api.js), which as of this
+ * `POST /workspace/:urlKey/api/issues` (routes/workspace-api-issue-write.js), which as of this
  * landing also rejects a submitted-but-undeclared `stateId`/`priority` with 400 —
  * safe only because this page never renders a control for a field the provider
  * doesn't declare.

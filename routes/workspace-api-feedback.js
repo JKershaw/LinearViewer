@@ -396,7 +396,7 @@ export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore
         if (mockAi) {
           // LIN-2981: a test-mode/local session never reaches the live
           // streamChat call this wraps, matching the other AI call sites in
-          // this file that already branch on shouldMockAi.
+          // routes/workspace-api.js that already branch on shouldMockAi.
           ticketTitle = buildMockFeedbackTitle(message);
         } else {
           // A throw from the gate (store fault) lands in the catch below:

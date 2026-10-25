@@ -1,5 +1,5 @@
 /**
- * LIN-2353 — `enqueueFeedbackTriage` (routes/workspace-api.js:2862) is a
+ * LIN-2353 — `enqueueFeedbackTriage` (routes/workspace-api-feedback.js) is a
  * dispatch-queue producer, not an in-app render: it calls `generatePrompt(...)`
  * with no `featureFlags`/`providerUi` arguments at all, so every triage prompt
  * it queues was shaped with the DEFAULT_PROMPT_UI floor (displayName 'Linear')
@@ -114,7 +114,7 @@ async function submit(app, urlKey, payload) {
   }
 }
 
-describe('LIN-2353 — enqueueFeedbackTriage (workspace-api.js:2862) threads provider?.ui into the queued dispatch prompt', () => {
+describe('LIN-2353 — enqueueFeedbackTriage (workspace-api-feedback.js) threads provider?.ui into the queued dispatch prompt', () => {
   test('a github-backed workspace queues a triage prompt shaped with GitHub Issues, not Linear', async () => {
     const provider = makeGithubShapedProvider();
     const dispatch = capturingDispatchStore();
@@ -201,7 +201,7 @@ describe('LIN-2353 — enqueueFeedbackTriage (workspace-api.js:2862) threads pro
 // exist. This file's `buildApp` already fixtures `accessToken: 'test-token'`
 // so `shouldMockAi(workspace)` is true for every submit() above — that is
 // what lets this test set a dummy, never-valid `OPENROUTER_API_KEY` in-process
-// without ever spending it. Without the mock gate (routes/workspace-api.js's
+// without ever spending it. Without the mock gate (routes/workspace-api-feedback.js's
 // `if (mockAi || aiApiKey)` branch), this key would reach `generateFeedbackTitle`
 // -> `streamChat`, a real network call to OpenRouter, and CI has no key to
 // reproduce that with — the review on PR #1543 confirmed CI stays green with
@@ -232,7 +232,7 @@ describe('LIN-2981 — feedback-title generation stays deterministic when OPENRO
       const { status } = await submit(app, 'acme', { message: 'Something is broken', action: 'triage' });
 
       assert.strictEqual(status, 201);
-      // The deterministic mock title (routes/workspace-api.js's
+      // The deterministic mock title (lib/workspace-api-mocks.js's
       // buildMockFeedbackTitle: `Triage: <first line>`) — NOT a live-generated
       // title, and NOT the plain `Feedback: ...` fallback a 401'd live call
       // would fall back to. Either of those would mean the mock gate didn't fire.

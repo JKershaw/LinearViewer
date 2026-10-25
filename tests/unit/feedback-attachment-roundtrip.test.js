@@ -4,7 +4,7 @@
 //
 // Verification-only slice. Two real surfaces already exist independently:
 //
-//   1. INTAKE — POST /workspace/:urlKey/api/feedback (routes/workspace-api.js,
+//   1. INTAKE — POST /workspace/:urlKey/api/feedback (routes/workspace-api-feedback.js,
 //      LIN-636) accepts a base64 image, uploads it via provider.uploadFile, and
 //      embeds the returned asset URL in the new ticket body as `![](<url>)`.
 //   2. EXPOSE — flattenIssue (lib/proxy-wire.js, LIN-649) parses markdown images

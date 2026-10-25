@@ -611,7 +611,7 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQue
   // PATCH /workspace/:urlKey/api/issues/:issueId    → update → 200 {success, issue}
   //
   // Backend for the in-app task UI (`public/task-create.js`, `public/task-edit.js`).
-  // Modeled on POST /workspace/:urlKey/api/feedback above:
+  // Modeled on POST /workspace/:urlKey/api/feedback (routes/workspace-api-feedback.js):
   // resolve the workspace provider, take the call-scope token, gate the
   // capability with a clean 422 (never 500), validate fields through the shared
   // seam (lib/issue-write-validation.js), resolve symbolic refs via the shared

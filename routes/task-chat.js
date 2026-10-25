@@ -56,7 +56,7 @@ function sanitizeHistory(history) {
 
 /**
  * Build a small deterministic task context from the data fixtures for test mode
- * (mirrors buildMockRecapContext in routes/workspace-api.js). Returns null when
+ * (mirrors buildMockRecapContext in lib/workspace-api-mocks.js). Returns null when
  * the identifier doesn't resolve, so the caller can 404.
  */
 function buildMockTaskContext(issueId) {
@@ -580,7 +580,7 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
       // lookup carrying no legacy-Linear default — so an undeclared workspace
       // yields null and the persona degrades to "a single task" rather than
       // asserting Linear. Same derivation as routes/collective.js and the
-      // feedback-triage dispatch in routes/workspace-api.js.
+      // feedback-triage dispatch in routes/workspace-api-feedback.js.
       //
       // Deliberately not read off `issueProvider` above: `resolveIssueBinding`'s
       // UNMATCHED branch ends in the defaulting lookup, so its display name can
