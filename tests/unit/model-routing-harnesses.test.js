@@ -90,6 +90,16 @@ describe('runnabilityProblems: the page check over the whole table', () => {
     assert.ok(problems.every((p) => p.harness === 'claude-code' && p.model === 'openai/gpt-6.1-sol'));
   });
 
+  // LIN-3966: the one observable relaxation of the write guard. A job row stating claude-code over a make
+  // group that states opencode + a model used to be refused, because the pair that resolved was the crossed
+  // one. The resolver now answers the job's harness with the model dropped (claude-code + null), which runs,
+  // so the same write is admitted. Nothing here is weakened: a pair that really runs and cannot is still refused.
+  test('a job row that creates the cross over an opencode group is admitted: the pair that runs is claude-code and no model (LIN-3966)', () => {
+    const before = withGroup(emptyTable(), 'make', { harness: 'opencode', model: 'deepseek/deepseek-v4-pro' });
+    const after = applyChangesToTable(before, [{ scope: 'job', surface: SURFACES.AGENT_SESSION, key: 'close-out', field: 'harness', to: 'claude-code' }]);
+    assert.deepEqual(runnabilityProblems(before, after), []);
+  });
+
   test('the same move with opencode named on the group is accepted', () => {
     const before = emptyTable();
     const after = withGroup(before, 'make', { model: 'openai/gpt-6.1-sol', harness: 'opencode' });

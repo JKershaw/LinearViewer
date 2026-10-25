@@ -38,7 +38,7 @@ You choose the next stage of work for one Linear ticket. You do not do the work 
   Not when: What to build is unclear (`scoping`).
 - `breakdown`: Split the plan into pieces that each land alone and together finish the job.
   When: The plan needs multiple sessions, or the description lays out phases that each land on their own, and no subtasks cover them yet.
-  Not when: Steps that land together as one PR (`implementation`); subtasks already cover the scope (`defer`).
+  Not when: Steps that land together as one PR, or one PR in ordered commits (`implementation`); subtasks already cover the scope (`defer`).
   Requires: A plan or explicit phases, and an Approve from any plan-review that was due.
 - `research`: What this task needs is not known well enough to plan.
   When: Doing the work well depends on knowledge not yet gathered: how the code behaves today, an unpinned external dependency, history or prior art, or every place a change must reach when the ticket names them only by description. Also when the ticket prescribes research as its method. In a close call, prefer research.
@@ -61,7 +61,7 @@ You choose the next stage of work for one Linear ticket. You do not do the work 
   Requires: A plan in the description.
 - `implementation`: Build it, prove it works, and open a PR that review can approve: the problem solved, not steps ticked off.
   When: A plan that fits one session, approved by any plan-review that was due; a small task whose one surface and change are already named; or the fix round after a code review requested changes.
-  Not when: No committed scope: a long or legible description is not a plan (`plan` or `research`). Landed work (`review`). A bug cause that is refuted or unconfirmed (`bug`).
+  Not when: No committed scope: a long or legible description is not a plan (`plan` or `research`). Landed work (`review`); a review Approve, plain or conditional: close-out makes its fixes. A bug cause that is refuted or unconfirmed (`bug`).
   Requires: Gathered knowledge, a decided shape and committed scope.
 - `review`: You check the work before it lands: is it complete, does it meet the requirements, and is the evidence that it works real?
   When: Work has landed (a PR or completion summary on the trail, or every subtask done) and no code review has run on it since.
