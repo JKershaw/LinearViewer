@@ -4,6 +4,7 @@
 //
 //   node replay.mjs --old <dirOrFile> --new <dirOrFile> [--n 3000] [--seed 1] [--out f]
 //                   [--coverage] [--lib DIR] [--tiers gen,edge,test] [--only <id>] [--quiet]
+//                   [--ai-floor fail|warn|off]   (default fail: exit 3 when the AI path was not exercised)
 import path from 'node:path';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -28,6 +29,7 @@ await runRouterReplay({
   seams: {
     'lib/openrouter.js': ['getRecommendation', 'getRecommendationStream', 'streamChat', 'streamChatWithTools'],
     'lib/audit.js': ['runAudit'],
+    'lib/prompts/autopilot-manual.js': ['extractPrincipleZeroSection'],
   },
   scrubEnv: ['OPENROUTER_API_KEY', 'OPENROUTER_FREE_TIER_KEY', 'FEEDBACK_TEAM_ID', 'FEEDBACK_PROJECT_ID', 'MONGODB_URI', 'LINEAR_API_KEY', 'LINEAR_ACCESS_TOKEN', 'GITHUB_TOKEN', 'OPENROUTER_MODEL', 'FREE_TIER_RUN_LIMIT'],
   managedEnv: ['OPENROUTER_API_KEY', 'OPENROUTER_FREE_TIER_KEY', 'FEEDBACK_TEAM_ID', 'FEEDBACK_PROJECT_ID'],
@@ -35,6 +37,8 @@ await runRouterReplay({
   loadSideLibs: fakes.loadSideLibs,
   onSideLibs: (holder, libs) => fakes.patchRegistry(holder, libs),
   seamHandler: fakes.seamHandler,
+  aiCounters: (sc, o) => fakes.aiCountersFor(sc, o),
+  aiFloors: fakes.AI_FLOORS,
   fetchHandler: (ctx, entry) => fakes.fetchHandler(ctx, entry),
   describeFetchHeaders: fakes.describeFetchHeaders,
   async loadVocabulary({ libUrl }) {

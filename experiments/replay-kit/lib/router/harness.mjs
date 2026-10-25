@@ -6,7 +6,8 @@
 // Math.random / randomUUID per request), per-side private lib graphs
 // (hooks.mjs), seam shims, real Express apps on 127.0.0.1:0, one HTTP request
 // per scenario sent to both sides, per-request comparison (compare.mjs),
-// aggregation, coverage, report. Exit 0 same / 1 differ / 2 tool failure.
+// aggregation, coverage, AI-path floors (ai-coverage.mjs), report.
+// Exit 0 same / 1 differ / 2 tool failure / 3 AI-path floor missed (fail mode).
 import { readFileSync, writeFileSync, mkdirSync, rmSync, readdirSync, statSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import net from 'node:net';
@@ -17,11 +18,12 @@ import { createRequire, register } from 'node:module';
 import { MessageChannel } from 'node:worker_threads';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { evaluateAiCoverage, AI_FLOOR_MODES } from './ai-coverage.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 export function parseArgs(argv, cfg) {
-  const o = { old: cfg.defaultOld, new: null, n: cfg.defaultN ?? 3000, seed: 1, out: null, coverage: false, lib: cfg.defaultLib, tiers: cfg.defaultTiers ?? 'gen,edge,test', only: null, quiet: false, keepWork: false, timeoutMs: 5000 };
+  const o = { old: cfg.defaultOld, new: null, n: cfg.defaultN ?? 3000, seed: 1, out: null, coverage: false, lib: cfg.defaultLib, tiers: cfg.defaultTiers ?? 'gen,edge,test', only: null, quiet: false, keepWork: false, timeoutMs: 5000, aiFloor: 'fail' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const next = () => argv[++i];
@@ -38,6 +40,10 @@ export function parseArgs(argv, cfg) {
     else if (a === '--keep-work') o.keepWork = true;
     else if (a === '--timeout-ms') o.timeoutMs = Number(next());
     else if (a === '--dump') o.dump = next();
+    else if (a === '--ai-floor') {
+      o.aiFloor = next();
+      if (!AI_FLOOR_MODES.includes(o.aiFloor)) { process.stderr.write(`--ai-floor takes ${AI_FLOOR_MODES.join(', ')}, got "${o.aiFloor}"\n`); process.exit(2); }
+    }
     else if (a === '-h' || a === '--help') { process.stdout.write(readFileSync(path.join(cfg.toolDir, 'README.md'), 'utf8')); process.exit(0); }
     else { process.stderr.write(`unknown argument: ${a}\n`); process.exit(2); }
   }
@@ -473,6 +479,9 @@ export async function runRouterReplay(cfg) {
   // 5. Scenarios
   // =========================================================================
   const groups = new Map();
+  // AI-path counters per side (cfg.aiCounters): what requests reached the model call, the store write and the fail-closed arms (LIN-3880)
+  const aiCounts = { old: {}, new: {} };
+  const bump = (side, k) => { aiCounts[side][k] = (aiCounts[side][k] || 0) + 1; };
   const perRoute = {};
   const perTier = {};
   const perIntent = {};
@@ -504,6 +513,7 @@ export async function runRouterReplay(cfg) {
     ep.statusPairs[pair] = (ep.statusPairs[pair] || 0) + 1;
     for (const tag of cfg.outcomeTags ? cfg.outcomeTags(sc, o) : []) ep.tags[tag] = (ep.tags[tag] || 0) + 1;
     if (sc.tier === 'edge') { const pi = (perIntent[`${sc.routeKey} ${sc.intent}`] ||= {}); pi[pair] = (pi[pair] || 0) + 1; }
+    if (cfg.aiCounters) { for (const k of cfg.aiCounters(sc, o)) bump('old', k); for (const k of cfg.aiCounters(sc, nn)) bump('new', k); }
     const diffs = compareOutcomes(o, nn);
     if (opts.dump) dumpLines.push(JSON.stringify({ id: sc.id, intent: sc.intent, routeKey: sc.routeKey, method: sc.method, path: sc.path, variant: sc.variant, ws: sc.wsKey, status: o.status, body: trim(o.body), console: o.calls.console, seams: trim(o.calls.seams), deps: trim(o.calls.deps), store: trim(o.calls.store), fetch: o.calls.fetch, unhandled: o.calls.unhandled, expressErrors: o.calls.expressErrors, session: o.calls.session, diffs: diffs.map(d => d.kind) }));
     if (opts.only) onlyDetail.push({ scenario: sc, old: o, new: nn, diffs });
@@ -546,6 +556,7 @@ export async function runRouterReplay(cfg) {
   const thin = [];
   for (const [rk, ep] of Object.entries(perRoute)) for (const [p, c] of Object.entries(ep.statusPairs)) if (c < 5) thin.push({ route: rk, pair: p, count: c });
   report.summary = { requests: total, differingRequests: differing, groups: groups.size, perTier, elapsedMs, socketEscapesDuringReplay: socketEscapes.length };
+  if (cfg.aiCounters) report.aiCoverage = evaluateAiCoverage({ counts: aiCounts, floors: cfg.aiFloors || [], tiers: opts.tiers.split(',').map(t => t.trim()), mode: opts.aiFloor, only: !!opts.only });
   report.perRoute = perRoute;
   report.edgeOutcomes = perIntent;
   report.thinStatusPairs = thin;
@@ -585,6 +596,18 @@ export async function runRouterReplay(cfg) {
       if (socketEscapes.length) out(`WARNING: ${socketEscapes.length} non-loopback socket attempts were blocked`);
     }
     out(`report: ${outFile}`);
-    process.exit(report.fatal ? 2 : (report.summary?.differingRequests || Object.values(report.exportsDiff || {}).some(d => d.length)) ? 1 : 0);
+    const ai = report.aiCoverage;
+    if (ai && ai.verdict !== 'off') {
+      out(`ai-path coverage: ${ai.verdict}${ai.reason ? ` (${ai.reason})` : ''}`);
+      const reached = Object.entries(ai.sides.new.counts).filter(([k]) => /^(model|store|arm):/.test(k)).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k} ${v}`);
+      if (reached.length) out(`  reached (new): ${reached.join(', ')}`);
+      for (const side of ['old', 'new']) {
+        const m = ai.sides[side].missed;
+        if (m.length) out(`  ${side}: ${m.map(x => `${x.key} ${x.have}/${x.min}`).join(', ')}`);
+      }
+      if (ai.verdict === 'fail') out(`FAIL: the AI path was not exercised to its floors; the replay's clean result would not mean the AI path matched`);
+      if (ai.verdict === 'warn') out(`WARNING: the AI path was not exercised to its floors (--ai-floor warn)`);
+    }
+    process.exit(report.fatal ? 2 : ai?.verdict === 'fail' ? 3 : (report.summary?.differingRequests || Object.values(report.exportsDiff || {}).some(d => d.length)) ? 1 : 0);
   }
 }

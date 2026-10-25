@@ -41,7 +41,8 @@
     {
       "name": "Reports & operator tools",
       "match": [
-        "^lib/(kpi-stats|workspace-kpi-stats|kpi-daily-rollup|milestone-funnel|account-erasure|pricing-conformance-sweep|scan-public-pages)\\.js$"
+        "^lib/(kpi-stats|workspace-kpi-stats|kpi-daily-rollup|milestone-funnel|account-erasure|pricing-conformance-sweep|scan-public-pages)\\.js$",
+        "^experiments/replay-kit/"
       ]
     },
     {

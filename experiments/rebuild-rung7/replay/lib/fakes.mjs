@@ -17,8 +17,9 @@
 // absence of a method (github-projects has no issueWriteGuard) are faithful.
 //
 // Seams (module shims, replay-kit/lib/router/hooks.mjs): lib/openrouter.js
-// getRecommendation / getRecommendationStream / streamChat / streamChatWithTools
-// and lib/audit.js runAudit. Every importer in the side — the router AND
+// getRecommendation / getRecommendationStream / streamChat / streamChatWithTools,
+// lib/audit.js runAudit, and lib/prompts/autopilot-manual.js
+// extractPrincipleZeroSection (null on demand, LIN-3880). Every importer in the side — the router AND
 // lib/recap.js, brief.js, scan.js, feedback-title.js, the roadmap router — gets
 // the recorder, so no model call and no Linear GraphQL call can happen. The
 // recorders emit scenario-driven events through the caller's onEvent and
@@ -33,6 +34,7 @@ export async function loadSideLibs({ libUrl }) {
   const workspace = await import(libUrl('lib/workspace.js'));
   await import(libUrl('lib/providers/index.js'));
   const registry = await import(libUrl('lib/providers/registry.js'));
+  const modelRouting = await import(libUrl('lib/model-routing.js'));
   const refs = await import(libUrl('lib/proxy-ref-resolver.js'));
   const pwe = await import(libUrl('lib/partial-write-error.js'));
   const connection = await import(libUrl('lib/connection-binding.js'));
@@ -47,7 +49,7 @@ export async function loadSideLibs({ libUrl }) {
   registry.registerProvider({ name: 'stub-bare', ui: undefined, supports: () => false, createFields: () => ['title'], apiWriteFields: () => [], fetchIssueContext: noop, fetchIssueComments: noop, fetchIssueFields: noop, fetchProjects: noop });
   registry.registerProvider({ name: 'stub-noguard', ui: { displayName: 'NoGuard', write: true }, supports: () => true, createFields: () => ['title', 'teamId', 'description'], apiWriteFields: () => ['title', 'description'],
     fetchIssueContext: noop, fetchRecommendationContext: noop, fetchIssueComments: noop, fetchIssueFields: noop, fetchProjects: noop, createComment: noop, createIssue: noop, updateIssue: noop, fetchTeams: noop, states: noop, uploadFile: noop, fetchProjectsList: noop });
-  return { hashContext, errors, workspace, registry, RefResolutionError: refs.RefResolutionError, PartialWriteError: pwe.PartialWriteError, TeamNotFoundError: workspace.TeamNotFoundError, connection };
+  return { hashContext, errors, workspace, registry, tableFromPreferences: modelRouting.tableFromPreferences, RefResolutionError: refs.RefResolutionError, PartialWriteError: pwe.PartialWriteError, TeamNotFoundError: workspace.TeamNotFoundError, connection };
 }
 
 const sha = (s) => crypto.createHash('sha256').update(String(s)).digest('hex').slice(0, 16);
@@ -161,7 +163,34 @@ function queueDefaults(mem) {
   };
 }
 
-export function storeSet(holder, libs, mem) {
+/**
+ * The routing table a scenario's workspace preferences give (LIN-3853): the same
+ * pure migration the production store runs when it has no routing store. The
+ * scenario's getWorkspacePreferences answer is the preferences; a throw gives the
+ * empty table, as the store's own fault path does. Scenario `delayMs`/`hang` on
+ * that store are not modelled here (none is set on the routing path).
+ */
+export function routingTableFromScenario(c, libs) {
+  const spec = c.sc.stores?.workspacePreferencesStore?.getWorkspacePreferences;
+  const b = pickBehaviour(spec, c.callCounts.get('workspacePreferencesStore.getWorkspacePreferences') || 0);
+  const prefs = b && b.ret !== undefined && !b.throw ? materialize(b.ret, libs) : {};
+  return libs.tableFromPreferences(prefs);
+}
+
+/**
+ * Principle 0 seam (LIN-3880): the manual's section, or `null` when the scenario asks
+ * for the fail-closed arm. buildScanMessages fails closed on null; the route then
+ * answers 503 PRINCIPLE_ZERO_UNAVAILABLE.
+ */
+export function principleZeroSection(sc, realFn) {
+  return sc.ai?.principleZero === null ? null : realFn();
+}
+
+// STALE_FAKES is the kit as it stood before LIN-3853: the store has no routing
+// table, so every AI resolution throws (`reading 'jobs'`). Kept so the vacuity
+// witness in selfcheck.mjs can show the guard catches today's failure. Read once
+// per app build.
+export function storeSet(holder, libs, mem, { staleFakes = process.env.REPLAY_STALE_FAKES === '1' } = {}) {
   const ctx = () => holder.ctx;
   const S = (name, defaults = {}, opts = {}) => makeRecordingStore(name, ctx, libs, { defaults, ...opts });
   return {
@@ -172,7 +201,10 @@ export function storeSet(holder, libs, mem) {
       getUsage: () => ({ used: 1, limit: 10, remaining: 9 }),
     }),
     userPreferencesStore: S('userPreferencesStore', { getUserPreferences: () => ({}), saveUserPreferences: () => undefined }),
-    workspacePreferencesStore: S('workspacePreferencesStore', { getWorkspacePreferences: () => ({}) }),
+    workspacePreferencesStore: S('workspacePreferencesStore', {
+      getWorkspacePreferences: () => ({}),
+      ...(staleFakes ? {} : { getRoutingTable: (args, c) => routingTableFromScenario(c, libs) }),
+    }),
     customPromptsStore: S('customPromptsStore', {
       get: ([, id]) => (id === 'cp-1' ? { id: 'cp-1', name: 'My prompt', template: 'Do {{title}} ({{identifier}})\n{{description}}' } : null),
       list: () => [{ id: 'cp-1', name: 'My prompt' }],
@@ -365,6 +397,7 @@ export function seamHandler(holder, libs) {
     const n = ctx.callCounts.get(`seam:${key}`) || 0;
     ctx.callCounts.set(`seam:${key}`, n + 1);
     const signal = signalIn(args);
+    if (key === 'prompts/autopilot-manual.extractPrincipleZeroSection') return principleZeroSection(ctx.sc, realFn);
     if (key === 'audit.runAudit') {
       ctx.rec.seams.push({ seam: key, args: args.map(a => snap(a)) });
       const b = pickBehaviour(ctx.sc.ai?.runAudit, n) || { ret: { summary: { teams: 1, projects: 0, issues: 0 }, findings: [] } };
@@ -450,3 +483,50 @@ export function fetchHandler(ctx, entry) {
   if (spec.json !== undefined) headers['content-type'] = 'application/json';
   return Promise.resolve(new Response(big ?? body, { status: spec.status ?? 200, headers }));
 }
+
+// ---------------------------------------------------------------------------
+// AI-path counters and floors (LIN-3880)
+// What each request reached, read from its outcome, and the minimums a run must
+// reach for the AI path to count as exercised (see replay-kit ai-coverage.mjs).
+// ---------------------------------------------------------------------------
+const AI_FAMILY = {
+  'POST /workspace/:urlKey/api/scan/:issueId': 'scan',
+  'POST /workspace/:urlKey/api/scan/:issueId/retire': 'retire',
+  'POST /workspace/:urlKey/api/recap/:issueId': 'recap',
+  'POST /workspace/:urlKey/api/brief/:issueId': 'brief',
+  'GET /workspace/:urlKey/api/recommend/:issueId': 'recommend',
+  'GET /workspace/:urlKey/api/recommend/:issueId/stream': 'recommend',
+};
+export const AI_VERBS = ['OPTIONS', 'HEAD', 'PUT', 'DELETE', 'PATCH', 'GET', 'POST'];
+const ARM_FAMILIES = ['scan', 'retire', 'recap', 'brief'];
+const VERB_FAMILIES = ['scan', 'retire', 'recap', 'brief', 'recommend'];
+
+/** The counter keys one request contributes (`model:<feature>`, `store:recordScan`, `arm:<arm>:<family>`, `verb:<METHOD>:<family>`). */
+export function aiCountersFor(sc, o) {
+  const out = [];
+  for (const s of o.calls?.seams || []) {
+    if (s.seam === 'openrouter.getRecommendation' || s.seam === 'openrouter.getRecommendationStream') out.push('model:recommend');
+    else if (s.feature) out.push(`model:${s.feature}`);
+  }
+  if (o.calls?.store?.some(x => x.store === 'taskDecisionsStore' && x.op === 'recordScan')) out.push('store:recordScan');
+  const family = AI_FAMILY[sc.routeKey];
+  if (family) {
+    if (o.body?.code === 'PRINCIPLE_ZERO_UNAVAILABLE') out.push(`arm:p0Null:${family}`);
+    if (o.body?.code === 'AI_NOT_CONFIGURED') out.push(`arm:notConfigured:${family}`);
+    if (o.body?.error === 'AI service temporarily unavailable') out.push(`arm:upstream503:${family}`);
+  }
+  if (sc.verbFamily) out.push(`verb:${sc.method}:${sc.verbFamily}`);
+  return out;
+}
+
+export const AI_FLOORS = [
+  ...['scan', 'scan-retire', 'recap', 'brief', 'recommend'].map(f => ({ key: `model:${f}`, min: 1, needs: 'gen' })),
+  { key: 'store:recordScan', min: 1, needs: 'gen' },
+  { key: 'arm:p0Null:scan', min: 1, needs: 'edge' },
+  { key: 'arm:p0Null:retire', min: 1, needs: 'edge' },
+  ...ARM_FAMILIES.flatMap(f => [
+    { key: `arm:notConfigured:${f}`, min: 1, needs: 'edge' },
+    { key: `arm:upstream503:${f}`, min: 1, needs: 'edge' },
+  ]),
+  ...VERB_FAMILIES.flatMap(f => AI_VERBS.map(v => ({ key: `verb:${v}:${f}`, min: 1, needs: 'edge' }))),
+];

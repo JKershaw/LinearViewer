@@ -4,14 +4,17 @@
 // floor; (2) each planted mutant must be detected in an expected kind on an
 // expected endpoint and nowhere else.
 //
-//   await runRouterSelfcheck({ toolDir, base, mutants, argv })
+//   await runRouterSelfcheck({ toolDir, base, mutants, witnesses, argv })
 //   mutant: { id, file, what, from, to, expect: { kinds: [...], endpoints: [...] } }
+//   witness: { id, what, env, expectExit } — an identity run under `env` that must exit `expectExit`
+//            (LIN-3880: the AI-path floor refuses a vacuous run; exit 3)
+//   identity passes only when the run's AI-path coverage (if the target counts it) is `pass`
 //   argv flags: --n --mutant-n --seeds 1,7 --jobs 4 --out f --lib DIR --coverage-floor 95
 import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync, copyFileSync, readdirSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 
-export async function runRouterSelfcheck({ toolDir, base, mutants, argv = process.argv }) {
+export async function runRouterSelfcheck({ toolDir, base, mutants, witnesses = [], argv = process.argv }) {
   const arg = (k, d) => { const i = argv.indexOf(k); return i > -1 ? argv[i + 1] : d; };
   const N = Number(arg('--n', 3000));
   const MN = Number(arg('--mutant-n', 1500));
@@ -30,6 +33,7 @@ export async function runRouterSelfcheck({ toolDir, base, mutants, argv = proces
 
   const jobs = [];
   for (const seed of SEEDS) jobs.push({ label: `identity-seed${seed}`, a: base, b: oldCopy, seed, n: N, coverage: true });
+  for (const w of witnesses) jobs.push({ label: w.id, a: base, b: oldCopy, seed: SEEDS[0], n: MN, env: w.env, expectExit: w.expectExit, witness: w });
   const meta = {};
   for (const m of mutants) {
     const src = readFileSync(path.join(base, m.file), 'utf8');
@@ -46,7 +50,7 @@ export async function runRouterSelfcheck({ toolDir, base, mutants, argv = proces
     const rep = path.join(dir, `${j.label}.json`);
     const args = [path.join(toolDir, 'replay.mjs'), '--old', j.a, '--new', j.b, '--seed', String(j.seed), '--n', String(j.n), '--out', rep, '--quiet', ...(j.coverage ? ['--coverage'] : []), ...(LIB ? ['--lib', LIB] : [])];
     const t0 = Date.now();
-    const p = spawn(process.execPath, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    const p = spawn(process.execPath, args, { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...(j.env || {}) } });
     let err = '';
     p.stdout.on('data', () => {}); p.stderr.on('data', (c) => { err += c; });
     p.on('close', (code) => resolve({ ...j, code, ms: Date.now() - t0, report: existsSync(rep) ? JSON.parse(readFileSync(rep, 'utf8')) : null, err: err.slice(-1500) }));
@@ -61,7 +65,7 @@ export async function runRouterSelfcheck({ toolDir, base, mutants, argv = proces
   for (const seed of SEEDS) {
     const r = by[`identity-seed${seed}`];
     const rep = r.report;
-    const ok = rep && !rep.fatal && rep.summary.differingRequests === 0 && Object.values(rep.exportsDiff).every(d => d.length === 0);
+    const ok = rep && !rep.fatal && rep.summary.differingRequests === 0 && Object.values(rep.exportsDiff).every(d => d.length === 0) && (!rep.aiCoverage || rep.aiCoverage.verdict === 'pass');
     summary.checks.push({ id: `identity-seed${seed}`, what: 'old vs an independent copy of old', pass: !!ok, requests: rep?.summary?.requests, perTier: rep?.summary?.perTier, differing: rep?.summary?.differingRequests, groups: (rep?.differences || []).map(g => `${g.endpoint} [${g.kind}] x${g.count}`), ms: r.ms, error: rep?.fatal || (rep ? undefined : r.err) });
     if (rep?.coverage?.old) summary.coverage[`seed${seed}`] = Object.fromEntries(Object.entries(rep.coverage.old).filter(([, c]) => c.pct !== undefined).map(([f, c]) => [f, { pct: c.pct, covered: c.coveredLines, executable: c.executableLines, uncovered: c.uncovered.map(u => `${u.line}: ${u.text}`) }]));
     if (seed === SEEDS[0] && rep) {
@@ -70,6 +74,12 @@ export async function runRouterSelfcheck({ toolDir, base, mutants, argv = proces
       summary.minPerRoute = Math.min(...Object.entries(rep.perRoute).filter(([k]) => k !== 'UNMATCHED').map(([, v]) => v.requests));
       summary.importSideEffects = rep.importSideEffects?.old;
     }
+  }
+  for (const w of witnesses) {
+    const r = by[w.id];
+    const rep = r.report;
+    const ok = r.code === w.expectExit && !!rep && !rep.fatal && rep.aiCoverage?.verdict === 'fail';
+    summary.checks.push({ id: w.id, what: w.what, pass: ok, exit: r.code, expectExit: w.expectExit, verdict: rep?.aiCoverage?.verdict, differing: rep?.summary?.differingRequests, error: ok ? undefined : (rep?.fatal || r.err) });
   }
   for (const [id, { m, occ }] of Object.entries(meta)) {
     if (occ !== 1) { summary.checks.push({ id, what: m.what, pass: false, error: `mutation site found ${occ} times (need 1)` }); continue; }
