@@ -9,7 +9,7 @@ const PROMPT_SIZES = [0, 1000, 272000, 272001, 500000];
 
 const usage = (o) => ({ message: `[usage] ${JSON.stringify(o.payload)}`, kind: 'usage', timestamp: iso(o.at ?? NOW - 2 * DAY), ...(o.rootItemId ? { rootItemId: o.rootItemId } : {}) });
 const done = (at = NOW - 2 * DAY, text = '[done] ok') => ({ kind: 'message', timestamp: iso(at), message: text });
-const row = (o) => ({ status: 'taken', kind: 'implementation', dispatchedAt: iso(o.at ?? NOW - 2 * DAY), issueIdentifier: TICKETS[0], harness: 'claude-code', feedback: [], ...o });
+const row = (o) => ({ status: 'taken', kind: 'implementation', dispatchedAt: iso(o.at ?? NOW - 2 * DAY), issueIdentifier: TICKETS[0], harness: 'claude-code', target: 'cli', feedback: [], ...o });
 const call = (o) => ({ feature: 'scan', model: 'anthropic/claude-haiku-5.5', issueIdentifier: TICKETS[0], cost: 0.05, timestamp: iso(NOW - DAY), totalTokens: 1000, durationMs: 500, ...o });
 
 const world = (o) => ({
@@ -17,7 +17,11 @@ const world = (o) => ({
   models: o.models ?? MODELS, promptSizes: PROMPT_SIZES, usages: o.usages ?? [],
   rows: o.rows ?? [], calls: o.calls ?? [], tickets: o.tickets ?? TICKETS, features: FEATURES,
   ...(o.callLogFail ? { callLogFail: o.callLogFail } : {}),
+  catalog: o.catalog ?? [], stored: o.stored ?? [], orUsages: o.orUsages ?? [],
 });
+
+const priced = (id, prompt, completion) => ({ id, name: id, pricing: { prompt, completion }, supported_parameters: null, reasoning: null });
+const stored = (sessionId, builderVersion, costUsd, extra = {}) => ({ _id: `wk:${sessionId}`, urlKey: 'wk', type: 'session', sessionId, builderVersion, session: { sessionId, telemetry: { usage: { costUsd } } }, ...extra });
 
 export function edgeScenarios() {
   return [
@@ -58,7 +62,45 @@ export function edgeScenarios() {
     world({ name: 'call-log-store-throws', callLogFail: 'throw', calls: [call({ cost: 0.5 })] }),
     world({ name: 'call-log-store-rejects', callLogFail: 'reject', calls: [call({ cost: 0.5 })] }),
     world({ name: 'latency-ties-sort', calls: [call({ feature: 'scan', model: 'm-b', durationMs: 100 }), call({ feature: 'scan', model: 'm-a', durationMs: 100 }), call({ feature: 'dispatch-plan', model: 'm-a', durationMs: 100 }), call({ feature: 'effort', model: 'm-a', durationMs: 900 })] }),
-    world({ name: 'row-usage-at-272k-boundary', rows: [row({ _id: 'bd1', at: NOW - 2 * DAY, feedback: [usage({ payload: { harness: 'opencode', model: 'openai/gpt-5.5', inputTokens: 272000, outputTokens: 1000 } }), done()] })], calls: [call({ cost: 0.1 })] }),
+    // The row is stamped opencode, as its usage says: the requested and realised harness agree, so the
+    // boundary is priced by the rule under test rather than by the harness divergence (decisions.md §5.3).
+    world({ name: 'row-usage-at-272k-boundary', rows: [row({ _id: 'bd1', harness: 'opencode', at: NOW - 2 * DAY, feedback: [usage({ payload: { harness: 'opencode', model: 'openai/gpt-5.5', inputTokens: 272000, outputTokens: 1000 } }), done()] })], calls: [call({ cost: 0.1 })] }),
     world({ name: 'raw-model-strings', models: ['claude-opus-4-8', 'claude-haiku-5-5-20251001', 'opus', '<synthetic>', '', 'claude-opus-5-20991231', 42] }),
+    // Divergence 1 (decisions.md §5.1): one OpenCode session. Row 1 reports $1, $2, $4; its follow-up row reports $8, $16.
+    // /cost reads the last report of the lineage ($16); the KPI readers read the last report per row, summed ($4 + $16 = $20);
+    // the reports sum to $31. The judge reads these three figures from `cost`, `termMarked` and `taskCost`.
+    world({ name: 'opencode-probe-1-2-4-8-16', rows: [
+      row({ _id: 'op1', harness: 'opencode', at: NOW - 3 * DAY, feedback: [
+        usage({ at: NOW - 3 * DAY, payload: { harness: 'opencode', model: 'anthropic/claude-sonnet-4.6', costUsd: 1 } }),
+        usage({ at: NOW - 3 * DAY + 60000, payload: { harness: 'opencode', model: 'anthropic/claude-sonnet-4.6', costUsd: 2 } }),
+        usage({ at: NOW - 3 * DAY + 120000, payload: { harness: 'opencode', model: 'anthropic/claude-sonnet-4.6', costUsd: 4 } }),
+        done(NOW - 3 * DAY + 180000),
+      ] }),
+      // The follow-up's reports carry the lineage anchor: only a sibling report stamped with it joins the lineage (mergeLineageFeedback).
+      row({ _id: 'op2', rootItemId: 'op1', harness: 'opencode', at: NOW - 2 * DAY, feedback: [
+        usage({ at: NOW - 2 * DAY, rootItemId: 'op1', payload: { harness: 'opencode', model: 'anthropic/claude-sonnet-4.6', costUsd: 8 } }),
+        usage({ at: NOW - 2 * DAY + 60000, rootItemId: 'op1', payload: { harness: 'opencode', model: 'anthropic/claude-sonnet-4.6', costUsd: 16 } }),
+        done(NOW - 2 * DAY + 120000),
+      ] }),
+    ] }),
+    // Pricing hint: the catalog fallback's branches (a router's -1, an empty field, a null, a usable row).
+    world({ name: 'pricing-hint-catalog-branches', catalog: [
+      priced('vendor/unknown-9', '-1', '0.00001'), priced('openai/gpt-5.5', '', '0'), priced('anthropic/claude-haiku-5.5', null, '1'),
+      priced('claude-opus-4-8', '0.0000002', '0.000001'), priced('anthropic/claude-sonnet-4.6', 'x', '0.000001'),
+    ] }),
+    // Observation store: a stored doc is served only at the current builder version.
+    world({ name: 'observation-stored-versions', stored: [stored('s19', 19, 999), stored('s20', 20, 1.5), stored('s21', 21, 0), { _id: 'wk:meta', urlKey: 'wk', type: 'meta', backfilledAt: new Date(0) }, { _id: 'wk:bare', urlKey: 'wk', type: 'session', builderVersion: 20 }] }),
+    // OpenRouter streamed usage: the final chunk's cost, absent, zero, non-numeric, negative, and no usage at all.
+    world({ name: 'openrouter-usage-branches', orUsages: [
+      { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15, cost: 0.25 }, { prompt_tokens: 10, cost: 'x' }, { completion_tokens: 4, cost: -1 },
+      null, { cost: 0 }, { cost: null, completion_tokens_details: { reasoning_tokens: 7 } }, {},
+    ] }),
+    // Spend by job: a prefix-named kind and feature (`plan` vs `plan-review`, `scan` vs `scan-retire`), an unpriced run, a run with no usage.
+    world({ name: 'spend-by-job-prefixes', rows: [
+      row({ _id: 'sp1', kind: 'plan-review', feedback: [usage({ payload: { harness: 'claude-code', model: 'anthropic/claude-sonnet-4.6', costUsd: 2 } }), done()] }),
+      row({ _id: 'sp2', kind: 'plan', feedback: [done()] }),
+      row({ _id: 'sp3', kind: 'plan', feedback: [usage({ payload: { harness: 'claude-code', model: 'vendor/unknown-9', inputTokens: 1000 } }), done()] }),
+      row({ _id: 'sp4', kind: 'custom', feedback: [usage({ payload: { harness: 'claude-code', model: 'anthropic/claude-sonnet-4.6', costUsd: 5 } }), done()] }),
+    ], calls: [call({ feature: 'scan-retire', cost: null }), call({ feature: 'scan', cost: 0.5 }), call({ feature: 'recap', cost: 0 }), call({ feature: 'recap', cost: 0.25, timestamp: iso(Date.parse('2026-09-01T00:00:00.000Z')) })] }),
   ];
 }

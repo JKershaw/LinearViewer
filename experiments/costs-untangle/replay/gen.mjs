@@ -9,8 +9,29 @@
 import { Rng } from '../../replay-kit/lib/gen-kit.mjs';
 
 const DAY = 86400000;
-const TICKETS = ['LIN-101', 'LIN-102', 'LIN-103'];
-const FEATURES = ['scan', 'dispatch-plan', 'effort'];
+// Eight tickets: the public /kpis cost block shows only at five priced tasks (PUBLIC_COUNT_FLOOR), so fewer
+// tickets would leave that page's figure unreachable by any world.
+const TICKETS = ['LIN-101', 'LIN-102', 'LIN-103', 'LIN-104', 'LIN-105', 'LIN-106', 'LIN-107', 'LIN-108'];
+// The workspace every surface reads (surfaces.mjs imports it, so the two cannot drift).
+export const URL_KEY = 'wk';
+// Feature names: production Harbour job ids (lib/model-routing.js HARBOUR_JOB_IDS, so the
+// Models page's per-job spend reaches them, including a prefix pair `scan` / `scan-retire`),
+// plus two names no job owns, which the by-feature sums must leave out.
+const FEATURES = ['scan', 'scan-retire', 'recap', 'brief', 'ship-biscuit', 'flight-companion', 'dispatch-plan', 'effort'];
+// Row kinds: production agent job ids (AGENT_JOB_IDS), including a prefix pair `plan` / `plan-review`.
+const KINDS = ['implementation', 'review', 'close-out', 'wake', 'autopilot', 'periodical', 'plan', 'plan-review', 'bug', 'custom'];
+// Catalog pricing as OpenRouter ships it (per-token strings, or the -1 of a variable-priced router).
+const CATALOG_PRICES = [
+  { prompt: '0.000003', completion: '0.000015' },
+  { prompt: '0.0000001', completion: '0.0000002' },
+  { prompt: '-1', completion: '0.00001' },
+  { prompt: '', completion: '0' },
+  { prompt: null, completion: '1' },
+];
+// Rich worlds draw from models that resolve to a rate row, dated ids included (resolveWorkerModelId strips the date).
+// openai/gpt-5.5 is the one row with a long-context tier (minPromptTokens 272000): without it no rich world can see the
+// threshold rule, whichever usage it carries.
+const PRICED_MODELS = ['anthropic/claude-sonnet-4.6', 'anthropic/claude-opus-4.8', 'claude-sonnet-4-6', 'claude-opus-4-8', 'anthropic/claude-haiku-5.5', 'claude-haiku-5-5-20251001', 'openai/gpt-5.5'];
 const MODELS = [
   'anthropic/claude-sonnet-4.6', 'anthropic/claude-opus-4.8', 'anthropic/claude-opus-5',
   'claude-opus-4-8', 'claude-sonnet-4-6', 'claude-haiku-5-5-20251001',
@@ -40,9 +61,11 @@ function usagePayload(r, { model, harness }) {
   return p;
 }
 
-function usageEntry(r, tsMs, rootItemId, harness) {
-  const model = r.pick(MODELS);
+// With `threshold`, half the time the prompt is exactly the long-context threshold (272,000 tokens, no cache fields), where the rate rule's > and >= differ.
+function usageEntry(r, tsMs, rootItemId, harness, models = MODELS, threshold = false) {
+  const model = r.pick(models);
   const payload = usagePayload(r, { model, harness });
+  if (threshold && r.chance(0.5)) Object.assign(payload, { inputTokens: 272000, outputTokens: 1000, cacheReadInputTokens: undefined, cacheCreationInputTokens: undefined, cacheCreation1hInputTokens: undefined });
   const message = r.chance(0.03) ? '[usage] {not json' : `[usage] ${JSON.stringify(payload)}`;
   const e = { kind: 'usage', timestamp: iso(tsMs), message };
   if (rootItemId) e.rootItemId = rootItemId;
@@ -51,12 +74,17 @@ function usageEntry(r, tsMs, rootItemId, harness) {
 
 function generate(r, now) {
   const rows = [];
-  const lineages = r.int(1, 6);
+  // A rich world: many ticketed lineages, each closed with [done]. Only these reach the public /kpis cost
+  // block, which shows at five priced finished tasks (PUBLIC_COUNT_FLOOR); a plain world rarely has five.
+  const rich = r.chance(0.5);
+  const lineages = rich ? r.int(6, 12) : r.int(1, 9);
   for (let k = 0; k < lineages; k++) {
     const anchor = `a${k}`;
     const harness = r.pick(['claude-code', 'opencode', null]);
-    const issueIdentifier = r.chance(0.9) ? r.pick(TICKETS) : null;
-    const base = now - r.int(0, 40) * DAY - r.int(0, 86400) * 1000;
+    const issueIdentifier = rich || r.chance(0.9) ? r.pick(TICKETS) : null;
+    // Most lineages fall inside the 30-day window the workspace page reads; some sit past it, where the read window must drop them.
+    const ageDays = r.chance(0.8) ? r.int(0, 25) : r.int(0, 40);
+    const base = now - ageDays * DAY - r.int(0, 86400) * 1000;
     const n = r.int(1, 3);
     for (let j = 0; j < n; j++) {
       const followUp = j > 0;
@@ -64,10 +92,12 @@ function generate(r, now) {
       const row = {
         _id: followUp ? `${anchor}-${j}` : anchor,
         status: r.weighted([['taken', 85], ['queued', 5], ['failed', 5], ['skipped', 5]]),
-        kind: r.pick(['implementation', 'review', 'close-out', 'wake', 'autopilot', 'periodical']),
+        kind: r.pick(KINDS),
         dispatchedAt,
         issueIdentifier: r.chance(0.9) ? issueIdentifier : null,
         harness: r.chance(0.9) ? harness : null,
+        // A session target (cli/web) is what lets a run stand alone in the run view (pipeline-loops `isFree`).
+        target: r.chance(0.85) ? r.pick(['cli', 'web']) : r.pick(['runner', null]),
         feedback: [],
       };
       if (followUp) {
@@ -76,13 +106,14 @@ function generate(r, now) {
         if (r.chance(0.7)) row.rootItemId = anchor;
         else row.feedback.push({ kind: 'note', timestamp: dispatchedAt, rootItemId: anchor, message: 'follow-up' });
       }
-      const usages = r.int(0, 3);
+      // A rich world prices every lineage: one or two usages on models with a rate row.
+      const usages = rich ? r.int(1, 2) : r.int(0, 3);
       for (let u = 0; u < usages; u++) {
-        row.feedback.push(usageEntry(r, base + j * 3600000 + (u + 1) * 60000, followUp && r.chance(0.5) ? anchor : null, row.harness));
+        row.feedback.push(usageEntry(r, base + j * 3600000 + (u + 1) * 60000, followUp && r.chance(0.5) ? anchor : null, row.harness, rich ? PRICED_MODELS : MODELS, rich));
       }
       if (r.chance(0.2)) row.feedback.push({ kind: 'evidence', timestamp: dispatchedAt, message: '[evidence] artifact' });
-      if (r.chance(0.5)) {
-        const marker = r.pick(['[done]', '[done]', '[failed]', '[skipped]', '[aborted]', '[complete]', '[blocked] wait']);
+      if (rich || r.chance(0.5)) {
+        const marker = rich ? r.pick(['[done]', '[done]', '[done]', '[done]', '[failed]']) : r.pick(['[done]', '[done]', '[failed]', '[skipped]', '[aborted]', '[complete]', '[blocked] wait']);
         row.feedback.push({ kind: 'message', timestamp: iso(base + j * 3600000 + 3600000 * 2), message: `${marker} finished` });
       }
       rows.push(row);
@@ -114,6 +145,37 @@ function generate(r, now) {
   return { env, rows, calls };
 }
 
+/** One live-catalog entry (the shape lib/openrouter-catalog.js caches). */
+export function catalogEntry(r, id) {
+  return { id, name: id, pricing: r.pick(CATALOG_PRICES), supported_parameters: null, reasoning: null };
+}
+
+/**
+ * One observation-store session doc, stored under some builder version. The served cost is
+ * the stored one, so a doc from another version is either served (a hit) or rebuilt (a miss),
+ * which the figure shows.
+ */
+export function storedSession(r, k) {
+  const sessionId = `s${k}`;
+  return {
+    _id: `${URL_KEY}:${sessionId}`, urlKey: URL_KEY, type: 'session', sessionId,
+    builderVersion: r.pick([19, 20, 21]),
+    session: { sessionId, telemetry: { usage: { costUsd: r.pick([1.5, 999, 0]) } } },
+  };
+}
+
+/** One OpenRouter streamed response's usage (the final SSE chunk's `usage`), or none. */
+export function orUsage(r) {
+  if (r.chance(0.15)) return null;
+  const usage = {};
+  if (r.chance(0.8)) usage.prompt_tokens = r.int(0, 50000);
+  if (r.chance(0.8)) usage.completion_tokens = r.int(0, 9000);
+  if (r.chance(0.7)) usage.total_tokens = r.int(0, 59000);
+  if (r.chance(0.7)) usage.cost = r.weighted([[null, 1], [0, 1], [r.int(1, 90) / 100, 4]]);
+  if (r.chance(0.3)) usage.completion_tokens_details = { reasoning_tokens: r.int(0, 3000) };
+  return usage;
+}
+
 /** Deterministic scenario list: `n` seeded worlds, then every edge case. */
 export function buildScenarios({ seed, n }) {
   const out = [];
@@ -126,6 +188,9 @@ export function buildScenarios({ seed, n }) {
       models: MODELS, promptSizes: PROMPT_SIZES,
       usages: Array.from({ length: r.int(1, 4) }, () => usagePayload(r, { model: r.pick(MODELS), harness: r.pick(['claude-code', 'opencode', undefined]) })),
       rows, calls, tickets: TICKETS, features: FEATURES,
+      catalog: r.chance(0.6) ? MODELS.filter(() => r.chance(0.6)).map(id => catalogEntry(r, id)) : [],
+      stored: Array.from({ length: r.int(0, 3) }, (_, k) => storedSession(r, k)),
+      orUsages: Array.from({ length: r.int(0, 3) }, () => orUsage(r)),
     });
   }
   return out;

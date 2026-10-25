@@ -6,7 +6,7 @@
 //      must be caught at exactly the surfaces its `expect` names
 //   3. non-vacuity: each surface has a floor of priced, non-null figures, so a
 //      run where everything collapses to zero/null cannot pass as "identical"
-// Exit 0 only if all three hold (coverage is judged in coverage.mjs, reported here).
+// Exit 0 only if all three hold and coverage meets its hard floor (90%; the 95% target is reported, coverage.mjs).
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -59,6 +59,21 @@ const floors = {
   gauge: { figure: 'scenarios with a percent consumed', n: perScenario('gauge', x => x.percentConsumed !== null), min: 0.1 },
   taskCost: { figure: 'scenarios with a fully priced ticket total', n: perScenario('taskCost', ts => ts.some(t => t.cost.totalUsd !== null)), min: 0.05 },
   callLog: { figure: 'scenarios with a summarised call cost above zero', n: perScenario('callLog', x => x.summarize.totalCost > 0), min: 0.2 },
+  pricingHint: { figure: 'scenarios with a catalog or table price hint', n: perScenario('pricingHint', hints => hints.some(h => h !== null)), min: 0.5 },
+  effort: { figure: 'scenarios with a priced effort read-out kind', n: perScenario('effort', e => e.perKind.some(k => k.costUsd !== null)), min: 0.2 },
+  callRecord: { figure: 'scenarios with a recorded call cost above zero', n: perScenario('callRecord', ds => ds.some(d => d.cost > 0)), min: 0.2 },
+  spendByJob: { figure: 'scenarios with a priced agent or Harbour job', n: perScenario('spendByJob', s => s.agent.some(j => j.priced > 0) || s.harbour.some(j => j.priced > 0)), min: 0.2 },
+  observationStored: { figure: 'scenarios serving a stored session with a cost above zero', n: perScenario('observationStored', o => o.sessions.some(s => s.telemetry.usage.costUsd > 0)), min: 0.05 },
+  openrouterUsage: { figure: 'scenarios with a streamed call whose cost is a number', n: perScenario('openrouterUsage', calls => calls.some(c => c.done.some(d => d.usage.cost !== null))), min: 0.2 },
+  run: { figure: 'scenarios with a priced run step or header total', n: perScenario('run', runs => runs.some(r => r.cost.status === 'total' || r.steps.some(s => s.cost.status === 'priced'))), min: 0.1 },
+  // Rendered pages: a page that shows a USD figure in a scenario (a page with none would compare as equal).
+  healthHtml: { figure: 'scenarios whose Health page shows a USD figure', n: perScenario('healthHtml', h => h.usd.length > 0), min: 0.3 },
+  effortHtml: { figure: 'scenarios whose effort read-out page shows a USD figure', n: perScenario('effortHtml', h => h.usd.length > 0), min: 0.2 },
+  modelsHtml: { figure: 'scenarios whose Models page shows a USD figure', n: perScenario('modelsHtml', h => h.usd.length > 0), min: 0.3 },
+  sessionHtml: { figure: 'scenarios whose run page shows a USD figure', n: perScenario('sessionHtml', ps => ps.some(p => p.usd.length > 0)), min: 0.1 },
+  workspaceKpisHtml: { figure: 'scenarios whose workspace KPI page shows a USD figure', n: perScenario('workspaceKpisHtml', h => h.usd.length > 0), min: 0.2 },
+  publicKpisHtml: { figure: 'scenarios whose public KPI page shows a USD figure', n: perScenario('publicKpisHtml', h => h.usd.length > 0), min: 0.05 },
+  observationHtml: { figure: 'scenarios whose observation page carries a numeric USD figure (shown or embedded for its script)', n: perScenario('observationHtml', h => h.usd.length + h.embedded.length > 0), min: 0.2 },
 };
 for (const f of Object.values(floors)) { f.of = total; f.need = Math.ceil(f.min * total); f.ok = f.n >= f.need; }
 const floorsOk = Object.values(floors).every(f => f.ok);
@@ -98,9 +113,14 @@ const summary = {
   old: oldSha.slice(0, 12), new: newSha.slice(0, 12), n, seeds,
   identity, identityOk,
   floors, floorsOk,
-  mutants: { total: MUTANTS.length, reachable: mutantsReachable.length, notRun: MUTANTS.filter(m => m.reach !== 'v1').map(m => ({ id: m.id, why: m.why })), results: mutantResults, ok: mutantsOk },
+  mutants: {
+    total: MUTANTS.length, reachable: mutantsReachable.length,
+    notRun: MUTANTS.filter(m => m.reach === 'not-run').map(m => ({ id: m.id, why: m.why })),
+    excluded: MUTANTS.filter(m => m.reach === 'excluded').map(m => ({ id: m.id, why: m.why })),
+    results: mutantResults, ok: mutantsOk,
+  },
   coverage: cov,
 };
 if (args.out) fs.writeFileSync(args.out, JSON.stringify(summary, null, 2));
 console.log(JSON.stringify({ identityOk, floorsOk, mutantsOk, identity, floors: Object.fromEntries(Object.entries(floors).map(([k, v]) => [k, `${v.n}/${v.of} (need ${v.need})`])), mutantVerdicts: mutantResults.map(r => `${r.id}: ${r.error || r.verdict} ${r.error ? '' : JSON.stringify(r.caughtAt)}`), coverage: cov.summary }, null, 2));
-process.exit(identityOk && floorsOk && mutantsOk ? 0 : 1);
+process.exit(identityOk && floorsOk && mutantsOk && cov.summary.meetsHardFloor ? 0 : 1);

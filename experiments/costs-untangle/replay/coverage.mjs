@@ -11,15 +11,24 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../../..');
 
 /** The cost functions the floor is judged on: file (repo-relative) and declaration name. */
+// Every function whose body holds a site in ../decisions.md §3 (the sites the mutants name), plus the
+// functions the surfaces call that hold a rule. A site in a function left out of this list is out of
+// the floor's denominator, so the list must grow with the inventory, never be trimmed to what is reached.
 export const INVENTORIED = [
   ['lib/model-pricing.js', 'getModelRate'], ['lib/model-pricing.js', 'resolveWorkerModelId'],
   ['lib/model-pricing.js', 'selectRateForPrompt'], ['lib/model-pricing.js', 'computeUsageCostUsd'],
+  ['lib/openrouter.js', 'getModelPricingHint'], ['lib/openrouter.js', 'extractUsage'],
   ['lib/session-telemetry.js', 'parseUsagePayload'], ['lib/session-telemetry.js', 'parseUsage'],
   ['lib/dispatch-lineage.js', 'usageOf'], ['lib/dispatch-lineage.js', 'groupDispatchLineages'],
   ['lib/task-cost.js', 'anchorFor'], ['lib/task-cost.js', 'buildTaskCost'],
   ['lib/terminal-marked-task-cost.js', 'reduceLineageCost'], ['lib/terminal-marked-task-cost.js', 'computeTerminalMarkedTaskCost'],
   ['lib/weekly-budget.js', 'windowedSpend'], ['lib/weekly-budget.js', 'computeWeeklyBudgetGauge'],
   ['lib/llm-call-log.js', 'summarize'], ['lib/llm-call-log.js', 'summarizeByIssue'], ['lib/llm-call-log.js', 'summarizeByFeature'],
+  ['lib/llm-call-log.js', 'record'], ['lib/llm-call-log.js', 'listInHorizon'],
+  ['lib/run-view.js', 'lineageCost'], ['lib/run-view.js', 'buildRunView'],
+  ['lib/effort-readout.js', 'computeEffortReadout'],
+  ['lib/observation-sessions-store.js', 'findByWorkspace'],
+  ['lib/model-routing-spend.js', 'summarise'], ['lib/model-routing-spend.js', 'agentSpendByJob'], ['lib/model-routing-spend.js', 'harbourSpendByJob'],
 ];
 
 /** Line range [first, last] (0-based) of a function declared in `src`, by brace matching. */
