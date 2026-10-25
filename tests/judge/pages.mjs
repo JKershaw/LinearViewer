@@ -55,6 +55,9 @@ export const PAGES = [
     id: `settings-${area}`, urlKey: 'judge', path: (k) => `/workspace/${k}/settings/${area}`, renderers: ['lib/render-settings.js'],
   })),
   { id: 'styleguide', urlKey: 'judge', path: () => '/styleguide', renderers: ['lib/render-styleguide.js'] },
+  // LIN-3950: the Legal pages on the Plain layout (brand shape). Public, so the path ignores the workspace.
+  { id: 'privacy', urlKey: 'judge', path: () => '/privacy', renderers: ['lib/render-legal.js'] },
+  { id: 'terms', urlKey: 'judge', path: () => '/terms', renderers: ['lib/render-legal.js'] },
   // States
   { id: 'running-ask-open', urlKey: 'judge', path: (k) => `/workspace/${k}/settings/running`, state: 'ask-open', renderers: ['lib/render-settings.js'] },
   { id: 'agent-access-key-open', urlKey: 'judge-key', path: (k) => `/workspace/${k}/settings/agent-access`, state: 'key-open', masks: [TIME_MASKS.key], renderers: ['lib/render-settings.js'] },

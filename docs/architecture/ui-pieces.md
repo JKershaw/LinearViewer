@@ -255,6 +255,18 @@ Layout only. For the pages Settings shares pieces with:
 
 2. **Dispatch's halt controls: keep both** (inventory in decision 16).
 
+### 17. Plain page
+
+- **Decides:** the layout of a page made of a title, sections, rows, notes, a form and an empty state, with no layout of its own (the LIN-3892 sweep's "Plain" treatment).
+- **Authority:** `renderPlainPage` and `renderPlainSections` in `lib/components/plain-page.js`, with `.plain-title` and `.plain-page .section` rules in `public/style.css`. The pieces it composes keep their own authority: `page-header.js`, `section.js`, `field.js`, `settings-row.js` and `settings-group.js` (rows and notes), `button.js` (the form's submit) and `empty-state.js`. Home 1 for the rules, home 2 for the component.
+- **Reason:** the Plain pages would otherwise each invent a sheet. One helper over the shared builders keeps each later Plain page's own sheet near nothing (LIN-3892). LIN-3950 proves it on Legal, the brand shape, and on /styleguide, which shows every section kind in both themes.
+- **Counting rule:** a site is a page `<main>` that sets its own title, section and prose rules instead of calling `renderPlainPage` (or `renderPlainSections` inside its own frame).
+- **Sites at base:** the `.legal-content` rules (five, `style.css:3679-3706` at head before LIN-3950 removed them), their emitters (`lib/render-legal.js` twice, `lib/render-styleguide.js` once). At head: none. `git grep legal-content -- lib public routes server.js` returns nothing but comments.
+- **Consolidate deletes:** the `.legal-content` rules and `legalSection` (done, LIN-3950). The `.sg-intro` `margin-left` undo in `styleguide.css` (done, LIN-3950).
+- **Differences (intended, named in the PR):** Legal's section headings take the canonical `.section-header`, so blue and weight 600 go; the prose drops its 3ch indent. Class: **variant** (the Plain look, the reviewed convergence shift).
+- **Variant:** two header shapes. Brand (`brand: true`): the "Harbour" brand h1 links home, the title is one `<h2 class="plain-title">` and sections are h3. Workspace (the default): the page-header h1 is the title, its lede the subtitle, and sections are h2.
+- **Constraint, rows and forms:** a page that uses the `rows` kind must link `public/settings.css` and sit inside the `.settings-shell` phone root, or its rows render unstyled or at the wrong size. Nothing guards this yet (it is documented, not checked). The `group()` builder titles its rows with an h2, so a brand-shape page should not use `rows` until the next Plain move decides it. The next Plain move (rows and forms) owns both.
+
 ## Consolidate (LIN-3889): status at head
 
 Measured at `55149a37` (the last commit that changed CSS). Each decision's authority, its losing copies, and its sites at base and head by the note's own counting rule: the base sites the note lists by `file:line`, and the rule bodies or render sites that still write the decision.
@@ -329,6 +341,23 @@ The verbatim share of the Settings renderers, `scripts/code-shape/verbatim.mjs` 
 
 Outcome 11 (one model-routing move is one change-log entry) is a follow-up: LIN-3925, filed next to LIN-3855. Cause: each job is its own proxy request, and no batch id reaches the store.
 
+## Plain (LIN-3950): status at head
+
+The first Plain move. The helper is `lib/components/plain-page.js`; decision 17 is its authority.
+
+| Piece | Authority at head | Status |
+| -- | -- | -- |
+| Brand shape (`brand: true`) | `renderPlainPage`, the Harbour brand h1 and `.plain-title` | done: `/privacy` and `/terms` (`lib/render-legal.js`) |
+| Workspace shape | `renderPlainPage`, the page-header h1 with its lede | shipped; no page yet (the next Plain moves) |
+| `html` section | `renderSection` | done: Legal |
+| `fields` section | `renderField` | shipped; sampled on `/styleguide` only |
+| `rows` section | `group()` with the settings-row builders | shipped; sampled on `/styleguide`, which links `settings.css`. Constraint above |
+| `form` section | `renderField` with an input, and a primary `renderButton` | shipped; sampled on `/styleguide` only |
+| `empty` section | `renderEmptyState` | shipped; sampled on `/styleguide` only |
+| Legal title | `.plain-title`, centred (Legal's look kept) | open question 6 |
+
+The judge's list gained `privacy` and `terms` (`tests/judge/pages.mjs`, `renderers: ['lib/render-legal.js']`). The Legal copy is unchanged: `tests/unit/legal-copy-lin3950.test.js` compares every heading and section body with a snapshot taken before the move.
+
 ## Models (LIN-3855): status at head
 
 The Models body is `lib/render-settings-models.js`: one staged form for every job and group (`lib/model-routing-edit.js` turns the posted fields into one logged change with one reason and one version check), the routing presets, and the change log with Undo. Its pieces are built once and listed here:
@@ -346,16 +375,19 @@ Each keeps today's behaviour until answered.
 2. **Key row** (only if the reading in decision 11 is wrong). Today there is one live key row, so none is open. If a second live emitter turns up, the options are `keyRow` or the token list; the recommendation is `keyRow`, which is built on the Settings row and already carries the owner-only revoke and the expiry.
 3. **Does the `action-btn` alias tail get renamed?** Fifteen files under `lib/` and `public/` still emit `action-btn`, which renders the same body as `.btn--quiet` with a tone. Today's behaviour: keep the alias and its emitters (LIN-3890 did not rename them). Decision 6 records the reason; the rename is a later sweep's call.
 4. **Does key revoke need a no-script path?** Revoke is an ask with `transport: 'script'` (`lib/components/settings-key-row.js`, `lib/components/settings-ask.js`), so it runs only with JavaScript. Options: (a) keep it script-only; (b) add a form-post fallback. Today's behaviour: script-only, unchanged.
+5. **Should a Plain page with rows get its settings.css link and phone root from the helper?** Today the `rows` kind is styled only where `settings.css` is linked and inside `.settings-shell` (decision 17). Options: (a) leave it to each page, as now; (b) have `renderPlainPage` add the link and the root when it uses `rows`. Today's behaviour: (a). The next Plain move, which has the first page that uses rows, decides.
+6. **Should the Plain title keep Legal's centred look?** Today it does (`.plain-title`, `text-align: center`). The alternative is the canonical section treatment. Today's behaviour: centred, unchanged by LIN-3950.
 
 ## For the tickets that follow
 
 - **LIN-3888 (Free the seam):** the tests that pin Settings' CSS are those naming `.settings-*`, `.settings-header`, `.token-*` (decision 11) and `.line`. The judge (`tests/judge/`) shows nothing moved while they are rewritten onto data attributes.
 - **LIN-3889 (Consolidate):** each row's "Consolidate deletes" line is its work list; the judge must stay at zero for every deletion that should not change a pixel, and must list a difference where one is intended.
+- **LIN-3892 (sweep, next Plain move):** rows and forms. The `rows` kind's styling home and phone root (open question 5), and the `form` kind's field inputs, which only the styleguide samples prove. Legal uses `html` sections only.
 - **LIN-3890 (Rebuild):** report against the measures at the series base above. Open question 1 (resolved by Rebuild) and the `unclear` classes were Rebuild's design input.
 
 ## The judge
 
-`node tests/judge/visual-replay.mjs --base <rev> --head <rev> [--self-check] [--control]` replays the 25 entries of `PAGES` at head (100 shots: 25 × 2 themes × 2 viewports, 1280×900 and 390×844; counted by importing `PAGES`, because `grep -c "{ id:"` gives 17 and the eight Settings areas come from `AREAS.map`) on two exports of two commits, at zero tolerance. It lives in `tests/judge/`, is not part of `npm test`, and commits no reference images. Its page list, masks (each with its reason) and "not covered" list are in `tests/judge/pages.mjs`.
+`node tests/judge/visual-replay.mjs --base <rev> --head <rev> [--self-check] [--control]` replays the 27 entries of `PAGES` at head (108 shots: 27 × 2 themes × 2 viewports, 1280×900 and 390×844; counted by importing `PAGES`, because `grep -c "{ id:"` gives 17 and the eight Settings areas come from `AREAS.map`; the count was 25 and 100 before LIN-3950 added `privacy` and `terms`) on two exports of two commits, at zero tolerance. It lives in `tests/judge/`, is not part of `npm test`, and commits no reference images. Its page list, masks (each with its reason) and "not covered" list are in `tests/judge/pages.mjs`.
 
 Three things to expect when reading the judge's output:
 
