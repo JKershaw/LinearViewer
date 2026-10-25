@@ -12,7 +12,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { decisionPanel, decisionSuggestions } from '../../lib/components/decision-panel.js';
+import { decisionPanel, decisionSuggestions, routingWords } from '../../lib/components/decision-panel.js';
 import { DISPATCH_EFFORT_LEVELS } from '../../lib/dispatch-validation.js';
 import { typicalByModel } from '../../lib/model-routing-spend.js';
 
@@ -22,9 +22,10 @@ const LISTS = {
   opencode: [{ id: 'openai/gpt-5.5', label: 'GPT-5.5', free: false }],
   any: [{ id: 'sonnet', label: 'sonnet', free: false }, { id: 'openai/gpt-5.5', label: 'GPT-5.5', free: false }]
 };
+// LIN-3987: a suggestion with no known rate has price null; the panel says so once, in a note.
 const SUGGEST = {
-  'claude-code': [{ id: 'sonnet', name: 'Sonnet', reason: 'A mid-size Claude model', price: 'price unknown', typical: '$0.75 a run' }],
-  opencode: [{ id: 'openai/gpt-5.5', name: 'GPT-5.5', reason: 'OpenAI model', price: '$5 / $30 per 1M tokens', typical: null }]
+  'claude-code': [{ id: 'sonnet', name: 'Claude Sonnet 5.5', reason: 'A mid-size Claude model', price: '$2.00 in / $10.00 out per 1M tokens', typical: '$0.75 a run', source: 'mapped' }],
+  opencode: [{ id: 'openai/gpt-5.5', name: 'GPT-5.5', reason: 'OpenAI model', price: '$5.00 in / $30.00 out per 1M tokens', typical: null, source: null }]
 };
 
 // The Models caller: named fields, the page's own testids. Home's caller: no names, run-* testids.
@@ -170,12 +171,33 @@ describe('suggested models belong to the harness in force', () => {
     assert.match(html, /data-decision-harness="claude-code"[^>]*>/);
     assert.match(html, /data-decision-harness="opencode"[^>]*hidden/);
     assert.match(html, /A mid-size Claude model/);
-    assert.match(html, /price unknown/);
+    assert.match(html, /\$2\.00 in \/ \$10\.00 out per 1M tokens/);
   });
 
-  test('a suggestion\'s price and typical cost sit in their own line, apart from its reason', () => {
+  test('a suggestion\'s name, rate and typical cost share one line; its reason sits under them', () => {
     const html = panel();
-    assert.match(html, /<span class="decision-panel-reason">A mid-size Claude model<\/span>\s*<span class="decision-panel-costs">\s*<span class="decision-panel-price">price unknown<\/span>\s*<span class="decision-panel-typical">\$0\.75 a run<\/span>/);
+    assert.match(html, /<span class="decision-panel-suggestion-head">\s*<button type="button" class="btn decision-panel-pick"[^>]*>Claude Sonnet 5\.5<\/button>\s*<span class="decision-panel-costs">\s*<span class="decision-panel-price">\$2\.00 in \/ \$10\.00 out per 1M tokens<\/span>\s*<span class="decision-panel-typical">\$0\.75 a run<\/span>/);
+    assert.match(html, /<\/span>\s*<span class="decision-panel-reason">A mid-size Claude model<\/span>\s*<\/li>/);
+  });
+
+  test('a suggestion with no known rate is named once, in a note, and never reads "price unknown"', () => {
+    const unrated = { 'claude-code': [{ id: 'sonnet', name: 'Claude Sonnet 5.5', reason: 'r', price: null, typical: null, source: 'mapped' }], opencode: [] };
+    const html = panel({ model: { value: 'sonnet', follow: 'Follow', lists: LISTS, suggestions: unrated } });
+    assert.match(html, /<p class="decision-panel-note" data-decision-harness="claude-code">No known rate for Claude Sonnet 5\.5\.<\/p>/);
+    assert.doesNotMatch(html, /price unknown/);
+    assert.doesNotMatch(html, /decision-panel-price/);
+  });
+
+  test('Claude Code\'s rates carry one note: they are for comparison, and a subscription may cover them', () => {
+    const html = panel();
+    assert.match(html, /<p class="decision-panel-note" data-decision-harness="claude-code">Rates are per 1M tokens, for comparison\. A Claude Code subscription may cover the cost\.<\/p>/);
+    assert.doesNotMatch(html, /<p class="decision-panel-note" data-decision-harness="opencode">Rates/);
+  });
+
+  test('a suggestion that ran or is mapped says which, in words', () => {
+    assert.match(panel(), /decision-panel-source">Mapped to this model</);
+    const ran = { 'claude-code': [{ id: 'sonnet', name: 'Claude Sonnet 5.5', reason: 'r', price: '$2.00 in / $10.00 out per 1M tokens', typical: null, source: 'ran' }], opencode: [] };
+    assert.match(panel({ model: { value: 'sonnet', follow: 'Follow', lists: LISTS, suggestions: ran } }), /decision-panel-source">Ran as this model</);
   });
 
   test('the search list is one datalist per harness, and the input starts on the harness in force', () => {
@@ -187,9 +209,19 @@ describe('suggested models belong to the harness in force', () => {
     assert.match(modelInput, /list="[^"]*opencode"/);
   });
 
-  test('a suggestion pick is a button that sets the input, never a submit', () => {
+  test('a suggestion pick is a shared button that sets the input, never a submit', () => {
     const html = panel();
-    assert.match(html, /<button type="button" class="decision-panel-pick" data-decision-pick="sonnet"/);
+    assert.match(html, /<button type="button" class="btn decision-panel-pick" data-decision-pick="sonnet"/);
+  });
+
+  test('the suggestion the model field names is the chosen one (aria-pressed); the others are not', () => {
+    const chosen = (value) => {
+      const html = panel({ model: { value, follow: 'Follow', lists: LISTS, suggestions: SUGGEST } });
+      return [...html.matchAll(/data-decision-pick="([^"]*)" aria-pressed="(true|false)"/g)].map((m) => [m[1], m[2]]);
+    };
+    assert.deepEqual(chosen('sonnet'), [['sonnet', 'true'], ['openai/gpt-5.5', 'false']]);
+    assert.deepEqual(chosen('openai/gpt-5.5'), [['sonnet', 'false'], ['openai/gpt-5.5', 'true']]);
+    assert.deepEqual(chosen('something-typed'), [['sonnet', 'false'], ['openai/gpt-5.5', 'false']]);
   });
 });
 
@@ -206,6 +238,45 @@ describe('escaping and the auto-switch rule', () => {
   });
 });
 
+describe('the effort row says why it is missing (LIN-3987)', () => {
+  test('with opencode in force, the Effort row is hidden and one line says effort does not apply', () => {
+    const html = panel({ harness: { value: 'opencode', inForce: 'opencode', follow: 'Follow Make' } });
+    assert.match(html, /data-decision-effort hidden/);
+    assert.match(html, /<p class="decision-panel-note" data-decision-harness="opencode">Effort does not apply: opencode through OpenRouter takes none\.<\/p>/);
+  });
+
+  test('with Claude Code in force the Effort row shows, and the line for opencode stays hidden', () => {
+    const html = panel();
+    assert.doesNotMatch(html, /data-decision-effort hidden/);
+    assert.match(html, /<p class="decision-panel-note" data-decision-harness="opencode" hidden>Effort does not apply/);
+  });
+
+  test('the effort line is not written where the panel has no effort row', () => {
+    assert.doesNotMatch(panel({ withEffort: false }), /Effort does not apply/);
+  });
+});
+
+describe('routingWords: every value the panel prints is said in words (LIN-3987)', () => {
+  test('a blank harness is Claude Code, and a blank model is its own model, not a default id', () => {
+    assert.deepEqual(routingWords({}), { harness: 'Claude Code', model: "Claude Code's own model", effort: "Claude Code's own effort" });
+  });
+
+  test('a blank model under opencode is opencode\'s default, and its effort is not used', () => {
+    assert.deepEqual(routingWords({ harness: 'opencode' }), { harness: 'opencode through OpenRouter', model: "opencode's default model", effort: 'not used' });
+  });
+
+  test('a Claude Code alias is the model it runs, by display name; an id is its own name', () => {
+    assert.equal(routingWords({ harness: 'claude-code', model: 'sonnet' }).model, 'Claude Sonnet 5.5');
+    assert.equal(routingWords({ harness: 'claude-code', model: 'claude-opus-5-5' }).model, 'Claude Opus 5.5');
+  });
+
+  test('a stored effort is shown as itself under Claude Code; the words never print a raw harness id', () => {
+    const w = routingWords({ harness: 'claude-code', effort: 'turbo' });
+    assert.equal(w.effort, 'turbo');
+    assert.doesNotMatch(JSON.stringify(routingWords({ harness: 'opencode', model: 'openai/gpt-5.5', effort: 'high' })), /opencode"|claude-code|\bsonnet\b/);
+  });
+});
+
 describe('decisionSuggestions: what a suggested row says, from the job\'s own runs', () => {
   const rows = (...r) => typicalByModel(r, { job: 'implementation' });
   const taken = (model, costUsd) => ({
@@ -213,23 +284,33 @@ describe('decisionSuggestions: what a suggested row says, from the job\'s own ru
     feedback: [{ kind: 'usage', timestamp: '2026-10-20T10:01:00Z', message: `[usage] ${JSON.stringify(costUsd === undefined ? { model } : { model, costUsd })}` }]
   });
 
-  test('an alias that ran as exactly one model shows that model, with its typical cost', () => {
+  test('an alias that ran as exactly one model, with a rate, shows that model, its rate and its typical cost', () => {
     const [opus] = decisionSuggestions({ harness: 'claude-code', typicals: rows(taken('claude-opus-5', 2), taken('claude-opus-5', 4)) }).filter((s) => s.id === 'opus');
-    assert.match(opus.name, /^Opus · ran as claude-opus-5$/);
+    assert.equal(opus.name, 'Claude Opus 5');
+    assert.equal(opus.price, '$5.00 in / $25.00 out per 1M tokens');
     assert.equal(opus.typical, '$3.00 a run');
+    assert.equal(opus.source, 'ran');
   });
 
-  test('an alias the job never ran shows its family and "price unknown", and no cost', () => {
+  test('an alias the job never ran shows the model its mapping names, its rate, and no cost', () => {
     const [opus] = decisionSuggestions({ harness: 'claude-code', typicals: [] }).filter((s) => s.id === 'opus');
-    assert.equal(opus.name, 'Opus');
-    assert.equal(opus.price, 'price unknown');
+    assert.equal(opus.name, 'Claude Opus 5.5');
+    assert.equal(opus.price, '$4.00 in / $20.00 out per 1M tokens');
     assert.equal(opus.typical, null);
+    assert.equal(opus.source, 'mapped');
   });
 
-  test('an alias with two reported models of its family shows no per-model cost, never a guessed one', () => {
+  test('an alias with two reported models of its family shows its mapping and no per-model cost, never a guessed one', () => {
     const [opus] = decisionSuggestions({ harness: 'claude-code', typicals: rows(taken('claude-opus-4-1', 1), taken('claude-opus-5', 3)) }).filter((s) => s.id === 'opus');
     assert.equal(opus.typical, null);
-    assert.equal(opus.name, 'Opus');
+    assert.equal(opus.name, 'Claude Opus 5.5');
+    assert.equal(opus.source, 'mapped');
+  });
+
+  test('every Claude Code alias has a rate, so none is left unrated', () => {
+    const list = decisionSuggestions({ harness: 'claude-code', typicals: [] });
+    assert.equal(list.length, 4);
+    assert.ok(list.every((s) => s.price && s.price.includes('per 1M tokens')), 'no alias reads without a rate');
   });
 
   test('the opencode suggestions are full ids, and their cost matches the exact model only', () => {

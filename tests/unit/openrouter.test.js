@@ -1677,14 +1677,20 @@ describe('getModelDisplayName: one name per model (LIN-3962)', () => {
     assert.equal(getModelDisplayName('openai/gpt-5.4-mini'), 'GPT-5.4 Mini');
   });
 
-  test('a bare alias shows its family in title case', () => {
-    assert.equal(getModelDisplayName('opus'), 'Opus');
-    assert.equal(getModelDisplayName('haiku'), 'Haiku');
+  // LIN-3987: an alias names the model it runs, and a Claude id absent from the curated list is named the same way.
+  test('a bare alias names the model it runs (lib/model-routing-harnesses.js), not its family', () => {
+    assert.equal(getModelDisplayName('opus'), 'Claude Opus 5.5');
+    assert.equal(getModelDisplayName('haiku'), 'Claude Haiku 5.5');
   });
 
-  test('an alias that ran as a known model says so, only when the caller passes ranOn', () => {
-    assert.equal(getModelDisplayName('opus', { ranOn: 'openai/gpt-5.4-mini' }), 'Opus · ran as GPT-5.4 Mini');
-    assert.equal(getModelDisplayName('opus', {}), 'Opus');
+  test('a Claude id absent from the curated list reads in the same form, with a dated build suffix dropped', () => {
+    assert.equal(getModelDisplayName('claude-sonnet-5-5'), 'Claude Sonnet 5.5');
+    assert.equal(getModelDisplayName('claude-haiku-4-5-20251001'), 'Claude Haiku 4.5');
+    assert.equal(getModelDisplayName('claude-opus-5'), 'Claude Opus 5');
+  });
+
+  test('a Claude-shaped name that is not a model id falls through to the slug', () => {
+    assert.equal(getModelDisplayName('claude-code'), 'claude-code');
   });
 
   test('an uncurated, uncatalogued id falls back to its provider-stripped slug', () => {

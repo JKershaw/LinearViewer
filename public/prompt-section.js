@@ -284,21 +284,21 @@
       // anyone else gets no run control at all (copy-first view, LIN-3833, is
       // not built yet, so this is today's non-run view).
       if (opts.runSetup) {
-        html += `<button class="opened-task-go opened-task-go--setup" data-testid="opened-task-go" data-rung="run-task" data-action="setup" data-setup-needs="dispatch">Go <span class="opened-task-setup">\u25CB set up \u203A</span></button>`;
+        html += `<button class="btn opened-task-go opened-task-go--setup" data-testid="opened-task-go" data-rung="run-task" data-action="setup" data-setup-needs="dispatch">Go <span class="opened-task-setup">\u25CB set up \u203A</span></button>`;
       }
     } else if (runsExhausted) {
-      html += `<button class="opened-task-go opened-task-go--limited" data-testid="opened-task-go" data-rung="run-task" disabled title="${runLimitTitle}">Go <span class="opened-task-setup">${runLimitTitle}</span></button>`;
+      html += `<button class="btn opened-task-go opened-task-go--limited" data-testid="opened-task-go" data-rung="run-task" disabled title="${runLimitTitle}">Go <span class="opened-task-setup">${runLimitTitle}</span></button>`;
     } else if (g.status === 'starting') {
-      html += '<button class="opened-task-go" data-testid="opened-task-go" data-rung="run-task" disabled>starting\u2026</button>';
+      html += '<button class="btn opened-task-go" data-testid="opened-task-go" data-rung="run-task" disabled>starting\u2026</button>';
     } else if (opts.surface === 'home') {
       // LIN-3833: Home's one main action names what it does: the step the sessions name, else Run to PR.
       // While a stage runs or is queued, no other step is offered as an action (LIN-3968); Stop and the
       // after-run line stay in the run block.
       const step = runStepOfState(state);
-      if (step) html += `<button class="opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-step" data-action="run-step-next">Run ${esc(step.label)}</button>`;
-      else if (state.opened && !stageBusy(state)) html += '<button class="opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-task" data-action="go">Run to PR</button>';
+      if (step) html += `<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-step" data-action="run-step-next">Run ${esc(step.label)}</button>`;
+      else if (state.opened && !stageBusy(state)) html += '<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-task" data-action="go">Run to PR</button>';
     } else {
-      html += '<button class="opened-task-go" data-testid="opened-task-go" data-rung="run-task" data-action="go">Go</button>';
+      html += '<button class="btn opened-task-go" data-testid="opened-task-go" data-rung="run-task" data-action="go">Go</button>';
     }
 
     // The allowance sits beside Go, the control it governs — shown only when the
@@ -996,17 +996,18 @@
 
     function renderRunsOn(preview) {
       if (!preview) return '<div class="opened-task-runs-on" data-testid="opened-task-runs-on">Working out what this run will use\u2026</div>';
+      // LIN-3987: the names are the server's words for what the run would use (preview.words, routingWords), never a raw id or alias.
       const target = state.run.choice.target || 'cli';
-      const model = preview.model || 'the default model';
-      const bits = [model];
-      if (preview.harness && preview.harness !== 'claude-code') bits.push(preview.harness);
-      if (preview.effort) bits.push(`effort ${preview.effort}`);
+      const w = preview.words || {};
+      const bits = [w.model].filter(Boolean);
+      if (w.harness && preview.harness !== 'claude-code') bits.push(w.harness);
+      if (preview.effort && w.effort !== 'not used') bits.push(`effort ${preview.effort}`);
       const words = [...new Set(['model', 'harness', 'effort'].map((f) => sourceWordOf(f, preview)).filter(Boolean))];
       return `<div class="opened-task-runs-on" data-testid="opened-task-runs-on">`
         + `Runs on <span class="opened-task-runs-on-what" data-testid="run-on-what">${esc(bits.join(' \u00b7 '))}</span>`
         + ` \u00b7 ${esc(TARGET_WORDS[target] || target)}`
         + `${words.length ? ` <span class="opened-task-source" data-testid="run-source">\u2014 ${esc(words.join(', '))}</span>` : ''}`
-        + ` <button class="opened-task-change" data-action="change-run" data-testid="run-change">Change</button></div>`;
+        + ` <button class="btn opened-task-change" data-action="change-run" data-testid="run-change">Change</button></div>`;
     }
 
     // The step line: the name and why it is next. ✦ write prompt writes this step's prompt (it does not replace the why).
@@ -1039,16 +1040,16 @@
         if (next) html += ` \u00b7 Next: ${esc(next.label)}, once ${esc(running.label || 'this')} finishes`;
         if (state.run.confirmStop) {
           html += ` <span class="opened-task-confirm">Stop this run? The session is cancelled and the task stays where it is.`
-            + ` <button data-action="stop-run-confirm" data-testid="run-stop-confirm">Stop</button>`
-            + ` <button data-action="stop-run-cancel">Cancel</button></span>`;
+            + ` <button class="btn btn--red" data-action="stop-run-confirm" data-testid="run-stop-confirm">Stop</button>`
+            + ` <button class="btn btn--quiet" data-action="stop-run-cancel">Cancel</button></span>`;
         } else if (polled) {
-          html += ` <button class="opened-task-stop" data-action="stop-run" data-testid="run-stop">Stop</button>`;
+          html += ` <button class="btn btn--quiet opened-task-stop" data-action="stop-run" data-testid="run-stop">Stop</button>`;
         }
         return `${html}</div>`;
       }
       if (state.run.item || (summary.running && summary.running.state === 'queued')) {
         return `<div class="opened-task-queued" data-testid="opened-task-queued">Queued, waiting for a runner`
-          + ` <button class="opened-task-undo" data-action="undo-run" data-testid="run-undo">Undo</button></div>`;
+          + ` <button class="btn btn--quiet opened-task-undo" data-action="undo-run" data-testid="run-undo">Undo</button></div>`;
       }
       return '';
     }
@@ -1076,16 +1077,16 @@
       const shownDefaults = defaults.filter(fits);
       const shownMore = more.filter(fits);
       const leftOut = [...defaults, ...more].filter((k) => !fits(k)).length;
-      const item = (k) => `<button class="opened-task-another-item" data-action="run-pick" data-kind="${esc(k)}" data-label="${esc(meta[k] || k)}" data-testid="run-another-item">${esc(meta[k] || k)}</button>`;
+      const item = (k) => `<button class="btn opened-task-another-item" data-action="run-pick" data-kind="${esc(k)}" data-label="${esc(meta[k] || k)}" data-testid="run-another-item">${esc(meta[k] || k)}</button>`;
       let html = '<div class="opened-task-more">';
-      if (step) html += `<button class="opened-task-see" data-action="see-prompt" data-testid="run-see-prompt">See prompt \u2726</button>`;
-      html += `<button class="opened-task-another" data-action="run-another" data-testid="run-another" aria-expanded="${state.run.anotherOpen ? 'true' : 'false'}">Another step \u25BE</button>`;
+      if (step) html += `<button class="btn btn--quiet opened-task-see" data-action="see-prompt" data-testid="run-see-prompt">See prompt \u2726</button>`;
+      html += `<button class="btn btn--quiet opened-task-another" data-action="run-another" data-testid="run-another" aria-expanded="${state.run.anotherOpen ? 'true' : 'false'}">Another step \u25BE</button>`;
       if (state.run.anotherOpen) {
         html += `<div class="opened-task-another-list" data-testid="run-another-list">${shownDefaults.map(item).join('')}`;
         if (shownMore.length) {
           html += state.run.moreOpen
             ? shownMore.map(item).join('')
-            : `<button class="opened-task-another-more" data-action="run-more" data-testid="run-another-more">Show ${shownMore.length} more</button>`;
+            : `<button class="btn btn--quiet opened-task-another-more" data-action="run-more" data-testid="run-another-more">Show ${shownMore.length} more</button>`;
         }
         if (leftOut) {
           html += `<p class="opened-task-left-out" data-testid="run-another-left-out">${leftOut} ${leftOut === 1 ? 'step' : 'steps'} left out: ${leftOut === 1 ? 'it does' : 'they do'} not fit this task's state.</p>`;
@@ -1095,38 +1096,66 @@
       return `${html}</div>`;
     }
 
+    // The words the panel's own options carry for a value: a model's display name, a harness's name. A value no option
+    // names is shown as typed (a model id the lists do not know). Read from the panel the server rendered (LIN-3987).
+    // The markup's own text is escaped (lib/utils/html.js), so an option's value and label are read back unescaped.
+    const unescapeText = (text) => text.replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+    const OPTIONS_OF = {
+      harness: /<select[^>]*data-decision-field="harness"[^>]*>([\s\S]*?)<\/select>/g,
+      model: /<datalist[^>]*>([\s\S]*?)<\/datalist>/g
+    };
+    function optionWords(value, which) {
+      if (!value) return null;
+      const scope = [...(state.run.panelHtml || '').matchAll(OPTIONS_OF[which])].map((m) => m[1]).join('');
+      const option = [...scope.matchAll(/<option value="([^"]*)"[^>]*>([^<]*)<\/option>/g)].find((m) => unescapeText(m[1]) === value);
+      return option ? unescapeText(option[2]).trim() : value;
+    }
+
+    // A target the harness in force cannot run is not kept: Claude Code on the web needs Claude Code, so a draft that
+    // names it falls back to the runner when another harness is chosen, and a choice made that way never reaches a run.
+    function fallBackTarget(draft, inForce) {
+      if (draft.target === 'web' && inForce === 'opencode') draft.target = 'cli';
+    }
+
     // The Change panel (LIN-3962): Home's extras (the preset, Runs on, agent access, the summary, Use/Reset/Close) around
     // the one decision panel the server renders (lib/components/decision-panel.js), which holds the harness, model and
     // effort. Edits go to a draft; "Use for this run" applies it. The panel's HTML is read when the panel opens.
     function renderChangePanel(preview) {
       const d = state.run.draft || state.run.choice;
       const presets = state.run.presets || [];
+      const panelWords = state.run.panelWords || {};
       const harness = d.harness || '';
       // Effort is judged by the harness in force (the draft's, else the one Settings resolves a blank to), against the
       // server's list of harnesses that take none. A blank harness with nothing resolved keeps effort, as effortAppliesTo does.
       const inForce = harness || (preview && preview.harness) || '';
       const showEffort = !state.run.withoutEffort.includes(inForce);
-      const presetButtons = presets.map((p) => `<button class="opened-task-preset${d.presetId === p.id ? ' is-chosen' : ''}" data-action="run-preset" data-preset-id="${esc(p.id)}" data-testid="run-preset">${esc(p.name || p.id)}</button>`).join('');
-      const targets = ['cli', ...(harness === 'opencode' ? [] : ['web']), ...(opts.isLocalhost ? ['local'] : [])];
-      const targetButtons = targets.map((t) => `<button class="opened-task-target${d.target === t ? ' is-chosen' : ''}" data-action="run-target" data-target="${esc(t)}" data-testid="run-target-${esc(t)}">${esc(TARGET_WORDS[t])}</button>`).join('');
+      const presetButtons = presets.map((p) => `<button class="btn opened-task-preset" data-action="run-preset" data-preset-id="${esc(p.id)}" aria-pressed="${d.presetId === p.id ? 'true' : 'false'}" data-testid="run-preset">${esc(p.name || p.id)}</button>`).join('');
+      // Claude Code on the web runs only under Claude Code: with opencode in force it is not offered, and the line says why.
+      const onWeb = inForce !== 'opencode';
+      const targets = ['cli', ...(onWeb ? ['web'] : []), ...(opts.isLocalhost ? ['local'] : [])];
+      const targetButtons = targets.map((t) => `<button class="btn opened-task-choice" data-action="run-target" data-target="${esc(t)}" aria-pressed="${d.target === t ? 'true' : 'false'}" data-testid="run-target-${esc(t)}">${esc(TARGET_WORDS[t])}</button>`).join('');
+      const modelNow = d.model ? optionWords(d.model, 'model') : panelWords.model;
+      const harnessNow = harness ? optionWords(harness, 'harness') : panelWords.harness;
+      const webNote = onWeb ? '' : `<p class="opened-task-change-note" data-testid="run-web-unavailable">Claude Code on the web needs Claude Code, so it is not offered with ${esc(harnessNow || '')}.</p>`;
       const agent = d.agentAccess == null ? (window.ProxyToggle && window.ProxyToggle.isActive ? window.ProxyToggle.isActive() : true) : d.agentAccess;
-      const summary = [d.model || 'the model from Models', inForce || 'the harness from Models', showEffort && d.effort ? `effort ${d.effort}` : null, TARGET_WORDS[d.target] || d.target].filter(Boolean).join(' \u00b7 ');
+      const effortNow = !showEffort ? null : (d.effort ? `effort ${d.effort}` : panelWords.effort);
+      const summary = [modelNow, harnessNow, effortNow, TARGET_WORDS[d.target] || d.target].filter(Boolean).join(' \u00b7 ');
       const panelBody = state.run.panelHtml
         || (state.run.panelFailed
           ? '<p class="opened-task-change-note" data-testid="run-panel-failed">The choices could not load. Use for this run stays off until they do.</p>'
           : '<p class="opened-task-change-note" data-testid="run-panel-loading">Loading the choices\u2026</p>');
       return `<div class="opened-task-change-panel" data-testid="run-change-panel">`
-        + `<div class="opened-task-change-head">This run only${preview ? ` \u00b7 default: ${esc(preview.model || 'from Models')}` : ''}`
-        + `<button class="opened-task-change-x" data-action="close-change" aria-label="Close" data-testid="run-change-x">\u00d7</button></div>`
+        + `<div class="opened-task-change-head">This run only${panelWords.model ? ` \u00b7 default: ${esc(panelWords.model)}` : ''}`
+        + `<button class="btn--quiet opened-task-change-x" data-action="close-change" aria-label="Close" data-testid="run-change-x">\u00d7</button></div>`
         + (presetButtons ? `<div class="opened-task-change-row"><span class="opened-task-change-label">Preset</span>${presetButtons}</div>` : '')
         + panelBody
-        + `<div class="opened-task-change-row"><span class="opened-task-change-label">Runs on</span>${targetButtons}</div>`
+        + `<div class="opened-task-change-row"><span class="opened-task-change-label">Runs on</span>${targetButtons}</div>${webNote}`
         + `<label class="opened-task-change-row"><input type="checkbox" data-testid="run-agent-access"${agent ? ' checked' : ''}> Your agent may read and update this task</label>`
         + `<p class="opened-task-change-summary" data-testid="run-will-use">This run will use ${esc(summary)}.</p>`
         + `<div class="opened-task-change-row">`
-        + `<button class="opened-task-use" data-action="use-run" data-testid="run-use"${state.run.panelFailed || !state.run.panelHtml ? ' disabled' : ''}>Use for this run</button>`
-        + `<button data-action="reset-run" data-testid="run-reset">Reset</button>`
-        + `<button data-action="close-change">Close</button>`
+        + `<button class="btn btn--primary opened-task-use" data-action="use-run" data-testid="run-use"${state.run.panelFailed || !state.run.panelHtml ? ' disabled' : ''}>Use for this run</button>`
+        + `<button class="btn btn--quiet" data-action="reset-run" data-testid="run-reset">Reset</button>`
+        + `<button class="btn btn--quiet" data-action="close-change">Close</button>`
         + `<a class="opened-task-settings-link" href="/workspace/${encodeURIComponent(opts.urlKey || '')}/settings/models">Settings \u203A Models</a>`
         + `</div><p class="opened-task-change-note">A change here is for this run only. The default is set in Settings \u203A Models.</p>`
         + `</div>`;
@@ -1146,6 +1175,7 @@
         .then((r) => {
           if (destroyed) return;
           state.run.panelHtml = (r && r.html) || null;
+          state.run.panelWords = (r && r.words) || null;
           state.run.withoutEffort = (r && r.withoutEffort) || [];
           state.run.panelFailed = !state.run.panelHtml;
           paintRun();
@@ -1153,6 +1183,7 @@
         .catch(() => {
           if (destroyed) return;
           state.run.panelHtml = null;
+          state.run.panelWords = null;
           state.run.panelFailed = true;
           paintRun();
         });
@@ -1263,7 +1294,9 @@
         case 'use-run':
           // Blank fields are not sent, and with no panel there is nothing to send from: Use stays off until it loads.
           if (state.run.panelFailed || !state.run.panelHtml) return true;
-          state.run.choice = { ...state.run.draft };
+          const chosen = { ...state.run.draft };
+          fallBackTarget(chosen, chosen.harness || (state.run.preview && state.run.preview.harness) || '');
+          state.run.choice = chosen;
           state.run.changeOpen = false;
           state.run.draft = null;
           state.run.panelHtml = null;
@@ -2051,7 +2084,11 @@
       if (!el || !el.dataset || !container.contains(el) || !runControlOn() || !el.dataset.testid) return;
       const draft = state.run.draft || (state.run.draft = { ...state.run.choice });
       switch (el.dataset.testid) {
-        case 'run-harness': draft.harness = el.value || null; paintRun(); break;
+        case 'run-harness':
+          draft.harness = el.value || null;
+          fallBackTarget(draft, draft.harness || (state.run.preview && state.run.preview.harness) || '');
+          paintRun();
+          break;
         case 'run-model': draft.model = el.value.trim() || null; break;
         case 'run-effort': draft.effort = el.value || null; paintRun(); break;
         case 'run-agent-access': draft.agentAccess = el.checked === true; break;

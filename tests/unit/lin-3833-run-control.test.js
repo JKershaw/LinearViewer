@@ -14,7 +14,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
-import { decisionPanel } from '../../lib/components/decision-panel.js';
+import { decisionPanel, routingWords } from '../../lib/components/decision-panel.js';
 import { HARNESSES_WITHOUT_EFFORT } from '../../lib/model-routing.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -84,6 +84,12 @@ const serverPanel = (q) => ({
   })
 });
 
+// The preview route answers the run's words with its own answer (LIN-3987, routes/dispatch.js): the fake does the same,
+// so the Runs-on line is tested against what the server sends, not against a raw value.
+const withWords = (preview) => (preview && !preview.words
+  ? { ...preview, words: routingWords({ harness: preview.harness, model: preview.model, effort: preview.effort }) }
+  : preview);
+
 function load({ opened = null, previewFor = () => null, panelFor = serverPanel, presets = [], kickoff = { prompt: 'AUTOPILOT PROMPT', promptName: 'Autopilot', kind: 'autopilot' }, document = null } = {}) {
   const calls = { api: [], dispatch: [], kickoff: [] };
   const window = {
@@ -94,7 +100,7 @@ function load({ opened = null, previewFor = () => null, panelFor = serverPanel, 
       calls.api.push({ url, method: o.method || 'GET', body: o.body ? JSON.parse(o.body) : null });
       if (url.includes('/api/task/')) return opened;
       if (url.includes('/api/task-mode/')) return { lastCopy: null };
-      if (url.includes('/api/dispatch/preview')) return previewFor(new URL(url, 'http://x').searchParams);
+      if (url.includes('/api/dispatch/preview')) return withWords(await previewFor(new URL(url, 'http://x').searchParams));
       if (url.includes('/api/dispatch/decision-panel')) return panelFor(new URL(url, 'http://x').searchParams);
       if (url.includes('/api/dispatch/presets')) return { presets };
       if (url.includes('/api/prompt/')) return { prompt: `PROMPT ${decodeURIComponent(url.split('/').pop().split('?')[0])}`, promptName: 'Plan' };
