@@ -58,9 +58,9 @@
   --border-subtle: rgba(0, 0, 0, 0.08);  /* Lower-contrast border over light bg */
   --font-mono: monospace;                /* Generic monospace fallback */
 
-  /* LIN-456: completed token groups (definitions only — not yet wired to sites,
-     so adding them changes nothing; they give 0C's /styleguide a home and let
-     later phases tokenize spacing/elevation deliberately rather than by sweep). */
+  /* LIN-456: completed token groups (definitions the page CSS consumes, e.g.
+     `var(--space-*)`; they give 0C's /styleguide a home and let later phases
+     tokenize spacing/elevation deliberately rather than by sweep). */
 
   /* Spacing scale */
   --space-1: 0.25rem;
@@ -308,8 +308,9 @@ body {
 /* =============================================================================
    Motion + a11y baseline (LIN-785 §7 / §11)
    =============================================================================
-   Reusable keyframes for status affordances S2 will attach to (a pulsing dot for
-   "running", an indeterminate shimmer for "loading"), a focus-visible ring driven
+   Reusable keyframes for status affordances (a pulsing dot for "running", which
+   `.status-pill--running .status-pill__dot` attaches to; an indeterminate
+   shimmer for "loading"), a focus-visible ring driven
    by the --focus token, and a prefers-reduced-motion baseline that neutralizes
    animation/transition/smooth-scroll for users who ask for less motion. */
 @keyframes pulse {
@@ -3282,8 +3283,8 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
    Status Pill (LIN-465, Phase A.5)
    The canonical state→glyph+label pill. Shares card-accent's state vocabulary
    and Phase-0 color tokens so a pill and a card accent compose on one interface.
-   Coexists with the per-page pill CSS (.foreman-state, swipe .state.*, …) until
-   Phase B points the client JS at this class.
+   Ship and swipe emit this class next to their per-page classes; the per-page
+   pill CSS (swipe .state.*, …) still coexists with it.
 */
 .status-pill {
   display: inline-flex;
@@ -3661,12 +3662,12 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 
 /*
    Empty State (LIN-466, Phase A.6)
-   The canonical "nothing here yet" placeholder. The five per-page empty states
-   genuinely diverge (foreman dashed border, roadmap structural font, swipe
-   italic, distinct paddings/alignments) — only the dim foreground is universal,
-   so the canonical class carries just that shared subset and composes with the
-   RETAINED per-page variant class for byte-identical rendering. Convergence onto
-   one canonical look is the tracked Phase-B seam.
+   The canonical "nothing here yet" placeholder. The per-page empty states
+   genuinely diverge (roadmap structural font, swipe italic, distinct
+   paddings/alignments, and the newer page-local variants) — only the dim
+   foreground is universal, so the canonical class carries just that shared
+   subset and composes with the RETAINED per-page variant class for
+   byte-identical rendering. Convergence onto one canonical look is still open.
 */
 .emptyState {
   color: var(--fg-dim);
@@ -3702,7 +3703,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 
 /* =========================================================================
    Recap Section (LIN-261)
-   Shared across swipe accordion and pipeline overlay.
+   Shared by every `RecapSection` host (swipe accordion, session, task page, scan).
    ========================================================================= */
 .recap-section {
   font-family: var(--font-content);

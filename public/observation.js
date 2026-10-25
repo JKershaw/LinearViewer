@@ -3961,8 +3961,8 @@ function classifyBulkScanError(err) {
  *
  * `onTeardown(results)` fires once, on full settlement OR on stopBulkScan(),
  * whichever comes first — clearing in-flight counters and handing back
- * whatever re-enables the (not-yet-built) run control is Phase 3's job, this
- * pool just calls the callback. Already-issued in-flight requests are LEFT TO
+ * whatever re-enables the run control is the caller's job (the bulk-scan call
+ * site's `onTeardown` re-runs `syncDueBulkBar`); this pool just calls the callback. Already-issued in-flight requests are LEFT TO
  * COMPLETE after a stop (the accepted abort gap — see LIN-2700/LIN-2651):
  * their eventual settlement still lands in `results`, but teardown does not
  * wait for it.
@@ -4084,9 +4084,9 @@ function stopBulkScan() {
 //
 // Presentation only: reads an already-settled pool entry ({item, outcome,
 // value|error}) and paints one row. Never mutates dueSelectedIds, never
-// re-enqueues, never feeds anything back into the pool above. Session 2
-// (§B.7) wires this in as the pool's onResult callback once the run
-// controls exist; nothing calls it yet.
+// re-enqueues, never feeds anything back into the pool above. The bulk-scan
+// run control wires this in as the pool's onResult callback (the `startBulkScan`
+// call).
 
 /**
  * Classify one settled bulk-scan pool entry into exactly one of seven
@@ -4512,8 +4512,8 @@ if (typeof module !== 'undefined' && module.exports) {
     BULK_SCAN_CONCURRENCY, BULK_SCAN_MAX_PER_RUN,
     // LIN-2701 §B.6: the seven-way result classifier + its per-row paint —
     // exposed so the predicate chain is directly unit-testable without a
-    // DOM, and so §B.7's run-control wiring (Session 2, later beats) can
-    // pass paintBulkScanRowResult straight into startBulkScan's onResult.
+    // DOM, and so the bulk-scan run control passes paintBulkScanRowResult
+    // straight into startBulkScan's onResult.
     classifyBulkScanResult, paintBulkScanRowResult, BULK_SCAN_RESULT_COPY,
   };
 }

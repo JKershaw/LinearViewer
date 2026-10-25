@@ -1602,7 +1602,9 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   // missing is refused by that gate while every other proxy path falls
   // through untouched. `haltReadTimeoutMs` is deliberately NOT passed — it is
   // not bound in this composer, and the factory's own default applies. The
-  // routes land dormant: no production path mints a `take` grant until S2b.
+  // The runner routes' path-scoped take gate refuses any token without the
+  // grant, and only the runner-copy mint in `routes/proxy-tokens-admin.js`
+  // carries it.
   // LIN-3098 S3: the served runner prompt (routes/proxy-runner-prompt.js),
   // GET /api/proxy/runner/prompt. Mounted BEFORE createProxyRunnerRoutes: it
   // runs its own limiter → auth → take-grant chain and answers, so the runner

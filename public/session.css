@@ -56,7 +56,7 @@
    The run page's ONE answer surface, replacing the LIN-1005 waiting banner and
    the decision half of the per-run reply box. Amber running-family accent (no
    new status colour); pinned above the steps, whether or not the session is
-   waiting. A dismiss control will sit in `.sess-qcard-actions` (beat 3). */
+   waiting. The dismiss control sits in `.sess-qcard-actions` (`.sess-qcard-dismiss`). */
 .sess-qcards {
   margin: 0 0 1.25rem;
   display: grid;

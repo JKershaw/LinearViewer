@@ -2,7 +2,7 @@
  * Task Chat routes — the experimental "talk to a task" feature (V1).
  *
  * Anchored at /workspace/:urlKey/task-chat (reusing workspaceFromUrl + the
- * pipeline/collective feature-gate-redirect-to-settings pattern). The page is a
+ * collective feature-gate-redirect-to-settings pattern). The page is a
  * provider-free shell; each conversation turn POSTs a question to the SSE chat
  * endpoint, which fetches the task's full context and streams a grounded,
  * first-person answer from the task itself.
@@ -249,7 +249,7 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
     const workspace = req.workspace;
     const featureFlags = await requestFeatureFlags(req);
 
-    // Gate: experimental feature must be enabled (mirrors collective/pipeline).
+    // Gate: experimental feature must be enabled (mirrors the collective gate).
     if (featureFlags.taskChat !== true) {
       return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings/features`);
     }

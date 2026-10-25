@@ -3,7 +3,7 @@
  *
  * Mobile-first, CLI/terminal aesthetic — modelled on the retired experimental
  * dashboard / Swipe (single column, touch targets, horizontal-scroll chips)
- * rather than the Pipeline desktop floor.
+ * rather than a desktop-first layout.
  *
  * Theme migration (LIN-783): reads the LIN-785 semantic token layer
  * (--text/--muted/--faint/--line/--line-soft/--card/--raised/--inset + the
@@ -1300,7 +1300,7 @@ a.obs-task-ident:hover { text-decoration: underline; }
 .obs-archive-more[disabled] { cursor: default; opacity: 0.6; }
 .obs-archive-more[hidden] { display: none; }
 
-/* New-row arrival pulse (shared idiom with pipeline/dashboard). */
+/* New-row arrival pulse. */
 .obs-session.cell-new { animation: obs-cell-new 1.2s ease-out; }
 @keyframes obs-cell-new {
   0% { background: var(--inset); }

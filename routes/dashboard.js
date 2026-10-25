@@ -415,7 +415,7 @@ export function createDashboardRoutes(deps) {
         : [];
 
       // LIN-3247/3248: the evidence fragment + close-out box mounted at the top
-      // of the session page, guarded to the ONE seam LIN-2948 will lift out.
+      // of the session page, guarded to the one mount point in that page.
       // Skipped when the reader is not wired (tests, and any deployment without
       // the module), and fail-open: a read error renders no evidence rather than
       // a broken page. The run's `stopAt` comes off the seed issue's rows, then
