@@ -1,20 +1,22 @@
 # Costs: what the work cost, and what you paid (design note)
 
-Status: design note, for operator approval. Docs only; the build tickets are filed after approval.
+Status: design note. Docs only. The build tickets are filed under the charter (LIN-3490) and run in the order below: tidy the cost seam first, then build.
 Checked at Harbour origin/main `87a766b`. Sample figures are Harbour's own workspace, read through the proxy on 25 Oct 2026.
 
 ## Why
 
 John, 24–25 Oct: Harbour should give people "a centralised cost management centre", "a lovely, simple, tidy way for people to easily understand costs, in a way that makes optimisation both easy and safe for an average user". Token cost at list price is the primary figure, because it "stays constant irrespective of how much the subscription was used"; discounts and subscriptions are "a layer on top", kept cleanly separate and "flexible enough we can add support for all the various other discounts and subscriptions out there". Agents do the optimising (trials, judges, reverting); the page shows the evidence.
 
-Today cost is computed in five places, each its own way, and the totals do not reconcile: "figures not matching is a smell of complexity and tangles in the underlying code". This note fixes what the page shows and what must be true underneath it. It does not choose files, functions or schemas; the build tickets' plan stages do.
+Today cost is computed in five places, each its own way, and the totals do not reconcile: "figures not matching is a smell of complexity and tangles in the underlying code". That makes cost a scattered decision in the Theseus method's sense (`docs/theseus-method-long.md`), and the charter's frame for the UI applies. John, 21 Oct: "it's worth taking what we've learned, making prototypes etc. and before then, getting the associated seams really tidy. Essentially flanking the code." The prototype exists. The seam comes next, then the page. John, 25 Oct: "We can change behaviour if it's an improvement. We just tidy first."
+
+This note fixes what the page shows and what must be true underneath it. It does not choose files, functions or schemas; the build tickets' plan stages do.
 
 ## What is true now
 
 - **Agent sessions are priced from stored tokens.** A `claude-code` session posts cumulative token counts; its cost is derived from the static rate table by `computeUsageCostUsd` (`lib/model-pricing.js:347`, LIN-1495, doc at `lib/session-telemetry.js:35-46`). `/cost` derives it when read; the observation read model stores the derived value and re-derives on a version bump (`lib/observation-sessions-store.js:66-94`).
 - **A cumulative session that crosses a long-context threshold prices to null** (`lib/model-pricing.js:362-369`). Haiku 5.5 carries a 100k override, so most Haiku sessions are unpriced today (`:159-167`). In the sample's 29 days, 114 sessions sent no usage at all, and 7 Haiku sessions priced to null.
 - **Harbour's own calls carry OpenRouter's billed cost** per call in the call log (`lib/llm-call-log.js`). A call's `urlKey` may be null (`:14`, `:59`), so some calls belong to no workspace and appear in no per-workspace total.
-- **Five surfaces show cost or price, each computed its own way:** `/cost` per ticket (`lib/task-cost.js`, `routes/proxy-compute.js:643`); Health's "Harbour's AI calls" block, 30 days of calls only (`lib/render-settings.js:605-627`, `routes/settings.js:260`); the KPI pages' "Cost per finished task", over `[done]`-marked lineages (`lib/terminal-marked-task-cost.js`, `lib/render-kpis.js:162`); the observation feed; and the model picker's display prices (`lib/openrouter.js`).
+- **Five surfaces show cost or price, each computed its own way:** `/cost` per ticket (`lib/task-cost.js`, `routes/proxy-compute.js:643`); Health's "Harbour's AI calls" block, 30 days of calls only (`lib/render-settings.js:605-627`, `routes/settings.js:260`); the KPI pages' "Cost per finished task", over `[done]`-marked lineages (`lib/terminal-marked-task-cost.js`, `lib/render-kpis.js:162`); the observation feed; and the model picker's display prices (`lib/openrouter.js`). Settings › Models (LIN-3855, in progress) adds a sixth: each job's spend.
 - **They do not reconcile.** Over 30 days, Harbour's calls linked to tickets LIN-2850 onward total $153.73; John's OpenRouter bill is about $200 a month. Some of the gap is calls with no ticket or no workspace; how much is unknown.
 - **Every published figure reads 30 days back; storage keeps everything** (`lib/read-horizon.js:1-21`, LIN-3157/LIN-3163). The KPI daily rollup already holds per-workspace daily counts past the horizon (`lib/kpi-daily-rollup.js`, LIN-3724, backfilled by LIN-3731, indexed by LIN-3811). The public KPI page's oldest rolled-up day is 1 Sep 2026.
 - **Every issue provider reports when a ticket was completed** (`completedAt` in `lib/providers/{linear,github,github-projects,jira,local}/index.js`).
@@ -51,10 +53,11 @@ A **finished task** is a ticket that reached a completed state, counted on the U
 - Sessions are priced from their stored tokens by one price function, when read. Correcting a rate re-prices history.
 - Harbour calls use OpenRouter's billed cost.
 - Anything that cannot be priced is listed under **Not counted** with a count, and left out of every figure, never counted as zero.
+- A cumulative session that crosses a long-context threshold stays in Not counted, as today. Modelling those tiers waits until the charter has landed. John, 25 Oct: "That 100k price change is very interesting, and a sign of complexity to come. Worth going down that rabbit hole once the current charter has landed."
 
 ### 4. One read model, every reader
 
-One read model produces a workspace's costs by day: token cost by kind of work, job, harness and model; Harbour calls; tickets finished; and the not-counted list. The page, `GET /api/proxy/costs`, Health's link line and any later reader use it, so their numbers agree by construction. Calls with no workspace are reported at the instance level, so the instance total reconciles with the bill.
+One read model produces a workspace's costs by day: token cost by kind of work, job, harness and model; Harbour calls; tickets finished; and the not-counted list. It is the cost decision's one authority. The page, `GET /api/proxy/costs`, Health's link line, Settings › Models' spend per job, `/cost` and any later reader ask it, so their numbers agree by construction. Calls with no workspace are reported at the instance level, so the instance total reconciles with the bill.
 
 ### 5. History
 
@@ -83,7 +86,7 @@ Entries apply top to bottom, each to what the ones above left. "Its traffic" is 
 
 ### 8. Worth a look
 
-At most two items, read from the same model. Each item only links; nothing on this page changes a model. Phase 2 adds offers ("included, not used", such as an allowance nothing draws on) and what-ifs ("the same calls on another model family"), computed with the same pay rules on the same traffic.
+At most two items, read from the same model. Each item only links; nothing on this page changes a model. Optimising (step 7 below) adds offers ("included, not used", such as an allowance nothing draws on) and what-ifs ("the same calls on another model family"), computed with the same pay rules on the same traffic.
 
 ### 9. What changed
 
@@ -95,26 +98,35 @@ Each model-routing change log entry appears with cost per run for that job befor
 
 ## Proof
 
-Each part closes on a run that watched it, not on reading the code.
+Each part closes on a run that watched it, not on reading the code. Tickets make no live calls to outside services (the charter's rule).
 
-- **Plumbing:** for 30 whole UTC days, Harbour's instance-wide OpenRouter call total matches OpenRouter's own figure within 2%, with the remaining gap named. OpenRouter's activity API needs a management key; confirm the key and field names when building. Every session in the window is either priced or listed as not counted; none is silently zero. The page and `GET /api/proxy/costs` return identical figures for the same period.
-- **Page:** end-to-end on a seeded workspace: the headline, tiles and charts match the seed; adding, reordering or removing a way of paying changes what you paid and never changes token cost; a workspace with nothing set up shows list price throughout; a workspace with no history shows the empty state.
+- **The tidy moves:** the independent replay compares every cost figure each surface shows, old code against new, on the same recorded inputs, and finds no difference that is not on the move's list of intended ones.
+- **The read model:** every session in the window is either priced or listed as not counted, and none is silently zero. Every reader returns identical figures for the same period.
 - **History:** the backfilled days for Harbour match a direct recount of the stored rows for three sample days.
+- **Page:** end-to-end on a seeded workspace: the headline, tiles and charts match the seed; adding, reordering or removing a way of paying changes what you paid and never changes token cost; a workspace with nothing set up shows list price throughout; a workspace with no history shows the empty state.
+- **Reconciliation, a check for John in production:** for 30 whole UTC days, Harbour's instance-wide OpenRouter call total against OpenRouter's own figure, with the gap named. It needs a scoped OpenRouter key; John, 25 Oct: "I can see about adding a scoped OR key when we need it." Until then the tickets record Harbour's side, ready to compare.
 
-## Phases
+## Order of work
 
-- **Phase 0, plumbing.** Decisions 2–5 and the read half of 10: one price function at read; cumulative over-threshold sessions resolved (see Open questions); calls with no ticket or no workspace counted; the read model; daily history and Harbour's backfill; `GET /api/proxy/costs`; reconciliation with OpenRouter.
-- **Phase 1, the page.** The Costs area as above, with subscriptions and pay as you go only; Worth a look with the biggest-lever item only; What changed with cost per run; agent writes to how you pay; Health's AI-calls block replaced by a link.
-- **Phase 2, optimising.** Allowances, discounts and the plan catalogue; offers and what-ifs in Worth a look.
+Tidy first, in the Theseus moves, then build. Each move gets the charter's prediction, fresh reader and replay.
+
+1. **Own.** Write down where each cost decision lives today (rates, pricing a session, a call's cost, summing by ticket, by period and by task, the read windows) and where it belongs, counted by a stated rule. Build the replay that judges the next moves.
+2. **Free the seam.** Replace the tests that pin cost code by its text with tests of its behaviour.
+3. **Consolidate.** One cost authority in the area that owns it; every surface in "What is true now" asks it; the copies are deleted. A copy that is plainly wrong is fixed, and the fix named.
+4. **Rebuild, with the improvements.** A design-first rebuild of the authority into decision 4's read model, with decision 5's daily history, calls with no workspace counted at instance level, and `GET /api/proxy/costs`. The replay lists each intended difference.
+5. **Backfill.** Harbour's workspace since records began, as a dry run first, then the write.
+6. **The page.** The Costs area as above, with subscriptions and pay as you go only; Worth a look with the biggest-lever item only; What changed with cost per run; agent writes to how you pay; Health's AI-calls block replaced by a link. It shares Settings files with LIN-3855 and LIN-3833, so it follows them.
+7. **Optimising.** Allowances, discounts and the plan catalogue; offers and what-ifs in Worth a look.
 
 ## Not in scope
 
-Window or limit calibration for subscriptions; trials, judges and reverting (agents do these); rework and second-round measures; per-person costs; currencies other than US dollars; changing what the public `/kpis` page counts.
+Window or limit calibration for subscriptions; trials, judges and reverting (agents do these); rework and second-round measures; per-person costs; currencies other than US dollars; changing what the public `/kpis` page counts, unless John rules it (Open questions); modelling long-context price tiers for cumulative sessions (after the charter).
 
 ## Open questions
 
-- **Label clash.** `/kpis` already says "Cost per finished task" for `[done]`-marked lineages. This page counts tickets set Done. Recommendation: keep the label here with its definition one click away, and file a small follow-up to move `/kpis` to tickets so both agree.
-- **Cumulative sessions over a long-context threshold.** Price at the base rate and show "at least", or keep them in Not counted? Recommendation: price at base and flag "at least", because one model's sessions disappearing from every figure distorts comparisons.
+Each has a recommendation; a ticket that reaches one asks John for a ruling, pre-filled with it.
+
+- **Label clash.** `/kpis` already says "Cost per finished task" for `[done]`-marked lineages. This page counts tickets set Done. Recommendation: keep the label here with its definition one click away; when Consolidate makes `/kpis` a reader of the authority, ask whether `/kpis` moves to tickets too, so both agree.
 - **The period.** The prototype compares 8 days with the 8 before. Recommendation: this month so far against the same days last month by default, because plans and allowances reset monthly, with last 7 and last 30 days as options.
-- **Tickets with no Harbour work.** 19 of the 238 tickets finished in the sample had no priced session. Count them (simple, as decided) or only tickets Harbour worked on?
+- **Tickets with no Harbour work.** 19 of the 238 tickets finished in the sample had no priced session. Recommendation: count them, as decided (John, 25 Oct: "Tickets moved to done [is] fine for now."), and revisit with the rework measures.
 - **Estimating sessions that never reported usage** (114 in the sample's 29 days) is a Paper, not this build.
