@@ -63,8 +63,15 @@ example.
 | `router/livetests.mjs` | live unit-test tier: per side an overlay of the snapshot (`routes/`, `tests/`, `server.js` copied, the rest symlinked) with the side's file(s) in `routes/`; runs each selected test file per side and compares per-test TAP verdicts — the witness for direct-handler tests and source-text tests |
 | `router/selfcheck.mjs` | `runRouterSelfcheck({toolDir, base, mutants})`: identity on N seeds with a coverage floor, then each mutant must be detected on its expected route only |
 | `router/coverage.mjs` | V8 precise coverage → lines (rung5c) |
+| `router/ai-coverage.mjs` | AI-path floors (LIN-3880): `evaluateAiCoverage({counts, floors, tiers, mode, only})` judges per-side counters a target's `cfg.aiCounters(sc, outcome)` produced against its `cfg.aiFloors` (`{key, min, needs: 'gen'|'edge'}`); a floor whose tier did not run is listed, not judged; `--ai-floor fail` (default) exits 3, `warn` prints, `off` records only |
 
 Kit changes made for rung 7: `ensureSnapshot` now also archives `docs/` (lib reads
 `docs/autopilot-operating-manual.md` at runtime; without it `buildScanMessages` fails closed and
 every scan/retire answers 503). `docs/` was added to the existing `snapshots/16e7ae77` in place —
 replays that ran on that snapshot before took the manual-missing fallback.
+
+LIN-3880 (AI-path floors): a replay that never reaches a model call compared two 500s and read
+`differing: 0`. `cfg.aiCounters` and `cfg.aiFloors` add a coverage judgement to every router run;
+`runRouterSelfcheck({witnesses})` runs extra identity jobs under an env (`{id, env, expectExit}`)
+and the identity check now also needs the coverage verdict `pass`. Targets without `aiCounters`
+keep the old behaviour.

@@ -4,6 +4,7 @@
 //
 //   node replay.mjs --old <dirOrFile> --new <dirOrFile> [--n 3000] [--seed 1] [--out f]
 //                   [--coverage] [--lib DIR] [--tiers gen,edge,test] [--only <id>] [--quiet]
+//                   [--ai-floor fail|warn|off]   (default fail: exit 3 when the AI path was not exercised)
 import path from 'node:path';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -14,13 +15,12 @@ import * as gen from './lib/gen.mjs';
 import * as edge from './lib/edge.mjs';
 
 const TOOL_DIR = path.dirname(fileURLToPath(import.meta.url));
-const SNAPSHOT = path.join(TOOL_DIR, '../../replay-kit/snapshots/16e7ae77');
 
 await runRouterReplay({
   name: 'workspace-api router behavioural replay (rung 7)',
   toolDir: TOOL_DIR,
   defaultOld: path.join(TOOL_DIR, 'pinned', 'origin-main'),
-  defaultLib: SNAPSHOT,
+  defaultLib: path.join(TOOL_DIR, '../../..'), // repo root: loadSideLibs needs lib/model-routing.js (LIN-3853), which the 16e7ae77 snapshot lacks (LIN-3880)
   fallbackRoot: '/home/user/LinearViewer',
   defaultN: 3000,
   subdir: 'routes',
@@ -28,6 +28,7 @@ await runRouterReplay({
   seams: {
     'lib/openrouter.js': ['getRecommendation', 'getRecommendationStream', 'streamChat', 'streamChatWithTools'],
     'lib/audit.js': ['runAudit'],
+    'lib/prompts/autopilot-manual.js': ['extractPrincipleZeroSection'],
   },
   scrubEnv: ['OPENROUTER_API_KEY', 'OPENROUTER_FREE_TIER_KEY', 'FEEDBACK_TEAM_ID', 'FEEDBACK_PROJECT_ID', 'MONGODB_URI', 'LINEAR_API_KEY', 'LINEAR_ACCESS_TOKEN', 'GITHUB_TOKEN', 'OPENROUTER_MODEL', 'FREE_TIER_RUN_LIMIT'],
   managedEnv: ['OPENROUTER_API_KEY', 'OPENROUTER_FREE_TIER_KEY', 'FEEDBACK_TEAM_ID', 'FEEDBACK_PROJECT_ID'],
@@ -35,6 +36,8 @@ await runRouterReplay({
   loadSideLibs: fakes.loadSideLibs,
   onSideLibs: (holder, libs) => fakes.patchRegistry(holder, libs),
   seamHandler: fakes.seamHandler,
+  aiCounters: (sc, o) => fakes.aiCountersFor(sc, o),
+  aiFloors: fakes.AI_FLOORS,
   fetchHandler: (ctx, entry) => fakes.fetchHandler(ctx, entry),
   describeFetchHeaders: fakes.describeFetchHeaders,
   async loadVocabulary({ libUrl }) {

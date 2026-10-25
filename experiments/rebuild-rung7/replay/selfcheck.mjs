@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Self-check for the workspace-api replay: identity (old vs an independent
-// copy) on two seeds with ≥95% line coverage, then 15 planted mutants, each
-// expected on its own route only.
+// copy) on two seeds with ≥95% line coverage and an AI-path floor pass, then
+// 24 planted mutants, each expected on its own route only, then one vacuity
+// witness (today's stale fakes must be refused, exit 3; LIN-3880).
 //   node selfcheck.mjs [--n 3000] [--seeds 1,7] [--mutant-n 1500] [--jobs 4] [--lib DIR]
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -56,6 +57,49 @@ const MUTANTS = [
   { id: 'm15-session', what: 'LIN-2933 recovery mirrors the adopted token without its expiry (session mutation)',
     from: 'applyAccessTokenToWorkspace(workspace, adopted.token, adopted.expiresAt)', to: 'applyAccessTokenToWorkspace(workspace, adopted.token, null)',
     expect: { kinds: ['session'], endpoints: [`POST ${W('/comments/:issueId')}`] } },
+  // LIN-3880: the AI-path routes the vacuity hid. Each mutant changes one route's model
+  // key, stamp or fail-closed arm; the replay must flag it on that route only.
+  { id: 'm16-scan-model', what: 'scan POST resolves the recap model key instead of the scan key',
+    from: "const inputHash = hashContext(context);\n      const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'scan', forceDefault: isFreeTier });\n\n      let scanResult;",
+    to: "const inputHash = hashContext(context);\n      const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'recap', forceDefault: isFreeTier });\n\n      let scanResult;",
+    expect: { kinds: ['seamCalls', 'body'], endpoints: [`POST ${W('/scan/:issueId')}`] } },
+  { id: 'm17-scan-stamp', what: 'scan POST drops the inputHash stamp from its recordScan row',
+    from: "        issueIdentifier: context.issue?.identifier || issueId,\n        inputHash,\n",
+    to: "        issueIdentifier: context.issue?.identifier || issueId,\n",
+    expect: { kinds: ['store:taskDecisionsStore'], endpoints: [`POST ${W('/scan/:issueId')}`] } },
+  { id: 'm18-scan-p0-arm', what: 'scan POST fail-closed arm code renamed (PRINCIPLE_ZERO_UNAVAILABLE)',
+    from: "\n        return keepaliveError(keepalive, 503, 'Scan rubric is temporarily unavailable; nothing was evaluated', {\n          code: 'PRINCIPLE_ZERO_UNAVAILABLE'",
+    to: "\n        return keepaliveError(keepalive, 503, 'Scan rubric is temporarily unavailable; nothing was evaluated', {\n          code: 'PRINCIPLE_ZERO_OFF'",
+    expect: { kinds: ['body'], endpoints: [`POST ${W('/scan/:issueId')}`] } },
+  { id: 'm19-retire-p0-arm', what: 'retire fail-closed arm code renamed (PRINCIPLE_ZERO_UNAVAILABLE)',
+    from: "\n          return keepaliveError(keepalive, 503, 'Scan rubric is temporarily unavailable; nothing was evaluated', {\n            code: 'PRINCIPLE_ZERO_UNAVAILABLE'",
+    to: "\n          return keepaliveError(keepalive, 503, 'Scan rubric is temporarily unavailable; nothing was evaluated', {\n            code: 'PRINCIPLE_ZERO_OFF'",
+    expect: { kinds: ['body'], endpoints: [`POST ${W('/scan/:issueId/retire')}`] } },
+  { id: 'm20-brief-model', what: 'brief POST resolves the recap model key instead of the brief key',
+    from: "opKind: 'brief', forceDefault: isFreeTier",
+    to: "opKind: 'recap', forceDefault: isFreeTier",
+    expect: { kinds: ['seamCalls', 'body'], endpoints: [`POST ${W('/brief/:issueId')}`] } },
+  { id: 'm21-recommend-model', what: 'GET recommend (JSON) resolves the brief model key instead of the recommend key',
+    from: "      // (above, before this point), not per hop.\n      const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'recommend', forceDefault: isFreeTier })",
+    to: "      // (above, before this point), not per hop.\n      const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'brief', forceDefault: isFreeTier })",
+    expect: { kinds: ['seamCalls', 'body'], endpoints: [`GET ${W('/recommend/:issueId')}`] } },
+  { id: 'm22-recap-unconfigured', what: 'recap not-configured arm code renamed (AI_NOT_CONFIGURED)',
+    from: "'AI recap is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.', { code: 'AI_NOT_CONFIGURED' }",
+    to: "'AI recap is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.', { code: 'AI_RECAP_OFF' }",
+    expect: { kinds: ['body'], endpoints: [`POST ${W('/recap/:issueId')}`] } },
+  { id: 'm23-brief-unconfigured', what: 'brief not-configured arm code renamed (AI_NOT_CONFIGURED)',
+    from: "'AI brief is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.', { code: 'AI_NOT_CONFIGURED' }",
+    to: "'AI brief is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.', { code: 'AI_BRIEF_OFF' }",
+    expect: { kinds: ['body'], endpoints: [`POST ${W('/brief/:issueId')}`] } },
+  { id: 'm24-scan-unconfigured', what: 'scan POST not-configured arm code renamed (AI_NOT_CONFIGURED)',
+    from: "'AI scan is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.', { code: 'AI_NOT_CONFIGURED' });\n    }\n\n    if (!mockAi && isFreeTier) {",
+    to: "'AI scan is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.', { code: 'AI_SCAN_OFF' });\n    }\n\n    if (!mockAi && isFreeTier) {",
+    expect: { kinds: ['body'], endpoints: [`POST ${W('/scan/:issueId')}`] } },
 ].map(m => ({ file: F, ...m }));
 
-process.exit(await runRouterSelfcheck({ toolDir: TOOL, base: path.join(TOOL, 'pinned', 'origin-main'), mutants: MUTANTS }));
+// LIN-3880: today's kit (REPLAY_STALE_FAKES=1) reports no difference, and the AI-path floor must refuse it.
+const WITNESSES = [
+  { id: 'w1-vacuity-stale-fakes', what: 'stale fakes (REPLAY_STALE_FAKES=1): 0 differing, refused by the AI-path floor (exit 3)', env: { REPLAY_STALE_FAKES: '1' }, expectExit: 3 },
+];
+
+process.exit(await runRouterSelfcheck({ toolDir: TOOL, base: path.join(TOOL, 'pinned', 'origin-main'), mutants: MUTANTS, witnesses: WITNESSES }));

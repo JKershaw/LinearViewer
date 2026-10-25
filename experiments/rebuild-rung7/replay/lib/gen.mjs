@@ -203,7 +203,7 @@ export const FORMS = {
   recommendStatus: { w: 3, make(g, sc) {
     commonWorld(g, sc);
     sc.method = 'GET'; sc.path = P(sc, '/recommend/status');
-    if (g.chance(0.4)) sc.stores.workspacePreferencesStore = { getWorkspacePreferences: g.weighted([[{ ret: { model: 'anthropic/claude-x' } }, 3], [{ ret: { aiModels: { recommend: 'openai/gpt-5.4' } } }, 2], [{ throw: storeErr(g) }, 1]]) };
+    if (g.chance(0.4)) sc.stores.workspacePreferencesStore = { getWorkspacePreferences: g.weighted([[{ ret: { model: 'anthropic/claude-x' } }, 3], [{ ret: { aiModelOverrides: { byKind: { recommend: { model: 'openai/gpt-5.4' } } } } }, 2], [{ throw: storeErr(g) }, 1]]) };
   } },
   recommend: { w: 7, make(g, sc, K) {
     commonWorld(g, sc, { prefer: ['acme', 'testws', 'localws', 'ghp', 'mixed'] });
@@ -282,6 +282,8 @@ export const FORMS = {
     sc.method = 'POST'; sc.path = P(sc, `/scan/${id}${q({ source: g.pick([undefined, undefined, 'linear', ' github ', '  ']) })}`);
     sc.prov.fetchRecommendationContext = g.chance(0.85) ? { ret: recCtx(g, id, { canonical: g.chance(0.85) }) } : { throw: upstreamErr(g) };
     sc.ai.chat = { scan: aiChat(g, 'scan') };
+    if (g.chance(0.15)) sc.ai.principleZero = null;
+    opModelOverrides(g, sc);
     freeTier(g, sc);
     if (g.chance(0.1)) sc.stores.taskDecisionsStore = { recordScan: g.weighted([[{ ret: null }, 1], [{ throw: storeErr(g) }, 1]]) };
     if (g.chance(0.15)) sc.stores.harbourCommentsStore = { wereRecordedByHarbour: g.weighted([[{ ret: { __setOf: ['c1'] } }, 1], [{ throw: storeErr(g) }, 1]]) };
@@ -452,11 +454,20 @@ export const FORMS = {
   } },
 };
 
+// Per-operation model overrides (LIN-3853 aiModelOverrides.byKind), with a distinct model per
+// operation so a route that resolves another operation's key changes the model it calls (LIN-3880).
+function opModelOverrides(g, sc, p = 0.5) {
+  if (!g.chance(p)) return;
+  const model = (m) => ({ model: m });
+  sc.stores.workspacePreferencesStore = { getWorkspacePreferences: { ret: { aiModelOverrides: { byKind: { scan: model('m-scan'), recap: model('m-recap'), brief: model('m-brief'), recommend: model('m-recommend') } } } } };
+}
+
 function freeTier(g, sc) {
   if (g.chance(0.3)) sc.stores.freeTierStore = { tryUse: g.weighted([[{ ret: { allowed: true, remaining: 3, limit: 10, resetsAt: '2026-10-02T00:00:00.000Z' } }, 2], [{ ret: { allowed: false, reason: 'Free tier limit reached', remaining: 0, limit: 10, resetsAt: '2026-10-02T00:00:00.000Z' } }, 2], [{ throw: storeErr(g) }, 1]]) };
 }
 
 function recommendWorld(g, sc, id) {
+  opModelOverrides(g, sc);
   freeTier(g, sc);
   const descent = g.weighted([['leaf', 6], ['parent', 3], ['cycle', 1], ['stuck', 1]]);
   if (descent === 'leaf') {
@@ -499,7 +510,7 @@ function cachePost(g, sc, K, kind) {
   freeTier(g, sc);
   const store = kind === 'recap' ? 'recapCacheStore' : 'briefCacheStore';
   sc.stores[store] = { get: g.weighted([[{ ret: null }, 2], [{ ret: { [kind]: 'stored', generatedAt: '2026-10-01T12:00:00.000Z' } }, 3], [{ throw: storeErr(g) }, 1]]), ...(g.chance(0.1) ? { put: { throw: storeErr(g) } } : {}) };
-  if (g.chance(0.3)) sc.stores.workspacePreferencesStore = { getWorkspacePreferences: { ret: { aiModels: { [kind]: 'anthropic/claude-haiku' } } } };
+  opModelOverrides(g, sc, 0.3);
 }
 
 function scanOutcome(g, sc, K, op) {
@@ -511,6 +522,8 @@ function scanOutcome(g, sc, K, op) {
   if (op === 'dismiss') sc.stores.taskDecisionsStore = { markOutcome: g.weighted([[{ ret: null }, 2], [{ throw: storeErr(g) }, 1], [{ throw: { kind: 'plain', message: 'row not found' } }, 1]]) };
   if (op === 'retire') {
     sc.ai.chat = { 'scan-retire': aiChat(g, 'scan-retire') };
+    if (g.chance(0.15)) sc.ai.principleZero = null;
+    opModelOverrides(g, sc);
     freeTier(g, sc);
     sc.stores.taskDecisionsStore = { markOutcome: g.weighted([[{ __default: true }, 5], [{ ret: null }, 1], [{ ret: { id: 'row-1', outcome: 'dismissed' } }, 1], [{ throw: storeErr(g) }, 1]]) };
     if (sc.stores.taskDecisionsStore.markOutcome.__default) delete sc.stores.taskDecisionsStore;

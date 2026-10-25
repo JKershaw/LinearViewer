@@ -11,13 +11,14 @@ S=/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung7
 node $S/replay/replay.mjs --new <dirOrFile> [--old $S/replay/pinned/origin-main] [--n 3000] [--seed 1]
      [--out f.json] [--coverage] [--lib DIR] [--tiers gen,edge,test] [--only <id>] [--dump f.jsonl]
 node $S/replay/livetests.mjs --new <dirOrFile> [--all]       # the unit tests, live, per side (~65 s)
-node $S/replay/selfcheck.mjs [--jobs 4]                      # identity ×2 seeds + 15 mutants (~6 min)
+node $S/replay/selfcheck.mjs [--jobs 4] [--lib .]            # identity ×2 seeds + 24 mutants + 1 witness (~5 min)
 node $S/replay/capture-tests.mjs                             # re-record pinned/test-calls.json
 ```
 `--new` takes the rebuilt file, or a folder holding `workspace-api.js` (+ any helper modules it
 imports relatively — they become part of the new side; sibling route files present in that folder
-are taken from it too). `--lib` defaults to the origin/main snapshot
-`../replay-kit/snapshots/16e7ae77` (lib/, routes/, docs/ …). Exit 0 same / 1 different (or export
+are taken from it too). `--lib` defaults to the repo root (HEAD: lib/, routes/, docs/ …) and must be a
+tree with `lib/model-routing.js` (LIN-3853 or later); the `16e7ae77` snapshot predates it and the
+replay exits 4 on it (LIN-3880). Exit 0 same / 1 different (or export
 surface changed) / 2 tool failure. Run both `replay.mjs` and `livetests.mjs` on a rebuild.
 
 Files: `requirements-notes.md` (every route, middleware, calls, responses, errors, logs, side
@@ -96,6 +97,37 @@ except one client-abort artifact (`PATCH /issues NO_RESPONSE(server 404)`, 1).
 Every mutant is detected only on its own route. Line coverage of the old file (V8 precise),
 identical on both seeds: **98.79 % (2,782/2,816)**; uncovered (all unreachable, see below): 468-471,
 550-551, 763-765, 1725, 2128-2129, 2361-2364, 2367-2371, 2673-2676, 2975-2978, 3874-3875, 4324-4326.
+
+## AI-path floors (LIN-3880)
+The fakes were stale against LIN-3853: the workspace-preferences store had no `getRoutingTable`,
+so POST scan, retire, recap and brief (and the recommend routes) died with a 500 before any model
+call, and the replay still printed `differing: 0`. Now:
+
+- the fake store answers `getRoutingTable` with `tableFromPreferences` over the scenario's
+  preferences; the Principle 0 section answers `null` on `sc.ai.principleZero` (fail-closed arm);
+- the generator sets per-operation model overrides and Principle 0 nulls; edge adds the seven verbs
+  (`OPTIONS HEAD PUT DELETE PATCH GET POST`) on each AI path;
+- every run counts what its requests reached (`model:<feature>`, `store:recordScan`,
+  `arm:{p0Null,notConfigured,upstream503}:<family>`, `verb:<METHOD>:<family>`) and judges the
+  totals against `AI_FLOORS` (replay-kit `router/ai-coverage.mjs`). A miss is exit 3 (`--ai-floor
+  fail`, the default; `warn` and `off` also exist). The report prints what the new side reached.
+
+Measured (`--n 3000`, seed 1, `--lib .` = HEAD): 6,672 requests (gen 3,000, edge 3,321, test 351);
+new side reached `model:scan` 73, `model:scan-retire` 69, `model:recap` 85, `model:brief` 84,
+`model:recommend` 226, `store:recordScan` 65; no `reading 'jobs'` error remains (the 407 remaining
+500s are the scenario's injected faults, e.g. `kaboom`, `store down`). Identity: 0 differing, AI path
+`pass`.
+
+Limits of the floors: they are presence floors (at least one request per family and arm), not rates.
+Partial vacuity (a few of many requests reaching the model) is caught by the per-route mutants
+16–24, not by the floors. `REPLAY_STALE_FAKES=1` (today's kit) gives 0 differing and exit 3.
+
+Self-check on HEAD (`reports/selfcheck-lin3880.json/.log`): identity ×2 pass; witness pass; mutants
+16–24 caught on their own route; m01–m15 as before. Two checks fail that are not AI-path and were
+not changed here: **m05** (sessions oldest-first) is not detected with the HEAD lib (the same
+result on the pre-change kit from `git archive HEAD`, 0 differing), and **line coverage** of the
+pinned file is 90.87 % (88.25 % on the pre-change kit) against the 95 % floor. The selfcheck exits 1
+for those two; no floor was loosened.
 
 ## Source-text tests that read this file (keep green; `livetests.mjs` runs all of them)
 Found by grep over `tests/unit` and confirmed live (`livetests.mjs` with the comment-stripped,

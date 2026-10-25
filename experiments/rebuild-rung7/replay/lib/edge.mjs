@@ -6,6 +6,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { G, FIXED_NOW } from '../../../replay-kit/lib/router/common.mjs';
 import { WORKSPACES, ISSUE_UUID, finalize, routeKeyFor, FORMS, generateScenario } from './gen.mjs';
+import { AI_VERBS } from './fakes.mjs';
 export { routeKeyFor };
 
 const UUID = (n) => `00000000-0000-4000-a000-${String(n).padStart(12, '0')}`;
@@ -148,7 +149,7 @@ function cases(K) {
   add('apg:providers', 6, (sc) => R.apGeneral(sc), null);
 
   // --- recommend status ------------------------------------------------------------
-  add('recStatus:sources', 6, (sc, k) => { R.recStatus(sc); if (k === 0) sc.session.openRouterApiKey = 'sk-s'; if (k === 1) sc.env = { NODE_ENV: 'production' }; if (k === 2) sc.env = { NODE_ENV: 'production', OPENROUTER_FREE_TIER_KEY: 'f' }; if (k === 3) { sc.env = { NODE_ENV: 'production', OPENROUTER_API_KEY: '  ' }; sc.session.freeTierEnabled = true; } if (k === 4) testEnv(sc); if (k === 5) sc.stores.workspacePreferencesStore = { getWorkspacePreferences: { ret: { aiModels: { recommend: 'anthropic/claude-sonnet-4' } } } }; }, null);
+  add('recStatus:sources', 6, (sc, k) => { R.recStatus(sc); if (k === 0) sc.session.openRouterApiKey = 'sk-s'; if (k === 1) sc.env = { NODE_ENV: 'production' }; if (k === 2) sc.env = { NODE_ENV: 'production', OPENROUTER_FREE_TIER_KEY: 'f' }; if (k === 3) { sc.env = { NODE_ENV: 'production', OPENROUTER_API_KEY: '  ' }; sc.session.freeTierEnabled = true; } if (k === 4) testEnv(sc); if (k === 5) sc.stores.workspacePreferencesStore = { getWorkspacePreferences: { ret: { aiModelOverrides: { byKind: { recommend: { model: 'anthropic/claude-sonnet-4' } } } } } }; }, null);
   add('recStatus:testws', 5, (sc) => { testEnv(sc); R.recStatus(sc); }, 'testws');
 
   // --- recommend (JSON) and stream ---------------------------------------------------
@@ -351,6 +352,24 @@ function cases(K) {
   add('retire:slow', 3, (sc, k) => { R.retire(sc); sc.ai.chat = { 'scan-retire': { text: k ? 'garbage' : '{"has_decision":false}', delayMs: 30_000 } }; if (k === 2) sc.stores.taskDecisionsStore = { markOutcome: { ret: null } }; });
   add('unretire:ok', 5, (sc, k) => { R.unretire(sc, k % 2 ? 'LIN-7' : ISSUE_UUID); if (k === 2) sc.variant = 'sparse'; });
   add('unretire:storeErrors', 6, (sc, k) => { R.unretire(sc); sc.stores.taskDecisionsStore = { reverseOutcome: { throw: [{ kind: 'plain', message: 'reverseOutcome: row not found (pruned or replaced)' }, { kind: 'plain', message: 'reverseOutcome: row is not self-resolved' }, ERR.auth, ERR.boom, ERR.str, ERR.nf][k] } }; });
+
+  // --- Principle 0 fail-closed arm: the seam answers null on demand (LIN-3880) -------------
+  add('scanPost:p0Null', 5, (sc, k) => { R.scanPost(sc); sc.ai.principleZero = null; if (k === 4) sc.stores.taskDecisionsStore = { recordScan: { throw: ERR.boom } }; });
+  add('retire:p0Null', 5, (sc, k) => { R.retire(sc); sc.ai.principleZero = null; if (k === 4) sc.env = { NODE_ENV: 'production' }; });
+
+  // --- the seven verbs on each AI path (LIN-3880): the route answers each one, none reaches a model unasked ----
+  const AI_PATH_SETUP = {
+    recommend: (sc) => R.rec(sc),
+    scan: (sc) => R.scanPost(sc),
+    retire: (sc) => R.retire(sc),
+    recap: (sc) => R.recapPost(sc),
+    brief: (sc) => R.briefPost(sc),
+  };
+  for (const [family, setup] of Object.entries(AI_PATH_SETUP)) {
+    for (const verb of AI_VERBS) {
+      add(`verbs:${family}:${verb}`, 2, (sc, k) => { setup(sc); sc.method = verb; sc.verbFamily = family; if (verb !== 'POST') sc.body = { kind: 'none' }; if (k === 1) sc.env = { NODE_ENV: 'production' }; });
+    }
+  }
 
   // --- scan-due --------------------------------------------------------------------------
   const goodCursor = Buffer.from(JSON.stringify({ scannedAt: '2026-09-01T00:00:00.000Z', issueId: ISSUE_UUID })).toString('base64url');
