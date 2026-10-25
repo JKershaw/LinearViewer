@@ -172,3 +172,23 @@ test('cmp: a repeat inside one file is not a group; a constant resolves to its l
 test('cmp is the one addition to the parity fixture: it holds no repeated comparison, so parity is still meaningful', () => {
   assert.deepEqual(cmpGroups(run({ 'lib/a.js': fn('alpha'), 'routes/b.js': fn('beta') })), []);
 });
+
+// ── scope: pinned replay snapshots are not live code (LIN-3881) ─────────────
+// A live handler is compared with its own pinned replica. Commit the handler and its pinned copy, then grow the live
+// file: the untouched handler must not pair with the snapshot, through the same scope a real census run uses.
+test('scope: a size-changing edit to a live file with a pinned twin yields no group that touches the pinned snapshot', async () => {
+  const { readCommit, compileScope } = await import('./code-shape-lib.mjs');
+  const repo = makeRepo();
+  try {
+    const handler = fn('closeOut', 'items');
+    repo.commit({
+      'routes/workspace-api.js': handler,
+      'experiments/rebuild-rung7/replay/pinned/origin-main/workspace-api.js': handler,
+    }, '2026-01-01T00:00:00Z');
+    const sha = repo.commit({ 'routes/workspace-api.js': `${handler}\nexport const extra = 1;\n` }, '2026-01-02T00:00:00Z');
+    const { sha: full, commitDate, files } = readCommit(repo.dir, sha, compileScope());
+    const r = runCensus({ files, commit: full, commitDate, churnDays: 90 });
+    const pinned = (g) => g.files.some((f) => f.startsWith('experiments/rebuild-rung7/replay/pinned/'));
+    assert.deepEqual(r.groups.filter(pinned).map((g) => [g.detector, g.files]), []);
+  } finally { repo.cleanup(); }
+});
