@@ -576,10 +576,10 @@ and is the recommended pattern for any consumer that posts foreman status.
 | `issueUrl` | string | Full URL to the Linear issue (nullable) |
 | `target` | string | Dispatch target: `"cli"` (default), `"web"`, `"dash"`, or `"local"`. See [Target Routing](#target-routing) |
 | `repo` | string | The runner's folder override, or `null`. Stored verbatim (opaque); Harbour does not validate it — the consumer resolves it against its own folder namespaces. See [Repo Override](#repo-override-runner-folder-override) (nullable) |
-| `model` | string | **Execution** model the consumer should use to *run* this prompt (the value it passes to its own CLI, e.g. `claude --model`), or `null`. OpenRouter `provider/model` naming convention (e.g. `"anthropic/claude-opus-4.8"`). Opaque and forwarded blindly; `null` keeps the consumer's current default. See [Execution model](#execution-model-model) (nullable) |
-| `harness` | string | **Execution** harness the consumer should use to *run* this prompt (e.g. `"claude-code"`, `"opencode"`), or `null`. Opaque and forwarded blindly; `null` keeps the consumer's own default. See [Harness](#harness-harness) (nullable) |
+| `model` | string | **Execution** model the consumer should use to *run* this prompt (the value it passes to its own CLI, e.g. `claude --model`), or `null`. OpenRouter `provider/model` naming convention (e.g. `"anthropic/claude-opus-4.8"`). Opaque and forwarded blindly; `null` means no default was resolved, so the consumer's own default applies. See [Execution model](#execution-model-model) (nullable) |
+| `harness` | string | **Execution** harness the consumer should use to *run* this prompt (e.g. `"claude-code"`, `"opencode"`), or `null`. Opaque and forwarded blindly; `null` means the consumer's own default applies. See [Harness](#harness-harness) (nullable) |
 | `terminal` | string | **Terminal-emulator driver** the consumer should launch this session in (e.g. `"terminal"`, `"iterm"`, `"kitty"`, `"tmux"`), or `null`. Opaque and forwarded blindly; `null` keeps the consumer's own default. See [Terminal](#terminal-terminal) (nullable) |
-| `effort` | string | **Effort level** for the consumer to pass to its own CLI (e.g. `"low"`, `"medium"`, `"high"`, `"xhigh"`, `"max"`), or `null`. Opaque and forwarded blindly; an out-of-set value is accepted with a server-side warning, never rejected. `null` keeps the consumer's own default/precedence chain. See [Effort](#effort-effort) (nullable) |
+| `effort` | string | **Effort level** for the consumer to pass to its own CLI (e.g. `"low"`, `"medium"`, `"high"`, `"xhigh"`, `"max"`), or `null`. Opaque and forwarded blindly; an out-of-set value is accepted with a server-side warning, never rejected. `null` means no default was resolved, so the consumer's own default/precedence chain applies. See [Effort](#effort-effort) (nullable) |
 | `followUpTo` | string | The `id` of an earlier dispatch whose session this item should resume, or `null`. See [Follow-ups](#follow-ups) (nullable) |
 | `force` | boolean | When `true`, the consumer should **override a runner-side guard**: on a follow-up it resumes even a wedged/sleeping session; on a single abort it force-closes even a human-continued session. Defaults to `false`; meaningful only alongside `followUpTo` **or** a single `abort`, and never with `cascade`. See [Follow-ups](#follow-ups) / [Cascade close](#cascade-close-closing-a-session-subtree) |
 | `abort` | boolean | When `true`, this item asks the consumer to cancel/close an existing session (named by `abortTo`) instead of running a prompt. Defaults to `false`. See [Aborting a session](#aborting-a-session) |
@@ -831,11 +831,13 @@ session's role, can choose at dispatch time:
 
 `model` lets a dispatch specify **which model the consumer/runner should use to *run* the
 prompt** — the value it passes to its own agent CLI (e.g. `claude --model`). It is optional
-and nullable; omit it (or send `null`) to keep the consumer's current default (e.g. Opus).
+and nullable. Omit it (or send `null`) and the proxy lanes fill it from the workspace's dispatch
+defaults before the runner sees it (see the proxy-lane bullet below); with
+no defaults configured it stays `null` and the consumer's own default applies (e.g. Opus).
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `model` | string | No | Execution model, OpenRouter `provider/model` convention (e.g. `"anthropic/claude-opus-4.8"`). `null`/omitted ⇒ consumer default. |
+| `model` | string | No | Execution model, OpenRouter `provider/model` convention (e.g. `"anthropic/claude-opus-4.8"`). Omitted or `null` ⇒ filled from workspace dispatch defaults (proxy lanes); still `null` ⇒ consumer default. |
 
 **Execution model ≠ generation model.** This is the model that *runs* the dispatched work,
 **not** the server-side model that *writes* prompts (recommendation / recap / brief). They
@@ -859,6 +861,14 @@ engine's model list.
   (e.g. Opus vs Opus 1m) are a consumer-vocabulary concern expressible as distinct IDs — no
   schema change.
 
+- **Proxy-lane fill (LIN-3866).** On `POST /api/proxy/dispatch` and
+  `POST /api/proxy/recommend-and-dispatch`, a blank `model` is filled server-side in this
+  order: the explicit value, then the workspace's dispatch defaults, then `null`. `model` has
+  no anchor-inheritance tier, so a `followUpTo` does not take the anchor's model. The one
+  anchor-derived source is the anchor's frozen preset snapshot, which is stamped only on
+  `autopilot` dispatches. The session lane (`POST /api/dispatch`) resolves `model` the same
+  way, so unlike `harness` it does not differ between lanes.
+
 Both dispatch write verbs accept `model`: `POST /api/dispatch` (user/UI) and, on the proxy,
 `POST /api/proxy/dispatch` and `POST /api/proxy/recommend-and-dispatch`. Setting it per task
 is how an orchestrator routes cheaper models where they suffice (e.g. Sonnet for
@@ -868,12 +878,13 @@ implementation, Opus for review).
 
 `harness` lets a dispatch specify **which harness the consumer/runner should use to *run* the
 prompt** — e.g. `"claude-code"` (the default in Simple Dispatcher today) or `"opencode"`
-(which can run any OpenRouter-backed model). It is optional and nullable; omit it (or send
-`null`) to keep the consumer's own default.
+(which can run any OpenRouter-backed model). It is optional and nullable. Omit it (or send `null`)
+and Harbour fills it server-side: on the proxy lanes the fill ends at `claude-code`, while the
+session lane stops at the workspace defaults. See the proxy-lane bullet below.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `harness` | string | No | Execution harness, e.g. `"claude-code"`, `"opencode"`. `null`/omitted ⇒ consumer default. |
+| `harness` | string | No | Execution harness, e.g. `"claude-code"`, `"opencode"`. Omitted or `null` ⇒ filled server-side (see below); a `null` that survives the fill ⇒ consumer default. |
 
 - **Opaque at the server boundary, same rigor as `model`.** The dispatch store records and
   forwards `harness` verbatim. Validation is the same loose opaque-string check used for
@@ -894,11 +905,20 @@ prompt** — e.g. `"claude-code"` (the default in Simple Dispatcher today) or `"
 - **Harbour-side default tier (LIN-1094).** Harbour resolves a blank incoming `model`/
   `harness` against workspace-configured dispatch defaults (Settings → Dispatch defaults)
   before the item ever reaches the queue: a per-prompt-`kind` override wins, then the
-  workspace-wide default, then `null` — each field resolved independently. With no defaults
-  configured this is byte-identical to the prior pass-through behaviour. The consumer's own
+  workspace-wide default, then `null` — each field resolved independently. Which tiers run
+  after that differs by lane: see the proxy-lane bullet below. The consumer's own
   payload → per-workspace-default → global-default precedence chain still applies on top of
   whatever value Harbour hands it (including `null`) — the two tiers compose rather than
   conflict.
+- **Proxy-lane fill (LIN-3866).** On `POST /api/proxy/dispatch` and
+  `POST /api/proxy/recommend-and-dispatch`, a blank `harness` is filled server-side in this
+  order: the explicit value; then, on a `followUpTo` to an `autopilot` anchor, the anchor's
+  frozen preset snapshot; then, on any `followUpTo`, the anchor's harness, so a resume runs on
+  the harness of the session it resumes; then the workspace's dispatch defaults; then
+  `"claude-code"`. The session lane (`POST /api/dispatch`) stops after the workspace defaults:
+  a blank harness there stays `null` and the consumer's own default applies, because the
+  dispatch page's blank choice is an explicit escape hatch. The two lanes therefore do not
+  resolve `harness` the same way.
 - **Inert until the runner reads it.** A server-side `harness` is a no-op until the (external)
   consumer reads `item.harness` and routes the prompt accordingly; a `null` value preserves
   today's default behaviour, so existing runners are unaffected.
@@ -939,12 +959,13 @@ consumer's own configured driver. See LIN-2452.
 
 `effort` lets a dispatch specify **the effort level the consumer/runner should pass to its own
 CLI** to run the prompt — e.g. `"low"`, `"medium"`, `"high"`, `"xhigh"`, or `"max"` (Claude
-Code's `--effort` vocabulary today). It is optional and nullable; omit it (or send `null`) to
-keep the consumer's own default/precedence chain. See LIN-2615.
+Code's `--effort` vocabulary today). It is optional and nullable. Omit it (or send `null`) and
+Harbour fills it from the workspace's dispatch defaults before the consumer's own
+default/precedence chain applies (see the default-tier bullet below). See LIN-2615.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `effort` | string | No | Effort level, e.g. `"low"`, `"medium"`, `"high"`, `"xhigh"`, `"max"`. `null`/omitted ⇒ consumer default/precedence chain. |
+| `effort` | string | No | Effort level, e.g. `"low"`, `"medium"`, `"high"`, `"xhigh"`, `"max"`. Omitted or `null` ⇒ filled from workspace dispatch defaults; still `null` ⇒ consumer default/precedence chain. |
 
 - **Opaque at the server boundary, same rigor as `model`/`harness`/`terminal`.** The dispatch
   store records and forwards `effort` verbatim. Validation is the same loose opaque-string
