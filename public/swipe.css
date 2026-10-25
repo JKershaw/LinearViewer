@@ -612,23 +612,6 @@ a.swipe-relation-issue:hover {
   pointer-events: none;
 }
 
-.swipe-prompt-btn.ai-btn {
-  border-color: #e8d48a;
-  color: #8a6d00;
-  background: linear-gradient(135deg, #fffdf5, #fff8e1);
-}
-
-.swipe-prompt-btn.ai-btn:hover {
-  background: linear-gradient(135deg, #fffbeb, #fff3cd);
-  border-color: var(--yellow);
-}
-
-.swipe-prompt-btn.ai-btn.active {
-  border-color: var(--yellow);
-  background: linear-gradient(135deg, #fff8e1, #fff3cd);
-  color: #6b5600;
-}
-
 .swipe-prompt-btn-more {
   font-size: 11px;
   color: var(--fg-dim);

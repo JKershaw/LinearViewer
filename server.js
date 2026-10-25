@@ -194,7 +194,7 @@ import { ModelRoutingStore } from './lib/model-routing-store.js'
 import { createSettingsModelRoutes } from './routes/settings-model.js'
 import { createSettingsRouter } from './routes/settings.js'
 import { settingsAreaUrl } from './lib/settings-areas.js'
-import { WorkspaceChangeLogStore, OUTSIDE_SETTINGS_REASON } from './lib/workspace-change-log.js'
+import { WorkspaceChangeLogStore, OUTSIDE_SETTINGS_REASON, UNNAMED_MEMBER } from './lib/workspace-change-log.js'
 import { getDeployInfo } from './lib/deploy-info.js'
 import { securityHeaders } from './lib/security-headers.js'
 import { publicOrigin } from './lib/public-origin.js'
@@ -342,7 +342,7 @@ const modelRoutingStore = new ModelRoutingStore({
   // one that is gone or erased reads as "former member" in the store.
   resolveActorName: async (accountId) => {
     const account = await accountStore.getAccount(accountId)
-    return account ? (account.displayName || 'a member') : null
+    return account ? (account.displayName || UNNAMED_MEMBER) : null
   }
 })
 const workspacePreferencesStore = new WorkspacePreferencesStore({
@@ -369,7 +369,7 @@ const workspaceChangeLogStore = new WorkspaceChangeLogStore({
   collection: db.collection('workspace-change-log'),
   resolveActorName: async (accountId) => {
     const account = await accountStore.getAccount(accountId)
-    return account ? (account.displayName || 'a member') : null
+    return account ? (account.displayName || UNNAMED_MEMBER) : null
   }
 })
 // Every halt writer (Settings, the Dispatch page, the proxy route) lands in the log through

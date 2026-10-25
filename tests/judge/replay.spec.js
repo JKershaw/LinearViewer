@@ -69,7 +69,27 @@ async function prepare(page, context, entry) {
       const ask = page.getByTestId('settings-toggle-periodicals');
       await ask.locator('summary').click();
       await ask.locator('textarea[name="reason"]').fill('Judge fixture');
-      await Promise.all([page.waitForURL(/settings\/running/), ask.locator('[data-testid$="-confirm"]').click()]);
+      // The submit redirects to running?changed=1; wait for that, not for any running URL (already true here).
+      await Promise.all([page.waitForURL(/settings\/running\?changed=1/), ask.locator('[data-testid$="-confirm"]').click()]);
+    }
+  }
+  if (entry.state === 'paused') {
+    // A queue token is a runner (run-controls.js), so Pause is offered. Minted on the Dispatch page as an owner does.
+    await page.goto(url);
+    if (!(await page.getByTestId('settings-halt-pause').count())) {
+      await page.goto(`/workspace/${entry.urlKey}/dispatch`);
+      await page.locator('.token-label-input').fill('judge-runner');
+      await page.locator('#create-token-form button[type="submit"]').click();
+      await page.locator('.token-modal-close').click();
+      await page.goto(url);
+    }
+    // The Runs row opens in place (head); base has no such row, so this step is conditional.
+    const runs = page.getByTestId('settings-halt-state');
+    if (await runs.locator(':scope > summary').count()) await runs.locator(':scope > summary').click();
+    if (await page.getByTestId('settings-halt-pause').count()) {
+      await page.getByTestId('settings-halt-pause').locator(':scope > summary').click();
+      await page.getByTestId('settings-halt-pause-reason').fill('Judge fixture');
+      await Promise.all([page.waitForURL(/settings\/running\?changed=1/), page.getByTestId('settings-halt-pause-confirm').click()]);
     }
   }
   await page.goto(url);

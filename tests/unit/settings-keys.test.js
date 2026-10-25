@@ -5,7 +5,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildKeyList, latestRunnerPoll, isExpired } from '../../lib/settings-keys.js';
+import { buildKeyList, latestRunnerPoll, isLiveKey } from '../../lib/settings-keys.js';
 import { agentAccessBody } from '../../lib/render-settings-workspace.js';
 import { hasLiveRunnerKey, hasLiveQueueToken } from '../../lib/run-controls.js';
 
@@ -62,17 +62,20 @@ describe('revoke uses today\'s DELETE routes and their owner rules', () => {
     const member = agentAccessBody({ urlKey: 'acme', keys: buildKeyList({ proxyRows, dispatchRows, isOwner: false, urlKey: 'acme' }) });
     const owner = agentAccessBody({ urlKey: 'acme', keys: buildKeyList({ proxyRows, dispatchRows, isOwner: true, urlKey: 'acme' }) });
     assert.equal((member.match(/settings-key-owner-only/g) || []).length, 2);
-    assert.equal((member.match(/data-revoke-route/g) || []).length, 1);
-    assert.equal((owner.match(/data-revoke-route/g) || []).length, 3);
+    assert.equal((member.match(/data-settings-ask-route/g) || []).length, 1);
+    assert.equal((owner.match(/data-settings-ask-route/g) || []).length, 3);
     assert.doesNotMatch(owner, /settings-key-owner-only/);
   });
 });
 
 describe('the list shows what a person needs', () => {
-  test('expiry, last use, and "no owner · re-issue" for an ownerless key', () => {
-    const html = agentAccessBody({ urlKey: 'acme', keys: buildKeyList({ proxyRows: [proxy({ tokenId: 'x', hasOwner: false, lastUsedAt: iso(NOW - 6e4) })], dispatchRows: [], isOwner: true, urlKey: 'acme' }) });
-    assert.match(html, /expires 2026-10-25/);
-    assert.match(html, /last used 2026-10-24 11:59 UTC/);
+  test('expiry and last use are relative (LIN-3890), and "no owner · re-issue" for an ownerless key', () => {
+    // The clock is injected (LIN-3890): the renderer formats against `now`, not a second read of Date.now().
+    const now = Date.now();
+    const keys = buildKeyList({ proxyRows: [proxy({ tokenId: 'x', hasOwner: false, expiresAt: iso(now + 2 * 864e5), lastUsedAt: iso(now - 6e4) })], dispatchRows: [], isOwner: true, urlKey: 'acme', now });
+    const html = agentAccessBody({ urlKey: 'acme', keys, now });
+    assert.match(html, /expires in 2d/);
+    assert.match(html, /last used 1m ago/);
     assert.match(html, /no owner · re-issue/);
   });
 
@@ -107,7 +110,8 @@ describe('"has a runner" is the house predicate, so Settings and Dispatch cannot
     });
     assert.deepEqual(poll, { at: iso(NOW - 6e4), kind: 'queue token' });
     assert.equal(latestRunnerPoll({ proxyRows: [proxy({ grants: ['take'] })], dispatchRows: [], now: NOW }), null, 'never used: no poll, and no liveness claim');
-    assert.equal(isExpired(iso(NOW - 1), NOW), true);
-    assert.equal(isExpired(null, NOW), false);
+    // The one liveness predicate (LIN-3890) replaces the old isExpired: a past expiry is not live, a null one is.
+    assert.equal(isLiveKey({ expiresAt: iso(NOW - 1) }, NOW), false);
+    assert.equal(isLiveKey({ expiresAt: null }, NOW), true);
   });
 });

@@ -97,14 +97,16 @@ describe('LIN-3136 S7 (moved by LIN-3846) — runner rows are the take holders o
     assert.equal(list(fixtures()).length, 4);
   });
 
-  test('a consumed grant-LESS bootstrap is still listed as before', () => {
+  test('a consumed grant-LESS bootstrap is no longer listed (LIN-3890: a spent key cannot be used, so it is not counted)', () => {
+    // Was listed as "Read and update" before LIN-3890. Each dispatched run left one
+    // of these behind, and they inflated the "N keys" count without being usable.
     const now = Date.now();
     const rows = list([{
       tokenId: 'plain-boot-spent', label: 'prompt-proxy', scope: 'readWrite', kind: 'bootstrap', singleUse: true,
       consumed: true, hasOwner: true, grants: [], parentTokenId: null, createdAt: iso(now - 1000), lastUsedAt: null,
       expiresAt: iso(now + 47 * 3600e3)
     }]);
-    assert.equal(kindOf(rows, 'plain-boot-spent'), 'Read and update');
+    assert.equal(rows.length, 0);
   });
 });
 

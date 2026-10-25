@@ -92,8 +92,24 @@ describe('the owner gate stays at the call site (LIN-3849)', () => {
   });
 
   test('a member sees the halt state on Settings › Running and no asks', () => {
-    const html = runningBody({ urlKey: 'acme', isOwner: false, haltMode: 'none' });
+    const html = runningBody({ urlKey: 'acme', isOwner: false, hasRunner: true, haltMode: 'none' });
     assert.match(html, /data-testid="settings-halt-state"/);
+    assert.match(html, /data-testid="settings-halt-owner-only"/);
     assert.doesNotMatch(html, /settings-halt-(pause|stop|resume)/);
+  });
+
+  // LIN-3890 outcome 6: with no runner, Running offers no Pause, Stop or Resume and shows no state row.
+  test('with no runner the owner gets no halt controls and no Runs row, but periodic reviews stays', () => {
+    const html = runningBody({ urlKey: 'acme', isOwner: true, runSetup: true, hasRunner: false, haltMode: 'none' });
+    assert.doesNotMatch(html, /settings-halt-(pause|stop|resume)/);
+    assert.doesNotMatch(html, /data-testid="settings-halt-state"/);
+    assert.match(html, /data-testid="settings-toggle-periodicals"/);
+    assert.match(html, /data-testid="settings-runner-setup"/);
+  });
+
+  test('halted with no runner, the owner is offered the clear only', () => {
+    const html = runningBody({ urlKey: 'acme', isOwner: true, hasRunner: false, haltMode: 'pause' });
+    assert.match(html, /settings-halt-resume/);
+    assert.doesNotMatch(html, /settings-halt-(pause|stop)"/);
   });
 });

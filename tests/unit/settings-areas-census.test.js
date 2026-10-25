@@ -123,19 +123,20 @@ describe('sidebar states', () => {
     for (const a of AREAS) {
       const s = a.state(ctx);
       assert.ok(s.text.length > 0 && s.text.length <= STATE_MAX_LENGTH, `${a.id}: "${s.text}"`);
-      assert.ok(['ok', 'bad'].includes(s.tone));
+      assert.ok(['ok', 'warn', 'bad'].includes(s.tone));
     }
   });
 
-  test('the words: a red dot for what needs fixing, stop and pause, no runner', () => {
+  test('the words: a red dot for what needs fixing, amber for stop and pause (LIN-3890), no runner', () => {
     assert.deepEqual(getArea('health').state(ctx), { text: '1 to fix', tone: 'bad' });
     assert.deepEqual(getArea('health').state({ healthProblems: 0 }), { text: 'All clear', tone: 'ok' });
     assert.equal(getArea('running').state({ ...ctx, haltMode: 'stop' }).text, 'Stopped');
-    assert.equal(getArea('running').state({ ...ctx, haltMode: 'pause' }).tone, 'bad');
+    assert.equal(getArea('running').state({ ...ctx, haltMode: 'pause' }).tone, 'warn');
+    assert.equal(getArea('running').state({ ...ctx, haltMode: 'stop' }).tone, 'warn');
     assert.equal(getArea('running').state({ ...ctx, hasRunner: false }).text, 'No runner');
     assert.equal(getArea('running').state(ctx).text, 'Runner ready');
     assert.equal(getArea('models').state(ctx).text, 'Sonnet 5.5');
-    assert.equal(getArea('agent-access').state({ keyCount: 1 }).text, '1 key');
+    assert.equal(getArea('agent-access').state({ keyCount: 1 }).text, '1 live key');
     assert.equal(getArea('account').state({ openRouterSource: 'free' }).text, 'Free tier');
     assert.equal(getArea('change-log').state({ changeLogCount: 0 }).text, 'Empty');
   });

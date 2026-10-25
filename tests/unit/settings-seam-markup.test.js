@@ -1,6 +1,6 @@
 /**
  * LIN-3888 (Free the seam): Settings markup checked through data attributes, test ids, element
- * and role, never a style class. These replace the class-string pins in render-settings-shell,
+ * and role, never a style class. These replace the class-string pins in the shell (now lib/components/settings-*.js),
  * render-settings, lin-1890-jira-entry-surfaces and settings-areas-census, so Consolidate and the
  * Rebuild can move the classes without silently breaking the checks.
  *
@@ -8,7 +8,9 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { switchRow, drillRow, group, renderSettingsShell } from '../../lib/render-settings-shell.js';
+import { switchRow, drillRow } from '../../lib/components/settings-row.js';
+import { group } from '../../lib/components/settings-group.js';
+import { renderSettingsShell } from '../../lib/components/settings-frame.js';
 import { getArea, AREAS } from '../../lib/settings-areas.js';
 import { renderSettingsPage } from '../../lib/render-settings.js';
 import { agentAccessBody } from '../../lib/render-settings-workspace.js';
@@ -106,11 +108,10 @@ describe('the rows that Settings renders in place of class checks', () => {
     assert.match(html, /<input [^>]*data-testid="settings-newkey-label"/);
   });
 
-  test('a blocked GitHub add row is found by its test id and says why', () => {
+  test('an unconfigured GitHub source is not listed at all (LIN-3890 outcome 1)', () => {
     const html = renderSettingsPage('Acme', { ...BASE, githubEnabled: false });
-    const row = html.match(/<div[^>]*data-testid="settings-provider-add-github"[^]*?<\/div>/);
-    assert.ok(row, 'expected a github add row');
-    assert.match(row[0], /not configured on this server/);
+    assert.doesNotMatch(html, /data-testid="settings-provider-add-github"/);
+    assert.doesNotMatch(html, /not configured on this server/);
   });
 
   test('the Sources heading for your own sources is a title test id', () => {

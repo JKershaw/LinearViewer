@@ -16,7 +16,7 @@ import { MAX_NAME_LENGTH } from '../lib/issue-write-validation.js';
 import { UUID_REGEX } from '../lib/workspace.js';
 import { getProvider } from '../lib/providers/registry.js';
 import { ownerlessCompatEnabled } from '../lib/ownerless-token-policy.js';
-import { BOOTSTRAP_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
+import { BOOTSTRAP_TOKEN_TTL_SECONDS, PROMPT_PROXY_LABEL } from '../lib/proxy-tokens.js';
 import { SCOPES, RUNNER_GRANTS } from '../lib/proxy-scopes.js';
 import { ownerMintRefusal } from '../lib/owner-mint-refusals.js';
 import { isRunnerOwnerRefusal, sendRunnerRefusal } from '../lib/runner-owner-gate.js';
@@ -26,7 +26,6 @@ import { isRunnerOwnerRefusal, sendRunnerRefusal } from '../lib/runner-owner-gat
 // from accumulating for the 90-day default TTL, give them a short TTL so they
 // self-prune. 48h comfortably outlives the 24h dispatch-queue item lifetime
 // plus the agent run that consumes the token, while bounding the exposure window.
-export const PROMPT_PROXY_LABEL = 'prompt-proxy';
 const PROMPT_PROXY_TOKEN_TTL_SECONDS = 48 * 60 * 60;
 
 /**

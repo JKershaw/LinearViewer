@@ -105,7 +105,7 @@ test.describe('Settings and Dispatch client hooks (LIN-3888)', () => {
     await expect(section.getByText('Seam prompt').first()).toBeVisible({ timeout: 5000 });
   });
 
-  // The phone layout that render-settings-shell.test.js:81-86 used to pin in the CSS text: the list
+  // The phone layout that settings-components.test.js (formerly render-settings-shell.test.js) used to pin in the CSS text: the list
   // and the page are never both shown on a phone, and nothing scrolls sideways.
   test('on a phone the list and the page are never both shown, and nothing scrolls sideways', async ({ page, localWorkerUrlKey }) => {
     await page.setViewportSize(PHONE);

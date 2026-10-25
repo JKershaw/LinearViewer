@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { seedLocalWorkspace } from '../fixtures/local-harness.js';
 import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
+import { revokeKeyInPlace } from '../helpers.js';
 
 /**
  * LIN-3131 — the runner credential surface, end to end (S2b.3 Settings +
@@ -88,11 +89,12 @@ test.describe('Proxy page - Runner credentials (LIN-3131 S2b.3)', () => {
     await page.waitForLoadState('networkidle');
     const keys = page.getByTestId('settings-key-proxy').filter({ hasText: 'Runner key' });
     await expect(keys).toHaveCount(1);
-    await keys.locator('summary').click();
-    await expect(keys).toContainText(/expires 2/);
+    await keys.locator(':scope > summary').click();
+    // The runner working token lives 24h, so its relative expiry is in hours (LIN-3890).
+    await expect(keys).toContainText(/expires in \d+h/);
 
     // Revoke from the opened row (lineage revoke by the live row's own id, the owner's DELETE route).
-    await keys.getByTestId('settings-key-revoke').click();
+    await revokeKeyInPlace(keys);
     await expect(page.getByTestId('settings-key-proxy').filter({ hasText: 'Runner key' })).toHaveCount(0);
 
     // The revoked working credential is dead: the next poll is a 401.
@@ -110,8 +112,8 @@ test.describe('Proxy page - Runner credentials (LIN-3131 S2b.3)', () => {
     await page.waitForLoadState('networkidle');
     const row = page.getByTestId('settings-key-proxy').filter({ hasText: 'Runner key' }).first();
     await expect(row).toContainText('waiting to be used');
-    await row.locator('summary').click();
-    await expect(row).toContainText(/expires 2/);
+    await row.locator(':scope > summary').click();
+    await expect(row).toContainText(/expires in \d+m/);
   });
 });
 

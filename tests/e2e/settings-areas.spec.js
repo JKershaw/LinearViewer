@@ -12,7 +12,7 @@
  */
 import { test, expect } from '../fixtures/test-base.js';
 import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
-import { SELECTORS, settings, expectNoClippedOverflow } from '../helpers.js';
+import { SELECTORS, settings, expectNoClippedOverflow, revokeKeyInPlace } from '../helpers.js';
 
 const AREAS = ['sources', 'models', 'running', 'agent-access', 'health', 'change-log', 'features', 'account'];
 const VIEWPORTS = { desktop: { width: 1280, height: 900 }, phone: { width: 375, height: 812 } };
@@ -69,21 +69,34 @@ test.describe('Settings areas: layout', () => {
   });
 });
 
+// LIN-3890 outcome 6: Pause, Stop and Resume are offered only when a runner can apply them, and a
+// queue token counts as one. Mint one on the Dispatch page the way an owner does.
+async function mintQueueToken(page, urlKey) {
+  await page.goto(`/workspace/${urlKey}/dispatch`);
+  await page.waitForLoadState('networkidle');
+  await page.fill('.token-label-input', 'runner');
+  await page.click('#create-token-form button[type="submit"]');
+  await expect(page.locator('.token-modal')).toBeVisible();
+  await page.locator('.token-modal-close').click();
+}
+
 test.describe('Settings areas: everyone-changes ask why, are logged, and can be undone', () => {
   test.beforeEach(async ({ page, seedLocal }) => {
     const { urlKey } = await seedLocal();
     await seedWorkspaceOwnership(page, urlKey);
     await page.request.get(`/test/clear-workspace-halt?urlKey=${urlKey}`);
+    await mintQueueToken(page, urlKey);
   });
 
   test('pause from Running asks in place, shows in the change log, and Undo resumes', async ({ page, localWorkerUrlKey }) => {
     const reason = `Deploy window ${Date.now()}`;
     await settings(page).gotoArea(localWorkerUrlKey, 'running');
 
-    // Nothing pops up: the form is inside the opened row.
+    // Nothing pops up: the asks are inside the Runs row, which opens in place (LIN-3890 outcome 3).
+    await page.getByTestId('settings-halt-state').locator(':scope > summary').click();
     const pause = page.getByTestId('settings-halt-pause');
     await expect(page.getByTestId('settings-halt-pause-confirm')).toBeHidden();
-    await pause.locator('summary').click();
+    await pause.locator(':scope > summary').click();
     await expect(page.getByTestId('settings-halt-pause-confirm')).toBeVisible();
     await page.getByTestId('settings-halt-pause-reason').fill(reason);
     await page.getByTestId('settings-halt-pause-confirm').click();
@@ -95,10 +108,12 @@ test.describe('Settings areas: everyone-changes ask why, are logged, and can be 
     const row = page.locator('[data-testid="settings-change-workspace"]', { hasText: reason });
     await expect(row).toContainText('Runs paused');
 
-    await row.locator('[data-testid^="settings-undo-"] summary').click();
-    await row.locator('textarea[name="reason"]').fill('Window is over');
-    await row.getByRole('button', { name: 'Undo this change' }).click();
-    await expect(page.getByTestId('settings-flash')).toContainText('Change undone');
+    // The Undo is an ask on the row after the change it undoes (LIN-3890 outcome 4): no flash bar.
+    const undo = page.locator('[data-testid^="settings-undo-"]').first();
+    await undo.locator(':scope > summary').click();
+    await undo.locator('textarea[name="reason"]').fill('Window is over');
+    await undo.getByRole('button', { name: 'Undo this change' }).click();
+    await expect(page.getByTestId('settings-flash')).toHaveCount(0);
 
     await settings(page).gotoArea(localWorkerUrlKey, 'running');
     await expect(page.getByTestId('settings-halt-state')).toContainText('Running');
@@ -108,7 +123,7 @@ test.describe('Settings areas: everyone-changes ask why, are logged, and can be 
     await settings(page).gotoArea(localWorkerUrlKey, 'running');
     const row = page.getByTestId('settings-toggle-periodicals');
     const before = await page.getByTestId('settings-periodicals-state').innerText();
-    await row.locator('summary').click();
+    await row.locator(':scope > summary').click();
     // The browser refuses an empty required reason, so the form does not submit.
     await row.locator('[data-testid$="-confirm"]').click();
     await expect(page).toHaveURL(/\/settings\/running$/);
@@ -136,7 +151,7 @@ test.describe('Settings areas: keys and the theme', () => {
     await seedWorkspaceOwnership(page, urlKey);
     await settings(page).gotoArea(urlKey, 'agent-access');
 
-    await page.getByTestId('settings-newkey').locator('summary').click();
+    await page.getByTestId('settings-newkey').locator(':scope > summary').click();
     await page.locator(SELECTORS.settings.newKeyLabel).fill('ci-reader');
     await page.getByTestId('settings-newkey-submit').click();
     await expect(page.getByTestId('settings-newkey-secret')).toContainText('shown once');
@@ -144,9 +159,9 @@ test.describe('Settings areas: keys and the theme', () => {
     await page.reload();
     const key = page.getByTestId('settings-key-proxy').filter({ hasText: 'ci-reader' });
     await expect(key).toHaveCount(1);
-    await key.locator('summary').click();
-    await expect(key).toContainText('expires 2');
-    await key.getByTestId('settings-key-revoke').click();
+    await key.locator(':scope > summary').click();
+    await expect(key).toContainText(/expires in \d+d/);
+    await revokeKeyInPlace(key);
     await expect(page.getByTestId('settings-key-proxy').filter({ hasText: 'ci-reader' })).toHaveCount(0);
   });
 

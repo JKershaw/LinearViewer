@@ -232,13 +232,14 @@ function redirectOldFragments() {
   }
 }
 
-// A short inline Undo beside a just-changed row. No popup.
+// A short inline Undo beside a just-changed row. No popup. (LIN-3890: found by its
+// data attribute, not a class, so the markup can change its look without touching this.)
 function offerUndo(row, redo) {
-  const old = row.querySelector('.settings-undo')
+  const old = row.querySelector('[data-settings-undo]')
   if (old) old.remove()
   const undo = document.createElement('button')
   undo.type = 'button'
-  undo.className = 'settings-undo'
+  undo.setAttribute('data-settings-undo', '')
   undo.textContent = 'Undo'
   undo.setAttribute('data-testid', 'settings-undo-inline')
   const timer = setTimeout(() => undo.remove(), 6000)
@@ -307,17 +308,31 @@ function initJsonToggles() {
   })
 }
 
-// Revoke a key from the list, through today's DELETE routes (their owner rules apply).
-// The button is only inside the opened row, which is the in-place confirmation.
-function initKeyRevoke() {
-  document.querySelectorAll('.settings-key-revoke').forEach((btn) => btn.addEventListener('click', async () => {
-    btn.disabled = true
+// Ask in place (LIN-3890): Cancel closes the panel where it is open. Without
+// script the Cancel link reloads the area, which closes it the same way. Each
+// control is bound to the element Harbour rendered (LIN-3401), never a page-wide listener.
+function initAskCancel() {
+  document.querySelectorAll('[data-settings-ask-cancel]').forEach((cancel) => cancel.addEventListener('click', (e) => {
+    e.preventDefault()
+    const panel = cancel.closest('details')
+    if (panel) panel.removeAttribute('open')
+  }))
+}
+
+// A script-transport ask (LIN-3890): its Confirm sends the method to the route the
+// row names. Used for key revoke, through today's DELETE routes (their owner rules
+// apply, and a non-owner row renders no Confirm at all). `on401: false` keeps a
+// refused session in place: the failure is toasted, not a redirect to the landing page.
+function initAskConfirm() {
+  document.querySelectorAll('[data-settings-ask-route]').forEach((confirm) => confirm.addEventListener('click', async (e) => {
+    e.preventDefault()
+    confirm.disabled = true
     try {
-      await window.api(btn.dataset.revokeRoute, { method: 'DELETE', on401: false })
+      await window.api(confirm.dataset.settingsAskRoute, { method: confirm.dataset.settingsAskMethod, on401: false })
       window.location.reload()
     } catch (err) {
-      btn.disabled = false
-      toast('Failed to revoke: ' + (err.message || 'refused'), { type: 'error' })
+      confirm.disabled = false
+      toast('Failed: ' + (err.message || 'refused'), { type: 'error' })
     }
   }))
 }
@@ -356,6 +371,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initDispatchPresets()
   initThemeChoices()
   initJsonToggles()
-  initKeyRevoke()
+  initAskCancel()
+  initAskConfirm()
   initNewKey()
 })

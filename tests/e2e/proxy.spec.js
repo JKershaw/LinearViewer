@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
-import { SELECTORS } from '../helpers.js';
+import { SELECTORS, revokeKeyInPlace } from '../helpers.js';
 import { seedJiraWorkspace } from '../fixtures/jira-harness.js';
 // fixture:LIN-3136
 import { mintDriverWriter } from '../fixtures/driver-writer.js';
@@ -74,8 +74,8 @@ test.describe('Proxy Page', () => {
     await expect(key).toHaveCount(1);
 
     // Revoke it from the opened row
-    await key.locator('summary').click();
-    await key.getByTestId('settings-key-revoke').click();
+    await key.locator(':scope > summary').click();
+    await revokeKeyInPlace(key);
     await expect(page.getByTestId('settings-key-proxy').filter({ hasText: 'test-ui-token' })).toHaveCount(0);
   });
 
@@ -2478,7 +2478,7 @@ test.describe('Proxy credential-fault visibility (LIN-1586)', () => {
       await page.goto(`/workspace/${URL_KEY}/settings/agent-access`);
 
       const row = page.getByTestId('settings-key-proxy').filter({ hasText: 'legacy-runner' });
-      await row.locator('summary').click();
+      await row.locator(':scope > summary').click();
       await expect(row).toContainText('no owner · re-issue');
     });
 

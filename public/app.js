@@ -1594,11 +1594,11 @@ function initFeatureToggles() {
  * seconds. Bound to the element Harbour rendered (LIN-3401), never by class.
  */
 function addInlineUndo(row, switchBtn) {
-  const existing = row.querySelector('.settings-undo')
+  const existing = row.querySelector('[data-settings-undo]')
   if (existing) existing.remove()
   const undo = document.createElement('button')
   undo.type = 'button'
-  undo.className = 'settings-undo'
+  undo.setAttribute('data-settings-undo', '')
   undo.textContent = 'Undo'
   undo.setAttribute('data-testid', 'settings-undo-inline')
   const timer = setTimeout(() => undo.remove(), 6000)

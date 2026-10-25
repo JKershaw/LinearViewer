@@ -508,8 +508,8 @@ describe('LIN-1887 Step 9 — the OAuth flow is reachable from Settings', () => 
     // 2026-08-07.
     const html = render({ jiraOAuthEnabled: false });
     assert.match(html, /data-testid="settings-provider-add-btn-jira-basic"/, 'the Basic add must survive a missing Atlassian app');
-    assert.match(html, /data-testid="settings-provider-add-btn-jira-oauth-blocked"/);
-    assert.doesNotMatch(html, /data-testid="settings-provider-add-btn-jira-oauth"[^-]/);
+    // LIN-3890: an unconfigured OAuth option is not offered at all (no blocked stub).
+    assert.doesNotMatch(html, /data-testid="settings-provider-add-btn-jira-oauth/);
     assert.match(html, /data-testid="settings-provider-add-jira"/, 'the ROW itself stays enabled');
   });
 
@@ -517,7 +517,7 @@ describe('LIN-1887 Step 9 — the OAuth flow is reachable from Settings', () => 
     const html = render({ githubEnabled: true });
     assert.match(html, /data-testid="settings-provider-add-github"/);
     assert.match(html, /data-testid="settings-provider-add-btn"/, 'a provider with one auth shape renders the original single button');
-    const blocked = render({ githubEnabled: false });
-    assert.match(blocked, /data-testid="settings-provider-add-github"[\s\S]{0,400}GitHub is not configured/);
+    const unlisted = render({ githubEnabled: false });
+    assert.doesNotMatch(unlisted, /data-testid="settings-provider-add-github"/, 'an unconfigured GitHub is not listed (LIN-3890)');
   });
 });

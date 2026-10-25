@@ -45,11 +45,11 @@ describe('renderSettingsPage — AI usage section', () => {
     });
     assert.match(html, /\$0\.0350/);          // small total → 4 decimals
     assert.match(html, /12,345/);             // tokens with thousands separator
-    assert.match(html, /recommend:/);
+    assert.match(html, />By feature · recommend</);
     assert.match(html, /2 calls · \$0\.0300/);
-    assert.match(html, /brief:/);
+    assert.match(html, />By feature · brief</);
     assert.match(html, /1 call · \$0\.0050/); // singular "call"
-    assert.match(html, /2026-06-15T20:00:00/);
+    assert.match(html, />Last call</);
   });
 
   test('formats totals over $1 with 2 decimals', () => {
@@ -78,10 +78,9 @@ describe('renderSettingsPage — AI usage section', () => {
         ]
       }
     });
-    assert.match(html, /latency \(feature × model\):/);
-    assert.match(html, /recommend · openai\/gpt-5\.4-mini:/);
+    assert.match(html, />recommend · openai\/gpt-5\.4-mini</);
     assert.match(html, /2 calls · p50 1200ms · p90 1800ms · max 2000ms/);
-    assert.match(html, /brief · anthropic\/claude-opus-5:/);
+    assert.match(html, />brief · anthropic\/claude-opus-5</);
     assert.match(html, /1 call · p50 500ms · p90 500ms · max 500ms/); // singular "call"
     assert.match(html, /end-to-end response time/);
     assert.match(html, /not time-to-first-token/);
@@ -96,11 +95,11 @@ describe('renderSettingsPage — AI usage section', () => {
       byFeature: [{ feature: 'recommend', calls: 1, cost: 0.01 }]
     };
     const htmlAbsent = renderSettingsPage('Acme', { ...BASE, llmStats: base });
-    assert.doesNotMatch(htmlAbsent, /latency \(feature × model\):/);
+    assert.doesNotMatch(htmlAbsent, /data-testid="settings-health-latency"|not time-to-first-token/);
     assert.doesNotMatch(htmlAbsent, /end-to-end response time/);
 
     const htmlEmpty = renderSettingsPage('Acme', { ...BASE, llmStats: { ...base, latencyByFeatureModel: [] } });
-    assert.doesNotMatch(htmlEmpty, /latency \(feature × model\):/);
+    assert.doesNotMatch(htmlEmpty, /not time-to-first-token/);
     assert.doesNotMatch(htmlEmpty, /end-to-end response time/);
   });
 });
@@ -110,7 +109,7 @@ describe('renderSettingsPage — provider context disclosure (LIN-2357)', () => 
 
   test('renders an empty state when providerContextSummary is omitted', () => {
     const html = renderSettingsPage('Acme', BASE);
-    assert.match(html, /provider context:/);
+    assert.match(html, />Provider context</);
     assert.match(html, /no prompt traces recorded yet/);
   });
 
@@ -135,7 +134,8 @@ describe('renderSettingsPage — provider context disclosure (LIN-2357)', () => 
     assert.match(html, /3 of 10 traces missing/);
     assert.match(html, /2 divergent/);
     assert.match(html, /1 benign/);
-    assert.match(html, /2026-08-20T12:00:00/);
+    assert.match(html, />Most recent untraced</);
+    assert.doesNotMatch(html, /2026-08-20T12:00:00/, 'a raw UTC stamp is not shown (LIN-3890)');
   });
 
   test('a benign-only (Linear) render does not read as an alarm: zero divergent, still states the count', () => {
@@ -161,7 +161,7 @@ describe('renderSettingsPage — provider context disclosure (LIN-2357)', () => 
       }
     });
     assert.match(html, /0 of 4 traces missing/);
-    assert.doesNotMatch(html, /most recent:/);
+    assert.doesNotMatch(html, />Most recent untraced</);
   });
 
   test('does not throw when providerContextSummary is omitted', () => {
@@ -201,7 +201,7 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
     assert.match(html, /data-testid="settings-section-providers"/);
     // LIN-3846: sources are labelled as yours (they follow the account, not everyone).
     assert.match(html, /Yours/);
-    assert.match(html, /Sources are yours/);
+    assert.match(html, /They follow your account/);
   });
 
   test('renders a row per binding with displayName, scope, masked token and remove/refresh forms', () => {
@@ -214,7 +214,7 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
     assert.match(html, /data-testid="settings-provider-binding"/);
     assert.match(html, /data-provider="linear"/);
     assert.match(html, /data-scope="org-123"/);
-    assert.match(html, /Linear:/);
+    assert.match(html, /<span class="settings-row-label">Linear</);
     // Masked token: only last 4 chars shown, secret hidden.
     assert.match(html, /••••9999/);
     assert.doesNotMatch(html, /lin_api_secret9999/);
@@ -251,7 +251,8 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
     assert.match(html, /\/settings\/providers\/switch/);
     // The active binding carries the ● marker, the inactive one the switch.
     const ghRow = html.slice(html.indexOf('data-provider="github"'));
-    assert.match(ghRow.slice(0, 600), /settings-provider-activate/);
+    // The row opens in place (LIN-3890), so the switch sits inside the github row's body.
+    assert.match(ghRow.slice(0, ghRow.indexOf('</details>')), /settings-provider-activate/);
   });
 
   test('no "make active" switch when the only binding is already active (LIN-717)', () => {
@@ -291,7 +292,7 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
   test('offers a working add affordance for Jira (unblocked, LIN-1885)', () => {
     const html = renderSettingsPage('Acme', BASE);
     assert.match(html, /data-testid="settings-provider-add-jira"/);
-    assert.match(html, /\+ Jira:/);
+    assert.match(html, /<span class="settings-row-label">Jira</);
   });
 
   // LIN-1885 research: server.js:2173 resolves a bound row's displayName via
@@ -312,8 +313,8 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
         { provider: 'jira', scope: 'https://acme.atlassian.net', displayName: jiraDisplayName, token: 'fake_jira_api_token1234', active: true },
       ],
     });
-    assert.match(html, /Jira:/);
-    assert.doesNotMatch(html, />jira:/, 'must never render the lowercase machine name as the visible label');
+    assert.match(html, /<span class="settings-row-label">Jira</);
+    assert.doesNotMatch(html, /settings-row-label">jira</, 'must never render the lowercase machine name as the visible label');
   });
 
   test('GitHub add affordances default to enabled when githubEnabled is omitted (LIN-761)', () => {
@@ -324,21 +325,15 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
     assert.doesNotMatch(html, /GitHub is not configured on this server/);
   });
 
-  test('disables BOTH GitHub add affordances with an honest reason when githubEnabled is false (LIN-761)', () => {
+  test('lists no GitHub add row when githubEnabled is false, and says nothing about it (LIN-761, LIN-3890 outcome 1)', () => {
     const html = renderSettingsPage('Acme', { ...BASE, githubEnabled: false });
-    // Both rows still render (data-testid preserved) but as blocked affordances,
-    // not live add buttons — one shared flag gates Issues + Projects, so the honest
-    // reason appears exactly twice (once per GitHub row).
-    assert.match(html, /data-testid="settings-provider-add-github"/);
-    assert.match(html, /data-testid="settings-provider-add-github-projects"/);
-    const reasonCount = (html.match(/GitHub is not configured on this server/g) || []).length;
-    assert.strictEqual(reasonCount, 2);
-    // Each GitHub row uses the blocked presentation. Linear is NOT gated by the
-    // GitHub config flag (LIN-1351 made its add-source live), so with GitHub
-    // disabled the ONLY live add button left is Linear's.
+    // Sources lists only what this server can add (LIN-3890): an unconfigured GitHub row is absent,
+    // not a blocked row. Linear is NOT gated by the GitHub config flag (LIN-1351), so it stays listed.
+    assert.doesNotMatch(html, /data-testid="settings-provider-add-github"/);
+    assert.doesNotMatch(html, /data-testid="settings-provider-add-github-projects"/);
+    assert.doesNotMatch(html, /GitHub is not configured on this server/);
     assert.match(html, /data-testid="settings-provider-add-linear"/);
     assert.match(html, /settings-provider-add-btn/);
-    // Honest reason, not a stale ticket-blocked message.
     assert.doesNotMatch(html, /blocked on LIN-541/);
   });
 
@@ -417,7 +412,8 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
 
   test('shows an empty state when there are no bindings', () => {
     const html = renderSettingsPage('Acme', { ...BASE, providerBindings: [] });
-    assert.match(html, /no provider bindings/);
+    assert.match(html, /settings-provider-empty/);
+    assert.match(html, /none yet/);
   });
 
   test('renders a provider notice when supplied (and escapes it)', () => {
@@ -470,7 +466,7 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
     });
     // Provider forms carry the dedicated `provider-form` class, never the
     // `feature-form` hook app.js delegates XHR toggles through.
-    assert.match(html, /class="settings-form provider-form"/);
+    assert.match(html, /class="settings-form settings-row-form"/);
     // The provider binding row must not expose the data-feature toggle hook.
     const bindingRow = html.slice(html.indexOf('settings-provider-binding'));
     const rowEnd = bindingRow.indexOf('</div>\n          </div>');
@@ -941,9 +937,9 @@ describe('renderSettingsPage — areas and their groups (LIN-3846, replaces the 
   // workspace and "You". The sidebar is on every page.
   const page = (area, extra = {}) => renderSettingsPage('Acme', { ...BASE, area, ...extra });
 
-  test('the sidebar lists every area in two groups on every page', () => {
+  test('the sidebar lists every area in two groups on every page (the workspace group is titled with its name, LIN-3890)', () => {
     const html = page('account');
-    assert.match(html, />Workspace</);
+    assert.match(html, />Acme</);
     assert.match(html, />You</);
     for (const id of ['sources', 'models', 'running', 'agent-access', 'health', 'change-log', 'features', 'account']) {
       assert.match(html, new RegExp(`data-testid="settings-nav-${id}"`), `nav row for ${id}`);
@@ -1047,11 +1043,11 @@ describe('renderSettingsPage — OpenRouter unattended-use consent (LIN-2412)', 
     assert.doesNotMatch(html, /consent\/clear/);
   });
 
-  test('LIN-3846: the free tier says the limit is on new runs, resets at midnight UTC, and prompts are not limited', () => {
+  test('LIN-3846: the free tier says the limit is on new runs, resets at midnight UTC, and prompts are not limited (one line, LIN-3890 outcome 5)', () => {
     const html = renderSettingsPage('Acme', { ...BASE, openRouterSource: 'free' });
-    assert.match(html, /new runs per account per UTC day/);
-    assert.match(html, /midnight UTC/);
-    assert.match(html, /prompts are not limited/);
+    assert.match(html, /limit on new runs/);
+    assert.match(html, /reset at midnight UTC/);
+    assert.match(html, /Prompts are not limited/);
   });
 
   test('not connected: connect link is present alongside the blast-radius notice (no consent grant form — there is no key yet)', () => {

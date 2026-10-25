@@ -3436,9 +3436,9 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
    names and the `.action-btn` aliases the tail still uses, so the look lives here once:
      .btn--quiet + tone   the chromeless tinted label (today's `.action-btn`). Used on its own, not with
                           `.btn`: its geometry is the label's, which these surfaces were drawn with.
-     .btn + .btn--red/teal  the ask-in-place confirm and the key revoke: the bordered `.btn` in a tone.
-   `.btn--teal` has no alias, so it stays here as the confirm's only tone. Tints derive from the
-   status token via color-mix, so they rebind under .theme-dark (LIN-786 dark-mode cleanup). */
+     .btn + .btn--red     the ask-in-place confirm and the key revoke: the bordered `.btn` in a tone.
+   The ask's teal confirm is `.btn--primary` (LIN-3890), so `.btn--teal` had no emitter and is gone.
+   Tints derive from the status token via color-mix, so they rebind under .theme-dark (LIN-786). */
 .action-btn,
 .btn--quiet {
   background: none;
@@ -3501,16 +3501,6 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   border-color: var(--red);
 }
 .btn.btn--red:hover { border-color: var(--red); }
-.btn--teal {
-  color: var(--brand-dim);
-  border-color: var(--brand);
-  background: color-mix(in srgb, var(--brand) 12%, transparent);
-}
-.btn--teal:hover {
-  background: color-mix(in srgb, var(--brand) 22%, transparent);
-  border-color: var(--brand);
-}
-
 .btn__icon { display: inline-flex; }
 
 /* --- Icon Button ----------------------------------------------------------- */

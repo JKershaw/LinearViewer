@@ -27,8 +27,8 @@ test.describe('Feature Toggle Settings', () => {
     await page.goto(`/workspace/${localWorkerUrlKey}/settings/features`);
     await page.waitForLoadState('networkidle');
 
-    // AI and Workflow section headers should be visible
-    await expect(page.locator(SELECTORS.settings.groupTitle('experimental'))).toHaveText('Views · for you');
+    // AI and Workflow section headers should be visible. The experiments group names what it holds (LIN-3890 outcome 6).
+    await expect(page.locator(SELECTORS.settings.groupTitle('experimental'))).toHaveText('Experiments · for you');
     await expect(page.locator(SELECTORS.settings.groupTitle('workflow'))).toHaveText('Feedback · for you');
 
     // All feature toggle labels should be present (split across sections)

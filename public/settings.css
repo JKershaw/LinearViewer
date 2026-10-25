@@ -441,6 +441,7 @@
 
 .provider-active {
   color: var(--green);
+  margin-left: var(--space-1);
 }
 
 /* De-emphasized coverage-limitation sub-label (LIN-2357 provider-context disclosure). */
@@ -464,17 +465,6 @@
 
 .provider-notice-blocked .field-value {
   color: var(--fg-dim);
-}
-
-/* Distinct from the OpenRouter connect/disconnect buttons (which several specs
-   locate strictly as `.action-btn.connect` / `.action-btn.disconnect`) — provider
-   actions use their own classes so they never collide. */
-.provider-add-btn {
-  color: var(--green);
-}
-
-.provider-remove-btn {
-  color: var(--red);
 }
 
 /* Inline save feedback */
@@ -529,6 +519,11 @@
   align-items: start;
 }
 
+/* The page header spans both columns, above the list and the page (LIN-3890 outcome 8). */
+.settings-page-head {
+  grid-column: 1 / -1;
+}
+
 .settings-pane {
   min-width: 0;
   max-width: 600px;
@@ -549,6 +544,13 @@
   font-family: var(--font-content);
   font-size: 1.2em;
   font-weight: 600;
+  margin: 0 0 var(--space-1) 0;
+}
+
+.settings-area-purpose {
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  color: var(--muted);
   margin: 0 0 var(--space-3) 0;
 }
 
@@ -597,6 +599,10 @@
   color: var(--muted);
   font-size: var(--font-size-sm);
   white-space: nowrap;
+}
+
+.settings-state-warn {
+  color: var(--amber-dim);
 }
 
 .settings-state-bad {
@@ -712,6 +718,19 @@
   margin-bottom: var(--space-2);
 }
 
+/* Cancel is a link styled as a quiet button with no tone, so it takes the muted text colour, not the link blue. */
+.settings-ask-cancel {
+  color: var(--muted);
+}
+
+/* The ask's Confirm and Cancel sit side by side, Confirm first (LIN-3890). */
+.settings-ask-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .settings-ask-reason,
 .settings-newkey-label {
   display: block;
@@ -766,7 +785,7 @@
   display: inline;
 }
 
-.settings-undo {
+[data-settings-undo] {
   background: none;
   border: 0;
   color: var(--brand-dim);
@@ -806,8 +825,11 @@
 
 /* Phone: the list, or the page with "‹ Settings". No sideways scroll. */
 @media (max-width: 760px) {
+  /* LIN-3890 outcome 8: the phone sizes are this root's. The body is 13px below 400px (style.css), and
+     `em` compounds, so rows (0.95em) read 12.4px. 1rem makes rows 15.2px and notes 13.6px at 390. */
   .settings-shell {
     grid-template-columns: minmax(0, 1fr);
+    font-size: 1rem;
   }
 
   .settings-shell[data-view="index"] .settings-pane {
@@ -818,11 +840,51 @@
     display: none;
   }
 
+  /* The phone area view opens with "‹ Settings" then its title; the page header stays on the list. */
+  .settings-shell[data-view="area"] > .settings-page-head {
+    display: none;
+  }
+
+  /* The phone list selects nothing (the desktop area beside it is the only current one). */
+  .settings-shell[data-view="index"] .settings-nav-link.is-current {
+    background: none;
+  }
+
+  /* A label keeps its words: it takes the width its text needs, and a long value wraps to its own line
+     under the label, not in a one-character column beside it (LIN-3890, the key row and the add row). */
+  .settings-row-label {
+    flex-basis: auto;
+  }
+
+  .settings-row-summary {
+    flex-wrap: wrap;
+  }
+
+  .settings-row-summary > .settings-row-value {
+    flex: 1 0 100%;
+    min-width: 0;
+    order: 2;
+  }
+
   .settings-back {
     display: inline-block;
   }
 
   .settings-pane {
     max-width: none;
+  }
+}
+
+/* Models' body keeps the page's small-phone sizes until LIN-3855 rebuilds it (the Settings root is 1rem on a phone,
+   but style.css sets the body to 14px at 640px and below and 13px at 400px and below). */
+@media (max-width: 640px) {
+  .settings-shell[data-area="models"] .settings-pane > .settings-section {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 400px) {
+  .settings-shell[data-area="models"] .settings-pane > .settings-section {
+    font-size: 13px;
   }
 }
