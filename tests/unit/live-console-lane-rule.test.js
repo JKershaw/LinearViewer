@@ -5,9 +5,9 @@
  *   1. Key    — one lane per workspace::task. A reply joins its anchor's group.
  *   2. Stale  — a member silent past laneStaleMs is removed before the choice.
  *   3. Superseded — a loop named by another loop's followUpTo is not waiting.
- *   4. Rank   — fresh waiting > fresh working > finished. Ties go to the most
- *               recent activity, then the newer sinceMs, then a loop lane over a
- *               status-only lane, then input order.
+ *   4. Rank   — fresh waiting > fresh working > finished. Ties go to a loop lane
+ *               over a status-only lane, then the most recent activity, then the
+ *               newer sinceMs, then input order.
  *
  * The witnesses below were committed before the change and fail at the base
  * commit (dfeabc20). The pins (a lone lane, independent tasks, the existing wake
@@ -157,6 +157,29 @@ test('LIN-3986 (witness, e2e regression): a fresh loop lane keeps its key over a
   assert.equal(feed.lanes[0].credential.state, 'dead', 'the loop lane, with its credential, shows');
 });
 
+// ─── 5b. Ranking ignores a superseded run's marker; a group is as waiting as its best fresh member ──
+
+test('LIN-3986 (witness, review ledger 1): an answered anchor\'s [blocked] marker does not make its group read as waiting', () => {
+  // Anchor A is running with a [blocked] marker and has been replied to (B follows up A), so it is
+  // superseded and not waiting. An independent review K on the same key is fresher. K must win.
+  const a = run({ loopId: 'A', agentAction: 'plan', dispatchedAt: at(50), agentTimestamp: at(50), wakeMarker: 'blocked' });
+  const b = run({ loopId: 'B', followUpTo: 'A', agentAction: 'reply-impl', dispatchedAt: at(40), agentTimestamp: at(40) });
+  const k = run({ loopId: 'K', kind: 'review', agentAction: 'review', dispatchedAt: at(30), agentTimestamp: at(3) });
+  const feed = buildConsoleFeed({ statusItems: [], loops: [a, b, k] }, { now: NOW });
+  assert.deepEqual(feed.lanes.map(l => l.action), ['review']);
+});
+
+test('LIN-3986 (witness, review ledger 2): a group with a fresh waiting member ranks as waiting, not as its freshest member\'s state', () => {
+  // Group A2 + B2: the anchor is running and unmarked, its reply B2 is [blocked] and fresh (20 min).
+  // Independent K2 is working and fresher. The key must show the waiting group, not K2.
+  const a2 = run({ loopId: 'A2', agentAction: 'plan', dispatchedAt: at(50), agentTimestamp: at(50) });
+  const b2 = run({ loopId: 'B2', followUpTo: 'A2', agentAction: 'reply-impl', dispatchedAt: at(40), agentTimestamp: at(20), wakeMarker: 'blocked' });
+  const k2 = run({ loopId: 'K2', kind: 'review', agentAction: 'review', dispatchedAt: at(30), agentTimestamp: at(3) });
+  const feed = buildConsoleFeed({ statusItems: [], loops: [a2, b2, k2] }, { now: NOW });
+  assert.equal(feed.lanes.length, 1);
+  assert.equal(feed.lanes[0].sinceMs, Date.parse(at(40)), 'the A2/B2 group is shown (led by B2, dispatched 40 min ago), not K2 (30 min)');
+});
+
 // ─── 6. Pins: independent tasks never merge; a lone lane is unchanged ────────
 
 test('LIN-3986 (pin): a reply naming a different issue, or a different workspace, does not fold', () => {
@@ -244,7 +267,7 @@ test('LIN-3986 (witness, rank): a candidate is judged on its fresh members only'
     { state: 'waiting', lastActivityMs: NOW - 300 * MIN },
     { state: 'working', lastActivityMs: NOW - 5 * MIN },
   ] };
-  assert.equal(pick([mixed, cand('waiting', { ago: 5, id: 'FW' })]), 'FW', 'the stale waiting member does not make the mixed candidate waiting');
+  assert.equal(pick([mixed, cand('waiting', { ago: 10, since: 500, id: 'FW' })]), 'FW', 'the stale waiting member does not make the mixed candidate waiting');
   assert.equal(pick([mixed, cand('finished', { ago: 5, id: 'FF' })]), 'MIXED', 'the mixed candidate ranks as working, above finished');
 });
 
