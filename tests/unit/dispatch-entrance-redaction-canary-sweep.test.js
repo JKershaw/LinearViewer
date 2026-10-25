@@ -112,7 +112,8 @@ function sessionWorld({ canary, accountId, target }) {
     userPreferencesStore: { getUserPreferences: async () => ({}), saveUserPreferences: async () => {}, getFavoritePrompts: async () => [], addFavoritePrompt: async () => [], removeFavoritePrompt: async () => [] },
     dispatchPresetsStore: { list: async () => [], get: async () => null, createCustom: async () => ({}), update: async () => ({}), delete: async () => true },
     workspaceFromUrl: (req, _res, next) => {
-      req.workspace = { urlKey: 'alpha', id: 'ws-alpha' };
+      // The test token keeps the decision panel's model catalog on its mock path (lib/should-mock-ai.js): no live OpenRouter call.
+      req.workspace = { urlKey: 'alpha', id: 'ws-alpha', accessToken: 'test-token' };
       req.session = { accountId };
       next();
     }
@@ -141,8 +142,8 @@ describe('LIN-3601 redaction canary sweep — session routes (routes/dispatch.js
     assert.match(canary, /^hbp_[A-Za-z0-9_-]{43}$/);
   });
 
-  test('enumerates exactly 28 session routes (LIN-3833 added the read-only preview)', () => {
-    assert.equal(routes.length, 28);
+  test('enumerates exactly 29 session routes (LIN-3833 added the read-only preview; LIN-3962 the decision panel)', () => {
+    assert.equal(routes.length, 29);
   });
 
   for (const route of routes) {

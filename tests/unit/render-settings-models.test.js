@@ -12,9 +12,8 @@ import { emptyTable, effectiveTable, applyChangesToTable, AGENT_JOB_IDS, HARBOUR
 import { agentSpendByJob, harbourSpendByJob } from '../../lib/model-routing-spend.js';
 import { DEFAULT_MODEL } from '../../lib/openrouter.js';
 import { SURFACES } from '../../lib/llm-jobs.js';
-import { changePanel, fieldName } from '../../lib/components/settings-change-panel.js';
+import { decisionPanel, fieldName } from '../../lib/components/decision-panel.js';
 import { spendBar } from '../../lib/components/settings-spend-bar.js';
-import { DISPATCH_HARNESS_SUGGESTIONS } from '../../lib/model-routing-harnesses.js';
 
 const URL_KEY = 'acme';
 const AVAILABLE = [{ id: 'openai/gpt-5.4-mini', name: 'GPT-5.4 Mini' }];
@@ -68,7 +67,7 @@ describe('what a row says', () => {
 
   test('a stored model outside the option set still shows as itself', () => {
     const table = applyChangesToTable(emptyTable(), [{ scope: 'job', surface: SURFACES.AGENT_SESSION, key: 'bug', field: 'model', to: 'odd/model-x' }]);
-    assert.match(body(table), /<option value="odd\/model-x" selected>/);
+    assert.match(body(table), /value="odd\/model-x"/);
   });
 });
 
@@ -93,11 +92,19 @@ describe('the option set a row offers', () => {
 });
 
 describe('the blank option on a group and the No job row', () => {
-  // One change panel, from its testid to its closing div: a match cannot run on into the next row's panel.
+  // One decision panel, from its testid to its own closing div: the panel nests divs, so count them. A match
+  // cannot run on into the next row's panel.
   const panelOf = (html, testid) => {
     const start = html.indexOf(`data-testid="${testid}"`);
     assert.notEqual(start, -1, testid);
-    return html.slice(start, html.indexOf('</div>', start));
+    const tag = /<(\/?)div\b/g;
+    tag.lastIndex = start;
+    let depth = 0;
+    for (let m = tag.exec(html); m; m = tag.exec(html)) {
+      depth += m[1] ? -1 : 1;
+      if (depth === 0) return html.slice(start, m.index + m[0].length);
+    }
+    assert.fail(`no closing div for ${testid}`);
   };
 
   test('an agent group with no setting reads "Not set": nothing above it fills the blank (LIN-3855 ruling)', () => {
@@ -112,38 +119,52 @@ describe('the blank option on a group and the No job row', () => {
 
   test('no blank option on the page says "Inherit the default": a blank group reads nothing above it (agent and Harbour alike)', () => {
     const html = body(emptyTable());
-    assert.match(panelOf(html, 'models-panel-group-harbour-call-make'), /<option value=""[^>]*>Not set<\/option>/);
+    assert.match(panelOf(html, 'models-panel-group-harbour-call-make'), /placeholder="Not set"/, 'a Harbour call has no harness: its model follows the group');
     assert.doesNotMatch(html, /Inherit the default/);
   });
 });
 
-describe('the change panel', () => {
+describe('the decision panel (LIN-3962)', () => {
+  const lists = { 'claude-code': [], opencode: [{ id: 'openai/gpt-5.5', label: 'GPT-5.5', free: false }], any: [{ id: 'openai/gpt-5.5', label: 'GPT-5.5', free: false }] };
+  const named = (target) => ({ nameOf: (field) => fieldName({ ...target, field }), fieldAttrs: (field) => `data-models-field="${field}"` });
+
   test('its fields are named by scope, surface, key and field, and the blank option follows the group', () => {
-    const html = changePanel({
-      target: { scope: 'job', surface: 'agent-session', key: 'bug' },
-      harness: 'opencode', model: null, effort: null,
-      modelOptions: [{ id: 'openai/gpt-5.5', label: 'GPT-5.5', free: false }],
-      harnesses: DISPATCH_HARNESS_SUGGESTIONS, inheritLabel: 'Follow Make'
+    const target = { scope: 'job', surface: 'agent-session', key: 'bug' };
+    const html = decisionPanel({
+      testid: 'models-panel-job-agent-session-bug',
+      harness: { value: null, inForce: 'opencode', follow: 'Follow Make (opencode)' },
+      model: { value: null, follow: 'Follow Make (none)', lists, suggestions: {} },
+      effort: { value: null, follow: 'Follow Make (none)' },
+      ...named(target)
     });
     assert.match(html, /name="c__job__agent-session__bug__harness"/);
     assert.match(html, /name="c__job__agent-session__bug__model"/);
     assert.match(html, /name="c__job__agent-session__bug__effort"/);
-    assert.match(html, /<option value="">Follow Make<\/option>/);
+    assert.match(html, /<option value=""[^>]*>Follow Make \(opencode\)<\/option>/);
+    assert.match(html, /placeholder="Follow Make \(none\)"/);
   });
 
   test('effort is hidden on a harness that takes none, and the panel never carries the old row classes', () => {
-    const html = changePanel({
-      target: { scope: 'group', surface: 'agent-session', key: 'make' }, harness: 'opencode', model: null, effort: null,
-      modelOptions: [], harnesses: DISPATCH_HARNESS_SUGGESTIONS, inheritLabel: 'Inherit the default'
+    const target = { scope: 'group', surface: 'agent-session', key: 'make' };
+    const html = decisionPanel({
+      testid: 'models-panel-group-agent-session-make',
+      harness: { value: 'opencode', inForce: 'opencode', follow: 'Not set' },
+      model: { value: null, follow: 'Not set', lists, suggestions: {} },
+      effort: { value: null, follow: 'Not set' },
+      ...named(target)
     });
-    assert.match(html, /data-models-effort hidden/);
-    assert.doesNotMatch(html, /class="[^"]*\b(line|toggle-btn|action-btn)\b/);
+    assert.match(html, /data-decision-effort hidden/);
+    assert.doesNotMatch(html, /class="[^"]*\b(line|toggle-btn|action-btn|settings-change-panel)\b/);
   });
 
   test('a free option carries data-free, never option text', () => {
-    const html = changePanel({
-      target: { scope: 'job', surface: 'agent-session', key: 'bug' }, harness: 'opencode', model: null, effort: null,
-      modelOptions: [{ id: 'z/free', label: 'Free', free: true }], harnesses: DISPATCH_HARNESS_SUGGESTIONS, inheritLabel: 'Follow Make'
+    const target = { scope: 'job', surface: 'agent-session', key: 'bug' };
+    const html = decisionPanel({
+      testid: 'models-panel-job-agent-session-bug',
+      harness: { value: 'opencode', inForce: 'opencode', follow: 'Follow Make' },
+      model: { value: null, follow: 'Follow Make', lists: { ...lists, opencode: [{ id: 'z/free', label: 'Free', free: true }] }, suggestions: {} },
+      effort: { value: null, follow: 'Follow Make' },
+      ...named(target)
     });
     assert.match(html, /<option value="z\/free" data-free="true">Free<\/option>/);
   });
@@ -166,7 +187,7 @@ describe('the spend', () => {
     const html = body(emptyTable(), {
       agentSpend: [{ id: 'bug', runs: 2, priced: 2, unpriced: 0, noTelemetry: 0, spendUsd: 1.5, typicalUsd: 0.75, models: ['sonnet'] }]
     });
-    assert.match(html, /\$1\.50 · typical \$0\.750 a run/);
+    assert.match(html, /\$1\.50 · typical \$0\.75 a run/);
   });
 
   test('the spend bar is a native progress element, with the share as its value', () => {

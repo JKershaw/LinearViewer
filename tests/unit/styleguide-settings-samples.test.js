@@ -23,6 +23,7 @@ const EXPECTED = [
   'settings-row-open',     // key-row: keyRow (drillRow, opened in place)
   'settings-pane',         // area-frame: renderSettingsShell
   'settings-state-warn',   // sidebar-state: renderSettingsNav
+  'decision-panel',        // decision-panel: decisionPanel (LIN-3962)
 ];
 
 test('every Settings piece has one live sample, in an inert phone-root wrapper', () => {
@@ -49,6 +50,17 @@ test('the switch-row sample is the switchRow builder\'s exact output', () => {
     sample.includes(switchRow({ key: 'sample', label: 'Keep a copy of changes', on: true, action: '#' })),
     'the sample holds switchRow()\'s output verbatim',
   );
+});
+
+// LIN-3962 (operator visual judge): the decision panel's two samples each carry a caption saying which state they
+// show, and each caption sits above its own panel, so the two never read as one panel.
+test('the decision-panel samples are two captioned samples, each caption above its own panel', () => {
+  const html = renderStyleguide();
+  const captions = [...html.matchAll(/class="sg-decision-caption">[^<]+</g)].map((m) => m.index);
+  assert.equal(captions.length, 2, 'one caption per sample');
+  const models = html.indexOf('data-testid="sg-decision-models"');
+  const home = html.indexOf('data-testid="sg-decision-home"');
+  assert.ok(captions[0] < models && models < captions[1] && captions[1] < home, 'Models\' caption, Models\' panel, Home\'s caption, Home\'s panel, in order');
 });
 
 // Two renders made milliseconds apart cannot see a wall-clock dependency, so render under two clocks

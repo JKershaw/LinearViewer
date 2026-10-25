@@ -135,7 +135,8 @@ async function makeWorld() {
     dispatchQueueStore: dispatchStore,
     dispatchTokenStore: dispatchTokens,
     workspaceFromUrl: (req, _res, next) => {
-      req.workspace = { urlKey: req.params.urlKey || URL_KEY, id: POSTER_WORKSPACE, provider: 'linear' };
+      // The test token keeps the decision panel's model catalog on its mock path (lib/should-mock-ai.js): no live OpenRouter call.
+      req.workspace = { urlKey: req.params.urlKey || URL_KEY, id: POSTER_WORKSPACE, provider: 'linear', accessToken: 'test-token' };
       req.session = { accountId };
       next();
     },
@@ -349,6 +350,7 @@ const SESSION_TABLE = {
   [`GET ${SESSION}/count`]: { kinds: ['none'], reason: 'queue count' },
   [`GET ${SESSION}/quota`]: { kinds: ['none'], reason: 'free-tier usage read' },
   [`GET ${SESSION}/preview`]: { kinds: ['none'], reason: 'LIN-3833: the read-only routing answer; resolves a setting, mints nothing' },
+  [`GET ${SESSION}/decision-panel`]: { kinds: ['none'], reason: 'LIN-3962: the run panel\'s read-only body; prices a history read, mints nothing' },
   [`GET ${SESSION}/history`]: { kinds: ['none'], reason: 'history list' },
   [`GET ${SESSION}/recent-prompts`]: { kinds: ['none'], reason: 'recent prompts read' },
   [`POST ${SESSION}/recent-prompts`]: { kinds: ['none'], reason: 'recent prompts write' },
@@ -392,10 +394,10 @@ const KINDS = ['none', 'plain-bootstrap', 'declared-bootstrap', 'dispatch-token'
 const DRIVEN_KINDS = ['plain-bootstrap', 'declared-bootstrap', 'dispatch-token'];
 
 describe('LIN-3601 mint sweep — the table', () => {
-  test('the session router enumerates 28 routes, each with one row naming its mint kinds and a reason', async () => {
+  test('the session router enumerates 29 routes (LIN-3962 adds the decision panel), each with one row naming its mint kinds and a reason', async () => {
     const w = await makeWorld();
     const routes = enumerateRoutes(w.sessionRouter());
-    assert.equal(routes.length, 28);
+    assert.equal(routes.length, 29);
     const keys = routes.map(r => `${r.method} ${r.path}`);
     assert.deepEqual(keys.filter(k => !SESSION_TABLE[k]), [], 'an enumerated route without a row');
     assert.deepEqual(Object.keys(SESSION_TABLE).filter(k => !keys.includes(k)), [], 'a row for a route that is not enumerated');
