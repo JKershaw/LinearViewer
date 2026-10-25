@@ -4,7 +4,7 @@ kind: paper
 version: 1
 date: 2026-10-25
 authors: [Claude (LIN-3944), for John Kershaw]
-model: claude-haiku-5-5 in Claude Code, dispatched by simple-dispatcher (dispatch eaab6f5a-62e6-4271-9874-b0e13b025ea9, kind implementation, LIN-3944); effort not recorded in the dispatch item
+model: claude-haiku-5-5 in Claude Code, dispatched by simple-dispatcher (dispatch eaab6f5a-62e6-4271-9874-b0e13b025ea9, kind implementation, LIN-3944), effort high
 grounded_at: 3861e1ea (LinearViewer, origin/main); 955349d (simple-dispatcher, HEAD); runner logs, transcripts and /cost records read 25 Oct 2026
 cites:
   - "lib/task-cost.js@3861e1ea:85 (buildTaskCost, which keeps status 'taken'), :138-141 (the no-telemetry branch), :175-179 (totalUsd nulled)"
@@ -64,7 +64,7 @@ No, not as a number to show. Model, kind and run time predict a reported session
 
 - **One runner host.** Every reported session in the window has a launch record on this host, so for this workspace the population is complete. Other runners cannot be bounded from here, and issue-less sessions are unbounded (there are none on this host).
 - **The issue list is a rule, checked only by reproduction.** A lineage on an issue missing from the list would be invisible. The rule reproduces the 694 issues exactly, but that is evidence that it is consistent, not that it is complete.
-- **The snapshot is not the live state.** The `/cost` records were read at 11:47 on 25 Oct; the logs and transcripts were read later. The count is 117 here against the Costs note's 114, because in-flight rows moved. The difference is reported, not trimmed.
+- **The snapshot is not the live state.** The `/cost` records were read at 11:47 on 25 Oct; the logs and transcripts were read later. The count is 117 here against the Costs note's 114, because in-flight rows moved. The difference is reported, not trimmed. Stage 1's inputs (`cost.jsonl`, `logmap.json`, `tcost.json`) are not committed; `build-table.py` was re-run from them to reproduce the table exactly, but a fresh sweep reads later state and will differ.
 - **The reported-cost shortfall is a measurement, not a diagnosis.** Its cause is a hypothesis.
 - **The decisive test is small.** Twenty-five sessions, mostly one-turn and under a minute. Its error is measured on those, not on the whole missing population.
 - **The bounds are ceilings, not guarantees.** The run-time-matched bound covers 24 of 25 recoverable sessions. The miss is LIN-3461, a 3.0-minute plan session that cost $0.996 against a matched maximum of $0.863. The opencode sessions ran toward the 60-minute failsafe, so if they were heavier than their cell the bound understates them. The cell maximum is shown beside the matched figure. It covers all 25, but the unrecovered rows reach $1,351 under it, which is useless as a bound.
@@ -78,7 +78,7 @@ These four moves are the recommendation. None is blocking. Each lands in the lay
 - **(a) Rows that never launched are not sessions.** Take the 48 out of Not counted and out of `noTelemetryCount` in both cost paths: `lib/task-cost.js:138-141` and `lib/terminal-marked-task-cost.js:142`. Owner: LIN-3936 (Consolidate, `docs/plans/costs.md:115`). LIN-3937 is its first step and holds `costs.md` now, so this paper does not edit it.
 - **(b) The cause fix.** The runner posts a final usage snapshot at session end and at reap, read after the transcript is flushed, so one-turn and killed sessions post too. Owner: simple-dispatcher (`hook.js:359`, and the Stop branches from `:1763`). Subagent files are LIN-3859.
 - **(c) Backfill the recoverable sessions** from their transcripts on the runner host, through `walkUsage` and the same pricer, so that there is one reducer.
-- **(d) The residue stays under Not counted** as a count and "≤ $82" for the 42 unrecovered rows, from the run-time-matched bound. It is never "≈" and never in a total.
+- **(d) The residue stays under Not counted** as a count and "≤ $82" for the 42 unrecovered rows, from the run-time-matched bound (the largest priced cost in the same kind and model among sessions that ran no longer; a ceiling, which covered 24 of the 25 back-tested sessions). It is never "≈" and never in a total.
 
 The layers that must agree with (a) and (c), from the research's grep, are `lib/task-cost.js`, `lib/terminal-marked-task-cost.js`, `lib/weekly-budget.js`, `lib/observation-sessions-store.js`, `lib/kpi-stats.js` (its own Mongo projection), `lib/run-view.js`, `lib/render-run-steps.js`, `lib/render-session.js`, `lib/effort-readout.js` and `lib/liveness-detectors.js`. A bound is never rendered as a cost.
 
