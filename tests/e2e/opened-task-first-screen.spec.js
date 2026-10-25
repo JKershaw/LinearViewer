@@ -615,9 +615,7 @@ test.describe('LIN-2944 P1 — Home top-task mark', () => {
 test.describe('LIN-2944 P1 — Home first-screen witness (R1/R2)', () => {
   test('top task opens to its copy-first control; writing its step and copying names TEST-13 in three clicks, with no AI spend (LIN-3833)', async ({ page, context, seedLocal, localWorkerUrlKey }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-    // LIN-3969: the copy-first control needs no run controls; `runnerKey: false` also clears queue tokens an
-    // earlier spec left on this worker's urlKey (a default seed keeps them, LIN-3849).
-    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, proxyDefault: false, runnerKey: false });
+    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, proxyDefault: false });
 
     const spend = recommendSpy(page);
     let clicks = 0;

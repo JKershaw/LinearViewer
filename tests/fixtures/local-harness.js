@@ -418,9 +418,11 @@ export async function seedLocalWorkspace(page, seed = null, { features, openRout
   // controls could otherwise inherit them from an earlier spec on the same
   // per-worker urlKey. The seeded session account is the workspace owner.
   data.runnerKey = runnerKey === true;
-  // Without an explicit runnerKey the default seed clears runner keys but leaves queue
-  // tokens alone: consumer-API specs mint one before they seed.
-  if (runnerKey === undefined || keepQueueTokens === true) data.keepQueueTokens = true;
+  // LIN-3969 (ruling `lin3969-seed-queue-tokens`): every seed clears queue tokens too, for the
+  // same reason. When the default kept them, close-out.spec.js's queue token turned run controls
+  // on for the next spec on this worker's urlKey. A spec that makes a queue token BEFORE it seeds
+  // keeps it by passing `keepQueueTokens: true`.
+  if (keepQueueTokens === true) data.keepQueueTokens = true;
   // `queueToken: true` gives run controls through a live queue token instead, so no
   // runner credential exists to read as "someone is listening" (routes/test.js).
   if (queueToken === true) data.queueToken = true;
