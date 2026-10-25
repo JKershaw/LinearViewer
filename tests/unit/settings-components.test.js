@@ -89,8 +89,8 @@ describe('the frame and nothing popping up', () => {
     const client = readFileSync(join(ROOT, 'public/settings.js'), 'utf8');
     const added = client.slice(client.indexOf('LIN-3846: the areas'));
     assert.doesNotMatch(added, /\bconfirm\(|window\.open|showModal|<dialog/);
-    // The presets delete keeps its native confirm() (LIN-511): that form is LIN-3855's to retire.
-    assert.equal((client.match(/if \(confirm\(/g) || []).length, 1);
+    // LIN-3855: the presets delete asks in place now; no native confirm() is left in this file.
+    assert.equal((client.match(/\bconfirm\(/g) || []).length, 0);
   });
 
   test('every area page renders the sidebar and the frame, in any area', () => {

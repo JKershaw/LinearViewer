@@ -3924,11 +3924,11 @@ app.get('/workspace/:urlKey/proxy', workspaceFromUrl, async (req, res) => {
 app.use(createSettingsModelRoutes({ workspaceFromUrl, modelRoutingStore }))
 app.use(createSettingsRouter({
   workspaceFromUrl, getOpenRouterSource, getDeployInfo, userPreferencesStore, workspacePreferencesStore,
-  llmCallLogStore, promptTraceStore, accountStore, requestFeatureFlags, resolveWorkspaceModel,
-  getWorkspaceFeatures, setWorkspaceFeature, projectLegacy, getModelCatalog, shouldMockAi, AVAILABLE_MODELS,
+  llmCallLogStore, promptTraceStore, accountStore, requestFeatureFlags,
+  getWorkspaceFeatures, setWorkspaceFeature, getModelCatalog, shouldMockAi, AVAILABLE_MODELS,
   getProvider, getProviderForWorkspace, getBindingsForWorkspace, getBindingCredentials, isActiveBinding,
   dispatchPresetsStore, proxyTokenStore, dispatchTokenStore, proxyEventStore, workspaceHaltStore,
-  workspaceChangeLogStore, modelRoutingStore, workspaceOwnerCheck
+  workspaceChangeLogStore, modelRoutingStore, workspaceOwnerCheck, dispatchStore: dispatchQueueStore
 }))
 
 // POST /settings/workspace-features (periodic reviews, agents-can-change-models) lives in routes/settings.js

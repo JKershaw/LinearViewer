@@ -12,7 +12,7 @@ import { JOBS } from '../../lib/llm-jobs.js';
 import { DISPATCH_DEFAULT_KINDS } from '../../lib/prompt-templates.js';
 import {
   AI_OPERATION_KINDS, AGENT_JOB_IDS, HARBOUR_JOB_IDS, tableFromPreferences, projectLegacy, emptyTable,
-  diffTables, applyChangesToTable, harbourModelTable, dispatchDefaultsTable, aiOverridesTable
+  diffTables, applyChangesToTable, harbourModelChanges
 } from '../../lib/model-routing.js';
 import { AI_OPERATION_KINDS as REEXPORTED } from '../../lib/workspace-preferences.js';
 
@@ -58,33 +58,19 @@ describe('the old forms are the migration run in reverse', () => {
     });
   }
 
-  test('the model form sets the Harbour default and every Harbour group, leaving job rows', () => {
-    const base = tableFromPreferences({ aiModelOverrides: { byKind: { recap: { model: 'own' } } } });
-    const t = harbourModelTable(base, 'a/new');
+  test('the Harbour model seed sets the Harbour default and every Harbour group, leaving job rows', () => {
+    const base = applyChangesToTable(tableFromPreferences({ aiModelOverrides: { byKind: { recap: { model: 'own' } } } }), []);
+    const t = applyChangesToTable(base, harbourModelChanges('a/new'));
     assert.equal(t.defaults['harbour-call'].model, 'a/new');
     assert.ok(Object.values(t.groups['harbour-call']).every((g) => g.model === 'a/new'));
     assert.equal(t.jobs.recap.model, 'own');
-  });
-
-  test('the dispatch-defaults form replaces the top row and each kind row; a blank field clears the job back to its group', () => {
-    const base = tableFromPreferences({ dispatchDefaults: { model: 'old', byKind: { review: { model: 'r', harness: 'opencode' }, bug: { model: 'b' } } } });
-    const t = dispatchDefaultsTable(base, { model: 'new' }, { review: { harness: 'opencode' } });
-    assert.deepEqual(t.jobs.review, { harness: 'opencode' });
-    assert.equal(t.jobs.bug, undefined);
-    assert.equal(t.groups['agent-session'].make.model, 'new');
-  });
-
-  test('the overrides form sets or clears each op, and scan sets scan-retire', () => {
-    const base = tableFromPreferences({ aiModelOverrides: { byKind: { recap: { model: 'x' } } } });
-    const t = aiOverridesTable(base, { scan: { model: 'a/s' } });
-    assert.deepEqual([t.jobs.scan, t.jobs['scan-retire'], t.jobs.recap], [{ model: 'a/s' }, { model: 'a/s' }, undefined]);
   });
 });
 
 describe('diff and apply', () => {
   test('diffTables reports from and to, and applying the diff reproduces the table', () => {
     const a = tableFromPreferences({ dispatchDefaults: { model: 'x' } });
-    const b = aiOverridesTable(harbourModelTable(a, 'a/b'), { recap: { model: 'a/r' } });
+    const b = applyChangesToTable(applyChangesToTable(a, harbourModelChanges('a/b')), [{ scope: 'job', surface: 'harbour-call', key: 'recap', field: 'model', to: 'a/r' }]);
     const changes = diffTables(a, b);
     assert.ok(changes.some((c) => c.key === 'recap' && c.from === null && c.to === 'a/r'));
     assert.deepEqual(diffTables(applyChangesToTable(a, changes), b), []);

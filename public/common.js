@@ -1760,29 +1760,6 @@ if (typeof document !== 'undefined' && document.addEventListener) {
     }
   });
 
-  // The Settings "Dispatch defaults" form is a plain native <form> POST
-  // (server.js reads req.body[name] directly, no JS reader) — a model
-  // select's own `name` attribute is what reaches the server, and a select
-  // can only submit one of its own <option> values. When it's on the
-  // `other…` sentinel, inject a transient <option> carrying the paired
-  // free-text input's value and select IT instead, so the server reads the
-  // typed id rather than the literal sentinel string (LIN-2719 HARD RULE 2/3
-  // — the same escape-hatch-reaches-the-wire requirement
-  // readDispatchExecControls satisfies for the JS-read exec controls).
-  document.addEventListener('submit', (e) => {
-    const form = e.target;
-    if (!form || !form.matches || !form.matches('.dispatch-defaults-form')) return;
-    form.querySelectorAll('select.dispatch-model-input').forEach(select => {
-      if (select.value !== DISPATCH_MODEL_OTHER_VALUE) return;
-      const row = select.closest('.dispatch-default-row');
-      const otherInput = row ? row.querySelector('.dispatch-model-input-other') : null;
-      const customValue = otherInput ? otherInput.value.trim() : '';
-      const opt = document.createElement('option');
-      opt.value = customValue;
-      opt.selected = true;
-      select.appendChild(opt);
-    });
-  });
 }
 
 // =============================================================================

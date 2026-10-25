@@ -137,6 +137,9 @@ describe('periodic reviews: for everyone, so it asks why and is logged', () => {
   test('Undo refuses when the value has changed since, and a second Undo is refused', async () => {
     await post('workspace-features', { feature: 'periodicals', enabled: 'true', reason: 'on' });
     const [first] = await logStore.getLog('alpha');
+    // The log orders by `at` (milliseconds): a second change in the same millisecond ties the first, and the
+    // newest-first read then keeps insertion order. Let the clock move so "newest" means the second change.
+    await new Promise((resolve) => setTimeout(resolve, 5));
     await post('workspace-features', { feature: 'periodicals', enabled: 'false', reason: 'off again' });
     const conflict = await post(`change-log/workspace/${first._id}/undo`, { reason: 'undo the first' });
     assert.equal(conflict.headers.get('location'), '/workspace/alpha/settings/change-log?error=conflict');
