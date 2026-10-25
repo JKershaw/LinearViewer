@@ -21,6 +21,11 @@
  * `...(options.callMeta || {})` spread at run time (as brief, recap and scan always
  * could); a static test cannot see values, so a `urlKey` that is present in code but
  * falsy at run time (`urlKey || null` in the roadmap routes) is the residual.
+ * Callees are matched by name, including a renamed import (`streamChat as sc2`, a wrapper
+ * `as gb`) and a namespace member (`o.streamChat`, `o['streamChat']`). A call that
+ * reaches one without a name in the file (a dynamic-import or namespace destructure, a
+ * reassignment, a re-export under a new name, a string-literal specifier, a template-literal
+ * key) is out of reach of a static name census, and none occur in the tree (LIN-3867).
  *
  * Run with: node --test tests/unit/llm-jobs-census.test.js
  */
@@ -140,10 +145,16 @@ function analyse(path, src) {
   const cachedDocCalls = [];
   const aliases = new Map(); // local name -> LLM_FNS name, for `import { streamChat as sc2 }`
   const namespaces = new Set(); // local name, for `import * as o`
+  const wrapperAliases = new Map(); // local name -> WRAPPERS name, for `import { generateBrief as gb }` (any source)
 
   visit(ast, (n) => {
     if (n.type === 'VariableDeclarator' && n.id.type === 'Identifier' && n.init?.type === 'ObjectExpression') consts.set(n.id.name, n.init);
     if (n.type === 'FunctionDeclaration' && n.id) functions.set(n.id.name, n);
+    if (n.type === 'ImportDeclaration') {
+      for (const s of n.specifiers) {
+        if (s.type === 'ImportSpecifier' && Object.hasOwn(WRAPPERS, s.imported.name) && WRAPPERS[s.imported.name]) wrapperAliases.set(s.local.name, s.imported.name);
+      }
+    }
     if (n.type === 'ImportDeclaration' && OPENROUTER_MODULE.test(n.source.value)) {
       for (const s of n.specifiers) {
         if (s.type === 'ImportNamespaceSpecifier') namespaces.add(s.local.name);
@@ -190,7 +201,7 @@ function analyse(path, src) {
     if (!NOT_CALL_SITES.has(path) && (LLM_FNS.has(name) || isSeam || isAlias)) {
       sites.push({ file: path, line: lineOf(src, n), name, meta: callMetaOf(n) });
     }
-    if (c.type === 'Identifier' && Object.hasOwn(WRAPPERS, name) && !functions.has(name)) {
+    if (c.type === 'Identifier' && (Object.hasOwn(WRAPPERS, name) || wrapperAliases.has(name)) && !functions.has(name)) {
       wrapperCalls.push({ file: path, line: lineOf(src, n), name, meta: callMetaOf(n) });
     }
     if (c.type === 'Identifier' && name === 'generateCachedDocument' && n.arguments[0]?.type === 'Literal') {
@@ -375,6 +386,12 @@ describe('LIN-3852: every LLM use is a registered job', () => {
     const fixture = "import * as o from './openrouter.js';\nexport const f = () => o['streamChat']([], { callMeta: { urlKey: 'u', feature: 'observer-pass' } }, () => {});\n";
     const problems = checkCensus({ ...inputs, sources: { ...sources, 'lib/fixture-ns-computed.js': fixture } });
     assert.ok(problems.some((p) => /^lib\/fixture-ns-computed\.js:\d+ streamChat\(\) is a model call with no CALL_PATHS entry/.test(p)), problems.join('\n'));
+  });
+
+  test('an aliased import of a wrapper called without its urlKey fails, naming the alias (LIN-3867)', () => {
+    const fixture = "import { generateBrief as gb } from './brief.js';\nexport const f = () => gb({}, { callMeta: { feature: 'brief' } });\n";
+    const problems = checkCensus({ ...inputs, sources: { ...sources, 'lib/fixture-wrapper-alias.js': fixture } });
+    assert.ok(problems.some((p) => /^lib\/fixture-wrapper-alias\.js:\d+ gb\(\) is called without callMeta\.urlKey/.test(p)), problems.join('\n'));
   });
 
   // Built from a synthetic unit file, not the live text of a file that is free to move.
