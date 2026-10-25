@@ -208,13 +208,14 @@ test.describe('Landing Page (bespoke showcase)', () => {
     expect(order & 4).toBe(4);
   });
 
-  test('every Start-here link resolves (item 1 to the Archive, the rest to the Library)', async ({ page, request }) => {
+  test('every Library link resolves, and the Library does not lead with the Archive edition (LIN-3980)', async ({ page, request }) => {
     await page.goto('/');
     const hrefs = await page.locator('[data-testid="landing-library"] a.lx-library__link').evaluateAll(els => els.map(e => e.getAttribute('href')));
-    expect(hrefs).toHaveLength(6);
-    expect(hrefs[0]).toBe('/archive/2');
-    for (const href of hrefs.slice(1)) expect(href).toMatch(/^\/library\//);
-    for (const href of hrefs) {
+    expect(hrefs).toHaveLength(5);
+    for (const href of hrefs) expect(href).toMatch(/^\/library\//);
+    const archive = await page.locator('[data-testid="landing-archive-link"]').getAttribute('href');
+    expect(hrefs).not.toContain(archive);
+    for (const href of [...hrefs, archive]) {
       const res = await request.get(href);
       expect(res.status(), href).toBe(200);
     }
