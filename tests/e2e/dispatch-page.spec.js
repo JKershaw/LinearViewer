@@ -605,8 +605,11 @@ test.describe('Dispatch Page', () => {
     // control becomes a <select> — the blank option stays selected/value=""
     // (HARD RULE 1), but its text now says what will run if left blank.
     test('with a configured workspace default, the blank model option is selected and names the default (LIN-2719 HARD RULE 4)', async ({ page }) => {
-      await page.request.post(`/workspace/${WS}/settings/dispatch-defaults`, {
-        form: { defaultModel: 'anthropic/claude-opus-4.8', defaultHarnessSelect: 'opencode' }
+      await page.request.post('/test/model-routing', {
+        data: { urlKey: WS, reason: 'seed the workspace default', changes: [
+          { scope: 'default', surface: 'agent-session', key: 'default', field: 'model', to: 'anthropic/claude-opus-4.8' },
+          { scope: 'default', surface: 'agent-session', key: 'default', field: 'harness', to: 'opencode' }
+        ] }
       });
       try {
         await page.goto(DISPATCH_URL);
@@ -622,7 +625,12 @@ test.describe('Dispatch Page', () => {
         // tests) — reset it so a later test relying on the pre-selected
         // claude-code default (e.g. the +proxy describe block below) doesn't
         // silently inherit 'opencode' from here.
-        await page.request.post(`/workspace/${WS}/settings/dispatch-defaults`, { form: {} });
+        await page.request.post('/test/model-routing', {
+          data: { urlKey: WS, reason: 'reset the workspace default', changes: [
+            { scope: 'default', surface: 'agent-session', key: 'default', field: 'model', to: null },
+            { scope: 'default', surface: 'agent-session', key: 'default', field: 'harness', to: null }
+          ] }
+        });
       }
     });
   });

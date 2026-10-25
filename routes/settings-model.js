@@ -1,31 +1,47 @@
 /**
- * The three old Settings model forms (LIN-3853), moved out of server.js so a unit test can
- * drive them. They keep working, but they write through the model-routing store instead of
- * the old preference fields (item 4 of LIN-3820 retires them):
+ * The Settings › Models page's writes (LIN-3855). The three legacy forms (the Harbour model, the Dispatch
+ * defaults and the AI model overrides) are retired: their POSTs are gone, and so is the old 307 that pointed a
+ * bare POST at them. Every model write now goes through the page's staged save, the presets or the undo.
  *
- *   POST /workspace/:urlKey/settings/model              — the Harbour-call model
- *   POST /workspace/:urlKey/settings/dispatch-defaults  — agent-session harness/model/effort
- *   POST /workspace/:urlKey/settings/ai-model-overrides — per-operation Harbour-call models
+ *   POST /workspace/:urlKey/settings/models/changes                  { reason, version, c__… fields }
+ *   POST /workspace/:urlKey/settings/models/presets                  { reason, name }
+ *   POST /workspace/:urlKey/settings/models/presets/:presetId/apply  { reason }
  *
- * The forms have no reason field, so each POST logs exactly one entry with a fixed reason
- * that names the form. Validation and redirects are the originals'.
+ * A refused write goes back to the Models page with the reason in place and the staged values kept (the
+ * session holds them for one page load). Each write is one logged change with one reason.
  */
 import { Router } from 'express';
 import { renderErrorPage } from '../lib/render.js';
-import { DISPATCH_DEFAULT_KINDS } from '../lib/prompt-templates.js';
-import { validateOpaqueDispatchField, MAX_NAME_LENGTH } from '../lib/dispatch-validation.js';
-import { AI_OPERATION_KINDS } from '../lib/model-routing.js';
+import { RoutingError } from '../lib/model-routing.js';
+import { stagedChanges, runnableGuard } from '../lib/model-routing-edit.js';
+import { settingsAreaUrl } from '../lib/settings-areas.js';
 
-export const LEGACY_FORM_REASONS = Object.freeze({
-  model: 'Changed on the old Settings form: Model',
-  dispatchDefaults: 'Changed on the old Settings form: Dispatch defaults',
-  aiOverrides: 'Changed on the old Settings form: AI model overrides'
-});
+/** What a refused page write says, in place, on the Models page (LIN-3855). */
+const REFUSAL_MESSAGES = {
+  CONFLICT: 'The models changed while you were editing, so nothing was saved. Your edits are still here: check them and save again.',
+  REASON_REQUIRED: 'Save needs a reason: say why these models are changing.'
+};
 
 export function createSettingsModelRoutes({ workspaceFromUrl, modelRoutingStore }) {
   const router = Router();
 
-  const settingsUrlOf = (workspace) => `/workspace/${encodeURIComponent(workspace.urlKey)}/settings/models`;
+  const modelsUrlOf = (workspace, query) => settingsAreaUrl(workspace.urlKey, 'models', query);
+  const reasonOfBody = (body) => (typeof body?.reason === 'string' ? body.reason.trim() : '');
+  /** The staged fields a refused save posted, so the page shows them again rather than the stored values. */
+  const stagedValuesOf = (body) => Object.fromEntries(Object.entries(body || {}).filter(([k]) => k.startsWith('c__')));
+  /**
+   * A refused write goes back to the Models page with its reason and the staged values (the session holds
+   * them for one page load). A refusal the store did not name is a real failure and is not hidden.
+   */
+  const refuse = (req, res, workspace, err, body) => {
+    if (!(err instanceof RoutingError)) {
+      return failure(res, workspace, 'Settings Error', 'Failed to save model changes. Please try again.');
+    }
+    const message = REFUSAL_MESSAGES[err.code] || err.message;
+    if (req.session) req.session.modelsFlash = { code: err.code, message, values: stagedValuesOf(body) };
+    return res.redirect(modelsUrlOf(workspace));
+  };
+
   const contextOf = (req, reason) => ({
     urlKey: req.workspace.urlKey,
     reason,
@@ -33,168 +49,55 @@ export function createSettingsModelRoutes({ workspaceFromUrl, modelRoutingStore 
   });
   const failure = (res, workspace, title, message) => res.status(500).send(renderErrorPage(title, message, {
     action: 'Back to settings',
-    actionUrl: settingsUrlOf(workspace)
+    actionUrl: modelsUrlOf(workspace)
   }));
 
   /**
-   * Save the workspace AI model selection.
-   * Accepts either a preset model ID or a custom model ID.
+   * Save the staged Models page: every field the page posted, diffed against the table, as ONE logged change
+   * with one reason. `version` is the table the page was rendered from; a table that has moved since is
+   * CONFLICT, never an overwrite. The runnable check refuses a change that would leave a job's model unable
+   * to run on its harness (it names the jobs, and writes nothing).
    */
-  router.post('/workspace/:urlKey/settings/model', workspaceFromUrl, async (req, res) => {
+  router.post('/workspace/:urlKey/settings/models/changes', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
-
-    const { modelId, customModelId } = req.body;
-
-    // Use custom model ID if provided, otherwise use selected preset
-    let selectedModel = customModelId?.trim() || modelId;
-
-    // Validate model ID format: provider/model (with optional :variant)
-    // Example: anthropic/claude-sonnet-4, meta-llama/llama-3.3-70b-instruct:free
-    // Dots allowed for version numbers (e.g., claude-3.5-sonnet) but not consecutive (..)
-    const modelIdRegex = /^[a-z0-9-]+\/[a-z0-9.-]+(?::[a-z0-9-]+)?$/i;
-
-    // Validate and provide feedback on failure
-    if (!selectedModel) {
-      return res.redirect(`${settingsUrlOf(workspace)}?error=empty`);
-    }
-
-    if (selectedModel.length > 100) {
-      return res.redirect(`${settingsUrlOf(workspace)}?error=too-long`);
-    }
-
-    // Reject path traversal sequences
-    if (selectedModel.includes('..')) {
-      return res.redirect(`${settingsUrlOf(workspace)}?error=invalid-format`);
-    }
-
-    if (!modelIdRegex.test(selectedModel)) {
-      return res.redirect(`${settingsUrlOf(workspace)}?error=invalid-format`);
-    }
-
-    // Validation passed — save the model. Workspace-scoped (shared across all users of the
-    // org), so the selection applies to both UI and proxy/agent traffic.
+    const reason = reasonOfBody(req.body);
+    const version = Number(req.body?.version);
     try {
-      await modelRoutingStore.saveHarbourModel(selectedModel, contextOf(req, LEGACY_FORM_REASONS.model));
+      if (!reason) throw new RoutingError('REASON_REQUIRED', 'a change needs a reason');
+      const table = await modelRoutingStore.getTable(workspace.urlKey);
+      if (!Number.isInteger(version) || table.version !== version) {
+        throw new RoutingError('CONFLICT', 'the routing table changed since this page was loaded', { version: table.version });
+      }
+      const changes = stagedChanges(req.body, table);
+      if (!changes.length) return res.redirect(modelsUrlOf(workspace, { nothing: '1' }));
+      await modelRoutingStore.applyChanges(changes, contextOf(req, reason), { expectedVersion: version, ...runnableGuard() });
     } catch (err) {
-      console.error('Failed to save workspace model preference:', err);
-      return failure(res, workspace, 'Settings Error', 'Failed to save model preference. Please try again.');
+      console.error('Settings › Models save:', err?.code || err?.message);
+      return refuse(req, res, workspace, err, req.body);
     }
-
-    res.redirect(settingsUrlOf(workspace));
+    return res.redirect(modelsUrlOf(workspace, { changed: '1' }));
   });
 
-  /**
-   * Save workspace-wide + per-prompt-type dispatch model/harness/effort defaults
-   * (LIN-1095, `effort` added LIN-2616/G2). Distinct from /settings/model above:
-   * that selects the model used to WRITE prompts; this selects the
-   * model/harness/effort dispatched agents EXECUTE with, consumed at dispatch
-   * time via resolveDispatchDefaults() (LIN-1094). All three fields stay opaque
-   * strings (no registry), validated with the same shared
-   * validateOpaqueDispatchField() the dispatch/proxy routes use (LIN-1084).
-   * The top-level row sets every agent group's default; a per-kind row is that
-   * job's own setting, and a blank field clears it so the job follows its group.
-   */
-  router.post('/workspace/:urlKey/settings/dispatch-defaults', workspaceFromUrl, async (req, res) => {
+  /** Save the current table as a named routing preset. The table does not change; the save is one log entry. */
+  router.post('/workspace/:urlKey/settings/models/presets', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
-    const settingsUrl = settingsUrlOf(workspace);
-
-    const readField = (key) => (req.body[key] || '').trim() || undefined;
-    // The free-text "custom harness" input was removed in LIN-1282; the harness is
-    // now only ever the select's value (one of the two real harnesses, or blank).
-    const readHarness = (selectKey) => (req.body[selectKey] || '').trim() || undefined;
-
-    let hasFieldError = false;
-    const validate = (value, name) => {
-      if (validateOpaqueDispatchField(value, name, { maxLength: MAX_NAME_LENGTH })) {
-        hasFieldError = true;
-      }
-    };
-
-    const model = readField('defaultModel');
-    const harness = readHarness('defaultHarnessSelect');
-    const effort = readField('defaultEffort');
-    validate(model, 'model');
-    validate(harness, 'harness');
-    validate(effort, 'effort');
-
-    // byKind is scoped to DISPATCH_DEFAULT_KINDS (the PROMPT_TEMPLATES step-kinds
-    // plus `autopilot`, LIN-1278), both by only ever reading these specific field
-    // names (any other posted field is simply never looked at) and defensively at
-    // read time in resolveDispatchDefaults.
-    const byKind = {};
-    for (const kind of DISPATCH_DEFAULT_KINDS) {
-      const kindModel = readField(`kind__${kind}__Model`);
-      const kindHarness = readHarness(`kind__${kind}__HarnessSelect`);
-      const kindEffort = readField(`kind__${kind}__Effort`);
-      validate(kindModel, 'model');
-      validate(kindHarness, 'harness');
-      validate(kindEffort, 'effort');
-      if (kindModel || kindHarness || kindEffort) {
-        byKind[kind] = {};
-        if (kindModel) byKind[kind].model = kindModel;
-        if (kindHarness) byKind[kind].harness = kindHarness;
-        if (kindEffort) byKind[kind].effort = kindEffort;
-      }
-    }
-
-    if (hasFieldError) {
-      return res.redirect(`${settingsUrl}?dispatchDefaultsError=invalid-field`);
-    }
-
     try {
-      await modelRoutingStore.saveDispatchDefaults({ model, harness, effort }, byKind, contextOf(req, LEGACY_FORM_REASONS.dispatchDefaults));
+      await modelRoutingStore.savePreset(req.body?.name, contextOf(req, reasonOfBody(req.body)));
     } catch (err) {
-      console.error('Failed to save workspace dispatch defaults:', err);
-      return failure(res, workspace, 'Settings Error', 'Failed to save dispatch defaults. Please try again.');
+      return refuse(req, res, workspace, err, req.body);
     }
-
-    res.redirect(settingsUrl);
+    return res.redirect(modelsUrlOf(workspace, { saved: '1' }));
   });
 
-  /**
-   * Save per-operation AI model overrides (LIN-1145).
-   * Each kind in AI_OPERATION_KINDS gets an optional model of its own. Blank rows signal
-   * "inherit the group default" and clear that job's own model (a `scan` override also
-   * sets `scan-retire`, as the retire route reads it for both).
-   */
-  router.post('/workspace/:urlKey/settings/ai-model-overrides', workspaceFromUrl, async (req, res) => {
+  /** Make the table equal a preset's snapshot, as one logged change, refused the same way a staged save is. */
+  router.post('/workspace/:urlKey/settings/models/presets/:presetId/apply', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
-    const settingsUrl = settingsUrlOf(workspace);
-    const modelIdRegex = /^[a-z0-9-]+\/[a-z0-9.-]+(?::[a-z0-9-]+)?$/i;
-    const MAX_LENGTH = 100;
-
-    let hasFieldError = false;
-
-    const byKind = {};
-    for (const kind of AI_OPERATION_KINDS) {
-      const fieldName = `byKind__${kind}__model`;
-      const customFieldName = `${fieldName}Custom`;
-      const custom = (req.body[customFieldName] || '').trim();
-      const select = (req.body[fieldName] || '').trim();
-      const model = custom || select || '';
-
-      if (!model) continue;
-
-      if (model.length > MAX_LENGTH || model.includes('..') || !modelIdRegex.test(model)) {
-        hasFieldError = true;
-        break;
-      }
-
-      byKind[kind] = { model };
-    }
-
-    if (hasFieldError) {
-      return res.redirect(`${settingsUrl}?aiOverridesError=invalid-format`);
-    }
-
     try {
-      await modelRoutingStore.saveAiOverrides(byKind, contextOf(req, LEGACY_FORM_REASONS.aiOverrides));
+      await modelRoutingStore.applyPreset(req.params.presetId, contextOf(req, reasonOfBody(req.body)), runnableGuard());
     } catch (err) {
-      console.error('Failed to save workspace AI model overrides:', err);
-      return failure(res, workspace, 'Settings Error', 'Failed to save AI model overrides. Please try again.');
+      return refuse(req, res, workspace, err, req.body);
     }
-
-    res.redirect(settingsUrl);
+    return res.redirect(modelsUrlOf(workspace, { applied: '1' }));
   });
 
   return router;

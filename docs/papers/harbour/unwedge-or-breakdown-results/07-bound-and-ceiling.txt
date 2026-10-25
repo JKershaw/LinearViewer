@@ -1,0 +1,24 @@
+Stops under the bound-3 and ceiling-5 eras, with the rule-coded next move. Sessions exclude wake and autopilot.
+ticket    stop        era/kind                    n   next move             state      sess  follow  fault
+LIN-2954  2026-10-08  bound-3/bound               3   breakdown             completed  12    17      0
+LIN-3285  2026-10-18  ceiling-5/not-converging    3   built                 completed  14    0       0
+LIN-3332  2026-10-07  bound-3/bound               3   breakdown             completed  10    3       0
+LIN-3333  2026-10-08  bound-3/bound               3   built                 completed  11    2       0
+LIN-3341  2026-10-08  bound-3/bound               3   built                 completed  10    1       0
+LIN-3358  2026-10-08  bound-3/bound               3   child-filed           completed  24    14      0
+LIN-3366  2026-10-08  bound-3/bound               3   built                 completed  13    0       0
+LIN-3373  2026-10-08  bound-3/bound               3   built                 completed  11    2       0
+LIN-3382  2026-10-09  bound-3/bound               3   built                 completed  17    0       0
+LIN-3398  2026-10-09  bound-3/bound               3   built                 completed  11    3       0
+LIN-3423  2026-10-19  ceiling-5/ceiling           5   built                 completed  16    1       0
+LIN-3453  2026-10-11  bound-3/bound               3   built                 completed  10    5       0
+LIN-3519  2026-10-12  bound-3/bound               3   breakdown             canceled   12    8       1
+LIN-3570  2026-10-16  bound-3/bound               3   built-after-ruling    completed  12    0       0
+LIN-3601  2026-10-17  bound-3/bound               3   built-after-ruling    completed  11    0       0
+LIN-3611  2026-10-17  bound-3/bound               3   built-after-ruling    completed  14    0       0
+LIN-3614  2026-10-18  ceiling-5/not-converging    3   built-after-ruling    completed  13    1       0
+LIN-3634  2026-10-18  ceiling-5/not-converging    3   built-after-ruling    completed  11    1       0
+LIN-3648  2026-10-18  ceiling-5/not-converging    3   built-after-ruling    completed  10    2       0
+LIN-3660  2026-10-18  ceiling-5/ceiling           5   built-after-ruling    completed  18    0       0
+LIN-3772  2026-10-23  ceiling-5/not-converging    3   built-after-ruling    completed  18    1       0
+LIN-3833  2026-10-25  ceiling-5/not-converging    3   built-after-ruling    started    14    1       0

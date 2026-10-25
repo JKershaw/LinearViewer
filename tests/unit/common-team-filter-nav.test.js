@@ -25,6 +25,7 @@ import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { withHarnessModels } from '../fixtures/harness-models.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const COMMON_SRC = readFileSync(join(__dirname, '../../public/common.js'), 'utf8');
@@ -144,7 +145,7 @@ function runInitNavBar({ pathname = '/workspace/acme/', search = '', savedTeam =
   };
   sandbox.window = sandbox;
   vm.createContext(sandbox);
-  vm.runInContext(COMMON_SRC, sandbox, { filename: 'common.js' });
+  vm.runInContext(withHarnessModels(COMMON_SRC), sandbox, { filename: 'common.js' });
 
   sandbox.initNavBar();
 
@@ -163,7 +164,7 @@ describe('LIN-2520 — window.buildFilterUrl (shared path-preserving filter URL 
     };
     sandbox.window = sandbox;
     vm.createContext(sandbox);
-    vm.runInContext(COMMON_SRC, sandbox, { filename: 'common.js' });
+    vm.runInContext(withHarnessModels(COMMON_SRC), sandbox, { filename: 'common.js' });
     return sandbox.window.buildFilterUrl(paramName, value);
   }
 

@@ -1,0 +1,166 @@
+== population ==
+lineages in window 3508 | priced 3384 | unpriced 7 | no usage 117
+  opencode             35
+  recoverable          25
+  abort                21
+  follow-up-reject     15
+  refused              7
+  no-transcript        7
+  follow-up-signal     5
+  no-turn              2
+not sessions (abort, follow-up REJECT/SIGNAL, refused): 48
+no-usage by kind [('implementation', 30), ('custom', 21), ('wake', 19), ('close-out', 15), ('autopilot', 8), ('blocked', 8), ('research', 7), ('breakdown', 4), ('context', 2), ('plan', 2), ('plan-review', 1)]
+
+== recoverable claude-code sessions (transcript is the truth) ==
+n 25, sum $14.50, median $0.218, max $5.53, priced-as-unknown 0
+no-usage, non-abort duration min: median 1.2, p90 63.9
+
+== measurement check: reported cost against the transcript ==
+matched sessions 2981: ratio p5 0.913, p50 0.958, p95 1.000
+matched totals: reported $8104.19, transcript $8293.76, shortfall $189.58 (2.3%)
+all priced reported total $8259.89
+sessions with subagent transcripts: 130, subagent cost $801.47 (9.7% of priced reported)
+main transcripts with sidechain lines: 0 of 3022
+
+== held-out estimator, trained on 3384 priced sessions ==
+kinds: [('review', 637), ('implementation', 611), ('close-out', 543), ('autopilot', 439), ('plan', 430), ('plan-review', 373), ('research', 157), ('custom', 58), ('wake', 39), ('blocked', 33), ('breakdown', 18), ('design', 14), ('bug', 12), ('retrospective-audit', 10), ('triage', 5), ('context', 1), ('spike', 1), ('retro', 1), ('scoping', 1), ('look-into', 1)]
+families: [('opus', 1774), ('sonnet', 1213), ('deepseek', 396), ('fable', 1)]
+time split: train before 2026-10-18 (2122), test from 2026-10-18 (1262)
+
+-- 5-fold | cell median (kind, model, effort) --  total error per fold: +13%, -4%, +14%, -19%, +4%
+  all                        n= 3384  median |err|   48%  80% within x0.49..x2.68
+  kind:autopilot             n=  439  median |err|   60%  80% within x0.55..x3.48
+  kind:blocked               n=   33  median |err|   63%  80% within x0.43..x1.76
+  kind:breakdown             n=   18  median |err|   22%  80% within x0.61..x1.38
+  kind:close-out             n=  543  median |err|   51%  80% within x0.40..x2.54
+  kind:custom                n=   58  median |err|   41%  80% within x0.27..x1.53
+  kind:implementation        n=  611  median |err|  102%  80% within x0.33..x5.30
+  kind:plan                  n=  430  median |err|   38%  80% within x0.58..x2.61
+  kind:plan-review           n=  373  median |err|   24%  80% within x0.69..x1.77
+  kind:research              n=  157  median |err|   49%  80% within x0.44..x2.23
+  kind:review                n=  637  median |err|   37%  80% within x0.57..x1.92
+  kind:wake                  n=   39  median |err|  125%  80% within x0.14..x6.71
+  model:deepseek             n=  396  median |err|  161%  80% within x0.21..x4.82
+  model:opus                 n= 1774  median |err|   42%  80% within x0.55..x2.23
+  model:sonnet               n= 1213  median |err|   47%  80% within x0.51..x2.68
+
+-- 5-fold | cell log-log on run time --  total error per fold: +1%, -8%, +12%, -23%, +4%
+  all                        n= 3384  median |err|   31%  80% within x0.54..x1.91
+  kind:autopilot             n=  439  median |err|   36%  80% within x0.59..x2.11
+  kind:blocked               n=   33  median |err|   41%  80% within x0.55..x1.44
+  kind:breakdown             n=   18  median |err|    9%  80% within x0.83..x1.14
+  kind:close-out             n=  543  median |err|   34%  80% within x0.43..x2.12
+  kind:custom                n=   58  median |err|   33%  80% within x0.54..x1.93
+  kind:implementation        n=  611  median |err|   89%  80% within x0.31..x3.42
+  kind:plan                  n=  430  median |err|   16%  80% within x0.76..x1.37
+  kind:plan-review           n=  373  median |err|   12%  80% within x0.78..x1.27
+  kind:research              n=  157  median |err|   30%  80% within x0.54..x1.83
+  kind:review                n=  637  median |err|   32%  80% within x0.61..x1.62
+  kind:wake                  n=   39  median |err|   88%  80% within x0.27..x2.71
+  model:deepseek             n=  396  median |err|  165%  80% within x0.20..x4.95
+  model:opus                 n= 1774  median |err|   27%  80% within x0.62..x1.70
+  model:sonnet               n= 1213  median |err|   26%  80% within x0.57..x1.69
+
+-- time split | cell median (kind, model, effort) --  total error per fold: +85%
+  all                        n= 1262  median |err|   51%  80% within x0.40..x1.62
+  kind:autopilot             n=  197  median |err|  101%  80% within x0.33..x0.96
+  kind:close-out             n=  210  median |err|   39%  80% within x0.56..x2.16
+  kind:implementation        n=  222  median |err|   82%  80% within x0.33..x2.73
+  kind:plan                  n=  170  median |err|   45%  80% within x0.45..x1.29
+  kind:plan-review           n=  153  median |err|   25%  80% within x0.58..x1.21
+  kind:research              n=   45  median |err|   50%  80% within x0.48..x1.65
+  kind:review                n=  224  median |err|   50%  80% within x0.49..x1.34
+  model:opus                 n=  621  median |err|   51%  80% within x0.41..x1.40
+  model:sonnet               n=  641  median |err|   53%  80% within x0.40..x1.92
+
+-- time split | cell log-log on run time --  total error per fold: +35%
+  all                        n= 1262  median |err|   31%  80% within x0.50..x1.39
+  kind:autopilot             n=  197  median |err|   59%  80% within x0.40..x0.84
+  kind:close-out             n=  210  median |err|   21%  80% within x0.69..x1.68
+  kind:implementation        n=  222  median |err|   73%  80% within x0.36..x2.07
+  kind:plan                  n=  170  median |err|   15%  80% within x0.81..x1.29
+  kind:plan-review           n=  153  median |err|   13%  80% within x0.76..x1.15
+  kind:research              n=   45  median |err|   21%  80% within x0.63..x1.22
+  kind:review                n=  224  median |err|   40%  80% within x0.55..x1.36
+  model:opus                 n=  621  median |err|   31%  80% within x0.55..x1.22
+  model:sonnet               n=  641  median |err|   30%  80% within x0.44..x1.59
+
+ablation, effort left out of the cell (kind, model), run time in:
+
+-- 5-fold | cell log-log on run time, no effort --  total error per fold: +6%, -10%, +10%, -21%, +3%
+  all                        n= 3384  median |err|   30%  80% within x0.54..x1.91
+  kind:autopilot             n=  439  median |err|   35%  80% within x0.61..x2.08
+  kind:blocked               n=   33  median |err|   41%  80% within x0.55..x1.44
+  kind:breakdown             n=   18  median |err|    9%  80% within x0.83..x1.14
+  kind:close-out             n=  543  median |err|   34%  80% within x0.43..x2.12
+  kind:custom                n=   58  median |err|   33%  80% within x0.54..x1.93
+  kind:implementation        n=  611  median |err|   89%  80% within x0.31..x3.53
+  kind:plan                  n=  430  median |err|   16%  80% within x0.76..x1.37
+  kind:plan-review           n=  373  median |err|   12%  80% within x0.78..x1.27
+  kind:research              n=  157  median |err|   30%  80% within x0.54..x1.83
+  kind:review                n=  637  median |err|   32%  80% within x0.61..x1.62
+  kind:wake                  n=   39  median |err|   93%  80% within x0.23..x2.94
+  model:deepseek             n=  396  median |err|  165%  80% within x0.20..x4.95
+  model:opus                 n= 1774  median |err|   28%  80% within x0.63..x1.69
+  model:sonnet               n= 1213  median |err|   26%  80% within x0.57..x1.69
+
+-- time split | cell log-log on run time, no effort --  total error per fold: +34%
+  all                        n= 1262  median |err|   31%  80% within x0.51..x1.40
+  kind:autopilot             n=  197  median |err|   59%  80% within x0.41..x0.90
+  kind:close-out             n=  210  median |err|   21%  80% within x0.69..x1.68
+  kind:implementation        n=  222  median |err|   73%  80% within x0.36..x2.07
+  kind:plan                  n=  170  median |err|   15%  80% within x0.81..x1.29
+  kind:plan-review           n=  153  median |err|   13%  80% within x0.76..x1.15
+  kind:research              n=   45  median |err|   21%  80% within x0.63..x1.22
+  kind:review                n=  224  median |err|   40%  80% within x0.55..x1.36
+  model:opus                 n=  621  median |err|   32%  80% within x0.55..x1.22
+  model:sonnet               n=  641  median |err|   30%  80% within x0.44..x1.59
+
+== decisive test: 25 real no-usage sessions with a transcript ==
+with run time: n=25, true $14.50, estimate $18.75 (+29%), median |err| 96%
+without run time: n=25, true $14.50, estimate $47.03 (+224%), median |err| 741%
+
+== effort within kind (priced sessions): efforts used per model ==
+  autopilot      opus      high:340, medium:54
+  autopilot      sonnet    high:44, medium:1
+  blocked        opus      high:33
+  breakdown      opus      high:18
+  bug            opus      high:12
+  close-out      deepseek  None:146
+  close-out      opus      high:32
+  close-out      sonnet    high:365
+  context        opus      high:1
+  custom         fable     high:1
+  custom         opus      high:57
+  design         opus      high:14
+  implementation deepseek  None:200
+  implementation opus      high:38, medium:1
+  implementation sonnet    medium:371, high:1
+  look-into      opus      high:1
+  plan           opus      high:3
+  plan           sonnet    high:427
+  plan-review    opus      high:373
+  research       deepseek  None:49
+  research       opus      high:108
+  retro          opus      high:1
+  retrospective-audit opus      high:10
+  review         opus      medium:633, high:4
+  scoping        opus      high:1
+  spike          opus      high:1
+  triage         deepseek  None:1
+  triage         sonnet    medium:4
+  wake           opus      high:27, medium:12
+model-within-kind pairs running more than one effort: 6
+haiku implementation: priced 0, unpriced 7
+
+== residue bounds ==
+opencode, 35 rows (true cost unrecoverable):
+  cell median  $1.91
+  cell p90     $10.46
+  cell max     $51.74
+no-transcript claude-code, 7 rows: at recoverable median $1.53, at recoverable p90 $5.95
+no-usage spend: recovered $14.50; unrecovered likely $3.44, high $16.41, bound $1350.83
+total no-usage spend: likely $17.94 (0.22% of priced reported), bound $1365.33 (16.53%)
+run-time-matched bound on the same rows: $82.02 (total no-usage spend $96.52, 1.17%)
+back-test (cell max) on 25 recoverable sessions: covers true cost in 25; bounds total $729.02 vs true $14.50
+back-test (run-time-matched max) on 25 recoverable sessions: covers true cost in 24; bounds total $119.01 vs true $14.50

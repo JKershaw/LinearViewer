@@ -179,7 +179,7 @@ John saw a clickable prototype of this page on 23 October and called it "the ben
 - the change log;
 - a filter for jobs set individually.
 
-**Numbers come from what Harbour already records.** The cost endpoint gives agent sessions, and the call log gives Harbour calls. They cover a recent window; the default length is the builder's call. A job with no runs in the window shows as such. It is never left out.
+**Numbers come from what Harbour already records.** Agent-session spend has no per-job read: `/api/proxy/issues/:identifier/cost` is per issue, so the page prices the dispatch rows itself (`lib/model-routing-spend.js`, LIN-3855), and the call log gives Harbour calls. They cover a recent window; the default length is the builder's call. A job with no runs in the window shows as such. It is never left out.
 
 ## Over the proxy
 

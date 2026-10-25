@@ -3216,8 +3216,9 @@ const onTicketWrite = createOnTicketWrite({
   sessionsFeedCache,
   agentStatusStore
 })
-// LIN-3756: records a pipeline merge on its Done write. Given to the proxy only,
-// so the task-page check route (seam 3) records exactly as it did.
+// LIN-3756: records a merge on a Done write. Given to seam 1 (the proxy) and seam 2
+// (the person's Done, LIN-3863); the task-page check route (seam 3) records itself,
+// stop-at-PR only, as it did.
 const recordPipelineMerge = createPipelineMergeRecorder({
   closeOutEventsStore,
   dispatchStore: dispatchQueueStore,
@@ -3234,7 +3235,7 @@ app.use(createRunnerKitRoutes())
 // LIN-3383: workspace-api, collective, dashboard, task-chat and flight-companion
 // all receive the ONE hoisted `workspaceOwnerCheck` (never a second
 // createWorkspaceOwnerCheck) for the owner-only runner enqueue gate.
-app.use(createWorkspaceApiRoutes({ installationTokenFor, workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, accountStore, adoptConnectionCredential: (args) => connectionAccess.adoptConnectionCredential(args), closeOutEventsStore, workspaceOwnerCheck, onTicketWrite }))
+app.use(createWorkspaceApiRoutes({ installationTokenFor, workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, accountStore, adoptConnectionCredential: (args) => connectionAccess.adoptConnectionCredential(args), closeOutEventsStore, workspaceOwnerCheck, onTicketWrite, recordPipelineMerge }))
 
 // Mount collective routes (experimental cross-project discussion — LIN-450).
 // yapClient falls back to DEFAULT_YAP_BASE_URL (lib/yap-client.js) when YAP_BASE_URL is unset.
@@ -3919,16 +3920,16 @@ app.get('/workspace/:urlKey/proxy', workspaceFromUrl, async (req, res) => {
   res.send(html);
 });
 
-// The three old model forms (POST /settings/model, /settings/dispatch-defaults, /settings/ai-model-overrides)
-// live in routes/settings-model.js and write through the model-routing store (LIN-3853).
+// The Models page's writes (POST …/settings/models/changes, …/presets and …/presets/:id/apply) live in
+// routes/settings-model.js and write through the model-routing store (LIN-3853, LIN-3855).
 app.use(createSettingsModelRoutes({ workspaceFromUrl, modelRoutingStore }))
 app.use(createSettingsRouter({
   workspaceFromUrl, getOpenRouterSource, getDeployInfo, userPreferencesStore, workspacePreferencesStore,
-  llmCallLogStore, promptTraceStore, accountStore, requestFeatureFlags, resolveWorkspaceModel,
-  getWorkspaceFeatures, setWorkspaceFeature, projectLegacy, getModelCatalog, shouldMockAi, AVAILABLE_MODELS,
+  llmCallLogStore, promptTraceStore, accountStore, requestFeatureFlags,
+  getWorkspaceFeatures, setWorkspaceFeature, getModelCatalog, shouldMockAi, AVAILABLE_MODELS,
   getProvider, getProviderForWorkspace, getBindingsForWorkspace, getBindingCredentials, isActiveBinding,
   dispatchPresetsStore, proxyTokenStore, dispatchTokenStore, proxyEventStore, workspaceHaltStore,
-  workspaceChangeLogStore, modelRoutingStore, workspaceOwnerCheck
+  workspaceChangeLogStore, modelRoutingStore, workspaceOwnerCheck, dispatchStore: dispatchQueueStore
 }))
 
 // POST /settings/workspace-features (periodic reviews, agents-can-change-models) lives in routes/settings.js

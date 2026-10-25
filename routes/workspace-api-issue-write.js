@@ -239,7 +239,7 @@ function partialWriteFailed(res, err) {
  * Register the three issue-write routes, in order: comment write, issue create, issue patch.
  * @param {import('express').Router} router - the composer's router
  */
-export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQueueStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, adoptConnectionCredential, onTicketWrite }) {
+export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQueueStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, adoptConnectionCredential, onTicketWrite, recordPipelineMerge = null }) {
   /**
    * Add a human comment to an issue (LIN-2154) — the session-auth twin of the
    * agent-lane `POST /api/proxy/issues/:issueId/comments` (routes/proxy.js).
@@ -729,6 +729,16 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQue
         void Promise.resolve()
           .then(() => onTicketWrite({ urlKey: req.workspace.urlKey, written: updated.issue, readBack: () => provider.fetchIssueContext(token, issueId) }))
           .catch(e => console.error('[ticket-closer] seam 2 failure:', e?.message || e));
+      }
+
+      // LIN-3863: a person's Done records the merged PR, as the pipeline's Done does
+      // (seam 1, proxy-writes.js), with `by: 'person'`. The recorder gates on a
+      // completed ticket and a GitHub token itself, and never throws; the catch
+      // only keeps a bad injection from surfacing as an unhandled rejection.
+      if (recordPipelineMerge && stateRef) {
+        void Promise.resolve()
+          .then(() => recordPipelineMerge({ urlKey: req.workspace.urlKey, workspaceId: req.workspace.id, accountId: req.session.accountId, provider, callScope: token, source: req.query.source, written: updated.issue, readBack: () => provider.fetchIssueContext(token, issueId), writer: 'person' }))
+          .catch(e => console.error('[close-out-merges] seam 2 failure:', e?.message || e));
       }
     } catch (err) {
       if (issueRefResolutionFailed(res, err) || partialWriteFailed(res, err)) return;

@@ -33,15 +33,6 @@ export function createLegacyRedirects() {
   router.get('/settings', redirectToWorkspace('settings'))
   router.get('/prompts', redirectToWorkspace('prompts'))
 
-  // Legacy POST route for settings model
-  router.post('/settings/model', (req, res) => {
-    const workspace = getActiveWorkspace(req.session)
-    if (workspace) {
-      // Re-submit to the workspace-prefixed route (redirect loses POST data, so we'll handle directly)
-      return res.redirect(307, `/workspace/${encodeURIComponent(workspace.urlKey)}/settings/model`)
-    }
-    res.redirect('/')
-  })
 
   // Legacy API routes - redirect to workspace-prefixed versions
   router.get('/api/audit', (req, res) => {

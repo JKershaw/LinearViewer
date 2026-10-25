@@ -3673,14 +3673,16 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 }
 
 /*
-   Legal Pages
+   Plain page (LIN-3950): the one layout the Plain pages share, built by lib/components/plain-page.js.
+   Its sections take the canonical .section and .section-header (LIN-461); only the title and the
+   prose are the Plain page's own. Every selector is namespaced so a git grep stays meaningful.
    Styled to match the landing and projects page aesthetic.
 */
-.legal-content {
+.plain-page {
   line-height: 1.6;
 }
 
-.legal-content h2 {
+.plain-title {
   color: var(--fg);
   font-family: var(--font-content);
   font-weight: normal;
@@ -3688,22 +3690,13 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   text-align: center;
 }
 
-.legal-content h3 {
-  color: var(--blue);
-  font-weight: 600;
-  font-family: var(--font-content);
-  padding: var(--space-2) 0;
-  margin-bottom: var(--space-2);
-}
-
-.legal-content p {
+.plain-page .section p:not([class]) {
   color: var(--fg-dim);
   margin-bottom: 0.75rem;
-  margin-left: 3ch;
   font-family: var(--font-content);
 }
 
-.legal-content a {
+.plain-page .section a:not([class]) {
   color: var(--blue);
 }
 
