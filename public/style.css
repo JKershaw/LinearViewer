@@ -2256,49 +2256,6 @@ select.github-repo-select {
   color: var(--amber-dim);
 }
 
-/* Local-workspace CTA — secondary action below the Linear login button.
-   No Linear account required; backed by the local provider (LIN-377). */
-.local-workspace-cta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75ch;
-  margin-top: var(--space-4);
-  font-family: var(--font-content);
-}
-
-.local-workspace-cta-sep {
-  color: var(--fg-dim);
-  font-size: 0.9em;
-}
-
-.local-workspace-name {
-  padding: 0.4rem 0.6rem;
-  font-family: var(--font-structural);
-  font-size: 0.9em;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--bg);
-  color: var(--fg);
-}
-
-.local-workspace-button {
-  padding: 0.4rem 0.9rem;
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  font-family: var(--font-content);
-  font-size: 0.9em;
-  color: var(--fg-dim);
-  cursor: pointer;
-}
-
-.local-workspace-button:hover {
-  color: var(--fg);
-  border-color: var(--fg-dim);
-}
-
 /* =============================================================================
    Landing (LIN-726, Harbour brand S4)
    =============================================================================
@@ -3681,6 +3638,14 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 */
 .plain-page {
   line-height: 1.6;
+}
+
+/* LIN-3956 (open question 6): the Plain column is the 40em measure, centred, so it sits under the centred
+   header instead of hugging the left. It caps the rows card too (about 1088px at 1280 otherwise).
+   /styleguide builds its own <main> and never gets this class. */
+.plain-page.plain-column {
+  max-width: 40em;
+  margin-inline: auto;
 }
 
 /* LIN-3958: the Plain type step is decided once here (decisions 2 and 17), not per page. The title is

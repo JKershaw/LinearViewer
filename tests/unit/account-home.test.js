@@ -55,9 +55,28 @@ describe('GET /account', () => {
     assert.match(res.text, /data-testid="account-home-email">Signed in as home@x\.io</);
     assert.match(res.text, /data-testid="account-home-add-linear"[^>]*>Connect Linear</);
     assert.match(res.text, /href="\/auth\/linear"/);
-    assert.match(res.text, /<form action="\/workspace\/new" method="POST" class="local-workspace-cta">/);
+    assert.match(res.text, /<form action="\/workspace\/new" method="POST" class="plain-form">/);
+    assert.match(res.text, /<input name="name" type="text" class="token-label-input" aria-label="Workspace name" value="" placeholder="Local Workspace" maxlength="50">/);
     assert.match(res.text, /href="\/logout"[^>]*data-testid="account-home-logout"/);
     assert.match(res.text, /data-testid="account-home-c6">Workspaces don&#039;t follow you to a new device yet: reconnect a source here\.</);
+  });
+
+  // LIN-3956: Account home is a Plain page with rows and a form. The document entry links settings.css
+  // (its rows need it), the phone root is .plain-page itself, and the page has one title and h3 sections.
+  test('the Plain layout: settings.css linked, no .settings-shell wrapper, one plain title and h3 sections', async () => {
+    const browser = await signInByEmail(harness, 'plain-layout@x.io');
+    const res = await browser.get('/account');
+
+    assert.match(res.text, /<link rel="stylesheet" href="\/style\.css">\s*<link rel="stylesheet" href="\/settings\.css">/);
+    assert.doesNotMatch(res.text, /settings-shell/);
+    assert.match(res.text, /<main class="plain-page plain-column" data-testid="account-home">/);
+    assert.equal((res.text.match(/<h2 class="plain-title">Add a source<\/h2>/g) || []).length, 1);
+    assert.equal((res.text.match(/<h2/g) || []).length, 1, 'the title is the only h2');
+    assert.match(res.text, /<h3 class="section-header">Your account<\/h3>/);
+    assert.match(res.text, /<section class="section" data-testid="account-home-sources">/);
+    assert.match(res.text, /<h3 class="section-header">Create a local workspace<\/h3>/);
+    assert.match(res.text, /<h3 class="section-header">Session<\/h3>/);
+    assert.match(res.text, /data-testid="account-home-add-linear"/);
   });
 
   test('a session that holds a workspace goes to / (which takes it to that workspace): no loop with the / branch', async () => {
