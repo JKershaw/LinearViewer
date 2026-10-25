@@ -129,7 +129,8 @@ The class is "a rule written in 2 or more places that Settings shares". Two repr
 - **Cost, recorded:** `.btn` has **one production caller**, `lib/render-styleguide.js:25`. `action-btn` appears in **24 JS files** under `lib/` and `public/`.
 - **Counting rule:** a site is a rule that gives a button its own box (background, border, padding, radius). Restyling a button from a page sheet counts.
 - **Sites at base:** 37 button-like class names (list via the script's `buttonClasses.names`). The `.btn` family 3 (+ `btn__icon`), `action-btn` 1, `toggle-btn` 1 (Switch), `token-copy-btn`, `icon-btn*`, plus per-feature ones (`fc-start-btn`, `ship-mode-btn`, `roadmap-generate-btn`, ...).
-- **Consolidate deletes:** the page-sheet restyles of `.action-btn` (`dispatch.css:478`, `flight-companion.css:369`) once callers move; `.action-btn`'s variants map onto named `.btn` variants first.
+- **Consolidate deletes (LIN-3889, strategy A):** the `.action-btn` block in common-actions.css, which is now one selector list per look in style.css, shared with the named tones `.btn--quiet` + `.btn--green/blue/red`. The `.halt-form .action-btn` restyle (`dispatch.css`) and the proxy pager's disabled rule are folded into the shared rules. `flight-companion.css:369` is layout (`flex: 0 0 auto`), not a button box, and stays.
+- **Not done (open question):** the 17 alias files and `render-settings.js` still say `action-btn`; they render the same body, so the look is one.
 - **Variants to map:** `action-btn.save` (green), `.connect` (blue), `.disconnect`/`.logout`/`.token-revoke` (red), and Settings' `settings-action-teal` / `settings-action-red` tones.
 - **Differences:** `.btn` is a bordered 32px control, `.action-btn` a chromeless tinted label. Class: **unclear**; this is a design decision for Rebuild's `/styleguide` step.
 
@@ -257,41 +258,41 @@ Layout only. For the pages Settings shares pieces with:
 
 ## Consolidate (LIN-3889): status at head
 
-Done in the PR `feat/lin-3889-consolidate-settings-authorities` (commit `c1035070`, plus the follow-up commit that updates this note). Each decision's authority and its losing copies, as built:
+Measured at `12b3d428` (the CSS is unchanged in the commits after it). Each decision's authority, its losing copies, and its sites at base and head by the note's own counting rule: the base sites the note lists by `file:line`, and the rule bodies or render sites that still write the decision.
 
-| Decision | Authority at head | Copies deleted | Status |
-| -- | -- | -- | -- |
-| 1 Spacing | `--space-N` | token-equal literals in the sheets this PR edits (9 sites) | scoped; off-scale values stay (Rebuild) |
-| 2 Type | `--font-size-*` | token-equal `1em` and `0.85em` in the same sheets | scoped; `0.9em` vs `0.85em` open |
-| 3 State colours | `:root` tokens | the three `var(--red, #c0392b)` / `var(--bg, #fff)` fallbacks in settings.css | done; Paused still red (open question 1) |
-| 4 Breakpoints | the written list (13) | none; the test pins the list | done |
-| 5a Key/value row | `.field` (+ its 640px wrap) | `.dispatch-section .line`, `.proxy-section .line`, `.settings-section .line` and their wraps; six dead flip declarations | done. Flip sweep: `.dispatch-prompt-line`, `.dispatch-prompt-actions` gap, `.ai-override-row`, `.dispatch-default-row`, `.dispatch-preset-name-line` gap, `.provider-binding/-add/-add-blocked` (`gap: var(--space-sm)`, a token defined nowhere) |
-| 5b Interactive row | `switchRow`, `drillRow`, `actionRow`, `staticRow` (shell) | hand-written static rows (`-you.js` 60/80/107/115, `-workspace.js` 20), the change-log row class, the JSON switch, `-you.js:110` action, `render-settings.js:866` drill | partly: the Theme row (`-you.js:95`), Email (`-you.js:107`, value carries a test id and class) and Runs (`-you.js:80`, value carries `data-free-tier-usage`) keep their markup minus `line`. The change row (`-workspace.js:181`) keeps its own markup: a composed label and tail, not label and value |
-| 6 Button | `.btn` with `btn--red` / `btn--teal` | none this PR | partly: the ask confirms and the key revoke use the tone variants. Alias consolidation (`.action-btn` to `.btn` names, 17 files left on the alias) is NOT done; see the PR |
-| 7 Switch | `.settings-switch` | `.toggle-btn`, `.feature-toggle`, `.feature-toggle-label`, `.settings-json-toggle`; the switch hover is `var(--bg-alt)` | done |
-| 8 Ask in place | `askInPlace`, confirm `btn btn--red` / `btn--teal` | the bare `.action-btn` confirm | done. Key revoke is a named variant with the same `btn btn--red` |
-| 9 Note | `.page-header__subtitle` | `.settings-subtitle` | done |
-| 10 Group title | `.settings-group-title` (Settings), `.section .section-header` (elsewhere) | `audit.css` `.settings-header` (no emitter on Audit) | done |
-| 11 Key row | `keyRow` | seven dead token-list rules in common-actions.css, plus `.token-revoke` | done. The same dead family remains in dispatch.css (`.token-list .token-item.card`, `.token-meta`) and proxy.css (`.proxy-token-list`): not in the common-actions list, left for a follow-up |
-| 13 Link | `.settings-link` (style.css) | `audit.css` copy and the `settings.css` copy | done |
-| 14 Back link | none | not done: the session and task back-link copies need their pages in the judge (out of this PR's page list) | open |
-| 15 Text control | `.model-select`, `.token-label-input` (style.css) | `audit.css` `.model-select` and `.model-select:focus`, the `settings.css` body, the `common-actions.css` body | done. `.model-select:focus` no longer removes the ring for keyboard focus (`:focus-visible`) |
-| 16 Halt controls | `lib/components/halt-controls.js` | the second Dispatch and Running markup | done |
+| Decision | Authority at head | Copies deleted | Status | Sites base → head |
+| -- | -- | -- | -- | -- |
+| 1 Spacing | `--space-N` | token-equal literals in the sheets this PR edits | scoped; off-scale values stay (Rebuild) | literal 904 → 889 (measure) |
+| 2 Type | `--font-size-*` | token-equal `1em` and `0.85em` in the same sheets | scoped; `0.9em` vs `0.85em` open | declarations 810 → 798 (measure) |
+| 3 State colours | `:root` tokens | the three `var(--red, #c0392b)` / `var(--bg, #fff)` fallbacks in settings.css | done; Paused still red (open question 1) | 4 → 1 (the `:443` hover `rgba`, decision 7) |
+| 4 Breakpoints | the written list (13) | none; the test pins the list | done | 13 → 13 |
+| 5a Key/value row | `.field` (+ its 640px wrap) | `.dispatch-section .line`, `.proxy-section .line`, `.settings-section .line` and their wraps; six dead flip declarations | done. Flip sweep: `.dispatch-prompt-line`, `.dispatch-prompt-actions`, `.ai-override-row`, `.dispatch-default-row`, `.dispatch-preset-name-line`, `.provider-binding/-add/-add-blocked` (`gap: var(--space-sm)`, a token defined nowhere) | 4 → 1 |
+| 5b Interactive row | `switchRow`, `drillRow`, `actionRow`, `staticRow` (shell) | hand-written static rows, `-you.js:110` action, `render-settings.js:866` drill, the JSON switch | partly: the Theme, Email and Runs rows and the change row keep their own markup minus `line` | about 11 hand-written → 4 |
+| 6 Button | `.action-btn` and `.btn--quiet` plus tones (`.btn--green/blue/red`), one rule body per look in style.css; `.btn.btn--red` / `.btn--teal` for the bordered confirm | the `.action-btn` block in common-actions.css; `.halt-form .action-btn`; the proxy pager's disabled rule | partly: callers moved to the canonical names in render-dispatch, render-proxy, render-settings-you, render-settings-workspace and the halt component. 17 files and render-settings.js stay on the alias, with the same body (open question) | button-like classes 37 → 41 (measure: the canonical tone names are new, so the gate sees +4); rule bodies naming `.action-btn` or `.btn--*` 10 → 13, the same bodies, one per look |
+| 7 Switch | `.settings-switch` | `.toggle-btn`, `.feature-toggle`, `.feature-toggle-label`, `.settings-json-toggle`; the hover `rgba` is `var(--bg-alt)` | done | 2 → 1 |
+| 8 Ask in place | `askInPlace`; confirm `btn btn--red` / `btn--teal` | the bare `.action-btn` confirm | done. Key revoke is a named variant with the same bordered confirm | confirm styles 2 → 1 |
+| 9 Note | `.page-header__subtitle` | `.settings-subtitle` | done | 5 → 4 |
+| 10 Group title | `.settings-group-title` (Settings), `.section .section-header` (elsewhere) | `audit.css` `.settings-header` (no emitter on Audit) | done | 5 → 4 |
+| 11 Key row | `keyRow` | the seven dead token-list rules in common-actions.css; `.token-list` and `.token-meta` in dispatch.css; `.proxy-token-list` in proxy.css | done | 7 dead → 0 |
+| 13 Link | `.settings-link` (style.css) | `audit.css` copy and the `settings.css` copy | done | 2 → 1 |
+| 14 Back link | `.sess-back, .task-create-back, .task-edit-back` (style.css); `.settings-back` is a named variant | the three page copies (session, task create, task edit) | done | 4 → 2 |
+| 15 Text control | `.model-select`, `.token-label-input` (style.css) | `audit.css` `.model-select`, the `settings.css` body, the `common-actions.css` body | done. `.model-select:focus` no longer removes the ring for keyboard focus (`:focus-visible`) | 3 → 2 |
+| 16 Halt controls | `lib/components/halt-controls.js` | the second Dispatch and Running markup | done; `routes/` is byte-unchanged | 2 render sites → 1 |
 
-**Count rule at head** (`node tests/measures/css-measures.mjs . <rev>`; the base is `22f6942d`):
+**Count rule at head** (`node tests/measures/css-measures.mjs . <rev>`; the base is `22f6942d`, and `--dup-blocks` as the script defines it):
 
-| Measure | Base `22f6942d` | Head |
+| Measure | Base `22f6942d` | Head `12b3d428` |
 | -- | -- | -- |
-| CSS lines | 19,888 | 19,776 |
-| Spacing, literal | 904 | 891 |
-| Spacing, token | 676 | 666 |
-| Distinct font sizes (declarations) | 74 (810) | 74 (800) |
-| Button-like classes | 37 | 38 (`btn--red`, `btn--teal` added) |
+| CSS lines | 19,888 | 19,744 |
+| Spacing, literal | 904 | 889 |
+| Spacing, token | 676 | 665 |
+| Distinct font sizes (declarations) | 74 (810) | 74 (798) |
+| Button-like classes | 37 | 41 |
 | Breakpoints | 13 | 13 |
-| Byte-identical bodies (`--dup-blocks`) | 35 | 30 |
+| Byte-identical bodies (`--dup-blocks`) | 35 | 29 |
 | Area pairs (`seams.mjs`) | 10 | 10 |
 
-The spacing token count fell (676 to 666) although 9 literals became tokens. The copies deleted held more token uses than that (for example `gap: var(--space-2)` in the flip rules), so the net is down. The plan's 680 to 700 prediction was wrong on that point; the literal count is inside its range.
+Button-like classes rose by four because the canonical tone names (`btn--quiet`, `btn--green`, `btn--blue`, plus the existing `btn--red`/`btn--teal`) are new class names, and the aliases remain. The Rebuild gate will see that rise, and the reason is the alias tail, not a second look. The spacing token count fell (676 to 665) although 9 literals became tokens: the copies deleted held more token uses than that, so the net is down. The plan's 680 to 700 prediction was wrong on that point; the literal count is inside its range.
 
 ## Open questions for John
 
