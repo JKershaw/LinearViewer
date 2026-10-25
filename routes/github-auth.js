@@ -56,7 +56,7 @@ export function createGitHubAuthRoutes({ provider, accountStore, accountWorkspac
     basePath: '/auth/github',
     providerOkKey: 'github',
     pendingKey: 'githubPending',
-    notConfiguredLead: 'GitHub login is not available.',
+    displayName: 'GitHub',
     // LIN-2802: this descriptor has a switcher entry point (entryCta), so a
     // signed-in "+ GitHub Issues" click must mint a fresh container per
     // invocation rather than reusing the per-account `github:<userId>` one.

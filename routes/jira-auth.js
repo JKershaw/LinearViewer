@@ -50,7 +50,7 @@
  */
 import crypto from 'crypto'
 import { Router } from 'express'
-import { renderErrorPage, renderJiraLinkForm, renderJiraSiteSelectPage } from '../lib/render-pages.js'
+import { renderErrorPage, renderJiraLinkForm, renderJiraSiteSelectPage, renderSignInUnavailablePage } from '../lib/render-pages.js'
 import {
   getWorkspaceByUrlKey,
   validateWorkspaceUrlKey,
@@ -124,11 +124,8 @@ export function normalizeJiraSite(site) {
 export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceStore, ownerCredentialStore, userPreferencesStore, connectionStore, resolveWorkspaceUrlKey, workspaceStore } = {}) {
   const router = Router()
 
-  const notConfigured = (res) => res.status(503).send(renderErrorPage(
-    'Jira OAuth Not Configured',
-    `Jira OAuth login is not available. Missing environment variables: ${getMissingJiraOAuthConfig().join(', ')}. See .env.example for setup instructions.`,
-    { action: 'Go to homepage', actionUrl: '/' }
-  ))
+  // LIN-3980: the names of the unset variables go to the server log, not the page.
+  const notConfigured = (res) => res.status(503).send(renderSignInUnavailablePage('Jira', getMissingJiraOAuthConfig()))
 
   /**
    * Resolve the ADD-SOURCE target workspace for an OAuth hop. Same contract as
