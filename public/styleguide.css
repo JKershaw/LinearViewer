@@ -137,6 +137,18 @@
   gap: var(--space-3);
 }
 
+/* One button look and its class string (LIN-3950): the caption sits under the sample. */
+.sg-button-look {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+}
+.sg-button-look code {
+  font-size: var(--font-size-sm);
+  color: var(--muted);
+}
+
 /* Themes (LIN-484): each theme panel paints its own surface via the .theme-*
    hook, so the same components below resolve their tokens to that theme. Laid
    out side-by-side for at-a-glance comparison of theme impact. */
