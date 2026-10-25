@@ -2372,7 +2372,8 @@ function rulingRowControls(li) {
 // (routes/dashboard.js), which tags the same decision-answer stamp
 // `outcome: 'dismissed'`. Neither path posts a comment. Returns the pending
 // request promise; the caller owns the pending-guard/restore/feedback wiring.
-function issueDismissRequest(anchor, decisionId, stampLoopId) {
+// LIN-3959: `stampLoopIds` is the joined row's copies; the dismiss stamps each.
+function issueDismissRequest(anchor, decisionId, stampLoopId, stampLoopIds) {
   const isTaskBound = !anchor?.loopId && !!anchor?.taskDecisionId;
   // LIN-3126 residual: the task-bound dismiss carries the anchor's source
   // so the scan dismiss route resolves the issue's provider, not the active one.
@@ -2391,7 +2392,7 @@ function issueDismissRequest(anchor, decisionId, stampLoopId) {
         on401: false,
         // LIN-2991/LIN-3022 §4/D3: the STAMP target, never the reply target
         // alone — see deliverRulingReply's own note on the same distinction.
-        body: JSON.stringify({ decisionLoopId: stampLoopId ?? anchor.loopId, decisionId })
+        body: JSON.stringify({ decisionLoopId: stampLoopId ?? anchor.loopId, decisionLoopIds: stampLoopIds, decisionId })
       });
 }
 
@@ -2422,7 +2423,7 @@ function dismissRulingRow(row, li) {
   };
   const refreshBadge = () => { if (pageUrlKey && typeof window.updateRulingsBadge === 'function') window.updateRulingsBadge(pageUrlKey); };
 
-  issueDismissRequest(anchor, decisionId, row?.stampLoopId).then(() => {
+  issueDismissRequest(anchor, decisionId, row?.stampLoopId, row?.stampLoopIds).then(() => {
     restore();
     setFeedback('dismissed', false);
     // Same class as F6/F7 (review): the selection seam #1432 ships is what
@@ -2495,7 +2496,7 @@ function agreeRulingRow(row, li) {
     };
     const refreshBadge = () => { if (pageUrlKey && typeof window.updateRulingsBadge === 'function') window.updateRulingsBadge(pageUrlKey); };
 
-    return issueDismissRequest(anchor, decisionId, row?.stampLoopId).then(() => {
+    return issueDismissRequest(anchor, decisionId, row?.stampLoopId, row?.stampLoopIds).then(() => {
       rulingsPending.delete(key);
       setFeedback('dismissed as proposed', false);
       // Review F6: clear selection at the moment of success, exactly as
@@ -2924,7 +2925,7 @@ function bulkAgreeRow(key, row, li) {
       feedback.classList.toggle('obs-ruling-feedback--error', !!isError);
     };
 
-    return issueDismissRequest(anchor, decisionId, row?.stampLoopId).then(() => {
+    return issueDismissRequest(anchor, decisionId, row?.stampLoopId, row?.stampLoopIds).then(() => {
       rulingsPending.delete(key);
       setFeedback('dismissed as proposed', false);
       rulingsSelected.delete(key);
@@ -3172,6 +3173,8 @@ function deliverRulingReply(row, prompt, li, optionId, { bulkAgree = false } = {
   // The RESUME target (`followUpTo`, below) stays `anchor.loopId` — the loop
   // a reply is actually delivered to is unchanged by this.
   const decisionLoopId = row?.stampLoopId ?? anchor?.loopId;
+  // LIN-3959: the joined row's copies; absent on a non-joined row.
+  const decisionLoopIds = row?.stampLoopIds;
   const feedback = li.querySelector('.obs-ruling-feedback');
   // A task-bound row (LIN-2197 Phase 3) has no dispatch item behind it, so
   // `anchor.loopId`/`decisionLoopId` is always null by design — admit
@@ -3318,6 +3321,7 @@ function deliverRulingReply(row, prompt, li, optionId, { bulkAgree = false } = {
         force: false,
         target: anchor.target || 'cli',
         decisionLoopId,
+        decisionLoopIds,
         decisionId,
         optionId,
         // LIN-3126 residual: the ruling anchor's own source (beat 2) so the
@@ -3372,6 +3376,7 @@ function deliverRulingReply(row, prompt, li, optionId, { bulkAgree = false } = {
       issueId: anchor.issueId || null,
       issueIdentifier: anchor.issueIdentifier || null,
       decisionLoopId,
+      decisionLoopIds,
       decisionId,
       optionId,
       recordOn: decision?.on_answer?.record_on || null,
@@ -3403,6 +3408,7 @@ function deliverRulingReply(row, prompt, li, optionId, { bulkAgree = false } = {
       issueIdentifier: anchor.issueIdentifier,
       target: anchor.target || 'cli',
       decisionLoopId,
+      decisionLoopIds,
       decisionId,
       optionId,
       prompt,
@@ -3955,8 +3961,8 @@ function classifyBulkScanError(err) {
  *
  * `onTeardown(results)` fires once, on full settlement OR on stopBulkScan(),
  * whichever comes first — clearing in-flight counters and handing back
- * whatever re-enables the (not-yet-built) run control is Phase 3's job, this
- * pool just calls the callback. Already-issued in-flight requests are LEFT TO
+ * whatever re-enables the run control is the caller's job (the bulk-scan call
+ * site's `onTeardown` re-runs `syncDueBulkBar`); this pool just calls the callback. Already-issued in-flight requests are LEFT TO
  * COMPLETE after a stop (the accepted abort gap — see LIN-2700/LIN-2651):
  * their eventual settlement still lands in `results`, but teardown does not
  * wait for it.
@@ -4078,9 +4084,9 @@ function stopBulkScan() {
 //
 // Presentation only: reads an already-settled pool entry ({item, outcome,
 // value|error}) and paints one row. Never mutates dueSelectedIds, never
-// re-enqueues, never feeds anything back into the pool above. Session 2
-// (§B.7) wires this in as the pool's onResult callback once the run
-// controls exist; nothing calls it yet.
+// re-enqueues, never feeds anything back into the pool above. The bulk-scan
+// run control wires this in as the pool's onResult callback (the `startBulkScan`
+// call).
 
 /**
  * Classify one settled bulk-scan pool entry into exactly one of seven
@@ -4506,8 +4512,8 @@ if (typeof module !== 'undefined' && module.exports) {
     BULK_SCAN_CONCURRENCY, BULK_SCAN_MAX_PER_RUN,
     // LIN-2701 §B.6: the seven-way result classifier + its per-row paint —
     // exposed so the predicate chain is directly unit-testable without a
-    // DOM, and so §B.7's run-control wiring (Session 2, later beats) can
-    // pass paintBulkScanRowResult straight into startBulkScan's onResult.
+    // DOM, and so the bulk-scan run control passes paintBulkScanRowResult
+    // straight into startBulkScan's onResult.
     classifyBulkScanResult, paintBulkScanRowResult, BULK_SCAN_RESULT_COPY,
   };
 }

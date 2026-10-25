@@ -58,9 +58,9 @@
   --border-subtle: rgba(0, 0, 0, 0.08);  /* Lower-contrast border over light bg */
   --font-mono: monospace;                /* Generic monospace fallback */
 
-  /* LIN-456: completed token groups (definitions only — not yet wired to sites,
-     so adding them changes nothing; they give 0C's /styleguide a home and let
-     later phases tokenize spacing/elevation deliberately rather than by sweep). */
+  /* LIN-456: completed token groups (definitions the page CSS consumes, e.g.
+     `var(--space-*)`; they give 0C's /styleguide a home and let later phases
+     tokenize spacing/elevation deliberately rather than by sweep). */
 
   /* Spacing scale */
   --space-1: 0.25rem;
@@ -308,8 +308,9 @@ body {
 /* =============================================================================
    Motion + a11y baseline (LIN-785 §7 / §11)
    =============================================================================
-   Reusable keyframes for status affordances S2 will attach to (a pulsing dot for
-   "running", an indeterminate shimmer for "loading"), a focus-visible ring driven
+   Reusable keyframes for status affordances (a pulsing dot for "running", which
+   `.status-pill--running .status-pill__dot` attaches to; an indeterminate
+   shimmer for "loading"), a focus-visible ring driven
    by the --focus token, and a prefers-reduced-motion baseline that neutralizes
    animation/transition/smooth-scroll for users who ask for less motion. */
 @keyframes pulse {
@@ -3499,8 +3500,8 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
    Status Pill (LIN-465, Phase A.5)
    The canonical state→glyph+label pill. Shares card-accent's state vocabulary
    and Phase-0 color tokens so a pill and a card accent compose on one interface.
-   Coexists with the per-page pill CSS (.foreman-state, swipe .state.*, …) until
-   Phase B points the client JS at this class.
+   Ship and swipe emit this class next to their per-page classes; the per-page
+   pill CSS (swipe .state.*, …) still coexists with it.
 */
 .status-pill {
   display: inline-flex;
@@ -3878,55 +3879,96 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 
 /*
    Empty State (LIN-466, Phase A.6)
-   The canonical "nothing here yet" placeholder. The five per-page empty states
-   genuinely diverge (foreman dashed border, roadmap structural font, swipe
-   italic, distinct paddings/alignments) — only the dim foreground is universal,
-   so the canonical class carries just that shared subset and composes with the
-   RETAINED per-page variant class for byte-identical rendering. Convergence onto
-   one canonical look is the tracked Phase-B seam.
+   The canonical "nothing here yet" placeholder. The per-page empty states
+   genuinely diverge (roadmap structural font, swipe italic, distinct
+   paddings/alignments, and the newer page-local variants) — only the dim
+   foreground is universal, so the canonical class carries just that shared
+   subset and composes with the RETAINED per-page variant class for
+   byte-identical rendering. Convergence onto one canonical look is still open.
 */
 .emptyState {
   color: var(--fg-dim);
 }
 
 /*
-   Legal Pages
-   Styled to match the landing and projects page aesthetic.
+   Plain page (LIN-3950): the one layout the Plain pages share, built by lib/components/plain-page.js.
+   Its sections take the canonical .section and .section-header (LIN-461); the title, the heading
+   step and the prose are the Plain page's own. Every selector is namespaced so a git grep stays
+   meaningful. Styled to match the landing and projects page aesthetic.
 */
-.legal-content {
+.plain-page {
   line-height: 1.6;
 }
 
-.legal-content h2 {
+/* LIN-3958: the Plain type step is decided once here (decisions 2 and 17), not per page. The title is
+   the browser's h2 default (1.5em), made explicit, so it stays 24px at every width. */
+.plain-title {
   color: var(--fg);
   font-family: var(--font-content);
+  font-size: 1.5rem;
   font-weight: normal;
   margin-bottom: var(--space-5);
   text-align: center;
 }
 
-.legal-content h3 {
-  color: var(--blue);
+/* LIN-3958: the heading steps up from the 1em prose (1.25em, so 20px over 16px), at weight 600 in --fg.
+   Scoped to .plain-page: the shared .section .section-header rule above it stays byte-identical. Direct
+   children only: a section nested in another (the /styleguide "Section component" specimens) is a component
+   and keeps the canonical heading. */
+.plain-page > .section > .section-header {
+  font-size: var(--font-size-lg);
   font-weight: 600;
-  font-family: var(--font-content);
-  padding: var(--space-2) 0;
-  margin-bottom: var(--space-2);
+  color: var(--fg);
 }
 
-.legal-content p {
-  color: var(--fg-dim);
+.plain-page .section p:not([class]) {
   margin-bottom: 0.75rem;
-  margin-left: 3ch;
+}
+
+/* LIN-3958: one voice on a Plain page. Unclassed prose is the sans face in --fg-dim: paragraphs, the items
+   of unclassed lists, and the terms of unclassed definition lists. Classed prose keeps its own look, since
+   a /styleguide builder sample (a font specimen, an empty state, a Settings nav item) is a component, not
+   Plain prose; the styleguide's own prose classes are set in styleguide.css. Inline code keeps the
+   browser's monospace, since its UA rule sets the face on the element itself. */
+.plain-page .section p:not([class]),
+.plain-page .section :is(ul, ol):not([class]) > li,
+.plain-page .section dl:not([class]) > :is(dd, dt) {
+  color: var(--fg-dim);
   font-family: var(--font-content);
 }
 
-.legal-content a {
+/* LIN-3958: a readable measure for running text. 40em (about 65 characters) rather than 70ch, because
+   Inter's "0" is about 0.6em wide, so 70ch comes to about 42em. Rows, fields and forms are not capped,
+   nor are classed paragraphs, lists or definition lists (settings-nav-list is a layout list). */
+.plain-page .section p:not([class]),
+.plain-page .section :is(ul, ol, dl):not([class]) {
+  max-width: 40em;
+}
+
+/* LIN-3958: the list gutter. The global reset zeroes padding, so the text sat at the content edge and
+   a phone's bullet fell at x=0 and was clipped. 1.5rem (--space-4, 24px at the 1rem root Plain prose uses)
+   clears the 1.25em bar. Classed lists keep their own padding (settings-nav-list is padding 0), so the
+   rule takes only unclassed lists. */
+.plain-page .section :is(ul, ol):not([class]) {
+  padding-left: var(--space-4);
+}
+
+.plain-page .section a:not([class]) {
   color: var(--blue);
+}
+
+/* LIN-3958 (decision 2, the second phone root): at 400px the body drops to 13px (the small-phone rule
+   above), so the Plain page takes 1rem, the root Settings uses (.settings-shell, settings.css). rem does
+   not compound, so a /styleguide sample that is both .plain-page and .settings-shell is 1rem, not squared. */
+@media (max-width: 400px) {
+  .plain-page {
+    font-size: 1rem;
+  }
 }
 
 /* =========================================================================
    Recap Section (LIN-261)
-   Shared across swipe accordion and pipeline overlay.
+   Shared by every `RecapSection` host (swipe accordion, session, task page, scan).
    ========================================================================= */
 .recap-section {
   font-family: var(--font-content);

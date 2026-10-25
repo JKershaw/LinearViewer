@@ -2,7 +2,7 @@
  * Task Chat routes — the experimental "talk to a task" feature (V1).
  *
  * Anchored at /workspace/:urlKey/task-chat (reusing workspaceFromUrl + the
- * pipeline/collective feature-gate-redirect-to-settings pattern). The page is a
+ * collective feature-gate-redirect-to-settings pattern). The page is a
  * provider-free shell; each conversation turn POSTs a question to the SSE chat
  * endpoint, which fetches the task's full context and streams a grounded,
  * first-person answer from the task itself.
@@ -56,7 +56,7 @@ function sanitizeHistory(history) {
 
 /**
  * Build a small deterministic task context from the data fixtures for test mode
- * (mirrors buildMockRecapContext in routes/workspace-api.js). Returns null when
+ * (mirrors buildMockRecapContext in lib/workspace-api-mocks.js). Returns null when
  * the identifier doesn't resolve, so the caller can 404.
  */
 function buildMockTaskContext(issueId) {
@@ -249,7 +249,7 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
     const workspace = req.workspace;
     const featureFlags = await requestFeatureFlags(req);
 
-    // Gate: experimental feature must be enabled (mirrors collective/pipeline).
+    // Gate: experimental feature must be enabled (mirrors the collective gate).
     if (featureFlags.taskChat !== true) {
       return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings/features`);
     }
@@ -580,7 +580,7 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
       // lookup carrying no legacy-Linear default — so an undeclared workspace
       // yields null and the persona degrades to "a single task" rather than
       // asserting Linear. Same derivation as routes/collective.js and the
-      // feedback-triage dispatch in routes/workspace-api.js.
+      // feedback-triage dispatch in routes/workspace-api-feedback.js.
       //
       // Deliberately not read off `issueProvider` above: `resolveIssueBinding`'s
       // UNMATCHED branch ends in the defaulting lookup, so its display name can

@@ -11,7 +11,7 @@
  *   with it (chair seat placed first — see launchPreset), and thread the
  *   preset's objective/exitCondition/defaultTopic into the SAME start flow
  * - Live transcript: visibility-gated 5s poll of /api/collective/state, rendered
- *   incrementally by Yap cursor (copied from the pipeline poll pattern)
+ *   incrementally by Yap cursor (the Observation visibility-gated poll pattern)
  * - Inject human input: POST to /api/collective/say
  *
  * Loaded only on the /collective page. Requires common.js (provides escapeHtml).

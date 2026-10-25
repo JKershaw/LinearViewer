@@ -1350,3 +1350,31 @@ describe('server.js production wiring pin (LIN-2933, plan-review R2)', () => {
     );
   });
 });
+
+// LIN-3959: a comment answer on a joined ruling stamps every copy, and a malformed
+// list is refused before the comment is written (never a posted comment with only
+// some copies stamped).
+describe('POST /workspace/:urlKey/api/comments/:issueId — joined-copy stamps (LIN-3959)', () => {
+  test('decisionLoopIds stamps each copy through the same write, and the comment still 201s', async () => {
+    const { provider } = makeFakeProvider();
+    const { store, calls } = makeFakeDispatchQueueStore();
+    const app = buildApp({ provider, dispatchQueueStore: store });
+
+    const { status } = await postComment(app, ISSUE_ID, { body: 'ship it — joined copies', decisionLoopId: 'wk-1', decisionLoopIds: ['wk-1', 'ap-1'], decisionId: 'd-1' });
+
+    assert.strictEqual(status, 201);
+    assert.deepStrictEqual(calls.markDecisionAnswered.map(c => c.itemId), ['wk-1', 'ap-1']);
+  });
+
+  test('a malformed decisionLoopIds is refused 400 with no comment written and no stamp', async () => {
+    const { provider, calls: providerCalls } = makeFakeProvider();
+    const { store, calls } = makeFakeDispatchQueueStore();
+    const app = buildApp({ provider, dispatchQueueStore: store });
+
+    const { status } = await postComment(app, ISSUE_ID, { body: 'ship it — bad list', decisionLoopId: 'wk-1', decisionLoopIds: 'ap-1', decisionId: 'd-1' });
+
+    assert.strictEqual(status, 400);
+    assert.strictEqual(providerCalls.createComment.length, 0, 'the comment is not written');
+    assert.strictEqual(calls.markDecisionAnswered.length, 0);
+  });
+});

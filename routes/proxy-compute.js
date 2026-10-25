@@ -104,7 +104,7 @@ export function createComputeRoutes({
   const MULTI_REQUEST_TIMEOUT_MS = 50_000;
 
   /**
-   * Build a mock recommendation context from test fixtures (mirrors workspace-api.js).
+   * Build a mock recommendation context from test fixtures (mirrors lib/workspace-api-mocks.js).
    */
   async function buildMockRecapContextFromFixtures(issueId) {
     const mockData = await getTestMockData();
@@ -184,7 +184,7 @@ export function createComputeRoutes({
 
   /**
    * Build a small deterministic brief (fixed-section Markdown) for test mode.
-   * Mirrors buildMockBrief in routes/workspace-api.js so the proxy and in-app
+   * Mirrors buildMockBrief in lib/workspace-api-mocks.js so the proxy and in-app
    * paths return the same shape under test.
    */
   function buildMockBriefFromContext(context) {

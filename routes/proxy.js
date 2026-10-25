@@ -184,7 +184,7 @@ async function resolvePromptIssueContext(provider, accessToken, identifier, isTe
 // consumer that retries after a lost response gets the original back.
 //
 // Exported (LIN-2154) so the session-auth human-lane comment route
-// (routes/workspace-api.js) shares this SAME cache instance rather than a
+// (routes/workspace-api-issue-write.js) shares this SAME cache instance rather than a
 // fresh one that would miss workspace-wide generation bumps below.
 export const commentDedupe = createDedupeCache();
 
@@ -1602,7 +1602,9 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   // missing is refused by that gate while every other proxy path falls
   // through untouched. `haltReadTimeoutMs` is deliberately NOT passed — it is
   // not bound in this composer, and the factory's own default applies. The
-  // routes land dormant: no production path mints a `take` grant until S2b.
+  // The runner routes' path-scoped take gate refuses any token without the
+  // grant, and only the runner-copy mint in `routes/proxy-tokens-admin.js`
+  // carries it.
   // LIN-3098 S3: the served runner prompt (routes/proxy-runner-prompt.js),
   // GET /api/proxy/runner/prompt. Mounted BEFORE createProxyRunnerRoutes: it
   // runs its own limiter → auth → take-grant chain and answers, so the runner

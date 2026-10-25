@@ -123,7 +123,8 @@ export function createAccountMergeRoutes({ accountStore, accountWorkspaceStore, 
     // LIN-3124 PR2 (D4/D10): drop the merged account's unreferenced
     // connection-backed rows and their owner records. A row with referents
     // stays and keeps resolving; a LIN-3127-born row (no origin) is never
-    // deleted. Inert until PR3 writes connection-backed bindings. This is not a
+    // deleted. `convertToConnectionBacked` (`routes/auth.js`) is the writer that
+    // gives a row its referents, so only rows nothing references are dropped. This is not a
     // workspace-keyed write, so it runs for EVERY merge — including S3-2's
     // null-workspace (email link-mode) case below.
     await onAccountMerged({ connectionStore, ownerCredentialStore, mergedAccountId: pending.mergedAccountId })

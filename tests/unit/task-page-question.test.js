@@ -265,3 +265,15 @@ describe('the press goes through the run page\'s ReplyDelivery entry', () => {
     assert.equal(calls[0].force, true);
   });
 });
+
+describe('a joined ruling row on the task page (LIN-3959)', () => {
+  test('the page of the autopilot copy keeps a joined row whose anchor is the worker', () => {
+    const rows = [
+      { anchor: { loopId: 'wk' }, stampLoopId: 'wk', stampLoopIds: ['wk', 'ap'], decision: { decision_id: 'd-1' } },
+      { anchor: { loopId: 'other' }, stampLoopId: 'other', decision: { decision_id: 'd-2' } },
+    ];
+    const m = model([blocked({ loopId: 'ap' })], { deriveSessionDecisions: () => rows });
+    assert.equal(m.question.decisions.length, 1, 'only the joined row is kept');
+    assert.equal(m.question.decisions[0].anchor.loopId, 'wk');
+  });
+});

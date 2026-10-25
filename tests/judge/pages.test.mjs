@@ -7,7 +7,7 @@ import { PAGES, AREAS, coverageOfChange, coveredRenderers, cssNamesIn, parsePixe
 test('the page list holds the pages and states the ticket asks for (LIN-3889 adds the back-link pages and audit-report) (the 4th, Running with no runner, is the Running page itself)', () => {
   const ids = PAGES.map((p) => p.id);
   assert.equal(new Set(ids).size, ids.length);
-  for (const id of ['home', 'task', 'dispatch', 'proxy', 'audit', 'settings-index', 'styleguide', ...AREAS.map((a) => `settings-${a}`)]) assert.ok(ids.includes(id), id);
+  for (const id of ['home', 'task', 'dispatch', 'proxy', 'audit', 'settings-index', 'styleguide', 'privacy', 'terms', ...AREAS.map((a) => `settings-${a}`)]) assert.ok(ids.includes(id), id);
   assert.deepEqual(PAGES.filter((p) => p.state).map((p) => p.state).sort(), ['ask-open', 'audit-report', 'change-log-entry', 'key-open', 'models-panel-open', 'models-staged', 'paused']);
   assert.equal(AREAS.length, 8);
 });

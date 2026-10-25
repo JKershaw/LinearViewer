@@ -714,8 +714,8 @@ const accountWorkspaceStore = new AccountWorkspaceStore({ collection: accountWor
 
 // LIN-3131 S2b.1: late-bind the owner-check seam now that both stores it
 // composes exist. `proxyTokenStore` is built above (before these), so the seam
-// is injected here rather than at construction; while it stays unwired the
-// grant mint fails closed with OWNER_CHECK_UNAVAILABLE. Keys on `workspaceId`
+// is injected here rather than at construction; an unwired seam fails the
+// grant mint closed with OWNER_CHECK_UNAVAILABLE. Keys on `workspaceId`
 // (the account↔workspace edge, LIN-1892 S1), reusing #1601's
 // `getWorkspaceOwnerAccountId` — no parallel owner model. LIN-3137 J5 hoists it
 // into a named const so the legacy dispatch-token mint consumes the SAME seam.
@@ -752,8 +752,8 @@ if (emailLinkOriginWarning) console.warn(`Warning: ${emailLinkOriginWarning}`)
 // refresh path) at every rotation/acquisition site — ensureValidToken
 // and handleTokenRefreshAndRetry below, the off-session refresh path
 // (refreshOwnerWorkspaceToken), and both OAuth-callback branches
-// (routes/auth.js). No read path is wired to it yet — that is Session 2
-// (LIN-1524). Plaintext `refreshToken` at rest is accepted conditionally for
+// (routes/auth.js). Its read path is the refresh point-read in
+// `lib/workspace-token-refresh.js` (LIN-1524). Plaintext `refreshToken` at rest is accepted conditionally for
 // this phase only — see LIN-1522, which owns encryption/retention for this
 // collection.
 const ownerCredentialsCollection = db.collection('owner-credentials')
@@ -1162,8 +1162,8 @@ app.use(session(createSessionOptions({ store: sessionStore, secret: process.env.
 
 // LIN-3124 PR2 (D1): one batched hydration read of the session's
 // connection-backed Connections, AFTER the session middleware. Legacy-only
-// sessions do zero reads. The side-table is written here and read by nothing
-// until PR3's read cutover, so this is inert today.
+// sessions do zero reads. The side-table is written here and read by the
+// accessors in `lib/workspace.js` (PR3's read cutover).
 app.use(createHydrationMiddleware({
   connectionStore,
   resolveCanonicalAccountId: (id) => accountStore.resolveCanonicalAccountId(id)
@@ -3223,8 +3223,9 @@ const onTicketWrite = createOnTicketWrite({
   sessionsFeedCache,
   agentStatusStore
 })
-// LIN-3756: records a pipeline merge on its Done write. Given to the proxy only,
-// so the task-page check route (seam 3) records exactly as it did.
+// LIN-3756: records a merge on a Done write. Given to seam 1 (the proxy) and seam 2
+// (the person's Done, LIN-3863); the task-page check route (seam 3) records itself,
+// stop-at-PR only, as it did.
 const recordPipelineMerge = createPipelineMergeRecorder({
   closeOutEventsStore,
   dispatchStore: dispatchQueueStore,
@@ -3241,7 +3242,7 @@ app.use(createRunnerKitRoutes())
 // LIN-3383: workspace-api, collective, dashboard, task-chat and flight-companion
 // all receive the ONE hoisted `workspaceOwnerCheck` (never a second
 // createWorkspaceOwnerCheck) for the owner-only runner enqueue gate.
-app.use(createWorkspaceApiRoutes({ installationTokenFor, workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, accountStore, adoptConnectionCredential: (args) => connectionAccess.adoptConnectionCredential(args), closeOutEventsStore, workspaceOwnerCheck, onTicketWrite }))
+app.use(createWorkspaceApiRoutes({ installationTokenFor, workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, accountStore, adoptConnectionCredential: (args) => connectionAccess.adoptConnectionCredential(args), closeOutEventsStore, workspaceOwnerCheck, onTicketWrite, recordPipelineMerge }))
 
 // Mount collective routes (experimental cross-project discussion — LIN-450).
 // yapClient falls back to DEFAULT_YAP_BASE_URL (lib/yap-client.js) when YAP_BASE_URL is unset.
