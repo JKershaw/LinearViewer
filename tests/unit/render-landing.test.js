@@ -229,3 +229,32 @@ test('the Archive link target exists, and the Library list does not repeat it', 
   const libSection = html.slice(libIdx, html.indexOf('data-testid="landing-archive"'));
   assert.ok(!libSection.includes(`href="/archive/${archive[1]}"`), 'Library does not lead with the Archive edition');
 });
+
+// LIN-3980 outcome 8: a shared link previews as the landing, not as a bare title.
+test('the landing carries a description and social-preview metadata with an absolute origin', () => {
+  const html = renderLandingPage({ origin: 'https://harbour.cat' });
+  assert.match(html, /<meta name="description" content="Harbour reads your backlog/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/harbour\.cat\/">/);
+  assert.match(html, /<meta property="og:title" content="Harbour — keep human intent in command of AI execution">/);
+  assert.match(html, /<meta property="og:description" content="Harbour reads your backlog/);
+  assert.match(html, /<meta property="og:image" content="https:\/\/harbour\.cat\/logo\/og-image\.png">/);
+  assert.match(html, /<meta property="og:url" content="https:\/\/harbour\.cat\/">/);
+  assert.match(html, /<meta name="twitter:card" content="summary_large_image">/);
+});
+
+test('without an origin (the logout render) the page keeps its description and drops the absolute tags', () => {
+  const html = renderLandingPage({});
+  assert.match(html, /<meta name="description" content="Harbour reads your backlog/);
+  assert.match(html, /<meta property="og:title"/);
+  assert.doesNotMatch(html, /og:image|og:url|rel="canonical"/);
+});
+
+test('the shared-image file the tags point at is committed at 1200×630', async () => {
+  const { readFileSync, existsSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const path = join(__dirname, '../../public/logo/og-image.png');
+  assert.ok(existsSync(path), 'public/logo/og-image.png exists');
+  const png = readFileSync(path);
+  assert.equal(png.readUInt32BE(16), 1200, 'width');
+  assert.equal(png.readUInt32BE(20), 630, 'height');
+});
