@@ -34,6 +34,9 @@ const TIME_MASKS = {
 //   ask-open          open the periodic-reviews ask in place (a change that affects everyone)
 //   key-open          mint a token, open its key row
 //   change-log-entry  really submit the periodic-reviews ask once, so the log has one entry
+//   remove-open       open the one source's row, then its remove ask (LIN-3890: asks in place)
+//   revoke-open       mint a key, open its row, then its revoke ask (a script-transport ask)
+//   paused            mint a queue token (a runner), pause runs in place; Running shows the Runs row and Resume
 // `urlKey` is fixed per entry and identical on both sides. States that write data get their own
 // urlKey so their writes never reach another page's sidebar counts.
 // `renderers` are the files that emit the page, for the changed-stylesheet check below.
@@ -56,6 +59,11 @@ export const PAGES = [
   { id: 'running-ask-open', urlKey: 'judge', path: (k) => `/workspace/${k}/settings/running`, state: 'ask-open', renderers: ['lib/render-settings.js'] },
   { id: 'agent-access-key-open', urlKey: 'judge-key', path: (k) => `/workspace/${k}/settings/agent-access`, state: 'key-open', masks: [TIME_MASKS.key], renderers: ['lib/render-settings.js'] },
   { id: 'change-log-entry', urlKey: 'judge-log', path: (k) => `/workspace/${k}/settings/change-log`, state: 'change-log-entry', masks: [TIME_MASKS.change], renderers: ['lib/render-settings.js'] },
+  // LIN-3890: the in-place asks the rebuild added (Sources' remove, Agent access' revoke) and a halted
+  // Running page (Runs row, Resume only). Each writes data, so each has its own urlKey.
+  { id: 'sources-remove-open', urlKey: 'judge', path: (k) => `/workspace/${k}/settings/sources`, state: 'remove-open', renderers: ['lib/render-settings.js'] },
+  { id: 'agent-access-revoke-open', urlKey: 'judge-revoke', path: (k) => `/workspace/${k}/settings/agent-access`, state: 'revoke-open', masks: [TIME_MASKS.key], renderers: ['lib/render-settings.js'] },
+  { id: 'running-paused', urlKey: 'judge-halt', path: (k) => `/workspace/${k}/settings/running`, state: 'paused', renderers: ['lib/render-settings.js'] },
   // LIN-3889: Audit's report, with the rows the client builds with `.field` (teams, queue items,
   // projects). The fixture answers `/api/audit` on both sides, so the request never leaves the browser.
   { id: 'audit-report', urlKey: 'judge', path: (k) => `/workspace/${k}/audit`, state: 'audit-report', renderers: ['lib/render-audit.js'] },
@@ -63,7 +71,7 @@ export const PAGES = [
 
 // Stated, not assumed: what the seed cannot reach.
 export const NOT_COVERED = [
-  'Running with a runner (Last poll row, run controls): needs a runner key, whose time is server-rendered; this judge runs the no-runner state only',
+  'Running with a runner (Last poll row, Pause and Stop): needs a runner key, whose time is server-rendered; the judge runs the no-runner state and the paused state (a queue token is the runner)',
   'A change-log entry with a fixed time: the time is server-rendered and so masked, not seeded',
   'Models body (LIN-3855) and Home content (LIN-3833): listed pages only, not their later states',
   'Session with a run (the populated session page and its run view): needs a session record the local seed does not write; the not-found branch is judged instead, and renders the same back link',

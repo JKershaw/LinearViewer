@@ -57,25 +57,39 @@ async function settle(page) {
 // Per-state set-up: identical on both sides, driven by the page's own markup.
 async function prepare(page, context, entry) {
   const url = entry.path(entry.urlKey);
-  if (entry.state === 'key-open') {
+  if (entry.state === 'key-open' || entry.state === 'revoke-open') {
     const minted = await context.request.get(`/test/create-proxy-token?urlKey=${entry.urlKey}&label=judge-key&scope=read`);
     if (!minted.ok()) throw new Error(`mint failed: ${minted.status()}`);
   }
-  if (entry.state === 'change-log-entry') {
-    // The log is only written by really submitting the ask; do it once per server.
+  if (entry.state === 'paused') {
+    // A queue token is a runner (run-controls.js), so Pause is offered. Minted on the Dispatch page as an owner does.
     await page.goto(url);
-    if (await page.getByTestId('settings-change-empty').count()) {
-      await page.goto(url.replace(/change-log$/, 'running'));
-      const ask = page.getByTestId('settings-toggle-periodicals');
-      await ask.locator('summary').click();
-      await ask.locator('textarea[name="reason"]').fill('Judge fixture');
-      await Promise.all([page.waitForURL(/settings\/running/), ask.locator('[data-testid$="-confirm"]').click()]);
+    if (!(await page.getByTestId('settings-halt-pause').count())) {
+      await page.goto(`/workspace/${entry.urlKey}/dispatch`);
+      await page.locator('.token-label-input').fill('judge-runner');
+      await page.locator('#create-token-form button[type="submit"]').click();
+      await page.locator('.token-modal-close').click();
+      await page.goto(url);
+    }
+    if (await page.getByTestId('settings-halt-pause').count()) {
+      await page.getByTestId('settings-halt-pause').locator(':scope > summary').click();
+      await page.getByTestId('settings-halt-pause-reason').fill('Judge fixture');
+      await Promise.all([page.waitForURL(/settings\/running/), page.getByTestId('settings-halt-pause-confirm').click()]);
     }
   }
   await page.goto(url);
   await settle(page);
   if (entry.state === 'ask-open') await page.getByTestId('settings-toggle-periodicals').locator('summary').click();
   if (entry.state === 'key-open') await page.locator('[data-testid="settings-key-proxy"], [data-testid="settings-key-dispatch"]').locator('summary').first().click();
+  if (entry.state === 'remove-open') {
+    await page.getByTestId('settings-provider-binding').first().locator(':scope > summary').click();
+    await page.getByTestId('settings-provider-remove').locator(':scope > summary').click();
+  }
+  if (entry.state === 'revoke-open') {
+    const key = page.getByTestId('settings-key-proxy').first();
+    await key.locator(':scope > summary').click();
+    await key.getByTestId('settings-key-revoke').locator(':scope > summary').click();
+  }
   if (entry.state === 'audit-report') {
     // Both sides answer the same fixture, so the report is identical and the request never leaves the browser.
     await page.route('**/api/audit', (route) => route.fulfill({ path: AUDIT_FIXTURE, contentType: 'application/json' }));
