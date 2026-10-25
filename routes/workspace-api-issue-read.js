@@ -122,7 +122,9 @@ export function registerIssueReadRoutes(router, { workspaceFromUrl, getOpenRoute
         customPrompts,
         isLocalhost,
         provider,
-        section
+        section,
+        // LIN-3833: the opened task on Home, state first (lib/render.js renderHomeDetailsContent).
+        layout: 'home'
       });
 
       res.json({ html });

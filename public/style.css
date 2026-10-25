@@ -1103,6 +1103,214 @@ a.wordmark:hover {
   font-family: var(--font-content);
 }
 
+/* LIN-3833: a task's state words (Build running · 5m, needs you, backlog), right of the title on
+   desktop; the phone rule below moves them under it. */
+.row-state {
+  color: var(--fg-dim);
+  margin-left: auto;
+  padding-left: 1ch;
+  font-size: 0.9em;
+  font-family: var(--font-content);
+  white-space: nowrap;
+}
+
+/* LIN-3833: the opened task on Home, state first: the facts line, the state block above the control, the
+   one links row. Plain text sizes; the controls below keep their own styles. */
+.opened-task-facts {
+  color: var(--fg-dim);
+  font-size: 0.9em;
+  font-family: var(--font-content);
+  padding: 2px 0 6px;
+}
+
+.opened-task-state {
+  margin-bottom: 8px;
+}
+
+.opened-task-last {
+  color: var(--fg-dim);
+  font-size: 0.9em;
+  font-family: var(--font-content);
+  padding-top: 4px;
+}
+
+.opened-task-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.2em;
+  padding: 6px 0;
+  font-family: var(--font-content);
+}
+
+/* LIN-3833: the run control on Home (one main action, what it runs on, the Change panel for this run only,
+   Undo and Stop). The block is one slot; the prompt box and the copy-first view sit beside it. */
+.opened-task-run {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 6px 0 10px;
+  font-family: var(--font-content);
+}
+
+.opened-task-step {
+  color: var(--fg);
+}
+
+.opened-task-step-name {
+  font-weight: 600;
+}
+
+.opened-task-runs-on,
+.opened-task-running,
+.opened-task-queued,
+.opened-task-last-copy {
+  color: var(--fg-dim);
+  font-size: 0.9em;
+}
+
+.opened-task-ask,
+.opened-task-change,
+.opened-task-another,
+.opened-task-see,
+.opened-task-undo,
+.opened-task-stop {
+  margin-left: 0.6em;
+  font-size: 0.9em;
+}
+
+.opened-task-change-panel {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--card);
+}
+
+.opened-task-change-head {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* The close × is the phone sheet's dismiss; on desktop the panel closes with its Close button. */
+.opened-task-change-x {
+  display: none;
+}
+
+/* LIN-3833: on a phone the Change panel is a full-screen sheet, not an inline block. */
+@media (max-width: 640px) {
+  .opened-task-change-panel {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    border: 0;
+    border-radius: 0;
+    padding: 16px;
+    overflow-y: auto;
+  }
+
+  .opened-task-change-x {
+    display: inline-block;
+    font-size: 1.4em;
+    line-height: 1;
+    padding: 4px 10px;
+  }
+}
+
+.opened-task-change-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.opened-task-change-label {
+  color: var(--fg-dim);
+  min-width: 5.5em;
+  font-size: 0.9em;
+}
+
+.opened-task-preset.is-chosen,
+.opened-task-target.is-chosen {
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.opened-task-change-summary,
+.opened-task-change-note {
+  color: var(--fg-dim);
+  font-size: 0.9em;
+  margin: 0;
+}
+
+.opened-task-more {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.opened-task-another-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+}
+
+.opened-task-go--main {
+  align-self: flex-start;
+}
+
+.opened-task-copy {
+  align-self: flex-start;
+}
+
+.opened-task-write {
+  align-self: flex-start;
+}
+
+.opened-task-box {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  max-height: 22em;
+  overflow: auto;
+}
+
+.opened-task-box-actions,
+.opened-task-progress-key,
+.opened-task-key-note,
+.opened-task-paste {
+  font-size: 0.9em;
+}
+
+.opened-task-box-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.opened-task-key-note,
+.opened-task-paste {
+  color: var(--fg-dim);
+  margin: 0;
+}
+
+.opened-task-confirm {
+  color: var(--fg);
+}
+
+/* LIN-3833: the count line under the In Progress heading (3 in progress · 1 needs you). */
+.in-progress-count {
+  color: var(--fg-dim);
+  font-size: 0.9em;
+  font-family: var(--font-content);
+  padding-bottom: var(--space-2);
+}
+
 /* Activity time/kind shown in the Recent activity section */
 .completed-time {
   color: var(--fg-dim);
@@ -1945,6 +2153,15 @@ a.wordmark:hover {
     flex-basis: 100%;
     order: 1;
     margin-left: 2.4ch;
+  }
+
+  /* LIN-3833: the state words take the same line under the title, aligned as the project badge is. */
+  .row-state {
+    flex-basis: 100%;
+    order: 1;
+    margin-left: 2.4ch;
+    padding-left: 0;
+    white-space: normal;
   }
 
   .project-header {

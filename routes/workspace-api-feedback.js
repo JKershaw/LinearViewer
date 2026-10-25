@@ -28,7 +28,7 @@ import { generateFeedbackTitle } from '../lib/feedback-title.js';
 import { resolveIssueBinding } from '../lib/workspace.js';
 import { resolveRunnerOwnerRefusal } from '../lib/runner-owner-gate.js';
 import { shouldMockAi } from '../lib/should-mock-ai.js';
-import { requestOriginOrNull } from '../lib/public-origin.js';
+import { requestOriginOrNull, ORIGIN_UNRESOLVED_REFUSAL } from '../lib/public-origin.js';
 import { buildMockFeedbackTitle } from '../lib/workspace-api-mocks.js';
 
 // ===========================================================================
@@ -186,15 +186,6 @@ function feedbackCaptureBlock({ url, userAgent }) {
     .map(([label, value]) => `- **${label}:** \`${value.trim().slice(0, MAX_FEEDBACK_CONTEXT_LENGTH)}\``);
   return bullets.length ? `\n\n---\n${bullets.join('\n')}` : '';
 }
-
-// LIN-3908: a feedback lane's run calls back to this workspace, so it needs an
-// origin. With no PUBLIC_ORIGIN and no Host header there is none, and the lane is
-// refused here, where the widget reports it, instead of queued with `http://undefined`.
-const ORIGIN_UNRESOLVED_REFUSAL = {
-  code: 'ORIGIN_UNRESOLVED',
-  retryable: false,
-  message: 'This request has no Host header and PUBLIC_ORIGIN is not set, so a run could not call back to this workspace.',
-};
 
 export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore, workspacePreferencesStore, dispatchQueueStore, proxyTokenStore, accountStore, workspaceOwnerCheck }) {
   // ===========================================================================
@@ -547,6 +538,9 @@ export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore
       if (laneRefusal) {
         launch = { launched: false, code: laneRefusal.code, retryable: laneRefusal.retryable, message: laneRefusal.error };
       } else if (lane && !baseUrl) {
+        // LIN-3908: a feedback lane's run calls back to this workspace, so it needs an origin.
+        // With no PUBLIC_ORIGIN and no Host header there is none, and the lane is refused here,
+        // where the widget reports it, instead of queued with `http://undefined`.
         launch = { launched: false, ...ORIGIN_UNRESOLVED_REFUSAL };
       } else if (lane === 'triage') {
         launch = await enqueueFeedbackTriage(workspace, created.issue, priority, req.session, baseUrl, overrides);

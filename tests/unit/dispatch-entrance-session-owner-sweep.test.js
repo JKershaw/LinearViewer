@@ -32,7 +32,7 @@ import assert from 'node:assert/strict';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { enumerateRoutes, sampleUrl, appAround, request, makeSpy, SAMPLE_UUID } from './lib/entrance-route-sweep.js';
 
-const ROUTE_COUNT = 27;
+const ROUTE_COUNT = 28;
 const COPY = "Only this workspace's owner can act on its runner.";
 const OWNER = 'acct-owner';
 const MEMBER = 'acct-member';
@@ -128,6 +128,7 @@ const TABLE = {
   },
   [`GET ${BASE}`]: { verdict: 'read-only', reason: 'queue list (LIN-3384 redacts the row); reads only', probes: [{}] },
   [`GET ${BASE}/count`]: { verdict: 'read-only', reason: 'queue count badge; reads only', probes: [{}] },
+  [`GET ${BASE}/preview`]: { verdict: 'read-only', reason: 'LIN-3833: the run control\'s routing answer, owner-only (PREVIEW_OWNER_ONLY); resolves, writes nothing', probes: [{}] },
   [`GET ${BASE}/quota`]: { verdict: 'read-only', reason: 'LIN-3238 Q6: the caller\'s own free-tier usage; reads only', probes: [{}] },
   [`GET ${BASE}/history`]: { verdict: 'read-only', reason: 'history list (LIN-3384 redacts the row); reads only', probes: [{}] },
   [`GET ${BASE}/recent-prompts`]: { verdict: 'read-only', reason: 'the caller\'s own recent prompts', probes: [{}] },

@@ -20,6 +20,7 @@ import rateLimit from 'express-rate-limit';
 import { badRequest, jsonError, unauthorized } from '../lib/errors.js';
 import { CLIENT_ACTS, validateTaskModeEvent } from '../lib/task-mode-store.js';
 import { resolveAccountGroup } from '../lib/account-group.js';
+import { stageLabel } from '../lib/task-page-loader.js';
 
 // PROVISIONAL (LIN-2942, for John): the POST appends to a lifetime-retained
 // collection on every press, so it gets its own per-IP budget. 60 a minute is
@@ -49,7 +50,7 @@ export function createTaskModeRoutes({ taskModeStore, accountStore, workspaceFro
       return unauthorized.json(res, 'Not authenticated');
     }
 
-    const { rung, ready, needs, act, surface, issueId, issueIdentifier, dispatchId } = req.body || {};
+    const { rung, ready, needs, act, surface, issueId, issueIdentifier, dispatchId, kind } = req.body || {};
     if (!CLIENT_ACTS.includes(act)) {
       return badRequest.json(res, `act must be one of: ${CLIENT_ACTS.join(', ')}`);
     }
@@ -69,7 +70,9 @@ export function createTaskModeRoutes({ taskModeStore, accountStore, workspaceFro
       needs: needs ?? null,
       act,
       dispatchId: null,
-      surface: surface ?? null
+      surface: surface ?? null,
+      // LIN-3833: which prompt a copy was of (the store drops a kind it does not know).
+      kind: kind ?? null
     };
     const invalid = validateTaskModeEvent(event);
     if (invalid) {
@@ -93,7 +96,13 @@ export function createTaskModeRoutes({ taskModeStore, accountStore, workspaceFro
         urlKey: req.workspace.urlKey,
         issueIdentifier: req.params.issueIdentifier
       });
-      return res.json(mode);
+      // LIN-3833: the last copy, for the copy-first view's "You copied the Build prompt" line.
+      const copies = mode.events.filter((event) => event.act === 'copy');
+      const last = copies.at(-1) || null;
+      return res.json({
+        ...mode,
+        lastCopy: last ? { kind: last.kind ?? null, label: last.kind ? stageLabel(last.kind) : null, at: last.at } : null
+      });
     } catch (err) {
       console.error('Error reading task mode:', err.message);
       return jsonError(res, 500, 'Failed to read task mode');

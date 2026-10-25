@@ -38,7 +38,7 @@ test.describe('GitHub provider (no test-token mock)', () => {
     // into the link. The detail block is lazy — expand an issue to load it first.
     await page.locator('.line.expandable').first().click();
     await expect(page.locator('.detail-link', { hasText: 'View in GitHub Issues' }).first()).toBeAttached();
-    await expect(page.locator('.detail-link', { hasText: 'View in Linear' })).toHaveCount(0);
+    await expect(page.locator('.detail-link', { hasText: 'Open in Linear' })).toHaveCount(0);
   });
 
   test('write round-trip: an issue created through provider.createIssue renders back', async ({ page }) => {

@@ -5,7 +5,9 @@
  *
  * Returns, as text/plain, the prompt that turns a person's Claude Code session
  * into this workspace's runner (docs/runner-prompt.md via
- * lib/prompts/runner-kickoff.js), with this request's base URL filled in.
+ * lib/prompts/runner-kickoff.js), with this request's base URL filled in. A request
+ * with no origin (no Host, no PUBLIC_ORIGIN) gets 400 ORIGIN_UNRESOLVED instead of a
+ * prompt that names `http://undefined` (LIN-3931).
  *
  * Its own chain, `proxyLimiter → authenticateProxyToken → requireGrant('take')`:
  * the prompt is for a runner credential, so any other token gets
@@ -16,7 +18,8 @@
  */
 import { Router } from 'express';
 import { buildRunnerKickoff } from '../lib/prompts/runner-kickoff.js';
-import { publicOrigin } from '../lib/public-origin.js';
+import { requestOriginOrNull, ORIGIN_UNRESOLVED_REFUSAL } from '../lib/public-origin.js';
+import { jsonError } from '../lib/errors.js';
 
 const PROMPT_ROUTE = '/api/proxy/runner/prompt';
 
@@ -38,7 +41,13 @@ export function createProxyRunnerPromptRoutes({
   const router = Router();
 
   router.get(PROMPT_ROUTE, proxyLimiter, authenticateProxyToken, requireGrant('take'), (req, res) => {
-    const baseUrl = publicOrigin(req);
+    // LIN-3931: the prompt names this request's origin as the runner's callback base. With no Host
+    // and no PUBLIC_ORIGIN that origin would read `http://undefined`, so refuse instead of serving it.
+    const baseUrl = requestOriginOrNull(req);
+    if (baseUrl === null) {
+      logEvent(req, PROMPT_ROUTE, 400);
+      return jsonError(res, 400, ORIGIN_UNRESOLVED_REFUSAL.message, { code: ORIGIN_UNRESOLVED_REFUSAL.code, retryable: ORIGIN_UNRESOLVED_REFUSAL.retryable });
+    }
     logEvent(req, PROMPT_ROUTE, 200);
     res.type('text/plain').send(buildPrompt({ baseUrl }));
   });

@@ -25,6 +25,7 @@
 
 import { Router } from 'express';
 import { renderErrorPage } from '../lib/render.js';
+import { sessionSummaryOf } from '../lib/task-page-loader.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
 import { resolveIssueBinding, isValidIssueId } from '../lib/workspace.js';
 import { jsonError } from '../lib/errors.js';
@@ -144,6 +145,8 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         live: model.live,
         headerHtml: renderTaskStatus(model),
         trackHtml: renderTaskTrack(model, { now: now() }),
+        // LIN-3833: the sessions the state block and the run control read (count, last, running).
+        sessions: sessionSummaryOf(model),
       };
       if (model.brief || model.recap) {
         const contextHtml = renderTaskContext(model, { urlKey: workspace.urlKey });

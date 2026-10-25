@@ -103,6 +103,10 @@ function baseContext(calls, appliedAssigneeName, assigneeState) {
       return '<html/>';
     },
     getFeatureFlags: () => ({}),
+    // LIN-3833: the Home row states; these sandboxes render no In Progress rows.
+    homeRowStates: async () => null,
+    // LIN-3833: the top task's subtask that needs you; these sandboxes render no In Progress rows.
+    subtaskNeedingYouByNodeKey: () => ({}),
     requestFeatureFlags: async () => ({}),
     resolveRunControls: async () => ({ runControls: false, runSetup: false }),
     isAuthError: () => false,

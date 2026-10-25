@@ -18,7 +18,7 @@ import { test, expect } from '../fixtures/test-base.js';
 import { workspaceApiLocalSeed } from '../fixtures/local-harness.js';
 import { testMockData } from '../../lib/sample-data/mock-data.js';
 
-test.describe('Scan UI — Dashboard', () => {
+test.describe('Scan UI — Swipe card (LIN-3833: Scan left Home)', () => {
   test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
     // The task-decisions store is durable with no TTL by design (LIN-2212) —
     // `seedLocal` re-seeds identical issue content, so an unchanged row from
@@ -30,19 +30,18 @@ test.describe('Scan UI — Dashboard', () => {
     await page.waitForLoadState('networkidle');
   });
 
-  function openScanToggle(page, titleText) {
-    const node = page.locator('.node').filter({ has: page.locator(`.line:has-text("${titleText}")`) }).first();
-    return { node, row: node.locator('.line').first() };
+  // LIN-3833: the Scan fold is on Swipe's card now (Home's opened task has no Scan). Opens the task's card
+  // by identifier, expands Scan, and returns its section.
+  async function openScanSection(page, urlKey, identifier) {
+    await page.goto(`/workspace/${urlKey}/swipe/${identifier}`);
+    const card = page.locator('#swipe-card');
+    await expect(card).toBeVisible();
+    await card.locator('.swipe-accordion-header[data-accordion="scan"]').click();
+    return card.locator('.swipe-accordion-body[data-accordion-body="scan"] .scan-section');
   }
 
-  test('a task row exposes a Scan toggle that starts missing (never auto-scans)', async ({ page }) => {
-    const { node, row } = openScanToggle(page, 'Task needing preparation');
-    await expect(row).toBeAttached();
-    await row.click();
-    await node.locator('[data-toggle="details"]').first().click();
-
-    await node.locator('[data-toggle="scan"]').first().click();
-    const section = node.locator('[data-content="scan"] .scan-section');
+  test('the Swipe card\'s Scan starts missing and never auto-scans', async ({ page, localWorkerUrlKey }) => {
+    const section = await openScanSection(page, localWorkerUrlKey, 'TEST-6');
     // Only the cheap GET status check runs on expand — never a POST — so a
     // never-scanned task must land on "missing", not "fresh".
     await expect(section).toHaveAttribute('data-state', 'missing', { timeout: 5000 });
@@ -56,13 +55,8 @@ test.describe('Scan UI — Dashboard', () => {
   // into separate tests would make the second depend on the first never
   // having run (an ordering assumption this suite doesn't guarantee), rather
   // than asserting a real workflow: find → dismiss → rescan-stays-dismissed.
-  test('pressing scan on a decision-bearing task finds a blocker; dismissing it stamps it, and a rescan never re-opens it', async ({ page }) => {
-    const { node, row } = openScanToggle(page, 'Task needing preparation');
-    await row.click();
-    await node.locator('[data-toggle="details"]').first().click();
-    await node.locator('[data-toggle="scan"]').first().click();
-
-    const section = node.locator('[data-content="scan"] .scan-section');
+  test('pressing scan on a decision-bearing task finds a blocker; dismissing it stamps it, and a rescan never re-opens it', async ({ page, localWorkerUrlKey }) => {
+    const section = await openScanSection(page, localWorkerUrlKey, 'TEST-6');
     await expect(section).toHaveAttribute('data-state', 'missing', { timeout: 5000 });
 
     await section.locator('[data-scan-action="scan"]').click();
@@ -91,12 +85,7 @@ test.describe('Scan UI — Dashboard', () => {
   // 'fresh'/already-answered instead of 'missing' here.
   test('sending an answer on a decision-bearing task stamps the outcome answered', async ({ page, localWorkerUrlKey }) => {
     const taskId = testMockData.issues.find(i => i.identifier === 'TEST-6').id;
-    const { node, row } = openScanToggle(page, 'Task needing preparation');
-    await row.click();
-    await node.locator('[data-toggle="details"]').first().click();
-    await node.locator('[data-toggle="scan"]').first().click();
-
-    const section = node.locator('[data-content="scan"] .scan-section');
+    const section = await openScanSection(page, localWorkerUrlKey, 'TEST-6');
     await expect(section).toHaveAttribute('data-state', 'missing', { timeout: 5000 });
 
     await section.locator('[data-scan-action="scan"]').click();
@@ -141,12 +130,7 @@ test.describe('Scan UI — Dashboard', () => {
   // a bare rescan placeholder.
   test('a decision-bearing scan orphaned by an unrelated comment is still answerable from the stale render', async ({ page, localWorkerUrlKey }) => {
     const taskId = testMockData.issues.find(i => i.identifier === 'TEST-6').id;
-    const { node, row } = openScanToggle(page, 'Task needing preparation');
-    await row.click();
-    await node.locator('[data-toggle="details"]').first().click();
-    await node.locator('[data-toggle="scan"]').first().click();
-
-    const section = node.locator('[data-content="scan"] .scan-section');
+    const section = await openScanSection(page, localWorkerUrlKey, 'TEST-6');
     await expect(section).toHaveAttribute('data-state', 'missing', { timeout: 5000 });
 
     await section.locator('[data-scan-action="scan"]').click();
@@ -168,19 +152,8 @@ test.describe('Scan UI — Dashboard', () => {
     // section"), not just a second toggle click.
     await page.reload();
     await page.waitForLoadState('networkidle');
-    const reopened = openScanToggle(page, 'Task needing preparation');
-    // The row's own expand state persists across reload via localStorage
-    // (public/app.js's `state.expanded`), unlike the nested "Details"/"Scan"
-    // toggles below (a transient `classList.toggle('hidden')`, always
-    // collapsed on a fresh load) — so only click the row if it isn't
-    // already expanded, or this would collapse it right back.
-    const reopenedDetailsToggle = reopened.node.locator('[data-toggle="details"]').first();
-    if (!(await reopenedDetailsToggle.isVisible())) {
-      await reopened.row.click();
-    }
-    await reopenedDetailsToggle.click();
-    await reopened.node.locator('[data-toggle="scan"]').first().click();
-    const reopenedSection = reopened.node.locator('[data-content="scan"] .scan-section');
+    // LIN-3833: the Swipe card is opened again by identifier; its Scan fold starts collapsed on a fresh load.
+    const reopenedSection = await openScanSection(page, localWorkerUrlKey, 'TEST-6');
     await expect(reopenedSection).toHaveAttribute('data-state', 'stale', { timeout: 5000 });
 
     // The orphaned ruling is still visible and actionable from the stale
@@ -211,13 +184,8 @@ test.describe('Scan UI — Dashboard', () => {
     expect(record.outcome).toBe('answered');
   });
 
-  test('pressing scan on a task with no blocking language reports no blockers found', async ({ page }) => {
-    const { node, row } = openScanToggle(page, 'Add pagination to user list');
-    await row.click();
-    await node.locator('[data-toggle="details"]').first().click();
-    await node.locator('[data-toggle="scan"]').first().click();
-
-    const section = node.locator('[data-content="scan"] .scan-section');
+  test('pressing scan on a task with no blocking language reports no blockers found', async ({ page, localWorkerUrlKey }) => {
+    const section = await openScanSection(page, localWorkerUrlKey, 'TEST-14');
     await expect(section).toHaveAttribute('data-state', 'missing', { timeout: 5000 });
     await section.locator('[data-scan-action="scan"]').click();
 

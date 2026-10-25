@@ -88,7 +88,9 @@ describe('PromptSection: look-alike controls in rendered markdown (LIN-3401)', (
     const { PromptSection, calls } = load();
     const c = makeContainer();
     PromptSection.init(c, opts);
-    calls.length = 0; // init may make its own reads; only the press is under test
+    // init's mount read (the state block, LIN-3833) settles before the reset; only the press is under test.
+    await new Promise((r) => setTimeout(r, 0));
+    calls.length = 0;
     await c.press({ prompt: '__autopilot__' }, true);
     assert.deepStrictEqual(calls, [], 'the look-alike made no fetch / window.api call');
     assert.ok(!c.innerHTML.includes('generating'), 'did not enter the generating state');
