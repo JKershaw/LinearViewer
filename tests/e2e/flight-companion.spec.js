@@ -121,12 +121,12 @@ test.describe('Flight Companion Page (experimental)', () => {
       // Positive control — Settings actually rendered, so the zero-count
       // check below is not vacuous.
       await expect(page.locator('[data-testid="settings-section-experimental"]')).toBeVisible();
-      await expect(page.locator(SELECTORS.settings.openLink('flightCompanion'))).toHaveCount(0);
+      await expect(page.locator(SELECTORS.nav.view('flight-companion'))).toHaveCount(0);
 
       await page.goto(`/test/set-session?${featuresParam({ flightCompanion: true })}&urlKey=${URL_KEY}`);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
-      await expect(page.locator(SELECTORS.settings.openLink('flightCompanion'))).toBeVisible();
+      await expect(page.locator(SELECTORS.nav.view('flight-companion'))).toBeVisible();
     });
   });
 

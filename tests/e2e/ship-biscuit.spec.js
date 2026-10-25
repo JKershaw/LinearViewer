@@ -52,12 +52,12 @@ test.describe("The Ship's Biscuit (experimental)", () => {
       await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
-      await expect(page.locator(SELECTORS.settings.openLink('shipBiscuit'))).toHaveCount(0);
+      await expect(page.locator(SELECTORS.nav.view('ship-biscuit'))).toHaveCount(0);
 
       await page.goto(`/test/set-session?${featuresParam({ shipBiscuit: true })}&urlKey=${URL_KEY}`);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
-      await expect(page.locator(SELECTORS.settings.openLink('shipBiscuit'))).toBeVisible();
+      await expect(page.locator(SELECTORS.nav.view('ship-biscuit'))).toBeVisible();
     });
   });
 

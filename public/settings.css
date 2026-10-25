@@ -466,17 +466,6 @@
   color: var(--fg-dim);
 }
 
-/* Distinct from the OpenRouter connect/disconnect buttons (which several specs
-   locate strictly as `.action-btn.connect` / `.action-btn.disconnect`) — provider
-   actions use their own classes so they never collide. */
-.provider-add-btn {
-  color: var(--green);
-}
-
-.provider-remove-btn {
-  color: var(--red);
-}
-
 /* Inline save feedback */
 .save-feedback {
   font-size: var(--font-size-sm);
@@ -549,6 +538,13 @@
   font-family: var(--font-content);
   font-size: 1.2em;
   font-weight: 600;
+  margin: 0 0 var(--space-1) 0;
+}
+
+.settings-area-purpose {
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  color: var(--muted);
   margin: 0 0 var(--space-3) 0;
 }
 
@@ -818,8 +814,11 @@
 
 /* Phone: the list, or the page with "‹ Settings". No sideways scroll. */
 @media (max-width: 760px) {
+  /* LIN-3890 outcome 8: the phone sizes are this root's. The body is 13px below 400px (style.css), and
+     `em` compounds, so rows (0.95em) read 12.4px. 1rem makes rows 15.2px and notes 13.6px at 390. */
   .settings-shell {
     grid-template-columns: minmax(0, 1fr);
+    font-size: 1rem;
   }
 
   .settings-shell[data-view="index"] .settings-pane {

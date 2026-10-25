@@ -871,8 +871,7 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
   border-color: var(--blue);
 }
 
-.roadmap-chat-send,
-.roadmap-generate-btn {
+.roadmap-chat-send {
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
   padding: 0.4em 1em;
@@ -883,13 +882,11 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
   cursor: pointer;
 }
 
-.roadmap-chat-send:hover,
-.roadmap-generate-btn:hover {
+.roadmap-chat-send:hover {
   background: var(--bg-muted);
 }
 
-.roadmap-chat-send:disabled,
-.roadmap-generate-btn:disabled {
+.roadmap-chat-send:disabled {
   color: var(--muted);
   cursor: not-allowed;
 }

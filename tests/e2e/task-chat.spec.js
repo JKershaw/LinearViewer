@@ -55,12 +55,12 @@ test.describe('Task Chat Page (experimental)', () => {
       await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
-      await expect(page.locator(SELECTORS.settings.openLink('taskChat'))).toHaveCount(0);
+      await expect(page.locator(SELECTORS.nav.view('task-chat'))).toHaveCount(0);
 
       await page.goto(`/test/set-session?${featuresParam({ taskChat: true })}&urlKey=${URL_KEY}`);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
-      await expect(page.locator(SELECTORS.settings.openLink('taskChat'))).toBeVisible();
+      await expect(page.locator(SELECTORS.nav.view('task-chat'))).toBeVisible();
     });
   });
 
