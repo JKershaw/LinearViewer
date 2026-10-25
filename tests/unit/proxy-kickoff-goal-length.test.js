@@ -133,6 +133,22 @@ describe('LIN-2818 — POST kickoff goal cap (raised to MAX_DESCRIPTION_LENGTH)'
   });
 });
 
+describe('LIN-2818 — GET kickoff preview goal cap (1000)', () => {
+  // Unlike the POST above, the GET preview cuts `goal` to 1000 on purpose (the
+  // value rides in the URL query string). LIN-3850 review: no other unit file
+  // pinned that slice at routes/proxy-kickoff.js.
+  test('a goal past 1000 characters is cut to exactly its first 1000 in the served preview', async () => {
+    const app = buildApp({ dispatchQueueStore: makeStore() });
+    const goal = 'g'.repeat(1000) + 'OVERFLOW_TAIL';
+    const res = await call(app, 'get', `${KICKOFF}?goal=${encodeURIComponent(goal)}`);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(typeof res.body, 'string', 'the preview is served as text');
+    assert.ok(res.body.includes('g'.repeat(1000)), 'the first 1000 characters of the goal reach the preview');
+    assert.ok(!res.body.includes('g'.repeat(1001)), 'nothing past the 1000th character is carried');
+    assert.ok(!/OVERFLOW_TAIL/.test(res.body), 'the overflow tail is cut');
+  });
+});
+
 describe('LIN-2818 — scoped kickoff delivers the caller goal (LIN-2730 shape)', () => {
   test('scoped + stepper + multi-line goal → the fetched prompt contains the goal verbatim', async () => {
     const store = makeStore();
