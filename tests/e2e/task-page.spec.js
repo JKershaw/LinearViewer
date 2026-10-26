@@ -208,8 +208,9 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await expect(evidence.locator('[data-testid="run-evidence-checked-review-verdict"]')).toContainText('Approve');
 
     // The page only ever polled its stored-data state endpoint, plus the
-    // one-time owner share list load and the owner widgets' one status GET each
-    // (LIN-3340 G2). A poll adds nothing; opening the widgets spends no AI.
+    // one-time owner share list load. With neither brief nor recap, no widget
+    // mounts, so there is no status GET; a press on the quiet line starts one
+    // (LIN-3340 G2, LIN-3975 finding 1). Opening the page spends no AI.
     expect(stateRequests.length).toBeGreaterThan(0);
     const stateUrl = `/workspace/${URL_KEY}/api/task/LOCAL-TP1/state`;
     const sharesUrl = `/workspace/${URL_KEY}/api/task/LOCAL-TP1/shares`;
@@ -219,8 +220,8 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     for (const path of stateRequests) {
       expect([stateUrl, sharesUrl, briefUrl, recapUrl], `unexpected task-page request: ${path}`).toContain(path);
     }
-    expect(stateRequests.filter(p => p === briefUrl).length, 'one brief GET on mount').toBe(1);
-    expect(stateRequests.filter(p => p === recapUrl).length, 'one recap GET on mount').toBe(1);
+    expect(stateRequests.filter(p => p === briefUrl).length, 'no brief GET on mount when neither exists').toBe(0);
+    expect(stateRequests.filter(p => p === recapUrl).length, 'no recap GET on mount when neither exists').toBe(0);
   });
 
   // LIN-3356: the layout John asked for, on a phone and on desktop.
@@ -329,7 +330,8 @@ test.describe('Task page, owner view (LIN-3329)', () => {
       '[data-testid="task-page-stage-ahead"] .task-stage-name',
       '[data-testid="task-page-stage-ahead"] .task-stage-state',
       '[data-testid="task-page-description"] .section-header',
-      '.brief-placeholder',
+      // With neither brief nor recap, the owner's one quiet line is the empty-state text (LIN-3975, finding 1).
+      '[data-testid="task-page-context-offers"]',
       '[data-testid="task-page-back"]',
       '.task-details .disclosure__label',
     ];
