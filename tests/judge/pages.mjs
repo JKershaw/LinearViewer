@@ -30,6 +30,14 @@ const TIME_MASKS = {
   poll: { selector: '[data-testid="settings-runner-last-poll"]', reason: 'Last poll is a server-rendered time' },
 };
 
+// LIN-3977: the Live Console's parts that move with the clock. Each mask names its reason; a mask that
+// matches nothing fails the shot, so a state only lists the masks its page has.
+const LIVE_STRIP = { selector: '.lc-pulse', reason: 'the activity strip is a canvas that repaints with the clock (heartbeat and event dots drift)' };
+const LIVE_BARS = { selector: '.lc-timeline-viewport', reason: 'bar positions and widths are the window at the moment of the shot (a running bar ends at now)' };
+const LIVE_AXIS = { selector: '.lc-timeline-axis', reason: 'the axis shows the window\'s own clock times' };
+const LIVE_SINCE = { selector: '.lc-lane-since', optional: true, reason: 'how long a stage has run is relative to the shot (base has no such element: LIN-3977 adds it, so the mask is skipped there)' };
+const LIVE_WHEN = { selector: '.lc-event-time', reason: 'a stream row\'s relative time is relative to the shot (its exact time is on hover)' };
+
 // `state` names a set-up the spec performs identically on both sides (see replay.spec.js):
 //   ask-open          open the periodic-reviews ask in place (a change that affects everyone)
 //   key-open          mint a token, open its key row
@@ -101,6 +109,12 @@ export const PAGES = [
   // transport (visual-replay.mjs), the same as Playwright's. Settings › Account then shows "Add email →"
   // on both sides, so it is identical on both and adds no difference.
   { id: 'account-home', urlKey: 'judge', path: () => '/account', state: 'email-signin', renderers: ['lib/render-account-home.js'] },
+  // LIN-3977: the Live Console, its flag on. These shoot on the real clock (live-console-states.mjs seeds the
+  // runs through the dispatch API), so the parts that move with the clock are masked, each with its reason.
+  // The key, the detail line, the lanes' words and the stream's words are NOT masked: those are what changed.
+  { id: 'live-console-quiet', urlKey: 'judge-live-quiet', path: (k) => `/workspace/${k}/live-console`, seed: { features: { liveConsole: true } }, masks: [LIVE_STRIP, LIVE_BARS, LIVE_AXIS], renderers: ['lib/render-live-console.js', 'public/live-console.js', 'public/live-console.css'] },
+  { id: 'live-console-working', urlKey: 'judge-live-working', path: (k) => `/workspace/${k}/live-console`, state: 'live-working', seed: { features: { liveConsole: true } }, masks: [LIVE_STRIP, LIVE_BARS, LIVE_AXIS, LIVE_SINCE, LIVE_WHEN], renderers: ['lib/render-live-console.js', 'public/live-console.js', 'public/live-console.css'] },
+  { id: 'live-console-history', urlKey: 'judge-live-history', path: (k) => `/workspace/${k}/live-console`, state: 'live-history', seed: { features: { liveConsole: true } }, masks: [LIVE_STRIP, LIVE_BARS, LIVE_AXIS, LIVE_SINCE, LIVE_WHEN], renderers: ['lib/render-live-console.js', 'public/live-console.js', 'public/live-console.css'] },
 ];
 
 // Stated, not assumed: what the seed cannot reach.

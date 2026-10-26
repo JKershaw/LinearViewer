@@ -418,12 +418,15 @@
 .lc-lanes-section { margin-bottom: 1.75rem; }
 .lc-lanes { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
 
+/* LIN-3977: one column, so the head, the stage row and the heartbeat stack in order. The bar is
+   absolutely placed (out of the grid's flow); the old three-column rule put the stage row beside the
+   head and wrapped a waiting lane's words one per line. */
 .lc-lane {
   position: relative;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: minmax(0, 1fr);
   align-items: baseline;
-  gap: 0.5rem;
+  gap: 0.35rem;
   padding: 0.5rem 0.7rem 0.5rem 0.9rem;
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-sm);

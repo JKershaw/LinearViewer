@@ -2116,6 +2116,19 @@ test.describe('Live Console (experimental)', () => {
       });
     });
 
+    test('a waiting lane stacks its stage and its wait across the lane, not in a narrow column beside the task', async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await seedTerminalWorker(page, URL_KEY, { task: 'LIN-9314', message: '[blocked] Which branch should I build on?' });
+      await page.goto(PAGE_URL);
+      const lane = page.locator('[data-testid="live-console-lane"]').filter({ hasText: 'LIN-9314' });
+      await expect(lane.locator('.lc-lane-action')).toContainText('waiting on you');
+      const laneWidth = (await lane.boundingBox()).width;
+      const stageWidth = (await lane.locator('.lc-lane-stage-row').boundingBox()).width;
+      // The stage row holds the stage, the wait and the ticket count. Beside the task in a narrow column it
+      // wraps word by word; stacked, it takes the lane's width.
+      expect(stageWidth, `the stage row is ${Math.round(stageWidth)}px of a ${Math.round(laneWidth)}px lane`).toBeGreaterThan(laneWidth * 0.8);
+    });
+
     test('each range control names, in visible text, what it sets', async ({ page }) => {
       await page.goto(PAGE_URL);
       const strip = page.getByRole('group', { name: 'Strip range' }).locator('.lc-range-label');
