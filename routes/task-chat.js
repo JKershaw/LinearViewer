@@ -499,6 +499,12 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
     // the lineage tail the follow-up would land on. A store rejection (e.g. a
     // secret-scan hit) throws and surfaces as a tool-error breadcrumb in chat.
     const persistProposal = async (proposal) => {
+      // LIN-3975 (F3): the one check both producers share, run before anything is written. The model chose the
+      // proposal's session, so a run-scoped turn's proposal must be for THAT run: a proposal for another run would
+      // show Apply on that run's page. A refusal is a tool-error breadcrumb in the chat, not a stored proposal.
+      if (rawRunId && proposal.sessionId !== rawRunId) {
+        throw new Error(`Proposal targets session ${proposal.sessionId}, not this run`);
+      }
       const session = await readSessionById(workspace.urlKey, proposal.sessionId, { dispatchStore: dispatchQueueStore, agentStatusStore });
       if (!session) throw new Error(`Session ${proposal.sessionId} not found`);
       let stepLoopId = null;
