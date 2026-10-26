@@ -1,0 +1,240 @@
+ticket,comment_id,created,chars,opener
+LIN-3833,4944ec53-f3a6-455b-9573-95d2796c5aa0,2026-10-24T07:42:25.152Z,398,"On open question 2 (the progress key for copied prompts): today's default is on. It is a per-user setting, lib/settings-"
+LIN-3833,b43dd129-b2f1-4ecb-b31a-194535abc260,2026-10-24T08:02:01.801Z,471,"What ""without dispatch"" means now (LIN-3849). The per-user dispatch switch is being replaced by a rule. Run controls sho"
+LIN-3833,4aae7369-678b-44e9-8dd0-4fd5dd13449e,2026-10-24T08:11:11.336Z,1231,"Answers to ""Open, for John"" (24 Oct)"
+LIN-3833,6149c459-0ff5-4ca5-94b8-5aab94652cf0,2026-10-24T19:48:57.364Z,415,"John, 24 Oct about 19:50Z: ""I think the feedback is sufficient and happy to say not to wait on that. I'll likely have ov"
+LIN-3833,dadd585a-22a0-44ab-8782-24410e3b8b8a,2026-10-25T08:32:16.887Z,970,"Prediction (operator side, short form, posted at launch before any PR)."
+LIN-3833,9bc01942-c267-46bc-9b26-444a68b1a8a9,2026-10-25T08:51:57.823Z,25170,"Research notes: LIN-3833 (Home first page), 25 Oct"
+LIN-3833,a4c7ed5c-6692-4225-9108-8bfd6d735e8e,2026-10-25T08:55:10.796Z,965,Question for John (from the LIN-3833 plan): should Go and Run <step> stop forcing claude-code?
+LIN-3833,3ccb042c-ac9a-4075-8b82-f065f2b33130,2026-10-25T09:02:03.183Z,8500,Plan Review Verdict
+LIN-3833,77adeb85-51e4-4064-a11a-13a10818db6e,2026-10-25T09:05:28.479Z,2065,Plan revision after plan-review 3ccb042c (Request Changes)
+LIN-3833,933a4162-f23e-44c2-855f-b7d40368b0f8,2026-10-25T09:11:18.379Z,7516,Plan Review Verdict
+LIN-3833,283a5288-3c9e-4e48-b97e-937eaa374c93,2026-10-25T09:14:38.587Z,2170,Plan revision 2 after plan-review 933a4162 (Request Changes)
+LIN-3833,96e21b85-4191-4ca6-a5dc-fcfa674a54e7,2026-10-25T09:15:54.453Z,98,Stop forcing; server falls back to claude-code for opened-task runs
+LIN-3833,31f58e84-9313-42e2-99a1-db87acebdc5c,2026-10-25T09:16:58.876Z,991,"Ruling on Q1 (25 Oct, answer to decision lin3833-q1-harness): stop forcing claude-code on the client. Opened-task runs ("
+LIN-3833,f5c1564a-77b1-41cc-b875-af4a82ce9164,2026-10-25T09:19:35.470Z,8243,Plan Review Verdict
+LIN-3833,8888340c-18e7-467f-a435-a7c83607e8b6,2026-10-25T09:23:08.597Z,3274,"Unblock analysis + plan revision 3 (after plan-review f5c1564a, Request Changes)"
+LIN-3833,c73a200d-0bfb-455c-ae40-af43dc8cc952,2026-10-25T09:39:18.513Z,136,"Drop the Q3 lineage reader from this PR (show 'You copied ...' only), file it as a follow-up, then review"
+LIN-3833,5a1d2727-24ce-47d3-b688-79efe4f9ea82,2026-10-25T09:42:10.437Z,1700,Plan revision 4 after John's ruling c73a200d (drop the Q3 lineage reader)
+LIN-3833,ddf6e434-29c9-4cf1-acd5-9d25d9c55b22,2026-10-25T09:47:07.042Z,8707,Plan Review Verdict
+LIN-3833,60621b62-3565-4572-a97e-6dc44f435f8f,2026-10-25T09:51:21.816Z,3188,"Unblock analysis + plan revision 5 (after the plan-review on Revision 4, Request Changes)"
+LIN-3833,71c7a5ee-01f5-4980-b12a-4d0131a1fbbf,2026-10-25T10:20:45.729Z,108,"One more plan-review limited to step 1's Q1 commit, then build if it approves"
+LIN-3833,1932405f-636a-40eb-9e28-2f0a3f9e9ce0,2026-10-25T10:26:39.758Z,9325,Plan Review Verdict
+LIN-3833,8a63520f-5232-423f-9e27-023d4de9edb0,2026-10-25T10:29:17.996Z,157,"Revise the plan once for the 3 fixes, then build with no further plan-review; the post-build review stays the independen"
+LIN-3833,99fe3f0d-73fb-48d5-98ae-bb97dd47d11e,2026-10-25T10:32:20.372Z,2767,Plan revision 6 after plan-review 1932405f (Request Changes) and John's ruling 8a63520f
+LIN-3833,b6eaa832-c291-472e-b9a2-4dcc5560319e,2026-10-25T12:00:51.961Z,1244,"PR: https://github.com/JKershaw/LinearViewer/pull/2134 (branch feat/lin-3833-home-opened-task, one PR, 6 commits, rebase"
+LIN-3833,554ceb69-84bb-4bd7-9e55-9c4a2cd0707b,2026-10-25T12:12:02.038Z,256,"CI on PR 2134 (head b91a4441) is green: CI success, unit tests, all four E2E shards and the secret scan pass. One fix on"
+LIN-3833,e57e86b4-5909-4a5d-9a35-237cf645b6b1,2026-10-25T12:16:25.099Z,2270,Autopilot cross-check of PR 2134 (head b91a4441) before review
+LIN-3833,d01ae336-f77a-4bcf-9b00-cd8ae1138c8f,2026-10-25T12:19:28.578Z,10485,Review — LIN-3833
+LIN-3833,e39dce98-b133-4b4c-97c4-78717eac00b9,2026-10-25T12:25:27.403Z,1005,"Visual judge on PR 2134 head b91a4441 (operator), against merge-base 84331b01. 4 of 72 shots differ, all on the dashboar"
+LIN-3833,e6951b64-8b90-4b2e-bce8-1096e7d59c2c,2026-10-25T12:44:16.471Z,88,Drop per-step numbers until LIN-3855; build the rest here
+LIN-3833,3f8758f3-d78e-4741-be24-de93faf8c23e,2026-10-25T12:44:58.999Z,2944,Review ledger amended by ruling lin3833-review-unbuilt (comment e6951b64)
+LIN-3833,22bf3e50-a30c-4b4e-80f2-213a650559eb,2026-10-25T13:35:54.623Z,1928,"Fix-up pushed to PR https://github.com/JKershaw/LinearViewer/pull/2134 (head 7dba7e09, merged with origin/main). CI on t"
+LIN-3833,ea40bdb6-e8a1-4dbe-b2d0-98c018f32f8e,2026-10-25T13:40:24.956Z,362,"Visual judge on PR 2134 head 7dba7e09 (operator), against merge-base 3281648c: pass. 4 of 72 shots differ, all on the da"
+LIN-3833,58d6581c-77c0-4dbf-8ae7-e60df514fe9f,2026-10-25T13:40:56.484Z,149,"Keep fixed default order, define fits by task next-stage rule, drop ask-Harbour replacement, keep inline desktop panel"
+LIN-3833,61e0c2f8-9af8-4037-98e7-df228ffe571e,2026-10-25T13:47:09.062Z,9708,Review — LIN-3833
+LIN-3833,e31f11dc-cc74-4177-8463-a56b1f523870,2026-10-25T14:13:37.412Z,878,"Ruling applied (option a), pushed to PR https://github.com/JKershaw/LinearViewer/pull/2134 (head a10a8a97). CI on that h"
+LIN-3833,314b0b9e-ce4b-400d-be5b-42195155fe05,2026-10-25T14:42:50.561Z,1785,"Autopilot: branch collision on PR 2134, resolved on code-quality grounds (answers worker decision lin3833-branch-conflic"
+LIN-3833,26b034b9-ce65-4278-8cdc-16fd58ab37a2,2026-10-25T15:23:18.730Z,1952,"Fix round: LIN-3833 review finding 2 (subtask ""needs you"" on every opened task)"
+LIN-3833,1b874ec6-5bab-46a8-bb06-04f7507aeeb2,2026-10-25T15:53:06.235Z,9903,Review — LIN-3833
+LIN-3833,f9fa6bd7-074e-4054-944a-c1463156022f,2026-10-25T17:04:48.900Z,100,Leave out only finished tasks and retro; every other step always fits
+LIN-3833,8f2aa819-2fab-494f-a0de-f5c7599ec687,2026-10-25T17:05:34.825Z,2901,Review ledger amended by ruling lin3833-fit-rule-loop (comment f9fa6bd7)
+LIN-3833,c827a7df-680e-4149-a6c7-af6a6131d40a,2026-10-25T17:23:46.303Z,1243,LIN-3833: implementation round on PR 2134
+LIN-3833,db301cc2-0f41-4b4d-a65b-9274b892693a,2026-10-25T17:27:40.155Z,6109,Review — LIN-3833
+LIN-3833,ac491dbe-2b87-467f-9970-1c92ed455d43,2026-10-25T17:51:45.099Z,3995,Close-out — LIN-3833
+LIN-3833,608889e8-8263-4807-b0c1-bd87f612a6ef,2026-10-25T17:54:26.523Z,1761,"Score after merge (operator side, short form). The merge is 8ecce6bc (2134, 17:39Z); its parent is 28da5680. The predict"
+LIN-3975,42649a89-3ca6-4645-9c71-0cf3627e567e,2026-10-25T19:11:36.111Z,667,"Open for John: answered 25 Oct ~19:12Z (operator relaying John's choices, with each option's label verbatim)."
+LIN-3975,744d21dc-97a9-4cad-a0a3-a9e72a3be3d8,2026-10-26T01:50:07.241Z,814,"Operator, before launch (26 Oct ~01:55Z): two small items folded in from the LIN-3991 review. This ticket owns the share"
+LIN-3975,36425e84-db5a-4395-83b8-933522247c90,2026-10-26T02:22:24.181Z,1898,"Prediction before launch (operator, short form), committed 26 Oct ~02:25Z. This is scored after merge against the real m"
+LIN-3975,5b037508-f726-4378-9921-5dbacf7641c3,2026-10-26T02:33:49.708Z,28097,"Research notes (LIN-3975), at main 847e5bf7 (fetched 26 Oct ~02:30Z). Read-only research: no code changed, no PR. This b"
+LIN-3975,de5591f7-7664-4933-aef2-412c66f942bc,2026-10-26T02:43:10.903Z,8650,Plan Review Verdict
+LIN-3975,7527f4c6-1665-4fed-8f02-4097cc44e7a6,2026-10-26T02:48:07.034Z,2274,Plan revision 2 (answers Plan Review Verdict de5591f7)
+LIN-3975,1e359e9b-0eb4-4cf8-a1f7-d1ce6ae7e945,2026-10-26T02:49:43.512Z,462,"Operator note, 26 Oct ~02:55Z (a nit for the run control, only if PR 1 touches renderRunsOn; don't widen for it). From t"
+LIN-3975,134b7899-82c2-46f4-9819-dcba171b04d7,2026-10-26T02:52:48.614Z,8093,Plan Review Verdict
+LIN-3975,5e456930-b5c6-4df2-9f0f-f31e9fd081d8,2026-10-26T02:58:19.564Z,3589,Plan revision 3 (answers Plan Review Verdict 134b7899)
+LIN-3975,360de2f7-c3b8-4ceb-b124-c606b88a04db,2026-10-26T03:05:09.137Z,8688,Plan Review Verdict
+LIN-3975,aba6e50a-dd98-4a0b-a0f8-79bcb28648cd,2026-10-26T03:08:10.317Z,2706,Plan revision 4 (answers Plan Review Verdict 360de2f7)
+LIN-3975,b91a1e72-cb82-4e7d-8cca-4c87b8ab8e36,2026-10-26T03:13:27.641Z,7576,Plan Review Verdict
+LIN-3975,80478849-76f7-4c64-b379-37023d2b475a,2026-10-26T03:16:14.585Z,2272,Plan revision 5 (answers Plan Review Verdict b91a1e72)
+LIN-3975,80c4ceb1-9a32-4c8c-a230-ecd7510d90ca,2026-10-26T03:19:31.489Z,4354,Plan Review Verdict
+LIN-3975,a42a1244-4173-44eb-bccd-5c19071b9268,2026-10-26T03:47:21.086Z,820,PR 1 of 3 is up: https://github.com/JKershaw/LinearViewer/pull/2168
+LIN-3975,dda15738-ccca-4ebe-bf65-f07e70be35dd,2026-10-26T04:13:54.332Z,676,"PR 2, part 1 is up, stacked on 2168: https://github.com/JKershaw/LinearViewer/pull/2169"
+LIN-3975,33773bd6-ac06-4523-9b72-73ee68b60c3c,2026-10-26T05:28:45.591Z,10702,Review — LIN-3975
+LIN-3975,4bec81f7-efbb-4986-bdcd-e04e77f0a51b,2026-10-26T06:17:46.682Z,3752,"LIN-3975 implementation: review findings answered, and PR 2 and PR 3 built."
+LIN-3975,41676874-8e20-4938-a59d-4728750d0990,2026-10-26T06:25:59.938Z,1159,"Autopilot (session 2148edea), 26 Oct ~06:15Z: sequencing and the lin3975-remainder-scope question."
+LIN-3975,4638c342-a4fb-437b-98d3-61d6a7eeba62,2026-10-26T06:26:31.068Z,459,"Autopilot verb override (26 Oct ~06:26Z): the engine chose implementation (1f494b02, aborted while still queued). I pinn"
+LIN-3975,d01915ad-e407-479c-9e4d-ff043de126ec,2026-10-26T06:30:12.525Z,7083,Review — LIN-3975
+LIN-3975,d65c2756-f7d6-430c-8d52-030bba4c5ea4,2026-10-26T06:30:57.665Z,520,Autopilot verb override (26 Oct ~06:40Z): pinned close-out for 2168 (PR 1) after review d01915ad gave a conditional Appr
+LIN-3975,d404d6b2-abd3-490a-9679-70b2a637a1c3,2026-10-26T06:43:51.299Z,4599,Close-out — LIN-3975
+LIN-3975,2a5fb864-8894-4988-b12d-bc42d202d9de,2026-10-26T06:51:56.509Z,11453,Review — LIN-3975
+LIN-3975,1566f49a-319c-4cf2-b81d-437f6366daca,2026-10-26T09:21:45.198Z,1450,"Autopilot (session 2148edea), 26 Oct ~09:22Z: the 2169 branch collision (lin3975-branch-integration)."
+LIN-3975,7533d467-9191-484c-98ca-04f33a60cf01,2026-10-26T12:29:08.454Z,1655,"LIN-3975 implementation: review findings answered, PRs 2 and 3 pushed to 2169."
+LIN-3975,839bb75b-7408-4302-8984-b1b61a9c713b,2026-10-26T12:30:06.511Z,629,Follow-up to my earlier summary: the judge classification is now complete. All nine task states were viewed at desktop l
+LIN-3975,26524483-967a-45d6-a6e3-35294bfe164b,2026-10-26T12:31:09.544Z,626,"Autopilot (26 Oct ~12:32Z), before re-review of 2169: I checked the head myself: 25170059, base main, CLEAN, 16 commits,"
+LIN-3975,42869296-86cd-4b56-b9e7-4190f7802a40,2026-10-26T12:35:58.295Z,7873,Review — LIN-3975
+LIN-3975,05892a1a-1a18-4043-8e05-2ba264ab8de4,2026-10-26T13:22:14.153Z,1991,"LIN-3975 implementation: review findings answered, PR 2169 pushed; ticket stays In Progress."
+LIN-3975,069ce25f-4045-483a-8eb0-c3953accaa7b,2026-10-26T13:23:40.862Z,613,"Autopilot (26 Oct ~13:25Z), on lin3975-judge-classification: classify all of it, before merge. Done-when 1 (every judge "
+LIN-3975,115b0a25-9f14-4005-833d-9b55b6bf54a1,2026-10-26T13:38:09.341Z,1497,"LIN-3975: judge classification finished, PR 2169 at 5b5211f0, CI green. Ticket stays In Progress for review."
+LIN-3975,ce97bb3a-b55e-4766-a3ee-8525056d4d4e,2026-10-26T13:41:26.078Z,6812,Review — LIN-3975
+LIN-3975,221b7110-797b-404d-a8ce-429d05643ef0,2026-10-26T13:59:54.807Z,2227,LIN-3975: review findings 1 and 2 answered and fixed; PR 2169 pushed (head 75f3d4c6); CI green.
+LIN-3975,65f7d68a-eb8b-4cfd-9bf8-382d5cb597bd,2026-10-26T14:05:51.795Z,5133,Review — LIN-3975
+LIN-3975,ccab4256-a468-474a-9b09-dacbfa7b7eeb,2026-10-26T14:06:42.013Z,1490,"Autopilot run paused (26 Oct ~14:15Z), at John's request (relayed by the operator ~14:05Z). The last step was let finish"
+LIN-3977,e07c30c7-8e7c-4079-8692-3186ff11011b,2026-10-25T19:19:25.074Z,959,"Open for John: answered 25 Oct ~19:22Z (operator relaying John's choices, with each option's label verbatim)."
+LIN-3977,9ba8643f-285b-4da2-b2e8-5024ccf3c0c8,2026-10-25T19:43:56.169Z,1697,"Prediction before launch (operator, short form), committed 25 Oct ~19:48Z. This is scored after merge against the real m"
+LIN-3977,33f8ca17-e8b4-4f98-a899-22bd88952e05,2026-10-25T20:31:44.829Z,17771,"Research notes (LIN-3977), base b47f4b9c (main, 25 Oct)."
+LIN-3977,315ea65e-984b-4810-b314-29e3372f1e64,2026-10-25T20:56:17.066Z,8456,Plan Review Verdict
+LIN-3977,05dac170-ab95-4455-b3c8-5dfe19a2bb83,2026-10-25T20:59:31.594Z,1453,Plan revised after review (answers verdict 315ea65e)
+LIN-3977,286b133f-6229-42c4-875b-bc0d4a4588f7,2026-10-25T21:04:34.515Z,8013,Plan Review Verdict
+LIN-3977,e6f49960-1cec-42de-baba-75ae177d6534,2026-10-25T21:08:13.412Z,1792,Plan revised after review (answers verdict 286b133f)
+LIN-3977,b39ad0bd-7487-4ab9-9641-2d9fee13f323,2026-10-25T21:12:11.612Z,7390,Plan Review Verdict
+LIN-3977,1692ed92-7963-4b89-95fc-0fba0fdd91e5,2026-10-25T21:14:28.790Z,1828,"Plan revised after review (answers verdict b39ad0bd, round 3)"
+LIN-3977,82dc216a-9a3c-4d17-ab6a-15d5e7e9baa8,2026-10-25T21:20:10.728Z,10463,Plan Review Verdict
+LIN-3977,6237c5b7-d849-4c68-bb90-4b9813743305,2026-10-25T21:26:12.292Z,3479,"Plan revised after review (answers verdict 82dc216a, round 4)"
+LIN-3977,df19bbf6-c727-4043-a3b4-0efad8e9ee77,2026-10-25T21:31:28.244Z,8659,Plan Review Verdict
+LIN-3977,ccfdd255-c33c-425d-880f-664993c22bb5,2026-10-25T21:48:04.787Z,335,"Operator, 25 Oct ~21:50Z: ruling lin3977-plan-after-r5 was answered ""revise-again"" and passed to the autopilot as a foll"
+LIN-3977,8a9a5218-6a66-48f1-b4b0-2449ac8a320e,2026-10-25T21:52:10.347Z,3048,"Plan revised after review (answers verdict df19bbf6, round 5)"
+LIN-3977,994bbb5d-1aea-41cc-8ea9-c69dbddb3941,2026-10-25T21:55:46.818Z,7862,Plan Review Verdict
+LIN-3977,3c05b81c-9383-48a9-8f44-e7942c662a5a,2026-10-25T21:59:16.296Z,641,"Operator, 25 Oct ~22:05Z: unwedged. Round 6 handed back on S1, the same waiting and lane derivation as rounds 2 to 5. Pl"
+LIN-3977,c48b82a3-e7e6-4c39-9662-7c75bd46bc33,2026-10-25T22:56:18.002Z,809,"Operator direction, 25 Oct ~22:55Z (relayed by the autopilot). LIN-3986 has merged: PR 2160, f2b68b80. Live Console's la"
+LIN-3977,c681104e-08b3-4c39-8d83-3adc303d5452,2026-10-25T23:01:32.981Z,2261,"Plan revised on LIN-3986's rule (round 6, answers operator direction c48b82a3)"
+LIN-3977,a70de78c-b3dc-4610-9623-67a076215f12,2026-10-25T23:04:25.559Z,365,LIN-3986 is Done and deployed (f2b68b80). chooseKeyLane / chooseLanes in lib/live-console.js are the settled lane rule: 
+LIN-3977,55cb5dc7-6734-4637-98c2-9bb1cca92fe1,2026-10-25T23:06:44.097Z,9465,Plan Review Verdict
+LIN-3977,275be24f-b324-4b7d-8e7b-700f602f24ae,2026-10-25T23:11:08.754Z,3236,Unblocked: plan revised for verdict 55cb5dc7 F1 (round 7)
+LIN-3977,6973760a-39a4-455d-8f16-5bfe9a818611,2026-10-25T23:17:14.149Z,402,"Operator, 25 Oct ~23:20Z: go ahead with plan-review. Round 6's one blocker (F1, which group member title and stage read "
+LIN-3977,96b4435f-0ec4-4a9a-bd84-5ada4f6ba035,2026-10-25T23:21:24.920Z,7749,Plan Review Verdict
+LIN-3977,1395a3e0-3435-4ed0-b67b-26c54c570c34,2026-10-26T00:24:46.766Z,1575,"LIN-3977: PR open, CI green. https://github.com/JKershaw/LinearViewer/pull/2164"
+LIN-3977,d427d03f-6f8f-4cc7-b363-d21772111eb0,2026-10-26T00:28:57.747Z,11102,Review — LIN-3977
+LIN-3977,d89ad3df-b72a-412e-8dc4-c72860e57700,2026-10-26T00:44:37.562Z,1148,"Operator visual judge on PR 2164 head fe15ee17 against f2b68b80, 26 Oct ~00:50Z. 16 of 84 shots differ, on 7 pages. Live"
+LIN-3977,6e307a0b-4417-4671-93ce-cc8f7eb5a301,2026-10-26T02:05:24.336Z,1638,LIN-3977 revision is pushed to the existing PR: https://github.com/JKershaw/LinearViewer/pull/2164 (head 813f6e4b). CI i
+LIN-3977,713b3312-7014-456b-ac26-274765ac6667,2026-10-26T02:11:46.749Z,11450,Review — LIN-3977
+LIN-3977,1066fd1b-4ce2-42e2-afb3-f3a173e233c9,2026-10-26T02:59:16.809Z,5748,Close-out — LIN-3977
+LIN-3977,9590c59e-045f-45d9-8b12-98c11690a5cb,2026-10-26T03:03:23.468Z,2196,"Score against the prediction (operator, short form), 26 Oct ~03:10Z. Merged as 273385fc (PR 2164). Launched 19:43Z on 25"
+LIN-3983,3a67a3d1-eead-45af-b616-ddffaf6c98ed,2026-10-25T19:35:22.251Z,650,"Open for John: answered 25 Oct ~19:50Z (operator relaying John's choices, with each option's label verbatim)."
+LIN-3983,2a40ae3b-4734-497b-9c57-5177a138e887,2026-10-26T02:58:48.817Z,621,"Note from the LIN-3977 close-out (merged as 273385fc, PR https://github.com/JKershaw/LinearViewer/pull/2164). LIN-3977 a"
+LIN-3983,9383ef6d-ce34-43ea-9524-dd2856ceba17,2026-10-26T03:00:49.544Z,1430,"Prediction before launch (operator, short form), committed 26 Oct ~03:05Z. This is scored after merge against the real m"
+LIN-3983,fc6a10dd-8b34-41b6-a3e1-47ddeb9753f6,2026-10-26T03:13:48.550Z,27619,"Research notes: LIN-3983 (Observation), 26 Oct"
+LIN-3983,2ab1a343-75ea-46dd-b0d3-20dd33fc8de5,2026-10-26T03:23:19.634Z,8494,Plan Review Verdict
+LIN-3983,6bcb3126-934f-4c38-aa9c-8ba7009dac89,2026-10-26T03:26:27.129Z,1364,Plan revised after plan-review (2ab1a343)
+LIN-3983,4905209a-8ab3-4476-b3ce-17534e8a6b34,2026-10-26T03:29:59.460Z,7168,Plan Review Verdict
+LIN-3983,28427769-12c0-4fd5-84cb-516c8c29acf7,2026-10-26T03:32:28.630Z,962,Plan revised after plan-review (4905209a)
+LIN-3983,7ac12f44-1956-4fe9-9a05-58a59ac4ca62,2026-10-26T03:37:39.141Z,5892,Plan Review Verdict
+LIN-3983,165fc6dc-4b13-4b59-80bf-1a38c7803834,2026-10-26T03:40:53.083Z,1782,Plan revised after plan-review (7ac12f44)
+LIN-3983,08563573-3ea9-4fe2-85ac-f2621c45ed6a,2026-10-26T03:45:13.024Z,5751,Plan Review Verdict
+LIN-3983,e862296f-9555-4d20-aa57-885ae4b49450,2026-10-26T03:49:05.610Z,2321,Plan revised after plan-review (08563573)
+LIN-3983,7bfafa3a-5171-4e83-98bb-377bc186c469,2026-10-26T03:52:46.659Z,6957,Plan Review Verdict
+LIN-3983,38417078-b45b-414c-b65e-f290886547d1,2026-10-26T03:59:38.012Z,621,"Operator, 26 Oct ~04:05Z: unwedged. Plan-review blocked five times on one rule: whether a waiting run's question already"
+LIN-3983,4c36b7e6-25a6-4c96-8481-c7c6d204767b,2026-10-26T05:24:37.290Z,2324,Plan revised after plan-review F7 and the LIN-4003 unwedge (fifth revision)
+LIN-3983,7f27e83e-fe62-48fe-b819-c0fda12bc680,2026-10-26T05:28:00.321Z,5057,Plan Review Verdict
+LIN-3983,caf49b78-6d35-44b3-9f8b-7658b148f791,2026-10-26T05:30:19.082Z,2992,Breakdown: no child tickets created (the ticket's own rule says not to)
+LIN-3983,dd19fae4-0525-4711-a5cd-aab14edc2f18,2026-10-26T05:31:33.693Z,812,"Autopilot: verb override (implementation, not review). After breakdown (caf49b78), recommend picked review. Its reason w"
+LIN-3983,5a7338bd-3405-4916-81f4-98bf00a04df7,2026-10-26T05:57:53.032Z,1645,"LIN-3983, PR 1 of 2 (structure): https://github.com/JKershaw/LinearViewer/pull/2171"
+LIN-3983,1780e890-7dec-4e8a-aafe-54c7af4250af,2026-10-26T06:02:25.061Z,10366,Review — LIN-3983
+LIN-3983,2eccf921-9114-4680-a590-b624af2d2954,2026-10-26T06:13:25.553Z,2218,"LIN-3983, PR 1 of 2 (structure), review fixes: https://github.com/JKershaw/LinearViewer/pull/2171"
+LIN-3983,fa6d8cd4-e66a-40cb-97ec-f2a668a32385,2026-10-26T06:21:33.819Z,213,"LIN-3983 PR 1 of 2 (2171, head 8d57329d): CI is green. Unit tests, all four E2E shards, the secret scan and CI success p"
+LIN-3983,3b3a15bf-e692-4311-b6bb-e4e6dd875369,2026-10-26T06:25:27.467Z,7112,Review — LIN-3983
+LIN-3983,8f5a1be7-ff9a-4593-a295-cb067af117da,2026-10-26T06:29:01.771Z,734,"Autopilot: operator answers recorded (26 Oct ~06:30Z, passed on while John is asleep)."
+LIN-3983,1a72de5d-876c-4832-aeb7-40e0eaab119a,2026-10-26T06:52:15.006Z,5102,Close-out — LIN-3983 (PR 1 of 2 merged; ticket stays In Progress for PR 2)
+LIN-3983,f0633543-91cc-478c-9b3e-5a1084b6e3bf,2026-10-26T08:18:29.649Z,1000,"LIN-3983 PR 2 of 2 (words and pieces): PR open, CI green"
+LIN-3983,5391ed49-447d-4bce-b69e-460e231151db,2026-10-26T08:24:31.495Z,9487,Review — LIN-3983
+LIN-3983,3811a4e4-9bf0-442a-9773-468922d6c6a9,2026-10-26T09:31:13.702Z,1464,"LIN-3983 PR 2 of 2: review fixes pushed, CI green, ready for re-review"
+LIN-3983,2156c358-ede9-459e-8cad-a77f5ed97f04,2026-10-26T09:51:40.147Z,9315,Review — LIN-3983
+LIN-3983,641f2837-926e-4153-aca0-44a8482c22b6,2026-10-26T10:04:11.143Z,1219,"LIN-3983 PR 2 of 2 (words and pieces): review fixes pushed, CI green"
+LIN-3983,f52c3698-726f-4f88-aa8b-cf4f485d686f,2026-10-26T10:04:56.112Z,965,Autopilot: for the next review of PR 2172 (head 5a6ed8b7). The fix commit 5a6ed8b7 does more than the font change findin
+LIN-3983,5ddb7fcb-b61e-4399-a8d8-2afa86905e39,2026-10-26T10:08:44.378Z,8878,Review — LIN-3983
+LIN-3983,775a8060-17cf-423c-b8ae-7e553ae58175,2026-10-26T10:55:22.828Z,5977,Close-out — LIN-3983
+LIN-3952,d3c5f558-0e15-4ee0-878c-e033bf99e8b7,2026-10-26T00:36:40.426Z,1483,"Operator, before launch (26 Oct ~00:45Z): what is already done, and what this ticket keeps. Read this before the descrip"
+LIN-3952,fe6b9a93-55a3-46b6-9042-194dff154da8,2026-10-26T00:36:41.049Z,1226,"Prediction before launch (operator, short form), committed 26 Oct ~00:45Z. This is scored after merge against the real m"
+LIN-3952,5a5f98d0-76e0-4ead-966e-35e5d91a1ea2,2026-10-26T00:49:05.159Z,20540,"Research notes: LIN-3952 (research stage, 26 Oct)"
+LIN-3952,588becd9-039e-4ba8-8478-d1377dc1762f,2026-10-26T00:50:31.280Z,565,"Operator, 26 Oct ~00:58Z: one more Models item, moved here from LIN-3992 (item 2) because this ticket is planning Models"
+LIN-3952,f244a086-e309-4616-8f74-ccabcc142ce8,2026-10-26T00:52:39.395Z,509,"Plan written to the description under Implementation Plan (one PR, 9 ordered commits; consolidation first). Session fit:"
+LIN-3952,fb073c37-8d2e-4495-85e9-c3cc02e13763,2026-10-26T00:57:01.228Z,6768,Plan Review Verdict
+LIN-3952,ed89500b-1062-4355-9359-53476bda3306,2026-10-26T00:57:41.408Z,709,"Autopilot note (26 Oct): plan-review finding 2, the Dispatch ""No job"" audience. Resolved without the human, using the ti"
+LIN-3952,4af57789-d837-439c-b673-777677a44881,2026-10-26T01:00:36.865Z,1064,Plan revised (replaces the prior Implementation Plan in the description) for plan-review fb073c37. Finding 1: btn--blue 
+LIN-3952,e79267d2-d1d0-47db-ba88-56751c4f163e,2026-10-26T01:03:59.039Z,5323,Plan Review Verdict
+LIN-3952,e769cc84-2146-434f-bf1c-e6133bd54feb,2026-10-26T03:03:14.331Z,1919,LIN-3952 — PR ready for review: https://github.com/JKershaw/LinearViewer/pull/2165
+LIN-3952,f32c64d2-b655-46ea-acac-dbc7a1dba8a1,2026-10-26T03:39:17.269Z,9031,Review — LIN-3952
+LIN-3952,28ac64bc-d347-4ffa-bf74-d798962a0a71,2026-10-26T05:08:07.051Z,1643,LIN-3952: PR ready for review: https://github.com/JKershaw/LinearViewer/pull/2165
+LIN-3952,dfc757c8-8898-4d0a-b2f0-f480b7de2ab5,2026-10-26T05:15:10.654Z,8162,Review — LIN-3952
+LIN-3986,3a36926e-82b1-416a-a023-30ac3d39b9da,2026-10-25T21:59:02.700Z,926,"Prediction before launch (operator, short form), committed 25 Oct ~22:08Z. This is scored after merge. It is the unwedge"
+LIN-3986,b107594e-975e-4e61-a677-41e944515102,2026-10-25T22:37:54.257Z,1652,"PR: https://github.com/JKershaw/LinearViewer/pull/2160 (head cbc1d995, branch feat/lin-3986-live-console-lane-rule, base"
+LIN-3986,17390be7-7d0d-4ff9-ae91-986c63e07b53,2026-10-25T22:42:12.453Z,7456,Review — LIN-3986
+LIN-3986,f6b7bcce-56fc-467f-b337-8d879cc4f8f2,2026-10-25T23:04:19.175Z,4073,Close-out — LIN-3986
+LIN-3986,088471e6-e181-4a3f-8240-3df22d32359b,2026-10-25T23:06:45.139Z,1224,"Score against the prediction (operator, short form), 25 Oct ~23:15Z. Merged as f2b68b80 (PR 2160). Launched 21:59Z, merg"
+LIN-3986,146790e6-7cff-4dbc-9da2-b227f970fd78,2026-10-25T23:55:15.501Z,349,"Score addendum (operator, 25 Oct ~23:58Z). Item 8, LIN-3977's next plan-review approves within 2 rounds: hit. Round 6 on"
+LIN-4003,8c04aef6-3843-41b0-bca4-dfdfb56eca53,2026-10-26T03:59:23.326Z,820,"Prediction before launch (operator, short form), committed 26 Oct ~04:05Z. This is scored after merge. It is the unwedge"
+LIN-4003,c2dc5582-7d1c-463d-89bd-fb8f114f4b82,2026-10-26T04:19:53.793Z,844,"PR: https://github.com/JKershaw/LinearViewer/pull/2170 (branch feat/lin-4003-open-decision-reader, commit 743784e8)"
+LIN-4003,107b05a6-c621-4b3b-85c6-435b9319c42a,2026-10-26T04:22:05.541Z,5405,Review — LIN-4003
+LIN-4003,b89a9095-a060-4653-9ad2-90975d7d06d1,2026-10-26T04:38:58.818Z,3310,Close-out — LIN-4003
+LIN-4003,51494b46-0a48-4eda-a369-8b3911b7ab4c,2026-10-26T05:21:46.233Z,1075,"Score against the prediction (operator, short form), 26 Oct ~05:25Z. Merged as 79911649. Launched 03:59Z, merged 04:30Z."
+LIN-3995,56a4c666-b95a-4dab-b969-4e1ae52c68bc,2026-10-26T01:29:54.731Z,888,"Prediction before launch (operator, short form), committed 26 Oct ~01:35Z. This is scored after merge. It's a small fill"
+LIN-3995,4fec0894-0a81-45ad-b3ef-d61ef1a5bcdf,2026-10-26T02:05:15.827Z,1164,"LIN-3995 implementation: PR https://github.com/JKershaw/LinearViewer/pull/2166 (branch feat/lin-3995-landing-round-two, "
+LIN-3995,20cec2a2-ec5b-4514-b240-04baf203af38,2026-10-26T02:09:14.252Z,6247,Review — LIN-3995
+LIN-3995,00e320fa-fe15-4a43-afdf-7d443914d70c,2026-10-26T02:21:55.404Z,3736,Close-out — LIN-3995
+LIN-3995,c246660d-48b2-448b-b68d-bf7027b9e88d,2026-10-26T02:29:57.560Z,893,"Score against the prediction (operator, short form), 26 Oct ~02:30Z. Merged as 847e5bf7 (PR 2166). Launched 01:29Z, merg"
+LIN-3992,c02b8820-bc24-4819-bb66-442341cf49a4,2026-10-26T00:50:31.913Z,592,"Operator, 26 Oct ~00:58Z: ownership and priority."
+LIN-3992,6f7a5ce1-6038-4e77-be60-8a277ec11170,2026-10-26T01:45:20.481Z,1032,"Prediction before launch (operator, short form), committed 26 Oct ~01:48Z. This is scored after merge. It runs in the li"
+LIN-3992,11d79608-652d-4e46-ba75-48b623c6921d,2026-10-26T01:52:25.415Z,753,"Operator judge note, 26 Oct ~02:00Z (one small item, in this ticket's area, if it fits). On live main, Home's Go button "
+LIN-3992,1ad5ebcf-d800-4ec0-bc98-9a363acf2fcb,2026-10-26T02:17:26.464Z,1024,PR is open and CI is green: https://github.com/JKershaw/LinearViewer/pull/2167 (branch feat/lin-3992-decision-panel-roun
+LIN-3992,58f85c1e-13ef-4dad-acb8-638c46ad5cdf,2026-10-26T02:21:19.770Z,5846,Review — LIN-3992
+LIN-3992,c45c0908-6ee9-4926-b153-de5bbf73343e,2026-10-26T02:40:13.984Z,2946,Close-out — LIN-3992
+LIN-3992,e429596d-8522-48bf-8339-6a09ce80c0f8,2026-10-26T02:47:44.412Z,1192,"Score against the prediction (operator, short form), 26 Oct ~02:50Z. Merged as 33bedfaf (PR 2167). Launched 01:45Z, merg"
+LIN-3872,323cd03a-a55f-4b07-9953-6c4bb7ae860e,2026-10-24T11:36:37.693Z,9724,"Prediction, committed before launch (scored after merge, line by line, with an independent replay on two seeds)."
+LIN-3872,3af790b9-25c8-473d-bce4-57a1e262af0f,2026-10-24T11:54:04.470Z,1229,"PR: https://github.com/JKershaw/LinearViewer/pull/2093 (commits c999e5a0 move, ae81feb1 source-map). CI green: CI succes"
+LIN-3872,fed2f16a-2fcd-46ca-b49b-8b34c86c5d83,2026-10-24T11:58:31.565Z,7400,Review — LIN-3872
+LIN-3872,bbd88d36-0b36-49f3-abf2-857ea3c44931,2026-10-24T12:10:34.762Z,3834,Close-out — LIN-3872
+LIN-3872,75f9eb39-0d0d-4faa-b236-a025e4985175,2026-10-24T12:18:08.345Z,4940,"Score after merge (an independent judge and scorer, against the prediction committed before launch). The judge found 0 d"
+LIN-3876,ce631031-762a-4b40-b6ab-f76038f355d9,2026-10-24T13:22:39.658Z,10445,"Prediction, committed before launch (scored after merge, line by line, with an independent replay on two seeds)."
+LIN-3876,12ac4a53-cd01-474d-b2fe-a3ab1e358469,2026-10-24T13:37:57.762Z,681,"PR: https://github.com/JKershaw/LinearViewer/pull/2096 (commit 5684f3b5). Moved POST /api/comments/:issueId, POST /api/i"
+LIN-3876,2efea542-0d85-40c5-8a98-59642926ae1e,2026-10-24T13:54:49.319Z,14391,Review — LIN-3876
+LIN-3876,ef80274f-6d20-4609-8b59-7b643d49c5a5,2026-10-24T14:03:17.473Z,6597,"Operator's independent judge, run on the PR head before merge (5684f3b5 against bfd5f8d6)."
+LIN-3876,d3c86f68-90dc-4b4f-9f14-06fb9e8deb8d,2026-10-24T14:23:14.444Z,4385,Close-out — LIN-3876
+LIN-3877,00d33a61-66dc-4c45-bd90-4a15f4fe6452,2026-10-24T15:18:32.926Z,10336,"Prediction, committed before launch (scored after merge, line by line, with an independent replay on two seeds)."
+LIN-3877,cf1a6e74-0f57-409f-bbfa-f5a12668903b,2026-10-24T15:23:02.827Z,6079,Plan Review Verdict
+LIN-3877,8b10e25a-3f70-44b0-bebf-4c4a0bb9f73d,2026-10-24T15:35:57.416Z,937,"PR: https://github.com/JKershaw/LinearViewer/pull/2098 (commits c5996219 move, 6d04c238 source map). CI green (ci-succes"
+LIN-3877,7d2bb3ba-87e3-44c1-90cb-ab7bef0fc538,2026-10-24T15:59:38.623Z,12032,Review — LIN-3877
+LIN-3877,83086ad2-a080-435f-9c25-d713771194ef,2026-10-24T17:05:03.972Z,4984,"Score after merge (an independent judge and scorer, against the prediction committed before launch)."
+LIN-3877,fd3f6ea1-07e7-4e6f-a3ca-c337e772ad73,2026-10-24T17:06:13.072Z,3294,Close-out — LIN-3877
+LIN-3877,dde01c28-a823-4cc7-8661-429ca972f3d4,2026-10-24T17:09:22.912Z,986,"Close-out addendum (LIN-3877). Clarifications to the close-out comment above, all verified this session:"
+LIN-3883,d0403c82-21df-41d2-8eff-fa16b5917545,2026-10-24T17:09:57.749Z,5217,"Prediction, committed before launch (scored after merge, with an independent replay on two seeds)."
+LIN-3883,67ffc146-4b4f-4050-b1c6-0ae1a418ea9d,2026-10-24T17:16:39.167Z,4940,Plan Review Verdict
+LIN-3883,31817dc7-6621-431b-a3fa-70e3ddaeb36a,2026-10-24T17:28:56.813Z,587,PR: https://github.com/JKershaw/LinearViewer/pull/2102 (branch feat/lin-3883-move-audit-route). Audit route moved byte-i
+LIN-3883,33ad7277-24b5-4114-8fe9-d33164c57560,2026-10-24T17:37:11.884Z,8415,Review — LIN-3883
+LIN-3883,b8282b90-f319-41cd-abe6-3958fb5bac60,2026-10-24T17:41:05.356Z,5078,"Operator's independent judge, run on the PR head before merge (71e40026 against 0e6cd32e)."
+LIN-3883,c235cdb6-8658-4538-9b24-bcb71db09d79,2026-10-24T17:47:50.323Z,3891,Close-out — LIN-3883
+LIN-3893,3dd92fe7-ce37-43e4-8fab-c8690024d3ed,2026-10-24T18:44:01.350Z,11438,"Prediction (operator side, committed before launch; scored after merge against the independent replay and the seams run)"
+LIN-3893,84cad89e-2fa8-4299-b6e1-1cbea05ccab2,2026-10-24T18:50:18.906Z,5202,Plan Review Verdict
+LIN-3893,6b8771d9-5ea4-46ab-9e1f-e2070f60e6e5,2026-10-24T19:01:47.658Z,488,LIN-3893 done: PR https://github.com/JKershaw/LinearViewer/pull/2105 (commit 1661dc7b). POST /api/feedback moved byte-id
+LIN-3893,13cdae45-64ac-490e-ac6b-a27b4cdd3cb2,2026-10-24T19:11:24.314Z,615,"Independent replay on the PR head, before merge (operator side). PR 2105, head 1661dc7b, against base 8cb65c0e."
+LIN-3893,4c20889c-dbbd-4a77-97b2-724955524ce6,2026-10-24T19:11:40.677Z,11382,Review — LIN-3893
+LIN-3893,17b20b47-63fb-4c94-84d9-c58b203b3395,2026-10-24T19:27:50.037Z,6859,"Score after merge (operator side, scored by an independent sub-agent)."
+LIN-3893,b474e90d-50b8-4b24-b766-a6138ac463b6,2026-10-24T19:30:43.025Z,4725,Close-out — LIN-3893
+LIN-3917,c5c97930-5d49-4bc4-b20d-2a15334d462c,2026-10-24T20:47:40.057Z,10440,"Prediction (operator side, committed before launch). It is scored after merge against the independent render replay (fla"
+LIN-3917,cd889fbc-53b5-49f1-8c3e-d2677f6f49a9,2026-10-24T21:06:51.196Z,1158,PR is open and CI is green: https://github.com/JKershaw/LinearViewer/pull/2111
+LIN-3917,de3442c2-4c15-4b7a-ae6a-226c767d82d5,2026-10-24T21:09:02.997Z,768,"Independent render replay on the PR head, before merge (operator side). PR 2111, head 55476223, against base 01e490c0."
+LIN-3917,d8ef55d8-9877-45e3-8010-0cf8ba04c54c,2026-10-24T21:13:51.382Z,8534,Review — LIN-3917
+LIN-3917,eba5563d-7e5a-4f3c-a05a-fb6e9b28bc65,2026-10-24T21:23:24.711Z,3772,Close-out — LIN-3917
+LIN-3917,dbdadb35-f432-460f-b819-b0d3205d08e1,2026-10-24T21:30:20.453Z,8405,"Score after merge (operator side, scored by an independent sub-agent). The merge is 62a9b2ad; its real parent is 8071228"
+LIN-3846,e577035e-9eca-474f-a86e-80eacffaf6c8,2026-10-24T08:02:00.929Z,708,"Settings review confirmed, 24 October. The description now holds the confirmed design."
+LIN-3846,dbed636b-a6f7-4bc6-9d4e-ce9fbb1fe6a3,2026-10-24T08:11:12.466Z,726,"Answers to ""Open, for John"" (24 Oct)"
+LIN-3846,7c7bbb2f-9d25-4823-8218-66843e253eb9,2026-10-24T12:48:10.132Z,8191,"Prediction, committed before launch, with an ""is it easier now?"" measure against LIN-3329 and LIN-3340. It is scored aft"
+LIN-3846,f66ceeea-8cba-4890-b0f1-7772bb1cdefb,2026-10-24T12:55:44.892Z,559,Plan added to the description under Implementation Plan. Summary: a page per area on one census table (lib/settings-area
+LIN-3846,3a39fbd8-750e-45e6-afb0-b558c2025b4b,2026-10-24T13:00:58.822Z,8783,Plan Review Verdict
+LIN-3846,b497c92d-be17-418c-96c5-bbb1c99b4731,2026-10-24T13:05:12.476Z,2037,"Plan revised (revision 2) after the plan-review verdict. The Implementation Plan block in the description is replaced, n"
+LIN-3846,a5d12450-54fa-48e5-914b-01dd8fe20b7c,2026-10-24T13:11:24.508Z,7146,Plan Review Verdict
+LIN-3846,9186bbca-f68e-4b11-81a1-5c81f1fca704,2026-10-24T15:52:15.213Z,493,"Autopilot verb override: engine recommended implementation after impl dispatch 3e4146eb finished, reasoning ""no landed w"
+LIN-3846,131d6960-a872-4ecf-94ee-80ec3d381f60,2026-10-24T15:59:04.110Z,9347,Review — LIN-3846
+LIN-3846,d102f1a2-8869-4a9c-95e6-f9a980c4b78e,2026-10-24T17:13:31.822Z,2660,Close-out — LIN-3846 (merged and deployed; held open for two post-deploy checks)
+LIN-3846,d44b907c-554e-4af2-a514-9b5bdb5904c5,2026-10-24T17:54:48.486Z,120,A person runs only item 6 now; item 5 notes are filed as follow-ups and the ticket closes
+LIN-3846,1cc94fd5-b34f-44bc-b853-f628667a485e,2026-10-24T17:55:27.530Z,653,Autopilot: human ruling recorded on decision lin-3846-postdeploy-checks: option item6only. Ledger item 5 (device look-an
+LIN-3846,fbf2f735-c3b2-4f19-a2a5-bcdbbf7d37d0,2026-10-24T17:58:59.941Z,463,"Closed by the operator, 24 Oct ~18:05Z, under John's 12 Oct standing ruling: a close-out held only on post-deploy checks"
+LIN-3846,ba9ee264-7a48-4464-817a-a002226f4479,2026-10-24T18:02:42.884Z,122,"24 Oct, ~18:10Z. John checked the Settings change-log page in production and it looks fine. LIN-3846's item 6 is done."
+LIN-3849,4b35507f-ac1f-457a-aa68-81ad8042d56d,2026-10-24T09:11:47.351Z,9898,Plan Review Verdict
+LIN-3849,da3c5d19-6377-431b-b525-d1a71f23bc64,2026-10-24T09:16:11.705Z,1938,Plan revised (answers the Plan Review Verdict)
+LIN-3849,3779978f-953a-4b75-8f9b-8b1d99faeb9b,2026-10-24T09:25:00.172Z,9063,Plan Review Verdict
+LIN-3849,7f49f804-5e23-478e-a8d9-894031efb5dd,2026-10-24T09:27:35.007Z,1640,Plan revised (answers the second Plan Review Verdict)
+LIN-3849,ab0485a1-0440-4523-95a5-00d667bb4082,2026-10-24T09:30:57.452Z,6892,Plan Review Verdict
+LIN-3849,176f462a-753b-4964-b128-e6c89e01140d,2026-10-24T09:33:25.516Z,1851,Plan revised (answers the third Plan Review Verdict)
+LIN-3849,c584fa1d-790f-4a42-a10a-b74c12f0ef64,2026-10-24T09:36:33.098Z,5914,Plan Review Verdict
+LIN-3849,a5420f64-ca80-4a72-a086-d05bedbecdb5,2026-10-24T10:34:45.748Z,726,PR: https://github.com/JKershaw/LinearViewer/pull/2090 (head 3bf0a145). Run controls = workspace owner AND a live runner
+LIN-3849,ca1c3188-be8a-4624-8125-20c46d341eef,2026-10-24T10:43:43.149Z,8267,Review — LIN-3849
+LIN-3849,5467f128-ea15-4e66-b881-50296546a8b7,2026-10-24T11:15:27.761Z,4121,Close-out — LIN-3849

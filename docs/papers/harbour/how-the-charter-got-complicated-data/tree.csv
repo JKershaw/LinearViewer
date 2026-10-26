@@ -1,0 +1,71 @@
+id,parent,root,state,created,completed,desc_chars_snapshot,title
+LIN-3490,,LIN-3490,,,,,
+LIN-3773,LIN-3490,LIN-3490,Done,2026-10-23T09:47,2026-10-23T10:03,1116,Incident: the GitHub integration errors on harbour.cat after the 23 Oc
+LIN-3774,LIN-3490,LIN-3490,Done,2026-10-23T10:03,2026-10-23T11:32,8522,"A Linear-primary workspace's GitHub binding is never re-minted, so its"
+LIN-3775,LIN-3490,LIN-3490,Done,2026-10-23T10:03,2026-10-23T12:53,7082,"Error pages say what failed: the source, the status and a reference to"
+LIN-3789,LIN-3490,LIN-3490,Done,2026-10-23T11:30,2026-10-23T12:10,4825,Email sign-in: remove the site-wide send ceiling (it silently blocks r
+LIN-3804,LIN-3490,LIN-3490,Done,2026-10-23T13:37,2026-10-23T14:14,4192,"docs/v1.md: bring the ""What exists and what is missing"" table up to da"
+LIN-3837,LIN-3490,LIN-3490,Done,2026-10-23T23:34,2026-10-24T00:03,10221,Seams: move stepKindWord and STEP_KIND_WORDS from lib/render-run-steps
+LIN-3840,LIN-3490,LIN-3490,Done,2026-10-24T00:38,2026-10-24T01:51,27451,Free the seam: turn the source-text pins on routes/dashboard.js (run p
+LIN-3847,LIN-3490,LIN-3490,Done,2026-10-24T07:59,2026-10-24T08:27,5253,"Method: the verbatim share is a prompt for a question, not a gate (doc"
+LIN-3851,LIN-3490,LIN-3490,Done,2026-10-24T08:32,2026-10-24T08:56,4865,Replay kit: virtual-clock pump fires timers before queued setImmediate
+LIN-3860,LIN-3490,LIN-3490,Done,2026-10-24T08:39,2026-10-24T09:21,8435,Seams & Tangles also reads change coupling: which areas keep changing 
+LIN-3891,LIN-3490,LIN-3490,Done,2026-10-24T18:27,2026-10-24T19:20,7764,Pipeline churn: find which runs a ticket needs between launch and Done
+LIN-3892,LIN-3490,LIN-3490,Todo,2026-10-24T18:40,,6625,"UI sweep: bring every kept page onto the shared pieces, one page at a "
+LIN-3912,LIN-3892,LIN-3490,Done,2026-10-24T20:07,2026-10-25T02:40,19397,"Sweep prep: delete the Next run page, its `nextRun` flag and job, and "
+LIN-3950,LIN-3892,LIN-3490,Done,2026-10-25T12:45,2026-10-25T14:09,7318,"UI sweep: the Plain page layout, built once from the shared pieces, pr"
+LIN-3958,LIN-3950,LIN-3490,Done,2026-10-25T14:17,2026-10-25T17:02,8848,"Plain layout polish: heading step, sans prose, list bullets on a phone"
+LIN-3956,LIN-3892,LIN-3490,Done,2026-10-25T14:09,2026-10-25T20:44,5573,UI sweep: prove the Plain layout's rows and form kinds on the first re
+LIN-3957,LIN-3892,LIN-3490,Backlog,2026-10-25T14:09,,1476,"/styleguide: show the Settings piece samples in each theme panel, not "
+LIN-3970,LIN-3892,LIN-3490,Backlog,2026-10-25T18:30,,3888,"UI sweep, Plain batch 1: the KPI pages on the Plain layout, with Escal"
+LIN-3971,LIN-3892,LIN-3490,Backlog,2026-10-25T18:30,,3661,"UI sweep, Plain batch 2: Templates with the Prompts catalog folded in,"
+LIN-3972,LIN-3892,LIN-3490,Backlog,2026-10-25T18:30,,3346,"UI sweep, Plain batch 3: Task edit and create share one form layout; R"
+LIN-3973,LIN-3892,LIN-3490,Backlog,2026-10-25T18:30,,3382,"UI sweep, Plain batch 4: the system pages and email sign-in on the Pla"
+LIN-3975,LIN-3892,LIN-3490,In Progress,2026-10-25T19:07,,70726,"Task page: move the task on from where you read it, with task chat in "
+LIN-3976,LIN-3892,LIN-3490,Todo,2026-10-25T19:11,,15594,"Run page: say what the run is doing, show it as stages, and let it be "
+LIN-3977,LIN-3892,LIN-3490,Done,2026-10-25T19:17,2026-10-26T02:59,18503,"Live Console: keep the delight, and make every lane say what it is doi"
+LIN-3978,LIN-3892,LIN-3490,Todo,2026-10-25T19:22,,15345,"Dispatch: lead with what is happening, send in one press, and make hal"
+LIN-3980,LIN-3892,LIN-3490,Done,2026-10-25T19:25,2026-10-26T01:19,15530,"Landing: say plainly what Harbour is, keep the glimpses true, and carr"
+LIN-3982,LIN-3892,LIN-3490,Todo,2026-10-25T19:31,,13346,Swipe: each card says where the task is and offers the same next step 
+LIN-3983,LIN-3892,LIN-3490,In Progress,2026-10-25T19:34,,69195,"Observation: lead with what waits on you, say each run's state once, a"
+LIN-3986,LIN-3892,LIN-3490,Done,2026-10-25T21:58,2026-10-25T23:04,6320,"Live Console lanes: one lane per task, chosen by one written rule (pre"
+LIN-3987,LIN-3892,LIN-3490,Done,2026-10-25T22:05,2026-10-26T00:38,16484,"Decision panel follow-up: comparable prices on Claude Code, values in "
+LIN-3991,LIN-3892,LIN-3490,Done,2026-10-25T23:05,2026-10-26T01:43,12057,"Home round two: the stages ahead after a failure, a failed pill, the s"
+LIN-3992,LIN-3892,LIN-3490,Done,2026-10-26T00:49,2026-10-26T02:40,10477,"Decision panel round three: a pick updates the summary, Models' follow"
+LIN-3995,LIN-3892,LIN-3490,Done,2026-10-26T01:29,2026-10-26T02:21,7116,"Landing round two: previews say they are previews, sign-in doors carry"
+LIN-3997,LIN-3892,LIN-3490,Backlog,2026-10-26T02:21,,1986,"renderPlainDocument drops followSystemTheme, so /privacy and /terms ig"
+LIN-4002,LIN-3892,LIN-3490,Todo,2026-10-26T03:07,,6028,"Live Console round two: workspace names only when they help, a plain s"
+LIN-4003,LIN-3892,LIN-3490,Done,2026-10-26T03:59,2026-10-26T04:38,6420,"One reader for ""is this question open?"": the rulings builder's cluster"
+LIN-3895,LIN-3490,LIN-3490,Backlog,2026-10-24T19:01,,3781,Chat pages: the end goal is one combined chat that agents join (design
+LIN-3896,LIN-3490,LIN-3490,Backlog,2026-10-24T19:01,,1488,"Ship Biscuit: tell the story of tasks moving through the system, not o"
+LIN-3903,LIN-3490,LIN-3490,Done,2026-10-24T19:29,2026-10-24T20:14,7754,Close-out: a post-deploy check the run can't do never holds the close 
+LIN-3904,LIN-3490,LIN-3490,Done,2026-10-24T19:29,2026-10-24T20:53,3725,"CI-wake sweep: send ""CI finished"" only to a worker parked on its PR, n"
+LIN-3905,LIN-3490,LIN-3490,Done,2026-10-24T19:29,2026-10-24T22:34,14898,Stall: re-ask a session hung in a tool well before the 60-minute fails
+LIN-3906,LIN-3490,LIN-3490,Done,2026-10-24T19:29,2026-10-25T20:51,3655,"Stage selector: an Approve means close-out, and one PR in ordered comm"
+LIN-3921,LIN-3490,LIN-3490,Done,2026-10-24T23:19,2026-10-24T23:47,15867,"Close the ""pages ⇄ Providers"" knot: the Linear, Local and Jira provide"
+LIN-3932,LIN-3490,LIN-3490,Done,2026-10-25T10:47,2026-10-25T13:18,8603,"Paper: when a plan keeps failing review, does unwedging (one or two sm"
+LIN-3936,LIN-3490,LIN-3490,Backlog,2026-10-25T10:59,,2187,Costs: one place for what the work cost and what you paid; tidy the co
+LIN-3937,LIN-3936,LIN-3490,Backlog,2026-10-25T10:59,,24673,"Costs untangle, 1 of 4 (Own): write down where each cost decision live"
+LIN-3938,LIN-3936,LIN-3490,Backlog,2026-10-25T10:59,,1312,"Costs untangle, 2 of 4 (Free the seam): replace the tests that pin cos"
+LIN-3939,LIN-3936,LIN-3490,Backlog,2026-10-25T10:59,,1792,"Costs untangle, 3 of 4 (Consolidate): one cost authority that every su"
+LIN-3940,LIN-3936,LIN-3490,Backlog,2026-10-25T10:59,,2206,"Costs untangle, 4 of 4 (Rebuild): the cost read model, with daily hist"
+LIN-3941,LIN-3936,LIN-3490,Backlog,2026-10-25T10:59,,654,Costs history: backfill Harbour's workspace since records began (dry r
+LIN-3942,LIN-3936,LIN-3490,Backlog,2026-10-25T10:59,,2012,"Settings › Costs: what the work cost at list price, what you paid, and"
+LIN-3943,LIN-3936,LIN-3490,Backlog,2026-10-25T10:59,,827,"Costs: allowances, discounts, the plan catalogue and offers"
+LIN-3944,LIN-3936,LIN-3490,Done,2026-10-25T10:59,2026-10-25T12:39,4022,"Paper: can model, effort, kind and run time estimate the cost of a ses"
+LIN-3945,LIN-3936,LIN-3490,Backlog,2026-10-25T10:59,,1005,Pricing: long-context tiers for cumulative claude-code sessions (parke
+LIN-3959,LIN-3490,LIN-3490,Done,2026-10-25T14:51,2026-10-25T15:50,7913,"Rulings: one question, one row, one resume (a worker and its autopilot"
+LIN-3757,,LIN-3757,,,,,
+LIN-3833,LIN-3757,LIN-3757,Done,2026-10-23T21:35,2026-10-25T17:51,15194,"Home: the opened task leads with its state and has one run control, wi"
+LIN-3968,LIN-3833,LIN-3757,Done,2026-10-25T18:01,2026-10-25T22:51,13262,"Home polish: style the opened task, the right next step after a failur"
+LIN-3846,LIN-3757,LIN-3757,Done,2026-10-24T07:42,2026-10-24T17:59,67465,"Settings: one page per area, built from three kinds of row, with Model"
+LIN-3848,LIN-3846,LIN-3757,Done,2026-10-24T08:01,2026-10-24T08:56,6106,Settings: remove the nine switches that do nothing or are superseded (
+LIN-3849,LIN-3846,LIN-3757,Done,2026-10-24T08:01,2026-10-24T11:15,9736,"Settings: run controls and key tools follow rules, not the dispatch an"
+LIN-3886,LIN-3846,LIN-3757,Done,2026-10-24T17:49,2026-10-25T08:32,12892,Settings polish: untangle and rebuild the shared UI pieces it stands o
+LIN-3887,LIN-3886,LIN-3757,Done,2026-10-24T18:11,2026-10-24T20:19,18631,"Settings untangle, 1 of 4 (Own): write down where each shared UI decis"
+LIN-3888,LIN-3886,LIN-3757,Done,2026-10-24T18:11,2026-10-24T22:58,13838,"Settings untangle, 2 of 4 (Free the seam): move the tests and hooks th"
+LIN-3889,LIN-3886,LIN-3757,Done,2026-10-24T18:11,2026-10-25T01:33,15074,"Settings untangle, 3 of 4 (Consolidate): one authority for each shared"
+LIN-3890,LIN-3886,LIN-3757,Done,2026-10-24T18:11,2026-10-25T08:34,20838,"Settings untangle, 4 of 4 (Rebuild): design the Settings pieces in /st"
+LIN-3855,LIN-3820,LIN-3855,Done,2026-10-24T08:36,2026-10-25T12:42,27277,"Model routing · 4 — Settings › Models: every job, its spend and its mo"
+LIN-3952,LIN-3855,LIN-3855,In Progress,2026-10-25T13:16,,43259,"Settings › Models polish: spend in every row, a decision panel, one na"
+LIN-3962,LIN-3952,LIN-3855,Done,2026-10-25T17:17,2026-10-25T21:46,10208,"One decision panel for Models and Home: the job's numbers, labelled ha"
