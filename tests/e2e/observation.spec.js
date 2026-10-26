@@ -614,24 +614,21 @@ test.describe('Sessions tab — in-flight standalone sessions (LIN-1194)', () =>
     return item;
   }
 
-  test('all four tabs render, Autopilot active by default', async ({ page }) => {
+  test('three view tabs render, Runs active by default, with the autopilot filter on (LIN-3983)', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    // A third tab, Rulings, was added by LIN-1728 Phase 4 (own coverage in
-    // tests/e2e/observation-rulings.spec.js), and a fourth, Scan-due, by
-    // LIN-2667 (LIN-2649 S4, unit-tested in render-observation.test.js);
-    // asserted here only for count/inactive-by-default so this file's own
-    // tab invariant stays true.
-    const tabs = page.locator('#obs-tabs .obs-tab');
-    await expect(tabs).toHaveCount(4);
-    await expect(page.locator('.obs-tab[data-view="autopilot"]')).toHaveClass(/is-active/);
-    await expect(page.locator('.obs-tab[data-view="sessions"]')).not.toHaveClass(/is-active/);
-    await expect(page.locator('.obs-tab[data-view="rulings"]')).not.toHaveClass(/is-active/);
-    await expect(page.locator('.obs-tab[data-view="due"]')).not.toHaveClass(/is-active/);
+    // Rulings (LIN-1728 Phase 4) and Scan-due (LIN-2667) keep their own coverage;
+    // this file's invariant is the strip's shape and the default selection. The
+    // old Autopilot and Sessions tabs are now the runs filter.
+    await expect(page.locator('[data-testid^="obs-tab-"]')).toHaveCount(3);
+    await expect(page.getByTestId('obs-tab-runs')).toHaveClass(/is-active/);
+    await expect(page.getByTestId('obs-tab-rulings')).not.toHaveClass(/is-active/);
+    await expect(page.getByTestId('obs-tab-due')).not.toHaveClass(/is-active/);
+    await expect(page.getByTestId('obs-filter-autopilot')).toHaveAttribute('aria-pressed', 'true');
   });
 
-  test('a standalone running session shows under Sessions but NOT under Autopilot', async ({ page }) => {
+  test('a standalone running session shows under the standalone filter but NOT under Autopilot (LIN-3983)', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     await clearRuns(page);
     await seedStandaloneRunning(page, { issueIdentifier: 'LIN-1194', issueTitle: 'Standalone in-flight' });
@@ -639,19 +636,19 @@ test.describe('Sessions tab — in-flight standalone sessions (LIN-1194)', () =>
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
 
-    // Autopilot tab (default): the standalone session must not appear at all.
+    // Autopilot filter (default): the standalone session must not appear at all.
     await expect(
       page.locator('.obs-session').filter({ hasText: 'Standalone in-flight' })
     ).toHaveCount(0);
 
-    // Switch to the Sessions tab — the standalone session appears in the Active feed.
-    await page.locator('.obs-tab[data-view="sessions"]').click();
-    await expect(page.locator('.obs-tab[data-view="sessions"]')).toHaveClass(/is-active/);
+    // Standalone filter: the session appears in the Active feed.
+    await page.getByTestId('obs-filter-standalone').click();
+    await expect(page.getByTestId('obs-filter-standalone')).toHaveAttribute('aria-pressed', 'true');
     const card = page.locator('#obs-active .obs-session').filter({ hasText: 'Standalone in-flight' });
     await expect(card).toBeVisible();
 
-    // Switch back to Autopilot — it disappears again (the two views are distinct).
-    await page.locator('.obs-tab[data-view="autopilot"]').click();
+    // Back to Autopilot: it disappears again (the two filters are distinct).
+    await page.getByTestId('obs-filter-autopilot').click();
     await expect(
       page.locator('.obs-session').filter({ hasText: 'Standalone in-flight' })
     ).toHaveCount(0);
@@ -664,7 +661,7 @@ test.describe('Sessions tab — in-flight standalone sessions (LIN-1194)', () =>
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('.obs-tab[data-view="sessions"]').click();
+    await page.getByTestId('obs-filter-standalone').click();
 
     const card = page.locator('#obs-active .obs-session').filter({ hasText: 'Standalone drill-in' });
     await expect(card).toBeVisible();
@@ -748,7 +745,7 @@ test.describe('LIN-2298: no fixed overlay covers the Observation feed', () => {
       await page.setViewportSize({ width, height: 844 });
       await page.goto(OBSERVATION_URL);
       await page.waitForLoadState('networkidle');
-      await page.locator('.obs-tab[data-view="sessions"]').click();
+      await page.getByTestId('obs-filter-all').click();
 
       // Preconditions, so a green sweep cannot mean "nothing was there".
       await expect(page.getByTestId('feedback-widget-root')).toHaveAttribute('data-enabled', 'true');

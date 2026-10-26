@@ -71,15 +71,39 @@ const DECISION_OPTIONS_CHARS = 80;
 const hiddenWorkspaces = new Set();        // urlKeys toggled off
 let archiveOpen = false;
 
-// Active view/tab (LIN-1194, extended LIN-1728): 'autopilot' (default — the
-// existing feed), 'sessions' (the in-flight Sessions view: standalone sessions
-// included, a running-only Active split instead of the recency one), or
-// 'rulings' (LIN-1728 Phase 4 — unanswered decisions, a different payload
-// shape entirely, polled from a different endpoint). The tab is a pure
-// in-page switch: it flips the poll URL/endpoint and the client-side
-// bucketing, and resets the feed state so views' distinct data sets never
-// bleed together.
-let currentView = 'autopilot';
+// Active view (LIN-1194, LIN-1728, LIN-3983): 'runs' (the one feed of runs,
+// narrowed by `currentFilter`), 'rulings' (LIN-1728 Phase 4 — unanswered
+// decisions, a different payload shape entirely, polled from a different
+// endpoint) or 'due' (scan-due checks, one-shot). LIN-3983 folded the old
+// Autopilot and Sessions tabs into 'runs' and a filter; `?view=autopilot` and
+// `?view=sessions` still load (viewFromParams). The tab is a pure in-page
+// switch: it flips the poll endpoint, and resets the feed state so the views'
+// distinct data sets never bleed together.
+const VIEWS = ['runs', 'rulings', 'due'];
+// Which runs the feed shows (LIN-3983). 'autopilot' is the default and reads the
+// cheap materialized feed; 'standalone' and 'all' read the sessions source
+// (`?view=sessions`, live) and filter on each session's `standalone` flag.
+const FILTERS = ['autopilot', 'standalone', 'all'];
+let currentView = 'runs';
+let currentFilter = 'autopilot';
+
+// The waiting block above the runs feed (LIN-3983). It paints the open ruling
+// rows (the same nodes the Rulings tab paints, capped) and one compact row for
+// each waiting run whose wait no ruling row covers.
+const WAITING_RULINGS_LIMIT = 3;
+// Loops whose question is open, from the rulings response (`openLoopIds`,
+// LIN-4003's reader). null until the first rulings response: no compact row is
+// painted before then, so one cannot appear and then duplicate a ruling row.
+// A failed first response settles it to the empty set, so no wait is hidden.
+let openLoopIds = null;
+// The last rulings payload this page painted, so a view change repaints it at once.
+let lastRulings = null;
+// Standalone waiting runs the feed does not carry under the autopilot filter
+// (decision 8, LIN-3983): sessionId → session, from the sessions source, read on
+// its own slower timer so the feed's 5 s poll never pays for it.
+const standaloneWaitSupplement = new Map();
+const SUPPLEMENT_POLL_MS = 30000;
+let supplementId = null;
 
 // Rulings poll state (LIN-1728 Phase 4). Separate from sessionIndex/*Cards
 // above — a ruling row has no stable per-poll identity worth diffing against
@@ -419,12 +443,20 @@ function isRecentlyActive(session) {
   return Number.isFinite(t) && (Date.now() - t) <= STALE_AFTER_MS;
 }
 
-// Sessions-view in-flight predicate (LIN-1194) — mirrors the server's running-only
-// boundary (routes/dashboard.js): a session is in-flight iff it has been taken
-// (past the live queue) and is not yet terminal. Completed sessions fall to the
-// Archive; queued-but-not-taken items are excluded from V1 entirely.
-function isInFlight(session) {
-  return !!session.taken && !session.terminal;
+// The runs filter (LIN-3983). Autopilot is the feed without standalone runs;
+// standalone is only those; all is every run the source carries.
+function passesRunFilter(session) {
+  if (currentFilter === 'standalone') return !!session.standalone;
+  if (currentFilter === 'autopilot') return !session.standalone;
+  return true;
+}
+
+// Which feed a poll is for. A response that lands after the view or filter moved
+// to a different feed is dropped. standalone and all share one source, so
+// moving between them does not discard anything.
+function feedKey() {
+  if (currentView !== 'runs') return currentView;
+  return currentFilter === 'autopilot' ? 'runs:autopilot' : 'runs:sessions';
 }
 
 function shortSessionId(id) {
@@ -861,18 +893,13 @@ function diffSessionList(listId, emptyId, cardMap, sessions) {
 }
 
 function renderFeeds() {
-  const sessions = [...sessionIndex.values()].filter(passesFilter);
-  // Per-view Active/Archive split (LIN-1194), each mirroring its server predicate
-  // so client and server bucket a session the same way (cross-cutting concern #4):
-  //   - Sessions view: running-only in-flight (taken ∧ non-terminal) is Active;
-  //     completed (terminal) is Archive. Queued/non-taken items are already dropped
-  //     by the server, so they never reach here.
-  //   - Autopilot view (UNCHANGED, LIN-631): recency-only — Active iff touched
-  //     within 24h, else Archive, regardless of terminal state (old non-terminal
-  //     sessions land in Archive, where the stale render branch still labels them).
-  const inSessionsView = currentView === 'sessions';
-  const active = inSessionsView ? sessions.filter(isInFlight) : sessions.filter(isRecentlyActive);
-  const recent = inSessionsView ? sessions.filter(s => s.terminal) : sessions.filter(s => !isRecentlyActive(s));
+  const sessions = [...sessionIndex.values()].filter(passesFilter).filter(passesRunFilter);
+  // One Active/Archive rule for every filter (LIN-631, LIN-3983), mirroring the
+  // server's splitSessionsFeed: Active iff touched within 24h, else Archive,
+  // regardless of terminal state. Old non-terminal sessions land in Archive,
+  // where the stale render branch still labels them.
+  const active = sessions.filter(isRecentlyActive);
+  const recent = sessions.filter(s => !isRecentlyActive(s));
   diffSessionList('obs-active', 'obs-active-empty', activeCards, active);
   diffSessionList('obs-recent', 'obs-recent-empty', recentCards, recent);
 
@@ -1541,11 +1568,12 @@ function repaintSession(sessionId) {
 
 // ─── Polling ──────────────────────────────────────────────────────────────────
 
-// Build the /sessions poll URL for the active tab (LIN-1194). The Sessions view
-// carries `?view=sessions`; Autopilot omits it (byte-identical legacy URL). Extra
-// query params (offset/limit for archive pagination) are appended by the caller.
+// Build the /sessions poll URL for the active filter (LIN-1194, LIN-3983). Any
+// filter but autopilot reads the sessions source (`?view=sessions`); autopilot
+// omits it (byte-identical legacy URL). Extra query params (offset/limit for
+// archive pagination) are appended by the caller.
 function sessionsUrl(urlKey, extra = '') {
-  const view = currentView === 'sessions' ? 'view=sessions' : '';
+  const view = currentFilter === 'autopilot' ? '' : 'view=sessions';
   const qs = [view, extra].filter(Boolean).join('&');
   return `/workspace/${encodeURIComponent(urlKey)}/api/dashboard/sessions${qs ? '?' + qs : ''}`;
 }
@@ -1553,16 +1581,17 @@ function sessionsUrl(urlKey, extra = '') {
 async function pollSessions() {
   const urlKey = observationData?.urlKey;
   if (!urlKey) return;
-  // Snapshot the view this poll was issued for, so a late response that lands
-  // AFTER the user switched tabs is discarded instead of populating the wrong feed.
-  const pollView = currentView;
+  // Snapshot the feed this poll was issued for, so a late response that lands
+  // AFTER the user switched view or filter is discarded instead of populating the
+  // wrong feed.
+  const pollKey = feedKey();
   try {
     const res = await fetch(sessionsUrl(urlKey));
     if (res.status === 401) { window.location.href = '/logout'; return; }
     if (!res.ok) { setPollStatus('● disconnected'); return; }
-    // Tab switched while this poll was in flight → its payload belongs to the old
-    // view; drop it (the switch already kicked a fresh poll for the new view).
-    if (pollView !== currentView) return;
+    // Feed switched while this poll was in flight → its payload belongs to the old
+    // feed; drop it (the switch already kicked a fresh poll for the new one).
+    if (pollKey !== feedKey()) return;
 
     const data = await res.json();
     const active = Array.isArray(data.active) ? data.active : [];
@@ -1580,6 +1609,7 @@ async function pollSessions() {
     for (const s of [...active, ...recent]) sessionIndex.set(String(s.sessionId), s);
 
     renderFeeds();
+    renderWaitingBlock();
     setPollStatus('● live');
   } catch (e) {
     setPollStatus('● disconnected');
@@ -1618,6 +1648,14 @@ async function loadMoreArchive() {
 
 function startPolling() {
   if (pollId) { clearTimeout(pollId); pollId = null; }
+  if (supplementId) { clearTimeout(supplementId); supplementId = null; }
+  // The standalone waiting read runs on its own slower timer (decision 8), and
+  // is paused while the tab is hidden, as the feed is.
+  const supplementTick = async () => {
+    if (!document.hidden) await pollWaitingSupplement();
+    supplementId = setTimeout(supplementTick, SUPPLEMENT_POLL_MS);
+  };
+  supplementTick();
   // Self-scheduling loop: wait for each poll to finish before queuing the next,
   // so a slow backend can never stack overlapping /sessions scans (each reads the
   // whole workspace). Request pile-up was a memory-pressure path.
@@ -1648,7 +1686,125 @@ function startPolling() {
 // never from here.
 function pollCurrentView() {
   if (currentView === 'due') return;
-  return currentView === 'rulings' ? pollRulings() : pollSessions();
+  if (currentView === 'rulings') return pollRulings();
+  // The runs view makes two reads per tick: the feed, and the rulings that feed
+  // the waiting block. The rulings read is not awaited, so the feed's own timing
+  // is unchanged by it.
+  pollRulings();
+  return pollSessions();
+}
+
+// ─── Waiting block (LIN-3983) ───────────────────────────────────────────────
+
+const WAIT_FALLBACK_TEXT = 'Waiting on you, with no message.';
+
+// The feedback markers the runner writes into a waiting message. They are a
+// machine signal, not copy: the message shows without them.
+function stripFeedbackMarkers(text) {
+  return String(text || '').replace(/\[(?:blocked|done|working)\]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+// The runs that get a compact row in the waiting block. A session qualifies on
+// its status (`waiting`, so a day-dead run never does, LIN-608) and when one of
+// its waiting loops is not an open question, since the open ruling rows already
+// speak for the rest. Its text is the producer's message when the producer's own
+// question has no ruling row; otherwise the fixed fallback. Pure: the rulings
+// list and any shelve state are not inputs.
+//
+// @param {Array<Object>} sessions - the feed's session payloads
+// @param {Set<string>} openIds - the rulings response's openLoopIds
+// @returns {Array<{sessionId, workspaceUrlKey, workspaceName, title, message}>}
+function compactWaitSessions(sessions, openIds) {
+  const rows = [];
+  for (const s of sessions) {
+    if (!s || s.status !== 'waiting') continue;
+    const waits = Array.isArray(s.waitingLoopIds) ? s.waitingLoopIds : [];
+    if (!waits.some(id => !openIds.has(id))) continue;
+    const producerCovered = !s.producerLoopId || openIds.has(s.producerLoopId);
+    rows.push({
+      sessionId: s.sessionId,
+      workspaceUrlKey: s.workspaceUrlKey,
+      workspaceName: s.workspaceName || s.workspaceUrlKey,
+      title: s.seedTitle || 'Untitled run',
+      message: producerCovered ? '' : stripFeedbackMarkers(s.waitingMessage)
+    });
+  }
+  return rows;
+}
+
+// Every session the block may judge: the loaded feed (under every filter), plus
+// the standalone waits read on the autopilot filter. The loaded feed wins on a
+// shared id, since it is the fresher read.
+function waitingSessions() {
+  const byId = new Map();
+  for (const s of standaloneWaitSupplement.values()) byId.set(String(s.sessionId), s);
+  for (const s of sessionIndex.values()) byId.set(String(s.sessionId), s);
+  return [...byId.values()];
+}
+
+function compactWaitRowHtml(row, multiWorkspace) {
+  const href = sessionHref(row);
+  const ws = multiWorkspace ? ` <span class="obs-ruling-ws">${escapeHtml(row.workspaceName)}</span>` : '';
+  const link = href ? `<a class="obs-waiting-run-link" href="${escapeHtml(href)}">reply on its run page →</a>` : '';
+  return `<li class="obs-waiting-run" data-session-id="${escapeHtml(String(row.sessionId))}">`
+    + `<span class="obs-waiting-run-title">${escapeHtml(row.title)}</span>${ws}`
+    + `<p class="obs-waiting-run-text">${escapeHtml(row.message || WAIT_FALLBACK_TEXT)}</p>${link}</li>`;
+}
+
+// Paint the waiting block from the last rulings read and the feed. It is hidden
+// off the runs view and when nothing waits. It never fetches: the polls feed it.
+function renderWaitingBlock() {
+  const section = document.getElementById('obs-waiting');
+  if (!section) return;
+  const onRuns = currentView === 'runs';
+  const rulingsList = document.getElementById('obs-waiting-rulings');
+  const runsList = document.getElementById('obs-waiting-runs');
+  const count = document.getElementById('obs-waiting-count');
+  const more = document.getElementById('obs-waiting-more');
+  if (!onRuns) { section.hidden = true; return; }
+
+  const rulings = lastRulings || [];
+  if (rulingsList && lastRulings) {
+    renderRulings(rulings, { list: rulingsList, empty: null, limit: WAITING_RULINGS_LIMIT, onTab: false });
+  }
+  const compact = openLoopIds === null ? [] : compactWaitSessions(waitingSessions(), openLoopIds);
+  const total = rulings.length + compact.length;
+  section.hidden = total === 0;
+  if (count) count.textContent = String(total);
+  if (runsList) {
+    const multi = (observationData?.workspaces || []).length > 1;
+    runsList.innerHTML = compact.map(row => compactWaitRowHtml(row, multi)).join('');
+  }
+  if (more) {
+    const hidden = rulings.length - WAITING_RULINGS_LIMIT;
+    more.hidden = hidden <= 0;
+    more.textContent = `${hidden} more in Rulings →`;
+  }
+}
+
+// Standalone waiting runs for the autopilot filter (decision 8). Under any other
+// filter the feed already carries them, so this does nothing and fetches nothing.
+async function pollWaitingSupplement() {
+  if (currentView !== 'runs' || currentFilter !== 'autopilot') {
+    if (standaloneWaitSupplement.size) { standaloneWaitSupplement.clear(); renderWaitingBlock(); }
+    return;
+  }
+  const urlKey = observationData?.urlKey;
+  if (!urlKey) return;
+  const key = feedKey();
+  try {
+    const res = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dashboard/sessions?view=sessions`);
+    // A failed read keeps the block as it was; it shows no banner.
+    if (!res.ok || key !== feedKey()) return;
+    const data = await res.json();
+    standaloneWaitSupplement.clear();
+    for (const s of Array.isArray(data.active) ? data.active : []) {
+      if (s.standalone) standaloneWaitSupplement.set(String(s.sessionId), s);
+    }
+    renderWaitingBlock();
+  } catch (e) {
+    console.warn('Observation waiting read failed:', e);
+  }
 }
 
 // ─── Rulings (LIN-1728 Phase 4) ─────────────────────────────────────────────
@@ -1657,24 +1813,44 @@ function rulingsUrl(urlKey) {
   return `/workspace/${encodeURIComponent(urlKey)}/api/dashboard/rulings`;
 }
 
+// The rulings read serves two hosts (LIN-3983): the Rulings tab, which paints
+// every row and owns the poll status pill, and the waiting block above the runs
+// feed, which paints its first few and does not touch the pill. A failed read on
+// the block's behalf therefore never flips the feed's "live" pill.
 async function pollRulings() {
   const urlKey = observationData?.urlKey;
   if (!urlKey) return;
   const pollView = currentView;
+  const onRulingsTab = pollView === 'rulings';
   try {
     const res = await fetch(rulingsUrl(urlKey));
     if (res.status === 401) { window.location.href = '/logout'; return; }
-    if (!res.ok) { setPollStatus('● disconnected'); return; }
-    if (pollView !== currentView) return; // tab switched mid-flight — discard
+    if (!res.ok) { rulingsReadFailed(onRulingsTab); return; }
+    if (pollView !== currentView) return; // view switched mid-flight — discard
 
     const data = await res.json();
-    const rulings = Array.isArray(data.rulings) ? data.rulings : [];
-    renderRulings(rulings);
-    setPollStatus('● live');
+    lastRulings = Array.isArray(data.rulings) ? data.rulings : [];
+    if (Array.isArray(data.openLoopIds)) openLoopIds = new Set(data.openLoopIds);
+    else if (openLoopIds === null) openLoopIds = new Set();
+    if (onRulingsTab) {
+      renderRulings(lastRulings);
+      setPollStatus('● live');
+    } else {
+      renderWaitingBlock();
+    }
   } catch (e) {
-    setPollStatus('● disconnected');
+    rulingsReadFailed(onRulingsTab);
     console.warn('Rulings poll failed:', e);
   }
+}
+
+// A failed rulings read keeps what was last painted. The first read to fail
+// settles `openLoopIds` to the empty set: every waiting run then gets its compact
+// row, so no wait is hidden for want of a ruling read.
+function rulingsReadFailed(onRulingsTab) {
+  if (onRulingsTab) setPollStatus('● disconnected');
+  if (openLoopIds === null) openLoopIds = new Set();
+  if (!onRulingsTab) renderWaitingBlock();
 }
 
 // Mostly-wholesale repaint (LIN-1728 Phase 4) — unlike the session feeds
@@ -1710,9 +1886,25 @@ async function pollRulings() {
 // `renderedRulingRows` is the single map behind all three: it tracks whichever
 // <li> is CURRENTLY attached for a decision_id, independent of whether that
 // decision still appears in this poll's payload.
-function renderRulings(rulings) {
-  const list = document.getElementById('obs-rulings');
-  const empty = document.getElementById('obs-rulings-empty');
+//
+// LIN-3983: `host` says where the rows paint. The Rulings tab (the default) and
+// the waiting block above the Observation feed both host these same nodes, so
+// a row keeps its pending / retry / settled / typed-input state when it moves
+// between them. `host.limit` caps how many payload rows are attached (the block
+// shows the first few and links to the rest); the rows past it stay tracked in
+// `renderedRulingRows`, so the next paint of the Rulings tab reuses them.
+function rulingsTabHost() {
+  return {
+    list: document.getElementById('obs-rulings'),
+    empty: document.getElementById('obs-rulings-empty'),
+    limit: Infinity,
+    onTab: true
+  };
+}
+
+function renderRulings(rulings, host = rulingsTabHost()) {
+  const list = host.list;
+  const empty = host.empty;
   if (!list) return;
 
   const seen = new Set();
@@ -1738,7 +1930,12 @@ function renderRulings(rulings) {
     const existing = key && renderedRulingRows.get(key);
     const mustReuse = key && (rulingsPending.has(key) || preservedRulingRows.has(key) || rulingsSettled.has(key) || rulingRowHoldsInput(existing));
     const li = (mustReuse && existing) ? existing : renderRulingRow(row);
-    nodes.push(li);
+    // A rebuilt row replaces its old node wherever that node is attached. The
+    // old one may sit in the other host (LIN-3983): the block and the Rulings
+    // tab share `renderedRulingRows`, so without this the stale <li> stays in
+    // the block's list after the tab repaints.
+    if (existing && existing !== li && existing.parentNode) existing.parentNode.removeChild(existing);
+    if (nodes.length < host.limit) nodes.push(li);
     if (key) {
       seen.add(key);
       renderedRulingRows.set(key, li);
@@ -1832,6 +2029,20 @@ function renderRulings(rulings) {
   });
   if (empty) empty.hidden = nodes.length > 0;
   syncRulingsBulkBar();
+  if (host.onTab) armBasisChecksFor(nodes);
+}
+
+// Re-arm the basis check for rows that now sit on the Rulings tab (LIN-3983).
+// A row first built while the waiting block was on screen never checked (the
+// check is gated on the Rulings view at creation), so moving it here must ask
+// again. `requestBasisCheck` keeps its own once-per-row and cap guards, so a
+// repaint that finds a row already checked or queued does nothing.
+function armBasisChecksFor(nodes) {
+  if (currentView !== 'rulings') return;
+  for (const li of nodes) {
+    const basis = rulingBasisByRow.get(li);
+    if (basis) requestBasisCheck(basis.anchor, basis.noteEl);
+  }
 }
 
 // Does this attached ruling row hold input a repaint would discard
@@ -1872,6 +2083,7 @@ function rulingRowHoldsInput(li) {
 // must never fail to render, or lose its actions, because an optional hint
 // could not be computed.
 const basisCheckCache = new Map();   // taskDecisionId → true | false | null
+const rulingBasisByRow = new WeakMap(); // <li> → { anchor, noteEl } for the re-arm on a host move (LIN-3983)
 const basisCheckStarted = new Set(); // taskDecisionId → already queued or in flight
 const basisCheckQueue = [];
 let basisChecksInFlight = 0;
@@ -2186,6 +2398,7 @@ function renderRulingRow(row) {
     staleNote.textContent = '↻ the task changed since this was raised — re-read before answering';
     staleNote.hidden = true;
     li.appendChild(staleNote);
+    rulingBasisByRow.set(li, { anchor, noteEl: staleNote });
     requestBasisCheck(anchor, staleNote);
   }
 
@@ -4196,32 +4409,10 @@ function paintBulkScanRowResult(entry) {
 // unanswered decisions; Scan-due is due-check rows), so the feed state is
 // reset before re-polling to keep them from bleeding together, and the
 // collapsed cards are torn down so a fresh poll rebuilds them for the new view.
-function switchView(view) {
-  if (view !== 'sessions' && view !== 'autopilot' && view !== 'rulings' && view !== 'due') return;
-  if (view === currentView) return;
-  currentView = view;
-
-  // Reflect selection on the tabs (aria + active class).
-  const tabs = document.getElementById('obs-tabs');
-  if (tabs) {
-    for (const tab of tabs.querySelectorAll('.obs-tab')) {
-      const on = tab.dataset.view === view;
-      tab.classList.toggle('is-active', on);
-      tab.setAttribute('aria-selected', on ? 'true' : 'false');
-    }
-  }
-
-  // The rulings/due tabs each host their own container, entirely separate
-  // from the session views' shared Filter/Active/Archive shell
-  // (#obs-session-views) — toggle which one is visible.
-  const sessionViews = document.getElementById('obs-session-views');
-  const rulingsSection = document.getElementById('obs-rulings-section');
-  const dueSection = document.getElementById('obs-due-section');
-  if (sessionViews) sessionViews.hidden = view === 'rulings' || view === 'due';
-  if (rulingsSection) rulingsSection.hidden = view !== 'rulings';
-  if (dueSection) dueSection.hidden = view !== 'due';
-
-  // Tear down the feed state — the other view's sessions must not linger.
+// Clear the feed's per-view state, so the views' distinct data sets never bleed
+// together. Used when the view changes, and when the filter moves to a different
+// source.
+function resetFeedState() {
   for (const el of activeCards.values()) el.remove();
   for (const el of recentCards.values()) el.remove();
   activeCards.clear();
@@ -4232,7 +4423,83 @@ function switchView(view) {
   loadedArchiveIds.clear();
   archiveTotal = 0;
   archiveOffset = ARCHIVE_PAGE_SIZE;
+  standaloneWaitSupplement.clear();
+}
+
+// Reflect the view and filter in the page: the tab strip, the one-line hint under
+// it, which section shows, and the filter buttons. Also the URL (writeViewToUrl).
+const VIEW_HINTS = {
+  'runs:autopilot': 'Autopilot runs touched in the last 24 hours. Older runs are in the archive below.',
+  'runs:standalone': 'Standalone runs, dispatched on their own rather than by autopilot, touched in the last 24 hours. Older ones are in the archive below.',
+  'runs:all': 'Every run touched in the last 24 hours. Older runs are in the archive below.',
+  rulings: 'Every question waiting on you. Answer, dismiss or shelve each one here.',
+  due: 'Tasks checked for changed content since their last scan.'
+};
+
+function syncViewChrome() {
+  for (const tab of document.querySelectorAll('#obs-tabs [data-tab]')) {
+    const on = tab.dataset.tab === currentView;
+    tab.classList.toggle('is-active', on);
+    tab.setAttribute('aria-selected', on ? 'true' : 'false');
+    tab.tabIndex = on ? 0 : -1;
+  }
+  const hint = document.getElementById('obs-view-hint');
+  if (hint) hint.textContent = VIEW_HINTS[currentView === 'runs' ? feedKey() : currentView] || '';
+
+  const sessionViews = document.getElementById('obs-session-views');
+  const rulingsSection = document.getElementById('obs-rulings-section');
+  const dueSection = document.getElementById('obs-due-section');
+  if (sessionViews) sessionViews.hidden = currentView !== 'runs';
+  if (rulingsSection) rulingsSection.hidden = currentView !== 'rulings';
+  if (dueSection) dueSection.hidden = currentView !== 'due';
+
+  for (const btn of document.querySelectorAll('#obs-filter [data-filter]')) {
+    const on = btn.dataset.filter === currentFilter;
+    btn.classList.toggle('is-on', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
+  writeViewToUrl();
+}
+
+// The URL carries the view and filter (LIN-3983), so a reload or a shared link
+// reopens the same place. Defaults are omitted: runs with the autopilot filter is
+// a bare URL. replaceState, so the back button does not walk through every tab.
+function writeViewToUrl() {
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('view');
+    url.searchParams.delete('filter');
+    if (currentView !== 'runs') url.searchParams.set('view', currentView);
+    else if (currentFilter !== 'autopilot') url.searchParams.set('filter', currentFilter);
+    window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+  } catch {
+    // The URL is a convenience: the page works the same without it.
+  }
+}
+
+// The view a page load opens on (LIN-3983). `view=autopilot` and `view=sessions`
+// are the old tab names: autopilot is the default filter, and sessions is the
+// all-runs filter unless a filter is given. Anything unknown opens on runs.
+function viewFromParams(params) {
+  const view = params.get('view');
+  if (view === 'rulings' || view === 'due') return { view, filter: 'autopilot' };
+  const explicit = params.get('filter');
+  const fallback = view === 'sessions' ? 'all' : 'autopilot';
+  return { view: 'runs', filter: FILTERS.includes(explicit) ? explicit : fallback };
+}
+
+// Tab switch (LIN-1194, LIN-1728, LIN-3983). The feed state is torn down, so the
+// new view starts from its own data and fills on its own poll. A rulings view does
+// not repaint from the last read here: a row painted now would be rebuilt by the
+// poll that answers the switch, which is the rebuild a person's place on the row
+// (a marker, a focused control) cannot survive.
+function switchView(view) {
+  if (!VIEWS.includes(view) || view === currentView) return;
+  currentView = view;
+  syncViewChrome();
+  resetFeedState();
   renderFeeds();
+  renderWaitingBlock();
 
   setPollStatus('loading…');
   // [C-2] pollCurrentView() no-ops for `due` (the [F-1] early return above),
@@ -4246,15 +4513,53 @@ function switchView(view) {
   pollCurrentView();
 }
 
+// Filter change inside the runs view (LIN-3983). Moving between autopilot and the
+// other two changes the source, so the feed is torn down; moving between
+// standalone and all keeps the feed and only re-buckets it.
+function setFilter(filter) {
+  if (!FILTERS.includes(filter) || filter === currentFilter) return;
+  const sourceChanged = (filter === 'autopilot') !== (currentFilter === 'autopilot');
+  currentFilter = filter;
+  syncViewChrome();
+  if (sourceChanged) resetFeedState();
+  renderFeeds();
+  renderWaitingBlock();
+  setPollStatus('loading…');
+  pollCurrentView();
+}
+
 function initControls() {
+  // The tab strip (LIN-3983): click switches; Left and Right move across the
+  // tabs, since only the selected tab sits in the tab order.
   const tabs = document.getElementById('obs-tabs');
   if (tabs) {
     tabs.addEventListener('click', (e) => {
-      const tab = e.target.closest('.obs-tab');
-      if (!tab || !tab.dataset.view) return;
-      switchView(tab.dataset.view);
+      const tab = e.target.closest('[data-tab]');
+      if (tab) switchView(tab.dataset.tab);
+    });
+    tabs.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+      const all = [...tabs.querySelectorAll('[data-tab]')];
+      const at = all.indexOf(e.target.closest('[data-tab]'));
+      if (at < 0) return;
+      const next = all[(at + (e.key === 'ArrowRight' ? 1 : all.length - 1)) % all.length];
+      e.preventDefault();
+      next.focus();
+      switchView(next.dataset.tab);
     });
   }
+
+  const filter = document.getElementById('obs-filter');
+  if (filter) {
+    filter.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-filter]');
+      if (btn) setFilter(btn.dataset.filter);
+    });
+  }
+
+  // The waiting block's "N more in Rulings →" opens the full list.
+  const waitingMore = document.getElementById('obs-waiting-more');
+  if (waitingMore) waitingMore.addEventListener('click', () => switchView('rulings'));
 
   const dueMore = document.getElementById('obs-due-more');
   if (dueMore) dueMore.addEventListener('click', loadMoreDueChecks);
@@ -4352,13 +4657,15 @@ function init() {
   observationData = window.__OBSERVATION_DATA__;
   if (!observationData) { console.warn('Observation: no initial data'); return; }
   initControls();
-  // Deep link from the ambient rulings badge (LIN-1728 review F6 —
-  // `lib/components/navbar.js` now links to `?view=rulings` instead of a
-  // button that did nothing). An explicit query param on load, distinct from
-  // the tab strip's in-page `switchView` click handler above.
-  if (new URLSearchParams(window.location.search).get('view') === 'rulings') {
-    switchView('rulings');
-  }
+  // The URL opens the page where it was left (LIN-3983): the view and filter,
+  // including the rulings deep link from the navbar badge (`?view=rulings`,
+  // LIN-1728 review F6). Legacy values are rewritten to the current names.
+  const opened = viewFromParams(new URLSearchParams(window.location.search));
+  currentView = opened.view;
+  currentFilter = opened.filter;
+  syncViewChrome();
+  if (currentView === 'due') loadInitialDueCheckPage();
+  renderWaitingBlock();
   startPolling();
 }
 
@@ -4368,6 +4675,7 @@ window.addEventListener('beforeunload', (e) => {
   // separate arm/disarm calls, no second listener).
   if (rulingsBulkRunning) { e.preventDefault(); e.returnValue = ''; }
   if (pollId) { clearTimeout(pollId); pollId = null; }
+  if (supplementId) { clearTimeout(supplementId); supplementId = null; }
   if (visibilityHandler) { document.removeEventListener('visibilitychange', visibilityHandler); visibilityHandler = null; }
 });
 
@@ -4473,6 +4781,12 @@ if (typeof module !== 'undefined' && module.exports) {
     // (one attempt per row, the concurrency gate, the per-page ceiling) and the
     // strict `=== true` render are the parts most likely to regress silently.
     requestBasisCheck, applyBasisResult, basisCheckCache, basisCheckStarted, BASIS_CHECK_MAX_PER_PAGE,
+    // LIN-3983: the waiting block's pure rule, the view/filter URL contract, and
+    // the poll/switch seams the view model is unit-tested through.
+    compactWaitSessions, stripFeedbackMarkers, viewFromParams, renderWaitingBlock,
+    pollCurrentView, pollRulings, pollWaitingSupplement, switchView, setFilter, sessionsUrl, feedKey, rulingsUrl,
+    openLoopIds: () => openLoopIds, setOpenLoopIds: (v) => { openLoopIds = v; },
+    lastRulingsRef: () => lastRulings, standaloneWaitSupplement, sessionIndex,
     // LIN-2649 S4 / LIN-2667: the scan-due tab seam — tri-state copy/rendering,
     // the never-ambient dispatch (pollCurrentView, switchView), and pagination
     // (loadInitialDueCheckPage/loadMoreDueChecks, dueUrl) are all unit-testable

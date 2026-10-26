@@ -4905,3 +4905,44 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
   padding: 0.02rem 0.35rem;
 }
 .obs-act-idle { background: transparent; padding-left: 0; padding-right: 0; color: var(--fg-dim); }
+
+/* LIN-3983: the shared tab strip (lib/components/tabs.js). One line, no wrap,
+   so a label that does not fit scrolls the strip instead of breaking a word
+   onto two lines on a 390px phone. Observation is the first consumer; the
+   task-edit tabs (.task-edit-tab) keep their own rules until they move here. */
+.tabs {
+  display: flex;
+  gap: 0.4rem;
+  margin: 0 0 0.9rem;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabs__tab {
+  appearance: none;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px; /* overlap the strip's border so the active underline sits on it */
+  padding: 0.4rem 0.7rem;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-content);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+.tabs__tab:hover { color: var(--text); }
+.tabs__tab.is-active {
+  color: var(--text);
+  border-bottom-color: var(--brand);
+}
+.tabs__tab:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 3px;
+}

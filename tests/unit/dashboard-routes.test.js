@@ -357,6 +357,20 @@ describe('GET /api/dashboard/rulings (LIN-1728 Phase 2)', () => {
     assert.equal(res.statusCode, 200);
     assert.equal(res.jsonBody.count, 0);
     assert.deepEqual(res.jsonBody.rulings, []);
+    assert.deepEqual(res.jsonBody.openLoopIds, [], 'an answered question is not open');
+  });
+
+  test('openLoopIds names the loop of every open ruling (LIN-3983), from the same loops the rows come from', async () => {
+    const router = makeRouter({ 'ws-a': { live: [], history: [decisionItem('a-dec', 'LIN-24', 'd-24')], agentStatus: [] } });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/rulings');
+    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.rulings.length, 1);
+    const row = res.jsonBody.rulings[0];
+    assert.ok(row.anchor.loopId, 'a loop-backed row names its loop');
+    assert.deepEqual(res.jsonBody.openLoopIds, [row.anchor.loopId]);
   });
 
   test('a loop with no decision at all contributes nothing', async () => {
@@ -3473,13 +3487,43 @@ describe('GET /api/dashboard/sessions — Sessions view (LIN-1194)', () => {
     assert.equal(findSession(sess.res.jsonBody, 'q1'), undefined, 'queued-but-not-taken must not surface as in-flight');
   });
 
-  test('a terminal standalone session drops to the Sessions view archive, not active', async () => {
+  test('one recency rule on the Sessions source (LIN-3983): a session finished within a day is Active, as on Autopilot', async () => {
     const router = makeRouter({ 'ws-a': { live: [], history: [standaloneTerminal('t1', 'LIN-3')], agentStatus: [] } });
     const handler = sessionsHandler(router);
     const sess = makeReqRes({ session: wsSession, query: { view: 'sessions' } });
     await handler(sess.req, sess.res);
-    assert.equal(sess.res.jsonBody.active.find(x => x.sessionId === 't1'), undefined, 'terminal is not in-flight');
-    assert.ok(sess.res.jsonBody.recent.find(x => x.sessionId === 't1'), 'terminal standalone is archived');
+    assert.ok(sess.res.jsonBody.active.find(x => x.sessionId === 't1'), 'touched within 24h, so Active');
+    assert.equal(sess.res.jsonBody.recent.find(x => x.sessionId === 't1'), undefined);
+  });
+
+  test('a standalone session untouched for over a day is archived on the Sessions source (LIN-3983)', async () => {
+    const old = { ...standaloneTerminal('t2', 'LIN-4'), dispatchedAt: OLD_ISO, resolvedAt: OLD_ISO, feedback: [{ message: '[done] shipped', timestamp: OLD_ISO }] };
+    const router = makeRouter({ 'ws-a': { live: [], history: [old], agentStatus: [] } });
+    const handler = sessionsHandler(router);
+    const sess = makeReqRes({ session: wsSession, query: { view: 'sessions' } });
+    await handler(sess.req, sess.res);
+    assert.equal(sess.res.jsonBody.active.find(x => x.sessionId === 't2'), undefined);
+    assert.ok(sess.res.jsonBody.recent.find(x => x.sessionId === 't2'), 'an old finished standalone is archived');
+  });
+
+  test('a waiting session names every loop it waits on, and a finished one names none (LIN-3983)', async () => {
+    const router = makeRouter({
+      'ws-a': {
+        live: [],
+        history: [{ ...standaloneRunning('w1', 'LIN-30'), feedback: [{ message: '[blocked] need a decision', timestamp: NOW_ISO }] }, standaloneTerminal('t3', 'LIN-31')],
+        agentStatus: []
+      }
+    });
+    const handler = sessionsHandler(router);
+    const sess = makeReqRes({ session: wsSession, query: { view: 'sessions' } });
+    await handler(sess.req, sess.res);
+
+    const waiting = findSession(sess.res.jsonBody, 'w1');
+    assert.equal(waiting.waiting, true);
+    assert.deepEqual(waiting.waitingLoopIds, [waiting.producerLoopId], 'one blocked loop, named');
+
+    const done = findSession(sess.res.jsonBody, 't3');
+    assert.deepEqual(done.waitingLoopIds, [], 'a finished session waits on nothing');
   });
 
   test('an autopilot session stays in the Autopilot view AND appears in the Sessions view (in-flight superset)', async () => {

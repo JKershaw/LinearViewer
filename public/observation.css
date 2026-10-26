@@ -152,41 +152,6 @@
   .obs-poll-status { animation: none; }
 }
 
-/* ─── View tabs (LIN-1194) — intra-page Autopilot | Sessions switcher ───────── */
-
-.obs-tabs {
-  display: flex;
-  gap: 0.4rem;
-  margin: 0 0 0.9rem;
-  border-bottom: 1px solid var(--line);
-}
-
-.obs-tab {
-  appearance: none;
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px; /* overlap the container border so the active underline sits on it */
-  padding: 0.4rem 0.7rem;
-  font-family: var(--font-content);
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-.obs-tab:hover { color: var(--text); }
-
-.obs-tab.is-active {
-  color: var(--text);
-  border-bottom-color: var(--brand);
-}
-
-.obs-tab:focus-visible {
-  outline: 2px solid var(--brand);
-  outline-offset: 2px;
-  border-radius: 3px;
-}
 
 /* ─── Sections — flat uppercase eyebrows (LIN-927; boxed framing dropped) ───── */
 
@@ -429,7 +394,7 @@
 /* Effect override flip (LIN-2775 Area 5) — neutral like .obs-ruling-dismiss:
    it changes what the row WILL do, not a clearance/acceptance action, so it
    borrows no green/amber weight from either. `--active` marks a standing
-   override with the same brand accent .obs-tab.is-active uses. */
+   override with the same brand accent .tabs__tab.is-active uses. */
 .obs-ruling-effect-flip {
   margin-top: 0.35rem;
   color: var(--fg-dim);
@@ -629,6 +594,10 @@
 .obs-session[data-status="done-with-warning"] { border-left-color: var(--green); }
 .obs-session[data-status="error"] { border-left-color: var(--red); }
 .obs-session[data-status="stale"] { border-left-color: var(--slate); }
+/* waiting (LIN-3983): the strongest accent on the card list. A teal edge, thicker
+   than the others, so a card that needs a person is never the quietest, and not
+   the amber of in-progress. */
+.obs-session[data-status="waiting"] { border-left-width: 4px; border-left-color: var(--brand); }
 
 /* The head is a non-interactive container (LIN-928, design §7): the whole header
    is no longer the toggle, so it carries no pointer cursor / hover affordance —
@@ -1417,3 +1386,70 @@ a.obs-task-ident:hover { text-decoration: underline; }
   margin: 0 0 0.6rem;
   max-width: 62ch;
 }
+
+/* ─── Waiting block (LIN-3983) ────────────────────────────────────────────────
+   What waits on you, above the runs feed. The strongest accent on the page: a
+   waiting run is the one card that needs a person, so it is not the quietest.
+   The ruling rows inside it are the Rulings tab's own rows; their bulk
+   checkbox belongs to the tab, not the block. */
+.obs-waiting[hidden] { display: none; }
+.obs-waiting {
+  border-left: 4px solid var(--brand);
+  padding-left: 0.75rem;
+  margin-bottom: 1.1rem;
+}
+.obs-waiting-rulings .obs-ruling-select { display: none; }
+.obs-waiting-run {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--line);
+  list-style: none;
+}
+.obs-waiting-run-title { font-weight: 600; color: var(--text); }
+.obs-waiting-run-text { margin: 0.2rem 0 0.25rem; color: var(--muted); font-size: 0.9rem; }
+.obs-waiting-run-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--brand);
+  font-size: 0.9rem;
+}
+.obs-waiting-more {
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 0.4rem 0;
+  min-height: 44px;
+  color: var(--brand);
+  font-family: var(--font-content);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.obs-waiting-more[hidden] { display: none; }
+
+/* ─── Runs filter and view hint (LIN-3983) ─────────────────────────────────── */
+.obs-view-hint {
+  margin: -0.4rem 0 0.9rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.obs-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+.obs-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--raised);
+  color: var(--muted);
+  font-family: var(--font-content);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.obs-filter-btn.is-on,
+.obs-filter-btn[aria-pressed="true"] { color: var(--text); border-color: var(--border-strong); }
