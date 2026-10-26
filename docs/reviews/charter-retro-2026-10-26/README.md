@@ -7,7 +7,7 @@
 - **Product:** the code is larger, not smaller. The UI doesn't match the design, and nothing checks it against the design.
 - **Decisions:** 8 rulings are open, and LIN-3952 is approved but wedged. Section 6 has the questions only you can answer.
 
-**Labels.** *checked* = I re-read the claim against the record. *not checked* = taken from an input and not re-read. Times are record times (comment `createdAt`), not the operator's labels, which run 5–15 minutes late. Full detail is in [evidence.md](evidence.md). The inputs are verbatim in [inputs/](inputs/).
+**Labels.** *checked* = I re-read the claim against the record. *not checked* = taken from an input and not re-read. Times are record times (comment `createdAt`), not the operator's labels, which run 5–15 minutes late. Full detail is in [evidence.md](evidence.md). The inputs are verbatim in [inputs/](inputs/). Input 3 is on main at [ui-design-gap-review-2026-10-26](../ui-design-gap-review-2026-10-26/README.md).
 
 ---
 
@@ -19,8 +19,8 @@
 - **Close-outs stalled off the code.** A deploy behind main (LIN-3956), a conflicted PR with no CI (LIN-3980), and flakes (LIN-3969, LIN-3985). *Checked.* "Commits nobody reviews" is *not checked*.
 
 **Expanded**
-- **Scope and pace grew, each step at your call.** The UI goal grew three times. Costs was added 25 Oct 10:59Z and paused 18:40Z after LIN-3937 aborted at $52 priced. Lanes went to three heavy, against `improvement-cycles.md:32`. The budget pause moved from 70% to 90%. *Checked* for the commits and tickets; the 80% and 91% meter readings are *not checked*.
-- **Tickets multiplied.** 234 filed since 23 Oct: 120 Done, 5 Canceled, 3 In Progress, 106 open. 104 of the open ones have never run. Priced spend is $1,478, a floor. This repeats `tasks-generate-tasks.md:34`. *Checked* from input 6.
+- **Scope and pace grew, each step at your call.** The UI goal grew three times. Costs was added 25 Oct 10:59Z and paused 18:24Z after LIN-3937 aborted at $52 priced. Lanes went to three heavy, against `improvement-cycles.md:32`. The budget pause moved from 70% to 90%. *Checked* for the commits and tickets; the 80% and 91% meter readings are *not checked*.
+- **Tickets multiplied.** 234 filed since 23 Oct: 120 Done, 5 Canceled, 3 In Progress, 106 open. 104 of the open ones have never run. Priced spend is $1,478, a floor. This repeats `tasks-generate-tasks.md:34`. *Not checked* (figures from input 6, not recounted).
 - **The code grew.** Production code +9,725 lines since `8e59ed62`. Decision points +2,310. Two internal measures improved: CSS duplicate blocks 35 → 29, knot pairs 11 → 9. *Checked*, with three corrections to input 1 (Next-run deleted lines, `.btn` at about 11 files, test growth).
 
 **Wedged**
@@ -107,14 +107,15 @@ Every state above was read live at 09:00–09:25Z.
 
 - **Run page, Dispatch, Swipe.** *Recommendation:* hold them until the design method changes. None has a prototype. *Case against:* they may be needed for the test.
 - **LIN-3952.** Options: any-member (today's behaviour and the builder's recommendation), owner-only (the operator's pre-fill), or park. *Recommendation:* finish with any-member; it's your call. *Case against:* owner-only matches the operator's rules block, and parking leaves #2165 open.
+- **Costs (LIN-3936, #2136 open).** *Recommendation:* leave it paused for its own charter, as you decided (25 Oct 18:24Z). *Case against:* #2136 drifts from main while it waits.
 - **The 104 never-run tickets.** *Recommendation:* one triage pass to close or park them. Don't work them. *Case against:* some may be needed for the test.
 
 ### Process
 
 - **Builders see the design and check against it.** *Recommendation:* yes. *Case against:* you chose to withhold prototypes, and over-specific tickets ran badly before (12 Oct charter).
-- **Design-review findings go into the page's own ticket**, not new tickets. *Recommendation:* yes.
-- **"Split after two" goes into the runbook;** predictions stay off work tickets; the rules block shrinks to what the templates don't say. *Recommendation:* yes, all three.
-- **Lanes.** The runbook says one heavy at a time; three ran. *Recommendation:* keep the runbook rule until you change it.
+- **Design-review findings go into the page's own ticket**, not new tickets. *Recommendation:* yes. *Case against:* it re-opens or widens a ticket after the fact. That is safe only between runs, never on a running ticket (`theseus-method-long.md:320`).
+- **"Split after two" goes into the runbook;** predictions stay off work tickets; the rules block shrinks to what the templates don't say. *Recommendation:* yes, all three. *Case against:* split-after-two would have cut converging plans that LIN-3651 deliberately lets continue. Taking predictions off work tickets removes what step 8 scores "line by line" (`theseus-method-long.md:322`), unless they move to the charter.
+- **Lanes.** The runbook says one heavy at a time; three ran. Options: one heavy (slower, but inside the laptop limit) or three heavy (the pace this charter ran at). *Recommendation:* keep the runbook rule until you change it. *Case against:* three heavy lanes is what this charter ran on, and the runbook's reason is a laptop freeze.
 
 ---
 

@@ -122,6 +122,6 @@ Title search across the team listing (3,947 tickets, all states), excluding Dupl
 
 ## 7. Counts
 
-- Filed since 23 Oct: 234. Done 120, Canceled 5, In Progress 3, open 106. Of the open tickets, 104 have never run. Priced spend $1,478 (a floor, because implementation ran on the unpriced `claude-haiku-5-5` from about 24 Oct 21:00Z).
+- Filed since 23 Oct (*not checked*: figures from input 6, not recounted): 234. Done 120, Canceled 5, In Progress 3, open 106. Of the open tickets, 104 have never run. Priced spend $1,478 (a floor, because implementation ran on the unpriced `claude-haiku-5-5` from about 24 Oct 21:00Z).
 - Open tickets across the team listing: 1,346 (1,052 Backlog, 289 Todo, 5 In Progress), excluding 36 Duplicate.
 - Meter readings, from input 5 and not re-read: 53% (24 Oct 19:45Z), 60% (25 Oct 07:00Z), 74% (17:07Z), 80% (19:40Z), 91% (26 Oct ~07:00Z).
