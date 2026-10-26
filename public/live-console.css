@@ -468,6 +468,7 @@
   font-size: 0.85rem;
   color: var(--text);
   text-decoration: none;
+  white-space: nowrap; /* the identifier is one unit: "LIN-1" never breaks across a line */
 }
 .lc-lane-task:hover { color: var(--brand-dim); text-decoration: underline; }
 /* LIN-3331 F1: the task identifier and its adjacent task-page link share ONE
@@ -658,7 +659,6 @@
 }
 
 @media (max-width: 560px) {
-  .lc-lane { grid-template-columns: auto 1fr; }
   .lc-lane-ws { display: none; }
   .lc-event { grid-template-columns: auto 1fr; }
   .lc-event-meta { grid-column: 2; }

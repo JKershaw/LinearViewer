@@ -2129,6 +2129,31 @@ test.describe('Live Console (experimental)', () => {
       expect(stageWidth, `the stage row is ${Math.round(stageWidth)}px of a ${Math.round(laneWidth)}px lane`).toBeGreaterThan(laneWidth * 0.8);
     });
 
+    test('at 390×844 a waiting lane keeps its identifier on one line and its stage row takes the lane\'s width', async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      // A long title, so the lane's head has to shorten it: the identifier must still stay whole.
+      const worker = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+        data: { prompt: 'implement', promptName: 'plan', kind: 'plan', issueIdentifier: 'LIN-9315', issueTitle: 'Pick the sign-in method and write the migration notes for the team', target: 'cli' },
+      });
+      expect(worker.status(), `worker seed failed: ${await worker.text()}`).toBe(201);
+      const workerId = (await worker.json()).item.id;
+      const { token } = await (await page.request.get(`/test/create-dispatch-token?label=runner-LIN-9315&urlKey=${URL_KEY}`)).json();
+      await page.request.post(`/api/dispatch/take/${workerId}`, { headers: { Authorization: `Bearer ${token}` } });
+      await page.request.post(`/api/dispatch/feedback/${workerId}`, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        data: { message: '[blocked] Which sign-in method should I build: email or Linear?' },
+      });
+      await page.goto(PAGE_URL);
+      const lane = page.locator('[data-testid="live-console-lane"]').filter({ hasText: 'LIN-9315' });
+      await expect(lane.locator('.lc-lane-action')).toContainText('waiting on you');
+      const laneWidth = (await lane.boundingBox()).width;
+      const stage = await lane.locator('.lc-lane-stage-row').boundingBox();
+      const task = await lane.locator('.lc-lane-task').boundingBox();
+      expect(stage.width, `the stage row is ${Math.round(stage.width)}px of a ${Math.round(laneWidth)}px lane`).toBeGreaterThan(laneWidth * 0.8);
+      // One line of the task's 0.85rem text is about 20px; a broken identifier is two lines.
+      expect(task.height, `the identifier is ${Math.round(task.height)}px tall: it broke across lines`).toBeLessThan(26);
+    });
+
     test('each range control names, in visible text, what it sets', async ({ page }) => {
       await page.goto(PAGE_URL);
       const strip = page.getByRole('group', { name: 'Strip range' }).locator('.lc-range-label');
