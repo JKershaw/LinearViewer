@@ -707,7 +707,7 @@ main.lc-page[data-url-key]                    - page container
   [data-testid="live-console-banner"]         - status banner
     #live-console-dot[data-health]            - health dot (live|waiting|done|error|idle); error only while a shown run failed and nothing has followed it (LIN-3977)
     #live-console-status[aria-live=polite]    - one-line fleet status / connection state
-  .lc-pulse-section                           - flowing activity strip section (LIN-1505 Phase C: zoom controls)
+  [data-testid="live-console-strip"]          - flowing activity strip section (LIN-1505 Phase C: zoom controls)
     [data-testid="live-console-pulse-presets"][role=group][aria-label="Strip range"]  - 3m/15m/1h/6h
                                                 range buttons (reuses .lc-timeline-preset styling verbatim);
                                                 3m is the always-on-load default, never data-dependent

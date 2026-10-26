@@ -403,6 +403,16 @@ describe('the dot: red only for a failure nothing has followed', () => {
     assert.equal(feed.summary.failedNow, 0);
   });
 
+  test('a status-only lane on the failed task clears the dot (it is a lane on that key, not a later run)', () => {
+    // The task's latest run failed. A status-only working row on the same task is a lane on
+    // its key with no loop behind it, and that lane is what the page shows now: the dot clears.
+    const failed = run({ loopId: 'F', issueIdentifier: 'LIN-7', dispatchedAt: at(60), takenAt: at(59), terminalStatus: 'failed', terminalCompletedAt: at(50), agentState: 'error' });
+    const statusItems = [{ id: 'st-7', taskIdentifier: 'LIN-7', action: 'research', status: 'in_progress', summary: 'Looking again', timestamp: at(3), workspaceUrlKey: 'acme', workspaceName: 'Acme' }];
+    const withLane = feedOf([failed], statusItems);
+    assert.ok(withLane.lanes.some(l => l.task === 'LIN-7'), 'the status-only row is a lane on LIN-7');
+    assert.equal(withLane.summary.failedNow, 0);
+    assert.equal(feedOf([failed], []).summary.failedNow, 1, 'with no lane on the key, the failed run is red');
+  });
   test('"0 working" with only a failure older than the 24 h window is not red', () => {
     const feed = feedOf([run({ loopId: 'O', terminalStatus: 'failed', terminalCompletedAt: at(29 * 60), dispatchedAt: at(30 * 60), agentTimestamp: at(29 * 60), agentState: 'error' })]);
     assert.equal(feed.summary.working, 0);
@@ -458,6 +468,23 @@ describe('run links: a bar and a status row carry the ledger id, not the loop id
     // derivedSinceMs past every loop event: nothing derives, so the status row stands alone.
     const { events } = buildConsoleEvents({ statusItems, loops, derivedSinceMs: NOW + 1, superseded: new Set(), sessionIdByLoop: sessionIds });
     assert.equal(events.find(e => e.id === 'st-b').sessionId, sessionIds.get('acme::B'));
+  });
+});
+
+describe('the fold: a status row joins only the run that owns it (LIN-3977 review finding 10a)', () => {
+  test('two same-task runs that end within 5 minutes: the row folds into its own run, not the other', () => {
+    // X and Y are two implementation runs on LIN-9 that finish two minutes apart. The
+    // status row S is X's own match (its timestamp, action and summary are X's record).
+    const X = run({ loopId: 'X', dispatchedAt: at(30), takenAt: at(29), terminalStatus: 'done', terminalCompletedAt: at(20), agentState: 'complete', agentTimestamp: at(20.5), agentSummary: 'X summary', agentAction: 'implementation' });
+    const Y = run({ loopId: 'Y', dispatchedAt: at(19), takenAt: at(18.5), terminalStatus: 'done', terminalCompletedAt: at(18), agentState: 'complete', agentTimestamp: at(18.2), agentSummary: 'Y summary', agentAction: 'implementation' });
+    const loops = [Y, X];
+    const statusItems = [{ id: 'st-x', taskIdentifier: 'LIN-9', action: 'implementation', status: 'done', summary: 'X summary', timestamp: at(20.5), workspaceUrlKey: 'acme', workspaceName: 'Acme' }];
+    const { events } = buildConsoleEvents({ statusItems, loops, derivedSinceMs: NOW - 86_400_000, superseded: new Set() });
+    assert.equal(events.find(e => e.id === 'st-x'), undefined, 'the status row is folded, not shown beside its moment');
+    const xFinished = events.find(e => e.id === 'd:X:finished');
+    const yFinished = events.find(e => e.id === 'd:Y:finished');
+    assert.equal(xFinished.summary, 'X summary', 'X\'s finished row keeps the row it owns');
+    assert.notEqual(yFinished.summary, 'X summary', 'Y\'s finished row never takes X\'s summary');
   });
 });
 

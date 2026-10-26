@@ -1,7 +1,7 @@
 /**
  * Live Console client (experimental, LIN-1436).
  *
- * The ambient, lean-back view. Polls the generation-free events endpoint and
+ * The ambient, lean-back view. Polls the events endpoint and
  * paints:
  *   - the status banner + tempo sparkline (the system's rhythm, incl. heartbeats),
  *   - the pulse-lane rail (one breathing lane per working agent, ticking its

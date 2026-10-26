@@ -76,9 +76,8 @@
   width: 100%;
   height: 100%;
 }
-/* .lc-pulse-presets reuses .lc-timeline-presets/.lc-timeline-preset verbatim
- * (both classes are present on the markup) — same idiom, zero new button
- * chrome. Only the span-text label is new. */
+/* The strip's range group reuses .lc-timeline-presets/.lc-timeline-preset verbatim
+ * — same idiom, zero new button chrome. Only the span-text label is new. */
 .lc-pulse-span-text {
   font-family: var(--font-structural);
   font-size: 0.72rem;
