@@ -164,7 +164,7 @@
   // every dynamic bit goes through `esc` before it becomes markup. When the
   // parsed state is 'idle', the numeric "0 tools" bit is suppressed in favour
   // of Observation's own idle chip (public/observation.js's renderActivityLog,
-  // `.obs-act-chip.obs-act-idle`, styled via public/observation.css) — reusing
+  // `.obs-act-chip.obs-act-idle`, styled via public/style.css, LIN-3977) — reusing
   // that vocabulary rather than inventing a parallel one.
   function fmtHeartbeat(hb) {
     if (!hb) return '';

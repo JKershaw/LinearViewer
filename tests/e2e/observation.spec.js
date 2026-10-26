@@ -104,10 +104,23 @@ test.describe('Autopilot Observation page (first-class)', () => {
       await expect(page.locator('.obs-archive-section')).toBeVisible();
     });
 
-    test('shows a filter chip per connected workspace, all on by default', async ({ page }) => {
-      const chips = page.locator('.obs-chip');
-      await expect(chips).toHaveCount(2);
+    test('opens on this workspace; All workspaces shows a chip per workspace, all on (LIN-3983 PR 2)', async ({ page }) => {
+      await expect(page.locator('.obs-chip')).toHaveCount(2);
+      await expect(page.getByTestId('obs-scope-current')).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.locator('#obs-chips')).toBeHidden();
+      await page.getByTestId('obs-scope-all').click();
+      await expect(page.getByTestId('obs-scope-all')).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.locator('#obs-chips')).toBeVisible();
       await expect(page.locator('.obs-chip.is-on')).toHaveCount(2);
+    });
+
+    test('All workspaces is in the URL and survives a reload (LIN-3983 PR 2)', async ({ page }) => {
+      await page.getByTestId('obs-scope-all').click();
+      await expect(page).toHaveURL(/[?&]scope=all/);
+      await page.reload();
+      await page.waitForLoadState('networkidle');
+      await expect(page.getByTestId('obs-scope-all')).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.locator('#obs-chips')).toBeVisible();
     });
 
     test('the completed archive is collapsed by default and toggles open', async ({ page }) => {
@@ -827,5 +840,53 @@ test.describe('LIN-2298: no fixed overlay covers the Observation feed', () => {
     await trigger.click();
     await expect(page.getByTestId('feedback-popup')).toBeHidden();
     await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  });
+});
+
+// LIN-3983 PR 2 (review finding A): the zoned exact time sits in the card head's
+// side column. Unwrapped, it grew that column to ~60% of a 390px card and
+// ellipsized the run's id and title ("Loca…"). Both must now render whole.
+test.describe('LIN-3983: a run card keeps its id and title whole at phone width', () => {
+  test('the id and title are not truncated at 390px, with the exact time visible', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    // Taken, not just queued: only a run in flight is in the active feed the card lives in.
+    const item = await seedQueuedRun(page, { issueIdentifier: 'LOCAL-1', issueTitle: 'Local parent task' });
+    const tokenResp = await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${URL_KEY}`);
+    const { token } = await tokenResp.json();
+    const take = await page.request.post(`/api/dispatch/take/${item.id}`, { headers: { Authorization: `Bearer ${token}` } });
+    expect(take.status(), `take failed: ${await take.text()}`).toBe(200);
+    await page.goto(`/test/clear-sessions-feed-cache?urlKey=${URL_KEY}`);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(OBSERVATION_URL);
+    await page.waitForLoadState('networkidle');
+    await page.getByTestId('obs-filter-all').click();
+
+    const card = page.locator('#obs-active .obs-session').filter({ hasText: 'Local parent task' });
+    await expect(card).toBeVisible();
+    // The exact time is the thing that used to crush the head; assert it is there.
+    await expect(card.locator('.obs-session-time time')).toBeVisible();
+
+    const ident = card.locator('.obs-session-ident');
+    const title = card.locator('.obs-session-name:not(.obs-session-started)');
+    await expect(ident).toHaveText('LOCAL-1');
+    await expect(title).toHaveText('Local parent task');
+    for (const el of [ident, title]) {
+      const fits = await el.evaluate(node => node.scrollWidth <= node.clientWidth);
+      expect(fits, `${await el.textContent()} is not truncated at 390px`).toBe(true);
+    }
+  });
+
+  // Review finding B: the Rulings disclaimer inherited the structural (mono) face from
+  // the page body. It is a human sentence, so it takes the content (sans) face.
+  test('the Rulings disclaimer is set in the content face, not mono', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await page.goto(`${OBSERVATION_URL}?view=rulings`);
+    await page.waitForLoadState('networkidle');
+
+    const fontFamily = await page.locator('#obs-rulings-limits').evaluate(node => getComputedStyle(node).fontFamily);
+    expect(fontFamily).toContain('Inter');
+    expect(fontFamily).not.toContain('JetBrains Mono');
   });
 });

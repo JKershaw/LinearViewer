@@ -12,6 +12,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
+import { loadCommonWindow } from '../fixtures/client-common.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const src = readFileSync(join(__dirname, '../../public/observation.js'), 'utf8');
@@ -28,9 +29,11 @@ const escapeHtml = (str) => {
 // the seams under test here (LIN-2244): it only needs to be deterministic and
 // take a timestamp, never the real "3m ago" formatting.
 const relativeTime = (ts) => (ts ? `stub-relative-time(${ts})` : '');
+// The page loads common.js before this script, so its shared pill and bar replicas exist on the page.
+const commonWindow = loadCommonWindow();
 const sandbox = {
   module: { exports: {} },
-  window: { addEventListener() {} },
+  window: { addEventListener() {}, renderStatusPill: commonWindow.renderStatusPill, renderSegmentBar: commonWindow.renderSegmentBar },
   document: { addEventListener() {} },
   escapeHtml,
   relativeTime,
@@ -38,7 +41,9 @@ const sandbox = {
 };
 vm.runInNewContext(src, sandbox, { filename: 'observation.js' });
 const { renderActivityLog, renderArtifacts, classifyArtifact, renderObjective } = sandbox.module.exports;
-const { renderSummaryLine, excerptDecisionCase, renderWaitingDecisionSummary, DECISION_EXCERPT_CHARS } = sandbox.module.exports;
+const { renderSummaryLine, excerptDecisionCase, DECISION_EXCERPT_CHARS } = sandbox.module.exports;
+// The page's open-question set (the rulings response's openLoopIds), a top-level `let` of observation.js.
+const setOpen = (ids) => vm.runInContext(`openLoopIds = ${ids === null ? 'null' : `new Set(${JSON.stringify(ids)})`}`, sandbox);
 const { boundDecisionOptions, DECISION_OPTIONS_CHARS } = sandbox.module.exports;
 const { laneTicketWalk, ticketProgressText } = sandbox.module.exports;
 const { sessionParkedWait } = sandbox.module.exports;
@@ -185,33 +190,49 @@ test.describe('renderSummaryLine / excerptDecisionCase — waiting card decision
     assert.match(excerpt, /Part three\./);
   });
 
-  test('option labels render in the decision summary', () => {
-    const html = renderWaitingDecisionSummary(
-      { decision_id: 'd-1', options: [{ id: 'yes', label: 'Yes, proceed' }, { id: 'no', label: 'No, hold off' }] },
-      ['short case']
-    );
+  test('the answer choices render in the waiting sentence while the question is open', () => {
+    setOpen(['p']);
+    const html = renderSummaryLine(waitingSession({
+      producerLoopId: 'p',
+      decision: { decision_id: 'd-1', options: [{ id: 'yes', label: 'Yes, proceed' }, { id: 'no', label: 'No, hold off' }] }
+    }));
     assert.match(html, /Yes, proceed/);
     assert.match(html, /No, hold off/);
+    setOpen(null);
   });
 
-  test('renderSummaryLine: a waiting session with a decision renders the excerpt + option labels + working reply CTA', () => {
+  test('the choices are dropped once the producer question is no longer open (dismissed, answered, withdrawn)', () => {
+    setOpen([]);
+    const html = renderSummaryLine(waitingSession({
+      producerLoopId: 'p',
+      decision: { decision_id: 'd-1', options: [{ id: 'yes', label: 'Yes, proceed' }] }
+    }));
+    assert.ok(!html.includes('Yes, proceed'), 'a question that is not open offers no choice');
+    assert.ok(!html.includes('obs-summary-decision-options'));
+    setOpen(null);
+  });
+
+  test('renderSummaryLine: a waiting card says the question once, offers its choices, and keeps the reply CTA', () => {
+    setOpen(['p']);
     const s = waitingSession({
+      producerLoopId: 'p',
+      waitingMessage: '[blocked] Proceed with the migration?',
       decision: { decision_id: 'd-1', options: [{ id: 'yes', label: 'Yes' }, { id: 'no', label: 'No' }] },
       decisionCase: ['Considered the schema diff.']
     });
     const html = renderSummaryLine(s);
     assert.match(html, /obs-summary-waiting/);
-    assert.match(html, /waiting on you/);
-    assert.match(html, /obs-summary-decision-excerpt/);
-    assert.match(html, /Considered the schema diff\./);
+    assert.match(html, /Proceed with the migration\?/, 'the question the run asked is the sentence');
+    assert.ok(!html.includes('[blocked]'), 'the runner marker is taken out at display time');
+    assert.ok(!html.includes('waiting on you'), 'the pill already says waiting; the sentence does not repeat it');
     assert.match(html, /obs-summary-decision-options/);
-    assert.match(html, /Yes/);
-    assert.match(html, /No/);
+    assert.match(html, /Answer with Yes · No/);
     assert.match(html, /obs-summary-reply/);
     assert.match(html, /reply →/);
+    setOpen(null);
   });
 
-  test('renderSummaryLine: a waiting session with NO decision renders exactly as before — no excerpt/options scaffolding', () => {
+  test('renderSummaryLine: a waiting session with NO decision has no excerpt/options scaffolding', () => {
     const html = renderSummaryLine(waitingSession());
     assert.match(html, /obs-summary-waiting/);
     assert.match(html, /need your decision/);
@@ -221,7 +242,9 @@ test.describe('renderSummaryLine / excerptDecisionCase — waiting card decision
   });
 
   test('the excerpt and option labels are HTML-escaped', () => {
+    setOpen(['p']);
     const s = waitingSession({
+      producerLoopId: 'p',
       decision: { decision_id: 'd-1', options: [{ id: 'x', label: '<script>alert(1)</script>' }] },
       decisionCase: ['<img src=x onerror=alert(1)>']
     });
@@ -229,6 +252,7 @@ test.describe('renderSummaryLine / excerptDecisionCase — waiting card decision
     assert.ok(!html.includes('<script>alert(1)</script>'));
     assert.ok(!html.includes('<img src=x onerror=alert(1)>'));
     assert.match(html, /&lt;script&gt;/);
+    setOpen(null);
   });
 
   // LIN-2184 (H5, beat 5): the ticket's V1-boundary acceptance test, feed-card
@@ -303,7 +327,7 @@ test.describe('sessionParkedWait / renderSummaryLine parked branch (LIN-2244)', 
     const s = { stale: false, waiting: false, terminal: false, runs: [{ parkedWait: { since: 't1', latest: 't2' } }] };
     const html = renderSummaryLine(s);
     assert.match(html, /obs-summary-parked/);
-    assert.match(html, /parked on a wait since stub-relative-time\(t1\)/);
+    assert.match(html, /Parked on a wait since stub-relative-time\(t1\)/);
     assert.ok(!html.includes('obs-summary-waiting'));
     assert.ok(!html.includes('working…'));
   });
@@ -507,8 +531,10 @@ test.describe('boundDecisionOptions — LIN-2195: the option run carries a budge
   });
 
   test('the rendered summary shows the overflow marker and escapes labels', () => {
-    const html = renderWaitingDecisionSummary(
-      {
+    setOpen(['p']);
+    const html = renderSummaryLine({
+      waiting: true, stale: false, terminal: false, waitingMessage: '[blocked] pick one', producerLoopId: 'p',
+      decision: {
         options: [
           { label: '<script>alert(1)</script>' },
           { label: 'a second option that is fairly long' },
@@ -516,16 +542,22 @@ test.describe('boundDecisionOptions — LIN-2195: the option run carries a budge
           { label: 'a fourth' }
         ]
       },
-      []
-    );
+      decisionCase: []
+    });
+    setOpen(null);
     assert.ok(!html.includes('<script>'), 'agent-authored labels must stay escaped');
     assert.match(html, /&lt;script&gt;/);
     assert.match(html, /\+\d+ more/, 'the remainder is reported rather than silently dropped');
   });
 
   test('a run that fits shows no "+N more" marker', () => {
-    const html = renderWaitingDecisionSummary({ options: [{ label: 'yes' }, { label: 'no' }] }, []);
+    setOpen(['p']);
+    const html = renderSummaryLine({
+      waiting: true, stale: false, terminal: false, waitingMessage: '[blocked] pick one', producerLoopId: 'p',
+      decision: { options: [{ label: 'yes' }, { label: 'no' }] }, decisionCase: []
+    });
+    setOpen(null);
     assert.ok(!/\+\d+ more/.test(html));
-    assert.match(html, /\[yes \/ no\]/);
+    assert.match(html, /Answer with yes · no/);
   });
 });
