@@ -84,6 +84,9 @@ describe('the Dispatch page carries the section (LIN-3952 item 6)', () => {
 
   test('without the section body, the page renders with no No job section and no error', () => {
     const html = renderDispatchPage('Acme', { urlKey: 'acme', featureFlags: {} });
+    // The titled box is the thing a reader sees as an empty box, so the box itself must be absent, not only its body (LIN-3952 review).
+    assert.doesNotMatch(html, /data-testid="dispatch-section-no-job"/);
+    assert.doesNotMatch(html, /No job \(Dispatch suggestion\)/);
     assert.doesNotMatch(html, /data-testid="dispatch-no-job"/);
   });
 });
