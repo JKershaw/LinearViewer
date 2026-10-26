@@ -136,10 +136,10 @@ describe('openDecisionLoopIds (LIN-4003: the worker/autopilot join, LIN-3959)', 
 
   test('unrelated loops sharing a decision_id on different tickets stay separate', () => {
     const loops = [
-      loop({ loopId: 'a', issueIdentifier: 'LIN-1', answeredDecisions: answered('d-1') }),
-      loop({ loopId: 'b', issueIdentifier: 'LIN-2' })
+      loop({ loopId: 'w', lineageId: 'W', sessionId: 'ap', issueIdentifier: 'LIN-1', answeredDecisions: answered('d-1') }),
+      loop({ loopId: 'ap', lineageId: 'ap', kind: 'autopilot', issueIdentifier: 'LIN-2' })
     ];
-    assert.deepStrictEqual(openAndAgree(loops), ['b']);
+    assert.deepStrictEqual(openAndAgree(loops), ['ap']);
   });
 
   test('the same decision on the same ticket with no sessionId link stays separate', () => {
