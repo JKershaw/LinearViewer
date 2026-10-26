@@ -254,3 +254,23 @@ describe('the page lists jobs by spend (LIN-3855 done-when)', () => {
     assert.match(html, /data-testid="models-job-bug"[\s\S]*?unknown/, 'an unpriced run is unknown, not $0');
   });
 });
+
+// LIN-3987: a label says what it resolves to in words, and the window's note names models by display name.
+describe('the Models words (LIN-3987)', () => {
+  test('a job following a blank group names what the group resolves to, never "(none)"', () => {
+    const html = body(emptyTable());
+    assert.doesNotMatch(html, /\(none\)/);
+    assert.match(html, /<option value=""[^>]*>Follow [^<]*\(Claude Code(?:&#039;|')s own effort\)<\/option>/, 'effort follows the harness in force, in words');
+    assert.match(html, /<option value=""[^>]*>Follow [^<]*\(Claude Code\)<\/option>/, 'a blank harness resolves to Claude Code');
+  });
+
+  test('the "also ran on" note names models by their display names, not their ids', () => {
+    const table = emptyTable();
+    table.jobs.implementation = { model: 'claude-sonnet-5-5' };
+    const spend = { id: 'implementation', runs: 3, priced: 3, unpriced: 0, noTelemetry: 0, spendUsd: 1, typicalUsd: 0.3, models: ['claude-sonnet-5-5', 'claude-opus-5-5'] };
+    const html = body(table, { agentSpend: [spend] });
+    assert.match(html, /also ran on Claude Opus 5\.5 \(1 of 2 models in the window\)/);
+    assert.doesNotMatch(html, /also ran on claude-opus-5-5/);
+  });
+});
+

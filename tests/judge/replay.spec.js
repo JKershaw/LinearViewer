@@ -161,7 +161,7 @@ async function prepare(page, context, entry, viewport, theme, side, baseURL) {
       }
     }
   }
-  if (entry.state === 'home-run-panel-open') {
+  if (entry.state === 'home-run-panel-open' || entry.state === 'home-run-panel-opencode') {
     // LIN-3962: Home's Change panel, opened the way a viewer opens it: the In Progress row (visible; the marked top task
     // sits under a collapsed parent in this seed), then Change. The seed gives this page its run controls, so head must
     // show Change; a head without it fails here rather than being skipped. Base's panel is the old one, so base may come
@@ -172,6 +172,11 @@ async function prepare(page, context, entry, viewport, theme, side, baseURL) {
     if (await change.count()) {
       await change.click();
       await page.getByTestId(side === 'head' ? 'run-decision-panel' : 'run-change-panel').waitFor();
+    }
+    // LIN-3987: the opencode state chooses opencode as the harness, so the effort line and the lost web choice show.
+    if (entry.state === 'home-run-panel-opencode' && side === 'head') {
+      await page.getByTestId('run-harness').selectOption('opencode');
+      await page.getByTestId('run-effort').first().waitFor({ state: 'hidden' });
     }
   }
   if (entry.state === 'swipe-dispatch-open') {
