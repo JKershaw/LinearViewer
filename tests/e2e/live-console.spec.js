@@ -172,11 +172,31 @@ test.beforeEach(({ workerUrlKey }) => {
 
 test.describe('Live Console (experimental)', () => {
   test.describe('Feature Flag Gating', () => {
-    test('redirects to settings when the flag is off', async ({ page }) => {
-      await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    // LIN-3977: an opt-out (a stored `false`) is explicit, so the test does not depend on
+    // whether the worker's workspace has a runner from another spec (promotion turns the
+    // flag on for an owner with a runner and no stored flag).
+    test('redirects to the features settings when the flag is opted out', async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ liveConsole: false })}&urlKey=${URL_KEY}`);
       await page.goto(PAGE_URL);
       await page.waitForLoadState('networkidle');
-      expect(page.url()).toContain('/settings');
+      expect(page.url()).toContain('/settings/features');
+    });
+
+    test.describe('promotion: an owner with a runner and no stored flag', () => {
+      test.afterEach(async ({ page }) => {
+        // Put the worker's workspace back to "no runner key" for the specs after this one.
+        await page.request.post(`/test/create-runner-key?urlKey=${URL_KEY}&state=none`);
+      });
+
+      test('opens the page and the events feed without a stored flag', async ({ page }) => {
+        await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+        await page.request.post(`/test/create-runner-key?urlKey=${URL_KEY}`);
+        await page.goto(PAGE_URL);
+        await page.waitForLoadState('networkidle');
+        await expect(page.locator('.page-header h1')).toHaveText('Live Console');
+        const res = await page.request.get(EVENTS_API);
+        expect(res.status()).toBe(200);
+      });
     });
 
     test('loads when the flag is on', async ({ page }) => {
@@ -186,7 +206,7 @@ test.describe('Live Console (experimental)', () => {
       await expect(page.locator('.page-header h1')).toHaveText('Live Console');
     });
 
-    test('toggle lives in the Experimental section and defaults off', async ({ page }) => {
+    test('toggle lives in the Views section and defaults off without a runner', async ({ page }) => {
       await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
@@ -281,7 +301,7 @@ test.describe('Live Console (experimental)', () => {
   });
 
   test.describe('Live data', () => {
-    test('renders seeded events with click-through to Observation', async ({ page }) => {
+    test('renders seeded events with click-through to the task page (no run behind them)', async ({ page }) => {
       await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
       await clearFeed(page, URL_KEY);
       await page.request.post('/test/seed-agent-status', {
@@ -298,9 +318,9 @@ test.describe('Live Console (experimental)', () => {
       await expect(page.locator('[data-testid="live-console-lane"]')).toHaveCount(1);
       await expect(page.locator('[data-testid="live-console-event"]').first()).toBeVisible();
 
-      // The event task links through to that workspace's Observation page.
+      // A row with no run behind it links to its task page (LIN-3977).
       const link = page.locator('.lc-event-task', { hasText: 'LIN-778' });
-      await expect(link).toHaveAttribute('href', `/workspace/${URL_KEY}/observation`);
+      await expect(link).toHaveAttribute('href', `/workspace/${URL_KEY}/task/LIN-778`);
     });
 
     test('a running worker becomes a heartbeat lane and its [evidence] a stream event', async ({ page }) => {
@@ -345,7 +365,7 @@ test.describe('Live Console (experimental)', () => {
     // the right edge) and the link renders at the lane's structural size, never
     // the body size. (The regression the review found by render is exactly the
     // unwrapped `<a>` taking the `1fr` cell and wrapping `.lc-lane-ws`.)
-    test('the lane task-page link shares the identifier\'s grid cell (one-row layout, structural font size)', async ({ page }) => {
+    test('the lane identifier sits on the same row as the workspace name (one-row layout)', async ({ page }) => {
       await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
       await clearFeed(page, URL_KEY);
 
@@ -365,28 +385,20 @@ test.describe('Live Console (experimental)', () => {
       const lane = page.locator('[data-testid="live-console-lane"]', { hasText: 'LIN-3331L' }).first();
       await expect(lane).toBeVisible();
 
-      const link = lane.locator('[data-testid="lc-lane-task-page-link"]');
+      // LIN-3977: the identifier is the one task link, to the task page.
+      const link = lane.locator('[data-testid="live-console-lane-task"]');
       await expect(link).toBeVisible();
       await expect(link).toHaveAttribute('href', `/workspace/${URL_KEY}/task/LIN-3331L`);
 
       const geometry = await lane.evaluate((li) => {
         const top = (sel) => Math.round(li.querySelector(sel).getBoundingClientRect().top);
-        const linkEl = li.querySelector('.lc-lane-task-page');
-        const taskEl = li.querySelector('.lc-lane-task');
         return {
-          linkTop: top('.lc-lane-task-page'),
           taskTop: top('.lc-lane-task'),
           wsTop: top('.lc-lane-ws'),
-          linkFont: parseFloat(getComputedStyle(linkEl).fontSize),
-          taskFont: parseFloat(getComputedStyle(taskEl).fontSize),
         };
       });
       // One row: the workspace name sits on the same row as the task id.
       expect(Math.abs(geometry.wsTop - geometry.taskTop)).toBeLessThanOrEqual(4);
-      // The link neighbours the identifier on that row.
-      expect(Math.abs(geometry.linkTop - geometry.taskTop)).toBeLessThanOrEqual(4);
-      // The link is lane-structural (0.72rem), not body-sized.
-      expect(geometry.linkFont).toBeLessThan(geometry.taskFont);
     });
 
     // LIN-1929 (Phase C of LIN-1908): a beat with no tool calls parses to
@@ -610,8 +622,9 @@ test.describe('Live Console (experimental)', () => {
       await page.goto(PAGE_URL);
       await page.waitForSelector('[data-testid="live-console-lane"]');
       const badge = page.locator('[data-testid="live-console-lane-credential"]').first();
+      // LIN-3977: an unknown credential is the ordinary case and does not show.
       await expect(badge).toHaveAttribute('data-state', 'unknown');
-      await expect(badge).toContainText('unknown');
+      await expect(badge).toBeHidden();
     });
 
     test('a lane whose credential is dead is badged `dead`', async ({ page }) => {
@@ -654,8 +667,8 @@ test.describe('Live Console (experimental)', () => {
       expect(body.summary).toMatchObject({ active: expect.any(Number), total: expect.any(Number) });
     });
 
-    test('is gated (403) when the flag is off', async ({ page }) => {
-      await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    test('is gated (403) when the flag is opted out', async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ liveConsole: false })}&urlKey=${URL_KEY}`);
       const res = await page.request.get(EVENTS_API);
       expect(res.status()).toBe(403);
     });
@@ -1126,7 +1139,7 @@ test.describe('Live Console (experimental)', () => {
       await expect(bar).toBeVisible();
       const label = bar.locator('.lc-timeline-bar-label');
       await expect(label).toBeAttached();
-      await expect(label).toHaveText('LIN-9300 — implementation');
+      await expect(label).toHaveText('LIN-9300 — Build');
       // Visible means rendered pixels, not display:none/visibility:hidden —
       // the same bar-box a hover-only title attribute would NOT provide.
       const box = await label.boundingBox();

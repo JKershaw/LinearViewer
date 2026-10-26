@@ -188,26 +188,28 @@ describe('Live Console lane task-page link (LIN-3331)', () => {
     vm.runInContext(read('public/live-console.js'), sandbox, { filename: 'live-console.js' });
     const { updateLaneNode } = sandbox.module.exports;
     const anchors = {};
-    const li = { querySelector: (sel) => { if (!anchors[sel]) anchors[sel] = makeEl(); return anchors[sel]; } };
+    // classList: updateLaneNode toggles the reduced-motion pulse and waiting classes on the node (LIN-3977).
+    const li = { classList: { toggle() {} }, querySelector: (sel) => { if (!anchors[sel]) anchors[sel] = makeEl(); return anchors[sel]; } };
     return { updateLaneNode, li, anchors };
   }
 
-  test('a lane with a task and a source shows the link, carrying the source', () => {
+  // LIN-3977: the lane has ONE task link (to the task page); the separate "task ↗"
+  // link is gone. The LIN-3331 contract is unchanged: the link carries the source,
+  // and a repaint with no task removes its href.
+  test('a lane with a task and a source links the task page, carrying the source', () => {
     const { updateLaneNode, li, anchors } = laneHarness();
     updateLaneNode(li, { task: 'LIN-5', workspaceUrlKey: 'ws', workspaceName: 'WS', issueSource: 'linear', issueBindingScope: 'team-a' });
-    const link = anchors['.lc-lane-task-page'];
-    assert.equal(link.hidden, false, 'link shown');
+    const link = anchors['.lc-lane-task'];
     assert.equal(link.getAttribute('href'), '/workspace/ws/task/LIN-5?source=linear');
   });
 
-  test('a repaint with the task gone hides the link and removes the href', () => {
+  test('a repaint with the task gone removes the task link href', () => {
     const { updateLaneNode, li, anchors } = laneHarness();
     updateLaneNode(li, { task: 'LIN-5', workspaceUrlKey: 'ws' });
-    const link = anchors['.lc-lane-task-page'];
-    assert.equal(link.hidden, false, 'shown while the lane has a task');
+    const link = anchors['.lc-lane-task'];
+    assert.equal(link.getAttribute('href'), '/workspace/ws/task/LIN-5', 'linked while the lane has a task');
     // The same node is reused across polls; a repaint with no task must clear it.
     updateLaneNode(li, { workspaceUrlKey: 'ws' });
-    assert.equal(link.hidden, true, 'hidden when the task is absent');
-    assert.equal(link.getAttribute('href'), null, 'href removed on hide');
+    assert.equal(link.getAttribute('href'), null, 'href removed when the task is absent');
   });
 });

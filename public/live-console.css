@@ -13,11 +13,14 @@
   padding: 0 1rem 3rem;
 }
 
-.lc-experimental {
+/* LIN-3977: the scope control and the visible labels of the two range controls. */
+.lc-scope { margin: 0.25rem 0 0.5rem; }
+.lc-scope[hidden] { display: none; }
+.lc-range-label {
   font-family: var(--font-content);
+  font-size: 0.72rem;
   color: var(--muted);
-  font-size: 0.85rem;
-  margin: 0.25rem 0 1rem;
+  margin-right: 0.3rem;
 }
 
 /* ── Banner ─────────────────────────────────────────────────────────────── */
@@ -41,6 +44,8 @@
 .lc-status-dot[data-health="done"]  { color: var(--green); }
 .lc-status-dot[data-health="error"] { color: var(--red); }
 .lc-status-dot[data-health="idle"]  { color: var(--slate); }
+/* LIN-3977: a run waits on a person: its own colour, and the banner says it in words. */
+.lc-status-dot[data-health="waiting"] { color: var(--brand); }
 
 .lc-status-dot--pulse { animation: lc-pulse 1.6s ease-in-out infinite; }
 @keyframes lc-pulse {
@@ -179,10 +184,31 @@
   color: var(--brand-dim);
 }
 .lc-timeline-axis {
+  position: relative;
   height: 1.1rem;
   font-family: var(--font-structural);
   font-size: 0.68rem;
   color: var(--muted);
+}
+/* LIN-3977: the axis' time ticks; the first and last are pinned to the column's edges. */
+.lc-timeline-tick {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.lc-timeline-tick--start { transform: none; }
+.lc-timeline-tick--end { transform: translateX(-100%); }
+.lc-timeline-key {
+  font-family: var(--font-content);
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin: 0.2rem 0 0.35rem;
+}
+.lc-lane-since {
+  font-family: var(--font-structural);
+  font-size: 0.7rem;
+  color: var(--slate-dim);
 }
 .lc-timeline-viewport {
   position: relative;
@@ -440,10 +466,34 @@
   gap: 0.4rem;
   min-width: 0;
 }
-.lc-lane-task-page {
+/* LIN-3977: the lane's title, its run link and its stage word. */
+.lc-lane-title {
+  font-family: var(--font-content);
+  font-size: 0.8rem;
+  color: var(--text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lc-lane-title[hidden] { display: none; }
+.lc-lane-run {
   font-family: var(--font-structural);
   font-size: 0.72rem;
+  color: var(--brand-dim);
+  white-space: nowrap;
 }
+.lc-lane-stage-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-family: var(--font-content);
+  font-size: 0.78rem;
+}
+.lc-lane-stage { color: var(--text); font-weight: 600; }
+.lc-lane--waiting .lc-lane-action[data-waiting="1"] { color: var(--brand); font-weight: 600; }
+.lc-lane-cred[hidden] { display: none; }
 /* LIN-2243: a worker-lane's touched-ticket count. Empty (no width) for a
    non-lane loop — never a fixed slot that leaves a visible gap. */
 .lc-lane-tickets {

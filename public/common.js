@@ -79,6 +79,35 @@ window.taskPageHref = function taskPageHref(opts) {
 };
 
 /**
+ * LIN-3977: the run page for a session, the same URL Observation's `sessionHref`
+ * builds. Returns '' when either id is missing, so the caller omits the link.
+ * @global
+ * @param {string} urlKey - workspace url key
+ * @param {string} sessionId - the session ledger's id for the run
+ * @returns {string} href (unescaped; escape at the attribute), or ''
+ */
+window.runPageHref = function runPageHref(urlKey, sessionId) {
+  if (!urlKey || !sessionId) return '';
+  return `/workspace/${encodeURIComponent(urlKey)}/observation/session/${encodeURIComponent(sessionId)}`;
+};
+
+/**
+ * LIN-3977 (LIN-3975's time rule): an exact time in the reader's local time, with
+ * the zone named, e.g. "25 Oct 2026, 13:04 BST". '' for a bad timestamp.
+ * @global
+ * @param {string|number|Date} iso
+ * @returns {string}
+ */
+window.exactLocalTime = function exactLocalTime(iso) {
+  const d = iso instanceof Date ? iso : new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleString(undefined, {
+    day: 'numeric', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
+  });
+};
+
+/**
  * First-paint fit zoom (LIN-1221 F1). Mirror of lib/ship-layout.js
  * computeFitZoom — pick the largest scale at which the content box fits the
  * viewport (with padding), clamped to [minZoom, maxZoom]; never zoom IN on
