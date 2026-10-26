@@ -53,7 +53,7 @@ import { readPlanFacts } from '../lib/chat-request.js';
 import { readModelsHistory } from '../lib/model-routing-history.js';
 import { HARNESSES_WITHOUT_EFFORT } from '../lib/model-routing.js';
 import { agentSpendByJob, typicalByModel } from '../lib/model-routing-spend.js';
-import { decisionPanel, agentLists, suggestionsByHarness } from '../lib/components/decision-panel.js';
+import { decisionPanel, agentLists, suggestionsByHarness, routingWords } from '../lib/components/decision-panel.js';
 import { getModelCatalog } from '../lib/openrouter-catalog.js';
 import { shouldMockAi } from '../lib/should-mock-ai.js';
 import { planOf, quotaAnswer } from '../lib/plan-allowance.js';
@@ -630,6 +630,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         settleHarness: surface !== null
       });
       // LIN-3833: the words the run control shows beside the sources: the step's name and its group.
+      // LIN-3987: `words` is what the run would use, in words, so the browser never prints a raw id or alias.
       const job = getJob(kind);
       res.json({
         kind,
@@ -637,7 +638,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         group: job?.group || null,
         presetId: preset ? presetId : null,
         presetName: preset?.name ?? null,
-        ...routing
+        ...routing,
+        words: routingWords({ harness: routing.harness, model: routing.model, effort: routing.effort })
       });
     } catch (err) {
       return reportFailure(res, 'Preview dispatch routing error:', err, 'Failed to preview dispatch routing');
@@ -650,6 +652,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
    * Owner-only, like the preview it sits beside. The numbers are the derived kind's own, read from the same history
    * Settings › Models prices from (lib/model-routing-history.js). A blank field says what Settings › Models sets it to
    * for this step: the resolution with the run's own fields cleared. Presets are per run, so they are not part of it.
+   * LIN-3987 (review): a harness the draft chose is part of that resolution, so a blank model or effort says what that
+   * harness runs; the client asks again whenever the draft's harness changes, so the words never name the other harness.
    * The fields the caller sent show as chosen, and an effort outside the set is kept as itself.
    */
   router.get('/workspace/:urlKey/api/dispatch/decision-panel', workspaceFromUrl, async (req, res) => {
@@ -671,7 +675,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       const workspace = req.workspace;
       const [routing, history, catalog] = await Promise.all([
         resolveRoutingWithSources({
-          urlKey: workspace.urlKey, kind, model: null, harness: null, effort: null, preset: null, anchor: null,
+          urlKey: workspace.urlKey, kind, model: null, harness: choice.harness, effort: null, preset: null, anchor: null,
           workspacePreferencesStore, ...settle
         }),
         readModelsHistory(dispatchQueueStore, workspace.urlKey).catch((err) => {
@@ -684,7 +688,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       const spend = history ? agentSpendByJob(history.items, { jobs: [kind] })[0] : null;
       const typicals = history ? typicalByModel(history.items, { job: kind }) : [];
       // The blank option stays short (a 390px select clips a long one); what it resolves to reads on a hint line under the field.
-      const follow = 'As Settings › Models sets it';
+      // LIN-3987: what it resolves to is said in words (routingWords), so the hint and the heading never print an id.
+      const follow = 'From Models';
+      const words = routingWords({ harness: routing.harness, model: routing.model, effort: routing.effort });
       const hint = (value) => `Right now: ${value}`;
       const numbers = spend && {
         runs: spend.runs, priced: spend.priced, unpriced: spend.unpriced, noTelemetry: spend.noTelemetry,
@@ -696,15 +702,16 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         numbers: {
           ...(numbers || { unavailable: true }), testid: 'run-numbers', shareTestid: 'run-share', heading: 'This step, last 30 days', share: null
         },
-        harness: { value: choice.harness, inForce: choice.harness || routing.harness || null, follow, hint: hint(routing.harness || 'no harness') },
+        harness: { value: choice.harness, inForce: choice.harness || routing.harness || null, follow, hint: hint(words.harness) },
         model: {
-          value: choice.model, follow, hint: hint(routing.model || 'the default model'),
+          value: choice.model, follow, hint: hint(words.model),
           lists: agentLists(catalog), suggestions: suggestionsByHarness(typicals)
         },
-        effort: { value: choice.effort, follow, hint: hint(routing.effort || 'none') }
+        effort: { value: choice.effort, follow, hint: hint(words.effort) }
       });
       // The harnesses that take no effort. The panel hides effort by this list; Home's summary judges its draft's harness by it.
-      res.json({ kind, html, numbers: numbers || null, withoutEffort: HARNESSES_WITHOUT_EFFORT });
+      // `words` is the resolution for the harness the draft chose (Settings' own when none is chosen), the words Home's heading and summary name a default by.
+      res.json({ kind, html, numbers: numbers || null, withoutEffort: HARNESSES_WITHOUT_EFFORT, words });
     } catch (err) {
       return reportFailure(res, 'Decision panel error:', err, 'Failed to load the decision panel');
     }
