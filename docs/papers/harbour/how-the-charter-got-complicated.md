@@ -13,7 +13,7 @@ cites: [LIN-4007 (comments 14:05:25–14:05:38Z; research comment 14:13:24Z), LI
 
 Mostly the pipeline's own text, not John's words or the operator's. At launch the five main UI tickets gave an
 implementer 17,000 to 19,000 characters; John's choices and words were at most 10% of that, the operator's
-text 18% to 34% (an upper bound; see Limits). By the first implementation dispatch the same tickets had grown to 81,000 to 151,000
+text 18% to 34%. By the first implementation dispatch the same tickets had grown to 81,000 to 151,000
 characters, 76% to 87% of it pipeline text (research, plan, plan review, review). The record, read at
 14:20Z, holds 102,000 to 224,000. Whether that made the work harder cannot be separated from model, scope
 and period. The record does show that the tickets with the most rounds were open-ended page builds with
@@ -47,7 +47,7 @@ five tickets, by character share (evidence §2):
 | LIN-3983 Observation | 18,370 (2%, 19%) | 99,411 (81%) | 165,918 (83%) |
 | LIN-3952 Models | 19,192 (0%, 34%) | 81,447 (76%) | 102,202 (77%) |
 
-"At launch" is the description without its pipeline sections plus the comments before the first pipeline comment.
+"At launch" is the description without its pipeline sections plus the comments before the first pipeline comment. It is measured on current text, so the operator column is an upper bound (see Limits).
 The UI session wrote the briefs for LIN-3975, LIN-3977 and LIN-3983 (the operator's part 3 log: "UI session files a design
 BRIEF = the ticket"); LIN-3952 came "from John's review via other session"; LIN-3833's author is not in the record,
 and the split of its brief among John, the operator and the UI session is not estimated. The later share is lower for LIN-3977 and LIN-3983 because their plans were
