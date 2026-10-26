@@ -1710,9 +1710,25 @@ async function pollRulings() {
 // `renderedRulingRows` is the single map behind all three: it tracks whichever
 // <li> is CURRENTLY attached for a decision_id, independent of whether that
 // decision still appears in this poll's payload.
-function renderRulings(rulings) {
-  const list = document.getElementById('obs-rulings');
-  const empty = document.getElementById('obs-rulings-empty');
+//
+// LIN-3983: `host` says where the rows paint. The Rulings tab (the default) and
+// the waiting block above the Observation feed both host these same nodes, so
+// a row keeps its pending / retry / settled / typed-input state when it moves
+// between them. `host.limit` caps how many payload rows are attached (the block
+// shows the first few and links to the rest); the rows past it stay tracked in
+// `renderedRulingRows`, so the next paint of the Rulings tab reuses them.
+function rulingsTabHost() {
+  return {
+    list: document.getElementById('obs-rulings'),
+    empty: document.getElementById('obs-rulings-empty'),
+    limit: Infinity,
+    onTab: true
+  };
+}
+
+function renderRulings(rulings, host = rulingsTabHost()) {
+  const list = host.list;
+  const empty = host.empty;
   if (!list) return;
 
   const seen = new Set();
@@ -1738,7 +1754,12 @@ function renderRulings(rulings) {
     const existing = key && renderedRulingRows.get(key);
     const mustReuse = key && (rulingsPending.has(key) || preservedRulingRows.has(key) || rulingsSettled.has(key) || rulingRowHoldsInput(existing));
     const li = (mustReuse && existing) ? existing : renderRulingRow(row);
-    nodes.push(li);
+    // A rebuilt row replaces its old node wherever that node is attached. The
+    // old one may sit in the other host (LIN-3983): the block and the Rulings
+    // tab share `renderedRulingRows`, so without this the stale <li> stays in
+    // the block's list after the tab repaints.
+    if (existing && existing !== li && existing.parentNode) existing.parentNode.removeChild(existing);
+    if (nodes.length < host.limit) nodes.push(li);
     if (key) {
       seen.add(key);
       renderedRulingRows.set(key, li);
@@ -1832,6 +1853,20 @@ function renderRulings(rulings) {
   });
   if (empty) empty.hidden = nodes.length > 0;
   syncRulingsBulkBar();
+  if (host.onTab) armBasisChecksFor(nodes);
+}
+
+// Re-arm the basis check for rows that now sit on the Rulings tab (LIN-3983).
+// A row first built while the waiting block was on screen never checked (the
+// check is gated on the Rulings view at creation), so moving it here must ask
+// again. `requestBasisCheck` keeps its own once-per-row and cap guards, so a
+// repaint that finds a row already checked or queued does nothing.
+function armBasisChecksFor(nodes) {
+  if (currentView !== 'rulings') return;
+  for (const li of nodes) {
+    const basis = rulingBasisByRow.get(li);
+    if (basis) requestBasisCheck(basis.anchor, basis.noteEl);
+  }
 }
 
 // Does this attached ruling row hold input a repaint would discard
@@ -1872,6 +1907,7 @@ function rulingRowHoldsInput(li) {
 // must never fail to render, or lose its actions, because an optional hint
 // could not be computed.
 const basisCheckCache = new Map();   // taskDecisionId → true | false | null
+const rulingBasisByRow = new WeakMap(); // <li> → { anchor, noteEl } for the re-arm on a host move (LIN-3983)
 const basisCheckStarted = new Set(); // taskDecisionId → already queued or in flight
 const basisCheckQueue = [];
 let basisChecksInFlight = 0;
@@ -2186,6 +2222,7 @@ function renderRulingRow(row) {
     staleNote.textContent = '↻ the task changed since this was raised — re-read before answering';
     staleNote.hidden = true;
     li.appendChild(staleNote);
+    rulingBasisByRow.set(li, { anchor, noteEl: staleNote });
     requestBasisCheck(anchor, staleNote);
   }
 
