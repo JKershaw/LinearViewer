@@ -448,3 +448,13 @@ The signed-out landing (`lib/render-landing.js`, `lib/components/landing-hero.js
 - **Buttons** (decision 6): every sign-in button (`renderSignInCtas`, hero and "Try it yourself") and the Library, Harbour OS and Archive calls to action are `renderButton`. Linear is `.btn--primary`, the others `.btn`. `.landing-cta` sets only the hero's size, and `.landing-cta-linear` only its ink (`--on-brand`, which clears AA on the teal fill where `.btn--primary`'s own ink does not). Both are scoped under `.landing-ctas`, so they beat `.btn`'s own rules.
 
 Not moved, with the reason: the Library list's item titles (`.lx-library__link`) stay a landing list style. Decision 13's link (`.settings-link`) is an inline blue text link with a left margin, and the list titles are bold text with their own hover, so using it would change the list. The `--on-brand` ink is landing-scoped, not a change to `.btn--primary`, which is 3.74:1 on the teal fill. Fixing that is a stylesheet-review item (LIN-3892).
+
+## Observation tabs (LIN-3983): the shared tab strip
+
+**Decides:** how a page shows a few mutually exclusive views, and where that markup and its CSS live. **Owner:** `lib/components/tabs.js` (`renderTabs`) for the markup and `public/style.css` (`.tabs`, `.tabs__tab`) for the look. The page owns the selection, the click handler and the view it shows.
+
+- **Anatomy.** A `role="tablist"` row of real `<button>` tabs, one `is-active` tab with `aria-selected="true"`, the others at `tabindex="-1"`. Each tab has `data-tab` (its key) and `data-testid="<prefix>-<key>"`. Labels do not wrap: the strip scrolls sideways on a narrow screen rather than breaking a word. Tap targets are 44px tall. The anatomy is shown in `/styleguide`.
+- **Arrow keys** are the page's job, because the server renders no script. Observation moves focus and selection with Left and Right in `public/observation.js`.
+- **Consumers.** Observation (`runs | rulings | due`). The task-edit tabs (`.task-edit-tab`, `lib/render-task-edit.js`) are the next consumer to move; they keep their own rules until then, so this decision has two copies to consolidate, not one.
+- **What a tab says.** Each tab names what it holds. The line under the strip states the active tab's contents, including the 24-hour window for the runs feed.
+- **Not decided here:** the tab keys are part of each page's own URL contract (`?view=`), so a key is never renamed without keeping its old value working.
