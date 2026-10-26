@@ -37,6 +37,8 @@ const TIME_MASKS = {
 //   paused            mint a queue token (a runner), pause runs in place; Running shows the Runs row and Resume
 //   models-panel-open open a job row's change panel on Settings › Models (head only; base's forms have no row)
 //   models-staged     the same row, with one model picked: the staged-change count shows (head only)
+//   home-run-panel-opencode  the same panel with opencode chosen as the harness (LIN-3987): effort is off and says so, and
+//                  Claude Code on the web is not offered. A new state: base has no opencode line, so it differs by design.
 //   home-run-panel-open  Home's Change panel open (LIN-3962): the shared decision panel the server renders; `seed` gives run controls
 //   swipe-dispatch-open  Swipe's card with Prompts open: expected to show no difference (Swipe has no run panel)
 //   email-signin      a zero-workspace account: no local seed; signs in by email (one address per shot)
@@ -90,7 +92,9 @@ export const PAGES = [
   // LIN-3962: the one decision panel on Home (desktop, and phone via the viewport pair) and Swipe's card with Prompts open.
   // Both seeds give run controls with a queue token (no runner credential). A queue token is a write, so each has its own
   // urlKey; the head must show the Change control, or the Home state fails.
-  { id: 'home-run-panel-open', urlKey: 'judge-run', path: (k) => `/workspace/${k}/`, state: 'home-run-panel-open', seed: { openRouterConnected: true, queueToken: true }, renderers: ['lib/render.js', 'lib/components/decision-panel.js', 'public/decision-panel.js'] },
+  { id: 'home-run-panel-open', urlKey: 'judge-run', path: (k) => `/workspace/${k}/`, state: 'home-run-panel-open', seed: { openRouterConnected: true, queueToken: true }, renderers: ['lib/render.js', 'lib/components/decision-panel.js', 'public/decision-panel.js', 'public/prompt-section.js'] },
+  // LIN-3987: the same Change panel with opencode chosen. Its own urlKey, since a queue token is a write.
+  { id: 'home-run-panel-opencode', urlKey: 'judge-run-opencode', path: (k) => `/workspace/${k}/`, state: 'home-run-panel-opencode', seed: { openRouterConnected: true, queueToken: true }, renderers: ['lib/render.js', 'lib/components/decision-panel.js', 'public/decision-panel.js', 'public/prompt-section.js'] },
   { id: 'swipe-dispatch-open', urlKey: 'judge-swipe', path: (k) => `/workspace/${k}/swipe`, state: 'swipe-dispatch-open', seed: { openRouterConnected: true, queueToken: true }, renderers: ['lib/render-swipe.js'] },
   // LIN-3956: Account home, the first Plain page with rows and a form. It needs a zero-workspace account,
   // which no local seed can make, so the spec signs in by email. The judge's server runs the capture
