@@ -626,8 +626,11 @@
   function runStepOfState(state) {
     return (state.run && state.run.step) || (state.opened && state.opened.sessions && state.opened.sessions.offered) || null;
   }
+  // LIN-3975 (review finding 1): busy is any session running, queued or waiting on an answer. A waiting question is
+  // not a reason to start another run, so "Run to PR" is not offered beside it (LIN-3968's rule, as nextStepOf applies).
   function stageBusy(state) {
-    return !!(state.opened && state.opened.sessions && state.opened.sessions.running);
+    const sessions = state.opened && state.opened.sessions;
+    return !!(sessions && (sessions.busy || sessions.running));
   }
 
   // LIN-3833: the run control's vocabulary. The targets are the dispatch targets Home offers (`dash` is not

@@ -170,6 +170,47 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await noHorizontalScroll(page);
   });
 
+  // LIN-3975 (review finding 1): a question that waits is not a reason to start another run. "Run to PR" is offered
+  // only when nothing is running, queued or waiting (LIN-3968's rule, the one Home follows).
+  test('a waiting question offers no "Run to PR" on the task page', async ({ page }) => {
+    await seedTasks(page);
+    const token = await runnerToken(page);
+    await seedSession(page, token, { identifier: 'LOCAL-TP3', title: 'A task waiting on an answer', kind: 'plan', feedback: ['[done] planned'] });
+    await seedSession(page, token, { identifier: 'LOCAL-TP3', title: 'A task waiting on an answer', kind: 'implementation', feedback: ['[blocked] which API key should the build use?'] });
+
+    await page.goto(`/workspace/${URL_KEY}/task/LOCAL-TP3`);
+    await expect(page.locator('[data-testid="task-page-status"]')).toHaveAttribute('data-status', 'waiting');
+    // The run control has drawn (its Runs-on line is there) before the absence is read.
+    await expect(page.locator('[data-testid="opened-task-runs-on"]')).toBeVisible();
+    await expect(page.locator('[data-testid="opened-task-go"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="task-page-run"]')).not.toContainText('Run to PR');
+  });
+
+  // LIN-3975 (review finding 2): the owner's quiet line is the only way to write a brief or recap from this page. A
+  // press generates it in place (one POST, no reload) and leaves the recap offer alone on the line.
+  test('the quiet line writes a brief in place, and the recap offer stays on the line', async ({ page }) => {
+    // LOCAL-TP4, not LOCAL-TP1: the server keeps a brief for the rest of the run, and the repaint test below expects
+    // LOCAL-TP1 to have none (no brief GET on mount).
+    await seedTasks(page);
+    const briefPosts = [];
+    page.on('request', (req) => {
+      const path = new URL(req.url()).pathname;
+      if (req.method() === 'POST' && /\/api\/brief\//.test(path)) briefPosts.push(path);
+    });
+
+    await page.goto(`/workspace/${URL_KEY}/task/LOCAL-TP4`);
+    await expect(page.locator('[data-testid="task-page-write-brief"]')).toBeVisible();
+    await page.evaluate(() => { window.__noReloadMarker = true; });
+    await page.locator('[data-testid="task-page-write-brief"]').click();
+
+    await expect(page.locator('[data-testid="session-brief"]')).toHaveAttribute('data-state', 'fresh', { timeout: 10000 });
+    expect(briefPosts, 'the press posted one brief for this task').toEqual([`/workspace/${URL_KEY}/api/brief/LOCAL-TP4`]);
+    expect(await page.evaluate(() => window.__noReloadMarker), 'the brief appeared without a reload').toBe(true);
+    await expect(page.locator('[data-testid="task-page-write-brief"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="task-page-write-recap"]')).toBeVisible();
+    await expect(page.locator('[data-testid="task-page-context-offers"] [data-write-kind]')).toHaveCount(1);
+  });
+
   test('it updates itself, and a repaint keeps the rows the reader opened and the evidence', async ({ page }) => {
     await seedTasks(page, { reviewed: true });
     const token = await runnerToken(page);
