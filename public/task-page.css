@@ -220,7 +220,7 @@
 }
 
 /* LIN-3975: a step still ahead is one quiet line, not a dashed box. */
-.task-stage-ahead { list-style: none; padding: 0.2rem 0; font-size: 0.9rem; color: var(--muted); }
+.task-stage-ahead { list-style: none; padding: var(--space-1) 0; font-size: 0.9rem; color: var(--muted); }
 .task-stage-ahead .task-stage-name { color: var(--fg); }
 /* LIN-3975: an attempt's link to its run page, and the line that says it cannot be opened. */
-.task-stage-run { margin-left: 0.5rem; font-size: 0.85rem; white-space: nowrap; }
+.task-stage-run { margin-left: var(--space-2); font-size: 0.85rem; white-space: nowrap; }
