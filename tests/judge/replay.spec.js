@@ -177,7 +177,9 @@ async function prepare(page, context, entry, viewport, theme, side, baseURL) {
       await page.getByTestId(side === 'head' ? 'run-decision-panel' : 'run-change-panel').waitFor();
     }
     // LIN-3987: the opencode state chooses opencode as the harness, so the effort line and the lost web choice show.
-    if (entry.state === 'home-run-panel-opencode' && side === 'head') {
+    // LIN-3991: on whichever side has the harness control. Base is main now and has it; choosing it on head only made the
+    // pair differ by a choice one side never made.
+    if (entry.state === 'home-run-panel-opencode' && (side === 'head' || await page.getByTestId('run-harness').count())) {
       await page.getByTestId('run-harness').selectOption('opencode');
       await page.getByTestId('run-effort').first().waitFor({ state: 'hidden' });
     }
