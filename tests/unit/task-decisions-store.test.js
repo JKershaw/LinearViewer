@@ -107,6 +107,32 @@ describe('TaskDecisionsStore.buildId', () => {
   });
 });
 
+describe('TaskDecisionsStore.recordScan issueTitle (LIN-3983 PR 2)', () => {
+  let collection;
+  let store;
+  beforeEach(() => {
+    collection = createMockCollection();
+    store = new TaskDecisionsStore({ collection });
+  });
+
+  test('a scan taken with a title stores it and reads it back on the record', async () => {
+    const record = await store.recordScan({
+      urlKey: URL_KEY, issueId: ISSUE_ID, issueIdentifier: 'LIN-2197', issueTitle: '  Rulings name their task  ',
+      inputHash: HASH_A, decision: null
+    });
+    assert.equal(record.issueTitle, 'Rulings name their task', 'trimmed, then carried on the record');
+    assert.equal((await store.getStatus(URL_KEY, ISSUE_ID)).issueTitle, 'Rulings name their task');
+  });
+
+  test('a scan with no title (or a blank one) leaves no key on the record, so an older row reads the same', async () => {
+    const none = await store.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, issueIdentifier: 'LIN-2197', inputHash: HASH_A, decision: null });
+    assert.equal('issueTitle' in none, false, 'no key at all, not a null one');
+    const blank = await store.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, issueIdentifier: 'LIN-2197', issueTitle: '   ', inputHash: HASH_B, decision: null });
+    assert.equal('issueTitle' in blank, false);
+    assert.equal('issueTitle' in collection._docs[0], false, 'nothing is stored on the document either');
+  });
+});
+
 describe('TaskDecisionsStore.recordScan / getStatus', () => {
   let collection, store;
 

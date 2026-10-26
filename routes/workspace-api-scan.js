@@ -314,6 +314,9 @@ export function registerScanRoutes(router, { workspaceFromUrl, freeTierStore, wo
         urlKey: workspace.urlKey,
         issueId: canonicalId,
         issueIdentifier: context.issue?.identifier || issueId,
+        // LIN-3983 PR 2: the title the Rulings row names its task by (the scan context carries
+        // the issue's own title; a row without one keeps the id alone).
+        issueTitle: context.issue?.title || null,
         inputHash,
         // LIN-2241 tier 1. A SECOND, narrower digest — `inputHash` stays the
         // row's identity (buildId → `_id`, and lib/scan.js's decision_id), so
