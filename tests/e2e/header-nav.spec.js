@@ -576,8 +576,8 @@ test.describe('Landing preview nav auth tap target (LIN-2210)', () => {
   });
 });
 
-// LIN-2523: `.nav-filters` goes from 2 items (wordmark + workspace) to 3
-// (+ team) on the four newly-selectored pages (swipe/swim/ship/roadmap) now
+// LIN-2523: `.nav-filters` goes from 1 item (workspace) to 2 (+ team; the wordmark
+// leads the row, outside the strip, since LIN-4009); on the four newly-selectored pages (swipe/swim/ship/roadmap) now
 // that they thread real teams/selectedTeamId into renderNavBar. PINNED on the
 // Linear test-token session (mirrors tests/e2e/error-handling.spec.js's own
 // "Team Filtering" block) — the local provider declares zero teams
@@ -603,46 +603,45 @@ test.describe('.nav-filters team-item mobile sweep (LIN-2523)', () => {
 
   for (const width of MOBILE_SWEEP_WIDTHS) {
     for (const pagePath of NEWLY_SELECTORED_PAGES) {
-      test(`${pagePath} at ${width}px: .nav-filters carries the team item (3 children, team selector attached)`, async ({ page, workerUrlKey }) => {
+      test(`${pagePath} at ${width}px: .nav-filters carries the team item (2 children, team selector attached)`, async ({ page, workerUrlKey }) => {
         await page.setViewportSize({ width, height: 800 });
         await page.goto(`/workspace/${workerUrlKey}/${pagePath}`);
         await page.waitForLoadState('networkidle');
 
         await expect(page.locator('.nav-filters')).toBeVisible();
         const childCount = await page.locator('.nav-filters').evaluate(el => el.children.length);
-        expect(childCount, `${pagePath} at ${width}px must carry brand + workspace + team (3), not just brand + workspace (2)`).toBe(3);
+        expect(childCount, `${pagePath} at ${width}px must carry workspace + team (2), not just workspace (1)`).toBe(2);
 
         await expect(page.locator('#team-toggle')).toBeAttached();
         await expect(page.locator('#team-toggle')).toHaveText('all');
       });
     }
 
-    test(`a non-filterable page (dispatch) at ${width}px stays at 2 — the baseline this sweep's "3" is measured against`, async ({ page, workerUrlKey }) => {
+    test(`a non-filterable page (dispatch) at ${width}px stays at 1 — the baseline this sweep's "3" is measured against`, async ({ page, workerUrlKey }) => {
       await page.setViewportSize({ width, height: 800 });
       await page.goto(`/workspace/${workerUrlKey}/dispatch`);
       await page.waitForLoadState('networkidle');
 
       const childCount = await page.locator('.nav-filters').evaluate(el => el.children.length);
-      expect(childCount).toBe(2);
+      expect(childCount).toBe(1);
       await expect(page.locator('#team-toggle')).toHaveCount(0);
     });
   }
 
-  test('picking a team marks the selection and keeps the count at 3, on each newly-selectored page', async ({ page, workerUrlKey }) => {
+  test('picking a team marks the selection and keeps the count at 2, on each newly-selectored page', async ({ page, workerUrlKey }) => {
     await page.setViewportSize({ width: 390, height: 800 });
     for (const pagePath of NEWLY_SELECTORED_PAGES) {
       await page.goto(`/workspace/${workerUrlKey}/${pagePath}?team=eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee`);
       await page.waitForLoadState('networkidle');
 
       const childCount = await page.locator('.nav-filters').evaluate(el => el.children.length);
-      expect(childCount, pagePath).toBe(3);
+      expect(childCount, pagePath).toBe(2);
       await expect(page.locator('#team-toggle'), pagePath).toHaveText('Engineering');
     }
   });
 });
 
-// LIN-2529: `.nav-filters` goes from 3 items (wordmark + workspace + team) to
-// 4 (+ assignee) on the DASHBOARD ONLY, now that renderPage threads
+// LIN-2529: `.nav-filters` goes from 2 items (workspace + team) to 3 (+ assignee) on the DASHBOARD ONLY, now that renderPage threads
 // availableAssignees/selectedAssignee/canFilterByMe into renderNavBar
 // (LIN-2526 computed the values; LIN-2527 built the navbar functions; this is
 // the first point real data actually reaches them). PINNED on the Linear
@@ -670,37 +669,37 @@ test.describe('.nav-filters assignee-item mobile sweep (LIN-2529)', () => {
     // counting it. This sweep keeps asserting item COUNT — a distinct
     // property (the assignee item is PRESENT on the dashboard and absent
     // elsewhere), which a wrap measurement does not cover.
-    test(`dashboard at ${width}px: .nav-filters carries the assignee item (4 children)`, async ({ page, workerUrlKey }) => {
+    test(`dashboard at ${width}px: .nav-filters carries the assignee item (3 children)`, async ({ page, workerUrlKey }) => {
       await page.setViewportSize({ width, height: 800 });
       await page.goto(`/workspace/${workerUrlKey}/`);
       await page.waitForLoadState('networkidle');
 
       await expect(page.locator('.nav-filters')).toBeVisible();
       const childCount = await page.locator('.nav-filters').evaluate(el => el.children.length);
-      expect(childCount, `dashboard at ${width}px must carry brand + workspace + team + assignee (4)`).toBe(4);
+      expect(childCount, `dashboard at ${width}px must carry workspace + team + assignee (3)`).toBe(3);
 
       await expect(page.locator('#assignee-toggle')).toBeAttached();
       await expect(page.locator('#assignee-toggle')).toHaveText('all');
     });
 
-    test(`/swim at ${width}px stays at 3 — assignee must not leak onto a team-reached, non-dashboard page`, async ({ page, workerUrlKey }) => {
+    test(`/swim at ${width}px stays at 2 — assignee must not leak onto a team-reached, non-dashboard page`, async ({ page, workerUrlKey }) => {
       await page.setViewportSize({ width, height: 800 });
       await page.goto(`/workspace/${workerUrlKey}/swim`);
       await page.waitForLoadState('networkidle');
 
       const childCount = await page.locator('.nav-filters').evaluate(el => el.children.length);
-      expect(childCount).toBe(3);
+      expect(childCount).toBe(2);
       await expect(page.locator('#assignee-toggle')).toHaveCount(0);
     });
   }
 
-  test('picking an assignee marks the selection and keeps the count at 4', async ({ page, workerUrlKey }) => {
+  test('picking an assignee marks the selection and keeps the count at 3', async ({ page, workerUrlKey }) => {
     await page.setViewportSize({ width: 390, height: 800 });
     await page.goto(`/workspace/${workerUrlKey}/?assignee=Alice`);
     await page.waitForLoadState('networkidle');
 
     const childCount = await page.locator('.nav-filters').evaluate(el => el.children.length);
-    expect(childCount).toBe(4);
+    expect(childCount).toBe(3);
     await expect(page.locator('#assignee-toggle')).toHaveText('Alice');
   });
 });
@@ -772,10 +771,10 @@ test.describe('.nav-filters mobile density budget (LIN-2551)', () => {
 
         const filters = page.locator('.nav-filters');
         await expect(filters).toBeVisible();
-        // Still 4 DOM children at every width — at phone widths the brand is
+        // Still 3 DOM children at every width (LIN-4009: the brand leads the row, outside the strip) — at phone widths the brand is
         // hidden with `display: none` rather than removed, so this block and
         // the LIN-2529 count sweep above agree about the strip's composition.
-        expect(await filters.evaluate(el => el.children.length)).toBe(4);
+        expect(await filters.evaluate(el => el.children.length)).toBe(3);
 
         const height = await filters.evaluate(el => Math.round(el.getBoundingClientRect().height));
         expect(height, `.nav-filters must render as ONE row at ${width}px with ${state.label} — measured ${height}px against a ${SINGLE_ROW_MAX_HEIGHT}px single-row bound`).toBeLessThanOrEqual(SINGLE_ROW_MAX_HEIGHT);

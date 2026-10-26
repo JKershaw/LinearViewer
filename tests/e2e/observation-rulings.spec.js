@@ -1471,7 +1471,7 @@ test.describe('Ambient rulings nav badge (LIN-1728 Phase 3)', () => {
 // pinned by CSS structure and cannot move, so none of them is the guard —
 // keep them for the shape they document, but do not read them as coverage.
 // `parentRows` is already at its structural maximum of 2 at 320px (the row has
-// exactly two children, `.nav-filters` and `.nav-actions`, already stacked);
+// three children, the wordmark, `.nav-filters` and `.nav-actions`, over two lines: LIN-4009);
 // `.nav-actions` sets no width and no `overflow-x` (`public/style.css:616-620`),
 // so `scrollWidth === clientWidth` by construction and `overflowPx` is always
 // exactly 0; and `align-items: baseline` puts the `<a>` badge ~2px above the
@@ -1616,5 +1616,33 @@ test.describe('Agree on a PROPOSED ANSWER (LIN-2754 L3) — e2e', () => {
     // And it genuinely clears the operator's inbox — the same SWR cache
     // budget every other clearing assertion in this file uses.
     await expect(page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-2754-ANSWER' })).toHaveCount(0, { timeout: 20000 });
+  });
+});
+
+// LIN-4009: on a phone the wordmark stays, and it leads the first line beside the actions, with the filters
+// on a line of their own. The worst case for that line is both badges visible, so this asserts the wordmark
+// and `.nav-actions` overlap vertically at every phone width the LIN-2191 guard covers and above.
+test.describe('Phone header: the wordmark shares the first line with the actions (LIN-4009)', () => {
+  test('both badges visible at 320-480px: the wordmark is visible and on the actions line', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}&runnerKey=1`);
+    await clearRuns(page);
+    for (const width of [320, 360, 390, 412, 430, 480]) {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto(`/workspace/${URL_KEY}/`);
+      await page.waitForLoadState('networkidle');
+      await page.evaluate(() => {
+        document.querySelectorAll('[data-queue-badge], [data-rulings-badge]').forEach(b => b.classList.remove('hidden'));
+      });
+      const { visible, sameLine } = await page.evaluate(() => {
+        const wordmark = document.querySelector('.nav-bar .wordmark').getBoundingClientRect();
+        const actions = document.querySelector('.nav-actions').getBoundingClientRect();
+        return {
+          visible: wordmark.width > 0 && wordmark.height > 0,
+          sameLine: wordmark.top < actions.bottom && actions.top < wordmark.bottom,
+        };
+      });
+      expect(visible, `the wordmark must stay visible at ${width}px`).toBe(true);
+      expect(sameLine, `the wordmark must share a line with .nav-actions at ${width}px`).toBe(true);
+    }
   });
 });

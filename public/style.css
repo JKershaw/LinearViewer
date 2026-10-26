@@ -91,7 +91,8 @@
      `scroll-margin-top` for interactive controls so scroll-into-view settles
      them below the pinned `.nav-bar`, and as the offset for page-level fixed
      controls that must clear the header (e.g. the ship mode toggle). Sized for
-     the tallest wrap of the two-row nav (filters/actions + the views row). */
+     the tallest wrap of the nav (its rows plus the views row); a phone is taller
+     still, see the 480px block below (LIN-4009). */
   --nav-sticky-h: 6rem;
 
   /* Font-size scale */
@@ -434,7 +435,7 @@ h1 {
 .nav-primary-row {
   flex: 1 1 100%;
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: baseline;
   gap: var(--space-2) 2ch;
   flex-wrap: wrap;
@@ -635,6 +636,8 @@ h1 {
   display: flex;
   align-items: baseline;
   gap: 1.5ch;
+  /* At the row's right edge: the wordmark and the filters lead the row (LIN-4009). */
+  margin-left: auto;
 }
 
 .nav-action {
@@ -2211,6 +2214,12 @@ a.wordmark:hover {
     gap: 1ch;
   }
 
+  /* The brand leads the row (LIN-4009), so the row takes the filters' one-character gap: the brand reads
+     as part of the strip it used to sit in, and the actions keep their line at 641px as they did before. */
+  .nav-primary-row {
+    gap: var(--space-2) 1ch;
+  }
+
   .nav-item {
     min-height: 44px;
     display: flex;
@@ -2444,40 +2453,42 @@ a.wordmark:hover {
 
 }
 
-/* LIN-2551 — on a phone the header carries controls, not the brand.
-   ===========================================================================
-   Four labelled selectors do not fit beside the wordmark at phone widths: at
-   320px they need ~332px of ~296px available, and even at 412px — a real,
-   swept device width — every other lever combined left only ~10px of margin
-   on CI's font metrics, which is a layout that holds by luck. The wordmark is
-   the one passenger in this strip that is not a control, so it is what gives
-   way. The app is still named in the tab title, in the footer, and in this
-   same header from 481px up.
-
-   This is the deliberate, visible trade in this fix, and it is one line to
-   reverse if the brand is wanted back on mobile — but reversing it re-opens
-   LIN-2551 unless the labels go instead.
-
-   The bound is 480px rather than the 400px used elsewhere in this file
-   because the root font steps up above 400px: the strip's content jumps ~40px
-   exactly where a 400px cutoff would stop helping, which is precisely how
-   412px ended up the tightest width. Its own block rather than widening the
-   400px one above, whose other rules are about page sections and have no
-   business moving. */
+/* LIN-4009 — on a phone the wordmark stays. It leads the first line, beside the
+   actions, and the filters wrap to a second line of their own. LIN-2551 hid the
+   brand here to fit four selectors on one row; the filters now wrap instead, and
+   the guards that pin the strip (LIN-2191, LIN-2523, LIN-2529, LIN-2551) count the
+   new shape. The wordmark is never display:none at these widths. */
 @media (max-width: 480px) {
-  .nav-filters > .wordmark-nav {
-    display: none;
+  /* LIN-4009: the wordmark has its own line on a phone, so the nav is taller than the 640px value covers:
+     148px measured at 360-430px, against 124px. 152px (9.5rem) clears it, so a control scrolled into view
+     still lands below the header. */
+  :root {
+    --nav-sticky-h: 9.5rem;
+  }
+
+  /* Tops, not baselines, decide the LIN-2191 row count: the wordmark and the actions share one line top, so
+     the count reads the line, not a 1-3px baseline offset between their boxes. */
+  .nav-primary-row {
+    align-items: flex-start;
   }
 
   .nav-filters {
+    order: 2;
+    flex-basis: 100%;
     gap: 0.75ch;
   }
 
-  /* The brand's ~80px is spent on fitting FOUR selectors, not on lengthening
-     three — 8ch is what leaves 360px (the tightest width carrying both a team
-     and an assignee) a margin that survives another machine's font metrics.
-     A 10ch cap fitted locally and still wrapped on CI at exactly that width
-     and that filter state. */
+  /* Lever 2 (LIN-4009): below 361px the ".cat" accent (aria-hidden) goes, so "harbour" and both badges fit one line. */
+  @media (max-width: 360px) {
+    .wordmark-accent {
+      display: none;
+    }
+  }
+
+  /* 8ch keeps each value narrow enough that the filter line holds a team and an
+     assignee at 360px with a margin that survives another machine's font metrics.
+     A 10ch cap fitted locally and still wrapped on CI at exactly that width and
+     that filter state (LIN-2551). */
   .nav-value {
     max-width: 8ch;
   }

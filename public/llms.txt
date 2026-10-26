@@ -40,7 +40,7 @@ The papers and essays behind Harbour are published unauthenticated at `/library`
 
 ### Landmarks
 - `main` - main content area
-- `[role="region"][aria-label="In Progress Tasks"]` - in-progress section (rows ranked: needs you, next step, running, the rest; `[data-testid="in-progress-count"]` is its count line; each row's state words are `[data-testid="issue-row-state"]`, LIN-3833)
+- `[role="region"][aria-label="In Progress Tasks"]` - in-progress section (rows ranked: needs you, next step, running, the rest; each row's state words are `[data-testid="issue-row-state"]` with `data-tone` = needs-you, failed, running, queued, ready or quiet, LIN-3833, LIN-4009). `[data-testid="in-progress-count"]` is the count line in the page header under the workspace title (LIN-4009)
 - `[role="region"][aria-label="Projects"]` - projects section
 
 ### Node Container Structure

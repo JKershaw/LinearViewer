@@ -146,8 +146,8 @@
 .task-strip-name { font-weight: 600; }
 .task-strip-state { color: var(--muted); }
 .task-strip-chip[data-tone="done"] { border-color: var(--green); }
-.task-strip-chip[data-tone="running"] { border-color: var(--brand); }
-.task-strip-chip[data-tone="waiting"] { border-color: var(--amber); }
+.task-strip-chip[data-tone="running"] { border-color: var(--amber); }
+.task-strip-chip[data-tone="waiting"] { border-color: var(--red); }
 .task-strip-chip[data-tone="error"] { border-color: var(--red); }
 .task-strip-chip[data-tone="ahead"] { border-style: dashed; color: var(--muted); }
 .task-strip-chip[data-offered="true"] { box-shadow: inset 0 0 0 1px var(--brand); }
