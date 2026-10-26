@@ -34,9 +34,7 @@ async function writePrompt(component) {
 test.describe('The opened task on Home, copy-first (LIN-3833)', () => {
   test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
     // Prompt GET is template/data-driven; the local provider supplies the data.
-    // LIN-3969: copy-first needs no run controls. A default seed keeps queue tokens (LIN-3849), which earlier
-    // specs on this worker's urlKey leave behind; `runnerKey: false` clears both kinds of key.
-    await seedLocal(workspaceApiLocalSeed, { runnerKey: false });
+    await seedLocal(workspaceApiLocalSeed);
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
   });
@@ -240,9 +238,8 @@ test.describe('Prompt API', () => {
 
 test.describe('AI Recommendations', () => {
   test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
-    // The ✦ primary requires OpenRouter to be configured. LIN-3969: `runnerKey: false`, as above, so the
-    // copy-first ✦ primary is the view under test.
-    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, runnerKey: false });
+    // The ✦ primary requires OpenRouter to be configured.
+    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true });
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
   });
@@ -258,7 +255,7 @@ test.describe('AI Recommendations', () => {
   test('the ✦ primary is disabled with a plain-words reason when OpenRouter is not configured', async ({ page, seedLocal, localWorkerUrlKey }) => {
     // Re-seed WITHOUT OpenRouter — the absence of the key is the thing under test,
     // so it must not inherit the block's connected seed.
-    await seedLocal(workspaceApiLocalSeed, { runnerKey: false });
+    await seedLocal(workspaceApiLocalSeed);
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
