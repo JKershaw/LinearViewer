@@ -38,6 +38,10 @@ const LIVE_AXIS = { selector: '.lc-timeline-axis', reason: 'the axis shows the w
 const LIVE_SINCE = { selector: '.lc-lane-since', optional: true, reason: 'how long a stage has run is relative to the shot (base has no such element: LIN-3977 adds it, so the mask is skipped there)' };
 const LIVE_WHEN = { selector: '.lc-event-time', reason: 'a stream row\'s relative time is relative to the shot (its exact time is on hover)' };
 
+// LIN-3983: Observation's times are relative to the real clock (its runs are seeded on it, see observation-states.mjs),
+// so the words that carry them move between the two shots. The masks are the containing rows, never the inline span.
+const OBS_TIMES = { selector: '.obs-session-head, .obs-waiting-run, .obs-ruling', reason: 'every card and row says how long ago something happened, relative to the real clock the seed runs on' };
+
 // `state` names a set-up the spec performs identically on both sides (see replay.spec.js):
 //   ask-open          open the periodic-reviews ask in place (a change that affects everyone)
 //   key-open          mint a token, open its key row
@@ -109,6 +113,20 @@ export const PAGES = [
   // LIN-3992: the same Change panel with a suggestion picked. Its own urlKey, since a queue token is a write.
   { id: 'home-run-panel-pick', urlKey: 'judge-run-pick', path: (k) => `/workspace/${k}/`, state: 'home-run-panel-pick', seed: { openRouterConnected: true, queueToken: true }, renderers: ['lib/render.js', 'lib/components/decision-panel.js', 'public/decision-panel.js', 'public/prompt-section.js'] },
   { id: 'swipe-dispatch-open', urlKey: 'judge-swipe', path: (k) => `/workspace/${k}/swipe`, state: 'swipe-dispatch-open', seed: { openRouterConnected: true, queueToken: true }, renderers: ['lib/render-swipe.js'] },
+  // LIN-3983 PR 2: Observation. `obs-two-runs` seeds one run waiting on a question and one working run (on the
+  // real clock, so the times are masked). The Runs view shows the waiting block above the feed; the Rulings tab
+  // lists the same question with its proposal; Scan-due and a new user (nothing running) use the seeded local
+  // workspace with no runs of its own. The two tabs and the default view each name their own state in the list.
+  { id: 'observation-runs', urlKey: 'judge-obs-runs', path: (k) => `/workspace/${k}/observation`, state: 'obs-two-runs', masks: [OBS_TIMES], renderers: ['lib/render-observation.js'] },
+  { id: 'observation-rulings', urlKey: 'judge-obs-runs', path: (k) => `/workspace/${k}/observation?view=rulings`, state: 'obs-two-runs', masks: [OBS_TIMES], renderers: ['lib/render-observation.js'] },
+  { id: 'observation-due', urlKey: 'judge', path: (k) => `/workspace/${k}/observation?view=due`, renderers: ['lib/render-observation.js'] },
+  { id: 'observation-new-user', urlKey: 'judge', path: (k) => `/workspace/${k}/observation`, renderers: ['lib/render-observation.js'] },
+  // LIN-3983 PR 2: the three pages that still load observation.css (Live Console no longer does). Each is behind its
+  // experimental flag, so the seed turns the flag on. Their renderers are listed so a change to observation.css is
+  // checked against them.
+  { id: 'flight-companion', urlKey: 'judge', path: (k) => `/workspace/${k}/flight-companion`, seed: { features: { flightCompanion: true } }, renderers: ['lib/render-flight-companion.js'] },
+  { id: 'passage-planner', urlKey: 'judge', path: (k) => `/workspace/${k}/passage-planner`, seed: { features: { passagePlanner: true } }, renderers: ['lib/render-passage-planner.js'] },
+  { id: 'ship-biscuit', urlKey: 'judge', path: (k) => `/workspace/${k}/ship-biscuit`, seed: { features: { shipBiscuit: true } }, renderers: ['lib/render-ship-biscuit.js'] },
   // LIN-3956: Account home, the first Plain page with rows and a form. It needs a zero-workspace account,
   // which no local seed can make, so the spec signs in by email. The judge's server runs the capture
   // transport (visual-replay.mjs), the same as Playwright's. Settings › Account then shows "Add email →"
