@@ -252,17 +252,22 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     expect(fonts.lead).toBe(fonts.detail);
     expect(fonts.lead).toMatch(/Inter|sans-serif/);
 
-    // Desktop (1280): the stages and the brief/recap sit side by side, in a
-    // plain column (not sticky, no scroll area of its own).
+    // Desktop (1280): with a brief or recap, the brief/recap sits beside the stages in a plain column (not sticky,
+    // no scroll area of its own). With neither, the one quiet line takes no column (LIN-3975).
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.reload();
     const dStages = await box('task-page-track-mount');
-    const dContext = await box('task-page-context-mount');
-    expect(dContext.x).toBeGreaterThan(dStages.x + dStages.width - 2);
-    expect(Math.abs(dContext.y - dStages.y), 'aligned at the top of the same band').toBeLessThan(80);
-    const aside = await page.locator('.task-context-section').evaluate((el) => { const cs = getComputedStyle(el); return { position: cs.position, overflowY: cs.overflowY }; });
-    expect(aside.position).not.toBe('sticky');
-    expect(aside.overflowY).toBe('visible');
+    if (await page.locator('[data-testid="task-page-context-quiet"]').count()) {
+      const quiet = await box('task-page-context-quiet');
+      expect(quiet.x, 'the quiet line takes no column beside the stages').toBeLessThanOrEqual(dStages.x + 2);
+    } else {
+      const dContext = await box('task-page-context-mount');
+      expect(dContext.x).toBeGreaterThan(dStages.x + dStages.width - 2);
+      expect(Math.abs(dContext.y - dStages.y), 'aligned at the top of the same band').toBeLessThan(80);
+      const aside = await page.locator('.task-context-section').evaluate((el) => { const cs = getComputedStyle(el); return { position: cs.position, overflowY: cs.overflowY }; });
+      expect(aside.position).not.toBe('sticky');
+      expect(aside.overflowY).toBe('visible');
+    }
     await noHorizontalScroll(page);
     await page.screenshot({ path: test.info().outputPath('task-page-running-1280.png'), fullPage: true });
   });
@@ -311,7 +316,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
       '[data-kind="implementation"] [data-testid="task-page-session-message"]',
       '[data-testid="task-page-stage-ahead"] .task-stage-name',
       '[data-testid="task-page-stage-ahead"] .task-stage-state',
-      '[data-testid="task-page-description"] .disclosure__label',
+      '[data-testid="task-page-description"] .section-header',
       '.brief-placeholder',
       '[data-testid="task-page-back"]',
       '.task-details .disclosure__label',

@@ -242,12 +242,30 @@
 
   // ── Share controls (LIN-3330, owner only) ───────────────────────────────────
 
-  /** A share's stored timestamps as a short label. */
-  function shareWhen(value) {
-    if (!value) return '';
-    var d = new Date(value);
-    if (isNaN(d.getTime())) return '';
-    return d.toISOString().slice(0, 10);
+  /**
+   * A moment's relative words, worded as the server's relativeAgo is (lib/task-page-loader.js, LIN-3975): the same
+   * words on every task-page moment, with the exact local time one tap away (the `tap` time piece).
+   */
+  function relativeWords(value) {
+    var ms = Date.now() - Date.parse(value);
+    if (!isFinite(ms)) return '';
+    var minutes = Math.floor(Math.max(ms, 0) / 60000);
+    if (minutes < 1) return 'just now';
+    if (minutes < 60) return minutes + ' minute' + (minutes === 1 ? '' : 's') + ' ago';
+    var hours = Math.floor(minutes / 60);
+    if (hours < 24) return hours + ' hour' + (hours === 1 ? '' : 's') + ' ago';
+    var days = Math.floor(hours / 24);
+    return days + ' day' + (days === 1 ? '' : 's') + ' ago';
+  }
+
+  /** A share's created time as a tap time (LIN-3975): the words, and the exact local time on a tap. */
+  function shareTime(doc, value) {
+    var when = doc.createElement('time');
+    when.className = 'task-share-when task-time';
+    when.setAttribute('datetime', value);
+    when.setAttribute('data-local-time', 'tap');
+    when.textContent = relativeWords(value);
+    return when;
   }
 
   /** The absolute URL a created share's path points at, as shown once. */
@@ -294,14 +312,14 @@
         li.setAttribute('data-testid', 'task-share-row');
         li.setAttribute('data-share-id', share.id);
         li.setAttribute('data-revoked', share.revokedAt ? 'true' : 'false');
-        var when = doc.createElement('span');
-        when.className = 'task-share-when';
-        when.textContent = shareWhen(share.createdAt) + (share.revokedAt ? ' · revoked' : '');
+        var when = shareTime(doc, share.createdAt);
         li.appendChild(when);
+        if (share.revokedAt) li.appendChild(doc.createTextNode(' · revoked'));
+        if (window.initLocalTimes) window.initLocalTimes(li);
         if (!share.revokedAt) {
           var revoke = doc.createElement('button');
           revoke.type = 'button';
-          revoke.className = 'task-share-revoke';
+          revoke.className = 'btn btn--quiet task-share-revoke';
           revoke.setAttribute('data-action', 'task-share-revoke');
           revoke.setAttribute('data-testid', 'task-share-revoke');
           revoke.textContent = 'Revoke';
@@ -341,7 +359,7 @@
       input.value = url;
       var copy = doc.createElement('button');
       copy.type = 'button';
-      copy.className = 'task-share-copy';
+      copy.className = 'btn btn--quiet task-share-copy';
       copy.setAttribute('data-testid', 'task-share-copy');
       copy.textContent = 'Copy';
       copy.addEventListener('click', function () {
@@ -511,6 +529,18 @@
     var main = doc.querySelector('[data-testid="task-page"][data-state-url]');
     if (!main) return null;
     initShare(doc);
+    // LIN-3975: "Read all of it" opens a cut description. Wired here, before the first Markdown render (LIN-3385),
+    // so ticket text can never be the control; a delegated listener, so no re-render needs a new one.
+    // Found as the section's own child, so a copy of the control inside the description text is never this one.
+    var readAll = doc.querySelector('[data-testid="task-page-description"] > [data-testid="task-page-description-more"]');
+    if (readAll) {
+      readAll.addEventListener('click', function () {
+        var body = readAll.parentNode.querySelector(':scope > .task-md--cut');
+        if (body) body.classList.remove('task-md--cut');
+        readAll.setAttribute('aria-expanded', 'true');
+        readAll.hidden = true;
+      });
+    }
     // The status mount is what the poll repaints; the tracker line beside it is the page-load read's (LIN-3975).
     var answer = doc.querySelector('[data-testid="task-page-answer-status"]');
     var trackMount = doc.querySelector('[data-testid="task-page-track-mount"]');
@@ -605,6 +635,8 @@
       if (trackMount && typeof state.trackHtml === 'string') {
         var checkIns = openCheckIns(trackMount);
         trackMount.innerHTML = state.trackHtml;
+        // A repainted track carries its own tap times (LIN-3975): bind them as the page does on load.
+        if (typeof window.initLocalTimes === 'function') window.initLocalTimes(trackMount);
         restoreCheckIns(trackMount, checkIns);
       }
       applyOpenMemory(rows(), memory);

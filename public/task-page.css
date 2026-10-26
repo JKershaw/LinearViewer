@@ -57,29 +57,29 @@
 .task-pr-section .rev-closeout { display: grid; gap: 0.5rem; justify-items: start; margin: 0 0 0.75rem; }
 .task-pr-section .rev-closeout p { margin: 0; font-size: 0.85rem; color: var(--muted); }
 .task-pr-section .rev-closeout-actions { display: flex; flex-direction: column; align-items: stretch; gap: 0.5rem; width: 100%; }
-.task-pr-section .rev-closeout-press {
-  min-height: 48px;
-  padding: var(--space-2) var(--space-4);
-  font: inherit;
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--bg);
-  background: var(--brand);
-  border: 1px solid var(--brand);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-.task-pr-section .rev-closeout-press:hover:not([disabled]) {
-  background: color-mix(in srgb, var(--brand) 85%, black);
-  border-color: color-mix(in srgb, var(--brand) 85%, black);
-}
-.task-pr-section .rev-closeout-press[disabled] { opacity: 0.7; cursor: progress; }
+/* The Merge press is the shared primary button (LIN-3975): `btn btn--primary`, set by the task page's close-out box. */
 .task-pr-section .rev-closeout-actions a { font-size: 0.8rem; color: var(--brand-dim); text-align: center; }
 .task-pr-raw { font-size: 0.85rem; overflow-wrap: anywhere; }
 .task-pr-raw .rev-row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.15rem 0; }
 .task-pr-raw .rev-row-label { color: var(--muted); min-width: 4.5rem; }
 .task-pr-raw .rev-row-body { min-width: 0; }
 .task-pr-raw a { color: var(--brand-dim); }
+
+/* ── Description and comments (LIN-3975) ───────────────────────────────────── */
+/* A long description is cut at about a dozen lines and fades out; "Read all of it" removes the cut. */
+.task-description { margin-bottom: var(--space-3); }
+.task-md--cut { max-height: 14em; overflow: hidden; position: relative; }
+.task-md--cut::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3em;
+  background: linear-gradient(to bottom, transparent, var(--card));
+  pointer-events: none;
+}
+.task-md-more { margin-top: var(--space-2); }
 
 /* ── Brief and recap ─────────────────────────────────────────────────────── */
 .task-context { display: grid; gap: 0.75rem; }
@@ -131,19 +131,7 @@
   gap: 0.5rem;
 }
 .task-share-label { font-family: var(--font-content); color: var(--muted); }
-.task-share-create,
-.task-share-copy,
-.task-share-revoke {
-  font-family: var(--font-content);
-  font-size: 0.8rem;
-  padding: 0.3rem 0.6rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--card);
-  color: var(--brand-dim);
-  cursor: pointer;
-}
-.task-share-create[disabled], .task-share-revoke[disabled] { opacity: 0.6; cursor: progress; }
+/* The share buttons are the shared quiet button (`btn btn--quiet`, LIN-3975). */
 .task-share-note { font-size: 0.8rem; color: var(--muted); }
 .task-share-new {
   display: flex;
@@ -213,6 +201,8 @@
   .sess-page.task-page > .task-stages { grid-area: stages; }
   .sess-page.task-page > .task-pr-section { grid-area: pr; }
   .sess-page.task-page > .task-context-section { grid-area: context; }
+  /* Neither brief nor recap yet: the quiet line takes no column; it flows under the stages (LIN-3975). */
+  .sess-page.task-page > .task-context-section--quiet { grid-area: auto; }
   .sess-page.task-page > .task-docs { grid-area: docs; }
   .sess-page.task-page > .task-details { grid-area: details; }
   .sess-page.task-page > .task-share { grid-area: share; }

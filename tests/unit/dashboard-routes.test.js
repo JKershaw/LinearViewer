@@ -4634,11 +4634,14 @@ describe('GET /observation/session/:sessionId — bare-BLOCKED card routing (LIN
 // tests below, which all assert the SAME invariant: the happy path is issue-scoped.
 function scopedStore(items) {
   const unscoped = [];
+  // LIN-3975: `sessionGroupId` is an indexed key too (`{urlKey, sessionGroupId}`, lib/db-indexes.js), so a group
+  // read is scoped the same way a session read is.
   const scope = (arr, opts, key) => {
-    if (!opts.issueIdentifier && !opts.sessionId) unscoped.push(key);
+    if (!opts.issueIdentifier && !opts.sessionId && !opts.sessionGroupId) unscoped.push(key);
     let r = arr;
     if (opts.issueIdentifier) r = r.filter(i => i.issueIdentifier === opts.issueIdentifier);
     if (opts.sessionId) r = r.filter(i => i.sessionId === opts.sessionId);
+    if (opts.sessionGroupId) r = r.filter(i => i.sessionGroupId === opts.sessionGroupId);
     return r;
   };
   let getItemStatusCalls = 0;

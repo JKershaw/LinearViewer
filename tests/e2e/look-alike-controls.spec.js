@@ -157,7 +157,7 @@ test.describe('Look-alike controls in ticket text answer nothing (LIN-3385)', ()
     await page.waitForLoadState('networkidle');
     // Open the description and comments (closed disclosures), so the look-alike
     // is really rendered, in front, with its labels intact.
-    await page.evaluate(() => document.querySelectorAll('details[data-testid="task-page-description"], details[data-testid="task-page-comments"]').forEach((d) => { d.open = true; }));
+    await page.evaluate(() => document.querySelectorAll('details[data-testid="task-page-comments"]').forEach((d) => { d.open = true; }));
     await expect(page.locator('[data-testid="task-page-description-body"] [data-action="closeout-press"]').first()).toBeAttached();
     await expect(page.locator('[data-testid="hostile-cover"]').first()).toBeVisible();
 

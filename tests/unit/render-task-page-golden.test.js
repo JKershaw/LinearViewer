@@ -340,7 +340,8 @@ describe('task page structure', () => {
       };
       const html = renderTaskPage(withBox, { viewer: 'owner', urlKey: 'acme', binding: BINDING, now: NOW, pageOptions: PAGE_OPTIONS });
       assert.match(html, /data-testid="run-evidence-closeout"/, `${status}: the box is present`);
-      assert.match(html, /data-testid="run-evidence-closeout-(ready|merged|neutral|setup|withheld)"/, `${status}: the box renders a line`);
+      // LIN-3975: on the task page a ready box's line is its Merge press (the state line moved into the lead sentence).
+      assert.match(html, /data-testid="run-evidence-closeout-(ready|merged|neutral|setup|withheld)"|data-testid="run-evidence-closeout-press"/, `${status}: the box renders a line`);
       assert.match(html, new RegExp(`data-state="${status}"`), `${status}: the box carries the status`);
       // The justification is plain words for every status: no SHA, no ISO time, no id.
       const from = html.indexOf('data-testid="task-page-pr-summary"');
