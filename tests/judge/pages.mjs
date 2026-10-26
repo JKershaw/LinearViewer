@@ -114,11 +114,12 @@ export const PAGES = [
   { id: 'home-run-panel-pick', urlKey: 'judge-run-pick', path: (k) => `/workspace/${k}/`, state: 'home-run-panel-pick', seed: { openRouterConnected: true, queueToken: true }, renderers: ['lib/render.js', 'lib/components/decision-panel.js', 'public/decision-panel.js', 'public/prompt-section.js'] },
   { id: 'swipe-dispatch-open', urlKey: 'judge-swipe', path: (k) => `/workspace/${k}/swipe`, state: 'swipe-dispatch-open', seed: { openRouterConnected: true, queueToken: true }, renderers: ['lib/render-swipe.js'] },
   // LIN-3983 PR 2: Observation. `obs-two-runs` seeds one run waiting on a question and one working run (on the
+  // own urlKey per entry: the seed is once per worker process, so two entries sharing a key can seed twice and the dispatch guard refuses the second;
   // real clock, so the times are masked). The Runs view shows the waiting block above the feed; the Rulings tab
   // lists the same question with its proposal; Scan-due and a new user (nothing running) use the seeded local
   // workspace with no runs of its own. The two tabs and the default view each name their own state in the list.
   { id: 'observation-runs', urlKey: 'judge-obs-runs', path: (k) => `/workspace/${k}/observation`, state: 'obs-two-runs', masks: [OBS_TIMES], renderers: ['lib/render-observation.js'] },
-  { id: 'observation-rulings', urlKey: 'judge-obs-runs', path: (k) => `/workspace/${k}/observation?view=rulings`, state: 'obs-two-runs', masks: [OBS_TIMES], renderers: ['lib/render-observation.js'] },
+  { id: 'observation-rulings', urlKey: 'judge-obs-rulings', path: (k) => `/workspace/${k}/observation?view=rulings`, state: 'obs-two-runs', masks: [OBS_TIMES], renderers: ['lib/render-observation.js'] },
   { id: 'observation-due', urlKey: 'judge', path: (k) => `/workspace/${k}/observation?view=due`, renderers: ['lib/render-observation.js'] },
   { id: 'observation-new-user', urlKey: 'judge', path: (k) => `/workspace/${k}/observation`, renderers: ['lib/render-observation.js'] },
   // LIN-3983 PR 2: the three pages that still load observation.css (Live Console no longer does). Each is behind its
