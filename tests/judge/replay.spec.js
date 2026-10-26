@@ -168,7 +168,10 @@ async function prepare(page, context, entry, viewport, theme, side, baseURL) {
     // up without the control and is shot as it is.
     await page.locator('[data-section="in-progress"][data-identifier="LOCAL-1"]').first().click();
     const change = page.getByTestId('run-change');
+    // LIN-3991: base waits too (briefly). Both sides now have Change, and a base that only counted it shot the page
+    // before the control rendered, so the pair differed by a panel that one side never opened.
     if (side === 'head') await change.waitFor();
+    else await change.waitFor({ timeout: 5000 }).catch(() => {});
     if (await change.count()) {
       await change.click();
       await page.getByTestId(side === 'head' ? 'run-decision-panel' : 'run-change-panel').waitFor();
