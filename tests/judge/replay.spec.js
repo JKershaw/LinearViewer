@@ -161,7 +161,7 @@ async function prepare(page, context, entry, viewport, theme, side, baseURL) {
       }
     }
   }
-  if (entry.state === 'home-run-panel-open' || entry.state === 'home-run-panel-opencode') {
+  if (entry.state === 'home-run-panel-open' || entry.state === 'home-run-panel-opencode' || entry.state === 'home-run-panel-pick') {
     // LIN-3962: Home's Change panel, opened the way a viewer opens it: the In Progress row (visible; the marked top task
     // sits under a collapsed parent in this seed), then Change. The seed gives this page its run controls, so head must
     // show Change; a head without it fails here rather than being skipped. Base's panel is the old one, so base may come
@@ -183,6 +183,10 @@ async function prepare(page, context, entry, viewport, theme, side, baseURL) {
       await page.getByTestId('run-harness').selectOption('opencode');
       await page.getByTestId('run-effort').first().waitFor({ state: 'hidden' });
     }
+  }
+  // LIN-3992: a viewer picks the Claude Opus 5.5 suggestion; head's summary then names it, base's still says the old thing.
+  if (entry.state === 'home-run-panel-pick') {
+    await page.locator('[data-decision-pick="opus"]').first().click();
   }
   if (entry.state === 'swipe-dispatch-open') {
     // LIN-3962: Swipe's card with its Prompts section open, where its exec controls live. The Dispatch ▾ disclosure

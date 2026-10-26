@@ -16,6 +16,7 @@ import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 import { decisionPanel, routingWords, agentLists } from '../../lib/components/decision-panel.js';
 import { HARNESSES_WITHOUT_EFFORT } from '../../lib/model-routing.js';
+import { escapeHtml } from '../../lib/utils/html.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
@@ -46,6 +47,12 @@ function makeContainer() {
       };
     }
   };
+  // The Change panel's summary is an element the page updates in place when a pick or a typed model changes it (LIN-3992),
+  // so it reads and writes its own text in the markup, as a real element's textContent does.
+  const summaryNode = {
+    get textContent() { return /data-testid="run-will-use">([^<]*)</.exec(html)?.[1] ?? ''; },
+    set textContent(v) { html = html.replace(/(data-testid="run-will-use">)[^<]*/, (_, open) => open + escapeHtml(v)); }
+  };
   const container = {
     get innerHTML() { return html; },
     set innerHTML(v) { html = v; written = {}; },
@@ -53,7 +60,10 @@ function makeContainer() {
     classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
     setAttribute() {},
     getAttribute() { return null; },
-    querySelector(sel) { return sel === '[data-decision-panel]' && html.includes('data-decision-panel') ? panelRoot : null; },
+    querySelector(sel) {
+      if (sel === '[data-testid="run-will-use"]') return html.includes('data-testid="run-will-use"') ? summaryNode : null;
+      return sel === '[data-decision-panel]' && html.includes('data-decision-panel') ? panelRoot : null;
+    },
     contains() { return true; },
     addEventListener(type, fn) { (listeners[type] = listeners[type] || []).push(fn); },
     removeEventListener() {},
@@ -624,5 +634,77 @@ describe('LIN-3987 review — a harness picked on the draft re-reads the panel, 
     await flush();
     assert.match(summary(), /^This run will use Claude Code(?:&#039;|')s own model/, 'the first read answered last and did not paint');
     assert.doesNotMatch(summary(), /opencode/, summary());
+  });
+});
+
+// LIN-3992: a pick (or a typed model) sets the draft's model, and the summary names it at once. The summary is updated
+// in place, not by a repaint: a repaint per keystroke would close the datalist and reset the caret (LIN-3969).
+describe('LIN-3992 — the summary names the model the draft holds, without a repaint', () => {
+  const summary = (c) => /data-testid="run-will-use">([^<]*)</.exec(c.innerHTML)[1];
+  const runsOn = (c) => /data-testid="opened-task-runs-on">([\s\S]*?)<\/div>/.exec(c.innerHTML)[1].replace(/<button[\s\S]*?<\/button>/, '').replace(/<[^>]+>/g, '').trim();
+  const panelOpen = { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT };
+
+  test('a suggestion picked names its display name in the summary at once', async () => {
+    const { c } = await mount({}, { opened: panelOpen });
+    await c.click({ action: 'change-run' });
+    await flush();
+    assert.match(summary(c), /^This run will use Claude Code(?:&#039;|')s own model/, summary(c));
+    // A pick sets the model field to the alias, then dispatches input and change (public/decision-panel.js).
+    await c.fire('input', { dataset: { testid: 'run-model' }, value: 'opus' });
+    await c.fire('change', { dataset: { testid: 'run-model' }, value: 'opus' });
+    assert.match(summary(c), /^This run will use Claude Opus 5\.5 · Claude Code · /, summary(c));
+  });
+
+  test('a typed model no option names is shown as typed, and a cleared model goes back to the default words', async () => {
+    const { c } = await mount({}, { opened: panelOpen });
+    await c.click({ action: 'change-run' });
+    await flush();
+    await c.fire('input', { dataset: { testid: 'run-model' }, value: 'x/y' });
+    assert.match(summary(c), /^This run will use x\/y · Claude Code · /, summary(c));
+    await c.fire('input', { dataset: { testid: 'run-model' }, value: '' });
+    assert.match(summary(c), /^This run will use Claude Code(?:&#039;|')s own model/, summary(c));
+  });
+
+  // Witness that "Use for this run" sends the picked id. It passes once the pick path sets the model, so it is checked
+  // by breaking that line (draft.model = null) and watching it fail; see the PR.
+  test('"Use for this run" sends the picked model: the preview is asked for it, and Run to PR dispatches it', async () => {
+    const { c, calls } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: { count: 0, next: null, last: null, running: null } } });
+    await c.click({ action: 'change-run' });
+    await flush();
+    await c.fire('input', { dataset: { testid: 'run-model' }, value: 'opus' });
+    await c.fire('change', { dataset: { testid: 'run-model' }, value: 'opus' });
+    await c.click({ action: 'use-run' });
+    await flush();
+    assert.ok(calls.api.some((a) => a.url.includes('/api/dispatch/preview') && a.url.includes('model=opus')), 'the preview is asked for model=opus');
+    await c.click({ action: 'go', rung: 'run-task' });
+    await flush();
+    await flush();
+    assert.equal(calls.dispatch.at(-1).model, 'opus');
+  });
+
+  const fallback = (sources = { model: 'fallback', harness: 'fallback', effort: 'none' }, model = null) => () => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model, harness: 'claude-code', effort: null, sources, words: routingWords({ harness: 'claude-code', model, effort: null }) });
+
+  test('Runs on names Claude Code once when the model is Claude Code\'s own, and says the runner', async () => {
+    const { c } = await mount({}, { opened: panelOpen, previewFor: fallback() });
+    await flush();
+    assert.equal(runsOn(c).match(/Claude Code/g)?.length, 1, runsOn(c));
+    assert.match(runsOn(c), /^Runs on Claude Code(?:&#039;|')s own model · your runner/, runsOn(c));
+  });
+
+  test('Runs on names Claude Code once when the target is Claude Code on the web and the model is its own', async () => {
+    const { c } = await mount({}, { opened: panelOpen, previewFor: fallback() });
+    await c.click({ action: 'change-run' });
+    await flush();
+    await c.click({ action: 'run-target', target: 'web' });
+    await c.click({ action: 'use-run' });
+    await flush();
+    assert.equal(runsOn(c).match(/Claude Code/g)?.length, 1, runsOn(c));
+    assert.match(runsOn(c), /on the web/, runsOn(c));
+  });
+
+  test('Runs on keeps where the harness came from when the model is named', async () => {
+    const { c } = await mount({}, { opened: panelOpen, previewFor: fallback({ model: 'explicit', harness: 'fallback', effort: 'none' }, 'sonnet') });
+    await flush();
+    assert.match(runsOn(c), /^Runs on Claude Sonnet 5\.5 · your runner — chosen for this run, Claude Code, the default$/, runsOn(c));
   });
 });
