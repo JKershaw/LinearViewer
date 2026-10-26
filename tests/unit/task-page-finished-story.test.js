@@ -155,7 +155,8 @@ describe('the witness: a guest reads a finished, merged task', () => {
 
     // 3. nobody is "you" on a guest page
     assert.doesNotMatch(text, /\b(you|your)\b/i);
-    assert.match(text, /PR #41 was merged by Harbour's close-out, after the owner pressed merge, as reported in the close-out on 8 Oct, 18:11 UTC\./);
+    // LIN-3975 (finding 3): the close-out's time is the tap piece, in relative words, not UTC prose.
+    assert.match(text, /PR #41 was merged by Harbour's close-out, after the owner pressed merge, as reported in the close-out \d+ \w+ ago ?\./);
 
     // 4. the sessions line says what it counts, and the parts sum to the total
     const line = sessionsLine(model);
@@ -181,7 +182,7 @@ describe('the witness: a guest reads a finished, merged task', () => {
     assert.doesNotMatch(lead, /All five items are discharged/, 'not in the visible lead or detail');
     assert.doesNotMatch(lead, /abc1234|deadbeef/, 'no SHA in the visible PR text');
     const raw = main.slice(main.indexOf('task-page-pr-raw'));
-    assert.match(raw, /Close-out summary, 8 Oct, 18:11 UTC — its own words, not re-reviewed/);
+    assert.match(raw, /Close-out summary, <time class="task-time"[^>]*data-local-time="tap"[^>]*>[^<]+ ago<\/time> — its own words, not re-reviewed/);
     assert.match(raw, /All five items are discharged; merged at abc1234/);
     const pr = main.slice(main.indexOf('task-pr-section'), main.indexOf('task-context-section'));
     assert.equal((pr.match(/All five items are discharged/g) || []).length, 1, 'once in the PR section (the tracker comments list is separate)');
