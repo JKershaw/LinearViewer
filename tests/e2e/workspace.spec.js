@@ -121,7 +121,7 @@ test.describe('Workspace Switching', () => {
     await page.goto(`/workspace/${workerUrlKey}/settings`);
 
     // Verify we're on settings page
-    await expect(page.locator('h1')).toHaveText('Settings');
+    await expect(page.getByTestId('settings-nav')).toBeVisible();
 
     // Open workspace selector
     await page.locator('#workspace-toggle').click();
@@ -134,7 +134,7 @@ test.describe('Workspace Switching', () => {
     ]);
 
     // Should still be on settings page
-    await expect(page.locator('h1')).toHaveText('Settings');
+    await expect(page.getByTestId('settings-nav')).toBeVisible();
     await expect(page.locator('#workspace-toggle')).toHaveText('Second Workspace');
   });
 });

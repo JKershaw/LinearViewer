@@ -12,7 +12,8 @@ test.describe('Settings › Models (LIN-3855)', () => {
   let urlKey
 
   test.beforeEach(async ({ seedLocal, request }) => {
-    ;({ urlKey } = await seedLocal())
+    // A runner is set, as in a workspace that runs agents: the agent rows apply (LIN-3952 item 6).
+    ;({ urlKey } = await seedLocal(null, { runnerKey: true }))
     // A clean routing table, log and presets for this workspace.
     await request.get(`/test/set-workspace-model?urlKey=${urlKey}`)
   })
@@ -24,6 +25,10 @@ test.describe('Settings › Models (LIN-3855)', () => {
     await settings(page).gotoArea(urlKey, 'models')
     if (query) await page.goto(`/workspace/${urlKey}/settings/models${query}`)
     await page.waitForLoadState('networkidle')
+    // Jobs with no runs sit behind the "Show N more" fold (LIN-3952 item 1): open each closed fold, as a person would.
+    for (const fold of await page.locator('details.models-fold:not([open])').all()) {
+      await fold.locator(':scope > summary').click()
+    }
   }
   const jobRow = (page, id) => page.locator(`[data-testid="models-job-${id}"]`)
   const openRow = async (page, id) => {
@@ -169,18 +174,23 @@ test.describe('Settings › Models (LIN-3855)', () => {
     expect(await page.evaluate(() => document.activeElement.matches('[data-testid="models-job-implementation"] > summary'))).toBe(true)
   })
 
-  test('the sidebar names what jobs run on, and a group move changes it', async ({ page, request }) => {
-    await openModels(page)
+  // Off Models the sidebar's state is spend-free (LIN-3952 item 5): one model in use names it, several read as a count.
+  test('off Models the sidebar names the one model every job runs on, and a group move changes it', async ({ page, request }) => {
+    await settings(page).gotoArea(urlKey, 'sources')
     const before = await stateOf(page).textContent()
-    // Every agent group on one model: the agent jobs then all run on it, and the sidebar must say so.
+    // Every agent group on one model: the agent jobs then all run on it. Harbour calls keep their own model, so two in use.
     const groups = ['judge', 'plan', 'make', 'steer', 'sort', 'tell']
     await seed(request, groups.map((key) => ({ scope: 'group', surface: 'agent-session', key, field: 'model', to: 'anthropic/claude-sonnet-5' })), 'all agent groups')
-    await openModels(page)
+    await settings(page).gotoArea(urlKey, 'sources')
     const after = await stateOf(page).textContent()
     expect(after).not.toBe(before)
-    // Every agent job now runs on Claude Sonnet 5 (named from the catalog, clipped to the sidebar's 16 characters).
-    expect(after).toMatch(/^Claude Sonn/)
-    expect(after).toMatch(/ \+1$/)
+    expect(after.trim()).toMatch(/^2 models$/)
+  })
+
+  // On Models the sidebar names the model carrying the most priced spend (LIN-3952 item 5). With no runs there is no priced spend.
+  test('on Models the sidebar reads "No priced runs" until a job has priced spend', async ({ page }) => {
+    await openModels(page)
+    await expect(stateOf(page)).toHaveText('No priced runs')
   })
 
   test('the retired forms are gone, the Dispatch presets section stays, and the old POSTs write nothing', async ({ page, request }) => {

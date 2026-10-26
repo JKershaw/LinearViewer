@@ -21,8 +21,9 @@ test.describe('Settings Page', () => {
 
   test('renders the list of areas with a state for each, in two groups (LIN-3846)', async ({ page }) => {
     await page.goto(`/workspace/${urlKey}/settings`)
-    await expect(page.locator('h1').first()).toContainText('Settings')
+    // The centred Settings heading is gone (LIN-3952): the nav is how the page starts.
     const nav = page.getByTestId('settings-nav')
+    await expect(nav).toBeVisible()
     await expect(nav).toContainText('Workspace')
     await expect(nav).toContainText('You')
     for (const area of ['sources', 'models', 'running', 'agent-access', 'health', 'change-log', 'features', 'account']) {
