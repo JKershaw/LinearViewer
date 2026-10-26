@@ -2,7 +2,7 @@
 // joins `npm test`. Run: node --test tests/judge/pages.test.mjs
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PAGES, AREAS, coverageOfChange, coveredRenderers, cssNamesIn, parsePixelDiff, renderersOf } from './pages.mjs';
+import { pngSize, layoutClass, PAGES, AREAS, coverageOfChange, coveredRenderers, cssNamesIn, parsePixelDiff, renderersOf } from './pages.mjs';
 
 test('the page list holds the pages and states the ticket asks for (LIN-3889 adds the back-link pages and audit-report) (the 4th, Running with no runner, is the Running page itself)', () => {
   const ids = PAGES.map((p) => p.id);
@@ -10,7 +10,7 @@ test('the page list holds the pages and states the ticket asks for (LIN-3889 add
   for (const id of ['home', 'task', 'dispatch', 'proxy', 'audit', 'settings-index', 'styleguide', 'privacy', 'terms', ...AREAS.map((a) => `settings-${a}`)]) assert.ok(ids.includes(id), id);
   // LIN-3987: the list follows every state the page list carries (home-copy-*, home-failed, home-running and home-stages-done
   // were added by LIN-3968 without this pin, which was already stale on main).
-  assert.deepEqual(PAGES.filter((p) => p.state).map((p) => p.state).sort(), ['ask-open', 'audit-report', 'change-log-entry', 'email-signin', 'home-copy-first', 'home-copy-written', 'home-failed', 'home-failed-first', 'home-run-panel-open', 'home-run-panel-opencode', 'home-run-panel-pick', 'home-running', 'home-stages-done', 'key-open', 'live-history', 'live-working', 'models-group-open', 'models-panel-open', 'models-saved', 'models-spend', 'models-staged', 'obs-two-runs', 'obs-two-runs', 'obs-two-runs', 'paused', 'swipe-dispatch-open']);
+  assert.deepEqual(PAGES.filter((p) => p.state).map((p) => p.state).sort(), ['ask-open', 'audit-report', 'change-log-entry', 'email-signin', 'home-copy-first', 'home-copy-written', 'home-failed', 'home-failed-first', 'home-run-panel-open', 'home-run-panel-opencode', 'home-run-panel-pick', 'home-running', 'home-stages-done', 'key-open', 'live-history', 'live-working', 'models-group-open', 'models-panel-open', 'models-saved', 'models-spend', 'models-staged', 'obs-two-runs', 'obs-two-runs', 'obs-two-runs', 'paused', 'swipe-dispatch-open', 'task-build-done', 'task-chat-open', 'task-failed', 'task-guest', 'task-member', 'task-no-runner', 'task-ready', 'task-running', 'task-waiting']);
   for (const id of ['account-home', 'workspace-not-found']) assert.ok(ids.includes(id), id);
   assert.equal(AREAS.length, 8);
 });
@@ -44,6 +44,22 @@ test('coverage: nothing changed, or only covered renderers, is clean', () => {
 test('renderersOf finds the renderer that links a stylesheet, in this repo at HEAD', () => {
   assert.ok(renderersOf(new URL('../..', import.meta.url).pathname, 'HEAD', 'audit.css').includes('lib/render-audit.js'));
   assert.deepEqual(renderersOf(new URL('../..', import.meta.url).pathname, 'HEAD', 'no-such-sheet-xyz.css'), []);
+});
+
+// LIN-3975 (judge classification): the layout class comes from each PNG's own size, not from the comparator's text,
+// which can carry a pixel count even when the two pages differ in height.
+const pngOf = (width, height) => {
+  const buf = Buffer.alloc(24);
+  buf.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0);
+  buf.writeUInt32BE(width, 16);
+  buf.writeUInt32BE(height, 20);
+  return buf;
+};
+test('layoutClass reads each PNG size: a height change is layout, even when the comparator also counted pixels', () => {
+  assert.deepEqual(pngSize(pngOf(1280, 1409)), { width: 1280, height: 1409 });
+  assert.equal(pngSize(Buffer.from('not a png at all, just text')), null);
+  assert.equal(layoutClass(pngOf(1280, 900), pngOf(1280, 900)), 'paint (same size)');
+  assert.equal(layoutClass(pngOf(1280, 1409), pngOf(1280, 1451)), 'layout (page size 1280x1409 -> 1280x1451)');
 });
 
 test('parsePixelDiff reads the comparator message', () => {

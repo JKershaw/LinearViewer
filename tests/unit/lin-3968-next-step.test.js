@@ -117,7 +117,7 @@ describe('LIN-3968 — the header says what failed, and the state block offers t
 
   test('a running stage says how long it has run, in relative words', () => {
     const input = { sessions: [s('implementation', 'running', { loop: { takenAt: '2026-10-25T13:54:00.000Z', dispatchedAt: '2026-10-25T13:50:00.000Z' } })], waiting: noWait, tracker: null, now: NOW };
-    assert.deepEqual(deriveHeader(input), { status: 'running', sentence: 'Build running for 6 minutes.', sentenceAt: '2026-10-25T13:54:00.000Z' });
+    assert.deepEqual(deriveHeader(input), { status: 'running', sentence: 'Build running for 6m.', sentenceAt: '2026-10-25T13:54:00.000Z' });
   });
 
   test('sessionSummaryOf offers the failed stage again, and nothing while one runs', () => {

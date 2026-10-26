@@ -131,9 +131,9 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await expect(step(page, 'plan').locator('[data-testid="task-page-session-message"]')).toHaveText('planned it');
     await expect(step(page, 'plan').locator('[data-testid="task-page-session-link"]')).toHaveText('plan doc');
 
-    // The stages still ahead, dotted and quiet; details closed.
+    // The stages still ahead: one quiet line each, with no bar (LIN-3975); details closed.
     await expect(page.locator('[data-testid="task-page-stage-ahead"]')).toHaveText([/Review/, /Close-out/]);
-    await expect(page.locator('[data-testid="task-page-stage-ahead"] .task-stage-head').first()).toHaveCSS('border-top-style', 'dashed');
+    await expect(page.locator('[data-testid="task-page-stage-ahead"] .task-stage-bar')).toHaveCount(0);
     await expect(page.locator('[data-testid="task-page-details"]')).not.toHaveAttribute('open', '');
     await expect(page.locator('[data-testid="task-page-subtasks-link"]')).toHaveText('LOCAL-TP4');
 
@@ -168,6 +168,47 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await expect(step(page, 'implementation').locator('[data-testid="task-page-stage-state"]')).toHaveText('waiting for an answer');
     await expect(step(page, 'implementation').locator('[data-testid="task-page-session-message"]')).toContainText('which API key should the build use?');
     await noHorizontalScroll(page);
+  });
+
+  // LIN-3975 (review finding 1): a question that waits is not a reason to start another run. "Run to PR" is offered
+  // only when nothing is running, queued or waiting (LIN-3968's rule, the one Home follows).
+  test('a waiting question offers no "Run to PR" on the task page', async ({ page }) => {
+    await seedTasks(page);
+    const token = await runnerToken(page);
+    await seedSession(page, token, { identifier: 'LOCAL-TP3', title: 'A task waiting on an answer', kind: 'plan', feedback: ['[done] planned'] });
+    await seedSession(page, token, { identifier: 'LOCAL-TP3', title: 'A task waiting on an answer', kind: 'implementation', feedback: ['[blocked] which API key should the build use?'] });
+
+    await page.goto(`/workspace/${URL_KEY}/task/LOCAL-TP3`);
+    await expect(page.locator('[data-testid="task-page-status"]')).toHaveAttribute('data-status', 'waiting');
+    // The run control has drawn (its Runs-on line is there) before the absence is read.
+    await expect(page.locator('[data-testid="opened-task-runs-on"]')).toBeVisible();
+    await expect(page.locator('[data-testid="opened-task-go"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="task-page-run"]')).not.toContainText('Run to PR');
+  });
+
+  // LIN-3975 (review finding 2): the owner's quiet line is the only way to write a brief or recap from this page. A
+  // press generates it in place (one POST, no reload) and leaves the recap offer alone on the line.
+  test('the quiet line writes a brief in place, and the recap offer stays on the line', async ({ page }) => {
+    // LOCAL-TP4, not LOCAL-TP1: the server keeps a brief for the rest of the run, and the repaint test below expects
+    // LOCAL-TP1 to have none (no brief GET on mount).
+    await seedTasks(page);
+    const briefPosts = [];
+    page.on('request', (req) => {
+      const path = new URL(req.url()).pathname;
+      if (req.method() === 'POST' && /\/api\/brief\//.test(path)) briefPosts.push(path);
+    });
+
+    await page.goto(`/workspace/${URL_KEY}/task/LOCAL-TP4`);
+    await expect(page.locator('[data-testid="task-page-write-brief"]')).toBeVisible();
+    await page.evaluate(() => { window.__noReloadMarker = true; });
+    await page.locator('[data-testid="task-page-write-brief"]').click();
+
+    await expect(page.locator('[data-testid="session-brief"]')).toHaveAttribute('data-state', 'fresh', { timeout: 10000 });
+    expect(briefPosts, 'the press posted one brief for this task').toEqual([`/workspace/${URL_KEY}/api/brief/LOCAL-TP4`]);
+    expect(await page.evaluate(() => window.__noReloadMarker), 'the brief appeared without a reload').toBe(true);
+    await expect(page.locator('[data-testid="task-page-write-brief"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="task-page-write-recap"]')).toBeVisible();
+    await expect(page.locator('[data-testid="task-page-context-offers"] [data-write-kind]')).toHaveCount(1);
   });
 
   test('it updates itself, and a repaint keeps the rows the reader opened and the evidence', async ({ page }) => {
@@ -208,8 +249,9 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await expect(evidence.locator('[data-testid="run-evidence-checked-review-verdict"]')).toContainText('Approve');
 
     // The page only ever polled its stored-data state endpoint, plus the
-    // one-time owner share list load and the owner widgets' one status GET each
-    // (LIN-3340 G2). A poll adds nothing; opening the widgets spends no AI.
+    // one-time owner share list load. With neither brief nor recap, no widget
+    // mounts, so there is no status GET; a press on the quiet line starts one
+    // (LIN-3340 G2, LIN-3975 finding 1). Opening the page spends no AI.
     expect(stateRequests.length).toBeGreaterThan(0);
     const stateUrl = `/workspace/${URL_KEY}/api/task/LOCAL-TP1/state`;
     const sharesUrl = `/workspace/${URL_KEY}/api/task/LOCAL-TP1/shares`;
@@ -219,8 +261,8 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     for (const path of stateRequests) {
       expect([stateUrl, sharesUrl, briefUrl, recapUrl], `unexpected task-page request: ${path}`).toContain(path);
     }
-    expect(stateRequests.filter(p => p === briefUrl).length, 'one brief GET on mount').toBe(1);
-    expect(stateRequests.filter(p => p === recapUrl).length, 'one recap GET on mount').toBe(1);
+    expect(stateRequests.filter(p => p === briefUrl).length, 'no brief GET on mount when neither exists').toBe(0);
+    expect(stateRequests.filter(p => p === recapUrl).length, 'no recap GET on mount when neither exists').toBe(0);
   });
 
   // LIN-3356: the layout John asked for, on a phone and on desktop.
@@ -229,14 +271,19 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     const token = await runnerToken(page);
     await seedSession(page, token, { identifier: 'LOCAL-TP1', title: 'A task with a running build', kind: 'plan', feedback: ['[done] planned it'] });
     await seedSession(page, token, { identifier: 'LOCAL-TP1', title: 'A task with a running build', kind: 'implementation' });
-    const box = async (testid) => page.locator(`[data-testid="${testid}"]`).first().boundingBox();
+    // A testid that is not drawn in this state reads as null, not as a 30-second wait.
+    const box = async (testid) => {
+      const el = page.locator(`[data-testid="${testid}"]`).first();
+      return (await el.count()) ? el.boundingBox() : null;
+    };
 
     // Phone (360): a single column in reading order, no sideways scroll.
     await page.goto(`/workspace/${URL_KEY}/task/LOCAL-TP1`);
     const answer = await box('task-page-answer');
     const stages = await box('task-page-track-mount');
     const pr = await box('task-page-pr-mount');
-    const context = await box('task-page-context-mount');
+    // With neither brief nor recap, the quiet line is the context block (LIN-3975, finding 1).
+    const context = (await box('task-page-context-mount')) || (await box('task-page-context-quiet'));
     expect(answer.y).toBeLessThan(stages.y);
     expect(stages.y).toBeLessThan(pr.y);
     expect(pr.y).toBeLessThan(context.y);
@@ -252,17 +299,29 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     expect(fonts.lead).toBe(fonts.detail);
     expect(fonts.lead).toMatch(/Inter|sans-serif/);
 
-    // Desktop (1280): the stages and the brief/recap sit side by side, in a
-    // plain column (not sticky, no scroll area of its own).
+    // Desktop (1280): with a brief or recap, the brief/recap sits beside the stages in a plain column (not sticky,
+    // no scroll area of its own). With neither, the one quiet line takes no column (LIN-3975).
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.reload();
     const dStages = await box('task-page-track-mount');
-    const dContext = await box('task-page-context-mount');
-    expect(dContext.x).toBeGreaterThan(dStages.x + dStages.width - 2);
-    expect(Math.abs(dContext.y - dStages.y), 'aligned at the top of the same band').toBeLessThan(80);
-    const aside = await page.locator('.task-context-section').evaluate((el) => { const cs = getComputedStyle(el); return { position: cs.position, overflowY: cs.overflowY }; });
-    expect(aside.position).not.toBe('sticky');
-    expect(aside.overflowY).toBe('visible');
+    if (await page.locator('[data-testid="task-page-context-quiet"]').count()) {
+      const quiet = await box('task-page-context-quiet');
+      expect(quiet.x, 'the quiet line takes no column beside the stages').toBeLessThanOrEqual(dStages.x + 2);
+      // Finding 1: the quiet line sits under the stages (not in an empty row above them), draws no placeholder box, and
+      // holds both offers on one line.
+      expect(quiet.y, 'the quiet line is under the stages').toBeGreaterThan(dStages.y + dStages.height - 2);
+      await expect(page.locator('.brief-placeholder, .recap-placeholder')).toHaveCount(0);
+      const offerBrief = await box('task-page-write-brief');
+      const offerRecap = await box('task-page-write-recap');
+      expect(Math.abs(offerBrief.y - offerRecap.y), 'both offers on one line').toBeLessThan(4);
+    } else {
+      const dContext = await box('task-page-context-mount');
+      expect(dContext.x).toBeGreaterThan(dStages.x + dStages.width - 2);
+      expect(Math.abs(dContext.y - dStages.y), 'aligned at the top of the same band').toBeLessThan(80);
+      const aside = await page.locator('.task-context-section').evaluate((el) => { const cs = getComputedStyle(el); return { position: cs.position, overflowY: cs.overflowY }; });
+      expect(aside.position).not.toBe('sticky');
+      expect(aside.overflowY).toBe('visible');
+    }
     await noHorizontalScroll(page);
     await page.screenshot({ path: test.info().outputPath('task-page-running-1280.png'), fullPage: true });
   });
@@ -311,8 +370,9 @@ test.describe('Task page, owner view (LIN-3329)', () => {
       '[data-kind="implementation"] [data-testid="task-page-session-message"]',
       '[data-testid="task-page-stage-ahead"] .task-stage-name',
       '[data-testid="task-page-stage-ahead"] .task-stage-state',
-      '[data-testid="task-page-description"] .disclosure__label',
-      '.brief-placeholder',
+      '[data-testid="task-page-description"] .section-header',
+      // With neither brief nor recap, the owner's one quiet line is the empty-state text (LIN-3975, finding 1).
+      '[data-testid="task-page-context-offers"]',
       '[data-testid="task-page-back"]',
       '.task-details .disclosure__label',
     ];

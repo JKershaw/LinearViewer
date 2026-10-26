@@ -3291,7 +3291,9 @@ app.use(createTaskPageRoutes({
   getDeployInfo,
   loader: taskPageLoader,
   // LIN-3975: the owner or a member is read from the one hoisted owner seam.
-  workspaceOwnerCheck
+  workspaceOwnerCheck,
+  // LIN-3975: the chat proposals the run control stages for the owner.
+  runProposalsStore
 }))
 
 // Mount the task share routes (LIN-3330) — the owner mint/list/revoke controls

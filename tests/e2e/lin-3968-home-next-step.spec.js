@@ -168,6 +168,24 @@ test.describe('Home: a running stage offers no other step (LIN-3968)', () => {
   });
 });
 
+test.describe('Home: a waiting question offers no "Run to PR" (LIN-3975, review finding 1)', () => {
+  test.use({ viewport: DESKTOP });
+
+  test('while Build waits on an answer, the run block offers no main action and no "Run to PR"', async ({ page }) => {
+    await seedTask(page);
+    const token = await runnerToken(page);
+    await seedSession(page, token, { kind: 'plan', feedback: ['[done] planned it'] });
+    await seedSession(page, token, { kind: 'implementation', feedback: ['[blocked] which API key should the build use?'] });
+    await gotoHome(page);
+    const block = await openTopTask(page);
+
+    const run = block.locator('[data-testid="opened-task-run"]');
+    await expect(run).toContainText('Runs on');
+    await expect(block.getByTestId('opened-task-go')).toHaveCount(0);
+    await expect(run).not.toContainText('Run to PR');
+  });
+});
+
 test.describe('Home: a failed stage can be run again (LIN-3968 DECISION, option a)', () => {
   test.use({ viewport: DESKTOP });
 

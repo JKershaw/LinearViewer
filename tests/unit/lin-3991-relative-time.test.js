@@ -65,7 +65,7 @@ describe('LIN-3991 — sentenceAt is the moment the sentence names', () => {
 
   test('a running stage names the latest attempt\'s start, not the first dispatch (LIN-3498)', () => {
     const header = deriveHeader({ sessions: [sess('implementation', 'running', { loop: { takenAt: '2026-10-25T13:30:00.000Z', dispatchedAt: '2026-10-25T13:00:00.000Z' } })], tracker: null, waiting: noWait, now: NOW });
-    assert.equal(header.sentence, 'Build running for 30 minutes.');
+    assert.equal(header.sentence, 'Build running for 30m.');
     assert.equal(header.sentenceAt, '2026-10-25T13:30:00.000Z');
   });
 

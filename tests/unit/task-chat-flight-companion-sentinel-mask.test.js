@@ -35,7 +35,7 @@ const TASK_CHAT_JS_SRC = readFileSync(join(__dirname, '../../public/task-chat.js
 function extractMaskFnSrc() {
   const start = TASK_CHAT_JS_SRC.indexOf('var FLIGHT_COMPANION_SENTINEL');
   assert.notEqual(start, -1, 'FLIGHT_COMPANION_SENTINEL found in public/task-chat.js');
-  const end = TASK_CHAT_JS_SRC.indexOf('\n  function updateSaveVisibility', start);
+  const end = TASK_CHAT_JS_SRC.indexOf('\n    function updateSaveVisibility', start);
   assert.notEqual(end, -1, 'the next top-level function marks the end of the slice');
   return TASK_CHAT_JS_SRC.slice(start, end);
 }
@@ -43,7 +43,7 @@ function extractMaskFnSrc() {
 function extractRenderSavedRowsSrc() {
   const start = TASK_CHAT_JS_SRC.indexOf('var FLIGHT_COMPANION_SENTINEL');
   assert.notEqual(start, -1, 'FLIGHT_COMPANION_SENTINEL found in public/task-chat.js');
-  const end = TASK_CHAT_JS_SRC.indexOf('\n  function loadSavedList', start);
+  const end = TASK_CHAT_JS_SRC.indexOf('\n    function loadSavedList', start);
   assert.notEqual(end, -1, 'the next top-level function marks the end of the slice');
   return TASK_CHAT_JS_SRC.slice(start, end);
 }
@@ -63,7 +63,7 @@ function extractRenderSavedRowsSrc() {
 function extractAppendBubbleSrc() {
   const start = TASK_CHAT_JS_SRC.indexOf('  function appendBubble(role, text, state) {');
   assert.notEqual(start, -1, 'appendBubble found in public/task-chat.js');
-  const end = TASK_CHAT_JS_SRC.indexOf('\n  function appendToolBreadcrumb', start);
+  const end = TASK_CHAT_JS_SRC.indexOf('\n    function appendToolBreadcrumb', start);
   assert.notEqual(end, -1, 'the next top-level function marks the end of the slice');
   return TASK_CHAT_JS_SRC.slice(start, end);
 }
@@ -251,7 +251,7 @@ describe('appendBubble (LIN-2437 A.11 review finding 1) — assistant bubble spe
 function extractOpenSavedChatSrc() {
   const start = TASK_CHAT_JS_SRC.indexOf('  function openSavedChat(id) {');
   assert.notEqual(start, -1, 'openSavedChat found in public/task-chat.js');
-  const end = TASK_CHAT_JS_SRC.indexOf('\n  function deleteSavedChat', start);
+  const end = TASK_CHAT_JS_SRC.indexOf('\n    function deleteSavedChat', start);
   assert.notEqual(end, -1, 'the next top-level function marks the end of the slice');
   return TASK_CHAT_JS_SRC.slice(start, end);
 }
@@ -330,7 +330,7 @@ describe('openSavedChat (LIN-2483/LIN-2634) — resume never seeds the raw senti
 function extractSendSrc() {
   const start = TASK_CHAT_JS_SRC.indexOf('  function send() {');
   assert.notEqual(start, -1, 'send found in public/task-chat.js');
-  const end = TASK_CHAT_JS_SRC.indexOf('\n  sendBtn.addEventListener', start);
+  const end = TASK_CHAT_JS_SRC.indexOf('\n    sendBtn.addEventListener', start);
   assert.notEqual(end, -1, 'the whole send() function body must be captured before the next top-level statement');
   return TASK_CHAT_JS_SRC.slice(start, end);
 }
@@ -339,6 +339,7 @@ function makeSendSandbox({ idValue, activeTask }) {
   const appendBubbleCalls = [];
   const sandbox = {
     streaming: false,
+    propose: false,
     idInput: { value: idValue, focus: () => {} },
     questionInput: { value: 'a question', focus: () => {} },
     activeTask,

@@ -242,12 +242,30 @@
 
   // ── Share controls (LIN-3330, owner only) ───────────────────────────────────
 
-  /** A share's stored timestamps as a short label. */
-  function shareWhen(value) {
-    if (!value) return '';
-    var d = new Date(value);
-    if (isNaN(d.getTime())) return '';
-    return d.toISOString().slice(0, 10);
+  /**
+   * A moment's relative words, worded as the server's relativeAgo is (lib/task-page-loader.js, LIN-3975): the same
+   * words on every task-page moment, with the exact local time one tap away (the `tap` time piece).
+   */
+  function relativeWords(value) {
+    var ms = Date.now() - Date.parse(value);
+    if (!isFinite(ms)) return '';
+    var minutes = Math.floor(Math.max(ms, 0) / 60000);
+    if (minutes < 1) return 'just now';
+    if (minutes < 60) return minutes + ' minute' + (minutes === 1 ? '' : 's') + ' ago';
+    var hours = Math.floor(minutes / 60);
+    if (hours < 24) return hours + ' hour' + (hours === 1 ? '' : 's') + ' ago';
+    var days = Math.floor(hours / 24);
+    return days + ' day' + (days === 1 ? '' : 's') + ' ago';
+  }
+
+  /** A share's created time as a tap time (LIN-3975): the words, and the exact local time on a tap. */
+  function shareTime(doc, value) {
+    var when = doc.createElement('time');
+    when.className = 'task-share-when task-time';
+    when.setAttribute('datetime', value);
+    when.setAttribute('data-local-time', 'tap');
+    when.textContent = relativeWords(value);
+    return when;
   }
 
   /** The absolute URL a created share's path points at, as shown once. */
@@ -294,14 +312,14 @@
         li.setAttribute('data-testid', 'task-share-row');
         li.setAttribute('data-share-id', share.id);
         li.setAttribute('data-revoked', share.revokedAt ? 'true' : 'false');
-        var when = doc.createElement('span');
-        when.className = 'task-share-when';
-        when.textContent = shareWhen(share.createdAt) + (share.revokedAt ? ' · revoked' : '');
+        var when = shareTime(doc, share.createdAt);
         li.appendChild(when);
+        if (share.revokedAt) li.appendChild(doc.createTextNode(' · revoked'));
+        if (window.initLocalTimes) window.initLocalTimes(li);
         if (!share.revokedAt) {
           var revoke = doc.createElement('button');
           revoke.type = 'button';
-          revoke.className = 'task-share-revoke';
+          revoke.className = 'btn btn--quiet task-share-revoke';
           revoke.setAttribute('data-action', 'task-share-revoke');
           revoke.setAttribute('data-testid', 'task-share-revoke');
           revoke.textContent = 'Revoke';
@@ -341,7 +359,7 @@
       input.value = url;
       var copy = doc.createElement('button');
       copy.type = 'button';
-      copy.className = 'task-share-copy';
+      copy.className = 'btn btn--quiet task-share-copy';
       copy.setAttribute('data-testid', 'task-share-copy');
       copy.textContent = 'Copy';
       copy.addEventListener('click', function () {
@@ -491,6 +509,14 @@
   }
 
   /**
+   * The owner's staged-proposals URL (LIN-3975), from the state URL the page polls: the same task and query, on the
+   * `proposals` read. Pure.
+   */
+  function proposalsUrlOf(stateUrl) {
+    return String(stateUrl || '').replace(/\/state(?=\?|$)/, '/proposals');
+  }
+
+  /**
    * Repaint the answer header from the state endpoint (LIN-3373). That read has
    * no tracker, so it can't verify a summary and its header carries none: the
    * load-time summary paragraph is carried across rather than deleted by the
@@ -511,6 +537,51 @@
     var main = doc.querySelector('[data-testid="task-page"][data-state-url]');
     if (!main) return null;
     initShare(doc);
+    // LIN-3975: "Read all of it" opens a cut description. Wired here, before the first Markdown render (LIN-3385),
+    // so ticket text can never be the control; a delegated listener, so no re-render needs a new one.
+    // Found as the section's own child, so a copy of the control inside the description text is never this one.
+    var readAll = doc.querySelector('[data-testid="task-page-description"] > [data-testid="task-page-description-more"]');
+    if (readAll) {
+      readAll.addEventListener('click', function () {
+        var body = readAll.parentNode.querySelector(':scope > .task-md--cut');
+        if (body) body.classList.remove('task-md--cut');
+        readAll.setAttribute('aria-expanded', 'true');
+        readAll.hidden = true;
+      });
+    }
+    // LIN-3975 (finding 1): with neither brief nor recap, the owner's quiet line offers to write each. A press mounts
+    // that one widget into the quiet section and starts its generate (the widget's own refresh, one press). The
+    // empty-state placeholder widgets are never mounted; the offer is removed once pressed.
+    // Both are captured here, before any Markdown renders, and the handler uses the captured references only.
+    var writeOffers = doc.querySelector('[data-testid="task-page-context-offers"]');
+    var quietContext = doc.querySelector('[data-testid="task-page-context-quiet"]');
+    if (writeOffers && quietContext) {
+      writeOffers.addEventListener('click', function (e) {
+        var button = e.target && e.target.closest ? e.target.closest('[data-write-kind]') : null;
+        if (!button || !writeOffers.contains(button)) return;
+        var kind = button.getAttribute('data-write-kind');
+        var widget = kind === 'brief' ? window.BriefSection : window.RecapSection;
+        if (!widget || typeof widget.refresh !== 'function') return;
+        var offer = button.parentNode;
+        if (offer && offer.parentNode) offer.parentNode.removeChild(offer);
+        if (!writeOffers.querySelector('[data-write-kind]')) writeOffers.parentNode.removeChild(writeOffers);
+        var panel = doc.createElement('div');
+        panel.className = 'sess-ctx-panel ' + (kind === 'brief' ? 'brief-section' : 'recap-section');
+        panel.setAttribute('data-testid', 'session-' + kind);
+        quietContext.appendChild(panel);
+        widget.refresh(panel, main.getAttribute('data-url-key') || '', main.getAttribute('data-identifier') || '', main.getAttribute('data-source') || undefined);
+      });
+    }
+    // LIN-3975: the owner's task-chat fold, mounted before the first Markdown render (LIN-3385). It is a direct child of
+    // the page (so a copy in ticket text is never it), and the page's own options ride on it.
+    var chatFold = doc.querySelector('[data-testid="task-page"] > [data-testid="task-page-chat-fold"]');
+    if (chatFold && window.TaskChat && typeof window.TaskChat.init === 'function') {
+      var foldOpts = {};
+      try { foldOpts = JSON.parse(chatFold.getAttribute('data-task-chat-opts') || '{}'); } catch (e) { foldOpts = {}; }
+      // The hook is read by TaskChat at init; refreshProposals is hoisted, and reads the run control only when a turn proposes.
+      foldOpts.onProposed = refreshProposals;
+      window.TaskChat.init(chatFold, foldOpts);
+    }
     // The status mount is what the poll repaints; the tracker line beside it is the page-load read's (LIN-3975).
     var answer = doc.querySelector('[data-testid="task-page-answer-status"]');
     var trackMount = doc.querySelector('[data-testid="task-page-track-mount"]');
@@ -535,8 +606,21 @@
     // member has no run-control root, so nothing mounts.
     var runRoot = doc.querySelector('[data-testid="task-page-run-control"]');
     var runOpts = runOptsOf(runRoot);
+    var runControl = null;
     if (runRoot && runOpts && window.PromptSection && typeof window.PromptSection.init === 'function') {
-      window.PromptSection.init(runRoot, runOpts);
+      runControl = window.PromptSection.init(runRoot, runOpts);
+    }
+
+    // LIN-3975 (finding 1): a fold turn that proposes a follow-up stages it in the run control at once. The owner's
+    // staged list is re-read (owner-only) and handed to the run control's own repaint; nothing is re-rendered here.
+    // Reached only from the fold's `proposed` frame, so it is never called on a page with no chat.
+    function refreshProposals() {
+      if (!runControl || typeof runControl.setProposals !== 'function') return;
+      window.api(proposalsUrlOf(main.getAttribute('data-state-url') || ''), { on401: '/logout' })
+        .then(function (body) { runControl.setProposals((body && body.proposals) || []); })
+        .catch(function (err) {
+          if (typeof window.toast === 'function') window.toast('Could not load the staged proposal: ' + ((err && err.message) || 'failed'), { type: 'error' });
+        });
     }
 
     // Owner's live widgets (if the libs loaded). Once mounted, the context
@@ -605,6 +689,8 @@
       if (trackMount && typeof state.trackHtml === 'string') {
         var checkIns = openCheckIns(trackMount);
         trackMount.innerHTML = state.trackHtml;
+        // A repainted track carries its own tap times (LIN-3975): bind them as the page does on load.
+        if (typeof window.initLocalTimes === 'function') window.initLocalTimes(trackMount);
         restoreCheckIns(trackMount, checkIns);
       }
       applyOpenMemory(rows(), memory);
@@ -673,6 +759,7 @@
       goneHandlerFor: goneHandlerFor,
       paintsReadyHeader: paintsReadyHeader,
       runOptsOf: runOptsOf,
+      proposalsUrlOf: proposalsUrlOf,
       enhanceMarkdown: enhanceMarkdown,
       enhanceContextMarkdown: enhanceContextMarkdown,
       mountWidgets: mountWidgets,

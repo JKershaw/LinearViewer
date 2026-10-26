@@ -248,10 +248,10 @@ describe('task page structure', () => {
     assert.match(html, /9 check-ins|2 check-ins/);
   });
 
-  test('stages still ahead are drawn dashed, with no id and no toggle', () => {
+  test('LIN-3975: stages still ahead are one quiet line each, with no bar, no id and no toggle', () => {
     const html = renderTaskTrack(model('running-blocked-repeat'), { now: NOW });
-    assert.match(html, /<li class="task-stage task-stage--ahead" data-testid="task-page-stage-ahead" data-state="ahead" data-tone="ahead" data-kind="close-out">/);
-    assert.doesNotMatch(html.slice(html.indexOf('task-stage--ahead')), /<button/);
+    assert.match(html, /<li class="task-stage-ahead" data-testid="task-page-stage-ahead" data-state="ahead" data-tone="ahead" data-kind="close-out"><span class="task-stage-name">Close-out<\/span> <span class="task-stage-state">usually next<\/span><\/li>/);
+    assert.doesNotMatch(html.slice(html.indexOf('task-page-stage-ahead')), /task-stage-bar|<button/);
     assert.doesNotMatch(renderTaskTrack(model('done'), { now: NOW }), /task-page-stage-ahead/, 'none once the tracker says done');
     const none = renderTaskTrack(model('no-sessions'), { now: NOW });
     assert.equal((none.match(/data-testid="task-page-stage-ahead"/g) || []).length, 5);
@@ -340,14 +340,16 @@ describe('task page structure', () => {
       };
       const html = renderTaskPage(withBox, { viewer: 'owner', urlKey: 'acme', binding: BINDING, now: NOW, pageOptions: PAGE_OPTIONS });
       assert.match(html, /data-testid="run-evidence-closeout"/, `${status}: the box is present`);
-      assert.match(html, /data-testid="run-evidence-closeout-(ready|merged|neutral|setup|withheld)"/, `${status}: the box renders a line`);
+      // LIN-3975: on the task page a ready box's line is its Merge press (the state line moved into the lead sentence).
+      assert.match(html, /data-testid="run-evidence-closeout-(ready|merged|neutral|setup|withheld)"|data-testid="run-evidence-closeout-press"/, `${status}: the box renders a line`);
       assert.match(html, new RegExp(`data-state="${status}"`), `${status}: the box carries the status`);
       // The justification is plain words for every status: no SHA, no ISO time, no id.
       const from = html.indexOf('data-testid="task-page-pr-summary"');
       const says = html.slice(from, html.indexOf('</div>', from));
       assert.match(says, /task-page-pr-lead">[^<]{12,}</, `${status}: a plain-words lead`);
-      const detail = (says.match(/task-page-pr-detail">([^<]*)</) || [])[1] || '';
-      assert.match(detail, /Review approved it on 6 Oct/, `${status}: the review sentence`);
+      // LIN-3975 (finding 3): the review's time is the tap piece, in its relative words, so the detail is read to its end.
+      const detail = (says.match(/task-page-pr-detail">([\s\S]*?)<\/p>/) || [])[1] || '';
+      assert.match(detail, /Review approved it, [^<]*<time class="task-time"[^>]*datetime="2026-10-06T10:00:00\.000Z"[^>]*data-local-time="tap"/, `${status}: the review sentence, pinned to the review's moment`);
       // LIN-3379: merged and not Done yet is the one status that doesn't count.
       if (status === 'merged') {
         assert.doesNotMatch(detail, /of 2 checked/, `${status}: no count while the close-out is finishing`);
@@ -355,7 +357,9 @@ describe('task page structure', () => {
       } else {
         assert.match(detail, /2 things CI couldn&#039;t prove: 1 of 2 checked/, `${status}: the ledger sentence`);
       }
-      assert.doesNotMatch(says, /\b(?=[0-9a-f]*\d)[0-9a-f]{7,40}\b|\d{4}-\d{2}-\d{2}T\d{2}:/, `${status}: no SHA or ISO time in the justification`);
+      // The check reads what a reader sees: a tap time's ISO stamp is its `datetime` attribute, never shown.
+      const visible = says.replace(/<[^>]+>/g, ' ');
+      assert.doesNotMatch(visible, /\b(?=[0-9a-f]*\d)[0-9a-f]{7,40}\b|\d{4}-\d{2}-\d{2}T\d{2}:/, `${status}: no SHA or ISO time in the justification`);
       // One clear button, and only when the close-out is ready.
       const buttons = html.match(/data-action="closeout-press"/g) || [];
       assert.equal(buttons.length, status === 'ready' ? 1 : 0, `${status}: the merge button iff ready`);
@@ -404,7 +408,7 @@ describe('task page structure', () => {
   });
 
   test('header answers running / waiting / done', () => {
-    assert.match(renderTaskStatus(model('running-blocked-repeat')), /data-status="running"[\s\S]*Review running for 58 minutes\./);
+    assert.match(renderTaskStatus(model('running-blocked-repeat')), /data-status="running"[\s\S]*Review running for 58m\./);
     assert.match(renderTaskStatus(model('waiting')), /data-status="waiting"[\s\S]*task-page-sentence">which API key\?</, 'the [blocked] marker is not in the sentence');
     // LIN-3991: the sentence is relative; the exact time sits beside it, outside the sentence.
     assert.match(renderTaskStatus(model('done'), { now: NOW }), /data-status="done"[\s\S]*task-page-sentence">Finished 3 hours ago\.<\/p>/);
@@ -454,12 +458,19 @@ describe('viewer isolation', () => {
       const owner = render(name, 'owner');
       const guest = render(name, 'guest');
       const fragments = renderOwnerControls(model(name), { urlKey: 'acme', binding: BINDING, promptOpts: PROMPT_OPTS });
-      let stripped = owner;
+      // LIN-3975: an attempt's run link (or its plain reason) is for a viewer with a run page to open. A guest has none,
+      // so that markup is the one viewer difference outside the owner fragments; strip it before the parity check.
+      let stripped = owner.replace(/ <(?:a|span) class="task-stage-run[^"]*"[^>]*>[^<]*<\/(?:a|span)>/g, '');
+      // LIN-3975 (finding 1): with neither brief nor recap, the owner's quiet line holds the offers and the marker is not
+      // drawn; the guest's quiet line is the plain state. That pair is the one context difference, stripped the same way.
+      const quiet = owner.includes('data-testid="task-page-context-offers"');
       for (const f of [fragments.context, fragments.pullRequest, fragments.share, fragments.question]) {
         if (!f) continue;
         assert.ok(stripped.includes(f), 'the owner page carries the fragment verbatim');
         stripped = stripped.replace(f, '');
       }
+      if (quiet) stripped = stripped.replace(fragments.writeOffers, '');
+      if (quiet) stripped = stripped.replace('<section class="sess-section task-context-section task-context-section--quiet" data-testid="task-page-context-quiet"></section>', '<section class="sess-section task-context-section task-context-section--quiet" data-testid="task-page-context-quiet"><p class="task-context-none" data-testid="task-page-context-none">○ no brief or recap yet</p></section>');
       // LIN-3975: the run control holds the slot the next-step line holds for a viewer with none, so the line is
       // present exactly when the run control is absent.
       if (fragments.runControl) {

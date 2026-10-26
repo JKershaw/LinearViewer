@@ -155,7 +155,11 @@ describe('the witness: a guest reads a finished, merged task', () => {
 
     // 3. nobody is "you" on a guest page
     assert.doesNotMatch(text, /\b(you|your)\b/i);
-    assert.match(text, /PR #41 was merged by Harbour's close-out, after the owner pressed merge, as reported in the close-out on 8 Oct, 18:11 UTC\./);
+    // LIN-3975 (finding 3): the close-out's time is the tap piece, in relative words, not UTC prose.
+    assert.match(text, /PR #41 was merged by Harbour's close-out, after the owner pressed merge, as reported in the close-out \d+ \w+ ago ?\./);
+    // The moment itself is pinned in the markup, not only its relative words (LIN-3975, review finding 2): the close-out's
+    // own time (CLOSE_OUT.createdAt), so a shift to the owner's press moment goes red.
+    assert.match(html, /as reported in the close-out <time class="task-time"[^>]*datetime="2026-10-08T18:11:00\.000Z"/);
 
     // 4. the sessions line says what it counts, and the parts sum to the total
     const line = sessionsLine(model);
@@ -181,7 +185,7 @@ describe('the witness: a guest reads a finished, merged task', () => {
     assert.doesNotMatch(lead, /All five items are discharged/, 'not in the visible lead or detail');
     assert.doesNotMatch(lead, /abc1234|deadbeef/, 'no SHA in the visible PR text');
     const raw = main.slice(main.indexOf('task-page-pr-raw'));
-    assert.match(raw, /Close-out summary, 8 Oct, 18:11 UTC — its own words, not re-reviewed/);
+    assert.match(raw, /Close-out summary, <time class="task-time"[^>]*datetime="2026-10-08T18:11:00\.000Z"[^>]*data-local-time="tap"[^>]*>[^<]+ ago<\/time> — its own words, not re-reviewed/);
     assert.match(raw, /All five items are discharged; merged at abc1234/);
     const pr = main.slice(main.indexOf('task-pr-section'), main.indexOf('task-context-section'));
     assert.equal((pr.match(/All five items are discharged/g) || []).length, 1, 'once in the PR section (the tracker comments list is separate)');

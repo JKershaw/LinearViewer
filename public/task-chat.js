@@ -9,450 +9,479 @@
 (function () {
   'use strict';
 
-  var data = window.__TASK_CHAT_DATA__ || {};
-  var urlKey = data.urlKey || '';
-  var savedChatsAvailable = data.savedChatsAvailable === true;
-  // LIN-1910: the resolved provider hint carried from the dashboard's Chat
-  // deep-link (lib/render.js chatHref), valid only while the input still
-  // holds the SAME identifier it was minted for — see send() below.
-  var prefillTask = data.defaultTask || '';
-  var prefillSource = data.defaultSource || '';
-  // LIN-3254: the run id this chat is scoped to (run-scoped chat proposes).
-  var prefillRun = data.defaultRun || '';
+  // LIN-3975: one client for the standalone /task-chat page and the task page's fold. `TaskChat.init(root, opts)`
+  // finds every control it drives by a `data-task-chat` hook INSIDE its own root, once, before any transcript is
+  // rendered (LIN-3385: a look-alike in a model's answer is never queried afterwards), and never queries the page
+  // again. The page's options arrive as `opts` (the standalone page carries them on its root), not as a global.
+  function init(root, opts) {
+    var data = opts || {};
+    var urlKey = data.urlKey || '';
+    var savedChatsAvailable = data.savedChatsAvailable === true;
+    // LIN-1910: the resolved provider hint carried from the dashboard's Chat
+    // deep-link (lib/render.js chatHref), valid only while the input still
+    // holds the SAME identifier it was minted for — see send() below.
+    var prefillTask = data.defaultTask || '';
+    var prefillSource = data.defaultSource || '';
+    // LIN-3254: the run id this chat is scoped to (run-scoped chat proposes).
+    var prefillRun = data.defaultRun || '';
+    // LIN-3975: the task page's fold is propose-only: every turn proposes, and the server stages the proposal for the
+    // run control. The flag rides in the turn body; the server reads it as a boolean.
+    var propose = data.propose === true;
+    // LIN-3975 (finding 1): the host is told when a turn staged a proposal (the `proposed` tool frame), so it can
+    // show the proposal where the reader applies it. Captured here, with the other hooks, at init.
+    var onProposed = typeof data.onProposed === 'function' ? data.onProposed : null;
 
-  var idInput = document.getElementById('task-chat-id');
-  var questionInput = document.getElementById('task-chat-question');
-  var sendBtn = document.getElementById('task-chat-send');
-  var transcript = document.getElementById('task-chat-transcript');
-  var emptyState = document.getElementById('task-chat-empty');
-  var activeLabel = document.getElementById('task-chat-active-label');
-  var resetBtn = document.getElementById('task-chat-reset');
+    function hook(name) { return root.querySelector('[data-task-chat="' + name + '"]'); }
+    var idInput = hook('id');
+    var questionInput = hook('question');
+    var sendBtn = hook('send');
+    var transcript = hook('transcript');
+    var emptyState = hook('empty');
+    var activeLabel = hook('active-label');
+    var resetBtn = hook('reset');
+    // Saved chats (LIN-1008) — present only when a user identity is available.
+    var saveBtn = hook('save');
+    var savedList = hook('saved-list');
+    var savedEmpty = hook('saved-empty');
 
-  // Saved chats (LIN-1008) — present only when a user identity is available.
-  var saveBtn = document.getElementById('task-chat-save');
-  var savedList = document.getElementById('task-chat-saved-list');
-  var savedEmpty = document.getElementById('task-chat-saved-empty');
+    var chatHistory = [];   // [{ role, content }] for the active task
+    var activeTask = '';     // the task identifier chatHistory belongs to
+    var streaming = false;
 
-  if (!idInput || !questionInput || !sendBtn || !transcript) return;
-
-  var chatHistory = [];   // [{ role, content }] for the active task
-  var activeTask = '';     // the task identifier chatHistory belongs to
-  var streaming = false;
-
-  function setEmptyVisible(visible) {
-    if (emptyState) emptyState.classList.toggle('hidden', !visible);
-  }
-
-  // Speaker → StatusPill: the user's "you" is a neutral tag chip that takes the
-  // shared self-turn accent (chat-msg--you); the task's own turn reads as
-  // in-progress (◐). Body → Surface, via the shared ChatUI helper (LIN-1298) —
-  // the `task-chat-msg-*` classes ride along as hooks so the per-role colour
-  // (now unified via chat.css) and E2E selectors still resolve. The streaming
-  // cursor MUST stay on the SSE text node (`.task-chat-msg-body`, the element
-  // send() writes textContent into), so it's the text span, not the wrapper,
-  // that toggles `.chat-cursor`.
-  //
-  // LIN-2445: `state` overrides the assistant default for a turn that is
-  // ALREADY complete when it is appended — the saved-chat replay, where every
-  // stored turn finished before it was ever persisted. A live turn still opens
-  // 'in-progress' and is settled by setBubbleState below.
-  function appendBubble(role, text, state) {
-    var whoLabel = role === 'user' ? 'you' : (maskFlightCompanionSentinel(activeTask) || 'task');
-    var li = window.ChatUI.appendMessage(transcript, {
-      who: whoLabel,
-      whoState: role === 'user' ? undefined : (state || 'in-progress'),
-      whoClass: 'task-chat-msg-who',
-      self: role === 'user',
-      text: text,
-      textClass: 'task-chat-msg-body',
-      bodyClass: 'task-chat-msg-surface',
-      liClass: 'task-chat-msg task-chat-msg-' + role,
-    });
-    setEmptyVisible(false);
-    return li.querySelector('.task-chat-msg-body');
-  }
-
-  // LIN-2445 (LIN-2443's sibling class): settle a live assistant bubble's
-  // speaker pill when its turn ends. ChatUI.appendMessage bakes the pill into
-  // innerHTML and returns only the <li>, so there is no mutation API — this is
-  // the same page-local swap public/flight-companion.js:229 landed for
-  // LIN-2443, against the SAME shared vocabulary (status-pill--done/--failed,
-  // public/style.css). Deliberately duplicated rather than hoisted into
-  // window.ChatUI: LIN-2443's boundary keeps the shared primitives untouched,
-  // and hoisting would tax collective.js/observation.js/session.js for a need
-  // only the two streaming pages have. Glyphs mirror STATUS_PILL_GLYPHS
-  // (public/common.js) — NOT a chat.css/chat.js fork.
-  var PILL_GLYPHS = { done: '\u2713', failed: '\u2715' };
-
-  function setBubbleState(li, state) {
-    if (!li) return;
-    var pill = li.querySelector('.chat-msg__who');
-    if (!pill) return;
-    // Clear EVERY state this function can set, not just in-progress: a bubble
-    // that is settled twice (an abort landing in the outer catch after a `done`
-    // already arrived) would otherwise carry both --done and --failed, and read
-    // as whichever CSS rule happens to come last. Removing all three first
-    // makes the swap idempotent and order-independent.
-    pill.classList.remove('status-pill--in-progress', 'status-pill--done', 'status-pill--failed');
-    pill.classList.add('status-pill--' + state);
-    var char = pill.querySelector('.status-pill__char');
-    if (char) char.textContent = PILL_GLYPHS[state] || '';
-  }
-
-  // Human-readable label for a `tool` SSE breadcrumb (LIN-990) — lifted into
-  // the shared window.ChatUI.toolBreadcrumbLabel (public/chat.js) by LIN-2632
-  // per LIN-1578's direction that this shared layer must not be forked; this
-  // page calls the shared implementation rather than keeping its own.
-
-  // Render a tool breadcrumb into the transcript. Breadcrumbs are surfaced to the
-  // reader but are NOT chat history — they never enter `chatHistory` and are not
-  // assistant content. Inserted BEFORE the (streaming) answer bubble so the log
-  // reads: you → ↳ lookup → the task's answer.
-  function appendToolBreadcrumb(label, beforeLi) {
-    if (!label) return;
-    window.ChatUI.appendNote(transcript, '↳ ' + label, { liClass: 'task-chat-tool', before: beforeLi });
-    setEmptyVisible(false);
-  }
-
-  function resetConversation() {
-    chatHistory = [];
-    activeTask = '';
-    transcript.innerHTML = '';
-    if (activeLabel) activeLabel.textContent = '';
-    if (resetBtn) resetBtn.classList.add('hidden');
-    updateSaveVisibility();
-    setEmptyVisible(true);
-  }
-
-  // ─── Saved chats (LIN-1008) ─────────────────────────────────────────────────
-
-  // LIN-2437: a Flight Companion session would save through this SAME endpoint
-  // under the sentinel task identifier 'flight-companion' (not a real task id —
-  // kept regex-clean so the existing resume/send validation path is untouched)
-  // — no shipped code emits that tag today, so this is the contract this file
-  // renders for, not a claim that it happens in production yet (a Save control
-  // on the Flight Companion page is a tracked LIN-2437 follow-up). The
-  // sentinel is never rewritten in storage; it is masked once, here, at render
-  // time, and every surface that echoes a saved chat's task identifier reuses
-  // this one helper so none of them can drift. The four render surfaces:
-  //   1. the saved-row meta chip (renderSavedRows);
-  //   2. the saved-row title, including its "Chat about …" auto-derived
-  //      fallback — deriveTitle() in lib/saved-chat-store.js, which an
-  //      assistant-only companion transcript hits because it has no user turn
-  //      to title itself from;
-  //   3. the active label set when a saved companion chat is resumed;
-  //   4. the speaker pill on every assistant bubble (appendBubble reads the
-  //      same `activeTask` openSavedChat sets, and the resume replay renders a
-  //      bubble per stored turn — so this is the LOUDEST surface, not the
-  //      quietest: an assistant-only transcript repeats it N times).
-  // `idInput.value` is deliberately NOT masked — the input holds a real,
-  // editable identifier that send() posts as an issue id, so masking it there
-  // would break the value rather than the label. LIN-2483/LIN-2634: for a
-  // companion sentinel chat specifically, openSavedChat() below leaves
-  // `idInput.value` EMPTY rather than seeding the raw sentinel into it (which
-  // `isValidIssueId` would pass, so send() would post it as an issue id and
-  // 404 — the original LIN-2483 bug). Masking the field instead of emptying
-  // it was considered and rejected: a masked label differs from `activeTask`
-  // (which keeps the raw sentinel), which trips send()'s switching branch
-  // (below, `taskId !== activeTask`) on the very next send attempt and wipes
-  // the just-resumed transcript before the request even fires — worse than
-  // the plain no-op an empty field produces. The accepted consequence: a
-  // resumed companion chat is silently unsendable until a real task id is
-  // typed in (send()'s own `if (!taskId)` guard below fires first, before
-  // the history-clearing branch, so nothing is lost) — a deliberate,
-  // recorded trade, not an oversight. A visible affordance for this is a
-  // named LIN-2437 follow-up, not built here.
-  var FLIGHT_COMPANION_SENTINEL = 'flight-companion';
-  var FLIGHT_COMPANION_LABEL = 'Flight Companion';
-
-  function maskFlightCompanionSentinel(text) {
-    if (typeof text !== 'string' || text.indexOf(FLIGHT_COMPANION_SENTINEL) === -1) return text;
-    return text.split(FLIGHT_COMPANION_SENTINEL).join(FLIGHT_COMPANION_LABEL);
-  }
-
-  // The save button appears once there is a non-empty conversation to save (and
-  // only when saved chats are available at all — no button is rendered otherwise).
-  function updateSaveVisibility() {
-    if (!saveBtn) return;
-    var canSave = savedChatsAvailable && !!activeTask && chatHistory.length > 0;
-    saveBtn.classList.toggle('hidden', !canSave);
-  }
-
-  function renderSavedRows(chats) {
-    if (!savedList) return;
-    savedList.innerHTML = '';
-    var hasChats = Array.isArray(chats) && chats.length > 0;
-    if (savedEmpty) savedEmpty.classList.toggle('hidden', hasChats);
-    if (!hasChats) return;
-
-    chats.forEach(function (chat) {
-      var li = document.createElement('li');
-      li.className = 'task-chat-saved-item';
-      li.setAttribute('data-saved-id', chat.id);
-
-      var meta = chat.taskIdentifier ? maskFlightCompanionSentinel(chat.taskIdentifier) : 'chat';
-      var title = maskFlightCompanionSentinel(chat.title || 'Saved chat');
-      var count = (chat.turnCount || 0) + ' turn' + (chat.turnCount === 1 ? '' : 's');
-      var openBtn = '<button type="button" class="action-btn task-chat-saved-open" data-testid="task-chat-saved-open">open</button>';
-      var delBtn = '<button type="button" class="action-btn task-chat-saved-delete" data-testid="task-chat-saved-delete">delete</button>';
-
-      li.innerHTML =
-        '<span class="task-chat-saved-meta">' + window.escapeHtml(meta) + '</span>' +
-        '<span class="task-chat-saved-title">' + window.escapeHtml(title) + '</span>' +
-        '<span class="task-chat-saved-count">' + window.escapeHtml(count) + '</span>' +
-        '<span class="task-chat-saved-actions">' + openBtn + delBtn + '</span>';
-
-      savedList.appendChild(li);
-    });
-  }
-
-  function loadSavedList() {
-    if (!savedChatsAvailable || !savedList) return;
-    window.api('/workspace/' + encodeURIComponent(urlKey) + '/api/task-chat/saved', { on401: false })
-      .then(function (body) { renderSavedRows(body && body.chats); })
-      .catch(function () { /* leave the empty state as-is on error */ });
-  }
-
-  function saveCurrentChat() {
-    if (!savedChatsAvailable || !activeTask || chatHistory.length === 0) return;
-    if (saveBtn) saveBtn.disabled = true;
-    window.api('/workspace/' + encodeURIComponent(urlKey) + '/api/task-chat/saved', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ taskIdentifier: activeTask, transcript: chatHistory }),
-      on401: false,
-      toastOnError: true
-    }).then(function () {
-      loadSavedList();
-      if (typeof window.toast === 'function') window.toast('Chat saved', { type: 'success' });
-    }).catch(function () {
-      /* error surfaced via toastOnError */
-    }).then(function () {
-      if (saveBtn) saveBtn.disabled = false;
-    });
-  }
-
-  // Resume: re-hydrate a saved transcript into the client and continue chatting
-  // through the unchanged replay-each-turn model (there is no live session).
-  function openSavedChat(id) {
-    if (!id) return;
-    window.api('/workspace/' + encodeURIComponent(urlKey) + '/api/task-chat/saved/' + encodeURIComponent(id), { on401: false })
-      .then(function (body) {
-        var chat = body && body.chat;
-        if (!chat) return;
-        chatHistory = (chat.transcript || []).map(function (t) { return { role: t.role, content: t.content }; });
-        activeTask = chat.taskIdentifier || '';
-        // LIN-2483: never seed the raw sentinel into the visible field — see
-        // the standing comment above for why emptying (not masking) is the
-        // fix. `activeTask` keeps the sentinel either way, so the label
-        // below, the speaker pill (appendBubble), and the save path all
-        // still work unchanged.
-        idInput.value = (activeTask === FLIGHT_COMPANION_SENTINEL) ? '' : activeTask;
-        transcript.innerHTML = '';
-        // LIN-2445: every replayed turn is finished by definition — it was
-        // persisted. Open it settled rather than appending an in-progress pill
-        // that nothing will ever come along to clear.
-        //
-        // LIN-2670: an assistant turn re-renders through the SAME helper the
-        // live path uses, so a reopened saved chat looks identical to the
-        // live turn it was saved from. The user turn's own raw text is left
-        // alone — same split as the live path (assistant renders, user
-        // stays plain).
-        chatHistory.forEach(function (turn) {
-          var bodyEl = appendBubble(turn.role, turn.content, 'done');
-          if (turn.role !== 'user') window.ChatUI.renderMarkdownText(bodyEl, turn.content);
-        });
-        if (activeLabel) activeLabel.textContent = activeTask ? 'talking to ' + maskFlightCompanionSentinel(activeTask) : '';
-        if (resetBtn) resetBtn.classList.remove('hidden');
-        setEmptyVisible(chatHistory.length === 0);
-        updateSaveVisibility();
-        questionInput.focus();
-      })
-      .catch(function () {
-        if (typeof window.toast === 'function') window.toast('Could not open that chat', { type: 'error' });
-      });
-  }
-
-  function deleteSavedChat(id) {
-    if (!id) return;
-    window.api('/workspace/' + encodeURIComponent(urlKey) + '/api/task-chat/saved/' + encodeURIComponent(id), {
-      method: 'DELETE',
-      on401: false
-    }).then(function () { loadSavedList(); })
-      .catch(function () {
-        if (typeof window.toast === 'function') window.toast('Could not delete that chat', { type: 'error' });
-      });
-  }
-
-  function setBusy(busy) {
-    streaming = busy;
-    sendBtn.disabled = busy;
-    questionInput.disabled = busy;
-    idInput.disabled = busy;
-  }
-
-  function send() {
-    if (streaming) return;
-    var taskId = (idInput.value || '').trim();
-    var question = (questionInput.value || '').trim();
-    if (!taskId) { idInput.focus(); return; }
-    if (!question) { questionInput.focus(); return; }
-
-    // Switching tasks starts a fresh conversation — history is per-task.
-    if (taskId !== activeTask) {
-      chatHistory = [];
-      transcript.innerHTML = '';
-      activeTask = taskId;
-      // LIN-2483: mask the sentinel here too — the field can be re-edited
-      // back to the raw 'flight-companion' string (e.g. the user retypes it
-      // after it was emptied on resume, see openSavedChat above), and this
-      // label rebuild must never re-expose it just because idInput.value
-      // itself is deliberately unmasked.
-      if (activeLabel) activeLabel.textContent = 'talking to ' + maskFlightCompanionSentinel(taskId);
-      if (resetBtn) resetBtn.classList.remove('hidden');
+    function setEmptyVisible(visible) {
+      if (emptyState) emptyState.classList.toggle('hidden', !visible);
     }
 
-    appendBubble('user', question);
-    chatHistory.push({ role: 'user', content: question });
-    updateSaveVisibility();
-    questionInput.value = '';
-
-    var answerEl = appendBubble('assistant', '');
-    answerEl.classList.add('chat-cursor');
-    var answerLi = answerEl.closest('li'); // tool breadcrumbs insert before this
-    var answerText = '';
-    setBusy(true);
-
-    var priorHistory = chatHistory.slice(0, -1); // server re-adds the question
-
-    // LIN-1910: the source hint is only trustworthy while `taskId` is still the
-    // identifier it was minted for — the moment the user types a different id,
-    // it no longer describes the row the link was generated for, so it's
-    // dropped rather than carried along.
-    var sourceHint = (taskId === prefillTask) ? prefillSource : '';
-    // LIN-3254: the run id rides the SAME "still the prefilled task" rule; it is
-    // sent in the turn body so the server scopes the turn to the run.
-    var runHint = (taskId === prefillTask) ? prefillRun : '';
-    var sourceParts = [];
-    if (sourceHint) sourceParts.push('source=' + encodeURIComponent(sourceHint));
-    var sourceQuery = sourceParts.length ? ('?' + sourceParts.join('&')) : '';
-
-    // Raw fetch carve-out: Server-Sent Events stream consumed via readSSEStream
-    // (public/common.js); window.api() parses the body as JSON and would break
-    // the stream, so the SSE reader keeps its own response handling.
-    var turnBody = { question: question, history: priorHistory };
-    if (runHint) turnBody.runId = runHint;
-    fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/task-chat/' + encodeURIComponent(taskId) + sourceQuery, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
-      body: JSON.stringify(turnBody)
-    }).then(function (response) {
-      if (!response.ok) {
-        return response.json().then(function (body) {
-          answerEl.classList.remove('chat-cursor');
-          answerEl.textContent = '[error: ' + ((body && body.error) || ('request failed (' + response.status + ')')) + ']';
-          setBubbleState(answerLi, 'failed');
-          chatHistory.pop(); // drop the unanswered question so retry is clean
-          setBusy(false);
-        }).catch(function () {
-          answerEl.classList.remove('chat-cursor');
-          answerEl.textContent = '[error: request failed (' + response.status + ')]';
-          setBubbleState(answerLi, 'failed');
-          chatHistory.pop();
-          setBusy(false);
-        });
-      }
-      return readSSEStream(response, function (type, eventData) {
-        if (type === 'tool') {
-          // Tool breadcrumb: surface it in the log, but it is NOT assistant
-          // content — do not touch answerText or chatHistory.
-          appendToolBreadcrumb(window.ChatUI.toolBreadcrumbLabel(eventData), answerLi);
-        } else if (type === 'token' || type === 'message') {
-          var text = typeof eventData === 'object' ? (eventData.token || eventData.text || '') : eventData;
-          // LIN-2812: sample pinned state BEFORE the DOM mutation below — a
-          // frame that grows the transcript by more than the predicate's 60px
-          // threshold would otherwise read a pinned reader as scrolled-away
-          // once measured after their own frame's growth.
-          var wasPinned = window.ChatUI.isPinnedToBottom(transcript);
-          answerText += text;
-          answerEl.textContent = answerText;
-          // Only follow the stream down when the reader was already pinned
-          // near the bottom — a reader who scrolled up to re-read earlier
-          // context must not be yanked back on every later frame.
-          if (wasPinned) {
-            transcript.scrollTop = transcript.scrollHeight;
-          }
-        } else if (type === 'done') {
-          answerEl.classList.remove('chat-cursor');
-          if (answerText) {
-            // Raw Markdown goes into chatHistory FIRST — the render below is
-            // display-only and never touches what gets sent back to the
-            // model or saved to a transcript (LIN-2670).
-            chatHistory.push({ role: 'assistant', content: answerText });
-            if (chatHistory.length > 40) chatHistory.splice(0, chatHistory.length - 40);
-            // LIN-2670: swap the streamed raw text for rendered Markdown,
-            // once, here on the done frame — never per token. Updates
-            // answerEl IN PLACE (renderMarkdownText assigns innerHTML on the
-            // same element, never replacing it).
-            window.ChatUI.renderMarkdownText(answerEl, answerText);
-          } else {
-            // LIN-2445: the row STAYS — Task Chat is user-initiated, so a human
-            // asked and deserves an answer even when it is empty (LIN-2443's
-            // own AC2 reasoning for keeping human-asked turns). Only the wording
-            // carries over: '[no response]' read like an error code rather than
-            // an answer, which is what AC2 rejected.
-            answerEl.textContent = 'no reply \u2014 nothing to add';
-          }
-          // The turn ended cleanly either way — an empty answer is still an
-          // answer here, not a failure.
-          setBubbleState(answerLi, 'done');
-          setBusy(false);
-          questionInput.focus();
-        } else if (type === 'error') {
-          answerEl.classList.remove('chat-cursor');
-          answerEl.textContent = answerText + '\n[error: ' + ((eventData && eventData.message) || 'failed') + ']';
-          setBubbleState(answerLi, 'failed');
-          chatHistory.pop();
-          setBusy(false);
-        }
+    // Speaker → StatusPill: the user's "you" is a neutral tag chip that takes the
+    // shared self-turn accent (chat-msg--you); the task's own turn reads as
+    // in-progress (◐). Body → Surface, via the shared ChatUI helper (LIN-1298) —
+    // the `task-chat-msg-*` classes ride along as hooks so the per-role colour
+    // (now unified via chat.css) and E2E selectors still resolve. The streaming
+    // cursor MUST stay on the SSE text node (`.task-chat-msg-body`, the element
+    // send() writes textContent into), so it's the text span, not the wrapper,
+    // that toggles `.chat-cursor`.
+    //
+    // LIN-2445: `state` overrides the assistant default for a turn that is
+    // ALREADY complete when it is appended — the saved-chat replay, where every
+    // stored turn finished before it was ever persisted. A live turn still opens
+    // 'in-progress' and is settled by setBubbleState below.
+    function appendBubble(role, text, state) {
+      var whoLabel = role === 'user' ? 'you' : (maskFlightCompanionSentinel(activeTask) || 'task');
+      var li = window.ChatUI.appendMessage(transcript, {
+        who: whoLabel,
+        whoState: role === 'user' ? undefined : (state || 'in-progress'),
+        whoClass: 'task-chat-msg-who',
+        self: role === 'user',
+        text: text,
+        textClass: 'task-chat-msg-body',
+        bodyClass: 'task-chat-msg-surface',
+        liClass: 'task-chat-msg task-chat-msg-' + role,
       });
-    }).catch(function () {
-      answerEl.classList.remove('chat-cursor');
-      answerEl.textContent = '[error: network failure]';
-      setBubbleState(answerLi, 'failed');
-      chatHistory.pop();
-      setBusy(false);
+      setEmptyVisible(false);
+      return li.querySelector('.task-chat-msg-body');
+    }
+
+    // LIN-2445 (LIN-2443's sibling class): settle a live assistant bubble's
+    // speaker pill when its turn ends. ChatUI.appendMessage bakes the pill into
+    // innerHTML and returns only the <li>, so there is no mutation API — this is
+    // the same page-local swap public/flight-companion.js:229 landed for
+    // LIN-2443, against the SAME shared vocabulary (status-pill--done/--failed,
+    // public/style.css). Deliberately duplicated rather than hoisted into
+    // window.ChatUI: LIN-2443's boundary keeps the shared primitives untouched,
+    // and hoisting would tax collective.js/observation.js/session.js for a need
+    // only the two streaming pages have. Glyphs mirror STATUS_PILL_GLYPHS
+    // (public/common.js) — NOT a chat.css/chat.js fork.
+    var PILL_GLYPHS = { done: '\u2713', failed: '\u2715' };
+
+    function setBubbleState(li, state) {
+      if (!li) return;
+      var pill = li.querySelector('.chat-msg__who');
+      if (!pill) return;
+      // Clear EVERY state this function can set, not just in-progress: a bubble
+      // that is settled twice (an abort landing in the outer catch after a `done`
+      // already arrived) would otherwise carry both --done and --failed, and read
+      // as whichever CSS rule happens to come last. Removing all three first
+      // makes the swap idempotent and order-independent.
+      pill.classList.remove('status-pill--in-progress', 'status-pill--done', 'status-pill--failed');
+      pill.classList.add('status-pill--' + state);
+      var char = pill.querySelector('.status-pill__char');
+      if (char) char.textContent = PILL_GLYPHS[state] || '';
+    }
+
+    // Human-readable label for a `tool` SSE breadcrumb (LIN-990) — lifted into
+    // the shared window.ChatUI.toolBreadcrumbLabel (public/chat.js) by LIN-2632
+    // per LIN-1578's direction that this shared layer must not be forked; this
+    // page calls the shared implementation rather than keeping its own.
+
+    // Render a tool breadcrumb into the transcript. Breadcrumbs are surfaced to the
+    // reader but are NOT chat history — they never enter `chatHistory` and are not
+    // assistant content. Inserted BEFORE the (streaming) answer bubble so the log
+    // reads: you → ↳ lookup → the task's answer.
+    function appendToolBreadcrumb(label, beforeLi) {
+      if (!label) return;
+      window.ChatUI.appendNote(transcript, '↳ ' + label, { liClass: 'task-chat-tool', before: beforeLi });
+      setEmptyVisible(false);
+    }
+
+    function resetConversation() {
+      chatHistory = [];
+      activeTask = '';
+      transcript.innerHTML = '';
+      if (activeLabel) activeLabel.textContent = '';
+      if (resetBtn) resetBtn.classList.add('hidden');
+      updateSaveVisibility();
+      setEmptyVisible(true);
+    }
+
+    // ─── Saved chats (LIN-1008) ─────────────────────────────────────────────────
+
+    // LIN-2437: a Flight Companion session would save through this SAME endpoint
+    // under the sentinel task identifier 'flight-companion' (not a real task id —
+    // kept regex-clean so the existing resume/send validation path is untouched)
+    // — no shipped code emits that tag today, so this is the contract this file
+    // renders for, not a claim that it happens in production yet (a Save control
+    // on the Flight Companion page is a tracked LIN-2437 follow-up). The
+    // sentinel is never rewritten in storage; it is masked once, here, at render
+    // time, and every surface that echoes a saved chat's task identifier reuses
+    // this one helper so none of them can drift. The four render surfaces:
+    //   1. the saved-row meta chip (renderSavedRows);
+    //   2. the saved-row title, including its "Chat about …" auto-derived
+    //      fallback — deriveTitle() in lib/saved-chat-store.js, which an
+    //      assistant-only companion transcript hits because it has no user turn
+    //      to title itself from;
+    //   3. the active label set when a saved companion chat is resumed;
+    //   4. the speaker pill on every assistant bubble (appendBubble reads the
+    //      same `activeTask` openSavedChat sets, and the resume replay renders a
+    //      bubble per stored turn — so this is the LOUDEST surface, not the
+    //      quietest: an assistant-only transcript repeats it N times).
+    // `idInput.value` is deliberately NOT masked — the input holds a real,
+    // editable identifier that send() posts as an issue id, so masking it there
+    // would break the value rather than the label. LIN-2483/LIN-2634: for a
+    // companion sentinel chat specifically, openSavedChat() below leaves
+    // `idInput.value` EMPTY rather than seeding the raw sentinel into it (which
+    // `isValidIssueId` would pass, so send() would post it as an issue id and
+    // 404 — the original LIN-2483 bug). Masking the field instead of emptying
+    // it was considered and rejected: a masked label differs from `activeTask`
+    // (which keeps the raw sentinel), which trips send()'s switching branch
+    // (below, `taskId !== activeTask`) on the very next send attempt and wipes
+    // the just-resumed transcript before the request even fires — worse than
+    // the plain no-op an empty field produces. The accepted consequence: a
+    // resumed companion chat is silently unsendable until a real task id is
+    // typed in (send()'s own `if (!taskId)` guard below fires first, before
+    // the history-clearing branch, so nothing is lost) — a deliberate,
+    // recorded trade, not an oversight. A visible affordance for this is a
+    // named LIN-2437 follow-up, not built here.
+    var FLIGHT_COMPANION_SENTINEL = 'flight-companion';
+    var FLIGHT_COMPANION_LABEL = 'Flight Companion';
+
+    function maskFlightCompanionSentinel(text) {
+      if (typeof text !== 'string' || text.indexOf(FLIGHT_COMPANION_SENTINEL) === -1) return text;
+      return text.split(FLIGHT_COMPANION_SENTINEL).join(FLIGHT_COMPANION_LABEL);
+    }
+
+    // The save button appears once there is a non-empty conversation to save (and
+    // only when saved chats are available at all — no button is rendered otherwise).
+    function updateSaveVisibility() {
+      if (!saveBtn) return;
+      var canSave = savedChatsAvailable && !!activeTask && chatHistory.length > 0;
+      saveBtn.classList.toggle('hidden', !canSave);
+    }
+
+    function renderSavedRows(chats) {
+      if (!savedList) return;
+      savedList.innerHTML = '';
+      var hasChats = Array.isArray(chats) && chats.length > 0;
+      if (savedEmpty) savedEmpty.classList.toggle('hidden', hasChats);
+      if (!hasChats) return;
+
+      chats.forEach(function (chat) {
+        var li = document.createElement('li');
+        li.className = 'task-chat-saved-item';
+        li.setAttribute('data-saved-id', chat.id);
+
+        var meta = chat.taskIdentifier ? maskFlightCompanionSentinel(chat.taskIdentifier) : 'chat';
+        var title = maskFlightCompanionSentinel(chat.title || 'Saved chat');
+        var count = (chat.turnCount || 0) + ' turn' + (chat.turnCount === 1 ? '' : 's');
+        var openBtn = '<button type="button" class="action-btn task-chat-saved-open" data-testid="task-chat-saved-open">open</button>';
+        var delBtn = '<button type="button" class="action-btn task-chat-saved-delete" data-testid="task-chat-saved-delete">delete</button>';
+
+        li.innerHTML =
+          '<span class="task-chat-saved-meta">' + window.escapeHtml(meta) + '</span>' +
+          '<span class="task-chat-saved-title">' + window.escapeHtml(title) + '</span>' +
+          '<span class="task-chat-saved-count">' + window.escapeHtml(count) + '</span>' +
+          '<span class="task-chat-saved-actions">' + openBtn + delBtn + '</span>';
+
+        savedList.appendChild(li);
+      });
+    }
+
+    function loadSavedList() {
+      if (!savedChatsAvailable || !savedList) return;
+      window.api('/workspace/' + encodeURIComponent(urlKey) + '/api/task-chat/saved', { on401: false })
+        .then(function (body) { renderSavedRows(body && body.chats); })
+        .catch(function () { /* leave the empty state as-is on error */ });
+    }
+
+    function saveCurrentChat() {
+      if (!savedChatsAvailable || !activeTask || chatHistory.length === 0) return;
+      if (saveBtn) saveBtn.disabled = true;
+      window.api('/workspace/' + encodeURIComponent(urlKey) + '/api/task-chat/saved', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskIdentifier: activeTask, transcript: chatHistory }),
+        on401: false,
+        toastOnError: true
+      }).then(function () {
+        loadSavedList();
+        if (typeof window.toast === 'function') window.toast('Chat saved', { type: 'success' });
+      }).catch(function () {
+        /* error surfaced via toastOnError */
+      }).then(function () {
+        if (saveBtn) saveBtn.disabled = false;
+      });
+    }
+
+    // Resume: re-hydrate a saved transcript into the client and continue chatting
+    // through the unchanged replay-each-turn model (there is no live session).
+    function openSavedChat(id) {
+      if (!id) return;
+      window.api('/workspace/' + encodeURIComponent(urlKey) + '/api/task-chat/saved/' + encodeURIComponent(id), { on401: false })
+        .then(function (body) {
+          var chat = body && body.chat;
+          if (!chat) return;
+          chatHistory = (chat.transcript || []).map(function (t) { return { role: t.role, content: t.content }; });
+          activeTask = chat.taskIdentifier || '';
+          // LIN-2483: never seed the raw sentinel into the visible field — see
+          // the standing comment above for why emptying (not masking) is the
+          // fix. `activeTask` keeps the sentinel either way, so the label
+          // below, the speaker pill (appendBubble), and the save path all
+          // still work unchanged.
+          idInput.value = (activeTask === FLIGHT_COMPANION_SENTINEL) ? '' : activeTask;
+          transcript.innerHTML = '';
+          // LIN-2445: every replayed turn is finished by definition — it was
+          // persisted. Open it settled rather than appending an in-progress pill
+          // that nothing will ever come along to clear.
+          //
+          // LIN-2670: an assistant turn re-renders through the SAME helper the
+          // live path uses, so a reopened saved chat looks identical to the
+          // live turn it was saved from. The user turn's own raw text is left
+          // alone — same split as the live path (assistant renders, user
+          // stays plain).
+          chatHistory.forEach(function (turn) {
+            var bodyEl = appendBubble(turn.role, turn.content, 'done');
+            if (turn.role !== 'user') window.ChatUI.renderMarkdownText(bodyEl, turn.content);
+          });
+          if (activeLabel) activeLabel.textContent = activeTask ? 'talking to ' + maskFlightCompanionSentinel(activeTask) : '';
+          if (resetBtn) resetBtn.classList.remove('hidden');
+          setEmptyVisible(chatHistory.length === 0);
+          updateSaveVisibility();
+          questionInput.focus();
+        })
+        .catch(function () {
+          if (typeof window.toast === 'function') window.toast('Could not open that chat', { type: 'error' });
+        });
+    }
+
+    function deleteSavedChat(id) {
+      if (!id) return;
+      window.api('/workspace/' + encodeURIComponent(urlKey) + '/api/task-chat/saved/' + encodeURIComponent(id), {
+        method: 'DELETE',
+        on401: false
+      }).then(function () { loadSavedList(); })
+        .catch(function () {
+          if (typeof window.toast === 'function') window.toast('Could not delete that chat', { type: 'error' });
+        });
+    }
+
+    function setBusy(busy) {
+      streaming = busy;
+      sendBtn.disabled = busy;
+      questionInput.disabled = busy;
+      idInput.disabled = busy;
+    }
+
+    function send() {
+      if (streaming) return;
+      var taskId = (idInput.value || '').trim();
+      var question = (questionInput.value || '').trim();
+      if (!taskId) { idInput.focus(); return; }
+      if (!question) { questionInput.focus(); return; }
+
+      // Switching tasks starts a fresh conversation — history is per-task.
+      if (taskId !== activeTask) {
+        chatHistory = [];
+        transcript.innerHTML = '';
+        activeTask = taskId;
+        // LIN-2483: mask the sentinel here too — the field can be re-edited
+        // back to the raw 'flight-companion' string (e.g. the user retypes it
+        // after it was emptied on resume, see openSavedChat above), and this
+        // label rebuild must never re-expose it just because idInput.value
+        // itself is deliberately unmasked.
+        if (activeLabel) activeLabel.textContent = 'talking to ' + maskFlightCompanionSentinel(taskId);
+        if (resetBtn) resetBtn.classList.remove('hidden');
+      }
+
+      appendBubble('user', question);
+      chatHistory.push({ role: 'user', content: question });
+      updateSaveVisibility();
+      questionInput.value = '';
+
+      var answerEl = appendBubble('assistant', '');
+      answerEl.classList.add('chat-cursor');
+      var answerLi = answerEl.closest('li'); // tool breadcrumbs insert before this
+      var answerText = '';
+      setBusy(true);
+
+      var priorHistory = chatHistory.slice(0, -1); // server re-adds the question
+
+      // LIN-1910: the source hint is only trustworthy while `taskId` is still the
+      // identifier it was minted for — the moment the user types a different id,
+      // it no longer describes the row the link was generated for, so it's
+      // dropped rather than carried along.
+      var sourceHint = (taskId === prefillTask) ? prefillSource : '';
+      // LIN-3254: the run id rides the SAME "still the prefilled task" rule; it is
+      // sent in the turn body so the server scopes the turn to the run.
+      var runHint = (taskId === prefillTask) ? prefillRun : '';
+      var sourceParts = [];
+      if (sourceHint) sourceParts.push('source=' + encodeURIComponent(sourceHint));
+      var sourceQuery = sourceParts.length ? ('?' + sourceParts.join('&')) : '';
+
+      // Raw fetch carve-out: Server-Sent Events stream consumed via readSSEStream
+      // (public/common.js); window.api() parses the body as JSON and would break
+      // the stream, so the SSE reader keeps its own response handling.
+      var turnBody = { question: question, history: priorHistory };
+      if (runHint) turnBody.runId = runHint;
+      if (propose) turnBody.propose = true;
+      fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/task-chat/' + encodeURIComponent(taskId) + sourceQuery, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
+        body: JSON.stringify(turnBody)
+      }).then(function (response) {
+        if (!response.ok) {
+          return response.json().then(function (body) {
+            answerEl.classList.remove('chat-cursor');
+            answerEl.textContent = '[error: ' + ((body && body.error) || ('request failed (' + response.status + ')')) + ']';
+            setBubbleState(answerLi, 'failed');
+            chatHistory.pop(); // drop the unanswered question so retry is clean
+            setBusy(false);
+          }).catch(function () {
+            answerEl.classList.remove('chat-cursor');
+            answerEl.textContent = '[error: request failed (' + response.status + ')]';
+            setBubbleState(answerLi, 'failed');
+            chatHistory.pop();
+            setBusy(false);
+          });
+        }
+        return readSSEStream(response, function (type, eventData) {
+          if (type === 'tool') {
+            // Tool breadcrumb: surface it in the log, but it is NOT assistant
+            // content — do not touch answerText or chatHistory.
+            appendToolBreadcrumb(window.ChatUI.toolBreadcrumbLabel(eventData), answerLi);
+            if (onProposed && eventData && eventData.phase === 'proposed') onProposed(eventData);
+          } else if (type === 'token' || type === 'message') {
+            var text = typeof eventData === 'object' ? (eventData.token || eventData.text || '') : eventData;
+            // LIN-2812: sample pinned state BEFORE the DOM mutation below — a
+            // frame that grows the transcript by more than the predicate's 60px
+            // threshold would otherwise read a pinned reader as scrolled-away
+            // once measured after their own frame's growth.
+            var wasPinned = window.ChatUI.isPinnedToBottom(transcript);
+            answerText += text;
+            answerEl.textContent = answerText;
+            // Only follow the stream down when the reader was already pinned
+            // near the bottom — a reader who scrolled up to re-read earlier
+            // context must not be yanked back on every later frame.
+            if (wasPinned) {
+              transcript.scrollTop = transcript.scrollHeight;
+            }
+          } else if (type === 'done') {
+            answerEl.classList.remove('chat-cursor');
+            if (answerText) {
+              // Raw Markdown goes into chatHistory FIRST — the render below is
+              // display-only and never touches what gets sent back to the
+              // model or saved to a transcript (LIN-2670).
+              chatHistory.push({ role: 'assistant', content: answerText });
+              if (chatHistory.length > 40) chatHistory.splice(0, chatHistory.length - 40);
+              // LIN-2670: swap the streamed raw text for rendered Markdown,
+              // once, here on the done frame — never per token. Updates
+              // answerEl IN PLACE (renderMarkdownText assigns innerHTML on the
+              // same element, never replacing it).
+              window.ChatUI.renderMarkdownText(answerEl, answerText);
+            } else {
+              // LIN-2445: the row STAYS — Task Chat is user-initiated, so a human
+              // asked and deserves an answer even when it is empty (LIN-2443's
+              // own AC2 reasoning for keeping human-asked turns). Only the wording
+              // carries over: '[no response]' read like an error code rather than
+              // an answer, which is what AC2 rejected.
+              answerEl.textContent = 'no reply \u2014 nothing to add';
+            }
+            // The turn ended cleanly either way — an empty answer is still an
+            // answer here, not a failure.
+            setBubbleState(answerLi, 'done');
+            setBusy(false);
+            questionInput.focus();
+          } else if (type === 'error') {
+            answerEl.classList.remove('chat-cursor');
+            answerEl.textContent = answerText + '\n[error: ' + ((eventData && eventData.message) || 'failed') + ']';
+            setBubbleState(answerLi, 'failed');
+            chatHistory.pop();
+            setBusy(false);
+          }
+        });
+      }).catch(function () {
+        answerEl.classList.remove('chat-cursor');
+        answerEl.textContent = '[error: network failure]';
+        setBubbleState(answerLi, 'failed');
+        chatHistory.pop();
+        setBusy(false);
+      });
+    }
+
+    sendBtn.addEventListener('click', send);
+
+    if (saveBtn) saveBtn.addEventListener('click', saveCurrentChat);
+
+    // Delegated open/delete on the saved-chat list.
+    if (savedList) {
+      savedList.addEventListener('click', function (e) {
+        var item = e.target.closest ? e.target.closest('.task-chat-saved-item') : null;
+        if (!item) return;
+        var id = item.getAttribute('data-saved-id');
+        if (e.target.classList.contains('task-chat-saved-open')) openSavedChat(id);
+        else if (e.target.classList.contains('task-chat-saved-delete')) deleteSavedChat(id);
+      });
+    }
+
+    questionInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
     });
+    idInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); questionInput.focus(); }
+    });
+
+    if (resetBtn) resetBtn.addEventListener('click', resetConversation);
+
+    // Load the user's saved chats up front (no-op when unavailable).
+    loadSavedList();
+
+    // Prefill focus: jump straight to the question when a task is already set.
+    if ((idInput.value || '').trim()) questionInput.focus();
+    else idInput.focus();
+
+    return { send: send, openSavedChat: openSavedChat, resetConversation: resetConversation };
   }
 
-  sendBtn.addEventListener('click', send);
-
-  if (saveBtn) saveBtn.addEventListener('click', saveCurrentChat);
-
-  // Delegated open/delete on the saved-chat list.
-  if (savedList) {
-    savedList.addEventListener('click', function (e) {
-      var item = e.target.closest ? e.target.closest('.task-chat-saved-item') : null;
-      if (!item) return;
-      var id = item.getAttribute('data-saved-id');
-      if (e.target.classList.contains('task-chat-saved-open')) openSavedChat(id);
-      else if (e.target.classList.contains('task-chat-saved-delete')) deleteSavedChat(id);
-    });
+  // The standalone page mounts itself: its root carries its options and the auto flag. The task page's fold is
+  // mounted by public/task-page.js, before its first Markdown render (LIN-3385), so it is not auto-mounted here.
+  function mountStandalone() {
+    var roots = document.querySelectorAll('[data-task-chat-auto]');
+    for (var i = 0; i < roots.length; i++) {
+      var raw = roots[i].getAttribute('data-task-chat-opts');
+      var opts = {};
+      try { opts = raw ? JSON.parse(raw) : {}; } catch (e) { opts = {}; }
+      init(roots[i], opts);
+    }
   }
 
-  questionInput.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
-  });
-  idInput.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') { e.preventDefault(); questionInput.focus(); }
-  });
-
-  if (resetBtn) resetBtn.addEventListener('click', resetConversation);
-
-  // Load the user's saved chats up front (no-op when unavailable).
-  loadSavedList();
-
-  // Prefill focus: jump straight to the question when a task is already set.
-  if ((idInput.value || '').trim()) questionInput.focus();
-  else idInput.focus();
+  window.TaskChat = { init: init };
+  mountStandalone();
 })();

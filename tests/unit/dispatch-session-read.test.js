@@ -24,7 +24,7 @@ function world() {
       return (...args) => { reads.push([prop, args[1] && typeof args[1] === 'object' ? { ...args[1] } : args[1]]); return v.apply(t, args); };
     }
   });
-  return { store, spied, reads, deps: { dispatchStore: spied, agentStatusStore } };
+  return { store, queue, history, spied, reads, deps: { dispatchStore: spied, agentStatusStore } };
 }
 
 async function autopilotSession(store) {
@@ -45,8 +45,10 @@ describe('readSessionById', () => {
 
     assert.equal(session.sessionId, sessionId);
     assert.deepEqual(new Set(session.loops.map(l => l.issueIdentifier)), new Set(['LIN-1', 'LIN-2']));
-    assert.ok(reads.every(([name, opts]) => name !== 'listHistory' || opts.issueIdentifier || opts.sessionId), 'every history read is scoped');
-    assert.ok(!reads.some(([name, opts]) => ['listItems', 'listHistory', 'listHistoryWithBodies', 'listItemsWithPrompt'].includes(name) && !opts?.issueIdentifier && !opts?.sessionId));
+    // LIN-3975: a sessionGroupId read is scoped too (the wake-on-another-issue read).
+    const scoped = (opts) => opts?.issueIdentifier || opts?.sessionId || opts?.sessionGroupId;
+    assert.ok(reads.every(([name, opts]) => name !== 'listHistory' || scoped(opts)), 'every history read is scoped');
+    assert.ok(!reads.some(([name, opts]) => ['listItems', 'listHistory', 'listHistoryWithBodies', 'listItemsWithPrompt'].includes(name) && !scoped(opts)));
   });
 
   test('the session is the non-lean build (raw feedback intact)', async () => {
@@ -68,9 +70,12 @@ describe('readSessionById', () => {
   });
 
   test('a session the point read cannot reach is found by the fallback, and not with fallback:false', async () => {
-    const { store, deps } = world();
+    const { store, queue, history, deps } = world();
     const loose = await store.addItem(URL_KEY, { prompt: 'standalone', issueIdentifier: 'LIN-9' });
     await store.takeItem(loose._id, URL_KEY, 't');
+    // A pre-LIN-1341 row: no durable group id, so the group read cannot reach it either (LIN-3975).
+    await queue.updateOne({ _id: loose._id }, { $set: { sessionGroupId: null } });
+    await history.updateOne({ _id: loose._id }, { $set: { sessionGroupId: null } });
     // A store with no point read of the root (the defensive case): nothing to scope by.
     const blind = { ...deps, dispatchStore: new Proxy(deps.dispatchStore, { get: (t, p) => (p === 'getItemStatus' ? undefined : t[p]) }) };
 
