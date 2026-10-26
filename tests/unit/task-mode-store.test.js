@@ -41,7 +41,7 @@ describe('vocabulary', () => {
     assert.deepStrictEqual([...RUNGS], ['copy', 'run-step', 'run-task']);
     assert.deepStrictEqual([...ACTS], ['press', 'copy', 'dispatch']);
     assert.deepStrictEqual([...NEEDS], ['prompt', 'dispatch']);
-    assert.deepStrictEqual([...SURFACES], ['swipe', 'home']);
+    assert.deepStrictEqual([...SURFACES], ['swipe', 'home', 'task']);
     for (const list of [RUNGS, ACTS, NEEDS, SURFACES, RUNG_ACTS, INSTRUMENTED_SURFACES, ...Object.values(RUNG_ACTS)]) {
       assert.ok(Object.isFrozen(list));
     }
@@ -180,7 +180,7 @@ describe('TaskModeStore.getTaskMode', () => {
     assert.deepStrictEqual(mode.events[3], {
       rung: 'run-step', ready: true, needs: null, act: 'dispatch', dispatchId: 'd-9', surface: null, kind: null, at: mode.events[3].at
     });
-    assert.deepStrictEqual(mode.coverage, { surfaces: ['swipe', 'home'] });
+    assert.deepStrictEqual(mode.coverage, { surfaces: ['swipe', 'home', 'task'] });
   });
 
   test('furthest follows ladder order when the highest rung comes last', async () => {
@@ -211,7 +211,7 @@ describe('TaskModeStore.getTaskMode', () => {
       copyAct({ accountId: 'someone-else' }),
     ]);
     const mode = await store.getTaskMode({ accountIds: ['acct-1'], urlKey: 'ws', issueIdentifier: 'LIN-42' });
-    assert.deepStrictEqual(mode, { entry: null, taken: null, furthest: null, events: [], coverage: { surfaces: ['swipe', 'home'] } });
+    assert.deepStrictEqual(mode, { entry: null, taken: null, furthest: null, events: [], coverage: { surfaces: ['swipe', 'home', 'task'] } });
   });
 
   test('queries across the merge group, entry being the group\'s first event', async () => {
@@ -247,7 +247,7 @@ describe('TaskModeStore.getTaskMode', () => {
   test('a failing collection never throws: reads return the empty mode', async () => {
     const failing = new TaskModeStore({ collection: { find: () => { throw new Error('db down'); } } });
     const mode = await failing.getTaskMode({ accountIds: ['acct-1'], urlKey: 'ws', issueIdentifier: 'LIN-42' });
-    assert.deepStrictEqual(mode, { entry: null, taken: null, furthest: null, events: [], coverage: { surfaces: ['swipe', 'home'] } });
+    assert.deepStrictEqual(mode, { entry: null, taken: null, furthest: null, events: [], coverage: { surfaces: ['swipe', 'home', 'task'] } });
     assert.deepStrictEqual(await failing.listForAccount(['acct-1']), []);
     assert.strictEqual((await failing.countByEntryRung()).total, 0);
   });
@@ -310,7 +310,7 @@ describe('TaskModeStore.countByEntryRung', () => {
         { rung: 'run-step', entries: 1, notReady: 0 },
         { rung: 'run-task', entries: 1, notReady: 1 },
       ],
-      coverage: { surfaces: ['swipe', 'home'] },
+      coverage: { surfaces: ['swipe', 'home', 'task'] },
     });
   });
 

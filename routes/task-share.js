@@ -43,8 +43,6 @@ import {
   renderTaskPage,
   renderTaskStatus,
   renderTaskTrack,
-  renderTaskContext,
-  contextSignature,
 } from '../lib/render-task-page.js';
 
 /** The loader-result cache window. A revoke/owner change still lands next request. */
@@ -253,22 +251,14 @@ export function createTaskShareRoutes({
         issueId: record.issueId,
       });
       res.set('Cache-Control', 'no-store');
-      // The state read has no tracker, so it holds no verified brief/recap:
-      // send no context at all and the client keeps the page-load panels
-      // (LIN-3373). Only a model that carries a doc repaints them.
+      // No brief or recap rides here (LIN-3975): the state read has no tracker, so the page-load panels are the only
+      // ones shown, and a poll never repaints them.
       const body = {
         status: model.status,
         live: model.live,
         headerHtml: maskFragment(record, 'state', renderTaskStatus(model)),
         trackHtml: maskFragment(record, 'state', renderTaskTrack(model, { now: now() })),
       };
-      if (model.brief || model.recap) {
-        const contextHtml = renderTaskContext(model, { urlKey: record.urlKey });
-        // The sig is over the UNMASKED fragment, exactly as the page stamps
-        // data-context-sig, so a masked panel is not repainted on every poll.
-        body.contextHtml = maskFragment(record, 'state', contextHtml);
-        body.contextSig = contextSignature(contextHtml);
-      }
       return res.json(body);
     } catch (error) {
       console.error('Task share state error:', error.message);

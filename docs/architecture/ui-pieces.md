@@ -409,6 +409,14 @@ Three pieces are shared decisions, each drawn on `/styleguide` (`LIVE_CONSOLE_PI
 - **Motion follows the setting while the page is open.** `applyMotion` (`public/live-console.js`) stops or restarts the strip and removes or adds the lane pulse when the reduced-motion query changes, so a reused lane node follows it too.
 - **The dot is for what is shown.** Red only while a task's latest run in the window failed and nothing on its key has followed it, lane or later run (`countFailedNow`). An earlier failure belongs to the stream and the timeline.
 
+## Task page (LIN-3975): the run control is Home's panel, and the answer is the tracker's line plus Harbour's pill
+
+- **The run control is the shared `PromptSection` (LIN-3962's panel), on a third surface, `task`.** It is not a second control. `capabilitiesOf(surface)` (`public/prompt-section.js`) is the one table that says what each surface shows: `home` keeps its state block and watch link, `task` keeps the run control and the copy-first view but drops the state block (the top answer already says it) and the watch link (the viewer is on the page), and `swipe` is unchanged. A surface added to `SURFACES` (`lib/task-mode-store.js`) needs a row, and a unit test pins that.
+- **Who sees it.** The owner, for an unfinished task, from the page-load model and never from a poll (the poll cannot mount it). A member and a guest get the next-step line in the same slot: one sentence, shared by the server render, saying what comes next. A finished task has neither. With no runner, the owner gets the copy-first view and the runner link (`lib/components/runner-link.js`).
+- **The answer.** "Tracker: <state>" (the tracker's own word, from the page-load read) sits beside the status mount, outside what the poll repaints. The pill and the sentence are Harbour's and repaint on each poll. The two are different facts, and the line says which is which.
+- **Styles.** The run control's rules live in `public/run-control.css`, linked by Home, Swipe and the task page. Swipe's card CSS is not shipped to the task page.
+- **Anatomy.** Drawn on `/styleguide` in a later step of LIN-3975 (not in this PR).
+
 ## Open questions for John
 
 Each keeps today's behaviour until answered.

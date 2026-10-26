@@ -250,6 +250,21 @@
     return !!opts.dispatchEnabled;
   }
 
+  // LIN-3975: what each opened-task surface shows, one row per capability. `home` is Home's opened task, `task`
+  // the task page's own run control (its top answer already says the sentence, so no state block and no
+  // repeated running line), `swipe` the Swipe card and the fallback for any other caller. A surface added to
+  // SURFACES (lib/task-mode-store.js) needs a row here; a unit test pins that every one has a value.
+  //   runningBody: 'blank' = the running line says the link only (home, task); 'header' = the state's sentence (swipe).
+  //   watchLink:   the "watch on the task page" link, not drawn where the viewer is already on the task page.
+  const SURFACE_CAPABILITIES = Object.freeze({
+    home: Object.freeze({ stateBlock: true, copyFirst: true, runControl: true, runningBody: 'blank', watchLink: true, plainPromptBox: true, lastCopy: true, sharedButtons: true }),
+    task: Object.freeze({ stateBlock: false, copyFirst: true, runControl: true, runningBody: 'blank', watchLink: false, plainPromptBox: true, lastCopy: true, sharedButtons: true }),
+    swipe: Object.freeze({ stateBlock: false, copyFirst: false, runControl: false, runningBody: 'header', watchLink: true, plainPromptBox: false, lastCopy: false, sharedButtons: false })
+  });
+  function capabilitiesOf(surface) {
+    return SURFACE_CAPABILITIES[surface] || SURFACE_CAPABILITIES.swipe;
+  }
+
   // LIN-3849: key tools (+proxy, Autopilot) have no switch. The landing preview
   // is the one surface without a workspace, and it has no key to make.
   function hasKeyTools(opts) {
@@ -260,8 +275,9 @@
     const g = state.go || { status: 'ready' };
     const ready = goReady(opts);
     const { quota, quotaKnown, runsExhausted, runLimitTitle } = runQuotaView(state);
+    const caps = capabilitiesOf(opts.surface);
     // LIN-3987: Home's Go takes the shared button classes. Swipe's card draws this same Go, and it keeps its own look (no change there).
-    const homeBtn = opts.surface === 'home' ? 'btn ' : '';
+    const homeBtn = caps.sharedButtons ? 'btn ' : '';
 
     let html = '<div class="opened-task-primary" data-go-slot>';
 
@@ -269,7 +285,7 @@
       // The started/running line: the task page's OWN sentence (the one source
       // of queued/running truth), with a link to the task page. Until a state
       // read lands, it says "Started" — true on a 201, not a status claim.
-      const href = window.taskPageHref({
+      const href = caps.watchLink && window.taskPageHref({
         urlKey: opts.urlKey,
         identifier: opts.issue && opts.issue.identifier,
         source: opts.issue && opts.issue.source
@@ -277,10 +293,10 @@
       const link = href
         ? ` <a class="opened-task-started-link" href="${esc(href)}" data-testid="opened-task-started-link">watch on the task page \u203A</a>`
         : '';
-      // LIN-3991 (item 5): on Home the state block above already says the running sentence once, so the Go
-      // slot keeps only the watch link; "Started." stays until the first state read lands.
+      // LIN-3991 (item 5): on Home (and the task page) the top answer already says the running sentence once, so the
+      // Go slot keeps only the watch link; "Started." stays until the first state read lands.
       const body = g.headerHtml
-        ? (opts.surface === 'home' ? '' : g.headerHtml)
+        ? (caps.runningBody === 'blank' ? '' : g.headerHtml)
         : '<p class="task-sentence" data-testid="opened-task-sentence">Started.</p>';
       html += `<div class="opened-task-started" data-testid="opened-task-started" data-go-status="${esc(g.status)}">${body}${link}</div>`;
     } else if (!ready) {
@@ -294,7 +310,7 @@
       html += `<button class="${homeBtn}opened-task-go opened-task-go--limited" data-testid="opened-task-go" data-rung="run-task" disabled title="${runLimitTitle}">Go <span class="opened-task-setup">${runLimitTitle}</span></button>`;
     } else if (g.status === 'starting') {
       html += `<button class="${homeBtn}opened-task-go" data-testid="opened-task-go" data-rung="run-task" disabled>starting\u2026</button>`;
-    } else if (opts.surface === 'home') {
+    } else if (caps.sharedButtons) {
       // LIN-3833: Home's one main action names what it does: the step the sessions name, else Run to PR.
       // While a stage runs or is queued, no other step is offered as an action (LIN-3968); Stop and the
       // after-run line stay in the run block.
@@ -524,6 +540,12 @@
     return `<div class="opened-task-last-copy" data-testid="opened-task-last-copy">You copied ${what} ${esc(age)}</div>`;
   }
 
+  // LIN-3975: the "You copied \u2026" line sits in the copy-first view itself (it was the state block's line on Home),
+  // so the task page's copy-first view has it too. A copy repaints only this slot (paintLastCopy).
+  function renderLastCopySlot(state) {
+    return `<div class="opened-task-last-copy-slot" data-last-copy-slot>${renderLastCopy(state)}</div>`;
+  }
+
   function renderCopyIdle(opts, state) {
     const step = copyStepOf(opts);
     // The AI gate applies to the selector's own write only; a template step needs no AI.
@@ -531,7 +553,8 @@
     const disabled = gateReason ? ` disabled title="${esc(gateReason)}"` : '';
     const name = step.name ? `<span class="opened-task-step-name">${esc(step.name)}</span> \u00b7 ` : '';
     const reason = gateReason ? ` <span class="opened-task-primary-reason" data-testid="opened-task-primary-reason">${esc(gateReason)}</span>` : '';
-    return `<div class="opened-task-step" data-testid="opened-task-step">${name}${esc(step.why)}</div>`
+    return renderLastCopySlot(state)
+      + `<div class="opened-task-step" data-testid="opened-task-step">${name}${esc(step.why)}</div>`
       + `<button class="btn opened-task-write" data-testid="opened-task-write" data-prompt="${esc(step.label)}"${disabled}>\u2726 Write the prompt</button>${reason}`;
   }
 
@@ -588,6 +611,7 @@
     const age = formatGeneratedAge(state.result.generatedAt);
     const keyOn = !!(window.ProxyToggle && typeof window.ProxyToggle.isActive === 'function' && window.ProxyToggle.isActive());
     return `
+      ${renderLastCopySlot(state)}
       <div class="opened-task-step" data-testid="opened-task-step"><span class="opened-task-step-name">${esc(copyStepOf(opts).name || 'Next prompt')}</span>${age ? ` \u00b7 generated ${esc(age)}` : ''}</div>
       ${renderTargetLine(state, opts)}
       ${renderPromptBox(state, opts, 'Copy it, then paste it into Claude Code, Codex or any coding agent.')}
@@ -772,8 +796,11 @@
     const issueId = issue.id;
     container.classList.add('prompt-section');
     // LIN-3833: the state block and the copy-first view are Home's. Swipe's card keeps its own Edit slot and
-    // change affordances, which the state-first layout does not replace (the PR says so).
-    const homeView = opts.surface === 'home';
+    // change affordances, which the state-first layout does not replace (the PR says so). LIN-3975: which of
+    // these a surface shows is one table (SURFACE_CAPABILITIES), not a surface-name test here.
+    const caps = capabilitiesOf(opts.surface);
+    // A viewer with no runner (no dispatch) gets the copy-first view on any surface that has one.
+    const copyFirstView = () => caps.copyFirst && !opts.dispatchEnabled;
 
     const state = {
       phase: 'idle',
@@ -859,7 +886,7 @@
       const stateBlock = renderOpenedState();
       // LIN-3833: a viewer with no runner (no dispatch) gets the copy-first view: the step, then the prompt
       // to copy. Everything that runs, costs or names a session is absent from it.
-      const copyFirst = homeView && !opts.dispatchEnabled;
+      const copyFirst = copyFirstView();
       const runFirst = runControlOn();
       if (state.phase === 'idle') {
         const idle = runFirst ? renderRunBlock() : (copyFirst ? renderCopyIdle(opts, state) : renderIdle(opts, state));
@@ -881,16 +908,13 @@
     // its session summary. Always a slot, so a state repaint is `paintState` alone and never rebuilds a
     // prompt body or a streamed reply.
     function renderOpenedState() {
-      if (!homeView) return '';
+      if (!caps.stateBlock) return '';
       const opened = state.opened;
-      if (!opened) {
-        const copied = !opts.dispatchEnabled ? renderLastCopy(state) : '';
-        return `<div class="opened-task-state" data-state-slot data-testid="opened-task-state">${copied}</div>`;
-      }
+      if (!opened) return `<div class="opened-task-state" data-state-slot data-testid="opened-task-state"></div>`;
       if (!opts.dispatchEnabled) {
-        // Copy-first: the task's own sentence and what was last copied. No stage strip, no sessions.
+        // Copy-first: the task's own sentence. No stage strip, no sessions. What was last copied is in the view.
         return `<div class="opened-task-state" data-state-slot data-testid="opened-task-state">`
-          + `${opened.headerHtml || ''}${renderLastCopy(state)}</div>`;
+          + `${opened.headerHtml || ''}</div>`;
       }
       const sessions = opened.sessions || { count: 0, last: null };
       const last = sessions.last;
@@ -917,13 +941,23 @@
     // Repaint only the state slot (a poll or the mount read). Falls back to a full render when the slot is
     // absent, as paintGo does for the Go slot.
     function paintState() {
-      if (destroyed || !homeView) return;
+      if (destroyed) return;
       // Once the state shows a session running, the queued item from this page is no longer the thing to undo.
       if (state.opened && state.opened.sessions && state.opened.sessions.running) state.run.item = null;
+      if (!caps.stateBlock) return;
       const slot = container.querySelector && container.querySelector('[data-state-slot]');
       if (slot) slot.outerHTML = renderOpenedState();
       else render();
       if (typeof window.initLocalTimes === 'function') window.initLocalTimes(container);
+    }
+
+    // LIN-3975: repaint only the copy-first view's "You copied …" line (a copy, or the task-mode read on mount).
+    // No slot (a stream or an error is on screen): the line is already in state and the next full render shows it,
+    // so a late read never rebuilds a streaming body.
+    function paintLastCopy() {
+      if (destroyed) return;
+      const slot = container.querySelector && container.querySelector('[data-last-copy-slot]');
+      if (slot) slot.outerHTML = renderLastCopySlot(state);
     }
 
     // ── LIN-3833: the run control (Home, dispatch on) ───────────────────────────
@@ -932,9 +966,10 @@
       return runStepOfState(state);
     }
 
-    // The run control is Home's, for a viewer who can run (dispatch on). The rest of the component is unchanged.
+    // The run control is Home's, and the task page's, for a viewer who can run (dispatch on). The rest of the
+    // component is unchanged.
     function runControlOn() {
-      return homeView && !!opts.dispatchEnabled;
+      return caps.runControl && !!opts.dispatchEnabled;
     }
 
     // Repaint only the run block (the preview and Change panel write here), never the prompt body.
@@ -1623,7 +1658,7 @@
           } else {
             if (nameEl) nameEl.textContent = 'AI Recommendation';
             // LIN-3968: Home's box is the text that will be pasted; Swipe keeps its markdown card.
-            if (homeView) body.textContent = promptRaw || reasoningRaw;
+            if (caps.plainPromptBox) body.textContent = promptRaw || reasoningRaw;
             else body.innerHTML = renderMarkdown(promptRaw || reasoningRaw);
           }
           const children = body.children;
@@ -2002,9 +2037,9 @@
         // LIN-3833: which prompt was copied (the kind the copy-first view reads back as "You copied the …").
         const copiedKind = state.result.label && state.result.label !== '__ai__' ? state.result.label : (state.result.kind || null);
         recordTaskMode({ rung: isAutopilotResult() ? 'run-task' : 'copy', ready: true, needs: null, act: 'copy', kind: copiedKind });
-        if (homeView && !opts.dispatchEnabled) {
+        if (copyFirstView()) {
           state.lastCopy = { label: state.result.name || null, kind: copiedKind, at: new Date().toISOString() };
-          paintState();
+          paintLastCopy();
         }
         btn.textContent = 'copied!';
         btn.classList.add('copied');
@@ -2163,12 +2198,12 @@
         return data;
       })
       : null;
-    if (homeView && !opts.dispatchEnabled && opts.urlKey && issue.identifier && typeof window.api === 'function') {
+    if (copyFirstView() && opts.urlKey && issue.identifier && typeof window.api === 'function') {
       window.api(`/workspace/${encodeURIComponent(opts.urlKey)}/api/task-mode/${encodeURIComponent(issue.identifier)}`, { on401: false })
         .then((mode) => {
           if (destroyed || !mode || !mode.lastCopy) return;
           state.lastCopy = mode.lastCopy;
-          paintState();
+          paintLastCopy();
         })
         .catch(() => {});
     }
@@ -2263,5 +2298,5 @@
     return memory ? { label: memory.label, name: memory.name } : null;
   }
 
-  window.PromptSection = { init, getCached, runnerLinkHtml };
+  window.PromptSection = { init, getCached, runnerLinkHtml, capabilitiesOf };
 })();

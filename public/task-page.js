@@ -19,10 +19,11 @@
  *
  * Evidence and the description/comments block sit OUTSIDE every poll-repainted
  * mount, so a repaint can never lose or move them. The brief/recap panels are
- * sig-gated: the context mount repaints only when `contextSig` changed, and a
- * guest's client-side markdown is re-applied after any repaint (LIN-3340 F2).
- * Once the owner's widgets mount, the context mount is never repainted (the
- * widgets own their refresh).
+ * never repainted by a poll (LIN-3975: the state read carries none); the owner's
+ * widgets own their refresh, and a guest keeps the page-load panels.
+ *
+ * The owner's run control (LIN-3975) is the shared PromptSection, mounted here
+ * from its `data-run-opts` before any Markdown renders. It owns its own refresh.
  *
  * A repaint never collapses a row the reader opened: an open-set keyed by
  * `data-loop-id` is seeded from the rows rendered open and re-applied after
@@ -480,13 +481,13 @@
   }
 
   /**
-   * Whether the context mount must be repainted: never once the owner's widgets
-   * mounted (they own their refresh), and otherwise only when `contextSig`
-   * changed (an unchanged brief keeps its client-side markdown). Pure.
+   * The run control's options, from the owner's `data-run-opts` (LIN-3975). Null when absent or not JSON, so a
+   * page that carries no run control mounts none. Pure.
    */
-  function contextNeedsRepaint(stateSig, mountSig, widgetsMounted) {
-    if (widgetsMounted) return false;
-    return stateSig == null || stateSig !== mountSig;
+  function runOptsOf(root) {
+    var raw = root && root.getAttribute ? root.getAttribute('data-run-opts') : null;
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch (e) { return null; }
   }
 
   /**
@@ -510,7 +511,8 @@
     var main = doc.querySelector('[data-testid="task-page"][data-state-url]');
     if (!main) return null;
     initShare(doc);
-    var answer = doc.querySelector('[data-testid="task-page-answer"]');
+    // The status mount is what the poll repaints; the tracker line beside it is the page-load read's (LIN-3975).
+    var answer = doc.querySelector('[data-testid="task-page-answer-status"]');
     var trackMount = doc.querySelector('[data-testid="task-page-track-mount"]');
     var contextMount = doc.querySelector('[data-testid="task-page-context-mount"]');
     var rows = function () { return trackMount ? trackMount.querySelectorAll('.task-step') : []; };
@@ -528,6 +530,14 @@
     var questionCard = doc.querySelector('[data-testid="task-page-question"]');
     var isOwnerPage = !!doc.querySelector('[data-testid="task-page-owner-widgets"]');
     var closeOutBox = window.CloseOut && typeof window.CloseOut.init === 'function' ? window.CloseOut.init(doc) : null;
+    // LIN-3975: the owner's run control (the shared PromptSection, surface `task`) is wired here too, before the
+    // first Markdown render below, so a look-alike control in ticket text cannot be the one found. A guest or a
+    // member has no run-control root, so nothing mounts.
+    var runRoot = doc.querySelector('[data-testid="task-page-run-control"]');
+    var runOpts = runOptsOf(runRoot);
+    if (runRoot && runOpts && window.PromptSection && typeof window.PromptSection.init === 'function') {
+      window.PromptSection.init(runRoot, runOpts);
+    }
 
     // Owner's live widgets (if the libs loaded). Once mounted, the context
     // mount is never repainted; the widgets own their refresh.
@@ -597,11 +607,6 @@
         trackMount.innerHTML = state.trackHtml;
         restoreCheckIns(trackMount, checkIns);
       }
-      if (contextMount && typeof state.contextHtml === 'string' && contextNeedsRepaint(state.contextSig, contextMount.getAttribute('data-context-sig'), widgetsMounted)) {
-        contextMount.innerHTML = state.contextHtml;
-        if (state.contextSig != null) contextMount.setAttribute('data-context-sig', state.contextSig);
-        enhanceContextMarkdown(contextMount);
-      }
       applyOpenMemory(rows(), memory);
       main.setAttribute('data-status', readyHtml ? (paintedStatus || 'waiting') : state.status);
       main.setAttribute('data-live', state.live ? 'true' : 'false');
@@ -667,7 +672,7 @@
       isGuestStateUrl: isGuestStateUrl,
       goneHandlerFor: goneHandlerFor,
       paintsReadyHeader: paintsReadyHeader,
-      contextNeedsRepaint: contextNeedsRepaint,
+      runOptsOf: runOptsOf,
       enhanceMarkdown: enhanceMarkdown,
       enhanceContextMarkdown: enhanceContextMarkdown,
       mountWidgets: mountWidgets,

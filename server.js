@@ -3288,7 +3288,9 @@ app.use(createTaskPageRoutes({
   workspaceFromUrl,
   getOpenRouterSource,
   getDeployInfo,
-  loader: taskPageLoader
+  loader: taskPageLoader,
+  // LIN-3975: the owner or a member is read from the one hoisted owner seam.
+  workspaceOwnerCheck
 }))
 
 // Mount the task share routes (LIN-3330) — the owner mint/list/revoke controls
