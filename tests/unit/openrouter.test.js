@@ -1669,3 +1669,48 @@ describe('stage descriptions: approved-parent-plan child exemption (LIN-3049)', 
     assert.match(stage('plan-review').whenNot, /breakdown child covered by its parent's approving plan-review/);
   });
 });
+
+// LIN-3962: getModelDisplayName is extended in place. Curated first (unchanged), then the catalog's name, then
+// an alias's family in title case (with "ran as" only from the job's own runs), then the provider-stripped slug.
+describe('getModelDisplayName: one name per model (LIN-3962)', () => {
+  test('a curated id keeps its curated name', () => {
+    assert.equal(getModelDisplayName('openai/gpt-5.4-mini'), 'GPT-5.4 Mini');
+  });
+
+  // LIN-3987: an alias names the model it runs, and a Claude id absent from the curated list is named the same way.
+  test('a bare alias names the model it runs (lib/model-routing-harnesses.js), not its family', () => {
+    assert.equal(getModelDisplayName('opus'), 'Claude Opus 5.5');
+    assert.equal(getModelDisplayName('haiku'), 'Claude Haiku 5.5');
+  });
+
+  test('a Claude id absent from the curated list reads in the same form, with a dated build suffix dropped', () => {
+    assert.equal(getModelDisplayName('claude-sonnet-5-5'), 'Claude Sonnet 5.5');
+    assert.equal(getModelDisplayName('claude-haiku-4-5-20251001'), 'Claude Haiku 4.5');
+    assert.equal(getModelDisplayName('claude-opus-5'), 'Claude Opus 5');
+  });
+
+  test('a Claude-shaped name that is not a model id falls through to the slug', () => {
+    assert.equal(getModelDisplayName('claude-code'), 'claude-code');
+  });
+
+  test('an uncurated, uncatalogued id falls back to its provider-stripped slug', () => {
+    assert.equal(getModelDisplayName('someone/unknown-model-x'), 'unknown-model-x');
+  });
+
+  test('a falsy id still yields the default model\'s name', () => {
+    assert.equal(getModelDisplayName(''), getModelDisplayName(DEFAULT_MODEL));
+  });
+});
+
+// LIN-3987: a bare Claude Code alias has the rate of the model it runs, through the same resolution a run is priced by.
+describe('getModelPricingHint: a bare Claude Code alias prices as the model it runs (LIN-3987)', () => {
+  test('an alias has the rate of its mapped model, in the same form as the opencode suggestions', () => {
+    assert.equal(getModelPricingHint('sonnet'), '$2.00 in / $10.00 out per 1M tokens');
+    assert.equal(getModelPricingHint('opus'), '$4.00 in / $20.00 out per 1M tokens');
+  });
+
+  test('a prototype name is not an alias, and an id with no row has no rate', () => {
+    assert.equal(getModelPricingHint('constructor'), null);
+    assert.equal(getModelPricingHint('someone/unknown-model-x'), null);
+  });
+});

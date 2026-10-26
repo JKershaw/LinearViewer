@@ -90,7 +90,7 @@ describe('LIN-3833 — the copy-first step comes from the task\'s status alone',
   for (const [stateType, label, text] of [
     ['unstarted', 'plan', 'the first step for a task in Todo'],
     ['backlog', 'scoping', 'the first step for a task in Backlog'],
-    ['started', '__ai__', 'generate the next prompt for this task'],
+    ['started', '__ai__', 'Generate the next prompt for this task'],
   ]) {
     test(`${stateType} → "Write the prompt" for ${label}`, async () => {
       const { PromptSection } = load();
@@ -122,8 +122,9 @@ describe('LIN-3833 — once written, the prompt is copied, bounded and keyed', (
     await c.click({ prompt: 'plan' });
     await flush();
     assert.match(c.innerHTML, /data-testid="opened-task-copy"[^>]*data-action="copy"/);
-    assert.match(c.innerHTML, /class="opened-task-box"><div class="swipe-prompt-text" data-prompt-body>PLAN PROMPT/);
-    assert.match(c.innerHTML, /class="opened-task-regenerate" data-prompt="plan">Rewrite/);
+    // LIN-3968: the prompt is the text that will be pasted: plain text in the bounded box, not rendered markdown.
+    assert.match(c.innerHTML, /class="opened-task-box"><div class="opened-task-text" data-prompt-body>PLAN PROMPT/);
+    assert.match(c.innerHTML, /class="btn opened-task-regenerate" data-prompt="plan">Rewrite/);
     assert.match(c.innerHTML, /data-action="download"[^>]*>Download/);
     assert.match(c.innerHTML, /data-testid="opened-task-progress-key"[^>]*checked/, 'the key follows the account default (on)');
     assert.match(c.innerHTML, /Copy it, then paste it into Claude Code, Codex or any coding agent\./);

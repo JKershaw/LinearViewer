@@ -8,14 +8,16 @@ test('the page list holds the pages and states the ticket asks for (LIN-3889 add
   const ids = PAGES.map((p) => p.id);
   assert.equal(new Set(ids).size, ids.length);
   for (const id of ['home', 'task', 'dispatch', 'proxy', 'audit', 'settings-index', 'styleguide', 'privacy', 'terms', ...AREAS.map((a) => `settings-${a}`)]) assert.ok(ids.includes(id), id);
-  assert.deepEqual(PAGES.filter((p) => p.state).map((p) => p.state).sort(), ['ask-open', 'audit-report', 'change-log-entry', 'email-signin', 'key-open', 'models-panel-open', 'models-staged', 'paused']);
+  // LIN-3987: the list follows every state the page list carries (home-copy-*, home-failed, home-running and home-stages-done
+  // were added by LIN-3968 without this pin, which was already stale on main).
+  assert.deepEqual(PAGES.filter((p) => p.state).map((p) => p.state).sort(), ['ask-open', 'audit-report', 'change-log-entry', 'email-signin', 'home-copy-first', 'home-copy-written', 'home-failed', 'home-run-panel-open', 'home-run-panel-opencode', 'home-running', 'home-stages-done', 'key-open', 'models-panel-open', 'models-staged', 'paused', 'swipe-dispatch-open']);
   for (const id of ['account-home', 'workspace-not-found']) assert.ok(ids.includes(id), id);
   assert.equal(AREAS.length, 8);
 });
 
 test('states that write data never share an urlKey with a plain page', () => {
   const plain = new Set(PAGES.filter((p) => !p.state).map((p) => p.urlKey));
-  for (const p of PAGES.filter((q) => q.state === 'key-open' || q.state === 'change-log-entry')) assert.ok(!plain.has(p.urlKey), p.id);
+  for (const p of PAGES.filter((q) => q.state === 'key-open' || q.state === 'change-log-entry' || q.state === 'home-run-panel-open' || q.state === 'home-run-panel-opencode' || q.state === 'swipe-dispatch-open')) assert.ok(!plain.has(p.urlKey), p.id);
 });
 
 test('every mask names a reason', () => {

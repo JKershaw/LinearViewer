@@ -33,10 +33,10 @@ import { mergeChangeLog, ChangeLogError, UNKNOWN_VALUE } from '../lib/workspace-
 import { getCachedCatalogModel } from '../lib/openrouter-catalog.js';
 import { DEFAULT_MODEL } from '../lib/openrouter.js';
 import { AGENT_JOB_IDS, HARBOUR_JOB_IDS, effectiveTable, resolveAgentFromTable, prefillDefaults } from '../lib/model-routing.js';
-import { agentSpendByJob, harbourSpendByJob } from '../lib/model-routing-spend.js';
+import { agentSpendByJob, harbourSpendByJob, typicalByModel } from '../lib/model-routing-spend.js';
 import { summariseRouting } from '../lib/model-routing-summary.js';
 import { runnableGuard } from '../lib/model-routing-edit.js';
-import { readHorizonStart } from '../lib/read-horizon.js';
+import { readModelsHistory } from '../lib/model-routing-history.js';
 import { HALT_MODES, HALT_MODE_ERROR } from '../lib/workspace-halt.js';
 import { CREDENTIAL_DEAD_VERDICT } from '../lib/credential-state.js';
 import { badRequest, serverError } from '../lib/errors.js';
@@ -83,9 +83,6 @@ export function providerNoticeFromQuery(query = {}, flash = null, getProvider = 
 
 const PROVIDER_QUERY_KEYS = ['provider_ok', 'provider_fail', 'provider_error', 'provider_removed', 'provider_switched', 'provider_blocked'];
 
-/** The largest history read the Models spend takes; a read at the cap says so on the page. */
-const MODELS_HISTORY_CAP = 2000;
-
 /** Short messages for the `?error=` codes the change-log redirects carry (never a reflected string). */
 const CHANGE_ERRORS = {
   invalid: 'That change could not be made: a model would not run on its harness. Nothing was changed.',
@@ -110,16 +107,6 @@ function cookieTheme(req) {
   if (req.session?.theme === 'dark' || req.session?.theme === 'light') return req.session.theme;
   const m = /(?:^|;\s*)theme=(dark|light)/.exec(req.headers?.cookie || '');
   return m ? m[1] : 'light';
-}
-
-/**
- * The dispatch rows the Models page's agent spend is priced from: the 30-day window, bounded by a row cap the
- * page reports when it is hit. Read for the owner's page and reduced to numbers there; no row is returned.
- */
-function readModelsHistory(dispatchStore, urlKey) {
-  return safeRead(() => (dispatchStore
-    ? dispatchStore.listHistoryWithBodies(urlKey, { since: readHorizonStart(), limit: MODELS_HISTORY_CAP, projection: { prompt: 0 } })
-    : { items: [], total: 0 }), { items: [], total: 0 });
 }
 
 /** A read the page can do without: its failure is logged and the page shows what it has (LIN-3855). */
@@ -304,7 +291,7 @@ export function createSettingsRouter(deps) {
       // The Models page reads the effective table (above) and its spend: the dispatch history and the call log,
       // one read each for the 30-day window. A read that fails shows an empty spend, never a page error.
       const [history, callDocs, log, presets] = await Promise.all([
-        readModelsHistory(dispatchStore, workspace.urlKey),
+        safeRead(() => readModelsHistory(dispatchStore, workspace.urlKey), { items: [], total: 0 }),
         safeRead(() => (llmCallLogStore?.listInHorizon ? llmCallLogStore.listInHorizon(workspace.urlKey) : []), []),
         modelRoutingStore.getLog(workspace.urlKey, { limit: 50 }),
         modelRoutingStore.listPresets(workspace.urlKey)
@@ -324,6 +311,8 @@ export function createSettingsRouter(deps) {
         table,
         effective,
         agentSpend: agentSpendByJob(history.items, { jobs: AGENT_JOB_IDS }),
+        // LIN-3962: each agent job's typical cost per model, for the decision panel's suggested models.
+        agentTypicals: Object.fromEntries(AGENT_JOB_IDS.map((id) => [id, typicalByModel(history.items, { job: id })])),
         harbourSpend: harbourSpendByJob(callDocs, { jobs: HARBOUR_JOB_IDS }),
         coverage: { windowRuns: history.items.length, capped: history.total > history.items.length },
         presets,

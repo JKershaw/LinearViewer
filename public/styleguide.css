@@ -293,3 +293,25 @@
 .sg-settings-anatomy dd {
   margin: 0;
 }
+
+/* LIN-3962: each decision-panel sample has its own caption, and the next sample sits a row lower, so two samples never
+   read as one panel. */
+.sg-decision-sample {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--card);
+}
+
+.sg-decision-sample + .sg-decision-sample {
+  margin-top: var(--space-4);
+}
+
+.sg-decision-caption {
+  margin: 0;
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  color: var(--fg-dim);
+}

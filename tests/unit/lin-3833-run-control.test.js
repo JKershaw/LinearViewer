@@ -14,21 +14,46 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
+import { decisionPanel, routingWords, agentLists } from '../../lib/components/decision-panel.js';
+import { HARNESSES_WITHOUT_EFFORT } from '../../lib/model-routing.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
-// A container that records every listener by type, so a test can fire input and change as well as click.
+// A container that records every listener by type, so a test can fire input and change as well as click. It reads its
+// own markup back the way applyPanelDraft does: the decision panel by its attribute, its fields by data-testid. A value
+// written to a field lives until the markup is replaced, as a control's value does.
 function makeContainer() {
   const listeners = {};
+  let html = '';
+  let written = {};
+  const markupValue = (testid) => {
+    const tag = new RegExp(`<(input|select)\\b[^>]*data-testid="${testid}"[^>]*>`).exec(html);
+    if (!tag) return undefined;
+    if (tag[1] === 'input') return /\svalue="([^"]*)"/.exec(tag[0])?.[1] ?? '';
+    const block = html.slice(tag.index, html.indexOf('</select>', tag.index));
+    return /<option value="([^"]*)"[^>]*\sselected/.exec(block)?.[1] ?? '';
+  };
+  const panelRoot = {
+    querySelector(sel) {
+      const m = /^\[data-testid="([^"]+)"\]$/.exec(sel);
+      if (!m || markupValue(m[1]) === undefined) return null;
+      const testid = m[1];
+      return {
+        get value() { return testid in written ? written[testid] : markupValue(testid); },
+        set value(v) { written[testid] = v; }
+      };
+    }
+  };
   const container = {
-    innerHTML: '',
+    get innerHTML() { return html; },
+    set innerHTML(v) { html = v; written = {}; },
     dataset: {},
     classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
     setAttribute() {},
     getAttribute() { return null; },
-    querySelector() { return null; },
+    querySelector(sel) { return sel === '[data-decision-panel]' && html.includes('data-decision-panel') ? panelRoot : null; },
     contains() { return true; },
     addEventListener(type, fn) { (listeners[type] = listeners[type] || []).push(fn); },
     removeEventListener() {},
@@ -45,7 +70,29 @@ function makeContainer() {
   return container;
 }
 
-function load({ opened = null, previewFor = () => null, presets = [], kickoff = { prompt: 'AUTOPILOT PROMPT', promptName: 'Autopilot', kind: 'autopilot' }, document = null } = {}) {
+// The server's panel for the choice it is asked about (routes/dispatch.js decision-panel), built by the same component.
+// The lists are the real ones (LIN-3987), so a typed alias is named by its display name, as it is on the server.
+const serverPanel = (q) => ({
+  kind: 'plan',
+  withoutEffort: HARNESSES_WITHOUT_EFFORT,
+  words: routingWords({ harness: q.get('harness') || null, model: null, effort: null }),
+  html: decisionPanel({
+    testid: 'run-decision-panel',
+    fieldAttrs: (field) => `data-testid="run-${field}"`,
+    numbers: null,
+    harness: { value: q.get('harness'), inForce: q.get('harness') || 'claude-code', follow: 'As Settings \u203a Models sets it', hint: 'Right now: Claude Code' },
+    model: { value: q.get('model'), follow: 'As Settings \u203a Models sets it', hint: 'Right now: Claude Code\'s own model', lists: agentLists([]), suggestions: {} },
+    effort: { value: q.get('effort'), follow: 'As Settings \u203a Models sets it', hint: 'Right now: none' }
+  })
+});
+
+// The preview route answers the run's words with its own answer (LIN-3987, routes/dispatch.js): the fake does the same,
+// so the Runs-on line is tested against what the server sends, not against a raw value.
+const withWords = (preview) => (preview && !preview.words
+  ? { ...preview, words: routingWords({ harness: preview.harness, model: preview.model, effort: preview.effort }) }
+  : preview);
+
+function load({ opened = null, previewFor = () => null, panelFor = serverPanel, presets = [], kickoff = { prompt: 'AUTOPILOT PROMPT', promptName: 'Autopilot', kind: 'autopilot' }, document = null } = {}) {
   const calls = { api: [], dispatch: [], kickoff: [] };
   const window = {
     escapeHtml: (s) => (s == null ? '' : String(s)),
@@ -55,7 +102,8 @@ function load({ opened = null, previewFor = () => null, presets = [], kickoff = 
       calls.api.push({ url, method: o.method || 'GET', body: o.body ? JSON.parse(o.body) : null });
       if (url.includes('/api/task/')) return opened;
       if (url.includes('/api/task-mode/')) return { lastCopy: null };
-      if (url.includes('/api/dispatch/preview')) return previewFor(new URL(url, 'http://x').searchParams);
+      if (url.includes('/api/dispatch/preview')) return withWords(await previewFor(new URL(url, 'http://x').searchParams));
+      if (url.includes('/api/dispatch/decision-panel')) return panelFor(new URL(url, 'http://x').searchParams);
       if (url.includes('/api/dispatch/presets')) return { presets };
       if (url.includes('/api/prompt/')) return { prompt: `PROMPT ${decodeURIComponent(url.split('/').pop().split('?')[0])}`, promptName: 'Plan' };
       return { success: true, item: { id: 'd-1' } };
@@ -93,7 +141,8 @@ const HOME = {
   issue: { id: 'uuid-42', identifier: 'LIN-42', title: 'T', url: '', stateType: 'started' },
 };
 
-const PLAN_NEXT = { count: 1, next: { kind: 'plan', label: 'Plan' }, last: { label: 'Research', state: 'done', at: null }, running: null };
+// `offered` is the step the server offers (LIN-3968); `next` is the "comes next" wording. Nothing runs, so they agree.
+const PLAN_NEXT = { count: 1, next: { kind: 'plan', label: 'Plan' }, offered: { kind: 'plan', label: 'Plan', why: 'usual', failed: false }, last: { label: 'Research', state: 'done', at: null }, running: null };
 
 async function mount(over = {}, loadOver = {}, container = null) {
   const env = load(loadOver);
@@ -133,13 +182,48 @@ describe('LIN-3833 — Runs on says where each value comes from, from the server
     assert.match(c.innerHTML, /from the Plan group in Models/);
   });
 
-  test('a Change panel starts with nothing chosen: the harness is from Models, and no option is selected', async () => {
-    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT } });
+  test('a Change panel starts with nothing chosen: the harness follows Settings › Models, and no option is selected', async () => {
+    const { c, calls } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT } });
     await c.click({ action: 'change-run' });
     await flush();
     assert.match(c.innerHTML, /data-testid="run-change-panel"/);
-    assert.match(c.innerHTML, /<option value="">from Models<\/option>/);
+    assert.match(c.innerHTML, /<option value=""[^>]*>As Settings \u203a Models sets it<\/option>/, 'the blank option is short, so a 390px select does not clip it');
+    assert.match(c.innerHTML, /data-decision-hint="harness">Right now: Claude Code</, 'what the blank resolves to reads on its own line, in words (LIN-3987)');
     assert.equal(/<option value="claude-code" selected>|<option value="opencode" selected>/.test(c.innerHTML), false, 'nothing is pre-selected');
+    assert.ok(calls.api.some((a) => a.url.includes('/api/dispatch/decision-panel')), 'the shared panel is read from the server when Change opens');
+  });
+
+  test('the panel\'s fields are the server\'s, so Use stays off until the panel has loaded, and says so when it cannot load', async () => {
+    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, panelFor: () => { throw new Error('down'); } });
+    await c.click({ action: 'change-run' });
+    await flush();
+    assert.match(c.innerHTML, /data-testid="run-panel-failed"/);
+    assert.match(c.innerHTML, /data-testid="run-use"[^>]*disabled/);
+  });
+
+  test('a repaint of the cached panel keeps the draft: a model typed and a harness picked both survive it (LIN-3962)', async () => {
+    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT } });
+    await c.click({ action: 'change-run' });
+    await flush();
+    await c.fire('input', { dataset: { testid: 'run-model' }, value: 'x/y' });
+    // The harness change repaints the run block from the cached panel, which holds the choice and not the draft.
+    await c.fire('change', { dataset: { testid: 'run-harness' }, value: 'opencode' });
+    await flush();
+    const root = c.querySelector('[data-decision-panel]');
+    assert.equal(root.querySelector('[data-testid="run-harness"]').value, 'opencode', 'the picked harness is shown');
+    assert.equal(root.querySelector('[data-testid="run-model"]').value, 'x/y', 'the typed model is shown');
+  });
+
+  test('the summary says no effort once the draft harness is opencode, which takes none (LIN-3962)', async () => {
+    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT } });
+    await c.click({ action: 'change-run' });
+    await flush();
+    await c.fire('change', { dataset: { testid: 'run-effort' }, value: 'high' });
+    await c.fire('change', { dataset: { testid: 'run-harness' }, value: 'opencode' });
+    await flush();
+    const summary = /data-testid="run-will-use">([^<]*)</.exec(c.innerHTML)[1];
+    assert.match(summary, /opencode/);
+    assert.equal(summary.includes('effort'), false, `no effort in: ${summary}`);
   });
 });
 
@@ -161,6 +245,7 @@ describe('LIN-3833 — the choice for this run goes through the preview, and the
   test('Run to PR dispatches the autopilot kickoff with the run choice, not a harness forced on the client', async () => {
     const { c, calls } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: { count: 0, next: null, last: null, running: null } } });
     await c.click({ action: 'change-run' });
+    await flush();
     await c.fire('change', { dataset: { testid: 'run-model' }, value: 'deepseek-v4-pro' });
     await c.click({ action: 'use-run' });
     await c.click({ action: 'go', rung: 'run-task' });
@@ -367,7 +452,7 @@ describe('LIN-3833 — "Another step" leaves out only what the task cannot take 
   // A task after Plan, Build and Review (the review asked for changes). `ahead` and `usual` are the stage-order
   // fields this PR removed from the summary; they are set here on purpose, so the rule is seen to ignore them.
   const REVIEWED = {
-    count: 3, next: { kind: 'close-out', label: 'Close-out' }, last: { label: 'Review', state: 'done', at: null }, running: null,
+    count: 3, next: { kind: 'close-out', label: 'Close-out' }, offered: { kind: 'close-out', label: 'Close-out', why: 'usual', failed: false }, last: { label: 'Review', state: 'done', at: null }, running: null,
     excluded: ['retro'], ahead: ['close-out'], usual: ['research', 'plan', 'implementation', 'review', 'close-out'],
   };
   const open = async (c) => {
@@ -391,5 +476,135 @@ describe('LIN-3833 — "Another step" leaves out only what the task cannot take 
     await open(c);
     assert.equal(c.innerHTML.includes('data-testid="run-another-item"'), false);
     assert.match(c.innerHTML, /7 steps left out: they do not fit this task's state\./);
+  });
+});
+
+// LIN-3987: Home's controls are real buttons with a shared class, a chosen choice is marked, a choice the harness cannot
+// run is not kept, and the words name what runs. The button tags are read from the markup the run block paints.
+describe('LIN-3987 — Home\'s run controls are shared buttons, marked when chosen, and say their words', () => {
+  const RUN_ACTIONS = ['change-run', 'ask-harbour', 'run-target', 'run-preset', 'use-run', 'reset-run', 'close-change', 'see-prompt', 'run-another', 'run-pick', 'run-more', 'stop-run', 'stop-run-confirm', 'stop-run-cancel', 'undo-run', 'run-step-next', 'run-step', 'go', 'setup'];
+  const SHARED = /class="[^"]*\bbtn(?:--[a-z]+)?\b/;
+  // The button's own opening tag, found by its test id (its attributes come in any order).
+  const tagOf = (html, testid) => new RegExp(`<button\\b[^>]*data-testid="${testid}"[^>]*>`).exec(html)[0];
+  const runButtons = (html) => [...html.matchAll(/<button\b[^>]*>/g)].map((m) => m[0])
+    .filter((tag) => /data-testid="(run-[a-z-]+|opened-task-go)"/.test(tag) || RUN_ACTIONS.some((a) => tag.includes(`data-action="${a}"`)));
+
+  test('every button in the run block, with the Change panel open, carries a shared button class', async () => {
+    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor: () => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: null, harness: 'claude-code', effort: null, sources: {} }) });
+    await c.click({ action: 'change-run' });
+    await flush();
+    await c.click({ action: 'run-another' });
+    await flush();
+    const tags = runButtons(c.innerHTML);
+    assert.ok(tags.length >= 8, `the run block has its buttons (${tags.length})`);
+    for (const tag of tags) assert.match(tag, SHARED, `shared class on ${tag}`);
+  });
+
+  test('a quiet button is used on its own, not with .btn: .btn:hover would paint a fill over its label (decision 6)', async () => {
+    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor: () => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: null, harness: 'claude-code', effort: null, sources: {} }) });
+    await c.click({ action: 'change-run' });
+    await flush();
+    await c.click({ action: 'run-another' });
+    await flush();
+    const tags = runButtons(c.innerHTML);
+    const classesOf = (tag) => (/class="([^"]*)"/.exec(tag)?.[1] || '').split(/\s+/);
+    const quiet = tags.filter((tag) => classesOf(tag).includes('btn--quiet'));
+    assert.ok(quiet.length >= 3, `the run block has quiet buttons (${quiet.length})`);
+    for (const tag of quiet) assert.equal(classesOf(tag).includes('btn'), false, `quiet alone: ${tag}`);
+  });
+
+  test('a chosen Runs-on target is marked aria-pressed, and is not marked by bold or underline', async () => {
+    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor: () => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: null, harness: 'claude-code', effort: null, sources: {} }) });
+    await c.click({ action: 'change-run' });
+    await flush();
+    await c.click({ action: 'run-target', target: 'web' });
+    await flush();
+    assert.equal(tagOf(c.innerHTML, 'run-target-web').includes('aria-pressed="true"'), true);
+    assert.equal(tagOf(c.innerHTML, 'run-target-cli').includes('aria-pressed="false"'), true);
+  });
+
+  test('with opencode chosen, Claude Code on the web is not offered and says why; a web draft falls back to the runner', async () => {
+    const { c, calls } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: { count: 0, next: null, last: null, running: null } }, previewFor: () => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: null, harness: 'claude-code', effort: null, sources: {} }) });
+    await c.click({ action: 'change-run' });
+    await flush();
+    await c.click({ action: 'run-target', target: 'web' });
+    await c.fire('change', { dataset: { testid: 'run-harness' }, value: 'opencode' });
+    await flush();
+    assert.doesNotMatch(c.innerHTML, /data-testid="run-target-web"/, 'no web choice under opencode');
+    assert.match(c.innerHTML, /data-testid="run-web-unavailable"[^>]*>Claude Code on the web needs Claude Code, so it is not offered with opencode through OpenRouter\./);
+    assert.equal(tagOf(c.innerHTML, 'run-target-cli').includes('aria-pressed="true"'), true, 'the draft falls back to the runner');
+    await c.click({ action: 'use-run' });
+    await c.click({ action: 'go', rung: 'run-task' });
+    await flush();
+    await flush();
+    assert.equal(calls.dispatch.length, 1);
+    assert.equal(calls.dispatch[0].target, 'cli', 'the run goes to the runner, never to a web target the harness cannot run');
+  });
+
+  test('the Runs-on line, the heading and the summary name models and harnesses in words, never a raw id or alias', async () => {
+    const previewFor = (q) => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: q.get('model') || null, harness: q.get('harness') || 'claude-code', effort: null, sources: {}, words: routingWords({ harness: q.get('harness') || 'claude-code', model: q.get('model') || null, effort: null }) });
+    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor });
+    await c.click({ action: 'change-run' });
+    await flush();
+    // The model field repaints nothing as it is typed (LIN-3969, so the caret stays); a target choice repaints the block.
+    await c.fire('change', { dataset: { testid: 'run-model' }, value: 'sonnet' });
+    await c.click({ action: 'run-target', target: 'cli' });
+    await flush();
+    const runsOn = /data-testid="run-on-what">([^<]*)</.exec(c.innerHTML)[1];
+    const summary = /data-testid="run-will-use">([^<]*)</.exec(c.innerHTML)[1];
+    const heading = /opened-task-change-head">([^<]*)</.exec(c.innerHTML)[1];
+    assert.match(summary, /^This run will use Claude Sonnet 5\.5 · Claude Code/, summary);
+    assert.match(heading, /^This run only · default: Claude Code(?:&#039;|')s own model/, heading);
+    for (const text of [runsOn, summary, heading]) assert.doesNotMatch(text, /\bclaude-code\b|\bsonnet\b|\bnone\b|from Models/, text);
+  });
+});
+
+
+// LIN-3987 review, finding 1: a harness picked on the draft re-reads the server's panel, so the words for a blank model
+// and effort follow the harness the draft names, and go back to Settings' words when the harness is blank again.
+describe('LIN-3987 review — a harness picked on the draft re-reads the panel, so its words follow it', () => {
+  test('picking opencode names its default model in the summary; a blank harness names Claude Code\'s own again', async () => {
+    const { c, calls } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor: () => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: null, harness: 'claude-code', effort: null, sources: {} }) });
+    await c.click({ action: 'change-run' });
+    await flush();
+    const summary = () => /data-testid="run-will-use">([^<]*)</.exec(c.innerHTML)[1];
+    assert.match(summary(), /^This run will use Claude Code(?:&#039;|')s own model/, summary());
+
+    await c.fire('change', { dataset: { testid: 'run-harness' }, value: 'opencode' });
+    await flush();
+    assert.ok(calls.api.some((a) => a.url.includes('/api/dispatch/decision-panel') && a.url.includes('harness=opencode')), 'the panel is read again for the harness the draft chose');
+    assert.match(summary(), /^This run will use opencode(?:&#039;|')s default model/, summary());
+    assert.doesNotMatch(summary(), /Claude Code(?:&#039;|')s own model/, summary());
+
+    await c.fire('change', { dataset: { testid: 'run-harness' }, value: '' });
+    await flush();
+    assert.match(summary(), /^This run will use Claude Code(?:&#039;|')s own model/, summary());
+  });
+
+  // Reads overlap and can answer in either order: only the latest paints (runPanelSeq in fetchRunPanel).
+  test('an older read that answers last does not paint over the latest answer\'s words', async () => {
+    const held = [];
+    let gate = false;
+    const panelFor = (q) => (gate
+      ? new Promise((resolve) => { held.push(() => resolve(serverPanel(q))); })
+      : serverPanel(q));
+    const { c } = await mount({}, { panelFor, opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor: () => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: null, harness: 'claude-code', effort: null, sources: {} }) });
+    await c.click({ action: 'change-run' });
+    await flush();
+    const summary = () => /data-testid="run-will-use">([^<]*)</.exec(c.innerHTML)[1];
+    assert.match(summary(), /^This run will use Claude Code(?:&#039;|')s own model/, summary());
+
+    gate = true;
+    await c.fire('change', { dataset: { testid: 'run-harness' }, value: 'opencode' });
+    await c.fire('change', { dataset: { testid: 'run-harness' }, value: '' });
+    await flush();
+    assert.equal(held.length, 2, 'both reads are in flight');
+
+    held[1]();
+    await flush();
+    held[0]();
+    await flush();
+    assert.match(summary(), /^This run will use Claude Code(?:&#039;|')s own model/, 'the first read answered last and did not paint');
+    assert.doesNotMatch(summary(), /opencode/, summary());
   });
 });

@@ -50,6 +50,12 @@ import { deriveTerminalStatus } from '../lib/dispatch-terminal.js';
 import { resolveOwnerMintRefusal } from '../lib/owner-mint-refusals.js';
 import { resolveRunnerOwnerRefusal, sendRunnerRefusal } from '../lib/runner-owner-gate.js';
 import { readPlanFacts } from '../lib/chat-request.js';
+import { readModelsHistory } from '../lib/model-routing-history.js';
+import { HARNESSES_WITHOUT_EFFORT } from '../lib/model-routing.js';
+import { agentSpendByJob, typicalByModel } from '../lib/model-routing-spend.js';
+import { decisionPanel, agentLists, suggestionsByHarness, routingWords } from '../lib/components/decision-panel.js';
+import { getModelCatalog } from '../lib/openrouter-catalog.js';
+import { shouldMockAi } from '../lib/should-mock-ai.js';
 import { planOf, quotaAnswer } from '../lib/plan-allowance.js';
 import { resolveAccountGroup } from '../lib/account-group.js';
 import { redactSessionItem, redactSessionItems } from '../lib/dispatch-session-redaction.js';
@@ -241,6 +247,9 @@ function presetBodyCheck({ model, harness, effort, byKind }) {
     || opaqueFieldError(effort, 'effort', { maxLength: MAX_NAME_LENGTH });
   return error ? { error } : normalizeDispatchPresetByKind(byKind);
 }
+
+/** A query value as text, or null when it is absent or blank (LIN-3833, shared by the preview and LIN-3962's panel). */
+const queryText = (value) => (typeof value === 'string' && value.trim() ? value : null);
 
 /**
  * Creates dispatch routes with injected dependencies.
@@ -599,22 +608,21 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         ownerOnlyCode: 'PREVIEW_OWNER_ONLY'
       });
       if (refusal) return res.status(refusal.status).json({ error: refusal.error, code: refusal.code });
-      const text = (value) => (typeof value === 'string' && value.trim() ? value : null);
-      const surface = text(req.query.surface);
+      const surface = queryText(req.query.surface);
       if (surface !== null && !SURFACES.includes(surface)) {
         return res.status(400).json({ error: `surface must be one of: ${SURFACES.join(', ')}` });
       }
-      const presetId = text(req.query.presetId);
+      const presetId = queryText(req.query.presetId);
       const preset = (presetId && dispatchPresetsStore)
         ? await Promise.resolve(dispatchPresetsStore.get(req.workspace.urlKey, presetId)).catch(() => null)
         : null;
-      const kind = text(req.query.kind) || deriveDispatchKind(text(req.query.promptName) || undefined);
+      const kind = queryText(req.query.kind) || deriveDispatchKind(queryText(req.query.promptName) || undefined);
       const routing = await resolveRoutingWithSources({
         urlKey: req.workspace.urlKey,
         kind,
-        model: text(req.query.model),
-        harness: text(req.query.harness),
-        effort: text(req.query.effort),
+        model: queryText(req.query.model),
+        harness: queryText(req.query.harness),
+        effort: queryText(req.query.effort),
         preset,
         anchor: null,
         workspacePreferencesStore,
@@ -622,6 +630,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         settleHarness: surface !== null
       });
       // LIN-3833: the words the run control shows beside the sources: the step's name and its group.
+      // LIN-3987: `words` is what the run would use, in words, so the browser never prints a raw id or alias.
       const job = getJob(kind);
       res.json({
         kind,
@@ -629,10 +638,82 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         group: job?.group || null,
         presetId: preset ? presetId : null,
         presetName: preset?.name ?? null,
-        ...routing
+        ...routing,
+        words: routingWords({ harness: routing.harness, model: routing.model, effort: routing.effort })
       });
     } catch (err) {
       return reportFailure(res, 'Preview dispatch routing error:', err, 'Failed to preview dispatch routing');
+    }
+  });
+
+  /**
+   * GET /workspace/:urlKey/api/dispatch/decision-panel
+   * LIN-3962: the body of Home's run panel (lib/components/decision-panel.js), read when its Change panel opens.
+   * Owner-only, like the preview it sits beside. The numbers are the derived kind's own, read from the same history
+   * Settings › Models prices from (lib/model-routing-history.js). A blank field says what Settings › Models sets it to
+   * for this step: the resolution with the run's own fields cleared. Presets are per run, so they are not part of it.
+   * LIN-3987 (review): a harness the draft chose is part of that resolution, so a blank model or effort says what that
+   * harness runs; the client asks again whenever the draft's harness changes, so the words never name the other harness.
+   * The fields the caller sent show as chosen, and an effort outside the set is kept as itself.
+   */
+  router.get('/workspace/:urlKey/api/dispatch/decision-panel', workspaceFromUrl, async (req, res) => {
+    try {
+      const refusal = await resolveOwnerMintRefusal({
+        ownerCheck: workspaceOwnerCheck,
+        workspaceId: req.workspace.id,
+        accountId: req.session?.accountId,
+        ownerOnlyCode: 'PREVIEW_OWNER_ONLY'
+      });
+      if (refusal) return res.status(refusal.status).json({ error: refusal.error, code: refusal.code });
+      const surface = queryText(req.query.surface);
+      if (surface !== null && !SURFACES.includes(surface)) {
+        return res.status(400).json({ error: `surface must be one of: ${SURFACES.join(', ')}` });
+      }
+      const kind = queryText(req.query.kind) || deriveDispatchKind(queryText(req.query.promptName) || undefined);
+      const choice = { harness: queryText(req.query.harness), model: queryText(req.query.model), effort: queryText(req.query.effort) };
+      const settle = { applyDefaultHarness: surface !== null, settleHarness: surface !== null };
+      const workspace = req.workspace;
+      const [routing, history, catalog] = await Promise.all([
+        resolveRoutingWithSources({
+          urlKey: workspace.urlKey, kind, model: null, harness: choice.harness, effort: null, preset: null, anchor: null,
+          workspacePreferencesStore, ...settle
+        }),
+        readModelsHistory(dispatchQueueStore, workspace.urlKey).catch((err) => {
+          console.error('Decision panel history read error:', err.message);
+          return null;
+        }),
+        getModelCatalog({ mock: shouldMockAi(workspace) }).catch(() => [])
+      ]);
+      // A failed read says so. It never reads as "no runs": that would be a false figure about the store.
+      const spend = history ? agentSpendByJob(history.items, { jobs: [kind] })[0] : null;
+      const typicals = history ? typicalByModel(history.items, { job: kind }) : [];
+      // The blank option stays short (a 390px select clips a long one); what it resolves to reads on a hint line under the field.
+      // LIN-3987: what it resolves to is said in words (routingWords), so the hint and the heading never print an id.
+      const follow = 'From Models';
+      const words = routingWords({ harness: routing.harness, model: routing.model, effort: routing.effort });
+      const hint = (value) => `Right now: ${value}`;
+      const numbers = spend && {
+        runs: spend.runs, priced: spend.priced, unpriced: spend.unpriced, noTelemetry: spend.noTelemetry,
+        spendUsd: spend.spendUsd, typicalUsd: spend.typicalUsd
+      };
+      const html = decisionPanel({
+        testid: 'run-decision-panel',
+        fieldAttrs: (field) => `data-testid="run-${field}"`,
+        numbers: {
+          ...(numbers || { unavailable: true }), testid: 'run-numbers', shareTestid: 'run-share', heading: 'This step, last 30 days', share: null
+        },
+        harness: { value: choice.harness, inForce: choice.harness || routing.harness || null, follow, hint: hint(words.harness) },
+        model: {
+          value: choice.model, follow, hint: hint(words.model),
+          lists: agentLists(catalog), suggestions: suggestionsByHarness(typicals)
+        },
+        effort: { value: choice.effort, follow, hint: hint(words.effort) }
+      });
+      // The harnesses that take no effort. The panel hides effort by this list; Home's summary judges its draft's harness by it.
+      // `words` is the resolution for the harness the draft chose (Settings' own when none is chosen), the words Home's heading and summary name a default by.
+      res.json({ kind, html, numbers: numbers || null, withoutEffort: HARNESSES_WITHOUT_EFFORT, words });
+    } catch (err) {
+      return reportFailure(res, 'Decision panel error:', err, 'Failed to load the decision panel');
     }
   });
 

@@ -212,3 +212,166 @@ test('findRecentFreshDispatch returns null when its required inputs are missing'
   assert.equal(await store.findRecentFreshDispatch(null, { issueIdentifier: 'LIN-1', kind: 'plan', since: new Date(0) }), null);
   assert.equal(mainQueries.length, 0, 'an unkeyable lookup must not issue a query at all');
 });
+
+test('findRecentFreshDispatch: a cancelled row (an Undo) does not block the same stage again (LIN-3968 ruling)', async () => {
+  const { store, mainQueries, historyQueries } = makeStore();
+  const base = new Date('2026-10-25T12:00:00.000Z');
+  const row = (id, extra) => ({
+    _id: id, urlKey: 'acme', issueIdentifier: 'LIN-1', kind: 'review',
+    followUpTo: null, abort: false, prompt: 'x', dispatchedAt: base, ...extra
+  });
+  await store.historyCollection.insertOne(row('undone', { status: 'cancelled' }));
+  const since = new Date(base.getTime() - 1000);
+
+  assert.equal(await store.findRecentFreshDispatch('acme', { issueIdentifier: 'LIN-1', kind: 'review', since }), null,
+    'the person undid it; nothing ran, so re-running the stage is not a duplicate');
+  for (const query of [mainQueries[0], historyQueries[0]]) {
+    assert.deepEqual(query.status, { $ne: 'cancelled' }, 'the exemption rides into both reads');
+  }
+
+  // Every other archived row still counts: taken (the LIN-1594 pile included).
+  await store.historyCollection.insertOne(row('taken', { status: 'taken' }));
+  assert.equal((await store.findRecentFreshDispatch('acme', { issueIdentifier: 'LIN-1', kind: 'review', since })).id, 'taken');
+});
+
+test('findRecentFreshDispatch: a row whose session ended failed, aborted or expired does not block the stage again (LIN-3968 DECISION, option a)', async () => {
+  const { store } = makeStore();
+  const base = new Date('2026-10-25T12:00:00.000Z');
+  const since = new Date(base.getTime() - 1000);
+  const row = (id, extra) => ({
+    _id: id, urlKey: 'acme', issueIdentifier: 'LIN-1', kind: 'review',
+    followUpTo: null, abort: false, prompt: 'x', dispatchedAt: base, ...extra
+  });
+  const find = () => store.findRecentFreshDispatch('acme', { issueIdentifier: 'LIN-1', kind: 'review', since });
+
+  // Ended rows: the archived status says so.
+  for (const status of ['failed', 'aborted', 'expired']) {
+    await store.historyCollection.insertOne(row(`status-${status}`, { status }));
+    assert.equal(await find(), null, `a ${status} row ran no work to duplicate`);
+  }
+
+  // The LIN-1594 pile: a row still `taken` whose runner posted a terminal failure marker. Only the feedback says it ended.
+  const failedMarker = [{ message: '[failed] Review could not finish', timestamp: base }];
+  await store.historyCollection.insertOne(row('taken-failed', { status: 'taken', feedback: failedMarker }));
+  assert.equal(await find(), null, 'a taken row whose latest terminal marker is [failed] is an ended session');
+  await store.historyCollection.insertOne(row('taken-aborted', { status: 'taken', feedback: [{ message: '[aborted] Stopped by the person', timestamp: base }] }));
+  assert.equal(await find(), null, 'a taken row whose latest terminal marker is [aborted] is an ended session');
+
+  // A session that completed still counts: its stage ran, so a second run is a duplicate.
+  await store.historyCollection.insertOne(row('taken-done', { status: 'taken', feedback: [{ message: '[done] Review written', timestamp: base }] }));
+  assert.equal((await find()).id, 'taken-done');
+});
+
+test('findRecentFreshDispatch: a row still in flight keeps counting, even after a failed one (LIN-3968)', async () => {
+  const { store } = makeStore();
+  const base = new Date('2026-10-25T12:00:00.000Z');
+  const since = new Date(base.getTime() - 1000);
+  const row = (id, extra) => ({
+    _id: id, urlKey: 'acme', issueIdentifier: 'LIN-1', kind: 'review',
+    followUpTo: null, abort: false, prompt: 'x', dispatchedAt: base, ...extra
+  });
+  await store.historyCollection.insertOne(row('failed-earlier', { status: 'failed' }));
+  await store.collection.insertOne(row('queued-now', {}));
+
+  assert.equal((await store.findRecentFreshDispatch('acme', { issueIdentifier: 'LIN-1', kind: 'review', since })).id, 'queued-now',
+    'a queued row has not ended; the guard protects it');
+});
+
+// LIN-3968 review finding 1: the production abort shape. Home's Stop posts an abort
+// row (`abort: true, abortTo: <target>`), and the runner writes `[aborted]` on THAT
+// row, never on the target. The guard must read the abort row, or it re-offers the
+// stage (Home's nextStepOf does) and then refuses the press as a duplicate.
+test('findRecentFreshDispatch: a Review Stopped by the person (the [aborted] on the abort row) does not block it again (LIN-3968 finding 1)', async () => {
+  const { store } = makeStore();
+  const base = new Date('2026-10-25T12:00:00.000Z');
+  const since = new Date(base.getTime() - 1000);
+  const find = () => store.findRecentFreshDispatch('acme', { issueIdentifier: 'LIN-1', kind: 'review', since });
+  await store.collection.insertOne({
+    _id: 'rev1', urlKey: 'acme', issueIdentifier: 'LIN-1', kind: 'review', rootItemId: 'rev1',
+    followUpTo: null, abort: false, prompt: 'x', dispatchedAt: base, status: 'taken',
+    feedback: [{ message: '[started] Review running', timestamp: base, rootItemId: 'rev1' }]
+  });
+  assert.equal((await find()).id, 'rev1', 'the Review is live before the Stop');
+
+  await store.collection.insertOne({
+    _id: 'stop-1', urlKey: 'acme', issueIdentifier: 'LIN-1', kind: 'review',
+    followUpTo: null, abort: true, abortTo: 'rev1', prompt: 'x',
+    dispatchedAt: new Date(base.getTime() + 5000), status: 'taken',
+    feedback: [{ message: '[aborted] Stopped by the person', timestamp: new Date(base.getTime() + 5000) }]
+  });
+  assert.equal(await find(), null, 'the Stop ended the target; the stage is offered again and the press must not be refused');
+});
+
+test('findRecentFreshDispatch: a Stop that landed before a later genuine terminal does not rewind it (LIN-3968 finding 1, F1 guard)', async () => {
+  const { store } = makeStore();
+  const base = new Date('2026-10-25T12:00:00.000Z');
+  const since = new Date(base.getTime() - 1000);
+  await store.collection.insertOne({
+    _id: 'rev2', urlKey: 'acme', issueIdentifier: 'LIN-1', kind: 'review', rootItemId: 'rev2',
+    followUpTo: null, abort: false, prompt: 'x', dispatchedAt: base, status: 'taken',
+    feedback: [{ message: '[done] Review written', timestamp: new Date(base.getTime() + 9000), rootItemId: 'rev2' }]
+  });
+  await store.collection.insertOne({
+    _id: 'stop-2', urlKey: 'acme', issueIdentifier: 'LIN-1', kind: 'review',
+    followUpTo: null, abort: true, abortTo: 'rev2', prompt: 'x',
+    dispatchedAt: new Date(base.getTime() + 1000), status: 'taken',
+    feedback: [{ message: '[aborted] Stopped by the person', timestamp: new Date(base.getTime() + 1000) }]
+  });
+
+  assert.equal((await store.findRecentFreshDispatch('acme', { issueIdentifier: 'LIN-1', kind: 'review', since })).id, 'rev2',
+    'the Review finished after the Stop, so it ran and still counts');
+});
+
+// LIN-3968 review finding 1, lineage: the Review is root `rev1` with no ending marker of
+// its own; its follow-up `fu1` ended `[failed]`. Home reads the stage as failed, so the
+// guard must read the lineage's newest terminal, as the lineage status does.
+test('findRecentFreshDispatch: a Review whose lineage ended in a failed follow-up does not block it again (LIN-3968 finding 1, lineage)', async () => {
+  const { store } = makeStore();
+  const base = new Date('2026-10-25T12:00:00.000Z');
+  const since = new Date(base.getTime() - 1000);
+  const find = () => store.findRecentFreshDispatch('acme', { issueIdentifier: 'LIN-1', kind: 'review', since });
+  await store.collection.insertOne({
+    _id: 'rev1', urlKey: 'acme', issueIdentifier: 'LIN-1', kind: 'review', rootItemId: 'rev1',
+    followUpTo: null, abort: false, prompt: 'x', dispatchedAt: base, status: 'taken',
+    feedback: [{ message: '[blocked] Needs a person', timestamp: base, rootItemId: 'rev1' }]
+  });
+  await store.collection.insertOne({
+    _id: 'fu1', urlKey: 'acme', issueIdentifier: 'LIN-1', kind: 'review', rootItemId: 'rev1',
+    followUpTo: 'rev1', abort: false, prompt: 'x', dispatchedAt: new Date(base.getTime() + 60_000), status: 'taken',
+    feedback: [{ message: '[failed] Review could not finish', timestamp: new Date(base.getTime() + 120_000), rootItemId: 'rev1' }]
+  });
+  assert.equal(await find(), null, 'the lineage ended failed; the stage is offered again');
+
+  // The same lineage with the follow-up still running is live: it keeps counting.
+  await store.collection.updateOne({ _id: 'fu1' }, { $set: { feedback: [{ message: '[working] Reviewing', timestamp: new Date(base.getTime() + 120_000), rootItemId: 'rev1' }] } });
+  assert.equal((await find()).id, 'rev1', 'a running follow-up is live work; the guard protects it');
+
+  // A later success of the lineage clears the failure, so it counts again.
+  await store.collection.updateOne({ _id: 'fu1' }, { $set: { feedback: [
+    { message: '[failed] Review could not finish', timestamp: new Date(base.getTime() + 120_000), rootItemId: 'rev1' },
+    { message: '[done] Review written', timestamp: new Date(base.getTime() + 180_000), rootItemId: 'rev1' }
+  ] } });
+  assert.equal((await find()).id, 'rev1', 'the lineage finished, so the stage ran and counts');
+});
+
+// LIN-3968 review (fourth), finding 1: the root's OWN last marker is `[failed]`, but a
+// follow-up of the same lineage finished `[done]` later, so Home reads the stage as done
+// (and offers Close-out). Ruling (a): a row that ended done still trips the guard, so the
+// own-row `[failed]` must not drop the candidate before the lineage read judges it.
+test('findRecentFreshDispatch: a failed Review whose follow-up later finished [done] still blocks it again (LIN-3968 finding 1, own [failed] then lineage [done])', async () => {
+  const { store } = makeStore();
+  const base = new Date('2026-10-25T12:00:00.000Z');
+  const since = new Date(base.getTime() - 1000);
+  await store.collection.insertOne({
+    _id: 'rev1', urlKey: 'acme', issueIdentifier: 'LIN-1', kind: 'review', rootItemId: 'rev1',
+    followUpTo: null, abort: false, prompt: 'x', dispatchedAt: base, status: 'taken',
+    feedback: [{ message: '[failed] Review could not finish', timestamp: new Date(base.getTime() + 1000), rootItemId: 'rev1' }]
+  });
+  await store.collection.insertOne({
+    _id: 'fu1', urlKey: 'acme', issueIdentifier: 'LIN-1', kind: 'review', rootItemId: 'rev1',
+    followUpTo: 'rev1', abort: false, prompt: 'x', dispatchedAt: new Date(base.getTime() + 60_000), status: 'taken',
+    feedback: [{ message: '[done] Review written', timestamp: new Date(base.getTime() + 120_000), rootItemId: 'rev1' }]
+  });
+  assert.equal((await store.findRecentFreshDispatch('acme', { issueIdentifier: 'LIN-1', kind: 'review', since })).id, 'rev1',
+    'the lineage finished done, so the stage ran and a second Review is a duplicate');
+});

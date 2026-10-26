@@ -6,7 +6,7 @@
 import { test, expect } from '../fixtures/test-base.js'
 import { settings } from '../helpers.js'
 
-const CLAUDE_OPTIONS = 5 // blank ("follow") + haiku, sonnet, opus, fable
+const CLAUDE_OPTIONS = 4 // haiku, sonnet, opus, fable: the Claude Code search list (LIN-3962: the model is an input now)
 
 test.describe('Settings › Models (LIN-3855)', () => {
   let urlKey
@@ -41,7 +41,7 @@ test.describe('Settings › Models (LIN-3855)', () => {
     await openModels(page)
     const row = await openRow(page, 'bug')
     await row.locator('select[data-models-field="harness"]').selectOption('claude-code')
-    await row.locator('select[data-models-field="model"]').selectOption('sonnet')
+    await row.locator('input[data-models-field="model"]').fill('sonnet')
     await reasonBox(page).fill('Bugs get the cheaper model')
     await saveButton(page).click()
 
@@ -58,7 +58,7 @@ test.describe('Settings › Models (LIN-3855)', () => {
     ])
     await openModels(page)
     const row = await openRow(page, 'bug')
-    await row.locator('select[data-models-field="model"]').selectOption('')
+    await row.locator('input[data-models-field="model"]').fill('')
     await reasonBox(page).fill('Follow Make again')
     await saveButton(page).click()
 
@@ -70,7 +70,7 @@ test.describe('Settings › Models (LIN-3855)', () => {
     await openModels(page)
     const groupRow = page.locator('[data-testid="models-group-agent-session-make"]')
     await groupRow.locator(':scope > summary').click()
-    await groupRow.locator('select[data-models-field="model"]').selectOption('sonnet')
+    await groupRow.locator('input[data-models-field="model"]').fill('sonnet')
     await reasonBox(page).fill('Make on sonnet')
     await saveButton(page).click()
 
@@ -82,7 +82,9 @@ test.describe('Settings › Models (LIN-3855)', () => {
   test('picking an OpenRouter-only model switches the harness to opencode and hides effort', async ({ page }) => {
     await openModels(page)
     const row = await openRow(page, 'implementation')
-    await row.locator('select[data-models-field="model"]').selectOption('openai/gpt-5.5')
+    const model = row.locator('input[data-models-field="model"]')
+    await model.fill('openai/gpt-5.5')
+    await model.dispatchEvent('change')
     await expect(row.locator('select[data-models-field="harness"]')).toHaveValue('opencode')
     await expect(row.locator('[data-models-effort]')).toBeHidden()
   })
@@ -91,22 +93,25 @@ test.describe('Settings › Models (LIN-3855)', () => {
     await openModels(page)
     const row = await openRow(page, 'implementation')
     const harness = row.locator('select[data-models-field="harness"]')
-    const model = row.locator('select[data-models-field="model"]')
+    const model = row.locator('input[data-models-field="model"]')
+    const searchList = (key) => row.locator(`datalist[data-decision-list="${key}"] option`)
 
     await harness.selectOption('claude-code')
-    await expect(model.locator('option')).toHaveCount(CLAUDE_OPTIONS)
-    await expect(model.locator('option[value^="openai/"]')).toHaveCount(0)
+    await expect(model).toHaveAttribute('list', /-list-claude-code$/)
+    await expect(searchList('claude-code')).toHaveCount(CLAUDE_OPTIONS)
+    await expect(searchList('claude-code').and(row.locator('[value^="openai/"]'))).toHaveCount(0)
 
     await harness.selectOption('opencode')
-    await expect(model.locator('option[value="openai/gpt-5.5"]')).toHaveCount(1)
+    await expect(model).toHaveAttribute('list', /-list-opencode$/)
+    await expect(searchList('opencode').and(row.locator('[value="openai/gpt-5.5"]'))).toHaveCount(1)
   })
 
   test('two edits saved together are one save with one reason', async ({ page }) => {
     await openModels(page)
     const bug = await openRow(page, 'bug')
-    await bug.locator('select[data-models-field="model"]').selectOption('sonnet')
+    await bug.locator('input[data-models-field="model"]').fill('sonnet')
     const plan = await openRow(page, 'plan')
-    await plan.locator('select[data-models-field="model"]').selectOption('opus')
+    await plan.locator('input[data-models-field="model"]').fill('opus')
     await reasonBox(page).fill('two at once')
     await saveButton(page).click()
 
@@ -119,7 +124,7 @@ test.describe('Settings › Models (LIN-3855)', () => {
     await seed(request, [{ scope: 'job', surface: 'agent-session', key: 'bug', field: 'model', to: 'sonnet' }])
     await openModels(page)
     const row = await openRow(page, 'bug')
-    await row.locator('select[data-models-field="model"]').selectOption('opus')
+    await row.locator('input[data-models-field="model"]').fill('opus')
     await reasonBox(page).fill('try opus')
     await saveButton(page).click()
     await expect(page.locator('[data-testid="models-notice"]')).toContainText('Saved.')
@@ -196,14 +201,14 @@ test.describe('Settings › Models (LIN-3855)', () => {
     await openModels(page)
     const row = page.locator('[data-testid="models-default-agent"]')
     await row.locator(':scope > summary').click()
-    await row.locator('select[data-models-field="model"]').selectOption('sonnet')
+    await row.locator('input[data-models-field="model"]').fill('sonnet')
     await row.locator('select[data-models-field="harness"]').selectOption('claude-code')
-    await row.locator('input[data-models-field="effort"]').fill('high')
+    await row.locator('select[data-models-field="effort"]').selectOption('high')
     await reasonBox(page).fill('suggest sonnet on Dispatch')
     await saveButton(page).click()
 
     await expect(page.locator('[data-testid="models-notice"]')).toContainText('Saved.')
     await expect(page.locator('[data-testid="models-default-agent"] > summary')).toContainText('sonnet')
-    await expect(page.locator('[data-testid="models-default-agent"] input[data-models-field="effort"]')).toHaveValue('high')
+    await expect(page.locator('[data-testid="models-default-agent"] select[data-models-field="effort"]')).toHaveValue('high')
   })
 })

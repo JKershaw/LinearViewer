@@ -527,6 +527,11 @@ a.swipe-relation-issue:hover {
   margin: -0.5rem 0 0.6rem;
 }
 
+/* LIN-3968: the runner line's link takes the sentence's size, as on Home (style.css). */
+.swipe-card-runner .opened-task-runner-link {
+  font-size: inherit;
+}
+
 /* Linear Link */
 .swipe-card-link {
   display: block;

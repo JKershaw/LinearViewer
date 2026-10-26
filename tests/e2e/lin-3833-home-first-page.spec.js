@@ -129,7 +129,8 @@ test.describe('Home first page — a run from each source stamps the row the con
       const { item } = await created.json();
       const stamped = await (await page.request.get(`/test/dispatch-item?urlKey=${key}&itemId=${encodeURIComponent(item._id || item.id)}`)).json();
       expect(stamped.row, `${source}: the queued row is stamped`).toBeTruthy();
-      expect(control, `${source}: the control shows the model the row carries`).toBe(stamped.row.model || 'the default model');
+      // LIN-3987: a blank model is named in words (Claude Code's own model), never "the default model".
+      expect(control, `${source}: the control shows the model the row carries`).toBe(stamped.row.model || "Claude Code's own model");
       // Undo, then reload: the queued session stays in the page's state until the next poll, so the page is
       // re-read from the server before the next source sets its own choice and presses.
       await component.locator('[data-testid="run-undo"]').click();
@@ -138,7 +139,7 @@ test.describe('Home first page — a run from each source stamps the row the con
       return stamped.row;
     };
 
-    const defaultRow = await runFrom('default', 'the default model');
+    const defaultRow = await runFrom('default', "Claude Code's own model");
     expect(defaultRow.model).toBeNull();
 
     await component.locator('[data-testid="run-change"]').click();
@@ -164,7 +165,7 @@ test.describe('Home first page — the Change panel keeps what is typed across a
     await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, runnerKey: true });
     await gotoHome(page, localWorkerUrlKey);
     const component = await openTopTask(page);
-    await expect(component.locator('[data-testid="run-on-what"]')).toHaveText('the default model');
+    await expect(component.locator('[data-testid="run-on-what"]')).toHaveText("Claude Code's own model");
     await component.locator('[data-testid="run-change"]').click();
     await expect(component.locator('[data-testid="run-change-panel"]')).toBeVisible();
     await page.waitForLoadState('networkidle');

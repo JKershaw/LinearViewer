@@ -37,6 +37,10 @@ const TIME_MASKS = {
 //   paused            mint a queue token (a runner), pause runs in place; Running shows the Runs row and Resume
 //   models-panel-open open a job row's change panel on Settings › Models (head only; base's forms have no row)
 //   models-staged     the same row, with one model picked: the staged-change count shows (head only)
+//   home-run-panel-opencode  the same panel with opencode chosen as the harness (LIN-3987): effort is off and says so, and
+//                  Claude Code on the web is not offered. A new state: base has no opencode line, so it differs by design.
+//   home-run-panel-open  Home's Change panel open (LIN-3962): the shared decision panel the server renders; `seed` gives run controls
+//   swipe-dispatch-open  Swipe's card with Prompts open: expected to show no difference (Swipe has no run panel)
 //   email-signin      a zero-workspace account: no local seed; signs in by email (one address per shot)
 // `urlKey` is fixed per entry and identical on both sides. States that write data get their own
 // urlKey so their writes never reach another page's sidebar counts.
@@ -75,8 +79,23 @@ export const PAGES = [
   { id: 'audit-report', urlKey: 'judge', path: (k) => `/workspace/${k}/audit`, state: 'audit-report', renderers: ['lib/render-audit.js'] },
   // LIN-3855: Settings › Models. At the phone viewport the open row is the full-screen sheet, so 'models-panel-open'
   // covers the sheet at 390px and the panel at 1280px. Both are read-only set-ups on the seeded 'judge' workspace.
-  { id: 'models-panel-open', urlKey: 'judge', path: (k) => `/workspace/${k}/settings/models`, state: 'models-panel-open', renderers: ['lib/render-settings-models.js'] },
-  { id: 'models-staged', urlKey: 'judge', path: (k) => `/workspace/${k}/settings/models`, state: 'models-staged', renderers: ['lib/render-settings-models.js'] },
+  { id: 'models-panel-open', urlKey: 'judge', path: (k) => `/workspace/${k}/settings/models`, state: 'models-panel-open', renderers: ['lib/render-settings-models.js', 'lib/components/decision-panel.js'] },
+  { id: 'models-staged', urlKey: 'judge', path: (k) => `/workspace/${k}/settings/models`, state: 'models-staged', renderers: ['lib/render-settings-models.js', 'lib/components/decision-panel.js'] },
+  // LIN-3968: Home's opened task. The stage states have a runner (the strip and run control show) and seed their
+  // sessions through the consumer API; the copy-first pair has no runner, and its write is a fixed stream. Each
+  // state has its own urlKey, so one state's sessions or prompt memory never reach another.
+  { id: 'home-stages-done', urlKey: 'judge-home-done', path: (k) => `/workspace/${k}/`, state: 'home-stages-done', runner: true, renderers: ['lib/render.js'] },
+  { id: 'home-running', urlKey: 'judge-home-run', path: (k) => `/workspace/${k}/`, state: 'home-running', runner: true, renderers: ['lib/render.js'] },
+  { id: 'home-failed', urlKey: 'judge-home-fail', path: (k) => `/workspace/${k}/`, state: 'home-failed', runner: true, renderers: ['lib/render.js'] },
+  { id: 'home-copy-first', urlKey: 'judge-home-copy', path: (k) => `/workspace/${k}/`, state: 'home-copy-first', renderers: ['lib/render.js'] },
+  { id: 'home-copy-written', urlKey: 'judge-home-write', path: (k) => `/workspace/${k}/`, state: 'home-copy-written', renderers: ['lib/render.js'] },
+  // LIN-3962: the one decision panel on Home (desktop, and phone via the viewport pair) and Swipe's card with Prompts open.
+  // Both seeds give run controls with a queue token (no runner credential). A queue token is a write, so each has its own
+  // urlKey; the head must show the Change control, or the Home state fails.
+  { id: 'home-run-panel-open', urlKey: 'judge-run', path: (k) => `/workspace/${k}/`, state: 'home-run-panel-open', seed: { openRouterConnected: true, queueToken: true }, renderers: ['lib/render.js', 'lib/components/decision-panel.js', 'public/decision-panel.js', 'public/prompt-section.js'] },
+  // LIN-3987: the same Change panel with opencode chosen. Its own urlKey, since a queue token is a write.
+  { id: 'home-run-panel-opencode', urlKey: 'judge-run-opencode', path: (k) => `/workspace/${k}/`, state: 'home-run-panel-opencode', seed: { openRouterConnected: true, queueToken: true }, renderers: ['lib/render.js', 'lib/components/decision-panel.js', 'public/decision-panel.js', 'public/prompt-section.js'] },
+  { id: 'swipe-dispatch-open', urlKey: 'judge-swipe', path: (k) => `/workspace/${k}/swipe`, state: 'swipe-dispatch-open', seed: { openRouterConnected: true, queueToken: true }, renderers: ['lib/render-swipe.js'] },
   // LIN-3956: Account home, the first Plain page with rows and a form. It needs a zero-workspace account,
   // which no local seed can make, so the spec signs in by email. The judge's server runs the capture
   // transport (visual-replay.mjs), the same as Playwright's. Settings › Account then shows "Add email →"
@@ -88,7 +107,7 @@ export const PAGES = [
 export const NOT_COVERED = [
   'Running with a runner (Last poll row, Pause and Stop): needs a runner key, whose time is server-rendered; the judge runs the no-runner state and the paused state (a queue token is the runner)',
   'A change-log entry with a fixed time: the time is server-rendered and so masked, not seeded',
-  'Home content (LIN-3833): listed pages only, not its later states',
+  'Home\'s run panel (See prompt, Another step, Change, Stop, the run-control repeats): LIN-3962 replaces it, so the stage states judge the opened task above it only',
   'Session with a run (the populated session page and its run view): needs a session record the local seed does not write; the not-found branch is judged instead, and renders the same back link',
   'Pages with no Settings-shared pieces (swim, swipe, ship, roadmap, library, KPIs, landing)',
 ];

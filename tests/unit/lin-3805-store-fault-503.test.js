@@ -776,6 +776,7 @@ describe('the contract is stated where callers read it', () => {
     const exempt = [
       [/\/heartbeat$/, 'heartbeat ingest: its own store, not the dispatch queue'],
       [/\/dispatch\/(tokens|presets|halt|recent-prompts|favorite-prompts|quota|preview)/, 'token/preset/preference/halt/quota stores, and the LIN-3833 preview (routing table and presets reads), not the dispatch queue members'],
+      [/\/dispatch\/decision-panel$/, 'LIN-3962 decision panel: its history read is best-effort; a store fault shows the numbers as unavailable (never a false "no runs") and the panel still answers, so it is not a 503 route'],
       [/\/api\/proxy\/dispatch\/halt$/, 'halt flag store'],
       [/\/api\/proxy\/wake-shadow$/, 'wake-shadow tally, a different member'],
       [/\/api\/proxy\/runner\/prompt$/, 'static runner prompt text, no store read']

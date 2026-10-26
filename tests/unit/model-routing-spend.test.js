@@ -144,3 +144,54 @@ describe('summariseRouting: the sidebar summary', () => {
     }
   });
 });
+
+// LIN-3962: the per-model typical cost the decision panel shows beside a suggested model, and the one
+// reported model of an alias's family (the only way to know what an alias ran as).
+import { typicalByModel, reportedModelForFamily } from '../../lib/model-routing-spend.js';
+
+describe('typicalByModel (LIN-3962)', () => {
+  test('a job that ran on one model gets one row, with that model\'s typical cost', () => {
+    const rows = [
+      taken({ id: 'a', kind: 'implementation', feedback: [usage({ model: 'claude-sonnet-5', costUsd: 0.5 })] }),
+      taken({ id: 'b', kind: 'implementation', feedback: [usage({ model: 'claude-sonnet-5', costUsd: 1.5 })] })
+    ];
+    const rowsByModel = typicalByModel(rows, { job: 'implementation' });
+    assert.equal(rowsByModel.length, 1);
+    assert.equal(rowsByModel[0].id, 'claude-sonnet-5');
+    assert.equal(rowsByModel[0].typicalUsd, 1);
+    assert.equal(rowsByModel[0].runs, 2);
+  });
+
+  test('two models give two rows, each priced from its own runs only', () => {
+    const rows = [
+      taken({ id: 'a', kind: 'implementation', feedback: [usage({ model: 'claude-sonnet-5', costUsd: 0.5 })] }),
+      taken({ id: 'b', kind: 'implementation', feedback: [usage({ model: 'claude-opus-5', costUsd: 4 })] }),
+      taken({ id: 'c', kind: 'implementation', feedback: [usage({ model: 'claude-opus-5' })] })
+    ];
+    const byModel = Object.fromEntries(typicalByModel(rows, { job: 'implementation' }).map((r) => [r.id, r]));
+    assert.equal(byModel['claude-sonnet-5'].typicalUsd, 0.5);
+    assert.equal(byModel['claude-opus-5'].typicalUsd, 4, 'the unpriced opus run does not drag the typical to $0');
+    assert.equal(byModel['claude-opus-5'].unpriced, 1);
+  });
+
+  test('another job\'s runs are not counted', () => {
+    const rows = [taken({ id: 'a', kind: 'review', feedback: [usage({ model: 'claude-opus-5', costUsd: 9 })] })];
+    assert.deepEqual(typicalByModel(rows, { job: 'implementation' }), []);
+  });
+});
+
+describe('reportedModelForFamily (LIN-3962)', () => {
+  test('an alias with exactly one reported model of its family names that model', () => {
+    const models = [{ id: 'claude-opus-5' }, { id: 'claude-sonnet-5' }];
+    assert.equal(reportedModelForFamily(models, 'opus'), 'claude-opus-5');
+  });
+
+  test('two models of one family name nothing: the alias shows no claim about what it ran as', () => {
+    const models = [{ id: 'claude-opus-4-1' }, { id: 'claude-opus-5' }];
+    assert.equal(reportedModelForFamily(models, 'opus'), null);
+  });
+
+  test('a family the job never ran names nothing', () => {
+    assert.equal(reportedModelForFamily([{ id: 'claude-sonnet-5' }], 'opus'), null);
+  });
+});

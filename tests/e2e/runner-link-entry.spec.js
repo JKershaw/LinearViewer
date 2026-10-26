@@ -56,7 +56,7 @@ test.describe('run on my machine › wherever a task opens (LIN-3098 S4b, phone)
       }
       await expect(link).toBeVisible();
       await expect(link).toBeInViewport();
-      await expect(link).toHaveText('run on my machine ›');
+      await expect(link).toHaveText('Set up a runner ›');
       await expect(link).toHaveAttribute('href', `/workspace/${urlKey}/runner`);
       await page.screenshot({ path: `${SHOTS}/tree-${name}.png` });
       await link.tap();
@@ -71,7 +71,7 @@ test.describe('run on my machine › wherever a task opens (LIN-3098 S4b, phone)
       const link = card.getByTestId('opened-task-runner-link');
       await expect(link).toBeVisible();
       await expect(link).toBeInViewport();
-      await expect(link).toHaveText('run on my machine ›');
+      await expect(link).toHaveText('Set up a runner ›');
       await expect(link).toHaveAttribute('href', `/workspace/${urlKey}/runner`);
       // No accordion was opened to reach it.
       await expect(card.locator('.swipe-accordion-body[data-accordion-body="prompts"]')).toBeHidden();
