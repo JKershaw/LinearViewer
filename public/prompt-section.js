@@ -1012,10 +1012,19 @@
       const bits = [w.model].filter(Boolean);
       if (w.harness && preview.harness !== 'claude-code') bits.push(w.harness);
       if (preview.effort && w.effort !== 'not used') bits.push(`effort ${preview.effort}`);
-      const words = [...new Set(['model', 'harness', 'effort'].map((f) => sourceWordOf(f, preview)).filter(Boolean))];
+      // LIN-3992: Claude Code is said once on the line. A model that is Claude Code's own already says it, so the web target
+      // reads "on the web", and the source word that only repeats it ("Claude Code, the default") is left out. A named model
+      // keeps the word, since there it is the only place the harness is said.
+      const modelSaysIt = bits.some((b) => b.includes('Claude Code'));
+      const targetWord = target === 'web' && modelSaysIt ? 'on the web' : (TARGET_WORDS[target] || target);
+      const saysIt = modelSaysIt || targetWord.includes('Claude Code');
+      const words = [...new Set(['model', 'harness', 'effort']
+        .filter((f) => !(saysIt && (preview.sources || {})[f] === 'fallback'))
+        .map((f) => sourceWordOf(f, preview))
+        .filter(Boolean))];
       return `<div class="opened-task-runs-on" data-testid="opened-task-runs-on">`
         + `Runs on <span class="opened-task-runs-on-what" data-testid="run-on-what">${esc(bits.join(' \u00b7 '))}</span>`
-        + ` \u00b7 ${esc(TARGET_WORDS[target] || target)}`
+        + ` \u00b7 ${esc(targetWord)}`
         + `${words.length ? ` <span class="opened-task-source" data-testid="run-source">\u2014 ${esc(words.join(', '))}</span>` : ''}`
         + ` <button class="btn opened-task-change" data-action="change-run" data-testid="run-change">Change</button></div>`;
     }
@@ -1126,6 +1135,31 @@
       if (draft.target === 'web' && inForce === 'opencode') draft.target = 'cli';
     }
 
+    // The sentence that says what the draft will run (the Change panel's summary, LIN-3992). It is the one place these words
+    // are built: renderChangePanel writes it, and onRunInput rewrites it in place (refreshRunSummary) when a pick or a typed
+    // model changes the draft, so the two cannot drift. Effort is judged by the harness in force (the draft's, else the one
+    // Settings resolves a blank to), against the server's list of harnesses that take none; a blank harness with nothing
+    // resolved keeps effort, as effortAppliesTo does.
+    function runWillUseText(d, preview) {
+      const panelWords = state.run.panelWords || {};
+      const harness = d.harness || '';
+      const inForce = harness || (preview && preview.harness) || '';
+      const showEffort = !state.run.withoutEffort.includes(inForce);
+      const modelNow = d.model ? optionWords(d.model, 'model') : panelWords.model;
+      const harnessNow = harness ? optionWords(harness, 'harness') : panelWords.harness;
+      const effortNow = !showEffort ? null : (d.effort ? `effort ${d.effort}` : panelWords.effort);
+      const summary = [modelNow, harnessNow, effortNow, TARGET_WORDS[d.target] || d.target].filter(Boolean).join(' · ');
+      return `This run will use ${summary}.`;
+    }
+
+    // LIN-3992: a pick or a typed model changes the draft's model, and the summary follows in place. Only that line is
+    // rewritten: a repaint would replace the model field under the datalist and the caret (LIN-3969). No-op while the
+    // Change panel is closed, since the summary is not on the page then.
+    function refreshRunSummary() {
+      const el = container.querySelector && container.querySelector('[data-testid="run-will-use"]');
+      if (el) el.textContent = runWillUseText(state.run.draft || state.run.choice, state.run.preview);
+    }
+
     // The Change panel (LIN-3962): Home's extras (the preset, Runs on, agent access, the summary, Use/Reset/Close) around
     // the one decision panel the server renders (lib/components/decision-panel.js), which holds the harness, model and
     // effort. Edits go to a draft; "Use for this run" applies it. The panel's HTML is read when the panel opens.
@@ -1134,21 +1168,15 @@
       const presets = state.run.presets || [];
       const panelWords = state.run.panelWords || {};
       const harness = d.harness || '';
-      // Effort is judged by the harness in force (the draft's, else the one Settings resolves a blank to), against the
-      // server's list of harnesses that take none. A blank harness with nothing resolved keeps effort, as effortAppliesTo does.
       const inForce = harness || (preview && preview.harness) || '';
-      const showEffort = !state.run.withoutEffort.includes(inForce);
       const presetButtons = presets.map((p) => `<button class="btn opened-task-preset" data-action="run-preset" data-preset-id="${esc(p.id)}" aria-pressed="${d.presetId === p.id ? 'true' : 'false'}" data-testid="run-preset">${esc(p.name || p.id)}</button>`).join('');
       // Claude Code on the web runs only under Claude Code: with opencode in force it is not offered, and the line says why.
       const onWeb = inForce !== 'opencode';
       const targets = ['cli', ...(onWeb ? ['web'] : []), ...(opts.isLocalhost ? ['local'] : [])];
       const targetButtons = targets.map((t) => `<button class="btn opened-task-choice" data-action="run-target" data-target="${esc(t)}" aria-pressed="${d.target === t ? 'true' : 'false'}" data-testid="run-target-${esc(t)}">${esc(TARGET_WORDS[t])}</button>`).join('');
-      const modelNow = d.model ? optionWords(d.model, 'model') : panelWords.model;
       const harnessNow = harness ? optionWords(harness, 'harness') : panelWords.harness;
       const webNote = onWeb ? '' : `<p class="opened-task-change-note" data-testid="run-web-unavailable">Claude Code on the web needs Claude Code, so it is not offered with ${esc(harnessNow || '')}.</p>`;
       const agent = d.agentAccess == null ? (window.ProxyToggle && window.ProxyToggle.isActive ? window.ProxyToggle.isActive() : true) : d.agentAccess;
-      const effortNow = !showEffort ? null : (d.effort ? `effort ${d.effort}` : panelWords.effort);
-      const summary = [modelNow, harnessNow, effortNow, TARGET_WORDS[d.target] || d.target].filter(Boolean).join(' \u00b7 ');
       const panelBody = state.run.panelHtml
         || (state.run.panelFailed
           ? '<p class="opened-task-change-note" data-testid="run-panel-failed">The choices could not load. Use for this run stays off until they do.</p>'
@@ -1160,7 +1188,7 @@
         + panelBody
         + `<div class="opened-task-change-row"><span class="opened-task-change-label">Runs on</span>${targetButtons}</div>${webNote}`
         + `<label class="opened-task-change-row"><input type="checkbox" data-testid="run-agent-access"${agent ? ' checked' : ''}> Your agent may read and update this task</label>`
-        + `<p class="opened-task-change-summary" data-testid="run-will-use">This run will use ${esc(summary)}.</p>`
+        + `<p class="opened-task-change-summary" data-testid="run-will-use">${esc(runWillUseText(d, preview))}</p>`
         + `<div class="opened-task-change-row">`
         + `<button class="btn btn--primary opened-task-use" data-action="use-run" data-testid="run-use"${state.run.panelFailed || !state.run.panelHtml ? ' disabled' : ''}>Use for this run</button>`
         + `<button class="btn--quiet" data-action="reset-run" data-testid="run-reset">Reset</button>`
@@ -2105,7 +2133,8 @@
           // LIN-3987 (review): the words for a blank model and effort follow the harness the draft names, so ask again.
           if (state.run.changeOpen) fetchRunPanel();
           break;
-        case 'run-model': draft.model = el.value.trim() || null; break;
+        // LIN-3992: a pick (or a typed model) names what the run will use at once, in the summary, without a repaint.
+        case 'run-model': draft.model = el.value.trim() || null; refreshRunSummary(); break;
         case 'run-effort': draft.effort = el.value || null; paintRun(); break;
         case 'run-agent-access': draft.agentAccess = el.checked === true; break;
         default: break;
