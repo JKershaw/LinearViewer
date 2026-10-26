@@ -4,7 +4,7 @@ kind: paper
 version: 1
 date: 2026-10-26
 authors: [the LIN-4007 implementation session, for John]
-model: by dispatch lineage; tiers named in the text, ids withheld per the ticket's rule
+model: by dispatch lineage; tiers named in the text, ids withheld in the paper's own text
 grounded_at: 323ce171
 cites: [LIN-4007 (comments 14:05:25–14:05:38Z; research comment 14:13:24Z), LIN-4006 (retro, 123867bd), LIN-3490, LIN-3833 (comments 25 Oct 09:16–17:05Z), LIN-3975 (paused 14:06Z), LIN-3977, LIN-3983, LIN-3952, docs/reviews/charter-retro-2026-10-26/, docs/reviews/ui-design-gap-review-2026-10-26/]
 ---
@@ -13,12 +13,15 @@ cites: [LIN-4007 (comments 14:05:25–14:05:38Z; research comment 14:13:24Z), LI
 
 Mostly the pipeline's own text, not John's words or the operator's. At launch the five main UI tickets gave an
 implementer 17,000 to 19,000 characters; John's choices and words were at most 10% of that, the operator's
-text 18% to 34%. By the first implementation dispatch the same tickets had grown to 81,000 to 151,000
+text 18% to 34% (an upper bound; see Limits). By the first implementation dispatch the same tickets had grown to 81,000 to 151,000
 characters, 76% to 87% of it pipeline text (research, plan, plan review, review). The record, read at
 14:20Z, holds 102,000 to 224,000. Whether that made the work harder cannot be separated from model, scope
 and period. The record does show that the tickets with the most rounds were open-ended page builds with
 mid-run changes, and that the long router moves, which were mostly Sonnet, took one implementation each. LIN-3975
 was paused by its autopilot at 14:06Z; anything after that is out of scope.
+
+**Labels.** *checked* = I re-read the claim against the record. *not checked* = taken from an input or from one
+reader and not re-read. Times are record times (comment `createdAt`) or transcript headers.
 
 ## Findings
 
@@ -31,6 +34,7 @@ At 13:07Z he wrote the process question this paper answers ("my gut feeling is t
 ticket"), and at 13:10Z asked "Perhaps a Paper/essay?". At 14:00Z he asked for the transcript to be filed
 as an attachment. His choices reached the tickets as ruling options he picked, not as prose: LIN-3833 has eight
 rulings, and the record shows his words only as the operator's relays.
+*Checked*: the quotes (`grep -F` in the transcript files) and the times (transcript headers).
 
 **2. Most of what an implementer read was pipeline text, and the operator's share was largest at launch.** The
 five tickets, by character share (evidence §2):
@@ -46,8 +50,9 @@ five tickets, by character share (evidence §2):
 "At launch" is the description without its pipeline sections plus the comments before the first pipeline comment.
 The UI session wrote the briefs for LIN-3975, LIN-3977 and LIN-3983 (the operator's part 3 log: "UI session files a design
 BRIEF = the ticket"); LIN-3952 came "from John's review via other session"; LIN-3833's author is not in the record,
-and its shares are not estimated. The later share is lower for LIN-3977 and LIN-3983 because their plans were
+and the split of its brief among John, the operator and the UI session is not estimated. The later share is lower for LIN-3977 and LIN-3983 because their plans were
 pruned after Done (LIN-3983 went from 69,195 to 17,405 characters), so their first-dispatch figures are a floor.
+*Checked*: the shares (classifier re-run). *Not checked*: who wrote each brief (the operator's log only).
 
 **3. The flywheel made tickets and rulings out of its stages, and most of what it made was follow-up.** The
 retro's index holds 1,107 runs: implementation 174, review 168, plan 154, custom 143, close-out 138, autopilot 135,
@@ -57,6 +62,7 @@ UI tickets), review fix rounds, close-out follow-up tickets, and operator "unwed
 LIN-4003). Of the 42 non-umbrella Done tickets under the charter's roots, 24 changed what a user of a kept page
 sees or removed code; 17 kept the pipeline moving; one was not needed; 23 are open. A single reader coded these
 from titles, so the split is a count, not a checked figure.
+*Checked*: the ruling counts. *Not checked*: the run counts (retro input 6, 07:45Z) and the served / process-only coding (one reader).
 
 **4. Long tickets did not clearly make the work harder, and the record cannot say what did.** Measured at launch
 (evidence §4):
@@ -72,9 +78,10 @@ Length, model, scope and period move together, and the router moves are not a cl
 `ticket-record-and-quality.md` (record size predicts nothing for first-pass approval) and with
 `how-a-task-is-composed.md` (size and composition cannot be separated). The record supports one candidate
 mechanism, open-ended outcomes with mid-run changes, and does not test it.
+*Checked*: the table (`/cost`, `/rulings`).
 
 **5. The roles.** John set the goal ("simplify the code, unify the UI, and update the pages"), and on the Haiku choice wrote
-"Haiku was intentional" (25 Oct 07:05Z, in the operator's log). He made the rulings that were his to make, and on 25 Oct at 19:40Z gave the operator "authority to rule on obvious things to keep things moving".
+"Haiku was intentional" (25 Oct 07:05Z, in the operator's log). He made the rulings that were his to make, and on 24 Oct at 19:40Z gave the operator "authority to rule on obvious things to keep things moving".
 The operator launched the moves, wrote the rules blocks, predictions and scores, passed eight rulings on
 overnight, moved items between tickets, relayed John's answers, and wrote the reviews and the retro's inputs. Its own
 pause note records that it over-steered: "opinionated pre-fills", "passed 8 rulings on", and "a dozen mid-flight
@@ -82,6 +89,7 @@ comments". The UI session wrote the three briefs and the follow-up tickets. Its 
 "How the gap arose", is that the briefs were written from surveys of the old pages, not the prototypes; that
 reviews compared each build with its ticket and never with the prototype; and that fresh-reader checks pushed
 tickets toward testable wording rather than layout.
+*Checked*: the quotes from John and the operator. *Not checked*: the UI session's own account.
 
 **6. What would have kept it simple.** Three principles, not a ticket list. Settle the goal, the finish line and the
 layout once, before launch, from the prototype, and do not append to a live ticket during the run. Make the
@@ -109,9 +117,13 @@ served-the-goal coding is one reader's, from titles at the 07:45Z index. Each qu
   His relayed choices are counted as John's; his verbatim words are a fraction of the figure.
 - The index is as of 07:45Z: it finds 22 direct children of LIN-3490, against 24 at 14:10Z in the research.
 - First-pass review verdicts and start-to-merge hours are not measured here; session time is.
-- Transcript comment 4 contains one model identifier as the operator wrote it. The transcript is committed as
-  given, as the ticket asks. The ticket also asks that repository files carry no model identifiers, so this is
-  flagged for John.
+- "At launch" (cut 1) is measured on current text. Operator sections that were rewritten or added after launch
+  ("Operator notes", the rules block, "Open for John") count as launch text; the operator rewrote the rules
+  block mid-run (`comment-3.md:117`). So the operator's 18% to 34% at launch is an upper bound, and "at launch"
+  is approximate. This matters because John's hypothesis is about text appended during the run.
+- The transcript is committed byte for byte, as the ticket asks. It keeps one model identifier the operator
+  wrote (comment 4, 25 Oct 04:05Z). The operator's no-identifiers rule governs its own text; main already
+  carries the same identifier in the retro.
 
 ## Next
 

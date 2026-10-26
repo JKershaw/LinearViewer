@@ -17,7 +17,7 @@ The fetch writes no raw ticket JSON; the derived CSVs are committed in this fold
 
 ## 1. John's requests, and what each became (C1)
 
-Transcript times are the header of each entry in `comment-1.md` to `comment-3.md`. Quotes were
+Rows are in time order. Transcript times are the header of each entry in `comment-1.md` to `comment-3.md`. Quotes were
 checked with `grep -F` against `../how-the-charter-got-complicated-transcript/` (all found, one each or more).
 The part 2a §6 messages (25 Oct evening to 26 Oct 07:15Z) are the operator's paraphrase of John's
 messages, with card answers paraphrased; only the verbatim spans are quoted here.
@@ -27,13 +27,13 @@ messages, with card answers paraphrased; only the verbatim spans are quoted here
 | 1 | 23 Oct 09:28 (part 2b) | "Happy for this to all be bundled into a Charter if that makes things simpler." | The charter LIN-3490 | LIN-3490 and its children |
 | 2 | 24 Oct ~18:50 (part 2b, msg 1) | "Chances are I'll want to keep a lot, but their relative displays for the less important views can likely be simplified so they're not too burdensome." | Plain treatments for kept pages | LIN-3950 (Plain layout), LIN-3970 to 3973 (Plain batches, Backlog) |
 | 3 | 24 Oct 18:50–19:05 (part 2b, msg 2) | "I use the live console almost constantly and find it delightful" | Keep the Live Console's delight | LIN-3977 title; its brief "What makes it delightful, and must survive the rebuild" |
-| 4 | 25 Oct ~17:25 (part 3 log) | "Fantastic, yes let's do this." | Order: Home first | LIN-3833 (Done 25 Oct 17:39Z) |
-| 5 | 25 Oct ~18:45 (part 3 log) | "Fantastic, I agree with your recommendations. Roadmap and library can stay out. Go on the briefs. Release." | UI session files the design briefs; Roadmap and Library out | LIN-3975, LIN-3977, LIN-3983 briefs (written by the UI session, per part 3's line "UI session files a design BRIEF = the ticket") |
-| 6 | 25 Oct 13:40 (part 3 log) | "keep a little note of how the duel-session approach goes. This might become a useful pattern." | The operator's dual-session log | Part 3 log; the UI review's "How the gap arose" |
-| 7 | 25 Oct 19:40 (part 3 log) | "you have authority to rule on obvious things to keep things moving." | Operator rules overnight | Eight rulings passed on overnight (part 2a §6; the operator's own count, "passed 8 rulings on") |
+| 4 | 24 Oct 19:40 (part 3 log) | "you have authority to rule on obvious things to keep things moving." | Operator rules overnight | Eight rulings passed on overnight (part 2a §6; the operator's own count, "passed 8 rulings on") |
+| 5 | 25 Oct 13:40 (part 3 log) | "keep a little note of how the duel-session approach goes. This might become a useful pattern." | The operator's dual-session log | Part 3 log; the UI review's "How the gap arose" |
+| 6 | 25 Oct ~17:25 (part 3 log) | "Fantastic, yes let's do this." | Approval of the ORDER list: LIN-3962 launched 17:53Z, LIN-3968 launched 18:02Z, LIN-3952 to follow LIN-3962, then the sweep by John's use | `comment-5.md:58-67`. LIN-3833 already existed (created 23 Oct 21:35Z) and merged 17:39Z, after the approval; it is item 1 of the list, not what the approval created |
+| 7 | 25 Oct ~18:45 (part 3 log) | "Fantastic, I agree with your recommendations. Roadmap and library can stay out. Go on the briefs. Release." | UI session files the design briefs; Roadmap and Library out | LIN-3975, LIN-3977, LIN-3983 briefs (written by the UI session, per part 3's line "UI session files a design BRIEF = the ticket") |
 | 8 | 25 Oct 21:20 (part 3 log) | "good plan to pass decisions on when I'm asleep." | Standing permission to pass decisions while John sleeps | The overnight rulings; the operator later wrote "I over-steered" (part 2a, 26 Oct 07:20Z PAUSED block) |
 | 9 | 26 Oct 07:18 (part 1) | "Very carefully, as I suspect tickets have become bloated and contain far more rules than I intended." | Review of code, UI and tickets | Operator's 07:20Z table and 07:24 to 07:47Z reviews; retro inputs 1 and 2 |
-| 10 | 26 Oct 07:24 and 07:27 (part 1) | John asks for code and ticket review by the operator, and UI review by the UI session | Three read-only reviews, and the UI review (PR #2173, merged as `973d08e`) | `docs/reviews/ui-design-gap-review-2026-10-26/`; retro inputs 1 and 2 |
+| 10 | 26 Oct 07:24 and 07:27 (part 1) | (paraphrase) John asks for code and ticket review by the operator, and UI review by the UI session | Three read-only reviews, and the UI review (PR #2173, merged as `973d08e`) | `docs/reviews/ui-design-gap-review-2026-10-26/`; retro inputs 1 and 2 |
 | 11 | 26 Oct 07:52 (part 1) | "I think we call this charter here and do a retro to pull all this juicy information out." | Retro ticket | LIN-4006; `docs/reviews/charter-retro-2026-10-26/` (merged `123867bd`) |
 | 12 | 26 Oct 07:57 (part 1) | "We also have this wonderful dashboard which tells quite the story" | Dashboard read into the retro | Retro input 4 (operator interventions) |
 | 13 | 26 Oct 08:49 (part 1) | "File a new ticket to perform the retro" | The retro dispatched | LIN-4006 |
@@ -199,8 +199,13 @@ Reading this table:
 ## 6. Checks and gaps
 
 - Transcript comment 4 contains one model identifier, in a STATE line dated 25 Oct 04:05Z, as the
-  operator wrote it. The transcript is committed as given, per the ticket. This is the one identifier in
-  the repository's new files; the rest use tier names.
+  operator wrote it. The transcript is committed byte for byte, as the ticket asks. The operator's
+  no-identifiers rule (`comment-3.md:175`) governs its own text; main already carries the same identifier in
+  `docs/reviews/charter-retro-2026-10-26/evidence.md` and `inputs/input-2-ticket-review.md`. This is the one
+  identifier in the new files; the rest use tier names.
+- Cut 1 is measured on current text. Operator sections rewritten or added after launch ("Operator notes", the
+  rules block, "Open for John") count as launch text (the rules block was rewritten mid-run, `comment-3.md:117`),
+  so the operator share at launch is an upper bound.
 - Descriptions are the current text. For Done tickets the plan was pruned after close, so cut 2 for the
   Done tickets undercounts pipeline text.
 - The research's "about 13 KB" paper and its Q4 hours (7.7–34 h start to merge) were not re-derived here.
