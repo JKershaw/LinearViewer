@@ -95,6 +95,6 @@ describe('GET /api/dispatch/preview — refusals', () => {
   test('an unknown surface is a 400 naming the allowed values', async () => {
     const { status, body } = await get(buildApp(), '/workspace/acme/api/dispatch/preview?promptName=plan&surface=mars');
     assert.equal(status, 400);
-    assert.match(body.error, /surface must be one of: swipe, home/);
+    assert.match(body.error, /surface must be one of: swipe, home, task/);
   });
 });

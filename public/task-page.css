@@ -180,19 +180,41 @@
 }
 
 /* ── Desktop: the stages and the brief side by side (LIN-3356) ────────────────
-   Source order is the phone order (answer, stages, PR, brief/recap, docs, …);
-   desktop only places it. A plain column: not sticky, no scroll area of its own. */
+   Source order is the phone order (answer, run control, stages, PR, brief/recap, docs, …);
+   desktop only places it. A plain column: not sticky, no scroll area of its own.
+   LIN-3975: named areas, not row numbers, so the run control (or the next-step line) and a
+   question card cannot shift the brief beside the stages. */
 @media (min-width: 1024px) {
   .sess-page.task-page {
     max-width: 1200px;
     display: grid;
     grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+    grid-template-areas:
+      "back back"
+      "header header"
+      "answer answer"
+      "run run"
+      "question question"
+      "stages context"
+      "pr context"
+      "docs docs"
+      "details details"
+      "share share";
     column-gap: 1.5rem;
     align-items: start;
   }
   .sess-page.task-page > * { grid-column: 1 / -1; }
-  .sess-page.task-page > .task-stages,
-  .sess-page.task-page > .task-pr-section { grid-column: 1; }
-  .sess-page.task-page > .task-context-section { grid-column: 2; grid-row: 4 / span 2; }
+  .sess-page.task-page > .sess-back { grid-area: back; }
+  .sess-page.task-page > .task-header { grid-area: header; }
+  .sess-page.task-page > .task-answer { grid-area: answer; }
+  .sess-page.task-page > .task-run,
+  .sess-page.task-page > .task-next { grid-area: run; }
+  .sess-page.task-page > .task-question { grid-area: question; }
+  .sess-page.task-page > .task-stages { grid-area: stages; }
+  .sess-page.task-page > .task-pr-section { grid-area: pr; }
+  .sess-page.task-page > .task-context-section { grid-area: context; }
+  .sess-page.task-page > .task-docs { grid-area: docs; }
+  .sess-page.task-page > .task-details { grid-area: details; }
+  .sess-page.task-page > .task-share { grid-area: share; }
   .task-context { grid-template-columns: 1fr; }
 }

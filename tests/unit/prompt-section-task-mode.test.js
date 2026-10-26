@@ -163,7 +163,8 @@ describe('LIN-2944 P1: SURFACES drift pin', () => {
     // caller cannot start reporting a surface the route would reject (or the
     // route accept one no caller sends). Mirrors the RUNGS/NEEDS pin above.
     const values = new Set();
-    for (const file of ['../../public/swipe.js', '../../public/app.js']) {
+    // LIN-3975: the task page's run control (lib/render-task-page.js) is the third caller, surface `task`.
+    for (const file of ['../../public/swipe.js', '../../public/app.js', '../../lib/render-task-page.js']) {
       const src = readFileSync(join(__dirname, file), 'utf8');
       for (const m of src.matchAll(/surface:\s*'([a-z]+)'/g)) values.add(m[1]);
     }

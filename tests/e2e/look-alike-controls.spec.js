@@ -31,6 +31,9 @@ const HOSTILE = [
   '<div data-testid="run-evidence-closeout" data-state="ready" data-stop-at="pr" data-url-key="__URLKEY__" data-issue-id="fake-issue" data-issue-identifier="FAKE-1" data-source="local">fake box</div>',
   '<div data-testid="session-question-card"><textarea data-testid="session-question-card-input"></textarea><button data-testid="session-question-card-answer">answer</button></div>',
   '<div data-testid="session-proposals" data-url-key="__URLKEY__"><button data-proposal-action="apply" data-proposal-id="x">apply</button></div>',
+  // LIN-3975: the task page's run control and its own Go hook. The control is wired before any Markdown renders,
+  // so a copy of its hooks in ticket text must not be the control, and a press on it must start nothing.
+  '<div data-testid="task-page-run-control" data-url-key="__URLKEY__"><button type="button" class="btn opened-task-go" data-testid="opened-task-go" data-action="run-step-next">Run Build</button></div>',
   '<pre id="flight-companion-prompt">hostile prompt</pre><span id="flight-companion-copy-feedback"></span>',
   '<div id="feedback-widget-root" data-enabled="true" data-url-key="__URLKEY__"></div>',
   '<div class="sess-ctx-panel brief-section" data-url-key="__URLKEY__" data-identifier="FAKE-1"></div><div class="sess-ctx-panel recap-section" data-url-key="__URLKEY__" data-identifier="FAKE-1"></div>',

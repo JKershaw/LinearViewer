@@ -199,7 +199,7 @@ describe('createPoller', () => {
 // LIN-3340: the poll must not leave a stale header on a merge-ready page, and a guest's
 // client-side markdown must survive an unchanged brief.
 describe('poll safety (LIN-3340)', () => {
-  const { paintsReadyHeader, contextNeedsRepaint } = load();
+  const { paintsReadyHeader, runOptsOf } = load();
 
   test('the ready-to-merge header is painted only across an idle poll', () => {
     assert.equal(paintsReadyHeader('true', 'idle'), true);
@@ -214,11 +214,12 @@ describe('poll safety (LIN-3340)', () => {
     assert.equal(paintsReadyHeader('false', 'failed'), false);
   });
 
-  test('the context mount repaints only on a changed signature, and never once widgets mount', () => {
-    assert.equal(contextNeedsRepaint(undefined, 'abc', false), true, 'no sig: repaint');
-    assert.equal(contextNeedsRepaint('abc', 'abc', false), false, 'unchanged brief is not repainted');
-    assert.equal(contextNeedsRepaint('def', 'abc', false), true, 'changed brief is repainted');
-    assert.equal(contextNeedsRepaint('def', 'abc', true), false, 'the owner widgets own their refresh');
+  test('LIN-3975: the run control options are read from data-run-opts; no attribute, or junk, mounts nothing', () => {
+    const root = (raw) => ({ getAttribute: (k) => (k === 'data-run-opts' ? raw : null) });
+    assert.equal(JSON.stringify(runOptsOf(root('{"surface":"task","urlKey":"acme"}'))), '{"surface":"task","urlKey":"acme"}');
+    assert.equal(runOptsOf(root(null)), null);
+    assert.equal(runOptsOf(root('{not json')), null);
+    assert.equal(runOptsOf(null), null);
   });
 
   test('a guest brief `<pre>` is upgraded to markdown and the upgrade is idempotent', () => {
@@ -388,7 +389,7 @@ describe('apply(): the header after a session ends on a merge-ready page (LIN-34
       hidden: false,
       querySelector: (sel) => {
         if (sel === '[data-testid="task-page"][data-state-url]' || sel === '[data-testid="task-page"]') return main;
-        if (sel === '[data-testid="task-page-answer"]') return answer;
+        if (sel === '[data-testid="task-page-answer-status"]') return answer;
         if (sel === '[data-testid="run-evidence-closeout"]') return box ? boxEl : null;
         return null;
       },

@@ -182,7 +182,7 @@ describe('LIN-2942 — session dispatch route, entryRung', () => {
     const captured = {};
     const res = await call(buildDispatchApp({ taskModeStore: store, captured }), 'post', DISPATCH_PATH, { ...TASK_BODY, entryRung: 'run-step', surface: 'mobile' });
     assert.equal(res.status, 400, res.text);
-    assert.match(res.body.error, /surface must be one of: swipe, home/);
+    assert.match(res.body.error, /surface must be one of: swipe, home, task/);
     assert.equal((captured.items || []).length, 0, 'nothing enqueued');
     assert.equal(store.calls.length, 0, 'nothing recorded');
   });
@@ -381,7 +381,7 @@ describe('LIN-2942 — POST and GET /workspace/:urlKey/api/task-mode', () => {
     assert.equal(res.body.taken.rung, 'copy');
     assert.equal(res.body.furthest, 'run-task');
     assert.equal(res.body.events.length, 2);
-    assert.deepEqual(res.body.coverage, { surfaces: ['swipe', 'home'] });
+    assert.deepEqual(res.body.coverage, { surfaces: ['swipe', 'home', 'task'] });
   });
 
   test('GET spans the canonical account\'s merge group and nobody else', async () => {
@@ -423,7 +423,7 @@ describe('LIN-2942 — POST and GET /workspace/:urlKey/api/task-mode', () => {
   test('GET for a task with no events returns the empty mode', async () => {
     const res = await call(buildTaskModeApp({ taskModeStore: store }), 'get', `${TASK_MODE_PATH}/LIN-404`);
     assert.equal(res.status, 200, res.text);
-    assert.deepEqual(res.body, { entry: null, taken: null, furthest: null, events: [], coverage: { surfaces: ['swipe', 'home'] }, lastCopy: null });
+    assert.deepEqual(res.body, { entry: null, taken: null, furthest: null, events: [], coverage: { surfaces: ['swipe', 'home', 'task'] }, lastCopy: null });
   });
 });
 
