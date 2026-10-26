@@ -108,6 +108,7 @@
 
 /* ── Task details (closed to start with) ─────────────────────────────────── */
 .task-details { margin: var(--space-4, 1rem) 0; }
+.task-chat-fold { margin-bottom: var(--space-4, 1rem); }
 .task-details .sess-v { min-width: 0; overflow-wrap: anywhere; }
 .task-refs { margin-top: 0.6rem; }
 .task-refs-label {
