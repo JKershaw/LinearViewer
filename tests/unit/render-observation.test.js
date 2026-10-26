@@ -79,11 +79,12 @@ describe('render-observation: scan-due tab (LIN-2649 S4 / LIN-2667)', () => {
     { urlKey: 'ws-a' }
   );
 
-  test('a fourth tab, Scan-due, renders alongside Autopilot/Sessions/Rulings', () => {
+  test('the Scan-due tab renders in the shared tab strip, after Runs and Rulings (LIN-3983)', () => {
     const out = html();
-    assert.match(out, /data-view="due"[^>]*>Scan-due</);
-    const tabCount = (out.match(/class="obs-tab( is-active)?"/g) || []).length;
-    assert.strictEqual(tabCount, 4);
+    assert.match(out, /data-tab="due"[^>]*data-testid="obs-tab-due"[^>]*>Scan-due</);
+    const tabCount = (out.match(/class="tabs__tab( is-active)?"/g) || []).length;
+    assert.strictEqual(tabCount, 3, 'Runs, Rulings and Scan-due');
+    assert.match(out, /data-tab="runs"[^>]*aria-selected="true"/, 'the runs tab is selected on a bare load');
   });
 
   test('the due section states its own backstop-not-guarantee disclaimer, distinct from the rulings one', () => {

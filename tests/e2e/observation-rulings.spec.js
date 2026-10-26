@@ -170,14 +170,14 @@ async function clearRunsFor(page, urlKey) {
 }
 
 test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
-  test('a third tab renders alongside Autopilot/Sessions/Scan-due', async ({ page }) => {
+  test('a third tab renders alongside Runs and Scan-due (LIN-3983)', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    const tabs = page.locator('#obs-tabs .obs-tab');
-    await expect(tabs).toHaveCount(4);
-    await expect(page.locator('.obs-tab[data-view="rulings"]')).toBeVisible();
-    await expect(page.locator('.obs-tab[data-view="rulings"]')).not.toHaveClass(/is-active/);
+    const tabs = page.locator('[data-testid^="obs-tab-"]');
+    await expect(tabs).toHaveCount(3);
+    await expect(page.locator('[data-testid="obs-tab-rulings"]')).toBeVisible();
+    await expect(page.locator('[data-testid="obs-tab-rulings"]')).not.toHaveClass(/is-active/);
   });
 
   test('a resumable ruling renders with pressable option buttons; the session views hide while active', async ({ page }) => {
@@ -187,8 +187,8 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('.obs-tab[data-view="rulings"]').click();
-    await expect(page.locator('.obs-tab[data-view="rulings"]')).toHaveClass(/is-active/);
+    await page.locator('[data-testid="obs-tab-rulings"]').click();
+    await expect(page.locator('[data-testid="obs-tab-rulings"]')).toHaveClass(/is-active/);
 
     // The session-views shell (Filter/Active/Archive) hides while the rulings
     // tab is active — a ruling is not a session, and the two must not bleed.
@@ -216,7 +216,7 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('.obs-tab[data-view="rulings"]').click();
+    await page.locator('[data-testid="obs-tab-rulings"]').click();
 
     const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-P' });
     await expect(row).toBeVisible();
@@ -257,7 +257,7 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('.obs-tab[data-view="rulings"]').click();
+    await page.locator('[data-testid="obs-tab-rulings"]').click();
 
     const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-D3' });
     await expect(row).toBeVisible();
@@ -366,7 +366,7 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('.obs-tab[data-view="rulings"]').click();
+    await page.locator('[data-testid="obs-tab-rulings"]').click();
 
     const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-F' });
     await expect(row).toBeVisible();
@@ -416,7 +416,7 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('.obs-tab[data-view="rulings"]').click();
+    await page.locator('[data-testid="obs-tab-rulings"]').click();
 
     const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-M' });
     await expect(row).toBeVisible();
@@ -436,7 +436,7 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('.obs-tab[data-view="rulings"]').click();
+    await page.locator('[data-testid="obs-tab-rulings"]').click();
 
     const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2225-T' });
     await expect(row).toBeVisible();
@@ -466,7 +466,7 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('.obs-tab[data-view="rulings"]').click();
+    await page.locator('[data-testid="obs-tab-rulings"]').click();
 
     const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2225-D' });
     await expect(row).toBeVisible();
@@ -494,7 +494,7 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('.obs-tab[data-view="rulings"]').click();
+    await page.locator('[data-testid="obs-tab-rulings"]').click();
 
     const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2225-M' });
     await expect(row).toBeVisible();
@@ -516,7 +516,7 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('.obs-tab[data-view="rulings"]').click();
+    await page.locator('[data-testid="obs-tab-rulings"]').click();
 
     const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1727-S' });
     await expect(row).toBeVisible();
@@ -585,7 +585,7 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('.obs-tab[data-view="rulings"]').click();
+    await page.locator('[data-testid="obs-tab-rulings"]').click();
 
     const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1727-M' });
     await expect(row).toBeVisible();
@@ -618,7 +618,7 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('.obs-tab[data-view="rulings"]').click();
+    await page.locator('[data-testid="obs-tab-rulings"]').click();
 
     const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-X' });
     await expect(row).toBeVisible();
@@ -666,7 +666,7 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('.obs-tab[data-view="rulings"]').click();
+    await page.locator('[data-testid="obs-tab-rulings"]').click();
 
     const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-Q' });
     await expect(row).toBeVisible();
@@ -722,7 +722,7 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('.obs-tab[data-view="rulings"]').click();
+    await page.locator('[data-testid="obs-tab-rulings"]').click();
 
     const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-3631-T' });
     const box = row.locator('.obs-ruling-answer-input');
@@ -776,7 +776,7 @@ test.describe('Bulk-agree suggested rulings (LIN-2444 Phase 5) — e2e', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('.obs-tab[data-view="rulings"]').click();
+    await page.locator('[data-testid="obs-tab-rulings"]').click();
 
     const rowA = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2444-BULK-1' });
     const rowB = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2444-BULK-2' });
@@ -820,7 +820,7 @@ test.describe('Bulk-agree suggested rulings (LIN-2444 Phase 5) — e2e', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('.obs-tab[data-view="rulings"]').click();
+    await page.locator('[data-testid="obs-tab-rulings"]').click();
 
     const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2444-BULK-3' });
     await row.locator('.obs-ruling-select').check();
@@ -853,7 +853,7 @@ test.describe('Bulk-agree suggested rulings (LIN-2444 Phase 5) — e2e', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('.obs-tab[data-view="rulings"]').click();
+    await page.locator('[data-testid="obs-tab-rulings"]').click();
 
     const rowA = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2444-BULK-4' });
     const rowB = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2444-BULK-5' });
@@ -898,7 +898,7 @@ test.describe('Bulk-agree suggested rulings (LIN-2444 Phase 5) — e2e', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('.obs-tab[data-view="rulings"]').click();
+    await page.locator('[data-testid="obs-tab-rulings"]').click();
 
     const rowA = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2756-LOOP-A' });
     const rowB = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2756-LOOP-B' });
@@ -983,7 +983,7 @@ test.describe('Bulk-agree progress / Stop / completion summary (LIN-2758) — e2
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('.obs-tab[data-view="rulings"]').click();
+    await page.locator('[data-testid="obs-tab-rulings"]').click();
 
     await page.locator('#obs-ruling-select-all').check();
     await expect(page.locator('#obs-ruling-selected-count')).toHaveText('3 selected');
@@ -1017,7 +1017,7 @@ test.describe('Bulk-agree progress / Stop / completion summary (LIN-2758) — e2
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('.obs-tab[data-view="rulings"]').click();
+    await page.locator('[data-testid="obs-tab-rulings"]').click();
 
     await page.locator('#obs-ruling-select-all').check();
 
@@ -1102,7 +1102,7 @@ test.describe('Task-bound ruling (LIN-2215) — a scan-produced decision end to 
 
     await page.goto(`/workspace/${localWorkerUrlKey}/observation`);
     await page.waitForLoadState('networkidle');
-    await page.locator('.obs-tab[data-view="rulings"]').click();
+    await page.locator('[data-testid="obs-tab-rulings"]').click();
 
     // Run-scoped (LIN-2215 close-out, ledger item 2): `TaskDecisionsStore` is
     // durable with no TTL and `_pruneToCapacity` is scoped per `(urlKey,
@@ -1185,7 +1185,7 @@ test.describe('Task-bound ruling (LIN-2215) — a scan-produced decision end to 
 
     await page.goto(`/workspace/${localWorkerUrlKey}/observation`);
     await page.waitForLoadState('networkidle');
-    await page.locator('.obs-tab[data-view="rulings"]').click();
+    await page.locator('[data-testid="obs-tab-rulings"]').click();
 
     const row = page.locator(`#obs-rulings .obs-ruling[data-decision-id="${scanBody.id}"]`);
     await expect(row).toBeVisible();
@@ -1242,7 +1242,7 @@ test.describe('Task-bound ruling (LIN-2215) — a scan-produced decision end to 
     // View from workspace B, not A — the exact cross-workspace shape F1 tests.
     await page.goto(`/workspace/${secondUrlKey}/observation`);
     await page.waitForLoadState('networkidle');
-    await page.locator('.obs-tab[data-view="rulings"]').click();
+    await page.locator('[data-testid="obs-tab-rulings"]').click();
 
     const row = page.locator(`#obs-rulings .obs-ruling[data-decision-id="${scanBody.id}"]`);
     await expect(row).toBeVisible();
@@ -1290,7 +1290,7 @@ test.describe('Task-bound ruling (LIN-2215) — a scan-produced decision end to 
 
     await page.goto(`/workspace/${localWorkerUrlKey}/observation`);
     await page.waitForLoadState('networkidle');
-    await page.locator('.obs-tab[data-view="rulings"]').click();
+    await page.locator('[data-testid="obs-tab-rulings"]').click();
 
     const row = page.locator(`#obs-rulings .obs-ruling[data-decision-id="${scanBody.id}"]`);
     await expect(row).toBeVisible();
@@ -1333,7 +1333,7 @@ test.describe('Task-bound ruling (LIN-2215) — a scan-produced decision end to 
     await page.waitForLoadState('networkidle');
     await Promise.all([
       page.waitForResponse(r => r.url().includes('/api/dashboard/rulings') && r.request().method() === 'GET'),
-      page.locator('.obs-tab[data-view="rulings"]').click()
+      page.locator('[data-testid="obs-tab-rulings"]').click()
     ]);
 
     await seedLocal({
@@ -1348,7 +1348,7 @@ test.describe('Task-bound ruling (LIN-2215) — a scan-produced decision end to 
     await page.waitForLoadState('networkidle');
     await Promise.all([
       page.waitForResponse(r => r.url().includes('/api/dashboard/rulings') && r.request().method() === 'GET'),
-      page.locator('.obs-tab[data-view="rulings"]').click()
+      page.locator('[data-testid="obs-tab-rulings"]').click()
     ]);
 
     await expect(page.locator('#obs-rulings .obs-ruling', { hasText: 'SCAN-2' })).toHaveCount(0);
@@ -1438,7 +1438,7 @@ test.describe('Ambient rulings nav badge (LIN-1728 Phase 3)', () => {
     await badge.click();
     await page.waitForURL(`**/workspace/${URL_KEY}/observation?view=rulings`);
     await page.waitForLoadState('networkidle');
-    await expect(page.locator('.obs-tab[data-view="rulings"]')).toHaveClass(/is-active/);
+    await expect(page.locator('[data-testid="obs-tab-rulings"]')).toHaveClass(/is-active/);
     await expect(page.locator('#obs-rulings-section')).toBeVisible();
     await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-B6' })).toBeVisible();
   });
@@ -1572,7 +1572,7 @@ test.describe('Agree on a PROPOSED ANSWER (LIN-2754 L3) — e2e', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('.obs-tab[data-view="rulings"]').click();
+    await page.locator('[data-testid="obs-tab-rulings"]').click();
 
     const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2754-ANSWER' });
     await expect(row).toBeVisible();

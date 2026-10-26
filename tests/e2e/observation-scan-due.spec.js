@@ -35,7 +35,7 @@ async function openDueTab(page) {
   await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
   await page.goto(OBSERVATION_URL);
   await page.waitForLoadState('networkidle');
-  await page.click('#obs-tabs [data-view="due"]');
+  await page.click('[data-testid="obs-tab-due"]');
 }
 
 test.describe('Scan-due bulk-scan bar — real render + real stylesheet (LIN-2706 review, PR #1424)', () => {
@@ -207,7 +207,7 @@ test.describe('Scan-due bulk-scan bar — real render + real stylesheet (LIN-270
     await page.goto(`/test/set-session?urlKey=${URL_KEY}&freeTierEnabled=true`);
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.click('#obs-tabs [data-view="due"]');
+    await page.click('[data-testid="obs-tab-due"]');
 
     const quotaNote = page.locator('#obs-due-bulk-quota-note');
     await expect(quotaNote).toBeVisible();
