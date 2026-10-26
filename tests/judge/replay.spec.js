@@ -171,13 +171,15 @@ async function prepare(page, context, entry, viewport, theme, side, baseURL) {
     // up without the control and is shot as it is.
     await page.locator('[data-section="in-progress"][data-identifier="LOCAL-1"]').first().click();
     const change = page.getByTestId('run-change');
-    if (side === 'head') await change.waitFor();
+    // Both sides wait for the control (LIN-3977: base's Change rendered after the click had already been skipped, so base showed the closed panel).
+    await change.waitFor({ timeout: 10_000 }).catch(() => {});
     if (await change.count()) {
       await change.click();
       await page.getByTestId(side === 'head' ? 'run-decision-panel' : 'run-change-panel').waitFor();
     }
     // LIN-3987: the opencode state chooses opencode as the harness, so the effort line and the lost web choice show.
-    if (entry.state === 'home-run-panel-opencode' && side === 'head') {
+    // Both sides choose opencode now that base is main, which has the harness select (LIN-3977 moved the judge's base off the pre-LIN-3987 commit).
+    if (entry.state === 'home-run-panel-opencode') {
       await page.getByTestId('run-harness').selectOption('opencode');
       await page.getByTestId('run-effort').first().waitFor({ state: 'hidden' });
     }
