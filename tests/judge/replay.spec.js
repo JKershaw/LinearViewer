@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { defaultLocalSeed } from '../fixtures/local-harness.js';
 import { PAGES, VIEWPORTS, THEMES, FROZEN_TIME, NORMALISE, parsePixelDiff } from './pages.mjs';
 import { homeSeed, hasHomeSessions, seedHomeSessions, HOME_WRITE_SSE } from './home-states.mjs';
+import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 
 const BASE_URL = process.env.JUDGE_BASE_URL;
 const HEAD_URL = process.env.JUDGE_HEAD_URL;
@@ -65,14 +66,17 @@ async function settle(page) {
 // Every agent job gets two priced runs at a cost that differs by job, so the rows, the section totals and the sidebar all have figures.
 const SPEND_JOBS = ['implementation', 'review', 'bug', 'plan', 'close-out'];
 async function seedAgentSpend(request, urlKey) {
+  // The dispatch create is an owner's write, so the workspace's owner is set first, as the e2e spec does.
+  await seedWorkspaceOwnership(request, urlKey, 'owner');
   const { token } = await (await request.get(`/test/create-dispatch-token?label=runner&urlKey=${urlKey}`)).json();
   const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
-  let issue = 0;
+  // The seed's issues are LOCAL-1 to LOCAL-4. A kind may not run twice on one issue within minutes, so a kind's two runs take
+  // two different issues (the rotation), and the kinds are spread across them.
   for (const [index, kind] of SPEND_JOBS.entries()) {
     for (let run = 0; run < 2; run += 1) {
-      issue += 1;
+      const issueIdentifier = `LOCAL-${((index + run) % 4) + 1}`;
       const create = await request.post(`/workspace/${urlKey}/api/dispatch`, {
-        data: { prompt: 'judge spend fixture', promptName: kind, kind, issueIdentifier: `JDG-${issue}`, issueTitle: 'Judge spend fixture', target: 'cli' },
+        data: { prompt: 'judge spend fixture', promptName: kind, kind, issueIdentifier, issueTitle: 'Judge spend fixture', target: 'cli' },
       });
       if (!create.ok()) throw new Error(`spend seed create failed: ${create.status()} ${await create.text()}`);
       const itemId = (await create.json()).item.id;
@@ -184,14 +188,23 @@ async function prepare(page, context, entry, viewport, theme, side, baseURL) {
     const group = page.locator('[data-testid="models-group-agent-session-judge"]');
     if (await group.count()) await group.locator(':scope > summary').click();
   }
-  if (entry.state === 'models-saved') {
-    // A row staged and saved (head): one Undo for the save, and the row marked. Base's forms save with one notice.
+  if (entry.state === 'models-saved' && side === 'head') {
+    // A row staged and saved (head only): one Undo for the save, and the row marked. Base's save redirects elsewhere, so base
+    // is shot as it is (unsaved) and the difference is the change itself. The row is a job with no runs, so it sits behind
+    // the fold: open the folds first, as a person would.
     const row = page.locator('[data-testid="models-job-review"]');
     if (await row.count()) {
+      const closed = page.locator('details.models-fold:not([open])');
+      while (await closed.count()) await closed.first().locator(':scope > summary').click();
       await row.locator(':scope > summary').click();
-      await row.locator('input[data-models-field="model"]').fill('sonnet');
+      // Base's model is a select, head's is the decision panel's input (as models-staged above): choose by the element's kind.
+      const model = row.locator('[data-models-field="model"]');
+      if ((await model.evaluate((el) => el.tagName)) === 'SELECT') await model.selectOption('sonnet');
+      else await model.fill('sonnet');
       await page.locator('[data-testid="models-reason"]').fill('Judge fixture');
-      await Promise.all([page.waitForURL(/settings\/models/), page.locator('[data-testid="models-save"]').click()]);
+      // A DOM click, not a pointer click: on a phone the open panels above Save can intercept the pointer, and the save is a plain form submit.
+      // Wait for the new document (the redirect lands on the page with ?changed=), not just the URL, before settling.
+      await Promise.all([page.waitForURL(/settings\/models\?changed=/, { waitUntil: 'domcontentloaded' }), page.locator('[data-testid="models-save"]').dispatchEvent('click')]);
       await settle(page);
     }
   }
