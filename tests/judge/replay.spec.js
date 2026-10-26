@@ -61,6 +61,28 @@ async function settle(page) {
   });
 }
 
+// LIN-3952: priced agent runs through the dispatch API, the way a runner reports them (see tests/e2e/lin-3987-decision-panel.spec.js).
+// Every agent job gets two priced runs at a cost that differs by job, so the rows, the section totals and the sidebar all have figures.
+const SPEND_JOBS = ['implementation', 'review', 'bug', 'plan', 'close-out'];
+async function seedAgentSpend(request, urlKey) {
+  const { token } = await (await request.get(`/test/create-dispatch-token?label=runner&urlKey=${urlKey}`)).json();
+  const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  let issue = 0;
+  for (const [index, kind] of SPEND_JOBS.entries()) {
+    for (let run = 0; run < 2; run += 1) {
+      issue += 1;
+      const create = await request.post(`/workspace/${urlKey}/api/dispatch`, {
+        data: { prompt: 'judge spend fixture', promptName: kind, kind, issueIdentifier: `JDG-${issue}`, issueTitle: 'Judge spend fixture', target: 'cli' },
+      });
+      if (!create.ok()) throw new Error(`spend seed create failed: ${create.status()} ${await create.text()}`);
+      const itemId = (await create.json()).item.id;
+      await request.post(`/api/dispatch/take/${itemId}`, { headers: auth });
+      await request.post(`/api/dispatch/feedback/${itemId}`, { headers: auth, data: { kind: 'usage', message: `[usage] ${JSON.stringify({ costUsd: 0.2 + index * 0.25 })}` } });
+      await request.post(`/api/dispatch/feedback/${itemId}`, { headers: auth, data: { message: '[done] complete' } });
+    }
+  }
+}
+
 // Per-state set-up: identical on both sides, driven by the page's own markup.
 // LIN-3968: Home's opened task. The sessions are seeded through the consumer API (on both sides), then Home is
 // opened and its top task clicked. The write is the fixed stream, so the request never leaves the browser.
@@ -109,6 +131,15 @@ async function prepare(page, context, entry, viewport, theme, side, baseURL) {
     await page.getByTestId('email-confirm-submit').click();
     await page.waitForURL(/\/account$/);
   }
+  if (entry.state === 'models-spend') {
+    // LIN-3952: priced agent runs, reported the way a runner reports them (a take, a `[usage]` line with a cost, a `[done]`),
+    // so every agent job has spend for its row. Once per server, as the Home seeds are: a second shoot is the same data.
+    const key = `${baseURL}|${entry.urlKey}|spend`;
+    if (!seeded.has(key)) {
+      await seedAgentSpend(context.request, entry.urlKey);
+      seeded.add(key);
+    }
+  }
   if (entry.state === 'key-open') {
     const minted = await context.request.get(`/test/create-proxy-token?urlKey=${entry.urlKey}&label=judge-key&scope=read`);
     if (!minted.ok()) throw new Error(`mint failed: ${minted.status()}`);
@@ -148,6 +179,22 @@ async function prepare(page, context, entry, viewport, theme, side, baseURL) {
   await settle(page);
   if (entry.state === 'ask-open') await page.getByTestId('settings-toggle-periodicals').locator('summary').click();
   if (entry.state === 'key-open') await page.locator('[data-testid="settings-key-proxy"], [data-testid="settings-key-dispatch"]').locator('summary').first().click();
+  if (entry.state === 'models-group-open') {
+    // Head's group rows open in place. Base's groups are the old forms, so this is conditional there.
+    const group = page.locator('[data-testid="models-group-agent-session-judge"]');
+    if (await group.count()) await group.locator(':scope > summary').click();
+  }
+  if (entry.state === 'models-saved') {
+    // A row staged and saved (head): one Undo for the save, and the row marked. Base's forms save with one notice.
+    const row = page.locator('[data-testid="models-job-review"]');
+    if (await row.count()) {
+      await row.locator(':scope > summary').click();
+      await row.locator('input[data-models-field="model"]').fill('sonnet');
+      await page.locator('[data-testid="models-reason"]').fill('Judge fixture');
+      await Promise.all([page.waitForURL(/settings\/models/), page.locator('[data-testid="models-save"]').click()]);
+      await settle(page);
+    }
+  }
   if (entry.state === 'models-panel-open' || entry.state === 'models-staged') {
     // Head's job rows open in place. Base has the legacy forms and no such row, so these steps are conditional there.
     const row = page.locator('[data-testid="models-job-implementation"]');

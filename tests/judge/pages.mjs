@@ -37,6 +37,9 @@ const TIME_MASKS = {
 //   paused            mint a queue token (a runner), pause runs in place; Running shows the Runs row and Resume
 //   models-panel-open open a job row's change panel on Settings › Models (head only; base's forms have no row)
 //   models-staged     the same row, with one model picked: the staged-change count shows (head only)
+//   models-group-open  the Judge group opened on head (LIN-3952); base's groups are the old forms, so base is shot as it is
+//   models-spend      a runner and priced agent runs seeded through the dispatch API: every row shows its figures (LIN-3952)
+//   models-saved      a row changed and saved: the row is marked, and the save's one Undo is offered (LIN-3952)
 //   home-run-panel-opencode  the same panel with opencode chosen as the harness (LIN-3987): effort is off and says so, and
 //                  Claude Code on the web is not offered. A new state: base has no opencode line, so it differs by design.
 //   home-run-panel-open  Home's Change panel open (LIN-3962): the shared decision panel the server renders; `seed` gives run controls
@@ -81,6 +84,12 @@ export const PAGES = [
   // covers the sheet at 390px and the panel at 1280px. Both are read-only set-ups on the seeded 'judge' workspace.
   { id: 'models-panel-open', urlKey: 'judge', path: (k) => `/workspace/${k}/settings/models`, state: 'models-panel-open', renderers: ['lib/render-settings-models.js', 'lib/components/decision-panel.js'] },
   { id: 'models-staged', urlKey: 'judge', path: (k) => `/workspace/${k}/settings/models`, state: 'models-staged', renderers: ['lib/render-settings-models.js', 'lib/components/decision-panel.js'] },
+  // LIN-3952: a group opened (head only: base's groups are the old forms), the list with spend (a runner and priced runs,
+  // seeded through the dispatch API on both sides), and a saved change with the row marked and one Undo for the save.
+  // The save writes, so it has its own urlKey.
+  { id: 'models-group-open', urlKey: 'judge', path: (k) => `/workspace/${k}/settings/models`, state: 'models-group-open', renderers: ['lib/render-settings-models.js', 'lib/components/decision-panel.js'] },
+  { id: 'models-spend', urlKey: 'judge-spend', path: (k) => `/workspace/${k}/settings/models`, state: 'models-spend', seed: { runnerKey: true }, renderers: ['lib/render-settings-models.js', 'lib/components/settings-row.js', 'lib/components/settings-spend-bar.js'] },
+  { id: 'models-saved', urlKey: 'judge-saved', path: (k) => `/workspace/${k}/settings/models`, state: 'models-saved', renderers: ['lib/render-settings-models.js', 'lib/components/decision-panel.js'] },
   // LIN-3968: Home's opened task. The stage states have a runner (the strip and run control show) and seed their
   // sessions through the consumer API; the copy-first pair has no runner, and its write is a fixed stream. Each
   // state has its own urlKey, so one state's sessions or prompt memory never reach another.

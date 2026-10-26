@@ -87,8 +87,8 @@ test.describe('OpenRouter OAuth Flow', () => {
     await expect(connectedStatus).toBeVisible();
     await expect(connectedStatus).toHaveText('● connected');
 
-    // Should have a disconnect button
-    const disconnectBtn = page.locator(SELECTORS.settings.openRouterDisconnect);
+    // Should have a disconnect action: the ask in place (LIN-3952), read by its summary, the row's own label
+    const disconnectBtn = page.locator(`${SELECTORS.settings.openRouterDisconnect} > summary`);
     await expect(disconnectBtn).toBeVisible();
     await expect(disconnectBtn).toHaveText('disconnect');
   });

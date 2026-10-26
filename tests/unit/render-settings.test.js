@@ -612,7 +612,7 @@ describe('renderSettingsPage — areas and their groups (LIN-3846, replaces the 
 describe('renderSettingsPage — OpenRouter unattended-use consent (LIN-2412)', () => {
   test('oauth + no consent: shows the not-enabled status and an enable form posting to /auth/openrouter/consent, plus the blast-radius notice', () => {
     const html = renderSettingsPage('Acme', { ...BASE, openRouterSource: 'oauth', openRouterConsentedAt: null });
-    assert.match(html, /data-testid="settings-openrouter-consent-status"[^>]*>○ not enabled/);
+    assert.match(html, /data-testid="settings-openrouter-consent-status"[^>]*>○ off/);
     assert.match(html, /action="\/auth\/openrouter\/consent" method="POST"/);
     assert.match(html, /data-testid="settings-openrouter-consent-grant"/);
     assert.match(html, /data-testid="settings-openrouter-consent-notice"/);
@@ -621,7 +621,7 @@ describe('renderSettingsPage — OpenRouter unattended-use consent (LIN-2412)', 
 
   test('oauth + granted consent: shows the enabled status, no grant form, connection status locator stays single-match', () => {
     const html = renderSettingsPage('Acme', { ...BASE, openRouterSource: 'oauth', openRouterConsentedAt: '2026-08-01T00:00:00.000Z' });
-    assert.match(html, /data-testid="settings-openrouter-consent-status"[^>]*>✓ enabled/);
+    assert.match(html, /data-testid="settings-openrouter-consent-status"[^>]*>● on/);
     assert.doesNotMatch(html, /data-testid="settings-openrouter-consent-grant"/);
     // openrouter-auth.spec.js locates the connection status by its test id alone — the consent
     // badge must never also carry that test id.
@@ -680,9 +680,9 @@ describe('renderSettingsPage — OpenRouter unattended-use consent (LIN-2412)', 
     assert.doesNotMatch(html, /data-testid="settings-openrouter-consent-notice"/);
   });
 
-  test('defaults to not-enabled when openRouterConsentedAt is omitted entirely (a caller that forgets to thread it fails closed, never silently "enabled")', () => {
+  test('defaults to off when openRouterConsentedAt is omitted entirely (a caller that forgets to thread it fails closed, never silently "on")', () => {
     const html = renderSettingsPage('Acme', { ...BASE, openRouterSource: 'oauth' });
-    assert.match(html, /○ not enabled/);
+    assert.match(html, /○ off/);
   });
 });
 
