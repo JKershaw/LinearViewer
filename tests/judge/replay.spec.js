@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { defaultLocalSeed } from '../fixtures/local-harness.js';
 import { PAGES, VIEWPORTS, THEMES, FROZEN_TIME, NORMALISE, parsePixelDiff } from './pages.mjs';
 import { homeSeed, hasHomeSessions, seedHomeSessions, HOME_WRITE_SSE } from './home-states.mjs';
+import { LIVE_CONSOLE_STATES, seedLiveConsole } from './live-console-states.mjs';
 
 const BASE_URL = process.env.JUDGE_BASE_URL;
 const HEAD_URL = process.env.JUDGE_HEAD_URL;
@@ -32,14 +33,15 @@ const isOpenedTaskState = (state) => /^home-(stages-done|running|failed|failed-f
 const isLoopback = (url) => /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(url) || url.startsWith('data:') || url.startsWith('blob:');
 
 // `urlKey` null means no local seed: the account is a zero-workspace one, signed in by email (LIN-3956).
-async function openContext(browser, baseURL, viewport, theme, urlKey, seed = {}, base = null) {
+async function openContext(browser, baseURL, viewport, theme, urlKey, seed = {}, base = null, realClock = false) {
   const context = await browser.newContext({
     baseURL, viewport: { width: viewport.width, height: viewport.height },
     colorScheme: theme, deviceScaleFactor: 1, reducedMotion: 'reduce',
   });
   await context.route('**/*', (route) => (isLoopback(route.request().url()) ? route.continue() : route.abort()));
   await context.addCookies([{ name: 'theme', value: theme, url: baseURL }]);
-  await context.clock.setFixedTime(new Date(FROZEN_TIME));
+  // LIN-3977: the Live Console's runs are seeded on the real clock, so its states keep the real clock (see pages.mjs).
+  if (!realClock) await context.clock.setFixedTime(new Date(FROZEN_TIME));
   if (urlKey) {
     // LIN-3968: Home's opened-task states seed their own workspace (homeSeed); the run control shows only where the entry has a runner.
     const data = { ...(base || defaultLocalSeed(urlKey)), urlKey, runnerKey: false, ...seed };
@@ -93,6 +95,7 @@ async function prepareHome(page, context, entry, baseURL) {
 async function prepare(page, context, entry, viewport, theme, side, baseURL) {
   const url = entry.path(entry.urlKey);
   if (isOpenedTaskState(entry.state)) return prepareHome(page, context, entry, baseURL);
+  if (LIVE_CONSOLE_STATES.has(entry.state)) await seedLiveConsole(context.request, baseURL, entry.urlKey, entry.state);
   if (entry.state === 'email-signin') {
     // One address per shot, the same on both sides: the send throttle is per address (3 per 15 minutes),
     // and the judge takes at most ATTEMPTS (3) tries per shot. The link is read from the capture outbox.
@@ -206,7 +209,8 @@ async function prepare(page, context, entry, viewport, theme, side, baseURL) {
 async function shoot(browser, baseURL, viewport, theme, entry, side) {
   const openedTask = isOpenedTaskState(entry.state);
   const context = await openContext(browser, baseURL, viewport, theme, entry.state === 'email-signin' ? null : entry.urlKey,
-    openedTask ? { runnerKey: entry.runner === true } : entry.seed, openedTask ? homeSeed(entry.urlKey) : null);
+    openedTask ? { runnerKey: entry.runner === true } : entry.seed, openedTask ? homeSeed(entry.urlKey) : null,
+    LIVE_CONSOLE_STATES.has(entry.state));
   try {
     const page = await context.newPage();
     await prepare(page, context, entry, viewport, theme, side, baseURL);
@@ -222,7 +226,11 @@ async function shoot(browser, baseURL, viewport, theme, entry, side) {
     const present = [];
     for (const m of masks) {
       // A mask that matches nothing would drop silently and let the judge read a false zero.
-      if (!await page.locator(m.selector).count()) throw new Error(`mask matched nothing on ${entry.id}: ${m.selector}`);
+      // An optional mask names an element one side does not emit (LIN-3977's new lane duration on base); it is skipped there.
+      if (!await page.locator(m.selector).count()) {
+        if (m.optional) continue;
+        throw new Error(`mask matched nothing on ${entry.id}: ${m.selector}`);
+      }
       present.push(m);
     }
     // Where the planted piece is shown, for the positive control: rendered, and NOT inside a mask (a

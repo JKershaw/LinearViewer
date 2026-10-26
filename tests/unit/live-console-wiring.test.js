@@ -35,10 +35,8 @@ test('liveConsole is a registered feature, defaulting OFF, with label + descript
   assert.ok(FEATURE_DESCRIPTIONS.liveConsole, 'has a settings description');
 });
 
-test('liveConsole is in the shared EXPERIMENTAL_VIEWS list mapped to the live-console route', () => {
-  const row = EXPERIMENTAL_VIEWS.find(v => v.flag === 'liveConsole');
-  assert.ok(row, 'liveConsole has an EXPERIMENTAL_VIEWS row');
-  assert.equal(row.path, 'live-console');
+test('liveConsole is promoted out of EXPERIMENTAL_VIEWS (LIN-3977): the nav and Settings place it in the roadmap tier', () => {
+  assert.equal(EXPERIMENTAL_VIEWS.find(v => v.flag === 'liveConsole'), undefined, 'no longer an experiment');
 });
 
 test('getFeatureFlags keeps liveConsole off by default and honours an explicit toggle', () => {
@@ -145,7 +143,7 @@ test('mount order is pulse → chips → timeline → lanes → stream — no ex
   const chips = idx('id="live-console-chips"');
   const timeline = idx('class="lc-timeline-section"');
   const lanes = idx('class="lc-lanes-section"');
-  const stream = idx('class="lc-stream-section"');
+  const stream = idx('aria-label="Activity stream"');
   assert.ok(pulse < chips && chips < timeline && timeline < lanes && lanes < stream, 'mount points out of order');
 });
 
@@ -162,7 +160,7 @@ test('the timeline has no full-bleed breakout wrapper — axis/bars are ordinary
   assert.ok(!html.includes('lc-timeline-breakout'), '.lc-timeline-breakout must not exist');
   const sectionOpen = html.indexOf('class="lc-timeline-section"');
   const labelOpen = html.indexOf('class="lc-section-label"', sectionOpen);
-  const presetsOpen = html.indexOf('class="lc-timeline-presets"');
+  const presetsOpen = html.indexOf('aria-label="Timeline range"');
   const axisOpen = html.indexOf('id="live-console-timeline-axis"');
   const viewportOpen = html.indexOf('data-testid="live-console-timeline"');
   assert.ok(sectionOpen > 0 && labelOpen > sectionOpen && presetsOpen > labelOpen && axisOpen > presetsOpen && viewportOpen > axisOpen);

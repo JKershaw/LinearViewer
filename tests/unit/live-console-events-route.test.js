@@ -28,6 +28,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createLiveConsoleRoutes } from '../../routes/live-console.js';
+import { FOLD_SKEW_MS } from '../../lib/live-console.js';
 
 // Build an app whose status store returns the given per-workspace pages.
 // `pages` maps urlKey → { items, total } (or a function that throws).
@@ -121,10 +122,25 @@ describe('live branch — per-workspace store truncation feeds hasMore + summary
       }
     });
 
-    const { body } = await get(app, '/workspace/acme/api/live-console/events');
+    // LIN-3977: the aggregate across workspaces is the `scope=all` view; the default is the current one.
+    const { body } = await get(app, '/workspace/acme/api/live-console/events?scope=all');
 
     assert.equal(body.hasMore, true, 'ANY truncated workspace flips hasMore');
     assert.equal(body.summary.total, 902, 'sum of per-workspace store totals');
+  });
+
+  test('the default scope reads only the current workspace (LIN-3977): the other workspace is never asked', async () => {
+    const workspaces = [{ urlKey: 'acme', name: 'Acme' }, { urlKey: 'beta', name: 'Beta' }];
+    const { app, statusCalls } = buildApp({
+      workspaces,
+      pages: { acme: { items: entries(2, { urlKey: 'acme' }), total: 2 }, beta: { items: entries(2, { urlKey: 'beta' }), total: 900 } },
+    });
+
+    const { body } = await get(app, '/workspace/acme/api/live-console/events');
+
+    assert.deepEqual(statusCalls.map(c => c.urlKey), ['acme'], 'one workspace read on the default scope');
+    assert.equal(body.hasMore, false, 'the other workspace truncation does not reach the current page');
+    assert.equal(body.summary.total, 2);
   });
 });
 
@@ -173,7 +189,9 @@ describe('history branch — the before cursor is pushed down as `until` so pagi
     assert.equal(statusCalls.length, 1);
     const { opts } = statusCalls[0];
     assert.ok(opts.until instanceof Date, 'the cursor must ride into the QUERY, not stay a JS post-filter');
-    assert.equal(opts.until.getTime(), before, 'until is exactly the before cursor');
+    // LIN-3977 (N1): the status read reaches FOLD_SKEW_MS past the cursor, so a row
+    // just past it can fold into a moment before it; the page cut happens after the fold.
+    assert.equal(opts.until.getTime(), before + FOLD_SKEW_MS, 'until is the cursor plus the fold skew');
     assert.ok(opts.since instanceof Date, 'the history window lower bound still applies');
     assert.equal(typeof opts.limit, 'number', 'the per-workspace cap still bounds the read');
   });

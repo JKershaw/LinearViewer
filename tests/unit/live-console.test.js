@@ -131,7 +131,8 @@ test('buildConsoleFeed is tolerant of a non-array / empty input', () => {
     const feed = buildConsoleFeed(bad, { now: 0 });
     assert.deepEqual(feed.events, []);
     assert.deepEqual(feed.lanes, []);
-    assert.deepEqual(feed.summary, { active: 0, done: 0, failed: 0, blocked: 0, total: 0 });
+    // LIN-3977: the summary gains the working/waiting split and the dot's failedNow.
+    assert.deepEqual(feed.summary, { active: 0, working: 0, waiting: 0, failedNow: 0, done: 0, failed: 0, blocked: 0, total: 0 });
   }
 });
 
@@ -591,6 +592,13 @@ test('buildConsoleFeed with no credentialByToken → every lane unknown, rest of
     heartbeat: { toolCount: 12, elapsedSeconds: 540, breakdown: { Bash: 7, Read: 5 }, total: 15, state: null },
     ticketWalk: null,
     parkedWait: null,
+    // LIN-3977: additive lane fields (this fixture has no title, no kind, no session index).
+    title: null,
+    stage: 'Step',
+    sessionId: null,
+    waiting: false,
+    waitingSince: null,
+    waitingFor: null,
   });
 });
 

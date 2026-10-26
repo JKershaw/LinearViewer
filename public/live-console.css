@@ -13,11 +13,14 @@
   padding: 0 1rem 3rem;
 }
 
-.lc-experimental {
+/* LIN-3977: the scope control and the visible labels of the two range controls. */
+.lc-scope { margin: var(--space-1) 0 var(--space-2); }
+.lc-scope[hidden] { display: none; }
+.lc-range-label {
   font-family: var(--font-content);
+  font-size: 0.72rem;
   color: var(--muted);
-  font-size: 0.85rem;
-  margin: 0.25rem 0 1rem;
+  margin-right: var(--space-1);
 }
 
 /* ── Banner ─────────────────────────────────────────────────────────────── */
@@ -41,6 +44,8 @@
 .lc-status-dot[data-health="done"]  { color: var(--green); }
 .lc-status-dot[data-health="error"] { color: var(--red); }
 .lc-status-dot[data-health="idle"]  { color: var(--slate); }
+/* LIN-3977: a run waits on a person: its own colour, and the banner says it in words. */
+.lc-status-dot[data-health="waiting"] { color: var(--brand); }
 
 .lc-status-dot--pulse { animation: lc-pulse 1.6s ease-in-out infinite; }
 @keyframes lc-pulse {
@@ -71,9 +76,8 @@
   width: 100%;
   height: 100%;
 }
-/* .lc-pulse-presets reuses .lc-timeline-presets/.lc-timeline-preset verbatim
- * (both classes are present on the markup) — same idiom, zero new button
- * chrome. Only the span-text label is new. */
+/* The strip's range group reuses .lc-timeline-presets/.lc-timeline-preset verbatim
+ * — same idiom, zero new button chrome. Only the span-text label is new. */
 .lc-pulse-span-text {
   font-family: var(--font-structural);
   font-size: 0.72rem;
@@ -179,10 +183,31 @@
   color: var(--brand-dim);
 }
 .lc-timeline-axis {
+  position: relative;
   height: 1.1rem;
   font-family: var(--font-structural);
   font-size: 0.68rem;
   color: var(--muted);
+}
+/* LIN-3977: the axis' time ticks; the first and last are pinned to the column's edges. */
+.lc-timeline-tick {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.lc-timeline-tick--start { transform: none; }
+.lc-timeline-tick--end { transform: translateX(-100%); }
+.lc-timeline-key {
+  font-family: var(--font-content);
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin: var(--space-1) 0 var(--space-2);
+}
+.lc-lane-since {
+  font-family: var(--font-structural);
+  font-size: 0.7rem;
+  color: var(--slate-dim);
 }
 .lc-timeline-viewport {
   position: relative;
@@ -263,7 +288,19 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  pointer-events: none; /* decoration only — title/aria-label live on the bar itself */
+}
+/* LIN-3977: the detail line under the timeline names the bar in words. It wraps,
+   never ellipsises, so the full label is readable on a phone. */
+.lc-timeline-detail {
+  font-family: var(--font-content);
+  font-size: 0.8rem;
+  color: var(--text);
+  margin: 0 0 var(--space-2);
+  overflow-wrap: anywhere;
+}
+.lc-timeline-detail-link {
+  font-family: var(--font-structural);
+  white-space: nowrap;
 }
 .lc-timeline-bar[data-kind="working"] .lc-timeline-bar-label {
   color: rgba(0, 0, 0, 0.82);
@@ -381,12 +418,15 @@
 .lc-lanes-section { margin-bottom: 1.75rem; }
 .lc-lanes { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
 
+/* LIN-3977: one column, so the head, the stage row and the heartbeat stack in order. The bar is
+   absolutely placed (out of the grid's flow); the old three-column rule put the stage row beside the
+   head and wrapped a waiting lane's words one per line. */
 .lc-lane {
   position: relative;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: minmax(0, 1fr);
   align-items: baseline;
-  gap: 0.5rem;
+  gap: 0.35rem;
   padding: 0.5rem 0.7rem 0.5rem 0.9rem;
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-sm);
@@ -428,11 +468,12 @@
   font-size: 0.85rem;
   color: var(--text);
   text-decoration: none;
+  white-space: nowrap; /* the identifier is one unit: "LIN-1" never breaks across a line */
 }
 .lc-lane-task:hover { color: var(--brand-dim); text-decoration: underline; }
 /* LIN-3331 F1: the task identifier and its adjacent task-page link share ONE
-   grid cell, so the `auto 1fr auto` lane template is unchanged when the link is
-   visible (the lane stays on one row; `.lc-lane-ws` keeps the right edge). The
+   flex row (this head), so the link never takes a cell of its own and the lane
+   stays on one line for the identifier (`.lc-lane-ws` keeps the right edge). The
    link carries the lane's structural font size, not the body size. */
 .lc-lane-head {
   display: inline-flex;
@@ -440,10 +481,34 @@
   gap: 0.4rem;
   min-width: 0;
 }
-.lc-lane-task-page {
+/* LIN-3977: the lane's title, its run link and its stage word. */
+.lc-lane-title {
+  font-family: var(--font-content);
+  font-size: 0.8rem;
+  color: var(--text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lc-lane-title[hidden] { display: none; }
+.lc-lane-run {
   font-family: var(--font-structural);
   font-size: 0.72rem;
+  color: var(--brand-dim);
+  white-space: nowrap;
 }
+.lc-lane-stage-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-family: var(--font-content);
+  font-size: 0.78rem;
+}
+.lc-lane-stage { color: var(--text); font-weight: 600; }
+.lc-lane--waiting .lc-lane-action[data-waiting="1"] { color: var(--brand); font-weight: 600; }
+.lc-lane-cred[hidden] { display: none; }
 /* LIN-2243: a worker-lane's touched-ticket count. Empty (no width) for a
    non-lane loop — never a fixed slot that leaves a visible gap. */
 .lc-lane-tickets {
@@ -594,7 +659,6 @@
 }
 
 @media (max-width: 560px) {
-  .lc-lane { grid-template-columns: auto 1fr; }
   .lc-lane-ws { display: none; }
   .lc-event { grid-template-columns: auto 1fr; }
   .lc-event-meta { grid-column: 2; }

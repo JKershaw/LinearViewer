@@ -1740,6 +1740,24 @@ describe("abort harvest sourced from the abort row's own feedbackDigest.terminal
     assert.strictEqual(target.waitingMessage, null);
   });
 
+  // LIN-3977 (B2): the harvested abort's wake carries the abort entry's own time,
+  // as the non-lean path does (its findWakeEvent returns the appended abort entry).
+  test('wakeAt on a harvested abort is the abort entry time (lean agrees with non-lean)', async () => {
+    const stores = makeLeanDigestStores({ items: [abortRow(), targetRow()], collectionDocs: abortCollectionDocs() });
+    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    const target = loops.find(l => l.loopId === 'target-1');
+    assert.strictEqual(target.wakeAt, digestIso(HOUR + 900));
+  });
+
+  // LIN-3977: a digest written before `wake.at` existed reads wakeAt as null, not undefined.
+  test('wakeAt is null for a digest whose wake has no `at` key (pre-LIN-3977 row)', async () => {
+    const stores = makeLeanDigestStores({ items: [targetRow()], collectionDocs: [rawCollectionDoc({ _id: 'target-1' })] });
+    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    const target = loops.find(l => l.loopId === 'target-1');
+    assert.strictEqual(target.wakeMarker, 'blocked');
+    assert.strictEqual(target.wakeAt, null);
+  });
+
   test('runtime completedAt/ms are taken from the abort entry', async () => {
     const stores = makeLeanDigestStores({ items: [abortRow(), targetRow()], collectionDocs: abortCollectionDocs() });
     const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });

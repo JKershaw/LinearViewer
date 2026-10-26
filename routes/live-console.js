@@ -1,22 +1,25 @@
 /**
- * Live Console routes — the experimental ambient "watch the swarm" view
- * (LIN-1436).
+ * Live Console routes (LIN-1436; promoted out of experimental by LIN-3977).
  *
- * Anchored at /workspace/:urlKey/live-console (reusing workspaceFromUrl + the
- * experimental feature-gate-redirect-to-settings pattern shared by
- * collective/task-chat). The page is a provider-free shell; the client
- * polls a generation-free events endpoint that merges, across every connected
- * workspace:
- *   - the agent-status log → the discrete step stream, and
- *   - lean dispatch loops  → currently-working lanes (with live heartbeats) plus
- *     [evidence] artifacts as stream events; heartbeat beats also feed the tempo.
+ * Anchored at /workspace/:urlKey/live-console (reusing workspaceFromUrl and the
+ * feature-gate-redirect-to-settings pattern shared by collective/task-chat). The
+ * page is a provider-free shell; the client polls an events
+ * endpoint built from:
+ *   - the agent-status log → the discrete step stream,
+ *   - lean dispatch loops  → currently-working lanes (with live heartbeats),
+ *     [evidence] artifacts and the moments each run records about itself
+ *     (started / finished / failed / waiting on you) as stream events, and
+ *   - the session ledger's run id per loop, so every row can link to its run.
  *
- *   GET /workspace/:urlKey/live-console            — page shell (gated)
- *   GET /workspace/:urlKey/api/live-console/events — merged feed (JSON)
- *       ?before=<epochMs>&limit=<n>  → a history PAGE (older status events only)
+ *   GET /workspace/:urlKey/live-console              — page shell (gated)
+ *   GET /workspace/:urlKey/api/live-console/events   — feed (JSON)
+ *       ?scope=current|all   — the current workspace (default) or every connected one (LIN-3977)
+ *       ?before=<epochMs>&limit=<n> — a history PAGE from the same event pool as the poll
  *
- * Cost contract (mirrors Observation): the poll spends NO LLM call — it is pure
- * Mongo reads + a deterministic transform.
+ * Cost contract: the poll spends NO LLM call. It is pure Mongo reads and a
+ * deterministic transform. The history page reads the loops too (one lean read
+ * per workspace per "view earlier" click, not per poll), so that the events it
+ * shows are the same ones the poll would have shown.
  */
 
 import { Router } from 'express';
@@ -24,10 +27,12 @@ import { renderLiveConsolePage } from '../lib/render-live-console.js';
 import { renderErrorPage } from '../lib/render.js';
 import { jsonError, serverError } from '../lib/errors.js';
 import { findWorkspaceByUrlKey } from '../lib/workspace-lookup.js';
-import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
-import { buildConsoleFeed, DEFAULT_PAGE_SIZE, isLoopActive, snapPulseWindowMs } from '../lib/live-console.js';
-import { getLoopsForWorkspace } from '../lib/pipeline-loops.js';
+import {
+  buildConsoleEvents, buildConsoleFeed, DEFAULT_PAGE_SIZE, FOLD_SKEW_MS, isLaneMember, pageEvents, snapPulseWindowMs,
+} from '../lib/live-console.js';
+import { getLoopsForWorkspace, sessionIdByLoop } from '../lib/pipeline-loops.js';
+import { computeSupersededLoopIds } from '../lib/loop-supersede.js';
 import { collectAgentTokenIds, foldCredentialIndex } from '../lib/credential-state.js';
 
 // Live window: peak memory tracks recent activity, not the 30-day window.
@@ -114,9 +119,11 @@ export function createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, di
   // default and is deliberately NOT widened to make more lanes resolve: a lane
   // older than the credential window has no recent evidence, and `unknown` is
   // the honest answer for that.
-  async function readCredentialIndex(workspaces, loops) {
+  async function readCredentialIndex(workspaces, loops, superseded) {
     if (!proxyEventStore) return {};
-    const tokenIds = collectAgentTokenIds(loops, isLoopActive);
+    // LIN-3977: the membership predicate, so a waiting run's token is read too
+    // (LIN-1588's stranded-worker case), with the same superseded set the feed uses.
+    const tokenIds = collectAgentTokenIds(loops, lp => isLaneMember(lp, superseded));
     if (!tokenIds.size) return {};
 
     // Per-workspace failure discipline matches mergeAcross: a workspace whose
@@ -154,39 +161,65 @@ export function createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, di
     }
   });
 
-  // ─── Events endpoint (generation-free poll source + history pages) ──────────
+  // Every workspace's lean loops, tagged with their workspace. One read per
+  // workspace; the poll and the history page both call it.
+  async function readLoops(workspaces) {
+    if (!dispatchQueueStore) return [];
+    return mergeAcross(workspaces, async (ws) => {
+      const wsLoops = await getLoopsForWorkspace(ws.urlKey, { dispatchStore: dispatchQueueStore, agentStatusStore, lean: true });
+      return (wsLoops || []).map(lp => ({ ...lp, workspaceUrlKey: ws.urlKey, workspaceName: ws.name || ws.urlKey }));
+    }, 'loops');
+  }
+
+  // ─── Events endpoint (poll source + history pages) ──────────
   router.get('/workspace/:urlKey/api/live-console/events', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
-    const featureFlags = getFeatureFlags(req.session);
+    // LIN-3977: the page's own resolution (stored flag, else the owner-with-runner
+    // rule), so the page and this data cannot disagree about who may see it.
+    const featureFlags = await requestFeatureFlags(req);
     if (featureFlags.liveConsole !== true) {
       return jsonError(res, 403, 'Live console feature is not enabled');
     }
 
-    const workspaces = connectedWorkspaces(req, workspace);
+    // LIN-3977 (C2): the current workspace by default; every connected one on
+    // `scope=all`. Filtering the read (not the output) keeps the banner's counts
+    // in step with what is shown.
+    const scope = req.query.scope === 'all' ? 'all' : 'current';
+    const workspaces = scope === 'all'
+      ? connectedWorkspaces(req, workspace)
+      : [{ urlKey: workspace.urlKey, name: workspace.name || workspace.urlKey }];
     const now = Date.now();
     const beforeRaw = Number(req.query.before);
     const before = Number.isFinite(beforeRaw) && beforeRaw > 0 ? beforeRaw : null;
 
     try {
       if (before) {
-        // ── History page: older STATUS events only (cheap; no loops read). ──
-        // LIN-1494: the `before` cursor is pushed DOWN into the store read as
-        // an exclusive `until` bound, so each page reads the newest rows OLDER
-        // than the cursor and paging genuinely advances past the per-workspace
-        // cap. This pushdown is what makes the honest `hasMore` below safe:
-        // truncation-aware hasMore WITHOUT it would have "view more" re-read
-        // the same newest rows forever (an empty-page loop — worse than the
-        // old dead-end).
+        // ── History page: the SAME event pool the poll builds (LIN-3977, N1). ──
+        // The `before` cursor is pushed DOWN into the status read as an exclusive
+        // `until` bound, widened by FOLD_SKEW_MS: a status row just past the cursor
+        // can still fold into a moment before it, so it must be read. The pool is
+        // built and folded first, and only then cut at the cursor, so a row shows
+        // once, on the page its moment falls on.
         const pageSize = Math.min(Math.max(1, Number(req.query.limit) || 40), MAX_HISTORY_PAGE);
         const since = new Date(now - HISTORY_WINDOW_MS);
-        const until = new Date(before);
-        const { statusItems, sourceHasMore } = await readStatusAcross(workspaces, async (ws) => {
-          const { items, total } = await agentStatusStore.listStatus(ws.urlKey, { since, until, limit: HISTORY_PER_WORKSPACE_LIMIT });
-          return { items: (items || []).map(item => ({ ...item, workspaceUrlKey: ws.urlKey, workspaceName: ws.name || ws.urlKey })), total: total || 0 };
-        }, 'status(history)');
-
-        const feed = buildConsoleFeed({ statusItems, loops: [] }, { now, before, pageSize, sourceHasMore });
-        return res.json({ events: feed.events, hasMore: feed.hasMore, oldestTs: feed.oldestTs });
+        const until = new Date(before + FOLD_SKEW_MS);
+        const [statusRead, loops] = await Promise.all([
+          readStatusAcross(workspaces, async (ws) => {
+            const { items, total } = await agentStatusStore.listStatus(ws.urlKey, { since, until, limit: HISTORY_PER_WORKSPACE_LIMIT });
+            return { items: (items || []).map(item => ({ ...item, workspaceUrlKey: ws.urlKey, workspaceName: ws.name || ws.urlKey })), total: total || 0 };
+          }, 'status(history)'),
+          readLoops(workspaces),
+        ]);
+        const superseded = computeSupersededLoopIds(loops);
+        const { events } = buildConsoleEvents({
+          statusItems: statusRead.statusItems,
+          loops,
+          derivedSinceMs: now - HISTORY_WINDOW_MS,
+          superseded,
+          sessionIdByLoop: sessionIdByLoop(loops, { now: new Date(now) }),
+        });
+        const { page, hasMore, oldestTs } = pageEvents(events, { before, pageSize });
+        return res.json({ events: page, hasMore: hasMore || statusRead.sourceHasMore, oldestTs });
       }
 
       // ── Live poll: status stream + loops (lanes/heartbeats/evidence/tempo). ──
@@ -200,19 +233,19 @@ export function createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, di
           const { items, total } = await agentStatusStore.listStatus(ws.urlKey, { since, limit: FEED_PER_WORKSPACE_LIMIT });
           return { items: (items || []).map(item => ({ ...item, workspaceUrlKey: ws.urlKey, workspaceName: ws.name || ws.urlKey })), total: total || 0 };
         }, 'status'),
-        dispatchQueueStore
-          ? mergeAcross(workspaces, async (ws) => {
-              const wsLoops = await getLoopsForWorkspace(ws.urlKey, { dispatchStore: dispatchQueueStore, agentStatusStore, lean: true });
-              return (wsLoops || []).map(lp => ({ ...lp, workspaceUrlKey: ws.urlKey, workspaceName: ws.name || ws.urlKey }));
-            }, 'loops')
-          : Promise.resolve([]),
+        readLoops(workspaces),
       ]);
+
+      // LIN-3977: one superseded set and one run-id index per poll, built from the
+      // loops the route already holds (CPU only, no further read).
+      const superseded = computeSupersededLoopIds(loops);
+      const sessionIds = sessionIdByLoop(loops, { now: new Date(now) });
 
       // Depends on `loops`, so it runs after the read above rather than inside
       // the Promise.all — it is the empty-set short-circuit that keeps the
       // ordinary poll free, and there is nothing to ask for until we know which
       // tokens the working lanes carry.
-      const credentialByToken = await readCredentialIndex(workspaces, loops);
+      const credentialByToken = await readCredentialIndex(workspaces, loops, superseded);
 
       // LIN-1505 Phase C: the strip's requested zoom span. Never trust the
       // raw query value as a store-facing window — snap it to one of the
@@ -228,6 +261,9 @@ export function createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, di
         sourceTotal: statusRead.sourceTotal,
         credentialByToken,
         pulseWindowMs,
+        sessionIdByLoop: sessionIds,
+        superseded,
+        derivedSinceMs: now - FEED_WINDOW_MS,
       });
       res.json(feed);
     } catch (error) {

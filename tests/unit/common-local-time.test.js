@@ -96,3 +96,22 @@ describe('LIN-3991 — the zoned local time names its zone', () => {
     assert.equal(zoned.attrs.title, '8 Oct, 01:05 UTC', 'the server text stays in title');
   });
 });
+
+describe('LIN-3977 — exactLocalTime names the zone', () => {
+  test('a non-UTC TZ shows its short zone name (a missing zone would be invisible in UTC)', () => {
+    const { window } = makeSandbox();
+    const was = process.env.TZ;
+    process.env.TZ = TZ;
+    try {
+      const out = window.exactLocalTime('2026-10-08T01:05:00Z');
+      assert.match(out, /GMT\+9|JST/);
+      assert.match(out, /2026/); // the date's order follows the runner's locale, so only the year is pinned
+    } finally {
+      if (was === undefined) delete process.env.TZ; else process.env.TZ = was;
+    }
+  });
+
+  test('a bad timestamp is the empty string', () => {
+    assert.equal(makeSandbox().window.exactLocalTime('nope'), '');
+  });
+});

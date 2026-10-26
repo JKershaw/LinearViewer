@@ -126,6 +126,8 @@ const EXPECTED_GOLDEN_LOOP = {
   terminalCompletedAt: '2026-01-01T10:01:00.000Z',
   wakeMarker: 'done',
   waitingMessage: null,
+  // LIN-3977: the last wake event's time (any marker), surfaced beside the wake fields.
+  wakeAt: '2026-01-01T10:01:00.000Z',
   decision: {
     decision_id: 'd-1',
     question: 'Proceed?',

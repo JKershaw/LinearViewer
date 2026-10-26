@@ -1,7 +1,7 @@
 /**
  * Live Console client (experimental, LIN-1436).
  *
- * The ambient, lean-back view. Polls the generation-free events endpoint and
+ * The ambient, lean-back view. Polls the events endpoint and
  * paints:
  *   - the status banner + tempo sparkline (the system's rhythm, incl. heartbeats),
  *   - the pulse-lane rail (one breathing lane per working agent, ticking its
@@ -43,7 +43,11 @@
   const TIMELINE_WHEEL_ZOOM_SPEED = 0.0025;
   const PULSE_WHEEL_ZOOM_SPEED = 0.0025; // same tuning as TIMELINE_WHEEL_ZOOM_SPEED
   const PULSE_RUNG_DEBOUNCE_MS = 200;
-  const REDUCED_MOTION = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // LIN-3977: reduced motion is read live, not once at load. The query's `change`
+  // (listener at the foot of this file) updates `reducedMotion` and applyMotion()
+  // re-applies it to the reused lane nodes, the strip loop and the status dot.
+  const motionQuery = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+  let reducedMotion = !!(motionQuery && motionQuery.matches);
 
   // Kind → glyph (colour lives in live-console.css via [data-kind]).
   const KIND = {
@@ -66,11 +70,14 @@
     // Phase C), so a bare class selector here would pick up BOTH button groups.
     pulsePresets: Array.from(document.querySelectorAll('[data-testid^="live-console-pulse-preset-"]')),
     chips: document.getElementById('live-console-chips'),
+    scopeBtns: Array.from(document.querySelectorAll('[data-testid^="live-console-scope-"]')),
     timelineSection: document.getElementById('live-console-timeline-section'),
     timelineLabelText: document.getElementById('live-console-timeline-label-text'),
     timeline: document.getElementById('live-console-timeline'),
+    axis: document.getElementById('live-console-timeline-axis'),
     timelineConnectors: document.getElementById('live-console-timeline-connectors'),
     timelineEmpty: document.getElementById('live-console-timeline-empty'),
+    timelineDetail: document.getElementById('live-console-timeline-detail'),
     timelinePresets: Array.from(document.querySelectorAll('[data-testid^="live-console-timeline-preset-"]')),
     lanes: document.getElementById('live-console-lanes'),
     lanesEmpty: document.getElementById('live-console-lanes-empty'),
@@ -87,6 +94,10 @@
   const laneNodes = new Map();          // `${ws}::${task}` → <li>
   const eventNodes = new Map();         // live event id → <li>
   const timelineBarNodes = new Map();   // timeline run id → <div class="lc-timeline-bar">
+  // LIN-3977: the bar whose full label the detail line shows after a touch tap
+  // (the first tap reads it, a second tap opens its run), and the last input kind.
+  let selectedBar = null;
+  let lastInputKind = 'mouse';
   let lastServerNow = 0;                // last poll's serverNow — the timeline's anchor for "now"
   // LIN-1743 (Phase 2): the timeline's zoom/pan viewport, module-scope and
   // untouched by paintTimeline's poll-driven reconcile — a poll tick mid-gesture
@@ -135,7 +146,6 @@
   const rel = (iso) => (window.relativeTime ? window.relativeTime(iso) : '');
   const kindOf = (k) => KIND[k] || KIND.info;
   const isVisibleWs = (k) => !hiddenWorkspaces.has(k);
-  const obsHref = (wsKey) => `/workspace/${encodeURIComponent(wsKey)}/observation`;
 
   function nodeFromHtml(html) {
     const t = document.createElement('template');
@@ -202,8 +212,9 @@
   // paintLanes/paintStream, above: nodes updated in place, never
   // innerHTML-replaced, so a hidden bar's node reference — and any in-flight
   // gesture — survives a poll tick).
+  // LIN-3977: the plain stage word (the server's `stage`), never the raw kind.
   function timelineLabel(run) {
-    return (run && (run.kind || run.promptName)) || 'run';
+    return (run && (run.stage || run.kind || run.promptName)) || 'run';
   }
   // The visible window: { start, end } epoch ms. `timelineView.endMs === null`
   // means "live" — tracks lastServerNow every call, exactly Phase 1's fixed
@@ -226,6 +237,25 @@
     els.timeline.dataset.windowStart = String(Math.round(start));
     els.timeline.dataset.windowEnd = String(Math.round(end));
   }
+  // LIN-3977: the detail line under the timeline names the bar it shows in words:
+  // identifier, stage, ticket progress and check-ins, with the run's own link.
+  function showBarDetail(div) {
+    const el = els.timelineDetail;
+    const run = div && div._run;
+    if (!el || !run) return;
+    const parts = [`${run.issueIdentifier || '?'} — ${timelineLabel(run)}`];
+    if (run.ticketWalk && run.ticketWalk.length) parts.push(ticketProgressText(run.ticketWalk));
+    if (run.wakeCount > 0) parts.push(`${run.wakeCount} check-ins`);
+    el.textContent = parts.join(' · ');
+    const href = div.firstElementChild && div.firstElementChild.getAttribute('href');
+    if (href) {
+      const open = document.createElement('a');
+      open.className = 'lc-timeline-detail-link';
+      open.setAttribute('href', href);
+      open.textContent = 'open run →';
+      el.append(' ', open);
+    }
+  }
   function timelineBarNode(run) {
     const div = document.createElement('div');
     div.className = 'lc-timeline-bar';
@@ -236,9 +266,24 @@
     // ticket ID and prompt type", not merely accessible-but-invisible).
     // Absolutely positioned to fill the bar and clip its own overflow, so a
     // narrow/zoomed-out bar truncates gracefully instead of spilling text.
-    const labelNode = document.createElement('span');
+    // LIN-3977: the label is an <a> to the run page, so a bar is reachable and
+    // openable by keyboard (Tab, Enter); with no run it is inert text.
+    const labelNode = document.createElement('a');
     labelNode.className = 'lc-timeline-bar-label';
     div.appendChild(labelNode);
+    // LIN-3977: the full label is one step away on every input, without cutting it
+    // to an ellipsis. Focus and a mouse hover show it in the detail line under the
+    // timeline. A touch tap on a bar that is not yet selected only reads it (the
+    // click is cancelled); a second tap, or a keyboard Enter, opens the run.
+    labelNode.addEventListener('focus', () => showBarDetail(div));
+    div.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') showBarDetail(div); });
+    labelNode.addEventListener('click', (e) => {
+      if (lastInputKind === 'touch' && selectedBar !== div) {
+        e.preventDefault();
+        selectedBar = div;
+        showBarDetail(div);
+      }
+    });
     // LIN-2905: folded-wake tick nodes, keyed by marker id — reconciled the
     // same way the bars themselves are (paintTimeline), so a tick's node
     // reference survives an in-place update rather than being torn down and
@@ -295,11 +340,19 @@
     // LIN-2905 (ii): a folded wake's own bar/row is suppressed server-side —
     // its count survives as a " · N wakes" suffix on the target bar's own
     // label/title instead.
-    const wakeSuffix = run.wakeCount > 0 ? ` · ${run.wakeCount} wakes` : '';
+    const wakeSuffix = run.wakeCount > 0 ? ` · ${run.wakeCount} check-ins` : '';
     const label = `${run.issueIdentifier || '?'} — ${timelineLabel(run)}${ticketSuffix}${wakeSuffix}`;
     div.title = label;
     div.setAttribute('aria-label', label);
-    if (div.firstElementChild) div.firstElementChild.textContent = label;
+    const labelEl = div.firstElementChild;
+    if (labelEl) {
+      labelEl.textContent = label;
+      const runHref = window.runPageHref(run.workspaceUrlKey, run.sessionId);
+      if (runHref) labelEl.setAttribute('href', runHref);
+      else labelEl.removeAttribute('href');
+    }
+    div._run = run;
+    if (selectedBar === div || div.matches(':focus-within')) showBarDetail(div);
 
     // LIN-2905 (i)/(ii): render each folded wake as a thin tick inside the
     // bar, positioned at the wake's own dispatch time RENORMALISED to the
@@ -336,7 +389,7 @@
       // indistinguishable tick on a bar that itself looks finished and green.
       tick.setAttribute('data-still-running', marker.stillRunning === true ? 'true' : 'false');
       tick.setAttribute('data-outcome', marker.outcomeKind || 'working');
-      const markerLabel = `woken by ${marker.issueIdentifier || '?'}`;
+      const markerLabel = `check-in: woken by ${marker.issueIdentifier || '?'}`;
       tick.title = markerLabel;
       tick.setAttribute('aria-label', markerLabel);
     }
@@ -370,6 +423,20 @@
     return flat;
   }
 
+  // LIN-3977: the axis names the window's times: four ticks in the reader's local
+  // time, the first and last pinned to the edges so they never spill out of the column.
+  function paintAxis() {
+    if (!els.axis) return;
+    const { start, end } = currentTimelineWindow();
+    const fmt = (ms) => new Date(ms).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    const fractions = [0, 1 / 3, 2 / 3, 1];
+    els.axis.innerHTML = fractions.map((f, i) => {
+      const edge = i === 0 ? ' lc-timeline-tick--start' : (i === fractions.length - 1 ? ' lc-timeline-tick--end' : '');
+      const t = start + (end - start) * f;
+      return `<span class="lc-timeline-tick${edge}" style="left:${(f * 100).toFixed(2)}%">${esc(fmt(t))}</span>`;
+    }).join('');
+  }
+
   function paintTimeline(timeline) {
     if (!els.timeline) return;
     const rowCount = Array.isArray(timeline && timeline.rows) ? timeline.rows.length : 0;
@@ -377,6 +444,7 @@
     timelineFlat = flat; // for gesture-driven repaints that touch no new data
     timelineConnectorEdges = Array.isArray(timeline && timeline.connectors) ? timeline.connectors : [];
     syncTimelineWindowAttrs();
+    paintAxis();
 
     const wanted = new Set(flat.map(f => f.run.id));
     for (const [id, node] of timelineBarNodes) {
@@ -438,6 +506,7 @@
   // changes (new/removed runs) stay paintTimeline's job, driven by the poll.
   function repaintTimelineViewport() {
     syncTimelineWindowAttrs();
+    paintAxis();
     for (const { run, rowIndex } of timelineFlat) {
       const node = timelineBarNodes.get(run.id);
       if (node) updateTimelineBarNode(node, run, rowIndex);
@@ -562,7 +631,7 @@
     pulseViewSpanMs = spanMs;
     pulseGesture = null;
     pulseActivePreset = presetName || null;
-    // Synchronous repaint regardless of REDUCED_MOTION: under reduced motion
+    // Synchronous repaint regardless of reducedMotion: under reduced motion
     // there is no rAF loop, so this is the ONLY repaint trigger a click gets
     // — without it a reduced-motion user would see no feedback for up to 5s
     // (the next poll). Under the continuous rAF loop this is a harmless no-op
@@ -875,10 +944,23 @@
   }
 
   // ─── Chips (cross-workspace filter) ─────────────────────────────────────────
+  // LIN-3977: the page opens on the current workspace. "All workspaces" widens the
+  // read on the server (scope=all); the per-workspace chips filter inside that view.
+  let scope = 'current';
+  function setScope(next) {
+    scope = next;
+    if (els.scopeBtns) els.scopeBtns.forEach(btn => btn.setAttribute('aria-pressed', String(btn.getAttribute('data-scope') === scope)));
+    if (els.chips) els.chips.hidden = scope !== 'all' || workspaces.length < 2;
+    if (scope === 'current') hiddenWorkspaces.clear();
+    poll();
+  }
   function buildChips() {
     if (!els.chips) return;
+    if (els.scopeBtns) {
+      els.scopeBtns.forEach(btn => btn.addEventListener('click', () => setScope(btn.getAttribute('data-scope'))));
+    }
     if (workspaces.length < 2) { els.chips.hidden = true; return; }
-    els.chips.hidden = false;
+    els.chips.hidden = scope !== 'all';
     els.chips.innerHTML = workspaces.map(w =>
       `<button type="button" class="lc-chip" data-ws="${esc(w.urlKey)}" aria-pressed="true">
         <span class="lc-chip-dot" aria-hidden="true"></span>${esc(w.name || w.urlKey)}
@@ -898,24 +980,38 @@
   }
 
   // ─── Banner + connection state ──────────────────────────────────────────────
+  // The status dot's last state, re-applied when reduced motion changes.
+  let lastHealth = 'idle';
+  function paintHealth() {
+    if (!els.dot) return;
+    els.dot.setAttribute('data-health', lastHealth);
+    els.dot.classList.toggle('lc-status-dot--pulse', lastHealth === 'live' && !reducedMotion);
+  }
+  // LIN-3977: the banner says what is happening NOW. Earlier failures belong to the
+  // stream and the timeline; the dot is red only while a shown run has failed and
+  // nothing has followed it (summary.failedNow, computed by the server).
   function paintBanner(summary) {
-    const s = summary || { active: 0, done: 0, failed: 0, blocked: 0, total: 0 };
-    const bits = [`${s.active} working`];
-    if (s.done) bits.push(`${s.done} done`);
-    if (s.blocked) bits.push(`${s.blocked} blocked`);
-    if (s.failed) bits.push(`${s.failed} failed`);
-    if (els.status) els.status.textContent = s.total ? bits.join(' · ') : 'all quiet — nothing in flight right now';
+    const s = summary || { active: 0, working: 0, waiting: 0, failedNow: 0, done: 0, total: 0 };
+    const working = s.working != null ? s.working : (s.active || 0);
+    const waiting = s.waiting || 0;
+    const failedNow = s.failedNow || 0;
+    const parts = [`${working} working`];
+    if (waiting) parts.push(`${waiting} waiting on you`);
+    if (failedNow) parts.push(`${failedNow} failed, nothing since`);
+    let line;
+    if (working || waiting || failedNow) line = parts.join(' · ');
+    else line = s.total ? '0 working · nothing waiting on you' : 'all quiet — nothing in flight right now';
+    if (els.status) els.status.textContent = line;
 
-    let health = 'idle';
-    if (s.failed) health = 'error';
-    else if (s.active) health = 'live';
-    else if (s.total) health = 'done';
-    if (els.dot) {
-      els.dot.setAttribute('data-health', health);
-      els.dot.classList.toggle('lc-status-dot--pulse', health === 'live' && !REDUCED_MOTION);
-    }
+    if (failedNow) lastHealth = 'error';
+    else if (waiting) lastHealth = 'waiting';
+    else if (working) lastHealth = 'live';
+    else if (s.total) lastHealth = 'done';
+    else lastHealth = 'idle';
+    paintHealth();
   }
   function paintDisconnected() {
+    lastHealth = 'idle';
     if (els.dot) {
       els.dot.setAttribute('data-health', 'idle');
       els.dot.classList.remove('lc-status-dot--pulse');
@@ -975,7 +1071,7 @@
     humMax = Math.max(curMax, humMax * 0.9, 1); // slow-decay → stable vertical scale
     const curLoadMax = pulseData.load.length ? Math.max.apply(null, pulseData.load) : 0;
     loadMax = Math.max(curLoadMax, loadMax * 0.9, 1); // load's OWN slow-decay scale — independent of humMax
-    if (REDUCED_MOTION) renderPulse(); // no rAF; repaint a static snapshot per poll
+    if (reducedMotion) renderPulse(); // no rAF; repaint a static snapshot per poll
   }
 
   function renderPulse() {
@@ -993,7 +1089,7 @@
     ctx.clearRect(0, 0, cssW, cssH);
 
     const W = cssW, H = cssH, base = H - 1, humH = H * 0.62;
-    const effNow = REDUCED_MOTION
+    const effNow = reducedMotion
       ? pulseData.serverNow
       : pulseData.serverNow + (((window.performance && performance.now) ? performance.now() : 0) - pulseData.perf);
     if (!effNow) return;
@@ -1087,7 +1183,7 @@
     rafId = requestAnimationFrame(pulseFrame);
   }
   function startPulse() {
-    if (REDUCED_MOTION) { renderPulse(); return; }
+    if (reducedMotion) { renderPulse(); return; }
     if (rafId) cancelAnimationFrame(rafId);
     rafId = requestAnimationFrame(pulseFrame);
   }
@@ -1103,7 +1199,7 @@
   // no `credential` at all (a status-only fallback lane, which has no session
   // identity to resolve) reads as `unknown` for the same reason.
   const CRED_TEXT = {
-    dead: '⚠ credential dead',
+    dead: '⚠ credential dead — re-issue the token',
     ok: '✓ credential ok',
     unknown: '○ credential unknown',
   };
@@ -1118,21 +1214,26 @@
   }
 
   function laneNode(lane) {
-    const shimmer = REDUCED_MOTION ? '' : ' lc-lane--pulse';
+    const shimmer = reducedMotion ? '' : ' lc-lane--pulse';
     const li = nodeFromHtml(`<li class="lc-lane${shimmer}" data-testid="live-console-lane">
         <span class="lc-lane-bar" aria-hidden="true"></span>
         <span class="lc-lane-head">
-          <a class="lc-lane-task" href="#"></a>
-          <a class="lc-lane-task-page task-page-link" data-testid="lc-lane-task-page-link" href="#" hidden>task ↗</a>
+          <a class="lc-lane-task" data-testid="live-console-lane-task" href="#"></a>
+          <span class="lc-lane-title" data-testid="live-console-lane-title"></span>
+          <a class="lc-lane-run" data-testid="live-console-lane-run" href="#" hidden>open run ↗</a>
+          <span class="lc-lane-ws"></span>
         </span>
-        <span class="lc-lane-tickets" data-testid="live-console-lane-tickets"></span>
+        <span class="lc-lane-stage-row">
+          <span class="lc-lane-stage" data-testid="live-console-lane-stage"></span>
+          <span class="lc-lane-since" data-testid="live-console-lane-since"></span>
+          <span class="lc-lane-action" data-testid="live-console-lane-action"></span>
+          <span class="lc-lane-tickets" data-testid="live-console-lane-tickets"></span>
+        </span>
         <span class="lc-lane-mid">
-          <span class="lc-lane-action"></span>
-          <span class="lc-lane-cred" data-testid="live-console-lane-credential"></span>
+          <span class="lc-lane-cred" data-testid="live-console-lane-credential" hidden></span>
           <span class="lc-lane-hb" data-testid="live-console-heartbeat"></span>
           <span class="lc-lane-summary"></span>
         </span>
-        <span class="lc-lane-ws"></span>
       </li>`);
     updateLaneNode(li, lane);
     return li;
@@ -1147,54 +1248,78 @@
     const last = ticketWalk[ticketWalk.length - 1];
     return `ticket ${ticketWalk.length} so far · ${last.identifier} ${last.state}`;
   }
+  // LIN-3977: the words a waiting lane says. The time is shown only when the lane
+  // carries one (the marker channel); a parked wait names what it waits for.
+  function waitingWords(lane) {
+    if (!lane.waitingSince) return 'waiting on you';
+    return `waiting on you since ${rel(new Date(lane.waitingSince).toISOString())}`;
+  }
   function updateLaneNode(li, lane) {
+    li.classList.toggle('lc-lane--pulse', !reducedMotion);
+    li.classList.toggle('lc-lane--waiting', !!lane.waiting);
+    // One task link, to the task page. The run is a second, separate link to its run page.
     const task = li.querySelector('.lc-lane-task');
     task.textContent = lane.task || '?';
-    task.setAttribute('href', obsHref(lane.workspaceUrlKey));
-    task.setAttribute('title', `open ${lane.workspaceName || lane.workspaceUrlKey} in Observation`);
-    // LIN-3331: the adjacent task-page link, repainted every update (a lane
-    // node is reused across polls). No identifier → hidden. Without a source the
-    // link is plain: it resolves to the workspace's active provider, exactly as
-    // the Edit link does.
-    const taskPage = li.querySelector('.lc-lane-task-page');
     const taskPageHref = window.taskPageHref({
       urlKey: lane.workspaceUrlKey,
       identifier: lane.task,
       source: lane.issueSource,
     });
     if (taskPageHref) {
-      taskPage.setAttribute('href', taskPageHref);
-      taskPage.hidden = false;
+      task.setAttribute('href', taskPageHref);
+      task.setAttribute('title', `open ${lane.task} in its task page`);
     } else {
-      taskPage.removeAttribute('href');
-      taskPage.hidden = true;
+      task.removeAttribute('href');
+      task.removeAttribute('title');
     }
+    const title = li.querySelector('.lc-lane-title');
+    title.textContent = lane.title || '';
+    title.hidden = !lane.title;
+    const runHref = window.runPageHref(lane.workspaceUrlKey, lane.sessionId);
+    const run = li.querySelector('.lc-lane-run');
+    if (runHref) {
+      run.setAttribute('href', runHref);
+      run.hidden = false;
+    } else {
+      run.removeAttribute('href');
+      run.hidden = true;
+    }
+    li.querySelector('.lc-lane-stage').textContent = lane.stage || '';
+    // LIN-3977: how long the stage has run (the lane's `sinceMs`: the latest attempt's clock).
+    const since = li.querySelector('.lc-lane-since');
+    since.textContent = lane.sinceMs ? `for ${fmtDuration(Math.max(0, Math.round(((lastServerNow || Date.now()) - lane.sinceMs) / 1000)))}` : '';
     const tickets = li.querySelector('.lc-lane-tickets');
     tickets.textContent = ticketProgressText(lane.ticketWalk);
     // LIN-2244: a THIRD lane state, distinct from both actively working and
-    // blocked on a human — overrides the action text (never appends to it)
-    // so "parked" can't be missed alongside a stale-looking "working" label.
+    // blocked on a human. LIN-3977: "waiting on you" is words, not only colour.
     const actionEl = li.querySelector('.lc-lane-action');
-    if (lane.parkedWait) {
+    actionEl.removeAttribute('data-parked');
+    actionEl.removeAttribute('data-waiting');
+    actionEl.removeAttribute('title');
+    if (lane.waiting) {
+      actionEl.textContent = waitingWords(lane);
+      actionEl.setAttribute('data-waiting', '1');
+      if (lane.waitingSince) actionEl.setAttribute('title', window.exactLocalTime(new Date(lane.waitingSince).toISOString()));
+    } else if (lane.parkedWait) {
       actionEl.textContent = `parked since ${rel(lane.parkedWait.since)}`;
       actionEl.setAttribute('data-parked', '1');
     } else {
-      actionEl.textContent = lane.action || 'working';
-      actionEl.removeAttribute('data-parked');
+      actionEl.textContent = 'working';
     }
-    // Credential badge — textContent like every sibling field, so a hostile
-    // token label could not become markup even if one were shown here (it is
-    // deliberately not: the label is display-only and adds nothing to a rail
-    // already keyed by workspace+task).
+    // LIN-3977: a credential shows only when it is dead and needs re-issuing. An
+    // `unknown` one is the ordinary case, not a fact about the lane.
     const cred = li.querySelector('.lc-lane-cred');
     const state = credState(lane);
-    cred.textContent = CRED_TEXT[state];
+    cred.hidden = state !== 'dead';
+    cred.textContent = state === 'dead' ? CRED_TEXT.dead : '';
     cred.setAttribute('data-state', state);
     cred.setAttribute('title', CRED_TITLE[state]);
     li.querySelector('.lc-lane-hb').innerHTML = fmtHeartbeat(lane.heartbeat); // live tick — pre-escaped HTML (idle chip)
+    // While waiting, the lane's own summary is the question it asks.
     const sum = li.querySelector('.lc-lane-summary');
-    sum.textContent = lane.summary || '';
-    sum.setAttribute('title', lane.summary || '');
+    const words = lane.waiting && lane.waitingFor ? lane.waitingFor : (lane.summary || '');
+    sum.textContent = words;
+    sum.setAttribute('title', words);
     li.querySelector('.lc-lane-ws').textContent = lane.workspaceName || lane.workspaceUrlKey || '';
   }
 
@@ -1229,11 +1354,19 @@
   // ─── Events (immutable; insert new, trim, keep continuity) ──────────────────
   function eventNode(ev, isNew) {
     const k = kindOf(ev.kind);
-    const cls = 'lc-event' + (isNew && !REDUCED_MOTION ? ' lc-event--new' : '');
-    const taskHtml = ev.task
-      ? `<a class="lc-event-task" href="${esc(obsHref(ev.workspaceUrlKey))}" title="open ${esc(ev.workspaceName || ev.workspaceUrlKey)} in Observation">${esc(ev.task)}</a>`
-      : '';
-    const action = ev.action ? `<span class="lc-event-action">${esc(ev.action)}</span>` : '';
+    const cls = 'lc-event' + (isNew && !reducedMotion ? ' lc-event--new' : '');
+    // A row about a run links to its run page; a row with no run links to its task.
+    const runHref = window.runPageHref(ev.workspaceUrlKey, ev.sessionId);
+    const taskHref = runHref ? '' : window.taskPageHref({ urlKey: ev.workspaceUrlKey, identifier: ev.task });
+    let taskHtml = '';
+    if (ev.task) {
+      if (runHref) taskHtml = `<a class="lc-event-task" href="${esc(runHref)}" title="open the run for ${esc(ev.task)}">${esc(ev.task)}</a>`;
+      else if (taskHref) taskHtml = `<a class="lc-event-task" href="${esc(taskHref)}" title="open ${esc(ev.task)} in its task page">${esc(ev.task)}</a>`;
+      else taskHtml = `<span class="lc-event-task">${esc(ev.task)}</span>`;
+    }
+    // A plain word for what happened (`actionWord`); the raw kind never shows.
+    const word = ev.actionWord || ev.action;
+    const action = word ? `<span class="lc-event-action">${esc(word)}</span>` : '';
     // Evidence summaries link to the artifact itself; others are plain text.
     const summary = ev.summary
       ? (ev.kind === 'evidence' && ev.url
@@ -1241,7 +1374,9 @@
           : `<span class="lc-event-summary" title="${esc(ev.summary)}">${esc(ev.summary)}</span>`)
       : '';
     const ws = `<span class="lc-event-ws">${esc(ev.workspaceName || ev.workspaceUrlKey || '')}</span>`;
-    const when = `<span class="lc-event-time" data-iso="${esc(ev.iso)}">${esc(rel(ev.iso))}</span>`;
+    // LIN-3977: relative time, with the exact local time (zone named) on hover.
+    const exact = window.exactLocalTime(ev.iso);
+    const when = `<span class="lc-event-time" data-iso="${esc(ev.iso)}" title="${esc(exact)}">${esc(rel(ev.iso))}</span>`;
     return nodeFromHtml(`<li class="${cls}" data-kind="${esc(ev.kind)}" data-testid="live-console-event">
         <span class="lc-event-glyph" aria-hidden="true">${esc(k.glyph)}</span>
         <span class="lc-event-body">${taskHtml}${action}${summary}</span>
@@ -1367,7 +1502,7 @@
       // revert to the 3-min default after a debounced rung refetch (span is
       // session-only, but that means "survives every poll", not "survives
       // only until the next one").
-      const feed = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/live-console/events?pulseSpanMs=${pulseServerSpanMs}`, { on401: '/logout' });
+      const feed = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/live-console/events?pulseSpanMs=${pulseServerSpanMs}&scope=${scope}`, { on401: '/logout' });
       failures = 0;
       lastFeed = feed;
       applyFeed(feed, true);
@@ -1404,9 +1539,24 @@
     else start();
   });
 
+  // LIN-3977: follow a change of the reduced-motion setting while the page is open.
+  function applyMotion() {
+    for (const node of laneNodes.values()) node.classList.toggle('lc-lane--pulse', !reducedMotion);
+    paintHealth();
+    if (reducedMotion) { stopPulse(); renderPulse(); }
+    else if (!stopped) startPulse();
+  }
+  if (motionQuery && motionQuery.addEventListener) {
+    motionQuery.addEventListener('change', (e) => { reducedMotion = !!e.matches; applyMotion(); });
+  }
+
   if (els.moreBtn) els.moreBtn.addEventListener('click', loadMore);
   buildChips();
   wireTimelineGestures();
+  // LIN-3977: what kind of input the last press was, read by a bar's click (a touch
+  // tap reads a bar before it opens the run; see timelineBarNode).
+  document.addEventListener('pointerdown', (e) => { lastInputKind = e.pointerType || 'mouse'; }, true);
+  document.addEventListener('keydown', () => { lastInputKind = 'keyboard'; }, true);
   wirePulseGestures();
   updatePulseSpanText();
   renderSkeleton();
