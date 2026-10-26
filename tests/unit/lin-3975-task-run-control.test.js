@@ -14,7 +14,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
@@ -67,7 +67,11 @@ describe('LIN-3975 — the capability table has a row for every surface', () => 
 
 const esc = (s) => escapeHtml(s);
 
-function load({ opened = null, lastCopy = null } = {}) {
+/**
+ * The page's stubs. `prompt` answers `/api/prompt/…` (a hang, a failure, or a prompt); `reply` and `rateLimit`
+ * drive the streamed reply and the proxy's token-limit notice, so every phase of the component is reachable.
+ */
+function load({ opened = null, lastCopy = null, prompt = null, fetch = null, reply = null, rateLimit = false } = {}) {
   const window = {
     escapeHtml: esc,
     stripCodeBlockWrapper: (s) => s,
@@ -79,12 +83,18 @@ function load({ opened = null, lastCopy = null } = {}) {
       if (url.includes('/api/dispatch/decision-panel')) return { html: '', words: null, withoutEffort: [] };
       if (url.includes('/api/dispatch/presets')) return { presets: [] };
       if (url.includes('/api/dispatch/quota')) return {};
+      if (url.includes('/api/prompt/') && prompt) return prompt();
       return { prompt: 'PROMPT', promptName: 'Plan' };
     },
+    readSSEStream: reply || (async () => {}),
     fetchAutopilotKickoff: async () => ({ prompt: 'A', promptName: 'Autopilot', kind: 'autopilot' }),
     dispatchPrompt: async () => ({ success: true, item: { id: 'd-1' } }),
     taskPageHref: () => '/workspace/acme/task/LIN-42',
-    ProxyToggle: { isActive: () => false, setActive() {}, maybeAppend: async (raw) => raw },
+    ProxyToggle: {
+      isActive: () => false, setActive() {}, maybeAppend: async (raw) => raw,
+      takeRateLimitNotice: () => rateLimit,
+      RATE_LIMIT_SKIP_NOTICE: 'The agent-access link was skipped — the token limit was reached. Try again in a few minutes.',
+    },
     readDispatchExecControls: () => ({ model: null, harness: null }),
     renderDispatchDisclosure: () => '',
     isPinnedToBottom: () => false,
@@ -97,7 +107,7 @@ function load({ opened = null, lastCopy = null } = {}) {
     setTimeout: (fn, ms) => { const t = globalThis.setTimeout(fn, ms); if (t && t.unref) t.unref(); return t; },
     clearTimeout,
     navigator: { clipboard: { writeText: async () => {} } },
-    fetch: async () => ({ ok: true, json: async () => ({}) }),
+    fetch: fetch || (async () => ({ ok: true, json: async () => ({}) })),
     console,
   };
   vm.createContext(sandbox);
@@ -106,24 +116,51 @@ function load({ opened = null, lastCopy = null } = {}) {
 }
 
 /**
- * A container that keeps its markup, as the component writes it. Its one slot repaint is the copy line's: the
- * component swaps `[data-last-copy-slot]` by outerHTML, so the fake supports exactly that swap, and nothing else.
+ * A container that keeps its markup, as the component writes it. Three writes reach it: the copy line's slot swap
+ * (outerHTML), the setup notice's slot (innerHTML, a press) and the token-limit note's slot (textContent). Each is matched on the component's own slot markup,
+ * so nothing else in the page is touched. Its own classes (`classList`) and its click listener are recorded, so a
+ * test can press a control the way a reader does.
  */
 function makeContainer() {
   let html = '';
+  const ownClasses = new Set();
+  const listeners = {};
   const LAST_COPY_SLOT = /<div class="opened-task-last-copy-slot" data-last-copy-slot>(?:<div class="opened-task-last-copy"[^>]*>[^<]*<\/div>)?<\/div>/;
+  const NOTICE_SLOT = /(<div class="opened-task-notice-slot" data-setup-notice-slot aria-live="polite">)(?:<div class="opened-task-setup-notice">[\s\S]*?<\/div>)?<\/div>/;
+  const PROXY_SLOT = /(<div class="opened-task-proxy-limit" data-proxy-limit-slot aria-live="polite">)[^<]*<\/div>/;
   return {
     get innerHTML() { return html; },
     set innerHTML(v) { html = v; },
-    classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
+    get html() { return html; },
+    classList: {
+      add(c) { ownClasses.add(c); },
+      remove(c) { ownClasses.delete(c); },
+      toggle(c) { if (ownClasses.has(c)) ownClasses.delete(c); else ownClasses.add(c); return ownClasses.has(c); },
+      contains(c) { return ownClasses.has(c); },
+    },
+    ownClasses,
     setAttribute() {},
     querySelector(sel) {
-      if (sel !== '[data-last-copy-slot]' || !LAST_COPY_SLOT.test(html)) return null;
-      return { set outerHTML(v) { html = html.replace(LAST_COPY_SLOT, v); } };
+      if (sel === '[data-last-copy-slot]' && LAST_COPY_SLOT.test(html)) {
+        return { set outerHTML(v) { html = html.replace(LAST_COPY_SLOT, v); } };
+      }
+      if (sel === '[data-setup-notice-slot]' && NOTICE_SLOT.test(html)) {
+        return { set innerHTML(v) { html = html.replace(NOTICE_SLOT, (_, open) => `${open}${v}</div>`); } };
+      }
+      if (sel === '[data-proxy-limit-slot]' && PROXY_SLOT.test(html)) {
+        return { set textContent(v) { html = html.replace(PROXY_SLOT, (_, open) => `${open}${v}</div>`); } };
+      }
+      return null;
     },
     querySelectorAll() { return []; },
-    addEventListener() {},
+    addEventListener(type, fn) { (listeners[type] ||= []).push(fn); },
     removeEventListener() {},
+    /** A reader's press on a control with these `data-*` attributes (`dataset` keys, camelCase). */
+    press(dataset) {
+      const btn = { dataset, disabled: false, textContent: '', classList: { add() {}, remove() {} } };
+      btn.closest = (sel) => (sel.includes('button') ? btn : null);
+      for (const fn of listeners.click || []) fn({ target: btn });
+    },
     contains() { return true; },
     closest() { return null; },
   };
@@ -302,6 +339,15 @@ describe('LIN-3975 — the run control is the owner\'s; everyone else reads the 
     assert.ok(tracker > 0 && mountAt > tracker && statusAt > mountAt);
     assert.match(html, /Tracker: In Progress/);
   });
+
+  test('the answer says which state is Harbour\'s: the pill is labelled Harbour, inside the repainted status', () => {
+    const html = page(model(), 'owner', PROMPT_OPTS);
+    const label = html.indexOf('data-testid="task-page-harbour-label"');
+    const pill = html.indexOf('data-testid="task-page-status-pill"');
+    const statusAt = html.indexOf('data-testid="task-page-status"');
+    assert.ok(label > statusAt && pill > label, 'the Harbour label sits in the status mount, before the pill');
+    assert.match(html, /task-page-harbour-label">Harbour:<\/span>/);
+  });
 });
 
 describe('LIN-3975 — the next-step line says what the page offers, in plain words', () => {
@@ -323,30 +369,157 @@ function classesIn(css) {
   return new Set([...bare.matchAll(/\.([A-Za-z_][\w-]*)/g)].map((m) => m[1]));
 }
 
-/** Hooks: classes the component draws for JS or tests, styled by no sheet on purpose (one reason each). */
-const HOOKS = {
-  btn: 'a house button class: styled by common-actions.css, which the task page links; listed for the census only',
-  'opened-task-last-copy-slot': 'the repaint target for the copy line (a press or the task-mode read writes into it); no rule of its own',
-};
+/** The linked sheets: the classes the task page's stylesheets define. */
+const TASK_SHEETS = ['style.css', 'common-actions.css', 'session.css', 'stage-track.css', 'run-control.css', 'task-page.css'];
+const IDENT = /^[A-Za-z][\w-]*$/;
+
+/**
+ * Hooks: classes the component draws for JS, tests or a repaint, and that no sheet defines on purpose. Each entry
+ * says why it has no rule. The witness below checks that every one is defined nowhere, so a rule added later
+ * moves the entry out of this list in the same change.
+ */
+const HOOK = Object.freeze({
+  'autopilot-btn': 'test/JS hook on the Autopilot prompt button; the swipe-prompt-btn base rule draws it',
+  'opened-task-all': 'test/JS hook on the "All N" button; the .btn base class draws it',
+  'opened-task-another-item': 'test/JS hook on a run-another item; the .btn base class draws it',
+  'opened-task-another-more': 'test/JS hook on the "Show N more" button; the .btn--quiet base class draws it',
+  'opened-task-choice': 'test/JS hook on a target choice; the .btn base class draws it',
+  'opened-task-download': 'test/JS hook on the download button; the .btn base class draws it',
+  'opened-task-go--limited': 'modifier on the Go button when the run limit is reached; the .opened-task-go rule draws it',
+  'opened-task-go--setup': 'modifier on the Go button when the runner is not set up; the .opened-task-go rule draws it',
+  'opened-task-last-copy-slot': 'repaint slot for the copy line (outerHTML swap); no rule of its own',
+  'opened-task-notice-slot': 'repaint slot for the setup notice (innerHTML write); no rule of its own',
+  'opened-task-proxy-limit': 'repaint slot for the token-limit note (textContent write); no rule of its own',
+  'opened-task-left-out': 'the "N steps left out" note in the run-another list; a plain paragraph by design',
+  'opened-task-needs-you': 'the subtask line in the state block, which the task surface does not draw',
+  'opened-task-needs-you-name': 'the subtask name span in the state block, which the task surface does not draw',
+  'opened-task-needs-you-open': 'the subtask link in the state block, which the task surface does not draw; a .btn--quiet',
+  'opened-task-preset': 'test/JS hook on a preset button; the .btn base class draws it',
+  'opened-task-runs-on-what': 'a plain text span inside the "Runs on" sentence; it reads as text by design',
+  'opened-task-settings-link': 'a plain link inside the "Runs on" sentence; it inherits the sentence style',
+  'opened-task-source': 'a plain text span inside the "Runs on" sentence; it reads as text by design',
+  'opened-task-use': 'test/JS hook on the "Use for this run" button; the .btn--primary base class draws it',
+  'swipe-reasoning': 'Swipe\'s hook on the reasoning toggle; the task surface styles the same block by opened-task-reasoning',
+});
+
+/**
+ * Swipe-only classes: defined by swipe.css and drawn by Swipe's own card, never by the task surface. The witness
+ * below checks two things: each is defined by swipe.css and not by a task sheet, and no task-surface phase emits one.
+ */
+const SWIPE_ONLY = Object.freeze({
+  'swipe-prompt-btn': 'the prompt-button row Swipe draws (renderPromptButtons); the task surface has no such row',
+  'swipe-prompt-btn-more': 'the "more" button of Swipe\'s prompt-button row',
+  'swipe-prompt-buttons': 'the prompt-button row Swipe draws (renderPromptButtons)',
+  'custom-prompt-btn': 'a custom prompt in Swipe\'s prompt-button row',
+  'swipe-prompt-copy': 'Swipe\'s action cluster (renderActionCluster): copy, download and edit',
+  'swipe-prompt-download': 'Swipe\'s action cluster (renderActionCluster): copy, download and edit',
+  'swipe-prompt-edit': 'Swipe\'s action cluster (renderActionCluster): copy, download and edit',
+  'copied': 'the copied state of Swipe\'s copy button (swipe-prompt-copy.copied)',
+  'opened-task-proxy': 'the +proxy disclosure in Swipe\'s action cluster',
+  'opened-task-proxy-faq': 'the +proxy disclosure in Swipe\'s action cluster',
+  'opened-task-proxy-label': 'the +proxy disclosure in Swipe\'s action cluster',
+});
+
+/** Every class token the component's source can write: `class="…"` attributes and classList calls. */
+function classTokensOfSource(src) {
+  const tokens = new Set();
+  for (const m of src.matchAll(/class="([^"]*)"/g)) for (const t of m[1].split(/\s+/)) if (IDENT.test(t)) tokens.add(t);
+  for (const m of src.matchAll(/classList\.(?:add|toggle|remove)\('([^']+)'/g)) tokens.add(m[1]);
+  return tokens;
+}
+
+/** The class tokens a rendered page (or a container's own classes) carries. */
+function classTokensOfMarkup(html, own = new Set()) {
+  const tokens = new Set(own);
+  for (const m of html.matchAll(/class="([^"]*)"/g)) for (const t of m[1].split(/\s+/)) if (t) tokens.add(t);
+  return tokens;
+}
+
+/**
+ * Each phase, reached the way a reader reaches it: a render, a press, or a stubbed reply. `marker` is what the
+ * phase must show, so a driver that did not reach its state fails here instead of passing vacuously.
+ */
+async function everyPhase() {
+  const hangs = () => new Promise(() => {});
+  const fails = async () => { throw new Error('boom'); };
+  const prompt = async () => ({ prompt: 'PROMPT', promptName: 'Plan' });
+  const reply = async (_resp, onEvent) => { onEvent('done', {}); };
+  const phases = [];
+  const run = async (name, marker, surface, over, loadOver, presses = []) => {
+    const PS = load(loadOver);
+    const c = makeContainer();
+    PS.init(c, { ...BASE, surface, ...over });
+    await flush();
+    await flush();
+    for (const dataset of presses) {
+      c.press(dataset);
+      await flush();
+      await flush();
+    }
+    phases.push({ name, marker, html: c.html, own: c.ownClasses });
+  };
+  const idle = { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT };
+  const copyFirst = { dispatchEnabled: false };
+  await run('run idle', /data-testid="opened-task-go"/, 'task', {}, { opened: idle });
+  await run('run running', /data-testid="opened-task-started"/, 'task', {}, { opened: { status: 'running', live: true, headerHtml: '', sessions: RUNNING } });
+  await run('run generating', /generating…/, 'task', {}, { opened: idle, prompt: hangs }, [{ prompt: 'plan' }]);
+  await run('run error', /prompt · error/, 'task', {}, { opened: idle, prompt: fails }, [{ prompt: 'plan' }]);
+  await run('run fresh', /data-prompt-body/, 'task', {}, { opened: idle, prompt: prompt }, [{ prompt: 'plan' }]);
+  await run('run change open', /data-testid="run-change"|opened-task-change-panel/, 'task', {}, { opened: idle }, [{ action: 'change-run' }]);
+  // Not a phase: the setup notice has no press on the task surface. A runner-less owner gets the copy-first view,
+  // whose only control is "Write the prompt", and the run control's Go setup button is drawn only when the run
+  // control is off. The notice's slot is still emitted by the fresh copy-first phase below.
+  await run('copy-first idle', /data-testid="opened-task-write"/, 'task', copyFirst, { opened: idle });
+  await run('copy-first generating', /generating…/, 'task', copyFirst, { opened: idle, prompt: hangs }, [{ prompt: 'plan' }]);
+  await run('copy-first error', /prompt · error/, 'task', copyFirst, { opened: idle, prompt: fails }, [{ prompt: 'plan' }]);
+  await run('copy-first fresh', /data-prompt-body/, 'task', copyFirst, { opened: idle, prompt: prompt }, [{ prompt: 'plan' }]);
+  await run('copy-first after a copy', /You copied the Plan prompt/, 'task', copyFirst, { opened: idle, lastCopy: { label: 'Plan', kind: 'plan', at: new Date().toISOString() } });
+  await run('prompt warning', /swipe-prompt-warning/, 'task', {}, { opened: idle, reply, fetch: async () => ({ ok: true }) }, [{ prompt: '__ai__' }]);
+  await run('proxy limit', /opened-task-proxy-limit[^>]*>The agent-access link was skipped/, 'task', copyFirst, { opened: idle, prompt: prompt, rateLimit: true }, [{ prompt: 'plan' }, { action: 'copy' }]);
+  await run('swipe card', /swipe-prompt-buttons|swipe-prompt-header/, 'swipe', {}, { opened: idle });
+  return phases;
+}
 
 describe('LIN-3975 — the run control\'s classes are styled by the sheets the task page links', () => {
-  test('every class the task-surface run control emits is defined by a linked sheet, or is a hook', async () => {
-    const linked = ['style.css', 'common-actions.css', 'session.css', 'stage-track.css', 'run-control.css', 'task-page.css'];
-    const defined = new Set();
-    for (const f of linked) for (const c of classesIn(read(`public/${f}`))) defined.add(c);
+  test('static: every class token the component can write is styled by a linked sheet, a swipe-only rule, or a hook', () => {
+    const src = read('public/prompt-section.js');
+    const linked = new Set(TASK_SHEETS.flatMap((f) => [...classesIn(read(`public/${f}`))]));
+    const swipe = classesIn(read('public/swipe.css'));
+    const everywhere = new Set(readdirSync(join(__dirname, '../../public')).filter((f) => f.endsWith('.css')).flatMap((f) => [...classesIn(read(`public/${f}`))]));
+    const unclassified = [...classTokensOfSource(src)].filter((t) => !linked.has(t) && !(t in SWIPE_ONLY) && !(t in HOOK));
+    assert.deepStrictEqual(unclassified, [], 'a class the component writes must be styled by a linked sheet, or listed with a reason');
+    for (const t of Object.keys(SWIPE_ONLY)) {
+      assert.ok(swipe.has(t), `${t} is styled by swipe.css`);
+      assert.equal(linked.has(t), false, `${t} is not styled by a task sheet`);
+    }
+    for (const t of Object.keys(HOOK)) assert.equal(everywhere.has(t), false, `${t} is defined by no sheet, as its entry says`);
+  });
 
-    const emitted = new Set();
-    const collect = (html) => {
-      for (const m of html.matchAll(/class="([^"]*)"/g)) for (const t of m[1].split(/\s+/)) if (t) emitted.add(t);
-    };
-    collect((await mount('task', {}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT } })).innerHTML);
-    collect((await mount('task', {}, { opened: { status: 'running', live: true, headerHtml: '', sessions: RUNNING } })).innerHTML);
-    collect((await mount('task', { dispatchEnabled: false }, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT } })).innerHTML);
-    collect((await mount('task', { dispatchEnabled: false }, { opened: null, lastCopy: { label: 'Plan', at: new Date().toISOString() } })).innerHTML);
+  test('dynamic: every phase is reached, and every class a phase emits is styled by a linked sheet or is a hook', async () => {
+    const linked = new Set(TASK_SHEETS.flatMap((f) => [...classesIn(read(`public/${f}`))]));
+    const phases = await everyPhase();
+    for (const ph of phases) assert.match(ph.html, ph.marker, `the "${ph.name}" phase is reached`);
+    const emittedBy = new Map();
+    for (const ph of phases.filter((p) => p.name !== 'swipe card')) {
+      for (const t of classTokensOfMarkup(ph.html, ph.own)) {
+        if (!emittedBy.has(t)) emittedBy.set(t, []);
+        emittedBy.get(t).push(ph.name);
+      }
+    }
+    const unstyled = [...emittedBy.keys()].filter((t) => !linked.has(t) && !(t in HOOK));
+    assert.deepStrictEqual(unstyled.map((t) => `${t} (${emittedBy.get(t)[0]})`), [], 'a class emitted on the task surface is styled by a linked sheet, or is a hook');
+  });
 
-    const prompt = [...emitted].filter((t) => /^(opened-task|swipe-prompt|prompt-section|task-)/.test(t) || t === 'btn' || t === 'btn--primary' || t === 'btn--quiet');
-    const unstyled = prompt.filter((t) => !defined.has(t) && !(t in HOOKS) && !t.startsWith('task-'));
-    assert.deepStrictEqual(unstyled, [], 'a class the run control emits must be styled by a linked sheet, or listed as a hook with its reason');
+  test('dynamic: no task-surface phase emits a swipe-only class (the claim is checked, not a comment)', async () => {
+    const phases = await everyPhase();
+    const leaked = [];
+    for (const ph of phases.filter((p) => p.name !== 'swipe card')) {
+      for (const t of classTokensOfMarkup(ph.html, ph.own)) if (t in SWIPE_ONLY) leaked.push(`${t} (${ph.name})`);
+    }
+    assert.deepStrictEqual(leaked, []);
+    // Control: Swipe's own card does emit the swipe-only classes, so the check above can fail.
+    const swipeCard = phases.find((p) => p.name === 'swipe card');
+    assert.ok(classTokensOfMarkup(swipeCard.html).has('swipe-prompt-buttons'), 'the control phase emits a swipe-only class');
   });
 
   test('run-control.css holds the component\'s moved rules, and swipe.css no longer defines them', () => {
@@ -359,7 +532,6 @@ describe('LIN-3975 — the run control\'s classes are styled by the sheets the t
     assert.ok(swipe.has('opened-task-proxy'), 'the proxy disclosure stays with Swipe\'s own action cluster');
   });
 });
-
 // ─── the client's wiring order ───────────────────────────────────────────────
 
 describe('LIN-3975 — the run control is wired before the first Markdown render', () => {
