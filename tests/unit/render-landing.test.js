@@ -132,12 +132,14 @@ test('grounds the dollar claim in formatModelPricing(DEFAULT_MODEL), not a secon
   assert.ok(html.includes(expectedPricing), 'renders the live pricing hint verbatim');
 });
 
-test('scopes the cheap-try claim to AI Generated Prompts, never the whole product', () => {
+test('scopes the cheap-try claim to writing prompts, and names no internal product or mechanism (LIN-3995)', () => {
   const html = renderLandingPage({});
   const section = html.slice(html.indexOf('data-testid="landing-try"'), html.indexOf('data-testid="landing-providers"'));
-  assert.match(section, /AI Generated Prompts/);
+  assert.doesNotMatch(section, /AI Generated Prompts/i);
+  assert.doesNotMatch(section, /autopilot dispatch/i);
   assert.match(section, /under \$1/);
-  assert.match(section, /pricier model/); // full dispatch/autopilot caveat
+  assert.match(section, /OpenRouter/);
+  assert.match(section, /pricier model/); // the cost caveat for running the work
   assert.ok(!section.includes('run Harbour for'), 'never implies the whole product runs for under $1');
 });
 
@@ -151,8 +153,8 @@ test('freeTierEnabled leads with the free path and never demands payment to try'
 test('defaults to the BYOK lead line when freeTierEnabled is false', () => {
   const html = renderLandingPage({});
   const section = html.slice(html.indexOf('data-testid="landing-try"'), html.indexOf('data-testid="landing-providers"'));
-  assert.match(section, /connect OpenRouter/i);
-  assert.match(section, /own OpenRouter tokens/);
+  assert.match(section, /connect your own OpenRouter key/i);
+  assert.match(section, /You pay OpenRouter a few cents; Harbour charges nothing/); // LIN-3995: the plain copy
 });
 
 // LIN-3980 outcome 4: "Try it yourself" offers the same sign-in buttons as the
