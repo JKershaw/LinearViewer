@@ -82,6 +82,10 @@
   max-width: 60ch;
 }
 
+.settings-rows > .consent-notice {
+  border-top: 0;
+}
+
 .settings-form {
   display: inline;
   margin: 0;
@@ -777,7 +781,68 @@
   width: 100%;
   height: 0.5em;
   margin-top: var(--space-1);
-  accent-color: var(--blue);
+  appearance: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--line);
+  overflow: hidden;
+}
+
+/* The bar is a native <progress>, styled with the house tokens rather than the browser's blue (LIN-3952). */
+.settings-spend-bar::-webkit-progress-bar {
+  background: var(--line);
+}
+
+.settings-spend-bar::-webkit-progress-value {
+  background: var(--blue);
+}
+
+.settings-spend-bar::-moz-progress-bar {
+  background: var(--blue);
+}
+
+/* A job's figures at rest, after its value: total, typical run and share (LIN-3952 item 1). */
+.settings-row-figures {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+  color: var(--fg);
+  white-space: nowrap;
+}
+
+.settings-row-figures .settings-row-typical {
+  color: var(--muted);
+  font-size: var(--font-size-sm);
+}
+
+.settings-row-figures .settings-spend-bar {
+  width: 4rem;
+  margin-top: 0;
+}
+
+.settings-group-meta {
+  margin-left: var(--space-2);
+  color: var(--muted);
+  font-size: var(--font-size-sm);
+  font-weight: normal;
+}
+
+/* "Show N more" is a row of its own, under the jobs at rest (LIN-3952). */
+.models-fold-summary {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+}
+
+.models-fold-summary::-webkit-details-marker {
+  display: none;
+}
+
+.models-fold[open] > .models-fold-summary {
+  color: var(--fg-dim);
 }
 
 .settings-filter {
@@ -798,11 +863,90 @@
 
 /* The save blocks sit between the Models groups: a gap on both sides, and the reason labels in the sans
    the other Settings labels use (LIN-3855 review). */
-.models-save,
 .models-preset-save {
   display: grid;
   gap: var(--space-2);
   margin: var(--space-4) 0;
+}
+
+/* The pending bar (LIN-3952 item 4): it stays in view at the foot of the screen while anything is staged, on desktop
+   and phone, and above an open phone sheet (z-index 61 over the sheet's 60). It is one line on desktop and a compact
+   stack on a phone; the client hides it while nothing is staged. */
+.models-save {
+  position: sticky;
+  bottom: 0;
+  z-index: 61;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin: var(--space-3) 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+}
+
+.models-save.is-idle {
+  display: none;
+}
+
+.models-save-count,
+.models-save .settings-note {
+  margin: 0;
+}
+
+.models-save-reason {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: center;
+  min-width: 0;
+}
+
+.models-save-reason .settings-ask-reason {
+  width: 100%;
+  min-width: 0;
+}
+
+.models-save-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* A staged row shows its pending value in its summary, and is marked (LIN-3952 item 4). A saved row is marked the same way. */
+.models-row-pending {
+  color: var(--blue);
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.settings-row.is-staged > summary .settings-row-label {
+  font-weight: 600;
+}
+
+.models-saved {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+@media (max-width: 640px) {
+  .models-save {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-1);
+    padding: var(--space-2);
+  }
+
+  .models-save-actions {
+    justify-content: flex-end;
+  }
+
+  /* The open sheet keeps its last field clear of the bar that sits above it. */
+  .models-form details.settings-row-open[open] {
+    padding-bottom: 12rem;
+  }
 }
 
 .models-save .settings-ask-label,
