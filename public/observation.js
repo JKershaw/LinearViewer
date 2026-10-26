@@ -425,8 +425,14 @@ function setPollStatus(text) {
 
 let workspaceScope = 'current';
 
+// The scope a page load opens on (LIN-3983 PR 2): `scope=all` reopens All workspaces, anything else is This workspace.
+function scopeFromParams(params) {
+  return params.get('scope') === 'all' ? 'all' : 'current';
+}
+
 // Sets the scope and what it implies: which workspaces the feed hides, the scope buttons, and the chips
-// (shown only under 'all', and only when more than one workspace is connected).
+// (shown only under 'all', and only when more than one workspace is connected). It does not write the URL:
+// a scope press does that itself (writeViewToUrl), and a page load reads it before any write.
 function applyWorkspaceScope(next) {
   workspaceScope = next === 'all' ? 'all' : 'current';
   const here = observationData?.urlKey;
@@ -452,6 +458,13 @@ function applyWorkspaceScope(next) {
 
 function isVisibleWs(urlKey) {
   return !hiddenWorkspaces.has(urlKey);
+}
+
+// A feed card names its workspace only when the feed is showing more than one: All workspaces, with two or
+// more still visible through the chips. Under This workspace the feed shows one, however many are connected.
+function feedShowsSeveralWorkspaces() {
+  if (workspaceScope !== 'all') return false;
+  return (observationData?.workspaces || []).filter((w) => isVisibleWs(w.urlKey)).length > 1;
 }
 
 function passesFilter(session) {
@@ -657,9 +670,10 @@ function stageNoun(s) {
 function runningSummary(s, st) {
   const since = typeof s.stageSince === 'string' ? Date.parse(s.stageSince) : NaN;
   const elapsed = Number.isFinite(since) ? formatRuntime({ ms: Math.max(0, Date.now() - since) }) : '';
-  const stage = `${stageNoun(s)}${elapsed ? `, ${elapsed} in` : ''}`;
+  // The elapsed time is its own span so the visual judge can mask the clock without masking the stage word.
+  const elapsedHtml = elapsed ? `, <span class="obs-summary-elapsed">${escapeHtml(elapsed)} in</span>` : '';
   const line = stripFeedbackMarkers((st && st.statusLine) || s.statusLine || '');
-  return `<span class="obs-summary-line obs-summary-stage">${escapeHtml(stage)}${line ? ` — ${escapeHtml(line)}` : ''}</span>`;
+  return `<span class="obs-summary-line obs-summary-stage">${escapeHtml(stageNoun(s))}${elapsedHtml}${line ? ` — ${escapeHtml(line)}` : ''}</span>`;
 }
 
 // The waiting card's sentence: the question the run asked, with its markers removed. The answer
@@ -796,9 +810,9 @@ function fillSessionHead(li, s) {
   // Prominent labelled meta line (mockup): runtime / model, with workspace + task
   // count kept as trailing context so multi-workspace info is not lost (LIN-608).
   const metaBits = [];
-  if (runtime) metaBits.push(`<span class="obs-meta"><span class="obs-meta-k">runtime</span> <span class="obs-meta-v">${escapeHtml(runtime)}</span></span>`);
+  if (runtime) metaBits.push(`<span class="obs-meta obs-meta-runtime"><span class="obs-meta-k">runtime</span> <span class="obs-meta-v">${escapeHtml(runtime)}</span></span>`);
   if (s.model) metaBits.push(`<span class="obs-meta"><span class="obs-meta-k">model</span> <span class="obs-meta-v">${escapeHtml(String(s.model))}</span></span>`);
-  if (s.workspaceName && multiWorkspace()) metaBits.push(`<span class="obs-meta obs-meta-ws">${escapeHtml(s.workspaceName)}</span>`);
+  if (s.workspaceName && feedShowsSeveralWorkspaces()) metaBits.push(`<span class="obs-meta obs-meta-ws">${escapeHtml(s.workspaceName)}</span>`);
   if (s.tasksTouched.length > 1) metaBits.push(`<span class="obs-meta">${s.tasksTouched.length} tasks</span>`);
   // Budget "n of N" (LIN-2934): task position ("task 1 of 8"). Omitted entirely
   // when the run declared no `maxTasks`, same additive-chip convention as
@@ -2229,6 +2243,7 @@ function renderRulingRow(row) {
   const { decision, decisionCase, anchor, disposition, canReply } = row || {};
   const li = document.createElement('li');
   li.className = 'obs-ruling';
+  li.dataset.testid = 'obs-ruling-row';
   if (decision && decision.decision_id) li.dataset.decisionId = decision.decision_id;
 
   const head = document.createElement('div');
@@ -2240,7 +2255,7 @@ function renderRulingRow(row) {
   const wsName = workspaces.find(w => w.urlKey === anchor?.workspaceUrlKey)?.name || anchor?.workspaceUrlKey;
   head.innerHTML = `<span class="obs-ruling-issue">${escapeHtml(String(idLabel))}</span>`
     + (anchor?.issueTitle ? ` <span class="obs-ruling-title">${escapeHtml(String(anchor.issueTitle))}</span>` : '')
-    + (workspaces.length > 1 && wsName ? ` <span class="obs-ruling-ws">${escapeHtml(String(wsName))}</span>` : '');
+    + (workspaces.length > 1 && wsName ? ` <span class="obs-ruling-ws" data-testid="obs-ruling-ws">${escapeHtml(String(wsName))}</span>` : '');
   li.appendChild(head);
 
   if (decision?.question) {
@@ -2294,6 +2309,7 @@ function renderRulingRow(row) {
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.className = 'obs-ruling-select';
+      checkbox.dataset.testid = 'obs-ruling-select';
       // LIN-2706 §B.3's convention: the identifier lives in the sibling
       // `idLabel` span above, so an unlabeled checkbox announces nothing
       // useful to a screen reader.
@@ -2410,6 +2426,7 @@ function renderRulingRow(row) {
   if (canReply) {
     const input = document.createElement('textarea');
     input.className = 'obs-ruling-answer-input chat-composer__input';
+    input.dataset.testid = 'obs-ruling-answer-input';
     input.rows = 2;
     input.placeholder = 'Answer in your own words…';
     input.setAttribute('aria-label', 'Free-text answer');
@@ -2485,6 +2502,7 @@ function renderRulingRow(row) {
 
   const feedback = document.createElement('p');
   feedback.className = 'obs-ruling-feedback';
+  feedback.dataset.testid = 'obs-ruling-feedback';
   li.appendChild(feedback);
 
   return li;
@@ -2529,10 +2547,12 @@ function toggleShelvePanel(row, li) {
 
   const panel = document.createElement('div');
   panel.className = 'obs-ruling-shelve-panel';
+  panel.dataset.testid = 'obs-ruling-shelve-panel';
 
   const reasonInput = document.createElement('input');
   reasonInput.type = 'text';
   reasonInput.className = 'obs-ruling-shelve-reason';
+  reasonInput.dataset.testid = 'obs-ruling-shelve-reason';
   reasonInput.placeholder = 'Why are you shelving this?';
   reasonInput.setAttribute('aria-label', 'Shelve reason');
   panel.appendChild(reasonInput);
@@ -3589,6 +3609,7 @@ function deliverRulingReply(row, prompt, li, optionId, { bulkAgree = false } = {
       const retryBtn = document.createElement('button');
       retryBtn.type = 'button';
       retryBtn.className = 'obs-ruling-retry-delivery';
+      retryBtn.dataset.testid = 'obs-ruling-retry-delivery';
       retryBtn.textContent = 'Retry delivery';
       retryBtn.addEventListener('click', () => {
         retryBtn.disabled = true;
@@ -3841,8 +3862,8 @@ function renderDueRowHtml(item) {
   // data-issue-id="..." checked` sequence the selection tests match stays
   // contiguous.
   const checkedAttr = dueSelectedIds.has(String(item.issueId)) ? ' checked' : '';
-  return `<li class="obs-due-row ${status.cls}" data-issue-id="${escapeHtml(String(item.issueId))}">`
-    + `<input type="checkbox" aria-label="select ${escapeHtml(String(idLabel))}" class="obs-due-select" data-issue-id="${escapeHtml(String(item.issueId))}"${checkedAttr}>`
+  return `<li class="obs-due-row ${status.cls}" data-issue-id="${escapeHtml(String(item.issueId))}" data-testid="obs-due-row">`
+    + `<input type="checkbox" aria-label="select ${escapeHtml(String(idLabel))}" class="obs-due-select" data-issue-id="${escapeHtml(String(item.issueId))}"${checkedAttr} data-testid="obs-due-select">`
     + `<span class="obs-due-issue">${escapeHtml(String(idLabel))}</span>`
     + `<span class="obs-due-badge">checked &middot; provider read</span>`
     + `<span class="obs-due-status">${escapeHtml(status.text)}</span>`
@@ -4564,16 +4585,18 @@ function syncViewChrome() {
   writeViewToUrl();
 }
 
-// The URL carries the view and filter (LIN-3983), so a reload or a shared link
-// reopens the same place. Defaults are omitted: runs with the autopilot filter is
+// The URL carries the view, filter and workspace scope (LIN-3983), so a reload or a shared link
+// reopens the same place. Defaults are omitted: runs with the autopilot filter on This workspace is
 // a bare URL. replaceState, so the back button does not walk through every tab.
 function writeViewToUrl() {
   try {
     const url = new URL(window.location.href);
     url.searchParams.delete('view');
     url.searchParams.delete('filter');
+    url.searchParams.delete('scope');
     if (currentView !== 'runs') url.searchParams.set('view', currentView);
     else if (currentFilter !== 'autopilot') url.searchParams.set('filter', currentFilter);
+    if (workspaceScope === 'all') url.searchParams.set('scope', 'all');
     window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
   } catch {
     // The URL is a convenience: the page works the same without it.
@@ -4731,7 +4754,9 @@ function initControls() {
   if (scope) {
     scope.addEventListener('click', (e) => {
       const btn = e.target.closest('[data-scope]');
-      if (btn) applyWorkspaceScope(btn.dataset.scope);
+      if (!btn) return;
+      applyWorkspaceScope(btn.dataset.scope);
+      writeViewToUrl();
     });
   }
 
@@ -4768,11 +4793,12 @@ function init() {
   observationData = window.__OBSERVATION_DATA__;
   if (!observationData) { console.warn('Observation: no initial data'); return; }
   initControls();
-  applyWorkspaceScope('current');
-  // The URL opens the page where it was left (LIN-3983): the view and filter,
+  // The URL opens the page where it was left (LIN-3983): the scope, the view and filter,
   // including the rulings deep link from the navbar badge (`?view=rulings`,
   // LIN-1728 review F6). Legacy values are rewritten to the current names.
-  const opened = viewFromParams(new URLSearchParams(window.location.search));
+  const params = new URLSearchParams(window.location.search);
+  applyWorkspaceScope(scopeFromParams(params));
+  const opened = viewFromParams(params);
   currentView = opened.view;
   currentFilter = opened.filter;
   syncViewChrome();
@@ -4895,7 +4921,7 @@ if (typeof module !== 'undefined' && module.exports) {
     requestBasisCheck, applyBasisResult, basisCheckCache, basisCheckStarted, BASIS_CHECK_MAX_PER_PAGE,
     // LIN-3983: the waiting block's pure rule, the view/filter URL contract, and
     // the poll/switch seams the view model is unit-tested through.
-    compactWaitSessions, stripFeedbackMarkers, viewFromParams, renderWaitingBlock,
+    compactWaitSessions, stripFeedbackMarkers, viewFromParams, scopeFromParams, renderWaitingBlock,
     pollCurrentView, pollRulings, pollWaitingSupplement, switchView, setFilter, sessionsUrl, feedKey, rulingsUrl,
     openLoopIds: () => openLoopIds, setOpenLoopIds: (v) => { openLoopIds = v; },
     lastRulingsRef: () => lastRulings, standaloneWaitSupplement, sessionIndex,

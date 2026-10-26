@@ -30,7 +30,7 @@ function makeSandbox(workspaces) {
   const sandbox = {
     module: { exports: {} },
     window: { addEventListener() {}, matchMedia: () => ({ matches: false }), renderStatusPill: common.renderStatusPill, renderSegmentBar: common.renderSegmentBar, ChatUI: { appendOptions() {}, resolveCaption: () => '' }, sourceQuery: () => '' },
-    document: { addEventListener() {}, createElement: () => ({}), getElementById: () => null },
+    document: { addEventListener() {}, createElement: () => ({}), getElementById: () => null, querySelector: () => null, querySelectorAll: () => [] },
     escapeHtml,
     relativeTime: (ts) => (ts ? `rel(${ts})` : ''),
     console: { warn() {}, error() {}, log() {} },
@@ -153,9 +153,24 @@ describe('names and places (LIN-3983 PR 2)', () => {
 
   test('the workspace name shows only when more than one workspace is showing', () => {
     const one = makeSandbox([WS]);
+    vm.runInContext("applyWorkspaceScope('all')", one);
     assert.ok(!paint(one, buildSessionPayload(CARDS.running(), WS, false)).includes('obs-meta-ws'));
     const two = makeSandbox([WS, { urlKey: 'other', name: 'Other' }]);
+    vm.runInContext("applyWorkspaceScope('all')", two);
     assert.match(paint(two, buildSessionPayload(CARDS.running(), WS, false)), /obs-meta-ws/);
+  });
+
+  test('two connected workspaces under This workspace show one, so no card names its workspace', () => {
+    const two = makeSandbox([WS, { urlKey: 'other', name: 'Other' }]);
+    vm.runInContext("applyWorkspaceScope('current')", two);
+    assert.ok(!paint(two, buildSessionPayload(CARDS.running(), WS, false)).includes('obs-meta-ws'), 'connected is not showing');
+  });
+
+  test('All workspaces with the other workspace chipped off shows one, so no card names its workspace', () => {
+    const two = makeSandbox([WS, { urlKey: 'other', name: 'Other' }]);
+    vm.runInContext("applyWorkspaceScope('all')", two);
+    vm.runInContext("hiddenWorkspaces.add('other')", two);
+    assert.ok(!paint(two, buildSessionPayload(CARDS.running(), WS, false)).includes('obs-meta-ws'));
   });
 
   test('a running card names its stage in words and how long it has run, not in capitals', () => {

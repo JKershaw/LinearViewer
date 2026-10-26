@@ -40,7 +40,15 @@ const LIVE_WHEN = { selector: '.lc-event-time', reason: 'a stream row\'s relativ
 
 // LIN-3983: Observation's times are relative to the real clock (its runs are seeded on it, see observation-states.mjs),
 // so the words that carry them move between the two shots. The masks are the containing rows, never the inline span.
-const OBS_TIMES = { selector: '.obs-session-head, .obs-waiting-run, .obs-ruling', reason: 'every card and row says how long ago something happened, relative to the real clock the seed runs on' };
+// Only the time-bearing nodes are masked, never the rows around them: a row's pill, title, workspace, actions and
+// answer choices are what this PR changes, so a mask on the row would hide the very difference the judge must class.
+const OBS_TIMES = [
+  { selector: '.obs-session-time', reason: 'the card\'s "updated … ago" stamp is relative to the real clock the seed runs on' },
+  { selector: '.obs-ruling-suggestion-meta', reason: 'the proposal\'s "by …, ago" stamp is relative to the real clock the seed runs on' },
+  { selector: '.obs-session-started', optional: true, reason: 'an untitled run\'s "Started …" is a relative time (base has no such line: LIN-3983 PR 2 adds it)' },
+  { selector: '.obs-summary-elapsed', optional: true, reason: 'a running stage\'s "… in" is the clock at the shot (base has no such span: PR 2 wraps it)' },
+  { selector: '.obs-meta-runtime', optional: true, reason: 'a run\'s runtime is the clock at the shot (base has no such class: PR 2 adds it)' },
+];
 
 // `state` names a set-up the spec performs identically on both sides (see replay.spec.js):
 //   ask-open          open the periodic-reviews ask in place (a change that affects everyone)
@@ -118,8 +126,8 @@ export const PAGES = [
   // real clock, so the times are masked). The Runs view shows the waiting block above the feed; the Rulings tab
   // lists the same question with its proposal; Scan-due and a new user (nothing running) use the seeded local
   // workspace with no runs of its own. The two tabs and the default view each name their own state in the list.
-  { id: 'observation-runs', urlKey: 'judge-obs-runs', path: (k) => `/workspace/${k}/observation`, state: 'obs-two-runs', masks: [OBS_TIMES], renderers: ['lib/render-observation.js'] },
-  { id: 'observation-rulings', urlKey: 'judge-obs-rulings', path: (k) => `/workspace/${k}/observation?view=rulings`, state: 'obs-two-runs', masks: [OBS_TIMES], renderers: ['lib/render-observation.js'] },
+  { id: 'observation-runs', urlKey: 'judge-obs-runs', path: (k) => `/workspace/${k}/observation`, state: 'obs-two-runs', masks: OBS_TIMES, renderers: ['lib/render-observation.js'] },
+  { id: 'observation-rulings', urlKey: 'judge-obs-rulings', path: (k) => `/workspace/${k}/observation?view=rulings`, state: 'obs-two-runs', masks: OBS_TIMES, renderers: ['lib/render-observation.js'] },
   { id: 'observation-due', urlKey: 'judge', path: (k) => `/workspace/${k}/observation?view=due`, renderers: ['lib/render-observation.js'] },
   { id: 'observation-new-user', urlKey: 'judge', path: (k) => `/workspace/${k}/observation`, renderers: ['lib/render-observation.js'] },
   // LIN-3983 PR 2: the three pages that still load observation.css (Live Console no longer does). Each is behind its

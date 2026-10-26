@@ -26,9 +26,15 @@ function makeSandbox() {
   const scope = new FakeElement('div');
   scope.querySelectorAll = (sel) => (sel === '#obs-scope [data-scope]' || sel === '[data-scope]' ? scopeBtns : []);
   const elements = { 'obs-chips': chips, 'obs-scope': scope };
+  const win = {
+      addEventListener() {}, matchMedia: () => ({ matches: false }), ChatUI: { appendOptions() {}, resolveCaption: () => '' }, sourceQuery: () => '',
+      location: { href: 'https://harbour.test/workspace/acme/observation' },
+      history: { state: null, replaceState: (state, title, url) => { win.location.href = new URL(url, win.location.href).href; } },
+    };
   const sandbox = {
     module: { exports: {} },
-    window: { addEventListener() {}, matchMedia: () => ({ matches: false }), ChatUI: { appendOptions() {}, resolveCaption: () => '' }, sourceQuery: () => '' },
+    window: win,
+    URL, URLSearchParams,
     document: {
       createElement: (tag) => new FakeElement(tag),
       addEventListener() {},
@@ -51,6 +57,41 @@ function makeSandbox() {
 
 // Values made inside the vm carry that realm's prototypes; a JSON copy compares structurally here.
 const hidden = (sandbox) => JSON.parse(vm.runInContext('JSON.stringify([...hiddenWorkspaces].sort())', sandbox));
+
+// The scope rides in the URL like the view and filter: scope=all reopens All workspaces, and This workspace
+// (the default) writes nothing. replaceState keeps the history clean, as for the view.
+describe('the scope in the URL (LIN-3983 PR 2)', () => {
+  const scopeOf = (sandbox, qs) => vm.runInContext(`scopeFromParams(new URLSearchParams(${JSON.stringify(qs)}))`, sandbox);
+  const written = (sandbox) => new URL(sandbox.window.location.href).searchParams;
+
+  test('scope=all opens All workspaces; a bare or unknown scope opens This workspace', () => {
+    const { sandbox } = makeSandbox();
+    assert.equal(scopeOf(sandbox, 'scope=all'), 'all');
+    assert.equal(scopeOf(sandbox, ''), 'current');
+    assert.equal(scopeOf(sandbox, 'scope=garbage'), 'current');
+  });
+
+  test('pressing All workspaces writes scope=all, and going back to This workspace drops it', () => {
+    const { sandbox } = makeSandbox();
+    vm.runInContext("applyWorkspaceScope('all'); writeViewToUrl()", sandbox);
+    assert.equal(written(sandbox).get('scope'), 'all');
+    vm.runInContext("applyWorkspaceScope('current'); writeViewToUrl()", sandbox);
+    assert.equal(written(sandbox).has('scope'), false, 'the default is a bare scope');
+  });
+
+  test('the scope survives a reload: the URL a press writes reopens All workspaces', () => {
+    const { sandbox } = makeSandbox();
+    vm.runInContext("applyWorkspaceScope('all'); writeViewToUrl()", sandbox);
+    assert.equal(scopeOf(sandbox, written(sandbox).toString()), 'all');
+  });
+
+  test('the scope and the view are written together, and the view keeps its own parameter', () => {
+    const { sandbox } = makeSandbox();
+    vm.runInContext("applyWorkspaceScope('all'); currentView = 'rulings'; writeViewToUrl()", sandbox);
+    assert.equal(written(sandbox).get('view'), 'rulings');
+    assert.equal(written(sandbox).get('scope'), 'all');
+  });
+});
 
 describe('the workspace scope (LIN-3983 PR 2)', () => {
   test('the feed opens on this workspace: the others are hidden and their chips are off', () => {

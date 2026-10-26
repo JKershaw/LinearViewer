@@ -54,6 +54,15 @@ export async function seedObservation(request, baseURL, urlKey, state) {
     }),
   });
 
+  // A standing proposal on that question, so the Rulings tab shows its banner and the bulk bar (the replay shoots both).
+  const proxy = await request.get(`/test/create-proxy-token?scope=readWrite&label=judge-suggest&urlKey=${urlKey}`);
+  if (!proxy.ok()) throw new Error(`observation seed proxy token failed: ${proxy.status()}`);
+  const suggest = await request.post('/api/proxy/rulings/judge-decision-sign-in/suggest-dismissal', {
+    headers: { Authorization: `Bearer ${(await proxy.json()).token}`, 'Content-Type': 'application/json' },
+    data: { reason: 'shipped separately' },
+  });
+  if (!suggest.ok()) throw new Error(`observation seed suggest-dismissal failed: ${suggest.status()} ${await suggest.text()}`);
+
   // A working run: its own standalone dispatch, with a heartbeat.
   const working = await enqueueAndTake(request, urlKey, { task: 'LOCAL-2', title: 'Local child task', kind: 'plan-review' }, token);
   await feedback(request, working, token, { message: '[working] 4 tools in 2m 03s: Read×4' });

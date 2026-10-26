@@ -176,8 +176,8 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
     await page.waitForLoadState('networkidle');
     const tabs = page.locator('[data-testid^="obs-tab-"]');
     await expect(tabs).toHaveCount(3);
-    await expect(page.locator('[data-testid="obs-tab-rulings"]')).toBeVisible();
-    await expect(page.locator('[data-testid="obs-tab-rulings"]')).not.toHaveClass(/is-active/);
+    await expect(page.locator(SELECTORS.observation.tab('rulings'))).toBeVisible();
+    await expect(page.locator(SELECTORS.observation.tab('rulings'))).not.toHaveClass(/is-active/);
   });
 
   test('a resumable ruling renders with pressable option buttons; the session views hide while active', async ({ page }) => {
@@ -187,15 +187,15 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('[data-testid="obs-tab-rulings"]').click();
-    await expect(page.locator('[data-testid="obs-tab-rulings"]')).toHaveClass(/is-active/);
+    await page.locator(SELECTORS.observation.tab('rulings')).click();
+    await expect(page.locator(SELECTORS.observation.tab('rulings'))).toHaveClass(/is-active/);
 
     // The session-views shell (Filter/Active/Archive) hides while the rulings
     // tab is active — a ruling is not a session, and the two must not bleed.
-    await expect(page.locator('#obs-session-views')).toBeHidden();
-    await expect(page.locator('#obs-rulings-section')).toBeVisible();
+    await expect(page.locator(SELECTORS.observation.sessionViews)).toBeHidden();
+    await expect(page.locator(SELECTORS.observation.rulingsSection)).toBeVisible();
 
-    const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-R' });
+    const row = page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-1728-R' });
     await expect(row).toBeVisible();
     await expect(row).toContainText('Proceed with option A?');
     // LIN-2775 Area 5: captions are effect-first — a resumable row's
@@ -216,9 +216,9 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('[data-testid="obs-tab-rulings"]').click();
+    await page.locator(SELECTORS.observation.tab('rulings')).click();
 
-    const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-P' });
+    const row = page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-1728-P' });
     await expect(row).toBeVisible();
 
     const [commentReq] = await Promise.all([
@@ -239,7 +239,7 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
     // is also covered by `rulingsSettled`'s client-side masking regardless
     // (LIN-2444), so this assertion alone does not prove server-side
     // invalidation — see the LIN-2755 round-trip test below for that.
-    await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-P' })).toHaveCount(0, { timeout: 20000 });
+    await expect(page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-1728-P' })).toHaveCount(0, { timeout: 20000 });
   });
 
   // LIN-2991/LIN-3022 D3: a genuinely grouped decision — raised on a non-root
@@ -257,9 +257,9 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('[data-testid="obs-tab-rulings"]').click();
+    await page.locator(SELECTORS.observation.tab('rulings')).click();
 
-    const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-D3' });
+    const row = page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-1728-D3' });
     await expect(row).toBeVisible();
 
     const [commentReq, dispatchReq] = await Promise.all([
@@ -276,7 +276,7 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
     expect(dispatchPayload.followUpTo, 'the RESUME target must be the anchor (root) loop, never the stamp target').toBe(rootId);
     expect((await dispatchReq.response()).status()).toBe(201);
 
-    await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-D3' })).toHaveCount(0, { timeout: 20000 });
+    await expect(page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-1728-D3' })).toHaveCount(0, { timeout: 20000 });
   });
 
   // LIN-2209 (F1/L1): the test above proves the UI-driven flow works, but no
@@ -366,9 +366,9 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('[data-testid="obs-tab-rulings"]').click();
+    await page.locator(SELECTORS.observation.tab('rulings')).click();
 
-    const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-F' });
+    const row = page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-1728-F' });
     await expect(row).toBeVisible();
 
     // Fail the follow-up dispatch call once (simulating a synchronous 503) —
@@ -391,10 +391,10 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
 
     await row.locator('.chat-option-btn').filter({ hasText: 'Approve' }).click();
 
-    const feedback = row.locator('.obs-ruling-feedback');
+    const feedback = row.locator(SELECTORS.observation.ruling.feedback);
     await expect(feedback).toContainText('Recorded');
     await expect(feedback).toContainText('Could not resume');
-    const retryBtn = row.locator('.obs-ruling-retry-delivery');
+    const retryBtn = row.locator(SELECTORS.observation.ruling.retryDelivery);
     await expect(retryBtn).toBeVisible();
     expect(commentAttempts).toBe(1);
 
@@ -416,9 +416,9 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('[data-testid="obs-tab-rulings"]').click();
+    await page.locator(SELECTORS.observation.tab('rulings')).click();
 
-    const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-M' });
+    const row = page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-1728-M' });
     await expect(row).toBeVisible();
     await expect(row.locator('.chat-options-caption')).toHaveText('still running — reply disabled');
     await expect(row.locator('.chat-option-btn')).toHaveCount(0);
@@ -436,19 +436,19 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('[data-testid="obs-tab-rulings"]').click();
+    await page.locator(SELECTORS.observation.tab('rulings')).click();
 
-    const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2225-T' });
+    const row = page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-2225-T' });
     await expect(row).toBeVisible();
 
     // The declared options stay present and untouched (LIN-2225's scoping
     // guard) — free text is additive, not a replacement.
     await expect(row.locator('.chat-option-btn')).toHaveCount(2);
 
-    await row.locator('.obs-ruling-answer-input').fill('why was I asked this?');
+    await row.locator(SELECTORS.observation.ruling.answerInput).fill('why was I asked this?');
     const [commentReq] = await Promise.all([
       page.waitForRequest(r => r.url().includes('/api/comments/') && r.method() === 'POST'),
-      row.locator('.obs-ruling-answer-send').click()
+      row.locator(SELECTORS.observation.ruling.answer).click()
     ]);
     const commentPayload = commentReq.postDataJSON();
     expect(commentPayload.body).toBe('why was I asked this?');
@@ -456,7 +456,7 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
     expect(commentPayload.decisionId).toBe('d-rulings-freetext');
     expect((await commentReq.response()).status()).toBe(201);
 
-    await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2225-T' })).toHaveCount(0, { timeout: 20000 });
+    await expect(page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-2225-T' })).toHaveCount(0, { timeout: 20000 });
   });
 
   test('LIN-2225: dismiss on a resumable ruling stamps outcome:dismissed with no comment, and the row clears', async ({ page }) => {
@@ -466,9 +466,9 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('[data-testid="obs-tab-rulings"]').click();
+    await page.locator(SELECTORS.observation.tab('rulings')).click();
 
-    const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2225-D' });
+    const row = page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-2225-D' });
     await expect(row).toBeVisible();
 
     let commentFired = false;
@@ -476,7 +476,7 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
 
     const [dismissReq] = await Promise.all([
       page.waitForRequest(r => r.url().includes('/api/dashboard/rulings/dismiss') && r.method() === 'POST'),
-      row.locator('.obs-ruling-dismiss').click()
+      row.locator(SELECTORS.observation.ruling.dismiss).click()
     ]);
     const dismissPayload = dismissReq.postDataJSON();
     expect(dismissPayload.decisionLoopId).toBe(workerId);
@@ -484,7 +484,7 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
     expect((await dismissReq.response()).status()).toBe(200);
     expect(commentFired).toBe(false);
 
-    await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2225-D' })).toHaveCount(0, { timeout: 20000 });
+    await expect(page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-2225-D' })).toHaveCount(0, { timeout: 20000 });
   });
 
   test('LIN-2225: a mid-turn ruling has no free-text composer but IS dismissable', async ({ page }) => {
@@ -494,19 +494,19 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('[data-testid="obs-tab-rulings"]').click();
+    await page.locator(SELECTORS.observation.tab('rulings')).click();
 
-    const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2225-M' });
+    const row = page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-2225-M' });
     await expect(row).toBeVisible();
-    await expect(row.locator('.obs-ruling-answer-input')).toHaveCount(0);
-    await expect(row.locator('.obs-ruling-dismiss')).toBeVisible();
+    await expect(row.locator(SELECTORS.observation.ruling.answerInput)).toHaveCount(0);
+    await expect(row.locator(SELECTORS.observation.ruling.dismiss)).toBeVisible();
 
     const [dismissReq] = await Promise.all([
       page.waitForRequest(r => r.url().includes('/api/dashboard/rulings/dismiss') && r.method() === 'POST'),
-      row.locator('.obs-ruling-dismiss').click()
+      row.locator(SELECTORS.observation.ruling.dismiss).click()
     ]);
     expect((await dismissReq.response()).status()).toBe(200);
-    await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2225-M' })).toHaveCount(0, { timeout: 20000 });
+    await expect(page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-2225-M' })).toHaveCount(0, { timeout: 20000 });
   });
 
   test('LIN-1727: shelving a ruling requires a reason and hides the row, without mutating the underlying decision', async ({ page }) => {
@@ -516,25 +516,25 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('[data-testid="obs-tab-rulings"]').click();
+    await page.locator(SELECTORS.observation.tab('rulings')).click();
 
-    const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1727-S' });
+    const row = page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-1727-S' });
     await expect(row).toBeVisible();
 
     // Opening the panel and confirming with no reason must NOT shelve — the
     // route (and the store beneath it) refuse a blank reason.
-    await row.locator('.obs-ruling-shelve').click();
-    await expect(row.locator('.obs-ruling-shelve-panel')).toBeVisible();
+    await row.locator(SELECTORS.observation.ruling.shelve).click();
+    await expect(row.locator(SELECTORS.observation.ruling.shelvePanel)).toBeVisible();
     let shelveFired = false;
     page.on('request', (r) => { if (r.url().includes('/rulings/shelve') && r.method() === 'POST') shelveFired = true; });
-    await row.locator('.obs-ruling-shelve-confirm').click();
+    await row.locator(SELECTORS.observation.ruling.shelveConfirm).click();
     await page.waitForTimeout(200);
     expect(shelveFired).toBe(false);
 
-    await row.locator('.obs-ruling-shelve-reason').fill('waiting on a stakeholder');
+    await row.locator(SELECTORS.observation.ruling.shelveReason).fill('waiting on a stakeholder');
     const [shelveReq] = await Promise.all([
       page.waitForRequest(r => r.url().includes('/rulings/shelve') && r.method() === 'POST'),
-      row.locator('.obs-ruling-shelve-confirm').click()
+      row.locator(SELECTORS.observation.ruling.shelveConfirm).click()
     ]);
     const shelvePayload = shelveReq.postDataJSON();
     expect(shelvePayload.decisionId).toBe('d-rulings-shelve');
@@ -543,7 +543,7 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
 
     // The row disappears from the live queue — shelving is a designed defer,
     // not an answer or a dismiss (no comment, no stamp on the underlying loop).
-    await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1727-S' })).toHaveCount(0, { timeout: 20000 });
+    await expect(page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-1727-S' })).toHaveCount(0, { timeout: 20000 });
 
     // Directly verify via the API that the underlying decision is UNCHANGED —
     // shelving must never mutate the loop/task-decision it defers.
@@ -585,17 +585,17 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('[data-testid="obs-tab-rulings"]').click();
+    await page.locator(SELECTORS.observation.tab('rulings')).click();
 
-    const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1727-M' });
+    const row = page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-1727-M' });
     await expect(row).toBeVisible();
-    await expect(row.locator('.obs-ruling-shelve')).toBeVisible();
+    await expect(row.locator(SELECTORS.observation.ruling.shelve)).toBeVisible();
 
-    await row.locator('.obs-ruling-shelve').click();
-    await row.locator('.obs-ruling-shelve-reason').fill('will revisit once it finishes');
+    await row.locator(SELECTORS.observation.ruling.shelve).click();
+    await row.locator(SELECTORS.observation.ruling.shelveReason).fill('will revisit once it finishes');
     const [shelveReq] = await Promise.all([
       page.waitForRequest(r => r.url().includes('/rulings/shelve') && r.method() === 'POST'),
-      row.locator('.obs-ruling-shelve-confirm').click()
+      row.locator(SELECTORS.observation.ruling.shelveConfirm).click()
     ]);
     expect((await shelveReq.response()).status()).toBe(200);
   });
@@ -618,12 +618,12 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('[data-testid="obs-tab-rulings"]').click();
+    await page.locator(SELECTORS.observation.tab('rulings')).click();
 
-    const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-X' });
+    const row = page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-1728-X' });
     await expect(row).toBeVisible();
     // The workspace's name, since two workspaces are showing; the raw key is never shown (LIN-3983 PR 2).
-    await expect(row.locator('.obs-ruling-ws')).toBeVisible();
+    await expect(row.locator(SELECTORS.observation.ruling.ws)).toBeVisible();
     await expect(row).not.toContainText(secondWorkerUrlKey);
 
     const [commentReq, dispatchReq] = await Promise.all([
@@ -648,7 +648,7 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
     // filters on {_id, urlKey}) — proven by the row actually clearing, which
     // it never would if the stamp had been written against the page's
     // workspace instead (F1's core bug: the row stays forever).
-    await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-X' })).toHaveCount(0, { timeout: 20000 });
+    await expect(page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-1728-X' })).toHaveCount(0, { timeout: 20000 });
   });
 
   // LIN-1728 review F4 (issueless resumable ruling — no invalid
@@ -668,9 +668,9 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('[data-testid="obs-tab-rulings"]').click();
+    await page.locator(SELECTORS.observation.tab('rulings')).click();
 
-    const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-Q' });
+    const row = page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-1728-Q' });
     await expect(row).toBeVisible();
     // Tag the actual DOM node so we can assert IDENTITY survives the poll
     // below, not just that "a" row with the same text is visible (a rebuilt
@@ -714,7 +714,7 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
     // would instead leave the row durably present (or preserved with a
     // "Could not resume" error), so this is a real proof of success, not
     // just an absence check.
-    await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-Q' })).toHaveCount(0, { timeout: 20000 });
+    await expect(page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-1728-Q' })).toHaveCount(0, { timeout: 20000 });
   });
 
   test('LIN-3631: a background poll landing while the operator types keeps the text, the box and its focus', async ({ page }) => {
@@ -724,10 +724,10 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('[data-testid="obs-tab-rulings"]').click();
+    await page.locator(SELECTORS.observation.tab('rulings')).click();
 
-    const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-3631-T' });
-    const box = row.locator('.obs-ruling-answer-input');
+    const row = page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-3631-T' });
+    const box = row.locator(SELECTORS.observation.ruling.answerInput);
     await expect(box).toBeVisible();
     // Identity, not just text: a rebuilt row with the text copied back would
     // still have dropped the focus and any keystrokes typed mid-repaint.
@@ -778,23 +778,23 @@ test.describe('Bulk-agree suggested rulings (LIN-2444 Phase 5) — e2e', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('[data-testid="obs-tab-rulings"]').click();
+    await page.locator(SELECTORS.observation.tab('rulings')).click();
 
-    const rowA = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2444-BULK-1' });
-    const rowB = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2444-BULK-2' });
+    const rowA = page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-2444-BULK-1' });
+    const rowB = page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-2444-BULK-2' });
     await expect(rowA).toBeVisible();
     await expect(rowB).toBeVisible();
     await expect(rowA).toContainText('proposed dismissal');
 
-    const bar = page.locator('#obs-ruling-bulk-bar');
+    const bar = page.locator(SELECTORS.observation.ruling.bulkBar);
     await expect(bar).toBeVisible();
-    const selectAll = page.locator('#obs-ruling-select-all');
-    const count = page.locator('#obs-ruling-selected-count');
-    const agreeSelected = page.locator('#obs-ruling-agree-selected');
+    const selectAll = page.locator(SELECTORS.observation.ruling.selectAll);
+    const count = page.locator(SELECTORS.observation.ruling.selectedCount);
+    const agreeSelected = page.locator(SELECTORS.observation.ruling.bulkApply);
     await expect(count).toHaveText('0 selected');
     await expect(agreeSelected).toBeDisabled();
 
-    const checkboxA = rowA.locator('.obs-ruling-select');
+    const checkboxA = rowA.locator(SELECTORS.observation.ruling.select);
     await expect(checkboxA).toBeVisible();
     await checkboxA.check();
 
@@ -805,7 +805,7 @@ test.describe('Bulk-agree suggested rulings (LIN-2444 Phase 5) — e2e', () => {
     expect(await selectAll.evaluate((el) => el.indeterminate)).toBe(true);
     expect(await selectAll.evaluate((el) => el.checked)).toBe(false);
 
-    await rowB.locator('.obs-ruling-select').check();
+    await rowB.locator(SELECTORS.observation.ruling.select).check();
     await expect(count).toHaveText('2 selected');
     await expect(selectAll).toBeChecked();
     expect(await selectAll.evaluate((el) => el.indeterminate)).toBe(false);
@@ -822,14 +822,14 @@ test.describe('Bulk-agree suggested rulings (LIN-2444 Phase 5) — e2e', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('[data-testid="obs-tab-rulings"]').click();
+    await page.locator(SELECTORS.observation.tab('rulings')).click();
 
-    const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2444-BULK-3' });
-    await row.locator('.obs-ruling-select').check();
+    const row = page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-2444-BULK-3' });
+    await row.locator(SELECTORS.observation.ruling.select).check();
 
     let dismissRequested = false;
     await page.route('**/api/dashboard/rulings/dismiss', async (route) => { dismissRequested = true; return route.continue(); });
-    await page.locator('#obs-ruling-agree-selected').click();
+    await page.locator(SELECTORS.observation.ruling.bulkApply).click();
     // The question is asked on the page (LIN-3983 PR 2), not in a native dialog.
     const ask = page.locator(SELECTORS.observation.bulkConfirm.panel);
     await expect(ask).toBeVisible();
@@ -842,8 +842,8 @@ test.describe('Bulk-agree suggested rulings (LIN-2444 Phase 5) — e2e', () => {
     expect(dismissRequested, 'cancelling the in-page question must send no dismiss request').toBe(false);
     // Still there, still selected, still checked — nothing was silently discarded.
     await expect(row).toBeVisible();
-    await expect(row.locator('.obs-ruling-select')).toBeChecked();
-    await expect(page.locator('#obs-ruling-selected-count')).toHaveText('1 selected');
+    await expect(row.locator(SELECTORS.observation.ruling.select)).toBeChecked();
+    await expect(page.locator(SELECTORS.observation.ruling.selectedCount)).toHaveText('1 selected');
   });
 
   test('accepting the native confirm() agrees every selected row for real: both settle immediately, and the feed eventually clears', async ({ page }) => {
@@ -855,28 +855,28 @@ test.describe('Bulk-agree suggested rulings (LIN-2444 Phase 5) — e2e', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('[data-testid="obs-tab-rulings"]').click();
+    await page.locator(SELECTORS.observation.tab('rulings')).click();
 
-    const rowA = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2444-BULK-4' });
-    const rowB = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2444-BULK-5' });
-    await page.locator('#obs-ruling-select-all').check();
-    await expect(page.locator('#obs-ruling-selected-count')).toHaveText('2 selected');
+    const rowA = page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-2444-BULK-4' });
+    const rowB = page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-2444-BULK-5' });
+    await page.locator(SELECTORS.observation.ruling.selectAll).check();
+    await expect(page.locator(SELECTORS.observation.ruling.selectedCount)).toHaveText('2 selected');
 
-    await page.locator('#obs-ruling-agree-selected').click();
+    await page.locator(SELECTORS.observation.ruling.bulkApply).click();
     await page.locator(SELECTORS.observation.bulkConfirm.yes).click();
 
     // Both rows settle at the moment of success — no wait for a poll: controls
     // disabled, feedback recorded, selection emptied, bar hidden.
-    await expect(rowA.locator('.obs-ruling-feedback')).toHaveText('dismissed as proposed');
-    await expect(rowB.locator('.obs-ruling-feedback')).toHaveText('dismissed as proposed');
-    await expect(rowA.locator('.obs-ruling-select')).toBeDisabled();
-    await expect(page.locator('#obs-ruling-bulk-bar')).toBeHidden();
-    await expect(page.locator('#obs-ruling-selected-count')).toHaveText('0 selected');
+    await expect(rowA.locator(SELECTORS.observation.ruling.feedback)).toHaveText('dismissed as proposed');
+    await expect(rowB.locator(SELECTORS.observation.ruling.feedback)).toHaveText('dismissed as proposed');
+    await expect(rowA.locator(SELECTORS.observation.ruling.select)).toBeDisabled();
+    await expect(page.locator(SELECTORS.observation.ruling.bulkBar)).toBeHidden();
+    await expect(page.locator(SELECTORS.observation.ruling.selectedCount)).toHaveText('0 selected');
 
     // Genuinely dismissed server-side, not just locally settled — same
     // sessionsFeedCache SWR TTL budget as the existing option-press test above.
-    await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2444-BULK-4' })).toHaveCount(0, { timeout: 20000 });
-    await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2444-BULK-5' })).toHaveCount(0, { timeout: 20000 });
+    await expect(page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-2444-BULK-4' })).toHaveCount(0, { timeout: 20000 });
+    await expect(page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-2444-BULK-5' })).toHaveCount(0, { timeout: 20000 });
   });
 
   // LIN-2756 close-out (review ledger item 4): the ticket's own bug, at
@@ -900,32 +900,32 @@ test.describe('Bulk-agree suggested rulings (LIN-2444 Phase 5) — e2e', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('[data-testid="obs-tab-rulings"]').click();
+    await page.locator(SELECTORS.observation.tab('rulings')).click();
 
-    const rowA = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2756-LOOP-A' });
-    const rowB = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2756-LOOP-B' });
+    const rowA = page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-2756-LOOP-A' });
+    const rowB = page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-2756-LOOP-B' });
 
     // Acceptance limb 1: two rows, two keys — not one surviving <li>.
     await expect(rowA).toHaveCount(1);
     await expect(rowB).toHaveCount(1);
     // The legacy workspace-wide suggestion reaches both, so both are selectable.
-    await expect(rowA.locator('.obs-ruling-select')).toBeVisible();
-    await expect(rowB.locator('.obs-ruling-select')).toBeVisible();
+    await expect(rowA.locator(SELECTORS.observation.ruling.select)).toBeVisible();
+    await expect(rowB.locator(SELECTORS.observation.ruling.select)).toBeVisible();
 
     // Acceptance limb 2: select-all counts BOTH.
-    await page.locator('#obs-ruling-select-all').check();
-    await expect(page.locator('#obs-ruling-selected-count')).toHaveText('2 selected');
+    await page.locator(SELECTORS.observation.ruling.selectAll).check();
+    await expect(page.locator(SELECTORS.observation.ruling.selectedCount)).toHaveText('2 selected');
 
     // Acceptance limb 3: bulk agree dismisses BOTH, not just the last one.
-    await page.locator('#obs-ruling-agree-selected').click();
+    await page.locator(SELECTORS.observation.ruling.bulkApply).click();
     await page.locator(SELECTORS.observation.bulkConfirm.yes).click();
-    await expect(rowA.locator('.obs-ruling-feedback')).toHaveText('dismissed as proposed');
-    await expect(rowB.locator('.obs-ruling-feedback')).toHaveText('dismissed as proposed');
+    await expect(rowA.locator(SELECTORS.observation.ruling.feedback)).toHaveText('dismissed as proposed');
+    await expect(rowB.locator(SELECTORS.observation.ruling.feedback)).toHaveText('dismissed as proposed');
 
     // Genuinely dismissed server-side — the pre-fix failure was precisely a
     // row that LOOKED handled and came back on the next poll still unanswered.
-    await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2756-LOOP-A' })).toHaveCount(0, { timeout: 20000 });
-    await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2756-LOOP-B' })).toHaveCount(0, { timeout: 20000 });
+    await expect(page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-2756-LOOP-A' })).toHaveCount(0, { timeout: 20000 });
+    await expect(page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-2756-LOOP-B' })).toHaveCount(0, { timeout: 20000 });
   });
 });
 
@@ -985,15 +985,15 @@ test.describe('Bulk-agree progress / Stop / completion summary (LIN-2758) — e2
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('[data-testid="obs-tab-rulings"]').click();
+    await page.locator(SELECTORS.observation.tab('rulings')).click();
 
-    await page.locator('#obs-ruling-select-all').check();
-    await expect(page.locator('#obs-ruling-selected-count')).toHaveText('3 selected');
+    await page.locator(SELECTORS.observation.ruling.selectAll).check();
+    await expect(page.locator(SELECTORS.observation.ruling.selectedCount)).toHaveText('3 selected');
 
-    await page.locator('#obs-ruling-agree-selected').click();
+    await page.locator(SELECTORS.observation.ruling.bulkApply).click();
     await page.locator(SELECTORS.observation.bulkConfirm.yes).click();
 
-    const progress = page.locator('#obs-ruling-bulk-progress');
+    const progress = page.locator(SELECTORS.observation.ruling.bulkProgress);
     await expect(progress).toHaveText('Applying 1 of 3…');
     release();
     await expect(progress).toHaveText('Applying 2 of 3…');
@@ -1002,8 +1002,8 @@ test.describe('Bulk-agree progress / Stop / completion summary (LIN-2758) — e2
     release();
 
     await expect(progress).toHaveText('3 applied.');
-    await expect(page.locator('#obs-ruling-bulk-bar')).toBeHidden();
-    await expect(page.locator('#obs-ruling-select-all')).toBeEnabled();
+    await expect(page.locator(SELECTORS.observation.ruling.bulkBar)).toBeHidden();
+    await expect(page.locator(SELECTORS.observation.ruling.selectAll)).toBeEnabled();
     // agreeBtn is deliberately NOT asserted enabled here: a full successful
     // run empties rulingsSelected (every row succeeded), and the button's
     // own pre-existing, unrelated rule (`disabled: selectedCount === 0`)
@@ -1019,19 +1019,19 @@ test.describe('Bulk-agree progress / Stop / completion summary (LIN-2758) — e2
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('[data-testid="obs-tab-rulings"]').click();
+    await page.locator(SELECTORS.observation.tab('rulings')).click();
 
-    await page.locator('#obs-ruling-select-all').check();
+    await page.locator(SELECTORS.observation.ruling.selectAll).check();
 
-    await page.locator('#obs-ruling-agree-selected').click();
+    await page.locator(SELECTORS.observation.ruling.bulkApply).click();
     await page.locator(SELECTORS.observation.bulkConfirm.yes).click();
 
     // Row 1's own write is held open by the gate — deterministically "in
     // flight" for as long as the test needs to press Stop, no race.
-    const progress = page.locator('#obs-ruling-bulk-progress');
+    const progress = page.locator(SELECTORS.observation.ruling.bulkProgress);
     await expect(progress).toHaveText('Applying 1 of 3…');
 
-    const stopBtn = page.locator('#obs-ruling-bulk-stop');
+    const stopBtn = page.locator(SELECTORS.observation.ruling.bulkStop);
     await expect(stopBtn).toBeVisible();
     await stopBtn.click();
     // Row 1 is already in flight (no AbortController) — it is never
@@ -1051,11 +1051,11 @@ test.describe('Bulk-agree progress / Stop / completion summary (LIN-2758) — e2
     // actually processes first is LIN-2758-3 (seeded LAST), not -1 — so an
     // assertion naming specific surviving rows would be pinning an
     // accidental ordering detail, not the behavior under test.
-    await expect(page.locator('#obs-rulings .obs-ruling-select:checked')).toHaveCount(2);
-    await expect(page.locator('#obs-rulings .obs-ruling-select:disabled')).toHaveCount(1);
+    await expect(page.locator(`${SELECTORS.observation.ruling.select}:checked`)).toHaveCount(2);
+    await expect(page.locator(`${SELECTORS.observation.ruling.select}:disabled`)).toHaveCount(1);
 
-    await expect(page.locator('#obs-ruling-select-all')).toBeEnabled();
-    await expect(page.locator('#obs-ruling-agree-selected')).toBeEnabled();
+    await expect(page.locator(SELECTORS.observation.ruling.selectAll)).toBeEnabled();
+    await expect(page.locator(SELECTORS.observation.ruling.bulkApply)).toBeEnabled();
     await expect(stopBtn).toBeHidden();
   });
 });
@@ -1104,7 +1104,7 @@ test.describe('Task-bound ruling (LIN-2215) — a scan-produced decision end to 
 
     await page.goto(`/workspace/${localWorkerUrlKey}/observation`);
     await page.waitForLoadState('networkidle');
-    await page.locator('[data-testid="obs-tab-rulings"]').click();
+    await page.locator(SELECTORS.observation.tab('rulings')).click();
 
     // Run-scoped (LIN-2215 close-out, ledger item 2): `TaskDecisionsStore` is
     // durable with no TTL and `_pruneToCapacity` is scoped per `(urlKey,
@@ -1118,7 +1118,7 @@ test.describe('Task-bound ruling (LIN-2215) — a scan-produced decision end to 
     // scopes the locator to strictly this run's own row, so it can never
     // strict-mode-violate against a leaked sibling row the way the fixed
     // 'SCAN-1' text filter did.
-    const row = page.locator(`#obs-rulings .obs-ruling[data-decision-id="${scanBody.id}"]`);
+    const row = page.locator(`${SELECTORS.observation.ruling.row}[data-decision-id="${scanBody.id}"]`);
     await expect(row).toBeVisible();
     // F2: the task-bound caption — proof this is NOT falling back to
     // "no action available yet" (the pre-fix indeterminate default a
@@ -1156,7 +1156,7 @@ test.describe('Task-bound ruling (LIN-2215) — a scan-produced decision end to 
     // `data-decision-id` for the same leaked-row reason as the locator above
     // — a `hasText: 'SCAN-1'` filter would also count any leaked sibling row
     // sharing that same hardcoded identifier and never reach 0.
-    await expect(page.locator(`#obs-rulings .obs-ruling[data-decision-id="${scanBody.id}"]`)).toHaveCount(0, { timeout: 20000 });
+    await expect(page.locator(`${SELECTORS.observation.ruling.row}[data-decision-id="${scanBody.id}"]`)).toHaveCount(0, { timeout: 20000 });
   });
 
   // LIN-2226 ledger item 3: deliverRulingReply's task-bound branch has a real
@@ -1187,9 +1187,9 @@ test.describe('Task-bound ruling (LIN-2215) — a scan-produced decision end to 
 
     await page.goto(`/workspace/${localWorkerUrlKey}/observation`);
     await page.waitForLoadState('networkidle');
-    await page.locator('[data-testid="obs-tab-rulings"]').click();
+    await page.locator(SELECTORS.observation.tab('rulings')).click();
 
-    const row = page.locator(`#obs-rulings .obs-ruling[data-decision-id="${scanBody.id}"]`);
+    const row = page.locator(`${SELECTORS.observation.ruling.row}[data-decision-id="${scanBody.id}"]`);
     await expect(row).toBeVisible();
 
     // Force the one way a task-bound reply's failure branch is reached: a
@@ -1202,7 +1202,7 @@ test.describe('Task-bound ruling (LIN-2215) — a scan-produced decision end to 
     const buttons = row.locator('.chat-option-btn');
     await buttons.first().click();
 
-    const feedback = row.locator('.obs-ruling-feedback');
+    const feedback = row.locator(SELECTORS.observation.ruling.feedback);
     await expect(feedback).toContainText('reply failed');
     // The pending guard released and the buttons re-enabled — a row stuck
     // disabled after a failure would be its own (different) bug.
@@ -1244,12 +1244,12 @@ test.describe('Task-bound ruling (LIN-2215) — a scan-produced decision end to 
     // View from workspace B, not A — the exact cross-workspace shape F1 tests.
     await page.goto(`/workspace/${secondUrlKey}/observation`);
     await page.waitForLoadState('networkidle');
-    await page.locator('[data-testid="obs-tab-rulings"]').click();
+    await page.locator(SELECTORS.observation.tab('rulings')).click();
 
-    const row = page.locator(`#obs-rulings .obs-ruling[data-decision-id="${scanBody.id}"]`);
+    const row = page.locator(`${SELECTORS.observation.ruling.row}[data-decision-id="${scanBody.id}"]`);
     await expect(row).toBeVisible();
     // The workspace's name, since two workspaces are showing; the raw key is never shown (LIN-3983 PR 2).
-    await expect(row.locator('.obs-ruling-ws')).toBeVisible();
+    await expect(row.locator(SELECTORS.observation.ruling.ws)).toBeVisible();
     await expect(row).not.toContainText(localWorkerUrlKey);
 
     const [commentReq] = await Promise.all([
@@ -1265,7 +1265,7 @@ test.describe('Task-bound ruling (LIN-2215) — a scan-produced decision end to 
     expect(commentPayload.taskDecisionId).toBe(scanBody.id);
     expect(commentPayload.taskDecisionIssueId).toBe(issueId);
 
-    await expect(page.locator(`#obs-rulings .obs-ruling[data-decision-id="${scanBody.id}"]`)).toHaveCount(0, { timeout: 20000 });
+    await expect(page.locator(`${SELECTORS.observation.ruling.row}[data-decision-id="${scanBody.id}"]`)).toHaveCount(0, { timeout: 20000 });
   });
 
   test('LIN-2225: dismiss on a task-bound ruling reuses the existing scan dismiss route/outcome, and the row clears', async ({ page, seedLocal, localWorkerUrlKey }) => {
@@ -1294,9 +1294,9 @@ test.describe('Task-bound ruling (LIN-2215) — a scan-produced decision end to 
 
     await page.goto(`/workspace/${localWorkerUrlKey}/observation`);
     await page.waitForLoadState('networkidle');
-    await page.locator('[data-testid="obs-tab-rulings"]').click();
+    await page.locator(SELECTORS.observation.tab('rulings')).click();
 
-    const row = page.locator(`#obs-rulings .obs-ruling[data-decision-id="${scanBody.id}"]`);
+    const row = page.locator(`${SELECTORS.observation.ruling.row}[data-decision-id="${scanBody.id}"]`);
     await expect(row).toBeVisible();
 
     // Dismiss must hit the EXISTING scan dismiss route (LIN-2211/LIN-2197
@@ -1304,13 +1304,13 @@ test.describe('Task-bound ruling (LIN-2215) — a scan-produced decision end to 
     // own canonical id.
     const [dismissReq] = await Promise.all([
       page.waitForRequest(r => r.url().includes(`/api/scan/${issueId}/dismiss`) && r.method() === 'POST'),
-      row.locator('.obs-ruling-dismiss').click()
+      row.locator(SELECTORS.observation.ruling.dismiss).click()
     ]);
     const dismissPayload = dismissReq.postDataJSON();
     expect(dismissPayload.id).toBe(scanBody.id);
     expect((await dismissReq.response()).status()).toBe(200);
 
-    await expect(page.locator(`#obs-rulings .obs-ruling[data-decision-id="${scanBody.id}"]`)).toHaveCount(0, { timeout: 20000 });
+    await expect(page.locator(`${SELECTORS.observation.ruling.row}[data-decision-id="${scanBody.id}"]`)).toHaveCount(0, { timeout: 20000 });
   });
 
   test('a mid-turn/loop-backed ruling is unaffected by the task-bound wiring — no regression on the existing reply path', async ({ page, seedLocal, localWorkerUrlKey }) => {
@@ -1337,7 +1337,7 @@ test.describe('Task-bound ruling (LIN-2215) — a scan-produced decision end to 
     await page.waitForLoadState('networkidle');
     await Promise.all([
       page.waitForResponse(r => r.url().includes('/api/dashboard/rulings') && r.request().method() === 'GET'),
-      page.locator('[data-testid="obs-tab-rulings"]').click()
+      page.locator(SELECTORS.observation.tab('rulings')).click()
     ]);
 
     await seedLocal({
@@ -1352,10 +1352,10 @@ test.describe('Task-bound ruling (LIN-2215) — a scan-produced decision end to 
     await page.waitForLoadState('networkidle');
     await Promise.all([
       page.waitForResponse(r => r.url().includes('/api/dashboard/rulings') && r.request().method() === 'GET'),
-      page.locator('[data-testid="obs-tab-rulings"]').click()
+      page.locator(SELECTORS.observation.tab('rulings')).click()
     ]);
 
-    await expect(page.locator('#obs-rulings .obs-ruling', { hasText: 'SCAN-2' })).toHaveCount(0);
+    await expect(page.locator(SELECTORS.observation.ruling.row, { hasText: 'SCAN-2' })).toHaveCount(0);
   });
 });
 
@@ -1442,9 +1442,9 @@ test.describe('Ambient rulings nav badge (LIN-1728 Phase 3)', () => {
     await badge.click();
     await page.waitForURL(`**/workspace/${URL_KEY}/observation?view=rulings`);
     await page.waitForLoadState('networkidle');
-    await expect(page.locator('[data-testid="obs-tab-rulings"]')).toHaveClass(/is-active/);
-    await expect(page.locator('#obs-rulings-section')).toBeVisible();
-    await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-B6' })).toBeVisible();
+    await expect(page.locator(SELECTORS.observation.tab('rulings'))).toHaveClass(/is-active/);
+    await expect(page.locator(SELECTORS.observation.rulingsSection)).toBeVisible();
+    await expect(page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-1728-B6' })).toBeVisible();
   });
 });
 
@@ -1576,9 +1576,9 @@ test.describe('Agree on a PROPOSED ANSWER (LIN-2754 L3) — e2e', () => {
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.locator('[data-testid="obs-tab-rulings"]').click();
+    await page.locator(SELECTORS.observation.tab('rulings')).click();
 
-    const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2754-ANSWER' });
+    const row = page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-2754-ANSWER' });
     await expect(row).toBeVisible();
     // The banner must name the PROPOSED ANSWER and its option's own label —
     // the pre-LIN-2792 UI had no such branch and read "proposed dismissal"
@@ -1592,9 +1592,9 @@ test.describe('Agree on a PROPOSED ANSWER (LIN-2754 L3) — e2e', () => {
     // A handle keeps reading the node `deliverRulingReply` actually wrote
     // its feedback into, attached or not — the settle text is written
     // synchronously on delivery, before any repaint can intervene.
-    const feedbackHandle = await row.locator('.obs-ruling-feedback').elementHandle();
+    const feedbackHandle = await row.locator(SELECTORS.observation.ruling.feedback).elementHandle();
 
-    await row.locator('.obs-ruling-agree').click();
+    await row.locator(SELECTORS.observation.ruling.agree).click();
 
     // Delivered, not dismissed: the answer branch's own feedback text.
     await expect.poll(async () => feedbackHandle.textContent(), { timeout: 15000 }).toBe('recorded ✓');
@@ -1615,6 +1615,6 @@ test.describe('Agree on a PROPOSED ANSWER (LIN-2754 L3) — e2e', () => {
 
     // And it genuinely clears the operator's inbox — the same SWR cache
     // budget every other clearing assertion in this file uses.
-    await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2754-ANSWER' })).toHaveCount(0, { timeout: 20000 });
+    await expect(page.locator(SELECTORS.observation.ruling.row).filter({ hasText: 'LIN-2754-ANSWER' })).toHaveCount(0, { timeout: 20000 });
   });
 });

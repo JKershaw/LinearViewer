@@ -346,7 +346,7 @@ describe('render-observation: bulk select-all checkbox accessible name (LIN-2444
     );
     assert.match(
       html,
-      /<input type="checkbox" id="obs-ruling-select-all" aria-label="select all proposed">/,
+      /<input type="checkbox" id="obs-ruling-select-all" aria-label="select all proposed" data-testid="obs-ruling-select-all">/,
       'the select-all checkbox must carry an aria-label so it has a name even when the sibling text span is display:none at ≤400px'
     );
   });
@@ -397,7 +397,7 @@ describe('render-observation: bulk-agree progress node + Stop button markup (LIN
     );
     assert.match(
       html,
-      /<p class="obs-ruling-bulk-progress" id="obs-ruling-bulk-progress" aria-live="polite"><\/p>/,
+      /<p class="obs-ruling-bulk-progress" id="obs-ruling-bulk-progress" data-testid="obs-ruling-bulk-progress" aria-live="polite"><\/p>/,
       'stripping aria-live="polite" here would silence the batch progress/summary announcement entirely, with no visible symptom'
     );
   });

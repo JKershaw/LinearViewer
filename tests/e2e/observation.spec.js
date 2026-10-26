@@ -114,6 +114,15 @@ test.describe('Autopilot Observation page (first-class)', () => {
       await expect(page.locator('.obs-chip.is-on')).toHaveCount(2);
     });
 
+    test('All workspaces is in the URL and survives a reload (LIN-3983 PR 2)', async ({ page }) => {
+      await page.getByTestId('obs-scope-all').click();
+      await expect(page).toHaveURL(/[?&]scope=all/);
+      await page.reload();
+      await page.waitForLoadState('networkidle');
+      await expect(page.getByTestId('obs-scope-all')).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.locator('#obs-chips')).toBeVisible();
+    });
+
     test('the completed archive is collapsed by default and toggles open', async ({ page }) => {
       const toggle = page.locator('#obs-archive-toggle');
       await expect(toggle).toHaveAttribute('aria-expanded', 'false');
