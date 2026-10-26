@@ -265,8 +265,25 @@ describe('the Models words (LIN-3987)', () => {
   test('a job following a blank group names what the group resolves to, never "(none)"', () => {
     const html = body(emptyTable());
     assert.doesNotMatch(html, /\(none\)/);
-    assert.match(html, /<option value=""[^>]*>Follow [^<]*\(Claude Code(?:&#039;|')s own effort\)<\/option>/, 'effort follows the harness in force, in words');
-    assert.match(html, /<option value=""[^>]*>Follow [^<]*\(Claude Code\)<\/option>/, 'a blank harness resolves to Claude Code');
+    assert.match(html, /<option value=""[^>]*>Follow Judge<\/option>/, 'the placeholder stays short: it does not fit a 390px phone with its words in it');
+    assert.match(html, /data-decision-hint="harness"[^>]*>Right now: Claude Code</, 'a blank harness resolves to Claude Code, in the hint');
+    assert.match(html, /data-decision-hint="effort"[^>]*>Right now: Claude Code(?:&#039;|')s own effort</, 'effort follows the harness in force, in words');
+  });
+
+  test('LIN-3952: the hint says "from <Group>" only when the group supplies the value', () => {
+    const table = emptyTable();
+    table.groups[SURFACES.AGENT_SESSION].judge = { model: 'sonnet' };
+    const fromGroup = body(table);
+    assert.match(fromGroup, /data-decision-hint="model"[^>]*>Right now: Claude Sonnet 5\.5, from Judge</, 'the group supplies the model');
+    assert.doesNotMatch(fromGroup, /data-decision-hint="harness"[^>]*>[^<]*from Judge/, 'the harness is not the group\'s');
+
+    const unset = body(emptyTable());
+    assert.doesNotMatch(unset, /from Judge/, 'a group with no value never reads "from Judge"');
+  });
+
+  test('LIN-3952: a Harbour call with nothing stored names the server default in its hint, not its group', () => {
+    const html = body(emptyTable());
+    assert.match(html, /data-decision-hint="model"[^>]*>Right now: [^<]*, server default</);
   });
 
   test('the "also ran on" note names models by their display names, not their ids', () => {

@@ -24,6 +24,8 @@ const EXPECTED = [
   'settings-pane',         // area-frame: renderSettingsShell
   'settings-state-warn',   // sidebar-state: renderSettingsNav
   'decision-panel',        // decision-panel: decisionPanel (LIN-3962)
+  'settings-row-figures',  // ranked-row: drillRow with rowFigures (LIN-3952)
+  'models-save',           // pending-bar: pendingBarHtml (LIN-3952)
 ];
 
 test('every Settings piece has one live sample, in an inert phone-root wrapper', () => {

@@ -113,8 +113,19 @@
   flex-wrap: wrap;
 }
 
-.dispatch-default-row .field-label {
-  min-width: 14ch;
+/* LIN-3952: the row's label keeps its width (the controls take the rest), and the controls sit in its value, wrapping on a phone. */
+.dispatch-default-row > .settings-row-label {
+  flex: 0 0 auto;
+  min-width: 11ch;
+}
+
+.dispatch-default-row > .settings-row-value {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--fg);
 }
 
 .harness-select,
@@ -197,19 +208,38 @@
   color: var(--fg);
 }
 
-.dispatch-preset-kind-overrides .children {
+.dispatch-preset-kind-overrides .dispatch-kind-rows {
   margin-top: var(--space-2);
 }
 
 /* =============================================================================
-   Dispatch presets (LIN-1391 S7)
+   Dispatch presets (LIN-1391 S7, restyled on the shared rows in LIN-3952)
 
-   Reuses .dispatch-default-row/.harness-select/.dispatch-model-input above for
-   each preset's config row (renderDispatchDefaultRow) — only the name line and
-   list/create wrapper need their own rules.
+   Each preset and the new-preset block is an open settings row (presetRow,
+   dispatchPresetsBody). Its config rows reuse .dispatch-default-row and the
+   control classes above; only the name line and the separators between a
+   list's rows need their own rules.
    ============================================================================= */
+.dispatch-preset-list > * + *,
+.dispatch-preset-kind-overrides .settings-row + .settings-row {
+  border-top: 1px solid var(--line);
+}
+
+.dispatch-preset-item .settings-row-body > .settings-row,
+.dispatch-preset-item .settings-row-body > .dispatch-preset-toplevel-config > .settings-row {
+  margin-top: var(--space-2);
+}
+
 .dispatch-preset-name-line {
+  display: flex;
   flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding-block: var(--space-2);
+}
+
+.dispatch-preset-name-line > .settings-row-label {
+  min-width: 6ch;
 }
 
 .dispatch-preset-name-input {
@@ -229,16 +259,8 @@
   border-color: var(--blue);
 }
 
-.dispatch-preset-empty {
-  color: var(--fg-dim);
-}
-
-.dispatch-preset-create {
-  margin-top: var(--space-3);
-}
-
 .dispatch-preset-create-submit {
-  margin-top: var(--space-2);
+  padding-block: var(--space-2);
 }
 
 /* =============================================================================
@@ -511,6 +533,11 @@
 .settings-rows > .consent-notice,
 .settings-rows > .settings-action-red:not(.settings-row) {
   margin-inline: 0.8rem;
+}
+
+/* LIN-3952: the consent notice has no row padding of its own, so its last line sat on the card's bottom border. It takes the rows' block padding too. */
+.settings-rows > .consent-notice {
+  padding-block: 0.7rem;
 }
 
 .settings-row {
@@ -943,10 +970,6 @@
     justify-content: flex-end;
   }
 
-  /* The open sheet keeps its last field clear of the bar that sits above it. */
-  .models-form details.settings-row-open[open] {
-    padding-bottom: 12rem;
-  }
 }
 
 .models-save .settings-ask-label,
@@ -954,12 +977,13 @@
   font-family: var(--font-content);
 }
 
-/* A job row's flag (no runs) is a tag after its name, not part of it (LIN-3855 review). */
-.models-form .settings-row-flags {
+/* A row's flag (a job's "no runs", "saved") is a tag after its name, not part of it (LIN-3855 review). Shared by every
+   drillRow that carries one, so the Models rows and the styleguide's ranked-row sample read the same (LIN-3952). */
+.settings-row-flags {
   margin-left: var(--space-2);
 }
 
-.models-form .settings-row-flag {
+.settings-row-flag {
   color: var(--muted);
   font-family: var(--font-content);
   font-size: 0.85em;
@@ -973,6 +997,9 @@
     overflow-y: auto;
     background: var(--bg);
     padding: var(--space-4);
+    /* The sticky bar sits over the sheet's foot (z-index 61), so the last field clears it by the bar's height (LIN-3952).
+       Set after the shorthand above, which would otherwise reset it. */
+    padding-bottom: 12rem;
   }
 
   .settings-field {
