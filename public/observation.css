@@ -594,6 +594,10 @@
 .obs-session[data-status="done-with-warning"] { border-left-color: var(--green); }
 .obs-session[data-status="error"] { border-left-color: var(--red); }
 .obs-session[data-status="stale"] { border-left-color: var(--slate); }
+/* waiting (LIN-3983): the strongest accent on the card list. A teal edge, thicker
+   than the others, so a card that needs a person is never the quietest, and not
+   the amber of in-progress. */
+.obs-session[data-status="waiting"] { border-left-width: 4px; border-left-color: var(--brand); }
 
 /* The head is a non-interactive container (LIN-928, design §7): the whole header
    is no longer the toggle, so it carries no pointer cursor / hover affordance —
@@ -1390,7 +1394,7 @@ a.obs-task-ident:hover { text-decoration: underline; }
    checkbox belongs to the tab, not the block. */
 .obs-waiting[hidden] { display: none; }
 .obs-waiting {
-  border-left: 3px solid var(--amber);
+  border-left: 4px solid var(--brand);
   padding-left: 0.75rem;
   margin-bottom: 1.1rem;
 }

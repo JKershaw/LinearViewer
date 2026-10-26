@@ -19,6 +19,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { FakeElement } from '../fixtures/observation-dom-shim.js';
+import { buildSessionPayload } from '../../routes/dashboard-feed.js';
+import { collectUnansweredDecisions, openDecisionLoopIds, MAX_STAMP_LOOP_IDS } from '../../lib/unanswered-decisions.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OBSERVATION_JS_SRC = readFileSync(join(__dirname, '../../public/observation.js'), 'utf8');
@@ -125,10 +127,11 @@ describe('compactWaitSessions — which waiting runs get a compact row (LIN-3983
     assert.deepEqual(plain(compactWaitSessions([waitingSession()], new Set(['loop-p']))), []);
   });
 
-  test('a day-dead run never gets a row, since its status is idle, not waiting (LIN-608)', () => {
+  test('a day-dead run never gets a row: its status is stale, though its wait flag is still set (LIN-608, F5.1)', () => {
     const { module } = makeSandbox();
     const { compactWaitSessions } = module.exports;
-    assert.deepEqual(plain(compactWaitSessions([waitingSession({ status: 'stale', waiting: false })], new Set())), []);
+    // `waiting` is not gated on staleness in the feed, so the real shape is stale AND waiting.
+    assert.deepEqual(plain(compactWaitSessions([waitingSession({ status: 'stale', waiting: true })], new Set())), []);
   });
 
   test('a finished run never gets a row', () => {
@@ -383,5 +386,293 @@ describe('the standalone waiting read (decision 8, LIN-3983)', () => {
     await pollWaitingSupplement();
     await flush();
     assert.deepEqual([...standaloneWaitSupplement.keys()], ['sa-1'], 'a failed read keeps what it had');
+  });
+
+  test('on the standalone filter an autopilot run waiting on a plain [blocked] stays in the block (decision 8(i))', async () => {
+    const autopilotWait = waitingSession({ sessionId: 'ap-1', standalone: false, waitingLoopIds: ['loop-ap'], producerLoopId: 'loop-ap' });
+    const sandbox = makeSandbox({
+      fetchImpl: async () => jsonResponse({ active: [autopilotWait], recent: [], rulings: [] })
+    });
+    const { setFilter, setOpenLoopIds } = sandbox.module.exports;
+    setOpenLoopIds(new Set());
+    setFilter('standalone'); // the filter change polls the feed, which fills the block's session list
+    await flush();
+    const block = sandbox.__nodes.get('obs-waiting');
+    assert.equal(block.hidden, false, 'the block is shown on the standalone filter');
+    assert.match(sandbox.__nodes.get('obs-waiting-runs').innerHTML, /data-session-id="ap-1"/);
+  });
+});
+
+// ─── The block's rule, over the real builder (LIN-3983 PR 1, step 8) ────────
+//
+// Each fixture is one loop set, the rulings route's input. The run payloads come
+// from `buildSessionPayload` (what the client receives), the open set and rows
+// from `openDecisionLoopIds` and `collectUnansweredDecisions` over the SAME
+// loops, and `compactWaitSessions` decides the compact rows. Nothing here writes
+// an open-set by hand, so a drift between the builder and the block fails here.
+
+const WS = { urlKey: 'acme', name: 'Acme' };
+const NOW = new Date();
+const RECENT = new Date(Date.now() - 60 * 1000).toISOString();
+const LONG_AGO = '2020-01-01T00:00:00.000Z';
+const WAIT_TEXT = '[blocked] need a ruling before removing the route';
+const PLAIN_TEXT = 'need a ruling before removing the route';
+const decision = (decisionId = 'd-1') => ({ decision_id: decisionId, question: 'Remove the route now?' });
+const answered = (decisionId, outcome = 'answered') => [{ decisionId, raisedAt: null, resolvedAt: RECENT, outcome }];
+const withdrawnFor = (decisionId) => ({ decisionId, timestamp: RECENT, reason: 'no longer needed' });
+const shelfFor = (decisionId, loopId) => ({
+  urlKey: 'acme', decisionId, decisionLoopId: loopId, lapseCount: 0,
+  resurfaceAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+});
+
+// One loop of session S. A `blocked` loop carries the runner's [blocked] wake and its message.
+function loop(over = {}) {
+  return {
+    loopId: 'p', lineageId: null, kind: 'worker', followUpTo: null, sessionId: 'S',
+    issueIdentifier: 'LIN-900', workspaceUrlKey: 'acme', dispatchedAt: RECENT, resolvedAt: null,
+    decision: null, decisionCase: [], answeredDecisions: [], withdrawal: null,
+    wakeMarker: null, waitingMessage: null,
+    ...over
+  };
+}
+const blocked = (over = {}) => loop({ wakeMarker: 'blocked', waitingMessage: WAIT_TEXT, ...over });
+
+// The worker/autopilot pair of LIN-3959: the worker's sessionId names the autopilot.
+const joinedAutopilot = (over = {}) => loop({
+  loopId: 'ap', lineageId: 'ap', kind: 'autopilot', sessionId: 'ap', decision: decision(), ...over
+});
+const joinedWorker = (over = {}) => loop({
+  loopId: 'w', lineageId: 'W', kind: 'worker', sessionId: 'ap', decision: decision(), ...over
+});
+
+const FIXTURES = {
+  dayDead: () => ({ loops: [blocked({ loopId: 'p', dispatchedAt: LONG_AGO, resolvedAt: LONG_AGO })] }),
+  shelved: () => ({ loops: [blocked({ loopId: 'p', decision: decision() })], shelved: [shelfFor('d-1', 'p')] }),
+  messageLessOpen: () => ({ loops: [blocked({ loopId: 'p', decision: decision(), waitingMessage: null })] }),
+  messageLessPlain: () => ({ loops: [blocked({ loopId: 'p', waitingMessage: null })] }),
+  producerPlainOtherOpen: () => ({
+    loops: [blocked({ loopId: 'a' }), blocked({ loopId: 'b', decision: decision(), waitingMessage: null })]
+  }),
+  dismissed: () => ({ loops: [blocked({ loopId: 'p', decision: decision(), answeredDecisions: answered('d-1', 'dismissed') })] }),
+  withdrawnThenPlain: () => ({
+    loops: [blocked({ loopId: 'p', decision: decision(), withdrawal: withdrawnFor('d-1'), waitingMessage: '[blocked] a plain wait now' })]
+  }),
+  answeredNoFollowUp: () => ({ loops: [blocked({ loopId: 'p', decision: decision(), answeredDecisions: answered('d-1') })] }),
+  siblingAnswered: () => ({
+    loops: [
+      blocked({ loopId: 'p', lineageId: 'L', decision: decision() }),
+      loop({ loopId: 'q', lineageId: 'L', decision: decision(), answeredDecisions: answered('d-1') })
+    ]
+  }),
+  joinedAnsweredOnWorker: () => ({
+    loops: [joinedWorker({ answeredDecisions: answered('d-1') }), joinedAutopilot({ wakeMarker: 'blocked', waitingMessage: WAIT_TEXT })]
+  }),
+  joinedWithdrawnWorker: () => ({
+    loops: [joinedWorker({ wakeMarker: 'blocked', waitingMessage: WAIT_TEXT, withdrawal: withdrawnFor('d-1') }), joinedAutopilot()]
+  }),
+  joinedOverStampCap: () => ({
+    loops: [
+      joinedWorker({ loopId: 'w0', lineageId: 'W0', wakeMarker: 'blocked', waitingMessage: WAIT_TEXT }),
+      ...Array.from({ length: MAX_STAMP_LOOP_IDS }, (_, i) => joinedWorker({ loopId: `w${i + 1}`, lineageId: `W${i + 1}` })),
+      joinedAutopilot()
+    ]
+  }),
+  supersededAndNonWaiting: () => ({
+    loops: [blocked({ loopId: 'a' }), loop({ loopId: 'b', followUpTo: 'a' }), blocked({ loopId: 'c' })]
+  })
+};
+
+// The agreement property, written against outputs only: every waiting loop of a
+// waiting run is open (its ruling row speaks for it) or its run gets a compact row,
+// and every loop a ruling row stamps is open. Shelving hides a row, never the loop.
+function assertAgreement(payloads, rows, openIds, compact) {
+  const compactRuns = new Set(compact.map(r => String(r.sessionId)));
+  for (const s of payloads) {
+    if (s.status !== 'waiting') continue;
+    for (const id of s.waitingLoopIds) {
+      assert.ok(openIds.has(id) || compactRuns.has(String(s.sessionId)), `waiting loop ${id} is shown on the block`);
+    }
+  }
+  for (const row of rows) {
+    for (const id of row.stampLoopIds ?? [row.stampLoopId]) assert.ok(openIds.has(id), `row stamp ${id} is in the open set`);
+  }
+}
+
+const { compactWaitSessions: compactOverBuilder } = makeSandbox().module.exports;
+
+// Runs the block's whole rule over one loop set, and checks agreement before returning.
+function runBlock({ loops, shelved = [] }) {
+  const bySession = new Map();
+  for (const l of loops) {
+    if (!bySession.has(l.sessionId)) bySession.set(l.sessionId, []);
+    bySession.get(l.sessionId).push(l);
+  }
+  const payloads = plain([...bySession].map(([sessionId, sessionLoops]) =>
+    buildSessionPayload({ sessionId, loops: sessionLoops }, WS, false)));
+  const rows = collectUnansweredDecisions({ loops, shelvedRulings: shelved }, { now: NOW });
+  const openIds = openDecisionLoopIds(loops);
+  const compact = plain(compactOverBuilder(payloads, openIds));
+  assertAgreement(payloads, rows, openIds, compact);
+  return { payloads, rows, openIds: [...openIds].sort(), compact };
+}
+
+describe('the waiting block over the real builder (LIN-3983, step 8)', () => {
+  test('(1) a day-dead wait gets no compact row: the run is stale, though its wait flag is set (F5.1)', () => {
+    const { payloads, compact } = runBlock(FIXTURES.dayDead());
+    assert.equal(payloads[0].status, 'stale');
+    assert.equal(payloads[0].waiting, true, 'the wait flag is not gated on staleness, so the gate is on status');
+    assert.deepEqual(compact, []);
+  });
+
+  test('(2) a shelved question: no ruling row and no compact row, the same as before the shelve (F1)', () => {
+    const before = runBlock({ loops: FIXTURES.shelved().loops });
+    const after = runBlock(FIXTURES.shelved());
+    assert.equal(before.rows.length, 1);
+    assert.equal(after.rows.length, 0, 'the shelve hides the row');
+    assert.deepEqual(after.openIds, ['p'], 'the open set is shelf-free');
+    assert.deepEqual(after.openIds, before.openIds);
+    assert.deepEqual(after.compact, before.compact);
+    assert.deepEqual(after.compact, [], 'the shelved wait is not a compact row');
+  });
+
+  test('(3) a message-less open question: one ruling row, no compact row, and still none once shelved (F5.2)', () => {
+    const open = runBlock(FIXTURES.messageLessOpen());
+    assert.equal(open.rows.length, 1);
+    assert.deepEqual(open.compact, []);
+    const shelvedNow = runBlock({ ...FIXTURES.messageLessOpen(), shelved: [shelfFor('d-1', 'p')] });
+    assert.equal(shelvedNow.rows.length, 0);
+    assert.deepEqual(shelvedNow.compact, []);
+  });
+
+  test('(4) a message-less wait with no question: one compact row with the fixed fallback (no message)', () => {
+    const { rows, compact } = runBlock(FIXTURES.messageLessPlain());
+    assert.equal(rows.length, 0);
+    assert.equal(compact.length, 1);
+    assert.equal(compact[0].message, '');
+  });
+
+  test('(5) a plain producer and another loop with a ruling row: the producer gets its row once, the ruling once (F4)', () => {
+    const { payloads, rows, openIds, compact } = runBlock(FIXTURES.producerPlainOtherOpen());
+    assert.equal(payloads[0].producerLoopId, 'a');
+    assert.deepEqual(openIds, ['b']);
+    assert.equal(rows.length, 1, 'one ruling row, for b');
+    assert.equal(compact.length, 1, 'one compact row, for the run');
+    assert.equal(compact[0].message, PLAIN_TEXT, 'a is not covered, so its message shows');
+  });
+
+  test('(6) a question dismissed through the dismiss route, on a run still blocked: one compact row, no ruling row (F6)', () => {
+    const { rows, openIds, compact } = runBlock(FIXTURES.dismissed());
+    assert.equal(rows.length, 0);
+    assert.deepEqual(openIds, []);
+    assert.equal(compact.length, 1);
+    assert.equal(compact[0].message, PLAIN_TEXT);
+  });
+
+  test('(7) a question withdrawn, then a plain [blocked]: the run gets its compact row with the new message', () => {
+    const { rows, openIds, compact } = runBlock(FIXTURES.withdrawnThenPlain());
+    assert.equal(rows.length, 0);
+    assert.deepEqual(openIds, []);
+    assert.equal(compact.length, 1);
+    assert.equal(compact[0].message, 'a plain wait now');
+  });
+
+  test('(8) an answer with no follow-up dispatch that ever landed: no ruling row, one compact row, the card says waiting (F6)', () => {
+    const { payloads, rows, openIds, compact } = runBlock(FIXTURES.answeredNoFollowUp());
+    assert.equal(rows.length, 0);
+    assert.deepEqual(openIds, []);
+    assert.equal(payloads[0].status, 'waiting');
+    assert.equal(compact.length, 1);
+  });
+
+  test('(9) an answer stamped on a sibling loop of the lineage: the producer leaves the open set and gets its compact row (F6)', () => {
+    const { rows, openIds, compact } = runBlock(FIXTURES.siblingAnswered());
+    assert.equal(rows.length, 0);
+    assert.deepEqual(openIds, []);
+    assert.equal(compact.length, 1);
+    assert.equal(compact[0].message, PLAIN_TEXT);
+  });
+
+  test('(10) pressing Dismiss on a block ruling row with the run still blocked: the row leaves and one compact row appears (F6)', () => {
+    const before = runBlock({ loops: [blocked({ loopId: 'p', decision: decision() })] });
+    const after = runBlock({ loops: [blocked({ loopId: 'p', decision: decision(), answeredDecisions: answered('d-1', 'dismissed') })] });
+    assert.equal(before.rows.length, 1);
+    assert.equal(before.compact.length, 0);
+    assert.equal(after.rows.length, 0);
+    assert.equal(after.compact.length, 1, 'exactly one compact row');
+  });
+
+  test('(11) a joined cluster answered on the worker copy only, the autopilot still blocked: one compact row, no ruling row (F7)', () => {
+    const { rows, openIds, compact, payloads } = runBlock(FIXTURES.joinedAnsweredOnWorker());
+    assert.equal(rows.length, 0);
+    assert.deepEqual(openIds, [], 'the answer closes the joined row, so the autopilot is not open');
+    assert.equal(payloads[0].producerLoopId, 'ap');
+    assert.equal(compact.length, 1);
+    assert.equal(compact[0].message, PLAIN_TEXT);
+  });
+
+  test('(12) a joined cluster with the worker withdrawn and the autopilot open: one joined row, both open, no compact row (F7)', () => {
+    const { rows, openIds, compact, payloads } = runBlock(FIXTURES.joinedWithdrawnWorker());
+    assert.equal(rows.length, 1, 'one joined row');
+    assert.deepEqual(openIds, ['ap', 'w']);
+    assert.deepEqual(payloads[0].waitingLoopIds, ['w']);
+    assert.deepEqual(compact, [], 'the withdrawn worker is open with its cluster, so its row speaks for it');
+  });
+
+  test('(13) a cluster with more copies than MAX_STAMP_LOOP_IDS: the open set holds every copy, the row caps its stamps, the block is unchanged', () => {
+    const { rows, openIds, compact } = runBlock(FIXTURES.joinedOverStampCap());
+    assert.equal(openIds.length, MAX_STAMP_LOOP_IDS + 2, 'every copy and the autopilot');
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].stampLoopIds.length, MAX_STAMP_LOOP_IDS);
+    assert.deepEqual(compact, [], 'the compact-row decision reads cluster members, not the stamp list');
+  });
+
+  test('waitingLoopIds names the live waits: a superseded loop and a non-waiting loop are both left out', () => {
+    const { payloads } = runBlock(FIXTURES.supersededAndNonWaiting());
+    assert.deepEqual(payloads[0].waitingLoopIds, ['c']);
+  });
+
+  test('waitingLoopIds names the one wait of a run that is waiting', () => {
+    const { payloads } = runBlock({ loops: [blocked({ loopId: 'p' })] });
+    assert.deepEqual(payloads[0].waitingLoopIds, ['p']);
+  });
+
+  test('waitingLoopIds is empty for a run that is not waiting', () => {
+    const { payloads } = runBlock({ loops: [loop({ loopId: 'p' })] });
+    assert.deepEqual(payloads[0].waitingLoopIds, []);
+    assert.equal(payloads[0].waiting, false);
+  });
+
+  test('waitingLoopIds is empty for a finished run, even with a lingering [blocked] loop', () => {
+    const { payloads } = runBlock({ loops: [blocked({ loopId: 'p', agentState: 'complete' })] });
+    assert.equal(payloads[0].waiting, false);
+    assert.deepEqual(payloads[0].waitingLoopIds, []);
+  });
+
+  test('the agreement property holds over every fixture above', () => {
+    for (const build of Object.values(FIXTURES)) runBlock(build());
+  });
+});
+
+describe('the waiting accent is the strongest on the page (LIN-3983, outcome 1)', () => {
+  const CSS = readFileSync(join(__dirname, '../../public/observation.css'), 'utf8');
+  const ruleBody = (selector) => {
+    const escaped = selector.replace(/[.[\]"=]/g, '\\$&');
+    const match = CSS.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`));
+    return match ? match[1] : null;
+  };
+
+  test('a waiting card has its own, thicker accent, and it is not the in-progress amber', () => {
+    const body = ruleBody('.obs-session[data-status="waiting"]');
+    assert.ok(body, 'a waiting-card accent rule exists');
+    assert.match(body, /border-left-width:\s*4px/);
+    assert.doesNotMatch(body, /--amber/);
+    assert.notEqual(ruleBody('.obs-session[data-status="in-progress"]'), null);
+  });
+
+  test('the waiting block is not amber either, so the card that needs a person is not the quietest', () => {
+    const body = ruleBody('.obs-waiting');
+    assert.ok(body, 'the block rule exists');
+    assert.doesNotMatch(body, /--amber/);
+    assert.match(body, /border-left:\s*4px solid var\(--brand\)/);
   });
 });

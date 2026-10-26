@@ -36,6 +36,23 @@ test.describe('waiting on you (LIN-3983)', () => {
     expect(box.y + box.height).toBeLessThanOrEqual(900);
   });
 
+  test('at 390×844 the waiting question is answerable in the first viewport, with no sideways scroll', async ({ page }) => {
+    await seedBlockedRun(page, {
+      urlKey: URL_KEY, issueIdentifier: 'LIN-3983-W2', issueTitle: 'Phone question', decisionId: 'd-waiting-phone'
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(OBSERVATION_URL);
+    await page.waitForLoadState('networkidle');
+
+    const row = page.getByTestId('obs-waiting').locator('.obs-ruling').filter({ hasText: 'LIN-3983-W2' });
+    await expect(row).toBeVisible();
+    const box = await row.locator('.chat-option-btn').first().boundingBox();
+    expect(box, 'the answer control has a box').not.toBeNull();
+    expect(box.y + box.height).toBeLessThanOrEqual(844);
+    const pageScrolls = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+    expect(pageScrolls, 'the page does not scroll sideways').toBe(false);
+  });
+
   test('with nothing waiting, the block is absent', async ({ page }) => {
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
@@ -56,6 +73,33 @@ test.describe('waiting on you (LIN-3983)', () => {
     await expect(compact).toContainText('the route still has callers');
     await expect(compact).not.toContainText('[blocked]');
     await expect(compact.getByRole('link', { name: /reply on its run page/ })).toBeVisible();
+  });
+});
+
+test.describe('the phone layout (LIN-3983)', () => {
+  test('at 390×844 every tab label sits on one line and the page does not scroll sideways', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(OBSERVATION_URL);
+    await page.waitForLoadState('networkidle');
+
+    const measures = await page.evaluate(() => {
+      const tabs = [...document.querySelectorAll('[role="tablist"] [role="tab"]')];
+      // A wrapped label has text rects on more than one line; a one-line label has one top.
+      const wrapped = tabs.filter(tab => {
+        const range = document.createRange();
+        range.selectNodeContents(tab);
+        const tops = new Set([...range.getClientRects()].map(r => Math.round(r.top)));
+        return tops.size > 1;
+      }).map(tab => tab.textContent.trim());
+      return {
+        tabCount: tabs.length,
+        wrapped,
+        pageScrolls: document.documentElement.scrollWidth > window.innerWidth
+      };
+    });
+    expect(measures.tabCount).toBe(3);
+    expect(measures.wrapped, 'no tab label wraps').toEqual([]);
+    expect(measures.pageScrolls, 'the page does not scroll sideways').toBe(false);
   });
 });
 
