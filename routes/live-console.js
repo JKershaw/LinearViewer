@@ -3,7 +3,7 @@
  *
  * Anchored at /workspace/:urlKey/live-console (reusing workspaceFromUrl and the
  * feature-gate-redirect-to-settings pattern shared by collective/task-chat). The
- * page is a provider-free shell; the client polls a generation-free events
+ * page is a provider-free shell; the client polls an events
  * endpoint built from:
  *   - the agent-status log → the discrete step stream,
  *   - lean dispatch loops  → currently-working lanes (with live heartbeats),
@@ -171,7 +171,7 @@ export function createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, di
     }, 'loops');
   }
 
-  // ─── Events endpoint (generation-free poll source + history pages) ──────────
+  // ─── Events endpoint (poll source + history pages) ──────────
   router.get('/workspace/:urlKey/api/live-console/events', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
     // LIN-3977: the page's own resolution (stored flag, else the owner-with-runner
