@@ -175,7 +175,7 @@ test.describe('Home run control: the panel on a desktop (LIN-3987)', () => {
     const component = await openChangePanel(page, seedLocal, localWorkerUrlKey);
     await expect(component.locator('li.decision-panel-suggestion:not([hidden]) .decision-panel-price')).toHaveCount(4);
     await expect(component.getByText('price unknown')).toHaveCount(0);
-    await expect(component.locator('.decision-panel-note[data-decision-harness="claude-code"]')).toContainText('A subscription may cover the cost.');
+    await expect(component.locator('.decision-panel-note[data-decision-harness="claude-code"]')).toContainText('A Claude Code subscription may cover the cost.');
   });
 });
 

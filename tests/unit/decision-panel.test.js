@@ -188,10 +188,16 @@ describe('suggested models belong to the harness in force', () => {
     assert.doesNotMatch(html, /decision-panel-price/);
   });
 
-  test('Claude Code\'s rates carry one note: what the rates are, where an alias\'s rate comes from, and that a subscription may cover them', () => {
+  test('Claude Code\'s rates carry one note: what the rates are, that each is priced for the model it runs, and that a subscription may cover them', () => {
     const html = panel();
-    assert.match(html, /<p class="decision-panel-note" data-decision-harness="claude-code">Per 1M tokens, for comparison\. Each alias uses the model its runs reported, else the newest it names\. A subscription may cover the cost\.<\/p>/);
-    assert.doesNotMatch(html, /<p class="decision-panel-note" data-decision-harness="opencode">Per 1M/);
+    assert.match(html, /<p class="decision-panel-note" data-decision-harness="claude-code">Rates per 1M tokens, to compare\. Each is priced for the model it runs\. A Claude Code subscription may cover the cost\.<\/p>/);
+    assert.doesNotMatch(html, /<p class="decision-panel-note" data-decision-harness="opencode">Rates per 1M/);
+  });
+
+  test('the rate note reads in plain words: no "alias" and no "names" (LIN-3992)', () => {
+    const note = /<p class="decision-panel-note" data-decision-harness="claude-code">([^<]*)<\/p>/.exec(panel())[1];
+    assert.doesNotMatch(note, /\balias\b/i);
+    assert.doesNotMatch(note, /\bnames\b/i);
   });
 
   test('a mapped rate is said once, in the note, and a rate the job ran decides is marked on its row', () => {
