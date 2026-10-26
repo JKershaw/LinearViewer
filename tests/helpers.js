@@ -174,6 +174,32 @@ export const SELECTORS = {
     stop: '[data-testid="dispatch-halt-stop"]',
     resume: '[data-testid="dispatch-halt-resume"]',
   },
+  /**
+   * Home's run control and its Change panel (LIN-3833, LIN-3962, LIN-3987). `panel` is the shared decision panel the
+   * server renders; `sample(…)` are the /styleguide's two decision samples, which carry their own test ids.
+   */
+  runControl: {
+    change: '[data-testid="run-change"]',
+    changePanel: '[data-testid="run-change-panel"]',
+    changeClose: '[data-testid="run-change-x"]',
+    panel: '[data-testid="run-decision-panel"]',
+    numbers: '[data-testid="run-numbers"]',
+    harness: '[data-testid="run-harness"]',
+    model: '[data-testid="run-model"]',
+    effort: '[data-testid="run-effort"]',
+    effortRow: '[data-decision-effort]',
+    runsOn: '[data-testid="run-on-what"]',
+    willUse: '[data-testid="run-will-use"]',
+    use: '[data-testid="run-use"]',
+    reset: '[data-testid="run-reset"]',
+    target: (name) => `[data-testid="run-target-${name}"]`,
+    suggestion: (id) => `[data-decision-pick="${id}"]`,
+    suggestionsMarked: '[data-decision-pick][aria-pressed="true"]',
+    reason: '.decision-panel-reason',
+    price: '.decision-panel-price',
+    sample: (name) => `[data-testid="sg-decision-${name}"]`,
+    sampleFrame: '.sg-decision-sample',
+  },
 }
 
 /**

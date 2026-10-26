@@ -652,6 +652,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
    * Owner-only, like the preview it sits beside. The numbers are the derived kind's own, read from the same history
    * Settings › Models prices from (lib/model-routing-history.js). A blank field says what Settings › Models sets it to
    * for this step: the resolution with the run's own fields cleared. Presets are per run, so they are not part of it.
+   * LIN-3987 (review): a harness the draft chose is part of that resolution, so a blank model or effort says what that
+   * harness runs; the client asks again whenever the draft's harness changes, so the words never name the other harness.
    * The fields the caller sent show as chosen, and an effort outside the set is kept as itself.
    */
   router.get('/workspace/:urlKey/api/dispatch/decision-panel', workspaceFromUrl, async (req, res) => {
@@ -673,7 +675,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       const workspace = req.workspace;
       const [routing, history, catalog] = await Promise.all([
         resolveRoutingWithSources({
-          urlKey: workspace.urlKey, kind, model: null, harness: null, effort: null, preset: null, anchor: null,
+          urlKey: workspace.urlKey, kind, model: null, harness: choice.harness, effort: null, preset: null, anchor: null,
           workspacePreferencesStore, ...settle
         }),
         readModelsHistory(dispatchQueueStore, workspace.urlKey).catch((err) => {

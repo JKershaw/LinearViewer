@@ -1,121 +1,204 @@
-import { test, expect } from '@playwright/test';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { decisionPanel, agentLists, suggestionsByHarness } from '../../lib/components/decision-panel.js';
+import { test, expect } from '../fixtures/test-base.js';
+import { workspaceApiLocalSeed } from '../fixtures/local-harness.js';
+import { testMockData } from '../../lib/sample-data/mock-data.js';
+import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
+import { SELECTORS } from '../helpers.js';
 
-// LIN-3987: the decision panel in a real browser, with the server's own markup, the shared style sheet and the client
-// script (public/decision-panel.js). The page is set with the markup, so no seeded server is needed: the panel is the
-// component's own output, as Home's sheet and Models both render it. Witnesses: a suggestion is chosen by keyboard and
-// by typing, the effort line explains a harness that takes no effort, the panel's words are sans and its prices mono,
-// and its fields stop at 32rem on a desktop.
+// LIN-3987: the decision panel on the real pages, not a copy of its markup. Home's run control is seeded through the
+// local harness with priced runs, the way the runner reports them (a take, a `[usage]` line, a `[done]`); /styleguide is
+// read as it ships. Witnesses: Use for this run is on a 390×844 first screen with Claude Code in force and priced runs
+// that report no model; the reasons are the content face and the prices the structural face, on Home and /styleguide;
+// the fields stop at 32rem on a desktop; a harness picked on the draft changes what a blank model says, in words; a
+// suggestion is chosen by keyboard; every Claude Code suggestion has a rate; each /styleguide sample sits in its frame.
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const STYLE = path.join(ROOT, 'public/style.css');
-const CLIENT = path.join(ROOT, 'public/decision-panel.js');
+const RC = SELECTORS.runControl;
+const PHONE = { width: 390, height: 844 };
+const DESKTOP = { width: 1280, height: 900 };
+// The kinds a Home top task can offer as its next step, so whichever one is in force has priced runs behind it.
+const KINDS = ['look-into', 'research', 'plan', 'implementation', 'review'];
+const RUNS_PER_KIND = 2;
+// Dispatch refuses a second run of one kind on one issue within minutes, so each seeded run takes an issue of its own.
+const ISSUES = testMockData.issues.map((issue) => issue.identifier);
+
+/** Home at the workspace's own URL, read to rest. */
+async function gotoHome(page, urlKey) {
+  await page.goto(`/workspace/${urlKey}/`);
+  await page.waitForLoadState('networkidle');
+}
+
+/** Open Home's marked top task unless it is already open, and return its opened-task component. */
+async function openTopTask(page) {
+  const component = page.locator('.prompt-section').first();
+  if (!(await component.isVisible())) await page.locator('[data-top-task="1"]').click();
+  await expect(component).toBeVisible();
+  return component;
+}
+
+/** Empty the workspace's dispatch queue, history and runner tokens, so the next spec on this worker starts clean. */
+async function resetRuns(page, urlKey) {
+  for (const reset of ['clear-dispatch-queue', 'clear-dispatch-history', 'clear-dispatch-tokens']) {
+    await page.request.get(`/test/${reset}?urlKey=${urlKey}`);
+  }
+}
 
 /**
- * The Change sheet as Home's run block paints it (public/prompt-section.js renderChangePanel): the head, the server's
- * panel with the job's numbers, Runs on, the agent access line, the summary and the Use row. Claude Code in force, with
- * priced runs that report no model, so the numbers block is there.
+ * Priced runs of each kind, reported the way the runner reports them (the effort read-out spec seeds the same way):
+ * created, taken with a runner token, given a `[usage]` line with a cost and no model, then a terminal `[done]`.
+ * No run reports a model, so each Claude Code alias reads the rate it maps to, not one its runs reported.
  */
-function sheet({ model = '' } = {}) {
-  const numbers = { testid: 'run-numbers', shareTestid: 'run-share', heading: 'This step, last 30 days', runs: 279, priced: 268, unpriced: 5, noTelemetry: 6, spendUsd: 169.59, typicalUsd: 0.63, share: null };
-  const panel = decisionPanel({
-    testid: 'run-decision-panel',
-    fieldAttrs: (field) => `data-testid="run-${field}"`,
-    numbers,
-    harness: { value: 'claude-code', inForce: 'claude-code', follow: 'From Models', hint: 'Right now: Claude Code' },
-    model: { value: model, follow: 'From Models', hint: "Right now: Claude Code's own model", lists: agentLists([]), suggestions: suggestionsByHarness([]) },
-    effort: { value: '', follow: 'From Models', hint: "Right now: Claude Code's own effort" }
-  });
-  return '<div class="opened-task-change-panel" data-testid="run-change-panel">'
-    + '<div class="opened-task-change-head">This run only · default: Claude Code\'s own model<button class="btn--quiet opened-task-change-x" data-testid="run-change-x">×</button></div>'
-    + panel
-    + '<div class="opened-task-change-row"><span class="opened-task-change-label">Runs on</span>'
-    + '<button class="btn opened-task-choice" data-testid="run-target-cli" aria-pressed="true">your runner</button>'
-    + '<button class="btn opened-task-choice" data-testid="run-target-web" aria-pressed="false">Claude Code on the web</button></div>'
-    + '<label class="opened-task-change-row"><input type="checkbox" checked> Your agent may read and update this task</label>'
-    + '<p class="opened-task-change-summary" data-testid="run-will-use">This run will use Claude Code\'s own model · Claude Code · Claude Code\'s own effort · your runner.</p>'
-    + '<div class="opened-task-change-row"><button class="btn btn--primary opened-task-use" data-testid="run-use">Use for this run</button>'
-    + '<button class="btn btn--quiet" data-testid="run-reset">Reset</button><button class="btn btn--quiet">Close</button></div>'
-    + '</div>';
+async function seedPricedRuns(page, urlKey) {
+  await seedWorkspaceOwnership(page, urlKey, 'owner');
+  const { token } = await (await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${urlKey}`)).json();
+  const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  let issue = 0;
+  for (const kind of KINDS) {
+    for (let i = 0; i < RUNS_PER_KIND; i += 1) {
+      const create = await page.request.post(`/workspace/${urlKey}/api/dispatch`, {
+        data: { prompt: 'run control fixture', promptName: kind, kind, issueIdentifier: ISSUES[issue++], issueTitle: 'Run control fixture', target: 'cli' },
+      });
+      expect(create.status(), await create.text()).toBe(201);
+      const itemId = (await create.json()).item.id;
+      const take = await page.request.post(`/api/dispatch/take/${itemId}`, { headers: auth });
+      expect(take.status()).toBe(200);
+      const usage = await page.request.post(`/api/dispatch/feedback/${itemId}`, {
+        headers: auth, data: { kind: 'usage', message: `[usage] ${JSON.stringify({ costUsd: 0.63 })}` },
+      });
+      expect(usage.status()).toBe(200);
+      const done = await page.request.post(`/api/dispatch/feedback/${itemId}`, { headers: auth, data: { message: '[done] complete' } });
+      expect(done.status()).toBe(200);
+    }
+  }
 }
 
-async function open(page, { width = 1280, height = 900, model = '' } = {}) {
-  await page.setViewportSize({ width, height });
-  await page.setContent(`<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body>${sheet({ model })}</body></html>`);
-  await page.addStyleTag({ path: STYLE });
-  await page.addScriptTag({ path: CLIENT });
+/** Home with a seeded workspace, its top task open, and the Change panel open once the panel's numbers have loaded. */
+async function openChangePanel(page, seedLocal, urlKey) {
+  await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, runnerKey: true });
+  await resetRuns(page, urlKey);
+  await seedPricedRuns(page, urlKey);
+  await gotoHome(page, urlKey);
+  const component = await openTopTask(page);
+  await component.locator(RC.change).click();
+  await expect(component.locator(RC.changePanel)).toBeVisible();
+  await expect(component.locator(RC.numbers)).toBeVisible();
+  return component;
 }
 
-const pick = (page, id) => page.locator(`[data-decision-pick="${id}"]`);
+test.describe('Home run control: the panel on a phone (LIN-3987)', () => {
+  // Mobile emulation gives the page a phone's overlay scrollbar; a desktop-style classic scrollbar would take 15px.
+  test.use({ viewport: PHONE, isMobile: true, hasTouch: true });
 
-test.describe('the decision panel in a browser (LIN-3987)', () => {
-  test('a suggestion is chosen by keyboard: Enter on the next one marks it and fills the model field', async ({ page }) => {
-    await open(page);
-    await pick(page, 'sonnet').focus();
-    await page.keyboard.press('Enter');
-    await expect(pick(page, 'sonnet')).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.locator('[data-testid="run-model"]')).toHaveValue('sonnet');
+  test.afterEach(async ({ page, localWorkerUrlKey }) => resetRuns(page, localWorkerUrlKey));
 
-    await pick(page, 'opus').focus();
-    await page.keyboard.press('Space');
-    await expect(pick(page, 'opus')).toHaveAttribute('aria-pressed', 'true');
-    await expect(pick(page, 'sonnet')).toHaveAttribute('aria-pressed', 'false');
-    await expect(page.locator('[data-testid="run-model"]')).toHaveValue('opus');
+  test('with Claude Code in force and priced runs that report no model, Use for this run is inside the first screen', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    const component = await openChangePanel(page, seedLocal, localWorkerUrlKey);
+    await expect(component.locator(RC.numbers)).toContainText('priced');
+    const use = component.locator(RC.use);
+    await expect.poll(() => use.boundingBox()).not.toBeNull();
+    const box = await use.boundingBox();
+    expect(box.y + box.height, 'the bottom of Use for this run').toBeLessThanOrEqual(PHONE.height);
   });
+});
 
-  test('typing a listed model marks its suggestion as it is typed, and an unlisted one marks none', async ({ page }) => {
-    await open(page);
-    const model = page.locator('[data-testid="run-model"]');
-    await model.fill('fable');
-    await expect(pick(page, 'fable')).toHaveAttribute('aria-pressed', 'true');
-    await model.fill('something-unlisted');
-    await expect(page.locator('[data-decision-pick][aria-pressed="true"]')).toHaveCount(0);
-  });
+test.describe('Home run control: the panel on a desktop (LIN-3987)', () => {
+  test.use({ viewport: DESKTOP });
 
-  test('with opencode in force the Effort row is hidden and one line says effort does not apply', async ({ page }) => {
-    await open(page);
-    const effortNote = page.locator('.decision-panel-note[data-decision-harness="opencode"]');
-    await expect(effortNote).toBeHidden();
-    await expect(page.locator('[data-decision-effort]')).toBeVisible();
-    await page.locator('[data-testid="run-harness"]').selectOption('opencode');
-    await expect(page.locator('[data-decision-effort]')).toBeHidden();
-    await expect(effortNote).toBeVisible();
-    await expect(effortNote).toHaveText('Effort does not apply: opencode through OpenRouter takes none.');
-  });
+  test.afterEach(async ({ page, localWorkerUrlKey }) => resetRuns(page, localWorkerUrlKey));
 
-  test('the reasons are the content face and the prices the structural face, on any page that hosts the panel', async ({ page }) => {
-    await open(page);
-    const reason = page.locator('.decision-panel-reason').first();
-    const price = page.locator('.decision-panel-price').first();
+  test('the reasons are the content face and the prices the structural face, on Home', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    const component = await openChangePanel(page, seedLocal, localWorkerUrlKey);
+    const reason = component.locator(RC.reason).first();
+    const price = component.locator(RC.price).first();
     expect(await reason.evaluate((el) => getComputedStyle(el).fontFamily)).toMatch(/^"?Inter/);
     expect(await price.evaluate((el) => getComputedStyle(el).fontFamily)).toMatch(/JetBrains Mono/);
   });
 
-  test('on a desktop the panel is 32rem wide at most, and a phone gives it the whole sheet', async ({ page }) => {
-    await open(page, { width: 1280, height: 900 });
-    const panel = page.locator('[data-decision-panel]');
-    const desktop = await panel.evaluate((el) => el.getBoundingClientRect().width);
-    expect(desktop).toBeLessThanOrEqual(32 * 16 + 1);
-    await open(page, { width: 390, height: 844 });
-    const phone = await page.locator('[data-decision-panel]').evaluate((el) => el.getBoundingClientRect().width);
-    expect(phone).toBeGreaterThan(300);
+  test('the fields are 32rem wide at most on a desktop', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    const component = await openChangePanel(page, seedLocal, localWorkerUrlKey);
+    const maxPx = 32 * 16 + 1;
+    expect((await component.locator(RC.model).boundingBox()).width).toBeLessThanOrEqual(maxPx);
+    expect((await component.locator(RC.harness).boundingBox()).width).toBeLessThanOrEqual(maxPx);
+    expect((await component.locator(RC.panel).boundingBox()).width).toBeLessThanOrEqual(maxPx);
   });
 
-  test('at 390×844 with Claude Code in force, Use for this run is inside the sheet\'s first screen', async ({ page }) => {
-    await open(page, { width: 390, height: 844 });
-    const use = await page.locator('[data-testid="run-use"]').boundingBox();
-    expect(use.y + use.height).toBeLessThanOrEqual(844);
+  test('Use is the primary shared button, Reset is a quiet one alone, and a chosen Runs on target is marked, not underlined', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    const component = await openChangePanel(page, seedLocal, localWorkerUrlKey);
+    const classesOf = (locator) => locator.evaluate((el) => [...el.classList]);
+    expect(await classesOf(component.locator(RC.use))).toEqual(expect.arrayContaining(['btn', 'btn--primary']));
+    expect(await classesOf(component.locator(RC.reset))).toEqual(expect.arrayContaining(['btn--quiet']));
+    expect(await classesOf(component.locator(RC.reset))).not.toContain('btn');
+    await component.locator(RC.target('web')).click();
+    await expect(component.locator(RC.target('web'))).toHaveAttribute('aria-pressed', 'true');
+    expect(await component.locator(RC.target('web')).evaluate((el) => getComputedStyle(el).textDecorationLine)).toBe('none');
   });
 
-  test('a Claude Code rate is named once as comparison, and a subscription note is written with it', async ({ page }) => {
-    await open(page);
-    await expect(page.locator('.decision-panel-note[data-decision-harness="claude-code"]')).toHaveText(
-      'Per 1M tokens, for comparison. Each alias uses the model its runs reported, else the newest it names. A subscription may cover the cost.'
-    );
-    // Both harnesses' rows are in the markup; the four Claude Code rows are the ones shown.
-    await expect(page.locator('li.decision-panel-suggestion:not([hidden]) .decision-panel-price')).toHaveCount(4);
-    await expect(page.getByText('price unknown')).toHaveCount(0);
+  test('a harness picked on the draft changes what a blank model says, in words, and goes back when it is blank again', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    const component = await openChangePanel(page, seedLocal, localWorkerUrlKey);
+    const willUse = component.locator(RC.willUse);
+    await expect(willUse).toContainText("Claude Code's own model");
+
+    await component.locator(RC.harness).selectOption('opencode');
+    await expect(willUse).toContainText("opencode's default model");
+    await expect(willUse).not.toContainText("Claude Code's own model");
+    await expect(component.locator(RC.effortRow)).toBeHidden();
+    await expect(component.locator('.decision-panel-note[data-decision-harness="opencode"]')).toHaveText('Effort does not apply: opencode through OpenRouter takes none.');
+
+    await component.locator(RC.harness).selectOption('');
+    await expect(willUse).toContainText("Claude Code's own model");
+    await expect(willUse).not.toContainText("opencode's default model");
   });
+
+  test('a suggestion is chosen by keyboard on Home, and the one chosen is marked', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    const component = await openChangePanel(page, seedLocal, localWorkerUrlKey);
+    await component.locator(RC.suggestion('sonnet')).focus();
+    await page.keyboard.press('Enter');
+    await expect(component.locator(RC.suggestion('sonnet'))).toHaveAttribute('aria-pressed', 'true');
+    await expect(component.locator(RC.model)).toHaveValue('sonnet');
+
+    await component.locator(RC.suggestion('opus')).focus();
+    await page.keyboard.press('Space');
+    await expect(component.locator(RC.suggestion('opus'))).toHaveAttribute('aria-pressed', 'true');
+    await expect(component.locator(RC.suggestion('sonnet'))).toHaveAttribute('aria-pressed', 'false');
+    await expect(component.locator(RC.model)).toHaveValue('opus');
+  });
+
+  test('with priced runs, every Claude Code suggestion shows a rate and no row says price unknown', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    const component = await openChangePanel(page, seedLocal, localWorkerUrlKey);
+    await expect(component.locator('li.decision-panel-suggestion:not([hidden]) .decision-panel-price')).toHaveCount(4);
+    await expect(component.getByText('price unknown')).toHaveCount(0);
+    await expect(component.locator('.decision-panel-note[data-decision-harness="claude-code"]')).toContainText('A subscription may cover the cost.');
+  });
+});
+
+test.describe('/styleguide: the decision samples (LIN-3987)', () => {
+  for (const [name, viewport] of [['desktop', DESKTOP], ['phone', PHONE]]) {
+    test.describe(`at ${name} width`, () => {
+      test.use({ viewport });
+
+      test('each sample sits in its own frame, and its panel is the content face', async ({ page }) => {
+        await page.goto('/styleguide');
+        for (const sample of ['models', 'home']) {
+          const frame = page.locator(RC.sampleFrame).filter({ has: page.locator(RC.sample(sample)) });
+          await expect(frame).toHaveCount(1);
+          expect(await frame.evaluate((el) => getComputedStyle(el).borderTopWidth)).toBe('1px');
+          // The panel sets the content face on its own root, so its reasons (and labels) are sans on any page that hosts it.
+          expect(await page.locator(RC.sample(sample)).evaluate((el) => getComputedStyle(el).fontFamily)).toMatch(/^"?Inter/);
+        }
+        // Only Models' sample carries suggestions, so only it has reasons to read.
+        expect(await page.locator(RC.sample('models')).locator(RC.reason).first().evaluate((el) => getComputedStyle(el).fontFamily)).toMatch(/^"?Inter/);
+      });
+
+      test('Home\'s sample keeps its harness and model hints inside its frame', async ({ page }) => {
+        await page.goto('/styleguide');
+        const frame = page.locator(RC.sampleFrame).filter({ has: page.locator(RC.sample('home')) });
+        const frameBox = await frame.boundingBox();
+        const hints = page.locator(RC.sample('home')).locator('.decision-panel-hint:visible');
+        const count = await hints.count();
+        expect(count).toBeGreaterThan(0);
+        for (let i = 0; i < count; i += 1) {
+          const box = await hints.nth(i).boundingBox();
+          expect(box.x + box.width, `hint ${i} is inside its frame`).toBeLessThanOrEqual(frameBox.x + frameBox.width);
+        }
+      });
+    });
+  }
 });

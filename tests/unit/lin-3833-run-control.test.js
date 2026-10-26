@@ -500,6 +500,19 @@ describe('LIN-3987 — Home\'s run controls are shared buttons, marked when chos
     for (const tag of tags) assert.match(tag, SHARED, `shared class on ${tag}`);
   });
 
+  test('a quiet button is used on its own, not with .btn: .btn:hover would paint a fill over its label (decision 6)', async () => {
+    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor: () => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: null, harness: 'claude-code', effort: null, sources: {} }) });
+    await c.click({ action: 'change-run' });
+    await flush();
+    await c.click({ action: 'run-another' });
+    await flush();
+    const tags = runButtons(c.innerHTML);
+    const classesOf = (tag) => (/class="([^"]*)"/.exec(tag)?.[1] || '').split(/\s+/);
+    const quiet = tags.filter((tag) => classesOf(tag).includes('btn--quiet'));
+    assert.ok(quiet.length >= 3, `the run block has quiet buttons (${quiet.length})`);
+    for (const tag of quiet) assert.equal(classesOf(tag).includes('btn'), false, `quiet alone: ${tag}`);
+  });
+
   test('a chosen Runs-on target is marked aria-pressed, and is not marked by bold or underline', async () => {
     const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor: () => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: null, harness: 'claude-code', effort: null, sources: {} }) });
     await c.click({ action: 'change-run' });
@@ -546,3 +559,25 @@ describe('LIN-3987 — Home\'s run controls are shared buttons, marked when chos
   });
 });
 
+
+// LIN-3987 review, finding 1: a harness picked on the draft re-reads the server's panel, so the words for a blank model
+// and effort follow the harness the draft names, and go back to Settings' words when the harness is blank again.
+describe('LIN-3987 review — a harness picked on the draft re-reads the panel, so its words follow it', () => {
+  test('picking opencode names its default model in the summary; a blank harness names Claude Code\'s own again', async () => {
+    const { c, calls } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor: () => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: null, harness: 'claude-code', effort: null, sources: {} }) });
+    await c.click({ action: 'change-run' });
+    await flush();
+    const summary = () => /data-testid="run-will-use">([^<]*)</.exec(c.innerHTML)[1];
+    assert.match(summary(), /^This run will use Claude Code(?:&#039;|')s own model/, summary());
+
+    await c.fire('change', { dataset: { testid: 'run-harness' }, value: 'opencode' });
+    await flush();
+    assert.ok(calls.api.some((a) => a.url.includes('/api/dispatch/decision-panel') && a.url.includes('harness=opencode')), 'the panel is read again for the harness the draft chose');
+    assert.match(summary(), /^This run will use opencode(?:&#039;|')s default model/, summary());
+    assert.doesNotMatch(summary(), /Claude Code(?:&#039;|')s own model/, summary());
+
+    await c.fire('change', { dataset: { testid: 'run-harness' }, value: '' });
+    await flush();
+    assert.match(summary(), /^This run will use Claude Code(?:&#039;|')s own model/, summary());
+  });
+});

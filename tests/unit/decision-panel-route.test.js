@@ -191,3 +191,31 @@ describe('GET /api/dispatch/decision-panel: the words for what a blank resolves 
   });
 });
 
+
+// LIN-3987 review, finding 1: the panel answers for the harness the draft chose. A blank field's words and hints name the
+// default of the harness in force, so a harness switched on Home never leaves the other harness's default on screen.
+describe('GET /api/dispatch/decision-panel: the words follow the harness the draft chose (LIN-3987 review)', () => {
+  test('a chosen opencode names its default model and "not used" effort, not Claude Code\'s', async () => {
+    const { body } = await get(buildApp(), `${PANEL}?promptName=implementation&surface=home&harness=opencode`);
+    assert.match(body.html, /data-decision-hint="model">Right now: opencode&#039;s default model<\/span>/);
+    assert.match(body.html, /data-decision-hint="effort">Right now: not used<\/span>/);
+    assert.equal(body.words.model, "opencode's default model");
+    assert.equal(body.words.effort, 'not used');
+  });
+
+  test('a chosen Claude Code under a Models opencode names Claude Code\'s own effort, not "not used"', async () => {
+    const table = emptyTable();
+    table.jobs.implementation = { harness: 'opencode' };
+    const { body } = await get(buildApp({ table }), `${PANEL}?promptName=implementation&surface=home&harness=claude-code`);
+    assert.match(body.html, /data-decision-hint="effort">Right now: Claude Code&#039;s own effort<\/span>/);
+    assert.equal(body.words.effort, "Claude Code's own effort");
+  });
+
+  test('a blank harness still answers for the harness Settings resolves, opencode from Models', async () => {
+    const table = emptyTable();
+    table.jobs.implementation = { harness: 'opencode' };
+    const { body } = await get(buildApp({ table }), `${PANEL}?promptName=implementation&surface=home`);
+    assert.equal(body.words.harness, 'opencode through OpenRouter');
+    assert.equal(body.words.model, "opencode's default model");
+  });
+});

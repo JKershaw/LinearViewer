@@ -1043,15 +1043,15 @@
         if (state.run.confirmStop) {
           html += ` <span class="opened-task-confirm">Stop this run? The session is cancelled and the task stays where it is.`
             + ` <button class="btn btn--red" data-action="stop-run-confirm" data-testid="run-stop-confirm">Stop</button>`
-            + ` <button class="btn btn--quiet" data-action="stop-run-cancel">Cancel</button></span>`;
+            + ` <button class="btn--quiet" data-action="stop-run-cancel">Cancel</button></span>`;
         } else if (polled) {
-          html += ` <button class="btn btn--quiet opened-task-stop" data-action="stop-run" data-testid="run-stop">Stop</button>`;
+          html += ` <button class="btn--quiet opened-task-stop" data-action="stop-run" data-testid="run-stop">Stop</button>`;
         }
         return `${html}</div>`;
       }
       if (state.run.item || (summary.running && summary.running.state === 'queued')) {
         return `<div class="opened-task-queued" data-testid="opened-task-queued">Queued, waiting for a runner`
-          + ` <button class="btn btn--quiet opened-task-undo" data-action="undo-run" data-testid="run-undo">Undo</button></div>`;
+          + ` <button class="btn--quiet opened-task-undo" data-action="undo-run" data-testid="run-undo">Undo</button></div>`;
       }
       return '';
     }
@@ -1081,14 +1081,14 @@
       const leftOut = [...defaults, ...more].filter((k) => !fits(k)).length;
       const item = (k) => `<button class="btn opened-task-another-item" data-action="run-pick" data-kind="${esc(k)}" data-label="${esc(meta[k] || k)}" data-testid="run-another-item">${esc(meta[k] || k)}</button>`;
       let html = '<div class="opened-task-more">';
-      if (step) html += `<button class="btn btn--quiet opened-task-see" data-action="see-prompt" data-testid="run-see-prompt">See prompt \u2726</button>`;
-      html += `<button class="btn btn--quiet opened-task-another" data-action="run-another" data-testid="run-another" aria-expanded="${state.run.anotherOpen ? 'true' : 'false'}">Another step \u25BE</button>`;
+      if (step) html += `<button class="btn--quiet opened-task-see" data-action="see-prompt" data-testid="run-see-prompt">See prompt \u2726</button>`;
+      html += `<button class="btn--quiet opened-task-another" data-action="run-another" data-testid="run-another" aria-expanded="${state.run.anotherOpen ? 'true' : 'false'}">Another step \u25BE</button>`;
       if (state.run.anotherOpen) {
         html += `<div class="opened-task-another-list" data-testid="run-another-list">${shownDefaults.map(item).join('')}`;
         if (shownMore.length) {
           html += state.run.moreOpen
             ? shownMore.map(item).join('')
-            : `<button class="btn btn--quiet opened-task-another-more" data-action="run-more" data-testid="run-another-more">Show ${shownMore.length} more</button>`;
+            : `<button class="btn--quiet opened-task-another-more" data-action="run-more" data-testid="run-another-more">Show ${shownMore.length} more</button>`;
         }
         if (leftOut) {
           html += `<p class="opened-task-left-out" data-testid="run-another-left-out">${leftOut} ${leftOut === 1 ? 'step' : 'steps'} left out: ${leftOut === 1 ? 'it does' : 'they do'} not fit this task's state.</p>`;
@@ -1156,26 +1156,30 @@
         + `<p class="opened-task-change-summary" data-testid="run-will-use">This run will use ${esc(summary)}.</p>`
         + `<div class="opened-task-change-row">`
         + `<button class="btn btn--primary opened-task-use" data-action="use-run" data-testid="run-use"${state.run.panelFailed || !state.run.panelHtml ? ' disabled' : ''}>Use for this run</button>`
-        + `<button class="btn btn--quiet" data-action="reset-run" data-testid="run-reset">Reset</button>`
-        + `<button class="btn btn--quiet" data-action="close-change">Close</button>`
+        + `<button class="btn--quiet" data-action="reset-run" data-testid="run-reset">Reset</button>`
+        + `<button class="btn--quiet" data-action="close-change">Close</button>`
         + `<a class="opened-task-settings-link" href="/workspace/${encodeURIComponent(opts.urlKey || '')}/settings/models">Settings \u203A Models</a>`
         + `</div><p class="opened-task-change-note">A change here is for this run only. The default is set in Settings \u203A Models.</p>`
         + `</div>`;
     }
 
-    // The decision panel for the choice this run would use: the server's panel (routes/dispatch.js decision-panel), read
-    // when the Change panel opens and again after the choice changes. A repaint re-applies the draft to it (applyPanelDraft).
+    // The decision panel for the draft: the server's panel (routes/dispatch.js decision-panel), read when the Change panel
+    // opens, after a reset, and after the draft's harness changes (LIN-3987 review), since a blank model or effort says what
+    // the harness the draft names runs. A repaint re-applies the draft to it (applyPanelDraft). Reads can overlap and answer
+    // in either order, so only the latest may paint (as refreshRunPreview does, LIN-3969).
+    let runPanelSeq = 0;
     function fetchRunPanel() {
       if (!runControlOn() || !opts.urlKey || typeof window.api !== 'function') return;
       const step = runStepOf();
       const params = new URLSearchParams({ promptName: step ? step.kind : 'autopilot', surface: opts.surface });
-      const c = state.run.choice;
+      const c = state.run.draft || state.run.choice;
       if (c.harness) params.set('harness', c.harness);
       if (c.model) params.set('model', c.model);
       if (c.effort) params.set('effort', c.effort);
+      const seq = ++runPanelSeq;
       window.api(`/workspace/${encodeURIComponent(opts.urlKey)}/api/dispatch/decision-panel?${params.toString()}`, { on401: false })
         .then((r) => {
-          if (destroyed) return;
+          if (destroyed || seq !== runPanelSeq) return;
           state.run.panelHtml = (r && r.html) || null;
           state.run.panelWords = (r && r.words) || null;
           state.run.withoutEffort = (r && r.withoutEffort) || [];
@@ -1183,7 +1187,7 @@
           paintRun();
         })
         .catch(() => {
-          if (destroyed) return;
+          if (destroyed || seq !== runPanelSeq) return;
           state.run.panelHtml = null;
           state.run.panelWords = null;
           state.run.panelFailed = true;
@@ -2090,6 +2094,8 @@
           draft.harness = el.value || null;
           fallBackTarget(draft, draft.harness || (state.run.preview && state.run.preview.harness) || '');
           paintRun();
+          // LIN-3987 (review): the words for a blank model and effort follow the harness the draft names, so ask again.
+          if (state.run.changeOpen) fetchRunPanel();
           break;
         case 'run-model': draft.model = el.value.trim() || null; break;
         case 'run-effort': draft.effort = el.value || null; paintRun(); break;
