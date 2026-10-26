@@ -770,9 +770,8 @@
 .obs-summary-reply { color: var(--amber); text-decoration: underline; white-space: nowrap; }
 .obs-summary-reply:hover,
 .obs-summary-reply:focus-visible { color: var(--brand); }
-/* Decision excerpt + option labels on a waiting card (LIN-2184/H5). Demoted
-   off the bold amber `.obs-summary-waiting` label they inherit from by
-   default — the excerpt is supporting detail, not the headline. */
+/* The case behind a waiting question (LIN-2184/H5), and the answer choices (LIN-3983 PR 2): both demoted
+   off the bold amber `.obs-summary-waiting` sentence they follow, since the question is the headline. */
 .obs-summary-decision-excerpt { font-weight: 400; color: var(--muted); }
 .obs-summary-decision-options {
   font-weight: 400;
@@ -785,18 +784,6 @@
      length bound alone cannot prevent this; the text has to be allowed to
      break anywhere. */
   overflow-wrap: anywhere;
-}
-/* Most-recent run kind beside "working…" (LIN-631). */
-.obs-summary-kind {
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--muted);
-  background: var(--inset);
-  border-radius: var(--radius-sm);
-  padding: 0.08rem 0.36rem;
-  margin-left: 0.3rem;
-  font-family: var(--font-structural);
 }
 .obs-summary-pending { color: var(--muted); }
 
@@ -1453,3 +1440,152 @@ a.obs-task-ident:hover { text-decoration: underline; }
 }
 .obs-filter-btn.is-on,
 .obs-filter-btn[aria-pressed="true"] { color: var(--text); border-color: var(--border-strong); }
+
+/* ─── LIN-3983 PR 2: the words and pieces ────────────────────────────────────
+   Rules for the classes this page emits that had none (the "unstyled" list in
+   the ticket), and for the new Rulings pieces. Additive: nothing above is
+   touched. Plain words are set in the content face; ids and counts keep the
+   structural face. */
+
+/* The task's title beside its id on a Rulings row, and the note that says what
+   each action does (both plain words, so the content face). */
+.obs-ruling-title { color: var(--text); font-family: var(--font-content); }
+.obs-ruling-actions-note {
+  margin: 0.4rem 0 0;
+  font-family: var(--font-content);
+  font-size: 0.78rem;
+  color: var(--muted);
+  max-width: 62ch;
+}
+
+/* The bulk apply's own question, asked in the page (LIN-3983 PR 2). Shown only
+   while a bulk apply is waiting on the person; the page never uses confirm(). */
+.obs-ruling-bulk-confirm {
+  margin: 0 0 0.6rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--inset);
+  font-family: var(--font-content);
+}
+.obs-ruling-bulk-confirm[hidden] { display: none; }
+.obs-ruling-bulk-confirm-text { margin: 0 0 0.5rem; font-size: 0.85rem; color: var(--text); }
+.obs-ruling-bulk-confirm-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.obs-ruling-bulk-confirm-yes {
+  color: var(--green);
+  font-weight: 600;
+}
+.obs-ruling-bulk-confirm-yes:hover { background: color-mix(in srgb, var(--green) 22%, transparent); }
+.obs-ruling-bulk-confirm-no {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.85rem;
+  padding: 0.3rem 0.5rem;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.obs-ruling-bulk-confirm-no:hover { color: var(--text); }
+
+/* Retry delivery on a partial failure (the Rulings row's own control). Styled as
+   the Scan-due retry, the other place a person retries a failed step. */
+.obs-ruling-retry-delivery {
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--amber);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  padding: 0.25rem 0.55rem;
+  cursor: pointer;
+}
+.obs-ruling-retry-delivery:hover { background: color-mix(in srgb, var(--amber) 18%, transparent); }
+.obs-ruling-retry-delivery:disabled { opacity: 0.5; cursor: default; }
+
+/* Scan-due's own bulk controls: Scan selected and Stop. Scan selected is the
+   primary action of the bar; Stop is the quiet interruption beside it. */
+.obs-bulk-scan-run {
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+}
+.obs-bulk-scan-run:hover { background: color-mix(in srgb, var(--green) 18%, transparent); }
+.obs-bulk-scan-run:disabled { opacity: 0.5; cursor: default; }
+.obs-bulk-scan-stop {
+  border: 0;
+  background: transparent;
+  color: var(--amber);
+  font-size: 0.82rem;
+  padding: 0.3rem 0.5rem;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.obs-bulk-scan-stop[hidden] { display: none; }
+
+/* One result badge per settled bulk-scan outcome, painted into its due row. Each
+   names its outcome in words (the text carries the meaning, the colour adds to it). */
+.obs-bulk-result-failed,
+.obs-bulk-result-noop,
+.obs-bulk-result-decision,
+.obs-bulk-result-zero,
+.obs-bulk-result-quota,
+.obs-bulk-result-unavailable,
+.obs-bulk-result-cancelled {
+  display: inline-block;
+  font-family: var(--font-structural);
+  font-size: 0.72rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-soft);
+  color: var(--muted);
+}
+.obs-bulk-result-failed { color: var(--red); border-color: var(--red); }
+.obs-bulk-result-decision { color: var(--amber); border-color: var(--amber); }
+
+/* The run's own meta chips for a task budget and its ticket walk (the same
+   muted, machine-fact face as the other meta). */
+.obs-meta-budget,
+.obs-meta-tickets {
+  font-family: var(--font-structural);
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* A "ran …" duration in an error box, and a produced pull-request link. */
+.obs-error-rt { font-family: var(--font-structural); font-size: 0.78rem; color: var(--muted); }
+.obs-artifact-pr { color: var(--brand); }
+
+/* Scan-due's per-row outcome text: "not due" and "not checked yet" are quiet, as
+   "due" is amber (the row's own rule above). */
+.obs-due-row.obs-due-no .obs-due-status,
+.obs-due-row.obs-due-unknown .obs-due-status { color: var(--muted); }
+
+/* The workspace chips start hidden under This workspace; the author rule above would
+   otherwise beat the attribute (LIN-3983 PR 2). */
+.obs-chips[hidden] { display: none; }
+
+/* The empty line of a list (no connected workspaces, for one). */
+.obs-empty { color: var(--muted); font-size: 0.85rem; padding: 0.4rem 0; }
+
+/* The running card's summary: what the stage is doing, in plain words. */
+.obs-summary-stage { color: var(--text); }
+
+/* The started line of an untitled run, and the exact local time in a card's
+   "updated" line (LIN-3975's time rule: relative words, with the time and zone). */
+.obs-session-started { color: var(--muted); font-size: 0.82rem; }
+.obs-session-time time { color: inherit; }
+
+/* Phone (LIN-3983 PR 2): the answer, dismiss and shelve controls are at least 44px
+   tall, so each is a real tap target. */
+@media (max-width: 640px) {
+  .obs-ruling-answer-send,
+  .obs-ruling-dismiss,
+  .obs-ruling-shelve,
+  .obs-ruling-agree,
+  .obs-ruling-keep,
+  .obs-ruling-bulk-confirm-yes,
+  .obs-ruling-bulk-confirm-no { min-height: 44px; }
+}

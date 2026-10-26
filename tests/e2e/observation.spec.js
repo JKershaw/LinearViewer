@@ -104,9 +104,13 @@ test.describe('Autopilot Observation page (first-class)', () => {
       await expect(page.locator('.obs-archive-section')).toBeVisible();
     });
 
-    test('shows a filter chip per connected workspace, all on by default', async ({ page }) => {
-      const chips = page.locator('.obs-chip');
-      await expect(chips).toHaveCount(2);
+    test('opens on this workspace; All workspaces shows a chip per workspace, all on (LIN-3983 PR 2)', async ({ page }) => {
+      await expect(page.locator('.obs-chip')).toHaveCount(2);
+      await expect(page.getByTestId('obs-scope-current')).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.locator('#obs-chips')).toBeHidden();
+      await page.getByTestId('obs-scope-all').click();
+      await expect(page.getByTestId('obs-scope-all')).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.locator('#obs-chips')).toBeVisible();
       await expect(page.locator('.obs-chip.is-on')).toHaveCount(2);
     });
 

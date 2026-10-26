@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { test, expect } from '../fixtures/test-base.js';
 import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
-import { featuresParam } from '../helpers.js';
+import { featuresParam, SELECTORS } from '../helpers.js';
 
 // LIN-1728 Phase 3/4 — the escalation surface: the ambient "waiting on you"
 // nav badge and the filtered rulings tab + option-button primitive. Seeding
@@ -622,7 +622,9 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
 
     const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-X' });
     await expect(row).toBeVisible();
-    await expect(row).toContainText(secondWorkerUrlKey); // the workspace chip (renderRulingRow)
+    // The workspace's name, since two workspaces are showing; the raw key is never shown (LIN-3983 PR 2).
+    await expect(row.locator('.obs-ruling-ws')).toBeVisible();
+    await expect(row).not.toContainText(secondWorkerUrlKey);
 
     const [commentReq, dispatchReq] = await Promise.all([
       page.waitForRequest(r => r.url().includes('/api/comments/') && r.method() === 'POST'),
@@ -829,11 +831,11 @@ test.describe('Bulk-agree suggested rulings (LIN-2444 Phase 5) — e2e', () => {
     await page.route('**/api/dashboard/rulings/dismiss', async (route) => { dismissRequested = true; return route.continue(); });
     await page.locator('#obs-ruling-agree-selected').click();
     // The question is asked on the page (LIN-3983 PR 2), not in a native dialog.
-    const ask = page.getByTestId('obs-ruling-bulk-confirm');
+    const ask = page.locator(SELECTORS.observation.bulkConfirm.panel);
     await expect(ask).toBeVisible();
-    await expect(page.getByTestId('obs-ruling-bulk-confirm-text')).toContainText('Apply 1 selected proposal');
-    await expect(page.getByTestId('obs-ruling-bulk-confirm-text')).toContainText('cannot be undone');
-    await page.getByTestId('obs-ruling-bulk-confirm-no').click();
+    await expect(page.locator(SELECTORS.observation.bulkConfirm.text)).toContainText('Apply 1 selected proposal');
+    await expect(page.locator(SELECTORS.observation.bulkConfirm.text)).toContainText('cannot be undone');
+    await page.locator(SELECTORS.observation.bulkConfirm.no).click();
     await expect(ask).toBeHidden();
     await page.waitForTimeout(200);
 
@@ -861,7 +863,7 @@ test.describe('Bulk-agree suggested rulings (LIN-2444 Phase 5) — e2e', () => {
     await expect(page.locator('#obs-ruling-selected-count')).toHaveText('2 selected');
 
     await page.locator('#obs-ruling-agree-selected').click();
-    await page.getByTestId('obs-ruling-bulk-confirm-yes').click();
+    await page.locator(SELECTORS.observation.bulkConfirm.yes).click();
 
     // Both rows settle at the moment of success — no wait for a poll: controls
     // disabled, feedback recorded, selection emptied, bar hidden.
@@ -916,7 +918,7 @@ test.describe('Bulk-agree suggested rulings (LIN-2444 Phase 5) — e2e', () => {
 
     // Acceptance limb 3: bulk agree dismisses BOTH, not just the last one.
     await page.locator('#obs-ruling-agree-selected').click();
-    await page.getByTestId('obs-ruling-bulk-confirm-yes').click();
+    await page.locator(SELECTORS.observation.bulkConfirm.yes).click();
     await expect(rowA.locator('.obs-ruling-feedback')).toHaveText('dismissed as proposed');
     await expect(rowB.locator('.obs-ruling-feedback')).toHaveText('dismissed as proposed');
 
@@ -989,7 +991,7 @@ test.describe('Bulk-agree progress / Stop / completion summary (LIN-2758) — e2
     await expect(page.locator('#obs-ruling-selected-count')).toHaveText('3 selected');
 
     await page.locator('#obs-ruling-agree-selected').click();
-    await page.getByTestId('obs-ruling-bulk-confirm-yes').click();
+    await page.locator(SELECTORS.observation.bulkConfirm.yes).click();
 
     const progress = page.locator('#obs-ruling-bulk-progress');
     await expect(progress).toHaveText('Applying 1 of 3…');
@@ -1022,7 +1024,7 @@ test.describe('Bulk-agree progress / Stop / completion summary (LIN-2758) — e2
     await page.locator('#obs-ruling-select-all').check();
 
     await page.locator('#obs-ruling-agree-selected').click();
-    await page.getByTestId('obs-ruling-bulk-confirm-yes').click();
+    await page.locator(SELECTORS.observation.bulkConfirm.yes).click();
 
     // Row 1's own write is held open by the gate — deterministically "in
     // flight" for as long as the test needs to press Stop, no race.
@@ -1246,7 +1248,9 @@ test.describe('Task-bound ruling (LIN-2215) — a scan-produced decision end to 
 
     const row = page.locator(`#obs-rulings .obs-ruling[data-decision-id="${scanBody.id}"]`);
     await expect(row).toBeVisible();
-    await expect(row).toContainText(localWorkerUrlKey); // the workspace chip (renderRulingRow)
+    // The workspace's name, since two workspaces are showing; the raw key is never shown (LIN-3983 PR 2).
+    await expect(row.locator('.obs-ruling-ws')).toBeVisible();
+    await expect(row).not.toContainText(localWorkerUrlKey);
 
     const [commentReq] = await Promise.all([
       page.waitForRequest(r => r.url().includes('/api/comments/') && r.method() === 'POST'),

@@ -83,6 +83,32 @@ export async function createSession(page, overrides = {}) {
  * selectors for the migrated surfaces.
  */
 export const SELECTORS = {
+  /** Observation (LIN-3983 PR 2): the view tabs, the workspace scope, the waiting block, the Rulings actions and the in-page bulk question. */
+  observation: {
+    tab: (key) => `[data-testid="obs-tab-${key}"]`,
+    scope: (key) => `[data-testid="obs-scope-${key}"]`,
+    waiting: '[data-testid="obs-waiting"]',
+    ruling: {
+      answer: '[data-testid="obs-ruling-answer"]',
+      dismiss: '[data-testid="obs-ruling-dismiss"]',
+      shelve: '[data-testid="obs-ruling-shelve"]',
+      shelveConfirm: '[data-testid="obs-ruling-shelve-confirm"]',
+      agree: '[data-testid="obs-ruling-agree"]',
+      keep: '[data-testid="obs-ruling-keep"]',
+      bulkApply: '[data-testid="obs-ruling-agree-selected"]',
+      bulkStop: '[data-testid="obs-ruling-bulk-stop"]',
+    },
+    bulkConfirm: {
+      panel: '[data-testid="obs-ruling-bulk-confirm"]',
+      text: '[data-testid="obs-ruling-bulk-confirm-text"]',
+      yes: '[data-testid="obs-ruling-bulk-confirm-yes"]',
+      no: '[data-testid="obs-ruling-bulk-confirm-no"]',
+    },
+    due: {
+      scanSelected: '[data-testid="obs-due-scan-selected"]',
+      stop: '[data-testid="obs-due-stop"]',
+    },
+  },
   footer: {
     /** Footer nav link by its visible text, e.g. 'swipe', 'settings'. */
     link: (name) => `[data-testid="footer-link-${name}"]`,

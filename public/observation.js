@@ -69,6 +69,8 @@ const DECISION_OPTIONS_CHARS = 80;
 
 // Filter state.
 const hiddenWorkspaces = new Set();        // urlKeys toggled off
+// The workspace scope (LIN-3983 PR 2, decision 4): 'current' opens the feed on this workspace, 'all' shows
+// every connected workspace with the chips filtering inside. The waiting block ignores it.
 let archiveOpen = false;
 
 // Active view (LIN-1194, LIN-1728, LIN-3983): 'runs' (the one feed of runs,
@@ -421,6 +423,33 @@ function setPollStatus(text) {
   if (el) el.textContent = text || '';
 }
 
+let workspaceScope = 'current';
+
+// Sets the scope and what it implies: which workspaces the feed hides, the scope buttons, and the chips
+// (shown only under 'all', and only when more than one workspace is connected).
+function applyWorkspaceScope(next) {
+  workspaceScope = next === 'all' ? 'all' : 'current';
+  const here = observationData?.urlKey;
+  const workspaces = observationData?.workspaces || [];
+  hiddenWorkspaces.clear();
+  if (workspaceScope === 'current') {
+    for (const w of workspaces) if (w.urlKey !== here) hiddenWorkspaces.add(w.urlKey);
+  }
+  for (const btn of document.querySelectorAll('#obs-scope [data-scope]')) {
+    const on = btn.dataset.scope === workspaceScope;
+    btn.classList.toggle('is-on', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
+  const chips = document.getElementById('obs-chips');
+  if (chips) {
+    chips.hidden = workspaceScope !== 'all' || workspaces.length < 2;
+    for (const chip of chips.querySelectorAll('.obs-chip')) {
+      chip.classList.toggle('is-on', !hiddenWorkspaces.has(chip.dataset.ws));
+    }
+  }
+  renderFeeds();
+}
+
 function isVisibleWs(urlKey) {
   return !hiddenWorkspaces.has(urlKey);
 }
@@ -639,9 +668,13 @@ function runningSummary(s, st) {
 function renderWaitingSummary(s) {
   const decision = s.decision || null;
   const message = stripFeedbackMarkers(s.waitingMessage);
-  const question = message || (decision && decision.question ? String(decision.question) : '')
-    || excerptDecisionCase(s.decisionCase, DECISION_EXCERPT_CHARS);
+  const excerpt = excerptDecisionCase(s.decisionCase, DECISION_EXCERPT_CHARS);
+  const question = message || (decision && decision.question ? String(decision.question) : '') || excerpt;
   const sentence = question || 'No question was attached. Open the run to see what it needs.';
+  // The case behind the question, as supporting detail after it (LIN-2184), when it adds to the sentence.
+  const caseHtml = excerpt && excerpt !== sentence
+    ? ` <span class="obs-summary-decision-excerpt">${escapeHtml(excerpt)}</span>`
+    : '';
   const open = !!decision && openLoopIds !== null && openLoopIds.has(s.producerLoopId);
   const { labels, overflow } = open ? boundDecisionOptions(decision.options, DECISION_OPTIONS_CHARS) : { labels: [], overflow: 0 };
   const choices = labels.length
@@ -650,7 +683,7 @@ function renderWaitingSummary(s) {
   // The direct path out of the dead-end (LIN-1019): a reply CTA straight to the session page.
   const href = sessionHref(s);
   const reply = href ? ` <a class="obs-summary-reply" href="${escapeHtml(href)}">reply →</a>` : '';
-  return `<span class="obs-summary-line obs-summary-waiting">${escapeHtml(sentence)}${choices}${reply}</span>`;
+  return `<span class="obs-summary-line obs-summary-waiting">${escapeHtml(sentence)}${caseHtml}${choices}${reply}</span>`;
 }
 
 // One sentence per card, saying what the run is doing, and never the pill's own words (LIN-3983 PR 2):
@@ -723,6 +756,17 @@ function ticketProgressText(ticketWalk) {
   if (!Array.isArray(ticketWalk) || !ticketWalk.length) return '';
   const last = ticketWalk[ticketWalk.length - 1];
   return `ticket ${ticketWalk.length} so far · ${last.identifier} ${last.state}`;
+}
+
+// The same exact time as a node, for a row built with the DOM. Null where the shared formatter is not loaded.
+function exactTimeNode(iso) {
+  const local = iso && window.formatLocalTime ? window.formatLocalTime(iso, { zone: true }) : null;
+  if (!local) return null;
+  const el = document.createElement('time');
+  el.setAttribute('datetime', iso);
+  el.setAttribute('data-local-time', 'zoned');
+  el.textContent = local;
+  return el;
 }
 
 // The exact local time and its zone, for a relative time that points at it (LIN-3975's time rule:
@@ -1331,7 +1375,7 @@ function renderErrorBox(run) {
   const log = (Array.isArray(run.producedArtifacts) ? run.producedArtifacts : []).find(a => a && a.url);
   const viewLog = log
     ? `<a class="obs-err-action" href="${escapeHtml(log.url)}" target="_blank" rel="noopener">view log ↗</a>` : '';
-  const meta = [rt ? `<span class="obs-err-rt">ran ${escapeHtml(rt)}</span>` : '', viewLog].filter(Boolean).join('');
+  const meta = [rt ? `<span class="obs-error-rt">ran ${escapeHtml(rt)}</span>` : '', viewLog].filter(Boolean).join('');
   return `<div class="obs-error-box" role="note">
       <p class="obs-error-cause"><span class="obs-error-mark" aria-hidden="true">✕</span> ${escapeHtml(cause)}</p>
       ${meta ? `<p class="obs-error-meta">${meta}</p>` : ''}
@@ -2277,6 +2321,14 @@ function renderRulingRow(row) {
     const meta = document.createElement('p');
     meta.className = 'obs-ruling-suggestion-meta';
     meta.textContent = `— ${suggestion.suggestedBy}, ${relativeTime(suggestion.suggestedAt)}`;
+    // The exact local time and its zone, beside the relative one (LIN-3975's time rule).
+    const exact = exactTimeNode(suggestion.suggestedAt);
+    if (exact) {
+      const sep = document.createElement('span');
+      sep.textContent = ' · ';
+      meta.appendChild(sep);
+      meta.appendChild(exact);
+    }
     banner.appendChild(meta);
 
     li.appendChild(banner);
@@ -2368,6 +2420,7 @@ function renderRulingRow(row) {
     const sendBtn = document.createElement('button');
     sendBtn.type = 'button';
     sendBtn.className = 'action-btn obs-ruling-answer-send';
+    sendBtn.setAttribute('data-testid', 'obs-ruling-answer');
     sendBtn.textContent = 'Answer';
     sendBtn.addEventListener('click', () => {
       const text = input.value.trim();
@@ -2440,6 +2493,7 @@ function makeDismissButton(row, li) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'action-btn obs-ruling-dismiss';
+  btn.setAttribute('data-testid', 'obs-ruling-dismiss');
   btn.textContent = 'Dismiss';
   btn.addEventListener('click', () => dismissRulingRow(row, li));
   return btn;
@@ -2462,6 +2516,7 @@ function makeShelveButton(row, li) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'action-btn obs-ruling-shelve';
+  btn.setAttribute('data-testid', 'obs-ruling-shelve');
   btn.textContent = 'Shelve';
   btn.addEventListener('click', () => toggleShelvePanel(row, li));
   return btn;
@@ -2496,6 +2551,7 @@ function toggleShelvePanel(row, li) {
   const confirmBtn = document.createElement('button');
   confirmBtn.type = 'button';
   confirmBtn.className = 'action-btn obs-ruling-shelve-confirm';
+  confirmBtn.setAttribute('data-testid', 'obs-ruling-shelve-confirm');
   confirmBtn.textContent = 'Shelve it';
   confirmBtn.addEventListener('click', () => {
     const reason = reasonInput.value.trim();
@@ -2905,6 +2961,7 @@ function makeAgreeButton(row, li) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'action-btn obs-ruling-agree';
+  btn.setAttribute('data-testid', 'obs-ruling-agree');
   const proposedOutcome = row?.suggestedDismissal?.proposedOutcome ?? 'dismissed';
   btn.textContent = proposedOutcome === 'answered' ? 'answer as proposed' : 'dismiss as proposed';
   btn.addEventListener('click', () => agreeRulingRow(row, li));
@@ -2915,6 +2972,7 @@ function makeKeepButton(row, li) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'action-btn obs-ruling-keep';
+  btn.setAttribute('data-testid', 'obs-ruling-keep');
   btn.textContent = 'keep open';
   btn.addEventListener('click', () => keepRulingRow(row, li));
   return btn;
@@ -4668,6 +4726,14 @@ function initControls() {
   const rulingBulkStop = document.getElementById('obs-ruling-bulk-stop');
   if (rulingBulkStop) rulingBulkStop.addEventListener('click', () => { rulingsBulkStopRequested = true; });
 
+  const scope = document.getElementById('obs-scope');
+  if (scope) {
+    scope.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-scope]');
+      if (btn) applyWorkspaceScope(btn.dataset.scope);
+    });
+  }
+
   const chips = document.getElementById('obs-chips');
   if (chips) {
     chips.addEventListener('click', (e) => {
@@ -4701,6 +4767,7 @@ function init() {
   observationData = window.__OBSERVATION_DATA__;
   if (!observationData) { console.warn('Observation: no initial data'); return; }
   initControls();
+  applyWorkspaceScope('current');
   // The URL opens the page where it was left (LIN-3983): the view and filter,
   // including the rulings deep link from the navbar badge (`?view=rulings`,
   // LIN-1728 review F6). Legacy values are rewritten to the current names.
