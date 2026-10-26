@@ -580,4 +580,31 @@ describe('LIN-3987 review — a harness picked on the draft re-reads the panel, 
     await flush();
     assert.match(summary(), /^This run will use Claude Code(?:&#039;|')s own model/, summary());
   });
+
+  // Reads overlap and can answer in either order: only the latest paints (runPanelSeq in fetchRunPanel).
+  test('an older read that answers last does not paint over the latest answer\'s words', async () => {
+    const held = [];
+    let gate = false;
+    const panelFor = (q) => (gate
+      ? new Promise((resolve) => { held.push(() => resolve(serverPanel(q))); })
+      : serverPanel(q));
+    const { c } = await mount({}, { panelFor, opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor: () => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: null, harness: 'claude-code', effort: null, sources: {} }) });
+    await c.click({ action: 'change-run' });
+    await flush();
+    const summary = () => /data-testid="run-will-use">([^<]*)</.exec(c.innerHTML)[1];
+    assert.match(summary(), /^This run will use Claude Code(?:&#039;|')s own model/, summary());
+
+    gate = true;
+    await c.fire('change', { dataset: { testid: 'run-harness' }, value: 'opencode' });
+    await c.fire('change', { dataset: { testid: 'run-harness' }, value: '' });
+    await flush();
+    assert.equal(held.length, 2, 'both reads are in flight');
+
+    held[1]();
+    await flush();
+    held[0]();
+    await flush();
+    assert.match(summary(), /^This run will use Claude Code(?:&#039;|')s own model/, 'the first read answered last and did not paint');
+    assert.doesNotMatch(summary(), /opencode/, summary());
+  });
 });

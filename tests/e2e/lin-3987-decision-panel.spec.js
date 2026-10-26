@@ -96,6 +96,16 @@ test.describe('Home run control: the panel on a phone (LIN-3987)', () => {
     await expect.poll(() => use.boundingBox()).not.toBeNull();
     const box = await use.boundingBox();
     expect(box.y + box.height, 'the bottom of Use for this run').toBeLessThanOrEqual(PHONE.height);
+    // The box is measured against the viewport, so a sheet scrolled to bring Use up would pass that alone: the sheet, and any
+    // container inside the page that scrolls it, must sit at the top (the page's own scroll is the document's, not the sheet's).
+    const scrolled = await component.locator(RC.changePanel).evaluate((panel) => {
+      const tops = [];
+      for (let el = panel; el && el !== document.body && el !== document.documentElement; el = el.parentElement) {
+        tops.push({ el: el.getAttribute('data-testid') || el.className || el.tagName, scrollTop: el.scrollTop });
+      }
+      return tops.filter((t) => t.scrollTop !== 0);
+    });
+    expect(scrolled, 'the sheet, and the containers around it, are not scrolled').toEqual([]);
   });
 });
 

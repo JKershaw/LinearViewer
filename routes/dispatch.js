@@ -710,7 +710,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         effort: { value: choice.effort, follow, hint: hint(words.effort) }
       });
       // The harnesses that take no effort. The panel hides effort by this list; Home's summary judges its draft's harness by it.
-      // `words` is the resolution with no choice made, the words Home's heading and summary name a default by.
+      // `words` is the resolution for the harness the draft chose (Settings' own when none is chosen), the words Home's heading and summary name a default by.
       res.json({ kind, html, numbers: numbers || null, withoutEffort: HARNESSES_WITHOUT_EFFORT, words });
     } catch (err) {
       return reportFailure(res, 'Decision panel error:', err, 'Failed to load the decision panel');
