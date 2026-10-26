@@ -20,7 +20,6 @@ import { homeSeed, hasHomeSessions, seedHomeSessions, HOME_WRITE_SSE } from './h
 import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 import { LIVE_CONSOLE_STATES, seedLiveConsole } from './live-console-states.mjs';
 import { taskSeed, seedTaskState, mintGuestPath } from './task-states.mjs';
-import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 import { OBSERVATION_STATES, seedObservation } from './observation-states.mjs';
 
 const BASE_URL = process.env.JUDGE_BASE_URL;
