@@ -3,40 +3,43 @@
  * defaults and the AI model overrides) are retired: their POSTs are gone, and so is the old 307 that pointed a
  * bare POST at them. Every model write now goes through the page's staged save, the presets or the undo.
  *
- *   POST /workspace/:urlKey/settings/models/changes                  { reason, version, c__… fields }
+ *   POST /workspace/:urlKey/settings/models/changes                  { reason, version, back?, c__… fields }
  *   POST /workspace/:urlKey/settings/models/presets                  { reason, name }
  *   POST /workspace/:urlKey/settings/models/presets/:presetId/apply  { reason }
  *
  * A refused write goes back to the Models page with the reason in place and the staged values kept (the
  * session holds them for one page load). Each write is one logged change with one reason.
+ *
+ * `back=dispatch` (LIN-3952) is the Dispatch page's "No job" section posting the same save. It is the one
+ * whitelisted return besides Models. Its result comes back on the Dispatch page as a query (`no_job` /
+ * `no_job_error`), not in the session flash, which only the Models page reads.
  */
 import { Router } from 'express';
 import { renderErrorPage } from '../lib/render.js';
 import { RoutingError } from '../lib/model-routing.js';
-import { stagedChanges, runnableGuard } from '../lib/model-routing-edit.js';
+import { stagedChanges, runnableGuard, REFUSAL_MESSAGES } from '../lib/model-routing-edit.js';
 import { settingsAreaUrl } from '../lib/settings-areas.js';
-
-/** What a refused page write says, in place, on the Models page (LIN-3855). */
-const REFUSAL_MESSAGES = {
-  CONFLICT: 'The models changed while you were editing, so nothing was saved. Your edits are still here: check them and save again.',
-  REASON_REQUIRED: 'Save needs a reason: say why these models are changing.'
-};
 
 export function createSettingsModelRoutes({ workspaceFromUrl, modelRoutingStore }) {
   const router = Router();
 
   const modelsUrlOf = (workspace, query) => settingsAreaUrl(workspace.urlKey, 'models', query);
+  const dispatchUrlOf = (workspace, query) => `/workspace/${encodeURIComponent(workspace.urlKey)}/dispatch?${new URLSearchParams(query)}`;
   const reasonOfBody = (body) => (typeof body?.reason === 'string' ? body.reason.trim() : '');
+  /** The whitelisted return: `dispatch` only when the Dispatch page posted it; anything else is Models. */
+  const backOf = (body) => (body?.back === 'dispatch' ? 'dispatch' : 'models');
   /** The staged fields a refused save posted, so the page shows them again rather than the stored values. */
   const stagedValuesOf = (body) => Object.fromEntries(Object.entries(body || {}).filter(([k]) => k.startsWith('c__')));
   /**
    * A refused write goes back to the Models page with its reason and the staged values (the session holds
    * them for one page load). A refusal the store did not name is a real failure and is not hidden.
+   * From the Dispatch page the refusal is a query code instead, so it is read where it was made.
    */
   const refuse = (req, res, workspace, err, body) => {
     if (!(err instanceof RoutingError)) {
       return failure(res, workspace, 'Settings Error', 'Failed to save model changes. Please try again.');
     }
+    if (backOf(body) === 'dispatch') return res.redirect(dispatchUrlOf(workspace, { no_job_error: err.code }));
     const message = REFUSAL_MESSAGES[err.code] || err.message;
     if (req.session) req.session.modelsFlash = { code: err.code, message, values: stagedValuesOf(body) };
     return res.redirect(modelsUrlOf(workspace));
@@ -62,6 +65,9 @@ export function createSettingsModelRoutes({ workspaceFromUrl, modelRoutingStore 
     const workspace = req.workspace;
     const reason = reasonOfBody(req.body);
     const version = Number(req.body?.version);
+    const back = backOf(req.body);
+    let entry = null;
+    let nothing = false;
     try {
       if (!reason) throw new RoutingError('REASON_REQUIRED', 'a change needs a reason');
       const table = await modelRoutingStore.getTable(workspace.urlKey);
@@ -69,13 +75,16 @@ export function createSettingsModelRoutes({ workspaceFromUrl, modelRoutingStore 
         throw new RoutingError('CONFLICT', 'the routing table changed since this page was loaded', { version: table.version });
       }
       const changes = stagedChanges(req.body, table);
-      if (!changes.length) return res.redirect(modelsUrlOf(workspace, { nothing: '1' }));
-      await modelRoutingStore.applyChanges(changes, contextOf(req, reason), { expectedVersion: version, ...runnableGuard() });
+      if (!changes.length) nothing = true;
+      else entry = await modelRoutingStore.applyChanges(changes, contextOf(req, reason), { expectedVersion: version, ...runnableGuard() });
     } catch (err) {
       console.error('Settings › Models save:', err?.code || err?.message);
       return refuse(req, res, workspace, err, req.body);
     }
-    return res.redirect(modelsUrlOf(workspace, { changed: '1' }));
+    if (back === 'dispatch') return res.redirect(dispatchUrlOf(workspace, { no_job: nothing ? 'nothing' : 'saved' }));
+    if (nothing) return res.redirect(modelsUrlOf(workspace, { nothing: '1' }));
+    // The saved entry's id, so the page can mark the rows it saved and offer one Undo for all of them (LIN-3952).
+    return res.redirect(modelsUrlOf(workspace, { changed: entry?._id || '1' }));
   });
 
   /** Save the current table as a named routing preset. The table does not change; the save is one log entry. */

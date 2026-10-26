@@ -473,3 +473,50 @@
 @media (max-width: 640px) {
   /* Token responsive: see common-actions.css */
 }
+
+/* The No job suggestion (LIN-3952): the Dispatch page loads style.css and this file, not settings.css, so the
+   few settings words the section uses are styled here, in the same tokens. The decision panel is style.css's. */
+.dispatch-no-job {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.dispatch-no-job .settings-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--font-size-sm);
+}
+
+.dispatch-no-job .settings-flash {
+  color: var(--fg);
+}
+
+.dispatch-no-job .settings-flash-error {
+  color: var(--red);
+}
+
+.dispatch-no-job-form {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.dispatch-no-job .settings-ask-label {
+  display: grid;
+  gap: var(--space-1);
+  font-family: var(--font-content);
+  color: var(--fg-dim);
+}
+
+.dispatch-no-job .settings-ask-reason {
+  font-family: var(--font-content);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--fg-vdim);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+  min-width: 0;
+}
+
+.dispatch-no-job-form .btn--primary {
+  justify-self: start;
+}

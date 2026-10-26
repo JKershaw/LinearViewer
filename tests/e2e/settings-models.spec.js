@@ -197,18 +197,9 @@ test.describe('Settings › Models (LIN-3855)', () => {
     await expect(logEntries(page)).toHaveCount(0)
   })
 
-  test('the No job (Dispatch suggestion) row saves its model and effort with a reason and reads them back', async ({ page }) => {
+  // LIN-3952: the No job suggestion moved to the Dispatch page (its own spec: dispatch-no-job.spec.js). Models no longer has it.
+  test('Models no longer carries the No job row: it is on the Dispatch page', async ({ page }) => {
     await openModels(page)
-    const row = page.locator('[data-testid="models-default-agent"]')
-    await row.locator(':scope > summary').click()
-    await row.locator('input[data-models-field="model"]').fill('sonnet')
-    await row.locator('select[data-models-field="harness"]').selectOption('claude-code')
-    await row.locator('select[data-models-field="effort"]').selectOption('high')
-    await reasonBox(page).fill('suggest sonnet on Dispatch')
-    await saveButton(page).click()
-
-    await expect(page.locator('[data-testid="models-notice"]')).toContainText('Saved.')
-    await expect(page.locator('[data-testid="models-default-agent"] > summary')).toContainText('sonnet')
-    await expect(page.locator('[data-testid="models-default-agent"] select[data-models-field="effort"]')).toHaveValue('high')
+    await expect(page.locator('[data-testid="models-default-agent"]')).toHaveCount(0)
   })
 })

@@ -154,6 +154,7 @@ import { renderSettingsPage } from './lib/render-settings.js'
 import { renderPromptsPage } from './lib/render-prompts.js'
 import { renderCustomPromptsPage } from './lib/render-custom-prompts.js'
 import { renderDispatchPage } from './lib/render-dispatch.js'
+import { noJobBody, noJobNoticeOf } from './lib/components/dispatch-no-job.js'
 import { renderSwipePage, orderIssuesForSwipe } from './lib/render-swipe.js'
 import { subtaskNeedingYouByNodeKey } from './lib/task-board-view.js'
 import { renderSwimPage } from './lib/render-swim.js'
@@ -3934,6 +3935,17 @@ app.get('/workspace/:urlKey/dispatch', workspaceFromUrl, async (req, res) => {
     // Non-fatal
   }
 
+  // LIN-3952 item 6: the No job suggestion moved here from Settings › Models, with the same stored value and the same save
+  // (`back=dispatch` returns a refusal here). It is not load-bearing for this page, so a failed read leaves the section out.
+  let noJobHtml = '';
+  try {
+    const table = await modelRoutingStore.getTable(workspace.urlKey);
+    const catalog = await getModelCatalog({ mock: shouldMockAi(workspace) });
+    noJobHtml = noJobBody({ urlKey: workspace.urlKey, table, catalog, notice: noJobNoticeOf(req.query) });
+  } catch (e) {
+    // Non-fatal: the section is absent this load.
+  }
+
   const html = renderDispatchPage(workspace.name || 'Workspace', {
     deployInfo,
     urlKey: workspace.urlKey,
@@ -3942,7 +3954,8 @@ app.get('/workspace/:urlKey/dispatch', workspaceFromUrl, async (req, res) => {
     featureFlags,
     isLocalhost,
     dispatchDefaults,
-    proxyDefault: req.session.proxyDefault
+    proxyDefault: req.session.proxyDefault,
+    noJobHtml
   });
   res.send(html);
 });

@@ -45,7 +45,7 @@ test.describe('Settings Page', () => {
     await expect(settings(page).section('account')).toBeVisible()
     const logoutLink = settings(page).logout()
     await expect(logoutLink).toBeVisible()
-    await expect(logoutLink).toContainText('logout')
+    await expect(logoutLink).toContainText('Sign out')
   })
 
   test('offers the email add affordance in the Account section (LIN-1892 S3-3)', async ({ page }) => {
