@@ -535,9 +535,9 @@
   margin-inline: 0.8rem;
 }
 
-/* LIN-3952: the consent notice has no row padding of its own, so its last line sat on the card's bottom border. It takes the rows' block padding too. */
+/* LIN-3952: the consent notice has no row padding of its own, so its last line sat on the card's bottom border. It takes a step of the spacing scale top and bottom. */
 .settings-rows > .consent-notice {
-  padding-block: 0.7rem;
+  padding-block: var(--space-2);
 }
 
 .settings-row {
@@ -998,8 +998,8 @@
     background: var(--bg);
     padding: var(--space-4);
     /* The sticky bar sits over the sheet's foot (z-index 61), so the last field clears it by the bar's height (LIN-3952).
-       Set after the shorthand above, which would otherwise reset it. */
-    padding-bottom: 12rem;
+       Set after the shorthand above, which would otherwise reset it. Six steps of the scale's largest rung: no token is 12rem. */
+    padding-bottom: calc(var(--space-5) * 6);
   }
 
   .settings-field {
