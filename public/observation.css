@@ -564,6 +564,7 @@
    criterion 5: the surface states its own limits). */
 .obs-rulings-limits {
   color: var(--muted);
+  font-family: var(--font-content);
   font-size: 0.78rem;
   margin: 0 0 0.6rem;
   max-width: 62ch;
@@ -688,6 +689,15 @@
   font-size: 0.78rem;
   color: var(--muted);
   white-space: nowrap;
+}
+
+/* At phone widths the stamp wraps inside a capped side column, so the ident and
+   the title keep the room they need. Unwrapped, the zoned exact time grew the
+   side column to ~60% of a 390px card and ellipsized the run's id to "Loca…"
+   (LIN-3983 review, finding A). Desktop keeps the one-line stamp. */
+@media (max-width: 640px) {
+  .obs-session-side { max-width: 40%; }
+  .obs-session-time { white-space: normal; text-align: right; }
 }
 
 /* Per-session page link in the header side column (LIN-1019). Subtle by default,

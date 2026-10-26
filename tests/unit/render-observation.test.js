@@ -49,8 +49,7 @@ describe('render-observation: rulings-tab limits disclaimer (LIN-2241 criterion 
     // holds, in the words a person reads (LIN-3983 PR 2): one plain sentence, no internal term.
     const out = html();
     assert.match(out, /id="obs-rulings-limits"/);
-    assert.match(out, /Some questions are raised automatically, by a model reading a task\. They can be wrong/);
-    assert.match(out, /check each one before you answer/);
+    assert.match(out, /Some questions are raised automatically by a model reading a task, and they can be wrong\./);
   });
 
   test('the disclaimer sits inside the rulings section, above the feed it qualifies', () => {
