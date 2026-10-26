@@ -22,7 +22,7 @@
 import { Router, json } from 'express';
 import { jsonError, keepaliveError, replyStoreFault } from '../lib/errors.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
-import { collectUnansweredDecisions, parseStampLoopIds, STAMP_LOOP_IDS_MESSAGE } from '../lib/unanswered-decisions.js';
+import { collectUnansweredDecisions, openDecisionLoopIds, parseStampLoopIds, STAMP_LOOP_IDS_MESSAGE } from '../lib/unanswered-decisions.js';
 import { attachStandingSuggestions } from '../lib/dismissal-suggestions-store.js';
 import { connectedWorkspaces, liveOnAnchor } from './dashboard-session-state.js';
 
@@ -102,10 +102,18 @@ function rulingsFeed({ sessionsFeedCache, mergeLoops, taskDecisionsStore, shelve
         suggestions
       );
 
+      // LIN-3983: the loop ids whose question is open, by the builder's own
+      // cluster rule (LIN-4003), over the SAME `merged` set as the rows above.
+      // The Observation waiting block asks membership here instead of
+      // re-deriving "is this run's question open?" on the client. Shelf-free,
+      // by design (see openDecisionLoopIds).
+      const openLoopIds = [...openDecisionLoopIds(merged)];
+
       keepalive.send(200, {
         workspaces,
         count: rulings.length,
         rulings,
+        openLoopIds,
         generatedAt: new Date().toISOString()
       });
     } catch (error) {

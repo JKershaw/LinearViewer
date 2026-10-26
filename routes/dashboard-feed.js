@@ -24,7 +24,7 @@ import { armKeepalive } from '../lib/http-keepalive.js';
 import { toEpochMs } from '../lib/utils/time.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
 import { findAnchorLoop, childLoops } from '../lib/session-summary.js';
-import { STALE_AFTER_MS, WORKSPACE_FANOUT_CONCURRENCY, settleWithConcurrency, isStandaloneSession, deriveSessionStatus, deriveSessionWaiting, loopActivityMs, peakToolCount, deriveFeedStatusLine, connectedWorkspaces } from './dashboard-session-state.js';
+import { STALE_AFTER_MS, WORKSPACE_FANOUT_CONCURRENCY, settleWithConcurrency, isStandaloneSession, deriveSessionStatus, deriveSessionWaiting, waitingLoops, loopActivityMs, peakToolCount, deriveFeedStatusLine, connectedWorkspaces } from './dashboard-session-state.js';
 
 // Default archive page size for the observation /sessions feed (LIN-631). The
 // client requests this many archived sessions per "load more"; the server caps
@@ -258,6 +258,9 @@ export function buildSessionPayload(session, ws, taskDone = false, lastActivityO
   const { waiting: rawWaiting, message: rawWaitingMessage, producerLoopId, decision, decisionCase } = deriveSessionWaiting(enriched);
   const waiting = !terminal && rawWaiting;
   const waitingMessage = waiting ? rawWaitingMessage : null;
+  // LIN-3983: every loop this session is waiting on, by id, for the Observation
+  // waiting block (see `waitingLoops`). Empty when terminal, like waitingMessage.
+  const waitingLoopIds = waiting ? waitingLoops(enriched).map(l => l.loopId) : [];
 
   // Sessions-tab discriminators (LIN-1194), both additive fields the Autopilot
   // tab ignores. `standalone` routes a synthesized single-loop session to the
@@ -310,6 +313,7 @@ export function buildSessionPayload(session, ws, taskDone = false, lastActivityO
     // surfaces the blocked message text. Null message when nothing is waiting.
     waiting,
     waitingMessage,
+    waitingLoopIds,
     // LIN-2184 (H5): the rollup's decision facts (from the SAME producing loop
     // as `message`/`waitingMessage` above — `deriveSessionWaiting`'s "one
     // producer, always" rule) — deliberately NOT gated on `waiting`, unlike
@@ -651,16 +655,27 @@ function observationPage({ llmCallLogStore, renderObservationPage, getDeployInfo
 }
 
 // Split the merged sessions into the polling tab's Active list and Archive.
+// Touched within the last day (LIN-631): the one Active/Archive rule, mirrored
+// in public/observation.js (`isRecentlyActive`).
+function recentlyActiveAt(now) {
+  return (s) => {
+    const t = Date.parse(s.lastActivity);
+    return Number.isFinite(t) && (now - t) <= STALE_AFTER_MS;
+  };
+}
+
 function splitSessionsFeed(merged, isSessionsView) {
+  const now = Date.now();
+  const recentlyActive = recentlyActiveAt(now);
   if (isSessionsView) {
-    // Sessions view (LIN-1194): the in-flight predicate is running-only —
-    // taken (past the live queue) AND non-terminal — NOT recency. Completed
-    // sessions drop to the shared archive; queued-but-not-taken and non-taken
-    // items are excluded from V1 entirely (the decided in-flight boundary).
-    // Standalone sessions are kept here (they are filtered OUT of Autopilot).
+    // Sessions source (LIN-1194, LIN-3983): standalone sessions included, and
+    // the SAME recency rule as Autopilot, so one bucketing rule holds for every
+    // filter on Observation. Taken sessions only: a queued-but-not-taken
+    // dispatch is still excluded from the feed (the in-flight boundary).
+    const taken = merged.filter(s => s.taken);
     return {
-      active: merged.filter(s => s.taken && !s.terminal),
-      archive: merged.filter(s => s.terminal)
+      active: taken.filter(recentlyActive),
+      archive: taken.filter(s => !recentlyActive(s))
     };
   }
   // Autopilot view — UNCHANGED (LIN-631): recency-only Active/Archive split
@@ -668,11 +683,6 @@ function splitSessionsFeed(merged, isSessionsView) {
   // in public/observation.js so server and client buckets agree. Standalone
   // sessions are filtered OUT so extending `_buildSessions` cannot leak them
   // into the existing feed on a live-fallback read (LIN-1194, concern #1).
-  const now = Date.now();
-  const recentlyActive = (s) => {
-    const t = Date.parse(s.lastActivity);
-    return Number.isFinite(t) && (now - t) <= STALE_AFTER_MS;
-  };
   const feed = merged.filter(s => !s.standalone);
   return {
     active: feed.filter(recentlyActive),
