@@ -77,3 +77,41 @@ describe('window.initLocalTimes', () => {
     assert.equal(bad.attrs.title, undefined);
   });
 });
+
+describe('LIN-3991 — the zoned local time names its zone', () => {
+  test('formatLocalTime adds the short zone name only when asked', () => {
+    const { window } = makeSandbox();
+    const zoned = window.formatLocalTime('2026-10-08T01:05:00Z', { nowMs: NOW, timeZone: TZ, zone: true });
+    const plain = window.formatLocalTime('2026-10-08T01:05:00Z', { nowMs: NOW, timeZone: TZ });
+    assert.match(zoned, /GMT\+9|JST/);
+    assert.doesNotMatch(plain, /GMT|JST/);
+  });
+
+  test('initLocalTimes paints data-local-time="zoned" with the zone, and a bare one without it', () => {
+    const { window } = makeSandbox();
+    const zoned = { attrs: { datetime: '2026-10-08T01:05:00Z', 'data-local-time': 'zoned' }, textContent: '8 Oct, 01:05 UTC', getAttribute(k) { return this.attrs[k] ?? null; }, setAttribute(k, v) { this.attrs[k] = v; } };
+    const bare = { attrs: { datetime: '2026-10-08T01:05:00Z', 'data-local-time': '' }, textContent: '8 Oct, 01:05 UTC', getAttribute(k) { return this.attrs[k] ?? null; }, setAttribute(k, v) { this.attrs[k] = v; } };
+    window.initLocalTimes({ querySelectorAll: () => [zoned, bare] });
+    assert.ok(zoned.textContent.length > bare.textContent.length, `zoned "${zoned.textContent}" names a zone the bare "${bare.textContent}" does not`);
+    assert.equal(zoned.attrs.title, '8 Oct, 01:05 UTC', 'the server text stays in title');
+  });
+});
+
+describe('LIN-3977 — exactLocalTime names the zone', () => {
+  test('a non-UTC TZ shows its short zone name (a missing zone would be invisible in UTC)', () => {
+    const { window } = makeSandbox();
+    const was = process.env.TZ;
+    process.env.TZ = TZ;
+    try {
+      const out = window.exactLocalTime('2026-10-08T01:05:00Z');
+      assert.match(out, /GMT\+9|JST/);
+      assert.match(out, /2026/); // the date's order follows the runner's locale, so only the year is pinned
+    } finally {
+      if (was === undefined) delete process.env.TZ; else process.env.TZ = was;
+    }
+  });
+
+  test('a bad timestamp is the empty string', () => {
+    assert.equal(makeSandbox().window.exactLocalTime('nope'), '');
+  });
+});

@@ -30,6 +30,14 @@ const TIME_MASKS = {
   poll: { selector: '[data-testid="settings-runner-last-poll"]', reason: 'Last poll is a server-rendered time' },
 };
 
+// LIN-3977: the Live Console's parts that move with the clock. Each mask names its reason; a mask that
+// matches nothing fails the shot, so a state only lists the masks its page has.
+const LIVE_STRIP = { selector: '.lc-pulse', reason: 'the activity strip is a canvas that repaints with the clock (heartbeat and event dots drift)' };
+const LIVE_BARS = { selector: '.lc-timeline-viewport', reason: 'bar positions and widths are the window at the moment of the shot (a running bar ends at now)' };
+const LIVE_AXIS = { selector: '.lc-timeline-axis', reason: 'the axis shows the window\'s own clock times' };
+const LIVE_SINCE = { selector: '.lc-lane-since', optional: true, reason: 'how long a stage has run is relative to the shot (base has no such element: LIN-3977 adds it, so the mask is skipped there)' };
+const LIVE_WHEN = { selector: '.lc-event-time', reason: 'a stream row\'s relative time is relative to the shot (its exact time is on hover)' };
+
 // `state` names a set-up the spec performs identically on both sides (see replay.spec.js):
 //   ask-open          open the periodic-reviews ask in place (a change that affects everyone)
 //   key-open          mint a token, open its key row
@@ -42,6 +50,8 @@ const TIME_MASKS = {
 //   models-saved      a row changed and saved (head only): the row is marked, and the save's one Undo is offered (LIN-3952)
 //   home-run-panel-opencode  the same panel with opencode chosen as the harness (LIN-3987): effort is off and says so, and
 //                  Claude Code on the web is not offered. A new state: base has no opencode line, so it differs by design.
+//   home-run-panel-pick  the same panel with the "Claude Opus 5.5" suggestion picked (LIN-3992): the summary names it. Base's summary
+//                  still says the old thing, so it differs by design.
 //   home-run-panel-open  Home's Change panel open (LIN-3962): the shared decision panel the server renders; `seed` gives run controls
 //   swipe-dispatch-open  Swipe's card with Prompts open: expected to show no difference (Swipe has no run panel)
 //   email-signin      a zero-workspace account: no local seed; signs in by email (one address per shot)
@@ -96,6 +106,7 @@ export const PAGES = [
   { id: 'home-stages-done', urlKey: 'judge-home-done', path: (k) => `/workspace/${k}/`, state: 'home-stages-done', runner: true, renderers: ['lib/render.js'] },
   { id: 'home-running', urlKey: 'judge-home-run', path: (k) => `/workspace/${k}/`, state: 'home-running', runner: true, renderers: ['lib/render.js'] },
   { id: 'home-failed', urlKey: 'judge-home-fail', path: (k) => `/workspace/${k}/`, state: 'home-failed', runner: true, renderers: ['lib/render.js'] },
+  { id: 'home-failed-first', urlKey: 'judge-home-fail-first', path: (k) => `/workspace/${k}/`, state: 'home-failed-first', runner: true, renderers: ['lib/render.js'] },
   { id: 'home-copy-first', urlKey: 'judge-home-copy', path: (k) => `/workspace/${k}/`, state: 'home-copy-first', renderers: ['lib/render.js'] },
   { id: 'home-copy-written', urlKey: 'judge-home-write', path: (k) => `/workspace/${k}/`, state: 'home-copy-written', renderers: ['lib/render.js'] },
   // LIN-3962: the one decision panel on Home (desktop, and phone via the viewport pair) and Swipe's card with Prompts open.
@@ -104,16 +115,30 @@ export const PAGES = [
   { id: 'home-run-panel-open', urlKey: 'judge-run', path: (k) => `/workspace/${k}/`, state: 'home-run-panel-open', seed: { openRouterConnected: true, queueToken: true }, renderers: ['lib/render.js', 'lib/components/decision-panel.js', 'public/decision-panel.js', 'public/prompt-section.js'] },
   // LIN-3987: the same Change panel with opencode chosen. Its own urlKey, since a queue token is a write.
   { id: 'home-run-panel-opencode', urlKey: 'judge-run-opencode', path: (k) => `/workspace/${k}/`, state: 'home-run-panel-opencode', seed: { openRouterConnected: true, queueToken: true }, renderers: ['lib/render.js', 'lib/components/decision-panel.js', 'public/decision-panel.js', 'public/prompt-section.js'] },
+  // LIN-3992: the same Change panel with a suggestion picked. Its own urlKey, since a queue token is a write.
+  { id: 'home-run-panel-pick', urlKey: 'judge-run-pick', path: (k) => `/workspace/${k}/`, state: 'home-run-panel-pick', seed: { openRouterConnected: true, queueToken: true }, renderers: ['lib/render.js', 'lib/components/decision-panel.js', 'public/decision-panel.js', 'public/prompt-section.js'] },
   { id: 'swipe-dispatch-open', urlKey: 'judge-swipe', path: (k) => `/workspace/${k}/swipe`, state: 'swipe-dispatch-open', seed: { openRouterConnected: true, queueToken: true }, renderers: ['lib/render-swipe.js'] },
   // LIN-3956: Account home, the first Plain page with rows and a form. It needs a zero-workspace account,
   // which no local seed can make, so the spec signs in by email. The judge's server runs the capture
   // transport (visual-replay.mjs), the same as Playwright's. Settings › Account then shows "Add email →"
   // on both sides, so it is identical on both and adds no difference.
   { id: 'account-home', urlKey: 'judge', path: () => '/account', state: 'email-signin', renderers: ['lib/render-account-home.js'] },
+  // LIN-3977: the Live Console, its flag on. These shoot on the real clock (live-console-states.mjs seeds the
+  // runs through the dispatch API), so the parts that move with the clock are masked, each with its reason.
+  // The key, the detail line, the lanes' words and the stream's words are NOT masked: those are what changed.
+  { id: 'live-console-quiet', urlKey: 'judge-live-quiet', path: (k) => `/workspace/${k}/live-console`, seed: { features: { liveConsole: true } }, masks: [LIVE_STRIP, LIVE_BARS, LIVE_AXIS], renderers: ['lib/render-live-console.js', 'public/live-console.js', 'public/live-console.css'] },
+  { id: 'live-console-working', urlKey: 'judge-live-working', path: (k) => `/workspace/${k}/live-console`, state: 'live-working', seed: { features: { liveConsole: true } }, masks: [LIVE_STRIP, LIVE_BARS, LIVE_AXIS, LIVE_SINCE, LIVE_WHEN], renderers: ['lib/render-live-console.js', 'public/live-console.js', 'public/live-console.css'] },
+  { id: 'live-console-history', urlKey: 'judge-live-history', path: (k) => `/workspace/${k}/live-console`, state: 'live-history', seed: { features: { liveConsole: true } }, masks: [LIVE_STRIP, LIVE_BARS, LIVE_AXIS, LIVE_SINCE, LIVE_WHEN], renderers: ['lib/render-live-console.js', 'public/live-console.js', 'public/live-console.css'] },
   // LIN-3980: the signed-out landing (no seed, so no session) and the email door it leads to. LIN-3973 owns the
   // email page's layout; this entry shows it as it is, so the step from the landing reads as one product.
   { id: 'landing', urlKey: null, path: () => '/', renderers: ['lib/render-landing.js', 'lib/components/landing-hero.js'] },
   { id: 'auth-email', urlKey: null, path: () => '/auth/email', renderers: ['lib/render-email-auth.js'] },
+  // LIN-3995: a signed-out preview (its sample-tasks line, the back link and the footer row) and an unconfigured
+  // sign-in door (the Plain page's Brand variant). Both are public. The judge server runs NODE_ENV=test with the
+  // Jira variables unset, so /auth/jira/oauth answers 503 with the door page on both sides; Playwright's goto
+  // does not treat a 503 as a failure, so the page is captured as it is.
+  { id: 'swipe-preview', urlKey: null, path: () => '/swipe', renderers: ['lib/render-swipe.js', 'lib/components/navbar.js', 'lib/components/footer.js'] },
+  { id: 'sign-in-door', urlKey: null, path: () => '/auth/jira/oauth', renderers: ['lib/render-pages.js', 'lib/components/plain-page.js'] },
 ];
 
 // Stated, not assumed: what the seed cannot reach.
@@ -122,7 +147,7 @@ export const NOT_COVERED = [
   'A change-log entry with a fixed time: the time is server-rendered and so masked, not seeded',
   'Home\'s run panel (See prompt, Another step, Change, Stop, the run-control repeats): LIN-3962 replaces it, so the stage states judge the opened task above it only',
   'Session with a run (the populated session page and its run view): needs a session record the local seed does not write; the not-found branch is judged instead, and renders the same back link',
-  'Pages with no Settings-shared pieces (swim, swipe, ship, roadmap, library, KPIs)',
+  'Pages with no Settings-shared pieces (swim, ship, roadmap, library, KPIs); the signed-out swipe preview is judged as swipe-preview (LIN-3995)',
 ];
 
 // Every page renders through renderPage, so its shell files are covered by any listed page.

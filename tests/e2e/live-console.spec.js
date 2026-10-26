@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { SELECTORS } from '../helpers.js';
 import { sweepFixedOverlaps, describeHits, expectSweepNotVacuous } from '../fixed-overlay-sweep.js';
+import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 
 // Experimental Live Console — an ambient, generation-free feed of the whole
 // swarm working (LIN-1436). Seeds via /test/set-session (the test-token
@@ -172,11 +173,31 @@ test.beforeEach(({ workerUrlKey }) => {
 
 test.describe('Live Console (experimental)', () => {
   test.describe('Feature Flag Gating', () => {
-    test('redirects to settings when the flag is off', async ({ page }) => {
-      await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    // LIN-3977: an opt-out (a stored `false`) is explicit, so the test does not depend on
+    // whether the worker's workspace has a runner from another spec (promotion turns the
+    // flag on for an owner with a runner and no stored flag).
+    test('redirects to the features settings when the flag is opted out', async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ liveConsole: false })}&urlKey=${URL_KEY}`);
       await page.goto(PAGE_URL);
       await page.waitForLoadState('networkidle');
-      expect(page.url()).toContain('/settings');
+      expect(page.url()).toContain('/settings/features');
+    });
+
+    test.describe('promotion: an owner with a runner and no stored flag', () => {
+      test.afterEach(async ({ page }) => {
+        // Put the worker's workspace back to "no runner key" for the specs after this one.
+        await page.request.post(`/test/create-runner-key?urlKey=${URL_KEY}&state=none`);
+      });
+
+      test('opens the page and the events feed without a stored flag', async ({ page }) => {
+        await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+        await page.request.post(`/test/create-runner-key?urlKey=${URL_KEY}`);
+        await page.goto(PAGE_URL);
+        await page.waitForLoadState('networkidle');
+        await expect(page.locator('.page-header h1')).toHaveText('Live Console');
+        const res = await page.request.get(EVENTS_API);
+        expect(res.status()).toBe(200);
+      });
     });
 
     test('loads when the flag is on', async ({ page }) => {
@@ -186,7 +207,7 @@ test.describe('Live Console (experimental)', () => {
       await expect(page.locator('.page-header h1')).toHaveText('Live Console');
     });
 
-    test('toggle lives in the Experimental section and defaults off', async ({ page }) => {
+    test('toggle lives in the Views section and defaults off without a runner', async ({ page }) => {
       await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
@@ -281,7 +302,7 @@ test.describe('Live Console (experimental)', () => {
   });
 
   test.describe('Live data', () => {
-    test('renders seeded events with click-through to Observation', async ({ page }) => {
+    test('renders seeded events with click-through to the task page (no run behind them)', async ({ page }) => {
       await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
       await clearFeed(page, URL_KEY);
       await page.request.post('/test/seed-agent-status', {
@@ -298,9 +319,9 @@ test.describe('Live Console (experimental)', () => {
       await expect(page.locator('[data-testid="live-console-lane"]')).toHaveCount(1);
       await expect(page.locator('[data-testid="live-console-event"]').first()).toBeVisible();
 
-      // The event task links through to that workspace's Observation page.
+      // A row with no run behind it links to its task page (LIN-3977).
       const link = page.locator('.lc-event-task', { hasText: 'LIN-778' });
-      await expect(link).toHaveAttribute('href', `/workspace/${URL_KEY}/observation`);
+      await expect(link).toHaveAttribute('href', `/workspace/${URL_KEY}/task/LIN-778`);
     });
 
     test('a running worker becomes a heartbeat lane and its [evidence] a stream event', async ({ page }) => {
@@ -345,7 +366,7 @@ test.describe('Live Console (experimental)', () => {
     // the right edge) and the link renders at the lane's structural size, never
     // the body size. (The regression the review found by render is exactly the
     // unwrapped `<a>` taking the `1fr` cell and wrapping `.lc-lane-ws`.)
-    test('the lane task-page link shares the identifier\'s grid cell (one-row layout, structural font size)', async ({ page }) => {
+    test('the lane identifier sits on the same row as the workspace name (one-row layout)', async ({ page }) => {
       await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
       await clearFeed(page, URL_KEY);
 
@@ -365,28 +386,20 @@ test.describe('Live Console (experimental)', () => {
       const lane = page.locator('[data-testid="live-console-lane"]', { hasText: 'LIN-3331L' }).first();
       await expect(lane).toBeVisible();
 
-      const link = lane.locator('[data-testid="lc-lane-task-page-link"]');
+      // LIN-3977: the identifier is the one task link, to the task page.
+      const link = lane.locator('[data-testid="live-console-lane-task"]');
       await expect(link).toBeVisible();
       await expect(link).toHaveAttribute('href', `/workspace/${URL_KEY}/task/LIN-3331L`);
 
       const geometry = await lane.evaluate((li) => {
         const top = (sel) => Math.round(li.querySelector(sel).getBoundingClientRect().top);
-        const linkEl = li.querySelector('.lc-lane-task-page');
-        const taskEl = li.querySelector('.lc-lane-task');
         return {
-          linkTop: top('.lc-lane-task-page'),
           taskTop: top('.lc-lane-task'),
           wsTop: top('.lc-lane-ws'),
-          linkFont: parseFloat(getComputedStyle(linkEl).fontSize),
-          taskFont: parseFloat(getComputedStyle(taskEl).fontSize),
         };
       });
       // One row: the workspace name sits on the same row as the task id.
       expect(Math.abs(geometry.wsTop - geometry.taskTop)).toBeLessThanOrEqual(4);
-      // The link neighbours the identifier on that row.
-      expect(Math.abs(geometry.linkTop - geometry.taskTop)).toBeLessThanOrEqual(4);
-      // The link is lane-structural (0.72rem), not body-sized.
-      expect(geometry.linkFont).toBeLessThan(geometry.taskFont);
     });
 
     // LIN-1929 (Phase C of LIN-1908): a beat with no tool calls parses to
@@ -610,8 +623,9 @@ test.describe('Live Console (experimental)', () => {
       await page.goto(PAGE_URL);
       await page.waitForSelector('[data-testid="live-console-lane"]');
       const badge = page.locator('[data-testid="live-console-lane-credential"]').first();
+      // LIN-3977: an unknown credential is the ordinary case and does not show.
       await expect(badge).toHaveAttribute('data-state', 'unknown');
-      await expect(badge).toContainText('unknown');
+      await expect(badge).toBeHidden();
     });
 
     test('a lane whose credential is dead is badged `dead`', async ({ page }) => {
@@ -654,8 +668,8 @@ test.describe('Live Console (experimental)', () => {
       expect(body.summary).toMatchObject({ active: expect.any(Number), total: expect.any(Number) });
     });
 
-    test('is gated (403) when the flag is off', async ({ page }) => {
-      await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    test('is gated (403) when the flag is opted out', async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ liveConsole: false })}&urlKey=${URL_KEY}`);
       const res = await page.request.get(EVENTS_API);
       expect(res.status()).toBe(403);
     });
@@ -773,7 +787,10 @@ test.describe('Live Console (experimental)', () => {
         const cx = rect.left + rect.width / 2;
         const cy = rect.top + rect.height / 2;
         const hit = document.elementFromPoint(cx, cy);
-        return hit ? hit.getAttribute('data-testid') : null;
+        // The label link is the bar's own child (LIN-3977: it takes the pointer, so a
+        // click opens the run), so a hit on it is a hit on the bar.
+        const owner = hit ? hit.closest('[data-testid="live-console-timeline-bar"]') : null;
+        return owner ? owner.getAttribute('data-testid') : null;
       });
       expect(paintedTestid).toBe('live-console-timeline-bar');
     });
@@ -909,7 +926,7 @@ test.describe('Live Console (experimental)', () => {
       expect(staleAnim).toBe('none');
     });
 
-    test('LIN-2905: folded wakeMarkers render as ticks inside the target bar with a " · N wakes" label suffix', async ({ page }) => {
+    test('LIN-2905: folded wakeMarkers render as ticks inside the target bar with a " · N check-ins" label suffix', async ({ page }) => {
       let injected = false;
       await page.route(`**${EVENTS_API}*`, async (route) => {
         const response = await route.fetch();
@@ -939,7 +956,7 @@ test.describe('Live Console (experimental)', () => {
       await page.goto(PAGE_URL);
       const bar = page.locator('[data-testid="live-console-timeline-bar"][aria-label*="LIN-9300"]');
       await expect(bar).toBeVisible();
-      await expect(bar).toHaveAttribute('aria-label', /· 2 wakes$/);
+      await expect(bar).toHaveAttribute('aria-label', /· 2 check-ins$/);
 
       const markers = bar.locator('[data-testid="live-console-timeline-wake-marker"]');
       await expect(markers).toHaveCount(2);
@@ -948,7 +965,7 @@ test.describe('Live Console (experimental)', () => {
       const runningMarker = bar.locator('[data-testid="live-console-timeline-wake-marker"][aria-label*="LIN-9302"]');
       await expect(doneMarker).toHaveAttribute('data-still-running', 'false');
       await expect(runningMarker).toHaveAttribute('data-still-running', 'true');
-      await expect(runningMarker).toHaveAttribute('aria-label', 'woken by LIN-9302');
+      await expect(runningMarker).toHaveAttribute('aria-label', 'check-in: woken by LIN-9302');
 
       // The marker's LOCAL left% must stay clamped inside the bar's own box
       // (never < 0, never > 100) even though the wake fired after the bar's
@@ -1026,7 +1043,7 @@ test.describe('Live Console (experimental)', () => {
         const hit = document.elementFromPoint(cx, cy);
         return hit ? hit.getAttribute('aria-label') : null;
       });
-      expect(topmostLabel).toBe('woken by LIN-9501');
+      expect(topmostLabel).toBe('check-in: woken by LIN-9501');
     });
 
     test('the still-running bar animation is suppressed under prefers-reduced-motion', async ({ page }) => {
@@ -1126,7 +1143,7 @@ test.describe('Live Console (experimental)', () => {
       await expect(bar).toBeVisible();
       const label = bar.locator('.lc-timeline-bar-label');
       await expect(label).toBeAttached();
-      await expect(label).toHaveText('LIN-9300 — implementation');
+      await expect(label).toHaveText('LIN-9300 — Build');
       // Visible means rendered pixels, not display:none/visibility:hidden —
       // the same bar-box a hover-only title attribute would NOT provide.
       const box = await label.boundingBox();
@@ -1939,6 +1956,212 @@ test.describe('Live Console (experimental)', () => {
 
       const pad = await page.evaluate(() => getComputedStyle(document.querySelector('.lc-more')).paddingRight);
       expect(pad).toBe('0px');
+    });
+  });
+
+  // LIN-3977 witnesses (review findings 1-3): the run links on every surface, the
+  // reduced-motion flip while the page is open, the [done] row, phone width, the
+  // scope switch, the bar's keyboard path and the range controls' visible names.
+  test.describe('LIN-3977: run links, motion, scope and phone', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
+      await clearFeed(page, URL_KEY);
+    });
+
+    test('a lane, a timeline bar and a stream row about a run each link to its run page, which returns 200', async ({ page }) => {
+      await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9301' });
+      await page.goto(PAGE_URL);
+      const lane = page.locator('[data-testid="live-console-lane"] a.lc-lane-run').first();
+      const bar = page.locator('[data-testid="live-console-timeline-bar"] a.lc-timeline-bar-label').first();
+      const row = page.locator('[data-testid="live-console-stream"] [data-testid="live-console-event"] a.lc-event-task').first();
+      const runPath = new RegExp(`^/workspace/${URL_KEY}/observation/session/[^/]+$`);
+      for (const link of [lane, bar, row]) {
+        await expect(link).toHaveAttribute('href', runPath);
+        const href = await link.getAttribute('href');
+        const response = await page.request.get(href);
+        expect(response.status(), `${href} should open the run`).toBe(200);
+      }
+    });
+
+    test('switching reduced motion on while the page is open stops the strip and the lane pulse', async ({ page }) => {
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      // Count the strip's per-frame repaints: clearRect is called once per paint, and only the strip canvas paints this way.
+      await page.addInitScript(() => {
+        window.__lcClears = 0;
+        const clear = CanvasRenderingContext2D.prototype.clearRect;
+        CanvasRenderingContext2D.prototype.clearRect = function (...args) { window.__lcClears += 1; return clear.apply(this, args); };
+      });
+      await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9302' });
+      await page.goto(PAGE_URL);
+      const lane = page.locator('[data-testid="live-console-lane"]').first();
+      await expect(lane).toHaveClass(/lc-lane--pulse/);
+
+      const paints = () => page.evaluate(() => window.__lcClears);
+      const before = await paints();
+      await page.waitForTimeout(800);
+      expect(await paints() - before, 'the strip repaints every frame while motion is allowed').toBeGreaterThan(20);
+
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await expect(lane, 'the reused lane node loses its pulse').not.toHaveClass(/lc-lane--pulse/);
+      await page.waitForTimeout(300);
+      const frozen = await paints();
+      await page.waitForTimeout(1200);
+      expect(await paints() - frozen, 'with reduced motion on, the strip repaints only once per poll').toBeLessThanOrEqual(2);
+    });
+
+    test('a seeded [done] adds one "finished" stream row within one poll, and never a second', async ({ page }) => {
+      await page.goto(PAGE_URL);
+      await expect(page.getByTestId('live-console-banner')).toBeVisible();
+      await seedTerminalWorker(page, URL_KEY, { task: 'LIN-9303', message: '[done] shipped' });
+      const finished = page.locator('[data-testid="live-console-stream"] [data-testid="live-console-event"]', { hasText: 'LIN-9303' }).filter({ hasText: 'finished' });
+      await expect(finished).toHaveCount(1, { timeout: 12_000 });
+      await page.waitForTimeout(6_000);
+      await expect(finished, 'one poll later it is still one row').toHaveCount(1);
+    });
+
+    test('at 390×844 the page, the lanes and the stream fit with no sideways scroll', async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9304' });
+      await seedTerminalWorker(page, URL_KEY, { task: 'LIN-9305', message: '[done] shipped' });
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-lane"]');
+      await page.waitForSelector('[data-testid="live-console-event"]');
+      const overflow = await page.evaluate(() => {
+        const measured = ['.lc-page', '#live-console-lanes', '#live-console-stream', '#live-console-timeline'];
+        const out = measured.map(sel => {
+          const el = document.querySelector(sel);
+          return [sel, el ? el.scrollWidth - el.clientWidth : 0];
+        });
+        out.push(['document', document.documentElement.scrollWidth - window.innerWidth]);
+        return out;
+      });
+      for (const [sel, px] of overflow) expect(px, `${sel} overflows sideways by ${px}px`).toBeLessThanOrEqual(0);
+    });
+
+    test('with two workspaces the page opens on the current one, and "all workspaces" shows both', async ({ page, secondWorkerUrlKey }) => {
+      await page.goto(`/test/set-session?multiWorkspace=true&urlKey=${URL_KEY}&${featuresParam({ liveConsole: true })}`);
+      await seedWorkspaceOwnership(page, URL_KEY, 'owner');
+      await seedWorkspaceOwnership(page, secondWorkerUrlKey, 'owner');
+      await clearFeed(page, URL_KEY);
+      await clearFeed(page, secondWorkerUrlKey);
+      await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9306' });
+      await seedRunningLoopWithToken(page, secondWorkerUrlKey, { task: 'LIN-9307' });
+      await page.goto(PAGE_URL);
+
+      const lanes = page.locator('[data-testid="live-console-lane"]');
+      await expect(lanes.filter({ hasText: 'LIN-9306' })).toHaveCount(1);
+      await expect(lanes.filter({ hasText: 'LIN-9307' })).toHaveCount(0);
+      await expect(page.getByTestId('live-console-scope-current')).toHaveAttribute('aria-pressed', 'true');
+
+      await page.getByTestId('live-console-scope-all').click();
+      await expect(lanes.filter({ hasText: 'LIN-9306' })).toHaveCount(1);
+      await expect(lanes.filter({ hasText: 'LIN-9307' })).toHaveCount(1);
+    });
+
+    test('a timeline bar is reached by Tab and opened by Enter', async ({ page }) => {
+      await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9308' });
+      await page.goto(PAGE_URL);
+      const bar = page.locator('[data-testid="live-console-timeline-bar"] a.lc-timeline-bar-label').first();
+      await expect(bar).toBeVisible();
+      await page.evaluate(() => document.activeElement && document.activeElement.blur());
+      let reached = false;
+      for (let i = 0; i < 150 && !reached; i++) {
+        await page.keyboard.press('Tab');
+        reached = await bar.evaluate(el => el === document.activeElement);
+      }
+      expect(reached, 'the bar is in the Tab order').toBe(true);
+      await Promise.all([page.waitForURL(/\/observation\/session\//), page.keyboard.press('Enter')]);
+    });
+
+    // LIN-3977 (outcome 4): a bar's full label is one step away with no ellipsis: the
+    // detail line under the timeline names it. The touch case dispatches a touch
+    // pointerdown then a click, because Playwright's touch needs a touch context.
+    test.describe('the timeline detail line', () => {
+      const detail = (page) => page.getByTestId('live-console-timeline-detail');
+      const barLink = (page) => page.locator('[data-testid="live-console-timeline-bar"] a.lc-timeline-bar-label').first();
+
+      test('hovering a bar names its task and stage in the detail line, and it links to the run', async ({ page }) => {
+        await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9310' });
+        await page.goto(PAGE_URL);
+        await barLink(page).hover();
+        await expect(detail(page)).toContainText('LIN-9310 — Build');
+        await expect(detail(page).locator('a.lc-timeline-detail-link')).toHaveAttribute('href', new RegExp(`/observation/session/`));
+      });
+
+      test('focusing a bar by keyboard names it in the detail line', async ({ page }) => {
+        await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9311' });
+        await page.goto(PAGE_URL);
+        await barLink(page).focus();
+        await expect(detail(page)).toContainText('LIN-9311 — Build');
+      });
+
+      test('a mouse click on a bar opens its run', async ({ page }) => {
+        await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9313' });
+        await page.goto(PAGE_URL);
+        await Promise.all([page.waitForURL(/\/observation\/session\//), barLink(page).click()]);
+      });
+
+      test('a touch tap reads a bar first; a second tap opens its run', async ({ page }) => {
+        await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9312' });
+        await page.goto(PAGE_URL);
+        const link = barLink(page);
+        const touchTap = () => link.evaluate(a => {
+          a.dispatchEvent(new PointerEvent('pointerdown', { pointerType: 'touch', bubbles: true }));
+          a.click();
+        });
+        await touchTap();
+        await expect(detail(page)).toContainText('LIN-9312 — Build');
+        expect(page.url(), 'the first tap only reads the bar').toContain(PAGE_URL);
+        await Promise.all([page.waitForURL(/\/observation\/session\//), touchTap()]);
+      });
+    });
+
+    test('a waiting lane stacks its stage and its wait across the lane, not in a narrow column beside the task', async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await seedTerminalWorker(page, URL_KEY, { task: 'LIN-9314', message: '[blocked] Which branch should I build on?' });
+      await page.goto(PAGE_URL);
+      const lane = page.locator('[data-testid="live-console-lane"]').filter({ hasText: 'LIN-9314' });
+      await expect(lane.locator('.lc-lane-action')).toContainText('waiting on you');
+      const laneWidth = (await lane.boundingBox()).width;
+      const stageWidth = (await lane.locator('.lc-lane-stage-row').boundingBox()).width;
+      // The stage row holds the stage, the wait and the ticket count. Beside the task in a narrow column it
+      // wraps word by word; stacked, it takes the lane's width.
+      expect(stageWidth, `the stage row is ${Math.round(stageWidth)}px of a ${Math.round(laneWidth)}px lane`).toBeGreaterThan(laneWidth * 0.8);
+    });
+
+    test('at 390×844 a waiting lane keeps its identifier on one line and its stage row takes the lane\'s width', async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      // A long title, so the lane's head has to shorten it: the identifier must still stay whole.
+      const worker = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+        data: { prompt: 'implement', promptName: 'plan', kind: 'plan', issueIdentifier: 'LIN-9315', issueTitle: 'Pick the sign-in method and write the migration notes for the team', target: 'cli' },
+      });
+      expect(worker.status(), `worker seed failed: ${await worker.text()}`).toBe(201);
+      const workerId = (await worker.json()).item.id;
+      const { token } = await (await page.request.get(`/test/create-dispatch-token?label=runner-LIN-9315&urlKey=${URL_KEY}`)).json();
+      await page.request.post(`/api/dispatch/take/${workerId}`, { headers: { Authorization: `Bearer ${token}` } });
+      await page.request.post(`/api/dispatch/feedback/${workerId}`, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        data: { message: '[blocked] Which sign-in method should I build: email or Linear?' },
+      });
+      await page.goto(PAGE_URL);
+      const lane = page.locator('[data-testid="live-console-lane"]').filter({ hasText: 'LIN-9315' });
+      await expect(lane.locator('.lc-lane-action')).toContainText('waiting on you');
+      const laneWidth = (await lane.boundingBox()).width;
+      const stage = await lane.locator('.lc-lane-stage-row').boundingBox();
+      const task = await lane.locator('.lc-lane-task').boundingBox();
+      expect(stage.width, `the stage row is ${Math.round(stage.width)}px of a ${Math.round(laneWidth)}px lane`).toBeGreaterThan(laneWidth * 0.8);
+      // One line of the task's 0.85rem text is about 20px; a broken identifier is two lines.
+      expect(task.height, `the identifier is ${Math.round(task.height)}px tall: it broke across lines`).toBeLessThan(26);
+    });
+
+    test('each range control names, in visible text, what it sets', async ({ page }) => {
+      await page.goto(PAGE_URL);
+      const strip = page.getByRole('group', { name: 'Strip range' }).locator('.lc-range-label');
+      const timeline = page.getByRole('group', { name: 'Timeline range' }).locator('.lc-range-label');
+      await expect(strip).toBeVisible();
+      await expect(strip).toHaveText('Strip');
+      await expect(timeline).toBeVisible();
+      await expect(timeline).toHaveText('Timeline');
     });
   });
 });

@@ -33,6 +33,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
+import { liveConsoleOn } from '../../lib/run-controls.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
@@ -109,6 +110,8 @@ function baseContext(calls, appliedAssigneeName, assigneeState) {
     subtaskNeedingYouByNodeKey: () => ({}),
     requestFeatureFlags: async () => ({}),
     resolveRunControls: async () => ({ runControls: false, runSetup: false }),
+    // LIN-3977: the post-401 Home render applies the promotion rule (server.js), so the real one is injected.
+    liveConsoleOn,
     isAuthError: () => false,
     handleUnauthorizedError: async () => {},
     renderUpstreamAwareErrorPage: () => '<error/>',

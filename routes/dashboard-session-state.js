@@ -10,8 +10,7 @@
  * routes/task-chat.js, tests) resolve there.
  */
 import { computeSupersededLoopIds } from '../lib/loop-supersede.js';
-import { findWakeEvent, isWaitingWakeMarker } from '../lib/dispatch-terminal.js';
-import { isTerminalLoop } from '../lib/run-loop-state.js';
+import { isTerminalLoop, loopIsWaiting } from '../lib/run-loop-state.js';
 import { collectUnansweredDecisions } from '../lib/unanswered-decisions.js';
 import { findAnchorLoop } from '../lib/session-summary.js';
 import { toEpochMs } from '../lib/utils/time.js';
@@ -118,32 +117,6 @@ export function deriveSessionStatus({ terminal, stale, hasError, waiting = false
   if (terminal) return hasError ? (taskDone ? 'done-with-warning' : 'error') : 'done';
   if (waiting) return 'waiting';
   return 'in-progress';
-}
-
-/**
- * Is a single ENRICHED loop (effectiveAgentState applied) waiting on a human?
- *
- * Two independent runner channels, unioned (LIN-1005 — neither subsumes the
- * other): (a) an agent-status `blocked` entry surfaces as `agentState==='waiting'`
- * (lib/pipeline-loops.js `_deriveAgentState`), and (b) a `[blocked]`
- * *feedback* marker (`WAITING_WAKE_MARKERS`, lib/dispatch-terminal.js; `[pending]`
- * is not a wait, LIN-1025), pre-derived at build time as `wakeMarker` so this read is
- * lean-safe (never touches raw `feedback[]`, which the feed drops). Terminal wins:
- * a run that actually finished (a terminal feedback marker folded in by
- * `effectiveAgentState`, or a native complete/error) is never waiting.
- *
- * @param {Object} loop - enriched loop (post-`enrichLoop`)
- * @returns {boolean}
- */
-function loopIsWaiting(loop) {
-  if (!loop || isTerminalLoop(loop)) return false;
-  if (loop.agentState === 'waiting') return true;
-  // Prefer the build-time `wakeMarker` (present on every reconstructed loop, lean
-  // or not); fall back to scanning raw feedback for loops built elsewhere.
-  const marker = loop.wakeMarker !== undefined
-    ? loop.wakeMarker
-    : (findWakeEvent(loop.feedback)?.marker || null);
-  return isWaitingWakeMarker(marker);
 }
 
 /**

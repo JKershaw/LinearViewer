@@ -1473,6 +1473,14 @@ a.wordmark:hover {
   gap: 8px;
 }
 
+/* LIN-3991: Copy and the instruction to paste it share a row, so the instruction sits where the person acts on it. */
+.opened-task-copy-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .opened-task-key-note,
 .opened-task-paste {
   color: var(--fg-dim);
@@ -4884,3 +4892,16 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
 .opened-task-setup-runner-link:hover {
   text-decoration: underline;
 }
+
+/* LIN-3977: the activity chips, shared by Observation and Live Console. They moved
+   here from observation.css so Live Console no longer borrows that sheet.
+   tests/unit/shared-chip-css.test.js pins this placement. */
+.obs-act-chip {
+  font-family: var(--font-structural);
+  font-size: 0.72rem;
+  color: var(--muted);
+  background: var(--inset);
+  border-radius: var(--radius-sm);
+  padding: 0.02rem 0.35rem;
+}
+.obs-act-idle { background: transparent; padding-left: 0; padding-right: 0; color: var(--fg-dim); }

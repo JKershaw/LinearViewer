@@ -61,7 +61,7 @@ import { CredentialLifecycleEventStore, CREDENTIAL_LIFECYCLE_EVENT_KINDS } from 
 import { WorkspaceStore } from './lib/workspace-store.js'
 import { AccountWorkspaceStore } from './lib/account-workspace-store.js'
 import { createWorkspaceOwnerCheck } from './lib/workspace-owner.js'
-import { createRunControlsResolver, setRunControlsResolver, requestFeatureFlags, resolveRunControls } from './lib/run-controls.js'
+import { createRunControlsResolver, setRunControlsResolver, requestFeatureFlags, resolveRunControls, liveConsoleOn } from './lib/run-controls.js'
 import { OwnerCredentialStore } from './lib/owner-credential-store.js'
 import { ConnectionStore } from './lib/connection-store.js'
 import { sanitizeSessionForPersist, createHydrationMiddleware, createConnectionRefresher, createConnectionAccess, createSweepConnectionDataLoader, rehydrateAfterRefresh, rehydrateBindingAfterRefresh, createAuthorizedAccountConnectionReader, createInstallationTokenResolver, createReferentHolderReader, heldConnectionCredentials, connectionBackedWritesEnabled, convertToConnectionBacked, CONNECTION_RETRY_TITLE, CONNECTION_RETRY_MESSAGE } from './lib/connection-credential.js'
@@ -2000,7 +2000,13 @@ async function renderDashboardAfterRefresh(workspace, session, teamId, assigneeS
   const homeTopTask = orderedHome.find((issue) => !issue.isSeed) || null;
   const seedOnlyHome = orderedHome.length > 0 && orderedHome.every((issue) => issue.isSeed);
   // LIN-3849: no `req` on this post-401 path, so call the resolver directly.
-  const featureFlags = { ...getFeatureFlags(session), ...(await resolveRunControls({ workspace, accountId: session.accountId })) };
+  // LIN-3977: liveConsole follows the one promotion rule (liveConsoleOn), as requestFeatureFlags does.
+  const runControlsBits = await resolveRunControls({ workspace, accountId: session.accountId });
+  const featureFlags = {
+    ...getFeatureFlags(session),
+    ...runControlsBits,
+    liveConsole: liveConsoleOn(session.features?.liveConsole, runControlsBits.runControls),
+  };
   const rowStates = await homeRowStates({ workspace, inProgressTrees, recentActivityTrees, projectTrees: trees, runControls: featureFlags.runControls === true });
   const html = renderPage(trees, inProgressTrees, recentActivityTrees, organizationName, {
     teams,

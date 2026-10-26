@@ -63,13 +63,19 @@ test.describe('Landing Swim Page (/swim)', () => {
     expect(options).toContain('By status');
   });
 
+  test('says under its title that it shows sample tasks (LIN-3995)', async ({ page }) => {
+    await expect(page.locator('header.page-header .page-header__subtitle')).toHaveText('Sample tasks, not a workspace. Sign in to see yours.');
+    await expect(page.locator('nav a[href="/"]')).toHaveText('← Harbour');
+  });
+
   test('footer shows cross-view navigation links', async ({ page }) => {
     await expect(page.locator('.page-footer')).toBeVisible();
     await expect(page.locator('.footer-actions')).toBeVisible();
     // swim is current page — shown in bold, not a link
     await expect(page.locator('.footer-actions strong.footer-current')).toHaveText('swim');
-    // projects and swipe are links
-    await expect(page.locator('.footer-actions a[href="/"]')).toBeVisible();
+    // LIN-3995: the row names the previews, and its home link reads as the back link does
+    await expect(page.locator('.footer-actions')).toContainText('previews:');
+    await expect(page.locator('.footer-actions a[href="/"]')).toHaveText('Harbour');
     await expect(page.locator('.footer-actions a[href="/swipe"]')).toBeVisible();
   });
 

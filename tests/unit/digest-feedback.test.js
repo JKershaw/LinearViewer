@@ -444,9 +444,11 @@ describe('digestFeedback: loop-facing fields match _buildLoops per-row derivatio
       assert.deepStrictEqual(digest.terminal, expected.terminalStatus
         ? { status: expected.terminalStatus, entry: { message: expected.feedback.find(f => f.timestamp === expected.terminalCompletedAt)?.message, timestamp: expected.terminalCompletedAt } }
         : null, 'terminal must match _buildLoops (status/entry)');
+      // LIN-3977: `wake.at` is the last wake event's time (any marker), surfaced as
+      // `wakeAt` on the loop; lean and non-lean must agree on it.
       assert.deepStrictEqual(digest.wake, expected.wakeMarker
-        ? { marker: expected.wakeMarker, waitingMessage: expected.waitingMessage }
-        : null, 'wake must match _buildLoops (marker/waitingMessage)');
+        ? { marker: expected.wakeMarker, waitingMessage: expected.waitingMessage, at: expected.wakeAt }
+        : null, 'wake must match _buildLoops (marker/waitingMessage/at)');
       assert.deepStrictEqual(digest.decision, expected.decision, 'decision must match _buildLoops');
       assert.deepStrictEqual(digest.decisionCase, expected.decisionCase, 'decisionCase must match _buildLoops');
       assert.deepStrictEqual(digest.answeredDecisionId, expected.answeredDecisionId, 'answeredDecisionId must match _buildLoops');

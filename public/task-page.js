@@ -467,15 +467,16 @@
   }
 
   /**
-   * Whether an idle poll paints the server-rendered ready header (`<main
+   * Whether an idle or failed poll paints the server-rendered ready header (`<main
    * data-ready-header>`, LIN-3448). The state endpoint is stored-data only, so
    * it can never report "ready"; while the page is merge-ready and the poll
    * finds nothing running, the authoritative answer is the ready sentence, not
    * whatever header happens to be painted. A polled running/waiting overrides.
-   * Pure.
+   * A failed poll (LIN-3991) keeps the ready header too: ready outranks failed
+   * in `deriveHeader`, so the load and the poll must agree. Pure.
    */
   function paintsReadyHeader(mergeReadyAttr, stateStatus) {
-    return mergeReadyAttr === 'true' && stateStatus === 'idle';
+    return mergeReadyAttr === 'true' && (stateStatus === 'idle' || stateStatus === 'failed');
   }
 
   /**
@@ -501,6 +502,8 @@
       var status = answer.querySelector('[data-testid="task-page-status"]');
       (status || answer).appendChild(summaryNode);
     }
+    // LIN-3991: the exact time beside a state sentence is local, so repainted HTML is localised again.
+    if (typeof window.initLocalTimes === 'function') window.initLocalTimes(answer);
   }
 
   function init(doc) {
@@ -604,7 +607,8 @@
       main.setAttribute('data-live', state.live ? 'true' : 'false');
       syncQuestion(state);
       tickClocks(main);
-      if (lastPolled === 'running' && state.status === 'idle' && closeOutBox && window.CloseOut && typeof window.CloseOut.runCheck === 'function') {
+      // A run that ends failed still re-checks the close-out box (LIN-3991: failed is an idle-like end).
+      if (lastPolled === 'running' && (state.status === 'idle' || state.status === 'failed') && closeOutBox && window.CloseOut && typeof window.CloseOut.runCheck === 'function') {
         // The check may move the box off `ready` without Done (so no reload):
         // then the ready header just painted is stale, and the polled one is
         // repainted unless a newer poll has already applied.

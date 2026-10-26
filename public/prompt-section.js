@@ -277,8 +277,10 @@
       const link = href
         ? ` <a class="opened-task-started-link" href="${esc(href)}" data-testid="opened-task-started-link">watch on the task page \u203A</a>`
         : '';
+      // LIN-3991 (item 5): on Home the state block above already says the running sentence once, so the Go
+      // slot keeps only the watch link; "Started." stays until the first state read lands.
       const body = g.headerHtml
-        ? g.headerHtml
+        ? (opts.surface === 'home' ? '' : g.headerHtml)
         : '<p class="task-sentence" data-testid="opened-task-sentence">Started.</p>';
       html += `<div class="opened-task-started" data-testid="opened-task-started" data-go-status="${esc(g.status)}">${body}${link}</div>`;
     } else if (!ready) {
@@ -554,8 +556,9 @@
     return line ? `<p class="opened-task-target" data-testid="opened-task-target">${esc(line)}</p>` : '';
   }
 
-  // The written prompt: Copy, the bounded box, Rewrite and Download (both views).
-  function renderPromptBox(state, opts) {
+  // The written prompt: Copy, the bounded box, Rewrite and Download (both views). `note` sits beside Copy (LIN-3991:
+  // the copy-first instruction is where the person acts on it); the run-first view passes none.
+  function renderPromptBox(state, opts, note = '') {
     const { raw, warning, label, reasoning } = state.result;
     const warningBanner = warning ? `<div class="swipe-prompt-warning">\u26A0 ${esc(warning)}</div>` : '';
     // LIN-2944 reverses LIN-70: the model's reasoning stays visible beside the prompt.
@@ -565,7 +568,10 @@
     const gateReason = primaryDisabledReason(opts, state);
     const rewriteDisabled = label === '__ai__' ? gateReason : null;
     return `
-      <button class="btn btn--primary opened-task-copy" data-testid="opened-task-copy" data-action="copy">Copy prompt</button>
+      <div class="opened-task-copy-row">
+        <button class="btn btn--primary opened-task-copy" data-testid="opened-task-copy" data-action="copy">Copy prompt</button>
+        ${note ? `<p class="opened-task-paste">${esc(note)}</p>` : ''}
+      </div>
       ${renderProxyLimitNotice(state)}
       ${warningBanner}
       ${reasoningBlock}
@@ -584,10 +590,9 @@
     return `
       <div class="opened-task-step" data-testid="opened-task-step"><span class="opened-task-step-name">${esc(copyStepOf(opts).name || 'Next prompt')}</span>${age ? ` \u00b7 generated ${esc(age)}` : ''}</div>
       ${renderTargetLine(state, opts)}
-      ${renderPromptBox(state, opts)}
+      ${renderPromptBox(state, opts, 'Copy it, then paste it into Claude Code, Codex or any coding agent.')}
       <label class="opened-task-progress-key"><input type="checkbox" data-testid="opened-task-progress-key"${keyOn ? ' checked' : ''}> Let your agent post progress to this task</label>
-      <p class="opened-task-key-note">The key lasts 48 hours. Without it, your agent can still do the work, but Harbour won\u2019t see its progress. Turning it off here sets it for every task.</p>
-      <p class="opened-task-paste">Copy it, then paste it into Claude Code, Codex or any coding agent.</p>`;
+      <p class="opened-task-key-note">The key lasts 48 hours. Without it, your agent can still do the work, but Harbour won\u2019t see its progress. Turning it off here sets it for every task.</p>`;
   }
 
   // LIN-3833: the step a run would start, from the state (a step chosen for this run, else the one the
@@ -738,6 +743,8 @@
   function applyState(container, html, phase) {
     container.innerHTML = html;
     container.setAttribute('data-phase', phase);
+    // LIN-3991: the exact time beside a state sentence is painted in the reader's zone.
+    if (typeof window.initLocalTimes === 'function') window.initLocalTimes(container);
     // LIN-3401: the +proxy toggle is bound to itself at the moment it is inserted
     // (there is no delegated listener). The direct-child chain is the header
     // template above; the markdown sinks sit elsewhere, so a look-alike in them
@@ -916,6 +923,7 @@
       const slot = container.querySelector && container.querySelector('[data-state-slot]');
       if (slot) slot.outerHTML = renderOpenedState();
       else render();
+      if (typeof window.initLocalTimes === 'function') window.initLocalTimes(container);
     }
 
     // ── LIN-3833: the run control (Home, dispatch on) ───────────────────────────
@@ -1004,10 +1012,19 @@
       const bits = [w.model].filter(Boolean);
       if (w.harness && preview.harness !== 'claude-code') bits.push(w.harness);
       if (preview.effort && w.effort !== 'not used') bits.push(`effort ${preview.effort}`);
-      const words = [...new Set(['model', 'harness', 'effort'].map((f) => sourceWordOf(f, preview)).filter(Boolean))];
+      // LIN-3992: Claude Code is said once on the line. A model that is Claude Code's own already says it, so the web target
+      // reads "on the web", and the source word that only repeats it ("Claude Code, the default") is left out. A named model
+      // keeps the word, since there it is the only place the harness is said.
+      const modelSaysIt = bits.some((b) => b.includes('Claude Code'));
+      const targetWord = target === 'web' && modelSaysIt ? 'on the web' : (TARGET_WORDS[target] || target);
+      const saysIt = modelSaysIt || targetWord.includes('Claude Code');
+      const words = [...new Set(['model', 'harness', 'effort']
+        .filter((f) => !(saysIt && (preview.sources || {})[f] === 'fallback'))
+        .map((f) => sourceWordOf(f, preview))
+        .filter(Boolean))];
       return `<div class="opened-task-runs-on" data-testid="opened-task-runs-on">`
         + `Runs on <span class="opened-task-runs-on-what" data-testid="run-on-what">${esc(bits.join(' \u00b7 '))}</span>`
-        + ` \u00b7 ${esc(TARGET_WORDS[target] || target)}`
+        + ` \u00b7 ${esc(targetWord)}`
         + `${words.length ? ` <span class="opened-task-source" data-testid="run-source">\u2014 ${esc(words.join(', '))}</span>` : ''}`
         + ` <button class="btn opened-task-change" data-action="change-run" data-testid="run-change">Change</button></div>`;
     }
@@ -1036,10 +1053,9 @@
       const running = summary.running && summary.running.state !== 'queued' ? summary.running : null;
       const next = summary.next || null;
       if (running) {
-        const since = running.since ? ` since ${esc(formatGeneratedAge(Date.parse(running.since)) || '')}` : '';
+        // LIN-3991 (item 5): the state block above says the run's state once; this line keeps only what is its own.
         const polled = POLLED_RUN_TARGETS.includes(running.target);
-        let html = `<div class="opened-task-running" data-testid="opened-task-running">${esc(running.label || 'A step')} running${since}`;
-        if (next) html += ` \u00b7 Next: ${esc(next.label)}, once ${esc(running.label || 'this')} finishes`;
+        let html = next ? `Next: ${esc(next.label)}, once ${esc(running.label || 'this')} finishes` : '';
         if (state.run.confirmStop) {
           html += ` <span class="opened-task-confirm">Stop this run? The session is cancelled and the task stays where it is.`
             + ` <button class="btn btn--red" data-action="stop-run-confirm" data-testid="run-stop-confirm">Stop</button>`
@@ -1047,7 +1063,7 @@
         } else if (polled) {
           html += ` <button class="btn--quiet opened-task-stop" data-action="stop-run" data-testid="run-stop">Stop</button>`;
         }
-        return `${html}</div>`;
+        return html.trim() ? `<div class="opened-task-running" data-testid="opened-task-running">${html.trim()}</div>` : '';
       }
       if (state.run.item || (summary.running && summary.running.state === 'queued')) {
         return `<div class="opened-task-queued" data-testid="opened-task-queued">Queued, waiting for a runner`
@@ -1119,6 +1135,31 @@
       if (draft.target === 'web' && inForce === 'opencode') draft.target = 'cli';
     }
 
+    // The sentence that says what the draft will run (the Change panel's summary, LIN-3992). It is the one place these words
+    // are built: renderChangePanel writes it, and onRunInput rewrites it in place (refreshRunSummary) when a pick or a typed
+    // model changes the draft, so the two cannot drift. Effort is judged by the harness in force (the draft's, else the one
+    // Settings resolves a blank to), against the server's list of harnesses that take none; a blank harness with nothing
+    // resolved keeps effort, as effortAppliesTo does.
+    function runWillUseText(d, preview) {
+      const panelWords = state.run.panelWords || {};
+      const harness = d.harness || '';
+      const inForce = harness || (preview && preview.harness) || '';
+      const showEffort = !state.run.withoutEffort.includes(inForce);
+      const modelNow = d.model ? optionWords(d.model, 'model') : panelWords.model;
+      const harnessNow = harness ? optionWords(harness, 'harness') : panelWords.harness;
+      const effortNow = !showEffort ? null : (d.effort ? `effort ${d.effort}` : panelWords.effort);
+      const summary = [modelNow, harnessNow, effortNow, TARGET_WORDS[d.target] || d.target].filter(Boolean).join(' · ');
+      return `This run will use ${summary}.`;
+    }
+
+    // LIN-3992: a pick or a typed model changes the draft's model, and the summary follows in place. Only that line is
+    // rewritten: a repaint would replace the model field under the datalist and the caret (LIN-3969). No-op while the
+    // Change panel is closed, since the summary is not on the page then.
+    function refreshRunSummary() {
+      const el = container.querySelector && container.querySelector('[data-testid="run-will-use"]');
+      if (el) el.textContent = runWillUseText(state.run.draft || state.run.choice, state.run.preview);
+    }
+
     // The Change panel (LIN-3962): Home's extras (the preset, Runs on, agent access, the summary, Use/Reset/Close) around
     // the one decision panel the server renders (lib/components/decision-panel.js), which holds the harness, model and
     // effort. Edits go to a draft; "Use for this run" applies it. The panel's HTML is read when the panel opens.
@@ -1127,21 +1168,15 @@
       const presets = state.run.presets || [];
       const panelWords = state.run.panelWords || {};
       const harness = d.harness || '';
-      // Effort is judged by the harness in force (the draft's, else the one Settings resolves a blank to), against the
-      // server's list of harnesses that take none. A blank harness with nothing resolved keeps effort, as effortAppliesTo does.
       const inForce = harness || (preview && preview.harness) || '';
-      const showEffort = !state.run.withoutEffort.includes(inForce);
       const presetButtons = presets.map((p) => `<button class="btn opened-task-preset" data-action="run-preset" data-preset-id="${esc(p.id)}" aria-pressed="${d.presetId === p.id ? 'true' : 'false'}" data-testid="run-preset">${esc(p.name || p.id)}</button>`).join('');
       // Claude Code on the web runs only under Claude Code: with opencode in force it is not offered, and the line says why.
       const onWeb = inForce !== 'opencode';
       const targets = ['cli', ...(onWeb ? ['web'] : []), ...(opts.isLocalhost ? ['local'] : [])];
       const targetButtons = targets.map((t) => `<button class="btn opened-task-choice" data-action="run-target" data-target="${esc(t)}" aria-pressed="${d.target === t ? 'true' : 'false'}" data-testid="run-target-${esc(t)}">${esc(TARGET_WORDS[t])}</button>`).join('');
-      const modelNow = d.model ? optionWords(d.model, 'model') : panelWords.model;
       const harnessNow = harness ? optionWords(harness, 'harness') : panelWords.harness;
       const webNote = onWeb ? '' : `<p class="opened-task-change-note" data-testid="run-web-unavailable">Claude Code on the web needs Claude Code, so it is not offered with ${esc(harnessNow || '')}.</p>`;
       const agent = d.agentAccess == null ? (window.ProxyToggle && window.ProxyToggle.isActive ? window.ProxyToggle.isActive() : true) : d.agentAccess;
-      const effortNow = !showEffort ? null : (d.effort ? `effort ${d.effort}` : panelWords.effort);
-      const summary = [modelNow, harnessNow, effortNow, TARGET_WORDS[d.target] || d.target].filter(Boolean).join(' \u00b7 ');
       const panelBody = state.run.panelHtml
         || (state.run.panelFailed
           ? '<p class="opened-task-change-note" data-testid="run-panel-failed">The choices could not load. Use for this run stays off until they do.</p>'
@@ -1153,7 +1188,7 @@
         + panelBody
         + `<div class="opened-task-change-row"><span class="opened-task-change-label">Runs on</span>${targetButtons}</div>${webNote}`
         + `<label class="opened-task-change-row"><input type="checkbox" data-testid="run-agent-access"${agent ? ' checked' : ''}> Your agent may read and update this task</label>`
-        + `<p class="opened-task-change-summary" data-testid="run-will-use">This run will use ${esc(summary)}.</p>`
+        + `<p class="opened-task-change-summary" data-testid="run-will-use">${esc(runWillUseText(d, preview))}</p>`
         + `<div class="opened-task-change-row">`
         + `<button class="btn btn--primary opened-task-use" data-action="use-run" data-testid="run-use"${state.run.panelFailed || !state.run.panelHtml ? ' disabled' : ''}>Use for this run</button>`
         + `<button class="btn--quiet" data-action="reset-run" data-testid="run-reset">Reset</button>`
@@ -1398,6 +1433,7 @@
       const slot = container.querySelector && container.querySelector('[data-go-slot]');
       if (slot) slot.outerHTML = renderGo(opts, state);
       else render();
+      if (typeof window.initLocalTimes === 'function') window.initLocalTimes(container);
     }
 
     // LIN-3267: the ladder twin of paintGo(). A post-press quota read changes only
@@ -2097,7 +2133,8 @@
           // LIN-3987 (review): the words for a blank model and effort follow the harness the draft names, so ask again.
           if (state.run.changeOpen) fetchRunPanel();
           break;
-        case 'run-model': draft.model = el.value.trim() || null; break;
+        // LIN-3992: a pick (or a typed model) names what the run will use at once, in the summary, without a repaint.
+        case 'run-model': draft.model = el.value.trim() || null; refreshRunSummary(); break;
         case 'run-effort': draft.effort = el.value || null; paintRun(); break;
         case 'run-agent-access': draft.agentAccess = el.checked === true; break;
         default: break;
