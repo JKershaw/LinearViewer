@@ -52,7 +52,7 @@ test.describe('Settings › Models (LIN-3855)', () => {
     await reasonBox(page).fill('Bugs get the cheaper model')
     await saveButton(page).click()
 
-    await expect(page.locator('[data-testid="models-notice"]')).toContainText('Saved.')
+    await expect(page.locator('[data-testid="models-notice"]')).toContainText(/Saved \d+ rows?\./)
     await expect(jobRow(page, 'bug').locator(':scope > summary')).toContainText('set here')
     await expect(logEntries(page)).toHaveCount(1)
     await expect(logEntries(page).first()).toContainText('Bugs get the cheaper model')
@@ -69,7 +69,7 @@ test.describe('Settings › Models (LIN-3855)', () => {
     await reasonBox(page).fill('Follow Make again')
     await saveButton(page).click()
 
-    await expect(page.locator('[data-testid="models-notice"]')).toContainText('Saved.')
+    await expect(page.locator('[data-testid="models-notice"]')).toContainText(/Saved \d+ rows?\./)
     await expect(jobRow(page, 'bug').locator(':scope > summary')).toContainText('from Make')
   })
 
@@ -81,7 +81,7 @@ test.describe('Settings › Models (LIN-3855)', () => {
     await reasonBox(page).fill('Make on sonnet')
     await saveButton(page).click()
 
-    await expect(page.locator('[data-testid="models-notice"]')).toContainText('Saved.')
+    await expect(page.locator('[data-testid="models-notice"]')).toContainText(/Saved \d+ rows?\./)
     await expect(jobRow(page, 'implementation').locator(':scope > summary')).toContainText('from Make')
     await expect(jobRow(page, 'implementation').locator(':scope > summary')).toContainText('sonnet')
   })
@@ -122,7 +122,7 @@ test.describe('Settings › Models (LIN-3855)', () => {
     await reasonBox(page).fill('two at once')
     await saveButton(page).click()
 
-    await expect(page.locator('[data-testid="models-notice"]')).toContainText('Saved.')
+    await expect(page.locator('[data-testid="models-notice"]')).toContainText(/Saved \d+ rows?\./)
     await expect(logEntries(page)).toHaveCount(1)
     await expect(logEntries(page).first()).toContainText('two at once')
   })
@@ -134,7 +134,7 @@ test.describe('Settings › Models (LIN-3855)', () => {
     await row.locator('input[data-models-field="model"]').fill('opus')
     await reasonBox(page).fill('try opus')
     await saveButton(page).click()
-    await expect(page.locator('[data-testid="models-notice"]')).toContainText('Saved.')
+    await expect(page.locator('[data-testid="models-notice"]')).toContainText(/Saved \d+ rows?\./)
 
     const undo = logEntries(page).filter({ hasText: 'try opus' }).locator('[data-testid^="models-undo-"]').first()
     await undo.locator(':scope > summary').click()
