@@ -69,6 +69,8 @@ const DECISION_OPTIONS_CHARS = 80;
 
 // Filter state.
 const hiddenWorkspaces = new Set();        // urlKeys toggled off
+// The workspace scope (LIN-3983 PR 2, decision 4): 'current' opens the feed on this workspace, 'all' shows
+// every connected workspace with the chips filtering inside. The waiting block ignores it.
 let archiveOpen = false;
 
 // Active view (LIN-1194, LIN-1728, LIN-3983): 'runs' (the one feed of runs,
@@ -351,17 +353,17 @@ const PROVENANCE_LABEL = { seed: 'seed', descended: 'descended', 'spun-off': 'sp
 // borrows the inert slate/queued treatment, and non-terminal `waiting` lands in
 // the amber running-family with its own title (never colour-alone vs queued-slate).
 
-// Session status (routes/dashboard.js deriveSessionStatus) → pill variant + label.
-// `waiting` (LIN-1005) lands in the amber running-family with its OWN label — no
-// 5th colour is minted (see the reconciliation note above); the distinct "waiting
-// on you" label carries the meaning, never colour alone (queued is also slate).
+// Session status (routes/dashboard.js deriveSessionStatus) → pill variant + label. The labels are
+// the task page's own words (lib/render-task-page.js STATUS_PILL: done / waiting / running / failed /
+// idle), so one state is named the same on both pages. `waiting` lands in the amber running-family
+// with its own label; the label carries the meaning, never colour alone. `warn` adds the ⚠ marker.
 const SESSION_PILL = {
-  'in-progress':       { variant: 'running', label: 'in progress' },
-  waiting:             { variant: 'running', label: 'waiting on you' },
+  'in-progress':       { variant: 'running', label: 'running' },
+  waiting:             { variant: 'running', label: 'waiting' },
   done:                { variant: 'done',    label: 'done' },
   'done-with-warning': { variant: 'done',    label: 'done', warn: true },
-  error:               { variant: 'error',   label: 'error' },
-  stale:               { variant: 'queued',  label: 'stale' },
+  error:               { variant: 'error',   label: 'failed' },
+  stale:               { variant: 'queued',  label: 'idle' },
 };
 
 // Worker-run agentState (effectiveAgentState) → segment cell + phase-node state.
@@ -381,17 +383,11 @@ function runState(agentState) {
   return RUN_STATE[agentState] || { state: 'queued', label: agentState || 'queued' };
 }
 
-// Emit the canonical `.status-pill` run-status markup (LIN-786 primitive) from
-// client JS. The shared contract is the global CSS class API, not the server
-// helper (`lib/components/status-pill.js`), which cards can't reach client-side —
-// the class strings are hand-mirrored here (the tracked Phase-B seam).
+// The run-status pill, from the shared client replica of lib/components/status-pill.js
+// (`window.renderStatusPill`, public/common.js). LIN-3983 PR 2: the markup used to be
+// hand-mirrored here as a string, so a change to the pill had to be made in two places.
 function statusPillHtml(variant, label, { warn = false } = {}) {
-  const warnMark = warn
-    ? `<span class="status-pill__warn" title="a run errored" aria-label="warning">⚠</span>`
-    : '';
-  return `<span class="status-pill status-pill--dot status-pill--${escapeHtml(variant)}">`
-    + `<span class="status-pill__dot" aria-hidden="true"></span>`
-    + `<span class="status-pill__label">${escapeHtml(label)}</span>${warnMark}</span>`;
+  return window.renderStatusPill({ dot: true, variant, label, warn });
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -427,8 +423,48 @@ function setPollStatus(text) {
   if (el) el.textContent = text || '';
 }
 
+let workspaceScope = 'current';
+
+// The scope a page load opens on (LIN-3983 PR 2): `scope=all` reopens All workspaces, anything else is This workspace.
+function scopeFromParams(params) {
+  return params.get('scope') === 'all' ? 'all' : 'current';
+}
+
+// Sets the scope and what it implies: which workspaces the feed hides, the scope buttons, and the chips
+// (shown only under 'all', and only when more than one workspace is connected). It does not write the URL:
+// a scope press does that itself (writeViewToUrl), and a page load reads it before any write.
+function applyWorkspaceScope(next) {
+  workspaceScope = next === 'all' ? 'all' : 'current';
+  const here = observationData?.urlKey;
+  const workspaces = observationData?.workspaces || [];
+  hiddenWorkspaces.clear();
+  if (workspaceScope === 'current') {
+    for (const w of workspaces) if (w.urlKey !== here) hiddenWorkspaces.add(w.urlKey);
+  }
+  for (const btn of document.querySelectorAll('#obs-scope [data-scope]')) {
+    const on = btn.dataset.scope === workspaceScope;
+    btn.classList.toggle('is-on', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
+  const chips = document.getElementById('obs-chips');
+  if (chips) {
+    chips.hidden = workspaceScope !== 'all' || workspaces.length < 2;
+    for (const chip of chips.querySelectorAll('.obs-chip')) {
+      chip.classList.toggle('is-on', !hiddenWorkspaces.has(chip.dataset.ws));
+    }
+  }
+  renderFeeds();
+}
+
 function isVisibleWs(urlKey) {
   return !hiddenWorkspaces.has(urlKey);
+}
+
+// A feed card names its workspace only when the feed is showing more than one: All workspaces, with two or
+// more still visible through the chips. Under This workspace the feed shows one, however many are connected.
+function feedShowsSeveralWorkspaces() {
+  if (workspaceScope !== 'all') return false;
+  return (observationData?.workspaces || []).filter((w) => isVisibleWs(w.urlKey)).length > 1;
 }
 
 function passesFilter(session) {
@@ -499,24 +535,24 @@ function sessionSignature(s) {
 
 // ─── Session cards (Level 2) ──────────────────────────────────────────────────
 
+// The worker-run progress bar: one equal cell per run, from the shared segment bar (`window.renderSegmentBar`),
+// with the count in words beside it (LIN-3983 PR 2). The feed carries no stages, so a cell is a run.
 function renderProgressBar(s) {
   if (!s.runs.length) {
-    return `<div class="obs-progress-row"><span class="segment-bar obs-progress" role="img" aria-label="no worker runs yet"><span class="segment-bar__cell segment-bar__cell--empty" title="no worker runs yet"></span></span></div>`;
+    return `<div class="obs-progress-row">${window.renderSegmentBar({
+      segments: [{ state: 'empty', title: 'no worker runs yet' }], ariaLabel: 'no worker runs yet', className: 'obs-progress'
+    })}</div>`;
   }
-  // Canonical SegmentBar cells (LIN-786): one equal cell per worker run, coloured
-  // by the run→4-state map. `data-live` drives the running-cell pulse (page CSS).
-  const cells = s.runs.map(r => {
+  const segments = s.runs.map(r => {
     const m = runState(r.agentState);
-    const title = `${r.issueIdentifier || 'run'}${r.stage ? ' · ' + r.stage : ''} — ${m.label}`;
-    return `<span class="segment-bar__cell segment-bar__cell--${m.state}"${m.live ? ' data-live="1"' : ''} title="${escapeHtml(title)}"></span>`;
-  }).join('');
-  // N/M count beside the bar (mockup): finished worker runs over total (LIN-608).
+    const title = `${r.issueIdentifier || 'run'}${r.stageWord ? ' · ' + r.stageWord : ''} — ${m.label}`;
+    return { state: m.state, title, live: m.live };
+  });
   const total = s.runCount || s.runs.length;
   const done = s.runs.filter(r => r.agentState === 'complete' || r.agentState === 'error').length;
-  return `<div class="obs-progress-row">
-      <span class="segment-bar obs-progress" role="img" aria-label="${s.runCount} worker run${s.runCount === 1 ? '' : 's'}">${cells}</span>
-      <span class="obs-progress-count">${done}/${total}</span>
-    </div>`;
+  const words = `${done} of ${total} ${total === 1 ? 'run' : 'runs'} finished`;
+  return `<div class="obs-progress-row">${window.renderSegmentBar({ segments, ariaLabel: words, className: 'obs-progress' })}`
+    + `<span class="obs-progress-count">${escapeHtml(words)}</span></div>`;
 }
 
 /**
@@ -625,71 +661,71 @@ function boundDecisionOptions(options, maxChars) {
   return result;
 }
 
-/**
- * The feed card's decision summary — a bounded excerpt of the case plus the
- * option labels, appended to the "waiting on you" line. NOT full prose (that
- * is the waiting banner's job, beat 3) — this is the glance. Consumes the
- * already-formed `decision`/`decisionCase` fields beat 2 widened onto the
- * session payload; never re-derives them.
- *
- * @param {Object} decision - `{decision_id, question?, options?: [{id,label,cost?}], ...}`
- * @param {Array<string>} decisionCase
- * @returns {string}
- */
-function renderWaitingDecisionSummary(decision, decisionCase) {
-  const excerpt = excerptDecisionCase(decisionCase, DECISION_EXCERPT_CHARS);
-  const excerptHtml = excerpt
-    ? ` <span class="obs-summary-decision-excerpt">${escapeHtml(excerpt)}</span>`
-    : '';
-  const options = Array.isArray(decision && decision.options) ? decision.options : [];
-  const { labels, overflow } = boundDecisionOptions(options, DECISION_OPTIONS_CHARS);
-  const optionsHtml = labels.length
-    ? ` <span class="obs-summary-decision-options">[${labels.map(l => escapeHtml(l)).join(' / ')}${overflow > 0 ? ` +${overflow} more` : ''}]</span>`
-    : '';
-  return `${excerptHtml}${optionsHtml}`;
+// The stage a card names: the server's plain stage word (LIN-3983 PR 2, `stageWord`), never an id.
+function stageNoun(s) {
+  return s.stageWord || 'Run';
 }
 
+// A status line the runner wrote, with its feedback markers taken out at display time.
+function runningSummary(s, st) {
+  const since = typeof s.stageSince === 'string' ? Date.parse(s.stageSince) : NaN;
+  const elapsed = Number.isFinite(since) ? formatRuntime({ ms: Math.max(0, Date.now() - since) }) : '';
+  // The elapsed time is its own span so the visual judge can mask the clock without masking the stage word.
+  const elapsedHtml = elapsed ? `, <span class="obs-summary-elapsed">${escapeHtml(elapsed)} in</span>` : '';
+  const line = stripFeedbackMarkers((st && st.statusLine) || s.statusLine || '');
+  return `<span class="obs-summary-line obs-summary-stage">${escapeHtml(stageNoun(s))}${elapsedHtml}${line ? ` — ${escapeHtml(line)}` : ''}</span>`;
+}
+
+// The waiting card's sentence: the question the run asked, with its markers removed. The answer
+// choices are offered only while the producer's question is still open (openLoopIds), so a dismissed
+// or answered question is never shown as something to pick.
+function renderWaitingSummary(s) {
+  const decision = s.decision || null;
+  const message = stripFeedbackMarkers(s.waitingMessage);
+  const excerpt = excerptDecisionCase(s.decisionCase, DECISION_EXCERPT_CHARS);
+  const question = message || (decision && decision.question ? String(decision.question) : '') || excerpt;
+  const sentence = question || 'No question was attached. Open the run to see what it needs.';
+  // The case behind the question, as supporting detail after it (LIN-2184), when it adds to the sentence.
+  const caseHtml = excerpt && excerpt !== sentence
+    ? ` <span class="obs-summary-decision-excerpt">${escapeHtml(excerpt)}</span>`
+    : '';
+  const open = !!decision && openLoopIds !== null && openLoopIds.has(s.producerLoopId);
+  const { labels, overflow } = open ? boundDecisionOptions(decision.options, DECISION_OPTIONS_CHARS) : { labels: [], overflow: 0 };
+  const choices = labels.length
+    ? ` <span class="obs-summary-decision-options">Answer with ${labels.map(l => escapeHtml(l)).join(' · ')}${overflow > 0 ? ` · +${overflow} more` : ''}</span>`
+    : '';
+  // The direct path out of the dead-end (LIN-1019): a reply CTA straight to the session page.
+  const href = sessionHref(s);
+  const reply = href ? ` <a class="obs-summary-reply" href="${escapeHtml(href)}">reply →</a>` : '';
+  return `<span class="obs-summary-line obs-summary-waiting">${escapeHtml(sentence)}${caseHtml}${choices}${reply}</span>`;
+}
+
+// One sentence per card, saying what the run is doing, and never the pill's own words (LIN-3983 PR 2):
+// the state is the pill, the summary says the rest.
 function renderSummaryLine(s) {
   const st = summaryState.get(s.sessionId);
   if (st && st.pending) return `<span class="obs-summary-line obs-summary-pending">summarising…</span>`;
   if (st && st.outcome) return `<span class="obs-summary-line">${escapeHtml(st.outcome)}</span>`;
   // Staleness takes precedence over the "live" status line so a day-dead session is
   // not shown as a live one (Bug 3, LIN-608).
-  if (s.stale) return `<span class="obs-summary-line obs-summary-dim">○ idle — no activity for over a day</span>`;
+  if (s.stale) return `<span class="obs-summary-line obs-summary-dim">No activity for over a day</span>`;
   // "Waiting on you" (LIN-1005) beats the generic live status line — it is the
   // "this session needs you" signal — but sits under stale to match the server's
   // deriveSessionStatus ordering (a day-dead session isn't shown as waiting).
-  if (s.waiting) {
-    const msg = s.waitingMessage ? ` — ${escapeHtml(String(s.waitingMessage))}` : '';
-    // LIN-2184 (H5): a bounded excerpt of the case + option labels when this
-    // waiting session carries a decision (beat 2 widened the session-level
-    // projection so `s.decision`/`s.decisionCase` reach this consumer).
-    const decisionSummary = s.decision ? renderWaitingDecisionSummary(s.decision, s.decisionCase) : '';
-    // The direct path out of the dead-end (LIN-1019): a reply CTA straight to the
-    // session page, where the follow-up reply box lives.
-    const href = sessionHref(s);
-    const reply = href ? ` <a class="obs-summary-reply" href="${escapeHtml(href)}">reply →</a>` : '';
-    return `<span class="obs-summary-line obs-summary-waiting">◐ waiting on you${msg}${decisionSummary}${reply}</span>`;
-  }
-  // LIN-2244: a THIRD state, distinct from both "waiting on you" above and the
-  // generic status/working lines below — parked on a pending async wait (e.g.
-  // a ScheduleWakeup CI poll). Checked before the status-line branches so a
-  // stale-looking "working"/status line can't paper over a genuinely stalled
-  // wait; sits below `waiting` since a human-gated block is the higher-
-  // priority signal when both could somehow apply.
+  if (s.waiting) return renderWaitingSummary(s);
+  // LIN-2244: parked on a pending async wait (e.g. a ScheduleWakeup CI poll). Checked before the
+  // status-line branches so a stale-looking line can't paper over a genuinely stalled wait.
   const parkedWait = sessionParkedWait(s);
   if (parkedWait) {
-    return `<span class="obs-summary-line obs-summary-parked">◐ parked on a wait since ${escapeHtml(relativeTime(parkedWait.since))}</span>`;
+    return `<span class="obs-summary-line obs-summary-parked">Parked on a wait since ${escapeHtml(relativeTime(parkedWait.since))}</span>`;
   }
-  if (st && st.statusLine) return `<span class="obs-summary-line obs-summary-status">${escapeHtml(st.statusLine)}</span>`;
-  // Live status line served on the feed itself (no per-poll backend fetch).
-  if (s.statusLine) return `<span class="obs-summary-line obs-summary-status">${escapeHtml(s.statusLine)}</span>`;
-  if (!s.terminal) {
-    const kind = s.recentKind ? ` <span class="obs-summary-kind">${escapeHtml(String(s.recentKind))}</span>` : '';
-    return `<span class="obs-summary-line obs-summary-dim">◐ working…${kind}</span>`;
+  if (!s.terminal) return runningSummary(s, st);
+  // Terminal but no cached summary → offer to generate (explicit spend only). A failed run says where it stopped first.
+  const gen = `<button type="button" class="obs-summary-gen" data-session="${escapeHtml(s.sessionId)}">summarise this session</button>`;
+  if (displayStatus(s) === 'error') {
+    return `<span class="obs-summary-line obs-summary-dim">${escapeHtml(stageNoun(s))}, last activity ${escapeHtml(relativeTime(s.lastActivity))}</span> ${gen}`;
   }
-  // Terminal but no cached summary → offer to generate (explicit spend only).
-  return `<button type="button" class="obs-summary-gen" data-session="${escapeHtml(s.sessionId)}">summarise this session</button>`;
+  return gen;
 }
 
 /**
@@ -737,24 +773,46 @@ function ticketProgressText(ticketWalk) {
   return `ticket ${ticketWalk.length} so far · ${last.identifier} ${last.state}`;
 }
 
+// The same exact time as a node, for a row built with the DOM. Null where the shared formatter is not loaded.
+function exactTimeNode(iso) {
+  const local = iso && window.formatLocalTime ? window.formatLocalTime(iso, { zone: true }) : null;
+  if (!local) return null;
+  const el = document.createElement('time');
+  el.setAttribute('datetime', iso);
+  el.setAttribute('data-local-time', 'zoned');
+  el.textContent = local;
+  return el;
+}
+
+// The exact local time and its zone, for a relative time that points at it (LIN-3975's time rule:
+// relative words, with the exact time visible). Empty where the shared formatter is not loaded.
+function exactTimeHtml(iso) {
+  const local = iso && window.formatLocalTime ? window.formatLocalTime(iso, { zone: true }) : null;
+  return local ? `<time datetime="${escapeHtml(iso)}" data-local-time="zoned">${escapeHtml(local)}</time>` : '';
+}
+
+// Whether the page is showing more than one workspace: only then does a card name its workspace.
+function multiWorkspace() {
+  return (observationData?.workspaces || []).length > 1;
+}
+
 function fillSessionHead(li, s) {
   const status = displayStatus(s);
   const pill = SESSION_PILL[status] || { variant: 'queued', label: status || '' };
-  const ident = s.seedIssue || `run ${shortSessionId(s.sessionId)}`;
-  // Bug 1 (LIN-783): the identifier already appears once, on the topline. The
-  // name line must never fall back to the id (that duplicated it when a session
-  // had no seedTitle) — use a neutral placeholder, and drop the name line
-  // entirely if it would only echo the ident.
-  const title = s.seedTitle || (s.seedIssue ? '' : 'autopilot session');
-  const showName = title && title !== ident;
+  // A card is named by its task, else by its goal's stand-in: never by its id (LIN-3983 PR 2). The
+  // payload carries no goal, so an untitled run reads "Untitled run" and says when it started.
+  const ident = s.seedIssue || s.seedTitle || 'Untitled run';
+  const name = s.seedIssue && s.seedTitle && s.seedTitle !== s.seedIssue ? s.seedTitle : '';
+  const started = !s.seedIssue && !s.seedTitle && s.dispatchedAt
+    ? `Started ${exactTimeHtml(s.dispatchedAt) || escapeHtml(relativeTime(s.dispatchedAt))}` : '';
   const runtime = formatRuntime(s.runtime);
 
   // Prominent labelled meta line (mockup): runtime / model, with workspace + task
   // count kept as trailing context so multi-workspace info is not lost (LIN-608).
   const metaBits = [];
-  if (runtime) metaBits.push(`<span class="obs-meta"><span class="obs-meta-k">runtime</span> <span class="obs-meta-v">${escapeHtml(runtime)}</span></span>`);
+  if (runtime) metaBits.push(`<span class="obs-meta obs-meta-runtime"><span class="obs-meta-k">runtime</span> <span class="obs-meta-v">${escapeHtml(runtime)}</span></span>`);
   if (s.model) metaBits.push(`<span class="obs-meta"><span class="obs-meta-k">model</span> <span class="obs-meta-v">${escapeHtml(String(s.model))}</span></span>`);
-  if (s.workspaceName) metaBits.push(`<span class="obs-meta obs-meta-ws">${escapeHtml(s.workspaceName)}</span>`);
+  if (s.workspaceName && feedShowsSeveralWorkspaces()) metaBits.push(`<span class="obs-meta obs-meta-ws">${escapeHtml(s.workspaceName)}</span>`);
   if (s.tasksTouched.length > 1) metaBits.push(`<span class="obs-meta">${s.tasksTouched.length} tasks</span>`);
   // Budget "n of N" (LIN-2934): task position ("task 1 of 8"). Omitted entirely
   // when the run declared no `maxTasks`, same additive-chip convention as
@@ -768,6 +826,9 @@ function fillSessionHead(li, s) {
   // right column that STACKS the status pill above the relative time. The ident
   // and title are the only flexible cells (they ellipsize); the right column is
   // fixed, so the "updated …" stamp never squeezes shut at narrow widths.
+  const updated = s.lastActivity
+    ? `<span class="obs-session-time">updated ${escapeHtml(relativeTime(s.lastActivity))} · ${exactTimeHtml(s.lastActivity)}</span>`
+    : '';
   li.querySelector('.obs-session-head').innerHTML = `
     <div class="obs-session-topline">
       <div class="obs-session-headmain">
@@ -775,11 +836,12 @@ function fillSessionHead(li, s) {
           <span class="obs-session-dot" data-state="${escapeHtml(pill.variant)}" aria-hidden="true"></span>
           <span class="obs-session-ident">${escapeHtml(String(ident))}</span>
         </span>
-        ${showName ? `<span class="obs-session-name">${escapeHtml(String(title))}</span>` : ''}
+        ${name ? `<span class="obs-session-name">${escapeHtml(String(name))}</span>` : ''}
+        ${started ? `<span class="obs-session-name obs-session-started">${started}</span>` : ''}
       </div>
       <div class="obs-session-side">
         ${statusPillHtml(pill.variant, pill.label, { warn: pill.warn })}
-        <span class="obs-session-time">updated ${escapeHtml(relativeTime(s.lastActivity))}</span>
+        ${updated}
         ${sessionHref(s) ? `<a class="obs-session-open" href="${escapeHtml(sessionHref(s))}" aria-label="Open session page">open ↗</a>` : ''}
       </div>
     </div>
@@ -1328,7 +1390,7 @@ function renderErrorBox(run) {
   const log = (Array.isArray(run.producedArtifacts) ? run.producedArtifacts : []).find(a => a && a.url);
   const viewLog = log
     ? `<a class="obs-err-action" href="${escapeHtml(log.url)}" target="_blank" rel="noopener">view log ↗</a>` : '';
-  const meta = [rt ? `<span class="obs-err-rt">ran ${escapeHtml(rt)}</span>` : '', viewLog].filter(Boolean).join('');
+  const meta = [rt ? `<span class="obs-error-rt">ran ${escapeHtml(rt)}</span>` : '', viewLog].filter(Boolean).join('');
   return `<div class="obs-error-box" role="note">
       <p class="obs-error-cause"><span class="obs-error-mark" aria-hidden="true">✕</span> ${escapeHtml(cause)}</p>
       ${meta ? `<p class="obs-error-meta">${meta}</p>` : ''}
@@ -1830,13 +1892,13 @@ async function pollRulings() {
 
     const data = await res.json();
     lastRulings = Array.isArray(data.rulings) ? data.rulings : [];
-    if (Array.isArray(data.openLoopIds)) openLoopIds = new Set(data.openLoopIds);
-    else if (openLoopIds === null) openLoopIds = new Set();
+    const openChanged = settleOpenLoopIds(Array.isArray(data.openLoopIds) ? new Set(data.openLoopIds) : null);
     if (onRulingsTab) {
       renderRulings(lastRulings);
       setPollStatus('● live');
     } else {
       renderWaitingBlock();
+      if (openChanged) repaintWaitingCardHeads();
     }
   } catch (e) {
     rulingsReadFailed(onRulingsTab);
@@ -1849,8 +1911,31 @@ async function pollRulings() {
 // row, so no wait is hidden for want of a ruling read.
 function rulingsReadFailed(onRulingsTab) {
   if (onRulingsTab) setPollStatus('● disconnected');
-  if (openLoopIds === null) openLoopIds = new Set();
-  if (!onRulingsTab) renderWaitingBlock();
+  const openChanged = settleOpenLoopIds(null);
+  if (!onRulingsTab) {
+    renderWaitingBlock();
+    if (openChanged) repaintWaitingCardHeads();
+  }
+}
+
+// Settles `openLoopIds` from a rulings response: the new set, or null for "no set in this
+// response", which keeps the last one and settles a never-read page to the empty set. Returns
+// whether the contents changed, so a caller repaints only when they did.
+function settleOpenLoopIds(next) {
+  const prev = openLoopIds;
+  if (next === null) next = prev === null ? new Set() : prev;
+  openLoopIds = next;
+  return prev === null || prev.size !== next.size || [...next].some(id => !prev.has(id));
+}
+
+// A waiting card offers its answer choices only while its producer loop is in openLoopIds
+// (renderWaitingSummary). The feed and rulings reads land in either order, so a card painted
+// under the old set is repainted when the set moves, rather than on the next feed poll.
+function repaintWaitingCardHeads() {
+  for (const sessionId of [...activeCards.keys(), ...recentCards.keys()]) {
+    const s = sessionIndex.get(sessionId);
+    if (s && s.waiting) refreshSessionCard(sessionId);
+  }
 }
 
 // Mostly-wholesale repaint (LIN-1728 Phase 4) — unlike the session feeds
@@ -2181,13 +2266,19 @@ function renderRulingRow(row) {
   const { decision, decisionCase, anchor, disposition, canReply } = row || {};
   const li = document.createElement('li');
   li.className = 'obs-ruling';
+  li.dataset.testid = 'obs-ruling-row';
   if (decision && decision.decision_id) li.dataset.decisionId = decision.decision_id;
 
   const head = document.createElement('div');
   head.className = 'obs-ruling-head';
-  const idLabel = anchor?.issueIdentifier || anchor?.workspaceUrlKey || 'ruling';
+  // The task by its id and its title (LIN-3983 PR 2). The workspace key is never shown; the workspace's
+  // name is, and only when more than one workspace is showing.
+  const idLabel = anchor?.issueIdentifier || 'Question';
+  const workspaces = observationData?.workspaces || [];
+  const wsName = workspaces.find(w => w.urlKey === anchor?.workspaceUrlKey)?.name || anchor?.workspaceUrlKey;
   head.innerHTML = `<span class="obs-ruling-issue">${escapeHtml(String(idLabel))}</span>`
-    + (anchor?.workspaceUrlKey ? ` <span class="obs-ruling-ws">${escapeHtml(String(anchor.workspaceUrlKey))}</span>` : '');
+    + (anchor?.issueTitle ? ` <span class="obs-ruling-title">${escapeHtml(String(anchor.issueTitle))}</span>` : '')
+    + (workspaces.length > 1 && wsName ? ` <span class="obs-ruling-ws" data-testid="obs-ruling-ws">${escapeHtml(String(wsName))}</span>` : '');
   li.appendChild(head);
 
   if (decision?.question) {
@@ -2208,7 +2299,7 @@ function renderRulingRow(row) {
   if (decision?.if_unanswered && typeof decision.if_unanswered.summary === 'string') {
     const cost = document.createElement('p');
     cost.className = 'obs-ruling-cost';
-    cost.textContent = `If unanswered: ${decision.if_unanswered.summary}`;
+    cost.textContent = `If you don't answer: ${decision.if_unanswered.summary}`;
     li.appendChild(cost);
   }
 
@@ -2241,6 +2332,7 @@ function renderRulingRow(row) {
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.className = 'obs-ruling-select';
+      checkbox.dataset.testid = 'obs-ruling-select';
       // LIN-2706 §B.3's convention: the identifier lives in the sibling
       // `idLabel` span above, so an unlabeled checkbox announces nothing
       // useful to a screen reader.
@@ -2269,6 +2361,14 @@ function renderRulingRow(row) {
     const meta = document.createElement('p');
     meta.className = 'obs-ruling-suggestion-meta';
     meta.textContent = `— ${suggestion.suggestedBy}, ${relativeTime(suggestion.suggestedAt)}`;
+    // The exact local time and its zone, beside the relative one (LIN-3975's time rule).
+    const exact = exactTimeNode(suggestion.suggestedAt);
+    if (exact) {
+      const sep = document.createElement('span');
+      sep.textContent = ' · ';
+      meta.appendChild(sep);
+      meta.appendChild(exact);
+    }
     banner.appendChild(meta);
 
     li.appendChild(banner);
@@ -2349,6 +2449,7 @@ function renderRulingRow(row) {
   if (canReply) {
     const input = document.createElement('textarea');
     input.className = 'obs-ruling-answer-input chat-composer__input';
+    input.dataset.testid = 'obs-ruling-answer-input';
     input.rows = 2;
     input.placeholder = 'Answer in your own words…';
     input.setAttribute('aria-label', 'Free-text answer');
@@ -2360,7 +2461,8 @@ function renderRulingRow(row) {
     const sendBtn = document.createElement('button');
     sendBtn.type = 'button';
     sendBtn.className = 'action-btn obs-ruling-answer-send';
-    sendBtn.textContent = 'send';
+    sendBtn.setAttribute('data-testid', 'obs-ruling-answer');
+    sendBtn.textContent = 'Answer';
     sendBtn.addEventListener('click', () => {
       const text = input.value.trim();
       if (!text) { input.focus(); return; }
@@ -2381,6 +2483,14 @@ function renderRulingRow(row) {
   }
 
   li.appendChild(composer);
+  // What each action does, in words, before it is pressed (LIN-3983 PR 2). Shelve's return time is the
+  // panel's default, which the note states.
+  const note = document.createElement('p');
+  note.className = 'obs-ruling-actions-note';
+  note.textContent = canReply
+    ? 'Answer sends your reply. Dismiss: this wasn\'t worth asking. Shelve: hides it, and it comes back in 1 day.'
+    : 'Dismiss: this wasn\'t worth asking. Shelve: hides it, and it comes back in 1 day.';
+  li.appendChild(note);
 
   // LIN-2241 tier 1: has the content this ruling was raised FROM moved since?
   // Only a task-bound (scan-produced) ruling has a recorded basis to compare;
@@ -2415,6 +2525,7 @@ function renderRulingRow(row) {
 
   const feedback = document.createElement('p');
   feedback.className = 'obs-ruling-feedback';
+  feedback.dataset.testid = 'obs-ruling-feedback';
   li.appendChild(feedback);
 
   return li;
@@ -2424,7 +2535,8 @@ function makeDismissButton(row, li) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'action-btn obs-ruling-dismiss';
-  btn.textContent = 'dismiss';
+  btn.setAttribute('data-testid', 'obs-ruling-dismiss');
+  btn.textContent = 'Dismiss';
   btn.addEventListener('click', () => dismissRulingRow(row, li));
   return btn;
 }
@@ -2446,7 +2558,8 @@ function makeShelveButton(row, li) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'action-btn obs-ruling-shelve';
-  btn.textContent = 'shelve';
+  btn.setAttribute('data-testid', 'obs-ruling-shelve');
+  btn.textContent = 'Shelve';
   btn.addEventListener('click', () => toggleShelvePanel(row, li));
   return btn;
 }
@@ -2457,10 +2570,12 @@ function toggleShelvePanel(row, li) {
 
   const panel = document.createElement('div');
   panel.className = 'obs-ruling-shelve-panel';
+  panel.dataset.testid = 'obs-ruling-shelve-panel';
 
   const reasonInput = document.createElement('input');
   reasonInput.type = 'text';
   reasonInput.className = 'obs-ruling-shelve-reason';
+  reasonInput.dataset.testid = 'obs-ruling-shelve-reason';
   reasonInput.placeholder = 'Why are you shelving this?';
   reasonInput.setAttribute('aria-label', 'Shelve reason');
   panel.appendChild(reasonInput);
@@ -2471,7 +2586,7 @@ function toggleShelvePanel(row, li) {
   for (const [label, ms] of SHELVE_DURATIONS) {
     const opt = document.createElement('option');
     opt.value = String(ms);
-    opt.textContent = `re-surface in ${label}`;
+    opt.textContent = `comes back in ${label}`;
     durationSelect.appendChild(opt);
   }
   durationSelect.value = String(24 * 60 * 60 * 1000); // 1 day default
@@ -2480,7 +2595,8 @@ function toggleShelvePanel(row, li) {
   const confirmBtn = document.createElement('button');
   confirmBtn.type = 'button';
   confirmBtn.className = 'action-btn obs-ruling-shelve-confirm';
-  confirmBtn.textContent = 'confirm shelve';
+  confirmBtn.setAttribute('data-testid', 'obs-ruling-shelve-confirm');
+  confirmBtn.textContent = 'Shelve it';
   confirmBtn.addEventListener('click', () => {
     const reason = reasonInput.value.trim();
     if (!reason) { reasonInput.focus(); return; }
@@ -2889,6 +3005,7 @@ function makeAgreeButton(row, li) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'action-btn obs-ruling-agree';
+  btn.setAttribute('data-testid', 'obs-ruling-agree');
   const proposedOutcome = row?.suggestedDismissal?.proposedOutcome ?? 'dismissed';
   btn.textContent = proposedOutcome === 'answered' ? 'answer as proposed' : 'dismiss as proposed';
   btn.addEventListener('click', () => agreeRulingRow(row, li));
@@ -2899,6 +3016,7 @@ function makeKeepButton(row, li) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'action-btn obs-ruling-keep';
+  btn.setAttribute('data-testid', 'obs-ruling-keep');
   btn.textContent = 'keep open';
   btn.addEventListener('click', () => keepRulingRow(row, li));
   return btn;
@@ -3062,12 +3180,11 @@ function computeBulkAgreeBreakdown() {
   return breakdown;
 }
 
-// Native confirm() (LIN-511's ratified destructive-action primitive, in the
-// form LIN-2650 landed — RETIRE_CONFIRM_TEXT, public/scan.js) behind a named
-// function beside its one call site, naming every count from `breakdown`
-// (LIN-2792 — a mixed dismiss/answer selection makes the old single-count
-// "each is a real dismissal" text false) so the operator sees exactly what
-// they are about to discharge, and what will be skipped.
+// The bulk apply's question text (LIN-2792: a mixed dismiss/answer selection
+// needs every count named), shown by askBulkApply in the page (LIN-3983 PR 2,
+// John's decision on confirm: in the page, not a native confirm()). It names
+// what will be sent and what will be skipped, so the operator sees exactly
+// what they are about to discharge.
 function bulkAgreeConfirmText(breakdown) {
   const total = breakdown.dismiss + breakdown.answer + breakdown.refused + breakdown.dispatchSkipped;
   const parts = [];
@@ -3249,10 +3366,39 @@ function bulkAgreeRow(key, row, li) {
 // "stopped early" summary shape a Stop press does (this ticket's own Mixed-
 // outcomes section: to the operator the two are indistinguishable), without
 // needing a separate flag to track which of the two actually happened.
+// The bulk apply's own question, asked on the page (LIN-3983 PR 2): the count and what each answer does,
+// with Apply and Cancel beside it. Resolves true on Apply, false on Cancel. It is never a native dialog, so
+// it is in the page, where a person reads it before the batch starts.
+function askBulkApply(text, applyLabel) {
+  const panel = document.getElementById('obs-ruling-bulk-confirm');
+  const textEl = document.getElementById('obs-ruling-bulk-confirm-text');
+  const yes = document.getElementById('obs-ruling-bulk-confirm-yes');
+  const no = document.getElementById('obs-ruling-bulk-confirm-no');
+  if (!panel || !textEl || !yes || !no) return Promise.resolve(false);
+  textEl.textContent = text;
+  yes.textContent = applyLabel;
+  panel.hidden = false;
+  yes.focus();
+  return new Promise((resolve) => {
+    const finish = (ok) => {
+      panel.hidden = true;
+      yes.removeEventListener('click', onYes);
+      no.removeEventListener('click', onNo);
+      resolve(ok);
+    };
+    const onYes = () => finish(true);
+    const onNo = () => finish(false);
+    yes.addEventListener('click', onYes);
+    no.addEventListener('click', onNo);
+  });
+}
+
 async function bulkAgreeSelected() {
   const keys = Array.from(rulingsSelected);
   if (keys.length === 0) return;
-  if (!confirm(bulkAgreeConfirmText(computeBulkAgreeBreakdown()))) return;
+  const breakdown = computeBulkAgreeBreakdown();
+  const proposals = breakdown.dismiss + breakdown.answer + breakdown.refused + breakdown.dispatchSkipped;
+  if (!(await askBulkApply(bulkAgreeConfirmText(breakdown), `Apply ${proposals}`))) return;
 
   const total = keys.length;
   let ok = 0, skipped = 0, failed = 0, i = 0, completed = false;
@@ -3486,6 +3632,7 @@ function deliverRulingReply(row, prompt, li, optionId, { bulkAgree = false } = {
       const retryBtn = document.createElement('button');
       retryBtn.type = 'button';
       retryBtn.className = 'obs-ruling-retry-delivery';
+      retryBtn.dataset.testid = 'obs-ruling-retry-delivery';
       retryBtn.textContent = 'Retry delivery';
       retryBtn.addEventListener('click', () => {
         retryBtn.disabled = true;
@@ -3706,7 +3853,7 @@ function dueStatusCopy(item) {
       ? { cls: 'obs-due-yes', text: 'due — scanned content has changed' }
       : { cls: 'obs-due-no', text: 'not due — no change since last scan' };
   }
-  return { cls: 'obs-due-unknown', text: 'basis not comparable yet — scan to establish a current baseline' };
+  return { cls: 'obs-due-unknown', text: 'not checked yet — scan it once to set its baseline' };
 }
 
 // Pure string renderer (like renderActivityLog/renderArtifacts above) so the
@@ -3738,8 +3885,8 @@ function renderDueRowHtml(item) {
   // data-issue-id="..." checked` sequence the selection tests match stays
   // contiguous.
   const checkedAttr = dueSelectedIds.has(String(item.issueId)) ? ' checked' : '';
-  return `<li class="obs-due-row ${status.cls}" data-issue-id="${escapeHtml(String(item.issueId))}">`
-    + `<input type="checkbox" aria-label="select ${escapeHtml(String(idLabel))}" class="obs-due-select" data-issue-id="${escapeHtml(String(item.issueId))}"${checkedAttr}>`
+  return `<li class="obs-due-row ${status.cls}" data-issue-id="${escapeHtml(String(item.issueId))}" data-testid="obs-due-row">`
+    + `<input type="checkbox" aria-label="select ${escapeHtml(String(idLabel))}" class="obs-due-select" data-issue-id="${escapeHtml(String(item.issueId))}"${checkedAttr} data-testid="obs-due-select">`
     + `<span class="obs-due-issue">${escapeHtml(String(idLabel))}</span>`
     + `<span class="obs-due-badge">checked &middot; provider read</span>`
     + `<span class="obs-due-status">${escapeHtml(status.text)}</span>`
@@ -4461,16 +4608,18 @@ function syncViewChrome() {
   writeViewToUrl();
 }
 
-// The URL carries the view and filter (LIN-3983), so a reload or a shared link
-// reopens the same place. Defaults are omitted: runs with the autopilot filter is
+// The URL carries the view, filter and workspace scope (LIN-3983), so a reload or a shared link
+// reopens the same place. Defaults are omitted: runs with the autopilot filter on This workspace is
 // a bare URL. replaceState, so the back button does not walk through every tab.
 function writeViewToUrl() {
   try {
     const url = new URL(window.location.href);
     url.searchParams.delete('view');
     url.searchParams.delete('filter');
+    url.searchParams.delete('scope');
     if (currentView !== 'runs') url.searchParams.set('view', currentView);
     else if (currentFilter !== 'autopilot') url.searchParams.set('filter', currentFilter);
+    if (workspaceScope === 'all') url.searchParams.set('scope', 'all');
     window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
   } catch {
     // The URL is a convenience: the page works the same without it.
@@ -4624,6 +4773,16 @@ function initControls() {
   const rulingBulkStop = document.getElementById('obs-ruling-bulk-stop');
   if (rulingBulkStop) rulingBulkStop.addEventListener('click', () => { rulingsBulkStopRequested = true; });
 
+  const scope = document.getElementById('obs-scope');
+  if (scope) {
+    scope.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-scope]');
+      if (!btn) return;
+      applyWorkspaceScope(btn.dataset.scope);
+      writeViewToUrl();
+    });
+  }
+
   const chips = document.getElementById('obs-chips');
   if (chips) {
     chips.addEventListener('click', (e) => {
@@ -4657,10 +4816,12 @@ function init() {
   observationData = window.__OBSERVATION_DATA__;
   if (!observationData) { console.warn('Observation: no initial data'); return; }
   initControls();
-  // The URL opens the page where it was left (LIN-3983): the view and filter,
+  // The URL opens the page where it was left (LIN-3983): the scope, the view and filter,
   // including the rulings deep link from the navbar badge (`?view=rulings`,
   // LIN-1728 review F6). Legacy values are rewritten to the current names.
-  const opened = viewFromParams(new URLSearchParams(window.location.search));
+  const params = new URLSearchParams(window.location.search);
+  applyWorkspaceScope(scopeFromParams(params));
+  const opened = viewFromParams(params);
   currentView = opened.view;
   currentFilter = opened.filter;
   syncViewChrome();
@@ -4699,7 +4860,7 @@ if (typeof module !== 'undefined' && module.exports) {
     // LIN-2184 (H5, beat 4): expose the feed card's decision-excerpt seam
     // (and its budget constant) so the truncation acceptance test asserts
     // against the constant, not a hard-coded copy of its value.
-    renderSummaryLine, excerptDecisionCase, renderWaitingDecisionSummary, DECISION_EXCERPT_CHARS,
+    renderSummaryLine, excerptDecisionCase, DECISION_EXCERPT_CHARS,
     // LIN-2195: the option run's budget seam.
     boundDecisionOptions, DECISION_OPTIONS_CHARS,
     // LIN-2934 (L3): expose the session-head renderer itself, so the
@@ -4783,8 +4944,9 @@ if (typeof module !== 'undefined' && module.exports) {
     requestBasisCheck, applyBasisResult, basisCheckCache, basisCheckStarted, BASIS_CHECK_MAX_PER_PAGE,
     // LIN-3983: the waiting block's pure rule, the view/filter URL contract, and
     // the poll/switch seams the view model is unit-tested through.
-    compactWaitSessions, stripFeedbackMarkers, viewFromParams, renderWaitingBlock,
+    compactWaitSessions, stripFeedbackMarkers, viewFromParams, scopeFromParams, renderWaitingBlock,
     pollCurrentView, pollRulings, pollWaitingSupplement, switchView, setFilter, sessionsUrl, feedKey, rulingsUrl,
+    repaintWaitingCardHeads,
     openLoopIds: () => openLoopIds, setOpenLoopIds: (v) => { openLoopIds = v; },
     lastRulingsRef: () => lastRulings, standaloneWaitSupplement, sessionIndex,
     // LIN-2649 S4 / LIN-2667: the scan-due tab seam — tri-state copy/rendering,

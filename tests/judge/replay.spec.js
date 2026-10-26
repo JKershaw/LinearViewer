@@ -20,6 +20,7 @@ import { homeSeed, hasHomeSessions, seedHomeSessions, HOME_WRITE_SSE } from './h
 import { LIVE_CONSOLE_STATES, seedLiveConsole } from './live-console-states.mjs';
 import { taskSeed, seedTaskState, mintGuestPath } from './task-states.mjs';
 import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
+import { OBSERVATION_STATES, seedObservation } from './observation-states.mjs';
 
 const BASE_URL = process.env.JUDGE_BASE_URL;
 const HEAD_URL = process.env.JUDGE_HEAD_URL;
@@ -123,6 +124,7 @@ async function prepare(page, context, entry, viewport, theme, side, baseURL) {
   if (isOpenedTaskState(entry.state)) return prepareHome(page, context, entry, baseURL);
   if (isTaskState(entry.state)) return prepareTask(page, context, entry, baseURL);
   if (LIVE_CONSOLE_STATES.has(entry.state)) await seedLiveConsole(context.request, baseURL, entry.urlKey, entry.state);
+  if (OBSERVATION_STATES.has(entry.state)) await seedObservation(context.request, baseURL, entry.urlKey, entry.state);
   if (entry.state === 'email-signin') {
     // One address per shot, the same on both sides: the send throttle is per address (3 per 15 minutes),
     // and the judge takes at most ATTEMPTS (3) tries per shot. The link is read from the capture outbox.
@@ -242,7 +244,7 @@ async function shoot(browser, baseURL, viewport, theme, entry, side) {
       : entry.seed;
   const baseFor = openedTask ? homeSeed(entry.urlKey) : taskState ? taskSeed(entry.urlKey, { ready: entry.state === 'task-ready' }) : null;
   const context = await openContext(browser, baseURL, viewport, theme, entry.state === 'email-signin' ? null : entry.urlKey,
-    seedFor, baseFor, LIVE_CONSOLE_STATES.has(entry.state));
+    seedFor, baseFor, LIVE_CONSOLE_STATES.has(entry.state) || OBSERVATION_STATES.has(entry.state));
   try {
     const page = await context.newPage();
     await prepare(page, context, entry, viewport, theme, side, baseURL);

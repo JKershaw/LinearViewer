@@ -454,7 +454,7 @@ Three things to expect when reading the judge's output:
 
 The signed-out landing (`lib/render-landing.js`, `lib/components/landing-hero.js`) reuses shared pieces, so a later change to one of them reaches the landing:
 
-- **Status pill** (`renderStatusPill`): the Observation and Swim glimpses.
+- **Status pill** (`renderStatusPill`): the Observation and Swim glimpses. The run-status pill's ⚠ marker (`warn`) is shared by the server helper and its client replica (LIN-3983 PR 2).
 - **Stage words and model names**: stage words come from `STAGE_LABELS` (`lib/run-view.js`); model family names stay typed locally until LIN-3952 owns one display name, so the landing no longer uses `getModelDisplayName`. The glimpses show family names, never raw ids or versions.
 - **Head metadata** (`lib/components/head-meta.js`): description, canonical and social-preview tags, shared with the Library.
 - **Dark mode**: the pre-paint script in `lib/components/page.js`, opted in with `followSystemTheme`.
@@ -471,3 +471,17 @@ Not moved, with the reason: the Library list's item titles (`.lx-library__link`)
 - **Consumers.** Observation (`runs | rulings | due`). The task-edit tabs (`.task-edit-tab`, `lib/render-task-edit.js`) are the next consumer to move; they keep their own rules until then, so this decision has two copies to consolidate, not one.
 - **What a tab says.** Each tab names what it holds. The line under the strip states the active tab's contents, including the 24-hour window for the runs feed.
 - **Not decided here:** the tab keys are part of each page's own URL contract (`?view=`), so a key is never renamed without keeping its old value working.
+
+## Observation words (LIN-3983 PR 2): one state, said once, in the task page's words
+
+**Decides:** what a card or a row says about a run's state, and where the shared pieces that say it come from. **Owners:** `SESSION_PILL` (`public/observation.js`) for the pill words; `stageLabel` (`lib/run-view.js`) for the stage word, read on the server into `stageWord`; `window.renderStatusPill` and `window.renderSegmentBar` (`public/common.js`) for the pill and the bar.
+
+- **The pill words are the task page's own**, not a parallel set: `running`, `waiting`, `done`, `failed`, `idle` (`lib/render-task-page.js` `STATUS_PILL`). A card whose pill says `waiting` does not say "waiting on you" again. `done-with-warning` is `done` with the ⚠ marker.
+- **The summary line never repeats the pill's word.** A running card says the stage and how long it has run ("Implementation, 12 min in"). A waiting card's sentence is the question the run asked, with its runner marker (`[blocked]`, `[done]`, `[working]`) taken out at display time and the stored text untouched. A failed card says the stage and when it was last active. No card reads as a bracketed option list.
+- **Answer choices show only while the question is open.** The choices come from the rulings response's `openLoopIds`, so a question that was dismissed, answered or withdrawn is never offered as something to pick.
+- **The progress count is in words** ("2 of 3 runs finished"), beside the bar. The feed carries no stages, so one cell is one run.
+- **One pill and one bar, each with a client replica pinned to its server helper.** `renderStatusPill` (`lib/components/status-pill.js`, with `warn`) and `renderSegmentBar` (`lib/components/segment-bar.js`, with `live`) are copied into `public/common.js`, because `public/` has no ES modules. `tests/unit/segment-bar-pill-parity.test.js` compares the two over a table of inputs, so a change made to one and not the other fails.
+- **Times are relative words with the exact local time and zone visible** (LIN-3975's time rule), for example `updated 3m ago · 14:02 BST`, as a `<time data-local-time="zoned">` the page formats. A `title` tooltip alone does not count.
+- **Bulk apply asks in the page**, never through `confirm()`: a question with the count and what each answer does, and Apply and Cancel beside it (`#obs-ruling-bulk-confirm`). This is the confirm decision above, applied to Observation.
+- **Workspace scope.** The feed opens on this workspace, as Live Console does. "All workspaces" widens it, and the chips filter inside it. The waiting block ignores the scope, so a question waiting in another workspace is still on it.
+- **Not decided here:** the goal of an untitled run is not in the feed payload, so such a card reads "Untitled run" with its start time. Carrying the goal in the payload is a separate change.

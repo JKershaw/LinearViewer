@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 
 // LIN-2706 review (PR #1424) — the browser-level witness the ticket's plan
 // called for and delivery skipped. Both blocking findings were invisible to
@@ -35,7 +36,7 @@ async function openDueTab(page) {
   await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
   await page.goto(OBSERVATION_URL);
   await page.waitForLoadState('networkidle');
-  await page.click('[data-testid="obs-tab-due"]');
+  await page.click(SELECTORS.observation.tab('due'));
 }
 
 test.describe('Scan-due bulk-scan bar — real render + real stylesheet (LIN-2706 review, PR #1424)', () => {
@@ -44,9 +45,9 @@ test.describe('Scan-due bulk-scan bar — real render + real stylesheet (LIN-270
       json: { items: [], nextCursor: null, pageCandidateCount: 0, totalCandidateCount: 0 },
     }));
     await openDueTab(page);
-    await expect(page.locator('#obs-due-empty')).toBeVisible();
+    await expect(page.locator(SELECTORS.observation.due.empty)).toBeVisible();
 
-    const bar = page.locator('#obs-due-bulk-bar');
+    const bar = page.locator(SELECTORS.observation.due.bulkBar);
     await expect(bar).toHaveJSProperty('hidden', true);
     // The defect: `hidden:true` alone does not prove nothing is painted — the
     // author-origin `.obs-bulk-scan-bar { display: flex }` rule can beat the
@@ -58,8 +59,8 @@ test.describe('Scan-due bulk-scan bar — real render + real stylesheet (LIN-270
     // No interactive control anywhere in the due section while it's empty —
     // the Session 1 constraint (no scan-triggering, no visible-but-inert
     // control) holds structurally, not just for the bar itself.
-    const dueSection = page.locator('#obs-due-section');
-    await expect(dueSection.locator('#obs-due-select-all')).toBeHidden();
+    const dueSection = page.locator(SELECTORS.observation.due.section);
+    await expect(dueSection.locator(SELECTORS.observation.due.selectAll)).toBeHidden();
   });
 
   test('selecting rows shows the bar, and the disclaimer correctly points at the estimate below it', async ({ page }) => {
@@ -76,9 +77,9 @@ test.describe('Scan-due bulk-scan bar — real render + real stylesheet (LIN-270
       },
     }));
     await openDueTab(page);
-    await expect(page.locator('#obs-due-list .obs-due-select').first()).toBeVisible();
+    await expect(page.locator(SELECTORS.observation.due.select).first()).toBeVisible();
 
-    const bar = page.locator('#obs-due-bulk-bar');
+    const bar = page.locator(SELECTORS.observation.due.bulkBar);
     // The bar appears as soon as ROWS load, independent of selection
     // (`syncDueBulkBar` keys its `hidden` off `dueLoadedItems.length`, not the
     // selection) — a freshly painted list already reads `0 selected (exact) ·
@@ -89,13 +90,13 @@ test.describe('Scan-due bulk-scan bar — real render + real stylesheet (LIN-270
     // comment here claimed the opposite and was the same species of defect as
     // finding 2 — prose that misdescribes what renders.)
     await expect(bar).toBeVisible();
-    await expect(page.locator('#obs-due-selected-count')).toHaveText('0 selected (exact)');
-    await page.locator('#obs-due-select-all').check();
+    await expect(page.locator(SELECTORS.observation.due.selectedCount)).toHaveText('0 selected (exact)');
+    await page.locator(SELECTORS.observation.due.selectAll).check();
     await expect(bar).toBeVisible();
     await expect(bar).toHaveCSS('display', 'flex');
     // LIN-2760: the not-due row (issue-2, dueStatus: false) is skipped by
     // select-all, so the count reflects the two due rows only.
-    await expect(page.locator('#obs-due-selected-count')).toHaveText('2 selected (exact)');
+    await expect(page.locator(SELECTORS.observation.due.selectedCount)).toHaveText('2 selected (exact)');
 
     // Review finding 3 / N2 (LIN-2706 PR #1424) — the STYLING witness. The
     // fix for finding 3 (the count/estimate/refusal/quota-note rendering as
@@ -110,11 +111,11 @@ test.describe('Scan-due bulk-scan bar — real render + real stylesheet (LIN-270
     // rather than a colour because it is theme-independent: an unstyled span
     // inherits the body's own 16px, so the assertion fails the moment the
     // rule is gone, in either colour scheme.
-    await expect(page.locator('#obs-due-selected-count')).toHaveCSS('font-size', '12.48px');
-    await expect(page.locator('#obs-due-selected-cost')).toHaveCSS('font-size', '12.48px');
+    await expect(page.locator(SELECTORS.observation.due.selectedCount)).toHaveCSS('font-size', '12.48px');
+    await expect(page.locator(SELECTORS.observation.due.selectedCost)).toHaveCSS('font-size', '12.48px');
 
     // Finding 2: the disclaimer must name the estimate's real position.
-    const disclaimer = page.locator('#obs-due-bulk-disclaimer');
+    const disclaimer = page.locator(SELECTORS.observation.due.disclaimer);
     await expect(disclaimer).toContainText(/estimate below/i);
     await expect(disclaimer).not.toContainText(/estimate above/i);
 
@@ -129,9 +130,9 @@ test.describe('Scan-due bulk-scan bar — real render + real stylesheet (LIN-270
 
     // The bar stays visible once rows are loaded (it hides only on an empty
     // list, per the previous test) — but the tri-state degrades cleanly.
-    await page.locator('#obs-due-select-all').uncheck();
+    await page.locator(SELECTORS.observation.due.selectAll).uncheck();
     await expect(bar).toBeVisible();
-    await expect(page.locator('#obs-due-selected-count')).toHaveText('0 selected (exact)');
+    await expect(page.locator(SELECTORS.observation.due.selectedCount)).toHaveText('0 selected (exact)');
   });
 
   test('an over-ceiling selection refuses and leaves every row checked, and clicking Scan anyway never issues a single scan call', async ({ page }) => {
@@ -144,10 +145,10 @@ test.describe('Scan-due bulk-scan bar — real render + real stylesheet (LIN-270
       json: { items, nextCursor: null, pageCandidateCount: items.length, totalCandidateCount: items.length },
     }));
     await openDueTab(page);
-    await expect(page.locator('#obs-due-list .obs-due-select')).toHaveCount(45);
+    await expect(page.locator(SELECTORS.observation.due.select)).toHaveCount(45);
 
-    await page.locator('#obs-due-select-all').check();
-    const refusal = page.locator('#obs-due-bulk-refusal');
+    await page.locator(SELECTORS.observation.due.selectAll).check();
+    const refusal = page.locator(SELECTORS.observation.due.refusal);
     await expect(refusal).toBeVisible();
     await expect(refusal).toContainText('scan 40 at a time');
     // The refusal's own share of the finding-3 styling fix (see the note in
@@ -161,7 +162,7 @@ test.describe('Scan-due bulk-scan bar — real render + real stylesheet (LIN-270
     // regressed at all.
     await expect(refusal).not.toHaveCSS('max-width', 'none');
 
-    const checkedCount = await page.locator('#obs-due-list .obs-due-select:checked').count();
+    const checkedCount = await page.locator(`${SELECTORS.observation.due.select}:checked`).count();
     expect(checkedCount, 'a refusal must never truncate the selection').toBe(45);
 
     // LIN-2701 §B.7 adds the "Scan selected (N)"/Stop controls this session
@@ -179,12 +180,12 @@ test.describe('Scan-due bulk-scan bar — real render + real stylesheet (LIN-270
       scanCalls++;
       route.fulfill({ json: {} });
     });
-    const scanBtn = page.locator('#obs-due-scan-selected');
+    const scanBtn = page.locator(SELECTORS.observation.due.scanSelected);
     await expect(scanBtn).toBeEnabled();
     await scanBtn.click();
     await expect(refusal).toContainText('scan 40 at a time');
     expect(scanCalls, 'an over-ceiling click must never issue a single scan call').toBe(0);
-    await expect(page.locator('#obs-due-stop')).toBeHidden();
+    await expect(page.locator(SELECTORS.observation.due.stop)).toBeHidden();
   });
 
   // The fourth element the finding-3 styling fix covers, and the one the
@@ -207,9 +208,9 @@ test.describe('Scan-due bulk-scan bar — real render + real stylesheet (LIN-270
     await page.goto(`/test/set-session?urlKey=${URL_KEY}&freeTierEnabled=true`);
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    await page.click('[data-testid="obs-tab-due"]');
+    await page.click(SELECTORS.observation.tab('due'));
 
-    const quotaNote = page.locator('#obs-due-bulk-quota-note');
+    const quotaNote = page.locator(SELECTORS.observation.due.quotaNote);
     await expect(quotaNote).toBeVisible();
     await expect(quotaNote).toContainText('free tier');
     await expect(quotaNote).toHaveCSS('font-size', '12.48px');
@@ -218,14 +219,14 @@ test.describe('Scan-due bulk-scan bar — real render + real stylesheet (LIN-270
     // Two budget gates, disclosed as two separate paragraphs (§B.9) — the
     // quota note must not have been folded into the dollar-estimate
     // disclaimer, and both must stay small print beside each other.
-    await expect(page.locator('#obs-due-bulk-disclaimer')).toHaveCSS('font-size', '12.48px');
-    await expect(page.locator('#obs-due-bulk-quota-note')).not.toHaveText(
-      await page.locator('#obs-due-bulk-disclaimer').innerText()
+    await expect(page.locator(SELECTORS.observation.due.disclaimer)).toHaveCSS('font-size', '12.48px');
+    await expect(page.locator(SELECTORS.observation.due.quotaNote)).not.toHaveText(
+      await page.locator(SELECTORS.observation.due.disclaimer).innerText()
     );
 
     // LIN-2701 §B.7: the control now exists on both tiers — it is not
     // itself free-tier-gated; only the quota disclosure above is.
-    await expect(page.locator('#obs-due-scan-selected')).toBeVisible();
+    await expect(page.locator(SELECTORS.observation.due.scanSelected)).toBeVisible();
   });
 
   // LIN-2760 (John's ruling on LIN-2241 F3): select-all covers due + unknown
@@ -249,14 +250,14 @@ test.describe('Scan-due bulk-scan bar — real render + real stylesheet (LIN-270
       },
     }));
     await openDueTab(page);
-    await expect(page.locator('#obs-due-list .obs-due-select')).toHaveCount(4);
+    await expect(page.locator(SELECTORS.observation.due.select)).toHaveCount(4);
 
     // LIN-2757: the control names its outcome — the label (and so the
     // checkbox's accessible name) says what it selects.
     await expect(page.getByRole('checkbox', { name: 'select all due + unknown' })).toBeVisible();
 
-    await page.locator('#obs-due-select-all').check();
-    await expect(page.locator('#obs-due-selected-count')).toHaveText('2 selected (exact)');
+    await page.locator(SELECTORS.observation.due.selectAll).check();
+    await expect(page.locator(SELECTORS.observation.due.selectedCount)).toHaveText('2 selected (exact)');
     await expect(page.getByRole('checkbox', { name: 'select LIN-1' })).toBeChecked();
     await expect(page.getByRole('checkbox', { name: 'select LIN-2' })).toBeChecked();
     await expect(page.getByRole('checkbox', { name: 'select LIN-3' })).not.toBeChecked();
@@ -265,7 +266,7 @@ test.describe('Scan-due bulk-scan bar — real render + real stylesheet (LIN-270
     // A hand-pick still works: the per-row checkbox stays free, so an
     // operator can still select a not-due row by hand.
     await page.getByRole('checkbox', { name: 'select LIN-3' }).check();
-    await expect(page.locator('#obs-due-selected-count')).toHaveText('3 selected (exact)');
+    await expect(page.locator(SELECTORS.observation.due.selectedCount)).toHaveText('3 selected (exact)');
     await expect(page.getByRole('checkbox', { name: 'select LIN-3' })).toBeChecked();
   });
 
@@ -289,28 +290,28 @@ test.describe('Scan-due bulk-scan bar — real render + real stylesheet (LIN-270
       },
     }));
     await openDueTab(page);
-    await expect(page.locator('#obs-due-list .obs-due-select')).toHaveCount(2);
+    await expect(page.locator(SELECTORS.observation.due.select)).toHaveCount(2);
 
     // Hand-pick both skipped rows — the only way to select anything here,
     // since select-all itself covers nothing on this page.
     await page.getByRole('checkbox', { name: 'select LIN-1' }).check();
-    await expect(page.locator('#obs-due-selected-count')).toHaveText('1 selected (exact)');
+    await expect(page.locator(SELECTORS.observation.due.selectedCount)).toHaveText('1 selected (exact)');
     // One of two loaded rows selected: the fallback reads "some" —
     // indeterminate, a state the coverable keying cannot show when the
     // coverable population is empty.
-    await expect(page.locator('#obs-due-select-all')).toHaveJSProperty('indeterminate', true);
+    await expect(page.locator(SELECTORS.observation.due.selectAll)).toHaveJSProperty('indeterminate', true);
     await page.getByRole('checkbox', { name: 'select LIN-2' }).check();
-    await expect(page.locator('#obs-due-selected-count')).toHaveText('2 selected (exact)');
+    await expect(page.locator(SELECTORS.observation.due.selectedCount)).toHaveText('2 selected (exact)');
 
     // Every loaded row hand-picked: the fallback reads checked, so the
     // operator's next click on the control is the UNCHECK branch.
-    await expect(page.locator('#obs-due-select-all')).toBeChecked();
+    await expect(page.locator(SELECTORS.observation.due.selectAll)).toBeChecked();
 
     // The escape hatch itself: unchecking clears the hand-picked selection
     // (Playwright's uncheck clicks the checked box and asserts it ends
     // unchecked — exactly the click the pre-fallback code could not offer).
-    await page.locator('#obs-due-select-all').uncheck();
-    await expect(page.locator('#obs-due-selected-count')).toHaveText('0 selected (exact)');
+    await page.locator(SELECTORS.observation.due.selectAll).uncheck();
+    await expect(page.locator(SELECTORS.observation.due.selectedCount)).toHaveText('0 selected (exact)');
     await expect(page.getByRole('checkbox', { name: 'select LIN-1' })).not.toBeChecked();
     await expect(page.getByRole('checkbox', { name: 'select LIN-2' })).not.toBeChecked();
   });
@@ -331,14 +332,14 @@ test.describe('Scan-due bulk-scan bar — real render + real stylesheet (LIN-270
       },
     }));
     await openDueTab(page);
-    await expect(page.locator('#obs-due-list .obs-due-select')).toHaveCount(2);
+    await expect(page.locator(SELECTORS.observation.due.select)).toHaveCount(2);
 
     await expect(page.getByRole('checkbox', { name: 'select LIN-1' })).toBeVisible();
     await expect(page.getByRole('checkbox', { name: 'select LIN-2' })).toBeVisible();
 
     // The name survives a repaint (select-all re-renders every row from
     // dueLoadedItems), so it is a property of the renderer, not of first paint.
-    await page.locator('#obs-due-select-all').check();
+    await page.locator(SELECTORS.observation.due.selectAll).check();
     await expect(page.getByRole('checkbox', { name: 'select LIN-1' })).toBeChecked();
   });
 });

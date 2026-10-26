@@ -272,7 +272,7 @@ const STATUS_PILL_GLYPHS = {
  * @global
  * @returns {string} Status pill HTML.
  */
-window.renderStatusPill = function renderStatusPill({ state, label, char, dot, variant, className, attrs } = {}) {
+window.renderStatusPill = function renderStatusPill({ state, label, char, dot, variant, className, attrs, warn } = {}) {
   const has = (v) => v != null && v !== '';
   const glyph = has(char) ? char : (state ? STATUS_PILL_GLYPHS[state] : undefined);
   if (!dot && !has(glyph) && !has(label)) {
@@ -288,7 +288,39 @@ window.renderStatusPill = function renderStatusPill({ state, label, char, dot, v
     ? '<span class="status-pill__dot" aria-hidden="true"></span>'
     : (has(glyph) ? `<span class="status-pill__char">${window.escapeHtml(glyph)}</span>` : '');
   const labelHtml = has(label) ? `<span class="status-pill__label">${window.escapeHtml(label)}</span>` : '';
-  return `<span class="${classes.join(' ')}"${attrStr}>${markerHtml}${labelHtml}</span>`;
+  // LIN-3983 PR 2: the ⚠ marker a done-with-warning run carries (lib/components/status-pill.js `warn`).
+  const warnHtml = warn ? '<span class="status-pill__warn" title="a run errored" aria-label="warning">⚠</span>' : '';
+  return `<span class="${classes.join(' ')}"${attrStr}>${markerHtml}${labelHtml}${warnHtml}</span>`;
+};
+
+/**
+ * Client replica of lib/components/segment-bar.js `renderSegmentBar` (LIN-3983 PR 2), the equal-cell track
+ * the Observation progress bar paints. Same segments, same markup; `live` on a cell pulses it. A vm parity
+ * test (tests/unit/segment-bar-pill-parity.test.js) pins it to the server helper.
+ * @global
+ * @returns {string} Segment-bar HTML.
+ */
+window.renderSegmentBar = function renderSegmentBar({ segments, ariaLabel, className, attrs } = {}) {
+  if (!Array.isArray(segments) || segments.length === 0) {
+    throw new Error('renderSegmentBar requires a non-empty `segments` array.');
+  }
+  const has = (v) => v != null && v !== '';
+  const classes = ['segment-bar'];
+  if (className) classes.push(className);
+  const labelAttr = has(ariaLabel) ? ` role="img" aria-label="${window.escapeHtml(ariaLabel)}"` : ' role="group"';
+  const attrStr = attrs ? ` ${attrs}` : '';
+  const cells = segments.map((seg) => {
+    const cell = seg || {};
+    const state = has(cell.state) ? cell.state : 'empty';
+    const cellClasses = ['segment-bar__cell', `segment-bar__cell--${state}`];
+    const title = has(cell.title) ? cell.title : state;
+    const live = cell.live ? ' data-live="1"' : '';
+    const inner = has(cell.label)
+      ? window.escapeHtml(String(cell.label))
+      : (has(cell.count) ? `<span class="segment-bar__count">${window.escapeHtml(String(cell.count))}</span>` : '');
+    return `<span class="${cellClasses.join(' ')}"${live} title="${window.escapeHtml(title)}">${inner}</span>`;
+  }).join('');
+  return `<span class="${classes.join(' ')}"${labelAttr}${attrStr}>${cells}</span>`;
 };
 
 /**

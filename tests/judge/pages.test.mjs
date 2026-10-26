@@ -10,7 +10,7 @@ test('the page list holds the pages and states the ticket asks for (LIN-3889 add
   for (const id of ['home', 'task', 'dispatch', 'proxy', 'audit', 'settings-index', 'styleguide', 'privacy', 'terms', ...AREAS.map((a) => `settings-${a}`)]) assert.ok(ids.includes(id), id);
   // LIN-3987: the list follows every state the page list carries (home-copy-*, home-failed, home-running and home-stages-done
   // were added by LIN-3968 without this pin, which was already stale on main).
-  assert.deepEqual(PAGES.filter((p) => p.state).map((p) => p.state).sort(), ['ask-open', 'audit-report', 'change-log-entry', 'email-signin', 'home-copy-first', 'home-copy-written', 'home-failed', 'home-failed-first', 'home-run-panel-open', 'home-run-panel-opencode', 'home-run-panel-pick', 'home-running', 'home-stages-done', 'key-open', 'live-history', 'live-working', 'models-panel-open', 'models-staged', 'paused', 'swipe-dispatch-open']);
+  assert.deepEqual(PAGES.filter((p) => p.state).map((p) => p.state).sort(), ['ask-open', 'audit-report', 'change-log-entry', 'email-signin', 'home-copy-first', 'home-copy-written', 'home-failed', 'home-failed-first', 'home-run-panel-open', 'home-run-panel-opencode', 'home-run-panel-pick', 'home-running', 'home-stages-done', 'key-open', 'live-history', 'live-working', 'models-panel-open', 'models-staged', 'obs-two-runs', 'obs-two-runs', 'obs-two-runs', 'paused', 'swipe-dispatch-open']);
   for (const id of ['account-home', 'workspace-not-found']) assert.ok(ids.includes(id), id);
   assert.equal(AREAS.length, 8);
 });
