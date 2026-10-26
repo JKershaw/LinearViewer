@@ -185,6 +185,7 @@
       "question question"
       "stages context"
       "pr context"
+      "quiet quiet"
       "docs docs"
       "details details"
       "share share";
@@ -201,8 +202,23 @@
   .sess-page.task-page > .task-stages { grid-area: stages; }
   .sess-page.task-page > .task-pr-section { grid-area: pr; }
   .sess-page.task-page > .task-context-section { grid-area: context; }
-  /* Neither brief nor recap yet: the quiet line takes no column; it flows under the stages (LIN-3975). */
-  .sess-page.task-page > .task-context-section--quiet { grid-area: auto; }
+  /* Neither brief nor recap yet: the quiet line is a named row after the PR, and the page gives the stages the full width
+     (`task-page--quiet-context`), so no empty column sits beside them (LIN-3975, finding 1). */
+  .sess-page.task-page > .task-context-section--quiet { grid-area: quiet; }
+  .sess-page.task-page.task-page--quiet-context {
+    grid-template-areas:
+      "back back"
+      "header header"
+      "answer answer"
+      "run run"
+      "question question"
+      "stages stages"
+      "pr pr"
+      "quiet quiet"
+      "docs docs"
+      "details details"
+      "share share";
+  }
   .sess-page.task-page > .task-docs { grid-area: docs; }
   .sess-page.task-page > .task-details { grid-area: details; }
   .sess-page.task-page > .task-share { grid-area: share; }
@@ -214,3 +230,8 @@
 .task-stage-ahead .task-stage-name { color: var(--fg); }
 /* LIN-3975: an attempt's link to its run page, and the line that says it cannot be opened. */
 .task-stage-run { margin-left: var(--space-2); font-size: 0.85rem; white-space: nowrap; }
+
+/* LIN-3975 (finding 1): with neither brief nor recap, one quiet line offers to write each, in place of two dashed boxes. */
+.task-context-offers, .task-context-none { margin: 0; font-size: 0.9rem; color: var(--muted); }
+.task-context-offer + .task-context-offer::before { content: "· "; }
+.task-context-section--quiet .sess-ctx-panel { margin-top: var(--space-2); }

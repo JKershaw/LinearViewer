@@ -147,6 +147,8 @@ const LOOKUP_ALLOW = {
   'task-page.js:[data-testid="task-page-run-control"]': 'captured: init (LIN-3975), before enhanceContextMarkdown/enhanceMarkdown; the owner-only run control root, whose options are read from its data-run-opts',
   'task-page.js:[data-testid="task-page-track-mount"]': 'init, before markdown; repaint target only',
   'task-page.js:[data-testid="task-page-context-mount"]': 'init, before markdown; repaint target only',
+  'task-page.js:[data-testid="task-page-context-offers"]': 'captured: init (LIN-3975, finding 1), before markdown; the owner quiet line\'s offers, whose press writes one of the two',
+  'task-page.js:[data-testid="task-page-context-quiet"]': 'captured: init (LIN-3975, finding 1), before markdown; the quiet section a pressed offer mounts its widget into',
   'flight-companion.js:.flight-companion-page': 'top-level capture, before any restored markdown',
   'flight-companion.js:flight-companion-prompt': 'top-level capture (copy control)',
   'flight-companion.js:flight-companion-copy': 'top-level capture (copy control)',

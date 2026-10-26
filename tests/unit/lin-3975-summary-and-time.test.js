@@ -229,19 +229,26 @@ describe('LIN-3975 — the description shows without a fold, and the empty brief
     assert.match(html, /task-md--cut/);
   });
 
-  test('neither brief nor recap: one quiet section with no heading and no column, the same text for every viewer', () => {
+  test('neither brief nor recap: one quiet section with no heading and no placeholder boxes; the owner gets the two offers', () => {
     const owner = renderTaskPage(model(), { viewer: 'owner', urlKey: 'acme', binding: { source: 'linear' }, now: NOW, pageOptions: {}, promptOpts: PROMPT_OPTS });
     assert.match(owner, /data-testid="task-page-context-quiet"/);
-    assert.match(owner, /○ no brief yet/);
-    assert.match(owner, /○ no recap yet/);
+    assert.match(owner, /data-testid="task-page-write-brief"[^>]*>Write a brief</);
+    assert.match(owner, /data-testid="task-page-write-recap"[^>]*>Write a recap</);
+    assert.doesNotMatch(owner, /No brief yet|No recap yet/, 'the placeholder widgets are not drawn');
+    assert.doesNotMatch(owner, /data-testid="task-page-context-mount"/, 'no panel mount for the placeholders to fill');
     assert.doesNotMatch(owner, /Brief and recap/, 'no heading');
+    assert.match(owner, /class="sess-page task-page task-page--quiet-context"/, 'the stages take the full width');
     const guest = renderTaskPage(model(), { viewer: 'guest', urlKey: 'acme', binding: { source: 'linear' }, now: NOW, pageOptions: {} });
     assert.match(guest, /data-testid="task-page-context-quiet"/);
-    assert.match(guest, /○ no brief yet/);
+    assert.match(guest, /○ no brief or recap yet/);
+    assert.doesNotMatch(guest, /task-page-write-brief/, 'a guest is offered no write');
   });
 
-  test('the quiet line takes no grid column on a desktop page', () => {
-    assert.match(read('public/task-page.css'), /\.task-context-section--quiet \{ grid-area: auto; \}/);
+  test('the quiet line is a named grid row after the PR, not an auto-placed cell that can land above the stages', () => {
+    const css = read('public/task-page.css');
+    assert.match(css, /\.sess-page\.task-page > \.task-context-section--quiet \{ grid-area: quiet; \}/);
+    assert.match(css, /"pr context"\s+"quiet quiet"\s+"docs docs"/);
+    assert.match(css, /\.task-page--quiet-context \{[\s\S]*"stages stages"[\s\S]*"quiet quiet"/);
   });
 
   test('the Read-all control is wired in the task page client before its first Markdown render', () => {

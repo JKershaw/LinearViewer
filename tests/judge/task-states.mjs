@@ -79,11 +79,14 @@ async function seedStage(request, urlKey, token, kind, feedback) {
 
 /**
  * The ready state: a stop-at-PR run, finished, with its PR open and its review approved on the GitHub stub. The
- * stub is global, so it is cleared first and seeded for this state alone.
+ * stub is global, so it is cleared first and seeded for this state alone. Plan, build and review are done before the
+ * PR (LIN-3975, review finding 3): the page then offers no step, as it does for a real ready task, rather than the
+ * Research step a bare kick-off would leave open.
  */
 async function seedReady(request, urlKey) {
   await request.get('/test/clear-pr-status');
   const { token, auth } = await runnerAuth(request, urlKey);
+  for (const [kind, feedback] of [...BUILT, ['review', '[done] reviewed it']]) await seedStage(request, urlKey, token, kind, feedback);
   const anchor = await request.post(`/workspace/${urlKey}/api/dispatch`, {
     data: { prompt: 'orchestrate', promptName: `Autopilot (${TASK_ID})`, kind: 'autopilot', issueIdentifier: TASK_ID, issueTitle: TITLE, target: 'cli', stopAt: 'pr', variant: 'standard' },
   });

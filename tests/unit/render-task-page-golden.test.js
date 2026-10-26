@@ -349,7 +349,7 @@ describe('task page structure', () => {
       assert.match(says, /task-page-pr-lead">[^<]{12,}</, `${status}: a plain-words lead`);
       // LIN-3975 (finding 3): the review's time is the tap piece, in its relative words, so the detail is read to its end.
       const detail = (says.match(/task-page-pr-detail">([\s\S]*?)<\/p>/) || [])[1] || '';
-      assert.match(detail, /Review approved it, [^<]*<time class="task-time"[^>]*data-local-time="tap"/, `${status}: the review sentence`);
+      assert.match(detail, /Review approved it, [^<]*<time class="task-time"[^>]*datetime="2026-10-06T10:00:00\.000Z"[^>]*data-local-time="tap"/, `${status}: the review sentence, pinned to the review's moment`);
       // LIN-3379: merged and not Done yet is the one status that doesn't count.
       if (status === 'merged') {
         assert.doesNotMatch(detail, /of 2 checked/, `${status}: no count while the close-out is finishing`);
@@ -461,11 +461,16 @@ describe('viewer isolation', () => {
       // LIN-3975: an attempt's run link (or its plain reason) is for a viewer with a run page to open. A guest has none,
       // so that markup is the one viewer difference outside the owner fragments; strip it before the parity check.
       let stripped = owner.replace(/ <(?:a|span) class="task-stage-run[^"]*"[^>]*>[^<]*<\/(?:a|span)>/g, '');
+      // LIN-3975 (finding 1): with neither brief nor recap, the owner's quiet line holds the offers and the marker is not
+      // drawn; the guest's quiet line is the plain state. That pair is the one context difference, stripped the same way.
+      const quiet = owner.includes('data-testid="task-page-context-offers"');
       for (const f of [fragments.context, fragments.pullRequest, fragments.share, fragments.question]) {
         if (!f) continue;
         assert.ok(stripped.includes(f), 'the owner page carries the fragment verbatim');
         stripped = stripped.replace(f, '');
       }
+      if (quiet) stripped = stripped.replace(fragments.writeOffers, '');
+      if (quiet) stripped = stripped.replace('<section class="sess-section task-context-section task-context-section--quiet" data-testid="task-page-context-quiet"></section>', '<section class="sess-section task-context-section task-context-section--quiet" data-testid="task-page-context-quiet"><p class="task-context-none" data-testid="task-page-context-none">○ no brief or recap yet</p></section>');
       // LIN-3975: the run control holds the slot the next-step line holds for a viewer with none, so the line is
       // present exactly when the run control is absent.
       if (fragments.runControl) {

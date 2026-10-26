@@ -229,14 +229,19 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     const token = await runnerToken(page);
     await seedSession(page, token, { identifier: 'LOCAL-TP1', title: 'A task with a running build', kind: 'plan', feedback: ['[done] planned it'] });
     await seedSession(page, token, { identifier: 'LOCAL-TP1', title: 'A task with a running build', kind: 'implementation' });
-    const box = async (testid) => page.locator(`[data-testid="${testid}"]`).first().boundingBox();
+    // A testid that is not drawn in this state reads as null, not as a 30-second wait.
+    const box = async (testid) => {
+      const el = page.locator(`[data-testid="${testid}"]`).first();
+      return (await el.count()) ? el.boundingBox() : null;
+    };
 
     // Phone (360): a single column in reading order, no sideways scroll.
     await page.goto(`/workspace/${URL_KEY}/task/LOCAL-TP1`);
     const answer = await box('task-page-answer');
     const stages = await box('task-page-track-mount');
     const pr = await box('task-page-pr-mount');
-    const context = await box('task-page-context-mount');
+    // With neither brief nor recap, the quiet line is the context block (LIN-3975, finding 1).
+    const context = (await box('task-page-context-mount')) || (await box('task-page-context-quiet'));
     expect(answer.y).toBeLessThan(stages.y);
     expect(stages.y).toBeLessThan(pr.y);
     expect(pr.y).toBeLessThan(context.y);
@@ -260,6 +265,13 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     if (await page.locator('[data-testid="task-page-context-quiet"]').count()) {
       const quiet = await box('task-page-context-quiet');
       expect(quiet.x, 'the quiet line takes no column beside the stages').toBeLessThanOrEqual(dStages.x + 2);
+      // Finding 1: the quiet line sits under the stages (not in an empty row above them), draws no placeholder box, and
+      // holds both offers on one line.
+      expect(quiet.y, 'the quiet line is under the stages').toBeGreaterThan(dStages.y + dStages.height - 2);
+      await expect(page.locator('.brief-placeholder, .recap-placeholder')).toHaveCount(0);
+      const offerBrief = await box('task-page-write-brief');
+      const offerRecap = await box('task-page-write-recap');
+      expect(Math.abs(offerBrief.y - offerRecap.y), 'both offers on one line').toBeLessThan(4);
     } else {
       const dContext = await box('task-page-context-mount');
       expect(dContext.x).toBeGreaterThan(dStages.x + dStages.width - 2);

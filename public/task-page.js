@@ -549,6 +549,29 @@
         readAll.hidden = true;
       });
     }
+    // LIN-3975 (finding 1): with neither brief nor recap, the owner's quiet line offers to write each. A press mounts
+    // that one widget into the quiet section and starts its generate (the widget's own refresh, one press). The
+    // empty-state placeholder widgets are never mounted; the offer is removed once pressed.
+    // Both are captured here, before any Markdown renders, and the handler uses the captured references only.
+    var writeOffers = doc.querySelector('[data-testid="task-page-context-offers"]');
+    var quietContext = doc.querySelector('[data-testid="task-page-context-quiet"]');
+    if (writeOffers && quietContext) {
+      writeOffers.addEventListener('click', function (e) {
+        var button = e.target && e.target.closest ? e.target.closest('[data-write-kind]') : null;
+        if (!button || !writeOffers.contains(button)) return;
+        var kind = button.getAttribute('data-write-kind');
+        var widget = kind === 'brief' ? window.BriefSection : window.RecapSection;
+        if (!widget || typeof widget.refresh !== 'function') return;
+        var offer = button.parentNode;
+        if (offer && offer.parentNode) offer.parentNode.removeChild(offer);
+        if (!writeOffers.querySelector('[data-write-kind]')) writeOffers.parentNode.removeChild(writeOffers);
+        var panel = doc.createElement('div');
+        panel.className = 'sess-ctx-panel ' + (kind === 'brief' ? 'brief-section' : 'recap-section');
+        panel.setAttribute('data-testid', 'session-' + kind);
+        quietContext.appendChild(panel);
+        widget.refresh(panel, main.getAttribute('data-url-key') || '', main.getAttribute('data-identifier') || '', main.getAttribute('data-source') || undefined);
+      });
+    }
     // LIN-3975: the owner's task-chat fold, mounted before the first Markdown render (LIN-3385). It is a direct child of
     // the page (so a copy in ticket text is never it), and the page's own options ride on it.
     var chatFold = doc.querySelector('[data-testid="task-page"] > [data-testid="task-page-chat-fold"]');
