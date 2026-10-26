@@ -106,6 +106,12 @@ export const PAGES = [
   // email page's layout; this entry shows it as it is, so the step from the landing reads as one product.
   { id: 'landing', urlKey: null, path: () => '/', renderers: ['lib/render-landing.js', 'lib/components/landing-hero.js'] },
   { id: 'auth-email', urlKey: null, path: () => '/auth/email', renderers: ['lib/render-email-auth.js'] },
+  // LIN-3995: a signed-out preview (its sample-tasks line, the back link and the footer row) and an unconfigured
+  // sign-in door (the Plain page's Brand variant). Both are public. The judge server runs NODE_ENV=test with the
+  // Jira variables unset, so /auth/jira/oauth answers 503 with the door page on both sides; Playwright's goto
+  // does not treat a 503 as a failure, so the page is captured as it is.
+  { id: 'swipe-preview', urlKey: null, path: () => '/swipe', renderers: ['lib/render-swipe.js', 'lib/components/navbar.js', 'lib/components/footer.js'] },
+  { id: 'sign-in-door', urlKey: null, path: () => '/auth/jira/oauth', renderers: ['lib/render-pages.js', 'lib/components/plain-page.js'] },
 ];
 
 // Stated, not assumed: what the seed cannot reach.
@@ -114,7 +120,7 @@ export const NOT_COVERED = [
   'A change-log entry with a fixed time: the time is server-rendered and so masked, not seeded',
   'Home\'s run panel (See prompt, Another step, Change, Stop, the run-control repeats): LIN-3962 replaces it, so the stage states judge the opened task above it only',
   'Session with a run (the populated session page and its run view): needs a session record the local seed does not write; the not-found branch is judged instead, and renders the same back link',
-  'Pages with no Settings-shared pieces (swim, swipe, ship, roadmap, library, KPIs)',
+  'Pages with no Settings-shared pieces (swim, ship, roadmap, library, KPIs); the signed-out swipe preview is judged as swipe-preview (LIN-3995)',
 ];
 
 // Every page renders through renderPage, so its shell files are covered by any listed page.
