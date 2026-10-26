@@ -165,3 +165,13 @@ describe('names and places (LIN-3983 PR 2)', () => {
     assert.ok(!/REVIEW|IMPLEMENTATION/.test(html), 'the stage is a plain word');
   });
 });
+
+describe('a failed card keeps its summarise control (LIN-3983 PR 2)', () => {
+  test('a failed run says where it stopped, and still offers to summarise it', () => {
+    const sandbox = makeSandbox([WS]);
+    const html = paint(sandbox, buildSessionPayload(CARDS.failed(), WS, false));
+    assert.equal(pillWord(html), 'failed');
+    assert.match(html, /obs-summary-gen/, 'the explicit summarise control is still there');
+    assert.match(visibleText(html), /last activity/);
+  });
+});

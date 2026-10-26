@@ -705,12 +705,13 @@ function renderSummaryLine(s) {
   if (parkedWait) {
     return `<span class="obs-summary-line obs-summary-parked">Parked on a wait since ${escapeHtml(relativeTime(parkedWait.since))}</span>`;
   }
-  if (displayStatus(s) === 'error') {
-    return `<span class="obs-summary-line obs-summary-dim">${escapeHtml(stageNoun(s))}, last activity ${escapeHtml(relativeTime(s.lastActivity))}</span>`;
-  }
   if (!s.terminal) return runningSummary(s, st);
-  // Terminal but no cached summary → offer to generate (explicit spend only).
-  return `<button type="button" class="obs-summary-gen" data-session="${escapeHtml(s.sessionId)}">summarise this session</button>`;
+  // Terminal but no cached summary → offer to generate (explicit spend only). A failed run says where it stopped first.
+  const gen = `<button type="button" class="obs-summary-gen" data-session="${escapeHtml(s.sessionId)}">summarise this session</button>`;
+  if (displayStatus(s) === 'error') {
+    return `<span class="obs-summary-line obs-summary-dim">${escapeHtml(stageNoun(s))}, last activity ${escapeHtml(relativeTime(s.lastActivity))}</span> ${gen}`;
+  }
+  return gen;
 }
 
 /**
