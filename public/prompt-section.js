@@ -626,8 +626,11 @@
   function runStepOfState(state) {
     return (state.run && state.run.step) || (state.opened && state.opened.sessions && state.opened.sessions.offered) || null;
   }
+  // LIN-3975 (review finding 1): busy is any session running, queued or waiting on an answer. A waiting question is
+  // not a reason to start another run, so "Run to PR" is not offered beside it (LIN-3968's rule, as nextStepOf applies).
   function stageBusy(state) {
-    return !!(state.opened && state.opened.sessions && state.opened.sessions.running);
+    const sessions = state.opened && state.opened.sessions;
+    return !!(sessions && (sessions.busy || sessions.running));
   }
 
   // LIN-3833: the run control's vocabulary. The targets are the dispatch targets Home offers (`dash` is not
@@ -1284,6 +1287,56 @@
     }
 
     // The whole run block: the step, what it runs on, the one main action, the after-run line, and More.
+    // LIN-3975: a chat proposal for this task's runs is a staged change: the reader applies or declines it here, and
+    // nothing starts until they do. Apply resumes that session on its own harness and model, so Change does not
+    // apply to it; the note says so. A row a press has settled shows one quiet line, kept across a repaint.
+    function renderStagedProposals() {
+      const list = Array.isArray(opts.proposals) ? opts.proposals : [];
+      if (!list.length) return '';
+      const done = state.run.proposalsDone || {};
+      const pending = state.run.proposalsPending || {};
+      const rows = list.map((p) => {
+        const settled = done[p.id];
+        const busy = pending[p.id] ? ' disabled' : '';
+        const controls = settled
+          ? `<span class="opened-task-proposal-state" data-testid="opened-task-proposal-state">${settled}</span>`
+          : `<span class="opened-task-proposal-actions">`
+            + `<button type="button" class="btn btn--primary opened-task-proposal-apply" data-action="apply-proposal" data-proposal-id="${esc(p.id)}" data-run-id="${esc(p.runId)}"${busy}>Apply</button>`
+            + `<button type="button" class="btn btn--quiet opened-task-proposal-decline" data-action="decline-proposal" data-proposal-id="${esc(p.id)}" data-run-id="${esc(p.runId)}"${busy}>Decline</button>`
+            + `</span>`;
+        return `<li class="opened-task-proposal" data-testid="opened-task-proposal" data-proposal-id="${esc(p.id)}" data-run-id="${esc(p.runId)}">`
+          + `<span class="opened-task-proposal-why">Proposed in chat: ${esc(p.reason || 'a follow-up')}</span> ${controls}</li>`;
+      }).join('');
+      return `<div class="opened-task-proposals" data-testid="opened-task-proposals">`
+        + `<p class="opened-task-proposals-note">Apply resumes that session on its own harness and model. Change does not apply to it.</p>`
+        + `<ul class="opened-task-proposal-list">${rows}</ul></div>`;
+    }
+
+    // The proposal's own endpoints (the run page's, routes/dashboard.js). A refused or failed press leaves the row
+    // pending, its buttons live again, and says why in the toast.
+    function proposalAction(btn, verb) {
+      const runId = btn.getAttribute('data-run-id') || '';
+      const id = btn.getAttribute('data-proposal-id') || '';
+      const base = `/workspace/${encodeURIComponent(opts.urlKey)}/api/run/${encodeURIComponent(runId)}/proposals/${encodeURIComponent(id)}`;
+      state.run.proposalsPending = { ...(state.run.proposalsPending || {}), [id]: true };
+      paintRun();
+      window.api(`${base}/${verb}`, { method: 'POST', body: JSON.stringify({}), on401: false })
+        .then(() => {
+          const settled = state.run.proposalsPending || {};
+          delete settled[id];
+          state.run.proposalsDone = { ...(state.run.proposalsDone || {}), [id]: verb === 'apply' ? 'applied' : 'declined' };
+          state.run.proposalsPending = settled;
+          paintRun();
+        })
+        .catch((err) => {
+          const pending = state.run.proposalsPending || {};
+          delete pending[id];
+          state.run.proposalsPending = pending;
+          paintRun();
+          if (typeof window.toast === 'function') window.toast(`Could not ${verb} that proposal: ${(err && err.message) || 'failed'}`, { type: 'error' });
+        });
+    }
+
     function renderRunBlock() {
       const step = runStepOf();
       const parts = [
@@ -1291,6 +1344,7 @@
         renderRunsOn(state.run.preview),
         state.run.changeOpen ? renderChangePanel(state.run.preview) : '',
         renderGo(opts, state),
+        renderStagedProposals(),
         renderAfterRun(),
         renderRunMore(step)
       ];
@@ -1353,6 +1407,12 @@
               .catch(() => { state.run.presets = []; paintRun(); });
           }
           paintRun();
+          return true;
+        case 'apply-proposal':
+          proposalAction(btn, 'apply');
+          return true;
+        case 'decline-proposal':
+          proposalAction(btn, 'decline');
           return true;
         case 'close-change':
           state.run.changeOpen = false;
@@ -2261,6 +2321,13 @@
     }
 
     return {
+      // LIN-3975 (finding 1): the task page hands in the staged chat proposals again after a fold turn proposes one.
+      // Only the run block is repainted (the same slot a preview answer writes), so a prompt or a stream is untouched.
+      setProposals(list) {
+        if (destroyed) return;
+        opts.proposals = Array.isArray(list) ? list : [];
+        paintRun();
+      },
       destroy() {
         destroyed = true;
         stopPoll();

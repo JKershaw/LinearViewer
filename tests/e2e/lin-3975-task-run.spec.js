@@ -2,11 +2,13 @@ import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId } from '../fixtures/local-harness.js';
 import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 import { expectNoClippedOverflow } from '../helpers.js';
+import { renderSSEFrames } from '../fixtures/flight-companion-sse-frames.js';
 
 // LIN-3975 (PRs 1 and 2): the task page moves the task on, in a browser.
 //
 //   - the owner's page has the shared run control under the answer, and it offers the step after the finished one;
 //   - a member reads the page with no run control, no share slot, and the next step in its place;
+//   - an attempt's link opens the run page that shows that attempt;
 //   - at 390×844 the answer and the run control are on the first screen, with no sideways scroll.
 //
 // Seeding goes through tests/fixtures/local-harness.js and dispatch takes, as task-page.spec.js does.
@@ -25,15 +27,16 @@ test.beforeEach(async ({ page, localWorkerUrlKey }) => {
   await page.goto(`/test/clear-sessions-feed-cache?urlKey=${URL_KEY}`);
 });
 
-async function seedTask(page) {
+async function seedTask(page, { description = 'Seeded run control task', features } = {}) {
   const id = (raw) => localSeedId(URL_KEY, raw);
   const resp = await page.request.post('/test/set-local-session', {
     data: {
       urlKey: URL_KEY,
       runnerKey: true,
+      ...(features ? { features } : {}),
       projects: [{ id: id('rc-proj'), name: 'Run control project', content: 'A project', sortOrder: 1 }],
       issues: [{
-        id: id('rc-task'), identifier: TASK, title: 'A task with a plan done', description: 'Seeded run control task',
+        id: id('rc-task'), identifier: TASK, title: 'A task with a plan done', description,
         projectId: id('rc-proj'), sortOrder: 1, state: { name: 'In Progress', type: 'started' },
         url: `/workspace/${URL_KEY}/issue/${id('rc-task')}`,
       }],
@@ -90,6 +93,142 @@ test.describe('LIN-3975 — the task page moves the task on', () => {
     await expect(page.locator('[data-testid="task-page-run-control"]')).toHaveCount(0);
     await expect(page.locator('[data-testid="task-page-share-slot"]')).toHaveCount(0);
     await expect(page.locator('[data-testid="task-page-next"]')).toContainText('comes next');
+  });
+
+  test('an attempt links to its run page, and the run page opens', async ({ page }) => {
+    await seedTask(page);
+    await seedWorkspaceOwnership(page, URL_KEY, 'owner');
+    const token = await runnerToken(page);
+    await seedRun(page, token, { kind: 'plan', feedback: ['[done] planned it'] });
+
+    await page.goto(`/workspace/${URL_KEY}/task/${TASK}`);
+    // A stage's attempts are drawn when its row opens (a click on its head), as task-page.spec.js does.
+    await page.locator('[data-testid="task-page-stage-head"]').first().click();
+    const link = page.locator('[data-testid="task-page-attempt-run"]').first();
+    await expect(link).toHaveAttribute('href', /\/observation\/session\/[^/?#]+$/);
+    const href = await link.getAttribute('href');
+    const response = await page.request.get(href);
+    expect(response.status(), `the run link ${href} opens`).toBe(200);
+  });
+
+  test('a moment reads as words, and a tap (or Enter) shows its exact local time with the zone named', async ({ page }) => {
+    await seedTask(page);
+    await seedWorkspaceOwnership(page, URL_KEY, 'owner');
+    const token = await runnerToken(page);
+    await seedRun(page, token, { kind: 'plan', feedback: ['[done] planned it'] });
+
+    await page.goto(`/workspace/${URL_KEY}/task/${TASK}`);
+    await page.locator('[data-testid="task-page-stage-head"]').first().click();
+    const moment = page.locator('[data-testid="task-page-session-line"] time[data-local-time="tap"]').first();
+    const words = await moment.textContent();
+    expect(words, 'the relative words are on the page').toMatch(/ago|just now/);
+    await moment.click();
+    await expect(moment).toHaveAttribute('aria-expanded', 'true');
+    await expect(moment).toHaveText(/\d{1,2}:\d{2}/);
+    await expect(moment).not.toHaveText(words);
+    await moment.focus();
+    await page.keyboard.press('Enter');
+    await expect(moment).toHaveText(words);
+    await expect(moment).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  test('a long description is cut, and "Read all of it" shows the rest', async ({ page }) => {
+    const long = Array.from({ length: 30 }, (_, i) => `Paragraph line ${i}.`).join('\n\n');
+    await seedTask(page, { description: long });
+    await seedWorkspaceOwnership(page, URL_KEY, 'owner');
+
+    await page.goto(`/workspace/${URL_KEY}/task/${TASK}`);
+    const body = page.locator('[data-testid="task-page-description-body"]');
+    await expect(body).toHaveClass(/task-md--cut/);
+    const more = page.locator('[data-testid="task-page-description-more"]');
+    await more.click();
+    await expect(body).not.toHaveClass(/task-md--cut/);
+    await expect(more).toBeHidden();
+  });
+
+  test('the owner\'s fold sends a propose-only turn, and the answer lands in its transcript', async ({ page }) => {
+    await seedTask(page, { features: { taskChat: true } });
+    await seedWorkspaceOwnership(page, URL_KEY, 'owner');
+    const turns = [];
+    await page.route('**/api/task-chat/**', async (route) => {
+      turns.push(route.request().postDataJSON());
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        body: renderSSEFrames([['token', { token: 'Nothing has run yet.' }], ['done', {}]]),
+      });
+    });
+
+    await page.goto(`/workspace/${URL_KEY}/task/${TASK}`);
+    const fold = page.locator('[data-testid="task-page-chat-fold"]');
+    await expect(fold).toHaveCount(1);
+    await fold.locator('summary').click();
+    await page.locator('[data-testid="task-page-chat-question"]').fill('where do you stand?');
+    await page.locator('[data-testid="task-page-chat-send"]').click();
+    await expect(fold.locator('[data-task-chat="transcript"]')).toContainText('Nothing has run yet.');
+    expect(turns).toHaveLength(1);
+    expect(turns[0].propose).toBe(true);
+    expect(turns[0].question).toBe('where do you stand?');
+  });
+
+  // LIN-3975 (finding 1): a fold turn that proposes stages the proposal in the run control at once, with no reload.
+  // The turn's stream and the staged-list read are answered by the browser's route, so the proof is the client's own
+  // wiring: the row appears in the same document (a marker on `window` survives), and Apply posts to the run page.
+  test('a fold turn that proposes lists the proposal in the run control with no reload, and Apply goes through it', async ({ page }) => {
+    await seedTask(page, { features: { taskChat: true } });
+    await seedWorkspaceOwnership(page, URL_KEY, 'owner');
+    let proposed = false;
+    const applies = [];
+    await page.route('**/api/task/*/proposals**', async (route) => {
+      const proposals = proposed ? [{ id: 'prop-1', runId: 'run-9', reason: 'Please post a status update.' }] : [];
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ proposals }) });
+    });
+    await page.route('**/api/run/run-9/proposals/prop-1/apply', async (route) => {
+      applies.push(route.request().method());
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+    });
+    await page.route('**/api/task-chat/**', async (route) => {
+      proposed = true;
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        body: renderSSEFrames([
+          ['tool', { phase: 'proposed', iteration: 1, name: 'send_follow_up', result: 'proposed a follow-up to session run-9' }],
+          ['token', { token: 'I staged a follow-up.' }],
+          ['done', {}],
+        ]),
+      });
+    });
+
+    await page.goto(`/workspace/${URL_KEY}/task/${TASK}`);
+    await page.evaluate(() => { window.__sameDocument = true; });
+    const fold = page.locator('[data-testid="task-page-chat-fold"]');
+    await fold.locator('summary').click();
+    await page.locator('[data-testid="task-page-chat-question"]').fill('Please follow up on this task.');
+    await page.locator('[data-testid="task-page-chat-send"]').click();
+
+    const row = page.locator('[data-testid="task-page-run-control"] [data-testid="opened-task-proposal"]');
+    await expect(row).toHaveCount(1);
+    await expect(row).toContainText('Proposed in chat: Please post a status update.');
+    expect(await page.evaluate(() => window.__sameDocument), 'listed without a reload').toBe(true);
+
+    await row.locator('[data-action="apply-proposal"]').click();
+    await expect(row.locator('[data-testid="opened-task-proposal-state"]')).toHaveText('applied');
+    expect(applies).toEqual(['POST']);
+  });
+
+  test('a failed Review is offered again: the run control says Run Review, and the answer does not read idle', async ({ page }) => {
+    await seedTask(page);
+    await seedWorkspaceOwnership(page, URL_KEY, 'owner');
+    const token = await runnerToken(page);
+    await seedRun(page, token, { kind: 'plan', feedback: ['[done] planned it'] });
+    await seedRun(page, token, { kind: 'implementation', feedback: ['[done] built it'] });
+    await seedRun(page, token, { kind: 'review', feedback: ['[failed] review could not finish'] });
+
+    await page.goto(`/workspace/${URL_KEY}/task/${TASK}`);
+    await expect(page.locator('[data-testid="task-page-run-control"] [data-testid="opened-task-go"]')).toContainText('Run Review');
+    await expect(page.locator('[data-testid="task-page-status"]')).toHaveAttribute('data-status', 'failed');
+    await expect(page.locator('[data-testid="task-page-answer"]')).not.toContainText('idle');
   });
 
   test('at 390×844 the answer and the run control sit on the first screen, with no sideways scroll', async ({ page }) => {

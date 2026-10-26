@@ -3164,11 +3164,41 @@ function initLocalTimes(root) {
   var scope = root || document;
   var els = scope.querySelectorAll('time[datetime][data-local-time]');
   Array.prototype.forEach.call(els, function (el) {
-    var local = formatLocalTime(el.getAttribute('datetime'), { zone: el.getAttribute('data-local-time') === 'zoned' });
+    var mode = el.getAttribute('data-local-time');
+    if (mode === 'tap') {
+      // LIN-3975: the relative words stay on the page; the exact local time, zone named, is one tap (or Enter) away.
+      // The exact text is kept in an attribute, so the toggle never has to re-derive it.
+      var exact = formatLocalTime(el.getAttribute('datetime'), { zone: true });
+      if (!exact || el.hasAttribute('data-time-exact')) return;
+      el.setAttribute('data-time-exact', exact);
+      el.setAttribute('data-time-relative', el.textContent);
+      el.setAttribute('data-time-showing', 'relative');
+      el.setAttribute('role', 'button');
+      el.setAttribute('tabindex', '0');
+      el.setAttribute('aria-expanded', 'false');
+      el.setAttribute('title', exact);
+      // Bound on the element, once (the guard above), so a re-rendered time is bound when it is written.
+      el.addEventListener('click', function () { toggleExactTime(el); });
+      el.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        toggleExactTime(el);
+      });
+      return;
+    }
+    var local = formatLocalTime(el.getAttribute('datetime'), { zone: mode === 'zoned' });
     if (!local) return;
     el.setAttribute('title', el.textContent);
     el.textContent = local;
   });
+}
+
+/** LIN-3975: flip a `tap` time between its relative words and its exact local time. */
+function toggleExactTime(el) {
+  var showing = el.getAttribute('data-time-showing') === 'exact';
+  el.textContent = showing ? el.getAttribute('data-time-relative') : el.getAttribute('data-time-exact');
+  el.setAttribute('data-time-showing', showing ? 'relative' : 'exact');
+  el.setAttribute('aria-expanded', showing ? 'false' : 'true');
 }
 
 if (typeof window !== 'undefined') {

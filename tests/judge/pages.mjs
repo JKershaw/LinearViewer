@@ -38,6 +38,15 @@ const LIVE_AXIS = { selector: '.lc-timeline-axis', reason: 'the axis shows the w
 const LIVE_SINCE = { selector: '.lc-lane-since', optional: true, reason: 'how long a stage has run is relative to the shot (base has no such element: LIN-3977 adds it, so the mask is skipped there)' };
 const LIVE_WHEN = { selector: '.lc-event-time', reason: 'a stream row\'s relative time is relative to the shot (its exact time is on hover)' };
 
+// LIN-3975: the task page's renderers, and its clock. A moment is its relative words ("2 hours ago"), which follow the
+// server's clock, not the frozen browser clock; a run's "for N minutes" sentence does too. Both are masked, each with its
+// reason, so a difference in the words' place or style still shows. Optional, as a state may show none of them.
+const TASK_RENDERERS = ['lib/render-task-page.js', 'public/prompt-section.js'];
+const TASK_CLOCK = [
+  { selector: 'time.task-time', optional: true, reason: 'a moment is its relative words, which follow the server clock (the frozen browser clock does not move them)' },
+  { selector: '.task-stage-ago', optional: true, reason: 'how long ago a stage started is relative to the shot (server clock)' },
+  { selector: '[data-testid="task-page-sentence-at"]', optional: true, reason: 'the exact time beside a state sentence is the zoned piece; its text is the server\'s UTC fallback' },
+];
 // LIN-3983: Observation's times are relative to the real clock (its runs are seeded on it, see observation-states.mjs),
 // so the words that carry them move between the two shots. The masks are the containing rows, never the inline span.
 // Only the time-bearing nodes are masked, never the rows around them: a row's pill, title, workspace, actions and
@@ -72,6 +81,17 @@ const OBS_RULING_TIMES = OBS_TIMES.filter((m) => m.selector === '.obs-ruling-sug
 export const PAGES = [
   { id: 'home', urlKey: 'judge', path: (k) => `/workspace/${k}/`, renderers: ['lib/render.js'] },
   { id: 'task', urlKey: 'judge', path: (k) => `/workspace/${k}/task/LOCAL-1`, renderers: ['lib/render-task-page.js'] },
+  // LIN-3975: the task page's states (tests/judge/task-states.mjs). Each has its own workspace: a runner token, an
+  // ownership edge and a share are per workspace. A state's words that follow the server's clock are masked (TASK_CLOCK).
+  { id: 'task-build-done', urlKey: 'judge-task-build', path: (k) => `/workspace/${k}/task/LOCAL-JT1`, state: 'task-build-done', runner: true, masks: TASK_CLOCK, renderers: TASK_RENDERERS },
+  { id: 'task-running', urlKey: 'judge-task-running', path: (k) => `/workspace/${k}/task/LOCAL-JT1`, state: 'task-running', runner: true, masks: TASK_CLOCK, renderers: TASK_RENDERERS },
+  { id: 'task-failed', urlKey: 'judge-task-failed', path: (k) => `/workspace/${k}/task/LOCAL-JT1`, state: 'task-failed', runner: true, masks: TASK_CLOCK, renderers: TASK_RENDERERS },
+  { id: 'task-waiting', urlKey: 'judge-task-waiting', path: (k) => `/workspace/${k}/task/LOCAL-JT1`, state: 'task-waiting', runner: true, masks: TASK_CLOCK, renderers: TASK_RENDERERS },
+  { id: 'task-ready', urlKey: 'judge-task-ready', path: (k) => `/workspace/${k}/task/LOCAL-JT1`, state: 'task-ready', runner: true, masks: TASK_CLOCK, renderers: TASK_RENDERERS },
+  { id: 'task-chat-open', urlKey: 'judge-task-chat', path: (k) => `/workspace/${k}/task/LOCAL-JT1`, state: 'task-chat-open', runner: true, seed: { features: { taskChat: true } }, masks: TASK_CLOCK, renderers: TASK_RENDERERS },
+  { id: 'task-member', urlKey: 'judge-task-member', path: (k) => `/workspace/${k}/task/LOCAL-JT1`, state: 'task-member', runner: true, masks: TASK_CLOCK, renderers: TASK_RENDERERS },
+  { id: 'task-guest', urlKey: 'judge-task-guest', path: (k) => `/workspace/${k}/task/LOCAL-JT1`, state: 'task-guest', runner: true, masks: TASK_CLOCK, renderers: TASK_RENDERERS },
+  { id: 'task-no-runner', urlKey: 'judge-task-norunner', path: (k) => `/workspace/${k}/task/LOCAL-JT1`, state: 'task-no-runner', masks: TASK_CLOCK, renderers: TASK_RENDERERS },
   { id: 'dispatch', urlKey: 'judge', path: (k) => `/workspace/${k}/dispatch`, renderers: ['lib/render-dispatch.js'] },
   { id: 'proxy', urlKey: 'judge', path: (k) => `/workspace/${k}/proxy`, renderers: ['lib/render-proxy.js'] },
   { id: 'audit', urlKey: 'judge', path: (k) => `/workspace/${k}/audit`, renderers: ['lib/render-audit.js'] },
@@ -171,6 +191,9 @@ export const NOT_COVERED = [
   'Home\'s run panel (See prompt, Another step, Change, Stop, the run-control repeats): LIN-3962 replaces it, so the stage states judge the opened task above it only',
   'Session with a run (the populated session page and its run view): needs a session record the local seed does not write; the not-found branch is judged instead, and renders the same back link',
   'Pages with no Settings-shared pieces (swim, ship, roadmap, library, KPIs); the signed-out swipe preview is judged as swipe-preview (LIN-3995)',
+  'LIN-3975: a task whose run is older than 30 days (its attempt is unlinked, with its plain reason): the store stamps every dispatch with now, so the seed cannot age a row; the window is pinned by unit tests',
+  'LIN-3975: the run control while it generates or has failed: both follow a press that calls the prompt generator (an LLM), which a judge run never makes; the judge stops before a press',
+  'LIN-3975: Swipe\'s card naming the same next step as the task page: LIN-3982 owns the Swipe card and is Todo, so the Swipe half of that check is not run',
 ];
 
 // Every page renders through renderPage, so its shell files are covered by any listed page.
@@ -201,6 +224,23 @@ export const coverageOfChange = (changedPaths, renderersFor, covered = coveredRe
     if (missing.length) uncovered.push({ css, renderers: missing });
   }
   return { changed, uncovered };
+};
+
+// A PNG's own size, from its IHDR chunk (LIN-3975). Null when the buffer is not a PNG.
+export const pngSize = (buf) => {
+  const sig = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  if (buf.length < 24 || !sig.every((b, i) => buf[i] === b)) return null;
+  return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+};
+
+// The class of a non-equal pair, from the two images' sizes. The comparator's text is not used: it can carry a pixel
+// count for a pair whose pages differ in height, which the message-based class labelled "paint (same size)" (LIN-3975).
+export const layoutClass = (base, head) => {
+  const a = pngSize(base);
+  const b = pngSize(head);
+  if (!a || !b) return 'unknown (not a PNG)';
+  if (a.width === b.width && a.height === b.height) return 'paint (same size)';
+  return `layout (page size ${a.width}x${a.height} -> ${b.width}x${b.height})`;
 };
 
 // Pixel count out of Playwright's comparator message; null when it reports a size mismatch.
