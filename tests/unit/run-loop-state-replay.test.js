@@ -412,7 +412,7 @@ test('route exports are the lib exports (identity, not copies)', () => {
   assert.strictEqual(flightCompanion.buildCensusSeedText, censusSeed.buildCensusSeedText);
 });
 
-test('run-loop-state exports exactly the seven moved names', () => {
+test('run-loop-state exports exactly the seven moved names, plus loopIsWaiting (LIN-3977 hoist)', () => {
   assert.deepStrictEqual(Object.keys(runLoopState).sort(), [
     'MARKER_TO_AGENT_STATE',
     'TERMINAL_AGENT_STATES',
@@ -420,6 +420,7 @@ test('run-loop-state exports exactly the seven moved names', () => {
     'enrichLoop',
     'isTerminalLoop',
     'loopIsTerminal',
+    'loopIsWaiting',
     'sessionIsTerminal'
   ]);
 });

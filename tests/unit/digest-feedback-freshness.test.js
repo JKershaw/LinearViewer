@@ -77,10 +77,10 @@ describe('applyHarvestedAbortToDigest(digest, abortEntry, dispatchedAt) — V4 +
     assert.equal(out.terminal.entry.timestamp, abortEntry.timestamp);
   });
 
-  test('wake becomes {marker:"aborted", waitingMessage:null}', () => {
+  test('wake becomes {marker:"aborted", waitingMessage:null, at: <abort time>} (LIN-3977 B2)', () => {
     const abortEntry = { message: '[aborted] cancelled', timestamp: '2026-04-10T10:00:00.900Z' };
     const out = applyHarvestedAbortToDigest(baseDigest(), abortEntry, '2026-04-10T09:00:00.000Z');
-    assert.deepEqual(out.wake, { marker: 'aborted', waitingMessage: null });
+    assert.deepEqual(out.wake, { marker: 'aborted', waitingMessage: null, at: '2026-04-10T10:00:00.900Z' });
   });
 
   test('parkedWait becomes null', () => {
