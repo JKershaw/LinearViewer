@@ -479,6 +479,24 @@ describe('LIN-3833 — "Another step" leaves out only what the task cannot take 
   });
 });
 
+describe('LIN-3991 — a running task says its state once in the opened task', () => {
+  const running = { loopId: 'loop-1', kind: 'implementation', label: 'Build', state: 'running', since: '2026-10-25T10:00:00.000Z', target: 'cli' };
+  const SENTENCE = '<p class="task-sentence" data-testid="task-page-sentence">Build running for 1 hour.</p>';
+
+  test('the state block says it, and neither the run control nor its Go slot repeats it', async () => {
+    const { c } = await mount({}, { opened: { status: 'running', live: true, headerHtml: SENTENCE, sessions: { count: 1, next: { kind: 'review', label: 'Review' }, last: null, running } } });
+    assert.equal(c.innerHTML.split('Build running for 1 hour.').length - 1, 1, 'the sentence appears once');
+  });
+
+  test('the after-run line keeps what is its own: Next, and Stop; it does not restate how long Build has run', async () => {
+    const { c } = await mount({}, { opened: { status: 'running', live: true, headerHtml: SENTENCE, sessions: { count: 1, next: { kind: 'review', label: 'Review' }, last: null, running } } });
+    const line = c.innerHTML.match(/<div class="opened-task-running"[\s\S]*?<\/div>/)[0];
+    assert.match(line, /Next: Review, once Build finishes/);
+    assert.match(line, /data-testid="run-stop"/);
+    assert.doesNotMatch(line.replace(/^<div[^>]*>/, ''), /since|ago|running/, 'the body, not the class name');
+  });
+});
+
 // LIN-3987: Home's controls are real buttons with a shared class, a chosen choice is marked, a choice the harness cannot
 // run is not kept, and the words name what runs. The button tags are read from the markup the run block paints.
 describe('LIN-3987 — Home\'s run controls are shared buttons, marked when chosen, and say their words', () => {

@@ -87,6 +87,7 @@ export const PAGES = [
   { id: 'home-stages-done', urlKey: 'judge-home-done', path: (k) => `/workspace/${k}/`, state: 'home-stages-done', runner: true, renderers: ['lib/render.js'] },
   { id: 'home-running', urlKey: 'judge-home-run', path: (k) => `/workspace/${k}/`, state: 'home-running', runner: true, renderers: ['lib/render.js'] },
   { id: 'home-failed', urlKey: 'judge-home-fail', path: (k) => `/workspace/${k}/`, state: 'home-failed', runner: true, renderers: ['lib/render.js'] },
+  { id: 'home-failed-first', urlKey: 'judge-home-fail-first', path: (k) => `/workspace/${k}/`, state: 'home-failed-first', runner: true, renderers: ['lib/render.js'] },
   { id: 'home-copy-first', urlKey: 'judge-home-copy', path: (k) => `/workspace/${k}/`, state: 'home-copy-first', renderers: ['lib/render.js'] },
   { id: 'home-copy-written', urlKey: 'judge-home-write', path: (k) => `/workspace/${k}/`, state: 'home-copy-written', renderers: ['lib/render.js'] },
   // LIN-3962: the one decision panel on Home (desktop, and phone via the viewport pair) and Swipe's card with Prompts open.

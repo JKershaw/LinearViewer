@@ -27,8 +27,8 @@ const ONLY = process.env.JUDGE_ONLY ? new RegExp(process.env.JUDGE_ONLY) : null;
 
 const AUDIT_FIXTURE = fileURLToPath(new URL('./audit-report.fixture.json', import.meta.url));
 
-// LIN-3968: Home's opened-task states (the five that seed sessions or write a prompt). The LIN-3962 states are not these.
-const isOpenedTaskState = (state) => /^home-(stages-done|running|failed|copy-first|copy-written)$/.test(state ?? '');
+// LIN-3968: Home's opened-task states (the six that seed sessions or write a prompt). The LIN-3962 states are not these.
+const isOpenedTaskState = (state) => /^home-(stages-done|running|failed|failed-first|copy-first|copy-written)$/.test(state ?? '');
 const isLoopback = (url) => /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(url) || url.startsWith('data:') || url.startsWith('blob:');
 
 // `urlKey` null means no local seed: the account is a zero-workspace one, signed in by email (LIN-3956).
@@ -168,13 +168,18 @@ async function prepare(page, context, entry, viewport, theme, side, baseURL) {
     // up without the control and is shot as it is.
     await page.locator('[data-section="in-progress"][data-identifier="LOCAL-1"]').first().click();
     const change = page.getByTestId('run-change');
+    // LIN-3991: base waits too (briefly). Both sides now have Change, and a base that only counted it shot the page
+    // before the control rendered, so the pair differed by a panel that one side never opened.
     if (side === 'head') await change.waitFor();
+    else await change.waitFor({ timeout: 5000 }).catch(() => {});
     if (await change.count()) {
       await change.click();
       await page.getByTestId(side === 'head' ? 'run-decision-panel' : 'run-change-panel').waitFor();
     }
     // LIN-3987: the opencode state chooses opencode as the harness, so the effort line and the lost web choice show.
-    if (entry.state === 'home-run-panel-opencode' && side === 'head') {
+    // LIN-3991: on whichever side has the harness control (base waits for it: the panel's body arrives after its frame). Base is main now and has it; choosing it on head only made the
+    // pair differ by a choice one side never made.
+    if (entry.state === 'home-run-panel-opencode' && (side === 'head' || await page.getByTestId('run-harness').waitFor({ timeout: 5000 }).then(() => true, () => false))) {
       await page.getByTestId('run-harness').selectOption('opencode');
       await page.getByTestId('run-effort').first().waitFor({ state: 'hidden' });
     }

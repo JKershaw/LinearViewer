@@ -407,3 +407,29 @@ describe('describeDescent', () => {
     assert.strictEqual(s, 'LIN-318 is a container → descended to LIN-297 (research)');
   });
 });
+
+// LIN-3991 item 6: a start id that is not the node's own identifier (the local provider's internal id, e.g.
+// `proto--i1` for LIN-3820) must not leak into `deferredVia`, which the copy-first line prints.
+describe('resolveRecommendation — deferredVia names nodes by identifier (LIN-3991)', () => {
+  test('a start by internal id: the first entry is the node\'s identifier, not the id the caller passed', async () => {
+    const computeOne = async (id) => {
+      if (id === 'proto--i1') return { identifier: 'LIN-3820', recommendedAction: 'defer', deferTo: 'LIN-3821', children: [{ identifier: 'LIN-3821', state: { type: 'unstarted' } }] };
+      if (id === 'LIN-3821') return { identifier: 'LIN-3821', recommendedAction: 'research', prompt: 'do it', deferTo: null };
+      throw new Error(`Issue not found: ${id}`);
+    };
+    const out = await resolveRecommendation({ computeOne, startIdentifier: 'proto--i1' });
+    assert.deepStrictEqual(out.deferredVia, ['LIN-3820', 'LIN-3821']);
+    assert.ok(!out.deferredVia.some(id => id.includes('--')), 'no internal id in the breadcrumb');
+  });
+
+  test('a child that defers back to the start by its identifier stops at the cycle guard, not a second hop', async () => {
+    const computeOne = async (id) => {
+      if (id === 'proto--i1') return { identifier: 'LIN-3820', recommendedAction: 'defer', deferTo: 'LIN-3821' };
+      if (id === 'LIN-3821') return { identifier: 'LIN-3821', recommendedAction: 'defer', deferTo: 'LIN-3820' };
+      throw new Error(`Issue not found: ${id}`);
+    };
+    const out = await resolveRecommendation({ computeOne, startIdentifier: 'proto--i1' });
+    assert.equal(out.deferStopReason, 'cycle');
+    assert.deepStrictEqual(out.deferredVia, ['LIN-3820', 'LIN-3821']);
+  });
+});
