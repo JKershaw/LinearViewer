@@ -339,6 +339,7 @@ function makeSendSandbox({ idValue, activeTask }) {
   const appendBubbleCalls = [];
   const sandbox = {
     streaming: false,
+    propose: false,
     idInput: { value: idValue, focus: () => {} },
     questionInput: { value: 'a question', focus: () => {} },
     activeTask,

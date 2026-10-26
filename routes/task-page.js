@@ -58,9 +58,21 @@ function queryValue(value) {
  * @param {Function} [deps.now] - () → Date
  * @returns {Router}
  */
-export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo, loader, workspaceOwnerCheck = null, now = () => new Date() }) {
+export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo, loader, workspaceOwnerCheck = null, runProposalsStore = null, now = () => new Date() }) {
   if (!loader) throw new Error('task-page routes: loader is required');
   const router = Router();
+
+  // LIN-3975: the chat proposals still pending for this task's runs (the run control stages them). Read for the owner
+  // only, from the runs the page already links (a run outside the page's read window has no link, so no proposal
+  // either). A proposal carries its first line as its reason; the prompt itself stays in the store.
+  const pendingProposalsOf = async (urlKey, model) => {
+    if (!runProposalsStore) return [];
+    const runIds = [...new Set((model.sessions || []).map(s => s.runId).filter(Boolean))];
+    const lists = await Promise.all(runIds.map(runId => runProposalsStore.list(urlKey, runId).catch(() => [])));
+    return lists.flat()
+      .filter(p => p && p.status === 'proposed')
+      .map(p => ({ id: p.id, runId: p.runId, reason: String(p.prompt || '').split('\n')[0].trim().slice(0, 200) }));
+  };
 
   // LIN-3975: the owner or a member. Fail closed: no seam, no account, or an unreadable answer is a member, the
   // same reading the share-creation seam takes (an ownerless workspace reads as member, not as owner).
@@ -116,7 +128,7 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
           { action: 'Back to tasks', actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/` }
         ));
       }
-      const { model } = result;
+      const model = owner ? { ...result.model, proposals: await pendingProposalsOf(workspace.urlKey, result.model) } : result.model;
       const issueIdQuery = model.issueId ? `?issueId=${encodeURIComponent(model.issueId)}` : '';
       const stateUrl = `/workspace/${encodeURIComponent(workspace.urlKey)}/api/task/${encodeURIComponent(model.identifier)}/state${issueIdQuery}`;
       // The run control's options (LIN-3975): the owner's only. The same vocabulary Home's opened task takes.

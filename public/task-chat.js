@@ -24,6 +24,9 @@
     var prefillSource = data.defaultSource || '';
     // LIN-3254: the run id this chat is scoped to (run-scoped chat proposes).
     var prefillRun = data.defaultRun || '';
+    // LIN-3975: the task page's fold is propose-only: every turn proposes, and the server stages the proposal for the
+    // run control. The flag rides in the turn body; the server reads it as a boolean.
+    var propose = data.propose === true;
 
     function hook(name) { return root.querySelector('[data-task-chat="' + name + '"]'); }
     var idInput = hook('id');
@@ -345,6 +348,7 @@
       // the stream, so the SSE reader keeps its own response handling.
       var turnBody = { question: question, history: priorHistory };
       if (runHint) turnBody.runId = runHint;
+      if (propose) turnBody.propose = true;
       fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/task-chat/' + encodeURIComponent(taskId) + sourceQuery, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },

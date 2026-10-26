@@ -541,6 +541,14 @@
         readAll.hidden = true;
       });
     }
+    // LIN-3975: the owner's task-chat fold, mounted before the first Markdown render (LIN-3385). It is a direct child of
+    // the page (so a copy in ticket text is never it), and the page's own options ride on it.
+    var chatFold = doc.querySelector('[data-testid="task-page"] > [data-testid="task-page-chat-fold"]');
+    if (chatFold && window.TaskChat && typeof window.TaskChat.init === 'function') {
+      var foldOpts = {};
+      try { foldOpts = JSON.parse(chatFold.getAttribute('data-task-chat-opts') || '{}'); } catch (e) { foldOpts = {}; }
+      window.TaskChat.init(chatFold, foldOpts);
+    }
     // The status mount is what the poll repaints; the tracker line beside it is the page-load read's (LIN-3975).
     var answer = doc.querySelector('[data-testid="task-page-answer-status"]');
     var trackMount = doc.querySelector('[data-testid="task-page-track-mount"]');

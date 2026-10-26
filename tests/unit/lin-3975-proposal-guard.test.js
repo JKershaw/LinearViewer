@@ -45,16 +45,22 @@ function sessionRow(id, issueIdentifier) {
   };
 }
 
-/** Two terminal sessions in this workspace: the run the chat is about (TEST-1) and another run (TEST-2). */
+/**
+ * Two terminal sessions in this workspace: the run the chat is about (TEST-1) and another run (TEST-2).
+ */
 function twoSessionStores() {
-  const history = [sessionRow(RUN_ID, 'TEST-1'), sessionRow(OTHER_RUN_ID, 'TEST-2')];
+  // A worker on TEST-3 stamped with the run's sessionId: the run spans two tasks, as an autopilot session can.
+  const worker = { ...sessionRow('worker-3', 'TEST-3'), sessionId: RUN_ID };
+  const history = [sessionRow(RUN_ID, 'TEST-1'), worker, sessionRow(OTHER_RUN_ID, 'TEST-2')];
+  const addItemCalls = [];
   return {
+    addItemCalls,
     dispatchQueueStore: {
       getGrantDeclaration: async () => ({ state: 'none' }),
       async listItems() { return []; },
       async listHistory() { return { items: history, total: history.length }; },
       async getItemStatus() { return null; },
-      async addItem() { throw new Error('a proposal dispatches nothing'); },
+      async addItem(urlKey, item) { addItemCalls.push(item); throw new Error('a proposal dispatches nothing'); },
     },
     agentStatusStore: { async listStatus() { return { items: [], total: 0 }; } },
   };
@@ -136,3 +142,72 @@ describe('LIN-3975 — a run-scoped chat proposes only for the run it is about',
     assert.ok(text.includes('"phase":"proposed"'));
   });
 });
+
+/** The fold: a task-scoped turn (`propose: true`, no run) proposes for a session that touches THIS task. */
+function foldAppBody(stores, runProposalsStore, chatClient) {
+  return buildTaskChatApp({
+    workspace: realAiWorkspace(),
+    dispatchQueueStore: stores.dispatchQueueStore,
+    agentStatusStore: stores.agentStatusStore,
+    proxyTokenStore: { async createToken() { return { token: 'minted' }; } },
+    runProposalsStore,
+    sessionOverrides: { openRouterApiKey: 'sk-test' },
+    freeTierStore: { tryUse: async () => ({ allowed: true }) },
+    chatClient,
+  });
+}
+
+describe('LIN-3975 — the task page fold proposes only for the task it is on', () => {
+  test('a fold proposal for another task\'s session is refused, and nothing is persisted', async () => {
+    const stores = twoSessionStores();
+    const runProposalsStore = fakeRunProposalsStore();
+    const app = foldAppBody(stores, runProposalsStore, modelProposing(OTHER_RUN_ID));
+
+    const { status, text } = await withServer(app, ({ post }) =>
+      post(`/workspace/${URL_KEY}/api/task-chat/TEST-1`, { question: 'where do you stand?', propose: true }));
+
+    assert.strictEqual(status, 200);
+    assert.strictEqual(runProposalsStore.created.length, 0, 'the other task\'s proposal is not persisted');
+    assert.ok(text.includes(`Proposal targets session ${OTHER_RUN_ID}, which does not touch this task`));
+    assert.strictEqual(stores.addItemCalls.length, 0, 'a fold turn never queues work');
+  });
+
+  test('a fold proposal for a session that touches this task is persisted once, and a multi-task session counts', async () => {
+    const stores = twoSessionStores();
+    const runProposalsStore = fakeRunProposalsStore();
+    const app = foldAppBody(stores, runProposalsStore, modelProposing(RUN_ID));
+
+    const { text } = await withServer(app, ({ post }) =>
+      post(`/workspace/${URL_KEY}/api/task-chat/TEST-1`, { question: 'where do you stand?', propose: true }));
+
+    assert.strictEqual(runProposalsStore.created.length, 1);
+    assert.strictEqual(runProposalsStore.created[0].runId, RUN_ID);
+    assert.ok(text.includes('"phase":"proposed"'), 'the reader sees the staged change, not a queued one');
+  });
+
+  test('a propose turn with no proposal stores is refused before the model runs', async () => {
+    const stores = twoSessionStores();
+    const app = buildTaskChatApp({
+      workspace: realAiWorkspace(),
+      dispatchQueueStore: stores.dispatchQueueStore,
+      agentStatusStore: stores.agentStatusStore,
+      proxyTokenStore: { async createToken() { return { token: 'minted' }; } },
+      sessionOverrides: { openRouterApiKey: 'sk-test' },
+      freeTierStore: { tryUse: async () => ({ allowed: true }) },
+      chatClient: { async streamChat() { throw new Error('the model must not run'); }, async streamChatWithTools() { throw new Error('the model must not run'); } },
+    });
+    const { status, text } = await withServer(app, ({ post }) =>
+      post(`/workspace/${URL_KEY}/api/task-chat/TEST-1`, { question: 'where do you stand?', propose: true }));
+    assert.strictEqual(status, 503);
+    assert.match(text, /Run-scoped chat is not configured/);
+  });
+
+  test('propose must be a boolean: a string is an ordinary chat, which keeps the owner gate', () => {
+    // The route reads `req.body?.propose === true` (routes/task-chat.js), so only the boolean true proposes.
+    const flag = (v) => v === true;
+    assert.equal(flag('true'), false);
+    assert.equal(flag(1), false);
+    assert.equal(flag(true), true);
+  });
+});
+

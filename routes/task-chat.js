@@ -435,6 +435,10 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
     if (rawRunId && !UUID_REGEX.test(rawRunId)) {
       return badRequest.json(res, 'runId must be a UUID');
     }
+    // LIN-3975: the task page's fold is propose-only. A `propose: true` turn is a task-scoped chat that proposes
+    // instead of queueing work, whatever run (if any) it names; it must be a boolean, and it needs the same stores a
+    // run-scoped turn does (its proposals are persisted to them).
+    const propose = req.body?.propose === true;
 
     // `isTestMode` gates the DATA mock; `mockAi` additionally fires the AI mock
     // for local-provider sessions. The AI-config + free-tier guards key off
@@ -480,10 +484,12 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
     // session belongs to THIS workspace — a cross-workspace run id is refused,
     // never proposed to. Ordinary chats (no runId) skip all of this.
     const runScoped = !!rawRunId;
-    if (runScoped) {
+    if (runScoped || propose) {
       if (!dispatchQueueStore || !agentStatusStore || !runProposalsStore) {
         return serviceUnavailable.json(res, 'Run-scoped chat is not configured for this workspace');
       }
+    }
+    if (runScoped) {
       try {
         const found = await readSessionById(workspace.urlKey, rawRunId, { dispatchStore: dispatchQueueStore, agentStatusStore });
         if (!found) {
@@ -500,13 +506,18 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
     // secret-scan hit) throws and surfaces as a tool-error breadcrumb in chat.
     const persistProposal = async (proposal) => {
       // LIN-3975 (F3): the one check both producers share, run before anything is written. The model chose the
-      // proposal's session, so a run-scoped turn's proposal must be for THAT run: a proposal for another run would
-      // show Apply on that run's page. A refusal is a tool-error breadcrumb in the chat, not a stored proposal.
+      // proposal's session, so a proposal must be for the turn's own subject: a run-scoped turn's proposal is for THAT
+      // run, and a task-scoped (fold) turn's proposal is for a session that touches THIS task. Either way a proposal
+      // for something else would show Apply on another run's page. A refusal is a tool-error breadcrumb in the chat.
       if (rawRunId && proposal.sessionId !== rawRunId) {
         throw new Error(`Proposal targets session ${proposal.sessionId}, not this run`);
       }
       const session = await readSessionById(workspace.urlKey, proposal.sessionId, { dispatchStore: dispatchQueueStore, agentStatusStore });
       if (!session) throw new Error(`Session ${proposal.sessionId} not found`);
+      // The turn's task: the context's identifier, else the path's (the page posts the identifier it shows).
+      if (!rawRunId && propose && !(session.tasksTouched || []).includes(context.issue?.identifier || issueId)) {
+        throw new Error(`Proposal targets session ${proposal.sessionId}, which does not touch this task`);
+      }
       let stepLoopId = null;
       try { ({ followUpTo: stepLoopId } = deriveFollowUpDispatch(session)); } catch { stepLoopId = null; }
       await runProposalsStore.create({
@@ -538,7 +549,7 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
           // one proposal, and dispatch nothing.
           const proposal = runScoped ? { sessionId: rawRunId, prompt: followUp.prompt } : followUp;
           sendSSE(res, 'tool', { phase: 'call', iteration: 1, name: 'send_follow_up', arguments: { sessionId: proposal.sessionId, prompt: proposal.prompt } });
-          if (runScoped) {
+          if (runScoped || propose) {
             try {
               await persistProposal(proposal);
               sendSSE(res, 'tool', { phase: 'proposed', iteration: 1, name: 'send_follow_up', result: `proposed a follow-up to session ${proposal.sessionId}` });
@@ -628,7 +639,7 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
         turnKind: 'user-initiated',
         // LIN-3254: a run-scoped turn proposes (and persists via onProposal);
         // an ordinary chat keeps today's execute posture.
-        ...(runScoped ? { followUpMode: 'propose', onProposal: persistProposal } : {}),
+        ...(runScoped || propose ? { followUpMode: 'propose', onProposal: persistProposal } : {}),
         message: question.trim(),
         history: safeHistory,
         apiKey: apiKeyToUse,

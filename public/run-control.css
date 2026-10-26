@@ -382,3 +382,13 @@
   font-size: 11px;
   color: var(--amber-dim);
 }
+
+/* LIN-3975: a chat proposal staged for the run control. A row is one line; Apply is the shared primary button,
+   Decline the quiet one. A settled row keeps one quiet word. */
+.opened-task-proposals { margin-top: var(--space-2); }
+.opened-task-proposals-note { margin: 0 0 var(--space-1); font-size: 0.8rem; color: var(--muted); }
+.opened-task-proposal-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); }
+.opened-task-proposal { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.opened-task-proposal-why { font-size: 0.9rem; min-width: 0; overflow-wrap: anywhere; }
+.opened-task-proposal-actions { display: inline-flex; gap: var(--space-2); }
+.opened-task-proposal-state { font-size: 0.8rem; color: var(--muted); }

@@ -7,8 +7,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { renderStyleguide, TASK_PAGE_PIECES } from '../../lib/render-styleguide.js';
 
-test('the task page pieces are the top answer, the moment, the quiet step and the attempt run link', () => {
-  assert.deepEqual(TASK_PAGE_PIECES.map(p => p.id), ['top-answer', 'task-time', 'quiet-step', 'attempt-run-link']);
+test('the task page pieces are the top answer, the moment, the quiet step, the chat fold and the attempt run link', () => {
+  assert.deepEqual(TASK_PAGE_PIECES.map(p => p.id), ['top-answer', 'task-time', 'quiet-step', 'chat-fold', 'attempt-run-link']);
 });
 
 test('every task page piece states its purpose, parts, sizes, states and light/dark', () => {

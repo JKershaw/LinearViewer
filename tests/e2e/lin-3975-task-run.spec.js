@@ -2,6 +2,7 @@ import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId } from '../fixtures/local-harness.js';
 import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 import { expectNoClippedOverflow } from '../helpers.js';
+import { renderSSEFrames } from '../fixtures/flight-companion-sse-frames.js';
 
 // LIN-3975 (PRs 1 and 2): the task page moves the task on, in a browser.
 //
@@ -26,12 +27,13 @@ test.beforeEach(async ({ page, localWorkerUrlKey }) => {
   await page.goto(`/test/clear-sessions-feed-cache?urlKey=${URL_KEY}`);
 });
 
-async function seedTask(page, { description = 'Seeded run control task' } = {}) {
+async function seedTask(page, { description = 'Seeded run control task', features } = {}) {
   const id = (raw) => localSeedId(URL_KEY, raw);
   const resp = await page.request.post('/test/set-local-session', {
     data: {
       urlKey: URL_KEY,
       runnerKey: true,
+      ...(features ? { features } : {}),
       projects: [{ id: id('rc-proj'), name: 'Run control project', content: 'A project', sortOrder: 1 }],
       issues: [{
         id: id('rc-task'), identifier: TASK, title: 'A task with a plan done', description,
@@ -142,6 +144,31 @@ test.describe('LIN-3975 — the task page moves the task on', () => {
     await more.click();
     await expect(body).not.toHaveClass(/task-md--cut/);
     await expect(more).toBeHidden();
+  });
+
+  test('the owner\'s fold sends a propose-only turn, and the answer lands in its transcript', async ({ page }) => {
+    await seedTask(page, { features: { taskChat: true } });
+    await seedWorkspaceOwnership(page, URL_KEY, 'owner');
+    const turns = [];
+    await page.route('**/api/task-chat/**', async (route) => {
+      turns.push(route.request().postDataJSON());
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        body: renderSSEFrames([['token', { token: 'Nothing has run yet.' }], ['done', {}]]),
+      });
+    });
+
+    await page.goto(`/workspace/${URL_KEY}/task/${TASK}`);
+    const fold = page.locator('[data-testid="task-page-chat-fold"]');
+    await expect(fold).toHaveCount(1);
+    await fold.locator('summary').click();
+    await page.locator('[data-testid="task-page-chat-question"]').fill('where do you stand?');
+    await page.locator('[data-testid="task-page-chat-send"]').click();
+    await expect(fold.locator('[data-task-chat="transcript"]')).toContainText('Nothing has run yet.');
+    expect(turns).toHaveLength(1);
+    expect(turns[0].propose).toBe(true);
+    expect(turns[0].question).toBe('where do you stand?');
   });
 
   test('at 390×844 the answer and the run control sit on the first screen, with no sideways scroll', async ({ page }) => {

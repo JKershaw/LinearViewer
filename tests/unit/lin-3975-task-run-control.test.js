@@ -71,12 +71,13 @@ const esc = (s) => escapeHtml(s);
  * The page's stubs. `prompt` answers `/api/prompt/…` (a hang, a failure, or a prompt); `reply` and `rateLimit`
  * drive the streamed reply and the proxy's token-limit notice, so every phase of the component is reachable.
  */
-function load({ opened = null, lastCopy = null, prompt = null, fetch = null, reply = null, rateLimit = false } = {}) {
+function load({ opened = null, lastCopy = null, prompt = null, fetch = null, reply = null, rateLimit = false, calls = [] } = {}) {
   const window = {
     escapeHtml: esc,
     stripCodeBlockWrapper: (s) => s,
     renderMarkdown: (s) => String(s == null ? '' : s),
-    api: async (url) => {
+    api: async (url, o) => {
+      calls.push({ url, method: o && o.method ? o.method : 'GET' });
       if (url.includes('/api/task/')) return opened;
       if (url.includes('/api/task-mode/')) return { lastCopy };
       if (url.includes('/api/dispatch/preview')) return null;
@@ -158,6 +159,11 @@ function makeContainer() {
     /** A reader's press on a control with these `data-*` attributes (`dataset` keys, camelCase). */
     press(dataset) {
       const btn = { dataset, disabled: false, textContent: '', classList: { add() {}, remove() {} } };
+      // A real element answers getAttribute for its data-* attributes, the way the component reads them.
+      btn.getAttribute = (name) => {
+        const key = name.replace(/^data-/, '').replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+        return key in dataset ? dataset[key] : null;
+      };
       btn.closest = (sel) => (sel.includes('button') ? btn : null);
       for (const fn of listeners.click || []) fn({ target: btn });
     },
@@ -399,6 +405,8 @@ const HOOK = Object.freeze({
   'opened-task-settings-link': 'a plain link inside the "Runs on" sentence; it inherits the sentence style',
   'opened-task-source': 'a plain text span inside the "Runs on" sentence; it reads as text by design',
   'opened-task-use': 'test/JS hook on the "Use for this run" button; the .btn--primary base class draws it',
+  'opened-task-proposal-apply': 'test/JS hook on the Apply button of a staged chat proposal; the .btn--primary base class draws it',
+  'opened-task-proposal-decline': 'test/JS hook on the Decline button of a staged chat proposal; the .btn--quiet base class draws it',
   'swipe-reasoning': 'Swipe\'s hook on the reasoning toggle; the task surface styles the same block by opened-task-reasoning',
 });
 
@@ -533,6 +541,53 @@ describe('LIN-3975 — the run control\'s classes are styled by the sheets the t
   });
 });
 // ─── the client's wiring order ───────────────────────────────────────────────
+
+describe('LIN-3975 — a staged chat proposal is applied or declined from the run control', () => {
+  const PROPOSAL = { id: 'prop-1', runId: 'run-9', reason: 'Please post a status update.' };
+
+  async function mountWithProposal(calls) {
+    const PS = load({ opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, calls });
+    const c = makeContainer();
+    PS.init(c, { ...BASE, surface: 'task', proposals: [PROPOSAL] });
+    await flush();
+    await flush();
+    return c;
+  }
+
+  test('the proposal is listed with its reason, and Apply and Decline sit beside it', async () => {
+    const c = await mountWithProposal([]);
+    assert.match(c.innerHTML, /data-testid="opened-task-proposals"/);
+    assert.match(c.innerHTML, /Proposed in chat: Please post a status update\./);
+    assert.match(c.innerHTML, /data-action="apply-proposal" data-proposal-id="prop-1" data-run-id="run-9"[^>]*>Apply</);
+    assert.match(c.innerHTML, /data-action="decline-proposal" data-proposal-id="prop-1" data-run-id="run-9"[^>]*>Decline</);
+    assert.match(c.innerHTML, /Change does not apply to it/, 'the run control says what Apply does');
+  });
+
+  test('Apply posts to the run page\'s apply endpoint, then settles the row to one quiet word', async () => {
+    const calls = [];
+    const c = await mountWithProposal(calls);
+    c.press({ action: 'apply-proposal', proposalId: 'prop-1', runId: 'run-9' });
+    await flush();
+    await flush();
+    const post = calls.find(call => /\/proposals\/prop-1\/apply$/.test(call.url));
+    assert.ok(post, 'the apply endpoint is called');
+    assert.equal(post.method, 'POST');
+    assert.match(post.url, /\/api\/run\/run-9\/proposals\/prop-1\/apply$/);
+    assert.match(c.innerHTML, /data-testid="opened-task-proposal-state">applied</, 'settled in place');
+    assert.doesNotMatch(c.innerHTML, /data-action="apply-proposal"/, 'no Apply once applied');
+  });
+
+  test('Decline posts to the decline endpoint and never to apply', async () => {
+    const calls = [];
+    const c = await mountWithProposal(calls);
+    c.press({ action: 'decline-proposal', proposalId: 'prop-1', runId: 'run-9' });
+    await flush();
+    await flush();
+    assert.ok(calls.some(call => /\/proposals\/prop-1\/decline$/.test(call.url)));
+    assert.ok(!calls.some(call => /\/apply$/.test(call.url)));
+    assert.match(c.innerHTML, /data-testid="opened-task-proposal-state">declined</);
+  });
+});
 
 describe('LIN-3975 — the run control is wired before the first Markdown render', () => {
   test('public/task-page.js init: PromptSection.init on the run control precedes every Markdown render', () => {

@@ -141,6 +141,7 @@ const LOOKUP_ALLOW = {
   'task-page.js:[data-testid="task-page"][data-state-url]': 'page root, an ancestor of all ticket text',
   'task-page.js:[data-testid="task-page-owner-widgets"]': 'captured: mountWidgets, before enhanceContextMarkdown',
   'task-page.js:[data-testid="task-page-question"]': 'captured: init (LIN-3499), before markdown; the poll only removes it',
+  'task-page.js:[data-testid="task-page"] > [data-testid="task-page-chat-fold"]': 'captured: init (LIN-3975), before markdown; a direct child of the page, so a copy in ticket text is never the fold',
   'task-page.js:[data-testid="task-page-description"] > [data-testid="task-page-description-more"]': 'captured: init (LIN-3975), before markdown; the section\'s own child, outside the description body, so a copy inside the ticket text is never this control',
   'task-page.js:[data-testid="task-page-answer-status"]': 'init, before markdown; repaint target only (the tracker line beside it is not repainted)',
   'task-page.js:[data-testid="task-page-run-control"]': 'captured: init (LIN-3975), before enhanceContextMarkdown/enhanceMarkdown; the owner-only run control root, whose options are read from its data-run-opts',
