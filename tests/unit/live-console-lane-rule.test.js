@@ -219,6 +219,14 @@ test('LIN-3986 (pin): a lone lane is deep-equal to today\'s lane shape, sparse i
     parkedWait: null,
     credential: { state: 'ok', label: null },
     issueSource: 'linear',
+    // LIN-3977: the lane gains its title, stage, run id and waiting facts (additive;
+    // this fixture has no title, no kind, no session index, and is not waiting).
+    title: null,
+    stage: 'Step',
+    sessionId: null,
+    waiting: false,
+    waitingSince: null,
+    waitingFor: null,
   }]);
 });
 

@@ -34,6 +34,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 import { nodeKey } from '../../lib/tree.js';
+import { liveConsoleOn } from '../../lib/run-controls.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
@@ -78,6 +79,8 @@ async function runRenderDashboardAfterRefresh({ fetchResult, topTask = null }) {
     subtaskNeedingYouByNodeKey: () => ({}),
     requestFeatureFlags: async () => ({}),
     resolveRunControls: async () => ({ runControls: false, runSetup: false }),
+    // LIN-3977: the post-401 Home render applies the promotion rule (server.js), so the real one is injected.
+    liveConsoleOn,
     // LIN-2526: renderDashboardAfterRefresh now derives a provider off the
     // workspace to compute canFilterByMe — a bare stub is enough here since
     // this suite is only proving `truncated` survives the refresh render tail.
@@ -186,6 +189,8 @@ async function runPrimaryDashboardRoute({ fetchResult }) {
     subtaskNeedingYouByNodeKey: () => ({}),
     requestFeatureFlags: async () => ({}),
     resolveRunControls: async () => ({ runControls: false, runSetup: false }),
+    // LIN-3977: the post-401 Home render applies the promotion rule (server.js), so the real one is injected.
+    liveConsoleOn,
     isAuthError: () => false,
     handleUnauthorizedError: async () => {},
     renderUpstreamAwareErrorPage: () => '<error/>',

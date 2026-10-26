@@ -34,6 +34,7 @@ import { orderIssuesForSwipe } from '../../lib/render-swipe.js';
 import { nodeKey } from '../../lib/tree.js';
 import { renderSourceErrorPage } from '../../lib/render-pages.js';
 import { errorReference, isAuthError } from '../../lib/errors.js';
+import { liveConsoleOn } from '../../lib/run-controls.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
@@ -111,6 +112,8 @@ function harness({ degraded = [], remintFails = false, fetchThrows = null, fetch
     subtaskNeedingYouByNodeKey: () => ({}),
     requestFeatureFlags: async () => ({}),
     resolveRunControls: async () => ({ runControls: false, runSetup: false }),
+    // LIN-3977: the post-401 Home render applies the promotion rule (server.js), so the real one is injected.
+    liveConsoleOn,
     fetchAndPrepareProjects: async (...args) => {
       calls.fetch.push(args);
       if (fetchThrows) throw fetchThrows;
