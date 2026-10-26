@@ -44,12 +44,15 @@ describe('render-observation: rulings-tab limits disclaimer (LIN-2241 criterion 
     { urlKey: 'ws-a' }
   );
 
-  test('the rulings section says in plain words that some questions are automatic and can be wrong', () => {
-    // LIN-2241's "Honest framing" (it must not be relied on as a guarantee that nothing is missed) still
-    // holds, in the words a person reads (LIN-3983 PR 2): one plain sentence, no internal term.
+  test('the rulings section says in plain words that some questions are automatic, can be wrong and can be missed', () => {
+    // LIN-2241's "Honest framing" (it will miss things and raise noise, and must not be relied on as a
+    // guarantee that nothing is missed) holds, in the words a person reads (LIN-3983 PR 2): one plain
+    // sentence carrying both halves, no internal term.
     const out = html();
     assert.match(out, /id="obs-rulings-limits"/);
-    assert.match(out, /Some questions are raised automatically by a model reading a task, and they can be wrong\./);
+    assert.match(out, /Some questions are raised automatically by a model reading a task, so some can be wrong and some can be missed\./);
+    assert.match(out, /can be wrong/);
+    assert.match(out, /can be missed/);
   });
 
   test('the disclaimer sits inside the rulings section, above the feed it qualifies', () => {

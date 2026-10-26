@@ -1892,13 +1892,13 @@ async function pollRulings() {
 
     const data = await res.json();
     lastRulings = Array.isArray(data.rulings) ? data.rulings : [];
-    if (Array.isArray(data.openLoopIds)) openLoopIds = new Set(data.openLoopIds);
-    else if (openLoopIds === null) openLoopIds = new Set();
+    const openChanged = settleOpenLoopIds(Array.isArray(data.openLoopIds) ? new Set(data.openLoopIds) : null);
     if (onRulingsTab) {
       renderRulings(lastRulings);
       setPollStatus('● live');
     } else {
       renderWaitingBlock();
+      if (openChanged) repaintWaitingCardHeads();
     }
   } catch (e) {
     rulingsReadFailed(onRulingsTab);
@@ -1911,8 +1911,31 @@ async function pollRulings() {
 // row, so no wait is hidden for want of a ruling read.
 function rulingsReadFailed(onRulingsTab) {
   if (onRulingsTab) setPollStatus('● disconnected');
-  if (openLoopIds === null) openLoopIds = new Set();
-  if (!onRulingsTab) renderWaitingBlock();
+  const openChanged = settleOpenLoopIds(null);
+  if (!onRulingsTab) {
+    renderWaitingBlock();
+    if (openChanged) repaintWaitingCardHeads();
+  }
+}
+
+// Settles `openLoopIds` from a rulings response: the new set, or null for "no set in this
+// response", which keeps the last one and settles a never-read page to the empty set. Returns
+// whether the contents changed, so a caller repaints only when they did.
+function settleOpenLoopIds(next) {
+  const prev = openLoopIds;
+  if (next === null) next = prev === null ? new Set() : prev;
+  openLoopIds = next;
+  return prev === null || prev.size !== next.size || [...next].some(id => !prev.has(id));
+}
+
+// A waiting card offers its answer choices only while its producer loop is in openLoopIds
+// (renderWaitingSummary). The feed and rulings reads land in either order, so a card painted
+// under the old set is repainted when the set moves, rather than on the next feed poll.
+function repaintWaitingCardHeads() {
+  for (const sessionId of [...activeCards.keys(), ...recentCards.keys()]) {
+    const s = sessionIndex.get(sessionId);
+    if (s && s.waiting) refreshSessionCard(sessionId);
+  }
 }
 
 // Mostly-wholesale repaint (LIN-1728 Phase 4) — unlike the session feeds
@@ -4923,6 +4946,7 @@ if (typeof module !== 'undefined' && module.exports) {
     // the poll/switch seams the view model is unit-tested through.
     compactWaitSessions, stripFeedbackMarkers, viewFromParams, scopeFromParams, renderWaitingBlock,
     pollCurrentView, pollRulings, pollWaitingSupplement, switchView, setFilter, sessionsUrl, feedKey, rulingsUrl,
+    repaintWaitingCardHeads,
     openLoopIds: () => openLoopIds, setOpenLoopIds: (v) => { openLoopIds = v; },
     lastRulingsRef: () => lastRulings, standaloneWaitSupplement, sessionIndex,
     // LIN-2649 S4 / LIN-2667: the scan-due tab seam — tri-state copy/rendering,

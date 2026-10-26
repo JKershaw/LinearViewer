@@ -19,6 +19,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { FakeElement } from '../fixtures/observation-dom-shim.js';
+import { loadCommonWindow } from '../fixtures/client-common.js';
 import { buildSessionPayload } from '../../routes/dashboard-feed.js';
 import { collectUnansweredDecisions, openDecisionLoopIds, MAX_STAMP_LOOP_IDS } from '../../lib/unanswered-decisions.js';
 
@@ -44,6 +45,8 @@ function makeSandbox({ fetchImpl, href = 'https://harbour.test/workspace/acme/ob
       history: { state: null, replaceState(state, title, url) { replaced.push(url); } },
       ChatUI: { appendOptions() {}, resolveCaption: () => '' },
       sourceQuery: () => '',
+      renderStatusPill: loadCommonWindow().renderStatusPill,
+      renderSegmentBar: loadCommonWindow().renderSegmentBar,
       api: async () => { throw new Error('window.api not stubbed'); }
     },
     document: {
@@ -288,6 +291,88 @@ describe('the waiting block paint (LIN-3983)', () => {
     const more = sandbox.__nodes.get('obs-waiting-more');
     assert.equal(more.hidden, false);
     assert.equal(more.textContent, '2 more in Rulings →');
+  });
+});
+
+describe('a waiting card\'s answer choices follow the rulings read, whichever read lands first (LIN-3983, review D)', () => {
+  const RECENT = new Date(Date.now() - 60 * 1000).toISOString();
+  const loop = (over = {}) => ({
+    loopId: 'w', lineageId: null, kind: 'implementation', followUpTo: null, sessionId: 'S',
+    issueIdentifier: 'LIN-900', issueTitle: 'Remove the old route', workspaceUrlKey: 'acme', dispatchedAt: RECENT, resolvedAt: null,
+    decision: null, decisionCase: [], answeredDecisions: [], withdrawal: null, wakeMarker: null, waitingMessage: null, ...over
+  });
+  const decision = { decision_id: 'd-1', question: 'Which sign-in method?', options: [{ id: 'a', label: 'Email link' }, { id: 'b', label: 'Linear OAuth' }] };
+  const waitingPayload = () => buildSessionPayload({
+    sessionId: 'S',
+    loops: [
+      loop({ loopId: 'ap', lineageId: 'ap', kind: 'autopilot', sessionId: 'ap', issueIdentifier: null, issueTitle: null }),
+      loop({ loopId: 'w', wakeMarker: 'blocked', waitingMessage: '[blocked] Which sign-in method should I build?', decision })
+    ]
+  }, { urlKey: 'acme', name: 'Acme' }, false);
+
+  // A card already on screen, as the feed paints it: its head is a node the page repaints in place.
+  function paintedCard(sandbox, payload) {
+    const head = { innerHTML: '' };
+    const body = { hidden: true, dataset: {}, querySelector: () => null };
+    const li = {
+      dataset: {},
+      classList: { toggle() {} },
+      querySelector: (sel) => (sel === '.obs-session-head' ? head : sel === '.obs-session-body' ? body : null)
+    };
+    const { sessionIndex } = sandbox.module.exports;
+    sessionIndex.set(String(payload.sessionId), payload);
+    vm.runInContext('activeCards', sandbox).set(payload.sessionId, li);
+    vm.runInContext('refreshSessionCard', sandbox)(payload.sessionId);
+    return head;
+  }
+
+  test('a card painted before the first rulings read gains its choices when the read lands, with no feed poll', async () => {
+    const sandbox = makeSandbox({ fetchImpl: async () => jsonResponse({ rulings: [], openLoopIds: ['w'] }) });
+    const { pollRulings, openLoopIds } = sandbox.module.exports;
+    const payload = waitingPayload();
+    assert.equal(payload.producerLoopId, 'w');
+    assert.equal(openLoopIds(), null);
+    const head = paintedCard(sandbox, payload);
+    assert.doesNotMatch(head.innerHTML, /obs-summary-decision-options/, 'no choices before the rulings read');
+    await pollRulings();
+    await flush();
+    assert.match(head.innerHTML, /Answer with Email link · Linear OAuth/, 'the choices appear when the rulings read lands');
+  });
+
+  test('a card drops its choices when a later rulings read no longer lists the question as open', async () => {
+    let open = ['w'];
+    const sandbox = makeSandbox({ fetchImpl: async () => jsonResponse({ rulings: [], openLoopIds: open }) });
+    const { pollRulings } = sandbox.module.exports;
+    const head = paintedCard(sandbox, waitingPayload());
+    await pollRulings();
+    await flush();
+    assert.match(head.innerHTML, /obs-summary-decision-options/);
+    open = [];
+    await pollRulings();
+    await flush();
+    assert.doesNotMatch(head.innerHTML, /obs-summary-decision-options/, 'a dismissed or answered question is not offered again');
+  });
+
+  test('a failed first rulings read settles the set to empty and repaints, so no choice is offered for want of a read', async () => {
+    const sandbox = makeSandbox({ fetchImpl: async () => jsonResponse({}, { ok: false, status: 500 }) });
+    const { pollRulings, openLoopIds } = sandbox.module.exports;
+    const head = paintedCard(sandbox, waitingPayload());
+    await pollRulings();
+    await flush();
+    assert.equal(openLoopIds().size, 0);
+    assert.doesNotMatch(head.innerHTML, /obs-summary-decision-options/);
+  });
+
+  test('a read that leaves the set unchanged does not repaint any card', async () => {
+    const sandbox = makeSandbox({ fetchImpl: async () => jsonResponse({ rulings: [], openLoopIds: ['w'] }) });
+    const { pollRulings } = sandbox.module.exports;
+    const head = paintedCard(sandbox, waitingPayload());
+    await pollRulings();
+    await flush();
+    head.innerHTML = 'untouched';
+    await pollRulings();
+    await flush();
+    assert.equal(head.innerHTML, 'untouched', 'same open set: the card is left alone');
   });
 });
 
