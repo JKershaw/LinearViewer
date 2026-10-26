@@ -129,6 +129,9 @@ export const PAGES = [
   // lists the same question with its proposal; Scan-due and a new user (nothing running) use the seeded local
   // workspace with no runs of its own. The two tabs and the default view each name their own state in the list.
   { id: 'observation-runs', urlKey: 'judge-obs-runs', path: (k) => `/workspace/${k}/observation`, state: 'obs-two-runs', masks: OBS_TIMES, renderers: ['lib/render-observation.js'] },
+  // The default filter (autopilot) hides the standalone working run, so its card and pill never reach the default shot.
+  // The all-runs filter shows both cards, so a change to the pill words has somewhere to show.
+  { id: 'observation-runs-all', urlKey: 'judge-obs-runs-all', path: (k) => `/workspace/${k}/observation?filter=all`, state: 'obs-two-runs', masks: OBS_TIMES, renderers: ['lib/render-observation.js'] },
   { id: 'observation-rulings', urlKey: 'judge-obs-rulings', path: (k) => `/workspace/${k}/observation?view=rulings`, state: 'obs-two-runs', masks: OBS_RULING_TIMES, renderers: ['lib/render-observation.js'] },
   { id: 'observation-due', urlKey: 'judge', path: (k) => `/workspace/${k}/observation?view=due`, renderers: ['lib/render-observation.js'] },
   { id: 'observation-new-user', urlKey: 'judge', path: (k) => `/workspace/${k}/observation`, renderers: ['lib/render-observation.js'] },
