@@ -349,10 +349,23 @@ body {
 /* =============================================================================
    Header Layout
    ============================================================================= */
-header {
+/* LIN-4009: a page's title (renderPageHeader) is left-aligned, with its summary under it. The other
+   headers (the landing hero, the ship biscuit lead) keep the centred look they always had. */
+header:not(.page-header) {
   text-align: center;
   margin-bottom: var(--space-5);
 }
+
+.page-header {
+  text-align: left;
+  margin-bottom: var(--space-5);
+}
+
+.page-header h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
 
 h1 {
   color: var(--fg);
@@ -687,10 +700,12 @@ a.wordmark:hover {
   align-items: center;
   gap: var(--space-1);
   padding: 0.2rem var(--space-2);
-  /* Quiet outline in the running hue: a count to look at, not a filled action (LIN-4009). */
+  /* Quiet outline in the running hue: a count to look at, not a filled action (LIN-4009). An inset
+     shadow, not a border, so the badge keeps its box and the LIN-2191 wrap guard reads the same. */
   background: none;
   color: var(--amber-dim);
-  border: 1px solid var(--amber);
+  box-shadow: inset 0 0 0 1px var(--amber);
+  border: none;
   border-radius: var(--radius-sm);
   font-size: 0.8em;
   font-family: var(--font-content);
@@ -1094,7 +1109,7 @@ a.wordmark:hover {
 }
 
 .in-progress-header {
-  color: var(--yellow);
+  color: var(--amber-dim);
   font-weight: 600;
   cursor: pointer;
   padding: var(--space-2) 0;
@@ -1119,6 +1134,18 @@ a.wordmark:hover {
   font-family: var(--font-content);
   white-space: nowrap;
 }
+
+/* LIN-4009: one tone map for a state's colour, read from data-tone on the row's words and on each part of
+   Home's count line. Colour carries the state as well as the words: needs you is bold with a soft red tint,
+   failed is the same red without weight, running and queued are warm, ready is the brand, quiet is muted. */
+.row-state[data-tone='needs-you'] { color: var(--red-dim); font-weight: 600; background: color-mix(in srgb, var(--red) 8%, transparent); border-radius: var(--radius-sm); }
+.row-state[data-tone='failed'] { color: var(--red-dim); }
+.row-state[data-tone='running'], .row-state[data-tone='queued'] { color: var(--amber-dim); }
+.row-state[data-tone='ready'] { color: var(--brand-dim); }
+.row-state[data-tone='quiet'] { color: var(--muted); }
+.in-progress-count__part[data-tone='needs-you'] { color: var(--red-dim); font-weight: 600; }
+.in-progress-count__part[data-tone='running'] { color: var(--amber-dim); }
+.in-progress-count__part[data-tone='quiet'] { color: var(--muted); }
 
 /* LIN-3968: the opened task is one contained block, so the eye can tell where its own content ends and the
    next row begins, at both widths. The sans face is set on the whole block: the body is monospace
@@ -1496,14 +1523,6 @@ a.wordmark:hover {
   color: var(--fg);
 }
 
-/* LIN-3833: the count line under the In Progress heading (3 in progress · 1 needs you). */
-.in-progress-count {
-  color: var(--fg-dim);
-  font-size: 0.9em;
-  font-family: var(--font-content);
-  padding-bottom: var(--space-2);
-}
-
 /* Activity time/kind shown in the Recent activity section */
 .completed-time {
   color: var(--fg-dim);
@@ -1536,7 +1555,7 @@ a.wordmark:hover {
 }
 
 .recent-activity-header {
-  color: var(--green);
+  color: var(--green-dim);
   font-weight: 600;
   cursor: pointer;
   padding: var(--space-2) 0;
@@ -2329,6 +2348,10 @@ a.wordmark:hover {
     font-size: 1.3rem;
   }
 
+  .page-header h1 {
+    font-size: 1.3rem;
+  }
+
   /* Reduce vertical spacing on issue lines */
   .line {
     padding: 2px 0;
@@ -2400,6 +2423,10 @@ a.wordmark:hover {
   }
 
   h1 {
+    font-size: 1.2rem;
+  }
+
+  .page-header h1 {
     font-size: 1.2rem;
   }
 
@@ -3391,9 +3418,9 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 /* =============================================================================
    Page Header (LIN-462, Phase A.2)
    Canonical home for the page-level <h1> + optional subtitle, rendered by
-   renderPageHeader() (lib/components/page-header.js). The <header> layout
-   (centering, margin) comes from the global `header` rule above; this block
-   owns only the subtitle, absorbing the former per-page `*-subtitle` rules.
+   renderPageHeader() (lib/components/page-header.js). The layout (left-aligned,
+   margin, the 24px title) is `.page-header` above (LIN-4009); this block owns
+   the subtitle, absorbing the former per-page `*-subtitle` rules.
    Load-bearing test-hook classes (.dashboard-subtitle, .dispatch-subtitle,
    .prompts-subtitle) ride alongside `.page-header__subtitle` as no-style hooks
    (passed via subtitleClass). `0.9em` has no exact Phase-0 token, so it stays a
@@ -3594,7 +3621,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 }
 
 /* State color modifiers — same state→token mapping as .card-accent--*. */
-.status-pill--in-progress { color: var(--yellow); }
+.status-pill--in-progress { color: var(--amber-dim); }
 .status-pill--done { color: var(--green); }
 .status-pill--todo { color: var(--fg-dim); }
 /* Idle/backlog on the semantic slate idle token (LIN-850) — the AA-safe slate
@@ -3648,6 +3675,9 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 }
 
 .status-pill--running { color: var(--amber-dim); }
+/* LIN-4009: a task waiting on a person (the header's needs-you state) reads red, as its row does. */
+.status-pill--needs-you { color: var(--red-dim); }
+.status-pill--needs-you .status-pill__dot { background: var(--red); }
 .status-pill--error   { color: var(--red-dim); }
 .status-pill--queued  { color: var(--slate-dim); }
 
@@ -3970,8 +4000,8 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   line-height: 1.6;
 }
 
-/* LIN-3956 (open question 6): the Plain column is the 40em measure, centred, so it sits under the centred
-   header instead of hugging the left. It caps the rows card too (about 1088px at 1280 otherwise).
+/* LIN-3956 (open question 6): the Plain column is the 40em measure, centred as a block, so it sits in the
+   middle of the page. Its title and text go left (LIN-4009), as on every other page. It caps the rows card too (about 1088px at 1280 otherwise).
    /styleguide builds its own <main> and never gets this class. */
 .plain-page.plain-column {
   max-width: 40em;
@@ -3986,7 +4016,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   font-size: 1.5rem;
   font-weight: normal;
   margin-bottom: var(--space-5);
-  text-align: center;
+  text-align: left;
 }
 
 /* LIN-3958: the heading steps up from the 1em prose (1.25em, so 20px over 16px), at weight 600 in --fg.
