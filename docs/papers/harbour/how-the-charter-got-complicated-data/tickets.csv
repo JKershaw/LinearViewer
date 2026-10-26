@@ -1,0 +1,18 @@
+ticket,title,state,desc_chars,comments,created,set
+LIN-3833,"Home: the opened task leads with its state and has one run control, with a copy-first view for new u",Done,15194,44,2026-10-23T21:35:04.546Z,UI
+LIN-3975,"Task page: move the task on from where you read it, with task chat in a fold",In Progress,70726,36,2026-10-25T19:07:56.302Z,UI
+LIN-3977,"Live Console: keep the delight, and make every lane say what it is doing and lead to its run",Done,18503,30,2026-10-25T19:17:47.595Z,UI
+LIN-3983,"Observation: lead with what waits on you, say each run's state once, and speak plainly",Done,17405,33,2026-10-25T19:34:06.526Z,UI
+LIN-3952,"Settings › Models polish: spend in every row, a decision panel, one name per model; finish Settings'",In Progress,43259,13,2026-10-25T13:16:04.516Z,UI
+LIN-3986,"Live Console lanes: one lane per task, chosen by one written rule (prerequisite for LIN-3977)",Done,6320,6,2026-10-25T21:58:54.505Z,comparison
+LIN-4003,"One reader for ""is this question open?"": the rulings builder's cluster rule, exported (prerequisite ",Done,6420,5,2026-10-26T03:59:04.568Z,comparison
+LIN-3995,"Landing round two: previews say they are previews, sign-in doors carry the wordmark, plainer Try cop",Done,7116,5,2026-10-26T01:29:19.104Z,comparison
+LIN-3992,"Decision panel round three: a pick updates the summary, Models' follow labels fit a phone, plainer r",Done,10477,7,2026-10-26T00:49:48.966Z,comparison
+LIN-3872,"Move: the issue-read routes (GET /api/comments/:issueId, GET /api/detail/:issueId, GET /api/image) o",Done,20132,5,2026-10-24T11:36:36.989Z,comparison
+LIN-3876,"Move: the issue-write routes (POST /api/comments/:issueId, POST /api/issues, PATCH /api/issues/:issu",Done,36616,5,2026-10-24T13:22:38.438Z,comparison
+LIN-3877,"Move: the scan routes (GET and POST /api/scan/:issueId, POST /api/scan/:issueId/dismiss, /retire and",Done,35631,7,2026-10-24T15:18:32.150Z,comparison
+LIN-3883,Move: the audit route (GET /api/audit) out of createWorkspaceApiRoutes into routes/workspace-api-aud,Done,10194,6,2026-10-24T17:09:57.015Z,comparison
+LIN-3893,Move: the feedback intake route (POST /api/feedback) out of createWorkspaceApiRoutes into routes/wor,Done,22959,7,2026-10-24T18:43:52.040Z,comparison
+LIN-3917,Close the UI flank (LIN-3754): page files take run and ordering rules through a named view model (`l,Done,30139,6,2026-10-24T20:47:39.365Z,comparison
+LIN-3846,"Settings: one page per area, built from three kinds of row, with Models inside (UI overhaul, second ",Done,67465,14,2026-10-24T07:42:22.774Z,comparison
+LIN-3849,"Settings: run controls and key tools follow rules, not the dispatch and proxy switches (LIN-3846)",Done,9736,10,2026-10-24T08:01:22.372Z,comparison

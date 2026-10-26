@@ -1,0 +1,7 @@
+state,code,tickets
+Done,served,24
+Done,process-only,17
+Done,not-needed,1
+Done,umbrella,1
+open (not Done),umbrella,2
+open (not Done),open,23
