@@ -72,6 +72,11 @@ describe('lane facts: title, stage, and the words of a wait', () => {
     assert.equal(feed.summary.working, 0);
   });
 
+  test('the question a waiting lane shows drops the feedback marker that carried it', () => {
+    const feed = feedOf([run({ loopId: 'Q', wakeMarker: 'blocked', wakeAt: at(5), waitingMessage: '[blocked] Which sign-in method should I build?' })]);
+    assert.equal(feed.lanes[0].waitingFor, 'Which sign-in method should I build?');
+  });
+
   test('a working lane is not waiting and carries no wait time', () => {
     const feed = feedOf([run({ loopId: 'W' })]);
     assert.equal(feed.lanes[0].waiting, false);
