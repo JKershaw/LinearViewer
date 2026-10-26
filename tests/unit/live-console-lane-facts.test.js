@@ -430,6 +430,37 @@ describe('the run id: the session ledger\'s, never loopId or groupKey', () => {
   });
 });
 
+describe('run links: a bar and a status row carry the ledger id, not the loop id (LIN-3977 witness)', () => {
+  // B is a stitched follow-up of A, so its ledger session is A's, not its own loopId.
+  // A witness that a loopId-built link would fail: the id differs from 'B'.
+  const chain = () => {
+    const A = run({ loopId: 'A', dispatchedAt: at(30), agentTimestamp: at(30), agentState: 'complete', terminalStatus: 'done', terminalCompletedAt: at(29) });
+    const B = run({ loopId: 'B', kind: null, followUpTo: 'A', dispatchedAt: at(10), agentTimestamp: at(10), agentState: 'complete', terminalStatus: 'done', terminalCompletedAt: at(9) });
+    return [A, B].map(l => ({ ...l, workspaceUrlKey: 'acme' }));
+  };
+
+  test('the timeline bar of a stitched follow-up carries its chain root\'s session id', () => {
+    const loops = chain();
+    const sessionIds = sessionIdByLoop(loops, { now: new Date(NOW) });
+    const root = sessionIds.get('acme::A');
+    assert.notEqual(root, 'B', 'the session id is the ledger\'s, not the loop id');
+    assert.equal(sessionIds.get('acme::B'), root);
+    const feed = feedOf(loops, [], { sessionIdByLoop: sessionIds });
+    const bars = feed.timeline.rows.flat();
+    assert.equal(bars.find(r => r.id === 'B').sessionId, root);
+    assert.equal(bars.find(r => r.id === 'A').sessionId, root);
+  });
+
+  test('a status row about a run keeps the run\'s session id when it is not folded into a derived moment', () => {
+    const loops = chain();
+    const sessionIds = sessionIdByLoop(loops, { now: new Date(NOW) });
+    const statusItems = [{ id: 'st-b', dispatchId: 'B', taskIdentifier: 'LIN-9', action: 'implementation', status: 'in_progress', summary: 'Follow-up', timestamp: at(9), workspaceUrlKey: 'acme', workspaceName: 'Acme' }];
+    // derivedSinceMs past every loop event: nothing derives, so the status row stands alone.
+    const { events } = buildConsoleEvents({ statusItems, loops, derivedSinceMs: NOW + 1, superseded: new Set(), sessionIdByLoop: sessionIds });
+    assert.equal(events.find(e => e.id === 'st-b').sessionId, sessionIds.get('acme::B'));
+  });
+});
+
 describe('promotion: one rule for stored flag and owner-with-runner', () => {
   test('liveConsoleOn truth table: a stored false opts out; a stored true opts in; unset follows the runner', () => {
     assert.equal(liveConsoleOn(undefined, false), false);

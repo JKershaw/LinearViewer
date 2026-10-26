@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { SELECTORS } from '../helpers.js';
 import { sweepFixedOverlaps, describeHits, expectSweepNotVacuous } from '../fixed-overlay-sweep.js';
+import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 
 // Experimental Live Console — an ambient, generation-free feed of the whole
 // swarm working (LIN-1436). Seeds via /test/set-session (the test-token
@@ -786,7 +787,10 @@ test.describe('Live Console (experimental)', () => {
         const cx = rect.left + rect.width / 2;
         const cy = rect.top + rect.height / 2;
         const hit = document.elementFromPoint(cx, cy);
-        return hit ? hit.getAttribute('data-testid') : null;
+        // The label link is the bar's own child (LIN-3977: it takes the pointer, so a
+        // click opens the run), so a hit on it is a hit on the bar.
+        const owner = hit ? hit.closest('[data-testid="live-console-timeline-bar"]') : null;
+        return owner ? owner.getAttribute('data-testid') : null;
       });
       expect(paintedTestid).toBe('live-console-timeline-bar');
     });
@@ -922,7 +926,7 @@ test.describe('Live Console (experimental)', () => {
       expect(staleAnim).toBe('none');
     });
 
-    test('LIN-2905: folded wakeMarkers render as ticks inside the target bar with a " · N wakes" label suffix', async ({ page }) => {
+    test('LIN-2905: folded wakeMarkers render as ticks inside the target bar with a " · N check-ins" label suffix', async ({ page }) => {
       let injected = false;
       await page.route(`**${EVENTS_API}*`, async (route) => {
         const response = await route.fetch();
@@ -952,7 +956,7 @@ test.describe('Live Console (experimental)', () => {
       await page.goto(PAGE_URL);
       const bar = page.locator('[data-testid="live-console-timeline-bar"][aria-label*="LIN-9300"]');
       await expect(bar).toBeVisible();
-      await expect(bar).toHaveAttribute('aria-label', /· 2 wakes$/);
+      await expect(bar).toHaveAttribute('aria-label', /· 2 check-ins$/);
 
       const markers = bar.locator('[data-testid="live-console-timeline-wake-marker"]');
       await expect(markers).toHaveCount(2);
@@ -961,7 +965,7 @@ test.describe('Live Console (experimental)', () => {
       const runningMarker = bar.locator('[data-testid="live-console-timeline-wake-marker"][aria-label*="LIN-9302"]');
       await expect(doneMarker).toHaveAttribute('data-still-running', 'false');
       await expect(runningMarker).toHaveAttribute('data-still-running', 'true');
-      await expect(runningMarker).toHaveAttribute('aria-label', 'woken by LIN-9302');
+      await expect(runningMarker).toHaveAttribute('aria-label', 'check-in: woken by LIN-9302');
 
       // The marker's LOCAL left% must stay clamped inside the bar's own box
       // (never < 0, never > 100) even though the wake fired after the bar's
@@ -1039,7 +1043,7 @@ test.describe('Live Console (experimental)', () => {
         const hit = document.elementFromPoint(cx, cy);
         return hit ? hit.getAttribute('aria-label') : null;
       });
-      expect(topmostLabel).toBe('woken by LIN-9501');
+      expect(topmostLabel).toBe('check-in: woken by LIN-9501');
     });
 
     test('the still-running bar animation is suppressed under prefers-reduced-motion', async ({ page }) => {
@@ -1952,6 +1956,174 @@ test.describe('Live Console (experimental)', () => {
 
       const pad = await page.evaluate(() => getComputedStyle(document.querySelector('.lc-more')).paddingRight);
       expect(pad).toBe('0px');
+    });
+  });
+
+  // LIN-3977 witnesses (review findings 1-3): the run links on every surface, the
+  // reduced-motion flip while the page is open, the [done] row, phone width, the
+  // scope switch, the bar's keyboard path and the range controls' visible names.
+  test.describe('LIN-3977: run links, motion, scope and phone', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
+      await clearFeed(page, URL_KEY);
+    });
+
+    test('a lane, a timeline bar and a stream row about a run each link to its run page, which returns 200', async ({ page }) => {
+      await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9301' });
+      await page.goto(PAGE_URL);
+      const lane = page.locator('[data-testid="live-console-lane"] a.lc-lane-run').first();
+      const bar = page.locator('[data-testid="live-console-timeline-bar"] a.lc-timeline-bar-label').first();
+      const row = page.locator('[data-testid="live-console-stream"] [data-testid="live-console-event"] a.lc-event-task').first();
+      const runPath = new RegExp(`^/workspace/${URL_KEY}/observation/session/[^/]+$`);
+      for (const link of [lane, bar, row]) {
+        await expect(link).toHaveAttribute('href', runPath);
+        const href = await link.getAttribute('href');
+        const response = await page.request.get(href);
+        expect(response.status(), `${href} should open the run`).toBe(200);
+      }
+    });
+
+    test('switching reduced motion on while the page is open stops the strip and the lane pulse', async ({ page }) => {
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      // Count the strip's per-frame repaints: clearRect is called once per paint, and only the strip canvas paints this way.
+      await page.addInitScript(() => {
+        window.__lcClears = 0;
+        const clear = CanvasRenderingContext2D.prototype.clearRect;
+        CanvasRenderingContext2D.prototype.clearRect = function (...args) { window.__lcClears += 1; return clear.apply(this, args); };
+      });
+      await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9302' });
+      await page.goto(PAGE_URL);
+      const lane = page.locator('[data-testid="live-console-lane"]').first();
+      await expect(lane).toHaveClass(/lc-lane--pulse/);
+
+      const paints = () => page.evaluate(() => window.__lcClears);
+      const before = await paints();
+      await page.waitForTimeout(800);
+      expect(await paints() - before, 'the strip repaints every frame while motion is allowed').toBeGreaterThan(20);
+
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await expect(lane, 'the reused lane node loses its pulse').not.toHaveClass(/lc-lane--pulse/);
+      await page.waitForTimeout(300);
+      const frozen = await paints();
+      await page.waitForTimeout(1200);
+      expect(await paints() - frozen, 'with reduced motion on, the strip repaints only once per poll').toBeLessThanOrEqual(2);
+    });
+
+    test('a seeded [done] adds one "finished" stream row within one poll, and never a second', async ({ page }) => {
+      await page.goto(PAGE_URL);
+      await expect(page.getByTestId('live-console-banner')).toBeVisible();
+      await seedTerminalWorker(page, URL_KEY, { task: 'LIN-9303', message: '[done] shipped' });
+      const finished = page.locator('[data-testid="live-console-stream"] [data-testid="live-console-event"]', { hasText: 'LIN-9303' }).filter({ hasText: 'finished' });
+      await expect(finished).toHaveCount(1, { timeout: 12_000 });
+      await page.waitForTimeout(6_000);
+      await expect(finished, 'one poll later it is still one row').toHaveCount(1);
+    });
+
+    test('at 390×844 the page, the lanes and the stream fit with no sideways scroll', async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9304' });
+      await seedTerminalWorker(page, URL_KEY, { task: 'LIN-9305', message: '[done] shipped' });
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-lane"]');
+      await page.waitForSelector('[data-testid="live-console-event"]');
+      const overflow = await page.evaluate(() => {
+        const measured = ['.lc-page', '#live-console-lanes', '#live-console-stream', '#live-console-timeline'];
+        const out = measured.map(sel => {
+          const el = document.querySelector(sel);
+          return [sel, el ? el.scrollWidth - el.clientWidth : 0];
+        });
+        out.push(['document', document.documentElement.scrollWidth - window.innerWidth]);
+        return out;
+      });
+      for (const [sel, px] of overflow) expect(px, `${sel} overflows sideways by ${px}px`).toBeLessThanOrEqual(0);
+    });
+
+    test('with two workspaces the page opens on the current one, and "all workspaces" shows both', async ({ page, secondWorkerUrlKey }) => {
+      await page.goto(`/test/set-session?multiWorkspace=true&urlKey=${URL_KEY}&${featuresParam({ liveConsole: true })}`);
+      await seedWorkspaceOwnership(page, URL_KEY, 'owner');
+      await seedWorkspaceOwnership(page, secondWorkerUrlKey, 'owner');
+      await clearFeed(page, URL_KEY);
+      await clearFeed(page, secondWorkerUrlKey);
+      await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9306' });
+      await seedRunningLoopWithToken(page, secondWorkerUrlKey, { task: 'LIN-9307' });
+      await page.goto(PAGE_URL);
+
+      const lanes = page.locator('[data-testid="live-console-lane"]');
+      await expect(lanes.filter({ hasText: 'LIN-9306' })).toHaveCount(1);
+      await expect(lanes.filter({ hasText: 'LIN-9307' })).toHaveCount(0);
+      await expect(page.getByTestId('live-console-scope-current')).toHaveAttribute('aria-pressed', 'true');
+
+      await page.getByTestId('live-console-scope-all').click();
+      await expect(lanes.filter({ hasText: 'LIN-9306' })).toHaveCount(1);
+      await expect(lanes.filter({ hasText: 'LIN-9307' })).toHaveCount(1);
+    });
+
+    test('a timeline bar is reached by Tab and opened by Enter', async ({ page }) => {
+      await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9308' });
+      await page.goto(PAGE_URL);
+      const bar = page.locator('[data-testid="live-console-timeline-bar"] a.lc-timeline-bar-label').first();
+      await expect(bar).toBeVisible();
+      await page.evaluate(() => document.activeElement && document.activeElement.blur());
+      let reached = false;
+      for (let i = 0; i < 150 && !reached; i++) {
+        await page.keyboard.press('Tab');
+        reached = await bar.evaluate(el => el === document.activeElement);
+      }
+      expect(reached, 'the bar is in the Tab order').toBe(true);
+      await Promise.all([page.waitForURL(/\/observation\/session\//), page.keyboard.press('Enter')]);
+    });
+
+    // LIN-3977 (outcome 4): a bar's full label is one step away with no ellipsis: the
+    // detail line under the timeline names it. The touch case dispatches a touch
+    // pointerdown then a click, because Playwright's touch needs a touch context.
+    test.describe('the timeline detail line', () => {
+      const detail = (page) => page.getByTestId('live-console-timeline-detail');
+      const barLink = (page) => page.locator('[data-testid="live-console-timeline-bar"] a.lc-timeline-bar-label').first();
+
+      test('hovering a bar names its task and stage in the detail line, and it links to the run', async ({ page }) => {
+        await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9310' });
+        await page.goto(PAGE_URL);
+        await barLink(page).hover();
+        await expect(detail(page)).toContainText('LIN-9310 — Build');
+        await expect(detail(page).locator('a.lc-timeline-detail-link')).toHaveAttribute('href', new RegExp(`/observation/session/`));
+      });
+
+      test('focusing a bar by keyboard names it in the detail line', async ({ page }) => {
+        await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9311' });
+        await page.goto(PAGE_URL);
+        await barLink(page).focus();
+        await expect(detail(page)).toContainText('LIN-9311 — Build');
+      });
+
+      test('a mouse click on a bar opens its run', async ({ page }) => {
+        await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9313' });
+        await page.goto(PAGE_URL);
+        await Promise.all([page.waitForURL(/\/observation\/session\//), barLink(page).click()]);
+      });
+
+      test('a touch tap reads a bar first; a second tap opens its run', async ({ page }) => {
+        await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9312' });
+        await page.goto(PAGE_URL);
+        const link = barLink(page);
+        const touchTap = () => link.evaluate(a => {
+          a.dispatchEvent(new PointerEvent('pointerdown', { pointerType: 'touch', bubbles: true }));
+          a.click();
+        });
+        await touchTap();
+        await expect(detail(page)).toContainText('LIN-9312 — Build');
+        expect(page.url(), 'the first tap only reads the bar').toContain(PAGE_URL);
+        await Promise.all([page.waitForURL(/\/observation\/session\//), touchTap()]);
+      });
+    });
+
+    test('each range control names, in visible text, what it sets', async ({ page }) => {
+      await page.goto(PAGE_URL);
+      const strip = page.getByRole('group', { name: 'Strip range' }).locator('.lc-range-label');
+      const timeline = page.getByRole('group', { name: 'Timeline range' }).locator('.lc-range-label');
+      await expect(strip).toBeVisible();
+      await expect(strip).toHaveText('Strip');
+      await expect(timeline).toBeVisible();
+      await expect(timeline).toHaveText('Timeline');
     });
   });
 });

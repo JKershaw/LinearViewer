@@ -289,7 +289,19 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  pointer-events: none; /* decoration only — title/aria-label live on the bar itself */
+}
+/* LIN-3977: the detail line under the timeline names the bar in words. It wraps,
+   never ellipsises, so the full label is readable on a phone. */
+.lc-timeline-detail {
+  font-family: var(--font-content);
+  font-size: 0.8rem;
+  color: var(--text);
+  margin: 0 0 var(--space-2);
+  overflow-wrap: anywhere;
+}
+.lc-timeline-detail-link {
+  font-family: var(--font-structural);
+  white-space: nowrap;
 }
 .lc-timeline-bar[data-kind="working"] .lc-timeline-bar-label {
   color: rgba(0, 0, 0, 0.82);

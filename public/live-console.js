@@ -77,6 +77,7 @@
     axis: document.getElementById('live-console-timeline-axis'),
     timelineConnectors: document.getElementById('live-console-timeline-connectors'),
     timelineEmpty: document.getElementById('live-console-timeline-empty'),
+    timelineDetail: document.getElementById('live-console-timeline-detail'),
     timelinePresets: Array.from(document.querySelectorAll('[data-testid^="live-console-timeline-preset-"]')),
     lanes: document.getElementById('live-console-lanes'),
     lanesEmpty: document.getElementById('live-console-lanes-empty'),
@@ -93,6 +94,10 @@
   const laneNodes = new Map();          // `${ws}::${task}` → <li>
   const eventNodes = new Map();         // live event id → <li>
   const timelineBarNodes = new Map();   // timeline run id → <div class="lc-timeline-bar">
+  // LIN-3977: the bar whose full label the detail line shows after a touch tap
+  // (the first tap reads it, a second tap opens its run), and the last input kind.
+  let selectedBar = null;
+  let lastInputKind = 'mouse';
   let lastServerNow = 0;                // last poll's serverNow — the timeline's anchor for "now"
   // LIN-1743 (Phase 2): the timeline's zoom/pan viewport, module-scope and
   // untouched by paintTimeline's poll-driven reconcile — a poll tick mid-gesture
@@ -232,6 +237,25 @@
     els.timeline.dataset.windowStart = String(Math.round(start));
     els.timeline.dataset.windowEnd = String(Math.round(end));
   }
+  // LIN-3977: the detail line under the timeline names the bar it shows in words:
+  // identifier, stage, ticket progress and check-ins, with the run's own link.
+  function showBarDetail(div) {
+    const el = els.timelineDetail;
+    const run = div && div._run;
+    if (!el || !run) return;
+    const parts = [`${run.issueIdentifier || '?'} — ${timelineLabel(run)}`];
+    if (run.ticketWalk && run.ticketWalk.length) parts.push(ticketProgressText(run.ticketWalk));
+    if (run.wakeCount > 0) parts.push(`${run.wakeCount} check-ins`);
+    el.textContent = parts.join(' · ');
+    const href = div.firstElementChild && div.firstElementChild.getAttribute('href');
+    if (href) {
+      const open = document.createElement('a');
+      open.className = 'lc-timeline-detail-link';
+      open.setAttribute('href', href);
+      open.textContent = 'open run →';
+      el.append(' ', open);
+    }
+  }
   function timelineBarNode(run) {
     const div = document.createElement('div');
     div.className = 'lc-timeline-bar';
@@ -247,6 +271,19 @@
     const labelNode = document.createElement('a');
     labelNode.className = 'lc-timeline-bar-label';
     div.appendChild(labelNode);
+    // LIN-3977: the full label is one step away on every input, without cutting it
+    // to an ellipsis. Focus and a mouse hover show it in the detail line under the
+    // timeline. A touch tap on a bar that is not yet selected only reads it (the
+    // click is cancelled); a second tap, or a keyboard Enter, opens the run.
+    labelNode.addEventListener('focus', () => showBarDetail(div));
+    div.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') showBarDetail(div); });
+    labelNode.addEventListener('click', (e) => {
+      if (lastInputKind === 'touch' && selectedBar !== div) {
+        e.preventDefault();
+        selectedBar = div;
+        showBarDetail(div);
+      }
+    });
     // LIN-2905: folded-wake tick nodes, keyed by marker id — reconciled the
     // same way the bars themselves are (paintTimeline), so a tick's node
     // reference survives an in-place update rather than being torn down and
@@ -303,7 +340,7 @@
     // LIN-2905 (ii): a folded wake's own bar/row is suppressed server-side —
     // its count survives as a " · N wakes" suffix on the target bar's own
     // label/title instead.
-    const wakeSuffix = run.wakeCount > 0 ? ` · ${run.wakeCount} wakes` : '';
+    const wakeSuffix = run.wakeCount > 0 ? ` · ${run.wakeCount} check-ins` : '';
     const label = `${run.issueIdentifier || '?'} — ${timelineLabel(run)}${ticketSuffix}${wakeSuffix}`;
     div.title = label;
     div.setAttribute('aria-label', label);
@@ -314,6 +351,8 @@
       if (runHref) labelEl.setAttribute('href', runHref);
       else labelEl.removeAttribute('href');
     }
+    div._run = run;
+    if (selectedBar === div || div.matches(':focus-within')) showBarDetail(div);
 
     // LIN-2905 (i)/(ii): render each folded wake as a thin tick inside the
     // bar, positioned at the wake's own dispatch time RENORMALISED to the
@@ -350,7 +389,7 @@
       // indistinguishable tick on a bar that itself looks finished and green.
       tick.setAttribute('data-still-running', marker.stillRunning === true ? 'true' : 'false');
       tick.setAttribute('data-outcome', marker.outcomeKind || 'working');
-      const markerLabel = `woken by ${marker.issueIdentifier || '?'}`;
+      const markerLabel = `check-in: woken by ${marker.issueIdentifier || '?'}`;
       tick.title = markerLabel;
       tick.setAttribute('aria-label', markerLabel);
     }
@@ -1514,6 +1553,10 @@
   if (els.moreBtn) els.moreBtn.addEventListener('click', loadMore);
   buildChips();
   wireTimelineGestures();
+  // LIN-3977: what kind of input the last press was, read by a bar's click (a touch
+  // tap reads a bar before it opens the run; see timelineBarNode).
+  document.addEventListener('pointerdown', (e) => { lastInputKind = e.pointerType || 'mouse'; }, true);
+  document.addEventListener('keydown', () => { lastInputKind = 'keyboard'; }, true);
   wirePulseGestures();
   updatePulseSpanText();
   renderSkeleton();
