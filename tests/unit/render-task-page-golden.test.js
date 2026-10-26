@@ -347,8 +347,9 @@ describe('task page structure', () => {
       const from = html.indexOf('data-testid="task-page-pr-summary"');
       const says = html.slice(from, html.indexOf('</div>', from));
       assert.match(says, /task-page-pr-lead">[^<]{12,}</, `${status}: a plain-words lead`);
-      const detail = (says.match(/task-page-pr-detail">([^<]*)</) || [])[1] || '';
-      assert.match(detail, /Review approved it on 6 Oct/, `${status}: the review sentence`);
+      // LIN-3975 (finding 3): the review's time is the tap piece, in its relative words, so the detail is read to its end.
+      const detail = (says.match(/task-page-pr-detail">([\s\S]*?)<\/p>/) || [])[1] || '';
+      assert.match(detail, /Review approved it, [^<]*<time class="task-time"[^>]*data-local-time="tap"/, `${status}: the review sentence`);
       // LIN-3379: merged and not Done yet is the one status that doesn't count.
       if (status === 'merged') {
         assert.doesNotMatch(detail, /of 2 checked/, `${status}: no count while the close-out is finishing`);
@@ -356,7 +357,9 @@ describe('task page structure', () => {
       } else {
         assert.match(detail, /2 things CI couldn&#039;t prove: 1 of 2 checked/, `${status}: the ledger sentence`);
       }
-      assert.doesNotMatch(says, /\b(?=[0-9a-f]*\d)[0-9a-f]{7,40}\b|\d{4}-\d{2}-\d{2}T\d{2}:/, `${status}: no SHA or ISO time in the justification`);
+      // The check reads what a reader sees: a tap time's ISO stamp is its `datetime` attribute, never shown.
+      const visible = says.replace(/<[^>]+>/g, ' ');
+      assert.doesNotMatch(visible, /\b(?=[0-9a-f]*\d)[0-9a-f]{7,40}\b|\d{4}-\d{2}-\d{2}T\d{2}:/, `${status}: no SHA or ISO time in the justification`);
       // One clear button, and only when the close-out is ready.
       const buttons = html.match(/data-action="closeout-press"/g) || [];
       assert.equal(buttons.length, status === 'ready' ? 1 : 0, `${status}: the merge button iff ready`);

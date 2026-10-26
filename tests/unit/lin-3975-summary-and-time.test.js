@@ -284,6 +284,45 @@ describe('LIN-3975 — the PR\'s state is said once, with Merge beside it', () =
   });
 });
 
+describe('LIN-3975 — the PR prose names its times as taps, never as UTC text (finding 3)', () => {
+  // A finished task whose review and close-out summary both carry a time: the sentences that name them.
+  const finished = () => model({
+    finished: true,
+    tracker: { state: { name: 'Done', type: 'completed' }, url: null, parent: null, subtasks: [], blockedBy: [] },
+    evidence: {
+      closeOut: { owner: false, status: 'merged', mergedBy: 'close-out', variant: 'standard', pr: { number: 12, url: 'https://github.com/acme/widget/pull/12' } },
+      state: { pr: { number: 12, url: 'https://github.com/acme/widget/pull/12' } },
+      evidence: { checked: { review: { verdict: 'approve', at: '2026-10-24T09:00:00.000Z' } } },
+      ledger: null,
+      closeOutSummary: { at: '2026-10-25T10:00:00.000Z', text: 'Merged and checked.' },
+    },
+  });
+  const visible = (fragment) => fragment.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+
+  test('the review and the merge sentence carry their time as the tap piece, in relative words', () => {
+    const html = renderTaskPage(finished(), { viewer: 'owner', urlKey: 'acme', binding: { source: 'linear' }, now: NOW, pageOptions: {}, promptOpts: PROMPT_OPTS });
+    const says = html.slice(html.indexOf('data-testid="task-page-pr-summary"'), html.indexOf('task-pr-raw'));
+    const lead = says.match(/task-page-pr-lead">([\s\S]*?)<\/p>/)[1];
+    const detail = says.match(/task-page-pr-detail">([\s\S]*?)<\/p>/)[1];
+    assert.match(lead, /as reported in the close-out <time class="task-time"[^>]*data-local-time="tap"[^>]*>1 day ago<\/time>/);
+    assert.match(detail, /Review approved it, <time class="task-time"[^>]*data-local-time="tap"[^>]*>2 days ago<\/time>/);
+    assert.doesNotMatch(visible(lead + detail), /\bUTC\b/, 'no exact UTC time in the sentence a reader sees');
+  });
+
+  test('the close-out quote\'s label names its time as a tap piece too', () => {
+    const html = renderTaskPage(finished(), { viewer: 'owner', urlKey: 'acme', binding: { source: 'linear' }, now: NOW, pageOptions: {}, promptOpts: PROMPT_OPTS });
+    const label = html.match(/rev-closeout-summary-label">([\s\S]*?)<\/p>/)[1];
+    assert.match(label, /Close-out summary, <time class="task-time"[^>]*data-local-time="tap"[^>]*>1 day ago<\/time>/);
+    assert.doesNotMatch(visible(label), /\bUTC\b/);
+  });
+
+  test('the guest reads the same sentences, and the page\'s sentences keep the escaped copy', () => {
+    const html = renderTaskPage(finished(), { viewer: 'guest', urlKey: 'acme', binding: { source: 'linear' }, now: NOW, pageOptions: {} });
+    assert.match(html, /Review approved it, <time class="task-time"/);
+    assert.match(html, /The pull request was merged by Harbour&#039;s close-out, after the owner pressed merge|was merged by Harbour&#039;s close-out/, 'the apostrophe is escaped as before');
+  });
+});
+
 // ─── fixtures ────────────────────────────────────────────────────────────────
 
 const PROMPT_OPTS = buildPromptOpts({ openRouterSource: 'env', featureFlags: { runControls: true }, isLocalhost: false });
