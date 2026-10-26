@@ -130,8 +130,9 @@
 }
 
 /* ── Section labels ─────────────────────────────────────────────────────── */
+/* LIN-4009: a section label is words, so it is the content face. */
 .lc-section-label {
-  font-family: var(--font-structural);
+  font-family: var(--font-content);
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;

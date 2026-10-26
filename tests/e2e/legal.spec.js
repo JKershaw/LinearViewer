@@ -208,8 +208,9 @@ test.describe('Legal Pages', () => {
         expect(m.fontSample).not.toBeNull();
         expect(m.fontSample.face).toContain('JetBrains Mono');
         expect(m.fontSample.color).toBe(m.fg);
-        expect(m.emptyState.face).toContain('JetBrains Mono');
-        expect(m.navItem.face).toContain('JetBrains Mono');
+        // LIN-4009: an empty-state sentence and a nav label are words, so the content face.
+        expect(m.emptyState.face).toContain('Inter');
+        expect(m.navItem.face).toContain('Inter');
         expect(m.navItem.color).toBe(m.fg);
         expect(m.intro.face).toContain('Inter');
         expect(m.anatomyLabel.face).toContain('Inter');

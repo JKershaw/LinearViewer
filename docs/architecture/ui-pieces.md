@@ -36,11 +36,11 @@ node --test tests/measures/css-measures.test.mjs                # the script's o
 | Spacing, token | the value contains `var(--space-` | **676** (58 declarations are both) |
 | Distinct font sizes | distinct trimmed `font-size` values, comments stripped | **74** distinct in **810** declarations; 3 `--font-size-*` tokens |
 | Button-like classes | distinct class names in `public/*.css` selectors containing `btn` or `button` | **37** |
-| Breakpoints | distinct px values of `min-width`/`max-width` in `@media` preludes | **13** (400, 480, 560, 600, 640, 641, 720, 760, 900, 960, 1024, 1040, 1280) |
+| Breakpoints | distinct px values of `min-width`/`max-width` in `@media` preludes | **14** (360, 400, 480, 560, 600, 640, 641, 720, 760, 900, 960, 1024, 1040, 1280) |
 
 The parent ticket (LIN-3886) said "about 860" literal and "33" button classes, from a rule it never wrote down; the written rules give 904 and 37. From now on the series uses these rules. **The Rebuild PR reports against this base.**
 
-Per-width breakpoint counts (`@media` preludes, all files): 640 is used 19 times in 14 files, 400 seven times, 480/600/641 six times each, 720 four, 760 and 900 twice, and 560, 960, 1024, 1040, 1280 once each.
+Per-width breakpoint counts (`@media` preludes, all files): 640 is used 19 times in 14 files, 400 seven times, 480/600/641 six times each, 720 four, 760 and 900 twice, and 360, 560, 960, 1024, 1040, 1280 once each.
 
 ## How the set of decisions is bounded
 

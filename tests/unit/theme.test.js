@@ -103,6 +103,11 @@ test('self-hosts Inter and JetBrains Mono via @font-face (no build step)', () =>
   assert.match(STYLE_CSS, /--font-content:\s*'Inter'/);
 });
 
+// LIN-4009: the body reads in the content face. A word inherits sans; mono is named on the machine facts.
+test('the body defaults to the content face, not the structural (mono) one (LIN-4009)', () => {
+  assert.match(ruleBody(STYLE_CSS, 'body'), /font-family:\s*var\(--font-content\)/);
+});
+
 // LIN-985 (follow-up to LIN-976/LIN-785): the typography split is `--font-structural`
 // (machine facts) / `--font-content` (human structure). `var(--font-mono)` is only the
 // generic `monospace` fallback token — a `font-family` declaration must never resolve to it

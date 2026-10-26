@@ -273,7 +273,7 @@
 }
 
 .settings-switch {
-  font-family: var(--font-structural);
+  font-family: var(--font-content);
   font-size: 0.85rem;
   min-width: 5ch;
   padding: 0.2rem 0.6rem;

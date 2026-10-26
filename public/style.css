@@ -292,9 +292,10 @@ html {
   scrollbar-gutter: stable;
 }
 
-/* Terminal-style typography: structural base is monospace for alignment */
+/* LIN-4009: the body reads in the content face (sans). Mono is for machine facts (IDs, counts, paths, carets),
+   which name their face explicitly, so a word never inherits it. Terminal character stays in the structure. */
 body {
-  font-family: var(--font-structural);
+  font-family: var(--font-content);
   font-size: 16px;
   line-height: 1.6;
   background: var(--bg);
@@ -3616,7 +3617,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   align-items: center;
   gap: var(--space-1);
   padding: 0.1rem 0.45rem;
-  font-family: var(--font-structural);
+  font-family: var(--font-content);
   font-size: var(--font-size-sm);
   line-height: 1.4;
   color: var(--fg-dim);

@@ -152,9 +152,10 @@
 .task-strip-chip[data-tone="ahead"] { border-style: dashed; color: var(--muted); }
 .task-strip-chip[data-offered="true"] { box-shadow: inset 0 0 0 1px var(--brand); }
 
-/* LIN-3991: the exact time beside a state sentence (Home and the task page both load this sheet). Mono: a machine fact. */
+/* LIN-3991: the exact time, after a state sentence (Home and the task page both load this sheet). LIN-4009: it is
+   inline and sans, a size down and muted. A date phrase is words, so it is not a machine fact (mono). */
 .task-sentence-at {
-  display: block;
-  font-family: var(--font-structural);
+  font-family: var(--font-content);
+  font-size: 0.85em;
   color: var(--muted);
 }

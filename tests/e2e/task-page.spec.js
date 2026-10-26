@@ -290,12 +290,12 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     expect(Math.abs(stages.x - context.x), 'one column').toBeLessThan(2);
     await noHorizontalScroll(page);
 
-    // The PR justification is the content face, not the page's mono body font.
+    // The page body is the content face now (LIN-4009), and the PR justification is the same face.
     const fonts = await page.evaluate(() => {
       const face = (sel) => getComputedStyle(document.querySelector(sel)).fontFamily;
       return { body: face('body'), lead: face('[data-testid="task-page-pr-lead"]'), detail: face('[data-testid="task-page-pr-detail"]') };
     });
-    expect(fonts.lead).not.toBe(fonts.body);
+    expect(fonts.body).toMatch(/Inter|sans-serif/);
     expect(fonts.lead).toBe(fonts.detail);
     expect(fonts.lead).toMatch(/Inter|sans-serif/);
 

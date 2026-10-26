@@ -4,7 +4,7 @@
  * Witnesses: `relativeAgo` names a moment in relative words; each rung of `deriveHeader` (done, running,
  * queued, failed, idle, ready, waiting) says no UTC stamp and never both "since" and "ago"; the moment a
  * sentence names is carried as `sentenceAt` (the latest attempt's start for a running stage, none for
- * queued, waiting or ready); the page renders that moment as a zoned local-time element outside the
+ * queued, waiting or ready); the page renders that moment as a zoned local-time element inside the
  * sentence, with the UTC text only as the no-JS fallback.
  *
  * Run with: node --test tests/unit/lin-3991-relative-time.test.js
@@ -13,6 +13,9 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { deriveHeader, relativeAgo } from '../../lib/task-page-loader.js';
 import { renderTaskStatus } from '../../lib/render-task-page.js';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const NOW = new Date('2026-10-25T14:00:00.000Z');
 const noWait = { waiting: false, message: null };
@@ -82,14 +85,25 @@ describe('LIN-3991 — sentenceAt is the moment the sentence names', () => {
   });
 });
 
-describe('LIN-3991 — the page renders the exact time beside the sentence, zoned, outside the sentence', () => {
+describe('LIN-3991 — the page renders the exact time after the sentence, zoned, inside its paragraph (LIN-4009)', () => {
   test('a sentence with a moment carries a zoned time element after it', () => {
     const html = renderTaskStatus({ status: 'failed', sentence: 'Review failed 30 minutes ago', sentenceAt: '2026-10-25T13:30:00.000Z' }, { now: NOW });
-    assert.match(html, /<p class="task-sentence" data-testid="task-page-sentence">Review failed 30 minutes ago<\/p>\s*<time class="task-sentence-at" data-testid="task-page-sentence-at" datetime="2026-10-25T13:30:00\.000Z" data-local-time="zoned">25 Oct, 13:30 UTC<\/time>/);
+    assert.match(html, /<p class="task-sentence" data-testid="task-page-sentence">Review failed 30 minutes ago<span class="task-sentence-sep" aria-hidden="true"> · <\/span><time class="task-sentence-at" data-testid="task-page-sentence-at" datetime="2026-10-25T13:30:00\.000Z" data-local-time="zoned">25 Oct, 13:30 UTC<\/time><\/p>/);
   });
 
   test('a sentence with no moment renders no time element', () => {
     const html = renderTaskStatus({ status: 'waiting', sentence: 'Approved. PR #41 is ready to merge.', sentenceAt: null }, { now: NOW });
     assert.doesNotMatch(html, /task-sentence-at/);
   });
+});
+
+// LIN-4009: the time is words, not a machine fact, so it is sans and inline in the sentence's paragraph.
+test('the sentence time is sans, inline and a size down (LIN-4009), not the mono machine-fact face', () => {
+  const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../public/stage-track.css'), 'utf8');
+  const rule = /\.task-sentence-at\s*\{([^}]*)\}/.exec(css);
+  assert.ok(rule, 'expected a .task-sentence-at rule');
+  assert.match(rule[1], /font-family:\s*var\(--font-content\)/);
+  assert.match(rule[1], /font-size:\s*0\.85em/);
+  assert.doesNotMatch(rule[1], /display:\s*block/);
+  assert.doesNotMatch(rule[1], /font-structural/);
 });
