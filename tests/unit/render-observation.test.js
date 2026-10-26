@@ -44,17 +44,13 @@ describe('render-observation: rulings-tab limits disclaimer (LIN-2241 criterion 
     { urlKey: 'ws-a' }
   );
 
-  test('the rulings section states that scan-raised rulings are a backstop, not a guarantee', () => {
-    // LIN-2241's "Honest framing": this is an LLM judgement behind a Principle
-    // 0 gate. It will miss things and occasionally raise noise, and the ticket
-    // requires that be said ON the surface rather than only in the ticket —
-    // "it must not be presented, or relied on, as a guarantee that nothing is
-    // missed."
+  test('the rulings section says in plain words that some questions are automatic and can be wrong', () => {
+    // LIN-2241's "Honest framing" (it must not be relied on as a guarantee that nothing is missed) still
+    // holds, in the words a person reads (LIN-3983 PR 2): one plain sentence, no internal term.
     const out = html();
     assert.match(out, /id="obs-rulings-limits"/);
-    assert.match(out, /backstop, not a guarantee/);
-    assert.match(out, /miss things/);
-    assert.match(out, /raise noise/);
+    assert.match(out, /Some questions are raised automatically, by a model reading a task\. They can be wrong/);
+    assert.match(out, /check each one before you answer/);
   });
 
   test('the disclaimer sits inside the rulings section, above the feed it qualifies', () => {
@@ -68,8 +64,14 @@ describe('render-observation: rulings-tab limits disclaimer (LIN-2241 criterion 
     assert.ok(feedAt > limitsAt, 'it is read before the feed, not buried under it');
   });
 
-  test('it names the Principle 0 gate the scan actually runs behind', () => {
-    assert.match(html(), /Principle&nbsp;0 gate/);
+  test('no Rulings or Scan-due copy names the internal Principle 0 gate (LIN-3983 PR 2)', () => {
+    const out = html();
+    const rulingsAt = out.indexOf('id="obs-rulings-section"');
+    const dueAt = out.indexOf('id="obs-due-section"');
+    const rulingsAndDue = out.slice(rulingsAt, out.indexOf('</main>'));
+    assert.ok(rulingsAt > -1 && dueAt > rulingsAt);
+    assert.doesNotMatch(rulingsAndDue, /Principle(&nbsp;| )0/);
+    assert.doesNotMatch(rulingsAndDue, /BASIS_VERSION|fingerprint/i);
   });
 });
 
@@ -92,9 +94,9 @@ describe('render-observation: scan-due tab (LIN-2649 S4 / LIN-2667)', () => {
     const sectionAt = out.indexOf('id="obs-due-section"');
     const limitsAt = out.indexOf('id="obs-due-limits"');
     assert.ok(sectionAt > -1 && limitsAt > sectionAt, 'the disclaimer is inside the due section');
-    assert.match(out, /provider-content fingerprint comparison/);
-    assert.match(out, /not an LLM judgement/);
-    assert.match(out, /backstop, not a guarantee/);
+    assert.match(out, /Due means the task&rsquo;s content has changed since its last scan/);
+    assert.match(out, /not whether the change matters/);
+    assert.doesNotMatch(out.slice(sectionAt), /fingerprint|BASIS_VERSION|Principle/);
   });
 
   test('the due section never shares markup with #obs-session-views', () => {
@@ -105,8 +107,8 @@ describe('render-observation: scan-due tab (LIN-2649 S4 / LIN-2667)', () => {
     assert.ok(dueSectionAt > sessionViewsCloseAt, 'the due section sits outside #obs-session-views entirely');
   });
 
-  test('states the provider-read-vs-LLM-scan cost distinction', () => {
-    assert.match(html(), /reads live task content but never calls a model/i);
+  test('states the check-vs-scan cost distinction, in plain words', () => {
+    assert.match(html(), /Checking is free: it reads each task but calls no model\. Scanning a task calls a model/);
   });
 
   test('carries the pagination/readout hooks: feed list, empty state, load-more, progress readout', () => {
@@ -220,8 +222,8 @@ describe('render-observation: third due-tab disclaimer — bulk-scan (LIN-2706 �
     for (const source of [null, 'oauth', 'env', 'free']) {
       const out = html(source);
       assert.match(out, /id="obs-due-bulk-disclaimer"/, `unconditional disclaimer missing for openRouterSource=${source}`);
-      assert.match(out, /Abort stops the queue and releases the browser; scans already sent will finish, bill, and may still raise a ruling/, `verbatim abort text missing for openRouterSource=${source}`);
-      assert.match(out, /30-day historical mean/, `dollar-estimate framing missing for openRouterSource=${source}`);
+      assert.match(out, /Stop ends the queue and frees the browser\. Scans already sent finish and are billed, and may still raise a question for you\./, `plain stop text missing for openRouterSource=${source}`);
+      assert.match(out, /average of the last 30 days, not a quote/, `dollar-estimate framing missing for openRouterSource=${source}`);
     }
   });
 

@@ -73,6 +73,9 @@ export class FakeElement {
   addEventListener(type, handler) {
     (this.listeners[type] = this.listeners[type] || []).push(handler);
   }
+  removeEventListener(type, handler) {
+    this.listeners[type] = (this.listeners[type] || []).filter(fn => fn !== handler);
+  }
   // LIN-3631: renderRulings asks whether the focused element sits inside a
   // row (`li.contains(document.activeElement)`), and the shelve panel focuses
   // its reason box on open.

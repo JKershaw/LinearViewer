@@ -746,7 +746,7 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
 });
 
 // LIN-2444 review F4 — no e2e coverage existed anywhere for the suggested-
-// dismissal UI: the native confirm() gate, a real <input type="checkbox">
+// dismissal UI: the in-page bulk question, a real <input type="checkbox">
 // selection, the bulk bar's real `hidden`, or `selectAll.indeterminate`.
 // Seeds a real standing suggestion via the actual proxy suggest-dismissal
 // route (the same one an agent uses in production), never a fabricated
@@ -825,19 +825,19 @@ test.describe('Bulk-agree suggested rulings (LIN-2444 Phase 5) — e2e', () => {
     const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2444-BULK-3' });
     await row.locator('.obs-ruling-select').check();
 
-    let dialogText = null;
     let dismissRequested = false;
     await page.route('**/api/dashboard/rulings/dismiss', async (route) => { dismissRequested = true; return route.continue(); });
-    page.once('dialog', async (dialog) => {
-      dialogText = dialog.message();
-      await dialog.dismiss();
-    });
     await page.locator('#obs-ruling-agree-selected').click();
+    // The question is asked on the page (LIN-3983 PR 2), not in a native dialog.
+    const ask = page.getByTestId('obs-ruling-bulk-confirm');
+    await expect(ask).toBeVisible();
+    await expect(page.getByTestId('obs-ruling-bulk-confirm-text')).toContainText('Apply 1 selected proposal');
+    await expect(page.getByTestId('obs-ruling-bulk-confirm-text')).toContainText('cannot be undone');
+    await page.getByTestId('obs-ruling-bulk-confirm-no').click();
+    await expect(ask).toBeHidden();
     await page.waitForTimeout(200);
 
-    expect(dialogText).toContain('Apply 1 selected proposal');
-    expect(dialogText).toContain('cannot be undone');
-    expect(dismissRequested, 'declining the confirm() dialog must send no dismiss request').toBe(false);
+    expect(dismissRequested, 'cancelling the in-page question must send no dismiss request').toBe(false);
     // Still there, still selected, still checked — nothing was silently discarded.
     await expect(row).toBeVisible();
     await expect(row.locator('.obs-ruling-select')).toBeChecked();
@@ -860,8 +860,8 @@ test.describe('Bulk-agree suggested rulings (LIN-2444 Phase 5) — e2e', () => {
     await page.locator('#obs-ruling-select-all').check();
     await expect(page.locator('#obs-ruling-selected-count')).toHaveText('2 selected');
 
-    page.on('dialog', (dialog) => dialog.accept());
     await page.locator('#obs-ruling-agree-selected').click();
+    await page.getByTestId('obs-ruling-bulk-confirm-yes').click();
 
     // Both rows settle at the moment of success — no wait for a poll: controls
     // disabled, feedback recorded, selection emptied, bar hidden.
@@ -915,8 +915,8 @@ test.describe('Bulk-agree suggested rulings (LIN-2444 Phase 5) — e2e', () => {
     await expect(page.locator('#obs-ruling-selected-count')).toHaveText('2 selected');
 
     // Acceptance limb 3: bulk agree dismisses BOTH, not just the last one.
-    page.on('dialog', (dialog) => dialog.accept());
     await page.locator('#obs-ruling-agree-selected').click();
+    await page.getByTestId('obs-ruling-bulk-confirm-yes').click();
     await expect(rowA.locator('.obs-ruling-feedback')).toHaveText('dismissed as proposed');
     await expect(rowB.locator('.obs-ruling-feedback')).toHaveText('dismissed as proposed');
 
@@ -988,8 +988,8 @@ test.describe('Bulk-agree progress / Stop / completion summary (LIN-2758) — e2
     await page.locator('#obs-ruling-select-all').check();
     await expect(page.locator('#obs-ruling-selected-count')).toHaveText('3 selected');
 
-    page.on('dialog', (dialog) => dialog.accept());
     await page.locator('#obs-ruling-agree-selected').click();
+    await page.getByTestId('obs-ruling-bulk-confirm-yes').click();
 
     const progress = page.locator('#obs-ruling-bulk-progress');
     await expect(progress).toHaveText('Applying 1 of 3…');
@@ -1021,8 +1021,8 @@ test.describe('Bulk-agree progress / Stop / completion summary (LIN-2758) — e2
 
     await page.locator('#obs-ruling-select-all').check();
 
-    page.on('dialog', (dialog) => dialog.accept());
     await page.locator('#obs-ruling-agree-selected').click();
+    await page.getByTestId('obs-ruling-bulk-confirm-yes').click();
 
     // Row 1's own write is held open by the gate — deterministically "in
     // flight" for as long as the test needs to press Stop, no race.

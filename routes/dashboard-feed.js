@@ -22,7 +22,7 @@ import { getLoopsForWorkspace, getSessionsForWorkspace } from '../lib/pipeline-l
 import { isTerminalLoop, enrichLoop, sessionIsTerminal } from '../lib/run-loop-state.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { toEpochMs } from '../lib/utils/time.js';
-import { stageLabel } from '../lib/run-view.js';
+import { stageLabel, ORCHESTRATION_KINDS } from '../lib/run-view.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
 import { findAnchorLoop, childLoops } from '../lib/session-summary.js';
 import { STALE_AFTER_MS, WORKSPACE_FANOUT_CONCURRENCY, settleWithConcurrency, isStandaloneSession, deriveSessionStatus, deriveSessionWaiting, waitingLoops, loopActivityMs, peakToolCount, deriveFeedStatusLine, connectedWorkspaces } from './dashboard-session-state.js';
@@ -271,9 +271,12 @@ export function buildSessionPayload(session, ws, taskDone = false, lastActivityO
   // waiting block (see `waitingLoops`). Empty when terminal, like waitingMessage.
   const waitingLoopIds = waiting ? waitingLoops(enriched).map(l => l.loopId) : [];
   // LIN-3983 PR 2: the run the card's state is about, for its stage word and how long it has run: the
-  // waiting question's producer when the session waits, else the session's most recent run. Read at
-  // request time from the loops already built, so no stored field and no BUILDER_VERSION bump.
-  const stageRun = (waiting && enriched.find(l => l.loopId === producerLoopId)) || recentRun(children);
+  // waiting question's producer when the session waits, else its most recent worker run (an orchestration
+  // row, such as the autopilot anchor, names no stage of its own), else its most recent run of any kind.
+  // Read at request time from the loops already built, so no stored field and no BUILDER_VERSION bump.
+  const stageRun = (waiting && enriched.find(l => l.loopId === producerLoopId))
+    || recentRun(children.filter(l => !ORCHESTRATION_KINDS.has(l.kind)))
+    || recentRun(children);
   const stageSinceMs = toEpochMs(stageRun?.dispatchedAt);
 
   // Sessions-tab discriminators (LIN-1194), both additive fields the Autopilot

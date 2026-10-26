@@ -181,7 +181,7 @@ test.describe('dueStatusCopy / renderDueRowHtml — tri-state rendering', () => 
   test('plain null (no error) renders the scan-baseline copy, never "not due"', () => {
     const { dueStatusCopy } = makeSandbox().module.exports;
     const result = dueStatusCopy({ dueStatus: null });
-    assert.match(result.text, /basis not comparable yet/i);
+    assert.match(result.text, /not checked yet — scan it once to set its baseline/);
     assert.doesNotMatch(result.text, /not due/i);
   });
 
@@ -189,7 +189,7 @@ test.describe('dueStatusCopy / renderDueRowHtml — tri-state rendering', () => 
     const { dueStatusCopy } = makeSandbox().module.exports;
     const result = dueStatusCopy({ dueStatus: null, error: true });
     assert.match(result.text, /provider read failed/i);
-    assert.doesNotMatch(result.text, /basis not comparable yet/i);
+    assert.doesNotMatch(result.text, /not checked yet/i);
     assert.doesNotMatch(result.text, /not due/i);
   });
 
@@ -199,7 +199,7 @@ test.describe('dueStatusCopy / renderDueRowHtml — tri-state rendering', () => 
     // "unknown", never be coerced into a due/not-due claim.
     const { dueStatusCopy } = makeSandbox().module.exports;
     const result = dueStatusCopy({ dueStatus: 'true' });
-    assert.match(result.text, /basis not comparable yet/i);
+    assert.match(result.text, /not checked yet — scan it once to set its baseline/);
   });
 
   test('renderDueRowHtml renders a Retry affordance ONLY on the error branch', () => {
