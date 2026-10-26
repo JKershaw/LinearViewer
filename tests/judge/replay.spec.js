@@ -27,8 +27,8 @@ const ONLY = process.env.JUDGE_ONLY ? new RegExp(process.env.JUDGE_ONLY) : null;
 
 const AUDIT_FIXTURE = fileURLToPath(new URL('./audit-report.fixture.json', import.meta.url));
 
-// LIN-3968: Home's opened-task states (the five that seed sessions or write a prompt). The LIN-3962 states are not these.
-const isOpenedTaskState = (state) => /^home-(stages-done|running|failed|copy-first|copy-written)$/.test(state ?? '');
+// LIN-3968: Home's opened-task states (the six that seed sessions or write a prompt). The LIN-3962 states are not these.
+const isOpenedTaskState = (state) => /^home-(stages-done|running|failed|failed-first|copy-first|copy-written)$/.test(state ?? '');
 const isLoopback = (url) => /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(url) || url.startsWith('data:') || url.startsWith('blob:');
 
 // `urlKey` null means no local seed: the account is a zero-workspace one, signed in by email (LIN-3956).
