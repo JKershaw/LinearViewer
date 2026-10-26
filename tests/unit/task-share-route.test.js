@@ -14,7 +14,7 @@ import { createTaskShareRoutes } from '../../routes/task-share.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 import { TaskShareStore } from '../../lib/task-share-store.js';
 import { FIXTURE_SECRETS as F } from '../fixtures/secret-scan-fixtures.js';
-import { renderTaskPage, contextSignature, renderTaskContext } from '../../lib/render-task-page.js';
+import { renderTaskPage } from '../../lib/render-task-page.js';
 import { escapeHtml } from '../../lib/utils/html.js';
 import { mintHarbourToken } from '../../lib/harbour-token-format.js';
 
@@ -576,7 +576,7 @@ describe('render-time secret masking (LIN-3389)', () => {
     } finally { await close(); }
   });
 
-  test('/state masks header, track and context; contextSig stays over the unmasked fragment and matches the page', async () => {
+  test('LIN-3975: /state carries no brief or recap, so the masked brief reaches the page only; the page masks it', async () => {
     const model = {
       ...guestModel(),
       brief: { body: `brief ${F.githubPat}`, generatedAt: NOW.toISOString() },
@@ -591,14 +591,14 @@ describe('render-time secret masking (LIN-3389)', () => {
     });
     try {
       await withLogs(async () => {
-        const state = JSON.parse((await get(base, `/t/${TOKEN}/state`)).text);
-        assert.ok(!JSON.stringify(state).includes(F.githubPat));
-        assert.ok(state.contextHtml.includes('[redacted]'));
-        const unmasked = renderTaskContext(model, { urlKey: 'acme' });
-        assert.ok(unmasked.includes(F.githubPat));
-        assert.equal(state.contextSig, contextSignature(unmasked));
+        const stateRes = await get(base, `/t/${TOKEN}/state`);
+        const state = JSON.parse(stateRes.text);
+        assert.ok(!stateRes.text.includes(F.githubPat));
+        assert.equal('contextHtml' in state, false, 'a poll never repaints the brief');
+        assert.equal('contextSig' in state, false);
         const page = await get(base, `/t/${TOKEN}`);
-        assert.ok(page.text.includes(`data-context-sig="${state.contextSig}"`));
+        assert.ok(!page.text.includes(F.githubPat), 'the guest page masks the brief it renders');
+        assert.ok(page.text.includes('[redacted]'));
       });
     } finally { await close(); }
   });

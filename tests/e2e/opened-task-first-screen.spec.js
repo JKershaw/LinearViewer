@@ -559,7 +559,7 @@ test.describe('LIN-2942 — the ladder records its mode', () => {
     expect(mode.entry).toMatchObject({ rung: 'run-task', ready: false });
     expect(mode.taken).toMatchObject({ rung: 'copy' });
     expect(mode.furthest).toBe('run-task');
-    expect(mode.coverage).toEqual({ surfaces: ['swipe', 'home'] });
+    expect(mode.coverage).toEqual({ surfaces: ['swipe', 'home', 'task'] });
 
     // Another task has no mode for this account.
     const other = await readMode(page, localWorkerUrlKey, 'TEST-404');
@@ -919,7 +919,6 @@ test.describe('LIN-3341 — Go is one press', () => {
         live: true,
         headerHtml: '<div class="task-status" data-testid="task-page-status"><span class="status-pill status-pill--running"></span><p class="task-sentence" data-testid="task-page-sentence">Autopilot running since 09:00.</p></div>',
         trackHtml: '',
-        contextHtml: '',
       }),
     }));
     await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);

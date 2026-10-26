@@ -21,7 +21,8 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { renderTaskPage, renderOwnerControls, renderTaskTrack, renderTaskStatus, harbourHref } from '../../lib/render-task-page.js';
+import { renderTaskPage, renderOwnerControls, renderTaskTrack, renderTaskStatus, harbourHref, renderNextLine } from '../../lib/render-task-page.js';
+import { buildPromptOpts } from '../../lib/render-prompt-opts.js';
 import { renderCloseOutBox } from '../../lib/render-run-evidence.js';
 import { buildTaskPageModel } from '../../lib/task-page-loader.js';
 import { enrichLoop, deriveSessionWaiting, deriveSessionDecisions } from '../../routes/dashboard.js';
@@ -174,6 +175,10 @@ function model(name) {
 
 const CASES = ['running-blocked-repeat', 'waiting', 'done', 'no-sessions', 'lin-3351', 'settling'];
 
+// LIN-3975: the owner's run-control options, as routes/task-page.js builds them (a runner set up, so the run control
+// is the shared PromptSection, not the copy-first view; the copy-first view is covered in its own test).
+const PROMPT_OPTS = buildPromptOpts({ openRouterSource: 'env', featureFlags: { runControls: true }, isLocalhost: false });
+
 function render(name, viewer = 'owner') {
   return renderTaskPage(model(name), {
     viewer,
@@ -182,6 +187,7 @@ function render(name, viewer = 'owner') {
     stateUrl: `/workspace/acme/api/task/LIN-50/state?issueId=${UUID}`,
     now: NOW,
     pageOptions: PAGE_OPTIONS,
+    promptOpts: viewer === 'owner' ? PROMPT_OPTS : null,
   });
 }
 
@@ -447,12 +453,18 @@ describe('viewer isolation', () => {
     test(`${name}: owner minus renderOwnerControls === guest`, () => {
       const owner = render(name, 'owner');
       const guest = render(name, 'guest');
-      const fragments = renderOwnerControls(model(name), { urlKey: 'acme', binding: BINDING });
+      const fragments = renderOwnerControls(model(name), { urlKey: 'acme', binding: BINDING, promptOpts: PROMPT_OPTS });
       let stripped = owner;
       for (const f of [fragments.context, fragments.pullRequest, fragments.share, fragments.question]) {
         if (!f) continue;
         assert.ok(stripped.includes(f), 'the owner page carries the fragment verbatim');
         stripped = stripped.replace(f, '');
+      }
+      // LIN-3975: the run control holds the slot the next-step line holds for a viewer with none, so the line is
+      // present exactly when the run control is absent.
+      if (fragments.runControl) {
+        assert.ok(stripped.includes(fragments.runControl), 'the owner page carries the run control verbatim');
+        stripped = stripped.replace(fragments.runControl, renderNextLine(model(name)));
       }
       assert.equal(stripped, guest);
     });
