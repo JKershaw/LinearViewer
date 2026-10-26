@@ -9,7 +9,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildRowStates } from '../../lib/task-page-loader.js';
-import { orderInProgress, buildInProgressCountLine } from '../../lib/task-board-view.js';
+import { orderInProgress, buildInProgressCountLine, buildInProgressCountParts } from '../../lib/task-board-view.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 import { renderPage } from '../../lib/render.js';
 
@@ -125,6 +125,26 @@ describe('LIN-4009 — each row state has its own tone', () => {
     const s = states({ roots: [node('LIN-96')], loops: { 'LIN-96': [queuedLoop] } });
     assert.equal(s.get('LIN-96').words, 'Build queued');
     assert.equal(s.get('LIN-96').running, true, 'it still counts as in the running set');
+  });
+
+  test('the count line counts a queued session as queued, not as running (LIN-4009)', () => {
+    const trees = [{ projectName: 'Alpha', roots: [node('LIN-101'), node('LIN-102')] }];
+    const rowStates = states({
+      roots: trees[0].roots,
+      loops: { 'LIN-101': [loop({ issueIdentifier: 'LIN-101' })], 'LIN-102': [queuedLoop] },
+    });
+    assert.equal(buildInProgressCountLine(trees, rowStates), '2 in progress · 1 running · 1 queued');
+    const parts = buildInProgressCountParts(trees, rowStates);
+    assert.deepEqual(parts.map((p) => p.tone), ['quiet', 'running', 'queued']);
+    const html = renderPage([], trees, [], 'Test', { urlKey: 'acme', workspace: { urlKey: 'acme', provider: 'linear' }, rowStates });
+    assert.match(html, /<span class="in-progress-count__part" data-tone="queued">1 queued</);
+    assert.doesNotMatch(html, />2 running</);
+  });
+
+  test('only queued sessions: the count line says queued and has no running part', () => {
+    const trees = [{ projectName: 'Alpha', roots: [node('LIN-103')] }];
+    const rowStates = states({ roots: trees[0].roots, loops: { 'LIN-103': [queuedLoop] } });
+    assert.equal(buildInProgressCountLine(trees, rowStates), '1 in progress · 1 queued');
   });
 
   test('a parent whose subtask needs you is needs-you, the same tone as its own', () => {

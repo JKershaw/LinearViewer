@@ -1148,7 +1148,7 @@ a.wordmark:hover {
 .row-state[data-tone='ready'] { color: var(--brand-dim); }
 .row-state[data-tone='quiet'] { color: var(--muted); }
 .in-progress-count__part[data-tone='needs-you'] { color: var(--red-dim); font-weight: 600; }
-.in-progress-count__part[data-tone='running'] { color: var(--amber-dim); }
+.in-progress-count__part[data-tone='running'], .in-progress-count__part[data-tone='queued'] { color: var(--amber-dim); }
 .in-progress-count__part[data-tone='quiet'] { color: var(--muted); }
 
 /* LIN-3968: the opened task is one contained block, so the eye can tell where its own content ends and the

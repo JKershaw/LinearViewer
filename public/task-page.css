@@ -231,6 +231,9 @@
 .task-stage-ahead .task-stage-name { color: var(--fg); }
 /* LIN-3975: an attempt's link to its run page, and the line that says it cannot be opened. */
 .task-stage-run { margin-left: var(--space-2); font-size: 0.85rem; white-space: nowrap; }
+/* LIN-4009: the link is brand, like `.task-page-link`, not the browser's default blue (the unlinked span keeps its muted colour). */
+a.task-stage-run { color: var(--brand-dim); text-decoration: none; }
+a.task-stage-run:hover { text-decoration: underline; }
 
 /* LIN-3975 (finding 1): with neither brief nor recap, one quiet line offers to write each, in place of two dashed boxes. */
 .task-context-offers, .task-context-none { margin: 0; font-size: 0.9rem; color: var(--muted); }

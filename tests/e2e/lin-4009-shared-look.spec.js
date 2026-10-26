@@ -145,6 +145,29 @@ test.describe('one shared look (LIN-4009)', () => {
     expect(inHeader).toBe(true);
   });
 
+  for (const theme of ['light', 'dark']) {
+    test(`the task page's open-run link is the brand colour in ${theme}, not the browser's blue`, async ({ page }) => {
+      await seedTasks(page);
+      await seedSession(page, await runnerToken(page), TASKS.running, { kind: 'implementation', feedback: ['[done] built it'] });
+      if (theme === 'dark') await page.context().addCookies([{ name: 'theme', value: 'dark', url: 'http://localhost:3001' }]);
+      await page.goto(`/workspace/${URL_KEY}/task/${TASKS.running}`);
+      // A stage's attempts are drawn when its row opens (a click on its head).
+      await page.locator('[data-testid="task-page-stage-head"]').first().click();
+      const link = page.locator('[data-testid="task-page-attempt-run"]').first();
+      await expect(link).toHaveCount(1);
+      const { color, brand } = await link.evaluate((el) => {
+        const probe = document.createElement('span');
+        probe.style.color = 'var(--brand-dim)';
+        document.body.appendChild(probe);
+        const brandDim = getComputedStyle(probe).color;
+        probe.remove();
+        return { color: getComputedStyle(el).color, brand: brandDim };
+      });
+      expect(color).toBe(brand);
+      expect(['rgb(0, 0, 238)', 'rgb(158, 158, 255)']).not.toContain(color);
+    });
+  }
+
   for (const { name, path } of [
     { name: 'Home', path: '/' },
     { name: 'Settings', path: '/settings' },
