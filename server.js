@@ -199,7 +199,7 @@ import { settingsAreaUrl } from './lib/settings-areas.js'
 import { WorkspaceChangeLogStore, OUTSIDE_SETTINGS_REASON, UNNAMED_MEMBER } from './lib/workspace-change-log.js'
 import { getDeployInfo } from './lib/deploy-info.js'
 import { securityHeaders } from './lib/security-headers.js'
-import { publicOrigin } from './lib/public-origin.js'
+import { publicOrigin, requestOriginOrNull } from './lib/public-origin.js'
 import { hstsHeader, defaultCacheControl } from './lib/response-headers.js'
 import { createVendorAssetsRouter } from './lib/vendor-assets.js'
 
@@ -2354,7 +2354,7 @@ app.get('/', (req, res) => {
   const setupNotice = (isLocalhost && hasNoAuth) ? 'setup' : null
 
   // Unauthenticated users see the bespoke Harbour showcase landing (LIN-980).
-  const html = renderLandingPage({ deployInfo, setupNotice, githubEnabled: getProvider('github').entryCta.isConfigured(), jiraEnabled: getProvider('jira').entryCta.isConfigured(), emailEnabled: isEmailSignInAvailable(), freeTierEnabled: isFreeTierOffered() })
+  const html = renderLandingPage({ origin: requestOriginOrNull(req), deployInfo, setupNotice, githubEnabled: getProvider('github').entryCta.isConfigured(), jiraEnabled: getProvider('jira').entryCta.isConfigured(), emailEnabled: isEmailSignInAvailable(), freeTierEnabled: isFreeTierOffered() })
   res.send(html)
 })
 

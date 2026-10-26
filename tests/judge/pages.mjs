@@ -102,6 +102,10 @@ export const PAGES = [
   // transport (visual-replay.mjs), the same as Playwright's. Settings › Account then shows "Add email →"
   // on both sides, so it is identical on both and adds no difference.
   { id: 'account-home', urlKey: 'judge', path: () => '/account', state: 'email-signin', renderers: ['lib/render-account-home.js'] },
+  // LIN-3980: the signed-out landing (no seed, so no session) and the email door it leads to. LIN-3973 owns the
+  // email page's layout; this entry shows it as it is, so the step from the landing reads as one product.
+  { id: 'landing', urlKey: null, path: () => '/', renderers: ['lib/render-landing.js', 'lib/components/landing-hero.js'] },
+  { id: 'auth-email', urlKey: null, path: () => '/auth/email', renderers: ['lib/render-email-auth.js'] },
 ];
 
 // Stated, not assumed: what the seed cannot reach.
@@ -110,7 +114,7 @@ export const NOT_COVERED = [
   'A change-log entry with a fixed time: the time is server-rendered and so masked, not seeded',
   'Home\'s run panel (See prompt, Another step, Change, Stop, the run-control repeats): LIN-3962 replaces it, so the stage states judge the opened task above it only',
   'Session with a run (the populated session page and its run view): needs a session record the local seed does not write; the not-found branch is judged instead, and renders the same back link',
-  'Pages with no Settings-shared pieces (swim, swipe, ship, roadmap, library, KPIs, landing)',
+  'Pages with no Settings-shared pieces (swim, swipe, ship, roadmap, library, KPIs)',
 ];
 
 // Every page renders through renderPage, so its shell files are covered by any listed page.

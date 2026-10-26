@@ -8,11 +8,6 @@ import { workspaceApiLocalSeed } from '../fixtures/local-harness.js';
 
 const PHONE = { width: 390, height: 844 };
 
-// LIN-3969: the copy-first view needs a workspace with no run controls. A default seed clears runner keys but
-// keeps queue tokens (LIN-3849), and specs earlier on this worker's urlKey leave queue tokens behind, so the copy-first
-// tests say `runnerKey: false`, which clears both.
-const COPY_FIRST = { runnerKey: false };
-
 /** Light is the default; dark is the opt-in `.theme-dark` hook on <html> (see CLAUDE.md, Design Principles). */
 async function setTheme(page, theme) {
   await page.evaluate((dark) => document.documentElement.classList.toggle('theme-dark', dark), theme === 'dark');
@@ -38,7 +33,7 @@ async function gotoHome(page, urlKey) {
 
 test.describe('Home first page — the copy-first card (LIN-3833)', () => {
   test('"Got it" is the shared Button piece, and the card stays dismissed after a reload', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(workspaceApiLocalSeed, COPY_FIRST);
+    await seedLocal(workspaceApiLocalSeed);
     await gotoHome(page, localWorkerUrlKey);
 
     const card = page.locator('[data-testid="home-copy-first-card"]');
@@ -62,7 +57,7 @@ test.describe('Home first page — the layout holds on a phone (LIN-3833)', () =
 
   for (const theme of ['light', 'dark']) {
     test(`copy-first view, ${theme}: no horizontal scrolling at 390px`, async ({ page, seedLocal, localWorkerUrlKey }) => {
-      await seedLocal(workspaceApiLocalSeed, COPY_FIRST);
+      await seedLocal(workspaceApiLocalSeed);
       await gotoHome(page, localWorkerUrlKey);
       await setTheme(page, theme);
       await openTopTask(page);

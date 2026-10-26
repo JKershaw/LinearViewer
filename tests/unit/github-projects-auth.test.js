@@ -321,7 +321,8 @@ describe('GitHub Projects auth routes', () => {
     const res = makeRes();
     await handler({ query: {}, session: makeSession() }, res);
     assert.equal(res.statusCode, 503);
-    assert.match(res.body, /GitHub App Not Configured/);
+    assert.match(res.body, /GitHub Projects sign-in is not set up/);
+    assert.doesNotMatch(res.body, /GITHUB_[A-Z_]+/, 'no env-var name on the page (LIN-3980)');
   });
 
   // LIN-2081 review finding 4 — byte-symmetric with github-auth.js: the front
@@ -334,8 +335,9 @@ describe('GitHub Projects auth routes', () => {
     const res = makeRes();
     await handler({ query: {}, session: makeSession() }, res);
     assert.equal(res.statusCode, 503);
-    assert.match(res.body, /GitHub App Not Configured/);
-    assert.match(res.body, /GITHUB_APP_PRIVATE_KEY is set but is not a valid PEM key/);
+    assert.match(res.body, /GitHub Projects sign-in is not set up/);
+    assert.doesNotMatch(res.body, /GITHUB_[A-Z_]+/, 'no env-var name on the page (LIN-3980)');
+    assert.doesNotMatch(res.body, /GITHUB_APP_PRIVATE_KEY/, 'the PEM fact goes to the server log (LIN-3980)');
   });
 
   // LIN-761 — partial config (App vars present, GITHUB_CLIENT_ID absent) returns a
@@ -348,8 +350,9 @@ describe('GitHub Projects auth routes', () => {
     const session = makeSession();
     await handler({ query: {}, session }, res);
     assert.equal(res.statusCode, 503);
-    assert.match(res.body, /GitHub App Not Configured/);
-    assert.match(res.body, /GITHUB_CLIENT_ID/);
+    assert.match(res.body, /GitHub Projects sign-in is not set up/);
+    assert.doesNotMatch(res.body, /GITHUB_[A-Z_]+/, 'no env-var name on the page (LIN-3980)');
+    assert.doesNotMatch(res.body, /GITHUB_CLIENT_ID/, 'the unset name goes to the server log (LIN-3980)');
     assert.equal(res.redirectedTo, null);
     assert.equal(session.oauthState, undefined);
   });
@@ -657,8 +660,9 @@ describe('GitHub Projects auth routes', () => {
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new' } });
     await handler({ query: { code: 'oauth-code', state: 'real' }, session }, res);
     assert.equal(res.statusCode, 503, 'must respond, not hang');
-    assert.match(res.body, /GitHub App Not Configured/);
-    assert.match(res.body, /GITHUB_APP_PRIVATE_KEY is set but is not a valid PEM key/);
+    assert.match(res.body, /GitHub Projects sign-in is not set up/);
+    assert.doesNotMatch(res.body, /GITHUB_[A-Z_]+/, 'no env-var name on the page (LIN-3980)');
+    assert.doesNotMatch(res.body, /GITHUB_APP_PRIVATE_KEY/, 'the PEM fact goes to the server log (LIN-3980)');
     assert.equal(res.redirectedTo, null, 'must not redirect to a broken install URL');
   });
 

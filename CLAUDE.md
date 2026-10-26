@@ -66,7 +66,7 @@ Test servers in `tests/unit` bind `127.0.0.1` explicitly (`app.listen(0, '127.0.
 
 ## Key Behaviors
 
-- Unauthenticated users see landing page with static projects preview
+- Unauthenticated users see the landing page (`/`): a plain definition, sign-in buttons and product glimpses, not a project tree
 - In Progress section shows all in-progress issues across projects
 - Click issue line → toggle details (description, assignee, dates, labels)
 - Click ▼ arrow → collapse/expand children

@@ -8,8 +8,8 @@
  *
  * Dark-safe rule: every colour is a semantic token (--text/--muted/--card/
  * --line/--brand/--amber/--green/--slate …). No raw hex — the same declarations
- * flip correctly under both `.theme-dark` and the landing's
- * `@media (prefers-color-scheme: dark)` remap. Type rides the shared split:
+ * flip correctly under `.theme-dark`, which the landing reaches by following
+ * `prefers-color-scheme` through the shared pre-paint script (LIN-3980). Type rides the shared split:
  * --font-structural (mono) for machine facts / eyebrows / terminals,
  * --font-content (sans) for headings and prose.
  * Mobile-first: single column by default, multi-column at ≥760px.
@@ -346,6 +346,12 @@
   margin: 0;
 }
 
+/* The sign-in buttons at the end of the page (LIN-3980): the hero's own row,
+   with a little air above it. */
+.lx-try__ctas {
+  margin-top: var(--space-4);
+}
+
 /* ---- Providers strip ----------------------------------------------------- */
 .lx-provider-list {
   list-style: none;
@@ -426,22 +432,10 @@
   color: var(--brand);
 }
 
-.lx-os__cta {
-  display: inline-block;
+/* Spacing for a shared button (renderButton) that closes a section. The button
+   itself is the shared .btn / .btn--primary, not a landing-only style (LIN-3980). */
+.lx-actions {
   margin-top: var(--space-4);
-  padding: 0.7rem 1.4rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--brand);
-  background: var(--brand);
-  color: var(--bg);
-  text-decoration: none;
-  font-family: var(--font-content);
-  font-weight: 500;
-}
-
-.lx-os__cta:hover {
-  background: color-mix(in srgb, var(--brand) 85%, black);
-  border-color: color-mix(in srgb, var(--brand) 85%, black);
 }
 
 .lx-os__glimpse {
@@ -484,43 +478,7 @@
   color: var(--muted);
 }
 
-.lx-library__cta {
-  display: inline-block;
-  margin-top: var(--space-4);
-  padding: 0.7rem 1.4rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--line);
-  background: var(--card);
-  color: var(--text);
-  text-decoration: none;
-  font-family: var(--font-structural);
-  font-size: 0.9rem;
-}
-
-.lx-library__cta:hover {
-  border-color: var(--brand);
-  color: var(--brand);
-}
-
 /* ---- Archive ------------------------------------------------------------- */
-
-.lx-archive__link {
-  display: inline-block;
-  margin-top: var(--space-2);
-  padding: 0.7rem 1.4rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--line);
-  background: var(--card);
-  color: var(--text);
-  text-decoration: none;
-  font-family: var(--font-structural);
-  font-size: 0.9rem;
-}
-
-.lx-archive__link:hover {
-  border-color: var(--brand);
-  color: var(--brand);
-}
 
 /* ---- Desktop: multi-column where it earns its keep ----------------------- */
 @media (min-width: 760px) {

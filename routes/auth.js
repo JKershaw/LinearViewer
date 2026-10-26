@@ -10,6 +10,7 @@ import { Router } from 'express'
 import { getProvider } from '../lib/providers/registry.js'
 import { AuthExchangeError } from '../lib/providers/interface.js'
 import { renderErrorPage } from '../lib/render.js'
+import { renderSignInUnavailablePage } from '../lib/render-pages.js'
 import { resolveKeyOrRespond } from '../lib/workspace-urlkey.js'
 import { upsertWorkspace, saveSession, linkProvider, getActiveWorkspace, validateWorkspaceUrlKey, persistOwnerCredential } from '../lib/workspace.js'
 import { writeConnection } from '../lib/connection-store.js'
@@ -30,13 +31,14 @@ import { respondToAccountConflict, reproofUrlForAccount } from '../lib/account-c
  *   provider as a documented legacy default for direct constructions (LIN-561).
  * @param {import('../lib/account-store.js').AccountStore} options.accountStore - LIN-1329: find-or-create the durable account for the signing-in identity.
  * @param {import('../lib/account-workspace-store.js').AccountWorkspaceStore} options.accountWorkspaceStore - LIN-1329: bind the account to the workspace.
+ * @param {Object} [options.env] - LIN-3980: the environment the OAuth config is read from. Defaults to `process.env`; a test injects one so the unconfigured door can fail first under NODE_ENV=test.
  * @param {(key: string) => void} [options.evictWorkspaceToken] - LIN-1507: evicts a resolved-token cache entry by its pre-computed key (see `workspaceTokenCacheKey`). Called at /logout for every workspace the session referenced, before the session is destroyed.
  * @param {import('../lib/owner-credential-store.js').OwnerCredentialStore} [options.ownerCredentialStore] - LIN-1523: durable owner-credential store. Linear-only; other providers' auth routers receive this option too (shared mount loop) but ignore it.
  * @param {import('../lib/workspace-store.js').WorkspaceStore} [options.workspaceStore] - LIN-3700: write-only urlKey registry. No default: absent is a logged skip.
  * @param {function(Object): Promise<Object>} [options.resolveWorkspaceUrlKey] - LIN-3382: the one urlKey resolver (lib/workspace-urlkey.js). NO default: the callback fails closed (503 retry page, nothing written) without it.
  * @returns {Router} Express router
  */
-export function createAuthRoutes({ userPreferencesStore, provider, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, connectionStore, resolveWorkspaceUrlKey, workspaceStore }) {
+export function createAuthRoutes({ userPreferencesStore, provider, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, connectionStore, resolveWorkspaceUrlKey, workspaceStore, env = process.env }) {
   const router = Router()
 
   const OAUTH_ENV_VARS = ['LINEAR_CLIENT_ID', 'LINEAR_CLIENT_SECRET', 'LINEAR_REDIRECT_URI'];
@@ -47,8 +49,8 @@ export function createAuthRoutes({ userPreferencesStore, provider, accountStore,
    * Skipped in test mode where mock auth is used.
    */
   function getMissingOAuthVars() {
-    if (process.env.NODE_ENV === 'test') return [];
-    return OAUTH_ENV_VARS.filter(v => !process.env[v]);
+    if (env.NODE_ENV === 'test') return [];
+    return OAUTH_ENV_VARS.filter(v => !env[v]);
   }
 
   /**
@@ -59,10 +61,7 @@ export function createAuthRoutes({ userPreferencesStore, provider, accountStore,
   router.get('/auth/linear', async (req, res) => {
     const missing = getMissingOAuthVars();
     if (missing.length > 0) {
-      return res.status(503).send(renderErrorPage(
-        'OAuth Not Configured',
-        `Linear OAuth is not available. Missing environment variables: ${missing.join(', ')}. See .env.example for setup instructions.`
-      ));
+      return res.status(503).send(renderSignInUnavailablePage('Linear', missing));
     }
 
     // Generate random state token to prevent CSRF attacks. `state` stays an
@@ -108,10 +107,7 @@ export function createAuthRoutes({ userPreferencesStore, provider, accountStore,
   router.get('/auth/callback', async (req, res) => {
     const missing = getMissingOAuthVars();
     if (missing.length > 0) {
-      return res.status(503).send(renderErrorPage(
-        'OAuth Not Configured',
-        `Linear OAuth is not available. Missing environment variables: ${missing.join(', ')}. See .env.example for setup instructions.`
-      ));
+      return res.status(503).send(renderSignInUnavailablePage('Linear', missing));
     }
 
     const { code, state, error } = req.query

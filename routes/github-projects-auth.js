@@ -64,7 +64,7 @@ export function createGitHubProjectsAuthRoutes({ provider, accountStore, account
     basePath: '/auth/github-projects',
     providerOkKey: 'github-projects',
     pendingKey: 'githubProjectsPending',
-    notConfiguredLead: 'GitHub Projects is not available.',
+    displayName: 'GitHub Projects',
     // LIN-2802: deliberately no `supportsFreshContainer` — github-projects has
     // no switcher entry point (no `entryCta`), so a signed-in `mode=new`
     // request here must keep today's exact `github:<userId>` find-or-create
