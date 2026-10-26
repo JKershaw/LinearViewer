@@ -429,7 +429,7 @@ Three things to expect when reading the judge's output:
 The signed-out landing (`lib/render-landing.js`, `lib/components/landing-hero.js`) reuses shared pieces, so a later change to one of them reaches the landing:
 
 - **Status pill** (`renderStatusPill`): the Observation and Swim glimpses.
-- **Stage words and model names**: `STAGE_LABELS` (`lib/run-view.js`) and `getModelDisplayName` (`lib/openrouter.js`). The glimpses show family names, never raw ids.
+- **Stage words and model names**: stage words come from `STAGE_LABELS` (`lib/run-view.js`); model family names stay typed locally until LIN-3952 owns one display name, so the landing no longer uses `getModelDisplayName`. The glimpses show family names, never raw ids or versions.
 - **Head metadata** (`lib/components/head-meta.js`): description, canonical and social-preview tags, shared with the Library.
 - **Dark mode**: the pre-paint script in `lib/components/page.js`, opted in with `followSystemTheme`.
 - **Buttons** (decision 6): every sign-in button (`renderSignInCtas`, hero and "Try it yourself") and the Library, Harbour OS and Archive calls to action are `renderButton`. Linear is `.btn--primary`, the others `.btn`. `.landing-cta` sets only the hero's size, and `.landing-cta-linear` only its ink (`--on-brand`, which clears AA on the teal fill where `.btn--primary`'s own ink does not). Both are scoped under `.landing-ctas`, so they beat `.btn`'s own rules.

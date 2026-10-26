@@ -195,6 +195,7 @@ test('glimpses carry no model ids, no calendar years and no hand-typed stage wor
     assert.doesNotMatch(g, /\b20\d{2}\b/);
     assert.doesNotMatch(g, />implement</);
     assert.doesNotMatch(g, /\bimplement\b/);
+    assert.doesNotMatch(g, /\b(Opus|Sonnet|Haiku)\s+\d/, 'a family name carries no version');
   }
   assert.match(html, /lx-run__label">Build</, 'the implementation stage reads as STAGE_LABELS sets it');
   assert.match(html, /Opus/, 'a model shows its family name');
