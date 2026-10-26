@@ -2318,6 +2318,13 @@
     }
 
     return {
+      // LIN-3975 (finding 1): the task page hands in the staged chat proposals again after a fold turn proposes one.
+      // Only the run block is repainted (the same slot a preview answer writes), so a prompt or a stream is untouched.
+      setProposals(list) {
+        if (destroyed) return;
+        opts.proposals = Array.isArray(list) ? list : [];
+        paintRun();
+      },
       destroy() {
         destroyed = true;
         stopPoll();

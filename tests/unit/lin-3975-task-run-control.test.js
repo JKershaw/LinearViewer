@@ -587,6 +587,23 @@ describe('LIN-3975 — a staged chat proposal is applied or declined from the ru
     assert.ok(!calls.some(call => /\/apply$/.test(call.url)));
     assert.match(c.innerHTML, /data-testid="opened-task-proposal-state">declined</);
   });
+
+  // LIN-3975 (finding 1): a fold turn proposes after the page loaded. The run control is handed the list again and
+  // lists it in place, with no reload; the same handle clears it when the list empties.
+  test('a proposal staged after mount is listed in place by setProposals, and cleared the same way', async () => {
+    const PS = load({ opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, calls: [] });
+    const c = makeContainer();
+    const handle = PS.init(c, { ...BASE, surface: 'task', proposals: [] });
+    await flush();
+    await flush();
+    assert.doesNotMatch(c.innerHTML, /data-testid="opened-task-proposals"/, 'nothing staged before the turn');
+    handle.setProposals([PROPOSAL]);
+    assert.match(c.innerHTML, /data-testid="opened-task-proposals"/, 'listed at once, without a reload');
+    assert.match(c.innerHTML, /Proposed in chat: Please post a status update\./);
+    assert.match(c.innerHTML, /data-action="apply-proposal" data-proposal-id="prop-1" data-run-id="run-9"/);
+    handle.setProposals([]);
+    assert.doesNotMatch(c.innerHTML, /data-testid="opened-task-proposal"/, 'an empty list clears the rows');
+  });
 });
 
 describe('LIN-3975 — the run control is wired before the first Markdown render', () => {

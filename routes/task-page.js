@@ -3,6 +3,7 @@
  *
  *   GET /workspace/:urlKey/task/:identifier            — the owner's task page
  *   GET /workspace/:urlKey/api/task/:identifier/state  — stored-data repaint
+ *   GET /workspace/:urlKey/api/task/:identifier/proposals — the owner's staged chat proposals (LIN-3975)
  *
  * A DRILL-DOWN page, like `/task/:issueId/edit` and the run page: no feature
  * flag, no view-tier entry, a back link, and a 404 body for an unknown id.
@@ -190,6 +191,29 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
     } catch (error) {
       console.error('Task page state error:', error.message);
       return jsonError(res, 500, 'Could not read task state');
+    }
+  });
+
+  // LIN-3975 (finding 1): the owner's staged chat proposals for this task, re-read when a fold turn proposes one, so the
+  // run control shows it without a reload. Owner-only and fail-closed: a member gets a refusal, not an empty list, so no
+  // proposal is ever named to a viewer who cannot act on it. The state poll stays free of them (its key set is pinned).
+  router.get('/workspace/:urlKey/api/task/:identifier/proposals', workspaceFromUrl, async (req, res) => {
+    const workspace = req.workspace;
+    const { identifier } = req.params;
+    if (!isValidIssueId(identifier)) return jsonError(res, 404, 'Task not found');
+    if ((await viewerOf(req)) !== 'owner') return jsonError(res, 403, 'Only the workspace owner can read staged proposals');
+    const issueId = queryValue(req.query.issueId);
+    try {
+      const { model } = await loader.loadTaskState({
+        urlKey: workspace.urlKey,
+        identifier,
+        issueId: issueId && isValidIssueId(issueId) ? issueId : null,
+      });
+      res.set('Cache-Control', 'no-store');
+      return res.json({ proposals: await pendingProposalsOf(workspace.urlKey, model) });
+    } catch (error) {
+      console.error('Task page proposals error:', error.message);
+      return jsonError(res, 500, 'Could not read staged proposals');
     }
   });
 

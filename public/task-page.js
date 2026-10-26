@@ -509,6 +509,14 @@
   }
 
   /**
+   * The owner's staged-proposals URL (LIN-3975), from the state URL the page polls: the same task and query, on the
+   * `proposals` read. Pure.
+   */
+  function proposalsUrlOf(stateUrl) {
+    return String(stateUrl || '').replace(/\/state(?=\?|$)/, '/proposals');
+  }
+
+  /**
    * Repaint the answer header from the state endpoint (LIN-3373). That read has
    * no tracker, so it can't verify a summary and its header carries none: the
    * load-time summary paragraph is carried across rather than deleted by the
@@ -547,6 +555,8 @@
     if (chatFold && window.TaskChat && typeof window.TaskChat.init === 'function') {
       var foldOpts = {};
       try { foldOpts = JSON.parse(chatFold.getAttribute('data-task-chat-opts') || '{}'); } catch (e) { foldOpts = {}; }
+      // The hook is read by TaskChat at init; refreshProposals is hoisted, and reads the run control only when a turn proposes.
+      foldOpts.onProposed = refreshProposals;
       window.TaskChat.init(chatFold, foldOpts);
     }
     // The status mount is what the poll repaints; the tracker line beside it is the page-load read's (LIN-3975).
@@ -573,8 +583,21 @@
     // member has no run-control root, so nothing mounts.
     var runRoot = doc.querySelector('[data-testid="task-page-run-control"]');
     var runOpts = runOptsOf(runRoot);
+    var runControl = null;
     if (runRoot && runOpts && window.PromptSection && typeof window.PromptSection.init === 'function') {
-      window.PromptSection.init(runRoot, runOpts);
+      runControl = window.PromptSection.init(runRoot, runOpts);
+    }
+
+    // LIN-3975 (finding 1): a fold turn that proposes a follow-up stages it in the run control at once. The owner's
+    // staged list is re-read (owner-only) and handed to the run control's own repaint; nothing is re-rendered here.
+    // Reached only from the fold's `proposed` frame, so it is never called on a page with no chat.
+    function refreshProposals() {
+      if (!runControl || typeof runControl.setProposals !== 'function') return;
+      window.api(proposalsUrlOf(main.getAttribute('data-state-url') || ''), { on401: '/logout' })
+        .then(function (body) { runControl.setProposals((body && body.proposals) || []); })
+        .catch(function (err) {
+          if (typeof window.toast === 'function') window.toast('Could not load the staged proposal: ' + ((err && err.message) || 'failed'), { type: 'error' });
+        });
     }
 
     // Owner's live widgets (if the libs loaded). Once mounted, the context
@@ -713,6 +736,7 @@
       goneHandlerFor: goneHandlerFor,
       paintsReadyHeader: paintsReadyHeader,
       runOptsOf: runOptsOf,
+      proposalsUrlOf: proposalsUrlOf,
       enhanceMarkdown: enhanceMarkdown,
       enhanceContextMarkdown: enhanceContextMarkdown,
       mountWidgets: mountWidgets,

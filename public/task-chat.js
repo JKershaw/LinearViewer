@@ -27,6 +27,9 @@
     // LIN-3975: the task page's fold is propose-only: every turn proposes, and the server stages the proposal for the
     // run control. The flag rides in the turn body; the server reads it as a boolean.
     var propose = data.propose === true;
+    // LIN-3975 (finding 1): the host is told when a turn staged a proposal (the `proposed` tool frame), so it can
+    // show the proposal where the reader applies it. Captured here, with the other hooks, at init.
+    var onProposed = typeof data.onProposed === 'function' ? data.onProposed : null;
 
     function hook(name) { return root.querySelector('[data-task-chat="' + name + '"]'); }
     var idInput = hook('id');
@@ -374,6 +377,7 @@
             // Tool breadcrumb: surface it in the log, but it is NOT assistant
             // content — do not touch answerText or chatHistory.
             appendToolBreadcrumb(window.ChatUI.toolBreadcrumbLabel(eventData), answerLi);
+            if (onProposed && eventData && eventData.phase === 'proposed') onProposed(eventData);
           } else if (type === 'token' || type === 'message') {
             var text = typeof eventData === 'object' ? (eventData.token || eventData.text || '') : eventData;
             // LIN-2812: sample pinned state BEFORE the DOM mutation below — a

@@ -171,6 +171,66 @@ test.describe('LIN-3975 — the task page moves the task on', () => {
     expect(turns[0].question).toBe('where do you stand?');
   });
 
+  // LIN-3975 (finding 1): a fold turn that proposes stages the proposal in the run control at once, with no reload.
+  // The turn's stream and the staged-list read are answered by the browser's route, so the proof is the client's own
+  // wiring: the row appears in the same document (a marker on `window` survives), and Apply posts to the run page.
+  test('a fold turn that proposes lists the proposal in the run control with no reload, and Apply goes through it', async ({ page }) => {
+    await seedTask(page, { features: { taskChat: true } });
+    await seedWorkspaceOwnership(page, URL_KEY, 'owner');
+    let proposed = false;
+    const applies = [];
+    await page.route('**/api/task/*/proposals**', async (route) => {
+      const proposals = proposed ? [{ id: 'prop-1', runId: 'run-9', reason: 'Please post a status update.' }] : [];
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ proposals }) });
+    });
+    await page.route('**/api/run/run-9/proposals/prop-1/apply', async (route) => {
+      applies.push(route.request().method());
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+    });
+    await page.route('**/api/task-chat/**', async (route) => {
+      proposed = true;
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        body: renderSSEFrames([
+          ['tool', { phase: 'proposed', iteration: 1, name: 'send_follow_up', result: 'proposed a follow-up to session run-9' }],
+          ['token', { token: 'I staged a follow-up.' }],
+          ['done', {}],
+        ]),
+      });
+    });
+
+    await page.goto(`/workspace/${URL_KEY}/task/${TASK}`);
+    await page.evaluate(() => { window.__sameDocument = true; });
+    const fold = page.locator('[data-testid="task-page-chat-fold"]');
+    await fold.locator('summary').click();
+    await page.locator('[data-testid="task-page-chat-question"]').fill('Please follow up on this task.');
+    await page.locator('[data-testid="task-page-chat-send"]').click();
+
+    const row = page.locator('[data-testid="task-page-run-control"] [data-testid="opened-task-proposal"]');
+    await expect(row).toHaveCount(1);
+    await expect(row).toContainText('Proposed in chat: Please post a status update.');
+    expect(await page.evaluate(() => window.__sameDocument), 'listed without a reload').toBe(true);
+
+    await row.locator('[data-action="apply-proposal"]').click();
+    await expect(row.locator('[data-testid="opened-task-proposal-state"]')).toHaveText('applied');
+    expect(applies).toEqual(['POST']);
+  });
+
+  test('a failed Review is offered again: the run control says Run Review, and the answer does not read idle', async ({ page }) => {
+    await seedTask(page);
+    await seedWorkspaceOwnership(page, URL_KEY, 'owner');
+    const token = await runnerToken(page);
+    await seedRun(page, token, { kind: 'plan', feedback: ['[done] planned it'] });
+    await seedRun(page, token, { kind: 'implementation', feedback: ['[done] built it'] });
+    await seedRun(page, token, { kind: 'review', feedback: ['[failed] review could not finish'] });
+
+    await page.goto(`/workspace/${URL_KEY}/task/${TASK}`);
+    await expect(page.locator('[data-testid="task-page-run-control"] [data-testid="opened-task-go"]')).toContainText('Run Review');
+    await expect(page.locator('[data-testid="task-page-status"]')).toHaveAttribute('data-status', 'failed');
+    await expect(page.locator('[data-testid="task-page-answer"]')).not.toContainText('idle');
+  });
+
   test('at 390×844 the answer and the run control sit on the first screen, with no sideways scroll', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await seedTask(page);
