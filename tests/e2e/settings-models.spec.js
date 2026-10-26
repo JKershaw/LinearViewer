@@ -83,7 +83,7 @@ test.describe('Settings › Models (LIN-3855)', () => {
 
     await expect(page.locator('[data-testid="models-notice"]')).toContainText(/Saved \d+ rows?\./)
     await expect(jobRow(page, 'implementation').locator(':scope > summary')).toContainText('from Make')
-    await expect(jobRow(page, 'implementation').locator(':scope > summary')).toContainText('sonnet')
+    await expect(jobRow(page, 'implementation').locator(':scope > summary')).toContainText('Claude Sonnet 5.5')
   })
 
   test('picking an OpenRouter-only model switches the harness to opencode and hides effort', async ({ page }) => {
@@ -142,7 +142,7 @@ test.describe('Settings › Models (LIN-3855)', () => {
     await undo.locator('[data-testid$="-confirm"]').click()
 
     await openModels(page)
-    await expect(jobRow(page, 'bug').locator(':scope > summary')).toContainText('sonnet')
+    await expect(jobRow(page, 'bug').locator(':scope > summary')).toContainText('Claude Sonnet 5.5')
   })
 
   test('at phone width the open row is a full-screen sheet and nothing scrolls sideways', async ({ page }) => {
