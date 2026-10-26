@@ -21,6 +21,8 @@ import { inReadWindow, READ_HORIZON_MS, READ_HORIZON_DAYS } from '../../lib/read
 import { runPageHref } from '../../lib/task-page-href.js';
 import { fmtDuration } from '../../lib/render-run-steps.js';
 import { runIdsOf, buildTaskPageModel } from '../../lib/task-page-loader.js';
+import { sessionIdByLoop } from '../../lib/pipeline-loops.js';
+import { sessionIdOf } from '../../lib/live-console.js';
 import { renderTaskTrack } from '../../lib/render-task-page.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 
@@ -112,10 +114,13 @@ describe('LIN-3975 — runIdsOf links only the attempts inside the run page\'s w
     assert.match(renderTaskTrack(m, { now: NOW, urlKey: 'acme', runLinks: true }), /no run page for this attempt/);
   });
 
-  test('the run id is the session ledger\'s id, the one the run page resolves', () => {
+  // The claim that the id is the one the run page resolves is witnessed in lin-3975-run-link-resolve.test.js, which
+  // reads the run by this id. Here: an in-window attempt gets a non-empty id, and that id is the ledger's (not a key built here).
+  test('an in-window attempt gets the ledger\'s session id (the run page\'s own witness is in lin-3975-run-link-resolve)', () => {
     const recent = loop('l-recent', daysAgo(1));
     const ids = runIdsOf('acme', [recent], NOW);
-    assert.match(ids.get('l-recent'), /\S/, 'a non-empty session id');
+    assert.match(ids.get('l-recent'), /^\S+$/, 'a non-empty session id');
+    assert.equal(ids.get('l-recent'), sessionIdOf({ ...recent, workspaceUrlKey: 'acme' }, sessionIdByLoop([{ ...recent, workspaceUrlKey: 'acme' }], { now: NOW })), 'the Live Console key');
   });
 
   test('a loop with an unparseable dispatch time gets no link (it is out of the window)', () => {
