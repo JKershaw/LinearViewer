@@ -154,16 +154,13 @@ export function deriveSessionStatus({ terminal, stale, hasError, waiting = false
  *   attach it to, so a message-less loop's decision is never surfaced this way.
  */
 export function deriveSessionWaiting(enrichedLoops) {
-  const supersededLoopIds = computeSupersededLoopIds(enrichedLoops);
   let waiting = false;
   let message = null;
   let producerLoopId = null;
   let decision = null;
   let decisionCase = [];
   let foundProducer = false;
-  for (const l of enrichedLoops) {
-    if (!l || supersededLoopIds.has(l.loopId)) continue;
-    if (!loopIsWaiting(l)) continue;
+  for (const l of waitingLoops(enrichedLoops)) {
     waiting = true;
     if (foundProducer) continue;
     const text = l.waitingMessage || l.agentSummary || null;
@@ -175,6 +172,24 @@ export function deriveSessionWaiting(enrichedLoops) {
     decisionCase = Array.isArray(l.decisionCase) ? l.decisionCase : [];
   }
   return { waiting, message, producerLoopId, decision, decisionCase };
+}
+
+/**
+ * The loops a session is waiting on, in the order they were given (LIN-3983):
+ * every non-superseded loop for which `loopIsWaiting` holds. This is the one
+ * copy of that filter; `deriveSessionWaiting` rolls it up, and the feed payload
+ * ships its ids as `waitingLoopIds` so the Observation waiting block can tell
+ * which of the session's waits its ruling rows do not already cover.
+ *
+ * Pure, and read at read time from fields stored loops already carry, so it
+ * needs no `BUILDER_VERSION` bump.
+ *
+ * @param {Array<Object>} enrichedLoops - loops already run through `enrichLoop`
+ * @returns {Array<Object>}
+ */
+export function waitingLoops(enrichedLoops) {
+  const supersededLoopIds = computeSupersededLoopIds(enrichedLoops);
+  return enrichedLoops.filter(l => l && !supersededLoopIds.has(l.loopId) && loopIsWaiting(l));
 }
 
 /**

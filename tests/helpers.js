@@ -83,6 +83,57 @@ export async function createSession(page, overrides = {}) {
  * selectors for the migrated surfaces.
  */
 export const SELECTORS = {
+  /** Observation (LIN-3983 PR 2): the view tabs, the workspace scope, the waiting block, the Rulings actions and the in-page bulk question. */
+  observation: {
+    tab: (key) => `[data-testid="obs-tab-${key}"]`,
+    scope: (key) => `[data-testid="obs-scope-${key}"]`,
+    waiting: '[data-testid="obs-waiting"]',
+    sessionViews: '[data-testid="obs-session-views"]',
+    rulingsSection: '[data-testid="obs-rulings-section"]',
+    ruling: {
+      row: '[data-testid="obs-ruling-row"]',
+      ws: '[data-testid="obs-ruling-ws"]',
+      select: '[data-testid="obs-ruling-select"]',
+      selectAll: '[data-testid="obs-ruling-select-all"]',
+      selectedCount: '[data-testid="obs-ruling-selected-count"]',
+      bulkBar: '[data-testid="obs-ruling-bulk-bar"]',
+      bulkProgress: '[data-testid="obs-ruling-bulk-progress"]',
+      answer: '[data-testid="obs-ruling-answer"]',
+      answerInput: '[data-testid="obs-ruling-answer-input"]',
+      feedback: '[data-testid="obs-ruling-feedback"]',
+      retryDelivery: '[data-testid="obs-ruling-retry-delivery"]',
+      dismiss: '[data-testid="obs-ruling-dismiss"]',
+      shelve: '[data-testid="obs-ruling-shelve"]',
+      shelvePanel: '[data-testid="obs-ruling-shelve-panel"]',
+      shelveReason: '[data-testid="obs-ruling-shelve-reason"]',
+      shelveConfirm: '[data-testid="obs-ruling-shelve-confirm"]',
+      agree: '[data-testid="obs-ruling-agree"]',
+      keep: '[data-testid="obs-ruling-keep"]',
+      bulkApply: '[data-testid="obs-ruling-agree-selected"]',
+      bulkStop: '[data-testid="obs-ruling-bulk-stop"]',
+    },
+    bulkConfirm: {
+      panel: '[data-testid="obs-ruling-bulk-confirm"]',
+      text: '[data-testid="obs-ruling-bulk-confirm-text"]',
+      yes: '[data-testid="obs-ruling-bulk-confirm-yes"]',
+      no: '[data-testid="obs-ruling-bulk-confirm-no"]',
+    },
+    due: {
+      section: '[data-testid="obs-due-section"]',
+      row: '[data-testid="obs-due-row"]',
+      select: '[data-testid="obs-due-select"]',
+      selectAll: '[data-testid="obs-due-select-all"]',
+      selectedCount: '[data-testid="obs-due-selected-count"]',
+      selectedCost: '[data-testid="obs-due-selected-cost"]',
+      bulkBar: '[data-testid="obs-due-bulk-bar"]',
+      disclaimer: '[data-testid="obs-due-bulk-disclaimer"]',
+      quotaNote: '[data-testid="obs-due-bulk-quota-note"]',
+      refusal: '[data-testid="obs-due-bulk-refusal"]',
+      empty: '[data-testid="obs-due-empty"]',
+      scanSelected: '[data-testid="obs-due-scan-selected"]',
+      stop: '[data-testid="obs-due-stop"]',
+    },
+  },
   footer: {
     /** Footer nav link by its visible text, e.g. 'swipe', 'settings'. */
     link: (name) => `[data-testid="footer-link-${name}"]`,

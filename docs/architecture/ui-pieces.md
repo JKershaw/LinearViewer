@@ -409,6 +409,14 @@ Three pieces are shared decisions, each drawn on `/styleguide` (`LIVE_CONSOLE_PI
 - **Motion follows the setting while the page is open.** `applyMotion` (`public/live-console.js`) stops or restarts the strip and removes or adds the lane pulse when the reduced-motion query changes, so a reused lane node follows it too.
 - **The dot is for what is shown.** Red only while a task's latest run in the window failed and nothing on its key has followed it, lane or later run (`countFailedNow`). An earlier failure belongs to the stream and the timeline.
 
+## Task page (LIN-3975): the run control is Home's panel, and the answer is the tracker's line plus Harbour's pill
+
+- **The run control is the shared `PromptSection` (LIN-3962's panel), on a third surface, `task`.** It is not a second control. `capabilitiesOf(surface)` (`public/prompt-section.js`) is the one table that says what each surface shows: `home` keeps its state block and watch link, `task` keeps the run control and the copy-first view but drops the state block (the top answer already says it) and the watch link (the viewer is on the page), and `swipe` is unchanged. A surface added to `SURFACES` (`lib/task-mode-store.js`) needs a row, and a unit test pins that.
+- **Who sees it.** The owner, for an unfinished task, from the page-load model and never from a poll (the poll cannot mount it). A member and a guest get the next-step line in the same slot: one sentence, shared by the server render, saying what comes next. A finished task has neither. With no runner, the owner gets the copy-first view and the runner link (`lib/components/runner-link.js`).
+- **The answer.** "Tracker: <state>" (the tracker's own word, from the page-load read) sits beside the status mount, outside what the poll repaints. The pill and the sentence are Harbour's and repaint on each poll. The two are different facts, and the line says which is which.
+- **Styles.** The run control's rules live in `public/run-control.css`, linked by Home, Swipe and the task page. Swipe's card CSS is not shipped to the task page.
+- **Anatomy.** Drawn on `/styleguide` in a later step of LIN-3975 (not in this PR).
+
 ## Open questions for John
 
 Each keeps today's behaviour until answered.
@@ -441,7 +449,7 @@ Three things to expect when reading the judge's output:
 
 The signed-out landing (`lib/render-landing.js`, `lib/components/landing-hero.js`) reuses shared pieces, so a later change to one of them reaches the landing:
 
-- **Status pill** (`renderStatusPill`): the Observation and Swim glimpses.
+- **Status pill** (`renderStatusPill`): the Observation and Swim glimpses. The run-status pill's ⚠ marker (`warn`) is shared by the server helper and its client replica (LIN-3983 PR 2).
 - **Stage words and model names**: stage words come from `STAGE_LABELS` (`lib/run-view.js`); model family names stay typed locally by design (the signed-out landing is not a routing surface, so it does not use `getModelDisplayName`, the one name authority for every routing page). The glimpses show family names, never raw ids or versions.
 - **Head metadata** (`lib/components/head-meta.js`): description, canonical and social-preview tags, shared with the Library.
 - **Dark mode**: the pre-paint script in `lib/components/page.js`, opted in with `followSystemTheme`.
@@ -462,3 +470,27 @@ Settings › Models polish. Each piece below has one authority; a new caller use
 - **"You" in a log** (`actorLabel`, `lib/render-settings-workspace.js`): the one actor rule. The Models log reaches it through an adapter over the model entry's `actor`, with the former-member fallback (`FORMER_MEMBER`, `lib/workspace-change-log.js`).
 - **Sidebar label** (`summariseSpend` and `summariseRouting`, `lib/model-routing-summary.js`): on Models, the model carrying the most priced spend, credited to each job's effective model (`spendByEffectiveModel`); on every other Settings area, a spend-free label from the effective table ("one model's name", or "N models"), so those pages add no spend read. Both fit the sidebar's width.
 - **Applicability** (`agentHasSetting`, `lib/render-settings-models.js`): agent rows apply when the workspace has a live runner, an agent run in the window, or an agent setting stored. Until then they are one line. Groups with no job on their surface are not listed (from the registry, `groupsWithJobs`). A Harbour call with nothing stored reads "server default".
+
+## Observation tabs (LIN-3983): the shared tab strip
+
+**Decides:** how a page shows a few mutually exclusive views, and where that markup and its CSS live. **Owner:** `lib/components/tabs.js` (`renderTabs`) for the markup and `public/style.css` (`.tabs`, `.tabs__tab`) for the look. The page owns the selection, the click handler and the view it shows.
+
+- **Anatomy.** A `role="tablist"` row of real `<button>` tabs, one `is-active` tab with `aria-selected="true"`, the others at `tabindex="-1"`. Each tab has `data-tab` (its key) and `data-testid="<prefix>-<key>"`. Labels do not wrap: the strip scrolls sideways on a narrow screen rather than breaking a word. Tap targets are 44px tall. The anatomy is shown in `/styleguide`.
+- **Arrow keys** are the page's job, because the server renders no script. Observation moves focus and selection with Left and Right in `public/observation.js`.
+- **Consumers.** Observation (`runs | rulings | due`). The task-edit tabs (`.task-edit-tab`, `lib/render-task-edit.js`) are the next consumer to move; they keep their own rules until then, so this decision has two copies to consolidate, not one.
+- **What a tab says.** Each tab names what it holds. The line under the strip states the active tab's contents, including the 24-hour window for the runs feed.
+- **Not decided here:** the tab keys are part of each page's own URL contract (`?view=`), so a key is never renamed without keeping its old value working.
+
+## Observation words (LIN-3983 PR 2): one state, said once, in the task page's words
+
+**Decides:** what a card or a row says about a run's state, and where the shared pieces that say it come from. **Owners:** `SESSION_PILL` (`public/observation.js`) for the pill words; `stageLabel` (`lib/run-view.js`) for the stage word, read on the server into `stageWord`; `window.renderStatusPill` and `window.renderSegmentBar` (`public/common.js`) for the pill and the bar.
+
+- **The pill words are the task page's own**, not a parallel set: `running`, `waiting`, `done`, `failed`, `idle` (`lib/render-task-page.js` `STATUS_PILL`). A card whose pill says `waiting` does not say "waiting on you" again. `done-with-warning` is `done` with the ⚠ marker.
+- **The summary line never repeats the pill's word.** A running card says the stage and how long it has run ("Implementation, 12 min in"). A waiting card's sentence is the question the run asked, with its runner marker (`[blocked]`, `[done]`, `[working]`) taken out at display time and the stored text untouched. A failed card says the stage and when it was last active. No card reads as a bracketed option list.
+- **Answer choices show only while the question is open.** The choices come from the rulings response's `openLoopIds`, so a question that was dismissed, answered or withdrawn is never offered as something to pick.
+- **The progress count is in words** ("2 of 3 runs finished"), beside the bar. The feed carries no stages, so one cell is one run.
+- **One pill and one bar, each with a client replica pinned to its server helper.** `renderStatusPill` (`lib/components/status-pill.js`, with `warn`) and `renderSegmentBar` (`lib/components/segment-bar.js`, with `live`) are copied into `public/common.js`, because `public/` has no ES modules. `tests/unit/segment-bar-pill-parity.test.js` compares the two over a table of inputs, so a change made to one and not the other fails.
+- **Times are relative words with the exact local time and zone visible** (LIN-3975's time rule), for example `updated 3m ago · 14:02 BST`, as a `<time data-local-time="zoned">` the page formats. A `title` tooltip alone does not count.
+- **Bulk apply asks in the page**, never through `confirm()`: a question with the count and what each answer does, and Apply and Cancel beside it (`#obs-ruling-bulk-confirm`). This is the confirm decision above, applied to Observation.
+- **Workspace scope.** The feed opens on this workspace, as Live Console does. "All workspaces" widens it, and the chips filter inside it. The waiting block ignores the scope, so a question waiting in another workspace is still on it.
+- **Not decided here:** the goal of an untitled run is not in the feed payload, so such a card reads "Untitled run" with its start time. Carrying the goal in the payload is a separate change.

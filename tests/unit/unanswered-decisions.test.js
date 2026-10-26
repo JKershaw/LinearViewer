@@ -460,6 +460,14 @@ describe('collectUnansweredDecisions — taskDecisions branch (LIN-2197 Phase 3)
     assert.strictEqual(rows[0].canReply, true);
   });
 
+  test('a task-bound row names its task by the scan-time title (LIN-3983 PR 2), and an older row with no title carries no key', () => {
+    const [titled] = collectUnansweredDecisions({ taskDecisions: [taskDecision({ issueTitle: 'Stop the nightly export' })] }, { now: NOW });
+    assert.strictEqual(titled.anchor.issueTitle, 'Stop the nightly export');
+    assert.strictEqual(titled.anchor.issueIdentifier, 'LIN-2197', 'the id stays beside the title');
+    const [older] = collectUnansweredDecisions({ taskDecisions: [taskDecision()] }, { now: NOW });
+    assert.equal('issueTitle' in older.anchor, false, 'a row written before the title existed is unchanged');
+  });
+
   test('a persisted zero-finding scan (decision: null) contributes no row', () => {
     const rows = collectUnansweredDecisions({ taskDecisions: [taskDecision({ decision: null })] }, { now: NOW });
     assert.deepStrictEqual(rows, []);

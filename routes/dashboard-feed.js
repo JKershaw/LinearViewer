@@ -22,9 +22,10 @@ import { getLoopsForWorkspace, getSessionsForWorkspace } from '../lib/pipeline-l
 import { isTerminalLoop, enrichLoop, sessionIsTerminal } from '../lib/run-loop-state.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { toEpochMs } from '../lib/utils/time.js';
+import { stageLabel, ORCHESTRATION_KINDS } from '../lib/run-view.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
 import { findAnchorLoop, childLoops } from '../lib/session-summary.js';
-import { STALE_AFTER_MS, WORKSPACE_FANOUT_CONCURRENCY, settleWithConcurrency, isStandaloneSession, deriveSessionStatus, deriveSessionWaiting, loopActivityMs, peakToolCount, deriveFeedStatusLine, connectedWorkspaces } from './dashboard-session-state.js';
+import { STALE_AFTER_MS, WORKSPACE_FANOUT_CONCURRENCY, settleWithConcurrency, isStandaloneSession, deriveSessionStatus, deriveSessionWaiting, waitingLoops, loopActivityMs, peakToolCount, deriveFeedStatusLine, connectedWorkspaces } from './dashboard-session-state.js';
 
 // Default archive page size for the observation /sessions feed (LIN-631). The
 // client requests this many archived sessions per "load more"; the server caps
@@ -93,13 +94,18 @@ function sessionActivityMs(enrichedLoops, session) {
 // surface on the card. Prefer the most-recently-active among the still-running
 // runs (what the session is doing right now); fall back to the most-recent
 // terminal run's kind (what it last did) when nothing is live.
-function recentRunKind(children) {
+function recentRun(children) {
   const live = children.filter(l => !isTerminalLoop(l));
   const pool = live.length ? live : children.filter(isTerminalLoop);
   let best = null;
   for (const l of pool) {
     if (!best || loopActivityMs(l) >= loopActivityMs(best)) best = l;
   }
+  return best;
+}
+
+function recentRunKind(children) {
+  const best = recentRun(children);
   return best ? (best.kind || null) : null;
 }
 
@@ -115,6 +121,9 @@ function projectRun(l) {
 function runIdentity(l) {
   return {
     loopId: l.loopId,
+    // LIN-3983 PR 2: the stage's plain word, from the same `stageLabel` the Live Console reads, so the
+    // two pages never name a stage differently. Null for a run with no kind.
+    stageWord: l.kind ? stageLabel(l.kind) : null,
     // Lineage identity (LIN-1487): carry the read-only `lineageId` derived
     // upstream (`lib/pipeline-loops.js` — `rootItemId ?? loopId`, emitted
     // ungated by `lean`) through the projection so the client can fold a
@@ -258,6 +267,17 @@ export function buildSessionPayload(session, ws, taskDone = false, lastActivityO
   const { waiting: rawWaiting, message: rawWaitingMessage, producerLoopId, decision, decisionCase } = deriveSessionWaiting(enriched);
   const waiting = !terminal && rawWaiting;
   const waitingMessage = waiting ? rawWaitingMessage : null;
+  // LIN-3983: every loop this session is waiting on, by id, for the Observation
+  // waiting block (see `waitingLoops`). Empty when terminal, like waitingMessage.
+  const waitingLoopIds = waiting ? waitingLoops(enriched).map(l => l.loopId) : [];
+  // LIN-3983 PR 2: the run the card's state is about, for its stage word and how long it has run: the
+  // waiting question's producer when the session waits, else its most recent worker run (an orchestration
+  // row, such as the autopilot anchor, names no stage of its own), else its most recent run of any kind.
+  // Read at request time from the loops already built, so no stored field and no BUILDER_VERSION bump.
+  const stageRun = (waiting && enriched.find(l => l.loopId === producerLoopId))
+    || recentRun(children.filter(l => !ORCHESTRATION_KINDS.has(l.kind)))
+    || recentRun(children);
+  const stageSinceMs = toEpochMs(stageRun?.dispatchedAt);
 
   // Sessions-tab discriminators (LIN-1194), both additive fields the Autopilot
   // tab ignores. `standalone` routes a synthesized single-loop session to the
@@ -310,6 +330,10 @@ export function buildSessionPayload(session, ws, taskDone = false, lastActivityO
     // surfaces the blocked message text. Null message when nothing is waiting.
     waiting,
     waitingMessage,
+    waitingLoopIds,
+    // LIN-3983 PR 2: the stage word and when the stage started (null for a session with no run).
+    stageWord: stageRun ? stageLabel(stageRun.kind || null) : null,
+    stageSince: stageSinceMs ? new Date(stageSinceMs).toISOString() : null,
     // LIN-2184 (H5): the rollup's decision facts (from the SAME producing loop
     // as `message`/`waitingMessage` above — `deriveSessionWaiting`'s "one
     // producer, always" rule) — deliberately NOT gated on `waiting`, unlike
@@ -651,16 +675,27 @@ function observationPage({ llmCallLogStore, renderObservationPage, getDeployInfo
 }
 
 // Split the merged sessions into the polling tab's Active list and Archive.
+// Touched within the last day (LIN-631): the one Active/Archive rule, mirrored
+// in public/observation.js (`isRecentlyActive`).
+function recentlyActiveAt(now) {
+  return (s) => {
+    const t = Date.parse(s.lastActivity);
+    return Number.isFinite(t) && (now - t) <= STALE_AFTER_MS;
+  };
+}
+
 function splitSessionsFeed(merged, isSessionsView) {
+  const now = Date.now();
+  const recentlyActive = recentlyActiveAt(now);
   if (isSessionsView) {
-    // Sessions view (LIN-1194): the in-flight predicate is running-only —
-    // taken (past the live queue) AND non-terminal — NOT recency. Completed
-    // sessions drop to the shared archive; queued-but-not-taken and non-taken
-    // items are excluded from V1 entirely (the decided in-flight boundary).
-    // Standalone sessions are kept here (they are filtered OUT of Autopilot).
+    // Sessions source (LIN-1194, LIN-3983): standalone sessions included, and
+    // the SAME recency rule as Autopilot, so one bucketing rule holds for every
+    // filter on Observation. Taken sessions only: a queued-but-not-taken
+    // dispatch is still excluded from the feed (the in-flight boundary).
+    const taken = merged.filter(s => s.taken);
     return {
-      active: merged.filter(s => s.taken && !s.terminal),
-      archive: merged.filter(s => s.terminal)
+      active: taken.filter(recentlyActive),
+      archive: taken.filter(s => !recentlyActive(s))
     };
   }
   // Autopilot view — UNCHANGED (LIN-631): recency-only Active/Archive split
@@ -668,11 +703,6 @@ function splitSessionsFeed(merged, isSessionsView) {
   // in public/observation.js so server and client buckets agree. Standalone
   // sessions are filtered OUT so extending `_buildSessions` cannot leak them
   // into the existing feed on a live-fallback read (LIN-1194, concern #1).
-  const now = Date.now();
-  const recentlyActive = (s) => {
-    const t = Date.parse(s.lastActivity);
-    return Number.isFinite(t) && (now - t) <= STALE_AFTER_MS;
-  };
   const feed = merged.filter(s => !s.standalone);
   return {
     active: feed.filter(recentlyActive),

@@ -131,6 +131,8 @@ function makeSandbox({ fetchImpl, scanCostEstimate, postScanImpl } = {}) {
       addEventListener() {},
       getElementById: (id) => nodes.get(id) || null,
       querySelector: () => null,
+      // LIN-3983: switchView paints the tab strip's state through this.
+      querySelectorAll: () => [],
       createElement: () => new FakeBadgeElement(),
     },
     escapeHtml: (s) => (s == null ? '' : String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')),
@@ -179,7 +181,7 @@ test.describe('dueStatusCopy / renderDueRowHtml — tri-state rendering', () => 
   test('plain null (no error) renders the scan-baseline copy, never "not due"', () => {
     const { dueStatusCopy } = makeSandbox().module.exports;
     const result = dueStatusCopy({ dueStatus: null });
-    assert.match(result.text, /basis not comparable yet/i);
+    assert.match(result.text, /not checked yet — scan it once to set its baseline/);
     assert.doesNotMatch(result.text, /not due/i);
   });
 
@@ -187,7 +189,7 @@ test.describe('dueStatusCopy / renderDueRowHtml — tri-state rendering', () => 
     const { dueStatusCopy } = makeSandbox().module.exports;
     const result = dueStatusCopy({ dueStatus: null, error: true });
     assert.match(result.text, /provider read failed/i);
-    assert.doesNotMatch(result.text, /basis not comparable yet/i);
+    assert.doesNotMatch(result.text, /not checked yet/i);
     assert.doesNotMatch(result.text, /not due/i);
   });
 
@@ -197,7 +199,7 @@ test.describe('dueStatusCopy / renderDueRowHtml — tri-state rendering', () => 
     // "unknown", never be coerced into a due/not-due claim.
     const { dueStatusCopy } = makeSandbox().module.exports;
     const result = dueStatusCopy({ dueStatus: 'true' });
-    assert.match(result.text, /basis not comparable yet/i);
+    assert.match(result.text, /not checked yet — scan it once to set its baseline/);
   });
 
   test('renderDueRowHtml renders a Retry affordance ONLY on the error branch', () => {
@@ -235,14 +237,19 @@ test.describe('pollCurrentView — the due tab is never polled ambiently', () =>
     assert.equal(calls, 0, 'pollCurrentView must be a pure no-op for the due tab, not a due-specific branch that fetches');
   });
 
-  test('pollCurrentView still dispatches normally for autopilot/sessions/rulings', async () => {
-    let calls = 0;
-    const sandbox = makeSandbox({ fetchImpl: async () => { calls++; return jsonResponse({ active: [], recent: [] }); } });
-    vm.runInContext('currentView = "autopilot";', sandbox);
+  test('pollCurrentView on the runs view makes exactly two reads: the feed, and the rulings for the waiting block', async () => {
+    // LIN-3983: the runs view polls the feed and the rulings read that feeds the
+    // waiting block. Neither is a due-tab read, so the due early return above
+    // leaves both pollers alone.
+    const calls = [];
+    const sandbox = makeSandbox({ fetchImpl: async (url) => { calls.push(url); return jsonResponse({ active: [], recent: [], rulings: [] }); } });
+    vm.runInContext('currentView = "runs";', sandbox);
     const { pollCurrentView } = sandbox.module.exports;
     pollCurrentView();
     await flush();
-    assert.equal(calls, 1, 'the pre-existing pollers must be unaffected by the due early return');
+    assert.equal(calls.length, 2, `expected the feed and the rulings read, got ${calls.length}`);
+    assert.ok(calls.some(u => /\/api\/dashboard\/sessions$/.test(u)), 'the feed read (autopilot filter: no view param)');
+    assert.ok(calls.some(u => /\/api\/dashboard\/rulings$/.test(u)), 'the rulings read');
   });
 });
 

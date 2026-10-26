@@ -142,7 +142,7 @@ test.describe('Rulings tab', () => {
     await page.setViewportSize(DESKTOP);
     await page.goto(observationUrl);
     await page.waitForLoadState('networkidle');
-    await page.locator('.obs-tab[data-view="rulings"]').click();
+    await page.locator('[data-testid="obs-tab-rulings"]').click();
     await page.waitForSelector('.obs-ruling-suggestion');
 
     // Select both rows so the bulk bar's "Apply N as proposed" and its

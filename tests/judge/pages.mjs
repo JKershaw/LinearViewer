@@ -28,6 +28,8 @@ const TIME_MASKS = {
   key: { selector: '[data-testid="settings-key-proxy"], [data-testid="settings-key-dispatch"]', reason: 'key expiry and last used are server-rendered times' },
   change: { selector: '[data-change-id]', reason: 'the change-log meta line carries a server-rendered time (WorkspaceChangeLogStore.record stamps new Date())' },
   poll: { selector: '[data-testid="settings-runner-last-poll"]', reason: 'Last poll is a server-rendered time' },
+  // Optional: base is shot unsaved and its Models page may emit no log row.
+  modelsLog: { selector: '[data-testid^="models-log-"] > .settings-row-label', optional: true, reason: 'the Models log label carries a server-rendered relative time (formatRelativeTime in logBody)' },
 };
 
 // LIN-3977: the Live Console's parts that move with the clock. Each mask names its reason; a mask that
@@ -37,6 +39,20 @@ const LIVE_BARS = { selector: '.lc-timeline-viewport', reason: 'bar positions an
 const LIVE_AXIS = { selector: '.lc-timeline-axis', reason: 'the axis shows the window\'s own clock times' };
 const LIVE_SINCE = { selector: '.lc-lane-since', optional: true, reason: 'how long a stage has run is relative to the shot (base has no such element: LIN-3977 adds it, so the mask is skipped there)' };
 const LIVE_WHEN = { selector: '.lc-event-time', reason: 'a stream row\'s relative time is relative to the shot (its exact time is on hover)' };
+
+// LIN-3983: Observation's times are relative to the real clock (its runs are seeded on it, see observation-states.mjs),
+// so the words that carry them move between the two shots. The masks are the containing rows, never the inline span.
+// Only the time-bearing nodes are masked, never the rows around them: a row's pill, title, workspace, actions and
+// answer choices are what this PR changes, so a mask on the row would hide the very difference the judge must class.
+const OBS_TIMES = [
+  { selector: '.obs-session-time', reason: 'the card\'s "updated … ago" stamp is relative to the real clock the seed runs on' },
+  { selector: '.obs-ruling-suggestion-meta', reason: 'the proposal\'s "by …, ago" stamp is relative to the real clock the seed runs on' },
+  { selector: '.obs-session-started', optional: true, reason: 'an untitled run\'s "Started …" is a relative time (base has no such line: LIN-3983 PR 2 adds it)' },
+  { selector: '.obs-summary-elapsed', optional: true, reason: 'a running stage\'s "… in" is the clock at the shot (base has no such span: PR 2 wraps it)' },
+  { selector: '.obs-meta-runtime', optional: true, reason: 'a run\'s runtime is the clock at the shot (base has no such class: PR 2 adds it)' },
+];
+// The Rulings tab shows no session cards, so only the proposal's stamp is on screen there.
+const OBS_RULING_TIMES = OBS_TIMES.filter((m) => m.selector === '.obs-ruling-suggestion-meta');
 
 // `state` names a set-up the spec performs identically on both sides (see replay.spec.js):
 //   ask-open          open the periodic-reviews ask in place (a change that affects everyone)
@@ -92,14 +108,14 @@ export const PAGES = [
   { id: 'audit-report', urlKey: 'judge', path: (k) => `/workspace/${k}/audit`, state: 'audit-report', renderers: ['lib/render-audit.js'] },
   // LIN-3855: Settings › Models. At the phone viewport the open row is the full-screen sheet, so 'models-panel-open'
   // covers the sheet at 390px and the panel at 1280px. Both are read-only set-ups on the seeded 'judge' workspace.
-  { id: 'models-panel-open', urlKey: 'judge', path: (k) => `/workspace/${k}/settings/models`, state: 'models-panel-open', renderers: ['lib/render-settings-models.js', 'lib/components/decision-panel.js'] },
-  { id: 'models-staged', urlKey: 'judge', path: (k) => `/workspace/${k}/settings/models`, state: 'models-staged', renderers: ['lib/render-settings-models.js', 'lib/components/decision-panel.js'] },
+  { id: 'models-panel-open', urlKey: 'judge', path: (k) => `/workspace/${k}/settings/models`, state: 'models-panel-open', masks: [TIME_MASKS.modelsLog], renderers: ['lib/render-settings-models.js', 'lib/components/decision-panel.js'] },
+  { id: 'models-staged', urlKey: 'judge', path: (k) => `/workspace/${k}/settings/models`, state: 'models-staged', masks: [TIME_MASKS.modelsLog], renderers: ['lib/render-settings-models.js', 'lib/components/decision-panel.js'] },
   // LIN-3952: a group opened (head only: base's groups are the old forms), the list with spend (a runner and priced runs,
   // seeded through the dispatch API on both sides), and a saved change with the row marked and one Undo for the save.
   // The save writes, so it has its own urlKey. Head only: base's save redirects elsewhere, so base is shot unsaved.
-  { id: 'models-group-open', urlKey: 'judge', path: (k) => `/workspace/${k}/settings/models`, state: 'models-group-open', renderers: ['lib/render-settings-models.js', 'lib/components/decision-panel.js'] },
-  { id: 'models-spend', urlKey: 'judge-spend', path: (k) => `/workspace/${k}/settings/models`, state: 'models-spend', seed: { runnerKey: true }, renderers: ['lib/render-settings-models.js', 'lib/components/settings-row.js', 'lib/components/settings-spend-bar.js'] },
-  { id: 'models-saved', urlKey: 'judge-saved', path: (k) => `/workspace/${k}/settings/models`, state: 'models-saved', renderers: ['lib/render-settings-models.js', 'lib/components/decision-panel.js'] },
+  { id: 'models-group-open', urlKey: 'judge', path: (k) => `/workspace/${k}/settings/models`, state: 'models-group-open', masks: [TIME_MASKS.modelsLog], renderers: ['lib/render-settings-models.js', 'lib/components/decision-panel.js'] },
+  { id: 'models-spend', urlKey: 'judge-spend', path: (k) => `/workspace/${k}/settings/models`, state: 'models-spend', masks: [TIME_MASKS.modelsLog], seed: { runnerKey: true }, renderers: ['lib/render-settings-models.js', 'lib/components/settings-row.js', 'lib/components/settings-spend-bar.js'] },
+  { id: 'models-saved', urlKey: 'judge-saved', path: (k) => `/workspace/${k}/settings/models`, state: 'models-saved', masks: [TIME_MASKS.modelsLog], renderers: ['lib/render-settings-models.js', 'lib/components/decision-panel.js'] },
   // LIN-3968: Home's opened task. The stage states have a runner (the strip and run control show) and seed their
   // sessions through the consumer API; the copy-first pair has no runner, and its write is a fixed stream. Each
   // state has its own urlKey, so one state's sessions or prompt memory never reach another.
@@ -118,6 +134,24 @@ export const PAGES = [
   // LIN-3992: the same Change panel with a suggestion picked. Its own urlKey, since a queue token is a write.
   { id: 'home-run-panel-pick', urlKey: 'judge-run-pick', path: (k) => `/workspace/${k}/`, state: 'home-run-panel-pick', seed: { openRouterConnected: true, queueToken: true }, renderers: ['lib/render.js', 'lib/components/decision-panel.js', 'public/decision-panel.js', 'public/prompt-section.js'] },
   { id: 'swipe-dispatch-open', urlKey: 'judge-swipe', path: (k) => `/workspace/${k}/swipe`, state: 'swipe-dispatch-open', seed: { openRouterConnected: true, queueToken: true }, renderers: ['lib/render-swipe.js'] },
+  // LIN-3983 PR 2: Observation. `obs-two-runs` seeds one run waiting on a question and one working run (on the
+  // own urlKey per entry: the seed is once per worker process, so two entries sharing a key can seed twice and the dispatch guard refuses the second;
+  // real clock, so the times are masked). The Runs view shows the waiting block above the feed; the Rulings tab
+  // lists the same question with its proposal; Scan-due and a new user (nothing running) use the seeded local
+  // workspace with no runs of its own. The two tabs and the default view each name their own state in the list.
+  { id: 'observation-runs', urlKey: 'judge-obs-runs', path: (k) => `/workspace/${k}/observation`, state: 'obs-two-runs', masks: OBS_TIMES, renderers: ['lib/render-observation.js'] },
+  // The default filter (autopilot) hides the standalone working run, so its card and pill never reach the default shot.
+  // The all-runs filter shows both cards, so a change to the pill words has somewhere to show.
+  { id: 'observation-runs-all', urlKey: 'judge-obs-runs-all', path: (k) => `/workspace/${k}/observation?filter=all`, state: 'obs-two-runs', masks: OBS_TIMES, renderers: ['lib/render-observation.js'] },
+  { id: 'observation-rulings', urlKey: 'judge-obs-rulings', path: (k) => `/workspace/${k}/observation?view=rulings`, state: 'obs-two-runs', masks: OBS_RULING_TIMES, renderers: ['lib/render-observation.js'] },
+  { id: 'observation-due', urlKey: 'judge', path: (k) => `/workspace/${k}/observation?view=due`, renderers: ['lib/render-observation.js'] },
+  { id: 'observation-new-user', urlKey: 'judge', path: (k) => `/workspace/${k}/observation`, renderers: ['lib/render-observation.js'] },
+  // LIN-3983 PR 2: the three pages that still load observation.css (Live Console no longer does). Each is behind its
+  // experimental flag, so the seed turns the flag on. Their renderers are listed so a change to observation.css is
+  // checked against them.
+  { id: 'flight-companion', urlKey: 'judge', path: (k) => `/workspace/${k}/flight-companion`, seed: { features: { flightCompanion: true } }, renderers: ['lib/render-flight-companion.js'] },
+  { id: 'passage-planner', urlKey: 'judge', path: (k) => `/workspace/${k}/passage-planner`, seed: { features: { passagePlanner: true } }, renderers: ['lib/render-passage-planner.js'] },
+  { id: 'ship-biscuit', urlKey: 'judge', path: (k) => `/workspace/${k}/ship-biscuit`, seed: { features: { shipBiscuit: true } }, renderers: ['lib/render-ship-biscuit.js'] },
   // LIN-3956: Account home, the first Plain page with rows and a form. It needs a zero-workspace account,
   // which no local seed can make, so the spec signs in by email. The judge's server runs the capture
   // transport (visual-replay.mjs), the same as Playwright's. Settings › Account then shows "Add email →"

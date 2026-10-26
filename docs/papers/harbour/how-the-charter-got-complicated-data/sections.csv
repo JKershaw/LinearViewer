@@ -1,0 +1,245 @@
+ticket,under,heading,chars
+LIN-3833,(preamble),(preamble),479
+LIN-3833,Why,Why,520
+LIN-3833,Scope,Scope,332
+LIN-3833,What is true now,What is true now,1890
+LIN-3833,The behaviour,The behaviour,18
+LIN-3833,The behaviour,Collapsed rows and In Progress,562
+LIN-3833,The behaviour,"The opened task, top to bottom",1164
+LIN-3833,The behaviour,"The run control, when dispatch is on",2784
+LIN-3833,The behaviour,When dispatch is off (the typical new user),1463
+LIN-3833,Principles,Principles,361
+LIN-3833,Done when,Done when,912
+LIN-3833,Suggested order of PRs,Suggested order of PRs,457
+LIN-3833,"Open, for John","Open, for John",533
+LIN-3833,Operator notes,Operator notes,2045
+LIN-3833,Research findings,Research findings,206
+LIN-3833,Implementation Plan,Implementation Plan,1469
+LIN-3975,(preamble),(preamble),221
+LIN-3975,Why,Why,1931
+LIN-3975,"Built on, not re-specified","Built on, not re-specified",736
+LIN-3975,What to reach on the task page,What to reach on the task page,6169
+LIN-3975,How,How,1751
+LIN-3975,Principles (the UX bar on LIN-3757),Principles (the UX bar on LIN-3757),334
+LIN-3975,Done when,Done when,1435
+LIN-3975,Not in this ticket,Not in this ticket,442
+LIN-3975,Open for John (keep today's behaviour and carry on),Open for John (keep today's behaviour and carry on),451
+LIN-3975,Operator notes,Operator notes,1864
+LIN-3975,"Research findings (26 Oct, at main `847e5bf7`)","Research findings (26 Oct, at main `847e5bf7`)",4693
+LIN-3975,Implementation Plan,Implementation Plan,3747
+LIN-3975,Implementation Plan,What LIN-3977 changed (landed after revision 2),1409
+LIN-3975,Implementation Plan,What this is for,532
+LIN-3975,Implementation Plan,Strategy framing,993
+LIN-3975,Implementation Plan,Decisions (each with its reason),3108
+LIN-3975,Implementation Plan,"Surface Assessment (carried from research, accepted)",784
+LIN-3975,Implementation Plan,"PR 1: Top answer, viewers, `task` surface and the run control",15075
+LIN-3975,Implementation Plan,"PR 2: Stages, times, summary and the PR line",9175
+LIN-3975,Implementation Plan,PR 3: Chat fold,5621
+LIN-3975,Implementation Plan,"Classes, how bounded, and verdict",3471
+LIN-3975,Implementation Plan,Surfaces and arrows,1801
+LIN-3975,Implementation Plan,Risks and edge cases,997
+LIN-3975,Implementation Plan,History signal,1258
+LIN-3975,Implementation Plan,"Judge, measures, process",1083
+LIN-3975,Implementation Plan,Scope verdict and routing,1449
+LIN-3975,Implementation Plan,Open questions for John (today's behaviour kept meanwhile; none blocks),197
+LIN-3977,(preamble),(preamble),287
+LIN-3977,Why,Why,2606
+LIN-3977,"Built on, not re-specified","Built on, not re-specified",445
+LIN-3977,What to reach on Live Console,What to reach on Live Console,5618
+LIN-3977,How,How,2094
+LIN-3977,Principles (the UX bar on LIN-3757),Principles (the UX bar on LIN-3757),334
+LIN-3977,Done when,Done when,2005
+LIN-3977,Not in this ticket,Not in this ticket,448
+LIN-3977,Answered by John,Answered by John,227
+LIN-3977,Operator notes,Operator notes,1869
+LIN-3977,Implementation Plan,Implementation Plan,2571
+LIN-3983,(preamble),(preamble),287
+LIN-3983,Why,Why,3390
+LIN-3983,"Built on, not re-specified","Built on, not re-specified",859
+LIN-3983,What to reach on Observation,What to reach on Observation,4535
+LIN-3983,How,How,1792
+LIN-3983,Principles (the UX bar on LIN-3757),Principles (the UX bar on LIN-3757),334
+LIN-3983,Done when,Done when,1767
+LIN-3983,Not in this ticket,Not in this ticket,430
+LIN-3983,Answered by John,Answered by John,280
+LIN-3983,Operator notes,Operator notes,1995
+LIN-3983,Implementation outcome,Implementation outcome,953
+LIN-3983,Implementation Plan,Implementation Plan,784
+LIN-3952,(preamble),(preamble),221
+LIN-3952,Why,Why,1212
+LIN-3952,What to reach on Settings › Models,What to reach on Settings › Models,6407
+LIN-3952,Settings leftovers from LIN-3886,Settings leftovers from LIN-3886,680
+LIN-3952,How,How,1698
+LIN-3952,Principles (the UX bar on LIN-3757),Principles (the UX bar on LIN-3757),334
+LIN-3952,Done when,Done when,1073
+LIN-3952,Rules,Rules,72
+LIN-3952,Not in this ticket,Not in this ticket,337
+LIN-3952,Open questions (keep today's behaviour and carry on),Open questions (keep today's behaviour and carry on),649
+LIN-3952,"Added before launch (operator, 25 Oct \~13:25Z)","Added before launch (operator, 25 Oct \~13:25Z)",1250
+LIN-3952,"Split, 25 Oct (operator, before launch)","Split, 25 Oct (operator, before launch)",686
+LIN-3952,Operator notes,Operator notes,1864
+LIN-3952,"Research findings (26 Oct, at `4f75f00d`)","Research findings (26 Oct, at `4f75f00d`)",1617
+LIN-3952,"Research findings (26 Oct, at `4f75f00d`)",Classes (each bounded by a concept grep; members listed),3081
+LIN-3952,"Research findings (26 Oct, at `4f75f00d`)","Recommended approach (one PR, ordered commits; operator: no child tickets)",3332
+LIN-3952,Implementation Plan,Implementation Plan,2483
+LIN-3952,Implementation Plan,Commits (in order),9855
+LIN-3952,Implementation Plan,Classes and how they were bounded,1938
+LIN-3952,Implementation Plan,History signal,581
+LIN-3952,Implementation Plan,Risks / edge cases,992
+LIN-3952,Implementation Plan,Testing,995
+LIN-3952,Implementation Plan,Scope decision,1903
+LIN-3986,(preamble),(preamble),217
+LIN-3986,Why,Why,552
+LIN-3986,What is true now (verify),What is true now (verify),1278
+LIN-3986,What to reach,What to reach,1256
+LIN-3986,Done when,Done when,228
+LIN-3986,Not here,Not here,113
+LIN-3986,Operator notes,Operator notes,1864
+LIN-3986,Implementation Plan,Implementation Plan,813
+LIN-4003,(preamble),(preamble),213
+LIN-4003,Why,Why,702
+LIN-4003,What is true now (verify),What is true now (verify),891
+LIN-4003,What to reach,What to reach,1297
+LIN-4003,Done when,Done when,356
+LIN-4003,Not here,Not here,125
+LIN-4003,Operator notes,Operator notes,1990
+LIN-4003,Implementation Plan,Implementation Plan,847
+LIN-3995,(preamble),(preamble),271
+LIN-3995,Why,Why,1557
+LIN-3995,What to reach,What to reach,1703
+LIN-3995,How,How,330
+LIN-3995,Done when,Done when,534
+LIN-3995,Not in this ticket,Not in this ticket,93
+LIN-3995,Operator notes,Operator notes,1864
+LIN-3995,Implementation Plan,Implementation Plan,765
+LIN-3992,(preamble),(preamble),271
+LIN-3992,Why,Why,1638
+LIN-3992,What to reach,What to reach,3280
+LIN-3992,How,How,545
+LIN-3992,Principles (the UX bar on LIN-3757),Principles (the UX bar on LIN-3757),334
+LIN-3992,Done when,Done when,898
+LIN-3992,Not in this ticket,Not in this ticket,188
+LIN-3992,Open for John (keep today's behaviour and carry on),Open for John (keep today's behaviour and carry on),432
+LIN-3992,Operator notes,Operator notes,1864
+LIN-3992,Implementation Plan,Implementation Plan,1028
+LIN-3872,(preamble),(preamble),512
+LIN-3872,Why,Why,3227
+LIN-3872,Implemented (close-out),Implemented (close-out),709
+LIN-3872,What moves (at `7776bd23`),What moves (at `7776bd23`),3116
+LIN-3872,"Pins (class: A convert, B loosen, C keep, S stale or blind, report)","Pins (class: A convert, B loosen, C keep, S stale or blind, report)",2988
+LIN-3872,Never weaken a guard,Never weaken a guard,1636
+LIN-3872,"Behaviour to keep, per route (verify it, don't trust it)","Behaviour to keep, per route (verify it, don't trust it)",2738
+LIN-3872,Keep the reasons,Keep the reasons,277
+LIN-3872,Done when,Done when,1389
+LIN-3872,Open questions (write them up in the PR; don't act on them here),Open questions (write them up in the PR; don't act on them here),1139
+LIN-3872,Out of scope,Out of scope,539
+LIN-3872,Operator notes,Operator notes,1863
+LIN-3876,(preamble),(preamble),913
+LIN-3876,Why,Why,3866
+LIN-3876,"The shape (decided): register on the composer's router, after the issue reads","The shape (decided): register on the composer's router, after the issue reads",4138
+LIN-3876,What moves (line numbers identical at `32f088d3` and `bfd5f8d6`),What moves (line numbers identical at `32f088d3` and `bfd5f8d6`),5193
+LIN-3876,"Pins (class: A convert, B loosen, C keep, S stale or blind, report)","Pins (class: A convert, B loosen, C keep, S stale or blind, report)",4946
+LIN-3876,Never weaken a guard,Never weaken a guard,3000
+LIN-3876,"Behaviour to keep, per route (verify it, don't trust it)","Behaviour to keep, per route (verify it, don't trust it)",2170
+LIN-3876,"Implementation record (replaces ""Order of work (fixed)"")","Implementation record (replaces ""Order of work (fixed)"")",658
+LIN-3876,"Your replay (kept out of the unit tests, not committed)","Your replay (kept out of the unit tests, not committed)",3901
+LIN-3876,Keep the reasons,Keep the reasons,280
+LIN-3876,Done when,Done when,2145
+LIN-3876,Measures (commit first; these read the object store),Measures (commit first; these read the object store),2081
+LIN-3876,Open questions (write them up in the PR; don't act on them here),Open questions (write them up in the PR; don't act on them here),933
+LIN-3876,Out of scope,Out of scope,530
+LIN-3876,Operator notes,Operator notes,1863
+LIN-3877,(preamble),(preamble),576
+LIN-3877,Why,Why,5247
+LIN-3877,"The shape (decided): register on the composer's router, where the scan block is today","The shape (decided): register on the composer's router, where the scan block is today",3076
+LIN-3877,What moves (line numbers at `aacbace1`),What moves (line numbers at `aacbace1`),7024
+LIN-3877,"Pins (class: A convert, B loosen, C keep, S stale or blind, report)","Pins (class: A convert, B loosen, C keep, S stale or blind, report)",4955
+LIN-3877,Never weaken a guard,Never weaken a guard,3623
+LIN-3877,"Behaviour to keep, per route (verify it, don't trust it)","Behaviour to keep, per route (verify it, don't trust it)",1898
+LIN-3877,Implementation (archived at close-out),Implementation (archived at close-out),787
+LIN-3877,Keep the reasons,Keep the reasons,280
+LIN-3877,Done when,Done when,2571
+LIN-3877,Measures (commit first; these read the object store),Measures (commit first; these read the object store),2042
+LIN-3877,Open questions (write them up in the PR; don't act on them here),Open questions (write them up in the PR; don't act on them here),1030
+LIN-3877,Out of scope,Out of scope,660
+LIN-3877,Operator notes,Operator notes,1863
+LIN-3883,(preamble),(preamble),455
+LIN-3883,What and who owns it,What and who owns it,1510
+LIN-3883,The shape (decided),The shape (decided),501
+LIN-3883,What moves,What moves,1528
+LIN-3883,Pins,Pins,1423
+LIN-3883,"Behaviour to keep (verify it, don't trust it)","Behaviour to keep (verify it, don't trust it)",767
+LIN-3883,Implementation (stub; plan discharged),Implementation (stub; plan discharged),589
+LIN-3883,Done when,Done when,1232
+LIN-3883,Out of scope,Out of scope,327
+LIN-3883,Operator notes,Operator notes,1863
+LIN-3893,(preamble),(preamble),644
+LIN-3893,Why,Why,1069
+LIN-3893,Who owns it: Runs & dispatch,Who owns it: Runs & dispatch,2127
+LIN-3893,"Placement (decided): ""Web routes"", through the existing `^routes/` pattern. Add no pattern and do not edit `scripts/code-shape/areas.json`.","Placement (decided): ""Web routes"", through the existing `^routes/` pattern. Add no pattern and do not edit `scripts/code-shape/areas.json`.",1071
+LIN-3893,"The shape (decided): register on the composer's router, where the feedback block is today","The shape (decided): register on the composer's router, where the feedback block is today",3531
+LIN-3893,Implementation record (pruned at close-out),Implementation record (pruned at close-out),1062
+LIN-3893,Never weaken a guard,Never weaken a guard,3519
+LIN-3893,"Behaviour to keep (verify it, don't trust it)","Behaviour to keep (verify it, don't trust it)",1296
+LIN-3893,Keep the reasons,Keep the reasons,280
+LIN-3893,Done when,Done when,2446
+LIN-3893,Measures (commit first; these read the object store),Measures (commit first; these read the object store),2269
+LIN-3893,Open questions (write them up in the PR; don't act on them here),Open questions (write them up in the PR; don't act on them here),1214
+LIN-3893,Out of scope,Out of scope,542
+LIN-3893,Operator notes,Operator notes,1890
+LIN-3917,(preamble),(preamble),528
+LIN-3917,Why,Why,2235
+LIN-3917,Who owns each application: the rule,Who owns each application: the rule,3073
+LIN-3917,"The move, per import","The move, per import",6246
+LIN-3917,"Placement: one `areas.json` pattern, said out loud","Placement: one `areas.json` pattern, said out loud",875
+LIN-3917,What may differ (everything else is byte-identical),What may differ (everything else is byte-identical),1028
+LIN-3917,Each file imports exactly what it uses (mechanical check),Each file imports exactly what it uses (mechanical check),1385
+LIN-3917,Pins and tests,Pins and tests,1475
+LIN-3917,Never weaken a guard,Never weaken a guard,1524
+LIN-3917,Order of work (fixed),Order of work (fixed),1345
+LIN-3917,Done when,Done when,2190
+LIN-3917,Measures (commit first; these tools read the object store),Measures (commit first; these tools read the object store),2696
+LIN-3917,Open questions (write them up in the PR; don't act on them here),Open questions (write them up in the PR; don't act on them here),1986
+LIN-3917,Out of scope,Out of scope,487
+LIN-3917,Operator notes,Operator notes,1894
+LIN-3917,Implementation Plan,Implementation Plan,1173
+LIN-3846,(preamble),(preamble),1056
+LIN-3846,How to work this ticket,How to work this ticket,1160
+LIN-3846,Already done since this ticket was written (out of scope here),Already done since this ticket was written (out of scope here),2061
+LIN-3846,Why,Why,776
+LIN-3846,The layout,The layout,1536
+LIN-3846,The areas,The areas,1628
+LIN-3846,"Models: this ticket gives the layout, LIN-3855 fills it","Models: this ticket gives the layout, LIN-3855 fills it",1494
+LIN-3846,What is true now (at `3907c211`; verify these lines; don't trust them),What is true now (at `3907c211`; verify these lines; don't trust them),7224
+LIN-3846,What each row must say (accuracy),What each row must say (accuracy),896
+LIN-3846,New behaviour this asks for,New behaviour this asks for,1810
+LIN-3846,Not in this ticket,Not in this ticket,826
+LIN-3846,Principles,Principles,351
+LIN-3846,Done when,Done when,1718
+LIN-3846,Order of work inside the one PR,Order of work inside the one PR,649
+LIN-3846,Answered by John (24 Oct),Answered by John (24 Oct),384
+LIN-3846,"Deviations already visible (name them in the PR, or take another route and say why)","Deviations already visible (name them in the PR, or take another route and say why)",535
+LIN-3846,Operator notes,Operator notes,1869
+LIN-3846,Implementation Plan,Implementation Plan,1031
+LIN-3846,Implementation Plan,What this is for,517
+LIN-3846,Implementation Plan,Re-grounding (staleness check),2049
+LIN-3846,Implementation Plan,Strategy framing,1406
+LIN-3846,Implementation Plan,Design decisions (each with its reason),16977
+LIN-3846,Implementation Plan,Surfaces and arrows,1763
+LIN-3846,Implementation Plan,"Classes named, and how each was bounded (at `3907c211`)",4936
+LIN-3846,Implementation Plan,Files,3617
+LIN-3846,Implementation Plan,Order of commits inside the one PR,1174
+LIN-3846,Implementation Plan,Testing (a failing-then-passing witness per behaviour change),3044
+LIN-3846,Implementation Plan,Risks and edge cases,1273
+LIN-3846,Implementation Plan,History signal,1384
+LIN-3846,Implementation Plan,Deviations to name in the PR,523
+LIN-3846,Implementation Plan,"Open questions for the PR (keep today's behaviour, do not wait)",232
+LIN-3846,Implementation Plan,Scope decision,1567
+LIN-3849,(preamble),(preamble),218
+LIN-3849,Why,Why,889
+LIN-3849,The rules,The rules,1014
+LIN-3849,"How ""the workspace has a way to run"" is computed","How ""the workspace has a way to run"" is computed",1189
+LIN-3849,What reads them today (verify these lines; don't trust them),What reads them today (verify these lines; don't trust them),2324
+LIN-3849,Done when,Done when,934
+LIN-3849,Operator notes,Operator notes,1864
+LIN-3849,Implementation Plan,Implementation Plan,1305

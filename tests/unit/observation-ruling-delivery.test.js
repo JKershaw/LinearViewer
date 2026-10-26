@@ -129,6 +129,9 @@ class FakeElement {
   addEventListener(type, handler) {
     (this.listeners[type] = this.listeners[type] || []).push(handler);
   }
+  removeEventListener(type, handler) {
+    this.listeners[type] = (this.listeners[type] || []).filter(fn => fn !== handler);
+  }
   // LIN-3631: renderRulings asks whether the focused element sits inside a
   // row (`li.contains(document.activeElement)`), and the shelve panel focuses
   // its reason box on open.
@@ -197,7 +200,26 @@ function nonTerminalHydrateApi() {
 // promise chain — `observationData` stays null in every sandbox (it is
 // never set here), so `pollRulings()`/`refreshBadge()` no-op safely off
 // `observationData?.urlKey` being undefined, needing no stub of their own.
+// LIN-3983 PR 2: a bulk apply asks in the page (askBulkApply), not through confirm(). This fake page answers
+// that question as the operator would: Apply on a yes, Cancel on a no. The answer is given once the page has
+// registered its listeners (focus() runs before them, so the click is deferred to the next turn).
+function bulkConfirmElements(answer = () => true) {
+  const panel = new FakeElement('div');
+  panel.hidden = true;
+  const text = new FakeElement('p');
+  const yes = new FakeElement('button');
+  const no = new FakeElement('button');
+  yes.focus = () => setImmediate(() => (answer(text.textContent) ? yes : no).click());
+  return {
+    'obs-ruling-bulk-confirm': panel,
+    'obs-ruling-bulk-confirm-text': text,
+    'obs-ruling-bulk-confirm-yes': yes,
+    'obs-ruling-bulk-confirm-no': no
+  };
+}
+
 function makeSandbox({ postComment, dispatchPrompt, deliverReply, api, elements = {}, confirm: confirmImpl } = {}) {
+  elements = { ...bulkConfirmElements(confirmImpl), ...elements };
   const sandbox = {
     module: { exports: {} },
     // observation.js calls the bare global `confirm(...)` (LIN-511's
@@ -4518,5 +4540,49 @@ describe('a joined row forwards stampLoopIds as decisionLoopIds (LIN-3959)', () 
     assert.equal(bodies.length, 2);
     assert.deepEqual(bodies[0].decisionLoopIds, ['wk', 'ap']);
     assert.equal('decisionLoopIds' in bodies[1], false, 'a non-joined row sends no decisionLoopIds key');
+  });
+});
+
+// LIN-3983 PR 2: the Rulings words. A row names its task by id and title, never by workspace key; its
+// actions say what each does; a bulk apply asks in the page; and no path calls confirm().
+describe('Rulings in plain words (LIN-3983 PR 2)', () => {
+  test('the row names its task by id and title; the workspace key is never shown, the name only when several show', () => {
+    const { module } = makeSandbox({ postComment: async () => ({ ok: true, status: 201, data: {} }), dispatchPrompt: async () => ({ id: 'd' }) });
+    const { renderRulingRow } = module.exports;
+    const row = makeRow({ anchor: { issueIdentifier: 'LIN-42', issueTitle: 'Stop the nightly export', workspaceUrlKey: 'proto' } });
+    const li = renderRulingRow(row);
+    const head = li.children[0];
+    assert.match(head.innerHTML, /LIN-42/);
+    assert.match(head.innerHTML, /Stop the nightly export/);
+    assert.ok(!head.innerHTML.includes('proto'), 'the raw workspace key is not shown');
+  });
+
+  test('the row says what each action does, and when a shelved question comes back, before it is pressed', () => {
+    const { module } = makeSandbox({ postComment: async () => ({ ok: true, status: 201, data: {} }), dispatchPrompt: async () => ({ id: 'd' }) });
+    const { renderRulingRow } = module.exports;
+    const li = renderRulingRow(makeRow());
+    const note = li.children.find(c => c.className === 'obs-ruling-actions-note');
+    assert.ok(note, 'an actions note is rendered');
+    assert.match(note.textContent, /Dismiss: this wasn't worth asking\./);
+    assert.match(note.textContent, /Shelve: hides it, and it comes back in 1 day\./);
+    const labels = [];
+    const walk = (n) => { if (n.className && /obs-ruling-(dismiss|shelve)\b/.test(n.className)) labels.push(n.textContent); (n.children || []).forEach(walk); };
+    walk(li);
+    assert.deepEqual(labels.sort(), ['Dismiss', 'Shelve']);
+  });
+
+  test('a bulk apply asks in the page: the question is the page\'s own, Apply resolves true, Cancel false, and confirm() is never called', async () => {
+    const asked = [];
+    const forbidden = () => { throw new Error('confirm() must not be called for a bulk apply'); };
+    const sandbox = makeSandbox({
+      postComment: async () => ({ ok: true, status: 201, data: {} }),
+      dispatchPrompt: async () => ({ id: 'd' }),
+      confirm: forbidden,
+      elements: bulkConfirmElements((text) => { asked.push(text); return false; })
+    });
+    assert.equal(await vm.runInContext('askBulkApply("Apply 2 selected proposals?", "Apply 2")', sandbox), false, 'Cancel resolves false');
+    assert.deepEqual(asked, ['Apply 2 selected proposals?']);
+    const source = readFileSync(join(__dirname, '../../public/observation.js'), 'utf8');
+    assert.ok(!/(^|[^\w.$])confirm\(/m.test(source.replace(/\/\/.*$/gm, '')), 'observation.js calls no confirm()');
   });
 });

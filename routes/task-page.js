@@ -21,6 +21,9 @@
  * endpoint
  * reads stored data only and never touches a provider: the client polls it, and
  * a poll must never spend a tracker read or an LLM call.
+ *
+ * The viewer is the owner or a member (LIN-3975). A member reads the page without
+ * any owner control; the server still refuses each action a member may not take.
  */
 
 import { Router } from 'express';
@@ -29,14 +32,15 @@ import { sessionSummaryOf } from '../lib/task-page-loader.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
 import { resolveIssueBinding, isValidIssueId } from '../lib/workspace.js';
 import { jsonError } from '../lib/errors.js';
+import { readOwnerSeamStatus } from '../lib/workspace-owner.js';
+import { buildPromptOpts } from '../lib/render-prompt-opts.js';
+import { isLocalhostRequest } from '../lib/public-origin.js';
 import {
   renderTaskPage,
   renderTaskNotFoundPage,
   renderTaskStatus,
   renderTaskTrack,
   renderStageStrip,
-  renderTaskContext,
-  contextSignature,
 } from '../lib/render-task-page.js';
 
 /** A non-empty query string value, else undefined. */
@@ -50,12 +54,22 @@ function queryValue(value) {
  * @param {Function} deps.getOpenRouterSource - Footer AI-status source.
  * @param {Function} deps.getDeployInfo - Footer deploy info.
  * @param {{loadTaskPage: Function, loadTaskState: Function}} deps.loader - `createTaskPageLoader(...)`
+ * @param {Function|null} [deps.workspaceOwnerCheck] - the ONE hoisted owner seam (server.js)
  * @param {Function} [deps.now] - () → Date
  * @returns {Router}
  */
-export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo, loader, now = () => new Date() }) {
+export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo, loader, workspaceOwnerCheck = null, now = () => new Date() }) {
   if (!loader) throw new Error('task-page routes: loader is required');
   const router = Router();
+
+  // LIN-3975: the owner or a member. Fail closed: no seam, no account, or an unreadable answer is a member, the
+  // same reading the share-creation seam takes (an ownerless workspace reads as member, not as owner).
+  const viewerOf = async (req) => {
+    const accountId = req.session?.accountId;
+    if (!accountId || !workspaceOwnerCheck) return 'member';
+    const { status } = await readOwnerSeamStatus(() => workspaceOwnerCheck({ workspaceId: req.workspace.id, accountId }));
+    return status === 'owner' ? 'owner' : 'member';
+  };
 
   router.get('/workspace/:urlKey/task/:identifier', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
@@ -80,13 +94,15 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
     const access = { provider: issueBinding.provider, callScope: issueBinding.callScope };
 
     try {
+      const viewer = await viewerOf(req);
+      const owner = viewer === 'owner';
       const result = await loader.loadTaskPage({
         urlKey: workspace.urlKey,
         workspaceId: workspace.id,
         identifier,
         access,
-        viewerIsOwner: true,
-        runnerReady: (await requestFeatureFlags(req)).runControls === true,
+        viewerIsOwner: owner,
+        runnerReady: owner && (await requestFeatureFlags(req)).runControls === true,
       });
       if (result.notFound) {
         return res.status(404).send(renderTaskNotFoundPage({ identifier, urlKey: workspace.urlKey }, pageOptions));
@@ -103,13 +119,20 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
       const { model } = result;
       const issueIdQuery = model.issueId ? `?issueId=${encodeURIComponent(model.issueId)}` : '';
       const stateUrl = `/workspace/${encodeURIComponent(workspace.urlKey)}/api/task/${encodeURIComponent(model.identifier)}/state${issueIdQuery}`;
+      // The run control's options (LIN-3975): the owner's only. The same vocabulary Home's opened task takes.
+      const promptOpts = owner ? buildPromptOpts({
+        openRouterSource: pageOptions.openRouterSource,
+        featureFlags: pageOptions.featureFlags,
+        isLocalhost: isLocalhostRequest(req),
+      }) : null;
       return res.send(renderTaskPage(model, {
-        viewer: 'owner',
+        viewer,
         urlKey: workspace.urlKey,
         binding: { source: binding.source || null },
         stateUrl,
         now: now(),
         pageOptions,
+        promptOpts,
       }));
     } catch (error) {
       console.error('Task page error:', error);
@@ -138,9 +161,8 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         issueId: issueId && isValidIssueId(issueId) ? issueId : null,
       });
       res.set('Cache-Control', 'no-store');
-      // The state read has no tracker, so it holds no verified brief/recap:
-      // send no context at all and the client keeps the page-load panels
-      // (LIN-3373). Only a model that carries a doc repaints them.
+      // No brief or recap rides here (LIN-3975): the state read has no tracker, so the page-load panels are
+      // the only ones shown, and a poll never repaints them.
       const body = {
         status: model.status,
         live: model.live,
@@ -151,11 +173,6 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         // LIN-3833: the sessions the state block and the run control read (count, last, running).
         sessions: sessionSummaryOf(model),
       };
-      if (model.brief || model.recap) {
-        const contextHtml = renderTaskContext(model, { urlKey: workspace.urlKey });
-        body.contextHtml = contextHtml;
-        body.contextSig = contextSignature(contextHtml);
-      }
       return res.json(body);
     } catch (error) {
       console.error('Task page state error:', error.message);
