@@ -26,8 +26,10 @@ test.describe('Settings › Models (LIN-3855)', () => {
     if (query) await page.goto(`/workspace/${urlKey}/settings/models${query}`)
     await page.waitForLoadState('networkidle')
     // Jobs with no runs sit behind the "Show N more" fold (LIN-3952 item 1): open each closed fold, as a person would.
-    for (const fold of await page.locator('details.models-fold:not([open])').all()) {
-      await fold.locator(':scope > summary').click()
+    // Each click opens one fold, so the next closed fold is always the first one left.
+    const closed = page.locator('details.models-fold:not([open])')
+    while (await closed.count()) {
+      await closed.first().locator(':scope > summary').click()
     }
   }
   const jobRow = (page, id) => page.locator(`[data-testid="models-job-${id}"]`)
