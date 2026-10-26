@@ -35,7 +35,7 @@ const EMAIL_CTA = /<a href="\/auth\/email" class="nav-action login" data-testid=
 describe('the landing hero (threaded emailEnabled)', () => {
   test('renders "Continue with email" iff emailEnabled', () => {
     const on = renderLandingHero({ emailEnabled: true });
-    assert.match(on, /<a href="\/auth\/email" class="landing-cta landing-cta-email" data-testid="landing-cta-email">Continue with email<\/a>/);
+    assert.match(on, /<a class="btn landing-cta landing-cta-email" href="\/auth\/email" data-testid="landing-cta-email"><span class="btn__label">Continue with email<\/span><\/a>/);
     assert.doesNotMatch(renderLandingHero({ emailEnabled: false }), /landing-cta-email|\/auth\/email/);
   });
 
@@ -51,7 +51,7 @@ describe('the landing hero (threaded emailEnabled)', () => {
   test('CHARACTERIZATION: the Linear, GitHub and Jira CTAs are unchanged by it', () => {
     const before = renderLandingHero({ githubEnabled: true, jiraEnabled: true });
     const after = renderLandingHero({ githubEnabled: true, jiraEnabled: true, emailEnabled: true });
-    const strip = html => html.replace(/<a href="\/auth\/email"[^>]*>Continue with email<\/a>/, '');
+    const strip = html => html.replace(/<a class="[^"]*landing-cta-email"[^>]*>.*?<\/a>/, '');
     assert.equal(strip(after), before);
   });
 });

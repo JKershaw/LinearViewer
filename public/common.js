@@ -3110,7 +3110,8 @@ function formatLocalTime(iso, opts) {
   if (isNaN(date.getTime())) return null;
   var o = opts || {};
   var tz = o.timeZone ? { timeZone: o.timeZone } : {};
-  var timeOpts = Object.assign({ hour: '2-digit', minute: '2-digit' }, tz);
+  // LIN-3991: `zone` names the zone (BST, GMT+1), for a reader who needs to know which time it is.
+  var timeOpts = Object.assign({ hour: '2-digit', minute: '2-digit' }, tz, o.zone ? { timeZoneName: 'short' } : {});
   var now = new Date(typeof o.nowMs === 'number' ? o.nowMs : Date.now());
   var dayKey = function (d) {
     return d.toLocaleDateString('en-CA', tz);
@@ -3123,14 +3124,15 @@ function formatLocalTime(iso, opts) {
 
 /**
  * Rewrite `time[datetime][data-local-time]` elements to local time, keeping the
- * original server text in `title`. Any element that fails to parse is left
+ * original server text in `title`. `data-local-time="zoned"` also names the zone
+ * (LIN-3991: the exact time beside a state sentence). Any element that fails to parse is left
  * untouched.
  */
 function initLocalTimes(root) {
   var scope = root || document;
   var els = scope.querySelectorAll('time[datetime][data-local-time]');
   Array.prototype.forEach.call(els, function (el) {
-    var local = formatLocalTime(el.getAttribute('datetime'));
+    var local = formatLocalTime(el.getAttribute('datetime'), { zone: el.getAttribute('data-local-time') === 'zoned' });
     if (!local) return;
     el.setAttribute('title', el.textContent);
     el.textContent = local;

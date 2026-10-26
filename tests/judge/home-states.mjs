@@ -24,6 +24,8 @@ const STAGES = {
   'home-stages-done': [['plan', '[done] planned it'], ['implementation', '[done] built it']],
   'home-running': [['plan', '[done] planned it'], ['implementation', null]],
   'home-failed': [['plan', '[done] planned it'], ['implementation', '[done] built it'], ['review', '[failed] review could not finish']],
+  // LIN-3991: the first and only stage failed, so the strip starts at the failed stage (Review, then Close-out).
+  'home-failed-first': [['review', '[failed] review could not finish']],
 };
 
 export const hasHomeSessions = (state) => Object.hasOwn(STAGES, state);

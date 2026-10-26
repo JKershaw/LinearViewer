@@ -284,6 +284,28 @@ describe('routed surfaces: one routing call, then code assembles the stage promp
     assert.equal(done?.data.title, CHILD.title, 'LIN-3968: the target title rides on done for the copy-first line');
   });
 
+  // LIN-3991: the local provider's route id is an internal id (`proto--i1`); the node's own identifier is
+  // `ctx.issue.identifier`. copy-first prints deferredVia, so the route must send identifiers only.
+  test('deferredVia names the descent by identifier when the route id is an internal id (stream and buffered)', async () => {
+    const INTERNAL = 'proto--i1';
+    CONTEXTS[INTERNAL] = CONTEXTS[PARENT.id];
+    try {
+      const streamCalls = capture();
+      const stream = await request(buildUiApp({ features: STALE_PREFS }), `/workspace/acme/api/recommend/${INTERNAL}/stream`);
+      const done = sseEvents(stream.text).find(e => e.type === 'done');
+      assert.equal(streamCalls.length, 2, stream.text.slice(0, 400));
+      assert.deepEqual(done?.data.deferredVia, [PARENT.identifier, CHILD.identifier]);
+      assert.ok(!JSON.stringify(done?.data).includes(INTERNAL), 'no internal id in the done payload');
+
+      capture();
+      const buffered = await request(buildUiApp({ features: STALE_PREFS }), `/workspace/acme/api/recommend/${INTERNAL}`);
+      assert.equal(buffered.status, 200, JSON.stringify(buffered.body));
+      assert.deepEqual(buffered.body.deferredVia, [PARENT.identifier, CHILD.identifier]);
+    } finally {
+      delete CONTEXTS[INTERNAL];
+    }
+  });
+
   test('UI buffered GET: one routing call; the prompt is generatePrompt', async () => {
     const calls = capture();
     const { status, body } = await request(buildUiApp({ features: STALE_PREFS }), `/workspace/acme/api/recommend/${LEAF.id}`);

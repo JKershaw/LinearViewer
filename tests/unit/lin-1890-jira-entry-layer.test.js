@@ -275,7 +275,9 @@ describe('LIN-1890 E1 — mode selects the entry point', () => {
     const app = makeApp({ session: jiraOnlySession(), store: makeStore(), provider: fakeProvider() });
     const asNew = await request(app, { path: '/auth/jira/oauth?mode=new' });
     assert.equal(asNew.status, 503);
-    assert.match(asNew.text, /JIRA_CLIENT_SECRET/);
+    // LIN-3980: the page names no variable; the missing name goes to the server log.
+    assert.match(asNew.text, /Jira sign-in is not set up/);
+    assert.doesNotMatch(asNew.text, /JIRA_CLIENT_SECRET/);
   });
 });
 

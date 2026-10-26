@@ -33,3 +33,16 @@ test('defaults to GitHub disabled when no options passed', () => {
   const html = renderLandingHero();
   assert.ok(!html.includes('/auth/github'));
 });
+
+// LIN-3980 outcome 1: a plain definition of Harbour sits under the tagline, in
+// the first screen, before the sign-in buttons.
+test('the hero states what Harbour does, plainly, between the tagline and the sign-in buttons', async () => {
+  const { renderLandingHero, HARBOUR_PLAIN_SENTENCE } = await import('../../lib/components/landing-hero.js');
+  const html = renderLandingHero({ githubEnabled: true });
+  const tagline = html.indexOf('landing-tagline');
+  const plain = html.indexOf('data-testid="landing-plain"');
+  const ctas = html.indexOf('class="landing-ctas"');
+  assert.ok(tagline !== -1 && tagline < plain && plain < ctas, 'tagline, then plain sentence, then sign-in row');
+  assert.ok(html.includes(HARBOUR_PLAIN_SENTENCE));
+  assert.match(HARBOUR_PLAIN_SENTENCE, /reads your backlog.*writes the next prompt.*runs it on your coding agents.*checks the result against real evidence/);
+});

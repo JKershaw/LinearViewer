@@ -95,6 +95,7 @@ export const PAGES = [
   { id: 'home-stages-done', urlKey: 'judge-home-done', path: (k) => `/workspace/${k}/`, state: 'home-stages-done', runner: true, renderers: ['lib/render.js'] },
   { id: 'home-running', urlKey: 'judge-home-run', path: (k) => `/workspace/${k}/`, state: 'home-running', runner: true, renderers: ['lib/render.js'] },
   { id: 'home-failed', urlKey: 'judge-home-fail', path: (k) => `/workspace/${k}/`, state: 'home-failed', runner: true, renderers: ['lib/render.js'] },
+  { id: 'home-failed-first', urlKey: 'judge-home-fail-first', path: (k) => `/workspace/${k}/`, state: 'home-failed-first', runner: true, renderers: ['lib/render.js'] },
   { id: 'home-copy-first', urlKey: 'judge-home-copy', path: (k) => `/workspace/${k}/`, state: 'home-copy-first', renderers: ['lib/render.js'] },
   { id: 'home-copy-written', urlKey: 'judge-home-write', path: (k) => `/workspace/${k}/`, state: 'home-copy-written', renderers: ['lib/render.js'] },
   // LIN-3962: the one decision panel on Home (desktop, and phone via the viewport pair) and Swipe's card with Prompts open.
@@ -115,6 +116,10 @@ export const PAGES = [
   { id: 'live-console-quiet', urlKey: 'judge-live-quiet', path: (k) => `/workspace/${k}/live-console`, seed: { features: { liveConsole: true } }, masks: [LIVE_STRIP, LIVE_BARS, LIVE_AXIS], renderers: ['lib/render-live-console.js', 'public/live-console.js', 'public/live-console.css'] },
   { id: 'live-console-working', urlKey: 'judge-live-working', path: (k) => `/workspace/${k}/live-console`, state: 'live-working', seed: { features: { liveConsole: true } }, masks: [LIVE_STRIP, LIVE_BARS, LIVE_AXIS, LIVE_SINCE, LIVE_WHEN], renderers: ['lib/render-live-console.js', 'public/live-console.js', 'public/live-console.css'] },
   { id: 'live-console-history', urlKey: 'judge-live-history', path: (k) => `/workspace/${k}/live-console`, state: 'live-history', seed: { features: { liveConsole: true } }, masks: [LIVE_STRIP, LIVE_BARS, LIVE_AXIS, LIVE_SINCE, LIVE_WHEN], renderers: ['lib/render-live-console.js', 'public/live-console.js', 'public/live-console.css'] },
+  // LIN-3980: the signed-out landing (no seed, so no session) and the email door it leads to. LIN-3973 owns the
+  // email page's layout; this entry shows it as it is, so the step from the landing reads as one product.
+  { id: 'landing', urlKey: null, path: () => '/', renderers: ['lib/render-landing.js', 'lib/components/landing-hero.js'] },
+  { id: 'auth-email', urlKey: null, path: () => '/auth/email', renderers: ['lib/render-email-auth.js'] },
 ];
 
 // Stated, not assumed: what the seed cannot reach.
@@ -123,7 +128,7 @@ export const NOT_COVERED = [
   'A change-log entry with a fixed time: the time is server-rendered and so masked, not seeded',
   'Home\'s run panel (See prompt, Another step, Change, Stop, the run-control repeats): LIN-3962 replaces it, so the stage states judge the opened task above it only',
   'Session with a run (the populated session page and its run view): needs a session record the local seed does not write; the not-found branch is judged instead, and renders the same back link',
-  'Pages with no Settings-shared pieces (swim, swipe, ship, roadmap, library, KPIs, landing)',
+  'Pages with no Settings-shared pieces (swim, swipe, ship, roadmap, library, KPIs)',
 ];
 
 // Every page renders through renderPage, so its shell files are covered by any listed page.

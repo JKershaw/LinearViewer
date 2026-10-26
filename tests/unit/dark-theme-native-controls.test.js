@@ -44,11 +44,9 @@ function contrast(a, b) {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-test('dark paths declare color-scheme: dark', () => {
+test('the dark path declares color-scheme: dark', () => {
+  // LIN-3980: the landing's own dark remap is gone; it reaches `.theme-dark` too.
   assert.match(rule('.theme-dark'), /color-scheme:\s*dark/);
-  const landing = CSS.slice(CSS.indexOf('@media (prefers-color-scheme: dark) {\n  body.is-landing {'));
-  // Slice from the rule, not the @media header: the header itself contains "dark".
-  assert.match(landing.slice(landing.indexOf('body.is-landing {'), landing.indexOf('}')), /color-scheme:\s*dark/);
 });
 
 test('shared control rule is token-only and carries no layout', () => {
@@ -92,4 +90,18 @@ test('renderers still emit the hooks the CSS targets', () => {
 
   const picker = renderGitHubRepoSelectPage([{ slug: 'o/r', name: 'r' }]);
   assert.match(picker, /class="repo-picker-row"[^]*?<input type="radio"/);
+});
+
+// LIN-3980: the hero's filled CTA used a raw hex ink (#04231f, 4.43:1 on light
+// teal, just under AA). Its ink now resolves through the `--on-brand` token,
+// which clears AA on the --teal fill in both themes.
+test('the hero CTA ink resolves through --on-brand and clears AA on the teal fill', () => {
+  const linear = rule('.landing-ctas .landing-cta-linear');
+  assert.match(linear, /color:\s*var\(--on-brand\)/);
+  assert.doesNotMatch(linear, /color:\s*#/);
+  const onBrand = token(rule(':root'), 'on-brand');
+  const teal = token(rule(':root'), 'teal');
+  assert.ok(contrast(onBrand, teal) >= 4.5, `light: ${contrast(onBrand, teal).toFixed(2)}:1`);
+  const tealDark = token(rule('.theme-dark'), 'teal');
+  assert.ok(contrast(onBrand, tealDark) >= 4.5, `dark: ${contrast(onBrand, tealDark).toFixed(2)}:1`);
 });

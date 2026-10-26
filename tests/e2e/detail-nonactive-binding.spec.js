@@ -86,10 +86,6 @@ test.describe('Sibling id-scoped routes on a non-active (Jira) binding (LIN-1904
   test('prompt and comments resolve through the JIRA binding, not the active local one', async ({ page, seedLocal }) => {
     await page.request.post('/test/set-jira-session', { data: { seed: defaultJiraSeed } });
     const { dashboard } = await seedLocal(null, {
-      // LIN-3969: the prompt below is written from the copy-first view, which needs no run controls. A default
-      // seed keeps queue tokens (LIN-3849), and close-out.spec.js and others leave one on this worker's urlKey;
-      // `runnerKey: false` clears both kinds of key.
-      runnerKey: false,
       extraBindings: [
         { provider: 'jira', scope: JIRA_SITE, credentials: { token: 'jira-api-token', email: 'ada@example.com', tokenExpiresAt: Number.MAX_SAFE_INTEGER } },
       ],
@@ -250,14 +246,10 @@ test.describe('Edit-link → task-edit → PATCH provenance chain, foreign write
 // plus a negative control against the active local binding's own answer.
 test.describe('Recap / Brief / Recommend / Task Chat on a non-active (Jira) binding (LIN-1910)', () => {
   // Shared seed: local active + Jira secondary (openRouterConnected so the AI
-  // surfaces render; taskChat on so the Chat deep-link renders). LIN-3969:
-  // `runnerKey: false` so no queue token left by an earlier spec on this
-  // worker's urlKey turns on run controls; AI suggest writes from the
-  // copy-first view.
+  // surfaces render; taskChat on so the Chat deep-link renders).
   async function seedAndGoto(page, seedLocal) {
     await page.request.post('/test/set-jira-session', { data: { seed: defaultJiraSeed } });
     const { dashboard } = await seedLocal(null, {
-      runnerKey: false,
       openRouterConnected: true,
       features: { taskChat: true },
       extraBindings: [
