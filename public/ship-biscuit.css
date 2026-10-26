@@ -2,8 +2,8 @@
  * "The Ship's Biscuit" page styles (experimental, LIN-818, V1).
  *
  * Semantic-token-only so the page is dark-safe under .theme-dark (no hard-coded
- * colours). Leans on the shared shell + observation.css for the section/box frame;
- * this file adds the newspaper character — a serif-ish masthead feel via the content
+ * colours). Leans on the shared shell for the section/box frame (it used to
+ * borrow observation.css, which LIN-3983 PR 2 stopped loading here); this file adds the newspaper character — a serif-ish masthead feel via the content
  * font, a front-page hero lede, and a headline index.
  */
 

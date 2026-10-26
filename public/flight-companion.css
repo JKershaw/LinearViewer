@@ -1,7 +1,8 @@
 /**
  * Flight Companion page (experimental, LIN-922).
- * Minimal styling for the prompt-surfacing stub; leans on style.css,
- * common-actions.css, and observation.css (the .obs-session-body pre block).
+ * Minimal styling for the prompt-surfacing stub; leans on style.css and
+ * common-actions.css. The prompt box's frame was borrowed from observation.css
+ * until LIN-3983 PR 2 folded it in below.
  */
 
 /* The page title + subtitle route through renderPageHeader (LIN-975); their
@@ -43,6 +44,10 @@
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-word;
+  /* The frame the observation card body uses (LIN-3983 PR 2), now owned here. */
+  padding: 0.5rem 0.8rem 0.65rem;
+  border-top: 1px solid var(--line-soft);
+  font-size: 0.84rem;
 }
 
 /* Latest observer report panel (read-only, LIN-2395). */
