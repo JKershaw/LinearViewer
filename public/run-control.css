@@ -140,9 +140,9 @@
   gap: 0.35rem;
   padding: 0.55rem 1rem;
   min-height: 40px;
-  border: 1px solid var(--blue);
+  border: 1px solid var(--brand-dim);
   border-radius: var(--radius-md);
-  background: var(--blue);
+  background: var(--brand);
   /* --bg is white in light and near-black in dark, so the label stays legible
      on the blue fill in BOTH themes without a new colour value. */
   color: var(--bg);
@@ -339,7 +339,7 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--raised);
-  color: var(--blue);
+  color: var(--brand-dim);
   font-family: var(--font-content);
   font-size: 10px;
   cursor: pointer;

@@ -37,7 +37,7 @@
      wordmark (LIN-725) and landing (LIN-726). The per-theme teal value is
      defined in .theme-dark below. */
   --teal: #0d9488;          /* Brand accent (light) */
-  --on-brand: #001512;      /* ink on a --teal fill: 5.0:1 on light teal, 10.1:1 on dark (LIN-3980) */
+  --on-brand: #ffffff;      /* ink on a --brand fill: 5.47:1 on light --brand #0f766e (LIN-4009); dark restates #001512 */
   --teal-soft: #0d948820;   /* Low-alpha teal tint for accent fills/hovers */
 
   /* Font families: Separate structural (mono, for machine facts) from content
@@ -116,8 +116,11 @@
   --card-h: var(--bg-alt);      /* card hover surface */
   --raised: var(--bg);          /* raised surface (sits on the page bg) */
   --inset: var(--bg-alt);       /* inset / well surface */
-  --brand: var(--teal);         /* product accent (teal, per LIN-782) — fill/dot/border */
-  --brand-dim: #0f766e;         /* AA-safe brand text on --card (LIN-786 §11: --teal #0d9488 on #f8f9fa ≈3.6:1 fails AA; darken for TEXT only, leave --brand fills intact) */
+  /* One primary colour for the one thing to do on a surface (LIN-4009). The light
+     fill is the deep teal, so white ink on it passes AA (LIN-739); --teal stays the
+     logotype hue. Dark keeps the brighter teal, set in .theme-dark below. */
+  --brand: #0f766e;             /* product accent: primary fill, dot, border, focus ring */
+  --brand-dim: #0f766e;         /* AA-safe brand text on --card (LIN-786 §11: --teal #0d9488 on #f8f9fa ≈3.6:1 fails AA) */
   --shadow: var(--shadow-md);   /* default elevation */
 
   /* Status palette — keep --green/--red; add running (--amber) + neutral
@@ -132,8 +135,8 @@
   --slate: #64748b;       /* neutral / idle status (fill/dot) */
   --slate-dim: #475569;   /* AA-safe slate text on light */
 
-  /* a11y: focus-visible ring colour (AA-safe against light surfaces). */
-  --focus: #0d6efd;
+  /* a11y: focus-visible ring colour. One house ring, the brand colour (LIN-4009). */
+  --focus: var(--brand);
 
   /* Motion baseline (LIN-785 §7). Tokenized durations so the reduced-motion
      media query can neutralize them in one place; keyframes defined below. */
@@ -264,7 +267,8 @@
   --red-dim: #ff9b9b;        /* AA-safe red text on dark */
   --slate: #94a3b8;          /* neutral / idle status on dark */
   --slate-dim: #cbd5e1;      /* AA-safe slate text on dark */
-  --focus: #6ea8fe;          /* focus ring on dark (AA-safe) */
+  --on-brand: #001512;       /* ink on the dark --brand fill (LIN-3980) */
+  --focus: var(--brand);     /* the house ring: same colour as the brand fill (LIN-4009) */
 
   background: var(--bg);
   color: var(--fg);
@@ -362,7 +366,7 @@ h1 {
 }
 
 .header-link:hover {
-  color: var(--blue);
+  color: var(--brand-dim);
 }
 
 /* =============================================================================
@@ -607,11 +611,11 @@ h1 {
 }
 
 .nav-value:hover {
-  color: var(--blue);
+  color: var(--brand-dim);
 }
 
 .nav-value[aria-expanded="true"] {
-  color: var(--blue);
+  color: var(--brand-dim);
 }
 
 .nav-actions {
@@ -683,9 +687,10 @@ a.wordmark:hover {
   align-items: center;
   gap: var(--space-1);
   padding: 0.2rem var(--space-2);
-  background: var(--blue);
-  color: white;
-  border: none;
+  /* Quiet outline in the running hue: a count to look at, not a filled action (LIN-4009). */
+  background: none;
+  color: var(--amber-dim);
+  border: 1px solid var(--amber);
   border-radius: var(--radius-sm);
   font-size: 0.8em;
   font-family: var(--font-content);
@@ -693,7 +698,7 @@ a.wordmark:hover {
 }
 
 .queue-badge:hover {
-  background: color-mix(in srgb, var(--blue) 85%, black);
+  background: color-mix(in srgb, var(--amber) 14%, transparent);
 }
 
 .queue-badge.hidden {
@@ -840,7 +845,7 @@ a.wordmark:hover {
 /* Richer default queue-row content (LIN-1244). Global file → both surfaces:
    the nav-badge popover (app.js) and the /dispatch Queue list (dispatch.js). */
 .queue-item-issue {
-  color: var(--blue);
+  color: var(--brand-dim);
   text-decoration: none;
 }
 
@@ -853,7 +858,7 @@ a.wordmark:hover {
    the look is defined once here, not copied per surface. In-Harbour navigation,
    so no target=_blank. */
 .task-page-link {
-  color: var(--blue);
+  color: var(--brand-dim);
   text-decoration: none;
   white-space: nowrap;
 }
@@ -973,7 +978,7 @@ a.wordmark:hover {
 }
 
 .nav-option:hover {
-  color: var(--blue);
+  color: var(--brand-dim);
 }
 
 .nav-option.selected {
@@ -981,7 +986,7 @@ a.wordmark:hover {
 }
 
 .option-marker {
-  color: var(--blue);
+  color: var(--brand-dim);
   font-size: var(--font-size-sm);
 }
 
@@ -1051,8 +1056,8 @@ a.wordmark:hover {
 }
 
 .search-input:focus {
-  outline: 1px solid var(--blue);
-  border-color: var(--blue);
+  outline: 1px solid var(--brand);
+  border-color: var(--brand);
 }
 
 .search-clear {
@@ -1330,7 +1335,7 @@ a.wordmark:hover {
 }
 
 .decision-panel-control:focus {
-  border-color: var(--blue);
+  border-color: var(--brand);
 }
 
 /* What a blank field resolves to, on its own line under the control (a long option is clipped on a phone). */
@@ -1549,7 +1554,7 @@ a.wordmark:hover {
 }
 
 .project-header {
-  color: var(--blue);
+  color: var(--text);
   font-weight: 600;
   cursor: pointer;
   padding: var(--space-2) 0;
@@ -1595,7 +1600,7 @@ a.wordmark:hover {
 .desc-toggle {
   background: none;
   border: none;
-  color: var(--blue);
+  color: var(--brand-dim);
   cursor: pointer;
   font-family: inherit;
   font-size: inherit;
@@ -1664,7 +1669,7 @@ a.wordmark:hover {
 }
 
 .toggle:hover {
-  color: var(--blue);
+  color: var(--brand-dim);
 }
 
 .detail-link {
@@ -1677,7 +1682,7 @@ a.wordmark:hover {
 }
 
 .detail-link:hover {
-  color: var(--blue);
+  color: var(--brand-dim);
 }
 
 /* =============================================================================
@@ -1696,7 +1701,7 @@ a.wordmark:hover {
 }
 
 .detail-toggle:hover {
-  color: var(--blue);
+  color: var(--brand-dim);
 }
 
 /* LIN-158: Nested toggle (e.g., Comments inside Details) */
@@ -1767,7 +1772,7 @@ a.wordmark:hover {
 }
 
 .add-task-link a:hover {
-  color: var(--blue);
+  color: var(--brand-dim);
 }
 
 /* Utility class for hiding elements (used by JS for expand/collapse) */
@@ -1843,7 +1848,7 @@ a.wordmark:hover {
 /* LIN-566: visible keyboard focus for expandable rows (WCAG 2.4.7). These rows
    are role=button + tabindex=0 controls, so keyboard users need a focus cue. */
 .line.expandable:focus-visible {
-  outline: 2px solid var(--blue);
+  outline: 2px solid var(--brand);
   outline-offset: -2px;
 }
 
@@ -1965,7 +1970,7 @@ a.wordmark:hover {
 }
 
 .issue-description .desc-full-content a {
-  color: var(--blue);
+  color: var(--brand-dim);
 }
 
 /* Images in expanded descriptions */
@@ -1985,7 +1990,7 @@ a.wordmark:hover {
 
 /* Toggle button for description expand/collapse */
 .issue-desc-toggle {
-  color: var(--blue);
+  color: var(--brand-dim);
   background: none;
   border: none;
   cursor: pointer;
@@ -2101,7 +2106,7 @@ a.wordmark:hover {
 }
 
 .comment-body a {
-  color: var(--blue);
+  color: var(--brand-dim);
 }
 
 /* =============================================================================
@@ -2898,19 +2903,19 @@ body.is-landing {
    single "Dispatch ▾" entry point reads as the primary dispatch affordance. */
 .dispatch-disclosure {
   background: none;
-  border: 1px solid var(--blue);
+  border: 1px solid var(--brand-dim);
   padding: var(--space-1) var(--space-2);
   font-family: var(--font-content);
   font-size: 0.8em;
-  color: var(--blue);
+  color: var(--brand-dim);
   cursor: pointer;
   border-radius: var(--radius-sm);
   user-select: none;
 }
 
 .dispatch-disclosure:hover {
-  background: var(--blue);
-  color: white;
+  background: var(--brand);
+  color: var(--bg);
 }
 
 /* Inline options panel revealed by the disclosure trigger. Show/hide is driven
@@ -2925,18 +2930,18 @@ body.is-landing {
 /* Dispatch button - similar to copy but with accent color */
 .prompt-dispatch {
   background: none;
-  border: 1px solid var(--blue);
+  border: 1px solid var(--brand-dim);
   padding: var(--space-1) var(--space-2);
   font-family: var(--font-content);
   font-size: 0.8em;
-  color: var(--blue);
+  color: var(--brand-dim);
   cursor: pointer;
   border-radius: var(--radius-sm);
 }
 
 .prompt-dispatch:hover {
-  background: var(--blue);
-  color: white;
+  background: var(--brand);
+  color: var(--bg);
 }
 
 .prompt-dispatch.dispatched {
@@ -3019,7 +3024,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 .dispatch-exec-harness-select:focus,
 .dispatch-exec-model:focus {
   outline: none;
-  border-color: var(--blue);
+  border-color: var(--brand);
 }
 
 .dispatch-exec-model::placeholder,
@@ -3042,7 +3047,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 
 .dispatch-exec-model-other:focus {
   outline: none;
-  border-color: var(--blue);
+  border-color: var(--brand);
 }
 
 /* Free-marker hint line (LIN-2719) — never option text (data-free rides the
@@ -3284,7 +3289,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 }
 
 .footer-link:hover {
-  color: var(--blue);
+  color: var(--brand-dim);
   text-decoration: underline;
 }
 
@@ -3318,7 +3323,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 }
 
 .footer-ai-status:hover {
-  color: var(--blue);
+  color: var(--brand-dim);
 }
 
 /* Workspace model indicator, populated client-side next to the AI status. */
@@ -3438,7 +3443,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
    control was `.model-select` (settings.css, audit.css) and `.token-label-input` (common-actions.css).
    ============================================================================= */
 .settings-link {
-  color: var(--blue);
+  color: var(--brand-dim);
   font-family: var(--font-content);
   font-size: var(--font-size-sm);
   text-decoration: none;
@@ -3752,15 +3757,15 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   background: color-mix(in srgb, var(--green) 22%, transparent);
 }
 
-/* Blue: connect / link actions. */
+/* Connect / link actions: a quiet brand tone (LIN-4009). The name stays until LIN-4015 retires the tone names. */
 .action-btn.connect,
 .btn--blue {
-  color: var(--blue);
-  background: color-mix(in srgb, var(--blue) 12%, transparent);
+  color: var(--brand-dim);
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
 }
 .action-btn.connect:hover,
 .btn--blue:hover {
-  background: color-mix(in srgb, var(--blue) 22%, transparent);
+  background: color-mix(in srgb, var(--brand) 22%, transparent);
 }
 
 /* Red: destructive actions. Quiet, so the text is --red (the confirm below is the dim text). */
@@ -4027,7 +4032,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 }
 
 .plain-page .section a:not([class]) {
-  color: var(--blue);
+  color: var(--brand-dim);
 }
 
 /* LIN-3958 (decision 2, the second phone root): at 400px the body drops to 13px (the small-phone rule
@@ -4853,7 +4858,7 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
 .opened-task-runner-link,
 .opened-task-setup-runner-link {
   font-family: var(--font-content);
-  color: var(--blue);
+  color: var(--brand-dim);
   text-decoration: none;
   white-space: nowrap;
 }

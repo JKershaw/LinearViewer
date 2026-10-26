@@ -206,8 +206,8 @@
 .feedback-message:focus,
 .feedback-priority:focus {
   outline: none;
-  border-color: var(--blue, #2563eb);
-  box-shadow: 0 0 0 2px var(--blue-bg, rgba(37, 99, 235, 0.08));
+  border-color: var(--brand, #0f766e);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 8%, transparent);
 }
 
 /* Model/harness override controls (LIN-1132). The inner control pair is the
@@ -240,9 +240,9 @@
 
 /* Active drag-over state — the target lights up so a drop reads as landing. */
 .feedback-drop-over {
-  border-color: var(--blue, #2563eb);
+  border-color: var(--brand, #0f766e);
   border-style: solid;
-  background: var(--blue-bg, rgba(37, 99, 235, 0.08));
+  background: color-mix(in srgb, var(--brand) 8%, transparent);
 }
 
 .feedback-drop .feedback-file {
@@ -270,7 +270,7 @@
 
 .feedback-drop .feedback-file::file-selector-button:hover {
   background: var(--bg-muted, #f8f9fa);
-  border-color: var(--blue, #2563eb);
+  border-color: var(--brand, #0f766e);
 }
 
 .feedback-drop-hint {
@@ -348,8 +348,8 @@
   font-family: var(--font-structural, monospace);
   font-size: var(--font-size-sm, 0.85em);
   color: var(--bg, #fff);
-  background: var(--blue, #2563eb);
-  border: 1px solid var(--blue, #2563eb);
+  background: var(--brand, #0f766e);
+  border: 1px solid var(--brand, #0f766e);
   border-radius: var(--radius-sm, 3px);
   padding: 6px 12px;
   cursor: pointer;
@@ -362,12 +362,12 @@
 /* Save is the primary; triage/autopilot are secondary (outline) so the foot
    reads as one primary action plus its follow-up options (LIN-918, LIN-1037). */
 .feedback-submit-secondary {
-  color: var(--blue, #2563eb);
+  color: var(--brand-dim, #0f766e);
   background: transparent;
 }
 
 .feedback-submit-secondary:hover {
-  background: var(--blue-bg, rgba(37, 99, 235, 0.08));
+  background: color-mix(in srgb, var(--brand) 8%, transparent);
   filter: none;
 }
 

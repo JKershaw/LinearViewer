@@ -96,7 +96,7 @@
 
 .model-input:focus {
   outline: none;
-  border-color: var(--blue);
+  border-color: var(--brand-dim);
 }
 
 .model-input::placeholder {
@@ -126,8 +126,8 @@
 }
 
 .audit-button {
-  background: var(--blue);
-  color: white;
+  background: var(--brand);
+  color: var(--bg);
   border: none;
   padding: var(--space-2) var(--space-3);
   font-family: var(--font-content);
@@ -137,7 +137,7 @@
 }
 
 .audit-button:hover {
-  background: color-mix(in srgb, var(--blue) 85%, black);
+  background: color-mix(in srgb, var(--brand) 85%, black);
 }
 
 .audit-button:disabled {

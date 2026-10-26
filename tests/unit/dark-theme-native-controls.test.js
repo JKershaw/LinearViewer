@@ -94,14 +94,16 @@ test('renderers still emit the hooks the CSS targets', () => {
 
 // LIN-3980: the hero's filled CTA used a raw hex ink (#04231f, 4.43:1 on light
 // teal, just under AA). Its ink now resolves through the `--on-brand` token,
-// which clears AA on the --teal fill in both themes.
+// which clears AA on the brand fill in both themes (LIN-4009: light --brand is the
+// deep teal #0f766e, so the light ink is white; dark keeps #001512 on --teal).
 test('the hero CTA ink resolves through --on-brand and clears AA on the teal fill', () => {
   const linear = rule('.landing-ctas .landing-cta-linear');
   assert.match(linear, /color:\s*var\(--on-brand\)/);
   assert.doesNotMatch(linear, /color:\s*#/);
   const onBrand = token(rule(':root'), 'on-brand');
-  const teal = token(rule(':root'), 'teal');
-  assert.ok(contrast(onBrand, teal) >= 4.5, `light: ${contrast(onBrand, teal).toFixed(2)}:1`);
+  const brand = token(rule(':root'), 'brand');
+  assert.ok(contrast(onBrand, brand) >= 4.5, `light: ${contrast(onBrand, brand).toFixed(2)}:1`);
   const tealDark = token(rule('.theme-dark'), 'teal');
-  assert.ok(contrast(onBrand, tealDark) >= 4.5, `dark: ${contrast(onBrand, tealDark).toFixed(2)}:1`);
+  const onBrandDark = token(rule('.theme-dark'), 'on-brand');
+  assert.ok(contrast(onBrandDark, tealDark) >= 4.5, `dark: ${contrast(onBrandDark, tealDark).toFixed(2)}:1`);
 });

@@ -280,8 +280,8 @@ test.describe('Landing with all four sign-in options (LIN-3980)', () => {
       const box = await el.boundingBox();
       expect(box.y + box.height).toBeLessThanOrEqual(844);
     }
-    // The Linear ink resolves through --on-brand (rgb(0, 21, 18) = #001512), not a raw hex.
-    expect(await linear.evaluate((el) => getComputedStyle(el).color)).toBe('rgb(0, 21, 18)');
+    // The Linear ink resolves through --on-brand (white on the deep-teal light --brand, LIN-4009), not a raw hex.
+    expect(await linear.evaluate((el) => getComputedStyle(el).color)).toBe('rgb(255, 255, 255)');
   });
 
   test('"Try it yourself" offers the hero\'s sign-in buttons, with the same hrefs and labels', async ({ page }) => {
