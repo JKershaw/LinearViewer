@@ -86,7 +86,9 @@
         warning: entry.warning,
         kind: entry.kind,
         proxyForce: entry.proxyForce,
-        generatedAt: entry.generatedAt
+        generatedAt: entry.generatedAt,
+        // LIN-3968: optional; a record written before it simply has none.
+        target: entry.target || undefined
       };
       for (const key of Object.keys(record)) {
         if (record[key] === undefined) delete record[key];
@@ -258,6 +260,8 @@
     const g = state.go || { status: 'ready' };
     const ready = goReady(opts);
     const { quota, quotaKnown, runsExhausted, runLimitTitle } = runQuotaView(state);
+    // LIN-3987: Home's Go takes the shared button classes. Swipe's card draws this same Go, and it keeps its own look (no change there).
+    const homeBtn = opts.surface === 'home' ? 'btn ' : '';
 
     let html = '<div class="opened-task-primary" data-go-slot>';
 
@@ -282,20 +286,21 @@
       // anyone else gets no run control at all (copy-first view, LIN-3833, is
       // not built yet, so this is today's non-run view).
       if (opts.runSetup) {
-        html += `<button class="opened-task-go opened-task-go--setup" data-testid="opened-task-go" data-rung="run-task" data-action="setup" data-setup-needs="dispatch">Go <span class="opened-task-setup">\u25CB set up \u203A</span></button>`;
+        html += `<button class="${homeBtn}opened-task-go opened-task-go--setup" data-testid="opened-task-go" data-rung="run-task" data-action="setup" data-setup-needs="dispatch">Go <span class="opened-task-setup">\u25CB set up \u203A</span></button>`;
       }
     } else if (runsExhausted) {
-      html += `<button class="opened-task-go opened-task-go--limited" data-testid="opened-task-go" data-rung="run-task" disabled title="${runLimitTitle}">Go <span class="opened-task-setup">${runLimitTitle}</span></button>`;
+      html += `<button class="${homeBtn}opened-task-go opened-task-go--limited" data-testid="opened-task-go" data-rung="run-task" disabled title="${runLimitTitle}">Go <span class="opened-task-setup">${runLimitTitle}</span></button>`;
     } else if (g.status === 'starting') {
-      html += '<button class="opened-task-go" data-testid="opened-task-go" data-rung="run-task" disabled>starting\u2026</button>';
+      html += `<button class="${homeBtn}opened-task-go" data-testid="opened-task-go" data-rung="run-task" disabled>starting\u2026</button>`;
     } else if (opts.surface === 'home') {
       // LIN-3833: Home's one main action names what it does: the step the sessions name, else Run to PR.
+      // While a stage runs or is queued, no other step is offered as an action (LIN-3968); Stop and the
+      // after-run line stay in the run block.
       const step = runStepOfState(state);
-      html += step
-        ? `<button class="opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-step" data-action="run-step-next">Run ${esc(step.label)}</button>`
-        : '<button class="opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-task" data-action="go">Run to PR</button>';
+      if (step) html += `<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-step" data-action="run-step-next">Run ${esc(step.label)}</button>`;
+      else if (state.opened && !stageBusy(state)) html += '<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-task" data-action="go">Run to PR</button>';
     } else {
-      html += '<button class="opened-task-go" data-testid="opened-task-go" data-rung="run-task" data-action="go">Go</button>';
+      html += `<button class="opened-task-go" data-testid="opened-task-go" data-rung="run-task" data-action="go">Go</button>`;
     }
 
     // The allowance sits beside Go, the control it governs — shown only when the
@@ -336,7 +341,7 @@
   // hosts this component renders it (public/swipe.js), outside the collapsed
   // Prompts section; lib/components/runner-link.js is the server twin.
   function runnerLinkHtml(urlKey) {
-    return `<a class="opened-task-runner-link" href="${esc(runnerSetupHref({ urlKey }))}" data-testid="opened-task-runner-link">run on my machine \u203A</a>`;
+    return `Harbour can also run steps for you, on your own machine. <a class="opened-task-runner-link" href="${esc(runnerSetupHref({ urlKey }))}" data-testid="opened-task-runner-link">Set up a runner \u203A</a>`;
   }
 
   // LIN-3098 N3: has THIS browser set up a runner for this workspace?
@@ -503,7 +508,7 @@
     unstarted: Object.freeze({ label: 'plan', name: 'Plan', why: 'the first step for a task in Todo' }),
     backlog: Object.freeze({ label: 'scoping', name: 'Scoping', why: 'the first step for a task in Backlog' }),
   });
-  const COPY_NEXT = Object.freeze({ label: '__ai__', name: null, why: 'generate the next prompt for this task' });
+  const COPY_NEXT = Object.freeze({ label: '__ai__', name: null, why: 'Generate the next prompt for this task' });
   function copyStepOf(opts) {
     return COPY_STEPS[opts.issue && opts.issue.stateType] || COPY_NEXT;
   }
@@ -525,36 +530,60 @@
     const name = step.name ? `<span class="opened-task-step-name">${esc(step.name)}</span> \u00b7 ` : '';
     const reason = gateReason ? ` <span class="opened-task-primary-reason" data-testid="opened-task-primary-reason">${esc(gateReason)}</span>` : '';
     return `<div class="opened-task-step" data-testid="opened-task-step">${name}${esc(step.why)}</div>`
-      + `<button class="opened-task-write" data-testid="opened-task-write" data-prompt="${esc(step.label)}"${disabled}>\u2726 Write the prompt</button>${reason}`;
+      + `<button class="btn opened-task-write" data-testid="opened-task-write" data-prompt="${esc(step.label)}"${disabled}>\u2726 Write the prompt</button>${reason}`;
+  }
+
+  // LIN-3968: the recommender's routing breadcrumbs ("↳ X is a container → routing to Y", and the mock's
+  // unarrowed form) are its own steps. The target line says which task the prompt is for, so they stay out.
+  const ROUTING_BREADCRUMB = /^\s*(?:\u21b3\s*)?[^\n]*\u2192 routing to [^\n]*$/gm;
+  function shownReasoning(text) {
+    return String(text || '').replace(ROUTING_BREADCRUMB, '').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  // LIN-3968: which task a written prompt is for, in plain words, when Harbour wrote it for a subtask (the
+  // container routed to it). Nothing when the prompt is for the opened task itself.
+  function targetSentence(target, openedId) {
+    if (!target || !target.identifier || target.identifier === openedId) return null;
+    const title = target.title ? ` ${target.title}` : '';
+    const via = (target.deferredVia || []).filter(id => id && id !== target.identifier).at(-1) || null;
+    if (!via) return `This prompt is for ${target.identifier}${title}.`;
+    return `This prompt is for ${target.identifier}${title}, a subtask of ${via}. ${via}\u2019s work is split into subtasks, so Harbour wrote the prompt for the one to do next.`;
+  }
+  function renderTargetLine(state, opts) {
+    const line = targetSentence(state.result && state.result.target, opts.issue && opts.issue.identifier);
+    return line ? `<p class="opened-task-target" data-testid="opened-task-target">${esc(line)}</p>` : '';
   }
 
   // The written prompt: Copy, the bounded box, Rewrite and Download (both views).
   function renderPromptBox(state, opts) {
-    const { html, warning, label, reasoning } = state.result;
+    const { raw, warning, label, reasoning } = state.result;
     const warningBanner = warning ? `<div class="swipe-prompt-warning">\u26A0 ${esc(warning)}</div>` : '';
     // LIN-2944 reverses LIN-70: the model's reasoning stays visible beside the prompt.
-    const reasoningBlock = reasoning ? `<div class="swipe-reasoning opened-task-reasoning" data-testid="opened-task-reasoning">${renderReasoning(reasoning)}</div>` : '';
+    const shown = shownReasoning(reasoning);
+    const reasoningBlock = shown ? `<div class="swipe-reasoning opened-task-reasoning" data-testid="opened-task-reasoning">${renderReasoning(shown)}</div>` : '';
     // LIN-2944 F2: Rewrite re-runs the same label, so it obeys the same gate as the primary.
     const gateReason = primaryDisabledReason(opts, state);
     const rewriteDisabled = label === '__ai__' ? gateReason : null;
     return `
-      <button class="opened-task-copy" data-testid="opened-task-copy" data-action="copy">Copy prompt</button>
+      <button class="btn btn--primary opened-task-copy" data-testid="opened-task-copy" data-action="copy">Copy prompt</button>
       ${renderProxyLimitNotice(state)}
       ${warningBanner}
       ${reasoningBlock}
-      <div class="opened-task-box"><div class="swipe-prompt-text" data-prompt-body>${html}</div></div>
+      <div class="opened-task-box"><div class="opened-task-text" data-prompt-body>${esc(raw || '')}</div></div>
       <div class="opened-task-box-actions">
-        <button class="opened-task-regenerate" data-prompt="${esc(label || '')}"${rewriteDisabled ? ` disabled title="${esc(rewriteDisabled)}"` : ''}>Rewrite</button>
-        <button class="opened-task-download" data-action="download" title="Download prompt as a .md file">Download</button>
+        <button class="btn opened-task-regenerate" data-prompt="${esc(label || '')}"${rewriteDisabled ? ` disabled title="${esc(rewriteDisabled)}"` : ''}>Rewrite</button>
+        <button class="btn opened-task-download" data-action="download" title="Download prompt as a .md file">Download</button>
       </div>`;
   }
 
+  // LIN-3968: the header names the step this view offers (Plan, Scoping, or the next prompt), not the
+  // result's `AI Recommendation` name, which Swipe and prompt memory share.
   function renderCopyFresh(state, opts) {
-    const { name, label } = state.result;
     const age = formatGeneratedAge(state.result.generatedAt);
     const keyOn = !!(window.ProxyToggle && typeof window.ProxyToggle.isActive === 'function' && window.ProxyToggle.isActive());
     return `
-      <div class="opened-task-step" data-testid="opened-task-step"><span class="opened-task-step-name">${esc(name || copyStepOf(opts).name || 'Next prompt')}</span>${age ? ` \u00b7 generated ${esc(age)}` : ''}</div>
+      <div class="opened-task-step" data-testid="opened-task-step"><span class="opened-task-step-name">${esc(copyStepOf(opts).name || 'Next prompt')}</span>${age ? ` \u00b7 generated ${esc(age)}` : ''}</div>
+      ${renderTargetLine(state, opts)}
       ${renderPromptBox(state, opts)}
       <label class="opened-task-progress-key"><input type="checkbox" data-testid="opened-task-progress-key"${keyOn ? ' checked' : ''}> Let your agent post progress to this task</label>
       <p class="opened-task-key-note">The key lasts 48 hours. Without it, your agent can still do the work, but Harbour won\u2019t see its progress. Turning it off here sets it for every task.</p>
@@ -563,8 +592,13 @@
 
   // LIN-3833: the step a run would start, from the state (a step chosen for this run, else the one the
   // sessions name as next). Shared by the main button (renderGo) and the run block.
+  // LIN-3968: the offered step (`sessions.offered`), so a running stage offers no other step, and a failed stage
+  // is offered again. `sessions.next` stays the "comes next" wording after a run.
   function runStepOfState(state) {
-    return (state.run && state.run.step) || (state.opened && state.opened.sessions && state.opened.sessions.next) || null;
+    return (state.run && state.run.step) || (state.opened && state.opened.sessions && state.opened.sessions.offered) || null;
+  }
+  function stageBusy(state) {
+    return !!(state.opened && state.opened.sessions && state.opened.sessions.running);
   }
 
   // LIN-3833: the run control's vocabulary. The targets are the dispatch targets Home offers (`dash` is not
@@ -790,7 +824,8 @@
         warning: memory.warning,
         kind: memory.kind,
         proxyForce: memory.proxyForce,
-        generatedAt: memory.generatedAt
+        generatedAt: memory.generatedAt,
+        target: memory.target || null
       };
       enterPhase('fresh'); // restored-from-memory fresh starts with no notice
       state.result = hydrated;
@@ -855,10 +890,10 @@
       const lastLine = sessions.count && last
         ? `<div class="opened-task-last" data-testid="opened-task-last">Last: ${esc(last.label || 'session')} ${esc(last.state || '')}`
           + `${last.at ? ` \u00b7 ${esc(formatGeneratedAge(Date.parse(last.at)) || '')}` : ''}`
-          + ` \u00b7 <button class="opened-task-all" data-action="all-sessions" data-testid="opened-task-all">All ${sessions.count}</button></div>`
+          + ` \u00b7 <button class="btn opened-task-all" data-action="all-sessions" data-testid="opened-task-all">All ${sessions.count}</button></div>`
         : '';
       return `<div class="opened-task-state" data-state-slot data-testid="opened-task-state">`
-        + `${opened.headerHtml || ''}${opened.trackHtml || ''}${renderSubtaskNeedsYou()}${lastLine}</div>`;
+        + `${opened.headerHtml || ''}${opened.stripHtml || ''}${renderSubtaskNeedsYou()}${lastLine}</div>`;
     }
 
     // LIN-3833: one line naming a subtask that needs you, with an Open link to its task page. Home passes the
@@ -963,28 +998,35 @@
 
     function renderRunsOn(preview) {
       if (!preview) return '<div class="opened-task-runs-on" data-testid="opened-task-runs-on">Working out what this run will use\u2026</div>';
+      // LIN-3987: the names are the server's words for what the run would use (preview.words, routingWords), never a raw id or alias.
       const target = state.run.choice.target || 'cli';
-      const model = preview.model || 'the default model';
-      const bits = [model];
-      if (preview.harness && preview.harness !== 'claude-code') bits.push(preview.harness);
-      if (preview.effort) bits.push(`effort ${preview.effort}`);
+      const w = preview.words || {};
+      const bits = [w.model].filter(Boolean);
+      if (w.harness && preview.harness !== 'claude-code') bits.push(w.harness);
+      if (preview.effort && w.effort !== 'not used') bits.push(`effort ${preview.effort}`);
       const words = [...new Set(['model', 'harness', 'effort'].map((f) => sourceWordOf(f, preview)).filter(Boolean))];
       return `<div class="opened-task-runs-on" data-testid="opened-task-runs-on">`
         + `Runs on <span class="opened-task-runs-on-what" data-testid="run-on-what">${esc(bits.join(' \u00b7 '))}</span>`
         + ` \u00b7 ${esc(TARGET_WORDS[target] || target)}`
         + `${words.length ? ` <span class="opened-task-source" data-testid="run-source">\u2014 ${esc(words.join(', '))}</span>` : ''}`
-        + ` <button class="opened-task-change" data-action="change-run" data-testid="run-change">Change</button></div>`;
+        + ` <button class="btn opened-task-change" data-action="change-run" data-testid="run-change">Change</button></div>`;
     }
 
     // The step line: the name and why it is next. ✦ write prompt writes this step's prompt (it does not replace the why).
     function renderStepLine(step) {
       const last = state.opened && state.opened.sessions && state.opened.sessions.last;
+      // LIN-3968: a running stage offers no step; the after-run line names what runs and what comes next. Before
+      // the state read lands, the step is not known, so no step is offered either (not "Run to PR").
+      if (!state.run.step && (!state.opened || stageBusy(state))) return '';
       let why = 'the next step for this task';
       if (state.run.step) why = 'chosen for this run';
+      else if (step && step.failed) why = 'failed last time, so it runs again';
+      // LIN-3968 ruling (option a): an undone stage is offered again, without calling it a failure.
+      else if (step && step.why === 'again') why = 'cancelled last time, so it is offered again';
       else if (step && last) why = `usually next after ${last.label || 'the last session'}`;
       const name = step ? esc(step.label) : 'Run to PR';
       return `<div class="opened-task-step" data-testid="opened-task-step"><span class="opened-task-step-name">${name}</span> \u00b7 ${esc(why)}`
-        + ` <button class="opened-task-ask" data-action="ask-harbour" data-testid="run-ask-harbour">\u2726 write prompt</button></div>`;
+        + ` <button class="btn opened-task-ask" data-action="ask-harbour" data-testid="run-ask-harbour">\u2726 write prompt</button></div>`;
     }
 
     // Undo for a run queued from here (until the runner takes it); Watch and Stop once a session runs.
@@ -1000,16 +1042,16 @@
         if (next) html += ` \u00b7 Next: ${esc(next.label)}, once ${esc(running.label || 'this')} finishes`;
         if (state.run.confirmStop) {
           html += ` <span class="opened-task-confirm">Stop this run? The session is cancelled and the task stays where it is.`
-            + ` <button data-action="stop-run-confirm" data-testid="run-stop-confirm">Stop</button>`
-            + ` <button data-action="stop-run-cancel">Cancel</button></span>`;
+            + ` <button class="btn btn--red" data-action="stop-run-confirm" data-testid="run-stop-confirm">Stop</button>`
+            + ` <button class="btn--quiet" data-action="stop-run-cancel">Cancel</button></span>`;
         } else if (polled) {
-          html += ` <button class="opened-task-stop" data-action="stop-run" data-testid="run-stop">Stop</button>`;
+          html += ` <button class="btn--quiet opened-task-stop" data-action="stop-run" data-testid="run-stop">Stop</button>`;
         }
         return `${html}</div>`;
       }
       if (state.run.item || (summary.running && summary.running.state === 'queued')) {
         return `<div class="opened-task-queued" data-testid="opened-task-queued">Queued, waiting for a runner`
-          + ` <button class="opened-task-undo" data-action="undo-run" data-testid="run-undo">Undo</button></div>`;
+          + ` <button class="btn--quiet opened-task-undo" data-action="undo-run" data-testid="run-undo">Undo</button></div>`;
       }
       return '';
     }
@@ -1037,16 +1079,16 @@
       const shownDefaults = defaults.filter(fits);
       const shownMore = more.filter(fits);
       const leftOut = [...defaults, ...more].filter((k) => !fits(k)).length;
-      const item = (k) => `<button class="opened-task-another-item" data-action="run-pick" data-kind="${esc(k)}" data-label="${esc(meta[k] || k)}" data-testid="run-another-item">${esc(meta[k] || k)}</button>`;
+      const item = (k) => `<button class="btn opened-task-another-item" data-action="run-pick" data-kind="${esc(k)}" data-label="${esc(meta[k] || k)}" data-testid="run-another-item">${esc(meta[k] || k)}</button>`;
       let html = '<div class="opened-task-more">';
-      if (step) html += `<button class="opened-task-see" data-action="see-prompt" data-testid="run-see-prompt">See prompt \u2726</button>`;
-      html += `<button class="opened-task-another" data-action="run-another" data-testid="run-another" aria-expanded="${state.run.anotherOpen ? 'true' : 'false'}">Another step \u25BE</button>`;
+      if (step) html += `<button class="btn--quiet opened-task-see" data-action="see-prompt" data-testid="run-see-prompt">See prompt \u2726</button>`;
+      html += `<button class="btn--quiet opened-task-another" data-action="run-another" data-testid="run-another" aria-expanded="${state.run.anotherOpen ? 'true' : 'false'}">Another step \u25BE</button>`;
       if (state.run.anotherOpen) {
         html += `<div class="opened-task-another-list" data-testid="run-another-list">${shownDefaults.map(item).join('')}`;
         if (shownMore.length) {
           html += state.run.moreOpen
             ? shownMore.map(item).join('')
-            : `<button class="opened-task-another-more" data-action="run-more" data-testid="run-another-more">Show ${shownMore.length} more</button>`;
+            : `<button class="btn--quiet opened-task-another-more" data-action="run-more" data-testid="run-another-more">Show ${shownMore.length} more</button>`;
         }
         if (leftOut) {
           html += `<p class="opened-task-left-out" data-testid="run-another-left-out">${leftOut} ${leftOut === 1 ? 'step' : 'steps'} left out: ${leftOut === 1 ? 'it does' : 'they do'} not fit this task's state.</p>`;
@@ -1056,64 +1098,98 @@
       return `${html}</div>`;
     }
 
+    // The words the panel's own options carry for a value: a model's display name, a harness's name. A value no option
+    // names is shown as typed (a model id the lists do not know). Read from the panel the server rendered (LIN-3987).
+    // The markup's own text is escaped (lib/utils/html.js), so an option's value and label are read back unescaped.
+    const unescapeText = (text) => text.replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+    const OPTIONS_OF = {
+      harness: /<select[^>]*data-decision-field="harness"[^>]*>([\s\S]*?)<\/select>/g,
+      model: /<datalist[^>]*>([\s\S]*?)<\/datalist>/g
+    };
+    function optionWords(value, which) {
+      if (!value) return null;
+      const scope = [...(state.run.panelHtml || '').matchAll(OPTIONS_OF[which])].map((m) => m[1]).join('');
+      const option = [...scope.matchAll(/<option value="([^"]*)"[^>]*>([^<]*)<\/option>/g)].find((m) => unescapeText(m[1]) === value);
+      return option ? unescapeText(option[2]).trim() : value;
+    }
+
+    // A target the harness in force cannot run is not kept: Claude Code on the web needs Claude Code, so a draft that
+    // names it falls back to the runner when another harness is chosen, and a choice made that way never reaches a run.
+    function fallBackTarget(draft, inForce) {
+      if (draft.target === 'web' && inForce === 'opencode') draft.target = 'cli';
+    }
+
     // The Change panel (LIN-3962): Home's extras (the preset, Runs on, agent access, the summary, Use/Reset/Close) around
     // the one decision panel the server renders (lib/components/decision-panel.js), which holds the harness, model and
     // effort. Edits go to a draft; "Use for this run" applies it. The panel's HTML is read when the panel opens.
     function renderChangePanel(preview) {
       const d = state.run.draft || state.run.choice;
       const presets = state.run.presets || [];
+      const panelWords = state.run.panelWords || {};
       const harness = d.harness || '';
       // Effort is judged by the harness in force (the draft's, else the one Settings resolves a blank to), against the
       // server's list of harnesses that take none. A blank harness with nothing resolved keeps effort, as effortAppliesTo does.
       const inForce = harness || (preview && preview.harness) || '';
       const showEffort = !state.run.withoutEffort.includes(inForce);
-      const presetButtons = presets.map((p) => `<button class="opened-task-preset${d.presetId === p.id ? ' is-chosen' : ''}" data-action="run-preset" data-preset-id="${esc(p.id)}" data-testid="run-preset">${esc(p.name || p.id)}</button>`).join('');
-      const targets = ['cli', ...(harness === 'opencode' ? [] : ['web']), ...(opts.isLocalhost ? ['local'] : [])];
-      const targetButtons = targets.map((t) => `<button class="opened-task-target${d.target === t ? ' is-chosen' : ''}" data-action="run-target" data-target="${esc(t)}" data-testid="run-target-${esc(t)}">${esc(TARGET_WORDS[t])}</button>`).join('');
+      const presetButtons = presets.map((p) => `<button class="btn opened-task-preset" data-action="run-preset" data-preset-id="${esc(p.id)}" aria-pressed="${d.presetId === p.id ? 'true' : 'false'}" data-testid="run-preset">${esc(p.name || p.id)}</button>`).join('');
+      // Claude Code on the web runs only under Claude Code: with opencode in force it is not offered, and the line says why.
+      const onWeb = inForce !== 'opencode';
+      const targets = ['cli', ...(onWeb ? ['web'] : []), ...(opts.isLocalhost ? ['local'] : [])];
+      const targetButtons = targets.map((t) => `<button class="btn opened-task-choice" data-action="run-target" data-target="${esc(t)}" aria-pressed="${d.target === t ? 'true' : 'false'}" data-testid="run-target-${esc(t)}">${esc(TARGET_WORDS[t])}</button>`).join('');
+      const modelNow = d.model ? optionWords(d.model, 'model') : panelWords.model;
+      const harnessNow = harness ? optionWords(harness, 'harness') : panelWords.harness;
+      const webNote = onWeb ? '' : `<p class="opened-task-change-note" data-testid="run-web-unavailable">Claude Code on the web needs Claude Code, so it is not offered with ${esc(harnessNow || '')}.</p>`;
       const agent = d.agentAccess == null ? (window.ProxyToggle && window.ProxyToggle.isActive ? window.ProxyToggle.isActive() : true) : d.agentAccess;
-      const summary = [d.model || 'the model from Models', inForce || 'the harness from Models', showEffort && d.effort ? `effort ${d.effort}` : null, TARGET_WORDS[d.target] || d.target].filter(Boolean).join(' \u00b7 ');
+      const effortNow = !showEffort ? null : (d.effort ? `effort ${d.effort}` : panelWords.effort);
+      const summary = [modelNow, harnessNow, effortNow, TARGET_WORDS[d.target] || d.target].filter(Boolean).join(' \u00b7 ');
       const panelBody = state.run.panelHtml
         || (state.run.panelFailed
           ? '<p class="opened-task-change-note" data-testid="run-panel-failed">The choices could not load. Use for this run stays off until they do.</p>'
           : '<p class="opened-task-change-note" data-testid="run-panel-loading">Loading the choices\u2026</p>');
       return `<div class="opened-task-change-panel" data-testid="run-change-panel">`
-        + `<div class="opened-task-change-head">This run only${preview ? ` \u00b7 default: ${esc(preview.model || 'from Models')}` : ''}`
-        + `<button class="opened-task-change-x" data-action="close-change" aria-label="Close" data-testid="run-change-x">\u00d7</button></div>`
+        + `<div class="opened-task-change-head">This run only${panelWords.model ? ` \u00b7 default: ${esc(panelWords.model)}` : ''}`
+        + `<button class="btn--quiet opened-task-change-x" data-action="close-change" aria-label="Close" data-testid="run-change-x">\u00d7</button></div>`
         + (presetButtons ? `<div class="opened-task-change-row"><span class="opened-task-change-label">Preset</span>${presetButtons}</div>` : '')
         + panelBody
-        + `<div class="opened-task-change-row"><span class="opened-task-change-label">Runs on</span>${targetButtons}</div>`
+        + `<div class="opened-task-change-row"><span class="opened-task-change-label">Runs on</span>${targetButtons}</div>${webNote}`
         + `<label class="opened-task-change-row"><input type="checkbox" data-testid="run-agent-access"${agent ? ' checked' : ''}> Your agent may read and update this task</label>`
         + `<p class="opened-task-change-summary" data-testid="run-will-use">This run will use ${esc(summary)}.</p>`
         + `<div class="opened-task-change-row">`
-        + `<button class="opened-task-use" data-action="use-run" data-testid="run-use"${state.run.panelFailed || !state.run.panelHtml ? ' disabled' : ''}>Use for this run</button>`
-        + `<button data-action="reset-run" data-testid="run-reset">Reset</button>`
-        + `<button data-action="close-change">Close</button>`
+        + `<button class="btn btn--primary opened-task-use" data-action="use-run" data-testid="run-use"${state.run.panelFailed || !state.run.panelHtml ? ' disabled' : ''}>Use for this run</button>`
+        + `<button class="btn--quiet" data-action="reset-run" data-testid="run-reset">Reset</button>`
+        + `<button class="btn--quiet" data-action="close-change">Close</button>`
         + `<a class="opened-task-settings-link" href="/workspace/${encodeURIComponent(opts.urlKey || '')}/settings/models">Settings \u203A Models</a>`
         + `</div><p class="opened-task-change-note">A change here is for this run only. The default is set in Settings \u203A Models.</p>`
         + `</div>`;
     }
 
-    // The decision panel for the choice this run would use: the server's panel (routes/dispatch.js decision-panel), read
-    // when the Change panel opens and again after the choice changes. A repaint re-applies the draft to it (applyPanelDraft).
+    // The decision panel for the draft: the server's panel (routes/dispatch.js decision-panel), read when the Change panel
+    // opens, after a reset, and after the draft's harness changes (LIN-3987 review), since a blank model or effort says what
+    // the harness the draft names runs. A repaint re-applies the draft to it (applyPanelDraft). Reads can overlap and answer
+    // in either order, so only the latest may paint (as refreshRunPreview does, LIN-3969).
+    let runPanelSeq = 0;
     function fetchRunPanel() {
       if (!runControlOn() || !opts.urlKey || typeof window.api !== 'function') return;
       const step = runStepOf();
       const params = new URLSearchParams({ promptName: step ? step.kind : 'autopilot', surface: opts.surface });
-      const c = state.run.choice;
+      const c = state.run.draft || state.run.choice;
       if (c.harness) params.set('harness', c.harness);
       if (c.model) params.set('model', c.model);
       if (c.effort) params.set('effort', c.effort);
+      const seq = ++runPanelSeq;
       window.api(`/workspace/${encodeURIComponent(opts.urlKey)}/api/dispatch/decision-panel?${params.toString()}`, { on401: false })
         .then((r) => {
-          if (destroyed) return;
+          if (destroyed || seq !== runPanelSeq) return;
           state.run.panelHtml = (r && r.html) || null;
+          state.run.panelWords = (r && r.words) || null;
           state.run.withoutEffort = (r && r.withoutEffort) || [];
           state.run.panelFailed = !state.run.panelHtml;
           paintRun();
         })
         .catch(() => {
-          if (destroyed) return;
+          if (destroyed || seq !== runPanelSeq) return;
           state.run.panelHtml = null;
+          state.run.panelWords = null;
           state.run.panelFailed = true;
           paintRun();
         });
@@ -1224,7 +1300,9 @@
         case 'use-run':
           // Blank fields are not sent, and with no panel there is nothing to send from: Use stays off until it loads.
           if (state.run.panelFailed || !state.run.panelHtml) return true;
-          state.run.choice = { ...state.run.draft };
+          const chosen = { ...state.run.draft };
+          fallBackTarget(chosen, chosen.harness || (state.run.preview && state.run.preview.harness) || '');
+          state.run.choice = chosen;
           state.run.changeOpen = false;
           state.run.draft = null;
           state.run.panelHtml = null;
@@ -1479,6 +1557,7 @@
       let renderPending = false;
       let prevChildCount = 0;
       let truncated = false;
+      let target = null;
 
       // First render: swap to fresh with empty body so the stream animates inline.
       // `streaming` lives on this placeholder result, so it ends with it: the
@@ -1504,10 +1583,12 @@
           const wasPinned = window.isPinnedToBottom(body);
           if (currentField === 'reasoning') {
             if (nameEl) nameEl.textContent = 'AI thinking\u2026';
-            body.innerHTML = renderReasoning(reasoningRaw);
+            body.innerHTML = renderReasoning(shownReasoning(reasoningRaw));
           } else {
             if (nameEl) nameEl.textContent = 'AI Recommendation';
-            body.innerHTML = renderMarkdown(promptRaw || reasoningRaw);
+            // LIN-3968: Home's box is the text that will be pasted; Swipe keeps its markdown card.
+            if (homeView) body.textContent = promptRaw || reasoningRaw;
+            else body.innerHTML = renderMarkdown(promptRaw || reasoningRaw);
           }
           const children = body.children;
           for (let i = prevChildCount; i < children.length; i++) {
@@ -1553,6 +1634,10 @@
         if (payload.truncated === true) {
           truncated = true;
         }
+        // LIN-3968: and the task the prompt is for (its title; the containers it was routed through).
+        if (type === 'done' && payload.identifier) {
+          target = { identifier: payload.identifier, title: payload.title || null, deferredVia: Array.isArray(payload.deferredVia) ? payload.deferredVia : [] };
+        }
       }
 
       await window.readSSEStream(response, onEvent);
@@ -1572,7 +1657,7 @@
       }
       const entry = {
         label, name: 'AI Recommendation', raw: displayText,
-        html: finalHtml, reasoning: reasoningRaw, warning, generatedAt: Date.now()
+        html: finalHtml, reasoning: reasoningRaw, warning, generatedAt: Date.now(), target
       };
       promptCache.set(`${sessionPromptKey(issueId)}:${label}`, entry);
       lastPromptLabel.set(sessionPromptKey(issueId), label);
@@ -2005,7 +2090,13 @@
       if (!el || !el.dataset || !container.contains(el) || !runControlOn() || !el.dataset.testid) return;
       const draft = state.run.draft || (state.run.draft = { ...state.run.choice });
       switch (el.dataset.testid) {
-        case 'run-harness': draft.harness = el.value || null; paintRun(); break;
+        case 'run-harness':
+          draft.harness = el.value || null;
+          fallBackTarget(draft, draft.harness || (state.run.preview && state.run.preview.harness) || '');
+          paintRun();
+          // LIN-3987 (review): the words for a blank model and effort follow the harness the draft names, so ask again.
+          if (state.run.changeOpen) fetchRunPanel();
+          break;
         case 'run-model': draft.model = el.value.trim() || null; break;
         case 'run-effort': draft.effort = el.value || null; paintRun(); break;
         case 'run-agent-access': draft.agentAccess = el.checked === true; break;
@@ -2029,7 +2120,9 @@
         if (destroyed || !data) return null;
         state.opened = data;
         paintState();
-        if (runControlOn()) refreshRunPreview();
+        // LIN-3968: the run block is repainted from the state at once, so the step is never guessed while the
+        // preview is still out (the preview's answer repaints it again, in refreshRunPreview).
+        if (runControlOn()) { paintRun(); refreshRunPreview(); }
         return data;
       })
       : null;

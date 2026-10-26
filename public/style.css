@@ -1115,6 +1115,18 @@ a.wordmark:hover {
   white-space: nowrap;
 }
 
+/* LIN-3968: the opened task is one contained block, so the eye can tell where its own content ends and the
+   next row begins, at both widths. The sans face is set on the whole block: the body is monospace
+   (style.css body rule), so without it the copy-first key note and paste line leaked into mono. */
+.opened-task {
+  font-family: var(--font-content);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  margin: var(--space-2) 0;
+}
+
 /* LIN-3833: the opened task on Home, state first: the facts line, the state block above the control, the
    one links row. Plain text sizes; the controls below keep their own styles. */
 .opened-task-facts {
@@ -1176,7 +1188,6 @@ a.wordmark:hover {
 .opened-task-undo,
 .opened-task-stop {
   margin-left: 0.6em;
-  font-size: 0.9em;
 }
 
 .opened-task-change-panel {
@@ -1235,10 +1246,13 @@ a.wordmark:hover {
   font-size: 0.9em;
 }
 
-.opened-task-preset.is-chosen,
-.opened-task-target.is-chosen {
+/* LIN-3987: a chosen choice (a preset, a Runs on target, a suggestion) is marked by aria-pressed, one look in both
+   panels. Not bold and underline, which read as a link. The .btn[...] form outranks .btn:hover, so a chosen button keeps its mark. */
+.opened-task-change-panel .btn[aria-pressed="true"],
+.decision-panel .btn[aria-pressed="true"] {
+  border-color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 14%, transparent);
   font-weight: 600;
-  text-decoration: underline;
 }
 
 .opened-task-change-summary,
@@ -1254,6 +1268,10 @@ a.wordmark:hover {
   display: grid;
   gap: var(--space-2);
   min-width: 0;
+  /* The panel's words are the content face on every page that hosts it (/styleguide included); prices are the structural face. */
+  font-family: var(--font-content);
+  /* A readable width on a desktop (32rem). A phone is narrower than that, so the panel fills it. */
+  max-width: 32rem;
 }
 
 .decision-panel-numbers {
@@ -1338,8 +1356,8 @@ a.wordmark:hover {
   font-size: 0.9em;
 }
 
-/* One suggestion: the name, its reason on the line under it, then its costs on a line of their own. Stacked, so the
-   price never runs into the reason at any width (LIN-3962 review). */
+/* One suggestion: the button (its name) and its costs on one line, the reason on the line under it (LIN-3987). The
+   reason wraps under the button, so the price never runs into it at any width (LIN-3962 review). */
 .decision-panel-suggestion {
   display: grid;
   justify-items: start;
@@ -1347,14 +1365,19 @@ a.wordmark:hover {
   min-width: 0;
 }
 
+.decision-panel-suggestion-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  min-width: 0;
+}
+
 .decision-panel-pick {
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  color: var(--blue);
-  text-decoration: underline;
-  cursor: pointer;
+  max-width: 100%;
+  text-align: left;
+  /* Tighter than .btn's, so the name and its rate fit one line on a phone (LIN-3987). */
+  padding-inline: var(--space-2);
 }
 
 .decision-panel-reason {
@@ -1362,12 +1385,32 @@ a.wordmark:hover {
   overflow-wrap: anywhere;
 }
 
+/* The costs are the small line beside the name: a phone fits the name and its rate on one line at this size (LIN-3987). */
 .decision-panel-costs {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-1) var(--space-3);
   font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
   color: var(--fg-dim);
+}
+
+/* Where a rate comes from is words, so it takes the content face inside the mono costs line. */
+.decision-panel-source {
+  font-family: var(--font-content);
+}
+
+/* The notes the panel says once: the rates are for comparison, which suggestion has no rate, and why Effort is not shown. */
+.decision-panel-note {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--fg-dim);
+  overflow-wrap: anywhere;
+}
+
+.decision-panel-note[hidden] {
+  display: none;
 }
 
 .opened-task-more {
@@ -1402,6 +1445,20 @@ a.wordmark:hover {
   padding: 8px 10px;
   max-height: 22em;
   overflow: auto;
+}
+
+/* LIN-3968: the prompt is the text that will be pasted, so it keeps its line breaks and is set in the sans face
+   (human prose; CLAUDE.md), not rendered markdown. */
+.opened-task-text {
+  font-family: var(--font-content);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.opened-task-target {
+  margin: 0 0 var(--space-2);
+  color: var(--fg-dim);
+  font-size: 0.9em;
 }
 
 .opened-task-box-actions,
@@ -4797,6 +4854,30 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
   display: inline-block;
   margin-top: 2px;
   font-size: 12px;
+}
+
+/* LIN-3968: Home's runner line is one run of prose and link, so it is a block, not the flex detail line (flex
+   collapsed the space before the link). The link takes the sentence's size here; Swipe's card does the same
+   in swipe.css. */
+.opened-task-runner-line {
+  margin-top: var(--space-1);
+}
+
+.opened-task-runner-line .opened-task-runner-link {
+  margin-top: 0;
+  font-size: inherit;
+}
+
+/* LIN-3968: on Home, Rewrite is the same button as Download beside it. swipe.css keeps its own 10px look for
+   the Swipe card, so this rule is scoped to the opened task. */
+.opened-task .btn.opened-task-regenerate {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--raised);
+  color: var(--text);
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
 }
 
 .opened-task-runner-link:hover,

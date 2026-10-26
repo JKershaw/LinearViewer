@@ -306,15 +306,15 @@ describe('deriveHeader: one row per branch, in order done → waiting → runnin
     ['done (canceled)', { sessions: [], waiting: noWait, tracker: tracker('canceled') }, 'done', 'Cancelled 5 Oct, 12:00 UTC.'],
     ['done (duplicate): closed work, read as canceled (LIN-276)', { sessions: [], waiting: noWait, tracker: tracker('duplicate') }, 'done', 'Cancelled 5 Oct, 12:00 UTC.'],
     ['waiting beats running; message cut to one line, marker dropped', { sessions: [s('running', 'review')], waiting: { waiting: true, message: '[blocked] Which API?\nmore detail' }, tracker: tracker('started') }, 'waiting', 'Which API?'],
-    ['running', { sessions: [s('done', 'plan'), s('running', 'implementation')], waiting: noWait, tracker: tracker('started') }, 'running', 'Build running since 6 Oct, 14:02 UTC.'],
+    ['running', { sessions: [s('done', 'plan'), s('running', 'implementation')], waiting: noWait, tracker: tracker('started') }, 'running', 'Build running for 58 minutes.'],
     ['queued only', { sessions: [s('done', 'plan'), s('queued', 'review')], waiting: noWait, tracker: tracker('started') }, 'running', 'Review queued, waiting for a worker.'],
-    ['idle after a session', { sessions: [s('failed', 'review')], waiting: noWait, tracker: tracker('started') }, 'idle', 'No session running. Last: Review failed 6 Oct, 13:30 UTC.'],
+    ['idle after a session', { sessions: [s('failed', 'review')], waiting: noWait, tracker: tracker('started') }, 'idle', 'Review failed 6 Oct, 13:30 UTC.'],
     ['idle, nothing yet', { sessions: [], waiting: noWait, tracker: tracker('unstarted') }, 'idle', 'No sessions yet.'],
     ['ready PR with nothing running: waiting on the person', { sessions: [s('done', 'review')], waiting: noWait, tracker: tracker('started'), closeOut: { status: 'ready', pr: { number: 41 } } }, 'waiting', 'Approved. PR #41 is ready to merge.'],
-    ['a running session beats ready', { sessions: [s('done', 'review'), s('running', 'close-out')], waiting: noWait, tracker: tracker('started'), closeOut: { status: 'ready', pr: { number: 41 } } }, 'running', 'Close-out running since 6 Oct, 14:02 UTC.'],
+    ['a running session beats ready', { sessions: [s('done', 'review'), s('running', 'close-out')], waiting: noWait, tracker: tracker('started'), closeOut: { status: 'ready', pr: { number: 41 } } }, 'running', 'Close-out running for 58 minutes.'],
     ['a not-ready close-out stays idle', { sessions: [s('done', 'review')], waiting: noWait, tracker: tracker('started'), closeOut: { status: 'not-ready', pr: { number: 41 } } }, 'idle', 'No session running. Last: Review done 6 Oct, 13:30 UTC.'],
     ['tracker not read (the state endpoint): never done, no suffix', { sessions: [s('done', 'close-out')], waiting: noWait, tracker: null }, 'idle', 'No session running. Last: Close-out done 6 Oct, 13:30 UTC.'],
-    ['unknown kind falls back to stepKindWord', { sessions: [s('running', 'brand-new-kind')], waiting: noWait, tracker: null }, 'running', 'Brand-new-kind running since 6 Oct, 14:02 UTC.'],
+    ['unknown kind falls back to stepKindWord', { sessions: [s('running', 'brand-new-kind')], waiting: noWait, tracker: null }, 'running', 'Brand-new-kind running for 58 minutes.'],
   ];
   for (const [name, input, status, sentence] of cases) {
     test(name, () => assert.deepEqual(deriveHeader({ ...input, now: NOW }), { status, sentence }));

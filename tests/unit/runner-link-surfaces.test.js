@@ -32,7 +32,7 @@ const PROMPT_SECTION_SRC = readFileSync(join(__dirname, '../../public/prompt-sec
 const COMMON_SRC = readFileSync(join(__dirname, '../../public/common.js'), 'utf8');
 const SWIPE_SRC = readFileSync(join(__dirname, '../../public/swipe.js'), 'utf8');
 
-const LINK = '<a class="opened-task-runner-link" href="/workspace/ws/runner" data-testid="opened-task-runner-link">run on my machine ›</a>';
+const LINK = 'Harbour can also run steps for you, on your own machine. <a class="opened-task-runner-link" href="/workspace/ws/runner" data-testid="opened-task-runner-link">Set up a runner ›</a>';
 const TESTID = 'data-testid="opened-task-runner-link"';
 
 const FLAG_STATES = [

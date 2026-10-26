@@ -16,6 +16,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defaultLocalSeed } from '../fixtures/local-harness.js';
 import { PAGES, VIEWPORTS, THEMES, FROZEN_TIME, NORMALISE, parsePixelDiff } from './pages.mjs';
+import { homeSeed, hasHomeSessions, seedHomeSessions, HOME_WRITE_SSE } from './home-states.mjs';
 
 const BASE_URL = process.env.JUDGE_BASE_URL;
 const HEAD_URL = process.env.JUDGE_HEAD_URL;
@@ -26,10 +27,12 @@ const ONLY = process.env.JUDGE_ONLY ? new RegExp(process.env.JUDGE_ONLY) : null;
 
 const AUDIT_FIXTURE = fileURLToPath(new URL('./audit-report.fixture.json', import.meta.url));
 
+// LIN-3968: Home's opened-task states (the five that seed sessions or write a prompt). The LIN-3962 states are not these.
+const isOpenedTaskState = (state) => /^home-(stages-done|running|failed|copy-first|copy-written)$/.test(state ?? '');
 const isLoopback = (url) => /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(url) || url.startsWith('data:') || url.startsWith('blob:');
 
 // `urlKey` null means no local seed: the account is a zero-workspace one, signed in by email (LIN-3956).
-async function openContext(browser, baseURL, viewport, theme, urlKey, seed = {}) {
+async function openContext(browser, baseURL, viewport, theme, urlKey, seed = {}, base = null) {
   const context = await browser.newContext({
     baseURL, viewport: { width: viewport.width, height: viewport.height },
     colorScheme: theme, deviceScaleFactor: 1, reducedMotion: 'reduce',
@@ -38,7 +41,8 @@ async function openContext(browser, baseURL, viewport, theme, urlKey, seed = {})
   await context.addCookies([{ name: 'theme', value: theme, url: baseURL }]);
   await context.clock.setFixedTime(new Date(FROZEN_TIME));
   if (urlKey) {
-    const data = { ...defaultLocalSeed(urlKey), urlKey, runnerKey: false, ...seed };
+    // LIN-3968: Home's opened-task states seed their own workspace (homeSeed); the run control shows only where the entry has a runner.
+    const data = { ...(base || defaultLocalSeed(urlKey)), urlKey, runnerKey: false, ...seed };
     const resp = await context.request.post('/test/set-local-session', { data });
     if (!resp.ok()) throw new Error(`seed failed on ${baseURL}: ${resp.status()} ${await resp.text()}`);
   }
@@ -58,8 +62,37 @@ async function settle(page) {
 }
 
 // Per-state set-up: identical on both sides, driven by the page's own markup.
-async function prepare(page, context, entry, viewport, theme, side) {
+// LIN-3968: Home's opened task. The sessions are seeded through the consumer API (on both sides), then Home is
+// opened and its top task clicked. The write is the fixed stream, so the request never leaves the browser.
+// Seeded once per server and state: the dispatch guard refuses the same kind on the same task for five minutes, so
+// a second shoot of the same state would be refused. Sessions persist on the server, so later contexts see them too.
+const seeded = new Set();
+async function prepareHome(page, context, entry, baseURL) {
+  const key = `${baseURL}|${entry.urlKey}`;
+  if (hasHomeSessions(entry.state) && !seeded.has(key)) {
+    await seedHomeSessions(context.request, entry.urlKey, entry.state);
+    seeded.add(key);
+  }
+  if (entry.state === 'home-copy-written') {
+    await page.route('**/api/recommend/*/stream*', (route) => route.fulfill({ status: 200, contentType: 'text/event-stream', body: HOME_WRITE_SSE }));
+  }
+  await page.goto(entry.path(entry.urlKey));
+  await settle(page);
+  const block = page.locator('.opened-task').first();
+  if (!(await block.isVisible())) await page.locator('[data-top-task="1"]').click();
+  // LIN-3968 adds the `.opened-task` wrapper: base (33e5dc6e) has none, so base is judged after its lazy detail settles.
+  await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+  if (await block.count()) await block.waitFor();
+  if (entry.state === 'home-copy-written' && await page.locator('[data-testid="opened-task-write"]').count()) {
+    await page.locator('[data-testid="opened-task-write"]').click();
+    // Both sides show the write's result (head: the target line; base: no target line), so wait for the Copy button.
+    await page.getByRole('button', { name: 'Copy prompt' }).waitFor();
+  }
+}
+
+async function prepare(page, context, entry, viewport, theme, side, baseURL) {
   const url = entry.path(entry.urlKey);
+  if (isOpenedTaskState(entry.state)) return prepareHome(page, context, entry, baseURL);
   if (entry.state === 'email-signin') {
     // One address per shot, the same on both sides: the send throttle is per address (3 per 15 minutes),
     // and the judge takes at most ATTEMPTS (3) tries per shot. The link is read from the capture outbox.
@@ -128,7 +161,7 @@ async function prepare(page, context, entry, viewport, theme, side) {
       }
     }
   }
-  if (entry.state === 'home-run-panel-open') {
+  if (entry.state === 'home-run-panel-open' || entry.state === 'home-run-panel-opencode') {
     // LIN-3962: Home's Change panel, opened the way a viewer opens it: the In Progress row (visible; the marked top task
     // sits under a collapsed parent in this seed), then Change. The seed gives this page its run controls, so head must
     // show Change; a head without it fails here rather than being skipped. Base's panel is the old one, so base may come
@@ -139,6 +172,11 @@ async function prepare(page, context, entry, viewport, theme, side) {
     if (await change.count()) {
       await change.click();
       await page.getByTestId(side === 'head' ? 'run-decision-panel' : 'run-change-panel').waitFor();
+    }
+    // LIN-3987: the opencode state chooses opencode as the harness, so the effort line and the lost web choice show.
+    if (entry.state === 'home-run-panel-opencode' && side === 'head') {
+      await page.getByTestId('run-harness').selectOption('opencode');
+      await page.getByTestId('run-effort').first().waitFor({ state: 'hidden' });
     }
   }
   if (entry.state === 'swipe-dispatch-open') {
@@ -157,10 +195,12 @@ async function prepare(page, context, entry, viewport, theme, side) {
 }
 
 async function shoot(browser, baseURL, viewport, theme, entry, side) {
-  const context = await openContext(browser, baseURL, viewport, theme, entry.state === 'email-signin' ? null : entry.urlKey, entry.seed);
+  const openedTask = isOpenedTaskState(entry.state);
+  const context = await openContext(browser, baseURL, viewport, theme, entry.state === 'email-signin' ? null : entry.urlKey,
+    openedTask ? { runnerKey: entry.runner === true } : entry.seed, openedTask ? homeSeed(entry.urlKey) : null);
   try {
     const page = await context.newPage();
-    await prepare(page, context, entry, viewport, theme, side);
+    await prepare(page, context, entry, viewport, theme, side, baseURL);
     await settle(page);
     // Rewrite per-run text (see NORMALISE in pages.mjs) in text nodes, before the screenshot.
     await page.evaluate((rules) => {
