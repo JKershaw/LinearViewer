@@ -91,14 +91,20 @@ test.describe('the phone layout (LIN-3983)', () => {
         const tops = new Set([...range.getClientRects()].map(r => Math.round(r.top)));
         return tops.size > 1;
       }).map(tab => tab.textContent.trim());
+      // The strip is overflow-x:auto with nowrap labels, so labels that outgrow 390px are
+      // clipped inside it: they neither wrap nor scroll the page. Only the strip's own
+      // scrollWidth against its clientWidth sees that.
+      const strip = document.querySelector('[role="tablist"]');
       return {
         tabCount: tabs.length,
         wrapped,
+        strip: [strip.scrollWidth, strip.clientWidth],
         pageScrolls: document.documentElement.scrollWidth > window.innerWidth
       };
     });
     expect(measures.tabCount).toBe(3);
     expect(measures.wrapped, 'no tab label wraps').toEqual([]);
+    expect(measures.strip[0], 'the tab strip fits without scrolling').toBeLessThanOrEqual(measures.strip[1]);
     expect(measures.pageScrolls, 'the page does not scroll sideways').toBe(false);
   });
 });
