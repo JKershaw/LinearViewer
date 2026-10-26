@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { defaultLocalSeed } from '../fixtures/local-harness.js';
 import { PAGES, VIEWPORTS, THEMES, FROZEN_TIME, NORMALISE, parsePixelDiff, layoutClass } from './pages.mjs';
 import { homeSeed, hasHomeSessions, seedHomeSessions, HOME_WRITE_SSE } from './home-states.mjs';
+import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 import { LIVE_CONSOLE_STATES, seedLiveConsole } from './live-console-states.mjs';
 import { taskSeed, seedTaskState, mintGuestPath } from './task-states.mjs';
 import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
@@ -66,6 +67,31 @@ async function settle(page) {
     await document.fonts.ready;
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   });
+}
+
+// LIN-3952: priced agent runs through the dispatch API, the way a runner reports them (see tests/e2e/lin-3987-decision-panel.spec.js).
+// Every agent job gets two priced runs at a cost that differs by job, so the rows, the section totals and the sidebar all have figures.
+const SPEND_JOBS = ['implementation', 'review', 'bug', 'plan', 'close-out'];
+async function seedAgentSpend(request, urlKey) {
+  // The dispatch create is an owner's write, so the workspace's owner is set first, as the e2e spec does.
+  await seedWorkspaceOwnership(request, urlKey, 'owner');
+  const { token } = await (await request.get(`/test/create-dispatch-token?label=runner&urlKey=${urlKey}`)).json();
+  const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  // The seed's issues are LOCAL-1 to LOCAL-4. A kind may not run twice on one issue within minutes, so a kind's two runs take
+  // two different issues (the rotation), and the kinds are spread across them.
+  for (const [index, kind] of SPEND_JOBS.entries()) {
+    for (let run = 0; run < 2; run += 1) {
+      const issueIdentifier = `LOCAL-${((index + run) % 4) + 1}`;
+      const create = await request.post(`/workspace/${urlKey}/api/dispatch`, {
+        data: { prompt: 'judge spend fixture', promptName: kind, kind, issueIdentifier, issueTitle: 'Judge spend fixture', target: 'cli' },
+      });
+      if (!create.ok()) throw new Error(`spend seed create failed: ${create.status()} ${await create.text()}`);
+      const itemId = (await create.json()).item.id;
+      await request.post(`/api/dispatch/take/${itemId}`, { headers: auth });
+      await request.post(`/api/dispatch/feedback/${itemId}`, { headers: auth, data: { kind: 'usage', message: `[usage] ${JSON.stringify({ costUsd: 0.2 + index * 0.25 })}` } });
+      await request.post(`/api/dispatch/feedback/${itemId}`, { headers: auth, data: { message: '[done] complete' } });
+    }
+  }
 }
 
 // Per-state set-up: identical on both sides, driven by the page's own markup.
@@ -141,6 +167,15 @@ async function prepare(page, context, entry, viewport, theme, side, baseURL) {
     await page.getByTestId('email-confirm-submit').click();
     await page.waitForURL(/\/account$/);
   }
+  if (entry.state === 'models-spend') {
+    // LIN-3952: priced agent runs, reported the way a runner reports them (a take, a `[usage]` line with a cost, a `[done]`),
+    // so every agent job has spend for its row. Once per server, as the Home seeds are: a second shoot is the same data.
+    const key = `${baseURL}|${entry.urlKey}|spend`;
+    if (!seeded.has(key)) {
+      await seedAgentSpend(context.request, entry.urlKey);
+      seeded.add(key);
+    }
+  }
   if (entry.state === 'key-open') {
     const minted = await context.request.get(`/test/create-proxy-token?urlKey=${entry.urlKey}&label=judge-key&scope=read`);
     if (!minted.ok()) throw new Error(`mint failed: ${minted.status()}`);
@@ -180,6 +215,31 @@ async function prepare(page, context, entry, viewport, theme, side, baseURL) {
   await settle(page);
   if (entry.state === 'ask-open') await page.getByTestId('settings-toggle-periodicals').locator('summary').click();
   if (entry.state === 'key-open') await page.locator('[data-testid="settings-key-proxy"], [data-testid="settings-key-dispatch"]').locator('summary').first().click();
+  if (entry.state === 'models-group-open') {
+    // Head's group rows open in place. Base's groups are the old forms, so this is conditional there.
+    const group = page.locator('[data-testid="models-group-agent-session-judge"]');
+    if (await group.count()) await group.locator(':scope > summary').click();
+  }
+  if (entry.state === 'models-saved' && side === 'head') {
+    // A row staged and saved (head only): one Undo for the save, and the row marked. Base's save redirects elsewhere, so base
+    // is shot as it is (unsaved) and the difference is the change itself. The row is a job with no runs, so it sits behind
+    // the fold: open the folds first, as a person would.
+    const row = page.locator('[data-testid="models-job-review"]');
+    if (await row.count()) {
+      const closed = page.locator('details.models-fold:not([open])');
+      while (await closed.count()) await closed.first().locator(':scope > summary').click();
+      await row.locator(':scope > summary').click();
+      // Base's model is a select, head's is the decision panel's input (as models-staged above): choose by the element's kind.
+      const model = row.locator('[data-models-field="model"]');
+      if ((await model.evaluate((el) => el.tagName)) === 'SELECT') await model.selectOption('sonnet');
+      else await model.fill('sonnet');
+      await page.locator('[data-testid="models-reason"]').fill('Judge fixture');
+      // A DOM click, not a pointer click: on a phone the open panels above Save can intercept the pointer, and the save is a plain form submit.
+      // Wait for the new document (the redirect lands on the page with ?changed=), not just the URL, before settling.
+      await Promise.all([page.waitForURL(/settings\/models\?changed=/, { waitUntil: 'domcontentloaded' }), page.locator('[data-testid="models-save"]').dispatchEvent('click')]);
+      await settle(page);
+    }
+  }
   if (entry.state === 'models-panel-open' || entry.state === 'models-staged') {
     // Head's job rows open in place. Base has the legacy forms and no such row, so these steps are conditional there.
     const row = page.locator('[data-testid="models-job-implementation"]');

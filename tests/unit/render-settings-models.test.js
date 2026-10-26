@@ -7,7 +7,8 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { modelsBody, agentOptions, jobLabel, modelNamer } from '../../lib/render-settings-models.js';
+import { modelsBody, agentOptions, jobLabel } from '../../lib/render-settings-models.js';
+import { getModelDisplayName } from '../../lib/openrouter.js';
 import { emptyTable, effectiveTable, applyChangesToTable, AGENT_JOB_IDS, HARBOUR_JOB_IDS } from '../../lib/model-routing.js';
 import { agentSpendByJob, harbourSpendByJob } from '../../lib/model-routing-spend.js';
 import { DEFAULT_MODEL } from '../../lib/openrouter.js';
@@ -24,7 +25,7 @@ function body(table, extra = {}) {
     urlKey: URL_KEY, table, effective,
     agentSpend: agentSpendByJob([], { jobs: AGENT_JOB_IDS }),
     harbourSpend: harbourSpendByJob([], { jobs: HARBOUR_JOB_IDS }),
-    presets: [], log: [], catalog: [], availableModels: AVAILABLE,
+    presets: [], log: [], catalog: [], availableModels: AVAILABLE, hasRunner: true,
     ...extra
   });
 }
@@ -112,14 +113,14 @@ describe('the blank option on a group and the No job row', () => {
     assert.match(panelOf(html, 'models-panel-group-agent-session-make'), /<option value=""[^>]*>Not set<\/option>/);
   });
 
-  test('the No job row reads "Not set" too: it is the suggestion, and no group sits above it', () => {
+  test('the No job row is not on Models any more: it moved to the Dispatch page (LIN-3952 item 6)', () => {
     const html = body(emptyTable());
-    assert.match(panelOf(html, 'models-panel-default-agent-session-default'), /<option value=""[^>]*>Not set<\/option>/);
+    assert.doesNotMatch(html, /models-default-agent|No job \(Dispatch suggestion\)/);
   });
 
   test('no blank option on the page says "Inherit the default": a blank group reads nothing above it (agent and Harbour alike)', () => {
     const html = body(emptyTable());
-    assert.match(panelOf(html, 'models-panel-group-harbour-call-make'), /placeholder="Not set"/, 'a Harbour call has no harness: its model follows the group');
+    assert.match(panelOf(html, 'models-panel-group-harbour-call-steer'), /placeholder="Not set"/, 'a Harbour call has no harness: its model follows the group');
     assert.doesNotMatch(html, /Inherit the default/);
   });
 });
@@ -220,12 +221,16 @@ describe('the page', () => {
     assert.match(html, /<option value="opus" selected>|value="opus"/);
   });
 
-  test('the Models label of a model prefers the catalog name, then the curated name, then the slug', () => {
-    const name = modelNamer({ catalog: [{ id: 'a/b', name: 'From Catalog' }], availableModels: [{ id: 'a/b', name: 'Curated' }, { id: 'c/d', name: 'Curated D' }] });
-    assert.equal(name('a/b'), 'From Catalog');
-    assert.equal(name('c/d'), 'Curated D');
-    assert.equal(name('e/f'), 'f');
-    assert.equal(name(null), 'Default');
+  test('a model has one display name in the rows: the one getModelDisplayName gives, never the alias or the id (LIN-3952)', () => {
+    const table = applyChangesToTable(emptyTable(), [{ scope: 'job', surface: SURFACES.AGENT_SESSION, key: 'bug', field: 'model', to: 'anthropic/claude-sonnet-5' }]);
+    assert.ok(body(table).includes(getModelDisplayName('anthropic/claude-sonnet-5')), 'the display name shows');
+    const summary = body(table).match(/data-testid="models-job-bug"[\s\S]*?settings-row-value">([^<]*)</)[1];
+    assert.doesNotMatch(summary, /\//, 'no raw id in the row summary');
+  });
+
+  test('an agent job reads its stage word, so Close-out and Build match the rest of the app (LIN-3952)', () => {
+    assert.match(body(emptyTable()), /data-testid="models-job-close-out"[\s\S]*?settings-row-label">Close-out/);
+    assert.match(body(emptyTable()), /data-testid="models-job-implementation"[\s\S]*?settings-row-label">Build/);
   });
 });
 
@@ -260,8 +265,25 @@ describe('the Models words (LIN-3987)', () => {
   test('a job following a blank group names what the group resolves to, never "(none)"', () => {
     const html = body(emptyTable());
     assert.doesNotMatch(html, /\(none\)/);
-    assert.match(html, /<option value=""[^>]*>Follow [^<]*\(Claude Code(?:&#039;|')s own effort\)<\/option>/, 'effort follows the harness in force, in words');
-    assert.match(html, /<option value=""[^>]*>Follow [^<]*\(Claude Code\)<\/option>/, 'a blank harness resolves to Claude Code');
+    assert.match(html, /<option value=""[^>]*>Follow Judge<\/option>/, 'the placeholder stays short: it does not fit a 390px phone with its words in it');
+    assert.match(html, /data-decision-hint="harness"[^>]*>Right now: Claude Code</, 'a blank harness resolves to Claude Code, in the hint');
+    assert.match(html, /data-decision-hint="effort"[^>]*>Right now: Claude Code(?:&#039;|')s own effort</, 'effort follows the harness in force, in words');
+  });
+
+  test('LIN-3952: the hint says "from <Group>" only when the group supplies the value', () => {
+    const table = emptyTable();
+    table.groups[SURFACES.AGENT_SESSION].judge = { model: 'sonnet' };
+    const fromGroup = body(table);
+    assert.match(fromGroup, /data-decision-hint="model"[^>]*>Right now: Claude Sonnet 5\.5, from Judge</, 'the group supplies the model');
+    assert.doesNotMatch(fromGroup, /data-decision-hint="harness"[^>]*>[^<]*from Judge/, 'the harness is not the group\'s');
+
+    const unset = body(emptyTable());
+    assert.doesNotMatch(unset, /from Judge/, 'a group with no value never reads "from Judge"');
+  });
+
+  test('LIN-3952: a Harbour call with nothing stored names the server default in its hint, not its group', () => {
+    const html = body(emptyTable());
+    assert.match(html, /data-decision-hint="model"[^>]*>Right now: [^<]*, server default</);
   });
 
   test('the "also ran on" note names models by their display names, not their ids', () => {

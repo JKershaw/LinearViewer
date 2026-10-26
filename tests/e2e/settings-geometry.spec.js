@@ -89,8 +89,8 @@ test.describe('Settings geometry (LIN-3890)', () => {
     expect(selectedBg).toMatch(/rgba\(0, 0, 0, 0\)|transparent/);
 
     await settings(page).gotoArea(urlKey, 'sources');
-    // The page header is hidden on the phone area view, so "‹ Settings" is the first thing on the page.
-    await expect(page.locator('[data-testid="settings-page-head"]')).toBeHidden();
+    // The centred Settings heading is gone (LIN-3952), so "‹ Settings" is the first thing on the page.
+    await expect(page.locator('[data-testid="settings-page-head"]')).toHaveCount(0);
     const top = async (selector) => (await page.locator(selector).first().boundingBox()).y;
     const back = await top('[data-testid="settings-back"]');
     const title = await top('.settings-area-title');

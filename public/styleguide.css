@@ -315,3 +315,9 @@
   font-size: var(--font-size-sm);
   color: var(--fg-dim);
 }
+
+/* LIN-3952: the pending bar sticks to the foot of Models while anything is staged. Its sample sits in a frame, not at the
+   foot of the page, so it stays where it is drawn. */
+.sg-pending-sample .models-save {
+  position: static;
+}

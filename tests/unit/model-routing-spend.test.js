@@ -6,8 +6,8 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { agentSpendByJob, harbourSpendByJob, byJobSpend } from '../../lib/model-routing-spend.js';
-import { summariseRouting, fit } from '../../lib/model-routing-summary.js';
+import { agentSpendByJob, harbourSpendByJob, byJobSpend, totalSpend, shareOf, spendByEffectiveModel } from '../../lib/model-routing-spend.js';
+import { summariseRouting, summariseSpend, fit } from '../../lib/model-routing-summary.js';
 import { AGENT_JOB_IDS, HARBOUR_JOB_IDS } from '../../lib/model-routing.js';
 import { STATE_MAX_LENGTH } from '../../lib/settings-areas.js';
 
@@ -111,37 +111,62 @@ describe('byJobSpend', () => {
   });
 });
 
-describe('summariseRouting: the sidebar summary', () => {
+describe('the sidebar label off Models: summariseRouting (spend-free, LIN-3952)', () => {
   const name = (m) => ({ 'openai/gpt-6.1-sol': 'GPT-6.1 Sol', 'anthropic/claude-sonnet-5': 'Claude Sonnet 5' })[m] || m.split('/').pop();
 
-  test('names the model most jobs run on, with how many other models are in use', () => {
-    const rows = [
-      { model: 'openai/gpt-6.1-sol' }, { model: 'openai/gpt-6.1-sol' }, { model: 'openai/gpt-6.1-sol' },
-      { model: 'anthropic/claude-sonnet-5' }, { model: 'google/x' }
-    ];
-    assert.equal(summariseRouting(rows, name), 'GPT-6.1 Sol +2');
+  test('one model in use names it, with no suffix', () => {
+    assert.equal(summariseRouting([{ model: 'openai/gpt-6.1-sol' }, { model: 'openai/gpt-6.1-sol' }], name), 'GPT-6.1 Sol');
   });
 
-  test('a single model is shown with no suffix; no jobs is Default', () => {
-    assert.equal(summariseRouting([{ model: 'openai/gpt-6.1-sol' }], name), 'GPT-6.1 Sol');
-    assert.equal(summariseRouting([], name), 'Default');
+  test('several models in use read as a count, never a job tally', () => {
+    assert.equal(summariseRouting([{ model: 'openai/gpt-6.1-sol' }, { model: 'anthropic/claude-sonnet-5' }], name), '2 models');
   });
 
-  test('a job with no stored model counts as Default, and the top model wins on job count', () => {
-    assert.equal(summariseRouting([{ model: null }, { model: null }, { model: 'openai/gpt-6.1-sol' }], name), 'Default +1');
+  test('no job naming a model reads "Not set", and a job with no model does not count as a model', () => {
+    assert.equal(summariseRouting([], name), 'Not set');
+    assert.equal(summariseRouting([{ model: null }, { model: null }, { model: 'openai/gpt-6.1-sol' }], name), 'GPT-6.1 Sol');
   });
 
-  test('a ties go to the model the registry meets first', () => {
-    assert.equal(summariseRouting([{ model: 'openai/gpt-6.1-sol' }, { model: 'anthropic/claude-sonnet-5' }], name), 'GPT-6.1 Sol +1');
+  test('the label fits the sidebar width', () => {
+    const long = (m) => (m ? 'An Extraordinarily Long Model Display Name' : '');
+    assert.ok(summariseRouting([{ model: 'x/y' }], long).length <= STATE_MAX_LENGTH);
+  });
+});
+
+describe('the sidebar label on Models: summariseSpend (LIN-3952 item 5)', () => {
+  const name = (m) => ({ 'anthropic/claude-sonnet-5': 'Claude Sonnet 5', 'openai/gpt-6.1-sol': 'GPT-6.1 Sol' })[m] || m;
+
+  test('names the model carrying the most priced spend, not the one most jobs run on', () => {
+    // Three cheap jobs on GPT, one expensive job on Sonnet: Sonnet carries the spend.
+    const byModel = [{ model: 'anthropic/claude-sonnet-5', spendUsd: 8 }, { model: 'openai/gpt-6.1-sol', spendUsd: 0.3 }];
+    assert.equal(summariseSpend(byModel, name), 'Claude Sonnet 5');
   });
 
-  test('every summary fits the sidebar, and the +N is never clipped', () => {
-    const long = 'An Extraordinarily Long Model Display Name';
-    for (const others of [0, 1, 9, 42]) {
-      const text = fit(long, others);
-      assert.ok(text.length <= STATE_MAX_LENGTH, `${text} is ${text.length} characters`);
-      if (others) assert.ok(text.endsWith(` +${others}`), `${text} keeps its count`);
-    }
+  test('no priced spend reads "No priced runs"', () => {
+    assert.equal(summariseSpend([], name), 'No priced runs');
+  });
+
+  test('the label fits the sidebar width', () => {
+    const long = () => 'An Extraordinarily Long Model Display Name';
+    assert.ok(summariseSpend([{ model: 'x', spendUsd: 1 }], long).length <= STATE_MAX_LENGTH);
+  });
+});
+
+describe('spend totals and attribution (LIN-3952 item 1, 5)', () => {
+  const spend = (id, spendUsd, priced) => ({ id, spendUsd, priced, runs: priced, models: [] });
+
+  test('the total is the sum of priced spend, and a job\'s share of it is null with none priced', () => {
+    const all = [spend('a', 3, 2), spend('b', 1, 1), spend('c', 0, 0)];
+    assert.equal(totalSpend(all), 4);
+    assert.equal(shareOf(all[0], totalSpend(all)), 0.75);
+    assert.equal(shareOf(all[2], totalSpend(all)), null, 'an unpriced job has no share');
+    assert.equal(shareOf(all[0], 0), null, 'no whole, no share');
+  });
+
+  test('spend is credited to each job\'s EFFECTIVE model, and a job with no model is not credited to a default', () => {
+    const effectiveRows = [{ id: 'a', model: 'm1' }, { id: 'b', model: 'm1' }, { id: 'c', model: null }];
+    const out = spendByEffectiveModel([spend('a', 2, 1), spend('b', 1, 1), spend('c', 5, 1)], effectiveRows);
+    assert.deepEqual(out, [{ model: 'm1', spendUsd: 3 }]);
   });
 });
 

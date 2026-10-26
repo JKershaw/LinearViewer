@@ -30,11 +30,10 @@ import { hasLiveRunnerKey, hasLiveQueueToken } from '../lib/run-controls.js';
 import { readOwnerSeamStatus } from '../lib/workspace-owner.js';
 import { resolveRunnerOwnerRefusal, sendRunnerRefusal } from '../lib/runner-owner-gate.js';
 import { mergeChangeLog, ChangeLogError, UNKNOWN_VALUE } from '../lib/workspace-change-log.js';
-import { getCachedCatalogModel } from '../lib/openrouter-catalog.js';
-import { DEFAULT_MODEL } from '../lib/openrouter.js';
+import { DEFAULT_MODEL, getModelDisplayName, resolveFreeTierModel } from '../lib/openrouter.js';
 import { AGENT_JOB_IDS, HARBOUR_JOB_IDS, effectiveTable, resolveAgentFromTable, prefillDefaults } from '../lib/model-routing.js';
-import { agentSpendByJob, harbourSpendByJob, typicalByModel } from '../lib/model-routing-spend.js';
-import { summariseRouting } from '../lib/model-routing-summary.js';
+import { agentSpendByJob, harbourSpendByJob, typicalByModel, spendByEffectiveModel } from '../lib/model-routing-spend.js';
+import { summariseRouting, summariseSpend } from '../lib/model-routing-summary.js';
 import { runnableGuard } from '../lib/model-routing-edit.js';
 import { readModelsHistory } from '../lib/model-routing-history.js';
 import { HALT_MODES, HALT_MODE_ERROR } from '../lib/workspace-halt.js';
@@ -222,11 +221,11 @@ export function createSettingsRouter(deps) {
       : null;
 
     // LIN-3855: the Models summary reads the effective table (what jobs run on), not the job-less default
-    // that no running call reads. One read for every area: the sidebar names every area's state.
+    // that no running call reads. One read for every area. Off Models it is spend-free (LIN-3952): one model
+    // in use, or a count. Models replaces it with the model carrying the most priced spend, once its spend is read.
     const table = await modelRoutingStore.getTable(workspace.urlKey);
     const effective = effectiveTable(table, { defaultModel: DEFAULT_MODEL });
-    const modelsSummary = summariseRouting(effective.jobs, (id) => getCachedCatalogModel(id)?.name
-      || AVAILABLE_MODELS.find((m) => m.id === id)?.name || id.split('/').pop(), { width: STATE_MAX_LENGTH });
+    const modelsSummary = summariseRouting(effective.jobs, getModelDisplayName, { width: STATE_MAX_LENGTH });
     const workspaceFeatures = await getWorkspaceFeatures({ urlKey: workspace.urlKey, store: workspacePreferencesStore });
     const featureFlags = await requestFeatureFlags(req);
 
@@ -299,6 +298,12 @@ export function createSettingsRouter(deps) {
       // Live OpenRouter catalog, mocked by the same predicate as the AI mock so
       // automated runs never make a live network call.
       dispatchModelCatalog = await getModelCatalog({ mock: shouldMockAi(workspace) });
+      // LIN-3952: on Models the sidebar names the model that carries the most priced spend (each job's spend, credited to
+      // its effective model), so it is set here, after the spend is read.
+      states.models = getArea('models').state({
+        ...stateCtx,
+        modelsSummary: summariseSpend(spendByEffectiveModel([...agentSpendByJob(history.items, { jobs: AGENT_JOB_IDS }), ...harbourSpendByJob(callDocs, { jobs: HARBOUR_JOB_IDS })], effective.jobs), getModelDisplayName, { width: STATE_MAX_LENGTH })
+      });
       try {
         dispatchPresets = dispatchPresetsStore ? await dispatchPresetsStore.list(workspace.urlKey) : [];
       } catch (e) {
@@ -308,6 +313,10 @@ export function createSettingsRouter(deps) {
       if (req.session) delete req.session.modelsFlash;
       modelsData = {
         urlKey: workspace.urlKey,
+        viewerAccountId: req.session?.accountId || null,
+        hasRunner,
+        // On the free tier every Harbour call runs this model whatever is stored (LIN-3952 item 6).
+        freeTierModel: openRouterSource === 'free' ? resolveFreeTierModel() : null,
         table,
         effective,
         agentSpend: agentSpendByJob(history.items, { jobs: AGENT_JOB_IDS }),
@@ -322,6 +331,8 @@ export function createSettingsRouter(deps) {
         filter: req.query.filter === 'set' ? 'set' : 'all',
         // A refused save comes back in the session (its values kept); a refused undo comes back in `?error=`.
         flash: flash ? { message: flash.message, values: flash.values } : (CHANGE_ERRORS[req.query.error] ? { message: CHANGE_ERRORS[req.query.error], values: null } : null),
+        // The entry this save wrote, found in the log the page already read (LIN-3952). An id the log does not hold reads as a plain "Saved."
+        savedEntry: req.query.changed ? log.find((e) => e._id === String(req.query.changed)) || null : null,
         notice: req.query.changed ? 'Saved.' : req.query.saved ? 'Preset saved.' : req.query.applied ? 'Preset applied.' : req.query.nothing ? 'Nothing to change.' : null
       };
       // What the footer's dispatch hint reads: the agent default, as a dispatch would resolve it.

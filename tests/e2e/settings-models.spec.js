@@ -12,7 +12,8 @@ test.describe('Settings › Models (LIN-3855)', () => {
   let urlKey
 
   test.beforeEach(async ({ seedLocal, request }) => {
-    ;({ urlKey } = await seedLocal())
+    // A runner is set, as in a workspace that runs agents: the agent rows apply (LIN-3952 item 6).
+    ;({ urlKey } = await seedLocal(null, { runnerKey: true }))
     // A clean routing table, log and presets for this workspace.
     await request.get(`/test/set-workspace-model?urlKey=${urlKey}`)
   })
@@ -24,6 +25,12 @@ test.describe('Settings › Models (LIN-3855)', () => {
     await settings(page).gotoArea(urlKey, 'models')
     if (query) await page.goto(`/workspace/${urlKey}/settings/models${query}`)
     await page.waitForLoadState('networkidle')
+    // Jobs with no runs sit behind the "Show N more" fold (LIN-3952 item 1): open each closed fold, as a person would.
+    // Each click opens one fold, so the next closed fold is always the first one left.
+    const closed = page.locator('details.models-fold:not([open])')
+    while (await closed.count()) {
+      await closed.first().locator(':scope > summary').click()
+    }
   }
   const jobRow = (page, id) => page.locator(`[data-testid="models-job-${id}"]`)
   const openRow = async (page, id) => {
@@ -45,7 +52,7 @@ test.describe('Settings › Models (LIN-3855)', () => {
     await reasonBox(page).fill('Bugs get the cheaper model')
     await saveButton(page).click()
 
-    await expect(page.locator('[data-testid="models-notice"]')).toContainText('Saved.')
+    await expect(page.locator('[data-testid="models-notice"]')).toContainText(/Saved \d+ rows?\./)
     await expect(jobRow(page, 'bug').locator(':scope > summary')).toContainText('set here')
     await expect(logEntries(page)).toHaveCount(1)
     await expect(logEntries(page).first()).toContainText('Bugs get the cheaper model')
@@ -62,7 +69,7 @@ test.describe('Settings › Models (LIN-3855)', () => {
     await reasonBox(page).fill('Follow Make again')
     await saveButton(page).click()
 
-    await expect(page.locator('[data-testid="models-notice"]')).toContainText('Saved.')
+    await expect(page.locator('[data-testid="models-notice"]')).toContainText(/Saved \d+ rows?\./)
     await expect(jobRow(page, 'bug').locator(':scope > summary')).toContainText('from Make')
   })
 
@@ -74,9 +81,9 @@ test.describe('Settings › Models (LIN-3855)', () => {
     await reasonBox(page).fill('Make on sonnet')
     await saveButton(page).click()
 
-    await expect(page.locator('[data-testid="models-notice"]')).toContainText('Saved.')
+    await expect(page.locator('[data-testid="models-notice"]')).toContainText(/Saved \d+ rows?\./)
     await expect(jobRow(page, 'implementation').locator(':scope > summary')).toContainText('from Make')
-    await expect(jobRow(page, 'implementation').locator(':scope > summary')).toContainText('sonnet')
+    await expect(jobRow(page, 'implementation').locator(':scope > summary')).toContainText('Claude Sonnet 5.5')
   })
 
   test('picking an OpenRouter-only model switches the harness to opencode and hides effort', async ({ page }) => {
@@ -115,7 +122,7 @@ test.describe('Settings › Models (LIN-3855)', () => {
     await reasonBox(page).fill('two at once')
     await saveButton(page).click()
 
-    await expect(page.locator('[data-testid="models-notice"]')).toContainText('Saved.')
+    await expect(page.locator('[data-testid="models-notice"]')).toContainText(/Saved \d+ rows?\./)
     await expect(logEntries(page)).toHaveCount(1)
     await expect(logEntries(page).first()).toContainText('two at once')
   })
@@ -127,7 +134,7 @@ test.describe('Settings › Models (LIN-3855)', () => {
     await row.locator('input[data-models-field="model"]').fill('opus')
     await reasonBox(page).fill('try opus')
     await saveButton(page).click()
-    await expect(page.locator('[data-testid="models-notice"]')).toContainText('Saved.')
+    await expect(page.locator('[data-testid="models-notice"]')).toContainText(/Saved \d+ rows?\./)
 
     const undo = logEntries(page).filter({ hasText: 'try opus' }).locator('[data-testid^="models-undo-"]').first()
     await undo.locator(':scope > summary').click()
@@ -135,7 +142,7 @@ test.describe('Settings › Models (LIN-3855)', () => {
     await undo.locator('[data-testid$="-confirm"]').click()
 
     await openModels(page)
-    await expect(jobRow(page, 'bug').locator(':scope > summary')).toContainText('sonnet')
+    await expect(jobRow(page, 'bug').locator(':scope > summary')).toContainText('Claude Sonnet 5.5')
   })
 
   test('at phone width the open row is a full-screen sheet and nothing scrolls sideways', async ({ page }) => {
@@ -169,18 +176,23 @@ test.describe('Settings › Models (LIN-3855)', () => {
     expect(await page.evaluate(() => document.activeElement.matches('[data-testid="models-job-implementation"] > summary'))).toBe(true)
   })
 
-  test('the sidebar names what jobs run on, and a group move changes it', async ({ page, request }) => {
-    await openModels(page)
+  // Off Models the sidebar's state is spend-free (LIN-3952 item 5): one model in use names it, several read as a count.
+  test('off Models the sidebar names the one model every job runs on, and a group move changes it', async ({ page, request }) => {
+    await settings(page).gotoArea(urlKey, 'sources')
     const before = await stateOf(page).textContent()
-    // Every agent group on one model: the agent jobs then all run on it, and the sidebar must say so.
+    // Every agent group on one model: the agent jobs then all run on it. Harbour calls keep their own model, so two in use.
     const groups = ['judge', 'plan', 'make', 'steer', 'sort', 'tell']
     await seed(request, groups.map((key) => ({ scope: 'group', surface: 'agent-session', key, field: 'model', to: 'anthropic/claude-sonnet-5' })), 'all agent groups')
-    await openModels(page)
+    await settings(page).gotoArea(urlKey, 'sources')
     const after = await stateOf(page).textContent()
     expect(after).not.toBe(before)
-    // Every agent job now runs on Claude Sonnet 5 (named from the catalog, clipped to the sidebar's 16 characters).
-    expect(after).toMatch(/^Claude Sonn/)
-    expect(after).toMatch(/ \+1$/)
+    expect(after.trim()).toMatch(/^2 models$/)
+  })
+
+  // On Models the sidebar names the model carrying the most priced spend (LIN-3952 item 5). With no runs there is no priced spend.
+  test('on Models the sidebar reads "No priced runs" until a job has priced spend', async ({ page }) => {
+    await openModels(page)
+    await expect(stateOf(page)).toHaveText('No priced runs')
   })
 
   test('the retired forms are gone, the Dispatch presets section stays, and the old POSTs write nothing', async ({ page, request }) => {
@@ -197,18 +209,9 @@ test.describe('Settings › Models (LIN-3855)', () => {
     await expect(logEntries(page)).toHaveCount(0)
   })
 
-  test('the No job (Dispatch suggestion) row saves its model and effort with a reason and reads them back', async ({ page }) => {
+  // LIN-3952: the No job suggestion moved to the Dispatch page (its own spec: dispatch-no-job.spec.js). Models no longer has it.
+  test('Models no longer carries the No job row: it is on the Dispatch page', async ({ page }) => {
     await openModels(page)
-    const row = page.locator('[data-testid="models-default-agent"]')
-    await row.locator(':scope > summary').click()
-    await row.locator('input[data-models-field="model"]').fill('sonnet')
-    await row.locator('select[data-models-field="harness"]').selectOption('claude-code')
-    await row.locator('select[data-models-field="effort"]').selectOption('high')
-    await reasonBox(page).fill('suggest sonnet on Dispatch')
-    await saveButton(page).click()
-
-    await expect(page.locator('[data-testid="models-notice"]')).toContainText('Saved.')
-    await expect(page.locator('[data-testid="models-default-agent"] > summary')).toContainText('sonnet')
-    await expect(page.locator('[data-testid="models-default-agent"] select[data-models-field="effort"]')).toHaveValue('high')
+    await expect(page.locator('[data-testid="models-default-agent"]')).toHaveCount(0)
   })
 })

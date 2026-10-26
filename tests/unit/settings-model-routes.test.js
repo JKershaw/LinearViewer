@@ -45,6 +45,49 @@ describe('the Models page writes (LIN-3855)', () => {
   const version = async () => (await fx.routingStore.getTable(URL_KEY)).version;
   const snapshot = () => JSON.stringify([fx.collections.routing._docs, fx.collections.log._docs, fx.collections.presets._docs]);
 
+  // LIN-3952: the Dispatch page's No job section posts the same save with back=dispatch. Its result comes back on the
+  // Dispatch page as a query, and a refusal never lands in the session flash, which only the Models page reads.
+  describe('back=dispatch (the No job section)', () => {
+    const NO_JOB_MAKE = 'c__default__agent-session__default__model';
+
+    test('a save from Dispatch saves, and returns to Dispatch with no_job=saved', async () => {
+      const v = await version();
+      const res = await post('models/changes', { version: String(v), reason: 'default suggestion', back: 'dispatch', [NO_JOB_MAKE]: 'anthropic/claude-sonnet-5' });
+      assert.equal(res.status, 302);
+      assert.match(location(res), /\/workspace\/acme\/dispatch\?no_job=saved$/);
+      const log = await logOf();
+      assert.equal(log.length, 1);
+      assert.deepEqual(log[0].changes.map((c) => [c.scope, c.surface, c.field]), [['default', 'agent-session', 'model']]);
+    });
+
+    test('an unchanged save from Dispatch writes nothing and says so there', async () => {
+      const v = await version();
+      const res = await post('models/changes', { version: String(v), reason: 'nothing', back: 'dispatch' });
+      assert.equal(res.status, 302);
+      assert.match(location(res), /\/dispatch\?no_job=nothing$/);
+      assert.equal((await logOf()).length, 0);
+    });
+
+    test('a refusal from Dispatch returns to Dispatch with the code, and leaves the Models flash alone', async () => {
+      const res = await post('models/changes', { version: '999', reason: 'stale', back: 'dispatch', [NO_JOB_MAKE]: 'anthropic/claude-sonnet-5' });
+      assert.equal(res.status, 302);
+      assert.match(location(res), /\/dispatch\?no_job_error=CONFLICT$/);
+      assert.equal((await logOf()).length, 0, 'nothing written');
+    });
+
+    test('a reason is still required from Dispatch', async () => {
+      const v = await version();
+      const res = await post('models/changes', { version: String(v), reason: '', back: 'dispatch', [NO_JOB_MAKE]: 'anthropic/claude-sonnet-5' });
+      assert.match(location(res), /\/dispatch\?no_job_error=REASON_REQUIRED$/);
+    });
+
+    test('an unknown back returns to Models, never to some other page', async () => {
+      const v = await version();
+      const res = await post('models/changes', { version: String(v), reason: 'x', back: 'https://evil.example', [MAKE_MODEL]: 'anthropic/claude-sonnet-5' });
+      assert.match(location(res), /\/settings\/models\?changed=/);
+    });
+  });
+
   describe('the retired forms', () => {
     for (const path of ['model', 'dispatch-defaults', 'ai-model-overrides']) {
       test(`POST /settings/${path} is gone: 404, and it writes nothing`, async () => {
@@ -62,7 +105,7 @@ describe('the Models page writes (LIN-3855)', () => {
       const v = await version();
       const res = await post('models/changes', { version: String(v), reason: 'cheaper make', [MAKE_MODEL]: 'anthropic/claude-sonnet-5' });
       assert.equal(res.status, 302);
-      assert.match(location(res), /\/settings\/models\?changed=1$/);
+      assert.match(location(res), /\/settings\/models\?changed=[^&]+$/);
       const log = await logOf();
       assert.equal(log.length, 1);
       assert.equal(log[0].reason, 'cheaper make');

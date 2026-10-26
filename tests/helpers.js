@@ -157,6 +157,10 @@ export const SELECTORS = {
     /** Feature-toggle line by feature key, e.g. 'dispatch', 'roadmap'. */
     toggle: (key) => `[data-testid="settings-toggle-${key}"]`,
     logout: '[data-testid="settings-logout"]',
+    /** Settings › Models (LIN-3952): a job's row by id, the pending bar that stays in view while anything is staged, and its Save. */
+    modelsJob: (id) => `[data-testid="models-job-${id}"]`,
+    modelsBar: '[data-testid="models-bar"]',
+    modelsSave: '[data-testid="models-save"]',
     /** Every switch row (LIN-3888); filter by `hasText` for one by its label. */
     switchRows: '[data-testid^="settings-toggle-"]',
     /** A feature switch's button: the row's form submit (LIN-3888, the `toggleFeature` precedent). Its text is `● on` / `○ off`, its state `aria-checked`. */
