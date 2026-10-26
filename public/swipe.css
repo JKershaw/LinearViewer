@@ -607,9 +607,9 @@ a.swipe-relation-issue:hover {
 }
 
 .swipe-prompt-btn.active {
-  border-color: var(--blue);
-  background: #eff4ff;
-  color: var(--blue);
+  border-color: var(--brand-dim);
+  background: color-mix(in srgb, var(--brand) 10%, transparent);
+  color: var(--brand-dim);
 }
 
 .swipe-prompt-btn.loading {
@@ -663,9 +663,9 @@ a.swipe-relation-issue:hover {
 
 /* LIN-525 #1: driven by the body attribute (see style.css), not a per-button class. */
 body[data-proxy-active="true"] .prompt-section .prompt-proxy-toggle {
-  background: #eff4ff;
-  color: var(--blue);
-  border-color: var(--blue);
+  background: color-mix(in srgb, var(--brand) 10%, transparent);
+  color: var(--brand-dim);
+  border-color: var(--brand-dim);
 }
 
 .swipe-prompt-text p { margin: 0 0 var(--space-2); }
@@ -746,7 +746,7 @@ body[data-proxy-active="true"] .prompt-section .prompt-proxy-toggle {
 
 .opened-task-proxy-label {
   cursor: pointer;
-  color: var(--blue);
+  color: var(--brand-dim);
   list-style: none;
 }
 
@@ -792,7 +792,7 @@ body[data-proxy-active="true"] .prompt-section .prompt-proxy-toggle {
 }
 
 .opened-task-proxy-faq a {
-  color: var(--blue);
+  color: var(--brand-dim);
 }
 
 /* LIN-2944 P3: Home's one-line onboarding hint replaces the top-task mark when
@@ -831,8 +831,8 @@ body[data-proxy-active="true"] .prompt-section .prompt-proxy-toggle {
 /* The ticket asks for a PROMINENT copy in the action cluster. */
 .swipe-prompt-actions .swipe-prompt-copy {
   padding: 0.3rem 0.6rem;
-  border-color: var(--blue);
-  color: var(--blue);
+  border-color: var(--brand-dim);
+  color: var(--brand-dim);
   font-size: 11px;
   font-weight: 600;
 }

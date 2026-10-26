@@ -95,13 +95,14 @@ describe('the button decision: .btn is the authority, with tone variants', () =>
 });
 
 describe('breakpoints are the written list', () => {
-  test('the widths used in @media preludes are the 13 in ui-pieces.md', () => {
+  test('the widths used in @media preludes are the 14 in ui-pieces.md', () => {
     const widths = new Set();
     for (const text of Object.values(css)) {
       for (const m of text.matchAll(/@media[^{]*\{/g)) {
         for (const w of m[0].matchAll(/(?:min|max)-width:\s*(\d+)px/g)) widths.add(Number(w[1]));
       }
     }
-    assert.deepEqual([...widths].sort((a, b) => a - b), [400, 480, 560, 600, 640, 641, 720, 760, 900, 960, 1024, 1040, 1280]);
+    // 360 is the LIN-4009 phone lever (.wordmark-accent hides below it so the nav line fits at 320px).
+    assert.deepEqual([...widths].sort((a, b) => a - b), [360, 400, 480, 560, 600, 640, 641, 720, 760, 900, 960, 1024, 1040, 1280]);
   });
 });

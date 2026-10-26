@@ -80,8 +80,10 @@ test('the stylesheet has no second dark-token copy (LIN-3980)', () => {
     'dark tokens come from .theme-dark only; the system scheme is applied pre-paint by lib/components/page.js');
 });
 
-test('--brand is teal (per LIN-782) in both themes', () => {
-  assert.match(ruleBody(STYLE_CSS, ':root'), /--brand:\s*var\(--teal\)/);
+// LIN-4009: the light primary is the deep teal (one primary colour, white ink passes AA);
+// dark keeps the brighter teal through --teal. The AA pins below check the values.
+test('--brand is the primary in both themes (LIN-4009)', () => {
+  assert.match(ruleBody(STYLE_CSS, ':root'), /--brand:\s*#0f766e\s*;/);
   assert.match(ruleBody(STYLE_CSS, '.theme-dark'), /--brand:\s*var\(--teal\)/);
 });
 
@@ -99,6 +101,11 @@ test('self-hosts Inter and JetBrains Mono via @font-face (no build step)', () =>
   // The loaded faces head their respective stacks.
   assert.match(STYLE_CSS, /--font-structural:\s*'JetBrains Mono'/);
   assert.match(STYLE_CSS, /--font-content:\s*'Inter'/);
+});
+
+// LIN-4009: the body reads in the content face. A word inherits sans; mono is named on the machine facts.
+test('the body defaults to the content face, not the structural (mono) one (LIN-4009)', () => {
+  assert.match(ruleBody(STYLE_CSS, 'body'), /font-family:\s*var\(--font-content\)/);
 });
 
 // LIN-985 (follow-up to LIN-976/LIN-785): the typography split is `--font-structural`
@@ -254,6 +261,32 @@ test('§11 AA: --brand-dim as text on --card clears AA-normal in both themes', (
   for (const theme of [':root', '.theme-dark']) {
     const ratio = contrast(resolveToken(theme, '--brand-dim'), resolveToken(theme, '--card'));
     assert.ok(ratio >= AA_NORMAL, `${theme}: --brand-dim on --card is ${ratio.toFixed(2)}:1 (< ${AA_NORMAL})`);
+  }
+});
+
+// LIN-4009: every filled action inks var(--bg) (or --on-brand on the landing CTA)
+// on the --brand fill. Both inks must clear AA-normal in both themes, so the fill
+// can never again be a colour that fails with the page's own ink (LIN-739).
+test('LIN-4009 AA: ink on the --brand fill clears AA-normal in both themes', () => {
+  for (const theme of [':root', '.theme-dark']) {
+    const brand = resolveToken(theme, '--brand');
+    for (const ink of ['--bg', '--on-brand']) {
+      const ratio = contrast(resolveToken(theme, ink), brand);
+      assert.ok(ratio >= AA_NORMAL, `${theme}: ${ink} on --brand is ${ratio.toFixed(2)}:1 (< ${AA_NORMAL})`);
+    }
+  }
+});
+
+// LIN-4009: one house focus ring. --focus is the brand colour, so it clears the
+// 3:1 non-text floor against both surfaces a ring can sit on.
+test('LIN-4009: --focus is the brand colour and clears 3:1 on --bg and --card', () => {
+  for (const theme of [':root', '.theme-dark']) {
+    const focus = resolveToken(theme, '--focus');
+    assert.equal(focus, resolveToken(theme, '--brand'), `${theme}: --focus must equal --brand`);
+    for (const surface of ['--bg', '--card']) {
+      const ratio = contrast(focus, resolveToken(theme, surface));
+      assert.ok(ratio >= 3, `${theme}: --focus on ${surface} is ${ratio.toFixed(2)}:1 (< 3)`);
+    }
   }
 });
 

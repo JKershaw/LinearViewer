@@ -184,7 +184,7 @@
 }
 
 .toast-info {
-  border-left-color: var(--blue);
+  border-left-color: var(--brand-dim);
 }
 
 /* =============================================================================

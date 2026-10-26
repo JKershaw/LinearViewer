@@ -295,15 +295,15 @@
   cursor: pointer;
 }
 .chat-option-btn:hover {
-  border-color: var(--blue);
-  color: var(--blue);
+  border-color: var(--brand-dim);
+  color: var(--brand-dim);
 }
 .chat-option-btn:disabled {
   opacity: 0.6;
   cursor: default;
 }
 .chat-option-btn.chat-option--recommended {
-  border-color: var(--blue);
+  border-color: var(--brand-dim);
   font-weight: 600;
 }
 .chat-option-btn.chat-option--recommended::after {

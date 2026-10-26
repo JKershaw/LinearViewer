@@ -148,7 +148,7 @@
 .dispatch-model-input:focus,
 .dispatch-effort-input:focus {
   outline: none;
-  border-color: var(--blue);
+  border-color: var(--brand);
 }
 
 .dispatch-model-input::placeholder,
@@ -179,7 +179,7 @@
 
 .dispatch-model-input-other:focus {
   outline: none;
-  border-color: var(--blue);
+  border-color: var(--brand);
 }
 
 /* Free-marker hint line (LIN-2719) — never option text, matching the
@@ -256,7 +256,7 @@
 
 .dispatch-preset-name-input:focus {
   outline: none;
-  border-color: var(--blue);
+  border-color: var(--brand);
 }
 
 .dispatch-preset-create-submit {
@@ -273,7 +273,7 @@
 }
 
 .settings-switch {
-  font-family: var(--font-structural);
+  font-family: var(--font-content);
   font-size: 0.85rem;
   min-width: 5ch;
   padding: 0.2rem 0.6rem;
@@ -800,7 +800,7 @@
 }
 
 .settings-field-control:focus {
-  border-color: var(--blue);
+  border-color: var(--brand);
 }
 
 .settings-spend-bar {
@@ -821,11 +821,11 @@
 }
 
 .settings-spend-bar::-webkit-progress-value {
-  background: var(--blue);
+  background: var(--brand);
 }
 
 .settings-spend-bar::-moz-progress-bar {
-  background: var(--blue);
+  background: var(--brand);
 }
 
 /* A job's figures at rest, after its value: total, typical run and share (LIN-3952 item 1). */
@@ -943,7 +943,7 @@
 
 /* A staged row shows its pending value in its summary, and is marked (LIN-3952 item 4). A saved row is marked the same way. */
 .models-row-pending {
-  color: var(--blue);
+  color: var(--brand-dim);
   font-family: var(--font-content);
   font-size: var(--font-size-sm);
   white-space: nowrap;

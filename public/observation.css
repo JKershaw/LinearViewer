@@ -230,7 +230,7 @@
   font-weight: 500;
   color: var(--fg-dim);
 }
-.obs-rulings-kpis-link:hover { color: var(--blue); }
+.obs-rulings-kpis-link:hover { color: var(--brand-dim); }
 
 /* Rulings tab (LIN-1728 Phase 4). One card per unanswered decision — an
    amber left accent (the escalation/waiting hue, matching `.chat-msg--blocked`
@@ -1169,7 +1169,7 @@ a.obs-task-ident:hover { text-decoration: underline; }
   display: inline-flex;
   align-items: baseline;
   gap: 0.3rem;
-  color: var(--blue);
+  color: var(--brand-dim);
   font-size: 0.8rem;
   text-decoration: none;
   word-break: break-all;
@@ -1193,7 +1193,7 @@ a.obs-task-ident:hover { text-decoration: underline; }
 .obs-error-mark { color: var(--red-dim); font-weight: 600; margin-right: 0.2rem; }
 .obs-error-meta { margin: 0.25rem 0 0; display: flex; flex-wrap: wrap; gap: 0.9rem; font-size: 0.78rem; }
 .obs-error-rt { color: var(--muted); font-family: var(--font-structural); }
-.obs-err-action { color: var(--blue); text-decoration: none; }
+.obs-err-action { color: var(--brand-dim); text-decoration: none; }
 .obs-err-action:hover { text-decoration: underline; }
 
 .obs-run-gen {
