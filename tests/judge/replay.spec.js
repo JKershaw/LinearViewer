@@ -18,6 +18,8 @@ import { defaultLocalSeed } from '../fixtures/local-harness.js';
 import { PAGES, VIEWPORTS, THEMES, FROZEN_TIME, NORMALISE, parsePixelDiff } from './pages.mjs';
 import { homeSeed, hasHomeSessions, seedHomeSessions, HOME_WRITE_SSE } from './home-states.mjs';
 import { LIVE_CONSOLE_STATES, seedLiveConsole } from './live-console-states.mjs';
+import { taskSeed, seedTaskState, mintGuestPath } from './task-states.mjs';
+import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 
 const BASE_URL = process.env.JUDGE_BASE_URL;
 const HEAD_URL = process.env.JUDGE_HEAD_URL;
@@ -30,6 +32,8 @@ const AUDIT_FIXTURE = fileURLToPath(new URL('./audit-report.fixture.json', impor
 
 // LIN-3968: Home's opened-task states (the six that seed sessions or write a prompt). The LIN-3962 states are not these.
 const isOpenedTaskState = (state) => /^home-(stages-done|running|failed|failed-first|copy-first|copy-written)$/.test(state ?? '');
+// LIN-3975: the task page's states (owner, member, guest, runner-less owner, and the chat fold open). Each has its own workspace.
+const isTaskState = (state) => /^task-(build-done|running|failed|waiting|ready|chat-open|member|guest|no-runner)$/.test(state ?? '');
 const isLoopback = (url) => /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(url) || url.startsWith('data:') || url.startsWith('blob:');
 
 // `urlKey` null means no local seed: the account is a zero-workspace one, signed in by email (LIN-3956).
@@ -92,9 +96,32 @@ async function prepareHome(page, context, entry, baseURL) {
   }
 }
 
+// LIN-3975: the task page's states. Seeded once per server and state, as prepareHome does. A guest is the owner's share
+// opened as a guest; the chat fold is opened by its own summary, the way a reader opens it, where the side has one.
+async function prepareTask(page, context, entry, baseURL) {
+  const key = `${baseURL}|${entry.urlKey}`;
+  if (!seeded.has(key)) {
+    await seedTaskState(context.request, entry.urlKey, entry.state);
+    seeded.add(key);
+  }
+  // A member is the session that is not the owner. Each shot re-binds the session (openContext), so the foreign edge
+  // is set again here, on every shot, not once per server.
+  if (entry.state === 'task-member') await seedWorkspaceOwnership(context.request, entry.urlKey, 'foreign');
+  const path = entry.state === 'task-guest' ? await mintGuestPath(context.request, entry.urlKey) : entry.path(entry.urlKey);
+  await page.goto(path);
+  await settle(page);
+  // The fold is new in LIN-3975: base has none, so it is opened only where it is (head), and the base shot shows the page without it.
+  const fold = page.locator('[data-testid="task-page-chat-fold"] summary');
+  if (entry.state === 'task-chat-open' && await fold.count()) {
+    await fold.first().click();
+    await settle(page);
+  }
+}
+
 async function prepare(page, context, entry, viewport, theme, side, baseURL) {
   const url = entry.path(entry.urlKey);
   if (isOpenedTaskState(entry.state)) return prepareHome(page, context, entry, baseURL);
+  if (isTaskState(entry.state)) return prepareTask(page, context, entry, baseURL);
   if (LIVE_CONSOLE_STATES.has(entry.state)) await seedLiveConsole(context.request, baseURL, entry.urlKey, entry.state);
   if (entry.state === 'email-signin') {
     // One address per shot, the same on both sides: the send throttle is per address (3 per 15 minutes),
@@ -208,9 +235,14 @@ async function prepare(page, context, entry, viewport, theme, side, baseURL) {
 
 async function shoot(browser, baseURL, viewport, theme, entry, side) {
   const openedTask = isOpenedTaskState(entry.state);
+  const taskState = isTaskState(entry.state);
+  // The task states seed their own task (taskSeed) and a runner key only where the state has one.
+  const seedFor = openedTask ? { runnerKey: entry.runner === true }
+    : taskState ? { runnerKey: entry.runner === true, ...(entry.seed || {}) }
+      : entry.seed;
+  const baseFor = openedTask ? homeSeed(entry.urlKey) : taskState ? taskSeed(entry.urlKey, { ready: entry.state === 'task-ready' }) : null;
   const context = await openContext(browser, baseURL, viewport, theme, entry.state === 'email-signin' ? null : entry.urlKey,
-    openedTask ? { runnerKey: entry.runner === true } : entry.seed, openedTask ? homeSeed(entry.urlKey) : null,
-    LIVE_CONSOLE_STATES.has(entry.state));
+    seedFor, baseFor, LIVE_CONSOLE_STATES.has(entry.state));
   try {
     const page = await context.newPage();
     await prepare(page, context, entry, viewport, theme, side, baseURL);
