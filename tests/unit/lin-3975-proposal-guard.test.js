@@ -202,12 +202,22 @@ describe('LIN-3975 — the task page fold proposes only for the task it is on', 
     assert.match(text, /Run-scoped chat is not configured/);
   });
 
-  test('propose must be a boolean: a string is an ordinary chat, which keeps the owner gate', () => {
-    // The route reads `req.body?.propose === true` (routes/task-chat.js), so only the boolean true proposes.
-    const flag = (v) => v === true;
-    assert.equal(flag('true'), false);
-    assert.equal(flag(1), false);
-    assert.equal(flag(true), true);
+  test('propose must be the boolean true: a string is an ordinary chat, so the same model\'s follow-up takes the execute path and stages nothing', async () => {
+    // The route reads `req.body?.propose === true` (routes/task-chat.js). With the string 'true' the turn is in the
+    // execute posture, where `send_follow_up` is owner-gated; the harness has no owner seam, so that gate refuses it.
+    // The propose posture never reaches that gate, which is what makes the refusal a witness of the execute path.
+    const stores = twoSessionStores();
+    const runProposalsStore = fakeRunProposalsStore();
+    const app = foldAppBody(stores, runProposalsStore, modelProposing(RUN_ID));
+
+    const { status, text } = await withServer(app, ({ post }) =>
+      post(`/workspace/${URL_KEY}/api/task-chat/TEST-1`, { question: 'where do you stand?', propose: 'true' }));
+
+    assert.strictEqual(status, 200);
+    assert.strictEqual(runProposalsStore.created.length, 0, 'a string flag stages no proposal');
+    assert.ok(text.includes('OWNER_CHECK_UNAVAILABLE'), 'the follow-up took the owner-gated execute path');
+    assert.strictEqual(stores.addItemCalls.length, 0, 'and nothing was queued past that gate');
+    assert.ok(!text.includes('"phase":"proposed"'), 'the reader never sees a staged change for a string flag');
   });
 });
 

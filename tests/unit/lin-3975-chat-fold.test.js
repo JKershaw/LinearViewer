@@ -3,7 +3,7 @@
  *
  *   - the fold is the owner's, behind the per-user `taskChat` flag; a member and a guest get none;
  *   - it sits under the answer and the run control, as a direct child of the page (so ticket text is never it);
- *   - its turns are propose-only on the wire (`propose: true`), and the route reads the flag as a boolean;
+ *   - its turns are propose-only (the wire flag is checked by behaviour in lin-3975-proposal-refresh/-guard);
  *   - the client finds its controls by hook at init, before any transcript renders (LIN-3385);
  *   - a chat proposal for the task's runs reaches the run control, with its reason (the prompt's first line).
  *
@@ -134,22 +134,8 @@ describe('LIN-3975 — the chat fold is the owner\'s, behind the taskChat flag',
 
 // ─── the wire: propose-only, and the boolean ─────────────────────────────────
 
-describe('LIN-3975 — the fold\'s turns are propose-only on the wire', () => {
-  test('the client sends propose from the fold, and only then', () => {
-    const src = read('public/task-chat.js');
-    assert.match(src, /var propose = data\.propose === true;/);
-    assert.match(src, /if \(propose\) turnBody\.propose = true;/);
-  });
-
-  test('the route reads the flag as a boolean, and a propose turn needs the proposal stores', () => {
-    const src = read('routes/task-chat.js');
-    assert.match(src, /const propose = req\.body\?\.propose === true;/);
-    assert.match(src, /if \(runScoped \|\| propose\) \{\n\s+if \(!dispatchQueueStore \|\| !agentStatusStore \|\| !runProposalsStore\)/);
-    assert.match(src, /\.\.\.\(runScoped \|\| propose \? \{ followUpMode: 'propose', onProposal: persistProposal \} : \{\}\)/);
-  });
-});
-
-// ─── mounting and wiring order ───────────────────────────────────────────────
+// The fold's turns are propose-only on the wire, and the route reads the flag as a boolean: both are behaviour, witnessed
+// in lin-3975-proposal-refresh.test.js (the body the fold sends) and lin-3975-proposal-guard.test.js (the route).
 
 describe('LIN-3975 — the fold is wired before the first Markdown render, and its hooks are read once', () => {
   test('task-page.js mounts the fold, from its direct child, before the first Markdown render in init', () => {
