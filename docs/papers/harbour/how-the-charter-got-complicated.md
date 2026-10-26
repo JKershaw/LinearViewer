@@ -91,7 +91,7 @@ mostly records the rounds that followed.
 
 ## Method
 
-The inputs were the six transcript comments on LIN-4007, copied byte for byte (`how-the-charter-got-complicated-transcript/`),
+The evidence file is `how-the-charter-got-complicated-data/evidence.md`. The inputs were the six transcript comments on LIN-4007, copied byte for byte (`how-the-charter-got-complicated-transcript/`),
 the research comment of 14:13Z, the retro and the UI review, and the ticket record read through the Workspace API
 at 14:20Z with GET requests only. `fetch.py` writes the derived CSVs; `classify.py` assigns the classes and cut points
 without network access. Descriptions were split at their headings; comments were classed by opening line. The

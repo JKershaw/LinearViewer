@@ -1,17 +1,24 @@
+---
+title: Evidence: how the charter got complicated
+kind: data
+date: 2026-10-26
+authors: [the LIN-4007 implementation session, for John]
+---
+
 # Evidence: how the charter got complicated
 
-Sidecar to `how-the-charter-got-complicated.md`. Every table here is printed by the scripts in
-`how-the-charter-got-complicated-scripts/` from the files in `how-the-charter-got-complicated-data/`,
-and the transcript is in `how-the-charter-got-complicated-transcript/`. Record read at **14:20Z**
-on 26 Oct (`data/fetched-at.txt`). Anything after 14:06Z on LIN-3975 is out of scope.
+Sidecar to `../how-the-charter-got-complicated.md`. Every table here is printed by the scripts in
+`../how-the-charter-got-complicated-scripts/` from the files in this folder,
+and the transcript is in `../how-the-charter-got-complicated-transcript/`. Record read at **14:20Z**
+on 26 Oct (`fetched-at.txt`). Anything after 14:06Z on LIN-3975 is out of scope.
 
 Re-run: `python3 fetch.py` (GET only, needs `HARBOUR_LOCAL_BASE`), then `python3 classify.py` (no network).
-The fetch writes no raw ticket JSON; the derived CSVs are committed beside this file.
+The fetch writes no raw ticket JSON; the derived CSVs are committed in this folder.
 
 ## 1. John's requests, and what each became (C1)
 
 Transcript times are the header of each entry in `comment-1.md` to `comment-3.md`. Quotes were
-checked with `grep -F` against `how-the-charter-got-complicated-transcript/` (all found, one each or more).
+checked with `grep -F` against `../how-the-charter-got-complicated-transcript/` (all found, one each or more).
 The part 2a §6 messages (25 Oct evening to 26 Oct 07:15Z) are the operator's paraphrase of John's
 messages, with card answers paraphrased; only the verbatim spans are quoted here.
 
@@ -117,8 +124,8 @@ Plan-review sessions on the same tickets (`/issues/X/cost`): LIN-3833 5, LIN-397
 LIN-3983 6, LIN-3952 2.
 
 Served the goal (C5). The walk of the retro's index from LIN-3490, LIN-3892, LIN-3757 and LIN-3855 found
-68 tickets under the four roots, each with a state in the index (`data/tree.csv`, 07:45Z). Coded by one reader from each title
-(`data/c5-coding.csv`), with the rule: **served** = changed what a user of the kept pages sees, or removed
+68 tickets under the four roots, each with a state in the index (`tree.csv`, 07:45Z). Coded by one reader from each title
+(`c5-coding.csv`), with the rule: **served** = changed what a user of the kept pages sees, or removed
 code; **process-only** = kept the pipeline moving (tests, tooling, rules, papers, rulings mechanics);
 **not-needed** = neither; **umbrella** = a grouping ticket, not counted; **open** = not Done.
 
@@ -179,12 +186,12 @@ Reading this table:
 
 ## 5. Method
 
-- Scripts: `how-the-charter-got-complicated-scripts/fetch.py` (GET only, six transcript comments byte for
+- Scripts: `../how-the-charter-got-complicated-scripts/fetch.py` (GET only, six transcript comments byte for
   byte, derived CSVs) and `classify.py` (classes, cut points, Q4 table, run kinds, C5 summary).
 - Record: LIN-4007 comments and description, LIN-3833, 3975, 3977, 3983, 3952 (description, comments,
   `/rulings`, `/cost`), 12 comparison tickets (`/issues/X`, `/cost`, `/rulings`), and the retro's
   input 6 CSV for the tree and run kinds.
-- Transcript: `how-the-charter-got-complicated-transcript/comment-1.md` to `comment-6.md`, copied from the
+- Transcript: `../how-the-charter-got-complicated-transcript/comment-1.md` to `comment-6.md`, copied from the
   proxy and compared by byte count with the fetch.
 - Checks made: each John quote in the paper and in section 1 found by `grep -F` in the transcript files
   (all found); no ticket, ruling or code changed; no model identifier written by the scripts.
