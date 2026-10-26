@@ -409,7 +409,7 @@ describe('render-observation: bulk-agree progress node + Stop button markup (LIN
     );
     assert.match(
       html,
-      /<button type="button" class="obs-ruling-bulk-stop" id="obs-ruling-bulk-stop" hidden>Stop<\/button>/,
+      /<button type="button" class="obs-ruling-bulk-stop" id="obs-ruling-bulk-stop" data-testid="obs-ruling-bulk-stop" hidden>Stop<\/button>/,
       'Stop must render hidden on first paint — syncRulingsBulkBar toggles it visible only while rulingsBulkRunning'
     );
   });
