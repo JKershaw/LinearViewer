@@ -226,6 +226,23 @@ export const coverageOfChange = (changedPaths, renderersFor, covered = coveredRe
   return { changed, uncovered };
 };
 
+// A PNG's own size, from its IHDR chunk (LIN-3975). Null when the buffer is not a PNG.
+export const pngSize = (buf) => {
+  const sig = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  if (buf.length < 24 || !sig.every((b, i) => buf[i] === b)) return null;
+  return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+};
+
+// The class of a non-equal pair, from the two images' sizes. The comparator's text is not used: it can carry a pixel
+// count for a pair whose pages differ in height, which the message-based class labelled "paint (same size)" (LIN-3975).
+export const layoutClass = (base, head) => {
+  const a = pngSize(base);
+  const b = pngSize(head);
+  if (!a || !b) return 'unknown (not a PNG)';
+  if (a.width === b.width && a.height === b.height) return 'paint (same size)';
+  return `layout (page size ${a.width}x${a.height} -> ${b.width}x${b.height})`;
+};
+
 // Pixel count out of Playwright's comparator message; null when it reports a size mismatch.
 export const parsePixelDiff = (message) => {
   const m = /(\d+) pixels? \(ratio [\d.]+ of all image pixels\) (?:are|is) different/.exec(message);

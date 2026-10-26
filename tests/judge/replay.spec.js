@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defaultLocalSeed } from '../fixtures/local-harness.js';
-import { PAGES, VIEWPORTS, THEMES, FROZEN_TIME, NORMALISE, parsePixelDiff } from './pages.mjs';
+import { PAGES, VIEWPORTS, THEMES, FROZEN_TIME, NORMALISE, parsePixelDiff, layoutClass } from './pages.mjs';
 import { homeSeed, hasHomeSessions, seedHomeSessions, HOME_WRITE_SSE } from './home-states.mjs';
 import { LIVE_CONSOLE_STATES, seedLiveConsole } from './live-console-states.mjs';
 import { taskSeed, seedTaskState, mintGuestPath } from './task-states.mjs';
@@ -338,7 +338,8 @@ for (const entry of PAGES) {
           const diff = parsePixelDiff(String(e.message)) || {};
           record({
             ...row, result: 'differs', pixels: diff.pixels ?? null,
-            class: diff.sizeMismatch ? 'layout (page size differs)' : 'paint (same size)',
+            // From the images' own sizes (LIN-3975): the comparator's text can count pixels for a pair that differs in height.
+            class: layoutClass(base.buffer, head.buffer),
             message: diff.pixels === undefined && !diff.sizeMismatch ? String(e.message).slice(0, 300) : undefined,
           });
           failures.push(name);
