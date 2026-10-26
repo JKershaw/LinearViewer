@@ -112,7 +112,7 @@ test.describe('Landing Page (bespoke showcase)', () => {
     }
   });
 
-  test('"try it yourself" section grounds its claim in the pricing rate card, scoped to AI Generated Prompts (LIN-1161)', async ({ page }) => {
+  test('"try it yourself" section grounds its claim in the pricing rate card, scoped to writing prompts (LIN-1161, LIN-3995)', async ({ page }) => {
     await page.goto('/');
     const tryIt = page.locator('[data-testid="landing-try"]');
     await expect(tryIt).toBeVisible();
@@ -120,8 +120,9 @@ test.describe('Landing Page (bespoke showcase)', () => {
     // rate from formatModelPricing(DEFAULT_MODEL), the same figure Settings shows.
     await expect(tryIt).toContainText(/\$\d+\.\d{2} in \/ \$\d+\.\d{2} out per 1M tokens/);
     await expect(tryIt).toContainText(/OpenRouter/);
-    await expect(tryIt).toContainText(/AI Generated Prompts/);
     await expect(tryIt).toContainText(/under \$1/);
+    // LIN-3995: plain words, no internal product name or dispatch mechanism
+    await expect(tryIt).not.toContainText(/AI Generated Prompts|autopilot dispatch/i);
     // Honesty guardrail: never claims the whole product runs for under $1, and
     // never says a user must pay to try (the playwright env unsets the free-tier
     // key, so this exercises the BYOK-lead copy fork).
