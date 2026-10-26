@@ -177,9 +177,9 @@ async function prepare(page, context, entry, viewport, theme, side, baseURL) {
       await page.getByTestId(side === 'head' ? 'run-decision-panel' : 'run-change-panel').waitFor();
     }
     // LIN-3987: the opencode state chooses opencode as the harness, so the effort line and the lost web choice show.
-    // LIN-3991: on whichever side has the harness control. Base is main now and has it; choosing it on head only made the
+    // LIN-3991: on whichever side has the harness control (base waits for it: the panel's body arrives after its frame). Base is main now and has it; choosing it on head only made the
     // pair differ by a choice one side never made.
-    if (entry.state === 'home-run-panel-opencode' && (side === 'head' || await page.getByTestId('run-harness').count())) {
+    if (entry.state === 'home-run-panel-opencode' && (side === 'head' || await page.getByTestId('run-harness').waitFor({ timeout: 5000 }).then(() => true, () => false))) {
       await page.getByTestId('run-harness').selectOption('opencode');
       await page.getByTestId('run-effort').first().waitFor({ state: 'hidden' });
     }
