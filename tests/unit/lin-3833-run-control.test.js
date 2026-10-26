@@ -491,11 +491,11 @@ describe('LIN-3833 — "Another step" leaves out only what the task cannot take 
 
 describe('LIN-3991 — a running task says its state once in the opened task', () => {
   const running = { loopId: 'loop-1', kind: 'implementation', label: 'Build', state: 'running', since: '2026-10-25T10:00:00.000Z', target: 'cli' };
-  const SENTENCE = '<p class="task-sentence" data-testid="task-page-sentence">Build running for 1 hour.</p>';
+  const SENTENCE = '<p class="task-sentence" data-testid="task-page-sentence">Build running for 1h.</p>';
 
   test('the state block says it, and neither the run control nor its Go slot repeats it', async () => {
     const { c } = await mount({}, { opened: { status: 'running', live: true, headerHtml: SENTENCE, sessions: { count: 1, next: { kind: 'review', label: 'Review' }, last: null, running } } });
-    assert.equal(c.innerHTML.split('Build running for 1 hour.').length - 1, 1, 'the sentence appears once');
+    assert.equal(c.innerHTML.split('Build running for 1h.').length - 1, 1, 'the sentence appears once');
   });
 
   test('the after-run line keeps what is its own: Next, and Stop; it does not restate how long Build has run', async () => {

@@ -248,10 +248,10 @@ describe('task page structure', () => {
     assert.match(html, /9 check-ins|2 check-ins/);
   });
 
-  test('stages still ahead are drawn dashed, with no id and no toggle', () => {
+  test('LIN-3975: stages still ahead are one quiet line each, with no bar, no id and no toggle', () => {
     const html = renderTaskTrack(model('running-blocked-repeat'), { now: NOW });
-    assert.match(html, /<li class="task-stage task-stage--ahead" data-testid="task-page-stage-ahead" data-state="ahead" data-tone="ahead" data-kind="close-out">/);
-    assert.doesNotMatch(html.slice(html.indexOf('task-stage--ahead')), /<button/);
+    assert.match(html, /<li class="task-stage-ahead" data-testid="task-page-stage-ahead" data-state="ahead" data-tone="ahead" data-kind="close-out"><span class="task-stage-name">Close-out<\/span> <span class="task-stage-state">usually next<\/span><\/li>/);
+    assert.doesNotMatch(html.slice(html.indexOf('task-page-stage-ahead')), /task-stage-bar|<button/);
     assert.doesNotMatch(renderTaskTrack(model('done'), { now: NOW }), /task-page-stage-ahead/, 'none once the tracker says done');
     const none = renderTaskTrack(model('no-sessions'), { now: NOW });
     assert.equal((none.match(/data-testid="task-page-stage-ahead"/g) || []).length, 5);
@@ -404,7 +404,7 @@ describe('task page structure', () => {
   });
 
   test('header answers running / waiting / done', () => {
-    assert.match(renderTaskStatus(model('running-blocked-repeat')), /data-status="running"[\s\S]*Review running for 58 minutes\./);
+    assert.match(renderTaskStatus(model('running-blocked-repeat')), /data-status="running"[\s\S]*Review running for 58m\./);
     assert.match(renderTaskStatus(model('waiting')), /data-status="waiting"[\s\S]*task-page-sentence">which API key\?</, 'the [blocked] marker is not in the sentence');
     // LIN-3991: the sentence is relative; the exact time sits beside it, outside the sentence.
     assert.match(renderTaskStatus(model('done'), { now: NOW }), /data-status="done"[\s\S]*task-page-sentence">Finished 3 hours ago\.<\/p>/);
@@ -454,7 +454,9 @@ describe('viewer isolation', () => {
       const owner = render(name, 'owner');
       const guest = render(name, 'guest');
       const fragments = renderOwnerControls(model(name), { urlKey: 'acme', binding: BINDING, promptOpts: PROMPT_OPTS });
-      let stripped = owner;
+      // LIN-3975: an attempt's run link (or its plain reason) is for a viewer with a run page to open. A guest has none,
+      // so that markup is the one viewer difference outside the owner fragments; strip it before the parity check.
+      let stripped = owner.replace(/ <(?:a|span) class="task-stage-run[^"]*"[^>]*>[^<]*<\/(?:a|span)>/g, '');
       for (const f of [fragments.context, fragments.pullRequest, fragments.share, fragments.question]) {
         if (!f) continue;
         assert.ok(stripped.includes(f), 'the owner page carries the fragment verbatim');

@@ -167,7 +167,8 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         status: model.status,
         live: model.live,
         headerHtml: renderTaskStatus(model),
-        trackHtml: renderTaskTrack(model, { now: now() }),
+        // The owner's and a member's state carries the attempts' run links (LIN-3975); it is a signed-in read.
+        trackHtml: renderTaskTrack(model, { now: now(), urlKey: workspace.urlKey, runLinks: true }),
         // LIN-3968: the one-row stage strip Home's opened task pastes; the task page keeps trackHtml.
         stripHtml: renderStageStrip(model, { now: now() }),
         // LIN-3833: the sessions the state block and the run control read (count, last, running).

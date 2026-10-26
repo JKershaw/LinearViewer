@@ -131,9 +131,9 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await expect(step(page, 'plan').locator('[data-testid="task-page-session-message"]')).toHaveText('planned it');
     await expect(step(page, 'plan').locator('[data-testid="task-page-session-link"]')).toHaveText('plan doc');
 
-    // The stages still ahead, dotted and quiet; details closed.
+    // The stages still ahead: one quiet line each, with no bar (LIN-3975); details closed.
     await expect(page.locator('[data-testid="task-page-stage-ahead"]')).toHaveText([/Review/, /Close-out/]);
-    await expect(page.locator('[data-testid="task-page-stage-ahead"] .task-stage-head').first()).toHaveCSS('border-top-style', 'dashed');
+    await expect(page.locator('[data-testid="task-page-stage-ahead"] .task-stage-bar')).toHaveCount(0);
     await expect(page.locator('[data-testid="task-page-details"]')).not.toHaveAttribute('open', '');
     await expect(page.locator('[data-testid="task-page-subtasks-link"]')).toHaveText('LOCAL-TP4');
 
