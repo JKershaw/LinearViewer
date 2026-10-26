@@ -76,26 +76,23 @@ test.describe('Landing Page (bespoke showcase)', () => {
     expect(consent.pathname).toBe('/authorize');
     expect(consent.searchParams.get('client_id')).toBeTruthy();
 
-    // LIN-2210 close-out ledger item 1: prior to this PR, `.landing-cta-jira`
-    // had NO CSS rule at all, so it inherited the base `.landing-cta`'s
-    // transparent border/no-background/no-color look — a bare default blue
-    // link beside a filled Linear CTA and an outlined GitHub CTA. Assert
-    // PARITY with the GitHub CTA (not fixed palette literals) so this survives
-    // a future palette change while still catching the regression: markup-only
+    // LIN-2210 close-out ledger item 1: the Jira CTA must not fall back to a bare
+    // default link beside the filled Linear CTA and the outlined GitHub CTA. LIN-3980
+    // moved every sign-in button onto the shared .btn, so the look now comes from
+    // that one rule. Assert PARITY with a GitHub sibling, not palette literals, so
+    // this survives a palette change while still catching a dropped class: markup-only
     // assertions (visible + href, above) do not.
     //
     // This webServer deliberately runs with no GITHUB_* configured (see
     // settings-providers.spec.js's "not configured on this server" assertion),
-    // so no live `.landing-cta-github` element exists to measure here. Compare
-    // against a same-class sibling inserted next to the real Jira CTA instead —
-    // it picks up the identical CSS rule (`.landing-cta-github,
-    // .landing-cta-jira { ... }`) and the same `.is-landing` token-remap
-    // ancestor context, so this still reads real browser-computed CSS rather
-    // than a hardcoded value.
+    // so no live GitHub CTA exists here. Compare against a same-class sibling inserted
+    // next to the real Jira CTA instead: it carries the same classes, so it picks up
+    // the identical .btn rules and the same ancestor context, and the result is real
+    // browser-computed CSS rather than a hardcoded value.
     const parity = await page.evaluate(() => {
       const jira = document.querySelector('[data-testid="landing-cta-jira"]');
       const synthetic = document.createElement('a');
-      synthetic.className = 'landing-cta landing-cta-github';
+      synthetic.className = jira.className.replace('landing-cta-jira', 'landing-cta-github');
       jira.parentElement.appendChild(synthetic);
       const read = el => {
         const s = getComputedStyle(el);
@@ -155,8 +152,10 @@ test.describe('Landing Page (bespoke showcase)', () => {
   test('footer shows cross-view navigation and the GitHub link', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('.page-footer')).toBeVisible();
-    // projects is the current landing view — bold, not a link.
-    await expect(page.locator('.footer-actions strong.footer-current')).toHaveText('projects');
+    // LIN-3980: a visitor on / is in no view, so nothing in the row is current;
+    // the row names the signed-out previews.
+    await expect(page.locator('.footer-actions strong.footer-current')).toHaveCount(0);
+    await expect(page.locator('.footer-actions')).toContainText('previews:');
     await expect(page.locator('.footer-actions a[href="/swipe"]')).toBeVisible();
     await expect(page.locator('.footer-actions a[href="/swim"]')).toBeVisible();
     const footerLink = page.locator('.footer-link');
@@ -206,13 +205,14 @@ test.describe('Landing Page (bespoke showcase)', () => {
     expect(order & 4).toBe(4);
   });
 
-  test('every Start-here link resolves (item 1 to the Archive, the rest to the Library)', async ({ page, request }) => {
+  test('every Library link resolves, and the Library does not lead with the Archive edition (LIN-3980)', async ({ page, request }) => {
     await page.goto('/');
     const hrefs = await page.locator('[data-testid="landing-library"] a.lx-library__link').evaluateAll(els => els.map(e => e.getAttribute('href')));
-    expect(hrefs).toHaveLength(6);
-    expect(hrefs[0]).toBe('/archive/2');
-    for (const href of hrefs.slice(1)) expect(href).toMatch(/^\/library\//);
-    for (const href of hrefs) {
+    expect(hrefs).toHaveLength(5);
+    for (const href of hrefs) expect(href).toMatch(/^\/library\//);
+    const archive = await page.locator('[data-testid="landing-archive-link"]').getAttribute('href');
+    expect(hrefs).not.toContain(archive);
+    for (const href of [...hrefs, archive]) {
       const res = await request.get(href);
       expect(res.status(), href).toBe(200);
     }
@@ -235,11 +235,11 @@ test.describe('Footer Library link (LIN-3345)', () => {
   }
 });
 
-// The landing is dark-safe: it responds to the OS colour scheme via the
-// `@media (prefers-color-scheme: dark) body.is-landing` token remap. This guards
-// the LIN-980 regression where the semantic layer (--text/--card …) was not
-// re-bound for the landing's dark path, leaving section titles near-black on a
-// dark background. We assert the section heading text is LIGHT under dark.
+// The landing is dark-safe: with no stored theme it follows the OS colour scheme
+// through the one dark mechanism (the pre-paint script sets .theme-dark, LIN-3980).
+// This guards the LIN-980 regression where the semantic layer (--text/--card …)
+// was not re-bound for the landing's dark path, leaving section titles near-black
+// on a dark background. We assert the section heading text is LIGHT under dark.
 test.describe('Landing Page (dark scheme)', () => {
   test.use({ colorScheme: 'dark' });
 
@@ -257,5 +257,39 @@ test.describe('Landing Page (dark scheme)', () => {
       });
       expect(luminance).toBeGreaterThan(160);
     }
+  });
+});
+
+// LIN-3980 Done-when: the first screen and the end of the page carry the same
+// sign-in options. The 3002 twin is the server with GitHub, Jira and email all
+// configured (Linear is always offered), so the four-option case runs there.
+test.describe('Landing with all four sign-in options (LIN-3980)', () => {
+  test.use({ baseURL: 'http://localhost:3002' });
+
+  test('at 390×844 the plain sentence and the Linear button are inside the first screen', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+    const plain = page.locator('[data-testid="landing-plain"]');
+    const linear = page.locator('[data-testid="landing-cta-linear"]');
+    for (const id of ['landing-cta-github', 'landing-cta-jira', 'landing-cta-email']) {
+      await expect(page.locator(`[data-testid="${id}"]`)).toBeVisible();
+    }
+    for (const el of [plain, linear]) {
+      await expect(el).toBeVisible();
+      const box = await el.boundingBox();
+      expect(box.y + box.height).toBeLessThanOrEqual(844);
+    }
+    // The Linear ink resolves through --on-brand (rgb(0, 21, 18) = #001512), not a raw hex.
+    expect(await linear.evaluate((el) => getComputedStyle(el).color)).toBe('rgb(0, 21, 18)');
+  });
+
+  test('"Try it yourself" offers the hero\'s sign-in buttons, with the same hrefs and labels', async ({ page }) => {
+    await page.goto('/');
+    const signIn = (scope) => page.locator(`${scope} a.landing-cta`).evaluateAll((els) =>
+      els.map((e) => [e.dataset.testid, e.getAttribute('href'), e.textContent.trim()]));
+    const hero = await signIn('[data-testid="landing-hero"]');
+    const tryRow = await signIn('[data-testid="landing-try"]');
+    expect(hero.map(([id]) => id)).toEqual(['landing-cta-linear', 'landing-cta-github', 'landing-cta-jira', 'landing-cta-email']);
+    expect(tryRow.map(([id, href, label]) => [id.replace('landing-try-cta-', 'landing-cta-'), href, label])).toEqual(hero);
   });
 });

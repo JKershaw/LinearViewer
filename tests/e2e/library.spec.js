@@ -158,6 +158,20 @@ test.describe('Library figures — dark mode', () => {
       expect(await canvasLuminance(page)).toBeGreaterThan(0.9);
     });
   });
+
+  // LIN-3980 finding: a stored light preference on a dark system must give light
+  // figures too. Library pages are is-landing, and library.css once re-darkened the
+  // figures on body.is-landing under the OS scheme, beside a light page.
+  test.describe('stored light preference with a dark OS', () => {
+    test.use({ colorScheme: 'dark' });
+    test('the page and its figures stay light', async ({ page, context, browserName }) => {
+      test.skip(browserName === 'webkit', 'WebKit does not apply the embedder color-scheme to <img> SVGs');
+      await context.addCookies([{ name: 'theme', value: 'light', url: 'http://localhost:3001' }]);
+      await page.goto('/library/cost-mix');
+      await expect(page.locator('html')).not.toHaveClass(/theme-dark/);
+      expect(await canvasLuminance(page)).toBeGreaterThan(0.9);
+    });
+  });
 });
 
 // LIN-3761 — wide tables were clipped and unreachable under `overflow-x: clip`

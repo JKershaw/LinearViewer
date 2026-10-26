@@ -37,6 +37,7 @@
      wordmark (LIN-725) and landing (LIN-726). The per-theme teal value is
      defined in .theme-dark below. */
   --teal: #0d9488;          /* Brand accent (light) */
+  --on-brand: #001512;      /* ink on a --teal fill: 5.0:1 on light teal, 10.1:1 on dark (LIN-3980) */
   --teal-soft: #0d948820;   /* Low-alpha teal tint for accent fills/hovers */
 
   /* Font families: Separate structural (mono, for machine facts) from content
@@ -2676,71 +2677,6 @@ body.is-landing {
   background-attachment: fixed;
 }
 
-/* Genuine light/dark for the landing only. Remaps the same token values the
-   .theme-dark sample uses (style.css top), so the grid, hero, CTAs, and the
-   showcase (LIN-980) all flip together — no switcher, and nothing outside the
-   landing is affected. Mirrors the FULL `.theme-dark` vocabulary — raw tokens,
-   the LIN-785 semantic layer (--text/--muted/--card/--line …), and the status
-   palette (--amber/--slate/-dim companions) — so token-driven landing CSS is
-   dark-safe here exactly as it is under the global `.theme-dark` toggle. The
-   semantic aliases MUST be re-declared at this scope: they are defined on :root
-   as `var(--fg)` etc. and inherit their light computed value otherwise (the raw
-   `--fg` override alone does not reach them). */
-@media (prefers-color-scheme: dark) {
-  body.is-landing {
-    color-scheme: dark;  /* LIN-3763 */
-    --bg: #16181d;
-    --bg-muted: #1f222a;
-    --bg-alt: rgba(255, 255, 255, 0.05);
-    --fg: #e6e6e6;
-    --fg-dim: #9aa0a6;
-    --fg-vdim: #2c313a;
-    --fg-mid: #5c6370;
-    --green: #2ee65f;
-    --yellow: #e6c14a;
-    --blue: #6ea8fe;
-    --purple: #b794f6;
-    --red: #ff6b6b;
-    --red-hover: #ff8787;
-    --teal: #2dd4bf;
-    --teal-soft: #2dd4bf20;
-    --accent: #ff6b6b;
-    --ok: #4ade80;
-    --border: #2c313a;
-    --border-strong: #3d4450;
-    --border-subtle: rgba(255, 255, 255, 0.12);
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.5);
-    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
-
-    /* Semantic layer (LIN-785) re-bound for the landing's dark path. */
-    --text: var(--fg);
-    --muted: var(--fg-dim);
-    --faint: var(--fg-vdim);
-    --line: var(--border);
-    --line-soft: var(--border-subtle);
-    --card: var(--bg-muted);
-    --card-h: var(--bg-alt);
-    --raised: var(--bg-muted);
-    --inset: var(--bg-alt);
-    --brand: var(--teal);
-    --brand-dim: #2dd4bf;
-    --shadow: var(--shadow-md);
-
-    /* Status palette on dark — raw hues for fills/dots, `-dim` for text. */
-    --green-dim: #4ade80;
-    --amber: #ffc04d;
-    --amber-dim: #ffd27a;
-    --red-dim: #ff9b9b;
-    --slate: #94a3b8;
-    --slate-dim: #cbd5e1;
-    --focus: #6ea8fe;
-
-    background-color: var(--bg);
-    color: var(--fg);
-  }
-}
-
 .landing-hero {
   text-align: center;
   margin: 3rem 0 4rem;
@@ -2778,6 +2714,16 @@ body.is-landing {
   margin: var(--space-2) 0 var(--space-4);
 }
 
+/* The plain definition under the tagline (LIN-3980): the sentence a cold
+   visitor reads first, so it takes the text colour, not the dim tagline's. */
+.landing-plain {
+  font-family: var(--font-content);
+  color: var(--fg);
+  max-width: 34rem;
+  margin: 0 auto var(--space-4);
+  line-height: 1.5;
+}
+
 .landing-ctas {
   display: flex;
   flex-wrap: wrap;
@@ -2786,50 +2732,25 @@ body.is-landing {
   gap: 0.75rem;
 }
 
-.landing-cta {
-  display: inline-block;
+/* The sign-in buttons are the shared .btn (renderButton), Linear as .btn--primary
+   (LIN-3980 outcome 9). `.landing-cta` sets only the hero's size. It is scoped
+   under .landing-ctas so it beats .btn's own padding and height. */
+.landing-ctas .landing-cta {
   padding: 0.75rem 1.5rem;
-  border-radius: 4px;
-  text-decoration: none;
-  font-family: var(--font-content);
   font-size: 1.05rem;
-  border: 1px solid transparent;
 }
 
-/* Linear: the filled, primary action. Dark teal-tinted text reads on the teal
-   fill in every theme (light/dark/amber all keep --teal saturated). */
-.landing-cta-linear {
-  background: var(--teal);
-  color: #04231f;
-  font-weight: 500;
-}
-
-.landing-cta-linear:hover {
-  background: color-mix(in srgb, var(--teal) 85%, black);
-}
-
-/* GitHub, Jira and email (LIN-1892): co-equal CTAs, visually quieter as a teal
-   outline — the same treatment for each, so another auth option reads as part
-   of the set rather than introducing its own visual weight. */
-.landing-cta-github,
-.landing-cta-jira,
-.landing-cta-email {
-  background: transparent;
-  color: var(--teal);
-  border-color: var(--teal);
-}
-
-.landing-cta-github:hover,
-.landing-cta-jira:hover,
-.landing-cta-email:hover {
-  background: var(--teal-soft);
+/* Linear keeps the shared primary fill and takes the landing's ink: --on-brand
+   clears AA on the teal fill in both themes, where .btn--primary's own ink does not. */
+.landing-ctas .landing-cta-linear {
+  color: var(--on-brand);
 }
 
 @media (max-width: 480px) {
   .landing-ctas {
     flex-direction: column;
   }
-  .landing-cta {
+  .landing-ctas .landing-cta {
     width: 100%;
     max-width: 18rem;
   }

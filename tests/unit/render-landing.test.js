@@ -4,6 +4,11 @@ import { renderLandingPage } from '../../lib/render-landing.js';
 import { DEFAULT_MODEL, AVAILABLE_MODELS, formatModelPricing } from '../../lib/openrouter.js';
 import { START_HERE } from '../../lib/library-metadata.js';
 import { escapeHtml } from '../../lib/utils/html.js';
+import { existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // LIN-980: the bespoke Harbour showcase landing. These lock the composition
 // contract — the top area, the fake-data glimpses of real surfaces, the distinct
@@ -69,23 +74,24 @@ test('has an archive section linking the latest Harbour Archive edition', () => 
 });
 
 // LIN-3345: the Library section — the homepage's discoverability link into the
-// Library. Item 1 goes to the Archive, the other five to their catalogued
-// documents; the section sits immediately above the Archive section.
+// Library. It lists the catalogued documents (LIN-3980 moved the Archive item
+// out of it); the section sits immediately above the Archive section.
 test('has a Library section above the Archive, driven by START_HERE', () => {
   const html = renderLandingPage({});
   const libIdx = html.indexOf('data-testid="landing-library"');
   const archiveIdx = html.indexOf('data-testid="landing-archive"');
   assert.ok(libIdx !== -1, 'has landing-library');
   assert.ok(libIdx < archiveIdx, 'Library sits above the Archive');
-  assert.match(html, /<a href="\/library" class="lx-library__cta" data-testid="landing-library-link">/);
+  assert.match(html, /<a class="btn[^"]*" href="\/library" data-testid="landing-library-link"><span class="btn__label">Visit the Library/);
 
-  // Item 1 → Archive; every other item → its Library document, from the data.
+  // LIN-3980: the Library lists the catalog documents only; the Archive item is
+  // not repeated here, so the landing never leads with the document the Archive
+  // section links to.
   const section = html.slice(libIdx, archiveIdx);
   const hrefs = [...section.matchAll(/<a class="lx-library__link" href="([^"]+)"/g)].map(m => m[1]);
-  assert.equal(hrefs.length, 6);
-  assert.equal(hrefs[0], '/archive/2');
-  assert.deepEqual(hrefs.slice(1), START_HERE.filter(i => i.slug).map(i => `/library/${i.slug}`));
-  for (const item of START_HERE) assert.ok(section.includes(escapeHtml(item.note)), `note: ${item.title}`);
+  assert.deepEqual(hrefs, START_HERE.filter(i => i.slug).map(i => `/library/${i.slug}`));
+  assert.ok(!hrefs.includes('/archive/2'), 'Library does not lead with the Archive edition');
+  for (const item of START_HERE.filter(i => i.slug)) assert.ok(section.includes(escapeHtml(item.note)), `note: ${item.title}`);
 });
 
 test('does NOT render the fake project-tree structure', () => {
@@ -147,4 +153,109 @@ test('defaults to the BYOK lead line when freeTierEnabled is false', () => {
   const section = html.slice(html.indexOf('data-testid="landing-try"'), html.indexOf('data-testid="landing-providers"'));
   assert.match(section, /connect OpenRouter/i);
   assert.match(section, /own OpenRouter tokens/);
+});
+
+// LIN-3980 outcome 4: "Try it yourself" offers the same sign-in buttons as the
+// hero, under the same configuration rules: Linear always, the rest when set.
+function signInLabels(fragment) {
+  return [...fragment.matchAll(/<a class="btn [^"]*landing-cta[^"]*" href="([^"]+)" data-testid="([^"]+)"><span class="btn__label">([^<]+)<\/span><\/a>/g)]
+    .map(([, href, , label]) => `${href}|${label}`);
+}
+const SIGN_IN_CONFIGS = [
+  {},
+  { githubEnabled: true },
+  { jiraEnabled: true },
+  { emailEnabled: true },
+  { githubEnabled: true, jiraEnabled: true, emailEnabled: true },
+];
+for (const cfg of SIGN_IN_CONFIGS) {
+  test(`the try section has the hero's sign-in buttons, configured as ${JSON.stringify(cfg)}`, () => {
+    const html = renderLandingPage(cfg);
+    const heroRow = html.slice(html.indexOf('class="landing-ctas"'), html.indexOf('</header>'));
+    const tryRow = html.slice(html.indexOf('data-testid="landing-try-ctas"'), html.indexOf('data-testid="landing-providers"'));
+    assert.deepEqual(signInLabels(tryRow), signInLabels(heroRow));
+    assert.ok(signInLabels(tryRow).length >= 1, 'Linear is always offered');
+  });
+}
+
+test('the plain definition is on the landing, under the tagline', () => {
+  const html = renderLandingPage({});
+  assert.match(html, /data-testid="landing-plain"/);
+});
+
+// LIN-3980 outcome 2: the glimpses show the product as it is and stay true. No
+// model id, no calendar year and no hand-typed stage word may sit inside a
+// role="img" glimpse. Stage and model words come from the shared sources.
+test('glimpses carry no model ids, no calendar years and no hand-typed stage words (LIN-3980)', () => {
+  const html = renderLandingPage({});
+  const glimpses = [...html.matchAll(/role="img"[\s\S]*?<\/section>/g)].map((m) => m[0]);
+  assert.equal(glimpses.length, 4, 'observation, swim, prompt and Harbour OS glimpses');
+  for (const g of glimpses) {
+    assert.doesNotMatch(g, /claude-[a-z0-9.-]+/);
+    assert.doesNotMatch(g, /\b20\d{2}\b/);
+    assert.doesNotMatch(g, />implement</);
+    assert.doesNotMatch(g, /\bimplement\b/);
+    assert.doesNotMatch(g, /\b(Opus|Sonnet|Haiku)\s+\d/, 'a family name carries no version');
+  }
+  assert.match(html, /lx-run__label">Build</, 'the implementation stage reads as STAGE_LABELS sets it');
+  assert.match(html, /Opus/, 'a model shows its family name');
+});
+
+test('the landing states no template count, so none can drift (LIN-3980)', () => {
+  const html = renderLandingPage({});
+  assert.doesNotMatch(html, /\b17 deterministic\b/);
+  assert.doesNotMatch(html, /\bdeterministic templates\b/);
+});
+
+test('the loop and section copy drops the insider words (LIN-3980 outcome 3)', () => {
+  const html = renderLandingPage({});
+  const copy = html.replace(/<[^>]+>/g, ' ');
+  for (const word of ['frontier', 'cohort', 'HEAD', 'grounded', 're-grounded', 'control plane', 'cockpit', 'first foreign backend', 'read-only V1', 'the original backend']) {
+    assert.ok(!copy.includes(word), `no insider word: ${word}`);
+  }
+});
+
+// LIN-3980 outcome 5: the Archive link resolves to a real edition, and the
+// Library list does not lead with the document the Archive section links to.
+// (Ruling lin3980-archive-library: the literal "the landing and START_HERE[0]
+// don't link the same document" cannot hold while the Archive section links
+// /archive/2 and START_HERE[0] is /archive/2, so the check reads "Library and
+// Archive don't both lead with the same document".)
+test('the Archive link target exists, and the Library list does not repeat it', () => {
+  const html = renderLandingPage({});
+  const archive = html.match(/href="\/archive\/(\d+)" data-testid="landing-archive-link"/);
+  assert.ok(archive, 'archive link present');
+  assert.ok(existsSync(join(__dirname, '../../docs/archive', `${archive[1]}.html`)), `docs/archive/${archive[1]}.html exists`);
+  const libIdx = html.indexOf('data-testid="landing-library"');
+  const libSection = html.slice(libIdx, html.indexOf('data-testid="landing-archive"'));
+  assert.ok(!libSection.includes(`href="/archive/${archive[1]}"`), 'Library does not lead with the Archive edition');
+});
+
+// LIN-3980 outcome 8: a shared link previews as the landing, not as a bare title.
+test('the landing carries a description and social-preview metadata with an absolute origin', () => {
+  const html = renderLandingPage({ origin: 'https://harbour.cat' });
+  assert.match(html, /<meta name="description" content="Harbour reads your backlog/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/harbour\.cat\/">/);
+  assert.match(html, /<meta property="og:title" content="Harbour — keep human intent in command of AI execution">/);
+  assert.match(html, /<meta property="og:description" content="Harbour reads your backlog/);
+  assert.match(html, /<meta property="og:image" content="https:\/\/harbour\.cat\/logo\/og-image\.png">/);
+  assert.match(html, /<meta property="og:url" content="https:\/\/harbour\.cat\/">/);
+  assert.match(html, /<meta name="twitter:card" content="summary_large_image">/);
+});
+
+test('without an origin (the logout render) the page keeps its description and drops the absolute tags', () => {
+  const html = renderLandingPage({});
+  assert.match(html, /<meta name="description" content="Harbour reads your backlog/);
+  assert.match(html, /<meta property="og:title"/);
+  assert.doesNotMatch(html, /og:image|og:url|rel="canonical"/);
+});
+
+test('the shared-image file the tags point at is committed at 1200×630', async () => {
+  const { readFileSync, existsSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const path = join(__dirname, '../../public/logo/og-image.png');
+  assert.ok(existsSync(path), 'public/logo/og-image.png exists');
+  const png = readFileSync(path);
+  assert.equal(png.readUInt32BE(16), 1200, 'width');
+  assert.equal(png.readUInt32BE(20), 630, 'height');
 });
