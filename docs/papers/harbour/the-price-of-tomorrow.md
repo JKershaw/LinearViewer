@@ -69,7 +69,7 @@ Financial markets have priced artificial intelligence as though new capability t
 The essay in brief:
 
 - **The money is enormous; the measured gains are small.** Spending on AI is huge and rising fast, while US productivity grows at the rate it has since 1947.
-- **The build is now partly paid for with other people's money.** In 2026 Alphabet and Meta each had quarters in which they spent more on buildings and equipment than their businesses brought in, and by September AI-related borrowing this year was more than double the whole of last year's.
+- **The build is now partly paid for with other people's money.** In 2026 Alphabet had two quarters, and Meta at least the one on record, in which they spent more on buildings and equipment than their businesses brought in, and by September AI-related borrowing this year was more than double the whole of last year's.
 - **So far, most of the value goes to users.** Among suppliers, chip-makers and cloud businesses are earning; the model labs project years of losses.
 - **Use is wide but shallow.** About 41% of US workers use AI at work and about 12% use it daily, a proportion that held over the past year.
 - **The cost that matters is not measured.** The price of a given level of AI capability falls fast; nobody tracks what it costs to get a piece of work done, checked and accepted.
@@ -98,11 +98,11 @@ And yet output per hour worked in the US has grown at 2.1% a year since the end 
 
 Increasingly, people other than the builders: the largest buyers' spending has outrun the cash their businesses generate, and borrowing and new shares are filling the gap.
 
-Until 2026 the standard reply to "bubble" was that the biggest spenders paid from their own pockets, unlike the telecom carriers of 1999, which borrowed. That reply weakened this year. The measure that shows it is free cash flow: the cash a business brings in from its operations, minus what it spends on buildings and equipment. Alphabet's was $24.5 billion in the third quarter of 2025 and −$9.1 billion a year later; over that year its capital spending more than doubled while the cash from its business fell [GOOG26]. Meta's turned negative in the third quarter of 2026 [META26], and a week later Meta raised $37.5 billion by selling new shares [META26b]. The Bank for International Settlements, the central banks' own bank, says the five largest hyperscalers' AI spending across 2025 and 2026, over a trillion dollars, is "outpacing earnings and the free cash flow of these firms" [BIS26].
+Until 2026 the standard reply to "bubble" was that the biggest spenders paid from their own pockets, unlike the telecom carriers of 1999, which borrowed. That reply weakened this year. The measure that shows it is free cash flow: the cash a business brings in from its operations, minus what it spends on buildings and equipment. Alphabet's was $24.5 billion in the third quarter of 2025 and −$9.1 billion a year later; over that year its capital spending more than doubled while the cash from its business fell [GOOG26]. Meta's was negative in the third quarter of 2026 [META26], and a week later Meta raised $37.5 billion by selling new shares [META26b]. The Bank for International Settlements, the central banks' own bank, says the five largest hyperscalers' AI spending across 2025 and 2026, over a trillion dollars, is "outpacing earnings and the free cash flow of these firms" [BIS26].
 
 ![Bar chart: Alphabet's operating cash flow against capital spending, Q3 2025 to Q3 2026, free cash flow falling from +24.5 to −9.1 billion dollars; Meta, two quarters, from +10.6 to −2.1](figures/the-price-of-tomorrow/spending-against-cash.svg)
 
-*Figure 2. Capital spending overtook operating cash at Alphabet during 2026, and at Meta in the third quarter. Meta's figure includes finance-lease payments and Alphabet's does not. Source: Form 8-K Exhibit 99.1 for Q3 2026: Alphabet's free-cash-flow reconciliation and cash-flow statement [GOOG26]; Meta's cash-flow statement [META26].*
+*Figure 2. Capital spending overtook operating cash at Alphabet during 2026, and at Meta by the third quarter. Meta's figure includes finance-lease payments and Alphabet's does not. Source: Form 8-K Exhibit 99.1 for Q3 2026: Alphabet's free-cash-flow reconciliation and cash-flow statement [GOOG26]; Meta's cash-flow statement [META26].*
 
 So the financing has moved into credit markets. The Bank of England's Financial Policy Committee, citing Morgan Stanley, recorded about $450 billion of AI-related debt issued in 2026 by early September, more than double the whole of 2025. It also cites an estimate that $700 billion of data-centre spending over 2026–28 will be financed by private credit: loans from investment funds rather than from banks or public bond markets [BOE26]. Debt changes what a disappointment does. A loss on shares falls on the people who chose the risk; a loss on loans passes to whoever lent.
 
@@ -206,7 +206,7 @@ The table gives a direction only where both sides have at least two credible poi
 | Any use at work against daily use | two survey points [FED26] | Holding, in proportion |
 | Investment and use against productivity | quarterly since 1947 [BLS26] | Widening, but it tells nothing apart |
 
-**Spending against cash** is the best-measured gap in the essay, and it has opened in each quarter of 2026 (Figure 2). It does not say whether the spending will pay; it says two of the largest buyers now spend more than their businesses generate.
+**Spending against cash** is the best-measured gap in the essay, and at Alphabet it has opened in each quarter of 2026 (Figure 2). It does not say whether the spending will pay; it says two of the largest buyers now spend more than their businesses generate.
 
 **Investment against revenue** gives two answers. In the one year with both on record, OpenAI's revenue rose about 3.3 times and private AI investment 2.3 times, so the ratio narrowed, but in dollars the gap widened by about $180 billion [OAI26a] [AII26]. One company over one year cannot settle which reading holds.
 
