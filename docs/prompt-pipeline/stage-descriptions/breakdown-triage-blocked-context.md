@@ -62,7 +62,7 @@ whoever picks up a piece can start working instead of re-researching.
 > the parent or in a follow-up for later.
 >
 > Mark a piece as blocked by another only where it really can't start until the other has landed;
-> the plan's dependency arrows show where that is. Unlinked pieces can be picked up straight away,
+> the plan's order of landing shows where that is. Unlinked pieces can be picked up straight away,
 > maybe at the same time, so if two pieces will edit the same files, say so in both.
 >
 > Finish with a comment on {identifier} listing the subtasks and how they fit together.

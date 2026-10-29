@@ -50,7 +50,7 @@ F1 is right; take the narrow revision.
   Not when: An investigation already names a root cause and fix direction that still stand at the end of the trail (`implementation`). The `bug` label alone does not mean investigation is owed.
 - `plan`: Decide how the change will be made, so it can be built without re-deciding anything.
   When: The knowledge is gathered and the shape decided, but there is no plan with a session-fit answer.
-  Not when: A complete plan (surfaces, approach, session fit) is already in the description, a breakdown child's copied slice of an approved parent plan included: route on its session fit.
+  Not when: A complete plan (approach, places, session fit) is already in the description, a breakdown child's copied slice of an approved parent plan included: route on its session fit.
   Requires: Gathered knowledge and a decided shape.
 - `look-into`: Give a quick overview of this task and its context, so the reader can decide what to do next.
   When: Someone wants a quick overview before deciding anything.

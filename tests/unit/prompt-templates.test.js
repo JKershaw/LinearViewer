@@ -2361,6 +2361,9 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
         'the ledger instruction requires marking each item inside/outside');
       assert.ok(/filing a ticket for it is never a discharge, since it belongs to this ticket/i.test(prompt),
         'the ledger instruction states filing never discharges an inside item');
+      // LIN-4021 (A3): the in-scope clause must be pinned, or reverting A3 goes unnoticed.
+      assert.ok(prompt.includes('the classes or behaviours research or the plan named, with their places, in its issue description (LIN-1871)'),
+        'the review in-scope clause names the classes research or the plan named, with their places (LIN-4021, A3)');
     });
 
     test('close-out settles an inside item only by done, or leaves it undone for a team-level reason; never by filing', () => {
@@ -4138,26 +4141,26 @@ describe('breakdown template subtask-description mandate (LIN-3049)', () => {
   test('the five approved-path bullets are present and in (a)-(e) order', () => {
     const p = generatePrompt('breakdown', baseIssue, baseContext).prompt;
     const section = sectionOf(p);
-    const a = section.indexOf('(a) This surface\'s slice of the approved plan');
+    const a = section.indexOf('(a) This piece\'s slice of the approved plan');
     const b = section.indexOf('(b) `Session fit: fits one session`');
     const c = section.indexOf('(c) `Plan-review due: no');
     const d = section.indexOf('(d) The grounding commit SHA(s)');
-    const e = section.indexOf('(e) A line saying the parent\'s approved plan is this surface\'s starting point');
+    const e = section.indexOf('(e) A line saying the parent\'s approved plan is this piece\'s starting point');
     assert.ok(a > -1 && b > -1 && c > -1 && d > -1 && e > -1, 'all five approved-path bullets must be present');
     assert.ok(a < b && b < c && c < d && d < e, 'the five bullets must appear in (a)-(e) order');
     // N2: bullet (c) names this ticket's own approving verdict, not the parent's.
     assert.ok(/cited from this ticket's own approving verdict \(the one the precondition found\)/.test(section),
       'N2: bullet (c) must cite this ticket\'s own approving verdict');
-    // R6: bullet (b) must not copy a false `fits one session` onto a surface the
+    // R6: bullet (b) must not copy a false `fits one session` onto a piece the
     // approved plan itself could not scope to one session; it must defer to a
     // fresh `plan` pass instead (M13).
-    assert.ok(/if a surface genuinely does not fit one session, leave this line for a fresh `plan` pass to answer honestly rather than copying a false claim/.test(section),
-      'R6: bullet (b) must require omitting the session-fit line for a surface that does not fit one session');
+    assert.ok(/if a piece genuinely does not fit one session, leave this line for a fresh `plan` pass to answer honestly rather than copying a false claim/.test(section),
+      'R6: bullet (b) must require omitting the session-fit line for a piece that does not fit one session');
   });
 
-  test('the existing drift exit is extended to name the approach/files each surface section names', () => {
+  test('the drift exit names the pieces, the order of landing and the approach/files the plan names', () => {
     const p = generatePrompt('breakdown', baseIssue, baseContext).prompt;
-    assert.ok(/Confirm the surfaces, any dependency arrows, and the approach\/files each surface's plan section names still reflect the current codebase/.test(p),
+    assert.ok(/Confirm the pieces, the order of landing, and the files and approach it names still reflect the current codebase/.test(p),
       'the existing drift exit must name the copied specifics');
   });
 
@@ -4166,11 +4169,11 @@ describe('breakdown template subtask-description mandate (LIN-3049)', () => {
     const section = sectionOf(p);
     assert.ok(/create the subtask with only a plain acceptance-criteria description/.test(section),
       'the no-Approve path must still produce a plain acceptance-criteria subtask');
-    // R4: the focused, per-surface acceptance-criteria guidance must survive as the
+    // R4: the focused, per-piece acceptance-criteria guidance must survive as the
     // fallback's description wording (it was deleted, leaving the precondition pointing
     // at wording that no longer existed).
-    assert.ok(/Description with acceptance criteria for this surface — the child sees its parent only as a title, so say where the parent's scope and design can be read/.test(section),
-      'R4: the no-Approve fallback must keep the per-surface acceptance-criteria guidance (LIN-3296: and point the child at the parent it cannot see)');
+    assert.ok(/Description with acceptance criteria for this piece — the child sees its parent only as a title, so say where the parent's scope and design can be read/.test(section),
+      'R4: the no-Approve fallback must keep the per-piece acceptance-criteria guidance (LIN-3296: and point the child at the parent it cannot see)');
     assert.ok(/none of bullets \(a\)–\(e\) below apply, and the subtask is expected to route through `research`\/`plan` normally/.test(section),
       'the fallback must withhold every approved-path bullet, (a) the plan slice included');
   });
@@ -4179,6 +4182,33 @@ describe('breakdown template subtask-description mandate (LIN-3049)', () => {
     const base = generatePrompt('breakdown', baseIssue, baseContext, {}).prompt;
     const withUi = generatePrompt('breakdown', baseIssue, baseContext, {}, { ...DEFAULT_PROMPT_UI }).prompt;
     assert.strictEqual(withUi, base, 'the new breakdown content must remain byte-identical for Linear');
+  });
+
+  // LIN-4021 (ruling on the review): the plan no longer writes a surface list or
+  // dependency arrows. Breakdown must decompose the seams and landing order instead.
+  test('breakdown reads a new-style plan (seams and landing order, no surfaces) as its shape', () => {
+    const p = generatePrompt('breakdown', { ...baseIssue, title: 'Break down the pieces' }, baseContext).prompt;
+    assert.ok(/the pieces the plan split the work into, how parts that share a path or state interact, and the order of landing/.test(p),
+      'breakdown reads the pieces, their interaction and the order of landing');
+    assert.ok(/Create one subtask per piece/.test(p), 'one subtask per piece');
+    assert.ok(/`blocked-by` relations are the pieces that must land before it, in the plan's order of landing/.test(p),
+      'blocked-by is taken from the order of landing');
+    assert.ok(!/surface|dependency arrow/i.test(p), 'breakdown does not expect a surface list or arrows');
+  });
+
+  test('breakdown re-plans only on drift, not because a plan has no surface list', () => {
+    const p = generatePrompt('breakdown', baseIssue, baseContext).prompt;
+    const replan = p.match(/stop and recommend re-planning/g) || [];
+    assert.strictEqual(replan.length, 1, 'the only re-plan instruction is the drift exit');
+    assert.ok(/If the plan has drifted, stop and recommend re-planning before decomposing/.test(p),
+      'the re-plan instruction is tied to drift');
+  });
+
+  test('the plan route counts a seams-and-places plan as complete (LIN-4021 whenNot)', () => {
+    const whenNot = PROMPT_TEMPLATES.plan.route.whenNot;
+    assert.ok(/A complete plan \(approach, places, session fit\) is already in the description/.test(whenNot),
+      'the plan route names approach, places and session fit');
+    assert.ok(!/surfaces/.test(whenNot), 'the plan route no longer requires a surface list');
   });
 });
 
