@@ -153,7 +153,8 @@ Three `POST /api/proxy/dispatch` body fields the endpoint reference below does n
   running autopilot; see [Sending a note to a running autopilot](dispatch-integration.md#follow-ups) (LIN-4025).
 - `subscription` (`"terminal-only"` (default) | `"everything"`) — which of this item's events wake
   the session named in `sessionId` (LIN-900 §6): `"everything"` wakes it on every report,
-  `"terminal-only"` only on DONE/FAILED/BLOCKED. Declared on the edge, never inferred.
+  `"terminal-only"` only on DONE/FAILED/BLOCKED and on a leaf worker's PENDING-external
+  hand-back (LIN-4027); a child autopilot's pause stays silent on it. Declared on the edge, never inferred.
 
 ### Single-Use Tokens
 
