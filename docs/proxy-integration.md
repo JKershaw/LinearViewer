@@ -149,7 +149,8 @@ Three `POST /api/proxy/dispatch` body fields the endpoint reference below does n
   Set it for a worker you will keep feeding; leave it off for an orchestrator.
 - `queueIfBusy` (boolean, default `false`) — for a follow-up (`followUpTo`) whose target session
   is busy: the runner leaves it unclaimed until the session can take it, rather than failing it
-  (LIN-827). Stored and forwarded; the runner owns the behaviour.
+  (LIN-827). Stored and forwarded; the runner owns the behaviour. This is how a note reaches a
+  running autopilot; see [Sending a note to a running autopilot](dispatch-integration.md#follow-ups) (LIN-4025).
 - `subscription` (`"terminal-only"` (default) | `"everything"`) — which of this item's events wake
   the session named in `sessionId` (LIN-900 §6): `"everything"` wakes it on every report,
   `"terminal-only"` only on DONE/FAILED/BLOCKED. Declared on the edge, never inferred.
