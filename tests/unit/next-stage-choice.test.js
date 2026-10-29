@@ -181,7 +181,7 @@ describe('plan-review verdict facts (LIN-3309 S2)', () => {
 
   test('the planner records what a revision addresses, with no exact form for code to read', () => {
     const plan = generatePrompt('plan', REVIEW, { comments: [] }).prompt;
-    assert.match(plan, /\*\*Record what changed\*\*: add a short changelog line/);
+    assert.match(plan, /add a line saying what changed and which findings it answers/);
     assert.doesNotMatch(plan, /Code reads that number|EXACTLY this form|third verdict/i);
   });
 });

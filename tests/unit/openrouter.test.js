@@ -167,7 +167,7 @@ describe('formatSubtaskOverview', () => {
 });
 
 // =============================================================================
-// LIN-279: Strategy Framing context — isEpicShapedParent + cousin rendering
+// LIN-279: the plan's routed-around-gap context — isEpicShapedParent + cousin rendering
 // =============================================================================
 
 describe('getModelDisplayName', () => {
@@ -367,8 +367,8 @@ describe('formatIssueContext siblings', () => {
       'must include explicit API-fetch instruction'
     );
     assert.ok(
-      result.includes('Strategy Framing'),
-      'must cross-reference the Strategy Framing step that consumes this list'
+      result.includes('routes around a contract gap'),
+      'must cross-reference the plan step that consumes this list'
     );
     // Negative assertion: bare "…and N more" is the failure mode being prevented
     assert.ok(!result.includes('…and '), 'must NOT use bare "…and N more"');
@@ -480,8 +480,8 @@ describe('formatIssueContext cousins', () => {
       'must include explicit API-fetch instruction'
     );
     assert.ok(
-      result.includes('Strategy Framing'),
-      'must cross-reference the Strategy Framing step that consumes this list'
+      result.includes('routes around a contract gap'),
+      'must cross-reference the plan step that consumes this list'
     );
     // Negative assertion: bare "…and N more" is the failure mode being prevented
     assert.ok(!result.includes('…and '), 'must NOT use bare "…and N more"');

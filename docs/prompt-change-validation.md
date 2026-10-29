@@ -9,7 +9,7 @@ The worked example throughout is **LIN-295**: a retro found that the plan that
 drove the work declared "blast radius confined" after grepping the *class name* the
 ticket cited, missing two sibling surfaces that implemented the same feature under
 different names. The fix was a "Completeness check" directive added to the plan
-prompt; this doc is how we got from finding → shipped-and-measured change.
+prompt; this doc is how we got from finding → shipped-and-measured change. That directive has since been rewritten into the behaviour-and-places standard (LIN-4021); the numbers under "Worked numbers" measured the earlier wording.
 
 ## The loop
 
