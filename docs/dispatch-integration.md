@@ -664,6 +664,20 @@ BUDGET_EXHAUSTED` when that `sessionId` names an Autopilot run launched with `ma
 do with it. `followUpTo`/`abort` dispatches, and any dispatch with no resolvable `sessionId`,
 are never refused by it.
 
+**Sending a note to a running autopilot.** A note is a message, not a run. Send it as a
+follow-up whose `followUpTo` is the autopilot's own dispatch `id` — its kickoff row, never the
+`id` of an earlier note — with `queueIfBusy: true` so it waits until the session is free:
+
+```json
+{ "prompt": "Also check the staging deploy before you wrap up.", "followUpTo": "<the autopilot's kickoff id>", "queueIfBusy": true }
+```
+
+Leave `kind` out, or pass any kind. A follow-up is delivered into a session that already holds
+its id, so it never mints a session id of its own: `kind: "autopilot"` on a follow-up is stored
+but does not start a run. Do not paste a session id into the note. The autopilot keeps the id
+its kickoff gave it, and no follow-up row carries a new one, so the workers it spawns still wake
+back to it.
+
 ## Aborting a session
 
 An **abort** asks the consumer to cancel/close an existing session instead of running a

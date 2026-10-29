@@ -4,9 +4,10 @@
  * An autopilot run must forward its own dispatch id as `sessionId` on the worker
  * dispatches it spawns (LIN-591), but the id is minted inside addItem — after the
  * kickoff prompt was built. addItem closes that gap by appending a self-reference
- * block naming `doc._id` to the prompt, gated on `kind === 'autopilot'`. These
- * tests pin that the block carries the minted id, that it reaches the consumer
- * through the poll/take seam, and that every other kind is left byte-identical.
+ * block naming `doc._id` to the prompt, gated on `kind === 'autopilot'` with no
+ * `followUpTo` (LIN-4025: a follow-up is not a run root). These tests pin that the
+ * block carries the minted id, that it reaches the consumer through the poll/take
+ * seam, and that every other kind is left byte-identical.
  *
  * (The explicit-link grouping half of LIN-599 is already covered by LIN-591 in
  * tests/unit/pipeline-sessions.test.js — not duplicated here.)
@@ -14,7 +15,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
+import { buildWakeFollowUp } from '../../lib/dispatch-wake.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
+
+// Drain the fire-and-forget microtask the onWrite hook schedules.
+const drain = () => new Promise(resolve => setImmediate(resolve));
 
 function makeStore() {
   return new DispatchQueueStore({
@@ -111,4 +116,99 @@ test('a worker dispatch carrying the forwarded sessionId is stored untouched', a
 
   assert.equal(worker.prompt, workerPrompt);
   assert.equal(worker.sessionId, autopilot._id);
+});
+
+// LIN-4025: a note sent to a RUNNING autopilot is a follow-up (`followUpTo` = the
+// autopilot's kickoff id), not a new run. It must not mint its own session-id
+// block, and its write must not notify the feed under the note's id. Otherwise
+// the autopilot is told the note's id is "its" id and stamps its next worker
+// with it, so that worker's wake goes to a row no session is behind.
+
+// The session ids named by the "Your autopilot session id" blocks in a prompt.
+const blockIds = prompt =>
+  [...prompt.matchAll(/## Your autopilot session id[\s\S]*?is `([^`]+)`/g)].map(m => m[1]);
+
+test('LIN-4025: a note to a running autopilot wakes its later workers back to the autopilot', async () => {
+  const store = makeStore();
+  const kickoff = await store.addItem('acme', {
+    prompt: 'You are Autopilot. Walk the stack.',
+    kind: 'autopilot',
+    issueIdentifier: 'LIN-4024'
+  });
+  // The autopilot takes its kickoff and starts running.
+  const running = await store.takeItem(kickoff._id, 'acme', 'token-a');
+
+  // The operator sends a note while it runs, the way the docs describe.
+  await store.addItem('acme', {
+    prompt: 'Also check the staging deploy before you wrap up.',
+    kind: 'autopilot',
+    followUpTo: kickoff._id,
+    queueIfBusy: true,
+    issueIdentifier: 'LIN-4024'
+  });
+  const [note] = await store.pollAvailable('acme');
+  const delivered = await store.takeItem(note.id, 'acme', 'token-b');
+
+  // The id the autopilot takes as its own = the last id block it was delivered.
+  const autopilotId = [...blockIds(running.prompt), ...blockIds(delivered.prompt)].at(-1);
+  assert.equal(autopilotId, kickoff._id);
+
+  // Its next worker is stamped with that id, and that worker's wake reaches it.
+  const worker = { _id: 'worker-1', sessionId: autopilotId, kind: 'planning', issueIdentifier: 'LIN-4024' };
+  const wake = buildWakeFollowUp(worker, [{ message: '[done] plan written' }]);
+  assert.equal(wake.followUpTo, kickoff._id);
+});
+
+test('LIN-4025: a note to a running autopilot is stored and delivered byte-identical', async () => {
+  const store = makeStore();
+  const kickoff = await store.addItem('acme', { prompt: 'kickoff', kind: 'autopilot' });
+  await store.takeItem(kickoff._id, 'acme', 'token-a');
+
+  const prompt = 'Also check the staging deploy before you wrap up.';
+  const note = await store.addItem('acme', {
+    prompt,
+    kind: 'autopilot',
+    followUpTo: kickoff._id,
+    queueIfBusy: true
+  });
+  assert.equal(note.prompt, prompt);
+
+  const delivered = await store.takeItem(note._id, 'acme', 'token-b');
+  assert.equal(delivered.prompt, prompt);
+  assert.deepEqual(blockIds(delivered.prompt), []);
+});
+
+test('LIN-4025: a fresh autopilot kickoff still gets its own id block, including a child run', async () => {
+  const store = makeStore();
+
+  const plain = await store.addItem('acme', { prompt: 'kickoff', kind: 'autopilot' });
+  assert.deepEqual(blockIds(plain.prompt), [plain._id]);
+
+  // A child run carries its parent's sessionId but no followUpTo: still a run root.
+  const child = await store.addItem('acme', { prompt: 'child kickoff', kind: 'autopilot', sessionId: 'parent-run-1' });
+  assert.deepEqual(blockIds(child.prompt), [child._id]);
+});
+
+test('LIN-4025: a note to a taken autopilot notifies the feed under the autopilot, not the note', async () => {
+  const calls = [];
+  const store = new DispatchQueueStore({ collection: createMockCollection(), historyCollection: createMockCollection(), onWrite: p => calls.push(p) });
+  const kickoff = await store.addItem('acme', { prompt: 'kickoff', kind: 'autopilot', issueIdentifier: 'LIN-4024' });
+  await store.takeItem(kickoff._id, 'acme', 'token-a');
+  calls.length = 0;
+
+  await store.addItem('acme', { prompt: 'note', kind: 'autopilot', followUpTo: kickoff._id, queueIfBusy: true, issueIdentifier: 'LIN-4024' });
+  await drain();
+  assert.deepEqual(calls, [{ urlKey: 'acme', sessionId: kickoff._id, issueIdentifier: 'LIN-4024' }]);
+});
+
+test('LIN-4025: a note whose target is still queued notifies nothing under the note', async () => {
+  const calls = [];
+  const store = new DispatchQueueStore({ collection: createMockCollection(), historyCollection: createMockCollection(), onWrite: p => calls.push(p) });
+  const kickoff = await store.addItem('acme', { prompt: 'kickoff', kind: 'autopilot', issueIdentifier: 'LIN-4024' });
+  calls.length = 0;
+
+  // The kickoff is not taken yet, so the note resolves to itself: no notify.
+  await store.addItem('acme', { prompt: 'note', kind: 'autopilot', followUpTo: kickoff._id, queueIfBusy: true, issueIdentifier: 'LIN-4024' });
+  await drain();
+  assert.deepEqual(calls, []);
 });
