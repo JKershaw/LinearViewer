@@ -1412,7 +1412,8 @@ a.wordmark:hover {
     z-index: 100;
     border: 0;
     border-radius: 0;
-    padding: 16px;
+    /* LIN-4010: the choice cards and the decision panel make the sheet taller; Use stays on the first phone screen. */
+    padding: 12px;
     overflow-y: auto;
   }
 
