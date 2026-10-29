@@ -152,7 +152,7 @@ const HOME = {
 };
 
 // `offered` is the step the server offers (LIN-3968); `next` is the "comes next" wording. Nothing runs, so they agree.
-const PLAN_NEXT = { count: 1, next: { kind: 'plan', label: 'Plan' }, offered: { kind: 'plan', label: 'Plan', why: 'usual', failed: false }, last: { label: 'Research', state: 'done', at: null }, running: null };
+const PLAN_NEXT = { count: 1, next: { kind: 'plan', label: 'Plan' }, offered: { kind: 'plan', label: 'Plan', why: 'usual', failed: false, reason: 'usually next after Research' }, last: { label: 'Research', state: 'done', at: null }, running: null };
 
 async function mount(over = {}, loadOver = {}, container = null) {
   const env = load(loadOver);
@@ -498,12 +498,15 @@ describe('LIN-3991 — a running task says its state once in the opened task', (
     assert.equal(c.innerHTML.split('Build running for 1h.').length - 1, 1, 'the sentence appears once');
   });
 
-  test('the after-run line keeps what is its own: Next, and Stop; it does not restate how long Build has run', async () => {
+  test('the running box says the state once: Running now, the step, Stop and Next; it does not repeat the state sentence', async () => {
     const { c } = await mount({}, { opened: { status: 'running', live: true, headerHtml: SENTENCE, sessions: { count: 1, next: { kind: 'review', label: 'Review' }, last: null, running } } });
-    const line = c.innerHTML.match(/<div class="opened-task-running"[\s\S]*?<\/div>/)[0];
+    // The box's own markup nests, so read from its opening tag to the end of its Next line.
+    const start = c.innerHTML.indexOf('data-testid="opened-task-running"');
+    const line = c.innerHTML.slice(start, c.innerHTML.indexOf('</p></div>', start) + '</p></div>'.length);
     assert.match(line, /Next: Review, once Build finishes/);
     assert.match(line, /data-testid="run-stop"/);
-    assert.doesNotMatch(line.replace(/^<div[^>]*>/, ''), /since|ago|running/, 'the body, not the class name');
+    assert.equal((line.match(/Running now/g) || []).length, 1, 'the state is named once, in the head');
+    assert.doesNotMatch(line, /Build running/, 'the box does not repeat the state sentence');
   });
 });
 

@@ -17,8 +17,8 @@ describe('run-view: stage vocabulary (LIN-3328)', () => {
   });
 
   test('USUAL_STAGES is research ahead of the unchanged SPINE', () => {
-    assert.deepEqual(USUAL_STAGES, ['research', 'plan', 'implementation', 'review', 'close-out']);
-    assert.deepEqual(USUAL_STAGES.slice(1), SPINE);
+    assert.deepEqual(USUAL_STAGES, ['research', 'plan', 'plan-review', 'implementation', 'review', 'close-out']);
+    assert.deepEqual(USUAL_STAGES.filter(kind => kind !== 'research' && kind !== 'plan-review'), SPINE);
   });
 
   test('every dispatch kind carries a non-empty stage label', () => {

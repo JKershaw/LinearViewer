@@ -547,7 +547,7 @@ describe('in-progress subtask project tag (LIN-903)', () => {
     // The child row (depth 1) carries the differing project as an inline tag.
     const childLine = result.match(/<div class="line[^"]*"[^>]*data-id="child"[^>]*>[\s\S]*?<\/div>/);
     assert.ok(childLine, 'child row is present');
-    assert.ok(childLine[0].includes('<span class="in-progress-project">(Project Two)</span>'),
+    assert.ok(childLine[0].includes('<span class="in-progress-project">Project Two</span>'),
       'nested subtask shows its own project as a tag');
     assert.strictEqual(childLine[0].includes('data-depth="1"'), true, 'child renders nested at depth 1');
   });

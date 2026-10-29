@@ -70,7 +70,10 @@ async function seedPricedRuns(page, urlKey) {
   }
 }
 
-/** Home with a seeded workspace, its top task open, and the Change panel open once the panel's numbers have loaded. */
+/**
+ * Home with a seeded workspace, its top task open, and the Change panel open once the panel's numbers have loaded.
+ * LIN-4010: the decision panel sits behind "Choose for this run", so the helper opens that too.
+ */
 async function openChangePanel(page, seedLocal, urlKey) {
   await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, runnerKey: true });
   await resetRuns(page, urlKey);
@@ -79,6 +82,8 @@ async function openChangePanel(page, seedLocal, urlKey) {
   const component = await openTopTask(page);
   await component.locator(RC.change).click();
   await expect(component.locator(RC.changePanel)).toBeVisible();
+  await component.locator('[data-testid="run-choose"]').click();
+  await expect(component.locator('[data-testid="run-choose-panel"]')).toBeVisible();
   await expect(component.locator(RC.numbers)).toBeVisible();
   return component;
 }

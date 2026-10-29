@@ -156,7 +156,7 @@ import { renderCustomPromptsPage } from './lib/render-custom-prompts.js'
 import { renderDispatchPage } from './lib/render-dispatch.js'
 import { noJobBody, noJobNoticeOf } from './lib/components/dispatch-no-job.js'
 import { renderSwipePage, orderIssuesForSwipe } from './lib/render-swipe.js'
-import { subtaskNeedingYouByNodeKey } from './lib/task-board-view.js'
+import { subtaskNeedingYouByNodeKey, focusSubtaskByNodeKey } from './lib/task-board-view.js'
 import { renderSwimPage } from './lib/render-swim.js'
 import { renderShipPage } from './lib/render-ship.js'
 import { createCollectiveRoutes } from './routes/collective.js'
@@ -2014,6 +2014,7 @@ async function renderDashboardAfterRefresh(workspace, session, teamId, assigneeS
     availableAssignees,
     rowStates,
     subtaskNeedsYouById: subtaskNeedingYouByNodeKey({ urlKey: workspace.urlKey, inProgressTrees, recentActivityTrees, projectTrees: trees, rowStates }),
+    focusSubtaskById: focusSubtaskByNodeKey({ urlKey: workspace.urlKey, inProgressTrees, recentActivityTrees, projectTrees: trees, rowStates }),
     copyFirstCard: featureFlags.runControls !== true && session.copyFirstCardDismissed !== true,
     // LIN-2550: same applied-not-requested labelling rule as the primary
     // dashboard route above — this post-401 re-render carries the assignee
@@ -3521,6 +3522,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       availableAssignees,
       rowStates,
       subtaskNeedsYouById: subtaskNeedingYouByNodeKey({ urlKey: workspace.urlKey, inProgressTrees, recentActivityTrees, projectTrees: trees, rowStates }),
+      focusSubtaskById: focusSubtaskByNodeKey({ urlKey: workspace.urlKey, inProgressTrees, recentActivityTrees, projectTrees: trees, rowStates }),
       copyFirstCard: featureFlags.runControls !== true && req.session.copyFirstCardDismissed !== true,
       // LIN-2550: label the selector off the filter the render APPLIED. An
       // unmatched name (a stale `?assignee=` carried across a team change by

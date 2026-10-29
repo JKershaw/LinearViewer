@@ -254,7 +254,7 @@ describe('task page structure', () => {
     assert.doesNotMatch(html.slice(html.indexOf('task-page-stage-ahead')), /task-stage-bar|<button/);
     assert.doesNotMatch(renderTaskTrack(model('done'), { now: NOW }), /task-page-stage-ahead/, 'none once the tracker says done');
     const none = renderTaskTrack(model('no-sessions'), { now: NOW });
-    assert.equal((none.match(/data-testid="task-page-stage-ahead"/g) || []).length, 5);
+    assert.equal((none.match(/data-testid="task-page-stage-ahead"/g) || []).length, 6, 'the six usual stages, Plan review among them (LIN-4010)');
     assert.match(none, /no sessions yet/);
   });
 

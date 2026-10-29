@@ -345,6 +345,8 @@ function mountHomePromptSections(root) {
       // LIN-3833: this row's subtask that needs you, named in the state block with an Open link (any row, not
       // only the top task; the server keys the map by node key).
       subtaskNeedsYou: (page.subtaskNeedsYouById || {})[el.dataset.nodeKey] || null,
+      // LIN-4010: a container's opened task runs on the subtask its row names (the row's focus, keyed the same way).
+      focusSubtask: (page.focusSubtaskById || {})[el.dataset.nodeKey] || null,
       hasAI: page.hasAI,
       aiState: page.aiState,
       freeTier: page.freeTier,

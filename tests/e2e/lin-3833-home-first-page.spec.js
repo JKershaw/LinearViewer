@@ -150,6 +150,8 @@ test.describe('Home first page — a run from each source stamps the row the con
 
     await component.locator('[data-testid="run-change"]').click();
     await component.locator('[data-testid="run-reset"]').click();
+    // LIN-4010: the decision panel (where a model is typed) sits behind "Choose for this run".
+    await component.locator('[data-testid="run-choose"]').click();
     await component.locator('[data-testid="run-model"]').fill('chosen-model-x');
     await component.locator('[data-testid="run-use"]').click();
     const chosenRow = await runFrom('chosen', 'chosen-model-x');
@@ -176,6 +178,8 @@ test.describe('Home first page — the Change panel keeps what is typed across a
       await route.continue();
     });
     await component.locator('[data-testid="run-reset"]').click();
+    // LIN-4010: the decision panel (where a model is typed) sits behind "Choose for this run".
+    await component.locator('[data-testid="run-choose"]').click();
     await component.locator('[data-testid="run-model"]').pressSequentially('chosen-model-x', { delay: 60 });
     await component.locator('[data-testid="run-use"]').click();
     await expect(component.locator('[data-testid="run-on-what"]')).toHaveText('chosen-model-x');

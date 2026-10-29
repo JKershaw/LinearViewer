@@ -40,10 +40,21 @@ function stripOf(sessions, trackerType = 'started') {
   return renderStageStrip({ stages: buildTaskStages(sessions, { trackerType }), nextStep: nextStepOf(sessions, trackerType) }, { now: NOW });
 }
 
-/** Each chip as `{name, word, offered}`. */
+/**
+ * Each chip as `{name, word, spoken, offered}`: `word` is what the chip shows, `spoken` the word a screen reader
+ * hears (LIN-4010: a running chip shows its minutes, and says "running" in a visually hidden span).
+ */
 function chipsOf(html) {
-  return [...html.matchAll(/<li class="task-strip-chip"([^>]*)><span class="task-strip-name">([^<]+)<\/span> <span class="task-strip-state">([^<]+)<\/span><\/li>/g)]
-    .map(m => ({ name: m[2], word: m[3], offered: /data-offered="true"/.test(m[1]) }));
+  return [...html.matchAll(/<li class="task-strip-chip"([^>]*)><span class="task-strip-name">([^<]+)<\/span> <span class="task-strip-state">([\s\S]*?)<\/span><\/li>/g)]
+    .map(m => {
+      const spoken = (m[3].match(/<span class="task-strip-srword">([^<]*)<\/span>/) || [])[1];
+      return {
+        name: m[2],
+        word: m[3].replace(/<span class="task-strip-srword">[^<]*<\/span>/, ''),
+        spoken: spoken ? spoken.trim() : null,
+        offered: /data-offered="true"/.test(m[1]),
+      };
+    });
 }
 
 describe('LIN-3968 — the stage strip: one row, one chip per stage', () => {
@@ -56,16 +67,18 @@ describe('LIN-3968 — the stage strip: one row, one chip per stage', () => {
 
   test('while Build runs, its chip says the minutes and no chip is offered', () => {
     const chips = chipsOf(stripOf([sess('plan', 'done'), sess('implementation', 'running', { loop: { takenAt: '2026-10-25T13:54:00.000Z', dispatchedAt: '2026-10-25T13:50:00.000Z' } })]));
-    assert.equal(chips.find(c => c.name === 'Build').word, 'running 6m');
+    const build = chips.find(c => c.name === 'Build');
+    assert.equal(build.word, '6m', 'the chip shows the minutes');
+    assert.equal(build.spoken, 'running', 'the word stays for screen readers');
     assert.equal(chips.some(c => c.offered), false, 'no step is offered while a stage runs');
   });
 
-  test('a task with no sessions shows the five usual stages, Research first, the first one offered', () => {
+  test('a task with no sessions shows the six usual stages, Research first, the first one offered', () => {
     const chips = chipsOf(stripOf([]));
-    assert.deepEqual(chips.map(c => c.name), ['Research', 'Plan', 'Build', 'Review', 'Close-out']);
+    assert.deepEqual(chips.map(c => c.name), ['Research', 'Plan', 'Plan review', 'Build', 'Review', 'Close-out']);
     assert.equal(chips[0].word, 'next', 'the first usual stage is the one offered');
     assert.equal(chips[0].offered, true);
-    assert.deepEqual(chips.slice(1).map(c => c.word), ['usual', 'usual', 'usual', 'usual']);
+    assert.deepEqual(chips.slice(1).map(c => c.word), ['usual', 'usual', 'usual', 'usual', 'usual']);
   });
 
   test('a stage reached more than once is one chip, in the order it was first reached', () => {
@@ -251,13 +264,13 @@ describe('LIN-3968 — run control: one step at a time, a failed stage offered a
     assert.doesNotMatch(c.innerHTML, /Run to PR/, 'the whole-task action is not offered while a stage runs');
     assert.doesNotMatch(c.innerHTML, /data-action="run-step-next"/, 'no next step is run');
     assert.doesNotMatch(c.innerHTML, /data-testid="run-ask-harbour"/, 'the step line offers no prompt action');
-    assert.match(c.innerHTML, /Build running/, 'the after-run line still says what runs');
+    assert.match(c.innerHTML, /Running now[\s\S]*Build/, 'the running box still says what runs');
   });
 
   test('a failed Review is offered again, and says why', async () => {
     const failed = state({
       count: 2, next: { kind: 'close-out', label: 'Close-out' },
-      offered: { kind: 'review', label: 'Review', why: 'again', failed: true },
+      offered: { kind: 'review', label: 'Review', why: 'again', failed: true, reason: 'failed last time, so it runs again' },
       last: { label: 'Review', state: 'failed', at: null },
     });
     const { PromptSection } = load({ stateBody: failed });
@@ -273,7 +286,7 @@ describe('LIN-3968 — run control: one step at a time, a failed stage offered a
   test('a cancelled Review is offered again, and says why without calling it a failure', async () => {
     const undone = state({
       count: 3, next: { kind: 'review', label: 'Review' },
-      offered: { kind: 'review', label: 'Review', why: 'again', failed: false },
+      offered: { kind: 'review', label: 'Review', why: 'again', failed: false, reason: 'cancelled last time, so it is offered again' },
       last: { label: 'Review', state: 'cancelled', at: null },
     });
     const { PromptSection } = load({ stateBody: undone });

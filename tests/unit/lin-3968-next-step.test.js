@@ -38,13 +38,13 @@ describe('LIN-3968 — guessStages: a failed stage is offered again, not passed 
   test('a cancelled stage (an Undo) is offered again, but not as a failure (LIN-3968 ruling, option a)', () => {
     const sessions = [sess('plan', 'done'), sess('implementation', 'done'), sess('review', 'cancelled')];
     assert.deepEqual(guessStages(sessions, 'started'), ['review', 'close-out'], 'the undone stage is not passed over');
-    assert.deepEqual(nextStepOf(sessions, 'started'), { kind: 'review', label: 'Review', why: 'again', failed: false });
+    assert.deepEqual(nextStepOf(sessions, 'started'), { kind: 'review', label: 'Review', why: 'again', failed: false, reason: 'cancelled last time, so it is offered again' });
   });
 
   test('a cancelled stage run again and done clears it', () => {
     const sessions = [sess('plan', 'done'), sess('implementation', 'done'), sess('review', 'cancelled', { n: 1 }), sess('review', 'done', { n: 2 })];
     assert.deepEqual(guessStages(sessions, 'started'), ['close-out']);
-    assert.deepEqual(nextStepOf(sessions, 'started'), { kind: 'close-out', label: 'Close-out', why: 'usual', failed: false });
+    assert.deepEqual(nextStepOf(sessions, 'started'), { kind: 'close-out', label: 'Close-out', why: 'usual', failed: false, reason: 'usually next after Review' });
   });
 
   test('a closed session is bookkeeping, not a failure (LIN-3364)', () => {
@@ -63,7 +63,7 @@ describe('LIN-3968 — guessStages: a failed stage is offered again, not passed 
 describe('LIN-3968 — nextStepOf: the one offered step', () => {
   test('a failed Review is offered again, marked as failed', () => {
     const sessions = [sess('plan', 'done'), sess('implementation', 'done'), sess('review', 'failed')];
-    assert.deepEqual(nextStepOf(sessions, 'started'), { kind: 'review', label: 'Review', why: 'again', failed: true });
+    assert.deepEqual(nextStepOf(sessions, 'started'), { kind: 'review', label: 'Review', why: 'again', failed: true, reason: 'failed last time, so it runs again' });
   });
 
   test('while a stage runs, no other step is offered', () => {
@@ -77,7 +77,7 @@ describe('LIN-3968 — nextStepOf: the one offered step', () => {
   });
 
   test('no failure: the first usual stage ahead, not marked as failed', () => {
-    assert.deepEqual(nextStepOf([sess('plan', 'done')], 'started'), { kind: 'implementation', label: 'Build', why: 'usual', failed: false });
+    assert.deepEqual(nextStepOf([sess('plan', 'done')], 'started'), { kind: 'plan-review', label: 'Plan review', why: 'usual', failed: false, reason: 'usually next after Plan' });
   });
 
   test('a finished task offers nothing', () => {
