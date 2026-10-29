@@ -29,8 +29,9 @@ test.describe('GitHub provider (no test-token mock)', () => {
     await expect(page.locator('.project-header:has-text("Sprint 1")')).toBeVisible();
     // The open issue (mapped to unstarted) is in the DOM under its project.
     await expect(page.locator('.line:has-text("GitHub open task")').first()).toBeAttached();
-    // The closed/completed issue surfaces too.
-    await expect(page.locator('.line:has-text("GitHub shipped task")').first()).toBeAttached();
+    // The closed/completed issue is counted on its project, never sent to the page (LIN-4024).
+    await expect(page.locator('.line:has-text("GitHub shipped task")')).toHaveCount(0);
+    await expect(page.locator('[data-testid="home-done-count"]').first()).toContainText('1 done');
   });
 
   test('detail link is provider-aware: "View in GitHub Issues" (not Linear)', async ({ page }) => {

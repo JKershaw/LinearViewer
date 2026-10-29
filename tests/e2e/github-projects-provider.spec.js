@@ -31,10 +31,11 @@ test.describe('GitHub Projects provider (no test-token mock)', () => {
   test('dashboard renders the board container + its items from the fake backend', async ({ page }) => {
     // The board itself maps to a canonical project header (named by board title).
     await expect(page.locator('.project-header:has-text("Roadmap")')).toBeVisible();
-    // Board items render under it: the In Progress, Todo, and Done items.
+    // Board items render under it: the In Progress and Todo items. LIN-4024: the Done item is counted on the project, not sent.
     await expect(page.locator('.line:has-text("Board task in progress")').first()).toBeAttached();
     await expect(page.locator('.line:has-text("Board task to do")').first()).toBeAttached();
-    await expect(page.locator('.line:has-text("Board task shipped")').first()).toBeAttached();
+    await expect(page.locator('.line:has-text("Board task shipped")')).toHaveCount(0);
+    await expect(page.locator('[data-testid="home-done-count"]').first()).toContainText('1 done');
     // The draft item (no Status column) surfaces too.
     await expect(page.locator('.line:has-text("Draft idea")').first()).toBeAttached();
   });

@@ -205,7 +205,8 @@ test.describe('Home first page — "Another step" fits the task (LIN-3833)', () 
     const items = component.locator('[data-testid="run-another-list"] [data-testid="run-another-item"]');
     await expect(items.nth(3)).toBeVisible();
     const labels = await items.allInnerTexts();
-    expect(labels.slice(0, 4)).toEqual(['look into', 'research', 'plan', 'implement']);
+    // LIN-4024 (item 17): each step carries its stage word (Build, not the step id "implement").
+    expect(labels.slice(0, 4)).toEqual(['Look into', 'Research', 'Plan', 'Build']);
     await expect(component.locator('[data-testid="run-another-left-out"]')).toHaveText("1 step left out: it does not fit this task's state.");
   });
 });

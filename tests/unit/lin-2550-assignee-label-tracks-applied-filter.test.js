@@ -34,6 +34,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 import { liveConsoleOn } from '../../lib/run-controls.js';
+import { buildHomeView } from '../../lib/home-view.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
@@ -106,6 +107,8 @@ function baseContext(calls, appliedAssigneeName, assigneeState) {
     getFeatureFlags: () => ({}),
     // LIN-3833: the Home row states; these sandboxes render no In Progress rows.
     homeRowStates: async () => null,
+    // LIN-4024: the trimmed Home view the post-401 render builds (server.js); the real one is injected.
+    buildHomeView,
     // LIN-3833: the top task's subtask that needs you; these sandboxes render no In Progress rows.
     subtaskNeedingYouByNodeKey: () => ({}),
     focusSubtaskByNodeKey: () => ({}),

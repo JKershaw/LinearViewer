@@ -35,6 +35,7 @@ import { nodeKey } from '../../lib/tree.js';
 import { renderSourceErrorPage } from '../../lib/render-pages.js';
 import { errorReference, isAuthError } from '../../lib/errors.js';
 import { liveConsoleOn } from '../../lib/run-controls.js';
+import { buildHomeView } from '../../lib/home-view.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
@@ -108,6 +109,8 @@ function harness({ degraded = [], remintFails = false, fetchThrows = null, fetch
     getFeatureFlags: () => ({}),
     // LIN-3833: the Home row states; these sandboxes render no In Progress rows.
     homeRowStates: async () => null,
+    // LIN-4024: the trimmed Home view the post-401 render builds (server.js); the real one is injected.
+    buildHomeView,
     // LIN-3833: the subtasks that need you by row; these sandboxes render no In Progress rows.
     subtaskNeedingYouByNodeKey: () => ({}),
     focusSubtaskByNodeKey: () => ({}),

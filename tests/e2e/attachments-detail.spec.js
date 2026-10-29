@@ -52,14 +52,14 @@ test.describe('Attachments gallery — task detail (LIN-652)', () => {
     await page.goto(`/workspace/${workerUrlKey}/`);
     await page.evaluate(() => localStorage.clear());
 
-    // Expand the issue-1 line → lazy-load its detail block. Scope to the project
-    // tree: issue-1 is in-progress so it also appears in the In Progress section.
-    const project = page.locator('.project').first();
-    const line = project.locator('.line[data-id="issue-1"]');
+    // Expand the issue-1 line → lazy-load its detail block. issue-1 is In Progress (LIN-4024: a project lists only its
+    // Up next work), so its row and details are in the In Progress section.
+    const inProgress = page.locator('.in-progress-section');
+    const line = inProgress.locator('.line[data-id="issue-1"]');
     await expect(line).toBeVisible();
     await line.click();
 
-    const details = project.locator('.details[data-details-for="issue-1"]');
+    const details = inProgress.locator('.details[data-details-for="issue-1"]');
     const detailsToggle = details.locator('.detail-toggle[data-toggle="description"]');
     await expect(detailsToggle).toBeVisible();
     await detailsToggle.click();

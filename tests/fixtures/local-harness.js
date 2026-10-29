@@ -124,6 +124,20 @@ export function localSeedId(urlKey, rawId) {
   return `${urlKey}--${rawId}`;
 }
 
+// LIN-4024: Home lists a project's open work only when it is not already In Progress or behind a fold. The default
+// seed's project rows are In Progress or done, so a spec that opens a project row seeds one Up next task too.
+export function defaultLocalSeedWithUpNext(urlKey = LOCAL_WORKSPACE_URL_KEY) {
+  const seed = defaultLocalSeed(urlKey);
+  const id = (rawId) => localSeedId(urlKey, rawId);
+  return {
+    ...seed,
+    issues: [
+      ...seed.issues,
+      { id: id('local-issue-up-next'), identifier: 'LOCAL-5', title: 'Local up next task', description: 'Seeded up next', projectId: id('local-proj-1'), sortOrder: 5, state: { name: 'Todo', type: 'unstarted' }, url: `/workspace/${urlKey}/issue/${id('local-issue-up-next')}` },
+    ],
+  };
+}
+
 export function defaultLocalSeed(urlKey = LOCAL_WORKSPACE_URL_KEY) {
   const id = (rawId) => localSeedId(urlKey, rawId);
   return {

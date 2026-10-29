@@ -48,13 +48,12 @@ test.describe('Empty-project default collapse (LIN-2514)', () => {
     expect(projectBox.height).toBeLessThanOrEqual(headerBox.height + 1);
 
     // Completed-only project (zero incomplete, one completed) stays open: no
-    // default-collapse hint, arrow open, and its live "show N completed"
-    // toggle remains reachable.
+    // default-collapse hint, arrow open, and Home counts its done task on the project (LIN-4024: no toggle).
     const completedOnlyId = localSeedId(localWorkerUrlKey, 'proj-completed-only');
     const completedOnlyProject = page.locator(`.project[data-id="${completedOnlyId}"]`);
     await expect(completedOnlyProject).not.toHaveAttribute('data-default-collapsed', 'true');
     await expect(completedOnlyProject.locator('.project-header')).toHaveText(/^▼/);
-    await expect(completedOnlyProject.locator('.completed-toggle')).toBeVisible();
+    await expect(completedOnlyProject.locator('[data-testid="home-done-count"]')).toContainText('1 done');
 
     // Pre-populate stored collapse state that does NOT include the empty
     // project's id, then reload — proves the union override reaches a

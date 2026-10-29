@@ -43,9 +43,8 @@ test.describe('Search Feature', () => {
     // Search for "Beta" - should match "Beta task in progress" and "Beta todo task"
     await searchInput.fill('Beta');
 
-    // Beta project issues should be visible
-    const betaProject = page.locator('.project[data-id="proj-beta"]');
-    await expect(betaProject).toBeVisible();
+    // Beta's match is In Progress, so its row shows there (LIN-4024: a project lists only its Up next work)
+    await expect(page.locator('.in-progress-section .line', { hasText: 'Beta task in progress' })).toBeVisible();
 
     // Alpha project should be hidden (no matching issues)
     const alphaProject = page.locator('.project[data-id="proj-alpha"]');
@@ -59,9 +58,8 @@ test.describe('Search Feature', () => {
     // Search lowercase for an uppercase-containing title
     await searchInput.fill('beta');
 
-    // Beta project should still be visible
-    const betaProject = page.locator('.project[data-id="proj-beta"]');
-    await expect(betaProject).toBeVisible();
+    // The Beta match is still visible (In Progress)
+    await expect(page.locator('.in-progress-section .line', { hasText: 'Beta task in progress' })).toBeVisible();
   });
 
   test('search matches assignee name', async ({ page }) => {
@@ -71,9 +69,8 @@ test.describe('Search Feature', () => {
     // Search for assignee "Charlie" - assigned to Beta task in progress
     await searchInput.fill('charlie');
 
-    // Beta project should be visible (Charlie is assigned to issue-4)
-    const betaProject = page.locator('.project[data-id="proj-beta"]');
-    await expect(betaProject).toBeVisible();
+    // Charlie is assigned to issue-4, the Beta task In Progress
+    await expect(page.locator('.in-progress-section .line', { hasText: 'Beta task in progress' })).toBeVisible();
   });
 
   test('search matches label name', async ({ page }) => {
@@ -83,8 +80,7 @@ test.describe('Search Feature', () => {
     // Search for label "urgent" - on Beta task in progress
     await searchInput.fill('urgent');
 
-    const betaProject = page.locator('.project[data-id="proj-beta"]');
-    await expect(betaProject).toBeVisible();
+    await expect(page.locator('.in-progress-section .line', { hasText: 'Beta task in progress' })).toBeVisible();
   });
 
   test('shows no results message for non-matching search', async ({ page }) => {
@@ -151,18 +147,17 @@ test.describe('Search Feature', () => {
     await page.locator('.search-toggle').click();
     const searchInput = page.locator('#search-input');
 
-    // "Child task todo" is a child of "Parent task in progress"
+    // "Child task todo" is a child of "Parent task in progress". LIN-4024: the child is a folded Todo task under its
+    // In Progress parent, so the page does not hold it; the server search returns it with its ancestor.
     await searchInput.fill('Child task');
 
-    // The child node should be visible in the project section
-    // (issue-2 may appear in multiple sections, so scope to .project)
-    const alphaProject = page.locator('.project[data-id="proj-alpha"]');
-    const childNode = alphaProject.locator('.node[data-id="issue-2"]');
-    await expect(childNode).not.toHaveClass(/hidden/);
+    const results = page.locator('[data-testid="home-search-results"]');
+    const childNode = results.locator('.node[data-id="issue-2"]');
+    await expect(childNode).toBeVisible();
 
-    // The parent node should also be visible (ancestor context)
-    const parentNode = alphaProject.locator('.node[data-id="issue-1"]');
-    await expect(parentNode).not.toHaveClass(/hidden/);
+    // The parent node is the ancestor context of the match
+    const parentNode = results.locator('.node[data-id="issue-1"]');
+    await expect(parentNode).toBeVisible();
   });
 
   test('search filters in-progress section', async ({ page }) => {

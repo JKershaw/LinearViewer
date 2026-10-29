@@ -1979,6 +1979,26 @@ a.wordmark:hover {
   font-family: var(--font-content);
 }
 
+/* LIN-4024: Home's folds (a project's Backlog, Up next's overflow, a started parent's "N more") are one line of
+   text, and so is the done count. They open on a click or Enter, and are buttons to the keyboard. */
+.home-fold,
+.home-done-count {
+  color: var(--fg-dim);
+  cursor: pointer;
+  margin-left: 4ch;
+  padding: var(--space-1) 0;
+  font-family: var(--font-content);
+  font-size: 0.9rem;
+}
+
+.home-done-count {
+  cursor: default;
+}
+
+.home-fold:hover {
+  color: var(--brand-dim);
+}
+
 /* "+ Add task" link at end of task list */
 .add-task-link {
   color: var(--fg-dim);

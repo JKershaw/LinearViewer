@@ -139,8 +139,9 @@ test.describe('Team Filtering', () => {
 
     // Both teams' work is present — Alpha is Engineering, Beta is Design — so
     // this is genuinely the whole board, not one team's slice or an empty one.
-    await expect(page.locator('.project[data-id="proj-alpha"] .node')).not.toHaveCount(0);
-    await expect(page.locator('.project[data-id="proj-beta"] .node')).not.toHaveCount(0);
+    // LIN-4024: each team's In Progress task is on the page (the Beta Todo task is folded under its parent).
+    await expect(page.locator('.line[data-identifier="TEST-1"]').first()).toBeAttached();
+    await expect(page.locator('.line[data-identifier="TEST-4"]').first()).toBeAttached();
   });
 });
 
@@ -188,7 +189,7 @@ test.describe('Team persistence across all five routes (LIN-2521)', () => {
     await identifiersOn(page, `${base}/swim?team=${DESIGN}`);
 
     const restored = await identifiersOn(page, `${base}/`);
-    assertDesignOnly(restored);
+    assertDesignOnly(restored, { onHome: true });
   });
 
   test('a team set on the dashboard is honoured on swim, ship, and swipe, with no ?team= param', async ({ page, workerUrlKey }) => {
@@ -206,7 +207,7 @@ test.describe('Team persistence across all five routes (LIN-2521)', () => {
     assertEngineeringOnly(await identifiersOn(page, `${base}/swipe`));
 
     await identifiersOn(page, `${base}/swipe?team=${DESIGN}`);
-    assertDesignOnly(await identifiersOn(page, `${base}/`));
+    assertDesignOnly(await identifiersOn(page, `${base}/`), { onHome: true });
   });
 
   test('roadmap participates in the same persisted selection as a WRITE (its own isTestMode render is unaffected, a pre-existing/orthogonal quirk) — swim still restores what roadmap set', async ({ page, workerUrlKey }) => {
@@ -230,9 +231,11 @@ test.describe('Team persistence across all five routes (LIN-2521)', () => {
     expect(unscoped.has('TEST-4')).toBe(true);  // Design
   });
 
-  function assertDesignOnly(identifiers) {
+  // onHome: Home folds a Todo task under its In Progress parent, so TEST-5 (the Beta Todo task, a child of the Beta
+  // In Progress task) is not in Home's HTML until its fold opens (LIN-4024). The other routes list it.
+  function assertDesignOnly(identifiers, { onHome = false } = {}) {
     expect(identifiers.has('TEST-4')).toBe(true);
-    expect(identifiers.has('TEST-5')).toBe(true);
+    if (!onHome) expect(identifiers.has('TEST-5')).toBe(true);
     expect(identifiers.has('TEST-1')).toBe(false); // an Engineering-only issue must be absent
   }
 

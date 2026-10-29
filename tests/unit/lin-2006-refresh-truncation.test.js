@@ -35,6 +35,7 @@ import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 import { nodeKey } from '../../lib/tree.js';
 import { liveConsoleOn } from '../../lib/run-controls.js';
+import { buildHomeView } from '../../lib/home-view.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
@@ -75,6 +76,8 @@ async function runRenderDashboardAfterRefresh({ fetchResult, topTask = null }) {
     getFeatureFlags: () => ({}),
     // LIN-3833: the Home row states; these sandboxes render no In Progress rows.
     homeRowStates: async () => null,
+    // LIN-4024: the trimmed Home view the post-401 render builds (server.js); the real one is injected.
+    buildHomeView,
     // LIN-3833: the subtasks that need you by row; these sandboxes render no In Progress rows.
     subtaskNeedingYouByNodeKey: () => ({}),
     focusSubtaskByNodeKey: () => ({}),
@@ -186,6 +189,8 @@ async function runPrimaryDashboardRoute({ fetchResult }) {
     getFeatureFlags: () => ({}),
     // LIN-3833: the Home row states; these sandboxes render no In Progress rows.
     homeRowStates: async () => null,
+    // LIN-4024: the trimmed Home view the post-401 render builds (server.js); the real one is injected.
+    buildHomeView,
     // LIN-3833: the subtasks that need you by row; these sandboxes render no In Progress rows.
     subtaskNeedingYouByNodeKey: () => ({}),
     focusSubtaskByNodeKey: () => ({}),

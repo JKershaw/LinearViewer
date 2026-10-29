@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
-import { localSeedId } from '../fixtures/local-harness.js';
+import { localSeedId, defaultLocalSeedWithUpNext } from '../fixtures/local-harness.js';
 
 // LIN-378: the dashboard surface is fully modeled by the local provider, so this
 // spec rides the seeded local workspace (no `test-token` mock). Assertions are
@@ -8,8 +8,8 @@ import { localSeedId } from '../fixtures/local-harness.js';
 
 test.describe('Authenticated Dashboard', () => {
   test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
-    // Seed a real local-provider workspace and establish its session.
-    await seedLocal();
+    // Seed a real local-provider workspace and establish its session. LIN-4024: one Up next task, so a project row shows.
+    await seedLocal(defaultLocalSeedWithUpNext(localWorkerUrlKey));
 
     // Navigate to workspace page (authenticated users are redirected here)
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
@@ -30,42 +30,35 @@ test.describe('Authenticated Dashboard', () => {
     await expect(inProgressHeader).toBeVisible();
     await expect(inProgressHeader).toContainText('In Progress');
 
-    // In-progress trees: local-issue-1 (started) + its child local-issue-2 (todo,
-    // hidden) + local-issue-4 (started) = 3 lines total.
-    await expect(page.locator('.in-progress-items .line')).toHaveCount(3);
+    // In Progress: local-issue-1 (started) and local-issue-4 (started) = 2 lines. LIN-4024: the child, local-issue-2,
+    // is an unstarted task, so it folds under its started parent ("show 1 more") instead of listing here.
+    await expect(page.locator('.in-progress-items .line')).toHaveCount(2);
 
     // Top-level started items are visible
     await expect(page.locator('.in-progress-items .line:has-text("Local parent task")')).toBeVisible();
     await expect(page.locator('.in-progress-items .line:has-text("Second project task")')).toBeVisible();
 
-    // Child task exists but is hidden (depth > 0) until parent is expanded.
-    // Note: hidden class is on the .node wrapper, not the .line.
+    // The child is folded under its parent, and not on the page until the fold opens.
     const childTask = page.locator('.in-progress-items .line:has-text("Local child task")');
-    await expect(childTask).toHaveCount(1);
-    const childNode = page.locator(`.in-progress-items .node[data-id="${localSeedId(localWorkerUrlKey, 'local-issue-2')}"]`);
-    await expect(childNode).toHaveClass(/hidden/);
+    await expect(childTask).toHaveCount(0);
+    await expect(page.locator('.in-progress-items [data-home-fetch="more-of-parent"]')).toHaveCount(1);
+    await expect(page.locator(`.in-progress-items .node[data-id="${localSeedId(localWorkerUrlKey, 'local-issue-2')}"]`)).toHaveCount(0);
   });
 
   test('displays correct state indicators', async ({ page }) => {
-    // The Recent activity feed now surfaces created/edited tasks, not just
-    // completed ones (LIN-490). The local store stamps `createdAt` at seed time,
-    // so every seeded issue also appears once as a "created" row in Recent
-    // activity, on top of its In Progress / project-tree appearances.
+    // LIN-850: tree-row status glyphs render through the shared status primitive as the box-less bare variant.
+    // LIN-4024: each section says its own state. Recent activity lists the just-created tasks too, so the counts
+    // below are scoped to the section that holds each row.
 
-    // Started issues (local-issue-1, local-issue-4): In Progress section + project
-    // section + Recent activity ("created") → 2 x 3 = 6.
-    // LIN-850: tree-row status glyphs now render through the shared status
-    // primitive as the box-less bare variant (`.status-pill--bare.status-pill--<state>`).
-    await expect(page.locator('.status-pill--bare.status-pill--in-progress')).toHaveCount(6);
+    // Started issues (local-issue-1, local-issue-4) are In Progress.
+    await expect(page.locator('.in-progress-items .status-pill--bare.status-pill--in-progress')).toHaveCount(2);
 
-    // Todo issue (local-issue-2): In Progress subtree + project tree + Recent
-    // activity ("created") = 3.
-    await expect(page.locator('.status-pill--bare.status-pill--todo')).toHaveCount(3);
+    // The Up next task is a project row in Todo.
+    await expect(page.locator('.line[data-section="project"] .status-pill--bare.status-pill--todo')).toHaveCount(1);
 
-    // Completed issue (local-issue-3): project tree + Recent activity. Its
-    // completedAt is old (out of window) but its seed-stamped createdAt is recent,
-    // so it shows as a "created" row → 2.
-    await expect(page.locator('.status-pill--bare.status-pill--done')).toHaveCount(2);
+    // The completed task is not a row in any project: Home counts it on its project instead.
+    await expect(page.locator('.line[data-section="project"] .status-pill--bare.status-pill--done')).toHaveCount(0);
+    await expect(page.locator('[data-testid="home-done-count"]').first()).toContainText('1 done');
   });
 
   test('shows text-based navigation bar', async ({ page }) => {
