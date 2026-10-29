@@ -147,11 +147,13 @@ test.describe('Change is a drawer at desktop width, and Escape closes it (LIN-40
     await block.locator('[data-testid="run-change"]').click();
     const drawer = block.locator('[data-testid="run-change-panel"]');
     await expect(drawer).toBeVisible();
-    // The panel repaints as its choices load, so read its box once it has settled at the right edge.
+    // The panel repaints as its choices load, so read its box once it has settled at the right edge. The reference is the
+    // layout viewport (clientWidth), not the window: a classic scrollbar (CI's Linux runner) takes its width from it.
     await expect.poll(async () => {
       const b = await drawer.boundingBox();
-      return b ? Math.round(b.x + b.width) : 0;
-    }, { message: 'the drawer is at the right edge' }).toBeGreaterThanOrEqual(DESKTOP.width - 1);
+      const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+      return b ? Math.round(b.x + b.width) - clientWidth : -Infinity;
+    }, { message: 'the drawer is at the right edge of the layout viewport' }).toBeGreaterThanOrEqual(-1);
 
     await page.keyboard.press('Escape');
     await expect(drawer).toHaveCount(0);
