@@ -303,3 +303,22 @@ describe('route collisions: /task/new and /task/:id/edit', () => {
     assert.ok(page > create, 'task page mounts after task-create, or /task/new is shadowed');
   });
 });
+
+// LIN-4024: a task that is waiting (the pill says so) sends its question card on /state to the owner only. The card
+// carries an answer box, and a member never gets one (the task page's rule, read the same way).
+describe('LIN-4024 — GET …/api/task/:identifier/state sends the question card to the owner only', () => {
+  const WAITING_LOOP = {
+    ...STORED_LOOP,
+    loopId: 'impl-2', wakeMarker: 'blocked', waitingMessage: '[blocked] which API key?',
+    feedback: [{ message: '[blocked] which API key?' }],
+  };
+
+  test('the owner gets the question card; a member gets none', async () => {
+    const owner = await call(makeRouter(makeLoader({ loops: [WAITING_LOOP] })), STATE, { params: { identifier: 'LIN-50' }, query: { issueId: UUID } });
+    assert.equal(owner.jsonBody.status, 'waiting');
+    assert.match(owner.jsonBody.questionHtml, /data-testid="session-question-card"/, 'the owner sees the card');
+    const member = await call(makeRouter(makeLoader({ loops: [WAITING_LOOP] }), undefined, MEMBER_CHECK), STATE, { params: { identifier: 'LIN-50' }, query: { issueId: UUID } });
+    assert.equal(member.jsonBody.status, 'waiting');
+    assert.equal(member.jsonBody.questionHtml, '', 'a member has no answer box');
+  });
+});

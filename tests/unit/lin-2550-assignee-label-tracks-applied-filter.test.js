@@ -111,7 +111,7 @@ function baseContext(calls, appliedAssigneeName, assigneeState) {
     buildHomeView,
     // LIN-3833: the top task's subtask that needs you; these sandboxes render no In Progress rows.
     subtaskNeedingYouByNodeKey: () => ({}),
-    focusSubtaskByNodeKey: () => ({}),
+    containerNodeKeysOf: () => [],
     requestFeatureFlags: async () => ({}),
     resolveRunControls: async () => ({ runControls: false, runSetup: false }),
     // LIN-3977: the post-401 Home render applies the promotion rule (server.js), so the real one is injected.

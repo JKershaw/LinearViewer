@@ -1178,6 +1178,11 @@ a.wordmark:hover {
   margin-bottom: 8px;
 }
 
+/* LIN-4024: a task waiting on a ruling shows its question card in the state block (session.css styles the card). */
+.opened-task-question {
+  margin-bottom: 8px;
+}
+
 /* LIN-4010: Home's state is one line: the pill and its sentence side by side, wrapping on a phone. */
 .task-status--home {
   display: flex;

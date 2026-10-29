@@ -417,22 +417,38 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
     assert.equal(/idle|No sessions yet/.test(c.innerHTML), false);
   });
 
-  test('a container: Run dispatches the subtask, the state read names the subtask, and the box says so', async () => {
-    const focusSubtask = { identifier: 'LIN-99', title: 'The child', id: 'uuid-99', stateType: 'unstarted', source: 'linear', href: '/workspace/acme/task/LIN-99' };
+  // LIN-4024 (John, 29 Oct): a container's opened task runs on the container. Its one action is Run to PR, which starts
+  // the autopilot on it; no subtask's stage is offered, read, or named from Home.
+  test('a container: no stage step is offered, the state read is the container\'s own, and its one action is Run to PR', async () => {
     const { PromptSection, calls } = loadClient({
       stateBody: { status: 'idle', live: false, homeStatusHtml: '<p>idle</p>', sessions: { ...PLAN_NEXT, offered: { kind: 'research', label: 'Research', why: 'usual', failed: false, reason: 'the next step for this task' }, next: { kind: 'research', label: 'Research' } } },
       previewBody: { kind: 'research', harness: 'claude-code', words: {}, sources: {}, group: null },
     });
     const c = makeContainer();
-    PromptSection.init(c, { ...HOME, focusSubtask });
+    PromptSection.init(c, { ...HOME, isContainer: true });
     await flush(); await flush();
-    assert.ok(calls.api.some((u) => u.includes('/api/task/LIN-99/state?issueId=uuid-99')), 'the state read is the subtask\'s');
-    assert.match(c.innerHTML, /data-testid="opened-task-on"[^>]*>On LIN-99 The child/, 'the box names the subtask');
-    await c.click({ action: 'run-step-next' });
-    await flush();
-    assert.equal(calls.dispatch.length, 1);
-    assert.equal(calls.dispatch[0].issue.identifier, 'LIN-99', 'the dispatch names the subtask, not the container');
-    assert.equal(calls.dispatch[0].issue.id, 'uuid-99');
+    assert.ok(calls.api.some((u) => u.includes('/api/task/LIN-42/state?issueId=uuid-42')), 'the state read is the container\'s');
+    assert.equal(calls.api.some((u) => u.includes('/api/task/LIN-99/')), false, 'no subtask is read');
+    assert.equal(c.innerHTML.includes('opened-task-on'), false, 'the box names no subtask it runs on');
+    assert.match(c.innerHTML, /data-action="go"[^>]*>Run to PR</, 'the one main action is Run to PR');
+    assert.equal(c.innerHTML.includes('Run Research'), false, 'no stage step is the main action');
+  });
+
+  // LIN-4024: a task waiting on a question shows the owner's card in the state block; no card when the server sends none.
+  test('a waiting task shows its question card in the state block, and no slot when the server sends no card', async () => {
+    const card = '<div class="sess-qcard" data-testid="session-question-card" data-url-key="acme"><p data-testid="session-question-card-question">Which key?</p></div>';
+    const waiting = loadClient({ stateBody: { status: 'waiting', live: false, homeStatusHtml: '<p>needs you</p>', questionHtml: card, sessions: PLAN_NEXT } });
+    const c = makeContainer();
+    waiting.PromptSection.init(c, HOME);
+    await flush(); await flush();
+    assert.match(c.innerHTML, /data-question-slot>\s*<div class="sess-qcard" data-testid="session-question-card"/, 'the card is in its slot');
+    assert.match(c.innerHTML, /data-testid="opened-task-state"/, 'the card sits in the state block');
+
+    const quiet = loadClient({ stateBody: { status: 'idle', live: false, homeStatusHtml: '<p>idle</p>', questionHtml: '', sessions: PLAN_NEXT } });
+    const d = makeContainer();
+    quiet.PromptSection.init(d, HOME);
+    await flush(); await flush();
+    assert.equal(d.innerHTML.includes('data-question-slot'), false, 'no card, no slot');
   });
 
   test('Escape closes the Change drawer and returns focus to its Change button (witnessed by the close action)', async () => {
@@ -467,35 +483,33 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
   });
 
   // LIN-4010 review (finding 5): Watch opens the task the running box runs on, not the container it sits under.
-  test('a container\'s running box: Watch links to the subtask it runs on', async () => {
-    const focusSubtask = { identifier: 'LIN-99', title: 'The child', id: 'uuid-99', stateType: 'started', source: 'linear', href: '/workspace/acme/task/LIN-99' };
+  test('a container\'s running box: Watch links to the container it runs on', async () => {
     const running = { loopId: 'l9', kind: 'research', label: 'Research', state: 'running', since: '2026-10-29T10:00:00.000Z', target: 'cli' };
     const { PromptSection } = loadClient({
       stateBody: { status: 'running', live: true, homeStatusHtml: '', headerHtml: '', sessions: { count: 1, running, next: null, last: null, offered: null, busy: true, excluded: [] } },
     });
     const c = makeContainer();
-    PromptSection.init(c, { ...HOME, focusSubtask });
+    PromptSection.init(c, { ...HOME, isContainer: true });
     await flush(); await flush();
-    assert.match(c.innerHTML, /href="\/workspace\/acme\/task\/LIN-99"[^>]*data-testid="opened-task-watch"/);
+    assert.match(c.innerHTML, /href="\/workspace\/acme\/task\/LIN-42"[^>]*data-testid="opened-task-watch"/);
   });
 
   // LIN-4010 review (finding 4, a missing witness): Stop on a container is the subtask's Stop, not the parent's.
-  test('Stop on a container posts the subtask it runs on', async () => {
-    const focusSubtask = { identifier: 'LIN-99', title: 'The child', id: 'uuid-99', stateType: 'started', source: 'linear', href: '/workspace/acme/task/LIN-99' };
+  test('Stop on a container posts the container it runs on', async () => {
     const running = { loopId: 'l9', kind: 'research', label: 'Research', state: 'running', since: '2026-10-29T10:00:00.000Z', target: 'cli' };
     const { PromptSection, calls } = loadClient({
       stateBody: { status: 'running', live: true, homeStatusHtml: '', headerHtml: '', sessions: { count: 1, running, next: null, last: null, offered: null, busy: true, excluded: [] } },
     });
     const c = makeContainer();
-    PromptSection.init(c, { ...HOME, focusSubtask });
+    PromptSection.init(c, { ...HOME, isContainer: true });
     await flush(); await flush();
     await c.click({ action: 'stop-run' });
     await c.click({ action: 'stop-run-confirm' });
     await flush();
     assert.equal(calls.post.length, 1, 'one stop was posted');
     assert.equal(calls.post[0].body.abort, true);
-    assert.equal(calls.post[0].body.issueIdentifier, 'LIN-99', 'the stop names the subtask, not the container');
-    assert.equal(calls.post[0].body.issueId, 'uuid-99');
+    assert.equal(calls.post[0].body.issueIdentifier, 'LIN-42', 'the stop names the container');
+    assert.equal(calls.post[0].body.issueId, 'uuid-42');
   });
 
   // LIN-4010 review (finding 3): Change is a choice. A default card and the saved presets are the choices; "Choose for

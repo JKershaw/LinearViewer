@@ -176,6 +176,11 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         issueId: issueId && isValidIssueId(issueId) ? issueId : null,
       });
       res.set('Cache-Control', 'no-store');
+      // LIN-4024: the question card carries an answer box, so only the owner gets one. It shows when the pill says
+      // waiting, the same rule as the task page's card (LIN-3499), so the two cannot drift.
+      const questionHtml = model.status === 'waiting' && (await viewerOf(req)) === 'owner'
+        ? renderTaskQuestion(model, { urlKey: workspace.urlKey })
+        : '';
       // No brief or recap rides here (LIN-3975): the state read has no tracker, so the page-load panels are
       // the only ones shown, and a poll never repaints them.
       const body = {
@@ -192,7 +197,7 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         sessions: sessionSummaryOf(model),
         // LIN-4024: the question card, for a task waiting on an open ruling only (a parked task has none). The
         // same renderer as the task page, so the two cannot drift.
-        questionHtml: model.waitingFor === 'ruling' ? renderTaskQuestion(model, { urlKey: workspace.urlKey }) : '',
+        questionHtml,
       };
       return res.json(body);
     } catch (error) {

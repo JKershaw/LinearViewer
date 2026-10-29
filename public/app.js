@@ -345,8 +345,9 @@ function mountHomePromptSections(root) {
       // LIN-3833: this row's subtask that needs you, named in the state block with an Open link (any row, not
       // only the top task; the server keys the map by node key).
       subtaskNeedsYou: (page.subtaskNeedsYouById || {})[el.dataset.nodeKey] || null,
-      // LIN-4010: a container's opened task runs on the subtask its row names (the row's focus, keyed the same way).
-      focusSubtask: (page.focusSubtaskById || {})[el.dataset.nodeKey] || null,
+      // LIN-4024: a row with subtasks is a container. Its opened task runs on the row itself ("Run to PR"), never a stage
+      // of a subtask, so the run box offers no step for it.
+      isContainer: (page.containerNodeKeys || []).includes(el.dataset.nodeKey),
       hasAI: page.hasAI,
       aiState: page.aiState,
       freeTier: page.freeTier,
@@ -412,7 +413,7 @@ function mergeHomeRowOpts(opts) {
   const page = window.__HOME_PROMPT_OPTS__
   if (!page || !opts) return
   page.subtaskNeedsYouById = { ...(page.subtaskNeedsYouById || {}), ...(opts.subtaskNeedsYouById || {}) }
-  page.focusSubtaskById = { ...(page.focusSubtaskById || {}), ...(opts.focusSubtaskById || {}) }
+  page.containerNodeKeys = [...new Set([...(page.containerNodeKeys || []), ...(opts.containerNodeKeys || [])])]
 }
 
 /**

@@ -156,7 +156,7 @@ import { renderCustomPromptsPage } from './lib/render-custom-prompts.js'
 import { renderDispatchPage } from './lib/render-dispatch.js'
 import { noJobBody, noJobNoticeOf } from './lib/components/dispatch-no-job.js'
 import { renderSwipePage, orderIssuesForSwipe } from './lib/render-swipe.js'
-import { subtaskNeedingYouByNodeKey, focusSubtaskByNodeKey } from './lib/task-board-view.js'
+import { subtaskNeedingYouByNodeKey, containerNodeKeysOf } from './lib/task-board-view.js'
 import { buildHomeView } from './lib/home-view.js'
 import { homeRowsFor, HOME_ROW_KINDS, HOME_SEARCH_MAX_LENGTH } from './lib/home-rows.js'
 import { renderSwimPage } from './lib/render-swim.js'
@@ -2021,7 +2021,7 @@ async function renderDashboardAfterRefresh(workspace, session, teamId, assigneeS
     rowStates,
     rulingCount: homeStates?.rulingCount ?? 0,
     subtaskNeedsYouById: subtaskNeedingYouByNodeKey({ urlKey: workspace.urlKey, inProgressTrees: homeView.inProgressTrees, recentActivityTrees, projectTrees: homeView.trees, rowStates }),
-    focusSubtaskById: focusSubtaskByNodeKey({ urlKey: workspace.urlKey, inProgressTrees: homeView.inProgressTrees, recentActivityTrees, projectTrees: homeView.trees, rowStates }),
+    containerNodeKeys: containerNodeKeysOf({ inProgressTrees: homeView.inProgressTrees, recentActivityTrees, projectTrees: homeView.trees }),
     copyFirstCard: featureFlags.runControls !== true && session.copyFirstCardDismissed !== true,
     // LIN-2550: same applied-not-requested labelling rule as the primary
     // dashboard route above — this post-401 re-render carries the assignee
@@ -3544,7 +3544,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       rowStates,
       rulingCount: homeStates?.rulingCount ?? 0,
       subtaskNeedsYouById: subtaskNeedingYouByNodeKey({ urlKey: workspace.urlKey, inProgressTrees: homeView.inProgressTrees, recentActivityTrees, projectTrees: homeView.trees, rowStates }),
-      focusSubtaskById: focusSubtaskByNodeKey({ urlKey: workspace.urlKey, inProgressTrees: homeView.inProgressTrees, recentActivityTrees, projectTrees: homeView.trees, rowStates }),
+      containerNodeKeys: containerNodeKeysOf({ inProgressTrees: homeView.inProgressTrees, recentActivityTrees, projectTrees: homeView.trees }),
       copyFirstCard: featureFlags.runControls !== true && req.session.copyFirstCardDismissed !== true,
       // LIN-2550: label the selector off the filter the render APPLIED. An
       // unmatched name (a stale `?assignee=` carried across a team change by
@@ -3637,7 +3637,7 @@ app.get('/workspace/:urlKey/api/home-rows', workspaceFromUrl, async (req, res) =
       // The per-row opts the page carries for its own rows (app.js merges them before the rows mount).
       opts: {
         subtaskNeedsYouById: subtaskNeedingYouByNodeKey({ urlKey, inProgressTrees: [], recentActivityTrees: [], projectTrees: rowTree, rowStates: states }),
-        focusSubtaskById: focusSubtaskByNodeKey({ urlKey, inProgressTrees: [], recentActivityTrees: [], projectTrees: rowTree, rowStates: states }),
+        containerNodeKeys: containerNodeKeysOf({ inProgressTrees: [], recentActivityTrees: [], projectTrees: rowTree }),
       },
     });
   } catch (error) {
