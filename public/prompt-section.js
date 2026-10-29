@@ -846,6 +846,8 @@
       // the harness starts null, and the resolved setting is shown on the Runs-on line from the preview.
       run: {
         step: null, choice: runChoiceDefaults(), draft: null, preview: null, changeOpen: false, presets: null,
+        // LIN-4010: the Change drawer's "Choose for this run" reveals the decision panel; a choice made there opens it.
+        chooseOpen: false, panelNumbers: null,
         panelHtml: null, panelFailed: false, withoutEffort: [],
         anotherOpen: false, moreOpen: false, item: null, confirmStop: false, busy: false
       }
@@ -904,14 +906,14 @@
       const copyFirst = copyFirstView();
       const runFirst = runControlOn();
       if (state.phase === 'idle') {
-        const idle = runFirst ? renderRunBlock() : (copyFirst ? renderCopyIdle(opts, state) : renderIdle(opts, state));
+        const idle = runFirst ? renderRunBlock() : (copyFirst ? renderCopyIdle(opts, state) + renderRunnerFoot() : renderIdle(opts, state));
         applyState(container, stateBlock + idle, 'idle');
       } else if (state.phase === 'generating') {
         applyState(container, stateBlock + (runFirst ? renderRunBlock() : '') + renderGenerating(state, opts), 'generating');
       } else if (state.phase === 'fresh') {
         let fresh;
         if (runFirst) fresh = renderRunBlock() + renderPromptBox(state, opts);
-        else fresh = copyFirst ? renderCopyFresh(state, opts) : renderFresh(state, opts);
+        else fresh = copyFirst ? renderCopyFresh(state, opts) + renderRunnerFoot() : renderFresh(state, opts);
         applyState(container, stateBlock + fresh, 'fresh');
       } else if (state.phase === 'error') {
         applyState(container, stateBlock + renderError(state, opts), 'error');
@@ -929,8 +931,17 @@
       if (copyFirstView()) return renderCopyState();
       const opened = state.opened;
       if (!opened) return `<div class="opened-task-state" data-state-slot data-testid="opened-task-state"></div>`;
+      // LIN-4010 review: Home's line is '' while a task runs (the running box says it), so it is not replaced by the
+      // task page's sentence. Only a server that sends no Home line at all falls back to headerHtml.
       return `<div class="opened-task-state" data-state-slot data-testid="opened-task-state">`
-        + `${opened.homeStatusHtml || opened.headerHtml || ''}${opened.stripHtml || ''}${renderSubtaskNeedsYou()}</div>`;
+        + `${opened.homeStatusHtml ?? opened.headerHtml ?? ''}${opened.stripHtml || ''}${renderSubtaskNeedsYou()}</div>`;
+    }
+
+    // LIN-4010: a copy-first viewer's runner line is the foot of the Home box, after the step and the prompt, not a line the
+    // server appends after the folds. The text is the server's own (lib/components/runner-link.js).
+    function renderRunnerFoot() {
+      if (!caps.runBox) return '';
+      return `<div class="opened-task-runner-line" data-testid="opened-task-runner-line">${runnerLinkHtml(opts.urlKey)}</div>`;
     }
 
     // LIN-4010: "Last" sits below the run box, not in the state block. No "Last" line while a session runs: the running
@@ -978,7 +989,17 @@
       // LIN-4010: Home's running box and "Last" line live in the run block, so it follows the state too (focus and
       // the Change panel's draft survive a run-block repaint, as they do for a preview).
       if (caps.runBox && runControlOn()) paintRun();
+      paintFoldCount();
       if (typeof window.initLocalTimes === 'function') window.initLocalTimes(container);
+    }
+
+    // LIN-4010: the Sessions fold's count comes from the state read (the server fragment does not know it). The fold sits
+    // in the same opened-task block as this mount, so it is found from the mount's parent.
+    function paintFoldCount() {
+      const scope = container.parentElement;
+      const el = scope && scope.querySelector ? scope.querySelector('[data-fold-count="sessions"]') : null;
+      const count = state.opened && state.opened.sessions ? state.opened.sessions.count : 0;
+      if (el) el.textContent = count ? ` (${count})` : '';
     }
 
     // LIN-3975: repaint only the copy-first view's "You copied …" line (a copy, or the task-mode read on mount).
@@ -1138,8 +1159,9 @@
         // and Stop beside each other; "Next" sits under it. The state block above does not repeat it.
         const polled = POLLED_RUN_TARGETS.includes(running.target);
         const since = running.since ? formatGeneratedAge(Date.parse(running.since)) : null;
+        // LIN-4010 review: Watch opens the task the box runs on (the subtask, for a container), as Stop does.
         const watchHref = caps.watchLink && window.taskPageHref
-          ? window.taskPageHref({ urlKey: opts.urlKey, identifier: issue.identifier, source: issue.source })
+          ? window.taskPageHref({ urlKey: opts.urlKey, identifier: runSubject.issue.identifier, source: runSubject.issue.source })
           : null;
         const watch = watchHref ? `<a class="btn--quiet opened-task-watch" href="${esc(watchHref)}" data-testid="opened-task-watch">Watch \u203A</a>` : '';
         let actions = watch;
@@ -1263,7 +1285,24 @@
       const panelWords = state.run.panelWords || {};
       const harness = d.harness || '';
       const inForce = harness || (preview && preview.harness) || '';
-      const presetButtons = presets.map((p) => `<button class="btn opened-task-preset" data-action="run-preset" data-preset-id="${esc(p.id)}" aria-pressed="${d.presetId === p.id ? 'true' : 'false'}" data-testid="run-preset">${esc(p.name || p.id)}</button>`).join('');
+      // LIN-4010 review: the choices are cards. The default is one card (the step's own resolved setting, from the
+      // preview, and its numbers from the decision panel); each saved preset is one more. "Choose for this run" reveals the
+      // decision panel for anything else.
+      const explicit = !!(d.harness || d.model || d.effort);
+      const stepLabel = (runStepOf() || {}).label || 'this step';
+      const defaultWhat = (preview && preview.words && preview.words.model) || 'Claude Code, the default';
+      const defaultFrom = (preview && (sourceWordOf('model', preview) || sourceWordOf('harness', preview))) || 'from Models';
+      const nums = state.run.panelNumbers;
+      const numbersText = nums && !nums.unavailable && nums.runs != null
+        ? `${nums.runs} ${nums.runs === 1 ? 'run' : 'runs'} in the last 30 days${typeof nums.typicalUsd === 'number' ? `, about $${nums.typicalUsd.toFixed(2)} each` : ''}`
+        : null;
+      const defaultCard = `<button class="btn opened-task-card" data-action="run-default" data-testid="run-default" aria-pressed="${!d.presetId && !explicit ? 'true' : 'false'}">`
+        + `<span class="opened-task-card-title">Default for ${esc(stepLabel)}</span>`
+        + `<span class="opened-task-card-what">${esc(defaultWhat)} · ${esc(defaultFrom)}</span>`
+        + (numbersText ? `<span class="opened-task-card-what">${esc(numbersText)}</span>` : '')
+        + `</button>`;
+      const choiceCards = defaultCard + presets.map((p) => `<button class="btn opened-task-card" data-action="run-preset" data-preset-id="${esc(p.id)}" aria-pressed="${d.presetId === p.id ? 'true' : 'false'}" data-testid="run-preset">${esc(p.name || p.id)}</button>`).join('');
+      const chooseOpen = !!state.run.chooseOpen;
       // Claude Code on the web runs only under Claude Code: with opencode in force it is not offered, and the line says why.
       const onWeb = inForce !== 'opencode';
       const targets = ['cli', ...(onWeb ? ['web'] : []), ...(opts.isLocalhost ? ['local'] : [])];
@@ -1278,9 +1317,10 @@
       return `<div class="opened-task-change-panel" data-testid="run-change-panel">`
         + `<div class="opened-task-change-head">This run only${panelWords.model ? ` \u00b7 default: ${esc(panelWords.model)}` : ''}`
         + `<button class="btn--quiet opened-task-change-x" data-action="close-change" aria-label="Close" data-testid="run-change-x">\u00d7</button></div>`
-        + (presetButtons ? `<div class="opened-task-change-row"><span class="opened-task-change-label">Preset</span>${presetButtons}</div>` : '')
-        + panelBody
+        + `<div class="opened-task-cards" data-testid="run-cards">${choiceCards}</div>`
         + `<div class="opened-task-change-row"><span class="opened-task-change-label">Runs on</span>${targetButtons}</div>${webNote}`
+        + `<button class="btn--quiet opened-task-choose-toggle" data-action="run-choose" aria-expanded="${chooseOpen ? 'true' : 'false'}" data-testid="run-choose">Choose for this run ${chooseOpen ? '▴' : '▾'}</button>`
+        + `<div class="opened-task-choose" data-testid="run-choose-panel"${chooseOpen ? '' : ' hidden'}>${panelBody}</div>`
         + `<label class="opened-task-change-row"><input type="checkbox" data-testid="run-agent-access"${agent ? ' checked' : ''}> Your agent may read and update this task</label>`
         + `<p class="opened-task-change-summary" data-testid="run-will-use">${esc(runWillUseText(d, preview))}</p>`
         + `<div class="opened-task-change-row">`
@@ -1311,6 +1351,7 @@
           if (destroyed || seq !== runPanelSeq) return;
           state.run.panelHtml = (r && r.html) || null;
           state.run.panelWords = (r && r.words) || null;
+          state.run.panelNumbers = (r && r.numbers) || null;
           state.run.withoutEffort = (r && r.withoutEffort) || [];
           state.run.panelFailed = !state.run.panelHtml;
           paintRun();
@@ -1319,6 +1360,7 @@
           if (destroyed || seq !== runPanelSeq) return;
           state.run.panelHtml = null;
           state.run.panelWords = null;
+          state.run.panelNumbers = null;
           state.run.panelFailed = true;
           paintRun();
         });
@@ -1418,8 +1460,10 @@
       const summary = (state.opened && state.opened.sessions) || {};
       const active = !!(summary.running || state.run.item);
       if (active) {
+        // LIN-4010 review: a Change drawer that is open stays open while a run is active, with its draft: it sets the next run.
         return `<div class="opened-task-run" data-run-slot data-testid="opened-task-run">${onLine}`
-          + renderGo(opts, state) + renderAfterRun() + renderStagedProposals() + renderRunMore(step) + renderLastLine() + `</div>`;
+          + renderGo(opts, state) + renderAfterRun() + (state.run.changeOpen ? renderChangePanel(state.run.preview) : '')
+          + renderStagedProposals() + renderRunMore(step) + renderLastLine() + `</div>`;
       }
       const box = [
         renderStepLine(step),
@@ -1478,12 +1522,36 @@
       if (el && typeof el.focus === 'function') el.focus();
     }
 
-    // LIN-4010: Escape closes the Change drawer (the same path as its Close button).
+    // LIN-4010: Escape closes the Change drawer (the same path as its Close button). While it is open, Tab and Shift+Tab
+    // cycle inside it: on a phone it is a modal sheet, and on a desktop focus must not go behind it.
     const onRunKeydown = (e) => {
-      if (!caps.runBox || e.key !== 'Escape' || !state.run.changeOpen || !runControlOn() || !container.contains(e.target)) return;
-      e.preventDefault();
-      handleRunAction('close-change');
+      if (!caps.runBox || !state.run.changeOpen || !runControlOn() || !container.contains(e.target)) return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        handleRunAction('close-change');
+      } else if (e.key === 'Tab') {
+        keepFocusInDrawer(e);
+      }
     };
+    function keepFocusInDrawer(e) {
+      const drawer = container.querySelector && container.querySelector('[data-testid="run-change-panel"]');
+      if (!drawer || !drawer.querySelectorAll) return;
+      // Only what can take focus: the phone's × is display:none on a desktop, and a hidden control cannot hold focus.
+      const items = [...drawer.querySelectorAll('button:not([disabled]), input:not([disabled]), select, textarea, a[href]')]
+        .filter((el) => el.getClientRects().length > 0);
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = typeof document !== 'undefined' ? document.activeElement : null;
+      const outside = !active || !drawer.contains(active);
+      if (e.shiftKey && (outside || active === first)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (outside || active === last)) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
     container.addEventListener('keydown', onRunKeydown);
 
     // The run control's clicks. Returns true when it handled the button.
@@ -1494,6 +1562,8 @@
         case 'change-run':
           state.run.changeOpen = true;
           state.run.draft = { ...state.run.choice };
+          // A choice already made by hand (not a card) opens the decision panel it was made in.
+          state.run.chooseOpen = !!(state.run.choice.harness || state.run.choice.model || state.run.choice.effort);
           state.run.panelHtml = null;
           state.run.panelFailed = false;
           fetchRunPanel();
@@ -1503,8 +1573,9 @@
               .catch(() => { state.run.presets = []; paintRun(); });
           }
           paintRun();
-          // LIN-4010: opening the choice moves focus into it, so a keyboard user lands in the drawer.
-          if (caps.runBox) focusIn('[data-testid="run-change-x"]');
+          // LIN-4010: opening the choice moves focus into it, so a keyboard user lands in the drawer (the first card: the
+          // phone's × is hidden on a desktop, where focus would otherwise go nowhere).
+          if (caps.runBox) focusIn('[data-testid="run-default"]');
           return true;
         case 'apply-proposal':
           proposalAction(btn, 'apply');
@@ -1514,10 +1585,24 @@
           return true;
         case 'close-change':
           state.run.changeOpen = false;
+          state.run.chooseOpen = false;
           state.run.draft = null;
           paintRun();
           // LIN-4010: closing returns focus to the Change button that opened it.
           if (caps.runBox) focusIn('[data-action="change-run"]');
+          return true;
+        case 'run-default': {
+          // The default card: no preset and no hand-made choice; the target and agent access stay as the draft has them.
+          const keep = d();
+          state.run.draft = { ...runChoiceDefaults(), target: keep.target, agentAccess: keep.agentAccess };
+          state.run.chooseOpen = false;
+          fetchRunPanel();
+          paintRun();
+          return true;
+        }
+        case 'run-choose':
+          state.run.chooseOpen = !state.run.chooseOpen;
+          paintRun();
           return true;
         case 'run-preset':
           d().presetId = d().presetId === btn.dataset.presetId ? null : btn.dataset.presetId;

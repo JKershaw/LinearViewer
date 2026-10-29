@@ -129,6 +129,7 @@
   min-width: 0;
 }
 .task-strip-chip {
+  position: relative;
   flex: 1 1 5.5rem;
   min-width: min-content;
   padding: var(--space-1) var(--space-2);
@@ -145,6 +146,15 @@
 }
 .task-strip-name { font-weight: 600; }
 .task-strip-state { color: var(--muted); }
+/* LIN-4010: a word a screen reader hears but a sighted reader does not see (a running chip says its minutes). */
+.task-strip-srword {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
 .task-strip-chip[data-tone="done"] { border-color: var(--green); }
 .task-strip-chip[data-tone="running"] { border-color: var(--amber); }
 .task-strip-chip[data-tone="waiting"] { border-color: var(--red); }

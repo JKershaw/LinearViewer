@@ -1201,6 +1201,36 @@ a.wordmark:hover {
   font-family: var(--font-content);
 }
 
+/* LIN-4010: the folds are one row of toggles, Sessions with its count; each body opens under the row. */
+.opened-task-folds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4em 1.2em;
+  padding: 2px 0 6px;
+  font-family: var(--font-content);
+}
+
+.opened-task-folds .detail-toggle {
+  display: inline-block;
+}
+
+.opened-task-fold-count {
+  color: var(--muted);
+}
+
+/* LIN-4010: Home's stage strip is a row of small chips (they wrap on a phone), not the task page's wide boxes. */
+.opened-task-home .task-strip {
+  margin-top: 6px;
+  gap: 4px;
+}
+
+.opened-task-home .task-strip-chip {
+  flex: 0 1 auto;
+  padding: 0 6px;
+  font-size: 0.8em;
+  border-radius: 999px;
+}
+
 /* LIN-3833: the run control on Home (one main action, what it runs on, the Change panel for this run only,
    Undo and Stop). The block is one slot; the prompt box and the copy-first view sit beside it. */
 .opened-task-run {
@@ -1222,11 +1252,12 @@ a.wordmark:hover {
   padding: 10px 12px;
 }
 
-.opened-task-next-kicker {
-  color: var(--muted);
-  font-size: 0.75em;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+/* LIN-4010: on a phone, Run fills the box's width under the reason: the one large target of the box. */
+@media (max-width: 640px) {
+  .opened-task-home .opened-task-next-run .opened-task-go {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 .opened-task-step {
@@ -1420,6 +1451,48 @@ a.wordmark:hover {
   color: var(--fg-dim);
   font-size: 0.9em;
   margin: 0;
+}
+
+/* LIN-4010: the Change choices are cards: the default, each saved preset, and where it runs. A pressed card is the
+   chosen one (aria-pressed, above). On a phone the cards fill the sheet's width, two to a row where they fit. */
+.opened-task-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: 6px;
+}
+
+.opened-task-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  height: auto;
+  text-align: left;
+  white-space: normal;
+}
+
+.opened-task-card-title {
+  font-weight: 600;
+}
+
+.opened-task-card-what {
+  color: var(--fg-dim);
+  font-size: 0.85em;
+}
+
+/* "Choose for this run" is a toggle; the decision panel it reveals stays in the same element, hidden until then. */
+.opened-task-choose-toggle {
+  align-self: flex-start;
+}
+
+.opened-task-choose {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.opened-task-choose[hidden] {
+  display: none;
 }
 
 /* LIN-3962: the decision panel (lib/components/decision-panel.js), the one harness, model and effort panel Models and
@@ -2537,6 +2610,11 @@ a.wordmark:hover {
 
   .details {
     padding-left: 0.75rem;
+  }
+
+  /* LIN-4010: Home's opened task takes the row's full width on a phone (its content is at least 340px at 390). */
+  .details:has(> .opened-task) {
+    padding-left: 0;
   }
 
   /* Disable hover underline on touch devices (no hover state) */

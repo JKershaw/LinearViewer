@@ -22,6 +22,14 @@ test.beforeEach(async ({ page, localWorkerUrlKey }) => {
   await page.goto(`/test/clear-sessions-feed-cache?urlKey=${URL_KEY}`);
 });
 
+// Leave the shared workspace as it was found: these tests leave running sessions, and a running session would move
+// the next step another spec reads from the same workspace.
+test.afterEach(async ({ page, localWorkerUrlKey }) => {
+  for (const reset of ['clear-dispatch-queue', 'clear-dispatch-history', 'clear-agent-status']) {
+    await page.request.get(`/test/${reset}?urlKey=${localWorkerUrlKey}`);
+  }
+});
+
 /** One In Progress task with a project. An owner with a runner, unless `runnerKey` is false (a new user). */
 async function seedTask(page, { runnerKey = true } = {}) {
   const id = (raw) => localSeedId(URL_KEY, raw);
@@ -105,6 +113,18 @@ for (const [label, viewport] of [['1280px', DESKTOP], ['390px', PHONE]]) {
       expect(whyBox.y, 'the reason is below the step').toBeGreaterThanOrEqual(stepBox.y);
       // On the first screen: the button's bottom edge is inside the viewport.
       expect(runBox.y + runBox.height, 'Run is on the first screen').toBeLessThanOrEqual(viewport.height);
+
+      if (viewport === PHONE) {
+        // LIN-4010 review: at 390 Run fills the box under the reason, the opened task is at least 340px wide, and the
+        // page does not scroll sideways.
+        const nextBox = await box(next);
+        const runFull = await box(run);
+        expect(runFull.width, 'Run fills the box width at 390').toBeGreaterThanOrEqual(nextBox.width * 0.9);
+        const taskBox = await box(block);
+        expect(taskBox.width, 'the opened task is at least 340px wide at 390').toBeGreaterThanOrEqual(340);
+        const sideways = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+        expect(sideways, 'no sideways scroll at 390').toBeLessThanOrEqual(0);
+      }
     });
   });
 }
@@ -126,6 +146,14 @@ for (const [label, viewport] of [['1280px', DESKTOP], ['390px', PHONE]]) {
       await expect(runningBox.locator('.opened-task-running-title')).toHaveText('Running now');
       await expect(block.locator('.opened-task-running-title')).toHaveCount(1);
       await expect(block.locator('[data-testid="opened-task-last"]')).toHaveCount(0);
+      // LIN-4010 review: the state is said once. Home's line is gone while it runs, and the stage chip for Build shows
+      // its minutes; the word "running" is for screen readers only (a visually hidden span, not the visible text).
+      await expect(block.locator('[data-testid="home-task-sentence"]')).toHaveCount(0);
+      await expect(block.locator('[data-testid="home-task-status-pill"]')).toHaveCount(0);
+      const buildChip = block.locator('[data-testid="task-page-strip-chip"][data-kind="implementation"]');
+      const visibleWords = await buildChip.locator('.task-strip-state').evaluate((el) => [...el.childNodes]
+        .filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.textContent).join('').trim());
+      expect(visibleWords, 'the chip shows its minutes, not the word').not.toMatch(/running/);
       const stop = runningBox.locator('[data-testid="run-stop"]');
       await expect(stop).toBeVisible();
       const stopBox = await box(stop);
@@ -157,6 +185,23 @@ test.describe('Change is a drawer at desktop width, and Escape closes it (LIN-40
     }, { message: 'the drawer is within a scrollbar of the window\'s right edge' }).toBeLessThanOrEqual(24);
     expect((await drawer.boundingBox()).x, 'the drawer is in the right half').toBeGreaterThan(DESKTOP.width / 2);
 
+    // LIN-4010 review: Change is a choice. The default is a card; the decision panel is hidden until "Choose for this run".
+    await expect(drawer.locator('[data-testid="run-default"]')).toBeVisible();
+    await expect(drawer.locator('[data-testid="run-choose-panel"]')).toBeHidden();
+    await drawer.locator('[data-testid="run-choose"]').click();
+    await expect(drawer.locator('[data-testid="run-choose-panel"]')).toBeVisible();
+
+    // Tab from the last control wraps to the first, so focus stays in the drawer (a modal sheet on a phone).
+    await drawer.locator('a').last().focus();
+    await page.keyboard.press('Tab');
+    const wrapped = await page.evaluate(() => {
+      const d = document.querySelector('[data-testid="run-change-panel"]');
+      const first = [...d.querySelectorAll('button:not([disabled]), input:not([disabled]), select, textarea, a[href]')]
+        .find((el) => el.getClientRects().length > 0);
+      return document.activeElement === first;
+    });
+    expect(wrapped, 'Tab wraps to the first control inside the drawer').toBe(true);
+
     await page.keyboard.press('Escape');
     await expect(drawer).toHaveCount(0);
     const focused = await page.evaluate(() => document.activeElement && document.activeElement.getAttribute('data-action'));
@@ -176,5 +221,120 @@ test.describe("a new user's Home says no idle and no No sessions yet (LIN-4010)"
     await expect(block).not.toContainText('idle');
     await expect(block).not.toContainText('No sessions yet');
     await expect(page.locator('body')).not.toContainText('No sessions yet');
+  });
+});
+
+// LIN-4010 review: the review-shaped Home. Three In Progress tasks, the opened one third, and a six-stage running task
+// (Research, Plan, Plan review and Plan done; Build running; Review and Close-out ahead). Light and dark, at 390 and 1280.
+const LIGHT_AND_DARK = [['light', null], ['dark', 'dark']];
+
+async function seedReviewShaped(page) {
+  const id = (raw) => localSeedId(URL_KEY, raw);
+  const issue = (identifier, sortOrder) => ({
+    id: id(`rs-${identifier}`), identifier, title: `Task ${identifier}`, description: 'Seeded task', projectId: id('rs-proj'),
+    sortOrder, state: { name: 'In Progress', type: 'started' }, url: `/workspace/${URL_KEY}/issue/${id(`rs-${identifier}`)}`,
+  });
+  const resp = await page.request.post('/test/set-local-session', {
+    data: {
+      urlKey: URL_KEY,
+      runnerKey: true,
+      openRouterConnected: false,
+      projects: [{ id: id('rs-proj'), name: 'Review project', content: 'A project', sortOrder: 1 }],
+      issues: [issue('LOCAL-R0', 1), issue('LOCAL-R0B', 2), issue(TOP, 3)],
+    },
+  });
+  expect(resp.ok(), `local seed failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();
+}
+
+for (const [label, viewport] of [['1280px', DESKTOP], ['390px', PHONE]]) {
+  for (const [theme, cookie] of LIGHT_AND_DARK) {
+    test.describe(`the review-shaped Home at ${label}, ${theme} (LIN-4010 review)`, () => {
+      test.use({ viewport, isMobile: viewport === PHONE, hasTouch: viewport === PHONE });
+
+      test('one running box with Stop in view, six chips with the minutes only, no sideways scroll, readable text', async ({ page }) => {
+        await seedReviewShaped(page);
+        const token = await runnerToken(page);
+        for (const kind of ['research', 'plan', 'plan-review']) await seedSession(page, token, { kind, feedback: '[done] done it' });
+        await seedSession(page, token, { kind: 'implementation', feedback: null });
+        await gotoHome(page);
+        if (cookie) {
+          await page.context().addCookies([{ name: 'theme', value: cookie, url: page.url() }]);
+          await gotoHome(page);
+          await expect(page.locator('html')).toHaveClass(/theme-dark/);
+        }
+        // The running task is the third row, not the first: open it by its own row.
+        await page.locator(`.line[data-section="in-progress"][data-identifier="${TOP}"]`).click();
+        const block = page.locator('.opened-task').first();
+        await expect(block).toBeVisible();
+
+        const runningBox = block.locator('[data-testid="opened-task-running"]');
+        await expect(runningBox).toBeVisible();
+        const stop = runningBox.locator('[data-testid="run-stop"]');
+        await expect(stop).toBeVisible();
+        const stopBox = await box(stop);
+        expect(stopBox.y + stopBox.height, 'Stop is on the first screen').toBeLessThanOrEqual(viewport.height);
+
+        // Six chips, one per usual stage; the running one shows its minutes and not the word.
+        await expect(block.locator('[data-testid="task-page-strip-chip"]')).toHaveCount(6);
+
+        if (viewport === PHONE) {
+          const sideways = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+          expect(sideways, 'no sideways scroll at 390').toBeLessThanOrEqual(0);
+        }
+
+        // Readable in both themes: the running title's text against the opened task's own background, WCAG AA (4.5:1).
+        const ratio = await page.evaluate(() => {
+          const luminance = (rgb) => {
+            const [r, g, b] = rgb.map((c) => { const s = c / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; });
+            return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+          };
+          const parse = (css) => css.match(/\d+(\.\d+)?/g).slice(0, 3).map(Number);
+          const fg = parse(getComputedStyle(document.querySelector('.opened-task-running-title')).color);
+          const bg = parse(getComputedStyle(document.querySelector('.opened-task')).backgroundColor);
+          const [a, b] = [luminance(fg), luminance(bg)].sort((x, y) => y - x);
+          return (a + 0.05) / (b + 0.05);
+        });
+        expect(ratio, 'the running title reads against its background').toBeGreaterThanOrEqual(4.5);
+      });
+    });
+  }
+}
+
+test.describe('the state poll repaints the run box without losing a Change draft or an open prompt (LIN-4010)', () => {
+  test.use({ viewport: DESKTOP });
+
+  test('a queued run flips to running on the poll; the drawer draft and the prompt body survive the repaint', async ({ page }) => {
+    test.setTimeout(90000);
+    await seedTask(page);
+    const token = await runnerToken(page);
+    await seedSession(page, token, { kind: 'plan', feedback: '[done] planned it' });
+    await gotoHome(page);
+    const block = await openTopTask(page);
+
+    // An open prompt body: the step's prompt, read without a model call.
+    await block.locator('[data-testid="run-see-prompt"]').click();
+    await expect(block.locator('[data-prompt-body]')).toBeVisible();
+
+    // A Change draft in progress: Claude Code on the web picked, not yet used.
+    await block.locator('[data-testid="run-change"]').click();
+    const drawer = block.locator('[data-testid="run-change-panel"]');
+    await drawer.locator('[data-testid="run-target-web"]').click();
+    await expect(drawer.locator('[data-testid="run-target-web"]')).toHaveAttribute('aria-pressed', 'true');
+
+    // Run: the dispatch is queued, and the page starts its state poll. The runner takes the item; the next poll flips
+    // the box to running.
+    const posted = page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname.endsWith('/api/dispatch'));
+    await block.locator('[data-testid="opened-task-go"]').click();
+    const itemId = (await (await posted).json()).item.id;
+    await expect(block.locator('[data-testid="opened-task-queued"]')).toBeVisible();
+    const taken = await page.request.post(`/api/dispatch/take/${itemId}`, { headers: { Authorization: `Bearer ${token}` } });
+    expect(taken.status(), `take failed: ${await taken.text()}`).toBe(200);
+
+    await expect(block.locator('[data-testid="opened-task-running"]')).toBeVisible({ timeout: 40000 });
+    await expect(block.locator('.opened-task-running-title')).toHaveText('Running now');
+    // The repaint replaced the state slot and the run box, and left the drawer, its draft and the prompt body alone.
+    await expect(drawer).toBeVisible();
+    await expect(drawer.locator('[data-testid="run-target-web"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(block.locator('[data-prompt-body]')).toBeVisible();
   });
 });

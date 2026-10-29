@@ -45,7 +45,9 @@ const TESTID_VERDICTS = {
   'sessions-toggle': 'the Sessions fold toggle (runControls only)',
   'attachments-toggle': 'the attachments fold toggle (images only)',
   'attachments-content': 'the attachments fold content (images only)',
-  'opened-task-runner-link': 'the quiet runner line for copy-first viewers (renderRunnerLink)'
+  'opened-task-folds': 'the one row of folds: Sessions (with its count), Description, Comments (LIN-4010)',
+  'opened-task-runner-line': 'the copy-first runner line, the Home box\'s foot (LIN-4010: rendered by PromptSection)',
+  'opened-task-runner-link': 'the quiet runner link for copy-first viewers (renderRunnerLink, or the client twin)'
 };
 
 function home(featureFlags, provider = null) {
@@ -80,9 +82,11 @@ describe('LIN-3833 C13 — every toggle and testid the Home opened task renders 
     assert.equal(/Details ▶|Prompts ▶/.test(html), false);
   });
 
-  test('the runner line goes to copy-first viewers only, and keeps its testid', () => {
+  // LIN-4010: the copy-first runner line is the Home box's foot, rendered by PromptSection (lin-4010 unit test). The
+  // fragment no longer appends it after the folds, for either viewer.
+  test('the fragment carries no runner line: the copy-first foot is the client\'s', () => {
     assert.equal(testids(home({ runControls: true })).includes('opened-task-runner-link'), false);
-    assert.equal(testids(home({ runControls: false })).includes('opened-task-runner-link'), true);
+    assert.equal(testids(home({ runControls: false })).includes('opened-task-runner-link'), false);
   });
 
   test('the Sessions fold is for run-controls viewers only', () => {

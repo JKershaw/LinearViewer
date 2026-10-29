@@ -40,10 +40,21 @@ function stripOf(sessions, trackerType = 'started') {
   return renderStageStrip({ stages: buildTaskStages(sessions, { trackerType }), nextStep: nextStepOf(sessions, trackerType) }, { now: NOW });
 }
 
-/** Each chip as `{name, word, offered}`. */
+/**
+ * Each chip as `{name, word, spoken, offered}`: `word` is what the chip shows, `spoken` the word a screen reader
+ * hears (LIN-4010: a running chip shows its minutes, and says "running" in a visually hidden span).
+ */
 function chipsOf(html) {
-  return [...html.matchAll(/<li class="task-strip-chip"([^>]*)><span class="task-strip-name">([^<]+)<\/span> <span class="task-strip-state">([^<]+)<\/span><\/li>/g)]
-    .map(m => ({ name: m[2], word: m[3], offered: /data-offered="true"/.test(m[1]) }));
+  return [...html.matchAll(/<li class="task-strip-chip"([^>]*)><span class="task-strip-name">([^<]+)<\/span> <span class="task-strip-state">([\s\S]*?)<\/span><\/li>/g)]
+    .map(m => {
+      const spoken = (m[3].match(/<span class="task-strip-srword">([^<]*)<\/span>/) || [])[1];
+      return {
+        name: m[2],
+        word: m[3].replace(/<span class="task-strip-srword">[^<]*<\/span>/, ''),
+        spoken: spoken ? spoken.trim() : null,
+        offered: /data-offered="true"/.test(m[1]),
+      };
+    });
 }
 
 describe('LIN-3968 — the stage strip: one row, one chip per stage', () => {
@@ -56,7 +67,9 @@ describe('LIN-3968 — the stage strip: one row, one chip per stage', () => {
 
   test('while Build runs, its chip says the minutes and no chip is offered', () => {
     const chips = chipsOf(stripOf([sess('plan', 'done'), sess('implementation', 'running', { loop: { takenAt: '2026-10-25T13:54:00.000Z', dispatchedAt: '2026-10-25T13:50:00.000Z' } })]));
-    assert.equal(chips.find(c => c.name === 'Build').word, 'running 6m');
+    const build = chips.find(c => c.name === 'Build');
+    assert.equal(build.word, '6m', 'the chip shows the minutes');
+    assert.equal(build.spoken, 'running', 'the word stays for screen readers');
     assert.equal(chips.some(c => c.offered), false, 'no step is offered while a stage runs');
   });
 

@@ -231,6 +231,28 @@ describe('LIN-4010 — Home\'s state is one line, with no "Harbour:" label', () 
     const model = buildTaskPageModel({ identifier: 'LIN-83', loops: [doneLoop('plan', { issueIdentifier: 'LIN-83' })], ctx: null, enrichLoop, deriveSessionWaiting, now: NOW });
     assert.equal(sessionSummaryOf(model).offered.reason, 'usually next after Plan');
   });
+
+  // LIN-4010 review (finding 1): a running task names its state once, in the running box, so Home's line is left out.
+  test('a running task has no Home state line: the running box says it once', () => {
+    const model = { status: 'running', sentence: 'Build running for 1s.', sentenceAt: null, sessions: [{ kind: 'implementation', state: 'running' }] };
+    assert.equal(renderHomeStatus(model, { now: NOW }), '');
+  });
+
+  // LIN-4010 review (finding 2): an idle task's "Last: …" is the Last line under the run box, not a second copy here.
+  test('an idle task with sessions says "No session running." on Home; the Last clause is not repeated', () => {
+    const model = {
+      status: 'idle', sentence: 'No session running. Last: Plan done just now.', sentenceAt: '2026-10-29T10:03:00.000Z',
+      sessions: [{ kind: 'plan', state: 'done' }], waitingFor: null,
+    };
+    const html = renderHomeStatus(model, { now: NOW });
+    assert.match(html, /No session running\.</);
+    assert.equal(html.includes('Last:'), false);
+  });
+
+  test('an idle task with no sessions keeps its own sentence (no session words are added)', () => {
+    const model = { status: 'idle', sentence: 'No sessions yet.', sentenceAt: null, sessions: [], waitingFor: null };
+    assert.match(renderHomeStatus(model, { now: NOW }), /No sessions yet\./);
+  });
 });
 
 // ─── a new user's Home ───────────────────────────────────────────────────────
@@ -281,19 +303,20 @@ function makeContainer() {
   return container;
 }
 
-function loadClient({ stateBody = null, previewBody = null } = {}) {
-  const calls = { api: [], dispatch: [] };
+function loadClient({ stateBody = null, previewBody = null, presetsBody = [] } = {}) {
+  const calls = { api: [], dispatch: [], post: [] };
   const window = {
     escapeHtml: (x) => (x == null ? '' : escapeHtml(String(x))),
     stripCodeBlockWrapper: (x) => x,
     renderMarkdown: (x) => String(x == null ? '' : x),
-    api: async (url) => {
+    api: async (url, opts = {}) => {
       calls.api.push(url);
+      if (opts.method === 'POST') calls.post.push({ url, body: JSON.parse(opts.body) });
       if (url.includes('/api/task/')) return stateBody;
       if (url.includes('/api/task-mode/')) return { lastCopy: null };
       if (url.includes('/api/dispatch/preview')) return previewBody;
       if (url.includes('/api/dispatch/decision-panel')) return { html: '', words: null, withoutEffort: [] };
-      if (url.includes('/api/dispatch/presets')) return { presets: [] };
+      if (url.includes('/api/dispatch/presets')) return { presets: presetsBody };
       if (url.includes('/api/prompt/')) return { prompt: 'PROMPT', promptName: 'Plan' };
       return { success: true, item: { id: 'd-1' } };
     },
@@ -415,5 +438,87 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
     assert.match(c.innerHTML, /data-testid="run-change-panel"/, 'the drawer opened');
     await c.key('Escape');
     assert.equal(c.innerHTML.includes('data-testid="run-change-panel"'), false, 'Escape closed it');
+  });
+
+  // LIN-4010 review (finding 1): a running task's state is said once. Home's line is empty while it runs (the server
+  // sends none), and the client must not fall back to the task page's sentence; the strip chip shows elapsed time only.
+  test('a running task says its state once: no Home line, and the strip chip shows the elapsed time, not the word', async () => {
+    const running = { loopId: 'l1', kind: 'implementation', label: 'Build', state: 'running', since: '2026-10-29T10:00:00.000Z', target: 'cli' };
+    const { PromptSection } = loadClient({
+      stateBody: {
+        status: 'running', live: true, homeStatusHtml: '', headerHtml: '<p>Build running for 1s.</p>',
+        stripHtml: '<li class="task-strip-chip"><span class="task-strip-name">Build</span> <span class="task-strip-state">1s<span class="task-strip-srword"> running</span></span></li>',
+        sessions: { count: 1, next: { kind: 'review', label: 'Review' }, last: null, running, offered: null, busy: true, excluded: [] },
+      },
+    });
+    const c = makeContainer();
+    PromptSection.init(c, HOME);
+    await flush(); await flush();
+    assert.equal(c.innerHTML.includes('Build running for'), false, 'the state sentence is not restated');
+    assert.equal(c.innerHTML.includes('task-status-pill'), false, 'no pill beside the running box');
+    assert.match(c.innerHTML, /task-strip-state">1s<span class="task-strip-srword"> running<\/span>/);
+    assert.equal((c.innerHTML.match(/Running now/g) || []).length, 1);
+  });
+
+  // LIN-4010 review (finding 5): Watch opens the task the running box runs on, not the container it sits under.
+  test('a container\'s running box: Watch links to the subtask it runs on', async () => {
+    const focusSubtask = { identifier: 'LIN-99', title: 'The child', id: 'uuid-99', stateType: 'started', source: 'linear', href: '/workspace/acme/task/LIN-99' };
+    const running = { loopId: 'l9', kind: 'research', label: 'Research', state: 'running', since: '2026-10-29T10:00:00.000Z', target: 'cli' };
+    const { PromptSection } = loadClient({
+      stateBody: { status: 'running', live: true, homeStatusHtml: '', headerHtml: '', sessions: { count: 1, running, next: null, last: null, offered: null, busy: true, excluded: [] } },
+    });
+    const c = makeContainer();
+    PromptSection.init(c, { ...HOME, focusSubtask });
+    await flush(); await flush();
+    assert.match(c.innerHTML, /href="\/workspace\/acme\/task\/LIN-99"[^>]*data-testid="opened-task-watch"/);
+  });
+
+  // LIN-4010 review (finding 4, a missing witness): Stop on a container is the subtask's Stop, not the parent's.
+  test('Stop on a container posts the subtask it runs on', async () => {
+    const focusSubtask = { identifier: 'LIN-99', title: 'The child', id: 'uuid-99', stateType: 'started', source: 'linear', href: '/workspace/acme/task/LIN-99' };
+    const running = { loopId: 'l9', kind: 'research', label: 'Research', state: 'running', since: '2026-10-29T10:00:00.000Z', target: 'cli' };
+    const { PromptSection, calls } = loadClient({
+      stateBody: { status: 'running', live: true, homeStatusHtml: '', headerHtml: '', sessions: { count: 1, running, next: null, last: null, offered: null, busy: true, excluded: [] } },
+    });
+    const c = makeContainer();
+    PromptSection.init(c, { ...HOME, focusSubtask });
+    await flush(); await flush();
+    await c.click({ action: 'stop-run' });
+    await c.click({ action: 'stop-run-confirm' });
+    await flush();
+    assert.equal(calls.post.length, 1, 'one stop was posted');
+    assert.equal(calls.post[0].body.abort, true);
+    assert.equal(calls.post[0].body.issueIdentifier, 'LIN-99', 'the stop names the subtask, not the container');
+    assert.equal(calls.post[0].body.issueId, 'uuid-99');
+  });
+
+  // LIN-4010 review (finding 3): Change is a choice. A default card and the saved presets are the choices; "Choose for
+  // this run" reveals the existing decision panel, which stays in the drawer, hidden until it is asked for.
+  test('Change is a choice: a default card, preset cards, and "Choose for this run" reveals the decision panel', async () => {
+    const { PromptSection } = loadClient({
+      stateBody: { status: 'idle', live: false, sessions: PLAN_NEXT },
+      previewBody: { kind: 'plan-review', harness: 'claude-code', words: { model: 'Sonnet' }, sources: { model: 'job' }, group: null, stepLabel: 'Plan review' },
+      presetsBody: [{ id: 'p1', name: 'Quick' }],
+    });
+    const c = makeContainer();
+    PromptSection.init(c, HOME);
+    await flush();
+    await c.click({ action: 'change-run' });
+    await flush();
+    assert.match(c.innerHTML, /data-testid="run-default"[^>]*>[\s\S]*?Default for Plan review/);
+    assert.match(c.innerHTML, /data-testid="run-preset"[^>]*>Quick</);
+    assert.match(c.innerHTML, /data-testid="run-choose-panel"[^>]*hidden/, 'the decision panel is hidden until it is chosen');
+    await c.click({ action: 'run-choose' });
+    assert.doesNotMatch(c.innerHTML, /data-testid="run-choose-panel"[^>]*hidden/, 'choosing reveals the panel');
+  });
+
+  // LIN-4010 review (finding 3): a copy-first viewer's runner line is the view's own foot (inside the Home box), not a
+  // line the server appends after the folds.
+  test('the copy-first view carries the runner line as its foot', async () => {
+    const { PromptSection } = loadClient({ stateBody: { status: 'idle', live: false, sessions: { count: 0 } } });
+    const c = makeContainer();
+    PromptSection.init(c, { ...HOME, dispatchEnabled: false });
+    await flush(); await flush();
+    assert.match(c.innerHTML, /data-testid="opened-task-runner-line"[^>]*>[\s\S]*Set up a runner/);
   });
 });

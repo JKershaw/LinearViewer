@@ -205,8 +205,8 @@ describe('GET /workspace/:urlKey/api/task/:identifier/state', () => {
     // LIN-3968: `stripHtml` is the one-row stage strip Home pastes; `trackHtml` stays for the task page.
     // LIN-4010: `homeStatusHtml` is Home's one-line state (no "Harbour:" label); the task page keeps `headerHtml`.
     assert.deepEqual(Object.keys(res.jsonBody).sort(), ['headerHtml', 'homeStatusHtml', 'live', 'sessions', 'status', 'stripHtml', 'trackHtml']);
-    assert.match(res.jsonBody.homeStatusHtml, /data-testid="home-task-status"/);
-    assert.equal(/Harbour:/.test(res.jsonBody.homeStatusHtml), false, 'Home\'s state has no Harbour label');
+    // LIN-4010 review: a running task has no Home line (the running box names it once); the key stays, empty.
+    assert.equal(res.jsonBody.homeStatusHtml, '', 'a running task\'s Home line is empty: the running box says it');
     assert.equal(res.jsonBody.status, 'running');
     assert.equal(res.jsonBody.live, true);
     assert.match(res.jsonBody.headerHtml, /data-testid="task-page-status"/);
