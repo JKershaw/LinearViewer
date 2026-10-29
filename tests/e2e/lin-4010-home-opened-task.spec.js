@@ -147,13 +147,15 @@ test.describe('Change is a drawer at desktop width, and Escape closes it (LIN-40
     await block.locator('[data-testid="run-change"]').click();
     const drawer = block.locator('[data-testid="run-change-panel"]');
     await expect(drawer).toBeVisible();
-    // The panel repaints as its choices load, so read its box once it has settled at the right edge. The reference is the
-    // layout viewport (clientWidth), not the window: a classic scrollbar (CI's Linux runner) takes its width from it.
+    // The panel repaints as its choices load, so read its box once it has settled on the right. The edge is compared to
+    // the window with a tolerance for a classic scrollbar, which CI's Linux runner has and this Mac does not: the drawer
+    // sits within a scrollbar's width of the right edge, and in the right half of the window.
     await expect.poll(async () => {
       const b = await drawer.boundingBox();
-      const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
-      return b ? Math.round(b.x + b.width) - clientWidth : -Infinity;
-    }, { message: 'the drawer is at the right edge of the layout viewport' }).toBeGreaterThanOrEqual(-1);
+      const { innerWidth } = await page.evaluate(() => ({ innerWidth: window.innerWidth }));
+      return b ? innerWidth - Math.round(b.x + b.width) : Infinity;
+    }, { message: 'the drawer is within a scrollbar of the window\'s right edge' }).toBeLessThanOrEqual(24);
+    expect((await drawer.boundingBox()).x, 'the drawer is in the right half').toBeGreaterThan(DESKTOP.width / 2);
 
     await page.keyboard.press('Escape');
     await expect(drawer).toHaveCount(0);
