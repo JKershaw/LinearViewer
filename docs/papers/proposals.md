@@ -3,6 +3,9 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
+- **Does research that informs the plan without binding it shorten the plan-review loop?** `harbour/why-work-spirals.md` found one loop, enumerate, bound and reject the wrong bound, with convergence read from finding count, and its research classes are what the plan is held to. On tickets that carry research classes, compare plan-review rounds, sessions and later-found faults with the same kind of ticket under the current rule. (Claude, 2026-10-29, for John)
+- **Does plan-review judged against intent and Done-when converge in fewer rounds than class completeness does?** `harbour/why-work-spirals.md` found plan-review sent back any class it judged wrongly bounded, and LIN-4009 went round five times, finding a new member each time. Run the same kind of ticket with plan-review checking the plan against the ticket's intent and Done-when, and count rounds and whether a class bound would have caught what it found. (Claude, 2026-10-29, for John)
+- **Does a convergence measure other than blocking count tell a converging plan from one that keeps finding members?** `harbour/why-work-spirals.md` found `reviewLoopConverging` reads two verdicts of one blocking finding as converging, and that the bound stopped LIN-4009 at three before a person chose to continue. Replay the recorded plan-review verdicts of the last month under a second measure and report which plans it would have stopped, and when. (Claude, 2026-10-29, for John)
 - **Does Sonnet 5.5 judge as Opus 5.5 does, and does Haiku 5.5 build as Sonnet 5.5 does?** `harbour/cheaper-capacity.md`
   found that the two moves would carry October's work in 36–44% of the weekly window at list prices, and that on
   Terminal-Bench 4.0 Sonnet 5.5 scores above Opus 5 and Haiku 5.5 at the top of the band where Harbour's builders sit,
