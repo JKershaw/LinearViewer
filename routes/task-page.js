@@ -30,6 +30,7 @@
 import { Router } from 'express';
 import { renderErrorPage } from '../lib/render.js';
 import { sessionSummaryOf } from '../lib/task-page-loader.js';
+import { renderTaskQuestion } from '../lib/render-task-page.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
 import { resolveIssueBinding, isValidIssueId } from '../lib/workspace.js';
 import { jsonError } from '../lib/errors.js';
@@ -189,6 +190,9 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         stripHtml: renderStageStrip(model, { now: now() }),
         // LIN-3833: the sessions the state block and the run control read (count, last, running).
         sessions: sessionSummaryOf(model),
+        // LIN-4024: the question card, for a task waiting on an open ruling only (a parked task has none). The
+        // same renderer as the task page, so the two cannot drift.
+        questionHtml: model.waitingFor === 'ruling' ? renderTaskQuestion(model, { urlKey: workspace.urlKey }) : '',
       };
       return res.json(body);
     } catch (error) {

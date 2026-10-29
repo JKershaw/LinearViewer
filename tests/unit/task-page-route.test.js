@@ -204,7 +204,9 @@ describe('GET /workspace/:urlKey/api/task/:identifier/state', () => {
     // LIN-3833: the state endpoint also carries the session summary the opened task's state block reads.
     // LIN-3968: `stripHtml` is the one-row stage strip Home pastes; `trackHtml` stays for the task page.
     // LIN-4010: `homeStatusHtml` is Home's one-line state (no "Harbour:" label); the task page keeps `headerHtml`.
-    assert.deepEqual(Object.keys(res.jsonBody).sort(), ['headerHtml', 'homeStatusHtml', 'live', 'sessions', 'status', 'stripHtml', 'trackHtml']);
+    // LIN-4024: `questionHtml` is the question card, for a task waiting on an open ruling only (empty here: a running task).
+    assert.deepEqual(Object.keys(res.jsonBody).sort(), ['headerHtml', 'homeStatusHtml', 'live', 'questionHtml', 'sessions', 'status', 'stripHtml', 'trackHtml']);
+    assert.equal(res.jsonBody.questionHtml, '');
     // LIN-4010 review: a running task has no Home line (the running box names it once); the key stays, empty.
     assert.equal(res.jsonBody.homeStatusHtml, '', 'a running task\'s Home line is empty: the running box says it');
     assert.equal(res.jsonBody.status, 'running');

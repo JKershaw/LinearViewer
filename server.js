@@ -170,6 +170,7 @@ import { createTaskEditRoutes } from './routes/task-edit.js'
 import { createTaskCreateRoutes } from './routes/task-create.js'
 import { createTaskPageRoutes } from './routes/task-page.js'
 import { createTaskPageLoader, buildRowStates } from './lib/task-page-loader.js'
+import { rulingStandingOf } from './lib/unanswered-decisions.js'
 import { createTaskShareRoutes } from './routes/task-share.js'
 import { createLibraryRouter } from './routes/library.js'
 import { TaskShareStore } from './lib/task-share-store.js'
@@ -2007,12 +2008,14 @@ async function renderDashboardAfterRefresh(workspace, session, teamId, assigneeS
     ...runControlsBits,
     liveConsole: liveConsoleOn(session.features?.liveConsole, runControlsBits.runControls),
   };
-  const rowStates = await homeRowStates({ workspace, inProgressTrees, recentActivityTrees, projectTrees: trees, runControls: featureFlags.runControls === true });
+  const homeStates = await homeRowStates({ workspace, inProgressTrees, recentActivityTrees, projectTrees: trees, runControls: featureFlags.runControls === true });
+  const rowStates = homeStates?.states ?? null;
   const html = renderPage(trees, inProgressTrees, recentActivityTrees, organizationName, {
     teams,
     selectedTeamId,
     availableAssignees,
     rowStates,
+    rulingCount: homeStates?.rulingCount ?? 0,
     subtaskNeedsYouById: subtaskNeedingYouByNodeKey({ urlKey: workspace.urlKey, inProgressTrees, recentActivityTrees, projectTrees: trees, rowStates }),
     focusSubtaskById: focusSubtaskByNodeKey({ urlKey: workspace.urlKey, inProgressTrees, recentActivityTrees, projectTrees: trees, rowStates }),
     copyFirstCard: featureFlags.runControls !== true && session.copyFirstCardDismissed !== true,
@@ -3285,7 +3288,7 @@ app.use(createTaskCreateRoutes({ workspaceFromUrl, getOpenRouterSource, getDeplo
 // `/task/:identifier` would otherwise swallow `/task/new`.
 // `deriveSessionWaiting` is injected (a lib/ loader must not import a route),
 // and `enrichLoop` (lib/run-loop-state.js) beside it.
-const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore, agentStatusStore, briefCacheStore, recapCacheStore, readRunEvidence, prStateStore, installationTokenFor, closeOutEventsStore, enrichLoop, deriveSessionWaiting, deriveSessionDecisions })
+const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore, agentStatusStore, briefCacheStore, recapCacheStore, readRunEvidence, prStateStore, installationTokenFor, closeOutEventsStore, enrichLoop, deriveSessionWaiting, deriveSessionDecisions, taskDecisionsStore, shelvedRulingsStore })
 app.use(createTaskPageRoutes({
   workspaceFromUrl,
   getOpenRouterSource,
@@ -3457,6 +3460,7 @@ async function homeRowStates({ workspace, inProgressTrees, recentActivityTrees, 
       ...(projectTrees || []).flatMap(({ incomplete = [], completed = [] }) => [...incomplete, ...completed])
     ];
     const loopsByIdentifier = new Map();
+    let ruling = null;
     if (runControls) {
       const loops = await getLoopsForWorkspace(workspace.urlKey, { dispatchStore: dispatchQueueStore, agentStatusStore, lean: true }).catch(() => []);
       for (const loop of loops || []) {
@@ -3464,13 +3468,23 @@ async function homeRowStates({ workspace, inProgressTrees, recentActivityTrees, 
         if (!loopsByIdentifier.has(loop.issueIdentifier)) loopsByIdentifier.set(loop.issueIdentifier, []);
         loopsByIdentifier.get(loop.issueIdentifier).push(loop);
       }
+      // LIN-4024: the badge's own reduction over this workspace, so a row, the count line and the badge
+      // agree on what is open. Once per request, over the loops the page already holds.
+      const urlKeys = [workspace.urlKey];
+      ruling = rulingStandingOf({
+        urlKey: workspace.urlKey,
+        loops: loops || [],
+        taskDecisions: await taskDecisionsStore.listUnansweredForWorkspaces(urlKeys),
+        shelvedRulings: await shelvedRulingsStore.listForWorkspaces(urlKeys),
+        newestScanByTask: await taskDecisionsStore.listNewestScanPerTask(urlKeys),
+      }, { now: new Date(), enrichLoop });
     }
-    const states = buildRowStates({ roots, loopsByIdentifier, enrichLoop, deriveSessionWaiting, sessionsVisible: runControls });
-    const otherStates = buildRowStates({ roots: otherRoots, loopsByIdentifier, enrichLoop, deriveSessionWaiting, sessionsVisible: runControls });
+    const states = buildRowStates({ roots, loopsByIdentifier, enrichLoop, deriveSessionWaiting, sessionsVisible: runControls, ruling });
+    const otherStates = buildRowStates({ roots: otherRoots, loopsByIdentifier, enrichLoop, deriveSessionWaiting, sessionsVisible: runControls, ruling });
     for (const [identifier, state] of otherStates) {
       if (!states.has(identifier)) states.set(identifier, state);
     }
-    return states;
+    return { states, rulingCount: ruling ? ruling.rows.length : 0 };
   } catch (err) {
     console.error('Home row states error:', err.message);
     return null;
@@ -3515,12 +3529,14 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
     const homeTopTask = orderedHome.find((issue) => !issue.isSeed) || null;
     const seedOnlyHome = orderedHome.length > 0 && orderedHome.every((issue) => issue.isSeed);
     const featureFlags = await requestFeatureFlags(req);
-    const rowStates = await homeRowStates({ workspace, inProgressTrees, recentActivityTrees, projectTrees: trees, runControls: featureFlags.runControls === true });
+    const homeStates = await homeRowStates({ workspace, inProgressTrees, recentActivityTrees, projectTrees: trees, runControls: featureFlags.runControls === true });
+    const rowStates = homeStates?.states ?? null;
     const html = renderPage(trees, inProgressTrees, recentActivityTrees, organizationName, {
       teams,
       selectedTeamId,
       availableAssignees,
       rowStates,
+      rulingCount: homeStates?.rulingCount ?? 0,
       subtaskNeedsYouById: subtaskNeedingYouByNodeKey({ urlKey: workspace.urlKey, inProgressTrees, recentActivityTrees, projectTrees: trees, rowStates }),
       focusSubtaskById: focusSubtaskByNodeKey({ urlKey: workspace.urlKey, inProgressTrees, recentActivityTrees, projectTrees: trees, rowStates }),
       copyFirstCard: featureFlags.runControls !== true && req.session.copyFirstCardDismissed !== true,

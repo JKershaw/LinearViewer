@@ -57,6 +57,7 @@ const rulingLoop = (over = {}) => loop({
 });
 // A waiting session with no structured question: a park.
 const parkLoop = (over = {}) => loop({
+  loopId: 'park-1', lineageId: 'park-1',
   wakeMarker: 'blocked', waitingMessage: '[blocked] waiting on the vendor',
   feedback: [{ message: '[blocked] waiting on the vendor', timestamp: '2026-10-29T10:05:00.000Z' }], ...over,
 });
@@ -136,11 +137,13 @@ describe('LIN-4010 — a waiting task is a ruling or a park', () => {
     assert.equal(s.get('LIN-63').needsYou, false);
     assert.equal(s.get('LIN-63').words, 'parked');
     assert.equal(s.get('LIN-63').tone, 'parked');
+    // LIN-4024: the count line counts rulings (one open ruling here) and tasks that run or failed; a park is neither.
     const parts = buildInProgressCountParts(
       [{ projectName: 'P', roots }],
       s,
+      { rulingCount: 1 },
     ).map((p) => p.text);
-    assert.deepEqual(parts, ['2 in progress', '1 needs you']);
+    assert.deepEqual(parts, ['1 waiting on you']);
   });
 
   test('a failed stage still needs a person, whatever the waiting word', () => {
@@ -158,8 +161,10 @@ describe('LIN-4010 — a container\'s row names the subtask its opened task runs
   test('an open child and nothing of the container\'s own: the row names the child and its step, and the focus is the child', () => {
     const parent = node('LIN-70', 'started', [child()]);
     const s = states({ roots: [parent] });
-    assert.equal(s.get('LIN-70').words, 'LIN-71 · Research next');
+    // LIN-4024: the row says its state once; the subtask it runs on is named in runOn, not in the words.
+    assert.equal(s.get('LIN-70').words, 'Research next');
     assert.equal(s.get('LIN-70').focus.identifier, 'LIN-71');
+    assert.equal(s.get('LIN-70').runOn.identifier, 'LIN-71');
     assert.equal(s.get('LIN-70').tone, 'ready');
   });
 
@@ -195,7 +200,8 @@ describe('LIN-4010 — a container\'s row names the subtask its opened task runs
     const parent = node('LIN-77', 'started', [node('LIN-78', 'started')]);
     const s = states({ roots: [parent], loops: { 'LIN-78': [loop({ issueIdentifier: 'LIN-78', kind: 'plan' })] } });
     assert.equal(s.get('LIN-77').focus.identifier, 'LIN-78');
-    assert.match(s.get('LIN-77').words, /^LIN-78 · Plan running/);
+    assert.match(s.get('LIN-77').words, /^Plan running/);
+    assert.equal(s.get('LIN-77').runOn.identifier, 'LIN-78');
     assert.equal(s.get('LIN-77').running, true, 'the count line counts a container whose subtask runs');
   });
 
