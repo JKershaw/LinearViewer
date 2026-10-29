@@ -97,3 +97,61 @@ describe('the Home mount — each opened row gets its container flag and the sta
     mount([]);
   });
 });
+
+describe('the Sessions fold on Home reads as sessions (public/sessions.js)', () => {
+  const SESSIONS = readFileSync(join(__dirname, '../../public/sessions.js'), 'utf8');
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  // Loads the real renderer over a fake container; `api` answers the sessions read.
+  function load(sessions, opts) {
+    let html = '';
+    const container = {
+      get innerHTML() { return html; },
+      set innerHTML(v) { html = v; },
+      classList: { add() {} },
+      setAttribute() {},
+      querySelector() { return null; },
+    };
+    const window = {
+      escapeHtml: (x) => String(x == null ? '' : x).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]),
+      relativeTime: () => '3m ago',
+      taskPageHref: () => '/workspace/acme/task/LIN-42',
+      api: async () => ({ sessions }),
+    };
+    const sandbox = { window, console };
+    vm.createContext(sandbox);
+    vm.runInContext(SESSIONS, sandbox, { filename: 'sessions.js' });
+    sandbox.window.SessionsSection.init(container, { urlKey: 'acme', identifier: 'LIN-42', ...opts });
+    return flush().then(flush).then(() => html);
+  }
+
+  const SESSION = {
+    loopId: 'l1', iteration: 2, promptName: 'Prompt', stage: 'implementation', agentState: 'running',
+    dispatchedAt: '2026-10-29T10:00:00.000Z',
+    feedback: [
+      { message: '[decision] {"decision_id":"lin4012-rc","question":"Re-dispatch?"}', timestamp: null },
+      { message: '[blocked] the research session was cancelled', timestamp: null },
+      { message: 'Checked the migration by hand', timestamp: null },
+    ],
+  };
+
+  test('Home: stage word, state word and time; no prompt name, iteration, [blocked] tag or decision JSON', async () => {
+    const html = await load([SESSION], { home: true, stageWords: { implementation: 'Build' } });
+    assert.equal(html.includes('dispatched sessions'), false, 'no machine label');
+    assert.match(html, /session-stage">Build</, 'the stage word names the step');
+    assert.match(html, /session-state-word">running</);
+    assert.equal(html.includes('Prompt'), false, 'the prompt name is not shown');
+    assert.equal(html.includes('#2'), false, 'the iteration is not shown');
+    assert.equal(html.includes('[blocked]'), false, 'the [blocked] tag is dropped');
+    assert.equal(html.includes('decision_id'), false, 'decision JSON is not shown');
+    assert.equal(html.includes('[decision]'), false, 'decision lines are not shown');
+    assert.match(html, /the research session was cancelled/, 'the line a person wrote stays, without its tag');
+    assert.match(html, /Checked the migration by hand/);
+  });
+
+  test('Swipe keeps its own fold, with the machine label and the prompt name (its bytes are unchanged)', async () => {
+    const html = await load([SESSION], {});
+    assert.match(html, /dispatched sessions/);
+    assert.match(html, /Prompt/);
+  });
+});

@@ -45,6 +45,24 @@
     return STATE_INDICATORS[agentState] || STATE_INDICATORS.queued;
   }
 
+  // LIN-4024 (look): Home's Sessions fold reads as sessions, not machine output. The state word is a plain word; the
+  // stage is its stage word ("Build", not "impl"); a session's prompt name and iteration are not shown.
+  const HOME_STATE_WORDS = {
+    queued: 'queued', running: 'running', waiting: 'waiting on you', complete: 'done', error: 'failed'
+  };
+
+  // Home shows a ruling as the question card in the opened task, so the fold keeps only what a person wrote: a
+  // decision's machine lines and its JSON are left out, and a [blocked] tag is dropped from the line it marks.
+  function humanFeedback(feedback) {
+    return (feedback || []).reduce((kept, f) => {
+      const message = String((f && f.message) || '').replace(/^\[(blocked|decision)\]\s*/, '').trim();
+      if (!message || message.startsWith('{')) return kept;
+      if (/^\[decision\]/.test(f && f.message ? f.message : '')) return kept;
+      kept.push({ message, timestamp: f.timestamp });
+      return kept;
+    }, []);
+  }
+
   // Canonical relative-time helper lives in common.js (window.relativeTime,
   // LIN-421); converges onto the shared "Behavior B" formatter.
   const relativeTime = window.relativeTime;
@@ -69,6 +87,26 @@
     return `<div class="session-feedback">${entries}</div>`;
   }
 
+  function renderHomeSession(s, opts) {
+    const si = stateIndicator(s.agentState);
+    const time = relativeTime(s.dispatchedAt);
+    const stage = (opts.stageWords && opts.stageWords[s.stage]) || stageLabel(s.stage);
+    const summaryHtml = s.agentSummary
+      ? `<div class="session-summary">${esc(s.agentSummary)}</div>`
+      : '';
+    return `
+      <div class="session-entry" data-agent-state="${esc(s.agentState || '')}">
+        <div class="session-header">
+          <span class="session-state ${si.css}">${si.symbol}</span>
+          <span class="session-stage">${esc(stage)}</span>
+          <span class="session-state-word">${esc(HOME_STATE_WORDS[s.agentState] || s.agentState || '')}</span>
+          <span class="session-time">${esc(time)}</span>
+        </div>
+        ${summaryHtml}
+        ${renderFeedback(humanFeedback(s.feedback))}
+      </div>`;
+  }
+
   function renderSession(s) {
     const si = stateIndicator(s.agentState);
     const time = relativeTime(s.dispatchedAt);
@@ -91,6 +129,14 @@
 
   function header(count, opts) {
     const refresh = `<button type="button" class="sessions-refresh" data-sessions-refresh>↻ refresh</button>`;
+    // Home's fold: the count and refresh only; the opened task names its own task page.
+    if (opts.home) {
+      return `
+      <div class="sessions-header">
+        <span class="sessions-count-meta">${count} ${count === 1 ? 'session' : 'sessions'}</span>
+        ${refresh}
+      </div>`;
+    }
     // LIN-3331: the one link through to this issue's task page, built by the
     // shared client helper so the path/`?source=` matches every other surface.
     const taskHref = window.taskPageHref({
@@ -116,7 +162,8 @@
         ${header(0, opts)}
         <div class="sessions-empty">No sessions yet. Dispatch a prompt to start one.</div>`;
     }
-    return `${header(sessions.length, opts)}${sessions.map(renderSession).join('')}`;
+    const rows = opts.home ? sessions.map(s => renderHomeSession(s, opts)) : sessions.map(renderSession);
+    return `${header(sessions.length, opts)}${rows.join('')}`;
   }
 
   function renderLoading(opts) {
@@ -125,10 +172,11 @@
       <div class="sessions-empty sessions-loading">Loading sessions…</div>`;
   }
 
-  function renderError(message) {
+  function renderError(message, opts) {
+    const label = opts && opts.home ? 'Sessions · could not load' : 'dispatched sessions · error';
     return `
       <div class="sessions-header">
-        <span class="sessions-status-label">dispatched sessions · error</span>
+        <span class="sessions-status-label">${label}</span>
         <button type="button" class="sessions-refresh" data-sessions-refresh>↻ retry</button>
       </div>
       <div class="sessions-empty sessions-error">${esc(message || 'Could not load sessions.')}</div>`;
@@ -154,7 +202,7 @@
       // Self-heal the accordion header count from the authoritative fetch.
       if (typeof opts.onCount === 'function') opts.onCount(sessions.length);
     } catch (err) {
-      applyState(container, renderError(err && err.message), 'error');
+      applyState(container, renderError(err && err.message, opts), 'error');
     }
     wireRefresh(container, opts);
   }
@@ -167,6 +215,8 @@
    * @param {string} opts.urlKey      - Workspace url key.
    * @param {string} opts.identifier  - Linear issue identifier (LIN-123) or id.
    * @param {Function} [opts.onCount] - Called with the fetched session count.
+   * @param {boolean} [opts.home] - LIN-4024: Home's fold (sessions read as stage, state and time; no machine lines).
+   * @param {Object} [opts.stageWords] - LIN-4024: the stage words Home names each step by ("Build", not "impl").
    */
   function init(container, opts) {
     if (!container || !opts || !opts.urlKey || !opts.identifier) return;

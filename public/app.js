@@ -223,7 +223,8 @@ function loadLazySection(type, toggle, content) {
     const placeholder = content.querySelector('[data-sessions-placeholder="1"]')
     if (placeholder && window.SessionsSection) {
       placeholder.removeAttribute('data-sessions-placeholder')
-      window.SessionsSection.init(placeholder, { urlKey, identifier, source })
+      // LIN-4024: Home's fold reads as sessions, with the stage words the opened task names its steps by.
+      window.SessionsSection.init(placeholder, { urlKey, identifier, source, home: true, stageWords: (window.__HOME_PROMPT_OPTS__ || {}).stageWords })
     }
   } else if (type === 'context') {
     const placeholder = content.querySelector('[data-context-placeholder="1"]')
