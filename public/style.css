@@ -1435,11 +1435,18 @@ a.wordmark:hover {
 .opened-task-change-panel {
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 10px 12px;
+  padding: 8px 10px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   background: var(--card);
+  /* LIN-4024: the sheet is tighter than the body (its lines at 1.4, its gaps at 6px), so "Use for this run" stays inside a
+     phone's first screen with the 12-13px text (LIN-3987's budget). */
+  line-height: 1.4;
+}
+
+.opened-task-change-panel .btn {
+  font-size: 0.75rem;
 }
 
 /* LIN-4010: on Home and on desktop, Change is a side drawer, so it does not push the rest of Home down. The phone
