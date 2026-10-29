@@ -110,15 +110,19 @@ to its parent is a pure function of `(outcome, edge.subscription)`:
 | **FAILED** | bubbles | bubbles |
 | **BLOCKED** | bubbles | bubbles |
 | **PENDING-internal** | silent | silent |
-| **PENDING-external** | silent | bubbles |
+| **PENDING-external** (leaf worker) | bubbles | bubbles |
+| **PENDING-external** (child autopilot) | silent | bubbles |
 
 - **DONE, FAILED, and BLOCKED always bubble**, regardless of subscription level. DONE/FAILED
   = "the branch finished" (well / badly); BLOCKED = "I need you now." A parent always learns
   of all three.
 - **PENDING-internal never bubbles.** It is internal noise; the node self-wakes.
-- **PENDING-external bubbles only on an `everything` edge.** This is the one row the
-  subscription level controls — the difference between a stepper (wants every beat) and an
-  orchestrator (wants only terminal outcomes).
+- **PENDING-external bubbles on an `everything` edge, and on a `terminal-only` edge when the
+  child is a leaf worker (LIN-4027).** A leaf cannot dispatch, so its hand-back can only be
+  resolved by its parent; since LIN-2203 a parent-gated worker says PENDING-external rather
+  than BLOCKED, so a silent row here would wedge the run. A child autopilot's pause stays
+  silent on a `terminal-only` edge: its coordinator wants only its terminal outcomes. The
+  subscription level still decides the child-autopilot row and every beat of a stepper.
 
 ## 6. The edge schema
 
@@ -224,8 +228,9 @@ A dispatcher conforms to this protocol when:
 - [ ] `PENDING:` is split by evidence-first, ask-second classification (§4).
 - [ ] The warm receive (stop-hook long poll) is armed on every stop **except**
       PENDING-internal; a ≈60-min no-activity failsafe re-fires the sentinel over resume (§8).
-- [ ] PENDING-internal never wakes the parent; PENDING-external wakes only on an
-      `everything` edge (§5, §8).
+- [ ] PENDING-internal never wakes the parent; PENDING-external wakes on an `everything`
+      edge, and on a `terminal-only` edge unless the child is a `kind: 'autopilot'`
+      coordinator (§5, §8; LIN-4027).
 - [ ] DONE, FAILED, and BLOCKED always bubble (§5).
 - [ ] Each edge carries an explicit `subscription` enum, not a reconstructed boolean (§6).
 - [ ] A node can address only its parent; multi-level is re-originated per hop (§7).

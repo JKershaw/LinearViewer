@@ -5,8 +5,9 @@
  *  - PURE CORE: buildWakeFollowUp(child, feedback) → the parent-addressed wake
  *    follow-up descriptor, or null. Asserts the descriptor shape and the §5
  *    bubbling matrix: terminals + [blocked] ALWAYS bubble (any subscription level);
- *    [pending] (PENDING-external) bubbles ONLY on an `everything` edge. Plus every
- *    structural null case (loop guard, self-skip, no parent edge).
+ *    [pending] (PENDING-external) bubbles on an `everything` edge, and on a leaf's
+ *    `terminal-only` edge too (LIN-4027; a child autopilot's pause stays silent).
+ *    Plus every structural null case (loop guard, self-skip, no parent edge).
  *  - EFFECT: the addFeedback seam in DispatchQueueStore resolves the up-chain edge
  *    from the ROOT subscribed dispatch (walking followUpTo) — NOT the possibly
  *    repointed / kind:'wake' feedback item (LIN-1059) — fires once per NEW wake
@@ -21,6 +22,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildWakeFollowUp, classifyWake, wakeFingerprint } from '../../lib/dispatch-wake.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
+import { DISPATCH_KINDS } from '../../lib/prompt-templates.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 
 // A child dispatch: a parent edge (sessionId), a distinct id (not self), an
@@ -94,17 +96,38 @@ describe('buildWakeFollowUp — the §5 bubbling matrix', () => {
     assert.ok(wake, 'a terminal outcome bubbles even on an undeclared edge');
   });
 
-  test('[pending] is SILENT on a terminal-only edge (the one row subscription controls)', () => {
+  test('[pending] is SILENT for a child autopilot on a terminal-only edge (LIN-4027: a coordinator pause)', () => {
     assert.equal(
-      buildWakeFollowUp(makeChild({ subscription: 'terminal-only' }), [{ message: '[pending] beat 1 done' }]),
+      buildWakeFollowUp(makeChild({ kind: 'autopilot', subscription: 'terminal-only' }), [{ message: '[pending] beat 1 done' }]),
       null,
-      'PENDING-external does not bubble on a terminal-only edge'
+      'a child autopilot pausing does not wake its coordinator on a terminal-only edge'
     );
     assert.equal(
-      buildWakeFollowUp(makeChild({ subscription: undefined }), [{ message: '[pending] beat 1 done' }]),
+      buildWakeFollowUp(makeChild({ kind: 'autopilot', subscription: undefined }), [{ message: '[pending] beat 1 done' }]),
       null,
       'and not on an undeclared (default terminal-only) edge'
     );
+  });
+
+  test('[pending] BUBBLES for a leaf worker on a terminal-only or undeclared edge, carrying its own words (LIN-4027)', () => {
+    const pending = [{ message: '[pending] Not done — The orchestrator owes the next implementation session' }];
+    for (const subscription of ['terminal-only', undefined]) {
+      const wake = buildWakeFollowUp(makeChild({ kind: 'implementation', subscription }), pending);
+      assert.ok(wake, `a leaf [pending] wakes its parent on subscription=${subscription}`);
+      assert.ok(wake.prompt.includes('The orchestrator owes the next implementation session'), 'the wake carries the worker\'s own words');
+    }
+  });
+
+  test('every leaf kind wakes on [pending] over a terminal-only or undeclared edge (LIN-4027)', () => {
+    // Every kind a worker can carry, minus the two that are never leaves: `autopilot`
+    // (a coordinator, silent by design) and `wake` (the loop guard, always null).
+    const leafKinds = DISPATCH_KINDS.filter(kind => kind !== 'autopilot' && kind !== 'wake');
+    const pending = [{ message: '[pending] waiting on the parent' }];
+    for (const kind of leafKinds) {
+      for (const subscription of ['terminal-only', undefined]) {
+        assert.ok(buildWakeFollowUp(makeChild({ kind, subscription }), pending), `${kind} on subscription=${subscription} wakes its parent`);
+      }
+    }
   });
 
   test('[pending] BUBBLES on an everything edge, labelled "paused (pending), not done" (LIN-843)', () => {
@@ -294,18 +317,40 @@ describe('addFeedback wake enqueue (effect + once-only)', () => {
     assert.equal(wakeItems(collection, historyCollection).length, 1, 'a terminal bubbles on a terminal-only edge');
   });
 
-  test('a terminal-only child does NOT wake on [pending] (the one gated row, §5)', async () => {
+  test('a child autopilot on a terminal-only edge does NOT wake on [pending] (LIN-4027 guard), and its later terminal still wakes once', async () => {
     const { store, collection, historyCollection } = makeStore();
-    const child = await takenChild(store, { subscription: 'terminal-only' });
+    const child = await takenChild(store, { kind: 'autopilot', subscription: 'terminal-only' });
 
     await store.addFeedback(child._id, URL_KEY, { message: '[pending] paused' }, 'token-a');
     await drain();
 
-    assert.equal(wakeItems(collection, historyCollection).length, 0, 'PENDING is silent on a terminal-only edge');
+    assert.equal(wakeItems(collection, historyCollection).length, 0, 'a child autopilot pause is silent on a terminal-only edge');
     // And the guard is NOT burned — a later terminal still wakes once.
     await store.addFeedback(child._id, URL_KEY, { message: '[done] now done' }, 'token-a');
     await drain();
     assert.equal(wakeItems(collection, historyCollection).length, 1, 'the later terminal still bubbles');
+  });
+
+  test('a leaf worker [pending] on a CI follow-up of a terminal-only edge wakes the autopilot with the worker\'s words (LIN-4027 incident shape)', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    const worker = await takenChild(store, { kind: 'implementation', subscription: 'terminal-only' });
+    // The incident: the worker's hand-back is posted on a CI follow-up that resolves to the worker's edge.
+    const ciFollowUp = await store.addItem(URL_KEY, {
+      prompt: 'CI finished on PR #2182: passing',
+      kind: 'custom',
+      followUpTo: worker._id,
+      issueIdentifier: 'LIN-42'
+    });
+    await store.takeItem(ciFollowUp._id, URL_KEY, 'token-a');
+
+    await store.addFeedback(ciFollowUp._id, URL_KEY, { message: '[pending] Not done — The orchestrator owes the next implementation session' }, 'token-a');
+    await drain();
+
+    const wakes = wakeItems(collection, historyCollection);
+    assert.equal(wakes.length, 1, 'exactly one wake to the autopilot');
+    assert.equal(wakes[0].followUpTo, 'parent-S1', 'addressed to the autopilot via the worker\'s sessionId edge');
+    assert.ok(wakes[0].prompt.includes('The orchestrator owes the next implementation session'), 'the wake carries the worker\'s own words');
+    assert.ok(wakes[0].prompt.includes('paused (pending), not done'), 'the pause is labelled, not presented as a completion');
   });
 
   test('a top-level kickoff (kind:autopilot, no parent sessionId) never self-enqueues a wake', async () => {
