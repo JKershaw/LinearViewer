@@ -1147,6 +1147,8 @@ a.wordmark:hover {
 .row-state[data-tone='running'], .row-state[data-tone='queued'] { color: var(--amber-dim); }
 .row-state[data-tone='ready'] { color: var(--brand-dim); }
 .row-state[data-tone='quiet'] { color: var(--muted); }
+/* LIN-4010: a park (waiting with no open ruling) is quiet, not a call on you; it reads apart from needs-you. */
+.row-state[data-tone='parked'] { color: var(--muted); font-style: italic; }
 .in-progress-count__part[data-tone='needs-you'] { color: var(--red-dim); font-weight: 600; }
 .in-progress-count__part[data-tone='running'], .in-progress-count__part[data-tone='queued'] { color: var(--amber-dim); }
 .in-progress-count__part[data-tone='quiet'] { color: var(--muted); }
@@ -1176,6 +1178,14 @@ a.wordmark:hover {
   margin-bottom: 8px;
 }
 
+/* LIN-4010: Home's state is one line: the pill and its sentence side by side, wrapping on a phone. */
+.task-status--home {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5em;
+}
+
 .opened-task-last {
   color: var(--fg-dim);
   font-size: 0.9em;
@@ -1201,12 +1211,109 @@ a.wordmark:hover {
   font-family: var(--font-content);
 }
 
+/* LIN-4010: the next run is one box: the step, why it is next, Run, then under a rule what it runs on and the other
+   steps. Run sits right under the reason, with nothing between them. */
+.opened-task-next-run {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+
+.opened-task-next-kicker {
+  color: var(--muted);
+  font-size: 0.75em;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .opened-task-step {
   color: var(--fg);
 }
 
 .opened-task-step-name {
   font-weight: 600;
+}
+
+.opened-task-home .opened-task-step-name {
+  display: block;
+  font-size: 1.15em;
+}
+
+.opened-task-step-what,
+.opened-task-step-why {
+  margin: 0;
+  color: var(--fg-dim);
+  font-size: 0.9em;
+}
+
+.opened-task-step-what {
+  color: var(--fg);
+}
+
+.opened-task-step-why .opened-task-ask {
+  margin-left: 0.6em;
+}
+
+/* LIN-4010: the running box names the state once: Running now, the step and when it started, Watch and Stop at its
+   head. The Next line sits under it, and nothing else in the run block repeats the state. */
+.opened-task-running-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  color: var(--fg);
+}
+
+.opened-task-running-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.opened-task-running-title {
+  font-weight: 600;
+}
+
+.opened-task-running-step {
+  font-weight: 600;
+}
+
+.opened-task-watch {
+  font-size: 0.9em;
+}
+
+.opened-task-running-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.opened-task-on {
+  margin: 0;
+  color: var(--fg-dim);
+  font-size: 0.9em;
+}
+
+.opened-task-on-open {
+  font-size: 0.95em;
+}
+
+.opened-task-running-next {
+  margin: 0;
+  color: var(--fg-dim);
+  font-size: 0.9em;
+}
+
+.opened-task-copy-state {
+  margin: 0;
+  color: var(--fg);
 }
 
 .opened-task-runs-on,
@@ -1234,6 +1341,23 @@ a.wordmark:hover {
   flex-direction: column;
   gap: 8px;
   background: var(--card);
+}
+
+/* LIN-4010: on Home and on desktop, Change is a side drawer, so it does not push the rest of Home down. The phone
+   sheet below is the same element, full screen. */
+@media (min-width: 641px) {
+  .opened-task-home .opened-task-change-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(420px, 100vw);
+    z-index: 100;
+    border-radius: 0;
+    border-width: 0 0 0 1px;
+    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.12);
+    overflow-y: auto;
+  }
 }
 
 .opened-task-change-head {

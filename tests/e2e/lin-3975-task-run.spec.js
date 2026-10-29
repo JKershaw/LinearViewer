@@ -77,7 +77,8 @@ test.describe('LIN-3975 — the task page moves the task on', () => {
     await page.goto(`/workspace/${URL_KEY}/task/${TASK}`);
     const control = page.locator('[data-testid="task-page-run-control"]');
     await expect(control).toHaveCount(1);
-    await expect(control.locator('[data-testid="opened-task-go"]')).toContainText('Run Build');
+    // LIN-4010: Plan review is the usual stage after Plan, so it is the step offered next (not Build).
+    await expect(control.locator('[data-testid="opened-task-go"]')).toContainText('Run Plan review');
     await expect(page.locator('[data-testid="task-page-next"]')).toHaveCount(0);
   });
 

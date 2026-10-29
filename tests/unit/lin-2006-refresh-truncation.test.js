@@ -77,6 +77,7 @@ async function runRenderDashboardAfterRefresh({ fetchResult, topTask = null }) {
     homeRowStates: async () => null,
     // LIN-3833: the subtasks that need you by row; these sandboxes render no In Progress rows.
     subtaskNeedingYouByNodeKey: () => ({}),
+    focusSubtaskByNodeKey: () => ({}),
     requestFeatureFlags: async () => ({}),
     resolveRunControls: async () => ({ runControls: false, runSetup: false }),
     // LIN-3977: the post-401 Home render applies the promotion rule (server.js), so the real one is injected.
@@ -187,6 +188,7 @@ async function runPrimaryDashboardRoute({ fetchResult }) {
     homeRowStates: async () => null,
     // LIN-3833: the subtasks that need you by row; these sandboxes render no In Progress rows.
     subtaskNeedingYouByNodeKey: () => ({}),
+    focusSubtaskByNodeKey: () => ({}),
     requestFeatureFlags: async () => ({}),
     resolveRunControls: async () => ({ runControls: false, runSetup: false }),
     // LIN-3977: the post-401 Home render applies the promotion rule (server.js), so the real one is injected.

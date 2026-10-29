@@ -145,13 +145,14 @@ describe('LIN-3833 — once written, the prompt is copied, bounded and keyed', (
 });
 
 describe('LIN-3833 — the state block: the task\'s own sentence, and what was last copied', () => {
-  test('a copy-first state block shows the header and no stage strip', async () => {
-    const { PromptSection } = load({ stateBody: { live: false, status: 'idle', headerHtml: '<p class="task-sentence">Nothing yet.</p>', trackHtml: '<div class="task-track">stages</div>', sessions: { count: 0, last: null, running: null } } });
+  test('a copy-first state block says the tracker word and what was copied, with no session words (LIN-4010)', async () => {
+    const { PromptSection } = load({ stateBody: { live: false, status: 'idle', headerHtml: '<p class="task-sentence">No sessions yet.</p>', trackHtml: '<div class="task-track">stages</div>', sessions: { count: 0, last: null, running: null } } });
     const c = makeContainer();
     PromptSection.init(c, homeOpts());
     await flush();
-    assert.match(c.innerHTML, /data-testid="opened-task-state"[\s\S]*Nothing yet\./);
-    assert.equal(c.innerHTML.includes('task-track'), false);
+    assert.match(c.innerHTML, /data-testid="opened-task-copy-state">Todo · No prompt copied from here yet\.</, 'the tracker word, then the copy line');
+    assert.equal(c.innerHTML.includes('task-track'), false, 'no stage strip');
+    assert.equal(/idle|No sessions yet/.test(c.innerHTML), false, 'a new user never sees "idle" or "No sessions yet"');
   });
 
   test('Swipe keeps its own card: no state block, no copy-first view', async () => {

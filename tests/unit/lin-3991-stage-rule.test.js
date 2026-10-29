@@ -35,7 +35,7 @@ describe('LIN-3991 — guessStages: the stages ahead start at the failed stage',
   });
 
   test('a failed Research, the first stage tried, still offers every usual stage', () => {
-    assert.deepEqual(guessStages([sess('research', 'failed')], 'started'), ['research', 'plan', 'implementation', 'review', 'close-out']);
+    assert.deepEqual(guessStages([sess('research', 'failed')], 'started'), ['research', 'plan', 'plan-review', 'implementation', 'review', 'close-out']);
   });
 
   test('nothing before the furthest stage tried is offered, failed or not', () => {
@@ -51,7 +51,7 @@ describe('LIN-3991 — guessStages: the stages ahead start at the failed stage',
 
 describe('LIN-3991 — the first-failed task reads the same to the next-step rule and the track', () => {
   test('nextStepOf offers the failed Review again, not the stage before it', () => {
-    assert.deepEqual(nextStepOf([sess('review', 'failed')], 'started'), { kind: 'review', label: 'Review', why: 'again', failed: true });
+    assert.deepEqual(nextStepOf([sess('review', 'failed')], 'started'), { kind: 'review', label: 'Review', why: 'again', failed: true, reason: 'failed last time, so it runs again' });
   });
 
   test('buildTaskStages lists the failed Review, then Close-out as ahead, and nothing earlier', () => {

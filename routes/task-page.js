@@ -40,6 +40,7 @@ import {
   renderTaskPage,
   renderTaskNotFoundPage,
   renderTaskStatus,
+  renderHomeStatus,
   renderTaskTrack,
   renderStageStrip,
 } from '../lib/render-task-page.js';
@@ -180,6 +181,8 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         status: model.status,
         live: model.live,
         headerHtml: renderTaskStatus(model),
+        // LIN-4010: Home's one-line state (no "Harbour:" label; a waiting task says needs you or parked).
+        homeStatusHtml: renderHomeStatus(model, { now: now() }),
         // The owner's and a member's state carries the attempts' run links (LIN-3975); it is a signed-in read.
         trackHtml: renderTaskTrack(model, { now: now(), urlKey: workspace.urlKey, runLinks: true }),
         // LIN-3968: the one-row stage strip Home's opened task pastes; the task page keeps trackHtml.

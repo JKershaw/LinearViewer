@@ -223,9 +223,10 @@ describe('LIN-3975 — the task surface shows the run control, not the state blo
     assert.equal(c.innerHTML.includes('RUNNING SENTENCE'), false, 'the running sentence is the top answer\'s, not repeated');
   });
 
-  test('the same running state on Home keeps its watch link', async () => {
+  test('the same running state on Home keeps its watch link, in the running box (LIN-4010)', async () => {
     const c = await mount('home', {}, { opened: { status: 'running', live: true, headerHtml: '<p>RUN</p>', sessions: RUNNING } });
-    assert.match(c.innerHTML, /data-testid="opened-task-started-link"/);
+    assert.match(c.innerHTML, /data-testid="opened-task-watch"/);
+    assert.equal(c.innerHTML.includes('data-testid="opened-task-started-link"'), false, 'the Go slot does not repeat it');
   });
 
   test('copy-first (no runner): the copy view carries the last-copy line in its own slot', async () => {

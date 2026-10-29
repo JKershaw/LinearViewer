@@ -284,9 +284,10 @@ describe('task page loader: the canonical identifier', () => {
 describe('guessStages: the usual stages after the FURTHEST one reached', () => {
   const k = (...kinds) => kinds.map(kind => ({ kind }));
   const cases = [
-    ['no sessions → all five', [], null, ['research', 'plan', 'implementation', 'review', 'close-out']],
-    ['only off-spine kinds → all five', k('triage', 'plan-review', 'autopilot'), null, ['research', 'plan', 'implementation', 'review', 'close-out']],
-    ['after plan', k('research', 'plan'), 'started', ['implementation', 'review', 'close-out']],
+    ['no sessions → all six', [], null, ['research', 'plan', 'plan-review', 'implementation', 'review', 'close-out']],
+    ['only off-spine kinds → all six', k('triage', 'autopilot'), null, ['research', 'plan', 'plan-review', 'implementation', 'review', 'close-out']],
+    ['after plan → Plan review is next, not Build (LIN-4010)', k('research', 'plan'), 'started', ['plan-review', 'implementation', 'review', 'close-out']],
+    ['after plan review → Build', k('research', 'plan', 'plan-review'), 'started', ['implementation', 'review', 'close-out']],
     ['review → implementation loop: furthest, not last', k('plan', 'implementation', 'review', 'implementation'), 'started', ['close-out']],
     ['close-out reached → nothing ahead', k('close-out'), 'started', []],
     ['tracker completed → none', k('plan'), 'completed', []],
@@ -658,7 +659,7 @@ describe('buildTaskStages (LIN-3356)', () => {
     assert.deepEqual(open.filter(s => s.state === 'ahead').map(s => s.kind), guessStages(sessions, 'started'));
     assert.ok(open.filter(s => s.state === 'ahead').every(s => s.id === undefined));
     assert.equal(buildTaskStages(sessions, { trackerType: 'completed' }).some(s => s.state === 'ahead'), false);
-    assert.equal(buildTaskStages([], { trackerType: 'started' }).length, 5, 'a task with no sessions shows the usual five');
+    assert.equal(buildTaskStages([], { trackerType: 'started' }).length, 6, 'a task with no sessions shows the usual six');
   });
 
   test('the model carries stages and the brief\'s summary', () => {
@@ -667,7 +668,7 @@ describe('buildTaskStages (LIN-3356)', () => {
       brief: { brief: '## Current\nIt is going well.\n\n## Constraints\n- none', model: 'm', generatedAt: null },
     });
     assert.equal(model.summary, 'It is going well.');
-    assert.equal(model.stages.length, 5);
+    assert.equal(model.stages.length, 6);
     const bare = buildTaskPageModel({ identifier: 'LIN-50', loops: [], ctx: ctxFor('LIN-50'), enrichLoop, deriveSessionWaiting, now: NOW });
     assert.equal(bare.summary, null, 'no brief, no paragraph, nothing generated');
   });

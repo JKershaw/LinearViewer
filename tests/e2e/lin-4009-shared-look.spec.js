@@ -67,11 +67,18 @@ async function seedSession(page, token, identifier, { kind, feedback = [] }) {
     });
     expect(fb.status(), `feedback failed: ${await fb.text()}`).toBe(200);
   }
+  return itemId;
 }
 
 async function seedStates(page) {
   const token = await runnerToken(page);
-  await seedSession(page, token, TASKS.needsYou, { kind: 'implementation', feedback: ['[blocked] which API key?'] });
+  // LIN-4010: "needs you" is an open ruling, so the waiting session carries a structured decision (a bare [blocked] is a park).
+  const itemId = await seedSession(page, token, TASKS.needsYou, { kind: 'implementation', feedback: ['[blocked] which API key?'] });
+  const decision = await page.request.post(`/api/dispatch/feedback/${itemId}`, {
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    data: { kind: 'decision', message: JSON.stringify({ decision_id: 'd-shared-look', question: 'Which API key?', options: [{ id: 'a', label: 'Use the staging key' }] }) },
+  });
+  expect(decision.status(), `decision failed: ${await decision.text()}`).toBe(200);
   await seedSession(page, token, TASKS.failed, { kind: 'implementation', feedback: ['[failed] the build broke'] });
   await seedSession(page, token, TASKS.running, { kind: 'implementation' });
 }

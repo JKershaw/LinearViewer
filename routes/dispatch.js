@@ -28,7 +28,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { spawnClaudeSession } from '../lib/harbour-spawn.js';
-import { DISPATCH_DEFAULT_KINDS, deriveDispatchKind } from '../lib/prompt-templates.js';
+import { DISPATCH_DEFAULT_KINDS, deriveDispatchKind, getPromptDescriptionsForAI } from '../lib/prompt-templates.js';
 import { resolveRoutingWithSources } from '../lib/dispatch-factory.js';
 import { getJob } from '../lib/llm-jobs.js';
 import { stageLabel } from '../lib/task-page-loader.js';
@@ -632,9 +632,12 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // LIN-3833: the words the run control shows beside the sources: the step's name and its group.
       // LIN-3987: `words` is what the run would use, in words, so the browser never prints a raw id or alias.
       const job = getJob(kind);
+      // LIN-4010: what the step does, in one sentence (the first of its template's own description), for the run box.
+      const described = getPromptDescriptionsForAI([kind])[0]?.description || '';
       res.json({
         kind,
         stepLabel: stageLabel(kind),
+        description: described.split(/(?<=\.)\s/)[0] || null,
         group: job?.group || null,
         presetId: preset ? presetId : null,
         presetName: preset?.name ?? null,

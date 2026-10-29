@@ -257,9 +257,11 @@
   //   runningBody: 'blank' = the running line says the link only (home, task); 'header' = the state's sentence (swipe).
   //   watchLink:   the "watch on the task page" link, not drawn where the viewer is already on the task page.
   const SURFACE_CAPABILITIES = Object.freeze({
-    home: Object.freeze({ stateBlock: true, copyFirst: true, runControl: true, runningBody: 'blank', watchLink: true, plainPromptBox: true, lastCopy: true, sharedButtons: true }),
-    task: Object.freeze({ stateBlock: false, copyFirst: true, runControl: true, runningBody: 'blank', watchLink: false, plainPromptBox: true, lastCopy: true, sharedButtons: true }),
-    swipe: Object.freeze({ stateBlock: false, copyFirst: false, runControl: false, runningBody: 'header', watchLink: true, plainPromptBox: false, lastCopy: false, sharedButtons: false })
+    // runBox (LIN-4010): Home's run box, running box, one-line state and Change drawer. The task page and Swipe keep
+    // their own run markup, so they stay as they were.
+    home: Object.freeze({ stateBlock: true, copyFirst: true, runControl: true, runBox: true, runningBody: 'blank', watchLink: true, plainPromptBox: true, lastCopy: true, sharedButtons: true }),
+    task: Object.freeze({ stateBlock: false, copyFirst: true, runControl: true, runBox: false, runningBody: 'blank', watchLink: false, plainPromptBox: true, lastCopy: true, sharedButtons: true }),
+    swipe: Object.freeze({ stateBlock: false, copyFirst: false, runControl: false, runBox: false, runningBody: 'header', watchLink: true, plainPromptBox: false, lastCopy: false, sharedButtons: false })
   });
   function capabilitiesOf(surface) {
     return SURFACE_CAPABILITIES[surface] || SURFACE_CAPABILITIES.swipe;
@@ -285,7 +287,9 @@
       // The started/running line: the task page's OWN sentence (the one source
       // of queued/running truth), with a link to the task page. Until a state
       // read lands, it says "Started" — true on a 201, not a status claim.
-      const href = caps.watchLink && window.taskPageHref({
+      // LIN-4010: once the running box shows, it holds the Watch link, so the Go slot does not repeat it.
+      const boxed = caps.runBox && !!(state.opened && state.opened.sessions && state.opened.sessions.running && state.opened.sessions.running.state !== 'queued');
+      const href = caps.watchLink && !boxed && window.taskPageHref({
         urlKey: opts.urlKey,
         identifier: opts.issue && opts.issue.identifier,
         source: opts.issue && opts.issue.source
@@ -527,6 +531,8 @@
     backlog: Object.freeze({ label: 'scoping', name: 'Scoping', why: 'the first step for a task in Backlog' }),
   });
   const COPY_NEXT = Object.freeze({ label: '__ai__', name: null, why: 'Generate the next prompt for this task' });
+  // LIN-4010: the tracker's word for a state type, for the copy-first state line.
+  const COPY_STATE_WORDS = Object.freeze({ started: 'In progress', unstarted: 'Todo', backlog: 'Backlog', completed: 'Done', canceled: 'Cancelled', duplicate: 'Duplicate' });
   function copyStepOf(opts) {
     return COPY_STEPS[opts.issue && opts.issue.stateType] || COPY_NEXT;
   }
@@ -797,11 +803,17 @@
 
     const issue = opts.issue;
     const issueId = issue.id;
+    // LIN-4010: a container's run box runs on the subtask the selector defers to (`opts.focusSubtask`, from the row's
+    // focus). The state read, the step's prompt, the dispatch and Stop all name that subtask; the ✦ write does not.
+    const runSubject = opts.focusSubtask
+      ? { issue: { id: opts.focusSubtask.id, identifier: opts.focusSubtask.identifier, title: opts.focusSubtask.title || '', url: '', source: opts.focusSubtask.source || undefined, stateType: opts.focusSubtask.stateType || '' }, issueId: opts.focusSubtask.id }
+      : { issue, issueId };
     container.classList.add('prompt-section');
     // LIN-3833: the state block and the copy-first view are Home's. Swipe's card keeps its own Edit slot and
     // change affordances, which the state-first layout does not replace (the PR says so). LIN-3975: which of
     // these a surface shows is one table (SURFACE_CAPABILITIES), not a surface-name test here.
     const caps = capabilitiesOf(opts.surface);
+    if (caps.runBox) container.classList.add('opened-task-home');
     // A viewer with no runner (no dispatch) gets the copy-first view on any surface that has one.
     const copyFirstView = () => caps.copyFirst && !opts.dispatchEnabled;
 
@@ -912,22 +924,34 @@
     // prompt body or a streamed reply.
     function renderOpenedState() {
       if (!caps.stateBlock) return '';
+      // LIN-4010: a copy-first viewer (no runner) gets the tracker's word and whether a prompt was copied here. No session
+      // words: nothing here runs, costs or names a session, so a new user never sees "idle" or "No sessions yet".
+      if (copyFirstView()) return renderCopyState();
       const opened = state.opened;
       if (!opened) return `<div class="opened-task-state" data-state-slot data-testid="opened-task-state"></div>`;
-      if (!opts.dispatchEnabled) {
-        // Copy-first: the task's own sentence. No stage strip, no sessions. What was last copied is in the view.
-        return `<div class="opened-task-state" data-state-slot data-testid="opened-task-state">`
-          + `${opened.headerHtml || ''}</div>`;
-      }
-      const sessions = opened.sessions || { count: 0, last: null };
-      const last = sessions.last;
-      const lastLine = sessions.count && last
-        ? `<div class="opened-task-last" data-testid="opened-task-last">Last: ${esc(last.label || 'session')} ${esc(last.state || '')}`
-          + `${last.at ? ` \u00b7 ${esc(formatGeneratedAge(Date.parse(last.at)) || '')}` : ''}`
-          + ` \u00b7 <button class="btn opened-task-all" data-action="all-sessions" data-testid="opened-task-all">All ${sessions.count}</button></div>`
-        : '';
       return `<div class="opened-task-state" data-state-slot data-testid="opened-task-state">`
-        + `${opened.headerHtml || ''}${opened.stripHtml || ''}${renderSubtaskNeedsYou()}${lastLine}</div>`;
+        + `${opened.homeStatusHtml || opened.headerHtml || ''}${opened.stripHtml || ''}${renderSubtaskNeedsYou()}</div>`;
+    }
+
+    // LIN-4010: "Last" sits below the run box, not in the state block. No "Last" line while a session runs: the running
+    // box says what runs and when it started.
+    function renderLastLine() {
+      const opened = state.opened;
+      const sessions = (opened && opened.sessions) || { count: 0, last: null };
+      const last = sessions.last;
+      if (!(sessions.count && last && !sessions.running)) return '';
+      return `<div class="opened-task-last" data-testid="opened-task-last">Last: ${esc(last.label || 'session')} ${esc(last.state || '')}`
+        + `${last.at ? ` \u00b7 ${esc(formatGeneratedAge(Date.parse(last.at)) || '')}` : ''}`
+        + ` \u00b7 <button class="btn opened-task-all" data-action="all-sessions" data-testid="opened-task-all">All ${sessions.count}</button></div>`;
+    }
+
+    // LIN-4010: the copy-first state line: the tracker's word, then either nothing (a prompt was copied; "You copied …"
+    // is the view's own line) or "No prompt copied from here yet.".
+    function renderCopyState() {
+      const word = COPY_STATE_WORDS[opts.issue && opts.issue.stateType] || 'Open';
+      const tail = state.lastCopy ? '' : ' \u00b7 No prompt copied from here yet.';
+      return `<div class="opened-task-state" data-state-slot data-testid="opened-task-state">`
+        + `<p class="opened-task-copy-state" data-testid="opened-task-copy-state">${esc(word)}${esc(tail)}</p></div>`;
     }
 
     // LIN-3833: one line naming a subtask that needs you, with an Open link to its task page. Home passes the
@@ -951,6 +975,9 @@
       const slot = container.querySelector && container.querySelector('[data-state-slot]');
       if (slot) slot.outerHTML = renderOpenedState();
       else render();
+      // LIN-4010: Home's running box and "Last" line live in the run block, so it follows the state too (focus and
+      // the Change panel's draft survive a run-block repaint, as they do for a preview).
+      if (caps.runBox && runControlOn()) paintRun();
       if (typeof window.initLocalTimes === 'function') window.initLocalTimes(container);
     }
 
@@ -1068,20 +1095,23 @@
     }
 
     // The step line: the name and why it is next. ✦ write prompt writes this step's prompt (it does not replace the why).
+    // LIN-4010: the step as one unit: its name, what it does (the first sentence of its own description, from the
+    // preview), and why it is next. The why is the server's words (sessions.offered.reason); a chosen step says so.
     function renderStepLine(step) {
-      const last = state.opened && state.opened.sessions && state.opened.sessions.last;
       // LIN-3968: a running stage offers no step; the after-run line names what runs and what comes next. Before
       // the state read lands, the step is not known, so no step is offered either (not "Run to PR").
       if (!state.run.step && (!state.opened || stageBusy(state))) return '';
       let why = 'the next step for this task';
       if (state.run.step) why = 'chosen for this run';
-      else if (step && step.failed) why = 'failed last time, so it runs again';
-      // LIN-3968 ruling (option a): an undone stage is offered again, without calling it a failure.
-      else if (step && step.why === 'again') why = 'cancelled last time, so it is offered again';
-      else if (step && last) why = `usually next after ${last.label || 'the last session'}`;
+      else if (step && step.reason) why = step.reason;
       const name = step ? esc(step.label) : 'Run to PR';
-      return `<div class="opened-task-step" data-testid="opened-task-step"><span class="opened-task-step-name">${name}</span> \u00b7 ${esc(why)}`
-        + ` <button class="btn opened-task-ask" data-action="ask-harbour" data-testid="run-ask-harbour">\u2726 write prompt</button></div>`;
+      const ask = `<button class="btn opened-task-ask" data-action="ask-harbour" data-testid="run-ask-harbour">\u2726 write prompt</button>`;
+      if (!caps.runBox) return `<div class="opened-task-step" data-testid="opened-task-step"><span class="opened-task-step-name">${name}</span> \u00b7 ${esc(why)} ${ask}</div>`;
+      const what = !state.run.step && step && state.run.preview && state.run.preview.description
+        ? `<p class="opened-task-step-what" data-testid="opened-task-step-what">${esc(state.run.preview.description)}</p>`
+        : '';
+      return `<div class="opened-task-step" data-testid="opened-task-step"><span class="opened-task-step-name">${name}</span>${what}`
+        + `<p class="opened-task-step-why" data-testid="opened-task-step-why">${esc(why)} ${ask}</p></div>`;
     }
 
     // Undo for a run queued from here (until the runner takes it); Watch and Stop once a session runs.
@@ -1090,8 +1120,8 @@
       // A queued session is not running yet: it reads as queued (with Undo), like a run queued from here.
       const running = summary.running && summary.running.state !== 'queued' ? summary.running : null;
       const next = summary.next || null;
-      if (running) {
-        // LIN-3991 (item 5): the state block above says the run's state once; this line keeps only what is its own.
+      if (running && !caps.runBox) {
+        // The task page's own line (unchanged): the next step, the confirm, and a text Stop.
         const polled = POLLED_RUN_TARGETS.includes(running.target);
         let html = next ? `Next: ${esc(next.label)}, once ${esc(running.label || 'this')} finishes` : '';
         if (state.run.confirmStop) {
@@ -1102,6 +1132,30 @@
           html += ` <button class="btn--quiet opened-task-stop" data-action="stop-run" data-testid="run-stop">Stop</button>`;
         }
         return html.trim() ? `<div class="opened-task-running" data-testid="opened-task-running">${html.trim()}</div>` : '';
+      }
+      if (running) {
+        // LIN-4010: one running box. Its head names the state once (Running now, the step, when it started) with Watch
+        // and Stop beside each other; "Next" sits under it. The state block above does not repeat it.
+        const polled = POLLED_RUN_TARGETS.includes(running.target);
+        const since = running.since ? formatGeneratedAge(Date.parse(running.since)) : null;
+        const watchHref = caps.watchLink && window.taskPageHref
+          ? window.taskPageHref({ urlKey: opts.urlKey, identifier: issue.identifier, source: issue.source })
+          : null;
+        const watch = watchHref ? `<a class="btn--quiet opened-task-watch" href="${esc(watchHref)}" data-testid="opened-task-watch">Watch \u203A</a>` : '';
+        let actions = watch;
+        let confirm = '';
+        if (state.run.confirmStop) {
+          confirm = `<div class="opened-task-confirm">Stop this run? The session is cancelled and the task stays where it is.`
+            + ` <button class="btn btn--red" data-action="stop-run-confirm" data-testid="run-stop-confirm">Stop</button>`
+            + ` <button class="btn--quiet" data-action="stop-run-cancel">Cancel</button></div>`;
+        } else if (polled) {
+          actions += ` <button class="btn btn--red opened-task-stop" data-action="stop-run" data-testid="run-stop">Stop</button>`;
+        }
+        const nextLine = next ? `<p class="opened-task-running-next" data-testid="opened-task-running-next">Next: ${esc(next.label)}, once ${esc(running.label || 'this')} finishes</p>` : '';
+        return `<div class="opened-task-running-box" data-testid="opened-task-running">`
+          + `<div class="opened-task-running-head"><span class="opened-task-running-title">Running now</span> \u00b7 `
+          + `<span class="opened-task-running-step">${esc(running.label || 'step')}</span>${since ? ` \u00b7 started ${esc(since)}` : ''}`
+          + `<span class="opened-task-running-actions">${actions}</span></div>${confirm}${nextLine}</div>`;
       }
       if (state.run.item || (summary.running && summary.running.state === 'queued')) {
         return `<div class="opened-task-queued" data-testid="opened-task-queued">Queued, waiting for a runner`
@@ -1133,7 +1187,9 @@
       const shownDefaults = defaults.filter(fits);
       const shownMore = more.filter(fits);
       const leftOut = [...defaults, ...more].filter((k) => !fits(k)).length;
-      const item = (k) => `<button class="btn opened-task-another-item" data-action="run-pick" data-kind="${esc(k)}" data-label="${esc(meta[k] || k)}" data-testid="run-another-item">${esc(meta[k] || k)}</button>`;
+      // LIN-4010 (H9): a step is named by its stage word (Build, not "implement"); the template name is the fallback.
+      const wordOf = (k) => (opts.stageWords && opts.stageWords[k]) || meta[k] || k;
+      const item = (k) => `<button class="btn opened-task-another-item" data-action="run-pick" data-kind="${esc(k)}" data-label="${esc(wordOf(k))}" data-testid="run-another-item">${esc(wordOf(k))}</button>`;
       let html = '<div class="opened-task-more">';
       if (step) html += `<button class="btn--quiet opened-task-see" data-action="see-prompt" data-testid="run-see-prompt">See prompt \u2726</button>`;
       html += `<button class="btn--quiet opened-task-another" data-action="run-another" data-testid="run-another" aria-expanded="${state.run.anotherOpen ? 'true' : 'false'}">Another step \u25BE</button>`;
@@ -1337,18 +1393,44 @@
         });
     }
 
+    // LIN-4010: the run box holds the step, why it is next, Run, and under a rule what it runs on, Change and the other
+    // steps, in that order. While a session runs or is queued, the running box takes its place: it says the state once.
     function renderRunBlock() {
       const step = runStepOf();
-      const parts = [
+      if (!caps.runBox) {
+        // The task page's and Swipe's run block, as it was (LIN-3975): the step, what it runs on, Go, the proposals, the
+        // after-run line and More, in one slot.
+        return `<div class="opened-task-run" data-run-slot data-testid="opened-task-run">${[
+          renderStepLine(step),
+          renderRunsOn(state.run.preview),
+          state.run.changeOpen ? renderChangePanel(state.run.preview) : '',
+          renderGo(opts, state),
+          renderStagedProposals(),
+          renderAfterRun(),
+          renderRunMore(step)
+        ].join('')}</div>`;
+      }
+      // LIN-4010: a container's box is its subtask's box, and says so once, with Open to the subtask's task page.
+      const onLine = opts.focusSubtask && opts.focusSubtask.identifier
+        ? `<p class="opened-task-on" data-testid="opened-task-on">On ${esc(opts.focusSubtask.identifier)}${opts.focusSubtask.title ? ` ${esc(opts.focusSubtask.title)}` : ''}`
+          + ` \u00b7 <a class="opened-task-on-open" data-testid="opened-task-on-open" href="${esc(opts.focusSubtask.href || '#')}">Open</a></p>`
+        : '';
+      const summary = (state.opened && state.opened.sessions) || {};
+      const active = !!(summary.running || state.run.item);
+      if (active) {
+        return `<div class="opened-task-run" data-run-slot data-testid="opened-task-run">${onLine}`
+          + renderGo(opts, state) + renderAfterRun() + renderStagedProposals() + renderRunMore(step) + renderLastLine() + `</div>`;
+      }
+      const box = [
         renderStepLine(step),
+        renderGo(opts, state),
         renderRunsOn(state.run.preview),
         state.run.changeOpen ? renderChangePanel(state.run.preview) : '',
-        renderGo(opts, state),
-        renderStagedProposals(),
-        renderAfterRun(),
         renderRunMore(step)
       ];
-      return `<div class="opened-task-run" data-run-slot data-testid="opened-task-run">${parts.join('')}</div>`;
+      return `<div class="opened-task-run" data-run-slot data-testid="opened-task-run">${onLine}`
+        + `<div class="opened-task-next-run" data-testid="opened-task-next-run">${box.join('')}</div>`
+        + renderStagedProposals() + renderLastLine() + `</div>`;
     }
 
     // Run a step now: fetch its prompt, then dispatch it with this run's choice (the one press, LIN-3446's
@@ -1357,7 +1439,7 @@
       if (!step || state.run.busy || destroyed) return;
       state.run.busy = true;
       try {
-        const prompt = await window.api(`/workspace/${encodeURIComponent(opts.urlKey)}/api/prompt/${issueId}/${encodeURIComponent(step.kind)}${issue.source ? `?source=${encodeURIComponent(issue.source)}` : ''}`, { on401: false });
+        const prompt = await window.api(`/workspace/${encodeURIComponent(opts.urlKey)}/api/prompt/${runSubject.issueId}/${encodeURIComponent(step.kind)}${runSubject.issue.source ? `?source=${encodeURIComponent(runSubject.issue.source)}` : ''}`, { on401: false });
         if (destroyed) return;
         const c = state.run.choice;
         const result = await window.dispatchPrompt({
@@ -1365,7 +1447,7 @@
           prompt: prompt.prompt,
           promptName: prompt.promptName || step.label,
           kind: step.kind,
-          issue,
+          issue: runSubject.issue,
           target: c.target || 'cli',
           model: c.model || undefined,
           harness: c.harness || undefined,
@@ -1390,6 +1472,20 @@
       }
     }
 
+    // LIN-4010: focus a control in the opened task, when it is on the page.
+    function focusIn(selector) {
+      const el = container.querySelector && container.querySelector(selector);
+      if (el && typeof el.focus === 'function') el.focus();
+    }
+
+    // LIN-4010: Escape closes the Change drawer (the same path as its Close button).
+    const onRunKeydown = (e) => {
+      if (!caps.runBox || e.key !== 'Escape' || !state.run.changeOpen || !runControlOn() || !container.contains(e.target)) return;
+      e.preventDefault();
+      handleRunAction('close-change');
+    };
+    container.addEventListener('keydown', onRunKeydown);
+
     // The run control's clicks. Returns true when it handled the button.
     function handleRunAction(action, btn) {
       if (!runControlOn()) return false;
@@ -1407,6 +1503,8 @@
               .catch(() => { state.run.presets = []; paintRun(); });
           }
           paintRun();
+          // LIN-4010: opening the choice moves focus into it, so a keyboard user lands in the drawer.
+          if (caps.runBox) focusIn('[data-testid="run-change-x"]');
           return true;
         case 'apply-proposal':
           proposalAction(btn, 'apply');
@@ -1418,6 +1516,8 @@
           state.run.changeOpen = false;
           state.run.draft = null;
           paintRun();
+          // LIN-4010: closing returns focus to the Change button that opened it.
+          if (caps.runBox) focusIn('[data-action="change-run"]');
           return true;
         case 'run-preset':
           d().presetId = d().presetId === btn.dataset.presetId ? null : btn.dataset.presetId;
@@ -1452,7 +1552,7 @@
           return true;
         case 'see-prompt': {
           const step = runStepOf();
-          if (step) fetchPrompt(step.kind);
+          if (step) fetchPrompt(step.kind, opts.focusSubtask ? runSubject : null);
           return true;
         }
         case 'run-another':
@@ -1509,8 +1609,8 @@
           abortTo: running.loopId,
           cascade: true,
           target: running.target,
-          issueId: issueId,
-          issueIdentifier: issue.identifier
+          issueId: runSubject.issueId,
+          issueIdentifier: runSubject.issue.identifier
         }),
         headers: { 'Content-Type': 'application/json' },
         on401: false
@@ -1582,7 +1682,11 @@
       return isAutopilotLabel(label);
     }
 
-    async function fetchPrompt(label) {
+    // LIN-4010: `subject` is the task the prompt is for. The ✦ write reads the opened task (the selector decides for a
+    // container); a step's "See prompt" reads the subtask its run box runs on.
+    async function fetchPrompt(label, subject = null) {
+      const subjectIssue = subject ? subject.issue : issue;
+      const subjectId = subject ? subject.issueId : issueId;
       if (abortController) abortController.abort();
       abortController = new AbortController();
       const ac = abortController;
@@ -1611,9 +1715,9 @@
           // fetchAutopilotKickoff convention) so a merged multi-binding swipe row
           // resolves recommend against its OWN binding, not the active one.
           const params = new URLSearchParams();
-          if (issue.source) params.set('source', issue.source);
+          if (subjectIssue.source) params.set('source', subjectIssue.source);
           const query = params.toString() ? `?${params.toString()}` : '';
-          const response = await fetch(`${apiPrefix}/api/recommend/${issueId}/stream${query}`, { signal: ac.signal });
+          const response = await fetch(`${apiPrefix}/api/recommend/${subjectId}/stream${query}`, { signal: ac.signal });
           if (!response.ok) {
             const error = await response.json().catch(() => ({}));
             throw new Error(error.error || 'Failed to load prompt');
@@ -1629,9 +1733,9 @@
           // accepts it, common.js). Omitted entirely when the issue has none.
           const result = await window.fetchAutopilotKickoff({
             urlKey: opts.urlKey,
-            issueId,
+            issueId: subjectId,
             variant,
-            source: issue.source || undefined,
+            source: subjectIssue.source || undefined,
             // LIN-3246: the ladder's own autopilot run is bounded to the PR —
             // close-out is the person's to send. Every other launcher omits it.
             stopAt: 'pr',
@@ -1645,9 +1749,9 @@
           // this autopilot result forces proxy context (copy/download/dispatch) and
           // suppresses the now-inert +proxy toggle. Every other result stays unforced.
           const entry = { label, name: result.promptName || 'Autopilot', kind: result.kind || 'autopilot', raw: result.prompt, html, proxyForce: true, generatedAt: Date.now() };
-          promptCache.set(`${sessionPromptKey(issueId)}:${label}`, entry);
-          lastPromptLabel.set(sessionPromptKey(issueId), label);
-          savePromptMemory(opts.urlKey, issueId, entry);
+          promptCache.set(`${sessionPromptKey(subjectId)}:${label}`, entry);
+          lastPromptLabel.set(sessionPromptKey(subjectId), label);
+          savePromptMemory(opts.urlKey, subjectId, entry);
           enterPhase('fresh');
           state.result = entry;
           render();
@@ -1656,15 +1760,15 @@
           // fetch too, via URLSearchParams (the LIN-2046 shape). The URL is
           // unchanged when the issue has no source.
           const params = new URLSearchParams();
-          if (issue.source) params.set('source', issue.source);
+          if (subjectIssue.source) params.set('source', subjectIssue.source);
           const query = params.toString() ? `?${params.toString()}` : '';
-          const result = await window.api(`${apiPrefix}/api/prompt/${issueId}/${encodeURIComponent(label)}${query}`, { signal: ac.signal, on401: false });
+          const result = await window.api(`${apiPrefix}/api/prompt/${subjectId}/${encodeURIComponent(label)}${query}`, { signal: ac.signal, on401: false });
           if (abortController !== ac || destroyed) return;
           const html = renderMarkdown(result.prompt);
           const entry = { label, name: result.promptName || '', raw: result.prompt, html, generatedAt: Date.now() };
-          promptCache.set(`${sessionPromptKey(issueId)}:${label}`, entry);
-          lastPromptLabel.set(sessionPromptKey(issueId), label);
-          savePromptMemory(opts.urlKey, issueId, entry);
+          promptCache.set(`${sessionPromptKey(subjectId)}:${label}`, entry);
+          lastPromptLabel.set(sessionPromptKey(subjectId), label);
+          savePromptMemory(opts.urlKey, subjectId, entry);
           enterPhase('fresh');
           state.result = entry;
           render();
@@ -1805,8 +1909,8 @@
     // like the quota read (routes/task-page.js).
     function readTaskState() {
       if (typeof window.api !== 'function') return Promise.resolve(null);
-      if (!opts.urlKey || !issue.identifier || !issueId) return Promise.resolve(null);
-      const url = `/workspace/${encodeURIComponent(opts.urlKey)}/api/task/${encodeURIComponent(issue.identifier)}/state?issueId=${encodeURIComponent(issueId)}`;
+      if (!opts.urlKey || !runSubject.issue.identifier || !runSubject.issueId) return Promise.resolve(null);
+      const url = `/workspace/${encodeURIComponent(opts.urlKey)}/api/task/${encodeURIComponent(runSubject.issue.identifier)}/state?issueId=${encodeURIComponent(runSubject.issueId)}`;
       return Promise.resolve()
         .then(() => window.api(url, { on401: false }))
         .catch(() => null);
@@ -2337,6 +2441,7 @@
         // `destroyed`). The container listener is the only DOM teardown.
         if (abortController) abortController.abort();
         container.removeEventListener('click', handleClick);
+        container.removeEventListener('keydown', onRunKeydown);
       },
       getCachedLabel() {
         const key = sessionPromptKey(issueId);

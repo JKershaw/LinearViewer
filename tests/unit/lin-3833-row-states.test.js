@@ -25,9 +25,16 @@ function loop(over = {}) {
     ...over
   };
 }
+// A waiting session whose question is an open ruling (LIN-4010: a structured decision, not a bare park).
 const blocked = (over = {}) => loop({
   wakeMarker: 'blocked', waitingMessage: '[blocked] which way?',
-  feedback: [{ message: '[blocked] which way?', timestamp: '2026-10-25T10:05:00.000Z' }], ...over
+  feedback: [{ message: '[blocked] which way?', timestamp: '2026-10-25T10:05:00.000Z' }],
+  decision: { decision_id: 'd-1', question: 'Which way?' }, decisionCase: [], answeredDecisions: [], withdrawal: null, ...over
+});
+// A waiting session with no structured question: a park (LIN-4010), not a ruling.
+const parkedLoop = (over = {}) => loop({
+  wakeMarker: 'blocked', waitingMessage: '[blocked] waiting on the vendor',
+  feedback: [{ message: '[blocked] waiting on the vendor', timestamp: '2026-10-25T10:05:00.000Z' }], ...over
 });
 
 const node = (identifier, state = 'started', children = []) => ({
@@ -60,6 +67,22 @@ describe('LIN-3833 — the words a row says, from the task page\'s own model', (
     assert.equal(s.get('LIN-51').needsYou, true);
   });
 
+  test('a bare park reads parked, is not needs you, and does not count toward the count line', () => {
+    const s = states({ roots: [node('LIN-57')], loops: { 'LIN-57': [parkedLoop({ issueIdentifier: 'LIN-57' })] } });
+    assert.equal(s.get('LIN-57').words, 'parked');
+    assert.equal(s.get('LIN-57').needsYou, false);
+    assert.equal(s.get('LIN-57').tone, 'parked');
+    assert.equal(s.get('LIN-57').rank, 3, 'parked ranks with the quiet rows');
+  });
+
+  test('a parent whose subtask is only parked does not say it needs you', () => {
+    const child = node('LIN-59');
+    const parent = node('LIN-58', 'started', [child]);
+    const s = states({ roots: [parent], loops: { 'LIN-59': [parkedLoop({ issueIdentifier: 'LIN-59' })] } });
+    assert.equal(s.get('LIN-58').needsYou, false);
+    assert.notEqual(s.get('LIN-58').words, 'subtask needs you · Research next');
+  });
+
   test('a parent whose subtask needs you says so, and names the next step', () => {
     const child = node('LIN-53');
     const parent = node('LIN-52', 'started', [child]);
@@ -68,7 +91,8 @@ describe('LIN-3833 — the words a row says, from the task page\'s own model', (
       loops: { 'LIN-53': [blocked({ issueIdentifier: 'LIN-53' })] },
     });
     assert.equal(s.get('LIN-53').words, 'needs you');
-    assert.equal(s.get('LIN-52').words, 'subtask needs you · Research next');
+    // LIN-4010: the parent names the step its subtask is on (the child's own next step), not its own.
+    assert.equal(s.get('LIN-52').words, `subtask needs you · ${s.get('LIN-53').next} next`);
     assert.equal(s.get('LIN-52').needsYou, true, 'the parent is ranked as needing you');
   });
 
