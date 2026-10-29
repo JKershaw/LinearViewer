@@ -166,7 +166,7 @@
 
 .opened-task-primary-reason {
   font-family: var(--font-content);
-  font-size: 11px;
+  font-size: 0.8125rem;
   line-height: 1.4;
   color: var(--amber-dim);
 }

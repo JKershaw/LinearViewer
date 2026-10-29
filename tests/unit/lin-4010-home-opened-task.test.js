@@ -375,7 +375,7 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
     await flush(); await flush();
     const box = c.innerHTML.slice(c.innerHTML.indexOf('data-testid="opened-task-next-run"'));
     const at = (re) => box.search(re);
-    const step = at(/opened-task-step-name">Plan review/);
+    const step = at(/opened-task-step-name[^"]*">Plan review/);
     const why = at(/usually next after Plan/);
     const run = at(/data-testid="opened-task-go"/);
     const runsOn = at(/data-testid="opened-task-runs-on"/);

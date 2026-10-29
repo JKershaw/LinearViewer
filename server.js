@@ -1156,6 +1156,9 @@ app.use(defaultCacheControl())
 // assets are untouched, before the session so even early error pages carry it.
 app.use(securityHeaders())
 app.use(express.urlencoded({ extended: false }))
+// LIN-4024: the seeded Home measure posts a ~3,700-task workspace to the test seed route in one body. Under
+// NODE_ENV=test only that route takes the larger body; every other route keeps the 250kb limit.
+if (process.env.NODE_ENV === 'test') app.use('/test/set-local-session', express.json({ limit: '4mb' }))
 app.use(express.json({ limit: '250kb' }))
 
 // Session middleware configuration: no resave, no session until something is

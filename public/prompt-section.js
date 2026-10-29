@@ -1153,7 +1153,7 @@
       const what = !state.run.step && step && state.run.preview && state.run.preview.description
         ? `<p class="opened-task-step-what" data-testid="opened-task-step-what">${esc(state.run.preview.description)}</p>`
         : '';
-      return `<div class="opened-task-step" data-testid="opened-task-step"><span class="opened-task-step-name">${name}</span>${what}`
+      return `<div class="opened-task-step" data-testid="opened-task-step"><span class="opened-task-step-name opened-task-step-name--block">${name}</span>${what}`
         + `<p class="opened-task-step-why" data-testid="opened-task-step-why">${esc(why)} ${ask}</p></div>`;
     }
 

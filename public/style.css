@@ -1169,7 +1169,7 @@ a.wordmark:hover {
    one links row. Plain text sizes; the controls below keep their own styles. */
 .opened-task-facts {
   color: var(--fg-dim);
-  font-size: 0.9em;
+  font-size: 0.875rem;
   font-family: var(--font-content);
   padding: 2px 0 6px;
 }
@@ -1193,7 +1193,7 @@ a.wordmark:hover {
 
 .opened-task-last {
   color: var(--fg-dim);
-  font-size: 0.9em;
+  font-size: 0.875rem;
   font-family: var(--font-content);
   padding-top: 4px;
 }
@@ -1223,6 +1223,55 @@ a.wordmark:hover {
   color: var(--muted);
 }
 
+/* LIN-4024: the folds are one line of text links with their counts. The bar and the box-row padding of a nested
+   toggle are gone here, and the links are body-sized rather than em-compounded. */
+.opened-task-folds .detail-toggle.nested-toggle {
+  margin-top: 0;
+  padding: 0;
+  border-left: 0;
+  font-size: 0.875rem;
+}
+
+.opened-task .detail-link {
+  font-size: 0.875rem;
+  margin-top: 0;
+}
+
+/* LIN-4024: the buttons in the opened task are body-sized. .btn is sized in em (0.85em), so on a phone it shrank with
+   the 13px body to about 11px. Download is a button without the .btn class, and it sits beside Rewrite at the same size. */
+.opened-task .btn,
+.opened-task .opened-task-download {
+  font-size: 0.875rem;
+}
+
+/* LIN-4024: the description fold's metadata line (identifier, assignee, labels) is body-sized text, not em-compounded. */
+.opened-task .detail-line,
+.opened-task .detail-meta {
+  font-size: 0.8125rem;
+}
+
+/* LIN-4024: a child row's opened task takes the Home column's full width. Each tree level indents the row by 1.5em,
+   and the box cancels that indent, so the box starts at its own tree line and no box sits inside another. */
+.children > .node > .details:has(> .opened-task) {
+  margin-left: -1.5em;
+}
+
+.children .children > .node > .details:has(> .opened-task) {
+  margin-left: -3em;
+}
+
+.children .children .children > .node > .details:has(> .opened-task) {
+  margin-left: -4.5em;
+}
+
+/* LIN-4024: Home's description renders the markdown of the task, so its headings stay body-sized in the fold. */
+.home-description h1,
+.home-description h2,
+.home-description h3 {
+  font-size: 1em;
+  margin: 0.4em 0 0.2em;
+}
+
 /* LIN-4010: Home's stage strip is a row of small chips (they wrap on a phone), not the task page's wide boxes. */
 .opened-task-home .task-strip {
   margin-top: 6px;
@@ -1232,7 +1281,7 @@ a.wordmark:hover {
 .opened-task-home .task-strip-chip {
   flex: 0 1 auto;
   padding: 0 6px;
-  font-size: 0.8em;
+  font-size: 0.75rem;
   border-radius: 999px;
 }
 
@@ -1273,16 +1322,21 @@ a.wordmark:hover {
   font-weight: 600;
 }
 
-.opened-task-home .opened-task-step-name {
+/* LIN-4024: the name is its own line only where a step's what and why follow it (renderStepLine). In the copy-first
+   line it stays inline, so the " \u00b7 " after it cannot start a line of its own. */
+.opened-task-home .opened-task-step-name--block {
   display: block;
-  font-size: 1.15em;
+}
+
+.opened-task-home .opened-task-step-name {
+  font-size: 1.0625rem;
 }
 
 .opened-task-step-what,
 .opened-task-step-why {
   margin: 0;
   color: var(--fg-dim);
-  font-size: 0.9em;
+  font-size: 0.875rem;
 }
 
 .opened-task-step-what {
@@ -1321,7 +1375,7 @@ a.wordmark:hover {
 }
 
 .opened-task-watch {
-  font-size: 0.9em;
+  font-size: 0.875rem;
 }
 
 .opened-task-running-actions {
@@ -1334,17 +1388,17 @@ a.wordmark:hover {
 .opened-task-on {
   margin: 0;
   color: var(--fg-dim);
-  font-size: 0.9em;
+  font-size: 0.875rem;
 }
 
 .opened-task-on-open {
-  font-size: 0.95em;
+  font-size: 0.9375rem;
 }
 
 .opened-task-running-next {
   margin: 0;
   color: var(--fg-dim);
-  font-size: 0.9em;
+  font-size: 0.875rem;
 }
 
 .opened-task-copy-state {
@@ -1357,7 +1411,7 @@ a.wordmark:hover {
 .opened-task-queued,
 .opened-task-last-copy {
   color: var(--fg-dim);
-  font-size: 0.9em;
+  font-size: 0.875rem;
 }
 
 .opened-task-ask,
@@ -1367,6 +1421,15 @@ a.wordmark:hover {
 .opened-task-undo,
 .opened-task-stop {
   margin-left: 0.6em;
+}
+
+/* LIN-4024: Undo and the watch link sit at body size next to the action they undo (they were ~10px on a phone, from
+   nested em sizes). */
+.opened-task-undo,
+.opened-task-see,
+.opened-task-stop,
+.opened-task-started-link {
+  font-size: 0.875rem;
 }
 
 .opened-task-change-panel {
@@ -1872,6 +1935,16 @@ a.wordmark:hover {
 /* Idle/backlog rides the semantic slate idle token (LIN-850), not a magic
    opacity. --slate-dim is the AA-safe slate text companion. */
 .state.backlog { color: var(--slate-dim); }
+
+/* LIN-4024: Home's row glyphs share one size and one box, so ○, ◦ and ◐ sit on the same line whichever list
+   the row is in. */
+.in-progress-section .state,
+.project .state {
+  font-size: 1em;
+  line-height: 1;
+  width: 1.2ch;
+  text-align: center;
+}
 
 /* Issue title - fills remaining space, wraps on overflow */
 .title {
@@ -5160,7 +5233,7 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
   background: var(--raised);
   color: var(--text);
   font-family: var(--font-content);
-  font-size: var(--font-size-sm);
+  font-size: 0.875rem;
 }
 
 .opened-task-runner-link:hover,

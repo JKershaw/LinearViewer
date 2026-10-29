@@ -378,6 +378,73 @@ function destroyHomePromptSections(root) {
 }
 
 /**
+ * Render a task description's markdown into `target` once (LIN-156). The raw text is base64 on the page, so it
+ * arrives attribute-safe; Linear image URLs are rewritten to the workspace's image relay. A description the page
+ * cannot decode shows an error, and the function returns false so the caller can keep its truncated view.
+ * @param {HTMLElement} target - Receives the rendered markdown; gets `data-rendered` once done
+ * @param {string} rawDescBase64 - The description, base64-encoded
+ * @param {string} [urlKey] - The workspace's url key, for the image relay
+ * @returns {boolean} false when the description could not be decoded
+ */
+function renderDescriptionMarkdown(target, rawDescBase64, urlKey) {
+  let rawDesc
+  try {
+    rawDesc = atob(rawDescBase64)
+  } catch (decodeErr) {
+    console.error('Failed to decode description:', decodeErr)
+    target.textContent = '[Error decoding description]'
+    target.dataset.rendered = 'true'
+    return false
+  }
+  try {
+    let html = renderMarkdown(rawDesc)
+
+    // Rewrite Linear image URLs to use proxy (LIN-156)
+    // Only rewrite for valid urlKey and proper image URLs
+    if (urlKey && /^[a-zA-Z0-9_-]+$/.test(urlKey)) {
+      const tempDiv = document.createElement('div')
+      tempDiv.innerHTML = html
+
+      // Find all images and rewrite Linear URLs
+      tempDiv.querySelectorAll('img').forEach(img => {
+        const src = img.getAttribute('src') || ''
+        if (src.match(/^https:\/\/(uploads\.linear\.app|cdn\.linear\.app)\//)) {
+          const proxyUrl = `/workspace/${encodeURIComponent(urlKey)}/api/image?url=${encodeURIComponent(src)}`
+          img.setAttribute('src', proxyUrl)
+          img.setAttribute('loading', 'lazy')
+          // Add error handler safely via event listener (not inline)
+          img.dataset.originalSrc = src
+        }
+      })
+
+      html = tempDiv.innerHTML
+    }
+
+    target.innerHTML = html
+
+    // Add error handlers to images after inserting into DOM
+    target.querySelectorAll('img[data-original-src]').forEach(img => {
+      img.addEventListener('error', function() {
+        this.style.display = 'none'
+        const errorSpan = document.createElement('span')
+        errorSpan.className = 'img-error'
+        errorSpan.textContent = '[Image failed to load]'
+        if (this.parentNode) {
+          this.parentNode.insertBefore(errorSpan, this.nextSibling)
+        }
+      })
+    })
+
+    target.dataset.rendered = 'true'
+  } catch (err) {
+    console.error('Failed to render description:', err)
+    target.textContent = '[Error rendering description]'
+    target.dataset.rendered = 'true'
+  }
+  return true
+}
+
+/**
  * Fetch any lazy `.details` blocks that are actually visible and not yet loaded
  * (e.g. after restoring persisted expand state or re-expanding a project).
  * loadDetails itself guards against duplicate fetches.
@@ -920,68 +987,12 @@ function init() {
       const fullContent = container.querySelector('.desc-full-content')
 
       // Render markdown on first expansion
-      if (fullContent && !fullContent.dataset.rendered) {
-        const rawDescBase64 = container.dataset.rawDesc
-        if (rawDescBase64) {
-          try {
-            // Decode base64 with validation
-            let rawDesc
-            try {
-              rawDesc = atob(rawDescBase64)
-            } catch (decodeErr) {
-              console.error('Failed to decode description:', decodeErr)
-              fullContent.textContent = '[Error decoding description]'
-              fullContent.dataset.rendered = 'true'
-              truncated.classList.toggle('hidden')
-              full.classList.toggle('hidden')
-              return
-            }
-
-            const urlKey = container.dataset.urlKey
-            let html = renderMarkdown(rawDesc)
-
-            // Rewrite Linear image URLs to use proxy (LIN-156)
-            // Only rewrite for valid urlKey and proper image URLs
-            if (urlKey && /^[a-zA-Z0-9_-]+$/.test(urlKey)) {
-              const tempDiv = document.createElement('div')
-              tempDiv.innerHTML = html
-
-              // Find all images and rewrite Linear URLs
-              tempDiv.querySelectorAll('img').forEach(img => {
-                const src = img.getAttribute('src') || ''
-                if (src.match(/^https:\/\/(uploads\.linear\.app|cdn\.linear\.app)\//)) {
-                  const proxyUrl = `/workspace/${encodeURIComponent(urlKey)}/api/image?url=${encodeURIComponent(src)}`
-                  img.setAttribute('src', proxyUrl)
-                  img.setAttribute('loading', 'lazy')
-                  // Add error handler safely via event listener (not inline)
-                  img.dataset.originalSrc = src
-                }
-              })
-
-              html = tempDiv.innerHTML
-            }
-
-            fullContent.innerHTML = html
-
-            // Add error handlers to images after inserting into DOM
-            fullContent.querySelectorAll('img[data-original-src]').forEach(img => {
-              img.addEventListener('error', function() {
-                this.style.display = 'none'
-                const errorSpan = document.createElement('span')
-                errorSpan.className = 'img-error'
-                errorSpan.textContent = '[Image failed to load]'
-                if (this.parentNode) {
-                  this.parentNode.insertBefore(errorSpan, this.nextSibling)
-                }
-              })
-            })
-
-            fullContent.dataset.rendered = 'true'
-          } catch (err) {
-            console.error('Failed to render description:', err)
-            fullContent.textContent = '[Error rendering description]'
-            fullContent.dataset.rendered = 'true'
-          }
+      if (fullContent && !fullContent.dataset.rendered && container.dataset.rawDesc) {
+        if (!renderDescriptionMarkdown(fullContent, container.dataset.rawDesc, container.dataset.urlKey)) {
+          // Decode failed: the error is in the full view, which opens now.
+          truncated.classList.toggle('hidden')
+          full.classList.toggle('hidden')
+          return
         }
       }
 
@@ -1008,6 +1019,12 @@ function init() {
         // LIN-156: Load comments on first expand
         if (toggleType === 'comments' && !isHidden && !content.dataset.loaded) {
           loadComments(detailToggle, content)
+        }
+
+        // LIN-4024: Home's description renders its markdown on first open, never a raw preview.
+        if (toggleType === 'description') {
+          const home = content.querySelector('.home-description')
+          if (home && !home.dataset.rendered) renderDescriptionMarkdown(home, home.dataset.rawDesc, home.dataset.urlKey)
         }
 
         // LIN-652: Attachments gallery is server-rendered (images already point

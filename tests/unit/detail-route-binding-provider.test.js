@@ -33,6 +33,11 @@ before(() => { process.env.NODE_ENV = 'test'; });
 const ACTIVE_ISSUE = { id: 'active-1', identifier: 'ACT-1', title: 'Active-binding issue', description: 'ACTIVE_BINDING_MARKER', state: { name: 'Todo', type: 'unstarted' } };
 const SECONDARY_ISSUE = { id: 'secondary-1', identifier: 'SEC-1', title: 'Secondary-binding issue', description: 'SECONDARY_BINDING_MARKER', state: { name: 'Todo', type: 'unstarted' } };
 
+// The Home description rides in the page as base64 (`data-raw-desc`, LIN-4024) and the client renders it on open, so
+// the page's text is the HTML plus each decoded description. A marker is found whichever way the page carries it.
+const withDescriptions = (html) => html + [...html.matchAll(/data-raw-desc="([^"]+)"/g)]
+  .map(([, raw]) => Buffer.from(raw, 'base64').toString('utf8')).join('\n');
+
 let providerSeq = 0;
 
 /** Register a fake provider under a unique name, so tests never contend over one shared registry slot. */
@@ -118,7 +123,7 @@ describe('GET /workspace/:urlKey/api/detail/:issueId — binding-scoped provider
     const app = buildApp(workspace);
     const { status, body } = await withServer(app, get => get(`/workspace/test-workspace/api/detail/${ACTIVE_ISSUE.id}`));
     assert.equal(status, 200);
-    assert.ok(body.html.includes(ACTIVE_ISSUE.description));
+    assert.ok(withDescriptions(body.html).includes(ACTIVE_ISSUE.description));
     assert.deepEqual(activeScopes, ['active-token']);
   });
 
@@ -139,7 +144,7 @@ describe('GET /workspace/:urlKey/api/detail/:issueId — binding-scoped provider
     const app = buildApp(workspace);
     const { status, body } = await withServer(app, get => get(`/workspace/test-workspace/api/detail/${SECONDARY_ISSUE.id}?source=${secondaryName}`));
     assert.equal(status, 200);
-    assert.ok(body.html.includes(SECONDARY_ISSUE.description));
+    assert.ok(withDescriptions(body.html).includes(SECONDARY_ISSUE.description));
     // The security-critical assertion: the ACTIVE provider was never called at
     // all, and the secondary provider received ITS OWN binding's scope — never
     // the active binding's already-computed getWorkspaceCallScope credential.
@@ -180,7 +185,7 @@ describe('GET /workspace/:urlKey/api/detail/:issueId — binding-scoped provider
     const app = buildApp(workspace);
     const { status, body } = await withServer(app, get => get(`/workspace/test-workspace/api/detail/${ACTIVE_ISSUE.id}?source=some-unrelated-provider-name`));
     assert.equal(status, 200);
-    assert.ok(body.html.includes(ACTIVE_ISSUE.description));
+    assert.ok(withDescriptions(body.html).includes(ACTIVE_ISSUE.description));
     assert.deepEqual(activeScopes, ['active-token']);
   });
 
@@ -325,7 +330,7 @@ describe('GET /api/detail — connection-backed binding resolution (LIN-3240)', 
     const app = buildWorkspaceApiApp({ workspace });
     const { status, body } = await withHarnessServer(app, ({ get }) => get('/workspace/acme/api/detail/1'));
     assert.equal(status, 200);
-    assert.ok(body.html.includes(ISSUE_A.description));
+    assert.ok(withDescriptions(body.html).includes(ISSUE_A.description));
     assert.deepEqual(calls.filter(c => c.method === 'fetchIssueFields').map(c => c.scope.repo), [REPO_A]);
   });
 });
