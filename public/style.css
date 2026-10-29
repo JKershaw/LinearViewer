@@ -1529,6 +1529,15 @@ a.wordmark:hover {
   margin: 0;
 }
 
+/* LIN-4024: on a phone the sheet's summary and note sit at 0.9em of the 13px body, about 11.7px, below the 12px floor.
+   0.75rem is the card's size (the same floor), and it does not depend on the body rule. */
+@media (max-width: 640px) {
+  .opened-task-change-summary,
+  .opened-task-change-note {
+    font-size: 0.75rem;
+  }
+}
+
 /* LIN-4010: the Change choices are cards: the default, each saved preset, and where it runs. A pressed card is the
    chosen one (aria-pressed, above). On a phone the cards fill the sheet's width, two to a row where they fit. */
 .opened-task-cards {
@@ -5187,6 +5196,14 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
 .session-time {
   color: var(--fg-dim);
   margin-left: auto;
+}
+
+/* LIN-4024: a session's run link, one quiet text link after its time (not a fold toggle, not a button). */
+.session-run-link {
+  color: var(--fg-dim);
+  font-size: 0.75rem;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .session-summary {

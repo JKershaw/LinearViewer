@@ -116,6 +116,7 @@ describe('the Sessions fold on Home reads as sessions (public/sessions.js)', () 
       escapeHtml: (x) => String(x == null ? '' : x).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]),
       relativeTime: () => '3m ago',
       taskPageHref: () => '/workspace/acme/task/LIN-42',
+      runPageHref: (urlKey, sessionId) => (urlKey && sessionId ? `/workspace/${urlKey}/observation/session/${sessionId}` : ''),
       api: async () => ({ sessions }),
     };
     const sandbox = { window, console };
@@ -147,6 +148,13 @@ describe('the Sessions fold on Home reads as sessions (public/sessions.js)', () 
     assert.equal(html.includes('[decision]'), false, 'decision lines are not shown');
     assert.match(html, /the research session was cancelled/, 'the line a person wrote stays, without its tag');
     assert.match(html, /Checked the migration by hand/);
+  });
+
+  test('Home: each session links to its run page, by the session id the route sends; no link without one', async () => {
+    const linked = await load([{ ...SESSION, sessionId: 'sess-7' }], { home: true, urlKey: 'acme' });
+    assert.match(linked, /<a class="session-run-link" data-testid="sessions-run-link" href="\/workspace\/acme\/observation\/session\/sess-7">run ↗<\/a>/);
+    const unlinked = await load([{ ...SESSION, sessionId: null }], { home: true, urlKey: 'acme' });
+    assert.equal(unlinked.includes('session-run-link'), false, 'a run with no session id has no link to draw');
   });
 
   test('Swipe keeps its own fold, with the machine label and the prompt name (its bytes are unchanged)', async () => {

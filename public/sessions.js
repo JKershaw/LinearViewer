@@ -94,6 +94,11 @@
     const summaryHtml = s.agentSummary
       ? `<div class="session-summary">${esc(s.agentSummary)}</div>`
       : '';
+    // LIN-4024: the run's own page, the one link a session row has (the same href the Live Console's lane uses).
+    const runHref = window.runPageHref(opts.urlKey, s.sessionId);
+    const runLink = runHref
+      ? `<a class="session-run-link" data-testid="sessions-run-link" href="${esc(runHref)}">run ↗</a>`
+      : '';
     return `
       <div class="session-entry" data-agent-state="${esc(s.agentState || '')}">
         <div class="session-header">
@@ -101,6 +106,7 @@
           <span class="session-stage">${esc(stage)}</span>
           <span class="session-state-word">${esc(HOME_STATE_WORDS[s.agentState] || s.agentState || '')}</span>
           <span class="session-time">${esc(time)}</span>
+          ${runLink}
         </div>
         ${summaryHtml}
         ${renderFeedback(humanFeedback(s.feedback))}

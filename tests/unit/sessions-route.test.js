@@ -88,6 +88,14 @@ describe('GET /api/sessions/:identifier (LIN-3913)', () => {
     assert.deepEqual(res.jsonBody.sessions.map((s) => s.loopId), ['newest', 'middle', 'old']);
   });
 
+  test('each session carries the session id its run page is keyed by (LIN-4024 run link)', async () => {
+    const dispatchQueueStore = fakeDispatchStore({ items: [item('only', 1)] });
+    const res = await callRoute(makeRouter({ dispatchQueueStore, agentStatusStore: fakeAgentStatusStore() }));
+    const [session] = res.jsonBody.sessions;
+    assert.equal(typeof session.sessionId, 'string', 'the run link needs a session id');
+    assert.ok(session.sessionId.length > 0);
+  });
+
   test('noPrompt: the history read drops the prompt projection (LIN-3812)', async () => {
     const dispatchQueueStore = fakeDispatchStore({ items: [item('only', 1)] });
     await callRoute(makeRouter({ dispatchQueueStore, agentStatusStore: fakeAgentStatusStore() }));

@@ -14,7 +14,8 @@ import { readRunEvidence } from '../lib/run-evidence.js';
 import { closeOutSetsDone } from '../lib/run-closeout-state.js';
 import { recordMergedPrs } from '../lib/close-out-merges.js';
 import { readCloseOutChain, closeOutNotReady, closeOutNotReadyRefusal } from '../lib/close-out-readiness.js';
-import { getLoopsForIssue } from '../lib/pipeline-loops.js';
+import { getLoopsForIssue, sessionIdByLoop } from '../lib/pipeline-loops.js';
+import { sessionIdOf } from '../lib/live-console.js';
 import { toSessionView } from '../lib/sessions-view.js';
 import { resolveIssueBinding } from '../lib/workspace.js';
 import { resolveStateRef } from '../lib/proxy-ref-resolver.js';
@@ -87,8 +88,11 @@ export function registerSessionsRoutes(router, { workspaceFromUrl, dispatchQueue
         agentStatusStore,
         noPrompt: true // toSessionView never reads promptText (LIN-3812)
       });
+      // The run's page is keyed by the session id the Live Console uses, so each session carries it for its run link
+      // (LIN-4024). Same lookup as the Live Console, so the link and the console cannot disagree on a run.
+      const sessionIds = sessionIdByLoop(loops);
       // getLoopsForIssue returns oldest-first; reverse for newest-first display.
-      const sessions = loops.map(toSessionView).reverse();
+      const sessions = loops.map((loop) => ({ ...toSessionView(loop), sessionId: sessionIdOf(loop, sessionIds) })).reverse();
       res.json({ sessions });
     } catch (error) {
       console.error('Sessions GET error:', error);

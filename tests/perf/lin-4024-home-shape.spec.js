@@ -102,3 +102,24 @@ test('Home on a few thousand tasks: the page is small, done tasks never reach it
   console.log(`LIN-4024 measure: the first Backlog fold added ${(await backlogRows.count()) - before} rows`);
 });
 
+// Witness F (timing): the server's cost for Home's state build (the page render, which builds each row's state and the
+// trimmed view) and for the open-ruling reduction (the badge's read, the same reduction Home's count line uses). The
+// seeded shape has no open rulings yet, so the reduction here runs over an empty set; a ruling-bearing shape is not
+// timed by this spec.
+test('the state build and the open-ruling reduction are timed on this shape', async ({ page }) => {
+  await seedWorkspace(page);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`/workspace/${URL_KEY}/`);
+  await expect(page.locator('.in-progress-section')).toBeVisible();
+
+  const renderStart = Date.now();
+  const render = await page.request.get(`/workspace/${URL_KEY}/`);
+  const renderMs = Date.now() - renderStart;
+  const reductionStart = Date.now();
+  const rulings = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/rulings`);
+  const reductionMs = Date.now() - reductionStart;
+  console.log(`LIN-4024 measure: home render ${renderMs} ms (status ${render.status()}), open-ruling reduction ${reductionMs} ms (status ${rulings.status()}, ${TASKS} tasks, no open rulings)`);
+  expect(render.ok()).toBeTruthy();
+  expect(rulings.ok()).toBeTruthy();
+});
+
