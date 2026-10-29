@@ -115,6 +115,7 @@ describe('buildWakeFollowUp — the §5 bubbling matrix', () => {
       const wake = buildWakeFollowUp(makeChild({ kind: 'implementation', subscription }), pending);
       assert.ok(wake, `a leaf [pending] wakes its parent on subscription=${subscription}`);
       assert.ok(wake.prompt.includes('The orchestrator owes the next implementation session'), 'the wake carries the worker\'s own words');
+      assert.match(wake.prompt, /if the child is waiting on you, do that step/, 'the wake tells the autopilot to act only if the child is waiting on it');
     }
   });
 

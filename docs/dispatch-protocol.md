@@ -102,7 +102,8 @@ line sits with the deeper epistemics question.
 ## 5. The bubbling matrix
 
 An edge carries a declared **subscription level** (§6). Whether a node's outcome propagates
-to its parent is a pure function of `(outcome, edge.subscription)`:
+to its parent is a pure function of `(outcome, edge.subscription, child kind)` — the kind only matters for
+the PENDING-external row (LIN-4027):
 
 | Outcome | `terminal-only` edge | `everything` edge |
 |---|---|---|
