@@ -434,6 +434,16 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
     assert.equal(c.innerHTML.includes('Run Research'), false, 'no stage step is the main action');
   });
 
+  // LIN-4024 (look): a new user's one action is a solid "Write the prompt", and the step line has no stray leading dot.
+  test('copy-first: the Write the prompt button is the primary, and the step line starts with the stage name', async () => {
+    const { PromptSection } = loadClient({ stateBody: { status: 'idle', live: false, homeStatusHtml: '<p>No sessions yet.</p>', sessions: { count: 0 } } });
+    const c = makeContainer();
+    PromptSection.init(c, { ...HOME, dispatchEnabled: false, issue: { ...HOME.issue, stateType: 'backlog' } });
+    await flush(); await flush();
+    assert.match(c.innerHTML, /class="btn btn--primary opened-task-write" data-testid="opened-task-write"/);
+    assert.match(c.innerHTML, /data-testid="opened-task-step"><span class="opened-task-step-name">Scoping<\/span> \u00b7 the first step for a task in Backlog/);
+  });
+
   // LIN-4024: a task waiting on a question shows the owner's card in the state block; no card when the server sends none.
   test('a waiting task shows its question card in the state block, and no slot when the server sends no card', async () => {
     const card = '<div class="sess-qcard" data-testid="session-question-card" data-url-key="acme"><p data-testid="session-question-card-question">Which key?</p></div>';

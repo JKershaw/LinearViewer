@@ -561,7 +561,8 @@
     const reason = gateReason ? ` <span class="opened-task-primary-reason" data-testid="opened-task-primary-reason">${esc(gateReason)}</span>` : '';
     return renderLastCopySlot(state)
       + `<div class="opened-task-step" data-testid="opened-task-step">${name}${esc(step.why)}</div>`
-      + `<button class="btn opened-task-write" data-testid="opened-task-write" data-prompt="${esc(step.label)}"${disabled}>\u2726 Write the prompt</button>${reason}`;
+      // LIN-4024: the copy-first view's one action is the solid primary, so a new user sees what to do first.
+      + `<button class="btn btn--primary opened-task-write" data-testid="opened-task-write" data-prompt="${esc(step.label)}"${disabled}>\u2726 Write the prompt</button>${reason}`;
   }
 
   // LIN-3968: the recommender's routing breadcrumbs ("↳ X is a container → routing to Y", and the mock's
