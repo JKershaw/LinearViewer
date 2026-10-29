@@ -1,11 +1,11 @@
 ---
 title: The Price of Tomorrow
 kind: essay
-argument: Markets have priced AI as if new capability turns quickly into profit for those who build it, but the record so far shows capability compounding while the cost of verified useful work falls slowly, adoption spreading wide but shallow, productivity holding at trend and most measured value going to users, so the likeliest outcome is divided rather than a single boom or bust (parts of the supply side over-invested, some applications of limited worth, narrow verifiable uses transformative), with the financial and diffusion timelines coupled through the price and supply of compute but not through how organisations learn.
+argument: AI has been priced as if capability quickly becomes suppliers' profit, but so far use is wide and shallow, productivity holds at trend and users keep most measured value; the answer likely differs by layer, and turns on a cost nobody yet measures.
 version: 1
 date: 2026-10-29
 authors: [Claude, for John Kershaw]
-model: "claude-opus-5-5, Claude Code CLI dispatched by simple-dispatcher; the dispatch row (GET /api/proxy/dispatch/95ea751d) reports model opus, harness claude-code, effort high, kind custom, LIN-4023, a follow-up to the research dispatch 64bee8d5 (kind research, same model, harness and effort). Commissioned by John Kershaw on 29 October 2026 from a discussion he had with GPT-6.1 Sol. Two in-session research subagents made the first sweep of outside sources in the research leg; every outside figure used here was then read at its source by the writing session on 29 October 2026 (SEC filings and Census files downloaded and read directly). No new Harbour measurement. Not independently checked; not typeset."
+model: "claude-opus-5-5, Claude Code CLI dispatched by simple-dispatcher; the dispatch row (GET /api/proxy/dispatch/95ea751d) reports model opus, harness claude-code, effort high, kind custom, LIN-4023, a follow-up to the research dispatch 64bee8d5 (kind research, same model, harness and effort). Commissioned by John Kershaw on 29 October 2026 from a discussion he had with GPT-6.1 Sol. Two in-session research subagents made the first sweep of outside sources in the research leg; every outside figure used here was then read at its source by the writing session on 29 October 2026 (SEC filings and Census files downloaded and read directly). Revised before merge, still version 1, by dispatch 4839b5bb (kind implementation; model opus, harness claude-code, effort high) after a sceptical-reader review: the Alphabet and Meta filings and the FEDS Note were re-read at source for the earlier quarters and the year-on-year changes the gaps section uses. No new Harbour measurement. Not independently checked; not typeset."
 sources:
   - "Census Bureau, Construction Spending (C30), private construction annual tables and monthly SAAR, release of 1 October 2026 — https://www.census.gov/construction/c30/xlsx/privateha2.xlsx, https://www.census.gov/construction/c30/xlsx/private.xlsx, https://www.census.gov/construction/c30/xlsx/privsatime.xlsx (read 2026-10-29)"
   - "Stanford HAI, AI Index Report 2026, Economy chapter — https://hai.stanford.edu/ai-index/2026-ai-index-report/economy (read 2026-10-29)"
@@ -27,7 +27,8 @@ sources:
   - "Nordhaus, Schumpeterian Profits in the American Economy, NBER WP 10433, 2004 — https://www.nber.org/papers/w10433"
   - "Brynjolfsson, Collis, Eggers, Kazinnik and Nguyen, What is Generative AI Worth?, 2026-04-13 — https://digitaleconomy.stanford.edu/publication/what-is-generative-ai-worth/"
   - "Brynjolfsson, Li and Raymond, Generative AI at Work, NBER WP 31161 (2023); QJE 140(2), 2025 — https://www.nber.org/papers/w31161, https://doi.org/10.1093/qje/qjae044"
-  - "METR, early-2025 AI and experienced open-source developers study, 2025-07-10, and uplift update, 2026-02-24 — https://metr.org/blog/2025-07-10-early-2025-ai-experienced-os-dev-study/, https://metr.org/blog/2026-02-24-uplift-update/"
+  - "METR, early-2025 AI and experienced open-source developers study, 2025-07-10 — https://metr.org/blog/2025-07-10-early-2025-ai-experienced-os-dev-study/"
+  - "METR, uplift update, 2026-02-24 — https://metr.org/blog/2026-02-24-uplift-update/"
   - "Humlum and Vestergaard, Still Waters, Rapid Currents, NBER WP 33777 (revised 2026) — https://www.nber.org/papers/w33777"
   - "Acemoglu, The Simple Macroeconomics of AI, NBER WP 32487; Economic Policy 40(121), 2025 — https://www.nber.org/papers/w32487, https://doi.org/10.1093/epolic/eiae042"
   - "Bick, Blandin and Deming, The Rapid Adoption of Generative AI, NBER WP 32966 — https://www.nber.org/papers/w32966"
@@ -49,8 +50,6 @@ sources:
   - "docs/papers/harbour/root-task-ratio.md@c5245296:15-23,37-38"
   - "docs/papers/harbour/never-worked-pile.md@c5245296:15-23"
   - "docs/papers/harbour/measuring-throughput.md@c5245296:15-24"
-  - "docs/papers/harbour/why-throughput-halved.md@c5245296:15-20"
-  - "docs/papers/harbour/reliability-baseline.md@c5245296:15-21"
   - "docs/papers/harbour/cheaper-capacity.md@c5245296:14-27"
   - "docs/papers/harbour/cheap-implementer.md@c5245296:13"
   - "docs/papers/harbour/what-lowers-the-verification-cost.md@c5245296:13"
@@ -66,18 +65,18 @@ Prepared for John Kershaw | October 2026
 
 Financial markets have priced artificial intelligence as though new capability becomes profit
 for the people who build it, and becomes it soon. The record to October 2026 does not yet
-support that, but it does not support a crash either. It shows four things moving at four
-different speeds. The capability of the models compounds. The cost of getting a piece of
-useful, checked work out of them falls much more slowly, and nobody publishes it. Use spreads
-wide and stays shallow. National productivity sits on its long-run trend. Where value can be
-measured, most of it goes to the people using AI, not to the companies selling it or the
-investors funding the data centres. The likeliest outcome is therefore not one verdict but a
-divided one. Some markets, chiefly the financing of compute, are over-invested relative to the
-returns their owners can capture. Some applications will turn out to be worth little. Some
-uses, narrow ones where the output can be checked, are already transformative. And the
-financial timeline and the diffusion timeline are not as separable as the question that
-commissioned this essay assumed. They are coupled through the price and supply of compute,
-but not through the slower business of organisations learning to use what they have bought.
+support that, but it does not support a crash either. The capability of the models compounds
+and its price falls fast. Whether the cost of getting a piece of useful, checked work out of
+them falls as fast is unknown, because nobody measures it. Use spreads wide and stays shallow.
+National productivity sits on its long-run trend. Where value can be measured, most of it
+goes to the people using AI, and among the suppliers it is the sellers of scarce chips who are
+visibly earning. Set side by side, the best-measured gap is widening: the largest buyers'
+spending is outrunning the cash that pays for it. The answer to the bubble question
+is therefore likely to differ by layer of the industry rather than be one verdict: some
+markets, chiefly the financing of compute, over-invested against what their owners can
+capture; some applications worth little; some narrow uses, where the output can be checked,
+already showing large gains. Whether the financial and diffusion timelines can be separated is
+not yet decided. The essay says what each answer predicts and what would settle it.
 
 The question John put was whether this is a technological revolution whose financial
 expectations have arrived too early, or an investment boom whose promised economic revolution
@@ -216,7 +215,9 @@ read as a base rate for the mechanism, not as an estimate.
 For AI there is one direct attempt to measure the user side. Brynjolfsson and colleagues asked
 representative samples of US adults how much they would need to be paid to give up chatbots
 for a month. The aggregate came to $116 billion in 2025 and $172 billion in 2026, which the
-authors say "substantially exceeds" estimated US generative-AI revenue [BCE26]. This is stated
+authors say "substantially exceeds" estimated US generative-AI revenue [BCE26]. It measures one
+market, US consumers' chatbot use, so it should not be read against the enterprise and
+programming-interface revenue that makes up much of the providers' sales. It is also stated
 preference, not observed spending; the mean is $124.50 a month while the median is $11.40, so
 a few heavy users carry most of it. But it points the same way as Nordhaus. *Inferred*: so far,
 the value of generative AI to its users is larger than what its sellers collect, and the gap
@@ -224,8 +225,8 @@ is the normal shape for a general-purpose technology, not a sign that the value 
 
 Capture also splits inside the supply side. Nvidia earns a 75% gross margin on the chips
 [NVDA26]; the model providers project years of negative cash flow [OAI26b]; the data-centre
-owners are financing with debt [BOE26]. Whoever holds the scarce input collects; whoever
-competes to sell a commodity on top of it does not. A technology can therefore be
+owners are financing with debt [BOE26]. *Inferred*: whoever holds the scarce input collects,
+and whoever competes to sell a commodity on top of it may not. A technology can therefore be
 transformative while most of its investors earn disappointing returns, and the two statements
 are not in tension.
 
@@ -243,7 +244,7 @@ expected to be faster [METR25]. Its 2026 follow-up, with 57 developers and over 
 estimated that returning developers took 18% less time with AI (the interval runs from 38% less
 to 9% more) and new ones 4% less (from 15% less to 9% more), and METR itself calls the result "only
 very weak evidence" because developers increasingly refuse to work without AI and select their
-tasks accordingly [METR25]. A clean measurement became impossible to run at about the moment
+tasks accordingly [METR26]. A clean measurement became impossible to run at about the moment
 it became interesting.
 
 Above the firm, the numbers shrink. Linking adoption surveys to Danish administrative records,
@@ -317,7 +318,8 @@ AI reaches work by at least three routes, and they have different economics.
 The first is **conversational use**: a person asks a general-purpose model to draft, summarise,
 translate or explain. It needs little expertise to start, the user checks the answer, and it
 spreads like a consumer application, fast and shallow. Most adoption surveys measure this
-route, which is why their headline numbers are high and their productivity numbers are low.
+route. *Inferred*: that may be why their headline numbers are high and their productivity
+numbers are low.
 
 The second is **embedded intelligence**: a model inside a product that someone else built,
 such as fraud checks, transcription, search ranking, or code completion inside an editor. The
@@ -376,35 +378,101 @@ work done, checked and accepted. **No public series measures it.** Kapoor and co
 that agents should be judged on cost and accuracy together [KAP24], and leaderboards report
 snapshots, but nobody tracks the cost of a verified result over time.
 
-Harbour's own record shows why the third measure is not the first two. In October 2026 its
-paper on capacity found the models had moved past the bar it had measured: a mid-priced model
-now scored with the strongest one on the one independent benchmark that still separates them,
-and a cheap one scored near the top of the band where every model Harbour had seen build sat,
-so re-tiering could carry two to three times the work for the same money. It also recorded that
-neither move had been tried on a real ticket [H-CC]. An earlier trial of cheap models found
-they could implement small tickets, "and the review is the cost" [H-CI]; a literature paper
-found verification named by every source that measures it as the gate on handing agents more
-autonomy [H-VER]. Over the same months, Harbour's count of correct, complete changes fell from
-about 95 a week in June to about 47 from mid-July, at 26 to 49 agent sessions and 2.7 to 4.4
-working hours per change [H-MT]. Its own analysis traced that fall to a change of regime, fewer
-merged tickets and a lower share judged correct, not to the models [H-WTH], and its escaped-
-defect count rose mostly because its agents began finding and filing older faults [H-REL]. Its
-headline cost per verified task reads empty, because the price table lacks rows for the models
-now doing the work [H-PROP]. *Observed, for one operator*: capability got cheaper and stronger
-while the cost of verified useful work did not visibly fall, because other things decide it:
-review, coordination, the work the system generates for itself, and whether anyone is
-measuring. Nothing here says that is true of the economy. It says that the economy's missing
-series is the one that would show it.
+Harbour cannot fill that gap either, and that is the point. Its own cost per verified task
+reads empty, because its price table lacks rows for the models now doing the work [H-PROP].
+What its papers do show is why the third measure need not follow the first two. A trial of
+cheap models found they could implement small tickets, "and the review is the cost" [H-CI]; a
+literature paper found verification named, by every source that measures it, as the gate on
+handing agents more autonomy [H-VER]. In October 2026 its paper on capacity found that cheaper
+models now cleared the bar it had measured, so re-tiering could in principle carry two to
+three times the work for the same money, and recorded that this had not been tried on a real
+ticket [H-CC]. So nothing has been observed about the trend in the cost of verified work, for
+Harbour or for the economy. *Hypothesised*: it falls more slowly than the price of capability,
+because review, coordination and the work a system generates for itself do not get cheaper
+when tokens do. That is a reason to measure it, not a finding, and section 6 proposes how.
 
-## 4 When the financial and technological cycles collide
+## 4 Setting the series side by side
+
+The brief behind this essay asked for five series to be read together: investment and provider
+revenue, the price of capability, the length and reliability of the tasks models can do, the
+depth of adoption, and measured productivity and returns. It asked whether the gaps between
+them are widening or narrowing. The series are very unequal. Productivity runs back to 1947,
+the price of capability about three years, and the cost of a verified outcome not at all.
+
+![How long each series is: bars showing the span of each published series and where no series exists](figures/the-price-of-tomorrow/series-lengths.svg)
+
+The table takes each pair the argument depends on, and gives a direction only where both
+sides have at least two credible points on a basis that can be compared.
+
+| Pair | Points behind it | Direction |
+|---|---|---|
+| Hyperscaler capital spending against operating cash flow | Alphabet, five quarters to Q3 2026; Meta, Q3 2025 and Q3 2026 [GOOG26] [META26] | **Widening** |
+| AI investment against model-provider revenue | investment annual since 2013 [AII26]; revenue one company's run-rate, 2024 and 2025 [OAI26a] | Too short to tell: narrowing as a ratio, widening in dollars |
+| Value to users against what sellers collect | surplus 2025 and 2026 [BCE26]; no revenue series on the same basis | Too short to tell |
+| Price of capability against cost of a verified outcome | about three years [EPO25]; no series | Cannot be told |
+| Task length models complete against daily use at work | six years [METR-H]; two survey points a year apart [FED26] | Widening, *Inferred* |
+| Any use at work against daily use | the same two survey points [FED26] | Holding, in proportion |
+| Investment and use against productivity | quarterly since 1947 [BLS26] | Widening, but it tells nothing apart |
+
+**Spending against cash.** Alphabet's free cash flow, its operating cash less its capital
+spending, was $24.5 billion in the third quarter of 2025 and $24.6 billion in the fourth, then
+$10.1 billion, −$5.9 billion and −$9.1 billion in the first three quarters of 2026. Over the
+year its capital spending more than doubled, from $24.0 billion to $51.4 billion, while
+operating cash flow fell from $48.4 billion to $42.3 billion [GOOG26]. Between the same two
+quarters Meta's capital spending, including finance leases, rose from $19.4 billion to $34.9
+billion and its operating cash flow from $30.0 billion to $32.8 billion [META26]. This is the
+best-measured gap in the essay, and it opens further every quarter. It does not say whether the
+spending will pay. It says the largest buyers now spend more than their businesses generate,
+which is why the financing moved into credit markets.
+
+**Investment against revenue.** In the one year with both on record, OpenAI's annualised
+revenue rose about 3.3 times, from $6 billion to over $20 billion [OAI26a], while private AI
+investment rose 2.3 times [AII26]. As a ratio the gap narrowed. In dollars it widened, by
+about $180 billion. The two readings disagree, and they serve different arguments: the bubble
+case is about dollars (Cahn's $600 billion), the growth case about ratios. One company's
+run-rate against the world's investment, over one year, cannot settle which reading holds.
+
+**Value against capture.** The consumer surplus rose by about half between 2025 and 2026
+[BCE26]. OpenAI's revenue tripled in the year before [OAI26a]. The two share no year on a common
+basis and measure different markets. If revenue keeps growing faster than the surplus, the
+ratio narrows, which would count against the divided reading in section 5. Two points cannot
+say, and this is the gap that reading depends on most.
+
+**Price of capability against cost of verified work.** The first falls between 9 and 900 times
+a year. The second has no series. The gap this essay cares about most cannot yet be measured.
+
+**Capability against depth.** In METR's 2026 update the task length doubled every three to
+seven months, depending on the window [METR-H], while the share of workers using generative AI every day rose from about
+9% to 12% in the year to November 2025 [FED26]. The units differ, so "widening" means only that
+capability grows by multiples while deep use grows by points. *Inferred*: the distance between
+what the models can do and what most workers ask of them each day is growing.
+
+**Breadth against depth.** In the same year, work use rose 9.7 points to 40.7% and daily use 2.9
+points to 12%. Each grew by about a third, so daily users stayed at about three in ten of those
+who use it at all [FED26]. In points the gap opened; in proportion it held. Use is spreading
+without getting proportionally deeper, or shallower. The Census's firm series cannot add a
+direction yet: on its new basis it has six months of points, flat at 17–20% [BTOS26].
+
+**Everything against productivity.** Every series above rose while productivity held at 2.1%
+[BLS26]. That gap is widening, and it is the least informative of all. A delayed large effect
+and a prompt small one both predict it, and section 2's two warnings apply.
+
+The result is lopsided. The one gap measured well enough to give a direction, spending against
+cash, is widening, and it sits in the financing layer. The gaps that would decide who captures
+the value are too short to tell, or not measured at all: surplus against revenue, and the
+price of capability against the cost of verified work. That is the main reason to read the
+next section as hypotheses and section 6 as the essay's result.
+
+## 5 When the financial and technological cycles collide
 
 A financial correction would not leave the technology where it is. Its effects run in different
-directions and arrive at different times.
+directions and arrive at different times. Each is a *Hypothesised* mechanism unless it cites a
+source.
 
 - **Surplus compute could make AI cheaper.** If financing stops before the buildings are full,
   the capacity remains and its price falls. The telecom bust left fibre in the ground that later
-  carried the internet's growth [CHW03]. *Hypothesised*: on this channel a crash lowers the cost
-  of capability within a year or two.
+  carried the internet's growth [CHW03]. On this channel a crash lowers the cost of capability;
+  how quickly is not measured.
 - **Funding could dry up for frontier work and start-ups.** Training runs and young companies
   depend on new capital, not on existing capacity. This channel slows capability, with a lag of
   a model generation.
@@ -422,67 +490,107 @@ directions and arrive at different times.
   exposed, because its workflows are tuned to particular tools.
 
 These effects make a single verdict unlikely, and they shape the four trajectories John asked to
-be weighed. They are competing hypotheses, each with an observable signature, not predictions.
+be weighed. They are competing hypotheses, not predictions.
 
-![Illustration, not a published series: four small panels showing what each hypothesis predicts for valuations, use and supplier returns from 2023 to 2030](figures/the-price-of-tomorrow/four-trajectories.svg)
+![Illustration, not a published series: four small panels showing what each hypothesis predicts for valuations, use and the returns of model providers and data-centre owners from 2023 to 2030](figures/the-price-of-tomorrow/four-trajectories.svg)
 
 **Dot-com.** Valuations and capital spending collapse; use keeps spreading on the cheap capacity
-left behind. Its signature is falling rental prices for compute, rising use, and losses
-concentrated among lenders and late investors. It fits a world where the first effect above
-dominates. It is the telecom story [CHW03] and the most common historical pattern in the BIS's
-list [BIS26].
+left behind. It fits a world where the first effect above dominates. It is the telecom story
+[CHW03] and the most common pattern in the BIS's list [BIS26].
 
 **Productivity breakthrough.** Returns arrive fast enough to justify much of the spending:
 revenue at the frontier grows roughly as projected, the embedded open-ended cell fills, and
-exposed industries pull away from their trends. Its signature is provider margins widening while
-prices per verified outcome fall, which would mean the supply side is capturing a share of a
-growing surplus.
+exposed industries pull away from their trends.
 
-**AI winter.** Poor returns cut research, infrastructure and adoption together. Its signature is
-falling use alongside falling investment, and rising prices for the use that remains. The
-evidence so far is weakest for this trajectory: every adoption series available rose through
-2025 and the first half of 2026 [FED26] [BTOS26], and the Bank of England recorded the sharp
-July 2026 fall in AI and semiconductor stocks as orderly, with no spillover to core markets
-[BOE26]. But a winter would begin with exactly that kind of tremor, and whether use held
-through it is something the Census survey can now show.
+**AI winter.** Poor returns cut research, infrastructure and adoption together.
 
 **Divided economy.** The technology delivers real value, mostly to its users, while suppliers
-struggle to earn a return. Its signature is rising consumer surplus, rising use and falling
-prices together with thin or negative supplier margins: the shape of Nordhaus's base rate
-[NOR04] and of the 2026 surplus estimate [BCE26]. Of the four, it is the one that requires no
-break from what is already observed.
+struggle to earn a return: the shape of Nordhaus's base rate [NOR04].
 
-*Inferred*: the record to October 2026 sits closest to the divided economy. *Hypothesised*:
-if a correction comes, it starts in the financing layer and looks like the dot-com case,
-because that is where the debt is and where the capacity would outlast it. That is a reading,
-not a forecast, and every part of it can be overturned by the indicators in section 5.
+Stated for the industry as a whole, these trajectories cannot be told apart in 2026. Before
+2027 the dot-com and breakthrough paths look much like the present. Section 1 also showed the
+layers of the industry already behaving differently. So each trajectory is better defined by
+what it predicts for each layer: chips, cloud, model labs, the owners of data centres financed
+by debt, and users.
+
+| Layer | Dot-com | Breakthrough | Winter | Divided | The record by October 2026 |
+|---|---|---|---|---|---|
+| Chips | earn until orders stop, then fall | keep earning | fall | keep earning while scarce | 75% gross margin; data-centre revenue up 117% [NVDA26] |
+| Cloud | idle capacity, falling prices | profitable growth | contracts | grows, thin return on the capital | Google Cloud up 103% at an operating profit [GOOG26]; demand above capacity [MSFT26] |
+| Model labs | many fail; survivors buy compute cheaply | margins widen | funding gone | revenue grows, margins stay thin | fast growth on run-rates; losses projected to 2030 [OAI26a] [OAI26b] [ANT26] |
+| Debt-financed data-centre owners | losses pass to lenders | refinanced from earnings | losses pass to lenders | thin returns, slow repayment | debt rising fast [BOE26]; no returns published |
+| Users | use keeps spreading on cheap capacity | use deepens; exposed industries pull away | use falls | surplus well above what they pay | surplus above revenue at one point [BCE26]; use wide and shallow, rising [FED26] |
+
+Read against that table, current data place some layers and not others.
+
+- **Chips and cloud are placed, and they contradict the divided economy as the brief stated
+  it.** These suppliers are earning, not struggling. But a high chip margin today does not tell
+  dot-com from breakthrough: under dot-com the chip layer also earns until orders stop. And a
+  cloud segment's operating profit does not yet show whether the capital behind it earns its
+  cost.
+- **Model labs and data-centre owners cannot be placed.** The labs' figures are run-rates and
+  private projections, and the owners' returns are not published. These are the two layers
+  where dot-com, breakthrough and divided part company.
+- **Users are partly placed.** At one point in time, in one market, they get more than they pay.
+  Whether that gap is growing is too short to tell (section 4).
+- **The record argues against winter, so far.** Every adoption series rose through 2025 and the
+  first half of 2026 [FED26] [BTOS26]. The Bank of England recorded the sharp July 2026 fall in
+  AI and semiconductor stocks as orderly, with no spillover to core markets [BOE26]. But a winter
+  would begin with exactly that kind of tremor.
+
+So the record does not sit closest to any one trajectory. It argues against winter so far,
+places the chip layer and users, and leaves the deciding layers open. The divided economy
+survives only if it is restricted to model labs and data-centre owners. That restriction is
+drawn after seeing the chip and cloud figures, so it carries no evidential weight until those
+two layers' own returns are observed. *Hypothesised*: if a correction comes, it starts in the
+financing layer and looks like the dot-com case there, because that is where the debt is and
+where the capacity would outlast it. That is a reading, not a forecast, and the indicators in
+section 6 can overturn it.
 
 ### Are the financial and diffusion timelines separable?
 
 The brief assumed two clocks: a fast financial one and a slow diffusion one. It asked whether
-they are really separate. The evidence says they are coupled at one end and not the other.
+they are really separate. The evidence does not yet say. It shows a coupling at one end, and
+at the other end it is silent.
 
-At the **supply edge** they are tightly coupled. Microsoft says demand exceeds capacity
-[MSFT26]; OpenAI's revenue grew in step with the gigawatts it could run [OAI26a]; and the price
-a user pays is set by a provider's need to service its financing [OAI26b] [BOE26]. A funding
-shock therefore reaches users directly, through availability and price, and it reaches them
-within a year. The coupling is strongest for the third pathway and for embedded products that
-call frontier models, because both buy compute by the token.
+At the **supply edge** the clocks are visibly coupled. Microsoft says demand exceeds capacity
+[MSFT26], and OpenAI's revenue grew in step with the gigawatts it could run [OAI26a]: how much
+AI is sold depends on how much compute is financed. *Hypothesised*: prices are coupled too,
+because today's prices sit beneath projected losses [OAI26b] and a provider that must service
+its financing will charge more. How fast a funding shock would reach users through availability
+and price has not been measured. The coupling would be strongest for the third pathway and for
+embedded products that call frontier models, because both buy compute by the token.
 
-At the **organisational edge** they look separable. Adoption depth is limited by what
-organisations have learned to do, not by what they can buy. Daily use at 12% against 41% any
-use [FED26], null effects on earnings and hours two years in [HV26], and assisted hours of 1–5%
-[BBD24] all describe a constraint that cheaper or dearer compute would hardly move. The
-buildings themselves outlast the financing, as fibre did.
+At the **organisational edge** the evidence shows that use is shallow: daily use at 12% against
+41% any use [FED26], null effects on earnings and hours two years in [HV26], and 1–5% of hours
+assisted [BBD24]. It does not show why. Shallow use fits a constraint in what organisations
+have learned to do, which dearer compute would hardly move. It fits equally well a constraint
+in what they can buy and what has been built for them, which a funding shock would tighten.
+This section's own list names two routes by which money reaches organisational learning. Young
+companies build many embedded products, and the embedded pathway is how organisations get
+depth without expertise, so when start-up funding dries up, the products that would deepen use
+arrive later. And practices tuned to one provider's models are stranded if that provider
+fails, so an organisation can lose what it has learned. Both routes act with a lag of a product
+cycle, not a price change, which is why the 2026 data cannot yet see them.
 
-*Hypothesised*: the two clocks are coupled through the price and supply of compute and largely
-separable through organisational learning. The decisive test is whether adoption depth keeps
-rising through a funding shock. The 2026 sell-offs are small natural experiments; the
-Census's biweekly survey runs straight through them and, on its new basis, can be read before
-and after each one [BTOS26]. *Predicted*: if depth dips after a funding shock, the clocks are
-more coupled than this reading allows; if it does not, the separable half holds.
+The two readings predict different things, which is what makes the question worth keeping open.
 
-## 5 What the next four years could show
+- **Separable at the organisational edge.** After a funding shock, prices and frontier releases
+  move, but depth keeps its trend: daily use, assisted hours and firm use carry on rising, and
+  embedded products keep shipping on cheaper and open models.
+- **Coupled at both edges.** Depth stalls or dips a few quarters after a shock. Fewer new
+  embedded products appear. Firms tied to a distressed provider report abandoned workflows.
+
+*Hypothesised*, and no more: the clocks are coupled through the supply and price of compute;
+whether they are also coupled through organisational learning is undecided. *Predicted*: the
+first discriminator is whether adoption depth holds through a funding shock. The 2026 sell-offs
+are small natural experiments. The Census's biweekly survey runs straight through them and, on
+its new basis, can be read before and after each one [BTOS26]. The quarterly worker survey adds
+daily use [FED26]. If depth dips after a shock, the clocks are coupled at both edges. If it
+holds for several quarters, the separable reading gains ground, though it cannot be confirmed
+until the slower start-up and stranded-tooling routes have had time to act.
+
+## 6 What the next four years could show
 
 The most useful output of this essay may not be a verdict but a set of measurements that would
 tell the trajectories apart as they unfold. Each indicator below is chosen because the four
@@ -490,8 +598,6 @@ hypotheses predict different things for it, and because a monitor independent of
 read it from published sources. Lighthouse, a lean research process John runs beside Harbour
 with its own second-agent review [H-SB], could track them from 2027 to 2030. Harbour can
 investigate the two marked for it, from its own record.
-
-![How long each series is: bars showing the span of each published series and where no series exists](figures/the-price-of-tomorrow/series-lengths.svg)
 
 | Indicator | Source | Dot-com | Breakthrough | Winter | Divided | Who |
 |---|---|---|---|---|---|---|
@@ -526,8 +632,8 @@ source on 29 October 2026; where a source could not be opened in full, the entry
 - **[AII26]** Stanford HAI, *AI Index Report 2026*, Economy chapter. https://hai.stanford.edu/ai-index/2026-ai-index-report/economy. *Observed.* Supports corporate AI investment of $14.57bn (2013) and $581.69bn (2025) and private investment of $344.66bn, up 127.5%. Built on a commercial deal database whose back-series is revised between editions; does not measure spending on compute directly.
 - **[STL26]** Rubinton, H. and Patro, B. A. "Tracking AI's Contribution to GDP Growth." St. Louis Fed, 12 January 2026. https://www.stlouisfed.org/on-the-economy/2026/jan/tracking-ai-contribution-gdp-growth. *Observed.* Supports 0.97 percentage points and 39% of growth (first three quarters of 2025) against 0.81 and 28% in 2000. Does not net out imports, and the 2000 figure excludes data centres.
 - **[BEA26]** BEA, GDP advance estimate, third quarter 2026, 29 October 2026. https://www.bea.gov/news/2026/gdp-advance-estimate-3rd-quarter-2026. *Observed.* Supports the import point: information-processing equipment led equipment investment and capital goods led imports. An advance estimate, revised in November.
-- **[GOOG26]** Alphabet, Form 8-K Exhibit 99.1, Q3 2026, 28 October 2026. https://www.sec.gov/Archives/edgar/data/1652044/000165204426000080/googexhibit991q32026.htm. *Observed.* Supports purchases of property and equipment of $51.4bn, free cash flow of −$5.9bn (Q2) and −$9.1bn (Q3), and Google Cloud revenue of $30.7bn, up 103%. Free cash flow is the company's own non-GAAP measure.
-- **[META26]** Meta Platforms, Form 8-K Exhibit 99.1, Q3 2026, 21 October 2026. https://www.sec.gov/Archives/edgar/data/1326801/000162828026066700/meta-09302026xexhibit991.htm. *Observed.* Supports capital expenditure of $34.91bn including finance-lease principal, operating cash flow of $32.79bn, free cash flow of −$2.12bn and 2026 guidance of $135–145bn.
+- **[GOOG26]** Alphabet, Form 8-K Exhibit 99.1, Q3 2026, 28 October 2026. https://www.sec.gov/Archives/edgar/data/1652044/000165204426000080/googexhibit991q32026.htm. *Observed.* Supports purchases of property and equipment of $51.4bn (Q3 2026) against $24.0bn (Q3 2025), operating cash flow of $42.3bn against $48.4bn, quarterly free cash flow of $24.5bn, $24.6bn, $10.1bn, −$5.9bn and −$9.1bn from Q3 2025 to Q3 2026 (the Q3 2025 figure computed from the same statement's prior-year column), and Google Cloud revenue of $30.7bn, up 103% at an operating profit. Free cash flow is the company's own non-GAAP measure.
+- **[META26]** Meta Platforms, Form 8-K Exhibit 99.1, Q3 2026, 21 October 2026. https://www.sec.gov/Archives/edgar/data/1326801/000162828026066700/meta-09302026xexhibit991.htm. *Observed.* Supports capital expenditure of $34.91bn including finance-lease principal, operating cash flow of $32.79bn, free cash flow of −$2.12bn and 2026 guidance of $135–145bn; and, from the prior-year column, $19.37bn, $30.00bn and $10.63bn for Q3 2025.
 - **[META26b]** Meta Platforms, prospectus supplements (424B5), 28 October 2026. https://www.sec.gov/Archives/edgar/data/1326801/000119312526436410/d94886d424b5.htm · https://www.sec.gov/Archives/edgar/data/1326801/000119312526436405/d133631d424b5.htm. *Observed.* Supports 40 million shares at $625 by forward sale ($25bn) and $12.5bn of 6.50% mandatory convertible preferred. Does not say what the proceeds are for beyond general corporate purposes; the link to AI spending is *Inferred* from timing.
 - **[NVDA26]** NVIDIA, CFO Commentary on Q2 Fiscal 2027 Results, 26 August 2026. https://www.sec.gov/Archives/edgar/data/1045810/000104581026000073/q2fy27cfocommentary.htm. *Observed.* Supports data-centre revenue of $89.0bn, up 117%, and a 75.0% gross margin. Does not show who the end customers are or what they earn.
 - **[MSFT26]** Microsoft, FY26 Q4 earnings call, 29 July 2026. https://www.microsoft.com/en-us/investor/events/fy-2026/earnings-fy-2026-q4. *Observed* as a statement by the company's CFO: "Customer demand continues to exceed available capacity"; capital expenditure of $41bn; Azure growth of 43%. A company's account of its own demand, not an independent measure.
@@ -548,7 +654,8 @@ source on 29 October 2026; where a source could not be opened in full, the entry
 ### Productivity
 
 - **[BLR23]** Brynjolfsson, E., Li, D. and Raymond, L. "Generative AI at Work." NBER Working Paper 31161, 2023; *Quarterly Journal of Economics* 140(2), 2025. https://www.nber.org/papers/w31161 · https://doi.org/10.1093/qje/qjae044. *Observed.* Supports 5,179 agents, 14% more issues resolved per hour, 34% for novice and low-skilled workers (working-paper figures; the published version reports a slightly different average). One firm, one occupation.
-- **[METR25]** METR, early-2025 study of experienced open-source developers, 10 July 2025, and uplift update, 24 February 2026. https://metr.org/blog/2025-07-10-early-2025-ai-experienced-os-dev-study/ · https://metr.org/blog/2026-02-24-uplift-update/. *Observed.* Supports the 19% slowdown (2025) and the 2026 estimates with their intervals and METR's own description of them as "only very weak evidence". Small samples; selection into the study is the stated problem.
+- **[METR25]** METR, early-2025 study of experienced open-source developers, 10 July 2025. https://metr.org/blog/2025-07-10-early-2025-ai-experienced-os-dev-study/. *Observed.* Supports the 19% slowdown for experienced developers on their own repositories, against their expectation of a speed-up. A small sample of one kind of developer.
+- **[METR26]** METR, uplift update, 24 February 2026. https://metr.org/blog/2026-02-24-uplift-update/. *Observed.* Supports the 2026 estimates (57 developers, over 800 tasks; 18% and 4% less time, with their intervals) and METR's own description of them as "only very weak evidence". Selection into the study, as developers refuse to work without AI, is the stated problem.
 - **[HV26]** Humlum, A. and Vestergaard, E. "Still Waters, Rapid Currents: Early Labor Market Transformation under Generative AI." NBER Working Paper 33777, revised 2026. https://www.nber.org/papers/w33777. *Observed.* Supports precise nulls on earnings and hours, ruling out effects above 2% two years after ChatGPT, in Denmark. Wages and hours, not output; one country.
 - **[ACE24]** Acemoglu, D. "The Simple Macroeconomics of AI." NBER Working Paper 32487; *Economic Policy* 40(121), 2025. https://www.nber.org/papers/w32487 · https://doi.org/10.1093/epolic/eiae042. *Hypothesised*: a calibrated model. Supports a ten-year TFP gain of no more than 0.66%, under 0.53% adjusted. Depends on its exposure and cost-saving inputs; excludes new products.
 - **[BBD24]** Bick, A., Blandin, A. and Deming, D. J. "The Rapid Adoption of Generative AI." NBER Working Paper 32966. https://www.nber.org/papers/w32966. *Observed* (survey). Supports nearly 40% adult use, 23% weekly and 9% daily work use (late 2024), 1–5% of hours assisted and 1.4% of hours saved. Self-reported.
@@ -561,7 +668,7 @@ source on 29 October 2026; where a source could not be opened in full, the entry
 
 ### Adoption
 
-- **[FED26]** Federal Reserve Board, "Monitoring AI Adoption in the U.S. Economy." FEDS Notes, 3 April 2026. https://www.federalreserve.gov/econres/notes/feds-notes/monitoring-ai-adoption-in-the-u-s-economy-20260403.html. *Observed.* Supports work use of about 41% and daily use of about 12% (November 2025), employment-weighted firm adoption of about 78% in the Atlanta Fed survey, BTOS at about 18% at the end of 2025, and the question change. The best single source on breadth against depth; draws no productivity conclusion.
+- **[FED26]** Federal Reserve Board, "Monitoring AI Adoption in the U.S. Economy." FEDS Notes, 3 April 2026. https://www.federalreserve.gov/econres/notes/feds-notes/monitoring-ai-adoption-in-the-u-s-economy-20260403.html. *Observed.* Supports work use of about 41% (40.7%, up 9.7 points in a year) and daily use of about 12% (up 2.9 points) in November 2025, employment-weighted firm adoption of about 78% in the Atlanta Fed survey, BTOS at about 18% at the end of 2025, and the question change. The best single source on breadth against depth; draws no productivity conclusion.
 - **[BTOS26]** Census Bureau, story on AI use among businesses, May 2026. https://www.census.gov/library/stories/2026/05/ai-use-businesses.html. *Observed.* Supports 19.8% of businesses (3 May 2026), 17–20% from December 2025 to May 2026, 37% of firms with 250 or more employees, and the November 2025 change of wording. The legacy and new series cannot be joined.
 - **[CHA25]** Chatterji, A. et al. "How People Use ChatGPT." NBER Working Paper 34255, 2025. https://www.nber.org/papers/w34255. *Observed*: non-work messages from 53% to more than 70% (November 2022 to July 2025). Consumer plans of one provider.
 - **[AEI25]** Anthropic, "Anthropic Economic Index: geography report", 15 September 2025. https://www.anthropic.com/research/economic-index-geography. *Observed* for one provider's traffic: directive conversations from 27% to 39%; automation 49.1% against augmentation 47%; 77% of API conversations showing automation. Not representative of the economy; the vendor classifies its own conversations.
@@ -582,9 +689,7 @@ the wider economy.
 - **[H-TGT]** [tasks-generate-tasks.md](tasks-generate-tasks.md), lines 15–21. *Observed, for Harbour.* 1,484 created against 701 closed in sixty days; 52% of generated tickets never worked.
 - **[H-RTR]** [root-task-ratio.md](root-task-ratio.md), lines 15–23 and 37–38. *Observed, for Harbour.* Units that reached done caused 1.52 further units; the rest 0.18; three in four caused none.
 - **[H-NWP]** [never-worked-pile.md](never-worked-pile.md), lines 15–23. *Observed, for Harbour*, one reader: 34 of 40 never-worked filings still true, 38 clearly stated, 23 the parent's own scope.
-- **[H-MT]** [measuring-throughput.md](measuring-throughput.md), lines 15–24. *Observed, for Harbour.* About 47 correct, complete changes a week from mid-July against 95 in June; 26–49 sessions and 2.7–4.4 working hours each.
-- **[H-WTH]** [why-throughput-halved.md](why-throughput-halved.md), lines 15–20. *Inferred, for Harbour.* The fall was a change of regime (fewer merged tickets; correct share 84% to 72%), not the measure.
-- **[H-REL]** [reliability-baseline.md](reliability-baseline.md), lines 15–21. *Inferred, for Harbour.* Escaped defects per 100 merged PRs rose from 5.4 to 13.7 in Harbour's repository, mostly a change in who finds and files faults.
+- **[H-MT]** [measuring-throughput.md](measuring-throughput.md), lines 15–24. *Observed, for Harbour.* Used in Next for its definition of a correct, complete change: merged with its ticket done, no escaped fault traced to it within 30 days, none of its work filed as a follow-up. Its weekly counts (about 95 in June, 47 from mid-July) are not used as evidence about cost: they come from a different period from the capacity findings, and Harbour's own analysis attributes the fall to a change of regime, not to the models.
 - **[H-CC]** [cheaper-capacity.md](cheaper-capacity.md), lines 14–27. *Observed* for the benchmark and price comparisons, *Predicted* for the capacity multiple; untried on a real ticket, as the paper says.
 - **[H-CI]** [cheap-implementer.md](cheap-implementer.md), line 13. *Observed, for Harbour*, thirteen tickets: "the review is the cost".
 - **[H-VER]** [what-lowers-the-verification-cost.md](what-lowers-the-verification-cost.md), line 13. *Inferred*: a literature reading that verification is the named gate on autonomy.
@@ -593,7 +698,7 @@ the wider economy.
 
 ## Next
 
-The essay leaves three questions that evidence could answer, and puts them in `proposals.md`.
+The essay leaves four questions that evidence could answer, and puts them in `proposals.md`.
 
 - **What does a verified outcome cost, and is it falling?** No public series measures the cost
   of getting a piece of work done, checked and accepted, though it is the quantity the economy is
@@ -601,18 +706,23 @@ The essay leaves three questions that evidence could answer, and puts them in `p
   tests, re-run each quarter on the then-current models at then-current prices, reporting cost
   per accepted result at a fixed success rate. Kept independent of Harbour, it would separate
   the price of capability from the price of useful work through 2027–2030 and tell the
-  trajectories in section 4 apart on the axis that matters most.
+  trajectories in section 5 apart on the axis that matters most.
 - **Do AI-exposed industries pull away from their own trends?** The cleanest test of delayed
   against small gains. Pair BLS industry productivity with an exposure measure and track each
   industry against its pre-2023 trend, quarterly; a Lighthouse series, not a Harbour one.
+- **Does adoption depth hold through a funding shock?** The first test of whether the financial
+  and diffusion timelines are separable at the organisational edge (section 5). Read the Census's
+  biweekly firm survey on its new basis, and the quarterly worker survey's daily use, before and
+  after the 2026 sell-offs and any later shock, and keep reading for several
+  quarters, since the start-up and stranded-tooling routes act with a lag; a Lighthouse series.
 - **Does Harbour's agent fleet raise valuable work, or only work?** Its papers show more work
   attempted, a minority finished, and finished work generating more than it closes, but never
   measured value per attempt. Join the throughput measure (changes that merged, passed review
-  and survived 30 days) to the cost record, monthly since August 2026, once the missing price
+  and survived 30 days) [H-MT] to the cost record, monthly since August 2026, once the missing price
   rows exist, and report correct, complete changes per API-equivalent dollar and the share of
   generated tickets that reach that bar.
 
-The remaining indicators in section 5 can be tracked from published sources without a new
+The remaining indicators in section 6 can be tracked from published sources without a new
 paper. This essay's version 1 is not independently checked; a check of its figures against
-their sources would be welcome, and section 4's separability reading is the claim most worth
-attacking.
+their sources would be welcome. The claims most worth attacking are the layer placements in
+section 5 and the directions given in section 4.
