@@ -303,7 +303,7 @@ function makeContainer() {
   return container;
 }
 
-function loadClient({ stateBody = null, previewBody = null, presetsBody = [] } = {}) {
+function loadClient({ stateBody = null, previewBody = null, presetsBody = [], panelHtml = '' } = {}) {
   const calls = { api: [], dispatch: [], post: [] };
   const window = {
     escapeHtml: (x) => (x == null ? '' : escapeHtml(String(x))),
@@ -315,7 +315,7 @@ function loadClient({ stateBody = null, previewBody = null, presetsBody = [] } =
       if (url.includes('/api/task/')) return stateBody;
       if (url.includes('/api/task-mode/')) return { lastCopy: null };
       if (url.includes('/api/dispatch/preview')) return previewBody;
-      if (url.includes('/api/dispatch/decision-panel')) return { html: '', words: null, withoutEffort: [] };
+      if (url.includes('/api/dispatch/decision-panel')) return { html: panelHtml, words: null, withoutEffort: [] };
       if (url.includes('/api/dispatch/presets')) return { presets: presetsBody };
       if (url.includes('/api/prompt/')) return { prompt: 'PROMPT', promptName: 'Plan' };
       return { success: true, item: { id: 'd-1' } };
@@ -521,4 +521,31 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
     await flush(); await flush();
     assert.match(c.innerHTML, /data-testid="opened-task-runner-line"[^>]*>[\s\S]*Set up a runner/);
   });
+  // LIN-4010 close-out (review: the opened-task surfaces class). Only Home changes layout: the task page's Change panel
+  // keeps the Preset row and the decision panel open, with no cards and no "Choose for this run".
+  test('the task surface\'s Change panel is unchanged: a Preset row, the decision panel visible, no cards, no choose toggle', async () => {
+    const { PromptSection } = loadClient({
+      stateBody: { status: 'idle', live: false, sessions: PLAN_NEXT },
+      previewBody: { kind: 'plan-review', harness: 'claude-code', words: { model: 'Sonnet' }, sources: { model: 'job' }, group: null, stepLabel: 'Plan review' },
+      presetsBody: [{ id: 'p1', name: 'Quick' }],
+      panelHtml: '<div data-testid="decision-panel-body">DECISION PANEL</div>',
+    });
+    const c = makeContainer();
+    PromptSection.init(c, { ...HOME, surface: 'task' });
+    await flush(); await flush();
+    await c.click({ action: 'change-run' });
+    await flush(); await flush();
+    const html = c.innerHTML;
+    assert.match(html, /data-testid="run-change-panel"/, 'Change opened');
+    assert.match(html, /<span class="opened-task-change-label">Preset<\/span><button class="btn opened-task-preset"[^>]*data-testid="run-preset">Quick</, 'the Preset row is there');
+    assert.equal(html.includes('data-testid="run-default"'), false, 'no default card');
+    assert.equal(html.includes('data-testid="run-cards"'), false, 'no cards');
+    assert.equal(html.includes('data-testid="run-choose"'), false, 'no "Choose for this run" toggle');
+    assert.equal(html.includes('data-testid="run-choose-panel"'), false, 'the panel is not wrapped in the choose container');
+    assert.match(html, /DECISION PANEL/, 'the decision panel body is in the panel');
+    assert.ok(html.indexOf('opened-task-preset') < html.indexOf('DECISION PANEL'), 'Preset row first, then the panel body');
+    assert.ok(html.indexOf('DECISION PANEL') < html.indexOf('>Runs on<'), 'then Runs on');
+    assert.doesNotMatch(html, /<[^>]*\bhidden\b[^>]*>[^<]*<div data-testid="decision-panel-body"/, 'the panel body is not inside a hidden element');
+  });
+
 });

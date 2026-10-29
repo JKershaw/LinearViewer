@@ -401,6 +401,7 @@ const HOOK = Object.freeze({
   'opened-task-needs-you': 'the subtask line in the state block, which the task surface does not draw',
   'opened-task-needs-you-name': 'the subtask name span in the state block, which the task surface does not draw',
   'opened-task-needs-you-open': 'the subtask link in the state block, which the task surface does not draw; a .btn--quiet',
+  'opened-task-preset': 'test/JS hook on a preset button; the .btn base class draws it',
   'opened-task-runs-on-what': 'a plain text span inside the "Runs on" sentence; it reads as text by design',
   'opened-task-settings-link': 'a plain link inside the "Runs on" sentence; it inherits the sentence style',
   'opened-task-source': 'a plain text span inside the "Runs on" sentence; it reads as text by design',

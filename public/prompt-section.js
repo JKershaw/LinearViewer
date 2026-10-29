@@ -1285,6 +1285,9 @@
       const panelWords = state.run.panelWords || {};
       const harness = d.harness || '';
       const inForce = harness || (preview && preview.harness) || '';
+      // LIN-4010: the task page keeps the Preset row and the open decision panel it always had; the cards and "Choose for
+      // this run" are Home's (caps.runBox).
+      const presetButtons = caps.runBox ? '' : presets.map((p) => `<button class="btn opened-task-preset" data-action="run-preset" data-preset-id="${esc(p.id)}" aria-pressed="${d.presetId === p.id ? 'true' : 'false'}" data-testid="run-preset">${esc(p.name || p.id)}</button>`).join('');
       // LIN-4010 review: the choices are cards. The default is one card (the step's own resolved setting, from the
       // preview, and its numbers from the decision panel); each saved preset is one more. "Choose for this run" reveals the
       // decision panel for anything else.
@@ -1317,10 +1320,14 @@
       return `<div class="opened-task-change-panel" data-testid="run-change-panel">`
         + `<div class="opened-task-change-head">This run only${panelWords.model ? ` \u00b7 default: ${esc(panelWords.model)}` : ''}`
         + `<button class="btn--quiet opened-task-change-x" data-action="close-change" aria-label="Close" data-testid="run-change-x">\u00d7</button></div>`
-        + `<div class="opened-task-cards" data-testid="run-cards">${choiceCards}</div>`
-        + `<div class="opened-task-change-row"><span class="opened-task-change-label">Runs on</span>${targetButtons}</div>${webNote}`
-        + `<button class="btn--quiet opened-task-choose-toggle" data-action="run-choose" aria-expanded="${chooseOpen ? 'true' : 'false'}" data-testid="run-choose">Choose for this run ${chooseOpen ? '▴' : '▾'}</button>`
-        + `<div class="opened-task-choose" data-testid="run-choose-panel"${chooseOpen ? '' : ' hidden'}>${panelBody}</div>`
+        + (caps.runBox
+          ? `<div class="opened-task-cards" data-testid="run-cards">${choiceCards}</div>`
+            + `<div class="opened-task-change-row"><span class="opened-task-change-label">Runs on</span>${targetButtons}</div>${webNote}`
+            + `<button class="btn--quiet opened-task-choose-toggle" data-action="run-choose" aria-expanded="${chooseOpen ? 'true' : 'false'}" data-testid="run-choose">Choose for this run ${chooseOpen ? '▴' : '▾'}</button>`
+            + `<div class="opened-task-choose" data-testid="run-choose-panel"${chooseOpen ? '' : ' hidden'}>${panelBody}</div>`
+          : (presetButtons ? `<div class="opened-task-change-row"><span class="opened-task-change-label">Preset</span>${presetButtons}</div>` : '')
+            + panelBody
+            + `<div class="opened-task-change-row"><span class="opened-task-change-label">Runs on</span>${targetButtons}</div>${webNote}`)
         + `<label class="opened-task-change-row"><input type="checkbox" data-testid="run-agent-access"${agent ? ' checked' : ''}> Your agent may read and update this task</label>`
         + `<p class="opened-task-change-summary" data-testid="run-will-use">${esc(runWillUseText(d, preview))}</p>`
         + `<div class="opened-task-change-row">`

@@ -107,6 +107,9 @@ for (const [label, viewport] of [['1280px', DESKTOP], ['390px', PHONE]]) {
       await expect(why).toContainText('usually next after Plan');
       await expect(run).toContainText('Run Plan review');
 
+      // Plan decision 2: the folds row carries the session count from the state read ("Sessions (1)" after one session).
+      await expect(block.locator('[data-fold-count="sessions"]')).toHaveText(' (1)');
+
       // The order on the page: the step name, then the reason, then Run, with nothing between the reason and Run.
       const [stepBox, whyBox, runBox] = [await box(step), await box(why), await box(run)];
       expect(runBox.y, 'Run is below the reason').toBeGreaterThanOrEqual(whyBox.y + whyBox.height - 1);
