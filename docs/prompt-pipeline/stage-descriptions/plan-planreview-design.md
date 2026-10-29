@@ -68,6 +68,9 @@ These cut across all three templates and affect how the two layers split.
 
 ## PLAN
 
+> **Status (LIN-4021, 29 Oct 2026):** the plan prompt now carries the agreed wording in `docs/reviews/stage-prompts-2026-10-29/proposed-prompts.md`. Sections 1–4 are the design analysis that led there; section 5 describes the prompt as it stood before LIN-4021 and is kept as the record.
+
+
 ### 1. What it's for
 
 Work out how this change should be made, where it reaches, and in what order, so it can be built
@@ -250,6 +253,9 @@ Record in the description, under a heading that starts `## Implementation Plan`:
 ---
 
 ## PLAN-REVIEW
+
+> **Status (LIN-4021, 29 Oct 2026):** the plan-review prompt now carries the agreed wording in `docs/reviews/stage-prompts-2026-10-29/proposed-prompts.md`. Sections 1–4 are the design analysis that led there; section 5 describes the prompt as it stood before LIN-4021 and is kept as the record.
+
 
 ### 1. What it's for
 

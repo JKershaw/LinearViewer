@@ -601,34 +601,46 @@ describe('plan template', () => {
     assert.ok(result.prompt.includes('Design profile UI'));
   });
 
-  test('includes planning content without implementation phase', () => {
+  test('includes planning content: the behaviour, its places and a witness for each promise', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Files to modify or create'));
-    assert.ok(result.prompt.includes('Testing approach'));
+    assert.ok(result.prompt.includes('A change is finished when the behaviour is right everywhere it lives, not just where the ticket pointed. Say how you know you\'ve found every place.'),
+      'the standard of done must be stated');
+    assert.ok(result.prompt.includes('gives each behaviour it promises a witness: a test or observation that fails before the change and passes after'),
+      'each behaviour the plan promises needs a witness');
     assert.ok(!result.prompt.includes('Phase 2: Implementation'), 'Should not include implementation phase');
     assert.ok(!result.prompt.includes('Implement changes incrementally'), 'Should not include implementation instructions');
   });
 
-  test('includes scope assessment section with session-fit question', () => {
+  // Proof of completeness is a test of the behaviour; where code cannot tell, the plan says so.
+  test('says how the plan knows it found every place, and what catches the rest', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Scope Assessment'));
-    assert.ok(result.prompt.includes('surfaces'));
-    assert.ok(result.prompt.includes('fits one session'));
-    assert.ok(result.prompt.includes('needs multiple sessions'));
+    assert.ok(result.prompt.includes('The strongest answer is a test of the behaviour that fails wherever it is still wrong'),
+      'the strongest proof must be a test of the behaviour');
+    assert.ok(result.prompt.includes('Where reading the code cannot tell you'),
+      'the honest exit must be stated');
+    assert.ok(result.prompt.includes('name what will catch the rest'),
+      'the honest exit must name what catches the rest');
+    assert.ok(result.prompt.includes('a place left out says why, and which ticket will handle it'),
+      'a place left out must name its ticket');
   });
 
-  test('includes subtask summary when subtasks present', () => {
+  test('names the behaviour plainly enough that anyone who meets one of its places can tell it belongs', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('**Subtasks:**'));
-    assert.ok(result.prompt.includes('0/1 done'));
-    assert.ok(result.prompt.includes('Next: TEST-C1'));
+    assert.ok(result.prompt.includes('The plan names the behaviour plainly enough that anyone who meets one of its places can tell it belongs, and puts each place it found in scope or out'),
+      'the behaviour must be named so that its places can be recognised');
   });
 
-  // LIN-3299: the role line is the Goal's lead now; it keeps the role's limit.
   test('leads with planning, and makes no code changes', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
-    assert.ok(result.prompt.split('## Process')[1].includes('Make no code changes here: the next stage builds the plan.'));
+    assert.ok(result.prompt.split('## Process')[1].includes('Make no code changes here: the next session builds what this plan decides.'));
     assert.ok(!result.prompt.includes('implementation engineer'));
+  });
+
+  test('says whether the work fits one focused session, and what would make it need more than one', () => {
+    const result = generatePrompt('plan', mockIssue, mockContext);
+    assert.ok(result.prompt.includes('The plan says whether the work fits one focused session, meaning one pass at building and verifying it without losing track of its edges.'));
+    assert.ok(result.prompt.includes('it needs more than one, split at seams where each piece lands and is verified on its own'));
+    assert.ok(result.prompt.includes('if you are reaching for examples, it fits one.'));
   });
 
   test('includes if blocked section', () => {
@@ -648,118 +660,50 @@ describe('plan template', () => {
     assert.ok(!result.prompt.includes('Remove it in Linear'));
   });
 
-  // LIN-279: Strategy Framing must run before Scope Assessment.
-  // Reversing the order produces post-hoc justification of the cheap default.
-  test('includes Strategy Framing block', () => {
+  // The revising planner reads the verdict before anything else in the Process (LIN-3300 / LIN-1603).
+  test('the revision section comes first in the Process, before the plan\'s own guidance', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Strategy Framing'), 'plan prompt must include Strategy Framing');
+    const proc = result.prompt.split('## Process')[1];
+    const rev = proc.indexOf('### If this pass is a revision');
+    const good = proc.indexOf('### What a good plan is');
+    assert.ok(rev > -1 && good > -1, 'both sections must be present');
+    assert.ok(rev < good, 'the revision section precedes the description of a good plan');
+    assert.ok(proc.includes('Every finding is answered: fixed, or disagreed with and why.'),
+      'every finding must be answered');
+    assert.ok(proc.includes('replace the old block in place (for example through `POST .../description/replace`)'),
+      'a revision replaces the plan in place');
+    assert.ok(proc.includes('Removing a step is a valid answer.'), 'a smaller revision is a valid answer');
   });
 
-  test('Strategy Framing appears before Scope Assessment', () => {
+  test('gives the four gate triggers for a second reader, and says most plans need none', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
-    const sfIdx = result.prompt.indexOf('Strategy Framing');
-    const saIdx = result.prompt.indexOf('Scope Assessment');
-    assert.notStrictEqual(sfIdx, -1, 'Strategy Framing must be present');
-    assert.notStrictEqual(saIdx, -1, 'Scope Assessment must be present');
-    assert.ok(sfIdx < saIdx, 'Strategy Framing must appear before Scope Assessment (ordering invariant)');
+    assert.ok(result.prompt.includes('Some plans deserve a second reader before anything is built: those that need more than one session, route around a cause tracked elsewhere, loosen a validation, contract or guard, or touch credentials, merge rules or the dispatch contract.'),
+      'the four triggers must be named');
+    assert.ok(result.prompt.includes('The plan says whether it is one of them; most are not, and go straight to the builder.'),
+      'the gate is gated, not universal');
   });
 
-  test('Strategy Framing block names cost-of-doing and cost-of-not-doing', () => {
+  test('a route around the cause names what it leaves unsolved and the ticket that tracks it', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Cost of doing'), 'must name cost-of-doing axis');
-    assert.ok(result.prompt.includes('Cost of not doing'), 'must name cost-of-not-doing axis');
+    assert.ok(result.prompt.includes('A route around the cause leaves a workaround that every later change here has to work around too, so a plan that takes one says what it leaves unsolved, why the cause cannot be fixed here, and which ticket tracks it.'),
+      'a route around the cause must say what it leaves unsolved and which ticket tracks it');
   });
 
-  test('Strategy Framing block instructs naming routed-around contract gap', () => {
+  test('builds on research: cites what it relies on, checks it at HEAD, and says where it disagrees', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
-    // The block must instruct the consumer to NAME the gap (identifier or "none identified"),
-    // not just to describe it in prose. A bare description silently reintroduces the failure mode.
-    assert.ok(result.prompt.includes('NAME the routed-around contract gap'), 'must instruct naming the gap');
-    assert.ok(result.prompt.includes('none identified'), 'must allow "none identified" as an explicit alternative');
+    assert.ok(result.prompt.includes('Each fact the plan relies on is true at HEAD and read from the source that is authoritative for it, not a summary, a cache or an earlier account.'));
+    assert.ok(result.prompt.includes('Where research ran, the plan builds on it and cites what it relies on (a comment, file:line or sha) rather than restating it'),
+      'research is cited, not restated');
+    assert.ok(result.prompt.includes('the claims are the plan\'s own'), 'the claims are the plan\'s own');
+    assert.ok(result.prompt.includes('everything research found that the change must handle is in the plan or set aside with a reason'),
+      'research\'s finds are carried or set aside');
+    assert.ok(result.prompt.includes('where it disagrees with research it says why'), 'disagreement is explained');
   });
 
-  // Completeness check: the surface list must be verified complete, not just correct.
-  // Guards the breadth failure — the same concept implemented in more than one place
-  // under a different name, where a clean search for the cited symbol looks like proof
-  // of completeness but is not.
-  test('includes a Completeness check on the surface list', () => {
+  test('carries the history constraints that bear on the change', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Completeness check'), 'plan prompt must include a Completeness check');
-    assert.ok(
-      result.prompt.includes('not proof of completeness'),
-      'must warn that a clean search for the cited symbol is not proof of completeness'
-    );
-  });
-
-  test('Completeness check follows surface enumeration and precedes the session-fit question', () => {
-    const result = generatePrompt('plan', mockIssue, mockContext);
-    const listIdx = result.prompt.indexOf('List the surfaces your plan touches');
-    const compIdx = result.prompt.indexOf('Completeness check');
-    const fitIdx = result.prompt.indexOf('does this fit one focused session');
-    assert.ok(listIdx !== -1 && compIdx !== -1 && fitIdx !== -1, 'all three anchors must be present');
-    assert.ok(listIdx < compIdx, 'Completeness check must follow surface enumeration');
-    assert.ok(compIdx < fitIdx, 'Completeness check must precede the session-fit question');
-  });
-
-  test('Completeness check does not misfire on genuinely single-surface work', () => {
-    const result = generatePrompt('plan', mockIssue, mockContext);
-    assert.ok(
-      result.prompt.includes('single-surface change is a valid result'),
-      'must explicitly allow a single-surface result so scope is a decision, not invented breadth'
-    );
-  });
-
-  // LIN-3202 (menu M14): the plan states what it adds beyond the research and
-  // cites the findings it relies on instead of restating them. Evidence base:
-  // the median plan restates ~440 words of research (`step-overlap` v2 B).
-  describe('cite, don\'t restate (LIN-3202)', () => {
-    test('states what the plan adds beyond the research and cites the rest', () => {
-      const result = generatePrompt('plan', mockIssue, mockContext);
-      assert.ok(result.prompt.includes('State what it adds, and cite the rest'),
-        'the plan prompt must carry the cite-don\'t-restate directive');
-      assert.ok(result.prompt.includes('what it adds beyond the research'),
-        'must ask what the plan adds beyond the research');
-      assert.ok(result.prompt.includes('the research findings it relies on instead of restating them'),
-        'must ask for citations of the findings relied on');
-    });
-
-    test('requires resolvable citations and forbids restatement to look self-contained', () => {
-      const result = generatePrompt('plan', mockIssue, mockContext);
-      assert.ok(result.prompt.includes('cite by comment (author/heading or id), file:line, or sha'),
-        'citations must be resolvable without the plan paraphrasing them');
-      assert.ok(result.prompt.includes('never restate a finding to "make the plan self-contained"'),
-        'must not instruct restating a finding to appear self-contained');
-      assert.ok(result.prompt.includes('there are no citations to manufacture'),
-        'the no-research case must forbid manufacturing citations');
-    });
-
-    test('states the no-research and disagreement cases as additions, not restatements', () => {
-      const result = generatePrompt('plan', mockIssue, mockContext);
-      assert.ok(result.prompt.includes('the plan stands alone'),
-        'a plan with no prior research must be allowed to stand alone');
-      assert.ok(result.prompt.includes('that is an addition, not a restatement'),
-        'a disagreement or stale finding must be named as an addition');
-      assert.ok(result.prompt.includes('the citation covers the member list, not the verdict'),
-        'the in/out-of-scope verdict stays the plan\'s own decision');
-    });
-
-    test('leaves the ordering invariant intact: Strategy Framing → Scope Assessment → session-fit → plan-review gate', () => {
-      const result = generatePrompt('plan', mockIssue, mockContext);
-      const sf = result.prompt.indexOf('### Strategy Framing');
-      const sa = result.prompt.indexOf('### Scope Assessment');
-      const fit = result.prompt.indexOf('does this fit one focused session');
-      const gate = result.prompt.indexOf('### Plan-review Gate');
-      assert.ok(sf > -1 && sa > -1 && fit > -1 && gate > -1, 'all four anchors must be present');
-      assert.ok(sf < sa, 'Strategy Framing precedes Scope Assessment');
-      assert.ok(sa < fit, 'Scope Assessment precedes the session-fit question');
-      assert.ok(fit < gate, 'the session-fit answer precedes the plan-review gate');
-    });
-
-    test('leaves the class-not-member bound text untouched', () => {
-      const result = generatePrompt('plan', mockIssue, mockContext);
-      assert.ok(result.prompt.includes('Record the class, its bound, and its members in the issue description alongside the plan, where plan-review will look for them'),
-        'the class bound must still have its stated destination');
-    });
+    assert.ok(result.prompt.includes('Files that keep changing carry constraints their text does not show'));
+    assert.ok(result.prompt.includes('read from `git log --oneline -15 -- <files>`'));
   });
 });
 
@@ -1135,14 +1079,14 @@ describe('class-not-member enumeration rule — research template (LIN-1871)', (
       'must name the population-is-data shape (LIN-1731)');
   });
 
-  test('hands the class list to the plan step, which extends it only with reason', () => {
+  test('hands the behaviour list to the plan step, which builds on it and checks what it relies on', () => {
     const result = generatePrompt('research', researchIssue, ctx);
     assert.ok(/Record each class, its bound, and its members in the description/i.test(result.prompt),
       'the class list needs a stated destination for the plan step to find');
-    assert.ok(/plan step works from this list/i.test(result.prompt),
-      'must state that plan is not free to re-derive classes from scratch');
-    assert.ok(/only adds a class of its own if it can say why you missed it/i.test(result.prompt),
-      'a new class at plan stage must be justified against research, not just added');
+    assert.ok(/The plan builds on this list and re-checks what it relies on/i.test(result.prompt),
+      'the plan builds on research\'s list rather than re-deriving it');
+    assert.ok(/every member you found ends up in or out of its scope, and your list is evidence for the plan, not a contract/i.test(result.prompt),
+      'research\'s list is evidence for the plan, not its edge');
   });
 
   test('sits after Audit the Layers, before Surface Assessment', () => {
@@ -1162,7 +1106,7 @@ describe('class-not-member enumeration rule — research template (LIN-1871)', (
   });
 });
 
-describe('class-not-member enumeration rule — plan template (LIN-1871, revising LIN-1873)', () => {
+describe('behaviour and its places — plan template (LIN-4021)', () => {
   const planIssue = {
     id: 'issue-sweep-plan', identifier: 'TEST-SW1', title: 'Cover every call site',
     description: 'Handle the whole class', url: 'https://linear.app/test/issue/TEST-SW1',
@@ -1171,96 +1115,45 @@ describe('class-not-member enumeration rule — plan template (LIN-1871, revisin
   };
   const ctx = { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [] };
 
-  test('works from research\'s classes and adds a class only with reason', () => {
+  test('names the behaviour plainly and puts each place in scope or out, with research\'s finds carried or set aside', () => {
     const result = generatePrompt('plan', planIssue, ctx);
-    assert.ok(/Name the class, and how you bounded it — work from research.s classes/i.test(result.prompt),
-      'plan prompt must carry the class-not-member directive, keyed to research');
-    assert.ok(/add a class of your own only if you can say why research missed it/i.test(result.prompt),
-      'a plan-added class must be justified against what research found');
+    assert.ok(/The plan names the behaviour plainly enough that anyone who meets one of its places can tell it belongs/.test(result.prompt),
+      'the plan must name the behaviour so its places can be recognised');
+    assert.ok(/research found that the change must handle is in the plan or set aside with a reason/.test(result.prompt),
+      'research\'s finds must be carried or set aside with a reason');
   });
 
-  test('requires a reproducible query as one way to bound a class, not the only way', () => {
+  test('says which places cannot be found by reading code, and what will catch the rest', () => {
     const result = generatePrompt('plan', planIssue, ctx);
-    assert.ok(/reproducible query whose output IS the enumeration/i.test(result.prompt),
-      'must pin the substantive clause — the query IS the enumeration, not a supporting note');
-    assert.ok(/is one way to bound a class, and the strongest one where it applies/i.test(result.prompt),
-      'a query must not be presented as the only accepted bound');
-    assert.ok(/paste its output and record the commit sha it ran at/i.test(result.prompt),
-      'a query with no output and no sha is not reproducible by the reviewer');
+    assert.ok(/Where reading the code cannot tell you, because the places are code not yet written or data in production, say so and name what will catch the rest/.test(result.prompt),
+      'the honest exit must name what catches the places the code cannot show');
+    assert.ok(/A search that finds more than you planned for is a finding, not something to trim/.test(result.prompt),
+      'a search that finds more is a finding, not to be trimmed');
   });
 
-  test('is sent back only for a missing class, never a missing member inside a bounded class', () => {
+  test('gives the strongest proof as a test of the behaviour, and a search someone else can repeat as the next best', () => {
     const result = generatePrompt('plan', planIssue, ctx);
-    assert.ok(/not sent back later for a missing member inside a class it correctly bounded/i.test(result.prompt),
-      'the class-not-member bound must be stated as the plan\'s own send-back rule');
-    assert.ok(/only for a class it should have named/i.test(result.prompt),
-      'the only valid send-back reason is a missing class');
+    assert.ok(/The strongest answer is a test of the behaviour that fails wherever it is still wrong; next, a search someone else can repeat/.test(result.prompt),
+      'the proof must be a test of the behaviour first, a repeatable search second');
   });
 
-  test('names the two un-sweepable shapes and makes declaring one a first-class answer', () => {
+  test('a loosened guard gets a test that tries what the guard was there to stop', () => {
     const result = generatePrompt('plan', planIssue, ctx);
-    assert.ok(/no sweep, and saying so is a first-class answer/i.test(result.prompt),
-      'declaring a class un-sweepable must not read as an omission');
-    // NOT `|| /destinations of new or moved code/`. The emphasis marker is part
-    // of the clause; the loose alternative passes with it stripped, and the meta
-    // counterpart was already tightened to the exact form. Review found the same
-    // item fixed on one path and not the other -- the drift the both-paths rule
-    // exists to prevent, inside this ticket's own tests.
-    assert.ok(/destinations\* of new or moved code/i.test(result.prompt),
-      'must name the moved-code-destinations shape (LIN-1717)');
-    assert.ok(/production data rather than source/i.test(result.prompt),
-      'must name the population-is-data shape (LIN-1731)');
+    assert.ok(/Where it loosens a validation, a contract or a guard \(a widened input, a dropped check, a softened assertion, a gate made advisory\), the witnesses include a test that tries what the guard was there to stop/.test(result.prompt),
+      'loosening a guard must carry a witness that tries what it stopped');
   });
 
-  test('bounds the un-sweepable escape hatch with a checkable criterion', () => {
-    // The escape hatch is the rule's ONLY opt-out, so it is the one clause a
-    // future edit can quietly widen back into "this class is awkward, therefore
-    // I am exempt" -- which would hollow out the whole directive while leaving
-    // every other assertion green. It shipped unpinned: review deleted the
-    // criterion from BOTH paths and the suites stayed at 324/0 and 177/0.
+  test('states the standard of done as the behaviour everywhere it lives, not as a member count', () => {
     const result = generatePrompt('plan', planIssue, ctx);
-    assert.ok(/not in the current source tree/i.test(result.prompt),
-      'the test for a third un-sweepable shape must be stated, not left to judgement');
-    assert.ok(/merely awkward to grep/i.test(result.prompt),
-      'a hard-to-grep class must be excluded from the hatch by name');
-    assert.ok(/harder query, not an absent one/i.test(result.prompt),
-      'must say WHY it is excluded, or the exclusion reads as arbitrary');
-  });
-
-  test('names where the class, its bound and its members are recorded', () => {
-    // A class the reviewer cannot find recorded is a hand-list with extra
-    // steps, and check (1) of plan-review is written to go looking for it.
-    const result = generatePrompt('plan', planIssue, ctx);
-    assert.ok(/Record the class, its bound, and its members in the issue description/i.test(result.prompt),
-      'the class, its bound and its members need a stated destination');
-    assert.ok(/where plan-review will look for them/i.test(result.prompt),
-      'the destination must be tied to the reader who consumes it');
-  });
-
-  test('warns against manufacturing a query, a script, or a checklist to fill the slot', () => {
-    const result = generatePrompt('plan', planIssue, ctx);
-    assert.ok(/Do not manufacture a query, a script, or a checklist to fill the slot/i.test(result.prompt),
-      'the anti-incentive is the half that keeps the rule honest, and now excludes scripted forms too');
-    assert.ok(/the rule asks for reasoning shown, not a form filled/i.test(result.prompt),
-      'must state the rule is about reasoning, not a fixed vocabulary');
-    assert.ok(/looks authoritative and is quietly incomplete/i.test(result.prompt),
-      'must name WHY a fabricated bound is worse than none');
-    assert.ok(/rather than trimming it until it agrees/i.test(result.prompt),
-      'a disagreeing bound is a result to report, not something to tune');
-  });
-
-  test('sits inside the completeness check, before the per-surface notes', () => {
-    const result = generatePrompt('plan', planIssue, ctx);
-    const completeness = result.prompt.indexOf('**Completeness check.**');
-    const classRule = result.prompt.indexOf('Name the class, and how you bounded it');
-    const perSurface = result.prompt.indexOf('For each surface, note:');
-    assert.ok(completeness > -1 && classRule > -1 && perSurface > -1, 'all three anchors present');
-    assert.ok(completeness < classRule, 'the class rule extends the completeness check');
-    assert.ok(classRule < perSurface, 'and stays ahead of the per-surface notes');
+    assert.ok(/A change is finished when the behaviour is right everywhere it lives, not just where the ticket pointed/.test(result.prompt),
+      'the standard of done is stated, not a member count');
+    assert.ok(/Say how you know you've found every place/.test(result.prompt),
+      'the plan must say how it knows it found every place');
   });
 });
 
-describe('class-not-member enumeration rule — plan-review template (LIN-1871, revising LIN-1873)', () => {
+
+describe('behaviour and its places — plan-review template (LIN-4021)', () => {
   const reviewIssue = {
     id: 'issue-sweep-rev', identifier: 'TEST-SW2', title: 'Verify the plan',
     description: 'Plan is documented', url: 'https://linear.app/test/issue/TEST-SW2',
@@ -1269,85 +1162,86 @@ describe('class-not-member enumeration rule — plan-review template (LIN-1871, 
   };
   const ctx = { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [] };
 
-  test('argues the class, not the member, when a missing member turns up', () => {
+  test('judges the reasoning, not the list: an unlisted place inside a correct description is a note', () => {
     const result = generatePrompt('plan-review', reviewIssue, ctx);
-    assert.ok(/Completeness check — argue the class, not the member/i.test(result.prompt),
-      'the check must be retitled to name the class-not-member rule');
-    assert.ok(/If you find a member the plan lacks, do not stop there/i.test(result.prompt),
-      'a found member must not end the finding by itself');
-    assert.ok(/how you bounded that class, and every other member your bounding found/i.test(result.prompt),
-      'the finding must widen to the whole class, not just the one member');
-    assert.ok(/One round, whole class/i.test(result.prompt),
-      'must pin the one-round-whole-class outcome');
-    assert.ok(/a verdict that names a member and stops is incomplete/i.test(result.prompt),
-      'a member-only verdict must be named as incomplete, however correct the member');
+    assert.ok(/If the plan describes the behaviour rightly, a place inside that description that it did not list is a note/i.test(result.prompt),
+      'an unlisted place inside a correct description must be a note');
+    assert.ok(/the description already puts it in scope/i.test(result.prompt),
+      'the description already covers the place, so it is not a separate defect');
   });
 
-  test('Check 5 accepts a permitted pin conversion whose behaviour replacement lands first, and keeps its guards (LIN-3615)', () => {
+  test('a place outside the description makes the description the finding, corrected whole', () => {
+    const result = generatePrompt('plan-review', reviewIssue, ctx);
+    assert.ok(/If you find a place the description leaves out, the finding is the description: say how the behaviour should be described, and give every other place that description reaches that you can find, so the plan is corrected whole rather than one place at a time/.test(result.prompt),
+      'a missing place must make the description the finding, corrected whole');
+  });
+
+  test('asks for a search only when it can say what search; an honest un-sweepable answer is sound', () => {
+    const result = generatePrompt('plan-review', reviewIssue, ctx);
+    assert.ok(/Where the places cannot all be found by reading code, a plan that says so and names what will catch the rest has given a sound answer; ask for a search only when you can say what search/.test(result.prompt),
+      'an un-sweepable class is sound when named, and a search is asked only with its query');
+  });
+
+  test('re-derives the premise from the source, not from the plan\'s word', () => {
+    const result = generatePrompt('plan-review', reviewIssue, ctx);
+    assert.ok(/\*\*Its premise is true\.\*\* The cause it names is the cause/.test(result.prompt),
+      'the premise must be checked first');
+    assert.ok(/Take nothing the build stands on from the plan\'s word when you can check it yourself/.test(result.prompt),
+      'the build\'s foundations are checked, not accepted');
+  });
+
+  test('a blocking finding is labelled apart from its note, and the line is what the plan decides', () => {
+    const result = generatePrompt('plan-review', reviewIssue, ctx);
+    assert.ok(/Write down everything you find\. Then, as a separate step, decide which findings block/.test(result.prompt),
+      'findings are written first, then labelled');
+    assert.ok(/A wrong detail that the plan\'s own witnesses would catch when the builder runs them is a note/.test(result.prompt),
+      'a detail the witnesses would catch is a note');
+    assert.ok(/so is any correction the builder can make without changing what the plan decides, its shape, scope or approach/.test(result.prompt),
+      'the block line is what the plan decides');
+  });
+
+  test('keeps the pin-conversion carve-out and the security exception, retargeted to "Its safeguards hold"', () => {
     const { prompt } = generatePrompt('plan-review', reviewIssue, ctx);
-    const start = prompt.indexOf('5. **Relaxation guard.**');
-    const end = prompt.indexOf('6. **Prerequisite refactor');
-    assert.ok(start > -1 && end > start, 'Check 5 is bounded by Checks 5 and 6');
-    const check5 = prompt.slice(start, end);
-    const clause = /Converting a source-text or location pin the ticket permits is no loosening once its behaviour replacement lands first and fails with the guard removed/;
-    assert.ok(clause.test(check5), 'Check 5 carries the conversion rule: permitted, replacement first, fails without the guard');
-    assert.ok(!clause.test(prompt.slice(0, start) + prompt.slice(end)), 'the rule sits in Check 5 only');
-    assert.ok(check5.includes('a ticket naming security guards keeps every check here'),
-      'a ticket that names security guards keeps every check');
-    assert.ok(check5.includes('adversarial follow-up') && check5.includes('an unnamed one is **Request Changes**'),
-      'the existing follow-up wording is kept');
+    const start = prompt.indexOf('**Its safeguards hold.**');
+    const end = prompt.indexOf('**Its shape fits the work.**');
+    assert.ok(start > -1 && end > start, 'the safeguards quality is bounded by the shape quality');
+    const safeguards = prompt.slice(start, end);
+    const clause = /Replacing a test that pins the code's text with one that pins its behaviour is not a loosening if the new test lands first and fails with the guard removed/;
+    assert.ok(clause.test(safeguards), 'the conversion rule: permitted, behaviour test first, fails without the guard');
+    assert.ok(!clause.test(prompt.slice(0, start) + prompt.slice(end)), 'the rule sits in the safeguards quality only');
+    assert.ok(safeguards.includes('on a ticket about security guards, every loosening is held to the full standard'),
+      'a ticket about security guards keeps the full standard');
+    assert.ok(safeguards.includes('a test that tries what the guard was there to stop'),
+      'a loosened guard needs a test that tries what it stopped');
   });
 
-  test('re-derives the plan\'s own bound before searching independently', () => {
+  test('a revised plan is read as new work, and an answer that holds is checked again', () => {
     const result = generatePrompt('plan-review', reviewIssue, ctx);
-    assert.ok(/re-derive that bound yourself/i.test(result.prompt),
-      'the cheap mechanical check must come first');
-    assert.ok(/re-run the query it cites at the sha it names, or redo the reasoning/i.test(result.prompt),
-      'must accept a re-run OR a redone reasoning as ways to re-derive the bound');
-    assert.ok(/Where the plan cites no bound for a class it claims to cover/i.test(result.prompt),
-      'the independent search is the fallback, not the primary, and now keys on "bound" not "sweep"');
+    assert.ok(/Start from what the last verdict asked: was each point answered, and does the answer hold\?/.test(result.prompt),
+      'the last verdict is the start point');
+    assert.ok(/Then read the revised text as new work, because it has had the least scrutiny/.test(result.prompt),
+      'the revised text is read as new work');
+    assert.ok(/the question is whether the plan should carry that mechanism at all/.test(result.prompt),
+      'the reviewer asks whether the mechanism should exist');
   });
 
-  test('is sent back only for a missing or wrongly-bounded class', () => {
+  test('a question only the asker can settle is Needs Discussion, with the question put plainly', () => {
     const result = generatePrompt('plan-review', reviewIssue, ctx);
-    assert.ok(/not sent back for a missing member inside a class already correctly bounded/i.test(result.prompt),
-      'the class-not-member bound must be stated as plan-review\'s own send-back rule');
-    assert.ok(/only for a missing or wrongly-bounded class/i.test(result.prompt),
-      'the only valid Request Changes reason is a missing or wrongly-bounded class');
+    assert.ok(/the verdict is Needs Discussion, with the question put plainly and your recommendation/.test(result.prompt),
+      'a dispute about what to deliver is Needs Discussion');
   });
 
-  test('directs disagreement at the bound, because that is what converges', () => {
+  test('is read-only and hands off on Approve, otherwise back to the planner', () => {
     const result = generatePrompt('plan-review', reviewIssue, ctx);
-    assert.ok(/argue about the BOUND/i.test(result.prompt),
-      'must redirect a disputed enumeration to the bound, not just "the sweep"');
-    assert.ok(/Propose the class, the query or reasoning you would use instead, and show what it finds/i.test(result.prompt),
-      'proposing a counter-class with its own bound is the concrete action');
-    // One alternative only. The old second branch `one at a time do not` was a
-    // SUBSTRING of the first, so the first could never be the deciding branch
-    // and the effective assertion was silently the weaker one -- the same dead
-    // -alternation defect review found two lines up, left behind by its fix.
-    assert.ok(/discovering members one at a time do not/i.test(result.prompt),
-      'must say why: member-by-member discovery does not converge');
-  });
-
-  test('an un-sweepable class is checked on its REASON, not treated as incomplete', () => {
-    const result = generatePrompt('plan-review', reviewIssue, ctx);
-    assert.ok(/declares a class un-sweepable is not thereby incomplete/i.test(result.prompt),
-      'the reviewer must not demand a sweep that cannot exist');
-    assert.ok(/Check the REASON, not the absence/i.test(result.prompt),
-      'pins what the reviewer actually checks');
-    assert.ok(/demand a sweep only where you can name the query/i.test(result.prompt),
-      'a demand for a sweep must come with the query that would produce it');
-  });
-
-  test('stays check (1) — the completeness slot, ahead of Strategy Framing', () => {
-    const result = generatePrompt('plan-review', reviewIssue, ctx);
-    const one = result.prompt.indexOf('1. **Completeness check');
-    const two = result.prompt.indexOf('2. **Strategy Framing');
-    assert.ok(one > -1 && two > -1, 'both numbered checks present');
-    assert.ok(one < two, 'the class-argument check belongs to check (1), not a new check');
+    assert.ok(/You are read-only: post the verdict, and do not edit the plan, build it or file tickets/.test(result.prompt),
+      'read-only is stated');
+    assert.ok(/On Approve, the plan goes to `implementation` with your notes/.test(result.prompt),
+      'an approval goes to implementation with its notes');
+    assert.ok(/on Request Changes or Needs Discussion, it goes back to `plan`/.test(result.prompt),
+      'otherwise it goes back to plan');
   });
 });
+
 
 // =============================================================================
 // look-into Template Tests
@@ -2052,30 +1946,18 @@ describe('Surface Assessment (handwritten path)', () => {
     );
   });
 
-  test('plan template sequences a necessary prerequisite refactor as a separate blocking subtask', () => {
+  test('plan template sequences a refactor research marked necessary as its own blocking subtask, landed first', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Surface Assessment'), 'plan must reference the prior Surface Assessment');
-    assert.ok(result.prompt.includes('blocking subtask'), 'plan must encode a necessary prerequisite refactor as a blocking subtask');
-    assert.ok(
-      result.prompt.includes('do not absorb the refactor into implementation'),
-      'plan must preserve the sequencing guarantee'
-    );
+    assert.ok(result.prompt.includes('If research marked a refactor `refactor required` and named the cause it removes or the line here that uses it'),
+      'the blocking-subtask rule must be conditioned on the refactor-required verdict and its named consumer');
+    assert.ok(result.prompt.includes('that refactor is its own blocking subtask and lands first, so the change is built on it rather than beside it'),
+      'the refactor must be sequenced first, built on rather than beside');
   });
 
-  test('plan template rejects consumer-less or bystander-taxing refactors', () => {
+  test('plan template folds in, scopes down or notes a refactor that removes no cause here or taxes bystanders', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
-    assert.ok(
-      result.prompt.includes('refactor required'),
-      'the blocking-subtask ratchet must be conditioned on the refactor-required verdict'
-    );
-    assert.ok(
-      result.prompt.includes('no consumer in this task'),
-      'plan must reject refactors with no in-task consumer'
-    );
-    assert.ok(
-      result.prompt.includes('does not become a subtask'),
-      'rejected refactors are folded inline, scoped down, or noted — never spun into subtasks'
-    );
+    assert.ok(result.prompt.includes('One that removes no cause here, that nothing here uses, or that makes other callers pay for this feature\'s need is folded in, scoped down or noted.'),
+      'a refactor with no cause here, or one taxing bystanders, must not become a subtask');
   });
 });
 
@@ -2198,19 +2080,23 @@ describe('Scale to the task (handwritten path)', () => {
   };
   const mockContext = { parent: null, siblings: [], project: null, children: [], comments: [] };
 
-  test('plan and research templates scale output to the task', () => {
-    for (const phase of ['plan', 'research']) {
-      const result = generatePrompt(phase, mockIssue, mockContext);
-      assert.ok(result.prompt.includes('Scale this to the task'), `${phase} must include the scale-to-task directive`);
-    }
+  test('research scales output to the task, and the plan states its own scale', () => {
+    const research = generatePrompt('research', mockIssue, mockContext);
+    assert.ok(research.prompt.includes('Scale this to the task'), 'research must include the scale-to-task directive');
+    const plan = generatePrompt('plan', mockIssue, mockContext);
+    assert.ok(plan.prompt.includes('A small change to one place gets a short plan: the file, the change, its witness and a line on scope.'),
+      'the plan sizes itself to the change, in its own words');
   });
 
-  test('scale directive carries the deceptive-small over-trim guard', () => {
-    const result = generatePrompt('plan', mockIssue, mockContext);
+  test('the over-trim guard: a terse ticket can still be a large change', () => {
+    const result = generatePrompt('research', mockIssue, mockContext);
     assert.ok(
       result.prompt.includes('across the codebase') && result.prompt.includes('one sentence'),
       'must warn that a terse description does not imply a small task (the over-trim guard)'
     );
+    const plan = generatePrompt('plan', mockIssue, mockContext);
+    assert.ok(plan.prompt.includes('A short ticket is not always a small change, though; renaming a shared identifier "everywhere" reaches many places.'),
+      'the plan must carry the same guard in its own words');
   });
 
   test('terminal phases do NOT carry the scale directive', () => {
@@ -2475,6 +2361,9 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
         'the ledger instruction requires marking each item inside/outside');
       assert.ok(/filing a ticket for it is never a discharge, since it belongs to this ticket/i.test(prompt),
         'the ledger instruction states filing never discharges an inside item');
+      // LIN-4021 (A3): the in-scope clause must be pinned, or reverting A3 goes unnoticed.
+      assert.ok(prompt.includes('the classes or behaviours research or the plan named, with their places, in its issue description (LIN-1871)'),
+        'the review in-scope clause names the classes research or the plan named, with their places (LIN-4021, A3)');
     });
 
     test('close-out settles an inside item only by done, or leaves it undone for a team-level reason; never by filing', () => {
@@ -3018,20 +2907,19 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
 });
 
 // =============================================================================
-// plan-review template: registration + the seven checks
-// (LIN-1602; 7th check — source-of-truth re-grounding — added by LIN-1859)
+// plan-review template: registration + the four qualities of a plan ready to build
+// (LIN-1602, LIN-1859; the qualities replaced the seven checks under LIN-4021)
 //
-// The acceptance criterion is that the seven checks are present AND ORDERED, so
-// the assertions below anchor on CONTENT, never on list numbering: the rendered
-// body opens with formatReadOnlyWorkflow's own `1./2./3.` list, ABOVE the checks —
-// a bare `^\d\. \*\*` scan anchors on that and proves nothing. Every ordering
-// assertion is therefore scoped to the `### The Seven Checks` section. The anchors
-// are case- and hyphen-tolerant.
+// The qualities are present AND ORDERED, so the assertions below anchor on CONTENT,
+// never on list numbering: the rendered body opens with formatReadOnlyWorkflow's own
+// `1./2./3.` list, ABOVE the qualities — a bare `^\d\. \*\*` scan anchors on that and
+// proves nothing. Every ordering assertion is therefore scoped to the
+// `### What a plan ready to build looks like` section.
 // =============================================================================
 
 import { formatReadOnlyWorkflow, formatDiscussionReference } from '../../lib/prompt-formatters.js';
 
-describe('plan-review template + the seven checks (LIN-1602 / LIN-1859)', () => {
+describe('plan-review template + the four qualities (LIN-1602 / LIN-1859 / LIN-4021)', () => {
   const issue = {
     id: 'pr-1', identifier: 'LIN-903', title: 'Verify the plan',
     description: 'a plan', url: 'https://linear.app/test/issue/LIN-903',
@@ -3039,23 +2927,20 @@ describe('plan-review template + the seven checks (LIN-1602 / LIN-1859)', () => 
   };
   const context = { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [] };
 
-  // The seven checks, in their committed order. Content anchors only.
-  const PLAN_REVIEW_CHECKS = [
-    { label: 'completeness check', re: /completeness check/i },
-    { label: 'Strategy Framing', re: /strategy framing/i },
-    { label: 'history signal', re: /history signal/i },
-    { label: 'session-fit', re: /session-fit/i },
-    { label: 'relaxation guard', re: /relaxation guard/i },
-    { label: 'prerequisite-refactor necessity', re: /prerequisite[- ]refactor/i },
-    { label: 'source-of-truth re-grounding', re: /source-of-truth|re-grounding|authoritative/i }
+  // The four qualities of a plan ready to build, in their committed order (proposal section 2).
+  const PLAN_REVIEW_QUALITIES = [
+    { label: 'premise', text: '**Its premise is true.**' },
+    { label: 'whole problem', text: '**It solves the whole problem.**' },
+    { label: 'safeguards', text: '**Its safeguards hold.**' },
+    { label: 'shape', text: '**Its shape fits the work.**' }
   ];
 
-  /** Assert the seven anchors are present and strictly increasing WITHIN one path's region. */
-  const assertSevenChecksOrdered = (region, pathName) => {
+  /** Assert the four qualities are present and strictly increasing, under their heading. */
+  const assertQualitiesOrdered = (region, pathName) => {
     let prev = -1;
-    for (const { label, re } of PLAN_REVIEW_CHECKS) {
-      const at = region.search(re);
-      assert.ok(at > -1, `${pathName}: missing the "${label}" check`);
+    for (const { label, text } of PLAN_REVIEW_QUALITIES) {
+      const at = region.indexOf(text);
+      assert.ok(at > -1, `${pathName}: missing the "${label}" quality`);
       assert.ok(at > prev, `${pathName}: "${label}" is out of order (index ${at} follows ${prev})`);
       prev = at;
     }
@@ -3073,31 +2958,28 @@ describe('plan-review template + the seven checks (LIN-1602 / LIN-1859)', () => 
     assert.strictEqual(t.completionSignals, COMPLETION_SIGNALS['plan-review'], 'template wires its completion signal');
   });
 
-  test('(a) handwritten path: the seven checks are present and ordered inside "### The Seven Checks"', () => {
+  test('(a) handwritten path: the four qualities of a plan ready to build are present, in order, under their heading', () => {
     const { prompt } = generatePrompt('plan-review', issue, context);
-    const start = prompt.indexOf('### The Seven Checks');
-    const end = prompt.indexOf('### Verdict');
-    assert.ok(start > -1, 'the body has a "### The Seven Checks" section');
-    assert.ok(end > start, 'the checks section is closed by "### Verdict"');
-    const section = prompt.slice(start, end);
-    // Trap 1: the decoy list from formatReadOnlyWorkflow sits ABOVE the section.
-    assert.ok(!section.includes('**Fetch details**'),
-      'the checks section excludes formatReadOnlyWorkflow\'s own numbered list');
-    assertSevenChecksOrdered(section, 'handwritten');
+    const start = prompt.indexOf('### What a plan ready to build looks like');
+    const end = prompt.indexOf('### Blocking findings, and notes');
+    assert.ok(start > -1, 'the body has a "### What a plan ready to build looks like" section');
+    assert.ok(end > start, 'the section is closed by "### Blocking findings, and notes"');
+    assertQualitiesOrdered(prompt.slice(start, end), 'handwritten');
   });
 
 
-  test('(c) the prompt carries the verdict vocabulary and the verify-don\'t-redesign, write-only stance', () => {
+  test('(c) the prompt carries the verdict vocabulary, the judge-don\'t-redesign line, and the read-only stance', () => {
     const { prompt } = generatePrompt('plan-review', issue, context);
-    // LIN-3299: verify-don't-redesign is a Scope and Authority line, which code adds.
-    assert.ok(/Verify, do not redesign: another reasonable approach is not a finding/.test(prompt));
+    // LIN-3299: judge-don't-redesign is a Scope and Authority line, which code adds.
+    assert.ok(/Judge, do not redesign: another reasonable approach is not a finding/.test(prompt));
     assert.ok(/Approve/.test(prompt) && /Request Changes/.test(prompt) && /Needs Discussion/.test(prompt),
       'carries the Approve / Request Changes / Needs Discussion vocabulary');
-    assert.ok(/against its own claims, adding no requirements of (your|its) own/i.test(prompt), 'verifies against the plan\'s own claims');
-    assert.ok(/claims verified; proceed to implementation/i.test(prompt), 'cheap-when-clean line');
-    // Write-only: no plan edits, no implementing, no follow-ups filed.
-    assert.ok(/You do NOT edit the plan, do NOT implement any part of it, and do NOT file follow-up tickets/i.test(prompt),
-      'plan-review is write-only');
+    assert.ok(/Block only on what would make the build go wrong; everything else is a note for the builder\./.test(prompt),
+      'the goal line draws the block line');
+    assert.ok(/a clean verdict is a few lines: what you checked, and that it holds\./.test(prompt), 'a clean verdict is a few lines');
+    // Read-only: no plan edits, no implementing, no tickets filed.
+    assert.ok(/You are read-only: post the verdict, and do not edit the plan, build it or file tickets\./.test(prompt),
+      'plan-review is read-only');
   });
 
   test('(d) plan-review uses the shared read-only workflow (verify → comment, no status write)', () => {
@@ -3138,18 +3020,18 @@ describe('plan-review template + the seven checks (LIN-1602 / LIN-1859)', () => 
 });
 
 // =============================================================================
-// The plan-review GATE and the revision half, in the handwritten `plan` template
-// (LIN-1603, items 2.1/2.2 — the routing that reads them is pinned in
+// The second-reader gate and the revision section, in the handwritten `plan` template
+// (LIN-1603, LIN-4021 — the routing that reads them is pinned in
 // tests/unit/openrouter.test.js). Two ordering facts are load-bearing and are
 // asserted by index, not by presence:
-//   - the gate sits AFTER the session-fit answer, because criterion (a) reads it;
-//   - the revision half sits BEFORE Strategy Framing, because a revising planner
-//     must see the verdict before re-deriving the framing the findings are about.
+//   - the gate sits AFTER the session-fit answer, because its triggers read it;
+//   - the revision section comes FIRST in the Process, because a revising planner
+//     must see the verdict before anything else.
 // The third property is negative and the easiest to erode: the gate must stay
-// GATED — a plan meeting none of the criteria hands straight to implementation.
+// GATED — a plan meeting none of the triggers hands straight to implementation.
 // =============================================================================
 
-describe('plan-review gate + revision half in the plan template (LIN-1603)', () => {
+describe('plan-review gate + revision section in the plan template (LIN-1603, LIN-4021)', () => {
   const issue = {
     id: 'pg-1', identifier: 'LIN-904', title: 'Add the gate',
     description: 'work', url: 'https://linear.app/test/issue/LIN-904',
@@ -3158,120 +3040,58 @@ describe('plan-review gate + revision half in the plan template (LIN-1603)', () 
   const context = { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [] };
   const plan = () => generatePrompt('plan', issue, context).prompt;
 
-  test('the gate names all four criteria and requires the decision be written down', () => {
+  test('the second-reader gate names its four triggers, and the plan says whether it is one of them', () => {
     const p = plan();
-    assert.ok(/### Plan-review Gate/.test(p), 'the plan carries a plan-review gate section');
-    assert.ok(/\*\*\(a\)\*\* The session-fit answer above is "needs multiple sessions"/.test(p), 'criterion (a)');
-    assert.ok(/\*\*\(b\)\*\* Strategy Framing names a routed-around contract gap/.test(p), 'criterion (b)');
-    assert.ok(/\*\*\(c\)\*\* Any step in the plan relaxes a validation, a contract, or a guard/.test(p), 'criterion (c)');
-    assert.ok(/\*\*\(d\)\*\* The plan touches credential, merge-rule, or dispatch-contract surfaces/.test(p), 'criterion (d)');
-    assert.ok(/Record the decision in the issue description, naming which of \(a\)–\(d\) fired/.test(p),
-      'the decision must be recorded in the description');
-    assert.ok(/`plan-review due: yes` or `plan-review due: no`/.test(p),
-      'in the form the router reads, carried by the stage contract (LIN-3292)');
+    assert.ok(p.includes('Some plans deserve a second reader before anything is built: those that need more than one session, route around a cause tracked elsewhere, loosen a validation, contract or guard, or touch credentials, merge rules or the dispatch contract.'),
+      'the four triggers are named');
+    assert.ok(p.includes('The plan says whether it is one of them; most are not, and go straight to the builder.'),
+      'the plan says whether it is one, and most are not');
   });
 
-  test('the gate is sited AFTER the session-fit answer — criterion (a) reads it', () => {
+  test('the gate is sited AFTER the session-fit answer, which the triggers read', () => {
     const p = plan();
-    const sessionFit = p.indexOf('Document the answer in the issue description alongside the plan.');
-    const gate = p.indexOf('### Plan-review Gate');
+    const sessionFit = p.indexOf('The plan says whether the work fits one focused session');
+    const gate = p.indexOf('Some plans deserve a second reader');
     assert.ok(sessionFit > -1 && gate > -1, 'both landmarks must be present');
     assert.ok(sessionFit < gate,
-      'the gate must follow the session-fit answer, or criterion (a) would read an answer that does not exist yet');
+      'the gate must follow the session-fit answer, or the triggers would read an answer that does not exist yet');
   });
 
-  test('the gate stays GATED — none of (a)–(d) hands straight to implementation', () => {
+  test('the revision section comes first, so a revising planner reads the verdict before the rest', () => {
     const p = plan();
-    assert.ok(/None of \(a\)–\(d\) firing is the common result: that plan hands directly to implementation, exactly as today/.test(p),
-      'the common case must route as it did before the gate existed');
-    assert.ok(/gated step, not a universal one/.test(p), 'the prompt must say the step is gated, not universal');
-    assert.ok(/do not volunteer it for a plan that meets none of the criteria/.test(p),
-      'the over-fire guard must be explicit, not implied by omission');
+    const revise = p.indexOf('### If this pass is a revision');
+    const replaceAt = p.indexOf('The description holds one current plan');
+    const good = p.indexOf('### What a good plan is');
+    assert.ok(revise > -1 && replaceAt > -1 && good > -1, 'all three landmarks are present');
+    assert.ok(revise < replaceAt && replaceAt < good,
+      'the replace instruction sits inside the revision section, before the description of a good plan');
+    assert.ok(p.includes('If the comments hold a plan-review verdict (headed `### Plan Review Verdict`)'),
+      'the header is named as the verdict\'s marker');
   });
 
-  test('the revision half sits BEFORE Strategy Framing and recognises a prior verdict by substance', () => {
+  test('a revision answers every finding and says what changed', () => {
     const p = plan();
-    const revise = p.indexOf('### Revising After a Plan Review');
-    const framing = p.indexOf('### Strategy Framing');
-    assert.ok(revise > -1 && framing > -1, 'both sections must be present');
-    assert.ok(revise < framing,
-      'the revision half must precede Strategy Framing so a revising planner reads the verdict first');
-    assert.ok(/a \`plan-review\` comment recording an explicit \*\*Approve\*\* \/ \*\*Request Changes\*\* \/ \*\*Needs Discussion\*\*/.test(p),
-      'the prior verdict is recognised by its substance (the verdict vocabulary)');
-    assert.ok(/headed \`### Plan Review Verdict\` where one is used/.test(p),
-      'the header is named as a disambiguator — "where one is used", not as a requirement');
-  });
-
-  test('the revision must address every finding and record what changed', () => {
-    const p = plan();
-    assert.ok(/this pass is a \*\*revision\*\*, not a fresh plan/.test(p),
-      'a plan with a verdict on the trail is a revision, not a re-plan from scratch');
-    assert.ok(/Where you disagree with a finding, answer it explicitly with your reasoning/.test(p),
-      'a disagreed-with finding must be answered, not silently dropped');
-    assert.ok(/\*\*Record what changed\*\*/.test(p),
+    assert.ok(p.includes('Every finding is answered: fixed, or disagreed with and why.'),
+      'every finding must be answered');
+    assert.ok(p.includes('add a line saying what changed and which findings it answers'),
       'the revision must record which findings it addressed, so the next review can check it');
   });
 
-  test('the plan-review template EMITS the disambiguating header (the producer half of 2.5)', () => {
-    // Without this the header has two consumers (the close-out exclusions and the
-    // plan's revision half) and no producer.
-    const { prompt } = generatePrompt('plan-review', issue, context);
-    assert.ok(/one comment that starts with \`### Plan Review Verdict\`/.test(prompt),
-      'plan-review must head its verdict comment with the disambiguator (the stage contract, LIN-3292)');
-    assert.ok(/an Approve here must never be mistaken for authorization to close the task out/.test(prompt),
-      'the template must say why the header exists — the close-out confusion it prevents');
+  test('a revision replaces the prior plan in place rather than appending it', () => {
+    const p = plan();
+    assert.ok(p.includes('The description holds one current plan: replace the old block in place (for example through `POST .../description/replace`)'),
+      'the revision replaces the old block, through the targeted write');
+    assert.ok(p.includes('Removing a step is a valid answer.'), 'a smaller revision is valid');
   });
 
-  // ===========================================================================
-  // Plan revisions REPLACE the prior plan section instead of appending (LIN-1770)
-  // ===========================================================================
-
-  test('(h1) the revision half instructs replace, not append, and states the one-current-plan invariant', () => {
+  test('the plan keeps the apparatus it still needs: the refactor rule and the completeness standard', () => {
     const p = plan();
-    const replaceAt = p.indexOf('**Replace, don\'t append**');
-    const recordAt = p.indexOf('**Record what changed**');
-    assert.ok(replaceAt > -1, 'the "Replace, don\'t append" instruction is present');
-    assert.ok(recordAt > -1 && replaceAt < recordAt,
-      'replace-semantics is stated before the record-what-changed instruction, in write order');
-    assert.ok(/REPLACES the plan section already in the description/.test(p),
-      'states explicitly that the revision replaces the prior plan section');
-    assert.ok(/rather than leaving the superseded plan in place beside it/.test(p),
-      'explicitly forbids leaving the old plan text in place alongside the new one');
-    assert.ok(/description\/replace/.test(p), 'names the targeted description/replace write surface');
-    assert.ok(/carries exactly one current plan, never a stack of them/.test(p),
-      'states the one-current-plan invariant');
-  });
-
-  test('(h2) the changelog is a short line, not the superseded plan\'s full text', () => {
-    const p = plan();
-    assert.ok(/a short changelog line/.test(p), 'the record-what-changed instruction names it as a short line');
-    assert.ok(/not the superseded plan's full text/.test(p),
-      'explicitly distinguishes the changelog from retaining the old plan verbatim');
-  });
-
-  test('(h3) the revision half still sits before Strategy Framing with the new replace instruction included', () => {
-    const p = plan();
-    const revise = p.indexOf('### Revising After a Plan Review');
-    const replaceAt = p.indexOf('**Replace, don\'t append**');
-    const framing = p.indexOf('### Strategy Framing');
-    assert.ok(revise > -1 && replaceAt > -1 && framing > -1, 'all three landmarks are present');
-    assert.ok(revise < replaceAt && replaceAt < framing,
-      'the replace instruction sits inside the revision section, before Strategy Framing');
-  });
-
-
-  test('the gate did not disturb the pre-existing plan apparatus', () => {
-    // Regression guard: two additive sections were spliced into the middle of this
-    // template; the ordering invariants around them must still hold.
-    const p = plan();
-    const framing = p.indexOf('### Strategy Framing');
-    const scope = p.indexOf('### Scope Assessment');
-    assert.ok(framing > -1 && scope > -1 && framing < scope,
-      'Strategy Framing must still precede Scope Assessment (the LIN-279 invariant)');
-    assert.ok(/Surface Assessment/.test(p), 'the prerequisite-refactor rule must survive');
-    assert.ok(/completeness check/i.test(p), 'the completeness check must survive');
+    assert.ok(/If research marked a refactor `refactor required`/.test(p), 'the prerequisite-refactor rule survives');
+    assert.ok(p.includes('A change is finished when the behaviour is right everywhere it lives, not just where the ticket pointed. Say how you know you\'ve found every place.'),
+      'the standard of done survives');
   });
 });
+
 
 // =============================================================================
 // How a ledger item is settled (LIN-898, LIN-1579, LIN-3326). LIN-898 began
@@ -3869,25 +3689,28 @@ describe('plan-fidelity reconciliation + refactor-equivalence (LIN-698)', () => 
   };
   const mockContext = { parent: null, siblings: [], project: null, children: [], comments: [] };
 
-  test('implementation template adds a Re-ground the Plan fidelity check', () => {
+  test('implementation template adds a Re-ground the Plan fidelity check, built on the research', () => {
     const result = generatePrompt('implementation', mockIssue, mockContext);
     assert.ok(result.prompt.includes('Re-ground the Plan'), 'implementation must include the plan-fidelity check');
-    assert.ok(result.prompt.includes('distillation'), 'must frame the plan as a distillation of the research');
+    assert.ok(result.prompt.includes('The approved plan is what you build: it builds on the research and says where it departs from it.'),
+      'the approved plan is what is built, and departures from research are said');
+    assert.ok(result.prompt.includes('If a plan-review approved the plan, read its notes. Each is part of what you build, or you say why not.'),
+      'the approval notes are read, not skipped');
     assert.ok(
-      result.prompt.includes('research/exploration notes') && result.prompt.includes('comment thread'),
-      'must direct reading the research notes and comment thread, not just the description'
+      result.prompt.includes('Read the research and the comment thread for any caution, who-pays note or behaviour to preserve that the plan does not mention.'),
+      'must direct reading the research and comment thread for cautions the plan does not mention'
     );
     assert.ok(
-      result.prompt.includes('"preserve this behavior" constraint'),
-      'must require extracting the research constraints, not just a staleness skim'
+      result.prompt.includes('Where the plan departs from the research and says why, follow the plan.'),
+      'a plan that departs from research and says why is followed'
     );
   });
 
-  test('implementation template tightens Guideline 1 to research-wins-on-conflict', () => {
+  test('implementation template no longer overrides a plan that says why it departs from research', () => {
     const result = generatePrompt('implementation', mockIssue, mockContext);
     assert.ok(
-      result.prompt.includes("research's reasoning wins"),
-      'Guideline 1 must defer to the research when plan and research conflict'
+      !result.prompt.includes("research's reasoning wins"),
+      'the research-wins line is retired: a plan that says why it departs is followed'
     );
     assert.ok(
       !result.prompt.includes('Follow the plan, including any history-sourced constraints it documented'),
@@ -4318,26 +4141,26 @@ describe('breakdown template subtask-description mandate (LIN-3049)', () => {
   test('the five approved-path bullets are present and in (a)-(e) order', () => {
     const p = generatePrompt('breakdown', baseIssue, baseContext).prompt;
     const section = sectionOf(p);
-    const a = section.indexOf('(a) This surface\'s slice of the approved plan');
+    const a = section.indexOf('(a) This piece\'s slice of the approved plan');
     const b = section.indexOf('(b) `Session fit: fits one session`');
     const c = section.indexOf('(c) `Plan-review due: no');
     const d = section.indexOf('(d) The grounding commit SHA(s)');
-    const e = section.indexOf('(e) A line saying the parent\'s approved plan is this surface\'s starting point');
+    const e = section.indexOf('(e) A line saying the parent\'s approved plan is this piece\'s starting point');
     assert.ok(a > -1 && b > -1 && c > -1 && d > -1 && e > -1, 'all five approved-path bullets must be present');
     assert.ok(a < b && b < c && c < d && d < e, 'the five bullets must appear in (a)-(e) order');
     // N2: bullet (c) names this ticket's own approving verdict, not the parent's.
     assert.ok(/cited from this ticket's own approving verdict \(the one the precondition found\)/.test(section),
       'N2: bullet (c) must cite this ticket\'s own approving verdict');
-    // R6: bullet (b) must not copy a false `fits one session` onto a surface the
+    // R6: bullet (b) must not copy a false `fits one session` onto a piece the
     // approved plan itself could not scope to one session; it must defer to a
     // fresh `plan` pass instead (M13).
-    assert.ok(/if a surface genuinely does not fit one session, leave this line for a fresh `plan` pass to answer honestly rather than copying a false claim/.test(section),
-      'R6: bullet (b) must require omitting the session-fit line for a surface that does not fit one session');
+    assert.ok(/if a piece genuinely does not fit one session, leave this line for a fresh `plan` pass to answer honestly rather than copying a false claim/.test(section),
+      'R6: bullet (b) must require omitting the session-fit line for a piece that does not fit one session');
   });
 
-  test('the existing drift exit is extended to name the approach/files each surface section names', () => {
+  test('the drift exit names the pieces, the order of landing and the approach/files the plan names', () => {
     const p = generatePrompt('breakdown', baseIssue, baseContext).prompt;
-    assert.ok(/Confirm the surfaces, any dependency arrows, and the approach\/files each surface's plan section names still reflect the current codebase/.test(p),
+    assert.ok(/Confirm the pieces, the order of landing, and the files and approach it names still reflect the current codebase/.test(p),
       'the existing drift exit must name the copied specifics');
   });
 
@@ -4346,11 +4169,11 @@ describe('breakdown template subtask-description mandate (LIN-3049)', () => {
     const section = sectionOf(p);
     assert.ok(/create the subtask with only a plain acceptance-criteria description/.test(section),
       'the no-Approve path must still produce a plain acceptance-criteria subtask');
-    // R4: the focused, per-surface acceptance-criteria guidance must survive as the
+    // R4: the focused, per-piece acceptance-criteria guidance must survive as the
     // fallback's description wording (it was deleted, leaving the precondition pointing
     // at wording that no longer existed).
-    assert.ok(/Description with acceptance criteria for this surface — the child sees its parent only as a title, so say where the parent's scope and design can be read/.test(section),
-      'R4: the no-Approve fallback must keep the per-surface acceptance-criteria guidance (LIN-3296: and point the child at the parent it cannot see)');
+    assert.ok(/Description with acceptance criteria for this piece — the child sees its parent only as a title, so say where the parent's scope and design can be read/.test(section),
+      'R4: the no-Approve fallback must keep the per-piece acceptance-criteria guidance (LIN-3296: and point the child at the parent it cannot see)');
     assert.ok(/none of bullets \(a\)–\(e\) below apply, and the subtask is expected to route through `research`\/`plan` normally/.test(section),
       'the fallback must withhold every approved-path bullet, (a) the plan slice included');
   });
@@ -4359,6 +4182,33 @@ describe('breakdown template subtask-description mandate (LIN-3049)', () => {
     const base = generatePrompt('breakdown', baseIssue, baseContext, {}).prompt;
     const withUi = generatePrompt('breakdown', baseIssue, baseContext, {}, { ...DEFAULT_PROMPT_UI }).prompt;
     assert.strictEqual(withUi, base, 'the new breakdown content must remain byte-identical for Linear');
+  });
+
+  // LIN-4021 (ruling on the review): the plan no longer writes a surface list or
+  // dependency arrows. Breakdown must decompose the seams and landing order instead.
+  test('breakdown reads a new-style plan (seams and landing order, no surfaces) as its shape', () => {
+    const p = generatePrompt('breakdown', { ...baseIssue, title: 'Break down the pieces' }, baseContext).prompt;
+    assert.ok(/the pieces the plan split the work into, how parts that share a path or state interact, and the order of landing/.test(p),
+      'breakdown reads the pieces, their interaction and the order of landing');
+    assert.ok(/Create one subtask per piece/.test(p), 'one subtask per piece');
+    assert.ok(/`blocked-by` relations are the pieces that must land before it, in the plan's order of landing/.test(p),
+      'blocked-by is taken from the order of landing');
+    assert.ok(!/surface|dependency arrow/i.test(p), 'breakdown does not expect a surface list or arrows');
+  });
+
+  test('breakdown re-plans only on drift, not because a plan has no surface list', () => {
+    const p = generatePrompt('breakdown', baseIssue, baseContext).prompt;
+    const replan = p.match(/stop and recommend re-planning/g) || [];
+    assert.strictEqual(replan.length, 1, 'the only re-plan instruction is the drift exit');
+    assert.ok(/If the plan has drifted, stop and recommend re-planning before decomposing/.test(p),
+      'the re-plan instruction is tied to drift');
+  });
+
+  test('the plan route counts a seams-and-places plan as complete (LIN-4021 whenNot)', () => {
+    const whenNot = PROMPT_TEMPLATES.plan.route.whenNot;
+    assert.ok(/A complete plan \(approach, places, session fit\) is already in the description/.test(whenNot),
+      'the plan route names approach, places and session fit');
+    assert.ok(!/surfaces/.test(whenNot), 'the plan route no longer requires a surface list');
   });
 });
 
@@ -4503,8 +4353,8 @@ describe('stage rules moved from the deleted meta-prompt (LIN-3300)', () => {
     assert.match(prompt('implementation'), /Before changing a shared system, find its dependents in the codebase\./);
   });
 
-  test('plan states how requirements that share a path, state or interface are expected to interact', () => {
-    assert.match(prompt('plan'), /Where requirements share a code path, state, or interface, state how they are expected to interact\./);
+  test('plan settles how parts that share a path or state interact, which data each reads, and what is left out', () => {
+    assert.match(prompt('plan'), /the boundaries and how parts that share a path or state interact, which data each part reads/);
   });
 
   test('review verifies a visual or behavioural change by running it', () => {
