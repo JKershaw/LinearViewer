@@ -137,15 +137,18 @@ test.describe('one shared look (LIN-4009)', () => {
     expect(ready.color).not.toBe(running.color);
   });
 
-  test('the count line is the page summary, with its needs-you part toned', async ({ page }) => {
+  test('the count line is the page summary, with its waiting part toned', async ({ page }) => {
     await seedTasks(page);
     await seedStates(page);
     await page.goto(`/workspace/${URL_KEY}/`);
     await page.waitForLoadState('networkidle');
 
     const count = page.locator('[data-testid="in-progress-count"]');
-    // A failed task counts as needing you (rowStateOf), so two rows need you here: the blocked one and the failed one.
-    await expect(count).toContainText('2 needs you');
+    // LIN-4024: the count line counts rulings as waiting on you, failed tasks as failed, running tasks as running.
+    // One ruling is open here (the blocked task), so the failed task is not waiting on you.
+    await expect(count).toContainText('1 waiting on you');
+    await expect(count).toContainText('1 failed');
+    await expect(count).toContainText('1 running');
     await expect(count.locator('[data-tone="needs-you"]')).toHaveCount(1);
     // It sits under the workspace title, in the page header, not under the In Progress heading.
     const inHeader = await count.evaluate((el) => !!el.closest('header'));
