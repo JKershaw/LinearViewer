@@ -70,7 +70,7 @@ and its price falls fast. Whether the cost of getting a piece of useful, checked
 them falls as fast is unknown, because nobody measures it. Use spreads wide and stays shallow.
 National productivity sits on its long-run trend. Where value can be measured, most of it
 goes to the people using AI, and among the suppliers it is the sellers of scarce chips who are
-visibly earning. Set side by side, the best-measured gap is widening: the largest buyers'
+visibly earning. Set side by side, the best-measured gap is widening: two of the largest buyers'
 spending is outrunning the cash that pays for it. The answer to the bubble question
 is therefore likely to differ by layer of the industry rather than be one verdict: some
 markets, chiefly the financing of compute, over-invested against what their owners can
@@ -421,8 +421,8 @@ year its capital spending more than doubled, from $24.0 billion to $51.4 billion
 operating cash flow fell from $48.4 billion to $42.3 billion [GOOG26]. Between the same two
 quarters Meta's capital spending, including finance leases, rose from $19.4 billion to $34.9
 billion and its operating cash flow from $30.0 billion to $32.8 billion [META26]. This is the
-best-measured gap in the essay, and it opens further every quarter. It does not say whether the
-spending will pay. It says the largest buyers now spend more than their businesses generate,
+best-measured gap in the essay, and it has opened in each quarter of 2026. It does not say whether the
+spending will pay. It says two of the largest buyers now spend more than their businesses generate,
 which is why the financing moved into credit markets.
 
 **Investment against revenue.** In the one year with both on record, OpenAI's annualised
