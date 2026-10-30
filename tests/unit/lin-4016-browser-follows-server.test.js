@@ -184,3 +184,31 @@ describe('LIN-4016 W4 — the run control paints the server\'s decision', () => 
     assert.equal(Object.keys(byKey).length, 2, 'a record for every row, leaves included');
   });
 });
+
+// The opened task agrees with its row when the row is decided by the tracker (done): /state has no tracker, so for a
+// finished task whose last stage failed it says failed, and the browser paints the row's own word instead.
+describe('LIN-4016 — the opened task agrees with its row (finished, and a failed subtask)', () => {
+  const FAILED_PILL = '<div class="task-status task-status--home" data-testid="home-task-status"><span class="status-pill status-pill--error task-status-pill" data-testid="home-task-status-pill"><span class="status-pill__dot" aria-hidden="true"></span>failed</span></div>';
+
+  test('a finished row whose last stage failed paints done, not the /state failed pill, and offers no stage', async () => {
+    const row = rowRecordOf({ stateType: 'completed', decided: { state: 'done', words: 'done' } });
+    const html = await paint({ ...stateWith({ offered: PLAN_OFFER, action: { kind: 'step', step: PLAN_OFFER, why: PLAN_OFFER.reason } }), homeStatusHtml: FAILED_PILL }, { row });
+    assert.match(html, /status-pill--done task-status-pill" data-testid="home-task-status-pill"><span class="status-pill__dot" aria-hidden="true"><\/span>done</);
+    assert.doesNotMatch(html, /status-pill--error/, 'the /state failed pill is not painted beside a done row');
+    assert.doesNotMatch(html, /data-action="run-step-next"/, 'a finished task offers no stage step');
+  });
+
+  test('a finished row with no decided word keeps /state\'s own line (the record carries the row word only when the tracker decides it)', async () => {
+    const row = rowRecordOf({ stateType: 'completed' });
+    assert.equal(row.stateWord, null);
+    const html = await paint({ ...stateWith({}), homeStatusHtml: FAILED_PILL }, { row });
+    assert.match(html, /status-pill--error/);
+  });
+
+  test('a parent whose subtask failed names it as failed, and does not say it needs a person', async () => {
+    const attention = { identifier: 'C-9', title: null, state: 'failed', lead: 'A subtask failed', detail: ' · Build failed', words: 'A subtask failed: C-9 · Build failed', href: '/workspace/acme/task/C-9' };
+    const html = await paint(stateWith({}), { row: { ...rowRecordOf({ stateType: 'started' }), attention } });
+    assert.match(html, /A subtask failed: <span class="opened-task-needs-you-name">C-9<\/span> · Build failed/);
+    assert.doesNotMatch(html, /needs you/);
+  });
+});

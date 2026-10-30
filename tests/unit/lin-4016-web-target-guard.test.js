@@ -32,7 +32,9 @@ function createMockCollection() {
   };
 }
 
-function buildApp(captured, { workspacePreferencesStore } = {}) {
+const PARENT_ID = '6f1c2b1e-0d4a-4c3e-9a8b-1234567890ab';
+
+function buildApp(captured, { workspacePreferencesStore, parent = null } = {}) {
   const app = express();
   app.use(express.json());
   app.use(createDispatchRoutes({
@@ -42,7 +44,9 @@ function buildApp(captured, { workspacePreferencesStore } = {}) {
         captured.item = item;
         return { _id: 'disp-1', dispatchedAt: '2026-10-30T00:00:00.000Z', ...item };
       },
-      getItemStatus: async () => null,
+      getItemStatus: async (urlKey, id) => (parent && id === parent._id ? parent : null),
+      // A follow-up looks up its parent's grant record: none here, so it resumes plainly (the path under test is the target).
+      getGrantDeclaration: async () => ({ state: 'absent' }),
     },
     dispatchTokenStore: {},
     workspaceFromUrl: (req, res, next) => {
@@ -126,10 +130,55 @@ describe('LIN-4016 W5 — POST /workspace/:urlKey/api/dispatch refuses web under
     assert.equal(captured.item.target, 'web');
   });
 
-  test('a follow-up keeps its parent\'s target and is not refused here (the named gap, pinned)', async () => {
+  // The named gap, pinned: a follow-up keeps its parent's `web` target and is not refused, so the lineage is not stalled.
+  // A real web parent and a valid UUID, so the request reaches the enqueue (a bad followUpTo fails format and proves nothing).
+  // The non-fresh lanes keep their target: an abort-cascade is not refused by the entrance rule. The mock store cannot serve
+  // an abort, so the request reaches the store and fails there (a 500), which is past the guard. A refusal would be a 400.
+  test('an abort-cascade under opencode is not refused by the entrance rule (only fresh runs are)', async () => {
     const captured = {};
     const app = buildApp(captured, { workspacePreferencesStore: new WorkspacePreferencesStore({ collection: createMockCollection() }) });
-    const res = await call(app, 'post', PATH, { prompt: 'continue', kind: 'implementation', target: 'web', harness: 'opencode', followUpTo: 'parent-1' });
-    assert.notEqual(res.body?.code, 'TARGET_HARNESS_REFUSED', 'a follow-up under opencode is not refused by the entrance rule');
+    const res = await call(app, 'post', PATH, { kind: 'implementation', target: 'web', harness: 'opencode', abort: true, cascade: true, abortTo: PARENT_ID });
+    assert.notEqual(res.status, 400, JSON.stringify(res.body));
+    assert.notEqual(res.body?.code, 'TARGET_HARNESS_REFUSED');
+  });
+
+  // The named gap, pinned: a follow-up keeps its parent's `web` target and is not refused, so the lineage is not stalled.
+  // A real web parent and a valid UUID, so the request reaches the enqueue (a bad followUpTo fails format and proves nothing).
+  test('PROBE cascade', async () => {
+    const captured = {};
+    const parent = { _id: PARENT_ID, issueIdentifier: 'LIN-1', target: 'web', harness: 'opencode' };
+    const app = buildApp(captured, { workspacePreferencesStore: new WorkspacePreferencesStore({ collection: createMockCollection() }), parent });
+    const res = await call(app, 'post', PATH, { kind: 'implementation', target: 'web', harness: 'opencode', abort: true, cascade: true, abortTo: PARENT_ID });
+    console.log('PROBE', res.status, JSON.stringify(res.body));
+  });
+  test('a follow-up to a web parent under opencode is not refused: it reaches the enqueue with the web target (the named gap, pinned)', async () => {
+    const captured = {};
+    const parent = { _id: PARENT_ID, issueIdentifier: 'LIN-1', target: 'web', harness: 'opencode' };
+    const app = buildApp(captured, { workspacePreferencesStore: new WorkspacePreferencesStore({ collection: createMockCollection() }), parent });
+    const res = await call(app, 'post', PATH, { prompt: 'continue', kind: 'implementation', target: 'web', harness: 'opencode', followUpTo: PARENT_ID });
+    assert.notEqual(res.body?.code, 'TARGET_HARNESS_REFUSED', JSON.stringify(res.body));
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.ok(captured.item, 'the follow-up was enqueued');
+    assert.equal(captured.item.target, 'web');
+    assert.equal(captured.item.followUpTo, PARENT_ID);
+  });
+});
+
+// The browser's Change panel and its POST resolve a blank harness the same way (both see the workspace default when the
+// request names its surface, which Home always does), so the list the panel offers and the refusal cannot disagree.
+describe('LIN-4016 W5 — the panel\'s target list and the entrance\'s refusal resolve a blank harness the same way', () => {
+  test('a blank harness that resolves to opencode from the workspace default: the panel offers no web, and the same blank POST is refused', async () => {
+    const store = new WorkspacePreferencesStore({ collection: createMockCollection() });
+    await store.saveWorkspacePreferences('acme', { dispatchDefaults: { harness: 'opencode' } });
+    const captured = {};
+    const app = buildApp(captured, { workspacePreferencesStore: store });
+    const panel = await call(app, 'get', '/workspace/acme/api/dispatch/decision-panel?promptName=implementation&surface=home');
+    assert.equal(panel.status, 200, JSON.stringify(panel.body));
+    assert.ok(!panel.body.targets.includes('web'), `the panel offered ${JSON.stringify(panel.body.targets)}`);
+    assert.ok(panel.body.targets.includes('cli'));
+    const res = await call(app, 'post', PATH, { prompt: 'run me', kind: 'implementation', target: 'web', surface: 'home' });
+    assert.equal(res.status, 400, JSON.stringify(res.body));
+    assert.equal(res.body.code, 'TARGET_HARNESS_REFUSED');
+    assert.equal(captured.item, undefined);
   });
 });

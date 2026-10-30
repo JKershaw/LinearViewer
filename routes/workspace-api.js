@@ -189,7 +189,7 @@ export function streamMockFixture(res, mockIssue) {
  * @param {Object} [options.closeOut] - LIN-3248 test seam for the check/press routes: optional `{ resolveProvider, readPrStatus, githubFetch, isStopAtRun, runnerReady, markDone }` overrides
  * @returns {Router} Express router
  */
-export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore = null, sessionsFeedCache = null, ownerCredentialStore = null, adoptConnectionCredential = null, accountStore = null, runEvidence = null, closeOutEventsStore = null, closeOut = null, workspaceOwnerCheck = null, onTicketWrite = null, recordPipelineMerge = null, installationTokenFor = null }) {
+export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore = null, sessionsFeedCache = null, ownerCredentialStore = null, adoptConnectionCredential = null, accountStore = null, runEvidence = null, closeOutEventsStore = null, closeOut = null, workspaceOwnerCheck = null, onTicketWrite = null, recordPipelineMerge = null, installationTokenFor = null, loadTaskState = null }) {
   const router = Router();
 
   // The test-token DATA mock charges the free tier on its own (the AI-gate above it is
@@ -606,7 +606,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
   registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQueueStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, adoptConnectionCredential, onTicketWrite, recordPipelineMerge });
 
   // The sessions route (LIN-3894): registered on this router, here, so the route table's order is unchanged.
-  registerSessionsRoutes(router, { workspaceFromUrl, dispatchQueueStore, agentStatusStore });
+  registerSessionsRoutes(router, { workspaceFromUrl, dispatchQueueStore, agentStatusStore, loadTaskState });
 
   // ===========================================================================
   // Recap API (LIN-261) and Brief API (current-state task brief)

@@ -55,7 +55,7 @@ async function defaultMarkDone({ provider, callScope, issueIdentifier }) {
   return provider.updateIssue(callScope, issueRef, { stateId: completedId || resolveStateRef(states, 'Done') });
 }
 
-export function registerSessionsRoutes(router, { workspaceFromUrl, dispatchQueueStore, agentStatusStore }) {
+export function registerSessionsRoutes(router, { workspaceFromUrl, dispatchQueueStore, agentStatusStore, loadTaskState = null }) {
   // ===========================================================================
   // Dispatched Sessions API
   // ===========================================================================
@@ -93,7 +93,12 @@ export function registerSessionsRoutes(router, { workspaceFromUrl, dispatchQueue
       const sessionIds = sessionIdByLoop(loops);
       // getLoopsForIssue returns oldest-first; reverse for newest-first display.
       const sessions = loops.map((loop) => ({ ...toSessionView(loop), sessionId: sessionIdOf(loop, sessionIds) })).reverse();
-      res.json({ sessions });
+      // LIN-4016: a waiting session reads "parked" on a parked task and "waiting on you" on a ruling. The task's decided
+      // state (the reader its row and opened task use) says which, so the fold does not re-derive it. Read only when a
+      // session waits.
+      const taskParked = !!loadTaskState && sessions.some((s) => s.agentState === 'waiting')
+        && (await loadTaskState({ urlKey: workspace.urlKey, identifier })).taskState.state === 'parked';
+      res.json({ sessions, taskParked });
     } catch (error) {
       console.error('Sessions GET error:', error);
       jsonError(res, 500, 'Failed to fetch sessions', { message: error.message });

@@ -3196,7 +3196,7 @@ app.use(createRunnerKitRoutes())
 // LIN-3383: workspace-api, collective, dashboard, task-chat and flight-companion
 // all receive the ONE hoisted `workspaceOwnerCheck` (never a second
 // createWorkspaceOwnerCheck) for the owner-only runner enqueue gate.
-app.use(createWorkspaceApiRoutes({ installationTokenFor, workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, accountStore, adoptConnectionCredential: (args) => connectionAccess.adoptConnectionCredential(args), closeOutEventsStore, workspaceOwnerCheck, onTicketWrite, recordPipelineMerge }))
+app.use(createWorkspaceApiRoutes({ installationTokenFor, workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, accountStore, adoptConnectionCredential: (args) => connectionAccess.adoptConnectionCredential(args), closeOutEventsStore, workspaceOwnerCheck, onTicketWrite, recordPipelineMerge, loadTaskState: (args) => taskPageLoader.loadTaskState(args) }))
 
 // Mount collective routes (experimental cross-project discussion — LIN-450).
 // yapClient falls back to DEFAULT_YAP_BASE_URL (lib/yap-client.js) when YAP_BASE_URL is unset.

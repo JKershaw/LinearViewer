@@ -627,10 +627,11 @@
   // LIN-3968: the offered step (`sessions.offered`), so a running stage offers no other step, and a failed stage
   // is offered again. `sessions.next` stays the "comes next" wording after a run.
   // LIN-4024: a container offers no stage step (its one action is Run to PR), whatever a step chosen for this run says.
+  // LIN-4016: a finished task offers no stage step either (the row's record says so; `sessions.action` is /state's, tracker-free).
   function runStepOfState(state, opts) {
     const action = mainActionOf(state);
-    // Busy (nothing is offered) or a container (its one action is Run to PR) offers no stage step: the server's decision.
-    if (!action || (opts && opts.row && opts.row.container)) return null;
+    // Busy (nothing is offered), a container (its one action is Run to PR) or a finished task offers no stage step.
+    if (!action || (opts && opts.row && (opts.row.container || opts.row.finished))) return null;
     return (state.run && state.run.step) || (action.kind === 'step' ? action.step : null);
   }
   // LIN-4016: the one main action the server decided (`sessions.action`): a step, Run to PR, or null while busy.
@@ -949,9 +950,18 @@
       // LIN-4024: a parent whose subtask needs you says that, once. Its own idle line ("No session running.") is the
       // parent's own loops only, so beside "A subtask needs you" it would say the task two ways, and the row says needs you.
       const subtaskLine = renderSubtaskNeedsYou();
-      const ownLine = subtaskLine && opened.status === 'idle' ? '' : (opened.homeStatusHtml ?? '');
+      // LIN-4016: a row the tracker decides (done, backlog) paints the word its row says. /state has no tracker, so for a
+      // finished task whose last stage failed, its line would say failed beside a done row.
+      const ownLine = opts.row && opts.row.stateWord ? renderRowStateWord(opts.row.stateWord)
+        : (subtaskLine && opened.status === 'idle' ? '' : (opened.homeStatusHtml ?? ''));
       return `<div class="opened-task-state" data-state-slot data-testid="opened-task-state">`
         + `${ownLine}${opened.stripHtml || ''}${subtaskLine}${renderQuestionSlot()}</div>`;
+    }
+
+    // LIN-4016: the row's own tracker-decided line (done or backlog), the pill Home's opened task paints in the row's tone.
+    function renderRowStateWord(stateWord) {
+      return `<div class="task-status task-status--home" data-testid="home-task-status">`
+        + `<span class="status-pill status-pill--${esc(stateWord.tone)} task-status-pill" data-testid="home-task-status-pill"><span class="status-pill__dot" aria-hidden="true"></span>${esc(stateWord.word)}</span></div>`;
     }
 
     // LIN-4024: a task waiting on an open ruling shows the question and its answers here (the server sends the card to the

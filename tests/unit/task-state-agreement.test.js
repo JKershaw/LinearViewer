@@ -14,7 +14,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildRowStates, buildTaskPageModel, createTaskPageLoader, sessionSummaryOf } from '../../lib/task-page-loader.js';
-import { buildInProgressCountParts } from '../../lib/task-board-view.js';
+import { buildInProgressCountParts, rowRecordOf } from '../../lib/task-board-view.js';
 import { rulingStandingOf } from '../../lib/unanswered-decisions.js';
 import { renderHomeStatus } from '../../lib/render-task-page.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
@@ -117,6 +117,13 @@ const OWN_SCENARIOS = [
   { name: 'waiting on an open ruling', loops: [rulingLoop()], trackerType: 'started', expect: { state: 'needs-you' } },
   { name: 'parked, no question', loops: [parkLoop()], trackerType: 'started', expect: { state: 'parked' } },
   { name: 'failed stage', loops: [failedLoop('implementation')], trackerType: 'started', expect: { state: 'failed', words: 'Build failed' } },
+  // LIN-4016 (review finding 2): an older running Build with a newer queued Review. The worker holds the Build, so the
+  // Build is the stage every surface names, and Stop targets it.
+  {
+    name: 'a running Build with a newer queued Review: the running stage is the one named',
+    loops: [loop({ loopId: 'b1', lineageId: 'b1' }), queuedLoop({ loopId: 'v1', lineageId: 'v1', kind: 'review' })],
+    trackerType: 'started', expect: { state: 'running' },
+  },
 ];
 
 describe('LIN-4016 W1 — the states the tracker does not decide read the same on the row and on /state', () => {
@@ -167,6 +174,15 @@ describe('LIN-4016 W1 — the states the tracker does not decide read the same o
     assert.equal(s.summary.busy, true, 'busy stays true: the wake is unended');
   });
 
+  test('a running Build with a newer queued Review: the header, the row, /state and the summary all name the Build', async () => {
+    const s = await surfacesOf(OWN_SCENARIOS[OWN_SCENARIOS.length - 1]);
+    assert.match(s.model.sentence, /^Build running/, 'the header names the running stage');
+    assert.match(s.row.words, /^Build running/, 'the row names the running stage');
+    assert.match(s.taskState.words, /^Build running/, '/state names the running stage');
+    assert.equal(s.summary.running.kind, 'implementation', 'Stop targets the running Build, not the queued Review');
+    assert.equal(s.summary.queued, null, 'the queued Review is not the session the task is working on');
+  });
+
   test('queued with no ruling is live and queued, so the task page polls fast', async () => {
     const s = await surfacesOf(OWN_SCENARIOS[2]);
     assert.equal(s.model.live, true);
@@ -189,12 +205,34 @@ describe('LIN-4016 W1 — a tracker-decided state: the row and the page-load rec
     assert.notEqual(s.taskState.state, 'backlog');
   });
 
-  // The one accepted difference (plan decision 5, review note 1): a finished task whose last stage failed. The row
-  // says done, because a finished task offers no next step and its failed stage is not offered again (LIN-3968). `/state`
-  // has no tracker, so it says what its own sessions say: failed. The PR names this for review.
-  test('a finished task whose last stage failed: the row says done, and /state says the task\'s own failure (named difference)', async () => {
+  // A finished task whose last stage failed (plan decision 5, review note 1; LIN-4016 finding 1). The row says done, and
+  // so does the opened task: the row's record carries its own word, and the browser paints that in place of /state's
+  // failed line. `/state` itself stays tracker-free (it says failed from its own sessions); the browser never reads it.
+  test('a finished task whose last stage failed: the row and its record say done; /state keeps its own failure, tracker-free', async () => {
     const s = await surfacesOf({ loops: [failedLoop('implementation')], trackerType: 'completed' });
     assert.equal(s.row.state, 'done');
-    assert.equal(s.taskState.state, 'failed');
+    const record = rowRecordOf({ stateType: 'completed', decided: s.row });
+    assert.equal(record.finished, true);
+    assert.deepEqual(record.stateWord, { word: 'done', tone: 'done' }, 'the opened task paints the row\'s own word');
+    assert.equal(s.taskState.state, 'failed', '/state reads its own sessions only');
+  });
+
+  test('a finished task whose last stage succeeded: the row and its record say done, and the record offers no step', async () => {
+    const s = await surfacesOf({ loops: [doneLoop('implementation')], trackerType: 'completed' });
+    assert.equal(s.row.state, 'done');
+    assert.deepEqual(rowRecordOf({ stateType: 'completed', decided: s.row }).stateWord, { word: 'done', tone: 'done' });
+    assert.equal(rowRecordOf({ stateType: 'completed', decided: s.row }).finished, true, 'a finished task offers no stage step');
+    // /state has no tracker, so it still offers the next stage; the record is what keeps that offer off the finished row.
+    assert.equal(s.summary.action?.kind, 'step');
+  });
+
+  test('a backlog task: the record carries the backlog word the row says', async () => {
+    const s = await surfacesOf({ loops: [], trackerType: 'backlog' });
+    assert.deepEqual(rowRecordOf({ stateType: 'backlog', decided: s.row }).stateWord, { word: 'backlog', tone: 'backlog' });
+  });
+
+  test('a running task carries no tracker word in its record: the row says running, and the opened task paints /state\'s line', async () => {
+    const s = await surfacesOf({ loops: [loop()], trackerType: 'started' });
+    assert.equal(rowRecordOf({ stateType: 'started', decided: s.row }).stateWord, null);
   });
 });
