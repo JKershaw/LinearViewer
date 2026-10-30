@@ -1252,8 +1252,11 @@
         // (lib/chat-tools.js's `projectPendingDecision`), so the same
         // best-effort stamp pair reaches `taskDecisionsStore.markOutcome`,
         // mirroring public/observation.js's rulings-tab task-bound branch.
+        // LIN-4028: the loop-bound tap carries the pressed option's id, so the answer stamp records which
+        // option was chosen. A routing ruling pins its model from that option's `routing`; without the id
+        // the stamp reads as a free-text answer and pins nothing.
         var extra = decision.loopId
-          ? { decisionLoopId: decision.loopId, decisionId: decision.decisionId }
+          ? { decisionLoopId: decision.loopId, decisionId: decision.decisionId, optionId: optionId }
           : { taskDecisionId: decision.taskDecisionId, taskDecisionIssueId: decision.issueId };
 
         window.ReplyDelivery.postComment(urlKey, decision.issueId || decision.issueIdentifier, optionLabel, extra)

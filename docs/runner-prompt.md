@@ -168,7 +168,7 @@ subagent to add `--unix-socket <path>` to every curl. Its value wins over any
 > `FAILED: <why>`, or `BLOCKED: <what you need from a human>`. If the person's choice is what you
 > need, write a `DECISION:` line just before the `BLOCKED:` line: `DECISION:` then one strict-JSON
 > object with `decision_id` (a short unique string) and `options` (1 to 10 of
-> `{"id": "...", "label": "..."}`), optionally `question` and `recommended` (an option's `id`).
+> `{"id": "...", "label": "..."}`), optionally `question` and `recommended` (an option's `id`). An option may carry `"routing": {"model", "effort", "harness"}` (any of the three) when the choice is which model or effort the task's work runs on.
 > Under 2000 characters; no line inside it starts with `DONE:`, `FAILED:` or `BLOCKED:`.
 
 **When a subagent finishes**, post, in this order:

@@ -2394,7 +2394,8 @@ function renderRulingRow(row) {
     effect: effectiveEffect,
     onSelect: (optionId, optionLabel) => {
       if (!canReply) return;
-      deliverRulingReply(row, optionLabel, li);
+      // LIN-4028: the pressed option's id reaches the answer stamp, so a routing ruling can pin its model.
+      deliverRulingReply(row, optionLabel, li, optionId);
     }
   });
 
