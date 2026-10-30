@@ -114,7 +114,7 @@ const EXPECTED = {
   ],
   'K kickoff': [
     'bootstrapToken', 'consumerLastSeenAt', 'dispatchedBy', 'effort', 'grantDeclaration', 'harness',
-    'issueIdentifier', 'issueSource', 'jobId', 'kind', 'maxTasks', 'model', 'presetConfig', 'presetName', 'prompt',
+    'issueIdentifier', 'issueSource', 'issueTitle', 'jobId', 'kind', 'maxTasks', 'model', 'presetConfig', 'presetName', 'prompt',
     'promptName', 'repo', 'sessionId', 'subscription', 'target', 'terminal', 'variant', 'waitForFollowUps'
   ]
 };
