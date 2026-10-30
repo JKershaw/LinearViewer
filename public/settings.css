@@ -23,13 +23,6 @@
   margin-bottom: var(--space-5);
 }
 
-.settings-group-subtitle {
-  color: var(--fg-dim);
-  font-family: var(--font-content);
-  font-size: 0.9em;
-  margin: 0 0 var(--space-3) 0;
-}
-
 /* =============================================================================
    Settings Nodes (tree items)
    ============================================================================= */
@@ -93,18 +86,12 @@
 
 /* Action buttons: see style.css (.btn--quiet and its tones). `.settings-link` is in style.css (LIN-3889). */
 
-.nav-value-static {
-  font-family: var(--font-content);
-  font-size: 0.9em;
-  color: var(--fg);
-}
-
 /* =============================================================================
    Dispatch defaults (LIN-1095)
 
    The workspace-wide row + ~15 per-prompt-type override rows each pair a harness
    select with a model input. They use their OWN control classes rather than
-   .model-select/.model-input — those are strict single-element selectors
+   .model-input — those are strict single-element selectors
    elsewhere (e.g. tests/e2e/settings.spec.js's model pricing test), and this
    section renders 16 of these controls on the same page. (The free-text "custom
    harness" fallback was removed in LIN-1282.)
@@ -303,18 +290,6 @@
   color: var(--fg-dim);
 }
 
-.feature-note {
-  font-size: 0.8rem;
-  color: var(--yellow);
-  margin-left: var(--space-1);
-}
-
-.feature-desc {
-  color: var(--fg-dim);
-  font-size: var(--font-size-sm);
-  font-family: var(--font-content);
-}
-
 /* =============================================================================
    Providers section (LIN-634)
    ============================================================================= */
@@ -337,15 +312,6 @@
 }
 
 /* De-emphasized coverage-limitation sub-label (LIN-2357 provider-context disclosure). */
-.field-muted {
-  color: var(--fg-dim);
-  font-size: 0.9em;
-}
-
-.provider-blocked {
-  color: var(--fg-dim);
-  font-style: italic;
-}
 
 .provider-notice-ok .field-value {
   color: var(--green);
@@ -382,10 +348,7 @@
     min-width: 100%;
   }
 
-  .feature-desc {
-    width: 100%;
   }
-}
 
 /* =============================================================================
    LIN-3846: one page per area, built from three kinds of row

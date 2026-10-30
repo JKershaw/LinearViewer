@@ -368,7 +368,6 @@ header:not(.page-header) {
   font-weight: 600;
 }
 
-
 h1 {
   color: var(--fg);
   font-weight: normal;
@@ -1385,16 +1384,6 @@ a.wordmark:hover {
   gap: 8px;
 }
 
-.opened-task-on {
-  margin: 0;
-  color: var(--fg-dim);
-  font-size: 0.8125rem;
-}
-
-.opened-task-on-open {
-  font-size: 0.8125rem;
-}
-
 .opened-task-running-next {
   margin: 0;
   color: var(--fg-dim);
@@ -2053,11 +2042,6 @@ a.wordmark:hover {
 }
 
 /* Prompt buttons row within Prompts section */
-.detail-prompts {
-  color: var(--fg-dim);
-  font-size: 0.9em;
-  font-family: var(--font-content);
-}
 
 /* Mobile: larger tap targets for toggles */
 @media (max-width: 640px) {
@@ -2171,12 +2155,6 @@ a.wordmark:hover {
 /* Hover highlighting for issue groups */
 .node:hover > .line {
   background-color: rgba(0, 0, 0, 0.02);
-}
-
-.child-count {
-  color: var(--fg-dim);
-  font-size: 12px;
-  font-family: var(--font-content);
 }
 
 /* =============================================================================
@@ -3620,10 +3598,6 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
    More Prompts Inline Expansion
    ============================================================================= */
 
-.more-prompts.hidden {
-  display: none;
-}
-
 /* =============================================================================
    Page Footer
    =============================================================================
@@ -3662,7 +3636,6 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   font-family: var(--font-structural);
   font-size: 0.9em;
 }
-
 
 .footer-link {
   color: var(--fg-dim);
@@ -3821,7 +3794,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 /* =============================================================================
    Inline link and text control (LIN-3889)
    One body each. `.settings-link` was byte-identical in settings.css and audit.css; the text
-   control was `.model-select` (settings.css, audit.css) and `.token-label-input` (common-actions.css).
+   control is `.token-label-input` (its body is here, its focus in common-actions.css).
    ============================================================================= */
 .settings-link {
   color: var(--brand-dim);
@@ -3853,7 +3826,6 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 .task-create-back:hover,
 .task-edit-back:hover { color: var(--brand); }
 
-.model-select,
 .token-label-input {
   font-family: var(--font-content);
   font-size: 0.9em;
@@ -3865,15 +3837,13 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   min-width: 18ch;
 }
 
-/* One focus rule for both: the border turns blue on focus, and the default ring is kept for
-   keyboard focus (LIN-786: never kill focus outright). `.model-select:focus` used to remove the
-   outline for every focus, mouse or keyboard; that was the difference, and it is now the fix. */
-.model-select:focus,
+/* The border turns blue on focus, and the default ring is kept for keyboard focus (LIN-786: never
+   kill focus outright). The old `.model-select:focus` rule that removed the outline for every focus,
+   mouse or keyboard, is gone (LIN-3889). */
 .token-label-input:focus {
   border-color: var(--blue);
 }
 
-.model-select:focus:not(:focus-visible),
 .token-label-input:focus:not(:focus-visible) {
   outline: none;
 }

@@ -561,31 +561,6 @@
 /* ── Human follow-up reply box (LIN-1004, Phase 2) ────────────────────────────
    The page's one interactive surface (rest is a LIN-1003 no-JS snapshot). A
    textarea→POST that injects a plain human follow-up back into the session. */
-.sess-reply-input {
-  width: 100%;
-  box-sizing: border-box;
-  min-height: 4.5rem;
-  resize: vertical;
-  padding: 0.5rem 0.6rem;
-  font-family: var(--font-structural);
-  font-size: 0.85rem;
-  line-height: 1.5;
-  color: var(--text);
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-}
-.sess-reply-input:focus {
-  outline: none;
-  border-color: var(--brand);
-}
-.sess-reply-actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.5rem 0.75rem;
-  margin-top: 0.5rem;
-}
 .sess-reply-feedback {
   font-family: var(--font-structural);
   font-size: 0.78rem;
@@ -614,12 +589,6 @@
 }
 .sess-reply-save:disabled { opacity: 0.5; cursor: default; }
 .sess-reply-save[hidden] { display: none; }
-.sess-reply-note {
-  margin: 0.5rem 0 0;
-  font-family: var(--font-content);
-  font-size: 0.8rem;
-  color: var(--muted);
-}
 
 /* ── Per-run inline reply box (LIN-1133) ──────────────────────────────────
    Scoped within each expanded run card. Textarea + send button + feedback span. */
@@ -714,7 +683,6 @@
   .sess-kv { grid-template-columns: 6.5rem 1fr; gap: 0.5rem; }
   .sess-qcard { padding: 0.75rem 0.85rem; }
   .sess-qcard-case-chunk { line-height: 1.5; }
-  .sess-reply-input { min-height: 5.5rem; }
   .sess-inline-reply-input { min-height: 4rem; }
   .sess-run-tx { --chat-thread-max-height: 280px; }
 }

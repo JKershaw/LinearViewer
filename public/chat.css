@@ -319,7 +319,7 @@
 /* ── Composer ────────────────────────────────────────────────────────────── */
 
 /* A clean, stacked ask row: the input above its action bar. Consumers keep their
-   own input/button classes (e.g. .sess-reply-input) — this only owns the layout. */
+   own input/button classes — this only owns the layout. */
 .chat-composer {
   display: flex;
   flex-direction: column;

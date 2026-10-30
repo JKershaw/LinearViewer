@@ -22,7 +22,6 @@
   border-radius: var(--radius-sm);
   cursor: pointer;
 }
-.task-stage-head--ahead { cursor: default; }
 .task-stage-top {
   display: flex;
   flex-wrap: wrap;
@@ -78,12 +77,6 @@
   .task-stage[data-tone="running"] .task-stage-fill { animation: none; width: 60%; }
 }
 /* Still ahead: a grey dotted-out bar, quiet, a guess not a promise. */
-.task-stage--ahead .task-stage-head {
-  background: transparent;
-  border-style: dashed;
-  color: var(--muted);
-}
-.task-stage--ahead .task-stage-bar { background: transparent; border: 1px dashed var(--line); }
 .task-stage-body {
   display: none;
   padding: 0.5rem 0.75rem 0.25rem;

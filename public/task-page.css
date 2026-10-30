@@ -86,25 +86,6 @@
 @media (min-width: 720px) {
   .task-context { grid-template-columns: 1fr 1fr; }
 }
-.task-ctx-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-  margin-top: 0.6rem;
-}
-.task-ask {
-  font-family: var(--font-content);
-  font-size: 0.8rem;
-  padding: 0.3rem 0.6rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--card);
-  color: var(--brand-dim);
-  cursor: pointer;
-}
-.task-ask[disabled] { opacity: 0.6; cursor: progress; }
-.task-ask-note { font-size: 0.8rem; color: var(--muted); }
 
 /* ── Task details (closed to start with) ─────────────────────────────────── */
 .task-details { margin: var(--space-4, 1rem) 0; }

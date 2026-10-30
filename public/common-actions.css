@@ -16,7 +16,7 @@
   gap: var(--space-2);
 }
 
-/* `.token-label-input` body and focus: style.css, with `.model-select` (LIN-3889). */
+/* `.token-label-input` body and focus: style.css (LIN-3889). */
 
 .token-label-input::placeholder {
   color: var(--fg-dim);

@@ -183,8 +183,6 @@ body:has(.swim-page) {
   margin-right: 0;
 }
 
-
-
 /* ==========================================================================
    Task Boxes
    ========================================================================== */
@@ -820,10 +818,8 @@ body:has(.swim-page) {
   padding: 12px 60px 48px 4px;
 }
 .swim-flow-edges { position: absolute; inset: 0; pointer-events: none; overflow: visible; z-index: 3; }
-.swim-flow-sep { height: 14px; }
 
 /* state bands (In Progress / Todo / Backlog) — the vertical segments */
-.swim-fband { display: flex; flex-direction: column; gap: 8px; }
 .swim-fband-label {
   font-size: 11px;
   letter-spacing: 0.8px;
@@ -832,19 +828,8 @@ body:has(.swim-page) {
   color: var(--fg-dim);
   margin: 10px 2px 0;
 }
-.swim-fband[data-segment="0"] .swim-fband-label { color: var(--amber-dim); }
-.swim-fband[data-segment="3"] .swim-fband-label { color: var(--green); }
 
 /* project = a top-level group box */
-.swim-fproject { margin: 0; }
-.swim-fgroup-label {
-  font-size: 10px;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  font-weight: 700;
-  color: var(--blue);
-  margin-bottom: 2px;
-}
 
 /* nested subtask "blue boxes" — compose the shared `.surface --inset` contract
    (LIN-977 workstream 4). The bespoke translucent brand-alpha depth ladder was

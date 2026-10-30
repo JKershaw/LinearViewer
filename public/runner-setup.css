@@ -16,7 +16,6 @@
 .runner-setup-lede,
 .runner-setup-steps,
 .runner-setup-facts,
-.runner-setup-note,
 .runner-setup-notice,
 .runner-setup-links,
 .runner-setup-error,
@@ -36,8 +35,7 @@
   margin-bottom: 8px;
 }
 
-.runner-setup-notice,
-.runner-setup-note {
+.runner-setup-notice {
   border-left: 3px solid var(--yellow);
   background: var(--bg-muted);
   padding: 8px 12px;

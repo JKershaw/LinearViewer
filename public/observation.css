@@ -152,7 +152,6 @@
   .obs-poll-status { animation: none; }
 }
 
-
 /* ─── Sections — flat uppercase eyebrows (LIN-927; boxed framing dropped) ───── */
 
 .obs-section { margin-bottom: 0.8rem; }
@@ -766,7 +765,6 @@
   font-family: var(--font-content);
 }
 .obs-summary-line { display: inline; }
-.obs-summary-status { font-style: italic; }
 .obs-summary-dim { color: var(--muted); }
 /* "Waiting on you" (LIN-1005): amber running-family, weighted so the
    needs-you signal reads at a glance without minting a new status colour. */

@@ -8,12 +8,6 @@
 /* `.dashboard-subtitle` is now a no-style E2E hook (audit.spec.js); canonical
    styling lives in `.page-header__subtitle` (style.css, LIN-462). */
 
-.nav-value-static {
-  font-family: var(--font-content);
-  font-size: 0.9em;
-  color: var(--fg);
-}
-
 /* =============================================================================
    Settings Section
    ============================================================================= */
@@ -26,15 +20,6 @@
 
 /* LIN-3889: `.settings-header` (a byte copy of `.section .section-header`) is gone: nothing on
    Audit emits it, and the group title it styled is settings.css's (`.settings-group-title`). */
-
-.settings-item {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.35rem 0;
-  font-family: var(--font-content);
-  font-size: 0.9em;
-}
 
 .settings-label {
   color: var(--fg-dim);
@@ -61,12 +46,6 @@
   color: var(--red);
 }
 
-.model-error {
-  margin-top: var(--space-1);
-  padding-top: var(--space-1);
-  border-top: 1px solid var(--red);
-}
-
 .settings-form {
   display: inline;
   margin: 0;
@@ -75,13 +54,6 @@
 /* LIN-3889: `.settings-link` is style.css's now; Audit emits none. */
 
 /* Model Selector */
-.model-form {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-/* LIN-3889: `.model-select` is style.css's now (with `.token-label-input`); Audit emits none. */
 
 .model-input {
   font-family: var(--font-content);
@@ -100,18 +72,6 @@
 }
 
 .model-input::placeholder {
-  color: var(--fg-dim);
-}
-
-.model-current {
-  margin-top: var(--space-1);
-  padding-top: var(--space-1);
-  border-top: 1px solid var(--fg-vdim);
-}
-
-.model-id {
-  font-family: var(--font-structural);
-  font-size: var(--font-size-sm);
   color: var(--fg-dim);
 }
 
@@ -403,16 +363,6 @@
 
   .project-row {
     flex-wrap: wrap;
-  }
-
-  .prompt-card-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-1);
-  }
-
-  .prompt-char-count {
-    margin-left: 0;
   }
 
   .prompt-text {
