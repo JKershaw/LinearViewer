@@ -25,7 +25,7 @@ import { createTaskPageRoutes } from '../../routes/task-page.js';
 import { createTaskCreateRoutes } from '../../routes/task-create.js';
 import { createTaskEditRoutes } from '../../routes/task-edit.js';
 import { createTaskPageLoader } from '../../lib/task-page-loader.js';
-import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
+import { enrichLoop, deriveSessionWaiting, deriveSessionDecisions } from '../../routes/dashboard.js';
 import { registerProvider } from '../../lib/providers/registry.js';
 // Side-effect import: the shared nav resolves the legacy default provider.
 import '../../lib/providers/linear/index.js';
@@ -66,13 +66,15 @@ function spyProvider({ read = async () => ISSUE_CTX } = {}) {
   return { name, calls };
 }
 
-function makeLoader({ loops = [STORED_LOOP], calls = null } = {}) {
+function makeLoader({ loops = [STORED_LOOP], calls = null, shelvedRulingsStore = null } = {}) {
   const loader = createTaskPageLoader({
     dispatchStore: {},
     agentStatusStore: {},
     enrichLoop,
     deriveSessionWaiting,
+    deriveSessionDecisions,
     getLoopsForIssue: async () => loops,
+    shelvedRulingsStore,
     now: () => NOW,
   });
   if (!calls) return loader;
@@ -307,10 +309,12 @@ describe('route collisions: /task/new and /task/:id/edit', () => {
 // LIN-4024: a task that is waiting (the pill says so) sends its question card on /state to the owner only. The card
 // carries an answer box, and a member never gets one (the task page's rule, read the same way).
 describe('LIN-4024 — GET …/api/task/:identifier/state sends the question card to the owner only', () => {
+  // An open ruling: a `[decision]` the worker is blocked on. Without the decision it reads parked, not a question.
   const WAITING_LOOP = {
     ...STORED_LOOP,
     loopId: 'impl-2', wakeMarker: 'blocked', waitingMessage: '[blocked] which API key?',
     feedback: [{ message: '[blocked] which API key?' }],
+    decision: { decision_id: 'lin-50-rc', question: 'Which API key?' }, decisionCase: [], answeredDecisions: [], withdrawal: null,
   };
 
   test('the owner gets the question card; a member gets none', async () => {
@@ -320,5 +324,13 @@ describe('LIN-4024 — GET …/api/task/:identifier/state sends the question car
     const member = await call(makeRouter(makeLoader({ loops: [WAITING_LOOP] }), undefined, MEMBER_CHECK), STATE, { params: { identifier: 'LIN-50' }, query: { issueId: UUID } });
     assert.equal(member.jsonBody.status, 'waiting');
     assert.equal(member.jsonBody.questionHtml, '', 'a member has no answer box');
+  });
+
+  // Finding 1 (LIN-4024 review): a shelved ruling reads parked and the badge hides it, so Home must not ask it.
+  test('a shelved ruling is parked and sends no question card, even to the owner', async () => {
+    const shelvedRulingsStore = { async listForWorkspaces() { return [{ urlKey: 'acme', decisionId: 'lin-50-rc', decisionLoopId: 'impl-2', resurfaceAt: '2026-11-05T00:00:00.000Z' }]; } };
+    const res = await call(makeRouter(makeLoader({ loops: [WAITING_LOOP], shelvedRulingsStore })), STATE, { params: { identifier: 'LIN-50' }, query: { issueId: UUID } });
+    assert.equal(res.jsonBody.status, 'waiting', 'the pill still says waiting');
+    assert.equal(res.jsonBody.questionHtml, '', 'a parked task asks nothing on Home');
   });
 });

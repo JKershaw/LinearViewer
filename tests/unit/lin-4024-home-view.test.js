@@ -10,7 +10,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildHomeView, UP_NEXT_PER_PROJECT } from '../../lib/home-view.js';
-import { PERIODICALS_PROJECT_ID } from '../../lib/tree.js';
+import { PERIODICALS_PROJECT_ID, partitionCompleted } from '../../lib/tree.js';
 
 const node = (identifier, type, children = []) => ({
   issue: { id: identifier, identifier, title: identifier, state: { type } },
@@ -52,6 +52,19 @@ describe('In Progress: what shows', () => {
       states: states({ 'LIN-11': stateFor({ needsYou: true, state: 'needs-you' }) }),
     });
     assert.deepEqual(ids(view.inProgressTrees[0].roots), ['LIN-11']);
+  });
+
+  // Review finding 2: a done root reaches the view through partitionCompleted, which puts it in `completed`, not
+  // `incomplete`. The fixture above hands the done task straight to In Progress, which is not where it arrives.
+  test('a done root with an open ruling, built through partitionCompleted, is In Progress and not repeated under its project', () => {
+    const { incomplete, completed, completedCount } = partitionCompleted([node('LIN-90', 'completed'), node('LIN-91', 'unstarted')]);
+    const view = buildHomeView({
+      inProgressTrees: [],
+      trees: [{ project: { id: 'p', name: 'p', collapsed: false }, incomplete, completed, completedCount }],
+      states: states({ 'LIN-90': stateFor({ needsYou: true, state: 'needs-you' }) }),
+    });
+    assert.deepEqual(ids(view.inProgressTrees[0].roots), ['LIN-90']);
+    assert.deepEqual(ids(view.trees[0].incomplete), ['LIN-91'], 'LIN-91 is Up next; LIN-90 is shown In Progress only');
   });
 
   test('a deep Backlog task with an open ruling is In Progress, with its ancestors as context', () => {

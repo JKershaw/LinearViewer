@@ -176,9 +176,10 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         issueId: issueId && isValidIssueId(issueId) ? issueId : null,
       });
       res.set('Cache-Control', 'no-store');
-      // LIN-4024: the question card carries an answer box, so only the owner gets one. It shows when the pill says
-      // waiting, the same rule as the task page's card (LIN-3499), so the two cannot drift.
-      const questionHtml = model.status === 'waiting' && (await viewerOf(req)) === 'owner'
+      // LIN-4024: the question card carries an answer box, so only the owner gets one. It shows only for an open
+      // ruling (`waitingFor` 'ruling'), not for a waiting task whose ruling is shelved (`'parked'`): the badge hides
+      // a shelved ruling, so Home must not ask it. The task page's own card (LIN-3499) still gates on the pill only.
+      const questionHtml = model.waitingFor === 'ruling' && (await viewerOf(req)) === 'owner'
         ? renderTaskQuestion(model, { urlKey: workspace.urlKey })
         : '';
       // No brief or recap rides here (LIN-3975): the state read has no tracker, so the page-load panels are
@@ -196,7 +197,7 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         // LIN-3833: the sessions the state block and the run control read (count, last, running).
         sessions: sessionSummaryOf(model),
         // LIN-4024: the question card, for a task waiting on an open ruling only (a parked task has none). The
-        // same renderer as the task page, so the two cannot drift.
+        // same renderer as the task page.
         questionHtml,
       };
       return res.json(body);
