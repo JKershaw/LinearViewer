@@ -808,7 +808,6 @@
     const issueId = issue.id;
     // LIN-4024: the run, its state read, Stop and Watch name the opened task itself. A container's autopilot runs on
     // it and works through its subtasks, so no subtask is named here; the ✦ write does not use this either.
-    const runSubject = { issue, issueId };
     container.classList.add('prompt-section');
     // LIN-3833: the state block and the copy-first view are Home's. Swipe's card keeps its own Edit slot and
     // change affordances, which the state-first layout does not replace (the PR says so). LIN-3975: which of
@@ -945,11 +944,11 @@
       const opened = state.opened;
       if (!opened) return `<div class="opened-task-state" data-state-slot data-testid="opened-task-state"></div>`;
       // LIN-4010 review: Home's line is '' while a task runs (the running box says it), so it is not replaced by the
-      // task page's sentence. Only a server that sends no Home line at all falls back to headerHtml.
+      // task page's sentence.
       // LIN-4024: a parent whose subtask needs you says that, once. Its own idle line ("No session running.") is the
       // parent's own loops only, so beside "A subtask needs you" it would say the task two ways, and the row says needs you.
       const needsYou = renderSubtaskNeedsYou();
-      const ownLine = needsYou && opened.status === 'idle' ? '' : (opened.homeStatusHtml ?? opened.headerHtml ?? '');
+      const ownLine = needsYou && opened.status === 'idle' ? '' : (opened.homeStatusHtml ?? '');
       return `<div class="opened-task-state" data-state-slot data-testid="opened-task-state">`
         + `${ownLine}${opened.stripHtml || ''}${needsYou}${renderQuestionSlot()}</div>`;
     }
@@ -1185,9 +1184,9 @@
         // and Stop beside each other; "Next" sits under it. The state block above does not repeat it.
         const polled = POLLED_RUN_TARGETS.includes(running.target);
         const since = running.since ? formatGeneratedAge(Date.parse(running.since)) : null;
-        // LIN-4010 review: Watch opens the task the box runs on (the subtask, for a container), as Stop does.
+        // LIN-4010 review: Watch opens the task the box runs on, as Stop does (the opened task; LIN-4024).
         const watchHref = caps.watchLink && window.taskPageHref
-          ? window.taskPageHref({ urlKey: opts.urlKey, identifier: runSubject.issue.identifier, source: runSubject.issue.source })
+          ? window.taskPageHref({ urlKey: opts.urlKey, identifier: issue.identifier, source: issue.source })
           : null;
         const watch = watchHref ? `<a class="btn--quiet opened-task-watch" href="${esc(watchHref)}" data-testid="opened-task-watch">Watch \u203A</a>` : '';
         let actions = watch;
@@ -1511,7 +1510,7 @@
       if (!step || state.run.busy || destroyed) return;
       state.run.busy = true;
       try {
-        const prompt = await window.api(`/workspace/${encodeURIComponent(opts.urlKey)}/api/prompt/${runSubject.issueId}/${encodeURIComponent(step.kind)}${runSubject.issue.source ? `?source=${encodeURIComponent(runSubject.issue.source)}` : ''}`, { on401: false });
+        const prompt = await window.api(`/workspace/${encodeURIComponent(opts.urlKey)}/api/prompt/${issueId}/${encodeURIComponent(step.kind)}${issue.source ? `?source=${encodeURIComponent(issue.source)}` : ''}`, { on401: false });
         if (destroyed) return;
         const c = state.run.choice;
         const result = await window.dispatchPrompt({
@@ -1519,7 +1518,7 @@
           prompt: prompt.prompt,
           promptName: prompt.promptName || step.label,
           kind: step.kind,
-          issue: runSubject.issue,
+          issue: issue,
           target: c.target || 'cli',
           model: c.model || undefined,
           harness: c.harness || undefined,
@@ -1722,8 +1721,8 @@
           abortTo: running.loopId,
           cascade: true,
           target: running.target,
-          issueId: runSubject.issueId,
-          issueIdentifier: runSubject.issue.identifier
+          issueId: issueId,
+          issueIdentifier: issue.identifier
         }),
         headers: { 'Content-Type': 'application/json' },
         on401: false
@@ -1795,11 +1794,7 @@
       return isAutopilotLabel(label);
     }
 
-    // LIN-4010: `subject` is the task the prompt is for. The ✦ write reads the opened task (the selector decides for a
-    // container); a step's "See prompt" reads the subtask its run box runs on.
-    async function fetchPrompt(label, subject = null) {
-      const subjectIssue = subject ? subject.issue : issue;
-      const subjectId = subject ? subject.issueId : issueId;
+    async function fetchPrompt(label) {
       if (abortController) abortController.abort();
       abortController = new AbortController();
       const ac = abortController;
@@ -1828,9 +1823,9 @@
           // fetchAutopilotKickoff convention) so a merged multi-binding swipe row
           // resolves recommend against its OWN binding, not the active one.
           const params = new URLSearchParams();
-          if (subjectIssue.source) params.set('source', subjectIssue.source);
+          if (issue.source) params.set('source', issue.source);
           const query = params.toString() ? `?${params.toString()}` : '';
-          const response = await fetch(`${apiPrefix}/api/recommend/${subjectId}/stream${query}`, { signal: ac.signal });
+          const response = await fetch(`${apiPrefix}/api/recommend/${issueId}/stream${query}`, { signal: ac.signal });
           if (!response.ok) {
             const error = await response.json().catch(() => ({}));
             throw new Error(error.error || 'Failed to load prompt');
@@ -1846,9 +1841,9 @@
           // accepts it, common.js). Omitted entirely when the issue has none.
           const result = await window.fetchAutopilotKickoff({
             urlKey: opts.urlKey,
-            issueId: subjectId,
+            issueId: issueId,
             variant,
-            source: subjectIssue.source || undefined,
+            source: issue.source || undefined,
             // LIN-3246: the ladder's own autopilot run is bounded to the PR —
             // close-out is the person's to send. Every other launcher omits it.
             stopAt: 'pr',
@@ -1862,9 +1857,9 @@
           // this autopilot result forces proxy context (copy/download/dispatch) and
           // suppresses the now-inert +proxy toggle. Every other result stays unforced.
           const entry = { label, name: result.promptName || 'Autopilot', kind: result.kind || 'autopilot', raw: result.prompt, html, proxyForce: true, generatedAt: Date.now() };
-          promptCache.set(`${sessionPromptKey(subjectId)}:${label}`, entry);
-          lastPromptLabel.set(sessionPromptKey(subjectId), label);
-          savePromptMemory(opts.urlKey, subjectId, entry);
+          promptCache.set(`${sessionPromptKey(issueId)}:${label}`, entry);
+          lastPromptLabel.set(sessionPromptKey(issueId), label);
+          savePromptMemory(opts.urlKey, issueId, entry);
           enterPhase('fresh');
           state.result = entry;
           render();
@@ -1873,15 +1868,15 @@
           // fetch too, via URLSearchParams (the LIN-2046 shape). The URL is
           // unchanged when the issue has no source.
           const params = new URLSearchParams();
-          if (subjectIssue.source) params.set('source', subjectIssue.source);
+          if (issue.source) params.set('source', issue.source);
           const query = params.toString() ? `?${params.toString()}` : '';
-          const result = await window.api(`${apiPrefix}/api/prompt/${subjectId}/${encodeURIComponent(label)}${query}`, { signal: ac.signal, on401: false });
+          const result = await window.api(`${apiPrefix}/api/prompt/${issueId}/${encodeURIComponent(label)}${query}`, { signal: ac.signal, on401: false });
           if (abortController !== ac || destroyed) return;
           const html = renderMarkdown(result.prompt);
           const entry = { label, name: result.promptName || '', raw: result.prompt, html, generatedAt: Date.now() };
-          promptCache.set(`${sessionPromptKey(subjectId)}:${label}`, entry);
-          lastPromptLabel.set(sessionPromptKey(subjectId), label);
-          savePromptMemory(opts.urlKey, subjectId, entry);
+          promptCache.set(`${sessionPromptKey(issueId)}:${label}`, entry);
+          lastPromptLabel.set(sessionPromptKey(issueId), label);
+          savePromptMemory(opts.urlKey, issueId, entry);
           enterPhase('fresh');
           state.result = entry;
           render();
@@ -2022,8 +2017,8 @@
     // like the quota read (routes/task-page.js).
     function readTaskState() {
       if (typeof window.api !== 'function') return Promise.resolve(null);
-      if (!opts.urlKey || !runSubject.issue.identifier || !runSubject.issueId) return Promise.resolve(null);
-      const url = `/workspace/${encodeURIComponent(opts.urlKey)}/api/task/${encodeURIComponent(runSubject.issue.identifier)}/state?issueId=${encodeURIComponent(runSubject.issueId)}`;
+      if (!opts.urlKey || !issue.identifier || !issueId) return Promise.resolve(null);
+      const url = `/workspace/${encodeURIComponent(opts.urlKey)}/api/task/${encodeURIComponent(issue.identifier)}/state?issueId=${encodeURIComponent(issueId)}`;
       return Promise.resolve()
         .then(() => window.api(url, { on401: false }))
         .catch(() => null);

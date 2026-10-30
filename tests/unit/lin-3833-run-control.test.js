@@ -494,12 +494,12 @@ describe('LIN-3991 — a running task says its state once in the opened task', (
   const SENTENCE = '<p class="task-sentence" data-testid="task-page-sentence">Build running for 1h.</p>';
 
   test('the state block says it, and neither the run control nor its Go slot repeats it', async () => {
-    const { c } = await mount({}, { opened: { status: 'running', live: true, headerHtml: SENTENCE, sessions: { count: 1, next: { kind: 'review', label: 'Review' }, last: null, running } } });
+    const { c } = await mount({}, { opened: { status: 'running', live: true, homeStatusHtml: SENTENCE, sessions: { count: 1, next: { kind: 'review', label: 'Review' }, last: null, running } } });
     assert.equal(c.innerHTML.split('Build running for 1h.').length - 1, 1, 'the sentence appears once');
   });
 
   test('the running box says the state once: Running now, the step, Stop and Next; it does not repeat the state sentence', async () => {
-    const { c } = await mount({}, { opened: { status: 'running', live: true, headerHtml: SENTENCE, sessions: { count: 1, next: { kind: 'review', label: 'Review' }, last: null, running } } });
+    const { c } = await mount({}, { opened: { status: 'running', live: true, homeStatusHtml: SENTENCE, sessions: { count: 1, next: { kind: 'review', label: 'Review' }, last: null, running } } });
     // The box's own markup nests, so read from its opening tag to the end of its Next line.
     const start = c.innerHTML.indexOf('data-testid="opened-task-running"');
     const line = c.innerHTML.slice(start, c.innerHTML.indexOf('</p></div>', start) + '</p></div>'.length);

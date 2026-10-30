@@ -551,14 +551,6 @@ async function loadHomeRows(fold) {
   }
 }
 
-function hasStoredState() {
-  try {
-    return localStorage.getItem(STORAGE_KEY) !== null
-  } catch (e) {
-    return false
-  }
-}
-
 // Factory function to create fresh default state (avoids shared array references)
 function getDefaultState() {
   return {
@@ -580,9 +572,6 @@ const setArrow = (el, expanded) => {
 }
 
 // Expanded state helpers (expanded is now array of { id, section } objects)
-const findExpanded = (arr, id, section) =>
-  arr.find(e => e.id === id && e.section === section)
-
 const isExpanded = (arr, id, section) =>
   arr.some(e => e.id === id && e.section === section)
 

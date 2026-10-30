@@ -18,7 +18,7 @@ import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 import { USUAL_STAGES, SPINE } from '../../lib/run-view.js';
 import { buildRowStates, buildTaskPageModel, nextStepOf, waitingForOf, sessionSummaryOf, guessStages } from '../../lib/task-page-loader.js';
-import { focusSubtaskByNodeKey, buildInProgressCountParts } from '../../lib/task-board-view.js';
+import { buildInProgressCountParts } from '../../lib/task-board-view.js';
 import { renderHomeStatus } from '../../lib/render-task-page.js';
 import { renderPage } from '../../lib/render.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
@@ -155,23 +155,19 @@ describe('LIN-4010 — a waiting task is a ruling or a park', () => {
 
 // ─── containers: the row and the opened task run on the same subtask ─────────
 
-describe('LIN-4010 — a container\'s row names the subtask its opened task runs on', () => {
+describe('LIN-4010 — a container\'s row reads the step its subtask is on', () => {
   const child = () => node('LIN-71', 'unstarted');
 
-  test('an open child and nothing of the container\'s own: the row names the child and its step, and the focus is the child', () => {
+  test('an open child and nothing of the container\'s own: the row reads the child\'s next step', () => {
     const parent = node('LIN-70', 'started', [child()]);
     const s = states({ roots: [parent] });
-    // LIN-4024: the row says its state once; the subtask it runs on is named in runOn, not in the words.
     assert.equal(s.get('LIN-70').words, 'Research next');
-    assert.equal(s.get('LIN-70').focus.identifier, 'LIN-71');
-    assert.equal(s.get('LIN-70').runOn.identifier, 'LIN-71');
     assert.equal(s.get('LIN-70').tone, 'ready');
   });
 
   test('the container\'s own landed work comes first: implementation done, a todo child, no focus (the selector would not defer)', () => {
     const parent = node('LIN-72', 'started', [child()]);
     const s = states({ roots: [parent], loops: { 'LIN-72': [doneLoop('plan', { issueIdentifier: 'LIN-72' }), doneLoop('implementation', { issueIdentifier: 'LIN-72' })] } });
-    assert.equal(s.get('LIN-72').focus, null);
     assert.equal(s.get('LIN-72').words, 'Review next', 'its own trail decides: Review is next, as the selector would have it');
     assert.doesNotMatch(s.get('LIN-72').words, /LIN-71/);
   });
@@ -179,41 +175,26 @@ describe('LIN-4010 — a container\'s row names the subtask its opened task runs
   test('a container whose own stage failed keeps its own failed row, no focus', () => {
     const parent = node('LIN-73', 'started', [child()]);
     const s = states({ roots: [parent], loops: { 'LIN-73': [doneLoop('plan', { issueIdentifier: 'LIN-73' }), failedLoop('plan-review', { issueIdentifier: 'LIN-73' })] } });
-    assert.equal(s.get('LIN-73').focus, null);
     assert.equal(s.get('LIN-73').words, 'Plan review failed');
   });
 
   test('a container with its own session running has no focus', () => {
     const parent = node('LIN-74', 'started', [child()]);
     const s = states({ roots: [parent], loops: { 'LIN-74': [loop({ issueIdentifier: 'LIN-74', kind: 'plan' })] } });
-    assert.equal(s.get('LIN-74').focus, null);
     assert.match(s.get('LIN-74').words, /^Plan running/);
   });
 
-  test('a container whose children are all finished has no focus', () => {
+  test('a container whose children are all finished reads its own tracker state, not a child\'s', () => {
     const parent = node('LIN-75', 'started', [node('LIN-76', 'completed')]);
     const s = states({ roots: [parent] });
-    assert.equal(s.get('LIN-75').focus, null);
+    assert.doesNotMatch(s.get('LIN-75').words, /LIN-76/);
   });
 
   test('a running child names its state on the container row', () => {
     const parent = node('LIN-77', 'started', [node('LIN-78', 'started')]);
     const s = states({ roots: [parent], loops: { 'LIN-78': [loop({ issueIdentifier: 'LIN-78', kind: 'plan' })] } });
-    assert.equal(s.get('LIN-77').focus.identifier, 'LIN-78');
     assert.match(s.get('LIN-77').words, /^Plan running/);
-    assert.equal(s.get('LIN-77').runOn.identifier, 'LIN-78');
     assert.equal(s.get('LIN-77').running, true, 'the count line counts a container whose subtask runs');
-  });
-
-  test('focusSubtaskByNodeKey carries the child\'s id, title, source and task-page link, keyed by the container\'s node key', () => {
-    const parent = node('LIN-79', 'started', [child()]);
-    const rowStates = states({ roots: [parent] });
-    const byKey = focusSubtaskByNodeKey({ urlKey: 'acme', inProgressTrees: [{ roots: [parent] }], rowStates });
-    const entry = Object.values(byKey)[0];
-    assert.equal(entry.identifier, 'LIN-71');
-    assert.equal(entry.id, 'id-LIN-71');
-    assert.match(entry.href, /LIN-71/);
-    assert.equal(Object.keys(byKey).length, 1, 'only the container has an entry');
   });
 });
 

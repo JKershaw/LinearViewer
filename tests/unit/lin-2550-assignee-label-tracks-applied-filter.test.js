@@ -35,6 +35,7 @@ import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 import { liveConsoleOn } from '../../lib/run-controls.js';
 import { buildHomeView } from '../../lib/home-view.js';
+import { renderDashboardAfterRefresh } from '../../lib/dashboard-refresh.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
@@ -63,16 +64,6 @@ function slicePrimaryDashboardRouteHandler() {
     'the sliced primary dashboard route handler must be brace-balanced — if this fails the route was reformatted and this harness needs re-anchoring'
   );
   return handler;
-}
-
-function sliceRenderDashboardAfterRefresh() {
-  const startMarker = 'async function renderDashboardAfterRefresh(workspace, session, teamId, assigneeState, openRouterSource, res) {';
-  const startIdx = SERVER_SRC.indexOf(startMarker);
-  assert.notEqual(startIdx, -1, 'expected to find renderDashboardAfterRefresh in server.js');
-  const endMarker = '\n/**\n * Handles 401 Unauthorized errors from the Linear API.\n */';
-  const endIdx = SERVER_SRC.indexOf(endMarker, startIdx);
-  assert.notEqual(endIdx, -1, 'expected the docstring marker bounding renderDashboardAfterRefresh — if this fails the function was moved and this harness needs re-anchoring');
-  return SERVER_SRC.slice(startIdx, endIdx);
 }
 
 /**
@@ -154,10 +145,18 @@ async function runRenderDashboardAfterRefresh({ appliedAssigneeName, assigneeSta
   const session = { workspaces: [workspace] };
   const res = { body: null, send(payload) { this.body = payload; return this; } };
 
-  const context = vm.createContext(baseContext(calls, appliedAssigneeName, assigneeState));
-  const script = [sliceRenderDashboardAfterRefresh(), '', 'renderDashboardAfterRefresh'].join('\n');
-  const fn = vm.runInContext(script, context);
-  await fn(workspace, session, null, assigneeState, null, res);
+  const base = baseContext(calls, appliedAssigneeName, assigneeState);
+  await renderDashboardAfterRefresh({
+    customPromptsStore: base.customPromptsStore,
+    getDeployInfo: base.getDeployInfo,
+    getFeatureFlags: base.getFeatureFlags,
+    getProviderForWorkspace: base.getProviderForWorkspace,
+    fetchAndPrepareProjects: base.fetchAndPrepareProjects,
+    resolveRunControls: base.resolveRunControls,
+    homeRowStates: base.homeRowStates,
+    orderIssuesForSwipe: base.orderIssuesForSwipe,
+    renderPage: base.renderPage,
+  }, { workspace, session, teamId: null, assigneeState, openRouterSource: null, res });
   return calls;
 }
 

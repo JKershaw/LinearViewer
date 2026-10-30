@@ -11,8 +11,8 @@
  * (LIN-2526), so swim/ship/swipe/roadmap show the dashboard with the notice on a
  * secondary 401, where they used to get the 503 page.
  *
- * server.js is not import-safe: the real source of renderDashboardAfterRefresh and
- * handleUnauthorizedError is sliced into a vm context (as lin-1503-*-behaviour).
+ * server.js is not import-safe: the real source of handleUnauthorizedError is sliced into a vm context (as
+ * lin-1503-*-behaviour); the render tail it calls is imported from lib/dashboard-refresh.js (LIN-4016).
  * The freshness seam is the REAL module over a counting re-mint; the Linear
  * exchange is a counting stub.
  *
@@ -36,6 +36,7 @@ import { renderSourceErrorPage } from '../../lib/render-pages.js';
 import { errorReference, isAuthError } from '../../lib/errors.js';
 import { liveConsoleOn } from '../../lib/run-controls.js';
 import { buildHomeView } from '../../lib/home-view.js';
+import { renderDashboardAfterRefresh as renderRefreshedDashboard } from '../../lib/dashboard-refresh.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
@@ -48,7 +49,6 @@ function slice(startMarker, endMarker) {
   assert.notEqual(endIdx, -1, `expected end marker ${endMarker.slice(0, 40)}`);
   return SERVER_SRC.slice(startIdx, endIdx);
 }
-const RENDER_SRC = slice('async function renderDashboardAfterRefresh(', '\n/**\n * Handles 401 Unauthorized');
 const HANDLER_SRC = slice('async function handleUnauthorizedError(', '\n/**\n * Home page');
 
 const authError = (binding) => Object.assign(new Error('Bad credentials'), { status: 401, ...(binding ? { binding } : {}) });
@@ -146,7 +146,20 @@ function harness({ degraded = [], remintFails = false, fetchThrows = null, fetch
     evictAllWorkspaceTokens: () => {},
     evictWorkspaceToken: () => {},
   });
-  vm.runInContext(`${RENDER_SRC}\n${HANDLER_SRC}`, context);
+  // The render tail is lib/dashboard-refresh.js (LIN-4016): the handler calls it by name, as server.js does, so the
+  // name is bound here to the real function over this context's fakes.
+  context.renderDashboardAfterRefresh = (workspace, session, teamId, assigneeState, openRouterSource, res) => renderRefreshedDashboard({
+    customPromptsStore: context.customPromptsStore,
+    getDeployInfo: context.getDeployInfo,
+    getFeatureFlags: context.getFeatureFlags,
+    getProviderForWorkspace: context.getProviderForWorkspace,
+    fetchAndPrepareProjects: context.fetchAndPrepareProjects,
+    resolveRunControls: context.resolveRunControls,
+    homeRowStates: context.homeRowStates,
+    orderIssuesForSwipe,
+    renderPage,
+  }, { workspace, session, teamId, assigneeState, openRouterSource, res });
+  vm.runInContext(HANDLER_SRC, context);
   return { calls, res, run: (workspace, error, routeShape = {}) => vm.runInContext('handleUnauthorizedError', context)(
     workspace,
     { accountId: 'a', workspaces: [workspace] },

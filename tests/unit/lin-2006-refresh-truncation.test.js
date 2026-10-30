@@ -6,14 +6,11 @@
 // OAuth workspace that 401s mid-session and refreshes would silently drop the
 // disclosure on that path even though the primary path shows it.
 //
-// server.js is not import-safe in a unit test (it connects to Mongo and calls
-// app.listen() at module load — the same documented constraint behind
-// owner-credential-durable-delete-census.test.js and the LIN-1503 behavioural
-// test). This pins renderDashboardAfterRefresh's REAL source, sliced by
-// docstring markers, executed in a vm context with the I/O boundaries
-// (fetchAndPrepareProjects, renderPage, customPromptsStore, getDeployInfo,
-// getFeatureFlags) faked — so a regression that drops `truncated` from either
-// the destructure or the renderPage call fails this test, not just a read.
+// renderDashboardAfterRefresh lives in lib/dashboard-refresh.js (LIN-4016), so
+// this suite imports it and runs it with its I/O boundaries (fetchAndPrepareProjects,
+// renderPage, customPromptsStore, getDeployInfo, getFeatureFlags, ...) injected. A
+// regression that drops `truncated` from either the destructure or the renderPage
+// call fails this test, not just a read.
 //
 // Close-out follow-up (implementation review's "What CI Did Not Prove" ledger,
 // row 1): the primary route's OWN threading (server.js's `GET
@@ -36,19 +33,10 @@ import vm from 'node:vm';
 import { nodeKey } from '../../lib/tree.js';
 import { liveConsoleOn } from '../../lib/run-controls.js';
 import { buildHomeView } from '../../lib/home-view.js';
+import { renderDashboardAfterRefresh } from '../../lib/dashboard-refresh.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
-
-function sliceRenderDashboardAfterRefresh() {
-  const startMarker = 'async function renderDashboardAfterRefresh(workspace, session, teamId, assigneeState, openRouterSource, res) {';
-  const startIdx = SERVER_SRC.indexOf(startMarker);
-  assert.notEqual(startIdx, -1, 'expected to find renderDashboardAfterRefresh in server.js');
-  const endMarker = '\n/**\n * Handles 401 Unauthorized errors from the Linear API.\n */';
-  const endIdx = SERVER_SRC.indexOf(endMarker, startIdx);
-  assert.notEqual(endIdx, -1, 'expected the docstring marker bounding renderDashboardAfterRefresh — if this fails the function was moved and this harness needs re-anchoring');
-  return SERVER_SRC.slice(startIdx, endIdx);
-}
 
 async function runRenderDashboardAfterRefresh({ fetchResult, topTask = null }) {
   const calls = { renderPageOptions: null };
@@ -60,15 +48,13 @@ async function runRenderDashboardAfterRefresh({ fetchResult, topTask = null }) {
     send(payload) { this.body = payload; return this; }
   };
 
-  const context = vm.createContext({
+  await renderDashboardAfterRefresh({
     customPromptsStore: { list: async () => [] },
     getDeployInfo: () => ({}),
     fetchAndPrepareProjects: async () => fetchResult,
     // LIN-2944 P1: the render tail derives Home's top task over the fetched trees
     // via the shared ordering helper. Defaults to no top task; a test can pass one.
     orderIssuesForSwipe: () => (topTask ? [topTask] : []),
-    // The route keys the top task with the shared binding-aware `nodeKey`.
-    nodeKey,
     renderPage: (trees, inProgressTrees, recentActivityTrees, organizationName, options) => {
       calls.renderPageOptions = options;
       return '<html/>';
@@ -76,25 +62,12 @@ async function runRenderDashboardAfterRefresh({ fetchResult, topTask = null }) {
     getFeatureFlags: () => ({}),
     // LIN-3833: the Home row states; these sandboxes render no In Progress rows.
     homeRowStates: async () => null,
-    // LIN-4024: the trimmed Home view the post-401 render builds (server.js); the real one is injected.
-    buildHomeView,
-    // LIN-3833: the subtasks that need you by row; these sandboxes render no In Progress rows.
-    subtaskNeedingYouByNodeKey: () => ({}),
-    containerNodeKeysOf: () => [],
-    requestFeatureFlags: async () => ({}),
     resolveRunControls: async () => ({ runControls: false, runSetup: false }),
-    // LIN-3977: the post-401 Home render applies the promotion rule (server.js), so the real one is injected.
-    liveConsoleOn,
-    // LIN-2526: renderDashboardAfterRefresh now derives a provider off the
-    // workspace to compute canFilterByMe — a bare stub is enough here since
-    // this suite is only proving `truncated` survives the refresh render tail.
+    // LIN-2526: the render derives a provider off the workspace to compute
+    // canFilterByMe — a bare stub is enough here since this suite is only
+    // proving `truncated` survives the refresh render tail.
     getProviderForWorkspace: () => ({ supports: () => false }),
-    console: { log() {}, error() {} }
-  });
-
-  const script = [sliceRenderDashboardAfterRefresh(), '', 'renderDashboardAfterRefresh'].join('\n');
-  const fn = vm.runInContext(script, context);
-  await fn(workspace, session, null, { selectedAssignee: 'all', resolvedAssigneeName: null }, null, res);
+  }, { workspace, session, teamId: null, assigneeState: { selectedAssignee: 'all', resolvedAssigneeName: null }, openRouterSource: null, res });
   return calls;
 }
 
