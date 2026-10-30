@@ -16,6 +16,12 @@
   margin-right: 0.35rem;
 }
 .task-title { font-family: var(--font-content); }
+.task-status {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
 .task-status-pill { flex-shrink: 0; }
 .task-sentence {
   margin: 0;
