@@ -1501,6 +1501,11 @@
       }
       const summary = (state.opened && state.opened.sessions) || {};
       const active = !!(summary.running || state.run.item);
+      // LIN-4042: a finished task has nothing to run, so Home's run box names no run for it (no step line, Go or runs-on).
+      // The "Another step" list stays, with its count of steps left out (LIN-3833 ruling f9fa6bd7). A run already active keeps its box.
+      if (!active && opts.row && opts.row.finished) {
+        return `<div class="opened-task-run" data-run-slot data-testid="opened-task-run">${renderRunMore(step)}${renderStagedProposals()}${renderLastLine()}</div>`;
+      }
       if (active) {
         // LIN-4010 review: a Change drawer that is open stays open while a run is active, with its draft: it sets the next run.
         return `<div class="opened-task-run" data-run-slot data-testid="opened-task-run">`
