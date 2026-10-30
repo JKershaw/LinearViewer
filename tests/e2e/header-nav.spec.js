@@ -711,16 +711,20 @@ test.describe('.nav-filters assignee-item mobile sweep (LIN-2529)', () => {
 // exactly why CI stayed green while the strip rendered three rows deep on
 // every phone-sized viewport: a count of 4 is satisfied whether those four
 // items sit on one row or four. What is asserted here is the property the
-// count cannot see — the strip occupies a SINGLE row. `.nav-filters` is a
-// wrapping flex container, so its rendered height is the direct witness: one
-// row of 44px-min-height items, against the 94-101px (three rows) it measured
-// before the budget fix.
+// count cannot see: how many rows the strip's items actually take.
+//
+// LIN-4024 (John's ruling `lin4024-header-name`) changed the shape this block
+// pins. At phone widths (every width swept here is inside the 480px phone
+// block) the workspace name has a FULL LINE OF ITS OWN under the wordmark and
+// is shown in full; before, it shared the strip and was cut to 8ch ("Local W…").
+// Team and assignee keep ONE row below it, and that row is what the budget now
+// measures. Rows are read from the items' own tops, not from the strip's
+// height, because the strip is two lines by design.
 //
 // SCOPE, stated precisely so it is not read as more than it is: this pins
-// `.nav-filters`. It does NOT pin `.nav-primary-row`, which still puts
-// `.nav-actions` (the search toggle) on its own line at narrow widths — that
-// is pre-existing behaviour, unchanged by LIN-2551, so LIN-2527 AC5's broader
-// "no `.nav-primary-row` wrap" question stays open.
+// `.nav-filters`. It does NOT pin `.nav-primary-row`, which puts `.nav-actions`
+// on the wordmark's line at these widths (LIN-4009). The 481-640px band keeps
+// the strip on one row with every value capped at 8ch, and is not swept here.
 //
 // EVERY FILTER STATE IS SWEPT, and that is the load-bearing part. A budget
 // tuned against the default `all`/`all` fits and then overflows the moment a
@@ -753,33 +757,89 @@ const DENSITY_SWEEP_WIDTHS = [360, 375, 390, 412, 430, 480];
 // lands near 88px and which the pre-fix three-row state measured at 94-101px.
 const SINGLE_ROW_MAX_HEIGHT = 60;
 
+// The test session's workspace (routes/test.js `/test/set-session`). It is 14
+// characters, so the old 8ch cap cut it, the way it cut "Local Workspace".
+const TEST_WORKSPACE_NAME = 'Test Workspace';
+
 function densityUrl(urlKey, state) {
   return `/workspace/${urlKey}/?team=${encodeURIComponent(state.team)}&assignee=${encodeURIComponent(state.assignee)}`;
 }
 
-test.describe('.nav-filters mobile density budget (LIN-2551)', () => {
+// The strip's shape, read from its items: the workspace item's box and value, and the rows the other items
+// (team, assignee) take, by their distinct tops.
+function readStripShape() {
+  const box = (el) => el.getBoundingClientRect();
+  const filters = document.querySelector('.nav-filters');
+  const workspace = filters.querySelector('.nav-item[data-selector="workspace"]');
+  const value = workspace.querySelector('.nav-value');
+  const others = [...filters.querySelectorAll('.nav-item')].filter(i => i !== workspace);
+  const tops = [...new Set(others.map(i => Math.round(box(i).top)))];
+  const rowTop = others.length ? Math.min(...others.map(i => box(i).top)) : 0;
+  const rowBottom = others.length ? Math.max(...others.map(i => box(i).bottom)) : 0;
+  return {
+    children: filters.children.length,
+    workspaceText: value.textContent.trim(),
+    workspaceTruncated: value.scrollWidth > value.clientWidth + 1,
+    workspaceBottom: Math.round(box(workspace).bottom),
+    workspaceWidth: Math.round(box(workspace).width),
+    filtersWidth: Math.round(box(filters).width),
+    otherRows: tops.length,
+    otherTop: Math.round(rowTop),
+    otherHeight: Math.round(rowBottom - rowTop),
+  };
+}
+
+test.describe('.nav-filters mobile density budget (LIN-2551, reshaped by LIN-4024)', () => {
   test.beforeEach(async ({ page, workerUrlKey }) => {
     await page.goto(`/test/set-session?urlKey=${workerUrlKey}`);
   });
 
   for (const width of DENSITY_SWEEP_WIDTHS) {
     for (const state of DENSITY_FILTER_STATES) {
-      test(`dashboard at ${width}px, ${state.label}: the 4-item filter strip does not wrap`, async ({ page, workerUrlKey }) => {
+      test(`dashboard at ${width}px, ${state.label}: the workspace name has its own full line, and team and assignee share one row`, async ({ page, workerUrlKey }) => {
         await page.setViewportSize({ width, height: 800 });
         await page.goto(densityUrl(workerUrlKey, state));
         await page.waitForLoadState('networkidle');
 
-        const filters = page.locator('.nav-filters');
-        await expect(filters).toBeVisible();
-        // Still 3 DOM children at every width (LIN-4009: the brand leads the row, outside the strip) — at phone widths the brand is
-        // hidden with `display: none` rather than removed, so this block and
-        // the LIN-2529 count sweep above agree about the strip's composition.
-        expect(await filters.evaluate(el => el.children.length)).toBe(3);
+        await expect(page.locator('.nav-filters')).toBeVisible();
+        const shape = await page.evaluate(readStripShape);
 
-        const height = await filters.evaluate(el => Math.round(el.getBoundingClientRect().height));
-        expect(height, `.nav-filters must render as ONE row at ${width}px with ${state.label} — measured ${height}px against a ${SINGLE_ROW_MAX_HEIGHT}px single-row bound`).toBeLessThanOrEqual(SINGLE_ROW_MAX_HEIGHT);
+        // Still 3 DOM children at every width (LIN-4009: the brand leads the row, outside the strip; LIN-4024
+        // moves the workspace name by CSS only), so this block and the LIN-2529 count sweep above agree about
+        // the strip's composition.
+        expect(shape.children).toBe(3);
+
+        // The workspace name, in full, on a line of its own (item 23 of LIN-4024).
+        expect(shape.workspaceText).toBe(TEST_WORKSPACE_NAME);
+        expect(shape.workspaceTruncated, `the workspace name must not be cut at ${width}px`).toBe(false);
+        expect(shape.workspaceWidth, 'the workspace item takes the strip\'s full width').toBeGreaterThanOrEqual(shape.filtersWidth - 1);
+        expect(shape.otherTop, 'team and assignee sit below the workspace line, not beside it').toBeGreaterThanOrEqual(shape.workspaceBottom - 1);
+
+        // Team and assignee: ONE row.
+        expect(shape.otherRows, `team and assignee must share one row at ${width}px with ${state.label}`).toBe(1);
+        expect(shape.otherHeight, `the team and assignee row at ${width}px with ${state.label} measured ${shape.otherHeight}px against a ${SINGLE_ROW_MAX_HEIGHT}px single-row bound`).toBeLessThanOrEqual(SINGLE_ROW_MAX_HEIGHT);
       });
     }
+
+    test(`dashboard at ${width}px: --nav-sticky-h clears the tallest header, the workspace line plus team and assignee`, async ({ page, workerUrlKey }) => {
+      // The LIN-2179 clearance sweep above reads a local page with a workspace item only. The workspace line
+      // (LIN-4024) makes the dashboard's header, with a team and an assignee, the tallest one, so it is read here.
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto(densityUrl(workerUrlKey, DENSITY_FILTER_STATES[3]));
+      await page.waitForLoadState('networkidle');
+
+      const { clearancePx, headerPx } = await page.evaluate(() => {
+        const probe = document.createElement('div');
+        probe.style.height = 'var(--nav-sticky-h)';
+        probe.style.position = 'absolute';
+        probe.style.visibility = 'hidden';
+        document.body.appendChild(probe);
+        const clearancePx = probe.getBoundingClientRect().height;
+        probe.remove();
+        return { clearancePx, headerPx: document.querySelector('.nav-bar').offsetHeight };
+      });
+      expect(clearancePx, `the sticky clearance (${clearancePx}px) must cover the ${headerPx}px header at ${width}px`).toBeGreaterThanOrEqual(headerPx);
+    });
 
     test(`dashboard at ${width}px: no filter control is pushed off-viewport`, async ({ page, workerUrlKey }) => {
       // The other half of "it fits", and a regression pin rather than a
@@ -836,32 +896,31 @@ test.describe('.nav-filters mobile density budget (LIN-2551)', () => {
     // And it must be the real selected values under test, not the defaults —
     // `?team=` resolves by id, and a value that silently degraded to `all`
     // would render ~12px and quietly measure the wrong thing.
-    const [, team, assignee] = values;
+    const [workspace, team, assignee] = values;
+    expect(workspace.text).toBe(TEST_WORKSPACE_NAME);
+    expect(workspace.truncated, 'the workspace name has a line of its own, so it is shown in full (LIN-4024)').toBe(false);
     expect(team.text, 'the selected team must be the value under test, not the `all` default').toBe('Engineering');
     expect(assignee.text, 'the selected assignee must be the value under test').toBe('Charlie');
     expect(assignee.truncated, 'a short real assignee name should sit under the cap, not at it').toBe(false);
   });
 
   test('320px — below the swept range, the strip degrades by wrapping rather than by clipping', async ({ page, workerUrlKey }) => {
-    // 320px is narrower than any width this ticket covers, and it is where the
-    // budget genuinely runs out with a team selected. Recorded honestly rather
-    // than asserted away: `flex-wrap` is KEPT precisely so this width degrades
-    // to a second row instead of pushing a control out of reach. Still an
-    // improvement on `main`, which rendered three rows here.
+    // 320px is narrower than any width this block covers. `flex-wrap` is KEPT
+    // so a width this narrow degrades to another row instead of pushing a
+    // control out of reach. With the workspace name on its own line (LIN-4024)
+    // team and assignee measured one row here too; a second is allowed, a
+    // third is not.
     await page.setViewportSize({ width: 320, height: 800 });
     await page.goto(densityUrl(workerUrlKey, DENSITY_FILTER_STATES[3]));
     await page.waitForLoadState('networkidle');
 
-    const { height, offscreen } = await page.evaluate(() => {
-      const el = document.querySelector('.nav-filters');
+    const shape = await page.evaluate(readStripShape);
+    const offscreen = await page.evaluate(() => {
       const viewport = document.documentElement.clientWidth;
-      return {
-        height: Math.round(el.getBoundingClientRect().height),
-        offscreen: [...el.querySelectorAll('.nav-value')].filter(c => c.getBoundingClientRect().right > viewport + 1).length
-      };
+      return [...document.querySelectorAll('.nav-filters .nav-value')].filter(c => c.getBoundingClientRect().right > viewport + 1).length;
     });
 
-    expect(height, 'at 320px the strip may take a second row, but never a third').toBeLessThanOrEqual(2 * SINGLE_ROW_MAX_HEIGHT);
+    expect(shape.otherRows, 'at 320px team and assignee may take a second row, but never a third').toBeLessThanOrEqual(2);
     expect(offscreen, 'wrapping is the degradation; clipping a control is not').toBe(0);
   });
 });

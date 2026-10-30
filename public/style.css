@@ -2784,13 +2784,15 @@ a.wordmark:hover {
    actions, and the filters wrap to a second line of their own. LIN-2551 hid the
    brand here to fit four selectors on one row; the filters now wrap instead, and
    the guards that pin the strip (LIN-2191, LIN-2523, LIN-2529, LIN-2551) count the
-   new shape. The wordmark is never display:none at these widths. */
+   new shape. The wordmark is never display:none at these widths. LIN-4024: inside
+   the filters, the workspace name takes a full line, and team and assignee the next. */
 @media (max-width: 480px) {
   /* LIN-4009: the wordmark has its own line on a phone, so the nav is taller than the 640px value covers:
-     148px measured at 360-430px, against 124px. 152px (9.5rem) clears it, so a control scrolled into view
-     still lands below the header. */
+     148px measured at 360-430px, against 124px. LIN-4024's workspace line adds one more: 199-201px measured
+     at 320-480px with a team and an assignee selected. 208px (13rem) clears it, so a control scrolled into
+     view still lands below the header. */
   :root {
-    --nav-sticky-h: 9.5rem;
+    --nav-sticky-h: 13rem;
   }
 
   /* Tops, not baselines, decide the LIN-2191 row count: the wordmark and the actions share one line top, so
@@ -2803,6 +2805,20 @@ a.wordmark:hover {
     order: 2;
     flex-basis: 100%;
     gap: 0.75ch;
+  }
+
+  /* LIN-4024 (John's ruling `lin4024-header-name`): the workspace name has a full-width line of its own under
+     the wordmark, shown in full rather than cut to 8ch. Team and assignee keep one line below it, so the
+     LIN-2551 budget now pins that line. A name longer than the phone still ends in an ellipsis at the line's
+     edge, never past it: `min-width: 0` lets the value shrink inside its line. */
+  .nav-item[data-selector="workspace"] {
+    flex-basis: 100%;
+    min-width: 0;
+  }
+
+  .nav-item[data-selector="workspace"] .nav-value {
+    max-width: none;
+    min-width: 0;
   }
 
   /* Lever 2 (LIN-4009): below 361px the ".cat" accent (aria-hidden) goes, so "harbour" and both badges fit one line. */
