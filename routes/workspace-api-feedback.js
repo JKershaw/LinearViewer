@@ -30,6 +30,7 @@ import { resolveRunnerOwnerRefusal } from '../lib/runner-owner-gate.js';
 import { shouldMockAi } from '../lib/should-mock-ai.js';
 import { requestOriginOrNull, ORIGIN_UNRESOLVED_REFUSAL } from '../lib/public-origin.js';
 import { buildMockFeedbackTitle } from '../lib/workspace-api-mocks.js';
+import { normalizeWritePayload } from '../lib/proxy-graphql-errors.js';
 
 // ===========================================================================
 // Feedback intake constants (LIN-636 route / LIN-635 widget)
@@ -493,8 +494,10 @@ export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore
       if (resolvedProjectId) createInput.projectId = resolvedProjectId;
       if (priority > 0 && canSetPriority) createInput.priority = priority;
 
-      const created = await provider.createIssue(token, createInput);
-      if (!created?.success || !created.issue) {
+      // LIN-1561: Linear returns `{ success, issue }`; local and GitHub return the bare
+      // issue. normalizeWritePayload accepts both, as the proxy write routes do.
+      const created = normalizeWritePayload(await provider.createIssue(token, createInput), 'issue');
+      if (!created.success || !created.issue) {
         return jsonError(res, 502, 'Failed to create feedback ticket');
       }
 
