@@ -133,24 +133,17 @@ describe('LIN-4016 W5 — POST /workspace/:urlKey/api/dispatch refuses web under
 
   // The named gap, pinned: a follow-up keeps its parent's `web` target and is not refused, so the lineage is not stalled.
   // A real web parent and a valid UUID, so the request reaches the enqueue (a bad followUpTo fails format and proves nothing).
-  // The non-fresh lanes keep their target: an abort-cascade is not refused by the entrance rule. The mock store cannot serve
-  // an abort, so the request reaches the store and fails there (a 500), which is past the guard. A refusal would be a 400.
-  test('an abort-cascade under opencode is not refused by the entrance rule (only fresh runs are)', async () => {
-    const captured = {};
-    const app = buildApp(captured, { workspacePreferencesStore: new WorkspacePreferencesStore({ collection: createMockCollection() }) });
-    const res = await call(app, 'post', PATH, { kind: 'implementation', target: 'web', harness: 'opencode', abort: true, cascade: true, abortTo: PARENT_ID });
-    assert.notEqual(res.status, 400, JSON.stringify(res.body));
-    assert.notEqual(res.body?.code, 'TARGET_HARNESS_REFUSED');
-  });
-
-  // The named gap, pinned: a follow-up keeps its parent's `web` target and is not refused, so the lineage is not stalled.
-  // A real web parent and a valid UUID, so the request reaches the enqueue (a bad followUpTo fails format and proves nothing).
-  test('PROBE cascade', async () => {
+  // The abort lane reaches the guarded stage and the enqueue, so this one is a live pin. The cascade expansion and the CI-wake
+  // sweep never reach the guarded stage (the entrance returns first), so they are covered by inspection only: `targetRefusal`
+  // is set only at lib/dispatch-entrance.js, behind isFreshDispatch.
+  test('an abort under opencode with target web is not refused by the entrance rule (only fresh runs are)', async () => {
     const captured = {};
     const parent = { _id: PARENT_ID, issueIdentifier: 'LIN-1', target: 'web', harness: 'opencode' };
     const app = buildApp(captured, { workspacePreferencesStore: new WorkspacePreferencesStore({ collection: createMockCollection() }), parent });
-    const res = await call(app, 'post', PATH, { kind: 'implementation', target: 'web', harness: 'opencode', abort: true, cascade: true, abortTo: PARENT_ID });
-    console.log('PROBE', res.status, JSON.stringify(res.body));
+    const res = await call(app, 'post', PATH, { kind: 'implementation', target: 'web', harness: 'opencode', abort: true, abortTo: PARENT_ID });
+    assert.notEqual(res.body?.code, 'TARGET_HARNESS_REFUSED', JSON.stringify(res.body));
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(captured.item.target, 'web');
   });
   test('a follow-up to a web parent under opencode is not refused: it reaches the enqueue with the web target (the named gap, pinned)', async () => {
     const captured = {};

@@ -70,6 +70,15 @@ describe('LIN-4016 — the sessions route says whether a waiting session sits on
     assert.equal(res.jsonBody.taskParked, false);
   });
 
+  test('the task-state read throws: the sessions still come back (200) and taskParked is false', async () => {
+    const loadTaskState = async () => { throw new Error('ruling store down'); };
+    const res = await callRoute(loadTaskState, blockedSession());
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.sessions.length, 1);
+    assert.equal(res.jsonBody.sessions[0].agentState, 'waiting');
+    assert.equal(res.jsonBody.taskParked, false);
+  });
+
   test('no waiting session: the decided state is not read at all', async () => {
     let reads = 0;
     const loadTaskState = async () => { reads += 1; return { taskState: { state: 'parked' } }; };
