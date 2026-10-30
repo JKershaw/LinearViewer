@@ -7,8 +7,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { renderStyleguide, LIVE_CONSOLE_PIECES } from '../../lib/render-styleguide.js';
 
-test('the Live Console pieces are the lane row, the live run row and the timeline key', () => {
-  assert.deepEqual(LIVE_CONSOLE_PIECES.map(p => p.id), ['lane-row', 'stream-row', 'timeline-key']);
+test('the Live Console pieces are the lane row, the live run row, the timeline key and the activity section', () => {
+  assert.deepEqual(LIVE_CONSOLE_PIECES.map(p => p.id), ['lane-row', 'stream-row', 'timeline-key', 'activity']);
 });
 
 test('every Live Console piece states its purpose, parts, sizes, states and light/dark', () => {
@@ -24,6 +24,7 @@ test('/styleguide shows each Live Console piece under its own section', () => {
   assert.ok(html.includes('data-testid="styleguide-live-console-lane-row"'));
   assert.ok(html.includes('data-testid="styleguide-live-console-stream-row"'));
   assert.ok(html.includes('data-testid="styleguide-live-console-timeline-key"'));
+  assert.ok(html.includes('data-testid="styleguide-live-console-activity"'));
 });
 
 test('ui-pieces.md records the Live Console decisions with their reasons', () => {

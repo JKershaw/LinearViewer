@@ -709,7 +709,7 @@ main.passage-planner-page[data-url-key]   - page container
 
 ## Live Console
 
-The Live Console page (`/workspace/{urlKey}/live-console`) is an ambient, "lean-back" realtime feed of agent activity merged across ALL connected workspaces. It has TWO sources, shaped by `lib/live-console.js`: the agent-status log (research/implementation/review/close-out steps → the event STREAM) and lean dispatch loops (running loops → currently-working LANES carrying their latest HEARTBEAT — tool count / elapsed / per-tool breakdown — plus `[evidence]` artifacts as linked stream events; heartbeat beats also feed the tempo sparkline so it keeps moving between discrete steps). Reads Mongo only — no Linear calls and no LLM per poll. Promoted out of experimental (LIN-3977): on for an owner with a live runner key or queue token, with no stored flag needed; the per-user `liveConsole` flag is an opt-out (a stored `false` turns it off; a non-owner without a stored `true` keeps today's behaviour). It sits in the nav's roadmap tier; the route redirects to `/settings/features` when off. It opens on the CURRENT workspace (`?scope=current`, the default); `?scope=all` widens it to every connected workspace, and the chips filter inside that view. Each run's lane, timeline bar and stream row links to its run page (LIN-3976) by the session ledger's id; a lane says its task title, its plain stage word, and "waiting on you" (with its time when the wait is marked) instead of a raw kind. Polls every 5s (chained, in-flight-guarded, exponential backoff on failure; pauses while the tab is hidden). A "view earlier activity" control pages OLDER status events (before page load) into a history region below the live feed. Purely presentational — no writes.
+The Live Console page (`/workspace/{urlKey}/live-console`) is an ambient, "lean-back" realtime feed of agent activity merged across ALL connected workspaces. It has TWO sources, shaped by `lib/live-console.js`: the agent-status log (research/implementation/review/close-out steps → the event STREAM) and lean dispatch loops (running loops → currently-working LANES carrying their latest HEARTBEAT — tool count / elapsed / per-tool breakdown — plus `[evidence]` artifacts as linked stream events; heartbeat beats also feed the tempo sparkline so it keeps moving between discrete steps). Reads Mongo only — no Linear calls and no LLM per poll. Promoted out of experimental (LIN-3977): on for an owner with a live runner key or queue token, with no stored flag needed; the per-user `liveConsole` flag is an opt-out (a stored `false` turns it off; a non-owner without a stored `true` keeps today's behaviour). It sits in the nav's roadmap tier; the route redirects to `/settings/features` when off. It opens on the CURRENT workspace (`?scope=current`, the default); `?scope=all` widens it to every connected workspace, and the chips filter inside that view. The task identifier in a lane, a stream row and the timeline's detail line links to the task page (LIN-4035). Each run has its own labelled link to its run page (LIN-3976) by the session ledger's id: the lane's "open run ↗", a stream row's "run ↗", and the timeline bar itself. A lane says its task title ("ID · title"), its plain stage word, and "waiting on you" (with its time when the wait is marked) instead of a raw kind. The activity section starts collapsed on every width (LIN-4035): its heading is a disclosure button with "· N new" for events that arrive after load, and the viewer's choice is remembered per browser. Polls every 5s (chained, in-flight-guarded, exponential backoff on failure; pauses while the tab is hidden). A "view earlier activity" control pages OLDER status events (before page load) into a history region below the live feed. Purely presentational — no writes.
 
 ### Live Console DOM Structure
 ```
@@ -773,11 +773,11 @@ main.lc-page[data-url-key]                    - page container
                                                 from a quiet, done one; the bar's own title/label also
                                                 gets a " · N check-ins" suffix when `run.wakeCount > 0`
   [data-testid="live-console-timeline-key"]   - the key sentence under the timeline (amber running, green done, red failed; a tick is a check-in)
-  [data-testid="live-console-timeline-detail"]  - the detail line under the key: a bar's full label (identifier, stage, ticket progress, check-ins) and an "open run →" link. Set by hover, focus, or a touch tap (a second tap opens the run); a bar's own label is a link to its run page (LIN-3977)
+  [data-testid="live-console-timeline-detail"]  - the detail line under the key: a bar's full label ("ID · title — stage", then ticket progress and check-ins), the identifier linked to the task page, and "open run →" and "open task →" links (LIN-4035). Set by hover, focus, or a touch tap (a second tap opens the run); a bar's own label is a link to its run page (LIN-3977)
   [data-testid="live-console-lanes"]          - "working now" rail (<ul>)
     [data-testid="live-console-lane"]         - one breathing lane per working or waiting agent (`.lc-lane--waiting` while waiting)
       a.lc-lane-task[href]                     - the task identifier, linked to its task page (`?source=` carried)
-      .lc-lane-title                           - the task's title (hidden when none)
+      .lc-lane-title                           - the task's title, after a `·` separator (`.lc-lane-title-sep`); hidden when none (LIN-4035)
       .lc-lane-stage                           - the plain stage word ("Build", "Plan review"), never a raw kind
       [data-testid="live-console-lane-action"][data-waiting="1"]  - "waiting on you" (+ "since <time>" when marked); "working"; or "parked since …" (LIN-3977)
       a.lc-lane-run[href]                      - the run's page (`/workspace/{urlKey}/observation/session/{sessionId}`); hidden when the run has no session
@@ -786,12 +786,17 @@ main.lc-page[data-url-key]                    - page container
                                                 escaped HTML — an idle beat (state:'idle') shows the shared
                                                 ".obs-act-chip.obs-act-idle" "no tools" chip (style.css, LIN-3977)
                                                 instead of the numeric count
-  [data-testid="live-console-stream"]         - live activity stream (<ol>, newest first)
-    [data-testid="live-console-event"][data-kind]  - one event; data-kind: done|working|blocked|failed|evidence|info
-      a.lc-event-task[href]                    - links to the run page when the row is about a run (`/observation/session/{sessionId}`), else to the task page; `.lc-event-action` is the plain word (LIN-3977)
-      a.lc-event-summary-link[href]            - (evidence only) links to the produced artifact
-  [data-testid="live-console-history"]        - paged-in OLDER events (<ol>, below the live stream)
-  [data-testid="live-console-more"]           - "view earlier activity" pager button
+  [data-testid="live-console-activity"]       - the activity section (LIN-4035: collapsed on every width)
+    button#live-console-activity-toggle[aria-expanded][aria-controls]  - the heading as a disclosure button; `#live-console-activity-new` reads "· N new" once events arrive after the first feed (hidden at zero; cumulative for the page session)
+    [data-testid="live-console-activity-body"][hidden]  - the body: stream, empty state, history and "view earlier". Collapsed in the server HTML; the open choice is one localStorage key (`live-console-activity`, per browser), and a storage that throws falls back to collapsed
+      [data-testid="live-console-stream"]     - live activity stream (<ol>, newest first)
+        [data-testid="live-console-event"][data-kind]  - one event; data-kind: done|working|blocked|failed|evidence|info
+          a.lc-event-task[href]                - the identifier, linked to the task page (`?source=` carried), plain text when there is no task page (LIN-4035: never the run page); `.lc-event-action` is the plain word (LIN-3977)
+          .lc-event-title                      - the task's title after the identifier (LIN-4035): clipped on desktop, hidden under 560px; the task link's title and aria-label carry it
+          a.lc-event-run[href]                 - "run ↗" to the run page (`/observation/session/{sessionId}`), when the row has a session (LIN-4035)
+          a.lc-event-summary-link[href]        - (evidence only) links to the produced artifact
+      [data-testid="live-console-history"]    - paged-in OLDER events (<ol>, below the live stream)
+      [data-testid="live-console-more"]       - "view earlier activity" pager button
 ```
 - `data-kind` vocabulary: `done` (✓), `working` (◐), `blocked` (◑), `failed` (✗), `evidence` (↗), `info` (·) — colour AND glyph carry the state (never colour alone).
 - New events on later polls get a transient `.lc-event--new` class; lane pulses + heartbeat ticks persist across polls via a keyed reconcile (nodes are updated in place, not rebuilt).
