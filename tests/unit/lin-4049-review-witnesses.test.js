@@ -43,16 +43,21 @@ const emptyTaskStores = () => ({
   shelvedRulingsStore: { listForWorkspaces: async () => [] },
 });
 
-/** A history row for one task, `ageDays` old, with its digest as the store writes it. `message` is the feedback line. */
+/**
+ * A history row for one task, `ageDays` old, with its digest as the store writes it. `message` is the feedback line.
+ * Dated from the wall clock, not NOW: the lean read's window is measured against `Date.now()`, so a row dated from a
+ * fixed instant falls outside it when the clock is shifted (CLOCK_SHIFT_DAYS, LIN-3949).
+ */
 function historyRow(identifier, ageDays, message = null) {
-  const dispatchedAt = new Date(NOW.getTime() - ageDays * DAY_MS);
+  const wallNow = Date.now();
+  const dispatchedAt = new Date(wallNow - ageDays * DAY_MS);
   const row = {
     id: `hist-${identifier}-${ageDays}`, promptName: 'implementation', prompt: 'implementation prompt text', issueId: `id-${identifier}`,
     issueIdentifier: identifier, issueTitle: identifier, workspace: { urlKey: 'ws' }, dispatchedAt: dispatchedAt.toISOString(),
     dispatchedBy: 'user-1', target: 'cli', repo: null, status: 'taken', resolvedAt: null, takenByTokenLabel: 'consumer-1',
     feedback: message ? [{ message, createdAt: new Date(dispatchedAt.getTime() + 60e3).toISOString() }] : [],
   };
-  row.feedbackDigest = digestFeedback(row, { now: NOW.getTime() });
+  row.feedbackDigest = digestFeedback(row, { now: wallNow });
   return row;
 }
 
