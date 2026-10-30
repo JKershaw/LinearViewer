@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { swimLocalSeed } from '../fixtures/local-harness.js';
-import { nav } from '../helpers.js';
+import { nav, featuresParam } from '../helpers.js';
 
 // LIN-978 (UI audit D, keystone): the shared header-level view switcher. The
 // cross-view links were hoisted from the footer into `renderNavBar`, so
@@ -788,6 +788,123 @@ function readStripShape() {
     otherHeight: Math.round(rowBottom - rowTop),
   };
 }
+
+// LIN-4037: the pinned header is taller than the static `--nav-sticky-min` floor in two bands (481–581 and
+// 641–~836) when row 1 wraps, which depends on content and flags. The clearance now follows the measured
+// header (`--nav-bar-h`), so these widths are swept with the worst content: a team, an assignee, and the
+// feedback trigger. The token probe and the scroll outcome are both asserted, because the token alone
+// read green over both bands before.
+test.describe('Pinned header clearance at the measured breach (LIN-4037)', () => {
+  const BREACH_WIDTHS = [481, 500, 520, 560, 600, 640, 660, 700, 760, 836];
+  const WORST_CASE = DENSITY_FILTER_STATES[3];
+  const FEEDBACK_ON = { feedbackWidget: true };
+
+  async function openDashboard(page, urlKey, { width, height = 800, features = {} }) {
+    await page.goto(`/test/set-session?urlKey=${urlKey}${featuresParam(features)}`);
+    await page.setViewportSize({ width, height });
+    await page.goto(densityUrl(urlKey, WORST_CASE));
+    await page.waitForLoadState('networkidle');
+  }
+
+  // The token as a rendered px height, resolved through a probe so it reflects the cascade the consumers see.
+  function readClearancePx(page) {
+    return page.evaluate(() => {
+      const probe = document.createElement('div');
+      probe.style.height = 'var(--nav-sticky-h)';
+      probe.style.position = 'absolute';
+      probe.style.visibility = 'hidden';
+      document.body.appendChild(probe);
+      const px = probe.getBoundingClientRect().height;
+      probe.remove();
+      return px;
+    });
+  }
+
+  for (const width of BREACH_WIDTHS) {
+    test(`token clears the measured header at ${width}px with team, assignee and feedback on`, async ({ page, workerUrlKey }) => {
+      await openDashboard(page, workerUrlKey, { width, features: FEEDBACK_ON });
+
+      const headerPx = await page.evaluate(() => document.querySelector('.nav-bar').offsetHeight);
+      const clearance = await readClearancePx(page);
+      expect(clearance, `the sticky clearance (${clearance}px) must cover the ${headerPx}px header at ${width}px`).toBeGreaterThanOrEqual(headerPx);
+    });
+
+    test(`a control scrolled into view at ${width}px settles below the header, not under it`, async ({ page, workerUrlKey }) => {
+      // A short viewport, so the dashboard is taller than the screen and has room to scroll.
+      await openDashboard(page, workerUrlKey, { width, height: 400, features: FEEDBACK_ON });
+
+      // A control whose scroll is clamped neither at the page top (it sits more than 200px down the page) nor at the
+      // page end (it sits above the last scroll position), so the header clearance alone decides where it lands. The header is read
+      // after the scroll, once it is pinned: before that it sits in flow, a few px lower.
+      const settle = await page.evaluate(() => {
+        const nav = document.querySelector('.nav-bar');
+        const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+        const docTop = (el) => el.getBoundingClientRect().top + window.scrollY;
+        // The scroll needed is docTop - token, and the token is at least the header's offsetHeight, so a control with
+        // docTop - offsetHeight <= maxScroll never needs more scroll than the page has.
+        // Only the window may scroll for the target: a clipping ancestor (overflow other than visible) would take the
+        // scroll itself, and the control would settle where that container puts it, not where the header clearance does.
+        const windowOnly = (el) => {
+          for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+            if (getComputedStyle(a).overflowY !== 'visible') return false;
+          }
+          return true;
+        };
+        const target = [...document.querySelectorAll('a[href], button, summary, [tabindex]')]
+          .filter(e => !nav.contains(e) && e.offsetParent !== null && windowOnly(e))
+          .filter(e => docTop(e) > 200 && docTop(e) - nav.offsetHeight <= maxScroll)
+          .sort((a, b) => docTop(b) - docTop(a))[0];
+        if (!target) return null;
+        target.scrollIntoView({ block: 'start' });
+        const rect = target.getBoundingClientRect();
+        const hit = document.elementFromPoint(
+          Math.round(rect.left + rect.width / 2),
+          Math.round(rect.top + rect.height / 2)
+        );
+        return {
+          top: rect.top,
+          navBottom: nav.getBoundingClientRect().bottom,
+          scrolled: window.scrollY,
+          maxScroll,
+          clickable: target === hit || target.contains(hit),
+        };
+      });
+      expect(settle, 'expected a focusable control with room to scroll').not.toBeNull();
+      expect(settle.scrolled, 'the page must have scrolled for the assertion to mean anything').toBeGreaterThan(0);
+      expect(settle.scrolled, 'the scroll must not be clamped at the page end').toBeLessThan(settle.maxScroll);
+      expect(settle.top, `control top (${settle.top}px) must not sit under the header bottom (${settle.navBottom}px) at ${width}px`).toBeGreaterThanOrEqual(settle.navBottom - 1);
+      expect(settle.clickable, 'the header must not click-intercept the control').toBe(true);
+    });
+  }
+
+  test('the clearance follows the header on resize, with no reload', async ({ page, workerUrlKey }) => {
+    await openDashboard(page, workerUrlKey, { width: 1024, features: FEEDBACK_ON });
+    expect(await readClearancePx(page)).toBe(96); // desktop: the floor clears the ~93px header
+
+    await page.setViewportSize({ width: 560, height: 800 });
+    const headerPx = await page.evaluate(() => document.querySelector('.nav-bar').offsetHeight);
+    expect(headerPx, 'the header must be in the breach band for this to mean anything').toBeGreaterThan(124);
+    // Poll until the observer catches up: the floor (124px) is already below the header, so a plain "> 96" would pass early.
+    await expect.poll(() => readClearancePx(page)).toBeGreaterThanOrEqual(headerPx);
+
+    await page.setViewportSize({ width: 1024, height: 800 });
+    await expect.poll(() => readClearancePx(page)).toBe(96);
+  });
+
+  for (const { width, expected } of [{ width: 400, expected: 208 }, { width: 480, expected: 208 }, { width: 1024, expected: 96 }]) {
+    test(`the clearance stays at the static floor at ${width}px where the header already clears it`, async ({ page, workerUrlKey }) => {
+      await openDashboard(page, workerUrlKey, { width });
+      expect(await readClearancePx(page)).toBe(expected);
+    });
+  }
+
+  test('with common.js unavailable, the clearance is the CSS floor (no-JS fallback)', async ({ page, workerUrlKey }) => {
+    await page.route(/\/common\.js(\?|$)/, route => route.abort());
+    await openDashboard(page, workerUrlKey, { width: 500, features: FEEDBACK_ON });
+    expect(await page.evaluate(() => document.documentElement.style.getPropertyValue('--nav-bar-h'))).toBe('');
+    expect(await readClearancePx(page)).toBe(124); // 7.75rem floor at ≤640px
+  });
+});
 
 test.describe('.nav-filters mobile density budget (LIN-2551, reshaped by LIN-4024)', () => {
   test.beforeEach(async ({ page, workerUrlKey }) => {

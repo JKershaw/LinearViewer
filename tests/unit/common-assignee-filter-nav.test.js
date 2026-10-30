@@ -50,6 +50,7 @@ function makeElement(overrides = {}) {
     querySelector: () => null,
     querySelectorAll: () => [],
     closest: () => null,
+    getBoundingClientRect: () => ({ height: 0 }),
     ...overrides,
   };
 }
@@ -84,6 +85,7 @@ function runInitNavBar({ pathname = '/workspace/acme/', search = '' } = {}) {
       getElementById: (id) => byId[id] || null,
       createElement: () => makeElement(),
       body: { appendChild() {} },
+      documentElement: { style: { setProperty() {} } },
       addEventListener() {},
     },
     localStorage: {
@@ -93,6 +95,7 @@ function runInitNavBar({ pathname = '/workspace/acme/', search = '' } = {}) {
     },
     URLSearchParams,
     console,
+    addEventListener() {},
     fetch() { throw new Error('fetch should not be called'); },
   };
   sandbox.window = sandbox;
