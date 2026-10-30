@@ -30,6 +30,7 @@
 import { Router } from 'express';
 import { renderErrorPage } from '../lib/render.js';
 import { sessionSummaryOf } from '../lib/task-page-loader.js';
+import { renderTaskQuestion } from '../lib/render-task-page.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
 import { resolveIssueBinding, isValidIssueId } from '../lib/workspace.js';
 import { jsonError } from '../lib/errors.js';
@@ -175,6 +176,12 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         issueId: issueId && isValidIssueId(issueId) ? issueId : null,
       });
       res.set('Cache-Control', 'no-store');
+      // LIN-4024: the question card carries an answer box, so only the owner gets one. It shows only for an open
+      // ruling (`waitingFor` 'ruling'), not for a waiting task whose ruling is shelved (`'parked'`): the badge hides
+      // a shelved ruling, so Home must not ask it. The task page's own card (LIN-3499) still gates on the pill only.
+      const questionHtml = model.waitingFor === 'ruling' && (await viewerOf(req)) === 'owner'
+        ? renderTaskQuestion(model, { urlKey: workspace.urlKey })
+        : '';
       // No brief or recap rides here (LIN-3975): the state read has no tracker, so the page-load panels are
       // the only ones shown, and a poll never repaints them.
       const body = {
@@ -189,6 +196,9 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         stripHtml: renderStageStrip(model, { now: now() }),
         // LIN-3833: the sessions the state block and the run control read (count, last, running).
         sessions: sessionSummaryOf(model),
+        // LIN-4024: the question card, for a task waiting on an open ruling only (a parked task has none). The
+        // same renderer as the task page.
+        questionHtml,
       };
       return res.json(body);
     } catch (error) {

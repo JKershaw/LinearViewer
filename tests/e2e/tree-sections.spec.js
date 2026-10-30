@@ -12,20 +12,21 @@
  * block itself is fetched lazily from /api/detail on first expand.
  */
 import { test, expect } from '../fixtures/test-base.js';
+import { defaultLocalSeedWithUpNext } from '../fixtures/local-harness.js';
 
 /**
- * Expand the first project issue line, then open its Details block (the nested
- * Brief/Recap/Sessions toggles live inside the Details content). Returns the
- * `.details` locator for the issue.
+ * Expand an issue line, then open its Details block (the nested Brief/Recap/Sessions toggles live inside the Details
+ * content). Returns the `.details` locator for the issue. LIN-4024: the default is the Up next project row (LOCAL-5);
+ * a started parent (LOCAL-1) is In Progress, so a spec that needs it names it.
  */
-async function openIssueDetails(page) {
-  const project = page.locator('.project').first();
-  const issueLine = project.locator('.line.expandable').first();
+async function openIssueDetails(page, identifier = 'LOCAL-5') {
+  // A task created just now is also a Recent activity row (hidden until opened); the visible copy is the one to open.
+  const issueLine = page.locator(`.line.expandable[data-identifier="${identifier}"]:not([data-section="recent-activity"])`).first();
   await expect(issueLine).toBeVisible();
   await issueLine.click();
 
   const issueId = await issueLine.getAttribute('data-id');
-  const details = project.locator(`.details[data-details-for="${issueId}"]`).first();
+  const details = page.locator(`.details[data-details-for="${issueId}"][data-section]:not([data-section="recent-activity"])`).first();
 
   // Details block is lazy-loaded from /api/detail; the Details toggle appears
   // once the fetch lands, then we expand it to reveal the nested toggles.
@@ -38,7 +39,7 @@ async function openIssueDetails(page) {
 
 test.describe('Tree view: Brief / Recap / Context leave Home (LIN-522, LIN-3833)', () => {
   test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal();
+    await seedLocal(defaultLocalSeedWithUpNext(localWorkerUrlKey));
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.evaluate(() => localStorage.clear());
   });
@@ -85,31 +86,31 @@ async function dispatchForIssue(page, urlKey, issueIdentifier, promptName = 'imp
 
 test.describe('Tree view: Dispatched Sessions (LIN-522)', () => {
   test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal();
+    await seedLocal(defaultLocalSeedWithUpNext(localWorkerUrlKey));
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.evaluate(() => localStorage.clear());
   });
 
   test('sessions toggle is absent when the dispatch flag is off', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(undefined, { runnerKey: false });
+    await seedLocal(defaultLocalSeedWithUpNext(localWorkerUrlKey), { runnerKey: false });
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.evaluate(() => localStorage.clear());
 
-    const details = await openIssueDetails(page);
+    const details = await openIssueDetails(page, 'LOCAL-1');
     await expect(details.locator('.detail-toggle[data-toggle="sessions"]')).toHaveCount(0);
   });
 
   test('sessions toggle lazy-loads and lists dispatched sessions', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await clearSessions(page, localWorkerUrlKey);
-    await seedLocal(undefined, { runnerKey: true });
+    await seedLocal(defaultLocalSeedWithUpNext(localWorkerUrlKey), { runnerKey: true });
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.evaluate(() => localStorage.clear());
 
-    // The first project issue is LOCAL-1 (see defaultLocalSeed); seed two sessions.
+    // LOCAL-1 is the In Progress parent (see defaultLocalSeed); seed two sessions on it.
     await dispatchForIssue(page, localWorkerUrlKey, 'LOCAL-1', 'research');
     await dispatchForIssue(page, localWorkerUrlKey, 'LOCAL-1', 'implementation');
 
-    const details = await openIssueDetails(page);
+    const details = await openIssueDetails(page, 'LOCAL-1');
     const toggle = details.locator('.detail-toggle[data-toggle="sessions"]');
     const content = details.locator('.detail-content[data-content="sessions"]');
     await expect(toggle).toBeVisible();
@@ -122,11 +123,11 @@ test.describe('Tree view: Dispatched Sessions (LIN-522)', () => {
 
   test('sessions toggle shows the empty state for an undispatched issue', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await clearSessions(page, localWorkerUrlKey);
-    await seedLocal(undefined, { runnerKey: true });
+    await seedLocal(defaultLocalSeedWithUpNext(localWorkerUrlKey), { runnerKey: true });
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.evaluate(() => localStorage.clear());
 
-    const details = await openIssueDetails(page);
+    const details = await openIssueDetails(page, 'LOCAL-5');
     const toggle = details.locator('.detail-toggle[data-toggle="sessions"]');
     const content = details.locator('.detail-content[data-content="sessions"]');
 

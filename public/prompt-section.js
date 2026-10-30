@@ -318,7 +318,7 @@
       // LIN-3833: Home's one main action names what it does: the step the sessions name, else Run to PR.
       // While a stage runs or is queued, no other step is offered as an action (LIN-3968); Stop and the
       // after-run line stay in the run block.
-      const step = runStepOfState(state);
+      const step = runStepOfState(state, opts);
       if (step) html += `<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-step" data-action="run-step-next">Run ${esc(step.label)}</button>`;
       else if (state.opened && !stageBusy(state)) html += '<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-task" data-action="go">Run to PR</button>';
     } else {
@@ -561,7 +561,8 @@
     const reason = gateReason ? ` <span class="opened-task-primary-reason" data-testid="opened-task-primary-reason">${esc(gateReason)}</span>` : '';
     return renderLastCopySlot(state)
       + `<div class="opened-task-step" data-testid="opened-task-step">${name}${esc(step.why)}</div>`
-      + `<button class="btn opened-task-write" data-testid="opened-task-write" data-prompt="${esc(step.label)}"${disabled}>\u2726 Write the prompt</button>${reason}`;
+      // LIN-4024: the copy-first view's one action is the solid primary, so a new user sees what to do first.
+      + `<button class="btn btn--primary opened-task-write" data-testid="opened-task-write" data-prompt="${esc(step.label)}"${disabled}>\u2726 Write the prompt</button>${reason}`;
   }
 
   // LIN-3968: the recommender's routing breadcrumbs ("↳ X is a container → routing to Y", and the mock's
@@ -629,7 +630,9 @@
   // sessions name as next). Shared by the main button (renderGo) and the run block.
   // LIN-3968: the offered step (`sessions.offered`), so a running stage offers no other step, and a failed stage
   // is offered again. `sessions.next` stays the "comes next" wording after a run.
-  function runStepOfState(state) {
+  // LIN-4024: a container offers no stage step (its one action is Run to PR), whatever a step chosen for this run says.
+  function runStepOfState(state, opts) {
+    if (opts && opts.isContainer) return null;
     return (state.run && state.run.step) || (state.opened && state.opened.sessions && state.opened.sessions.offered) || null;
   }
   // LIN-3975 (review finding 1): busy is any session running, queued or waiting on an answer. A waiting question is
@@ -803,11 +806,9 @@
 
     const issue = opts.issue;
     const issueId = issue.id;
-    // LIN-4010: a container's run box runs on the subtask the selector defers to (`opts.focusSubtask`, from the row's
-    // focus). The state read, the step's prompt, the dispatch and Stop all name that subtask; the ✦ write does not.
-    const runSubject = opts.focusSubtask
-      ? { issue: { id: opts.focusSubtask.id, identifier: opts.focusSubtask.identifier, title: opts.focusSubtask.title || '', url: '', source: opts.focusSubtask.source || undefined, stateType: opts.focusSubtask.stateType || '' }, issueId: opts.focusSubtask.id }
-      : { issue, issueId };
+    // LIN-4024: the run, its state read, Stop and Watch name the opened task itself. A container's autopilot runs on
+    // it and works through its subtasks, so no subtask is named here; the ✦ write does not use this either.
+    const runSubject = { issue, issueId };
     container.classList.add('prompt-section');
     // LIN-3833: the state block and the copy-first view are Home's. Swipe's card keeps its own Edit slot and
     // change affordances, which the state-first layout does not replace (the PR says so). LIN-3975: which of
@@ -900,6 +901,7 @@
 
     function render() {
       if (destroyed) return;
+      const oldQuestion = container.querySelector ? container.querySelector('[data-question-slot]') : null;
       const stateBlock = renderOpenedState();
       // LIN-3833: a viewer with no runner (no dispatch) gets the copy-first view: the step, then the prompt
       // to copy. Everything that runs, costs or names a session is absent from it.
@@ -918,6 +920,17 @@
       } else if (state.phase === 'error') {
         applyState(container, stateBlock + renderError(state, opts), 'error');
       }
+      keepTypedQuestion(oldQuestion);
+    }
+
+    // LIN-4024: the question card sits in the state block, so a repaint writes it again. When its markup is unchanged,
+    // the card already on the page is put back, so a half-typed answer and its thread survive a poll (the task page keeps
+    // its card outside the repainted answer for the same reason). A new card is bound here; the kept one is bound already.
+    function keepTypedQuestion(oldQuestion) {
+      const fresh = container.querySelector ? container.querySelector('[data-question-slot]') : null;
+      if (!fresh) return;
+      if (oldQuestion && oldQuestion.innerHTML === fresh.innerHTML) { fresh.replaceWith(oldQuestion); return; }
+      if (window.QuestionCards && typeof window.QuestionCards.initQuestionCards === 'function') window.QuestionCards.initQuestionCards(container);
     }
 
     // LIN-3833: the state block above the control. The task's pill and sentence and its stage strip are
@@ -933,8 +946,19 @@
       if (!opened) return `<div class="opened-task-state" data-state-slot data-testid="opened-task-state"></div>`;
       // LIN-4010 review: Home's line is '' while a task runs (the running box says it), so it is not replaced by the
       // task page's sentence. Only a server that sends no Home line at all falls back to headerHtml.
+      // LIN-4024: a parent whose subtask needs you says that, once. Its own idle line ("No session running.") is the
+      // parent's own loops only, so beside "A subtask needs you" it would say the task two ways, and the row says needs you.
+      const needsYou = renderSubtaskNeedsYou();
+      const ownLine = needsYou && opened.status === 'idle' ? '' : (opened.homeStatusHtml ?? opened.headerHtml ?? '');
       return `<div class="opened-task-state" data-state-slot data-testid="opened-task-state">`
-        + `${opened.homeStatusHtml ?? opened.headerHtml ?? ''}${opened.stripHtml || ''}${renderSubtaskNeedsYou()}</div>`;
+        + `${ownLine}${opened.stripHtml || ''}${needsYou}${renderQuestionSlot()}</div>`;
+    }
+
+    // LIN-4024: a task waiting on an open ruling shows the question and its answers here (the server sends the card to the
+    // owner only). Its own slot, so keepTypedQuestion can keep the card a repaint would replace.
+    function renderQuestionSlot() {
+      const html = state.opened && state.opened.questionHtml;
+      return html ? `<div class="opened-task-question" data-question-slot>${html}</div>` : '';
     }
 
     // LIN-4010: a copy-first viewer's runner line is the foot of the Home box, after the step and the prompt, not a line the
@@ -983,9 +1007,11 @@
       // Once the state shows a session running, the queued item from this page is no longer the thing to undo.
       if (state.opened && state.opened.sessions && state.opened.sessions.running) state.run.item = null;
       if (!caps.stateBlock) return;
+      const oldQuestion = container.querySelector ? container.querySelector('[data-question-slot]') : null;
       const slot = container.querySelector && container.querySelector('[data-state-slot]');
       if (slot) slot.outerHTML = renderOpenedState();
       else render();
+      keepTypedQuestion(oldQuestion);
       // LIN-4010: Home's running box and "Last" line live in the run block, so it follows the state too (focus and
       // the Change panel's draft survive a run-block repaint, as they do for a preview).
       if (caps.runBox && runControlOn()) paintRun();
@@ -1014,7 +1040,7 @@
     // ── LIN-3833: the run control (Home, dispatch on) ───────────────────────────
     // The step the run is for: a step chosen for this run, else the one the sessions name as next.
     function runStepOf() {
-      return runStepOfState(state);
+      return runStepOfState(state, opts);
     }
 
     // The run control is Home's, and the task page's, for a viewer who can run (dispatch on). The rest of the
@@ -1131,7 +1157,7 @@
       const what = !state.run.step && step && state.run.preview && state.run.preview.description
         ? `<p class="opened-task-step-what" data-testid="opened-task-step-what">${esc(state.run.preview.description)}</p>`
         : '';
-      return `<div class="opened-task-step" data-testid="opened-task-step"><span class="opened-task-step-name">${name}</span>${what}`
+      return `<div class="opened-task-step" data-testid="opened-task-step"><span class="opened-task-step-name opened-task-step-name--block">${name}</span>${what}`
         + `<p class="opened-task-step-why" data-testid="opened-task-step-why">${esc(why)} ${ask}</p></div>`;
     }
 
@@ -1459,16 +1485,11 @@
           renderRunMore(step)
         ].join('')}</div>`;
       }
-      // LIN-4010: a container's box is its subtask's box, and says so once, with Open to the subtask's task page.
-      const onLine = opts.focusSubtask && opts.focusSubtask.identifier
-        ? `<p class="opened-task-on" data-testid="opened-task-on">On ${esc(opts.focusSubtask.identifier)}${opts.focusSubtask.title ? ` ${esc(opts.focusSubtask.title)}` : ''}`
-          + ` \u00b7 <a class="opened-task-on-open" data-testid="opened-task-on-open" href="${esc(opts.focusSubtask.href || '#')}">Open</a></p>`
-        : '';
       const summary = (state.opened && state.opened.sessions) || {};
       const active = !!(summary.running || state.run.item);
       if (active) {
         // LIN-4010 review: a Change drawer that is open stays open while a run is active, with its draft: it sets the next run.
-        return `<div class="opened-task-run" data-run-slot data-testid="opened-task-run">${onLine}`
+        return `<div class="opened-task-run" data-run-slot data-testid="opened-task-run">`
           + renderGo(opts, state) + renderAfterRun() + (state.run.changeOpen ? renderChangePanel(state.run.preview) : '')
           + renderStagedProposals() + renderRunMore(step) + renderLastLine() + `</div>`;
       }
@@ -1479,7 +1500,7 @@
         state.run.changeOpen ? renderChangePanel(state.run.preview) : '',
         renderRunMore(step)
       ];
-      return `<div class="opened-task-run" data-run-slot data-testid="opened-task-run">${onLine}`
+      return `<div class="opened-task-run" data-run-slot data-testid="opened-task-run">`
         + `<div class="opened-task-next-run" data-testid="opened-task-next-run">${box.join('')}</div>`
         + renderStagedProposals() + renderLastLine() + `</div>`;
     }
@@ -1644,7 +1665,7 @@
           return true;
         case 'see-prompt': {
           const step = runStepOf();
-          if (step) fetchPrompt(step.kind, opts.focusSubtask ? runSubject : null);
+          if (step) fetchPrompt(step.kind);
           return true;
         }
         case 'run-another':

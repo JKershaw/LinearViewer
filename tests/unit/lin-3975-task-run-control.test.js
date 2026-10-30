@@ -391,7 +391,6 @@ const HOOK = Object.freeze({
   'opened-task-another-item': 'test/JS hook on a run-another item; the .btn base class draws it',
   'opened-task-another-more': 'test/JS hook on the "Show N more" button; the .btn--quiet base class draws it',
   'opened-task-choice': 'test/JS hook on a target choice; the .btn base class draws it',
-  'opened-task-download': 'test/JS hook on the download button; the .btn base class draws it',
   'opened-task-go--limited': 'modifier on the Go button when the run limit is reached; the .opened-task-go rule draws it',
   'opened-task-go--setup': 'modifier on the Go button when the runner is not set up; the .opened-task-go rule draws it',
   'opened-task-last-copy-slot': 'repaint slot for the copy line (outerHTML swap); no rule of its own',

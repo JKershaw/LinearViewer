@@ -73,6 +73,8 @@ test.describe('Detail drill-down on a non-active binding (LIN-1903)', () => {
     await expect(localRow.locator('[data-testid="issue-source"]')).toHaveText('local');
 
     await localRow.click();
+    // The description is rendered when its fold opens (LIN-4024), so open it before reading it.
+    await page.locator('[data-testid="issue-description-toggle"]').first().click();
     await expect(page.locator('body')).toContainText('Seeded parent');
   });
 });

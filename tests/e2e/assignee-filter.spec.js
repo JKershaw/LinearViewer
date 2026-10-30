@@ -13,6 +13,25 @@ import { seedGitHubWorkspace, githubDashboardUrl } from '../fixtures/github-harn
 // passthrough — so `me` only exercises anything if an issue is actually
 // seeded assignee: { name: 'Local User' }, which this fixture does.
 
+// LIN-4024: Home holds the Backlog and a started parent's unstarted children behind folds. The filter's rows are
+// there when the folds open, so these specs open them the way a person does, then assert the same rows.
+async function openFolds(page, parentIdentifier = 'FILT-3') {
+  const backlog = page.locator('[data-testid="home-fold-backlog"]');
+  if (await backlog.count()) {
+    await backlog.first().click();
+    await expect(page.locator('[data-testid="home-fold-backlog"]')).toHaveCount(0);
+  }
+  const parent = page.locator(`.in-progress-section .line[data-identifier="${parentIdentifier}"]`);
+  if (await parent.count()) {
+    await parent.click();
+    const more = page.locator('.in-progress-section [data-home-fetch="more-of-parent"]').first();
+    if (await more.count()) {
+      await more.click();
+      await expect(page.locator('.in-progress-section [data-home-fetch="more-of-parent"]')).toHaveCount(0);
+    }
+  }
+}
+
 test.describe('LIN-2529 — assignee filter (local provider, real `me` match)', () => {
   test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(assigneeFilterLocalSeed(localWorkerUrlKey));
@@ -42,6 +61,7 @@ test.describe('LIN-2529 — assignee filter (local provider, real `me` match)', 
   test('?assignee=me keeps a matched sub-issue\'s unmatched parent in place (ancestor context) and excludes unrelated assignees', async ({ page, localWorkerUrlKey }) => {
     await page.goto(`/workspace/${localWorkerUrlKey}/?assignee=me`);
     await page.waitForLoadState('networkidle');
+    await openFolds(page);
 
     // The unassigned parent is pulled in as ancestor context for its matched
     // child, in the PROJECT tree specifically (scoped past the separate Recent
@@ -59,28 +79,30 @@ test.describe('LIN-2529 — assignee filter (local provider, real `me` match)', 
     await expect(page.locator('.line[data-section="project"][data-identifier="FILT-6"]')).toHaveCount(0);
   });
 
-  test('?assignee=me — In Progress keeps a matched parent\'s subtasks (LIN-2525 seam ordering: assignee filter runs before buildInProgressForest)', async ({ page, localWorkerUrlKey }) => {
+  test('?assignee=me — In Progress keeps a matched parent, and its unstarted subtask folds under it', async ({ page, localWorkerUrlKey }) => {
     await page.goto(`/workspace/${localWorkerUrlKey}/?assignee=me`);
     await page.waitForLoadState('networkidle');
 
-    // Only the matched in-progress parent + its subtask reach the In Progress
-    // section — the ancestor-context pair (Unassigned parent / Assigned child)
-    // never reaches it since neither is "started".
-    await expect(page.locator('.in-progress-items .line')).toHaveCount(2);
+    // Only the matched in-progress parent reaches the In Progress section. Its subtask is not started, so it folds
+    // under the parent ("show 1 more") rather than sitting in the In Progress list (LIN-4024).
+    await expect(page.locator('.in-progress-items .line')).toHaveCount(1);
     await expect(page.locator('.in-progress-items .line:has-text("Assigned in-progress parent")')).toBeVisible();
+    await expect(page.locator('.in-progress-items .line:has-text("Unassigned in-progress subtask")')).toHaveCount(0);
 
+    await openFolds(page);
     const childLine = page.locator('.in-progress-items .line:has-text("Unassigned in-progress subtask")');
     await expect(childLine).toHaveCount(1);
     const childNode = page.locator(`.in-progress-items .node[data-id="${localSeedId(localWorkerUrlKey, 'filter-ip-child')}"]`);
-    await expect(childNode).toHaveClass(/hidden/); // depth > 0, collapsed until parent expands — same convention as dashboard.spec.js
+    await expect(childNode).not.toHaveClass(/hidden/);
   });
 
   test('?assignee=all shows every issue, unfiltered (both sentinels behave identically to absent)', async ({ page, localWorkerUrlKey }) => {
     await page.goto(`/workspace/${localWorkerUrlKey}/?assignee=all`);
     await page.waitForLoadState('networkidle');
+    await openFolds(page);
 
     for (const identifier of ['FILT-1', 'FILT-2', 'FILT-3', 'FILT-5', 'FILT-6']) {
-      await expect(page.locator(`.line[data-section="project"][data-identifier="${identifier}"]`)).toBeAttached();
+      await expect(page.locator(`.line[data-identifier="${identifier}"]`).first()).toBeAttached();
     }
   });
 });
@@ -104,8 +126,9 @@ test.describe('LIN-2550 — an unmatched assignee degrades the board AND the lab
   });
 
   test('L3 (LIN-2516 ledger): ?assignee=Nobody renders the FULL board — every seeded FILT-* line', async ({ page }) => {
+    await openFolds(page);
     for (const identifier of ['FILT-1', 'FILT-2', 'FILT-3', 'FILT-4', 'FILT-5', 'FILT-6']) {
-      await expect(page.locator(`.line[data-section="project"][data-identifier="${identifier}"]`)).toBeAttached();
+      await expect(page.locator(`.line[data-identifier="${identifier}"]`).first()).toBeAttached();
     }
   });
 
@@ -127,8 +150,9 @@ test.describe('LIN-2550 — an unmatched assignee degrades the board AND the lab
     await expect(page.locator('#assignee-options .nav-option[data-assignee="Other User"]')).toHaveClass(/selected/);
     // FILT-5 is Other User's; FILT-6 is unrelated and unassigned, so a genuinely
     // applied filter drops it — the observable difference from the degrade above.
-    await expect(page.locator('.line[data-section="project"][data-identifier="FILT-5"]')).toBeAttached();
-    await expect(page.locator('.line[data-section="project"][data-identifier="FILT-6"]')).toHaveCount(0);
+    await openFolds(page);
+    await expect(page.locator('.line[data-identifier="FILT-5"]').first()).toBeAttached();
+    await expect(page.locator('.line[data-identifier="FILT-6"]')).toHaveCount(0);
   });
 });
 

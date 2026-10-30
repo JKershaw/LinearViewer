@@ -31,11 +31,15 @@ test.describe('Jira provider (no test-token mock)', () => {
   test('dashboard renders the project container + its issues from the fake backend', async ({ page }) => {
     // The Jira project itself maps to a canonical project header (named by project name).
     await expect(page.locator('.project-header:has-text("Engineering")')).toBeVisible();
-    // Issues render under it, across all three statusCategory states.
+    // Open issues render under it: To Do, and In Progress (LIN-4024: an In Progress task is listed in In Progress).
     await expect(page.locator('.line:has-text("Jira task to do")').first()).toBeAttached();
     await expect(page.locator('.line:has-text("Jira task in progress")').first()).toBeAttached();
-    await expect(page.locator('.line:has-text("Jira task shipped")').first()).toBeAttached();
-    // The best-effort subtask surfaces too (native one-level parent/child).
+    // The done issue is counted on its project, never sent to the page (LIN-4024).
+    await expect(page.locator('.line:has-text("Jira task shipped")')).toHaveCount(0);
+    await expect(page.locator('[data-testid="home-done-count"]').first()).toContainText('1 done');
+    // The unstarted subtask folds under its In Progress parent, and opens with it (native one-level parent/child).
+    await page.locator('.in-progress-section .line:has-text("Jira task in progress")').first().click();
+    await page.locator('.in-progress-section [data-home-fetch="more-of-parent"]').first().click();
     await expect(page.locator('.line:has-text("Subtask of the in-progress task")').first()).toBeAttached();
   });
 
@@ -50,9 +54,10 @@ test.describe('Jira provider (no test-token mock)', () => {
     const noProjectGroup = page.locator('.project[data-id="__no_project__"]');
     await expect(noProjectGroup.locator('.line:has-text("Engineering")')).toHaveCount(0);
     // The "No Project" group still exists and holds the genuinely project-less
-    // issues (ENG-3/5/6 carry neither a native nor legacy epic link) — the
+    // open issues (ENG-5/6 carry neither a native nor legacy epic link) — the
     // fix removes the epic from `issues`, it doesn't remove the group itself.
-    await expect(noProjectGroup.locator('.line:has-text("Jira task shipped")').first()).toBeAttached();
+    // LIN-4024: a done issue (ENG-3) is counted, not listed, so this checks an open one.
+    await expect(noProjectGroup.locator('.line:has-text("Issue with a table in its description")').first()).toBeAttached();
   });
 
   test('detail link is provider-aware: "View in Jira" (not Linear) — the ui.displayName trap, rendered', async ({ page }) => {

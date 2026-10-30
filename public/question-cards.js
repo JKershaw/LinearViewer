@@ -236,10 +236,14 @@
     });
   }
 
-  function initQuestionCards() {
-    var cards = document.querySelectorAll('[data-testid="session-question-card"]');
+  // `root` scopes the binding (Home binds the card it paints into its state block); a card bound once is skipped, so a
+  // repeat call never answers twice.
+  function initQuestionCards(root) {
+    var cards = (root || document).querySelectorAll('[data-testid="session-question-card"]');
     for (var i = 0; i < cards.length; i++) {
       (function (card) {
+        if (card.dataset.qcardBound) return;
+        card.dataset.qcardBound = 'true';
         var btn = card.querySelector('[data-testid="session-question-card-answer"]');
         var textarea = card.querySelector('[data-testid="session-question-card-input"]');
         var feedback = card.querySelector('.sess-qcard-feedback');

@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { defaultLocalSeedWithUpNext } from '../fixtures/local-harness.js';
 
 // LIN-378: the detail/interaction surface is fully modeled by the local
 // provider, so these specs ride a seeded local workspace (no `test-token`
@@ -7,8 +8,8 @@ import { test, expect } from '../fixtures/test-base.js';
 
 test.describe('Interactive Features', () => {
   test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
-    // Seed a local-provider workspace and establish its session.
-    await seedLocal();
+    // Seed a local-provider workspace and establish its session. LIN-4024: one Up next task, so a project row is open.
+    await seedLocal(defaultLocalSeedWithUpNext(localWorkerUrlKey));
 
     // Navigate to workspace page, then clear any persisted collapse state.
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
@@ -85,25 +86,13 @@ test.describe('Interactive Features', () => {
     await expect(inProgressItems).toBeVisible();
   });
 
-  test('shows completed issues when toggle clicked', async ({ page }) => {
-    // Find completed toggle button (mock data has completed issues, so this should exist)
-    const completedToggle = page.locator('.completed-toggle').first();
-    await expect(completedToggle).toBeVisible();
-    await expect(completedToggle).toContainText('show');
-
-    // Get the project ID
-    const projectId = await completedToggle.getAttribute('data-project-id');
-    const completedSection = page.locator(`[data-completed-for="${projectId}"]`);
-
-    // Initially hidden
-    await expect(completedSection).toHaveClass(/hidden/);
-
-    // Click to show
-    await completedToggle.click();
-
-    // Should now be visible
-    await expect(completedSection).not.toHaveClass(/hidden/);
-    await expect(completedToggle).toContainText('hide');
+  test('a done task is counted on its project, never sent to the page (LIN-4024)', async ({ page }) => {
+    // Home no longer renders completed tasks; the project shows how many it holds, and the task is not on the page.
+    const doneCount = page.locator('[data-testid="home-done-count"]').first();
+    await expect(doneCount).toContainText('1 done');
+    // Recent activity may list a task created just now; the project section never does.
+    await expect(page.locator('[data-section="project"][data-identifier="LOCAL-3"]')).toHaveCount(0);
+    await expect(page.locator('.completed-toggle')).toHaveCount(0);
   });
 
   test('reset button restores default state', async ({ page }) => {
@@ -155,7 +144,7 @@ test.describe('Interactive Features', () => {
 
 test.describe('Detail Section Toggles', () => {
   test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal();
+    await seedLocal(defaultLocalSeedWithUpNext(localWorkerUrlKey));
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.evaluate(() => localStorage.clear());
   });
@@ -346,15 +335,15 @@ test.describe('Description Expansion (LIN-156)', () => {
 
     test('Comments toggle appears for authenticated users', async ({ page }) => {
       // Find an expandable issue (use project section, first() to avoid duplicates)
-      const issueLine = page.locator('.project .line.expandable').first();
+      const issueLine = page.locator('.in-progress-section .line[data-identifier="LOCAL-1"]');
       await expect(issueLine).toBeVisible();
 
       // Expand the issue to show details
       await issueLine.click();
 
       const issueId = await issueLine.getAttribute('data-id');
-      // Use .project to get the details in project section specifically
-      const details = page.locator(`.project .details[data-details-for="${issueId}"]`).first();
+      // LIN-4024: the seeded parent, which carries the comments, is In Progress (its project row is folded there).
+      const details = page.locator(`.in-progress-section .details[data-details-for="${issueId}"]`);
 
       // LIN-158: Comments is now nested inside Details, so expand Details first
       const detailsToggle = details.locator('.detail-toggle[data-toggle="description"]');
@@ -369,14 +358,14 @@ test.describe('Description Expansion (LIN-156)', () => {
 
     test('Clicking Comments toggle expands section and loads comments', async ({ page }) => {
       // Find an expandable issue
-      const issueLine = page.locator('.project .line.expandable').first();
+      const issueLine = page.locator('.in-progress-section .line[data-identifier="LOCAL-1"]');
       await expect(issueLine).toBeVisible();
 
       // Expand issue details
       await issueLine.click();
 
       const issueId = await issueLine.getAttribute('data-id');
-      const details = page.locator(`.project .details[data-details-for="${issueId}"]`).first();
+      const details = page.locator(`.in-progress-section .details[data-details-for="${issueId}"]`);
 
       // LIN-158: Comments is now nested inside Details, so expand Details first
       const detailsToggle = details.locator('.detail-toggle[data-toggle="description"]');
@@ -412,13 +401,13 @@ test.describe('Description Expansion (LIN-156)', () => {
     });
 
     test('Comments toggle arrow changes on expand/collapse', async ({ page }) => {
-      const issueLine = page.locator('.project .line.expandable').first();
+      const issueLine = page.locator('.in-progress-section .line[data-identifier="LOCAL-1"]');
       await expect(issueLine).toBeVisible();
 
       await issueLine.click();
 
       const issueId = await issueLine.getAttribute('data-id');
-      const details = page.locator(`.project .details[data-details-for="${issueId}"]`).first();
+      const details = page.locator(`.in-progress-section .details[data-details-for="${issueId}"]`);
 
       // LIN-158: Comments is now nested inside Details, so expand Details first
       const detailsToggle = details.locator('.detail-toggle[data-toggle="description"]');
@@ -439,12 +428,12 @@ test.describe('Description Expansion (LIN-156)', () => {
     });
 
     test('Comments show count after loading', async ({ page }) => {
-      const issueLine = page.locator('.project .line.expandable').first();
+      const issueLine = page.locator('.in-progress-section .line[data-identifier="LOCAL-1"]');
       await expect(issueLine).toBeVisible();
       await issueLine.click();
 
       const issueId = await issueLine.getAttribute('data-id');
-      const details = page.locator(`.project .details[data-details-for="${issueId}"]`).first();
+      const details = page.locator(`.in-progress-section .details[data-details-for="${issueId}"]`);
 
       // LIN-158: Comments is now nested inside Details, so expand Details first
       const detailsToggle = details.locator('.detail-toggle[data-toggle="description"]');

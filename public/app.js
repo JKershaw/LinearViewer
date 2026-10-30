@@ -223,7 +223,8 @@ function loadLazySection(type, toggle, content) {
     const placeholder = content.querySelector('[data-sessions-placeholder="1"]')
     if (placeholder && window.SessionsSection) {
       placeholder.removeAttribute('data-sessions-placeholder')
-      window.SessionsSection.init(placeholder, { urlKey, identifier, source })
+      // LIN-4024: Home's fold reads as sessions, with the stage words the opened task names its steps by.
+      window.SessionsSection.init(placeholder, { urlKey, identifier, source, home: true, stageWords: (window.__HOME_PROMPT_OPTS__ || {}).stageWords })
     }
   } else if (type === 'context') {
     const placeholder = content.querySelector('[data-context-placeholder="1"]')
@@ -345,8 +346,9 @@ function mountHomePromptSections(root) {
       // LIN-3833: this row's subtask that needs you, named in the state block with an Open link (any row, not
       // only the top task; the server keys the map by node key).
       subtaskNeedsYou: (page.subtaskNeedsYouById || {})[el.dataset.nodeKey] || null,
-      // LIN-4010: a container's opened task runs on the subtask its row names (the row's focus, keyed the same way).
-      focusSubtask: (page.focusSubtaskById || {})[el.dataset.nodeKey] || null,
+      // LIN-4024: a row with subtasks is a container. Its opened task runs on the row itself ("Run to PR"), never a stage
+      // of a subtask, so the run box offers no step for it.
+      isContainer: (page.containerNodeKeys || []).includes(el.dataset.nodeKey),
       hasAI: page.hasAI,
       aiState: page.aiState,
       freeTier: page.freeTier,
@@ -357,6 +359,8 @@ function mountHomePromptSections(root) {
       defaultPromptKeys: page.defaultPromptKeys,
       morePromptKeys: page.morePromptKeys,
       promptMeta: page.promptMeta,
+      // LIN-4010: the stage words name each step ("Build"), not the template's "implement".
+      stageWords: page.stageWords,
       // LIN-732: a caller-supplied dispatch-disclosure id prefix so the same
       // issue in In Progress AND its project tree gets disjoint panel ids.
       idPrefix: el.dataset.instanceKey || `home-${id}`
@@ -374,6 +378,73 @@ function destroyHomePromptSections(root) {
 }
 
 /**
+ * Render a task description's markdown into `target` once (LIN-156). The raw text is base64 on the page, so it
+ * arrives attribute-safe; Linear image URLs are rewritten to the workspace's image relay. A description the page
+ * cannot decode shows an error, and the function returns false so the caller can keep its truncated view.
+ * @param {HTMLElement} target - Receives the rendered markdown; gets `data-rendered` once done
+ * @param {string} rawDescBase64 - The description, base64-encoded
+ * @param {string} [urlKey] - The workspace's url key, for the image relay
+ * @returns {boolean} false when the description could not be decoded
+ */
+function renderDescriptionMarkdown(target, rawDescBase64, urlKey) {
+  let rawDesc
+  try {
+    rawDesc = atob(rawDescBase64)
+  } catch (decodeErr) {
+    console.error('Failed to decode description:', decodeErr)
+    target.textContent = '[Error decoding description]'
+    target.dataset.rendered = 'true'
+    return false
+  }
+  try {
+    let html = renderMarkdown(rawDesc)
+
+    // Rewrite Linear image URLs to use proxy (LIN-156)
+    // Only rewrite for valid urlKey and proper image URLs
+    if (urlKey && /^[a-zA-Z0-9_-]+$/.test(urlKey)) {
+      const tempDiv = document.createElement('div')
+      tempDiv.innerHTML = html
+
+      // Find all images and rewrite Linear URLs
+      tempDiv.querySelectorAll('img').forEach(img => {
+        const src = img.getAttribute('src') || ''
+        if (src.match(/^https:\/\/(uploads\.linear\.app|cdn\.linear\.app)\//)) {
+          const proxyUrl = `/workspace/${encodeURIComponent(urlKey)}/api/image?url=${encodeURIComponent(src)}`
+          img.setAttribute('src', proxyUrl)
+          img.setAttribute('loading', 'lazy')
+          // Add error handler safely via event listener (not inline)
+          img.dataset.originalSrc = src
+        }
+      })
+
+      html = tempDiv.innerHTML
+    }
+
+    target.innerHTML = html
+
+    // Add error handlers to images after inserting into DOM
+    target.querySelectorAll('img[data-original-src]').forEach(img => {
+      img.addEventListener('error', function() {
+        this.style.display = 'none'
+        const errorSpan = document.createElement('span')
+        errorSpan.className = 'img-error'
+        errorSpan.textContent = '[Image failed to load]'
+        if (this.parentNode) {
+          this.parentNode.insertBefore(errorSpan, this.nextSibling)
+        }
+      })
+    })
+
+    target.dataset.rendered = 'true'
+  } catch (err) {
+    console.error('Failed to render description:', err)
+    target.textContent = '[Error rendering description]'
+    target.dataset.rendered = 'true'
+  }
+  return true
+}
+
+/**
  * Fetch any lazy `.details` blocks that are actually visible and not yet loaded
  * (e.g. after restoring persisted expand state or re-expanding a project).
  * loadDetails itself guards against duplicate fetches.
@@ -387,6 +458,97 @@ function loadVisibleLazyDetails(root) {
     if (details.offsetParent === null) return
     loadDetails(details)
   })
+}
+
+/**
+ * LIN-4024: the page's own team and assignee filters, forwarded to /api/home-rows so a fetched row is filtered the
+ * way the page is. The server reads the same two parameters the page does.
+ * @param {URLSearchParams} params - the request's parameters, added to in place
+ */
+function addHomeRowsScope(params) {
+  const page = new URLSearchParams(window.location.search)
+  for (const key of ['team', 'assignee']) {
+    if (page.has(key)) params.set(key, page.get(key))
+  }
+  return params
+}
+
+/**
+ * LIN-4024: merge the per-row opts a fetched Home row carries into the page's own maps, so the row's opened task
+ * names its subtask the way a page row does. Called before the rows mount.
+ */
+function mergeHomeRowOpts(opts) {
+  const page = window.__HOME_PROMPT_OPTS__
+  if (!page || !opts) return
+  page.subtaskNeedsYouById = { ...(page.subtaskNeedsYouById || {}), ...(opts.subtaskNeedsYouById || {}) }
+  page.containerNodeKeys = [...new Set([...(page.containerNodeKeys || []), ...(opts.containerNodeKeys || [])])]
+}
+
+/**
+ * LIN-4024: bind each Home fold to its own element, so a click or Enter/Space opens it. A fold is bound once; the
+ * rows a fold fetches bind their own folds when they are inserted.
+ * @param {ParentNode} [root=document]
+ */
+function bindHomeFolds(root) {
+  ;(root || document).querySelectorAll('[data-home-fetch]').forEach((fold) => {
+    if (fold.dataset.bound === 'true') return
+    fold.dataset.bound = 'true'
+    fold.addEventListener('click', () => loadHomeRows(fold))
+    fold.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return
+      e.preventDefault()
+      loadHomeRows(fold)
+    })
+  })
+}
+
+/**
+ * LIN-4024: open a Home fold. Its rows come from /api/home-rows and go where the fold sits. A paged fold stays
+ * for the next page; the last page removes it. A folded child of a started parent is shown when it arrives,
+ * because the parent is open (that is why the fold could be clicked).
+ * @param {HTMLElement} fold - a `[data-home-fetch]` element
+ */
+async function loadHomeRows(fold) {
+  if (fold.dataset.loading === 'true') return
+  const urlKey = fold.dataset.urlKey
+  if (!urlKey) return
+  fold.dataset.loading = 'true'
+  const params = addHomeRowsScope(new URLSearchParams({ kind: fold.dataset.homeFetch, offset: fold.dataset.offset || '0' }))
+  if (fold.dataset.projectId) params.set('project', fold.dataset.projectId)
+  if (fold.dataset.parentId) params.set('parent', fold.dataset.parentId)
+  try {
+    const res = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/home-rows?${params}`, { headers: { Accept: 'application/json' } })
+    if (!res.ok) throw new Error(`home rows ${res.status}`)
+    const data = await res.json()
+    mergeHomeRowOpts(data.opts)
+    const template = document.createElement('template')
+    template.innerHTML = data.html
+    const nodes = [...template.content.childNodes]
+    let mountRoot = fold.parentElement
+    if (fold.dataset.homeFetch === 'more-of-parent') {
+      nodes.forEach(node => { if (node.classList?.contains('node')) show(node) })
+      fold.before(...nodes)
+    } else {
+      // A project's rows sit in their own tree, so the project's own open and close show them with the rest.
+      mountRoot = document.createElement('div')
+      mountRoot.className = 'tree home-fetched'
+      mountRoot.append(...nodes)
+      fold.before(mountRoot)
+    }
+    mountHomePromptSections(mountRoot)
+    bindHomeFolds(fold.parentElement)
+    if (data.nextOffset == null) {
+      fold.remove()
+    } else {
+      fold.dataset.offset = String(data.nextOffset)
+      fold.textContent = `show ${data.remaining} more ▶`
+    }
+  } catch (error) {
+    console.error('Failed to load Home rows:', error)
+    fold.textContent = 'Could not load these tasks. Try again ▶'
+  } finally {
+    fold.dataset.loading = ''
+  }
 }
 
 function hasStoredState() {
@@ -477,6 +639,7 @@ function resetDOM() {
     show(project.querySelector('.project-meta'))
     show(project.querySelector('.completed-toggle'))
     show(project.querySelector('.add-task-link'))
+    project.querySelectorAll(':scope > .home-fold').forEach(show)
   })
 
   // Hide all completed sections, reset toggle text
@@ -509,8 +672,8 @@ function getDescendants(id, section) {
   const childrenContainer = node?.querySelector(':scope > .children')
   if (!childrenContainer) return []
 
-  // Return all descendant nodes (they contain their own line and details)
-  return [...childrenContainer.querySelectorAll('.node')]
+  // Return all descendant nodes (they contain their own line and details), and the folds under them (LIN-4024)
+  return [...childrenContainer.querySelectorAll('.node'), ...childrenContainer.querySelectorAll('.home-fold')]
 }
 
 function showDescendantsRespectingExpanded(id, expandedArr, section) {
@@ -521,6 +684,9 @@ function showDescendantsRespectingExpanded(id, expandedArr, section) {
   const node = line.closest('.node')
   const childrenContainer = node?.querySelector(':scope > .children')
   if (!childrenContainer) return
+
+  // LIN-4024: a started parent's "N more" fold opens with the parent.
+  childrenContainer.querySelectorAll(':scope > .home-fold').forEach(show)
 
   // Show direct child nodes
   childrenContainer.querySelectorAll(':scope > .node').forEach(childNode => {
@@ -609,7 +775,7 @@ function applyState(state) {
     setArrow(header, false)
 
     // Hide all project content (including .node containers)
-    const children = project.querySelectorAll('.node, .project-description, .project-meta, .completed-toggle, [data-completed-for], .add-task-link')
+    const children = project.querySelectorAll('.node, .project-description, .project-meta, .completed-toggle, [data-completed-for], .add-task-link, .home-fold')
     children.forEach(hide)
   })
 
@@ -677,6 +843,7 @@ function init() {
       }
 
   applyState(state)
+  bindHomeFolds()
 
   // Reset view to defaults (including default collapsed projects)
   // Button is in the footer (uses same .reset-view class)
@@ -736,7 +903,7 @@ function init() {
 
     if (isCollapsed) {
       // Hide all project content (including .node containers)
-      project.querySelectorAll('.node, .project-description, .project-meta, .completed-toggle, [data-completed-for], .add-task-link')
+      project.querySelectorAll('.node, .project-description, .project-meta, .completed-toggle, [data-completed-for], .add-task-link, .home-fold')
         .forEach(hide)
     } else {
       // Show project description, meta, and completed toggle
@@ -744,6 +911,7 @@ function init() {
       show(project.querySelector('.project-meta'))
       show(project.querySelector('.completed-toggle'))
       show(project.querySelector('.add-task-link'))
+      project.querySelectorAll(':scope > .home-fold').forEach(show)
 
       // Show top-level nodes (but keep them collapsed unless explicitly expanded)
       // Nodes are inside a .tree wrapper (not the completed one)
@@ -819,68 +987,12 @@ function init() {
       const fullContent = container.querySelector('.desc-full-content')
 
       // Render markdown on first expansion
-      if (fullContent && !fullContent.dataset.rendered) {
-        const rawDescBase64 = container.dataset.rawDesc
-        if (rawDescBase64) {
-          try {
-            // Decode base64 with validation
-            let rawDesc
-            try {
-              rawDesc = atob(rawDescBase64)
-            } catch (decodeErr) {
-              console.error('Failed to decode description:', decodeErr)
-              fullContent.textContent = '[Error decoding description]'
-              fullContent.dataset.rendered = 'true'
-              truncated.classList.toggle('hidden')
-              full.classList.toggle('hidden')
-              return
-            }
-
-            const urlKey = container.dataset.urlKey
-            let html = renderMarkdown(rawDesc)
-
-            // Rewrite Linear image URLs to use proxy (LIN-156)
-            // Only rewrite for valid urlKey and proper image URLs
-            if (urlKey && /^[a-zA-Z0-9_-]+$/.test(urlKey)) {
-              const tempDiv = document.createElement('div')
-              tempDiv.innerHTML = html
-
-              // Find all images and rewrite Linear URLs
-              tempDiv.querySelectorAll('img').forEach(img => {
-                const src = img.getAttribute('src') || ''
-                if (src.match(/^https:\/\/(uploads\.linear\.app|cdn\.linear\.app)\//)) {
-                  const proxyUrl = `/workspace/${encodeURIComponent(urlKey)}/api/image?url=${encodeURIComponent(src)}`
-                  img.setAttribute('src', proxyUrl)
-                  img.setAttribute('loading', 'lazy')
-                  // Add error handler safely via event listener (not inline)
-                  img.dataset.originalSrc = src
-                }
-              })
-
-              html = tempDiv.innerHTML
-            }
-
-            fullContent.innerHTML = html
-
-            // Add error handlers to images after inserting into DOM
-            fullContent.querySelectorAll('img[data-original-src]').forEach(img => {
-              img.addEventListener('error', function() {
-                this.style.display = 'none'
-                const errorSpan = document.createElement('span')
-                errorSpan.className = 'img-error'
-                errorSpan.textContent = '[Image failed to load]'
-                if (this.parentNode) {
-                  this.parentNode.insertBefore(errorSpan, this.nextSibling)
-                }
-              })
-            })
-
-            fullContent.dataset.rendered = 'true'
-          } catch (err) {
-            console.error('Failed to render description:', err)
-            fullContent.textContent = '[Error rendering description]'
-            fullContent.dataset.rendered = 'true'
-          }
+      if (fullContent && !fullContent.dataset.rendered && container.dataset.rawDesc) {
+        if (!renderDescriptionMarkdown(fullContent, container.dataset.rawDesc, container.dataset.urlKey)) {
+          // Decode failed: the error is in the full view, which opens now.
+          truncated.classList.toggle('hidden')
+          full.classList.toggle('hidden')
+          return
         }
       }
 
@@ -907,6 +1019,12 @@ function init() {
         // LIN-156: Load comments on first expand
         if (toggleType === 'comments' && !isHidden && !content.dataset.loaded) {
           loadComments(detailToggle, content)
+        }
+
+        // LIN-4024: Home's description renders its markdown on first open, never a raw preview.
+        if (toggleType === 'description') {
+          const home = content.querySelector('.home-description')
+          if (home && !home.dataset.rendered) renderDescriptionMarkdown(home, home.dataset.rawDesc, home.dataset.urlKey)
         }
 
         // LIN-652: Attachments gallery is server-rendered (images already point
@@ -1643,6 +1761,11 @@ function updateFooterModel(modelName) {
  * Initialize search functionality for filtering issues by keyword.
  * LIN-145: Client-side filtering using data-search-text attributes.
  */
+/** LIN-4024: the elements matching `selector` on the page, not the search rows the server fetched. */
+function pageOnly(selector) {
+  return [...document.querySelectorAll(selector)].filter(el => !el.closest('[data-lazy-results]'))
+}
+
 function initSearch() {
   const searchToggle = document.querySelector('.search-toggle')
   const searchPanel = document.getElementById('search-panel')
@@ -1653,6 +1776,66 @@ function initSearch() {
   if (!searchToggle || !searchPanel || !searchInput) return
 
   let searchActive = false
+  // LIN-4024: the page's own rows that match, and the server's search rows (backlog and folded tasks are not on the
+  // page). The "no results" line waits for both.
+  let localMatchCount = 0
+  let serverSeq = 0
+  let serverTimer = null
+  const resultsEl = () => document.querySelector('[data-lazy-results]')
+
+  function updateNoResults() {
+    if (!noResults) return
+    const results = resultsEl()
+    const serverRows = !!results && !!results.querySelector(':scope > .node')
+    noResults.classList.toggle('hidden', localMatchCount > 0 || serverRows)
+  }
+
+  function clearServerResults() {
+    serverSeq++
+    clearTimeout(serverTimer)
+    const results = resultsEl()
+    if (results) {
+      results.innerHTML = ''
+      results.hidden = true
+    }
+  }
+
+  // Search the whole open workspace on the server, after a short pause in typing. Its rows that are already on the
+  // page are dropped, so a task shows once; a match with folded children keeps its ancestors as context.
+  function searchServer(term) {
+    const results = resultsEl()
+    const urlKey = results?.dataset.urlKey
+    if (!urlKey) return
+    const seq = ++serverSeq
+    clearTimeout(serverTimer)
+    serverTimer = setTimeout(async () => {
+      try {
+        const params = addHomeRowsScope(new URLSearchParams({ kind: 'search', q: term }))
+        const res = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/home-rows?${params}`, { headers: { Accept: 'application/json' } })
+        if (!res.ok || seq !== serverSeq) return
+        const data = await res.json()
+        if (seq !== serverSeq) return
+        mergeHomeRowOpts(data.opts)
+        results.innerHTML = data.html
+        results.hidden = !data.html
+        // The server sends only the matches and the ancestors that lead to them, so every row here shows. A row below
+        // depth 0 is hidden by its markup, which is right for an ordinary tree and wrong for a search path.
+        results.querySelectorAll('.node').forEach(show)
+        const onPage = new Set(pageOnly('.line[data-identifier]')
+          .filter(line => !line.closest('.node.hidden'))
+          .map(line => line.dataset.identifier))
+        results.querySelectorAll(':scope > .node').forEach(node => {
+          const id = node.querySelector(':scope > .line')?.dataset.identifier
+          if (id && onPage.has(id) && !node.querySelector('.node')) node.remove()
+        })
+        mountHomePromptSections(results)
+        bindHomeFolds(results)
+        updateNoResults()
+      } catch (error) {
+        console.error('Search failed:', error)
+      }
+    }, 200)
+  }
 
   function openSearch() {
     searchPanel.classList.remove('hidden')
@@ -1663,15 +1846,17 @@ function initSearch() {
   function clearSearchState() {
     if (!searchActive) return
     searchActive = false
+    clearServerResults()
+    localMatchCount = 0
     // Remove all search-driven hidden classes before applyState restores normal view.
     // applyState/resetDOM handle .node visibility by depth but don't touch projects/sections
     // (which are normally never hidden), so we must clean those up explicitly.
-    document.querySelectorAll('.project.hidden').forEach(p => p.classList.remove('hidden'))
+    pageOnly('.project.hidden').forEach(p => p.classList.remove('hidden'))
     document.querySelectorAll('.in-progress-section.hidden').forEach(s => s.classList.remove('hidden'))
     document.querySelectorAll('.recent-activity-section.hidden').forEach(s => s.classList.remove('hidden'))
     // Also ensure all .node elements are visible before resetDOM re-applies depth-based visibility,
     // in case search left nodes hidden that resetDOM wouldn't otherwise reach (e.g. in completed sections)
-    document.querySelectorAll('.node.hidden').forEach(n => n.classList.remove('hidden'))
+    pageOnly('.node.hidden').forEach(n => n.classList.remove('hidden'))
     // LIN-2514: fold in default-collapsed empty projects the same way init()
     // does — raw loadState() alone would leave an empty project rendered
     // expanded (▼) with its children still hidden by the collapse logic below.
@@ -1705,14 +1890,14 @@ function initSearch() {
     searchActive = true
 
     // Hide all nodes first
-    document.querySelectorAll('.node').forEach(n => n.classList.add('hidden'))
+    pageOnly('.node').forEach(n => n.classList.add('hidden'))
 
     // Hide all details during search
-    document.querySelectorAll('.details').forEach(d => d.classList.add('hidden'))
+    pageOnly('.details').forEach(d => d.classList.add('hidden'))
 
     // Find matching lines and show their nodes + ancestors
     let matchCount = 0
-    document.querySelectorAll('.line[data-search-text]').forEach(line => {
+    pageOnly('.line[data-search-text]').forEach(line => {
       if (!line.dataset.searchText.includes(lowerTerm)) return
       matchCount++
 
@@ -1726,7 +1911,7 @@ function initSearch() {
     })
 
     // Show/hide projects based on whether they contain matches
-    document.querySelectorAll('.project').forEach(project => {
+    pageOnly('.project').forEach(project => {
       const hasMatch = project.querySelector('.node:not(.hidden)')
       project.classList.toggle('hidden', !hasMatch)
     })
@@ -1751,13 +1936,16 @@ function initSearch() {
     }
 
     // Also check completed sections for matches
-    document.querySelectorAll('[data-completed-for]').forEach(completedSection => {
+    pageOnly('[data-completed-for]').forEach(completedSection => {
       const hasMatch = completedSection.querySelector('.node:not(.hidden)')
       completedSection.classList.toggle('hidden', !hasMatch)
     })
 
+    // Rows the server finds (backlog and folded tasks) come from the same term
+    localMatchCount = matchCount
+    searchServer(term)
     // Show/hide "no results" message
-    if (noResults) noResults.classList.toggle('hidden', matchCount > 0)
+    updateNoResults()
   }
 
   // Toggle search panel

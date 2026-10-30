@@ -105,7 +105,8 @@ test.describe('Home: a failed stage is needs-you and offered again (LIN-3968)', 
     await expect(chip(block, 'review')).toHaveAttribute('data-state', 'failed');
     await expect(chip(block, 'review')).toHaveAttribute('data-offered', 'true');
     await expect(chip(block, 'close-out')).not.toHaveAttribute('data-offered', 'true');
-    await expect(page.locator('[data-testid="in-progress-count"]')).toContainText('1 needs you');
+    // LIN-4024: a failed task is counted under failed, not waiting on you (only rulings count as waiting).
+    await expect(page.locator('[data-testid="in-progress-count"]')).toContainText('1 failed');
     await expect(page.locator('[data-testid="issue-row-state"]').filter({ hasText: 'Review failed' }).first()).toBeVisible();
   });
 });

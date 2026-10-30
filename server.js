@@ -107,7 +107,7 @@ import { LocalStore } from './lib/local-store.js'
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID, PERIODICALS_PROJECT_ID, expandToTreeContext, nodeKey } from './lib/tree.js'
 import { isHiddenState } from './lib/providers/state-map.js'
 import { buildPeriodicalNodes } from './lib/periodicals.js'
-import { renderPage, renderErrorPage, renderUpstreamAwareErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
+import { renderPage, renderErrorPage, renderUpstreamAwareErrorPage, renderWorkspaceNotFoundPage, homeRowsContext, renderHomeRowsHtml } from './lib/render.js'
 import { isAuthError, errorReference, clientErrorStatus, clientErrorMessage, badRequest, jsonError, serverError, unauthorized } from './lib/errors.js'
 import { renderSourceErrorPage } from './lib/render-pages.js'
 import { renderLandingPage } from './lib/render-landing.js'
@@ -156,7 +156,9 @@ import { renderCustomPromptsPage } from './lib/render-custom-prompts.js'
 import { renderDispatchPage } from './lib/render-dispatch.js'
 import { noJobBody, noJobNoticeOf } from './lib/components/dispatch-no-job.js'
 import { renderSwipePage, orderIssuesForSwipe } from './lib/render-swipe.js'
-import { subtaskNeedingYouByNodeKey, focusSubtaskByNodeKey } from './lib/task-board-view.js'
+import { subtaskNeedingYouByNodeKey, containerNodeKeysOf } from './lib/task-board-view.js'
+import { buildHomeView } from './lib/home-view.js'
+import { homeRowsFor, HOME_ROW_KINDS, HOME_SEARCH_MAX_LENGTH } from './lib/home-rows.js'
 import { renderSwimPage } from './lib/render-swim.js'
 import { renderShipPage } from './lib/render-ship.js'
 import { createCollectiveRoutes } from './routes/collective.js'
@@ -170,6 +172,7 @@ import { createTaskEditRoutes } from './routes/task-edit.js'
 import { createTaskCreateRoutes } from './routes/task-create.js'
 import { createTaskPageRoutes } from './routes/task-page.js'
 import { createTaskPageLoader, buildRowStates } from './lib/task-page-loader.js'
+import { rulingStandingOf } from './lib/unanswered-decisions.js'
 import { createTaskShareRoutes } from './routes/task-share.js'
 import { createLibraryRouter } from './routes/library.js'
 import { TaskShareStore } from './lib/task-share-store.js'
@@ -1153,6 +1156,9 @@ app.use(defaultCacheControl())
 // assets are untouched, before the session so even early error pages carry it.
 app.use(securityHeaders())
 app.use(express.urlencoded({ extended: false }))
+// LIN-4024: the seeded Home measure posts a ~3,700-task workspace to the test seed route in one body. Under
+// NODE_ENV=test only that route takes the larger body; every other route keeps the 250kb limit.
+if (process.env.NODE_ENV === 'test') app.use('/test/set-local-session', express.json({ limit: '4mb' }))
 app.use(express.json({ limit: '250kb' }))
 
 // Session middleware configuration: no resave, no session until something is
@@ -2007,14 +2013,18 @@ async function renderDashboardAfterRefresh(workspace, session, teamId, assigneeS
     ...runControlsBits,
     liveConsole: liveConsoleOn(session.features?.liveConsole, runControlsBits.runControls),
   };
-  const rowStates = await homeRowStates({ workspace, inProgressTrees, recentActivityTrees, projectTrees: trees, runControls: featureFlags.runControls === true });
-  const html = renderPage(trees, inProgressTrees, recentActivityTrees, organizationName, {
+  const homeStates = await homeRowStates({ workspace, inProgressTrees, recentActivityTrees, projectTrees: trees, runControls: featureFlags.runControls === true });
+  const rowStates = homeStates?.states ?? null;
+  // LIN-4024: Home renders the trimmed view (what needs you, what runs, what is next; the rest behind folds).
+  const homeView = buildHomeView({ inProgressTrees, trees, states: rowStates ?? new Map(), topTaskId: homeTopTask ? nodeKey(homeTopTask) : null });
+  const html = renderPage(homeView.trees, homeView.inProgressTrees, recentActivityTrees, organizationName, {
     teams,
     selectedTeamId,
     availableAssignees,
     rowStates,
-    subtaskNeedsYouById: subtaskNeedingYouByNodeKey({ urlKey: workspace.urlKey, inProgressTrees, recentActivityTrees, projectTrees: trees, rowStates }),
-    focusSubtaskById: focusSubtaskByNodeKey({ urlKey: workspace.urlKey, inProgressTrees, recentActivityTrees, projectTrees: trees, rowStates }),
+    rulingCount: homeStates?.rulingCount ?? 0,
+    subtaskNeedsYouById: subtaskNeedingYouByNodeKey({ urlKey: workspace.urlKey, inProgressTrees: homeView.inProgressTrees, recentActivityTrees, projectTrees: homeView.trees, rowStates }),
+    containerNodeKeys: containerNodeKeysOf({ inProgressTrees: homeView.inProgressTrees, recentActivityTrees, projectTrees: homeView.trees }),
     copyFirstCard: featureFlags.runControls !== true && session.copyFirstCardDismissed !== true,
     // LIN-2550: same applied-not-requested labelling rule as the primary
     // dashboard route above — this post-401 re-render carries the assignee
@@ -3285,7 +3295,7 @@ app.use(createTaskCreateRoutes({ workspaceFromUrl, getOpenRouterSource, getDeplo
 // `/task/:identifier` would otherwise swallow `/task/new`.
 // `deriveSessionWaiting` is injected (a lib/ loader must not import a route),
 // and `enrichLoop` (lib/run-loop-state.js) beside it.
-const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore, agentStatusStore, briefCacheStore, recapCacheStore, readRunEvidence, prStateStore, installationTokenFor, closeOutEventsStore, enrichLoop, deriveSessionWaiting, deriveSessionDecisions })
+const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore, agentStatusStore, briefCacheStore, recapCacheStore, readRunEvidence, prStateStore, installationTokenFor, closeOutEventsStore, enrichLoop, deriveSessionWaiting, deriveSessionDecisions, taskDecisionsStore, shelvedRulingsStore })
 app.use(createTaskPageRoutes({
   workspaceFromUrl,
   getOpenRouterSource,
@@ -3457,6 +3467,7 @@ async function homeRowStates({ workspace, inProgressTrees, recentActivityTrees, 
       ...(projectTrees || []).flatMap(({ incomplete = [], completed = [] }) => [...incomplete, ...completed])
     ];
     const loopsByIdentifier = new Map();
+    let ruling = null;
     if (runControls) {
       const loops = await getLoopsForWorkspace(workspace.urlKey, { dispatchStore: dispatchQueueStore, agentStatusStore, lean: true }).catch(() => []);
       for (const loop of loops || []) {
@@ -3464,13 +3475,23 @@ async function homeRowStates({ workspace, inProgressTrees, recentActivityTrees, 
         if (!loopsByIdentifier.has(loop.issueIdentifier)) loopsByIdentifier.set(loop.issueIdentifier, []);
         loopsByIdentifier.get(loop.issueIdentifier).push(loop);
       }
+      // LIN-4024: the badge's own reduction over this workspace, so a row, the count line and the badge
+      // agree on what is open. Once per request, over the loops the page already holds.
+      const urlKeys = [workspace.urlKey];
+      ruling = rulingStandingOf({
+        urlKey: workspace.urlKey,
+        loops: loops || [],
+        taskDecisions: await taskDecisionsStore.listUnansweredForWorkspaces(urlKeys),
+        shelvedRulings: await shelvedRulingsStore.listForWorkspaces(urlKeys),
+        newestScanByTask: await taskDecisionsStore.listNewestScanPerTask(urlKeys),
+      }, { now: new Date(), enrichLoop });
     }
-    const states = buildRowStates({ roots, loopsByIdentifier, enrichLoop, deriveSessionWaiting, sessionsVisible: runControls });
-    const otherStates = buildRowStates({ roots: otherRoots, loopsByIdentifier, enrichLoop, deriveSessionWaiting, sessionsVisible: runControls });
+    const states = buildRowStates({ roots, loopsByIdentifier, enrichLoop, deriveSessionWaiting, sessionsVisible: runControls, ruling });
+    const otherStates = buildRowStates({ roots: otherRoots, loopsByIdentifier, enrichLoop, deriveSessionWaiting, sessionsVisible: runControls, ruling });
     for (const [identifier, state] of otherStates) {
       if (!states.has(identifier)) states.set(identifier, state);
     }
-    return states;
+    return { states, rulingCount: ruling ? ruling.rows.length : 0 };
   } catch (err) {
     console.error('Home row states error:', err.message);
     return null;
@@ -3515,14 +3536,18 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
     const homeTopTask = orderedHome.find((issue) => !issue.isSeed) || null;
     const seedOnlyHome = orderedHome.length > 0 && orderedHome.every((issue) => issue.isSeed);
     const featureFlags = await requestFeatureFlags(req);
-    const rowStates = await homeRowStates({ workspace, inProgressTrees, recentActivityTrees, projectTrees: trees, runControls: featureFlags.runControls === true });
-    const html = renderPage(trees, inProgressTrees, recentActivityTrees, organizationName, {
+    const homeStates = await homeRowStates({ workspace, inProgressTrees, recentActivityTrees, projectTrees: trees, runControls: featureFlags.runControls === true });
+    const rowStates = homeStates?.states ?? null;
+    // LIN-4024: Home renders the trimmed view (what needs you, what runs, what is next; the rest behind folds).
+    const homeView = buildHomeView({ inProgressTrees, trees, states: rowStates ?? new Map(), topTaskId: homeTopTask ? nodeKey(homeTopTask) : null });
+    const html = renderPage(homeView.trees, homeView.inProgressTrees, recentActivityTrees, organizationName, {
       teams,
       selectedTeamId,
       availableAssignees,
       rowStates,
-      subtaskNeedsYouById: subtaskNeedingYouByNodeKey({ urlKey: workspace.urlKey, inProgressTrees, recentActivityTrees, projectTrees: trees, rowStates }),
-      focusSubtaskById: focusSubtaskByNodeKey({ urlKey: workspace.urlKey, inProgressTrees, recentActivityTrees, projectTrees: trees, rowStates }),
+      rulingCount: homeStates?.rulingCount ?? 0,
+      subtaskNeedsYouById: subtaskNeedingYouByNodeKey({ urlKey: workspace.urlKey, inProgressTrees: homeView.inProgressTrees, recentActivityTrees, projectTrees: homeView.trees, rowStates }),
+      containerNodeKeys: containerNodeKeysOf({ inProgressTrees: homeView.inProgressTrees, recentActivityTrees, projectTrees: homeView.trees }),
       copyFirstCard: featureFlags.runControls !== true && req.session.copyFirstCardDismissed !== true,
       // LIN-2550: label the selector off the filter the render APPLIED. An
       // unmatched name (a stale `?assignee=` carried across a team change by
@@ -3570,6 +3595,61 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
 
 // =============================================================================
 // Workspace-Prefixed Dashboard Routes
+// =============================================================================
+
+/**
+ * LIN-4024: the rows a Home fold opens: a project's Backlog, its Up next overflow, a started parent's folded
+ * children, or a search. It runs the same fetch, filters and states as the page, so a fetched row is the row the
+ * page would have rendered. Done tasks are never returned. Authorisation is the workspace's own, as /api/detail.
+ *
+ * Query: `kind` (see HOME_ROW_KINDS), `project` (backlog, up-next), `parent` (more-of-parent), `q` (search),
+ * `offset` (the page start, paged kinds).
+ * @returns {Object} { html, nextOffset, remaining, opts } - `opts` carries the row's subtask maps for the client
+ */
+app.get('/workspace/:urlKey/api/home-rows', workspaceFromUrl, async (req, res) => {
+  const workspace = req.workspace;
+  const kind = req.query.kind;
+  if (!HOME_ROW_KINDS.includes(kind)) return badRequest.json(res, 'Unknown home-rows kind');
+  const q = typeof req.query.q === 'string' ? req.query.q.slice(0, HOME_SEARCH_MAX_LENGTH) : '';
+  const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
+  const projectId = typeof req.query.project === 'string' ? req.query.project : null;
+  const parentId = typeof req.query.parent === 'string' ? req.query.parent : null;
+  if (kind !== 'search' && kind !== 'more-of-parent' && !projectId) return badRequest.json(res, 'home-rows needs a project');
+  if (kind === 'more-of-parent' && !parentId) return badRequest.json(res, 'home-rows needs a parent');
+
+  const { teamId } = await resolveTeamSelection(req, workspace);
+  const provider = getProviderForWorkspace(workspace);
+  const assigneeState = await resolveAssigneeSelection(req, provider, getWorkspaceCallScope(workspace));
+  try {
+    // The page's own inputs, so these rows and the page's rows come from one filtered view of the workspace.
+    const { trees, inProgressTrees, recentActivityTrees, showSource } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true, assigneeName: assigneeState.resolvedAssigneeName, accountId: req.session.accountId });
+    const orderedHome = orderIssuesForSwipe({ projectTrees: trees, inProgressTrees, recentActivityTrees, urlKey: workspace.urlKey });
+    const homeTopTask = orderedHome.find((issue) => !issue.isSeed) || null;
+    const featureFlags = await requestFeatureFlags(req);
+    const homeStates = await homeRowStates({ workspace, inProgressTrees, recentActivityTrees, projectTrees: trees, runControls: featureFlags.runControls === true });
+    const states = homeStates?.states ?? new Map();
+    const rows = homeRowsFor({ kind, projectId, parentId, q, offset, trees, inProgressTrees, states, topTaskId: homeTopTask ? nodeKey(homeTopTask) : null });
+    const urlKey = workspace.urlKey;
+    const ctx = homeRowsContext({ workspace, urlKey, featureFlags, rowStates: states, showSource });
+    const html = renderHomeRowsHtml(rows.nodes, { section: rows.section, parentId: rows.parentId, ctx });
+    const rowTree = [{ incomplete: rows.nodes, completed: [] }];
+    res.json({
+      html,
+      nextOffset: rows.nextOffset,
+      remaining: rows.remaining,
+      // The per-row opts the page carries for its own rows (app.js merges them before the rows mount).
+      opts: {
+        subtaskNeedsYouById: subtaskNeedingYouByNodeKey({ urlKey, inProgressTrees: [], recentActivityTrees: [], projectTrees: rowTree, rowStates: states }),
+        containerNodeKeys: containerNodeKeysOf({ inProgressTrees: [], recentActivityTrees: [], projectTrees: rowTree }),
+      },
+    });
+  } catch (error) {
+    if (isAuthError(error)) return unauthorized.json(res, 'Not authenticated');
+    console.error('Home rows error:', error);
+    return jsonError(res, 500, 'Could not load these rows');
+  }
+});
+
 // =============================================================================
 
 /**

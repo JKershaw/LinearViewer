@@ -83,7 +83,7 @@ describe('LIN-3833 — the words a row says, from the task page\'s own model', (
     assert.notEqual(s.get('LIN-58').words, 'subtask needs you · Research next');
   });
 
-  test('a parent whose subtask needs you says so, and names the next step', () => {
+  test('a parent whose subtask needs you says so, and lists that subtask (LIN-4024: one state word, the subtask named once)', () => {
     const child = node('LIN-53');
     const parent = node('LIN-52', 'started', [child]);
     const s = states({
@@ -91,8 +91,9 @@ describe('LIN-3833 — the words a row says, from the task page\'s own model', (
       loops: { 'LIN-53': [blocked({ issueIdentifier: 'LIN-53' })] },
     });
     assert.equal(s.get('LIN-53').words, 'needs you');
-    // LIN-4010: the parent names the step its subtask is on (the child's own next step), not its own.
-    assert.equal(s.get('LIN-52').words, `subtask needs you · ${s.get('LIN-53').next} next`);
+    // LIN-4024: the row says its state once; the subtask that needs you is named in needsYouTasks, not in the words.
+    assert.equal(s.get('LIN-52').words, 'needs you');
+    assert.deepEqual(s.get('LIN-52').needsYouTasks.map((t) => t.identifier), ['LIN-53']);
     assert.equal(s.get('LIN-52').needsYou, true, 'the parent is ranked as needing you');
   });
 
@@ -145,30 +146,32 @@ describe('LIN-4009 — each row state has its own tone', () => {
     assert.equal(s.get('LIN-95').tone, 'quiet');
   });
 
-  test('a queued session says queued, not running', () => {
+  test('a queued session says queued, not running (LIN-4024: running never includes queued)', () => {
     const s = states({ roots: [node('LIN-96')], loops: { 'LIN-96': [queuedLoop] } });
     assert.equal(s.get('LIN-96').words, 'Build queued');
-    assert.equal(s.get('LIN-96').running, true, 'it still counts as in the running set');
+    assert.equal(s.get('LIN-96').state, 'queued');
+    assert.equal(s.get('LIN-96').running, false);
+    assert.equal(s.get('LIN-96').queued, true);
   });
 
-  test('the count line counts a queued session as queued, not as running (LIN-4009)', () => {
+  test('the count line counts a running task and says nothing about a queued one (LIN-4024)', () => {
     const trees = [{ projectName: 'Alpha', roots: [node('LIN-101'), node('LIN-102')] }];
     const rowStates = states({
       roots: trees[0].roots,
       loops: { 'LIN-101': [loop({ issueIdentifier: 'LIN-101' })], 'LIN-102': [queuedLoop] },
     });
-    assert.equal(buildInProgressCountLine(trees, rowStates), '2 in progress · 1 running · 1 queued');
+    assert.equal(buildInProgressCountLine(trees, rowStates), '1 running');
     const parts = buildInProgressCountParts(trees, rowStates);
-    assert.deepEqual(parts.map((p) => p.tone), ['quiet', 'running', 'queued']);
+    assert.deepEqual(parts.map((p) => p.tone), ['running']);
     const html = renderPage([], trees, [], 'Test', { urlKey: 'acme', workspace: { urlKey: 'acme', provider: 'linear' }, rowStates });
-    assert.match(html, /<span class="in-progress-count__part" data-tone="queued">1 queued</);
-    assert.doesNotMatch(html, />2 running</);
+    assert.match(html, /<span class="row-state" data-tone="queued" data-testid="issue-row-state">Build queued</);
+    assert.doesNotMatch(html, /in-progress-count__part" data-tone="queued"/);
   });
 
-  test('only queued sessions: the count line says queued and has no running part', () => {
+  test('only queued sessions: the count line has no part (a queued row says queued on its own)', () => {
     const trees = [{ projectName: 'Alpha', roots: [node('LIN-103')] }];
     const rowStates = states({ roots: trees[0].roots, loops: { 'LIN-103': [queuedLoop] } });
-    assert.equal(buildInProgressCountLine(trees, rowStates), '1 in progress · 1 queued');
+    assert.equal(buildInProgressCountLine(trees, rowStates), null);
   });
 
   test('a parent whose subtask needs you is needs-you, the same tone as its own', () => {
@@ -180,10 +183,10 @@ describe('LIN-4009 — each row state has its own tone', () => {
   test('the rendered row carries its tone, and the count line parts carry theirs', () => {
     const trees = [{ projectName: 'Alpha', roots: [node('LIN-99'), node('LIN-100')] }];
     const rowStates = states({ roots: trees[0].roots, loops: { 'LIN-99': [blocked({ issueIdentifier: 'LIN-99' })] } });
-    const html = renderPage([], trees, [], 'Test', { urlKey: 'acme', workspace: { urlKey: 'acme', provider: 'linear' }, rowStates });
+    const html = renderPage([], trees, [], 'Test', { urlKey: 'acme', workspace: { urlKey: 'acme', provider: 'linear' }, rowStates, rulingCount: 1 });
     assert.match(html, /<span class="row-state" data-tone="needs-you" data-testid="issue-row-state">needs you</);
-    assert.match(html, /<span class="in-progress-count__part" data-tone="needs-you">1 needs you</);
-    assert.match(html, /<span class="in-progress-count__part" data-tone="quiet">2 in progress</);
+    assert.match(html, /<span class="in-progress-count__part" data-tone="needs-you">1 waiting on you</);
+    assert.doesNotMatch(html, /in progress<\/span>/);
   });
 });
 
@@ -220,8 +223,10 @@ describe('LIN-3833 — In Progress order and its count line', () => {
         'A-blocked': [blocked({ issueIdentifier: 'A-blocked' })],
       },
     });
-    assert.equal(buildInProgressCountLine(trees, rowStates), '3 in progress · 1 needs you · 1 running');
-    assert.equal(buildInProgressCountLine([tree('Alpha', node('A-idle'))], states({ roots: [node('A-idle')] })), '1 in progress');
+    // LIN-4024: waiting on you counts rulings (passed in), running counts tasks; an idle task adds no part.
+    assert.equal(buildInProgressCountLine(trees, rowStates, { rulingCount: 1 }), '1 waiting on you · 1 running');
+    assert.equal(buildInProgressCountLine(trees, rowStates), '1 running');
+    assert.equal(buildInProgressCountLine([tree('Alpha', node('A-idle'))], states({ roots: [node('A-idle')] })), null);
     assert.equal(buildInProgressCountLine([], new Map()), null, 'no tasks, no line');
   });
 });
@@ -246,7 +251,7 @@ describe('LIN-3833 — the rendered Home In Progress section', () => {
     const countAt = html.indexOf('data-testid="in-progress-count"');
     assert.ok(countAt > 0 && countAt < html.indexOf('aria-label="In Progress Tasks"'), 'the count line sits in the page header');
     const countText = html.slice(html.indexOf('>', countAt) + 1).split('</header>')[0].replace(/<[^>]+>/g, '').trim();
-    assert.equal(countText, '2 in progress · 1 running');
+    assert.equal(countText, '1 running');
     assert.match(html, /class="in-progress-count__part" data-tone="running">1 running</);
   });
 

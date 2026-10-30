@@ -9,6 +9,7 @@
     "start": "node server.js",
     "test": "node scripts/run-unit-tests.mjs tests/unit/*.test.js scripts/eval/eval-dense.test.mjs scripts/code-shape/*.test.mjs && playwright test",
     "test:ui": "playwright test --ui",
+    "test:home-shape": "playwright test --config=playwright.perf.config.js",
     "test:unit": "node scripts/run-unit-tests.mjs tests/unit/*.test.js scripts/eval/eval-dense.test.mjs scripts/code-shape/*.test.mjs",
     "env:check": "bash scripts/env-check.sh",
     "setup": "bash scripts/setup.sh",

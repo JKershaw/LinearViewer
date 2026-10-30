@@ -13,7 +13,8 @@
   gap: 0.3rem;
   padding: 0.4rem 0;
   font-family: var(--font-content);
-  font-size: 11px;
+  /* 12px, the opened task's floor (LIN-4024; was 11px). Home, Swipe and the task page share it. */
+  font-size: 12px;
 }
 
 .prompt-section[data-phase="idle"] .swipe-prompt-header {
@@ -40,7 +41,7 @@
   background: var(--bg);
   color: var(--fg-dim);
   font-family: var(--font-content);
-  font-size: 10px;
+  font-size: 12px; /* the 12px floor (LIN-4024; was 10px) */
   cursor: pointer;
   transition: background 0.15s;
 }
@@ -166,7 +167,7 @@
 
 .opened-task-primary-reason {
   font-family: var(--font-content);
-  font-size: 11px;
+  font-size: 0.8125rem;
   line-height: 1.4;
   color: var(--amber-dim);
 }
@@ -247,7 +248,7 @@
 
 .opened-task-run-quota {
   font-family: var(--font-content);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
 }
 
@@ -295,7 +296,7 @@
 
 .opened-task-setup {
   color: var(--amber-dim);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 /* A rung that needs a prompt while the ✦ stream is generating one (N4):
@@ -320,16 +321,16 @@
 
 .opened-task-other-prompts-label {
   font-family: var(--font-content);
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.02em;
   color: var(--muted);
   margin-bottom: var(--space-1);
 }
 
-/* "generated 2h ago · regenerate" — an age fact (mono) plus an action. */
+/* "generated 2h ago · regenerate" — an age fact (mono) plus an action. 12px, the floor (LIN-4024; was 10px). */
 .opened-task-generated {
   font-family: var(--font-structural);
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
   white-space: nowrap;
 }
@@ -341,7 +342,7 @@
   background: var(--raised);
   color: var(--brand-dim);
   font-family: var(--font-content);
-  font-size: 10px;
+  font-size: 12px; /* the 12px floor (LIN-4024; was 10px) */
   cursor: pointer;
 }
 
@@ -379,7 +380,7 @@
 .opened-task-setup-notice {
   margin: var(--space-1) 0;
   font-family: var(--font-content);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--amber-dim);
 }
 
