@@ -186,3 +186,23 @@ describe('the Home page: the folds, and no done task', () => {
     assert.match(html, /data-section="project"/);
   });
 });
+
+describe('a task that needs you is openable even with no details', () => {
+  // A bare Todo row (no description, assignee, labels or children) waiting on a ruling. Its opened task is where the
+  // ruling is answered, so it must be a button that lazy-loads its detail, as a row with details does.
+  const bare = (identifier) => ({ issue: { id: `id-${identifier}`, identifier, title: identifier, state: { type: 'unstarted' }, labels: { nodes: [] } }, children: [], depth: 0 });
+  const ctxFor = (rowStates) => homeRowsContext({ workspace: WORKSPACE, urlKey: 'ws', featureFlags: {}, rowStates });
+
+  test('a needs-you row with no details is expandable and lazy-loads its opened task', () => {
+    const html = renderHomeRowsHtml([bare('LIN-90')], { section: 'in-progress', parentId: 'p1', ctx: ctxFor(states({ 'LIN-90': { state: 'needs-you', tone: 'needs-you', words: 'needs you' } })) });
+    assert.match(html, /data-identifier="LIN-90"[^>]*/);
+    assert.match(html, /class="line expandable" role="button"[^>]*data-identifier="LIN-90"/);
+    assert.match(html, /data-details-for="id-LIN-90"[^>]*data-lazy="1"/, 'the detail wrapper is there for the opened task to load into');
+  });
+
+  test('a row with no details and no ruling stays a plain line, as before', () => {
+    const html = renderHomeRowsHtml([bare('LIN-91')], { section: 'in-progress', parentId: 'p1', ctx: ctxFor(states({})) });
+    assert.doesNotMatch(html, /role="button"/);
+    assert.doesNotMatch(html, /data-details-for/);
+  });
+});

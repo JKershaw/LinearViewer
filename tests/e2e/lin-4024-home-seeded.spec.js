@@ -15,11 +15,15 @@ test.beforeEach(async ({ page, localWorkerUrlKey }) => {
   URL_KEY = localWorkerUrlKey;
   await page.request.get('/test/clear-comment-dedupe');
   await page.goto('/test/clear-local-store');
+  // The rulings witness writes real dispatch rows, so the queue, its history and the badge's feed cache are cleared too.
+  await page.request.get(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
+  await page.request.get(`/test/clear-dispatch-history?urlKey=${URL_KEY}`);
+  await page.request.get(`/test/clear-sessions-feed-cache?urlKey=${URL_KEY}`);
 });
 
 // The route's authz and done-task witnesses need a few tasks, not the whole shape. A small seed keeps this file's load on
 // the shared server down, so the Home witnesses above do not starve the specs that run beside them.
-async function seedSmall(page) {
+async function seedSmall(page, { runnerKey = false } = {}) {
   const id = (raw) => localSeedId(URL_KEY, raw);
   const issues = [
     { id: id('charter'), identifier: 'LOCAL-0', title: 'Charter root, started', projectId: id('proj-0'), sortOrder: 0, createdAt: OLD, description: 'The charter, with work under it.', url: 'https://example.com/charter', state: { name: 'In Progress', type: 'started' } },
@@ -28,7 +32,7 @@ async function seedSmall(page) {
     { id: id('backlog'), identifier: 'LOCAL-B1', title: 'Backlog task 3', projectId: id('proj-0'), parentId: id('charter'), sortOrder: 3, createdAt: OLD, state: { name: 'Backlog', type: 'backlog' } },
   ];
   const resp = await page.request.post('/test/set-local-session', {
-    data: { urlKey: URL_KEY, runnerKey: false, projects: [{ id: id('proj-0'), name: 'Project 0', content: 'Seeded', sortOrder: 0 }], issues },
+    data: { urlKey: URL_KEY, runnerKey, projects: [{ id: id('proj-0'), name: 'Project 0', content: 'Seeded', sortOrder: 0 }], issues },
   });
   expect(resp.ok()).toBeTruthy();
 }
@@ -64,6 +68,49 @@ test('the charter root opens with its own state, one opened task and no box insi
   });
   console.log(`LIN-4024 measure: smallest opened-task text ${smallest.size}px at 390px: ${smallest.where} "${smallest.text}"`);
   expect(smallest.size).toBeGreaterThanOrEqual(12);
+});
+
+// A worker waiting on a ruling, written through the public dispatch API the way a runner writes it: enqueue, take, then the
+// `[blocked]` beat and the structured `[decision]`. The set-local-session seed cannot carry loops, so this is the seam.
+async function seedRuling(page, identifier) {
+  const token = (await (await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${URL_KEY}`)).json()).token;
+  const res = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+    data: { prompt: 'implementation prompt', promptName: 'implementation', kind: 'implementation', issueIdentifier: identifier, issueTitle: identifier, target: 'cli' },
+  });
+  expect(res.status(), `dispatch seed failed: ${await res.text()}`).toBe(201);
+  const itemId = (await res.json()).item.id;
+  const taken = await page.request.post(`/api/dispatch/take/${itemId}`, { headers: { Authorization: `Bearer ${token}` } });
+  expect(taken.status(), `take failed: ${await taken.text()}`).toBe(200);
+  const feedback = (data) => page.request.post(`/api/dispatch/feedback/${itemId}`, {
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, data,
+  });
+  expect((await feedback({ message: '[blocked] which API key?' })).status()).toBe(200);
+  const decision = await feedback({ kind: 'decision', message: JSON.stringify({ decision_id: 'd-home-seeded', question: 'Which API key?', options: [{ id: 'a', label: 'Use the staging key' }] }) });
+  expect(decision.status(), `decision failed: ${await decision.text()}`).toBe(200);
+}
+
+test('a task waiting on a ruling reads the same on the count line, the row, the opened task and the header badge', async ({ page }) => {
+  await seedSmall(page, { runnerKey: true });
+  await seedRuling(page, 'LOCAL-T1');
+  await page.goto(`/workspace/${URL_KEY}/`);
+
+  const count = page.locator('[data-testid="in-progress-count"]');
+  await expect(count).toContainText('1 waiting on you');
+  await expect(count).not.toContainText('running');
+
+  // The row is one state, the same words as the count line.
+  const row = page.locator('.in-progress-section .line[data-identifier="LOCAL-T1"]');
+  await expect(row.locator('[data-testid="issue-row-state"]')).toContainText('needs you');
+
+  // The badge fills from a 5s client poll, so wait for it to settle before comparing it with the summary's number.
+  const waiting = (await count.textContent()).match(/(\d+) waiting on you/)[1];
+  await expect(page.locator('.rulings-badge .rulings-count')).toHaveText(waiting, { timeout: 15000 });
+
+  // The opened task shows the question on Home, not as raw decision JSON.
+  await row.click();
+  const opened = page.locator('[data-testid="opened-task"]').first();
+  await expect(opened).toContainText('Which API key?');
+  await expect(opened.locator('text=decision_id')).toHaveCount(0);
 });
 
 test('search finds a Backlog task the page does not hold, under its ancestors', async ({ page }) => {
