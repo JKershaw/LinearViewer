@@ -418,8 +418,12 @@ describe('GitHubProvider write-path guard reads (LIN-1559)', () => {
     // team.id is load-bearing: the routes hand it to resolveStateInput, which
     // 422s "the issue's team could not be determined" on a null. GitHub's
     // states() ignores teamId, so the repo slug is a stable local placeholder.
-    assert.deepEqual(guard, { id: '1', trashed: false, team: { id: REPO } });
+    assert.deepEqual(guard, { id: '1', trashed: false, team: { id: REPO }, title: 'Open bug' });
     assert.notEqual(guard.team.id, null);
+  });
+
+  test('issueWriteGuard carries the issue title, so a dispatch row names the issue (LIN-4036)', async () => {
+    assert.equal((await provider.issueWriteGuard(REPO, '1')).title, 'Open bug');
   });
 
   test('issueWriteGuard reports trashed:false — GitHub Issues has no soft-delete', async () => {
@@ -539,7 +543,7 @@ describe('GitHubProvider write-path guard reads (LIN-1559)', () => {
     const cred = { repo: REPO, token: 'ghs_install_token' };
 
     const guard = await app.issueWriteGuard(cred, '1');
-    assert.deepEqual(guard, { id: '1', trashed: false, team: { id: REPO } });
+    assert.deepEqual(guard, { id: '1', trashed: false, team: { id: REPO }, title: 'Open bug' });
     assert.equal((await app.issueDescription(cred, '1')).description, 'something broke');
     assert.deepEqual((await app.issueLabels(cred, '1')).labels.nodes, [{ id: 'bug', name: 'bug' }]);
     const updated = await app.updateIssueLabels(cred, '1', ['enhancement']);
