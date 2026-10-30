@@ -67,7 +67,7 @@ describe('Home description — rendered markdown on open, no raw preview', () =>
 
 // An element that answers any property with another element, so app.js's init can run over it. The tests below hand
 // the click handler its own small nodes (the fold, the show-more block) and read what they become.
-function stand_in() {
+function standIn() {
   const target = function () {};
   target.dataset = {};
   return new Proxy(target, {
@@ -80,9 +80,9 @@ function stand_in() {
       if (p === 'querySelectorAll') return () => [];
       if (p === 'getAttribute') return () => null;
       if (p === 'classList') return { toggle: () => false, add() {}, remove() {}, contains: () => false };
-      return stand_in();
+      return standIn();
     },
-    apply() { return stand_in(); },
+    apply() { return standIn(); },
     set(t, p, v) { t[p] = v; return true; },
   });
 }
@@ -93,10 +93,10 @@ function stand_in() {
 function loadAppJs() {
   const renders = [];
   const listeners = {};
-  const doc = stand_in();
+  const doc = standIn();
   doc.readyState = 'complete';
   doc.addEventListener = (type, fn) => { (listeners[type] ||= []).push(fn); };
-  const win = stand_in();
+  const win = standIn();
   win.addEventListener = () => {};
   const context = vm.createContext({
     document: doc,
@@ -107,7 +107,7 @@ function loadAppJs() {
     setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, clearInterval() {},
     fetch: () => new Promise(() => {}),
     renderMarkdown: (text) => { renders.push(text); return `<p>${text}</p>`; },
-    location: win.location, navigator: stand_in(), history: stand_in(),
+    location: win.location, navigator: standIn(), history: standIn(),
   });
   vm.runInContext(APP, context, { filename: 'public/app.js' });
   for (const fn of listeners.DOMContentLoaded || []) fn({});
@@ -126,7 +126,7 @@ describe('Home description — the client renders the markdown on first open (pu
 
   test('Home\'s description fold renders its markdown the first time it opens, and not again', () => {
     const { click, renders } = loadAppJs();
-    const home = stand_in();
+    const home = standIn();
     home.dataset = { rawDesc: encoded, urlKey: 'ws' };
     const content = { classList: hiddenFlag(true), querySelector: (sel) => (sel === '.home-description' ? home : null) };
     const details = { querySelector: (sel) => (sel === '[data-content="description"]' ? content : null) };
@@ -144,9 +144,9 @@ describe('Home description — the client renders the markdown on first open (pu
     assert.equal(renders.length, 1, 'a second open does not render it again');
   });
 
-  test('the show-more block and Home\'s fold share one renderer, each rendering on its first open', () => {
+  test('the show-more block renders on its first expansion, and not again', () => {
     const { click, renders } = loadAppJs();
-    const fullContent = stand_in();
+    const fullContent = standIn();
     fullContent.dataset = { rawDesc: encoded, urlKey: 'ws' };
     const truncated = { classList: hiddenFlag(false) };
     const full = { classList: hiddenFlag(true) };

@@ -61,7 +61,7 @@ import { CredentialLifecycleEventStore, CREDENTIAL_LIFECYCLE_EVENT_KINDS } from 
 import { WorkspaceStore } from './lib/workspace-store.js'
 import { AccountWorkspaceStore } from './lib/account-workspace-store.js'
 import { createWorkspaceOwnerCheck } from './lib/workspace-owner.js'
-import { createRunControlsResolver, setRunControlsResolver, requestFeatureFlags, resolveRunControls, liveConsoleOn } from './lib/run-controls.js'
+import { createRunControlsResolver, setRunControlsResolver, requestFeatureFlags, resolveRunControls } from './lib/run-controls.js'
 import { OwnerCredentialStore } from './lib/owner-credential-store.js'
 import { ConnectionStore } from './lib/connection-store.js'
 import { sanitizeSessionForPersist, createHydrationMiddleware, createConnectionRefresher, createConnectionAccess, createSweepConnectionDataLoader, rehydrateAfterRefresh, rehydrateBindingAfterRefresh, createAuthorizedAccountConnectionReader, createInstallationTokenResolver, createReferentHolderReader, heldConnectionCredentials, connectionBackedWritesEnabled, convertToConnectionBacked, CONNECTION_RETRY_TITLE, CONNECTION_RETRY_MESSAGE } from './lib/connection-credential.js'
