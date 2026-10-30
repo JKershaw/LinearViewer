@@ -84,7 +84,7 @@ describe('LIN-2525 — fetchAndPrepareProjects assignee filtering wiring', () =>
   test('availableAssignees is returned alongside the existing fields', () => {
     // LIN-2550 appended `appliedAssigneeName` — the filter this call actually
     // applied (null when an unmatched name degraded to unfiltered), which the
-    // dashboard routes label the selector off.
-    assert.match(body, /return \{ trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId: resolvedTeamId, periodicalsEnabled, showSource, truncated, availableAssignees, appliedAssigneeName, degradedSources \};/);
+    // dashboard routes label the selector off. LIN-4049 added `subtrees`, the subtree index the row states read.
+    assert.match(body, /return \{ trees, inProgressTrees, recentActivityTrees, subtrees, organizationName, teams, selectedTeamId: resolvedTeamId, periodicalsEnabled, showSource, truncated, availableAssignees, appliedAssigneeName, degradedSources \};/);
   });
 });

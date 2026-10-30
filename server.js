@@ -105,6 +105,7 @@ import { getProvider, getProviderForWorkspace, getAllProviders, localProvider } 
 import { createProviderAuthRouter } from './routes/provider-auth-routers.js'
 import { LocalStore } from './lib/local-store.js'
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID, PERIODICALS_PROJECT_ID, expandToTreeContext, nodeKey } from './lib/tree.js'
+import { buildSubtreeIndex } from './lib/subtree-index.js'
 import { isHiddenState } from './lib/providers/state-map.js'
 import { buildPeriodicalNodes } from './lib/periodicals.js'
 import { renderPage, renderErrorPage, renderUpstreamAwareErrorPage, renderWorkspaceNotFoundPage, homeRowsContext, renderHomeRowsHtml } from './lib/render.js'
@@ -1778,6 +1779,10 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
   // shared terminal/glyph helpers, so completed (✓) and duplicate stay visible.
   let issues = mergedIssues.filter(issue => !isHiddenState(issue));
 
+  // LIN-4049: the subtree index, built from the set before the assignee filter so a shown parent keeps every child, at
+  // any depth, whatever its project or assignee. Row states read it (lib/home-row-states.js); the forests stay views.
+  const subtrees = buildSubtreeIndex(issues);
+
   // LIN-2525: the assignee filter's available options are the full,
   // team-scoped set — computed BEFORE the assignee filter below narrows
   // `issues`, so the dropdown never shrinks to just the current selection.
@@ -1872,7 +1877,7 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
       return { project: { ...project, collapsed }, incomplete, completed, completedCount };
     });
 
-  return { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId: resolvedTeamId, periodicalsEnabled, showSource, truncated, availableAssignees, appliedAssigneeName, degradedSources };
+  return { trees, inProgressTrees, recentActivityTrees, subtrees, organizationName, teams, selectedTeamId: resolvedTeamId, periodicalsEnabled, showSource, truncated, availableAssignees, appliedAssigneeName, degradedSources };
 }
 
 /**
@@ -3425,7 +3430,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       customPrompts = (await customPromptsStore.list(workspace.urlKey)).map(p => ({ id: p.id, name: p.name }));
     } catch (e) { /* non-fatal */ }
 
-    const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated, availableAssignees, appliedAssigneeName } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true, assigneeName: assigneeState.resolvedAssigneeName, accountId: req.session.accountId });
+    const { trees, inProgressTrees, recentActivityTrees, subtrees, organizationName, teams, selectedTeamId, showSource, truncated, availableAssignees, appliedAssigneeName } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true, assigneeName: assigneeState.resolvedAssigneeName, accountId: req.session.accountId });
     const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h));
     // LIN-2944 P1 F3: the deck's front card, over the SAME already-fetched trees —
     // `orderIssuesForSwipe` is pure and adds no provider call. With `?assignee=`,
@@ -3434,7 +3439,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
     const homeTopTask = orderedHome.find((issue) => !issue.isSeed) || null;
     const seedOnlyHome = orderedHome.length > 0 && orderedHome.every((issue) => issue.isSeed);
     const featureFlags = await requestFeatureFlags(req);
-    const homeStates = await homeRowStates({ urlKey: workspace.urlKey, inProgressTrees, recentActivityTrees, projectTrees: trees, runControls: featureFlags.runControls === true });
+    const homeStates = await homeRowStates({ urlKey: workspace.urlKey, subtrees, inProgressTrees, recentActivityTrees, projectTrees: trees, runControls: featureFlags.runControls === true });
     const rowStates = homeStates?.states ?? null;
     // LIN-4024: Home renders the trimmed view (what needs you, what runs, what is next; the rest behind folds).
     const homeView = buildHomeView({ inProgressTrees, trees, states: rowStates ?? new Map(), topTaskId: homeTopTask ? nodeKey(homeTopTask) : null });
@@ -3519,11 +3524,11 @@ app.get('/workspace/:urlKey/api/home-rows', workspaceFromUrl, async (req, res) =
   const assigneeState = await resolveAssigneeSelection(req, provider, getWorkspaceCallScope(workspace));
   try {
     // The page's own inputs, so these rows and the page's rows come from one filtered view of the workspace.
-    const { trees, inProgressTrees, recentActivityTrees, showSource } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true, assigneeName: assigneeState.resolvedAssigneeName, accountId: req.session.accountId });
+    const { trees, inProgressTrees, recentActivityTrees, subtrees, showSource } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true, assigneeName: assigneeState.resolvedAssigneeName, accountId: req.session.accountId });
     const orderedHome = orderIssuesForSwipe({ projectTrees: trees, inProgressTrees, recentActivityTrees, urlKey: workspace.urlKey });
     const homeTopTask = orderedHome.find((issue) => !issue.isSeed) || null;
     const featureFlags = await requestFeatureFlags(req);
-    const homeStates = await homeRowStates({ urlKey: workspace.urlKey, inProgressTrees, recentActivityTrees, projectTrees: trees, runControls: featureFlags.runControls === true });
+    const homeStates = await homeRowStates({ urlKey: workspace.urlKey, subtrees, inProgressTrees, recentActivityTrees, projectTrees: trees, runControls: featureFlags.runControls === true });
     const states = homeStates?.states ?? new Map();
     const rows = homeRowsFor({ kind, projectId, parentId, q, offset, trees, inProgressTrees, states, topTaskId: homeTopTask ? nodeKey(homeTopTask) : null });
     const urlKey = workspace.urlKey;
