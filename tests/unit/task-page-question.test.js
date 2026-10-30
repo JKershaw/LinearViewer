@@ -8,7 +8,7 @@
  *     A shelved ruling or a bare `[blocked]` reads parked, as on Home (LIN-4038),
  *     and gets no card. For the owner only; a guest and a non-owner get none;
  *   - it sits OUTSIDE `task-page-answer`, so the poll's repaint cannot wipe a
- *     half-typed answer, and the poll removes it once the task stops waiting;
+ *     half-typed answer, and the poll removes it once the state read's `questionHtml` is empty;
  *   - it is the run page's own markup (`lib/question-card.js`), and the press
  *     goes through the same `window.ReplyDelivery` entry the run page uses.
  *
@@ -140,6 +140,11 @@ describe('a parked wait is not a question on the task page, as on Home (LIN-4038
     const html = render(m, 'owner');
     assert.doesNotMatch(html, /task-page-question|session-question-card/);
     assert.match(renderTaskStatus(m), /which API key\?/, 'the pill sentence is still shown');
+    const header = renderTaskStatus(m);
+    assert.match(header, /status-pill--queued/, 'the pill is in the queued tone, as Home\'s parked');
+    assert.match(header, />parked</);
+    assert.doesNotMatch(header, /status-pill--needs-you/);
+    assert.match(header, /data-status="waiting"/, 'data-status stays waiting: the client and Go key on it');
     assert.match(render(m, 'owner'), /Nothing comes next while it is parked\./, 'no card above, so the next line does not point at one');
     assert.doesNotMatch(render(m, 'owner'), /question above/);
   });
@@ -148,6 +153,8 @@ describe('a parked wait is not a question on the task page, as on Home (LIN-4038
     const m = model([blocked()]);
     assert.equal(m.waitingFor, 'ruling');
     assert.match(render(m, 'owner'), /data-testid="task-page-question"/);
+    assert.match(renderTaskStatus(m), /status-pill--needs-you/);
+    assert.match(renderTaskStatus(m), />waiting</);
   });
 
   test('a shelf that has lapsed (resurfaceAt passed) makes the ruling open again, and the card returns', () => {
@@ -161,6 +168,8 @@ describe('a parked wait is not a question on the task page, as on Home (LIN-4038
     assert.equal(m.status, 'waiting');
     assert.equal(m.waitingFor, 'parked');
     assert.doesNotMatch(render(m, 'owner'), /task-page-question|session-question-card/);
+    assert.match(renderTaskStatus(m), /status-pill--queued/);
+    assert.match(renderTaskStatus(m), />parked</);
   });
 });
 
