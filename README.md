@@ -200,7 +200,7 @@ LINEAR_REDIRECT_URI=https://yourdomain.com/auth/callback
 SESSION_SECRET=generate-a-secure-random-string
 ```
 
-And add `https://yourdomain.com/auth/callback` to your Linear OAuth app's redirect URIs. HTTPS and secure cookies are enforced in production. See [GitHub App (optional)](#github-app-optional) and [Jira Cloud (optional)](#jira-cloud-optional) above for those providers' production setup.
+`SESSION_SECRET` is required in production: the server refuses to start without a real value, so replace the example above with your own random string. And add `https://yourdomain.com/auth/callback` to your Linear OAuth app's redirect URIs. HTTPS and secure cookies are enforced in production. See [GitHub App (optional)](#github-app-optional) and [Jira Cloud (optional)](#jira-cloud-optional) above for those providers' production setup.
 
 ## Tech Stack
 

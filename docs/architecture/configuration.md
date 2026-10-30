@@ -7,7 +7,7 @@ LINEAR_CLIENT_ID        OAuth client ID from Linear
 LINEAR_CLIENT_SECRET    OAuth client secret from Linear
 LINEAR_REDIRECT_URI     Callback URL (must match Linear OAuth app config)
 LINEAR_ACCESS_TOKEN     Personal API key for auto-authentication (optional, bypasses OAuth)
-SESSION_SECRET          Secret for signing session cookies
+SESSION_SECRET          Secret for signing session cookies. Required when NODE_ENV=production: the server refuses to start without a real value (unset, blank, or an example value from .env.example or README.md). Dev and test fall back to a public default (LIN-619)
 PORT                    Server port (default: 3000)
 MONGODB_URI             MongoDB connection string (optional, uses file storage if not set). Production today: `${{MongoDB-harbour.MONGO_URL}}` (the root user). Planned (LIN-3772, not yet cut over): `${{MongoDB-harbour.HARBOUR_CAT_MONGO_URL}}`, a `readWrite@linear-viewer` user; see docs/runbooks/mongodb-app-user.md
 MONGODB_TEST_URI        Test-only: real MongoDB for tests/unit/mongo-smoke.test.js (LIN-1337). NOT a runtime var. Deliberately separate from MONGODB_URI so a developer's production URI can't be hit by the suite's concurrency probes. Unset locally skips the suite explicitly; CI sets it via a mongo:8.0 service container and hard-fails if missing

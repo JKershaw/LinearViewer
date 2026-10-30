@@ -23,7 +23,7 @@ import { ensureIndexes, reportDeferredIndexes, scheduleDeferredIndexBuild } from
 import { runOwnerBackfill } from './lib/owner-backfill.js'
 import { Scheduler } from './lib/scheduler.js'
 import { MongoSessionStore } from './lib/session-store.js'
-import { createSessionOptions, SESSION_TTL_SECONDS } from './lib/session-options.js'
+import { createSessionOptions, resolveSessionSecret, SESSION_TTL_SECONDS } from './lib/session-options.js'
 import { UserPreferencesStore, VALID_THEMES, setThemeCookie } from './lib/user-preferences.js'
 import { getWorkspaceOpenRouterKey as resolveOpenRouterKey, getUnattendedOpenRouterKey } from './lib/openrouter-key-resolver.js'
 import { getWorkspaceNorthStar as resolveNorthStar, getWorkspaceNorthStarDocVersion as resolveNorthStarDocVersion } from './lib/north-star-resolver.js'
@@ -214,12 +214,19 @@ import { createVendorAssetsRouter } from './lib/vendor-assets.js'
 // Validate required environment variables at startup to fail fast with clear errors
 const oauthEnvVars = ['LINEAR_CLIENT_ID', 'LINEAR_CLIENT_SECRET', 'LINEAR_REDIRECT_URI'];
 
-// SESSION_SECRET defaults for easy local development (override in production)
-const DEFAULT_SESSION_SECRET = 'dev-secret-change-in-production';
-if (!process.env.SESSION_SECRET) {
-  console.warn('Warning: SESSION_SECRET not set, using default (not secure for production)');
-  process.env.SESSION_SECRET = DEFAULT_SESSION_SECRET;
+// SESSION_SECRET (LIN-619): production refuses to start without a real secret.
+// Other environments fall back to the public default, with a warning.
+let sessionSecret;
+try {
+  sessionSecret = resolveSessionSecret(process.env);
+} catch (err) {
+  console.error(err.message);
+  process.exit(1);
 }
+if (sessionSecret.usedDefault) {
+  console.warn('Warning: SESSION_SECRET not set, using default (not secure for production)');
+}
+process.env.SESSION_SECRET = sessionSecret.secret;
 
 // OAuth vars: warn at startup but don't exit — show errors in web UI instead
 if (process.env.NODE_ENV !== 'test') {
