@@ -23,6 +23,7 @@ import { validateTaskModeEvent } from '../../lib/task-mode-store.js';
 import { renderTaskPage, renderNextLine } from '../../lib/render-task-page.js';
 import { buildPromptOpts } from '../../lib/render-prompt-opts.js';
 import { escapeHtml } from '../../lib/utils/html.js';
+import { serverSessions, serverRow } from '../fixtures/task-decision.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const read = (rel) => readFileSync(join(__dirname, '../..', rel), 'utf8');
@@ -72,6 +73,8 @@ const esc = (s) => escapeHtml(s);
  * drive the streamed reply and the proxy's token-limit notice, so every phase of the component is reachable.
  */
 function load({ opened = null, lastCopy = null, prompt = null, fetch = null, reply = null, rateLimit = false, calls = [] } = {}) {
+  // LIN-4016: the opened task's sessions are the server's (the decision the browser reads).
+  if (opened && opened.sessions) opened = { ...opened, sessions: serverSessions(opened.sessions) };
   const window = {
     escapeHtml: esc,
     stripCodeBlockWrapper: (s) => s,

@@ -343,12 +343,9 @@ function mountHomePromptSections(root) {
       // ranking reason; every other opened task renders no why line. N2: match on
       // the binding-aware node key, not the raw id.
       why: el.dataset.nodeKey === page.topTaskId ? (page.topTaskWhy || []) : [],
-      // LIN-3833: this row's subtask that needs you, named in the state block with an Open link (any row, not
-      // only the top task; the server keys the map by node key).
-      subtaskNeedsYou: (page.subtaskNeedsYouById || {})[el.dataset.nodeKey] || null,
-      // LIN-4024: a row with subtasks is a container. Its opened task runs on the row itself ("Run to PR"), never a stage
-      // of a subtask, so the run box offers no step for it.
-      isContainer: (page.containerNodeKeys || []).includes(el.dataset.nodeKey),
+      // LIN-4016: this row's decision record from the server (rowData, keyed by node key): whether it is a container,
+      // whether it is finished, the subtask line it names, and its copy-first step. The browser looks it up and decides nothing.
+      row: (page.rowData || {})[el.dataset.nodeKey] || null,
       hasAI: page.hasAI,
       aiState: page.aiState,
       freeTier: page.freeTier,
@@ -480,8 +477,7 @@ function addHomeRowsScope(params) {
 function mergeHomeRowOpts(opts) {
   const page = window.__HOME_PROMPT_OPTS__
   if (!page || !opts) return
-  page.subtaskNeedsYouById = { ...(page.subtaskNeedsYouById || {}), ...(opts.subtaskNeedsYouById || {}) }
-  page.containerNodeKeys = [...new Set([...(page.containerNodeKeys || []), ...(opts.containerNodeKeys || [])])]
+  page.rowData = { ...(page.rowData || {}), ...(opts.rowData || {}) }
 }
 
 /**

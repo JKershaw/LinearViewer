@@ -14,9 +14,11 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
-import { decisionPanel, routingWords, agentLists } from '../../lib/components/decision-panel.js';
+import { decisionPanel, routingWords, agentLists, optionWordsOf } from '../../lib/components/decision-panel.js';
+import { offeredTargetsFor } from '../../lib/dispatch-targets.js';
 import { HARNESSES_WITHOUT_EFFORT } from '../../lib/model-routing.js';
 import { escapeHtml } from '../../lib/utils/html.js';
+import { serverSessions, serverRow } from '../fixtures/task-decision.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
@@ -86,6 +88,9 @@ const serverPanel = (q) => ({
   kind: 'plan',
   withoutEffort: HARNESSES_WITHOUT_EFFORT,
   words: routingWords({ harness: q.get('harness') || null, model: null, effort: null }),
+  // LIN-4016: the target list and the option words, as routes/dispatch.js sends them for the harness the draft names.
+  targets: offeredTargetsFor({ harness: q.get('harness') || 'claude-code', localhost: false }),
+  optionWords: optionWordsOf(agentLists([])),
   html: decisionPanel({
     testid: 'run-decision-panel',
     fieldAttrs: (field) => `data-testid="run-${field}"`,
@@ -155,7 +160,12 @@ const HOME = {
 const PLAN_NEXT = { count: 1, next: { kind: 'plan', label: 'Plan' }, offered: { kind: 'plan', label: 'Plan', why: 'usual', failed: false, reason: 'usually next after Research' }, last: { label: 'Research', state: 'done', at: null }, running: null };
 
 async function mount(over = {}, loadOver = {}, container = null) {
-  const env = load(loadOver);
+  // LIN-4016: the server's decision for the row and its sessions (the browser reads these, it decides nothing).
+  const row = over.row || serverRow({ stateType: (over.issue || HOME.issue).stateType, attention: over.subtaskNeedsYou || null });
+  const { subtaskNeedsYou, ...rest } = over;
+  const opened = loadOver.opened && { ...loadOver.opened, sessions: serverSessions(loadOver.opened.sessions, { container: row.container }) };
+  const env = load({ ...loadOver, opened: opened || loadOver.opened });
+  over = { ...rest, row };
   const c = container || makeContainer();
   env.PromptSection.init(c, { ...HOME, ...over });
   await flush();

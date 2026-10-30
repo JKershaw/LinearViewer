@@ -112,8 +112,7 @@ function harness({ degraded = [], remintFails = false, fetchThrows = null, fetch
     // LIN-4024: the trimmed Home view the post-401 render builds (server.js); the real one is injected.
     buildHomeView,
     // LIN-3833: the subtasks that need you by row; these sandboxes render no In Progress rows.
-    subtaskNeedingYouByNodeKey: () => ({}),
-    containerNodeKeysOf: () => [],
+        rowDataByNodeKey: () => ({}),
     requestFeatureFlags: async () => ({}),
     resolveRunControls: async () => ({ runControls: false, runSetup: false }),
     // LIN-3977: the post-401 Home render applies the promotion rule (server.js), so the real one is injected.

@@ -53,7 +53,9 @@ import { readPlanFacts } from '../lib/chat-request.js';
 import { readModelsHistory } from '../lib/model-routing-history.js';
 import { HARNESSES_WITHOUT_EFFORT } from '../lib/model-routing.js';
 import { agentSpendByJob, typicalByModel } from '../lib/model-routing-spend.js';
-import { decisionPanel, agentLists, suggestionsByHarness, routingWords } from '../lib/components/decision-panel.js';
+import { decisionPanel, agentLists, suggestionsByHarness, routingWords, optionWordsOf } from '../lib/components/decision-panel.js';
+import { offeredTargetsFor } from '../lib/dispatch-targets.js';
+import { isLocalhostRequest } from '../lib/public-origin.js';
 import { getModelCatalog } from '../lib/openrouter-catalog.js';
 import { shouldMockAi } from '../lib/should-mock-ai.js';
 import { planOf, quotaAnswer } from '../lib/plan-allowance.js';
@@ -699,6 +701,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         runs: spend.runs, priced: spend.priced, unpriced: spend.unpriced, noTelemetry: spend.noTelemetry,
         spendUsd: spend.spendUsd, typicalUsd: spend.typicalUsd
       };
+      const lists = agentLists(catalog);
+      const inForce = choice.harness || routing.harness || null;
+      const localhost = isLocalhostRequest(req);
       const html = decisionPanel({
         testid: 'run-decision-panel',
         fieldAttrs: (field) => `data-testid="run-${field}"`,
@@ -708,13 +713,19 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         harness: { value: choice.harness, inForce: choice.harness || routing.harness || null, follow, hint: hint(words.harness) },
         model: {
           value: choice.model, follow, hint: hint(words.model),
-          lists: agentLists(catalog), suggestions: suggestionsByHarness(typicals)
+          lists, suggestions: suggestionsByHarness(typicals)
         },
         effort: { value: choice.effort, follow, hint: hint(words.effort) }
       });
       // The harnesses that take no effort. The panel hides effort by this list; Home's summary judges its draft's harness by it.
       // `words` is the resolution for the harness the draft chose (Settings' own when none is chosen), the words Home's heading and summary name a default by.
-      res.json({ kind, html, numbers: numbers || null, withoutEffort: HARNESSES_WITHOUT_EFFORT, words });
+      // LIN-4016: the run control's target list and option words are data the browser paints. The list is the one rule
+      // (lib/dispatch-targets.js) for the harness the draft chose, so the list and the refusal cannot disagree.
+      res.json({
+        kind, html, numbers: numbers || null, withoutEffort: HARNESSES_WITHOUT_EFFORT, words,
+        targets: offeredTargetsFor({ harness: inForce, localhost }),
+        optionWords: optionWordsOf(lists),
+      });
     } catch (err) {
       return reportFailure(res, 'Decision panel error:', err, 'Failed to load the decision panel');
     }

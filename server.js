@@ -156,7 +156,7 @@ import { renderCustomPromptsPage } from './lib/render-custom-prompts.js'
 import { renderDispatchPage } from './lib/render-dispatch.js'
 import { noJobBody, noJobNoticeOf } from './lib/components/dispatch-no-job.js'
 import { renderSwipePage, orderIssuesForSwipe } from './lib/render-swipe.js'
-import { subtaskNeedingYouByNodeKey, containerNodeKeysOf } from './lib/task-board-view.js'
+import { rowDataByNodeKey } from './lib/task-board-view.js'
 import { createHomeRowStates } from './lib/home-row-states.js'
 import { buildHomeView } from './lib/home-view.js'
 import { renderDashboardAfterRefresh as renderRefreshedDashboard } from './lib/dashboard-refresh.js'
@@ -3444,8 +3444,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       availableAssignees,
       rowStates,
       rulingCount: homeStates?.rulingCount ?? 0,
-      subtaskNeedsYouById: subtaskNeedingYouByNodeKey({ urlKey: workspace.urlKey, inProgressTrees: homeView.inProgressTrees, recentActivityTrees, projectTrees: homeView.trees, rowStates }),
-      containerNodeKeys: containerNodeKeysOf({ inProgressTrees: homeView.inProgressTrees, recentActivityTrees, projectTrees: homeView.trees }),
+      rowData: rowDataByNodeKey({ urlKey: workspace.urlKey, inProgressTrees: homeView.inProgressTrees, recentActivityTrees, projectTrees: homeView.trees, rowStates }),
       copyFirstCard: featureFlags.runControls !== true && req.session.copyFirstCardDismissed !== true,
       // LIN-2550: label the selector off the filter the render APPLIED. An
       // unmatched name (a stale `?assignee=` carried across a team change by
@@ -3537,8 +3536,7 @@ app.get('/workspace/:urlKey/api/home-rows', workspaceFromUrl, async (req, res) =
       remaining: rows.remaining,
       // The per-row opts the page carries for its own rows (app.js merges them before the rows mount).
       opts: {
-        subtaskNeedsYouById: subtaskNeedingYouByNodeKey({ urlKey, inProgressTrees: [], recentActivityTrees: [], projectTrees: rowTree, rowStates: states }),
-        containerNodeKeys: containerNodeKeysOf({ inProgressTrees: [], recentActivityTrees: [], projectTrees: rowTree }),
+        rowData: rowDataByNodeKey({ urlKey, inProgressTrees: [], recentActivityTrees: [], projectTrees: rowTree, rowStates: states }),
       },
     });
   } catch (error) {

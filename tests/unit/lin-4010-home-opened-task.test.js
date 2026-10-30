@@ -27,6 +27,7 @@ import { renderPage } from '../../lib/render.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 import { escapeHtml } from '../../lib/utils/html.js';
 import { needsAPerson, taskStateOf, taskFactsOf } from '../../lib/task-state.js';
+import { serverSessions, serverRow } from '../fixtures/task-decision.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
@@ -296,7 +297,9 @@ function makeContainer() {
   return container;
 }
 
-function loadClient({ stateBody = null, previewBody = null, presetsBody = [], panelHtml = '' } = {}) {
+function loadClient({ stateBody = null, previewBody = null, presetsBody = [], panelHtml = '', container = false } = {}) {
+  // LIN-4016: the state body is the server's (its `sessions` carry the decision: queued, busy, action and canStop).
+  if (stateBody && stateBody.sessions) stateBody = { ...stateBody, sessions: serverSessions(stateBody.sessions, { container }) };
   const calls = { api: [], dispatch: [], post: [] };
   const window = {
     escapeHtml: (x) => (x == null ? '' : escapeHtml(String(x))),
@@ -344,6 +347,8 @@ const HOME = {
   defaultPromptKeys: ['look-into', 'research', 'plan', 'implementation'],
   morePromptKeys: ['review', 'scoping', 'plan-review'],
   issue: { id: 'uuid-42', identifier: 'LIN-42', title: 'T', url: '', source: 'linear', stateType: 'started' },
+  // LIN-4016: the row's decision record, as the server stamps it.
+  row: serverRow({ stateType: 'started' }),
 };
 const PLAN_NEXT = {
   count: 1, next: { kind: 'plan-review', label: 'Plan review' },
@@ -408,11 +413,12 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
   // the autopilot on it; no subtask's stage is offered, read, or named from Home.
   test('a container: no stage step is offered, the state read is the container\'s own, and its one action is Run to PR', async () => {
     const { PromptSection, calls } = loadClient({
+      container: true,
       stateBody: { status: 'idle', live: false, homeStatusHtml: '<p>idle</p>', sessions: { ...PLAN_NEXT, offered: { kind: 'research', label: 'Research', why: 'usual', failed: false, reason: 'the next step for this task' }, next: { kind: 'research', label: 'Research' } } },
       previewBody: { kind: 'research', harness: 'claude-code', words: {}, sources: {}, group: null },
     });
     const c = makeContainer();
-    PromptSection.init(c, { ...HOME, isContainer: true });
+    PromptSection.init(c, { ...HOME, row: serverRow({ container: true }) });
     await flush(); await flush();
     assert.ok(calls.api.some((u) => u.includes('/api/task/LIN-42/state?issueId=uuid-42')), 'the state read is the container\'s');
     assert.equal(calls.api.some((u) => u.includes('/api/task/LIN-99/')), false, 'no subtask is read');
@@ -428,7 +434,7 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
       stateBody: { status: 'idle', live: false, homeStatusHtml: '<p>OWN-IDLE-LINE</p>', sessions: PLAN_NEXT },
     });
     const c = makeContainer();
-    PromptSection.init(c, { ...HOME, isContainer: true, subtaskNeedsYou: { identifier: 'LIN-99', title: 'Models rows', href: '/workspace/acme/task/LIN-99' } });
+    PromptSection.init(c, { ...HOME, row: serverRow({ container: true, attention: { identifier: 'LIN-99', title: 'Models rows', href: '/workspace/acme/task/LIN-99', state: 'needs-you', lead: 'A subtask needs you', detail: '' } }) });
     await flush(); await flush();
     assert.match(c.innerHTML, /data-testid="opened-task-needs-you">A subtask needs you: <span class="opened-task-needs-you-name">LIN-99 Models rows/);
     assert.equal(c.innerHTML.includes('OWN-IDLE-LINE'), false, 'the parent\'s own idle line is not shown beside it');
@@ -439,7 +445,7 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
       stateBody: { status: 'idle', live: false, homeStatusHtml: '<p>OWN-IDLE-LINE</p>', sessions: PLAN_NEXT },
     });
     const c = makeContainer();
-    PromptSection.init(c, { ...HOME, isContainer: true });
+    PromptSection.init(c, { ...HOME, row: serverRow({ container: true }) });
     await flush(); await flush();
     assert.match(c.innerHTML, /OWN-IDLE-LINE/);
     assert.equal(c.innerHTML.includes('opened-task-needs-you'), false);
@@ -449,7 +455,7 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
   test('copy-first: the Write the prompt button is the primary, and the step line starts with the stage name', async () => {
     const { PromptSection } = loadClient({ stateBody: { status: 'idle', live: false, homeStatusHtml: '<p>No sessions yet.</p>', sessions: { count: 0 } } });
     const c = makeContainer();
-    PromptSection.init(c, { ...HOME, dispatchEnabled: false, issue: { ...HOME.issue, stateType: 'backlog' } });
+    PromptSection.init(c, { ...HOME, dispatchEnabled: false, issue: { ...HOME.issue, stateType: 'backlog' }, row: serverRow({ stateType: 'backlog' }) });
     await flush(); await flush();
     assert.match(c.innerHTML, /class="btn btn--primary opened-task-write" data-testid="opened-task-write"/);
     assert.match(c.innerHTML, /data-testid="opened-task-step"><span class="opened-task-step-name">Scoping<\/span> \u00b7 the first step for a task in Backlog/);
@@ -510,7 +516,7 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
       stateBody: { status: 'running', live: true, homeStatusHtml: '', headerHtml: '', sessions: { count: 1, running, next: null, last: null, offered: null, busy: true, excluded: [] } },
     });
     const c = makeContainer();
-    PromptSection.init(c, { ...HOME, isContainer: true });
+    PromptSection.init(c, { ...HOME, row: serverRow({ container: true }) });
     await flush(); await flush();
     assert.match(c.innerHTML, /href="\/workspace\/acme\/task\/LIN-42"[^>]*data-testid="opened-task-watch"/);
   });
@@ -522,7 +528,7 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
       stateBody: { status: 'running', live: true, homeStatusHtml: '', headerHtml: '', sessions: { count: 1, running, next: null, last: null, offered: null, busy: true, excluded: [] } },
     });
     const c = makeContainer();
-    PromptSection.init(c, { ...HOME, isContainer: true });
+    PromptSection.init(c, { ...HOME, row: serverRow({ container: true }) });
     await flush(); await flush();
     await c.click({ action: 'stop-run' });
     await c.click({ action: 'stop-run-confirm' });

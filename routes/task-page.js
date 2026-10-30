@@ -30,6 +30,7 @@
 import { Router } from 'express';
 import { renderErrorPage } from '../lib/render.js';
 import { sessionSummaryOf } from '../lib/task-page-loader.js';
+import { rowRecordOf } from '../lib/task-board-view.js';
 import { renderTaskQuestion } from '../lib/render-task-page.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
 import { resolveIssueBinding, isValidIssueId } from '../lib/workspace.js';
@@ -139,11 +140,15 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
       ].filter(Boolean);
       const stateUrl = `/workspace/${encodeURIComponent(workspace.urlKey)}/api/task/${encodeURIComponent(model.identifier)}/state${stateQuery.length ? `?${stateQuery.join('&')}` : ''}`;
       // The run control's options (LIN-3975): the owner's only. The same vocabulary Home's opened task takes.
-      const promptOpts = owner ? buildPromptOpts({
-        openRouterSource: pageOptions.openRouterSource,
-        featureFlags: pageOptions.featureFlags,
-        isLocalhost: isLocalhostRequest(req),
-      }) : null;
+      // LIN-4016: the task's own decision record (container, finished, copy-first step), the same one a Home row carries.
+      const promptOpts = owner ? {
+        ...buildPromptOpts({
+          openRouterSource: pageOptions.openRouterSource,
+          featureFlags: pageOptions.featureFlags,
+          isLocalhost: isLocalhostRequest(req),
+        }),
+        row: rowRecordOf({ stateType: model.tracker?.state?.type ?? null, container: !!model.tracker?.subtasks?.length }),
+      } : null;
       return res.send(renderTaskPage(model, {
         viewer,
         urlKey: workspace.urlKey,

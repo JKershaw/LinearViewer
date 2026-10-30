@@ -36,7 +36,8 @@ describe('LIN-3833 — the needs-you line is passed to each mounted opened task 
     const window = {
       __HOME_PROMPT_OPTS__: {
         topTaskId: 'linear:top',
-        subtaskNeedsYouById: { 'linear:row-b': { identifier: 'LIN-22', title: 'Waiting child', href: '/workspace/acme/task/LIN-22' } },
+        // LIN-4016: the row's decision record carries its subtask line (`attention`).
+        rowData: { 'linear:row-b': { container: true, finished: false, copyStep: { label: '__ai__', name: null, why: '' }, trackerWord: 'In progress', attention: { identifier: 'LIN-22', title: 'Waiting child', href: '/workspace/acme/task/LIN-22', state: 'needs-you', lead: 'A subtask needs you', detail: '', words: 'A subtask needs you: LIN-22' } } },
         defaultPromptKeys: [], morePromptKeys: [],
       },
       PromptSection: { init: (el, opts) => { inits.push({ el, opts }); return {}; } },
@@ -49,7 +50,7 @@ describe('LIN-3833 — the needs-you line is passed to each mounted opened task 
 
     assert.equal(inits.length, 2);
     const byNode = (key) => inits.find((i) => i.el.dataset.nodeKey === key).opts;
-    assert.deepEqual(byNode('linear:row-b').subtaskNeedsYou, { identifier: 'LIN-22', title: 'Waiting child', href: '/workspace/acme/task/LIN-22' });
-    assert.equal(byNode('linear:top').subtaskNeedsYou, null);
+    assert.deepEqual(byNode('linear:row-b').row.attention, { identifier: 'LIN-22', title: 'Waiting child', href: '/workspace/acme/task/LIN-22', state: 'needs-you', lead: 'A subtask needs you', detail: '', words: 'A subtask needs you: LIN-22' });
+    assert.equal(byNode('linear:top').row, null);
   });
 });

@@ -9,7 +9,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildRowStates } from '../../lib/task-page-loader.js';
-import { buildInProgressCountParts, subtaskNeedingYouByNodeKey } from '../../lib/task-board-view.js';
+import { buildInProgressCountParts, rowDataByNodeKey } from '../../lib/task-board-view.js';
 import { buildHomeView } from '../../lib/home-view.js';
 import { nodeKey } from '../../lib/tree.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
@@ -79,9 +79,9 @@ describe('LIN-4016 W2 — a parent whose subtask\'s Build failed', () => {
       identifier: 'LIN-C9', title: 'Title LIN-C9', state: 'failed', lead: 'A subtask failed', detail: ' · Build failed',
       words: 'A subtask failed: LIN-C9 · Build failed',
     });
-    const byKey = subtaskNeedingYouByNodeKey({ urlKey: 'acme', inProgressTrees: [{ roots: [parent] }], rowStates: s });
-    assert.equal(byKey[nodeKey(parent.issue)].words, 'A subtask failed: LIN-C9 · Build failed');
-    assert.doesNotMatch(byKey[nodeKey(parent.issue)].words, /needs you/);
+    const byKey = rowDataByNodeKey({ urlKey: 'acme', inProgressTrees: [{ roots: [parent] }], rowStates: s });
+    assert.equal(byKey[nodeKey(parent.issue)].attention.words, 'A subtask failed: LIN-C9 · Build failed');
+    assert.doesNotMatch(byKey[nodeKey(parent.issue)].attention.words, /needs you/);
   });
 
   test('a child that needs you is named as needing you, not as failed', () => {

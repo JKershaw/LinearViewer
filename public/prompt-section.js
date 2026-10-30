@@ -288,7 +288,7 @@
       // of queued/running truth), with a link to the task page. Until a state
       // read lands, it says "Started" — true on a 201, not a status claim.
       // LIN-4010: once the running box shows, it holds the Watch link, so the Go slot does not repeat it.
-      const boxed = caps.runBox && !!(state.opened && state.opened.sessions && state.opened.sessions.running && state.opened.sessions.running.state !== 'queued');
+      const boxed = caps.runBox && !!(state.opened && state.opened.sessions && state.opened.sessions.running && !state.opened.sessions.queued);
       const href = caps.watchLink && !boxed && window.taskPageHref({
         urlKey: opts.urlKey,
         identifier: opts.issue && opts.issue.identifier,
@@ -320,7 +320,7 @@
       // after-run line stay in the run block.
       const step = runStepOfState(state, opts);
       if (step) html += `<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-step" data-action="run-step-next">Run ${esc(step.label)}</button>`;
-      else if (state.opened && !stageBusy(state)) html += '<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-task" data-action="go">Run to PR</button>';
+      else if (mainActionOf(state) && mainActionOf(state).kind === 'run-to-pr') html += '<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-task" data-action="go">Run to PR</button>';
     } else {
       html += `<button class="opened-task-go" data-testid="opened-task-go" data-rung="run-task" data-action="go">Go</button>`;
     }
@@ -526,15 +526,11 @@
   // LIN-3833: the copy-first view (no runner). The step comes from the task's status alone (Todo: Plan,
   // Backlog: Scoping; In Progress: the selector generates the next prompt, with no name given, John 24 Oct
   // answer 1). Unknown or finished status: the next prompt, generated.
-  const COPY_STEPS = Object.freeze({
-    unstarted: Object.freeze({ label: 'plan', name: 'Plan', why: 'the first step for a task in Todo' }),
-    backlog: Object.freeze({ label: 'scoping', name: 'Scoping', why: 'the first step for a task in Backlog' }),
-  });
+  // LIN-4016: the copy-first step and tracker word come from the row's decision record (`opts.row`, server-built). COPY_NEXT
+  // is the one fallback for a mount that carries no record: the selector writes the next prompt, with no name given.
   const COPY_NEXT = Object.freeze({ label: '__ai__', name: null, why: 'Generate the next prompt for this task' });
-  // LIN-4010: the tracker's word for a state type, for the copy-first state line.
-  const COPY_STATE_WORDS = Object.freeze({ started: 'In progress', unstarted: 'Todo', backlog: 'Backlog', completed: 'Done', canceled: 'Cancelled', duplicate: 'Duplicate' });
   function copyStepOf(opts) {
-    return COPY_STEPS[opts.issue && opts.issue.stateType] || COPY_NEXT;
+    return (opts.row && opts.row.copyStep) || COPY_NEXT;
   }
 
   // The last copy on this task, read from the task-mode record (the mount read) or set by a copy just made.
@@ -632,21 +628,26 @@
   // is offered again. `sessions.next` stays the "comes next" wording after a run.
   // LIN-4024: a container offers no stage step (its one action is Run to PR), whatever a step chosen for this run says.
   function runStepOfState(state, opts) {
-    if (opts && opts.isContainer) return null;
-    return (state.run && state.run.step) || (state.opened && state.opened.sessions && state.opened.sessions.offered) || null;
+    const action = mainActionOf(state);
+    // Busy (nothing is offered) or a container (its one action is Run to PR) offers no stage step: the server's decision.
+    if (!action || (opts && opts.row && opts.row.container)) return null;
+    return (state.run && state.run.step) || (action.kind === 'step' ? action.step : null);
   }
-  // LIN-3975 (review finding 1): busy is any session running, queued or waiting on an answer. A waiting question is
-  // not a reason to start another run, so "Run to PR" is not offered beside it (LIN-3968's rule, as nextStepOf applies).
+  // LIN-4016: the one main action the server decided (`sessions.action`): a step, Run to PR, or null while busy.
+  function mainActionOf(state) {
+    const sessions = state.opened && state.opened.sessions;
+    return (sessions && sessions.action) || null;
+  }
+  // LIN-3975 (review finding 1): busy is any session running, queued or waiting on an answer (`sessions.busy`, the server's).
   function stageBusy(state) {
     const sessions = state.opened && state.opened.sessions;
-    return !!(sessions && (sessions.busy || sessions.running));
+    return !!(sessions && sessions.busy);
   }
 
   // LIN-3833: the run control's vocabulary. The targets are the dispatch targets Home offers (`dash` is not
   // offered; LIN-3833 ruling, John 24 Oct); `local` only on localhost. Stop is offered only for a target a
   // runner polls (lib/dispatch-targets.js POLLED_TARGETS).
   const TARGET_WORDS = Object.freeze({ cli: 'your runner', web: 'Claude Code on the web', local: 'Harbour OS' });
-  const POLLED_RUN_TARGETS = Object.freeze(['cli', 'web', 'dash']);
   function runChoiceDefaults() {
     return { presetId: null, model: null, harness: null, effort: null, target: 'cli', agentAccess: null };
   }
@@ -947,10 +948,10 @@
       // task page's sentence.
       // LIN-4024: a parent whose subtask needs you says that, once. Its own idle line ("No session running.") is the
       // parent's own loops only, so beside "A subtask needs you" it would say the task two ways, and the row says needs you.
-      const needsYou = renderSubtaskNeedsYou();
-      const ownLine = needsYou && opened.status === 'idle' ? '' : (opened.homeStatusHtml ?? '');
+      const subtaskLine = renderSubtaskNeedsYou();
+      const ownLine = subtaskLine && opened.status === 'idle' ? '' : (opened.homeStatusHtml ?? '');
       return `<div class="opened-task-state" data-state-slot data-testid="opened-task-state">`
-        + `${ownLine}${opened.stripHtml || ''}${needsYou}${renderQuestionSlot()}</div>`;
+        + `${ownLine}${opened.stripHtml || ''}${subtaskLine}${renderQuestionSlot()}</div>`;
     }
 
     // LIN-4024: a task waiting on an open ruling shows the question and its answers here (the server sends the card to the
@@ -982,7 +983,7 @@
     // LIN-4010: the copy-first state line: the tracker's word, then either nothing (a prompt was copied; "You copied …"
     // is the view's own line) or "No prompt copied from here yet.".
     function renderCopyState() {
-      const word = COPY_STATE_WORDS[opts.issue && opts.issue.stateType] || 'Open';
+      const word = (opts.row && opts.row.trackerWord) || 'Open';
       const tail = state.lastCopy ? '' : ' \u00b7 No prompt copied from here yet.';
       return `<div class="opened-task-state" data-state-slot data-testid="opened-task-state">`
         + `<p class="opened-task-copy-state" data-testid="opened-task-copy-state">${esc(word)}${esc(tail)}</p></div>`;
@@ -991,7 +992,7 @@
     // LIN-3833: one line naming a subtask that needs you, with an Open link to its task page. Home passes the
     // opened row's own subtask, from the same row states as the In Progress rows (run-control viewers only).
     function renderSubtaskNeedsYou() {
-      const sub = opts.subtaskNeedsYou;
+      const sub = opts.row && opts.row.attention;
       if (!sub || !sub.identifier) return '';
       // LIN-4016: the words are the server's (`attention`): lead and detail come from it, so a failed subtask reads as
       // failed and the browser picks no text of its own.
@@ -1166,11 +1167,11 @@
     function renderAfterRun() {
       const summary = (state.opened && state.opened.sessions) || {};
       // A queued session is not running yet: it reads as queued (with Undo), like a run queued from here.
-      const running = summary.running && summary.running.state !== 'queued' ? summary.running : null;
+      const running = summary.running && !summary.queued ? summary.running : null;
       const next = summary.next || null;
       if (running && !caps.runBox) {
         // The task page's own line (unchanged): the next step, the confirm, and a text Stop.
-        const polled = POLLED_RUN_TARGETS.includes(running.target);
+        const polled = !!summary.canStop;
         let html = next ? `Next: ${esc(next.label)}, once ${esc(running.label || 'this')} finishes` : '';
         if (state.run.confirmStop) {
           html += ` <span class="opened-task-confirm">Stop this run? The session is cancelled and the task stays where it is.`
@@ -1184,7 +1185,7 @@
       if (running) {
         // LIN-4010: one running box. Its head names the state once (Running now, the step, when it started) with Watch
         // and Stop beside each other; "Next" sits under it. The state block above does not repeat it.
-        const polled = POLLED_RUN_TARGETS.includes(running.target);
+        const polled = !!summary.canStop;
         const since = running.since ? formatGeneratedAge(Date.parse(running.since)) : null;
         // LIN-4010 review: Watch opens the task the box runs on, as Stop does (the opened task; LIN-4024).
         const watchHref = caps.watchLink && window.taskPageHref
@@ -1206,7 +1207,7 @@
           + `<span class="opened-task-running-step">${esc(running.label || 'step')}</span>${since ? ` \u00b7 started ${esc(since)}` : ''}`
           + `<span class="opened-task-running-actions">${actions}</span></div>${confirm}${nextLine}</div>`;
       }
-      if (state.run.item || (summary.running && summary.running.state === 'queued')) {
+      if (state.run.item || summary.queued) {
         return `<div class="opened-task-queued" data-testid="opened-task-queued">Queued, waiting for a runner`
           + ` <button class="btn--quiet opened-task-undo" data-action="undo-run" data-testid="run-undo">Undo</button></div>`;
       }
@@ -1217,11 +1218,10 @@
     // task cannot take it: the steps never offered as a next step (`summary.excluded`, retro), and every step once
     // the task is finished. Every other step always fits, so Build and Review stay on the list after a Review
     // session. The rule does not read the stage order. Before the state is read nothing is left out.
-    const FINISHED_STATE_TYPES = ['completed', 'canceled', 'duplicate'];
-    function stepFits(kind, summary, stateType) {
+    function stepFits(kind, summary, finished) {
       if (!summary) return true;
       if ((summary.excluded || []).includes(kind)) return false;
-      if (FINISHED_STATE_TYPES.includes(stateType)) return false;
+      if (finished) return false;
       return true;
     }
 
@@ -1232,7 +1232,7 @@
       const defaults = opts.defaultPromptKeys || [];
       const more = (opts.morePromptKeys || []).filter((k) => !defaults.includes(k));
       const summary = state.opened && state.opened.sessions;
-      const fits = (k) => stepFits(k, summary, issue.stateType);
+      const fits = (k) => stepFits(k, summary, !!(opts.row && opts.row.finished));
       const shownDefaults = defaults.filter(fits);
       const shownMore = more.filter(fits);
       const leftOut = [...defaults, ...more].filter((k) => !fits(k)).length;
@@ -1259,23 +1259,19 @@
 
     // The words the panel's own options carry for a value: a model's display name, a harness's name. A value no option
     // names is shown as typed (a model id the lists do not know). Read from the panel the server rendered (LIN-3987).
-    // The markup's own text is escaped (lib/utils/html.js), so an option's value and label are read back unescaped.
-    const unescapeText = (text) => text.replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
-    const OPTIONS_OF = {
-      harness: /<select[^>]*data-decision-field="harness"[^>]*>([\s\S]*?)<\/select>/g,
-      model: /<datalist[^>]*>([\s\S]*?)<\/datalist>/g
-    };
+    // LIN-4016: option words are the server's data (`optionWords` from the panel response), by id. A value the panel
+    // does not list reads as itself.
     function optionWords(value, which) {
       if (!value) return null;
-      const scope = [...(state.run.panelHtml || '').matchAll(OPTIONS_OF[which])].map((m) => m[1]).join('');
-      const option = [...scope.matchAll(/<option value="([^"]*)"[^>]*>([^<]*)<\/option>/g)].find((m) => unescapeText(m[1]) === value);
-      return option ? unescapeText(option[2]).trim() : value;
+      const words = (state.run.optionWords || {})[which] || {};
+      return words[value] || value;
     }
 
-    // A target the harness in force cannot run is not kept: Claude Code on the web needs Claude Code, so a draft that
-    // names it falls back to the runner when another harness is chosen, and a choice made that way never reaches a run.
-    function fallBackTarget(draft, inForce) {
-      if (draft.target === 'web' && inForce === 'opencode') draft.target = 'cli';
+    // A target the harness in force cannot run is not kept. The server's list (`targets`) says which targets run for the
+    // harness the draft names, and the server refuses the rest; a draft that names one not offered falls back to the runner.
+    function fallBackTarget(draft) {
+      const offered = state.run.targets;
+      if (offered && draft.target && !offered.includes(draft.target)) draft.target = 'cli';
     }
 
     // The sentence that says what the draft will run (the Change panel's summary, LIN-3992). It is the one place these words
@@ -1333,12 +1329,14 @@
         + `</button>`;
       const choiceCards = defaultCard + presets.map((p) => `<button class="btn opened-task-card" data-action="run-preset" data-preset-id="${esc(p.id)}" aria-pressed="${d.presetId === p.id ? 'true' : 'false'}" data-testid="run-preset">${esc(p.name || p.id)}</button>`).join('');
       const chooseOpen = !!state.run.chooseOpen;
-      // Claude Code on the web runs only under Claude Code: with opencode in force it is not offered, and the line says why.
-      const onWeb = inForce !== 'opencode';
-      const targets = ['cli', ...(onWeb ? ['web'] : []), ...(opts.isLocalhost ? ['local'] : [])];
+      // Claude Code on the web runs only under Claude Code: the server's list leaves it out for opencode, and the line says why.
+      const offered = state.run.targets;
+      const targets = offered || ['cli'];
+      const onWeb = targets.includes('web');
       const targetButtons = targets.map((t) => `<button class="btn opened-task-choice" data-action="run-target" data-target="${esc(t)}" aria-pressed="${d.target === t ? 'true' : 'false'}" data-testid="run-target-${esc(t)}">${esc(TARGET_WORDS[t])}</button>`).join('');
       const harnessNow = harness ? optionWords(harness, 'harness') : panelWords.harness;
-      const webNote = onWeb ? '' : `<p class="opened-task-change-note" data-testid="run-web-unavailable">Claude Code on the web needs Claude Code, so it is not offered with ${esc(harnessNow || '')}.</p>`;
+      // The note says why web is missing once the server's list is in; before it arrives, nothing is said about web.
+      const webNote = !offered || onWeb ? '' : `<p class="opened-task-change-note" data-testid="run-web-unavailable">Claude Code on the web needs Claude Code, so it is not offered with ${esc(harnessNow || '')}.</p>`;
       const agent = d.agentAccess == null ? (window.ProxyToggle && window.ProxyToggle.isActive ? window.ProxyToggle.isActive() : true) : d.agentAccess;
       const panelBody = state.run.panelHtml
         || (state.run.panelFailed
@@ -1385,6 +1383,9 @@
           if (destroyed || seq !== runPanelSeq) return;
           state.run.panelHtml = (r && r.html) || null;
           state.run.panelWords = (r && r.words) || null;
+          state.run.optionWords = (r && r.optionWords) || null;
+          state.run.targets = (r && r.targets) || null;
+          if (state.run.draft) fallBackTarget(state.run.draft);
           state.run.panelNumbers = (r && r.numbers) || null;
           state.run.withoutEffort = (r && r.withoutEffort) || [];
           state.run.panelFailed = !state.run.panelHtml;
@@ -1394,6 +1395,8 @@
           if (destroyed || seq !== runPanelSeq) return;
           state.run.panelHtml = null;
           state.run.panelWords = null;
+          state.run.optionWords = null;
+          state.run.targets = null;
           state.run.panelNumbers = null;
           state.run.panelFailed = true;
           paintRun();
@@ -1645,7 +1648,7 @@
           // Blank fields are not sent, and with no panel there is nothing to send from: Use stays off until it loads.
           if (state.run.panelFailed || !state.run.panelHtml) return true;
           const chosen = { ...state.run.draft };
-          fallBackTarget(chosen, chosen.harness || (state.run.preview && state.run.preview.harness) || '');
+          fallBackTarget(chosen);
           state.run.choice = chosen;
           state.run.changeOpen = false;
           state.run.draft = null;
@@ -1715,7 +1718,7 @@
     function stopRunNow() {
       const running = state.opened && state.opened.sessions && state.opened.sessions.running;
       state.run.confirmStop = false;
-      if (!running || !running.loopId || !POLLED_RUN_TARGETS.includes(running.target)) { paintRun(); return; }
+      if (!running || !running.loopId || !state.opened.sessions.canStop) { paintRun(); return; }
       window.api(`/workspace/${encodeURIComponent(opts.urlKey)}/api/dispatch`, {
         method: 'POST',
         body: JSON.stringify({
@@ -2021,7 +2024,7 @@
       if (typeof window.api !== 'function') return Promise.resolve(null);
       if (!opts.urlKey || !issue.identifier || !issueId) return Promise.resolve(null);
       // LIN-4016: a container's own fact rides on the read (`container=1`), so `sessions.action` offers Run to PR.
-      const containerQuery = opts.isContainer ? '&container=1' : '';
+      const containerQuery = opts.row && opts.row.container ? '&container=1' : '';
       const url = `/workspace/${encodeURIComponent(opts.urlKey)}/api/task/${encodeURIComponent(issue.identifier)}/state?issueId=${encodeURIComponent(issueId)}${containerQuery}`;
       return Promise.resolve()
         .then(() => window.api(url, { on401: false }))
@@ -2439,7 +2442,7 @@
       switch (el.dataset.testid) {
         case 'run-harness':
           draft.harness = el.value || null;
-          fallBackTarget(draft, draft.harness || (state.run.preview && state.run.preview.harness) || '');
+          fallBackTarget(draft);
           paintRun();
           // LIN-3987 (review): the words for a blank model and effort follow the harness the draft names, so ask again.
           if (state.run.changeOpen) fetchRunPanel();

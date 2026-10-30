@@ -7,14 +7,14 @@
  *  - `subtaskNeedingYouOf` names the subtask the parent's row state carries as `attention`, with its task-page
  *    link (the top task's source carried), and says nothing when no subtask needs you or fails, when there is no
  *    row-state map (a viewer with no sessions), or when the top task has no row.
- *  - `subtaskNeedingYouByNodeKey` gives EVERY Home row whose subtask needs you its own entry, keyed by the
+ *  - `rowDataByNodeKey` gives EVERY Home row its decision record, its subtask line (`attention`) included, keyed by the
  *    row's node key, so the line shows for whichever task is opened, not only Home's top task.
- *  - Home's prompt options carry `subtaskNeedsYouById` when one needs you, and are byte-identical to today
- *    when none does (the key is added only when set).
+ *  - Home's prompt options carry `rowData` (the per-row decision records) when there are rows to carry, and
+ *    carry no `rowData` key when there are none.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { subtaskNeedingYouOf, subtaskNeedingYouByNodeKey } from '../../lib/task-board-view.js';
+import { subtaskNeedingYouOf, rowDataByNodeKey } from '../../lib/task-board-view.js';
 import { renderPage } from '../../lib/render.js';
 import { nodeKey } from '../../lib/tree.js';
 import { taskStateOf, rollUpRow } from '../../lib/task-state.js';
@@ -78,7 +78,7 @@ const node = (identifier, children = [], extra = {}) => ({
   children
 });
 
-describe('LIN-3833 subtaskNeedingYouByNodeKey — every opened row names its own subtask that needs you', () => {
+describe('LIN-3833 rowDataByNodeKey — every opened row names its own subtask that needs you (its attention)', () => {
   // A project-tree row that is NOT the top task, with one waiting child; a row with a quiet child; a row with none.
   const waitingRow = node('LIN-20', [node('LIN-21'), node('LIN-22')]);
   const quietRow = node('LIN-30', [node('LIN-31')]);
@@ -95,14 +95,15 @@ describe('LIN-3833 subtaskNeedingYouByNodeKey — every opened row names its own
   ]);
 
   test('a row that is not the top task gets its waiting subtask, keyed by its node key', () => {
-    const byKey = subtaskNeedingYouByNodeKey({ urlKey: 'acme', projectTrees: [{ incomplete: roots, completed: [] }], rowStates });
-    assert.equal(byKey[nodeKey(waitingRow.issue)].identifier, 'LIN-22');
-    assert.equal(byKey[nodeKey(waitingRow.issue)].href, '/workspace/acme/task/LIN-22?source=linear');
+    const byKey = rowDataByNodeKey({ urlKey: 'acme', projectTrees: [{ incomplete: roots, completed: [] }], rowStates });
+    assert.equal(byKey[nodeKey(waitingRow.issue)].attention.identifier, 'LIN-22');
+    assert.equal(byKey[nodeKey(waitingRow.issue)].attention.href, '/workspace/acme/task/LIN-22?source=linear');
   });
 
-  test('rows whose subtasks are quiet, or who have none, get no entry', () => {
-    const byKey = subtaskNeedingYouByNodeKey({ urlKey: 'acme', projectTrees: [{ incomplete: roots, completed: [] }], rowStates });
-    assert.deepEqual(Object.keys(byKey), [nodeKey(waitingRow.issue)]);
+  test('rows whose subtasks are quiet, or who have none, carry no subtask line', () => {
+    const byKey = rowDataByNodeKey({ urlKey: 'acme', projectTrees: [{ incomplete: roots, completed: [] }], rowStates });
+    assert.equal(byKey[nodeKey(quietRow.issue)].attention, null);
+    assert.equal(byKey[nodeKey(bareRow.issue)].attention, null);
   });
 
   test('a waiting subtask of a nested row is named by its direct parent', () => {
@@ -113,9 +114,9 @@ describe('LIN-3833 subtaskNeedingYouByNodeKey — every opened row names its own
       ['LIN-50', parentOf([childOf('LIN-51', NEEDS_YOU)])],
       ['LIN-51', taskStateOf(NEEDS_YOU)],
     ]);
-    const byKey = subtaskNeedingYouByNodeKey({ urlKey: 'acme', inProgressTrees: [{ roots: [outer] }], rowStates: states });
-    assert.equal(byKey[nodeKey(inner.issue)].identifier, 'LIN-51');
-    assert.equal(byKey[nodeKey(outer.issue)], undefined, 'the grandparent does not name a grandchild');
+    const byKey = rowDataByNodeKey({ urlKey: 'acme', inProgressTrees: [{ roots: [outer] }], rowStates: states });
+    assert.equal(byKey[nodeKey(inner.issue)].attention.identifier, 'LIN-51');
+    assert.equal(byKey[nodeKey(outer.issue)].attention, null, 'the grandparent does not name a grandchild');
   });
 
   test('rows in Recent activity and in the completed part of a project are covered too', () => {
@@ -125,18 +126,19 @@ describe('LIN-3833 subtaskNeedingYouByNodeKey — every opened row names its own
       ['LIN-60', parentOf([childOf('LIN-61', NEEDS_YOU)])],
       ['LIN-70', parentOf([childOf('LIN-71', NEEDS_YOU)])],
     ]);
-    const byKey = subtaskNeedingYouByNodeKey({
+    const byKey = rowDataByNodeKey({
       urlKey: 'acme',
       recentActivityTrees: [{ roots: [recent] }],
       projectTrees: [{ incomplete: [], completed: [done] }],
       rowStates: states
     });
-    assert.equal(byKey[nodeKey(recent.issue)].identifier, 'LIN-61');
-    assert.equal(byKey[nodeKey(done.issue)].identifier, 'LIN-71');
+    assert.equal(byKey[nodeKey(recent.issue)].attention.identifier, 'LIN-61');
+    assert.equal(byKey[nodeKey(done.issue)].attention.identifier, 'LIN-71');
   });
 
   test('says nothing without row states (a copy-first viewer reads no sessions)', () => {
-    assert.deepEqual(subtaskNeedingYouByNodeKey({ urlKey: 'acme', projectTrees: [{ incomplete: roots, completed: [] }], rowStates: null }), {});
+    const byKey = rowDataByNodeKey({ urlKey: 'acme', projectTrees: [{ incomplete: roots, completed: [] }], rowStates: null });
+    assert.equal(byKey[nodeKey(waitingRow.issue)].attention, null);
   });
 });
 
@@ -150,13 +152,13 @@ describe('LIN-3833 — Home\'s prompt options carry the subtask only when one ne
   });
 
   test('a subtask that needs you is in the page options, keyed by its row', () => {
-    const html = fixture({ subtaskNeedsYouById: { 'linear:row': { identifier: 'LIN-12', title: 'Waiting child', href: '/workspace/acme/task/LIN-12' } } });
-    assert.match(html, /subtaskNeedsYouById/);
+    const html = fixture({ rowData: { 'linear:row': { container: true, attention: { identifier: 'LIN-12', title: 'Waiting child', href: '/workspace/acme/task/LIN-12' } } } });
+    assert.match(html, /rowData/);
     assert.match(html, /linear:row/);
     assert.match(html, /LIN-12/);
   });
 
-  test('with no subtask needing you, the options are unchanged (no subtaskNeedsYouById key)', () => {
-    assert.equal(/subtaskNeedsYouById/.test(fixture({ subtaskNeedsYouById: {} })), false);
+  test('with no row data, the options are unchanged (no rowData key)', () => {
+    assert.equal(/rowData/.test(fixture({ rowData: {} })), false);
   });
 });
