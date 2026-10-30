@@ -1,6 +1,6 @@
 /**
  * LIN-4016 W3 — the one main action: the same offered step, for a leaf and for a container.
- * LIN-4049 — `actions` replaces `action` (`mainActionOf` is `actionsOf`). It is empty while the task or anything in its
+ * LIN-4049 — `actions` replaces the single `action` (the rule is `actionsOf`). It is empty while the task or anything in its
  * subtree runs, is queued or needs you, and once the task is finished; otherwise it offers the one reach the server knows.
  *
  * `/state` sends `sessions.actions`: a step for a leaf, Run to PR for a container (a container never offers a stage). These
