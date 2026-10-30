@@ -31,6 +31,7 @@ import { Router } from 'express';
 import { renderErrorPage } from '../lib/render.js';
 import { sessionSummaryOf } from '../lib/task-page-loader.js';
 import { rowRecordOf } from '../lib/task-board-view.js';
+import { hasOpenSubtask } from '../lib/task-state.js';
 import { renderTaskQuestion } from '../lib/render-task-page.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
 import { resolveIssueBinding, isValidIssueId } from '../lib/workspace.js';
@@ -136,7 +137,7 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
       const stateQuery = [
         model.issueId ? `issueId=${encodeURIComponent(model.issueId)}` : null,
         // LIN-4016: a container's own fact, passed back to the state read (the page knows it; the state read does not).
-        model.tracker?.subtasks?.length ? 'container=1' : null,
+        hasOpenSubtask(model.tracker?.subtasks) ? 'container=1' : null,
       ].filter(Boolean);
       const stateUrl = `/workspace/${encodeURIComponent(workspace.urlKey)}/api/task/${encodeURIComponent(model.identifier)}/state${stateQuery.length ? `?${stateQuery.join('&')}` : ''}`;
       // The run control's options (LIN-3975): the owner's only. The same vocabulary Home's opened task takes.
@@ -147,7 +148,7 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
           featureFlags: pageOptions.featureFlags,
           isLocalhost: isLocalhostRequest(req),
         }),
-        row: rowRecordOf({ stateType: model.tracker?.state?.type ?? null, container: !!model.tracker?.subtasks?.length }),
+        row: rowRecordOf({ stateType: model.tracker?.state?.type ?? null, container: hasOpenSubtask(model.tracker?.subtasks) }),
       } : null;
       return res.send(renderTaskPage(model, {
         viewer,

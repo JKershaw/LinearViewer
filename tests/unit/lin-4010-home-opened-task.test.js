@@ -166,7 +166,7 @@ describe('LIN-4010 — a container\'s row reads the step its subtask is on', () 
   test('an open child and nothing of the container\'s own: the row reads the child\'s next step', () => {
     const parent = node('LIN-70', 'started', [child()]);
     const s = states({ roots: [parent] });
-    assert.equal(s.get('LIN-70').words, 'Research next');
+    assert.equal(s.get('LIN-70').words, 'Next: Research on LIN-71', 'the row names the subtask it is on (LIN-4039)');
     assert.equal(s.get('LIN-70').tone, 'ready');
   });
 
