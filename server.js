@@ -61,7 +61,7 @@ import { CredentialLifecycleEventStore, CREDENTIAL_LIFECYCLE_EVENT_KINDS } from 
 import { WorkspaceStore } from './lib/workspace-store.js'
 import { AccountWorkspaceStore } from './lib/account-workspace-store.js'
 import { createWorkspaceOwnerCheck } from './lib/workspace-owner.js'
-import { createRunControlsResolver, setRunControlsResolver, requestFeatureFlags, resolveRunControls, liveConsoleOn } from './lib/run-controls.js'
+import { createRunControlsResolver, setRunControlsResolver, requestFeatureFlags, resolveRunControls } from './lib/run-controls.js'
 import { OwnerCredentialStore } from './lib/owner-credential-store.js'
 import { ConnectionStore } from './lib/connection-store.js'
 import { sanitizeSessionForPersist, createHydrationMiddleware, createConnectionRefresher, createConnectionAccess, createSweepConnectionDataLoader, rehydrateAfterRefresh, rehydrateBindingAfterRefresh, createAuthorizedAccountConnectionReader, createInstallationTokenResolver, createReferentHolderReader, heldConnectionCredentials, connectionBackedWritesEnabled, convertToConnectionBacked, CONNECTION_RETRY_TITLE, CONNECTION_RETRY_MESSAGE } from './lib/connection-credential.js'
@@ -156,8 +156,10 @@ import { renderCustomPromptsPage } from './lib/render-custom-prompts.js'
 import { renderDispatchPage } from './lib/render-dispatch.js'
 import { noJobBody, noJobNoticeOf } from './lib/components/dispatch-no-job.js'
 import { renderSwipePage, orderIssuesForSwipe } from './lib/render-swipe.js'
-import { subtaskNeedingYouByNodeKey, containerNodeKeysOf } from './lib/task-board-view.js'
+import { rowDataByNodeKey } from './lib/task-board-view.js'
+import { createHomeRowStates } from './lib/home-row-states.js'
 import { buildHomeView } from './lib/home-view.js'
+import { renderDashboardAfterRefresh as renderRefreshedDashboard } from './lib/dashboard-refresh.js'
 import { homeRowsFor, HOME_ROW_KINDS, HOME_SEARCH_MAX_LENGTH } from './lib/home-rows.js'
 import { renderSwimPage } from './lib/render-swim.js'
 import { renderShipPage } from './lib/render-ship.js'
@@ -171,8 +173,7 @@ import { createTaskChatRoutes } from './routes/task-chat.js'
 import { createTaskEditRoutes } from './routes/task-edit.js'
 import { createTaskCreateRoutes } from './routes/task-create.js'
 import { createTaskPageRoutes } from './routes/task-page.js'
-import { createTaskPageLoader, buildRowStates } from './lib/task-page-loader.js'
-import { rulingStandingOf } from './lib/unanswered-decisions.js'
+import { createTaskPageLoader } from './lib/task-page-loader.js'
 import { createTaskShareRoutes } from './routes/task-share.js'
 import { createLibraryRouter } from './routes/library.js'
 import { TaskShareStore } from './lib/task-share-store.js'
@@ -1975,79 +1976,14 @@ async function handleTokenRefreshAndRetry(workspace, session, teamId, assigneeSt
 }
 
 /**
- * Renders the dashboard after a successful post-401 credential refresh/re-mint.
- * Provider-agnostic — extracted from handleTokenRefreshAndRetry (LIN-1503) so the
- * GitHub-family branch in handleUnauthorizedError can reuse the same render tail
- * without duplicating it, and without widening handleTokenRefreshAndRetry's own
- * Linear-specific refresh scope.
- *
- * LIN-2526 (F2): this path always re-renders as the dashboard regardless of
- * which of the five routes triggered the 401, so it must carry the same
- * assignee state a direct dashboard load would — otherwise `?assignee=`
- * silently drops after a credential refresh.
+ * Renders the dashboard after a successful post-401 credential refresh/re-mint (LIN-1503, LIN-2526). The render tail
+ * is lib/dashboard-refresh.js; this passes it the server's own reads, so every caller keeps the same signature.
  */
 async function renderDashboardAfterRefresh(workspace, session, teamId, assigneeState, openRouterSource, res) {
-  // Load custom prompts (non-blocking, fallback to empty)
-  let customPrompts = [];
-  try {
-    customPrompts = (await customPromptsStore.list(workspace.urlKey)).map(p => ({ id: p.id, name: p.name }));
-  } catch (e) { /* non-fatal */ }
-
-  const deployInfo = getDeployInfo()
-  const provider = getProviderForWorkspace(workspace);
-  // Pass urlKey so the periodicals group renders consistently after a token
-  // refresh, matching the primary dashboard route (LIN-341).
-  const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated, availableAssignees, appliedAssigneeName, degradedSources } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true, assigneeName: assigneeState.resolvedAssigneeName, accountId: session.accountId, degradeSecondary: true });
-  // LIN-2944 P1 F3: the deck's front card, over the SAME already-fetched trees —
-  // `orderIssuesForSwipe` is pure and adds no provider call.
-  // LIN-2944 P3 (addendum 18): the top task is the first NON-seed card; when only
-  // seed rows remain the mark is replaced by a one-line onboarding hint.
-  const orderedHome = orderIssuesForSwipe({ projectTrees: trees, inProgressTrees, recentActivityTrees, urlKey: workspace.urlKey });
-  const homeTopTask = orderedHome.find((issue) => !issue.isSeed) || null;
-  const seedOnlyHome = orderedHome.length > 0 && orderedHome.every((issue) => issue.isSeed);
-  // LIN-3849: no `req` on this post-401 path, so call the resolver directly.
-  // LIN-3977: liveConsole follows the one promotion rule (liveConsoleOn), as requestFeatureFlags does.
-  const runControlsBits = await resolveRunControls({ workspace, accountId: session.accountId });
-  const featureFlags = {
-    ...getFeatureFlags(session),
-    ...runControlsBits,
-    liveConsole: liveConsoleOn(session.features?.liveConsole, runControlsBits.runControls),
-  };
-  const homeStates = await homeRowStates({ workspace, inProgressTrees, recentActivityTrees, projectTrees: trees, runControls: featureFlags.runControls === true });
-  const rowStates = homeStates?.states ?? null;
-  // LIN-4024: Home renders the trimmed view (what needs you, what runs, what is next; the rest behind folds).
-  const homeView = buildHomeView({ inProgressTrees, trees, states: rowStates ?? new Map(), topTaskId: homeTopTask ? nodeKey(homeTopTask) : null });
-  const html = renderPage(homeView.trees, homeView.inProgressTrees, recentActivityTrees, organizationName, {
-    teams,
-    selectedTeamId,
-    availableAssignees,
-    rowStates,
-    rulingCount: homeStates?.rulingCount ?? 0,
-    subtaskNeedsYouById: subtaskNeedingYouByNodeKey({ urlKey: workspace.urlKey, inProgressTrees: homeView.inProgressTrees, recentActivityTrees, projectTrees: homeView.trees, rowStates }),
-    containerNodeKeys: containerNodeKeysOf({ inProgressTrees: homeView.inProgressTrees, recentActivityTrees, projectTrees: homeView.trees }),
-    copyFirstCard: featureFlags.runControls !== true && session.copyFirstCardDismissed !== true,
-    // LIN-2550: same applied-not-requested labelling rule as the primary
-    // dashboard route above — this post-401 re-render carries the assignee
-    // state forward (F2), so it must carry the correction with it.
-    selectedAssignee: appliedAssigneeName ? assigneeState.selectedAssignee : 'all',
-    canFilterByMe: provider.supports('viewer'),
-    workspaces: session.workspaces,
-    workspace,
-    openRouterSource,
-    deployInfo,
-    urlKey: workspace.urlKey,
-    featureFlags,
-    customPrompts,
-    showSource,
-    truncated,
-    // LIN-3774: `?? []` because the lin-2006/lin-2550 vm stubs return no list.
-    degradedSources: degradedSources ?? [],
-    topTaskId: homeTopTask ? nodeKey(homeTopTask) : null,
-    topTaskWhy: homeTopTask ? homeTopTask.why : [],
-    topTaskOnboarding: seedOnlyHome,
-    proxyDefault: session.proxyDefault
-  });
-  return res.send(html);
+  return renderRefreshedDashboard({
+    customPromptsStore, getDeployInfo, getFeatureFlags, getProviderForWorkspace, fetchAndPrepareProjects,
+    resolveRunControls, homeRowStates, orderIssuesForSwipe, renderPage
+  }, { workspace, session, teamId, assigneeState, openRouterSource, res });
 }
 
 /**
@@ -3260,7 +3196,7 @@ app.use(createRunnerKitRoutes())
 // LIN-3383: workspace-api, collective, dashboard, task-chat and flight-companion
 // all receive the ONE hoisted `workspaceOwnerCheck` (never a second
 // createWorkspaceOwnerCheck) for the owner-only runner enqueue gate.
-app.use(createWorkspaceApiRoutes({ installationTokenFor, workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, accountStore, adoptConnectionCredential: (args) => connectionAccess.adoptConnectionCredential(args), closeOutEventsStore, workspaceOwnerCheck, onTicketWrite, recordPipelineMerge }))
+app.use(createWorkspaceApiRoutes({ installationTokenFor, workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, accountStore, adoptConnectionCredential: (args) => connectionAccess.adoptConnectionCredential(args), closeOutEventsStore, workspaceOwnerCheck, onTicketWrite, recordPipelineMerge, loadTaskState: (args) => taskPageLoader.loadTaskState(args) }))
 
 // Mount collective routes (experimental cross-project discussion — LIN-450).
 // yapClient falls back to DEFAULT_YAP_BASE_URL (lib/yap-client.js) when YAP_BASE_URL is unset.
@@ -3296,6 +3232,14 @@ app.use(createTaskCreateRoutes({ workspaceFromUrl, getOpenRouterSource, getDeplo
 // `deriveSessionWaiting` is injected (a lib/ loader must not import a route),
 // and `enrichLoop` (lib/run-loop-state.js) beside it.
 const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore, agentStatusStore, briefCacheStore, recapCacheStore, readRunEvidence, prStateStore, installationTokenFor, closeOutEventsStore, enrichLoop, deriveSessionWaiting, deriveSessionDecisions, taskDecisionsStore, shelvedRulingsStore })
+// LIN-3833 / LIN-4016: Home's row states, assembled once for all three Home routes (lib/home-row-states.js): one lean
+// loop read for the workspace, grouped by task. A viewer who sees no sessions (copy-first, no `runControls`) reads
+// nothing and gets the tracker words alone. The states cover the Recent and project rows too, so a subtask that needs
+// you is named on any opened row; In Progress's own states win for a task in both. `null` on a store failure, and each
+// caller falls back to plain rows, so a store hiccup never breaks the page.
+const homeRowStates = createHomeRowStates({
+  getLoopsForWorkspace, dispatchStore: dispatchQueueStore, agentStatusStore, taskDecisionsStore, shelvedRulingsStore, enrichLoop, deriveSessionWaiting,
+})
 app.use(createTaskPageRoutes({
   workspaceFromUrl,
   getOpenRouterSource,
@@ -3451,52 +3395,6 @@ async function resolveAssigneeSelection(req, provider, scope) {
   return { selectedAssignee: rawAssignee, resolvedAssigneeName: rawAssignee };
 }
 
-/**
- * LIN-3833: the In Progress row states for Home (`buildRowStates`). One lean loop read for the
- * workspace, grouped by task, the read Swipe makes. A viewer who sees no sessions (copy-first, no
- * `runControls`) reads nothing and gets the tracker words alone. A failure leaves the rows plain:
- * a store hiccup must never break the page.
- * LIN-3833: the states also cover the Recent and project rows, so a subtask that needs you is named on
- * any opened row. In Progress's own states win for a task in both, so its ranking does not change.
- */
-async function homeRowStates({ workspace, inProgressTrees, recentActivityTrees, projectTrees, runControls }) {
-  try {
-    const roots = (inProgressTrees || []).flatMap(({ roots: trees }) => trees);
-    const otherRoots = [
-      ...(recentActivityTrees || []).flatMap(({ roots: trees }) => trees),
-      ...(projectTrees || []).flatMap(({ incomplete = [], completed = [] }) => [...incomplete, ...completed])
-    ];
-    const loopsByIdentifier = new Map();
-    let ruling = null;
-    if (runControls) {
-      const loops = await getLoopsForWorkspace(workspace.urlKey, { dispatchStore: dispatchQueueStore, agentStatusStore, lean: true }).catch(() => []);
-      for (const loop of loops || []) {
-        if (!loop?.issueIdentifier) continue;
-        if (!loopsByIdentifier.has(loop.issueIdentifier)) loopsByIdentifier.set(loop.issueIdentifier, []);
-        loopsByIdentifier.get(loop.issueIdentifier).push(loop);
-      }
-      // LIN-4024: the badge's own reduction over this workspace, so a row, the count line and the badge
-      // agree on what is open. Once per request, over the loops the page already holds.
-      const urlKeys = [workspace.urlKey];
-      ruling = rulingStandingOf({
-        urlKey: workspace.urlKey,
-        loops: loops || [],
-        taskDecisions: await taskDecisionsStore.listUnansweredForWorkspaces(urlKeys),
-        shelvedRulings: await shelvedRulingsStore.listForWorkspaces(urlKeys),
-        newestScanByTask: await taskDecisionsStore.listNewestScanPerTask(urlKeys),
-      }, { now: new Date(), enrichLoop });
-    }
-    const states = buildRowStates({ roots, loopsByIdentifier, enrichLoop, deriveSessionWaiting, sessionsVisible: runControls, ruling });
-    const otherStates = buildRowStates({ roots: otherRoots, loopsByIdentifier, enrichLoop, deriveSessionWaiting, sessionsVisible: runControls, ruling });
-    for (const [identifier, state] of otherStates) {
-      if (!states.has(identifier)) states.set(identifier, state);
-    }
-    return { states, rulingCount: ruling ? ruling.rows.length : 0 };
-  } catch (err) {
-    console.error('Home row states error:', err.message);
-    return null;
-  }
-}
 
 /**
  * Workspace project view - renders the interactive tree view.
@@ -3536,7 +3434,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
     const homeTopTask = orderedHome.find((issue) => !issue.isSeed) || null;
     const seedOnlyHome = orderedHome.length > 0 && orderedHome.every((issue) => issue.isSeed);
     const featureFlags = await requestFeatureFlags(req);
-    const homeStates = await homeRowStates({ workspace, inProgressTrees, recentActivityTrees, projectTrees: trees, runControls: featureFlags.runControls === true });
+    const homeStates = await homeRowStates({ urlKey: workspace.urlKey, inProgressTrees, recentActivityTrees, projectTrees: trees, runControls: featureFlags.runControls === true });
     const rowStates = homeStates?.states ?? null;
     // LIN-4024: Home renders the trimmed view (what needs you, what runs, what is next; the rest behind folds).
     const homeView = buildHomeView({ inProgressTrees, trees, states: rowStates ?? new Map(), topTaskId: homeTopTask ? nodeKey(homeTopTask) : null });
@@ -3546,8 +3444,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       availableAssignees,
       rowStates,
       rulingCount: homeStates?.rulingCount ?? 0,
-      subtaskNeedsYouById: subtaskNeedingYouByNodeKey({ urlKey: workspace.urlKey, inProgressTrees: homeView.inProgressTrees, recentActivityTrees, projectTrees: homeView.trees, rowStates }),
-      containerNodeKeys: containerNodeKeysOf({ inProgressTrees: homeView.inProgressTrees, recentActivityTrees, projectTrees: homeView.trees }),
+      rowData: rowDataByNodeKey({ urlKey: workspace.urlKey, inProgressTrees: homeView.inProgressTrees, recentActivityTrees, projectTrees: homeView.trees, rowStates }),
       copyFirstCard: featureFlags.runControls !== true && req.session.copyFirstCardDismissed !== true,
       // LIN-2550: label the selector off the filter the render APPLIED. An
       // unmatched name (a stale `?assignee=` carried across a team change by
@@ -3626,7 +3523,7 @@ app.get('/workspace/:urlKey/api/home-rows', workspaceFromUrl, async (req, res) =
     const orderedHome = orderIssuesForSwipe({ projectTrees: trees, inProgressTrees, recentActivityTrees, urlKey: workspace.urlKey });
     const homeTopTask = orderedHome.find((issue) => !issue.isSeed) || null;
     const featureFlags = await requestFeatureFlags(req);
-    const homeStates = await homeRowStates({ workspace, inProgressTrees, recentActivityTrees, projectTrees: trees, runControls: featureFlags.runControls === true });
+    const homeStates = await homeRowStates({ urlKey: workspace.urlKey, inProgressTrees, recentActivityTrees, projectTrees: trees, runControls: featureFlags.runControls === true });
     const states = homeStates?.states ?? new Map();
     const rows = homeRowsFor({ kind, projectId, parentId, q, offset, trees, inProgressTrees, states, topTaskId: homeTopTask ? nodeKey(homeTopTask) : null });
     const urlKey = workspace.urlKey;
@@ -3639,8 +3536,7 @@ app.get('/workspace/:urlKey/api/home-rows', workspaceFromUrl, async (req, res) =
       remaining: rows.remaining,
       // The per-row opts the page carries for its own rows (app.js merges them before the rows mount).
       opts: {
-        subtaskNeedsYouById: subtaskNeedingYouByNodeKey({ urlKey, inProgressTrees: [], recentActivityTrees: [], projectTrees: rowTree, rowStates: states }),
-        containerNodeKeys: containerNodeKeysOf({ inProgressTrees: [], recentActivityTrees: [], projectTrees: rowTree }),
+        rowData: rowDataByNodeKey({ urlKey, inProgressTrees: [], recentActivityTrees: [], projectTrees: rowTree, rowStates: states }),
       },
     });
   } catch (error) {

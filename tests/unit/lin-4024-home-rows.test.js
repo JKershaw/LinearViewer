@@ -71,7 +71,7 @@ describe('homeRowsFor: the rows a fold opens', () => {
     const rows = homeRowsFor({
       kind: 'backlog', projectId: 'p1', trees: [tree],
       inProgressTrees: inProgress([node('LIN-20', 'backlog')]),
-      states: states({ 'LIN-20': { state: 'needs-you', needsYou: true } }),
+      states: states({ 'LIN-20': { state: 'needs-you' } }),
     });
     assert.deepEqual(ids(rows.nodes), ['LIN-21'], 'LIN-20 is already on the page, so it is not repeated in the fold');
   });

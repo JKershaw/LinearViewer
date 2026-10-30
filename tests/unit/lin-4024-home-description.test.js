@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import vm from 'node:vm';
 import { renderDetailsContent } from '../../lib/render.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -64,17 +65,108 @@ describe('Home description — rendered markdown on open, no raw preview', () =>
   });
 });
 
-describe('Home description — the client renders the markdown on first open (public/app.js)', () => {
-  test('one shared renderer serves the "show more" block and Home\'s fold', () => {
-    assert.match(APP, /function renderDescriptionMarkdown\(target, rawDescBase64, urlKey\) \{/);
-    assert.equal(APP.split('renderDescriptionMarkdown(').length - 1, 3, 'declared once, called by the show-more path and the Home hook');
+// An element that answers any property with another element, so app.js's init can run over it. The tests below hand
+// the click handler its own small nodes (the fold, the show-more block) and read what they become.
+function standIn() {
+  const target = function () {};
+  target.dataset = {};
+  return new Proxy(target, {
+    get(t, p) {
+      if (p === Symbol.toPrimitive) return () => '';
+      if (p === 'then' || typeof p === 'symbol') return undefined;
+      if (p in t) return t[p];
+      if (p === 'length') return 0;
+      if (p === 'closest' || p === 'querySelector') return () => null;
+      if (p === 'querySelectorAll') return () => [];
+      if (p === 'getAttribute') return () => null;
+      if (p === 'classList') return { toggle: () => false, add() {}, remove() {}, contains: () => false };
+      return standIn();
+    },
+    apply() { return standIn(); },
+    set(t, p, v) { t[p] = v; return true; },
+  });
+}
+
+// Loads public/app.js for real, runs its DOMContentLoaded init (which registers the delegated click handler), and
+// returns a `click(target)` that dispatches a click through every registered handler. `renders` records each
+// markdown render, so a test counts renders, not calls to a helper.
+function loadAppJs() {
+  const renders = [];
+  const listeners = {};
+  const doc = standIn();
+  doc.readyState = 'complete';
+  doc.addEventListener = (type, fn) => { (listeners[type] ||= []).push(fn); };
+  const win = standIn();
+  win.addEventListener = () => {};
+  const context = vm.createContext({
+    document: doc,
+    window: win,
+    console: { log() {}, error() {}, warn() {} },
+    localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+    atob: (s) => Buffer.from(s, 'base64').toString('binary'),
+    setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, clearInterval() {},
+    fetch: () => new Promise(() => {}),
+    renderMarkdown: (text) => { renders.push(text); return `<p>${text}</p>`; },
+    location: win.location, navigator: standIn(), history: standIn(),
+  });
+  vm.runInContext(APP, context, { filename: 'public/app.js' });
+  for (const fn of listeners.DOMContentLoaded || []) fn({});
+  const click = (target) => {
+    const event = { target, stopPropagation() {}, preventDefault() {} };
+    for (const fn of listeners.click || []) fn(event);
+  };
+  return { click, renders };
+}
+
+// A fold's click target: `closest` answers only the selectors the handler asks for.
+const clickTargetFor = (answers) => ({ closest: (selector) => answers[selector] ?? null });
+
+describe('Home description — the client renders the markdown on first open (public/app.js, run)', () => {
+  const encoded = Buffer.from(DESCRIPTION).toString('base64');
+
+  test('Home\'s description fold renders its markdown the first time it opens, and not again', () => {
+    const { click, renders } = loadAppJs();
+    const home = standIn();
+    home.dataset = { rawDesc: encoded, urlKey: 'ws' };
+    const content = { classList: hiddenFlag(true), querySelector: (sel) => (sel === '.home-description' ? home : null) };
+    const details = { querySelector: (sel) => (sel === '[data-content="description"]' ? content : null) };
+    const foldToggle = { dataset: { toggle: 'description' }, textContent: '▶ Description', closest: (sel) => (sel === '.details' ? details : null) };
+    const target = clickTargetFor({ '.detail-toggle': foldToggle });
+
+    click(target);
+    assert.equal(renders.length, 1, 'the first open renders the description');
+    assert.equal(renders[0], DESCRIPTION, 'it renders the description exactly');
+    assert.equal(home.dataset.rendered, 'true', 'the body is marked rendered');
+    assert.ok(home.innerHTML.includes(DESCRIPTION), 'the rendered markdown is what the fold shows');
+
+    click(target); // close
+    click(target); // open again
+    assert.equal(renders.length, 1, 'a second open does not render it again');
   });
 
-  test('the Home description fold renders its markdown when it opens, and only once', () => {
-    const hook = APP.indexOf("if (toggleType === 'description') {");
-    assert.ok(hook > 0, 'the fold toggle handler has a description hook');
-    const block = APP.slice(hook, hook + 400);
-    assert.match(block, /content\.querySelector\('\.home-description'\)/, 'it finds the Home description body');
-    assert.match(block, /if \(home && !home\.dataset\.rendered\)/, 'it renders once, on the first open');
+  test('the show-more block renders on its first expansion, and not again', () => {
+    const { click, renders } = loadAppJs();
+    const fullContent = standIn();
+    fullContent.dataset = { rawDesc: encoded, urlKey: 'ws' };
+    const truncated = { classList: hiddenFlag(false) };
+    const full = { classList: hiddenFlag(true) };
+    const container = {
+      dataset: { rawDesc: encoded, urlKey: 'ws' },
+      querySelector: (sel) => ({ '.desc-truncated': truncated, '.desc-full': full, '.desc-full-content': fullContent })[sel] ?? null,
+    };
+    const showMore = { closest: (sel) => (sel === '.issue-description' ? container : null) };
+    const showMoreTarget = clickTargetFor({ '.issue-desc-toggle': showMore, '.issue-description': container });
+
+    click(showMoreTarget);
+    assert.equal(renders.length, 1, 'show more renders on its first expansion');
+    click(showMoreTarget);
+    click(showMoreTarget);
+    assert.equal(renders.length, 1, 'and does not render again on a later expansion');
   });
 });
+
+/** A `classList` whose `toggle('hidden')` flips a flag and returns the new state, as the browser does. */
+function hiddenFlag(hidden) {
+  let state = hidden;
+  return { toggle: () => { state = !state; return state; }, contains: () => state };
+}

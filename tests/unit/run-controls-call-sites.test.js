@@ -26,11 +26,12 @@ const ALLOWED_SYNC = {
   'routes/workspace-api-prompts.js': [2, 'prompt generation reads the stored flags, no nav'],
   'routes/workspace-api-roadmap.js': [7, 'JSON roadmap API, no nav'],
   'routes/workspace-api.js': [1, 'recommend call options (session flags), no nav'],
-  'server.js': [2, 'the `.ship` redirect check; the post-401 re-render (no req: it calls resolveRunControls beside it)']
+  'server.js': [1, 'the `.ship` redirect check'],
+  'lib/dashboard-refresh.js': [1, 'the post-401 re-render (no req: it calls resolveRunControls beside it)']
 };
 
 function files() {
-  const out = ['server.js'];
+  const out = ['server.js', 'lib/dashboard-refresh.js'];
   for (const f of readdirSync(join(ROOT, 'routes'))) if (f.endsWith('.js')) out.push(`routes/${f}`);
   return out;
 }

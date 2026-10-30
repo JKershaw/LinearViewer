@@ -238,8 +238,10 @@ describe('LIN-3790 fetchAndPrepareProjects — legacy (not connection-backed) se
 
 describe('LIN-3774 every fetchAndPrepareProjects call site passes accountId', () => {
   test('all six call sites carry accountId; the three non-dashboard sites keep urlKey null', () => {
-    // LIN-4024: the Home rows route is a sixth call site; it carries the workspace urlKey like the dashboard.
-    const calls = [...SERVER_SRC.matchAll(/(?<!function )fetchAndPrepareProjects\((workspace,[^\n]*)/g)].map(m => m[1]);
+    // LIN-4024: the Home rows route is a call site too; it carries the workspace urlKey like the dashboard. LIN-4016:
+    // the post-401 render's call is in lib/dashboard-refresh.js, so the sites are scanned in both files.
+    const sources = SERVER_SRC + readFileSync(join(__dirname, '../../lib/dashboard-refresh.js'), 'utf8');
+    const calls = [...sources.matchAll(/(?<!function )fetchAndPrepareProjects\((workspace,[^\n]*)/g)].map(m => m[1]);
     assert.equal(calls.length, 6, `expected 6 call sites, found ${calls.length}`);
     for (const c of calls) assert.match(c, /accountId: (req\.)?session\.accountId/, c);
     const nonDashboard = calls.filter(c => !c.includes('workspace.urlKey'));

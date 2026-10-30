@@ -20,6 +20,7 @@ import { buildTaskStages, nextStepOf, buildRowStates } from '../../lib/task-page
 import { renderStageStrip } from '../../lib/render-task-page.js';
 import { renderPage } from '../../lib/render.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
+import { serverSessions, serverRow } from '../fixtures/task-decision.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
@@ -147,6 +148,8 @@ function makeContainer() {
 
 /** A PromptSection sandbox. `events` is the SSE stream the recommend route answers with. */
 function load({ stateBody = null, events = [] } = {}) {
+  // LIN-4016: the state body is the server's: its `sessions` carry the decision the browser reads.
+  if (stateBody && stateBody.sessions) stateBody = { ...stateBody, sessions: serverSessions(stateBody.sessions) };
   const window = {
     escapeHtml: (s) => (s == null ? '' : String(s)),
     stripCodeBlockWrapper: (s) => s,
@@ -184,10 +187,12 @@ const COPY_FIRST = {
   urlKey: 'acme', surface: 'home', dispatchEnabled: false, runSetup: false, hasAI: true, aiState: 'ok',
   promptMeta: { plan: 'Plan', scoping: 'Scoping', implementation: 'Implementation' },
   issue: { id: 'uuid-42', identifier: 'LIN-42', title: 'Parent work', url: '', stateType: 'started' },
+  row: serverRow({ stateType: 'started' }),
 };
 
 const RUN = {
   urlKey: 'acme', surface: 'home', dispatchEnabled: true, runSetup: false, hasAI: true, aiState: 'ok', isLocalhost: false,
+  row: serverRow({ stateType: 'started' }),
   promptMeta: { plan: 'Plan', implementation: 'Build', research: 'Research', scoping: 'Scoping', review: 'Review' },
   defaultPromptKeys: ['look-into', 'research', 'plan', 'implementation'],
   morePromptKeys: ['review', 'scoping'],

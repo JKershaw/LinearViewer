@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { buildRowStates, buildTaskPageModel, createTaskPageLoader, sessionSummaryOf } from '../../lib/task-page-loader.js';
 import { buildInProgressCountParts } from '../../lib/task-board-view.js';
 import { collectUnansweredDecisions, rulingStandingOf } from '../../lib/unanswered-decisions.js';
-import { taskStateOf } from '../../lib/task-state.js';
+import { taskStateOf, needsAPerson } from '../../lib/task-state.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 
 const NOW = new Date('2026-10-29T12:00:00.000Z');
@@ -64,7 +64,7 @@ describe('taskStateOf — one precedence for the row, the count and the task', (
     assert.equal(s.state, 'failed');
     assert.equal(s.words, 'Build failed');
     assert.equal(s.tone, 'failed');
-    assert.equal(s.needsYou, true, 'a failed task still needs a person (LIN-3968), so it ranks first');
+    assert.equal(needsAPerson(s.state), true, 'a failed task still needs a person (LIN-3968), so it ranks first');
   });
 
   test('running never includes queued: a queued session is queued, with its own words', () => {
@@ -82,11 +82,11 @@ describe('taskStateOf — one precedence for the row, the count and the task', (
     assert.equal(taskStateOf({ next: 'Research' }).tone, 'ready');
   });
 
-  test('a subtask that needs you is named in needsYouTasks and does not change the parent\'s word', () => {
+  test('a subtask that needs you makes the parent needs you, with the one word', () => {
     const s = taskStateOf({ childNeedsYou: [{ identifier: 'LIN-1', title: 'one' }, { identifier: 'LIN-2', title: 'two' }] });
+    assert.equal(s.state, 'needs-you');
     assert.equal(s.words, 'needs you');
-    assert.deepEqual(s.needsYouTasks.map((t) => t.identifier), ['LIN-1', 'LIN-2']);
-    assert.equal(s.runOn, null, 'a parent waiting on answers offers no run target');
+    assert.equal(needsAPerson(s.state), true);
   });
 });
 
@@ -115,7 +115,6 @@ describe('LIN-4024 — LIN-4011/4012 read the same on the row, the count and the
     assert.equal(states.get('LIN-4011').words, 'needs you', 'the queued check-in behind the ruling is not queued');
     assert.equal(states.get('LIN-4012').words, 'needs you');
     assert.equal(states.get('LIN-4008').words, 'needs you');
-    assert.deepEqual(states.get('LIN-4008').needsYouTasks.map((t) => t.identifier), ['LIN-4011', 'LIN-4012']);
     assert.equal(states.get('LIN-4008').running, false);
 
     const parts = buildInProgressCountParts([{ projectName: 'P', roots: [parent] }], states, { rulingCount: ruling0.rows.length });
@@ -143,7 +142,7 @@ describe('LIN-4024 — LIN-4011/4012 read the same on the row, the count and the
 
     const states = buildRowStates({ roots: [parent], loopsByIdentifier: new Map(Object.entries(loops)), enrichLoop, deriveSessionWaiting, now: NOW, ruling: ruling0 });
     assert.equal(states.get('LIN-4012').state, 'parked');
-    assert.equal(states.get('LIN-4012').needsYou, false);
+    assert.equal(needsAPerson(states.get('LIN-4012').state), false);
     assert.equal(states.get('LIN-4011').state, 'needs-you');
   });
 

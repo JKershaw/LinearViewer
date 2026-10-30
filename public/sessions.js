@@ -89,6 +89,8 @@
 
   function renderHomeSession(s, opts) {
     const si = stateIndicator(s.agentState);
+    // LIN-4016: a waiting session on a parked task reads parked; on a ruling it reads waiting on you (the server's decision).
+    const stateWord = s.agentState === 'waiting' && opts.taskParked ? 'parked' : (HOME_STATE_WORDS[s.agentState] || s.agentState || '');
     const time = relativeTime(s.dispatchedAt);
     const stage = (opts.stageWords && opts.stageWords[s.stage]) || stageLabel(s.stage);
     const summaryHtml = s.agentSummary
@@ -104,7 +106,7 @@
         <div class="session-header">
           <span class="session-state ${si.css}">${si.symbol}</span>
           <span class="session-stage">${esc(stage)}</span>
-          <span class="session-state-word">${esc(HOME_STATE_WORDS[s.agentState] || s.agentState || '')}</span>
+          <span class="session-state-word">${esc(stateWord)}</span>
           <span class="session-time">${esc(time)}</span>
           ${runLink}
         </div>
@@ -204,7 +206,7 @@
     try {
       const data = await fetchSessions(opts.urlKey, opts.identifier);
       const sessions = Array.isArray(data.sessions) ? data.sessions : [];
-      applyState(container, renderList(sessions, opts), sessions.length ? 'list' : 'empty');
+      applyState(container, renderList(sessions, { ...opts, taskParked: !!data.taskParked }), sessions.length ? 'list' : 'empty');
       // Self-heal the accordion header count from the authoritative fetch.
       if (typeof opts.onCount === 'function') opts.onCount(sessions.length);
     } catch (err) {

@@ -9,9 +9,13 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildRowStates } from '../../lib/task-page-loader.js';
-import { orderInProgress, buildInProgressCountLine, buildInProgressCountParts } from '../../lib/task-board-view.js';
+import { orderInProgress, buildInProgressCountParts } from '../../lib/task-board-view.js';
+
+// The count line's text, one entry per part (the parts are joined with ' · ' where the line is shown).
+const countTexts = (...args) => buildInProgressCountParts(...args).map((p) => p.text);
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 import { renderPage } from '../../lib/render.js';
+import { needsAPerson } from '../../lib/task-state.js';
 
 const NOW = new Date('2026-10-25T10:06:00.000Z');
 
@@ -64,13 +68,13 @@ describe('LIN-3833 — the words a row says, from the task page\'s own model', (
   test('a session waiting on a person says needs you', () => {
     const s = states({ roots: [node('LIN-51')], loops: { 'LIN-51': [blocked({ issueIdentifier: 'LIN-51' })] } });
     assert.equal(s.get('LIN-51').words, 'needs you');
-    assert.equal(s.get('LIN-51').needsYou, true);
+    assert.equal(needsAPerson(s.get('LIN-51').state), true);
   });
 
   test('a bare park reads parked, is not needs you, and does not count toward the count line', () => {
     const s = states({ roots: [node('LIN-57')], loops: { 'LIN-57': [parkedLoop({ issueIdentifier: 'LIN-57' })] } });
     assert.equal(s.get('LIN-57').words, 'parked');
-    assert.equal(s.get('LIN-57').needsYou, false);
+    assert.equal(needsAPerson(s.get('LIN-57').state), false);
     assert.equal(s.get('LIN-57').tone, 'parked');
     assert.equal(s.get('LIN-57').rank, 3, 'parked ranks with the quiet rows');
   });
@@ -79,7 +83,7 @@ describe('LIN-3833 — the words a row says, from the task page\'s own model', (
     const child = node('LIN-59');
     const parent = node('LIN-58', 'started', [child]);
     const s = states({ roots: [parent], loops: { 'LIN-59': [parkedLoop({ issueIdentifier: 'LIN-59' })] } });
-    assert.equal(s.get('LIN-58').needsYou, false);
+    assert.equal(needsAPerson(s.get('LIN-58').state), false);
     assert.notEqual(s.get('LIN-58').words, 'subtask needs you · Research next');
   });
 
@@ -91,10 +95,9 @@ describe('LIN-3833 — the words a row says, from the task page\'s own model', (
       loops: { 'LIN-53': [blocked({ issueIdentifier: 'LIN-53' })] },
     });
     assert.equal(s.get('LIN-53').words, 'needs you');
-    // LIN-4024: the row says its state once; the subtask that needs you is named in needsYouTasks, not in the words.
+    // LIN-4024: the row says its state once, in the words; the subtask that needs you is not named in them.
     assert.equal(s.get('LIN-52').words, 'needs you');
-    assert.deepEqual(s.get('LIN-52').needsYouTasks.map((t) => t.identifier), ['LIN-53']);
-    assert.equal(s.get('LIN-52').needsYou, true, 'the parent is ranked as needing you');
+    assert.equal(needsAPerson(s.get('LIN-52').state), true, 'the parent is ranked as needing you');
   });
 
   test('a backlog task says backlog, and a finished one says done', () => {
@@ -160,7 +163,7 @@ describe('LIN-4009 — each row state has its own tone', () => {
       roots: trees[0].roots,
       loops: { 'LIN-101': [loop({ issueIdentifier: 'LIN-101' })], 'LIN-102': [queuedLoop] },
     });
-    assert.equal(buildInProgressCountLine(trees, rowStates), '1 running');
+    assert.deepEqual(countTexts(trees, rowStates), ['1 running']);
     const parts = buildInProgressCountParts(trees, rowStates);
     assert.deepEqual(parts.map((p) => p.tone), ['running']);
     const html = renderPage([], trees, [], 'Test', { urlKey: 'acme', workspace: { urlKey: 'acme', provider: 'linear' }, rowStates });
@@ -171,7 +174,7 @@ describe('LIN-4009 — each row state has its own tone', () => {
   test('only queued sessions: the count line has no part (a queued row says queued on its own)', () => {
     const trees = [{ projectName: 'Alpha', roots: [node('LIN-103')] }];
     const rowStates = states({ roots: trees[0].roots, loops: { 'LIN-103': [queuedLoop] } });
-    assert.equal(buildInProgressCountLine(trees, rowStates), null);
+    assert.deepEqual(countTexts(trees, rowStates), []);
   });
 
   test('a parent whose subtask needs you is needs-you, the same tone as its own', () => {
@@ -224,10 +227,10 @@ describe('LIN-3833 — In Progress order and its count line', () => {
       },
     });
     // LIN-4024: waiting on you counts rulings (passed in), running counts tasks; an idle task adds no part.
-    assert.equal(buildInProgressCountLine(trees, rowStates, { rulingCount: 1 }), '1 waiting on you · 1 running');
-    assert.equal(buildInProgressCountLine(trees, rowStates), '1 running');
-    assert.equal(buildInProgressCountLine([tree('Alpha', node('A-idle'))], states({ roots: [node('A-idle')] })), null);
-    assert.equal(buildInProgressCountLine([], new Map()), null, 'no tasks, no line');
+    assert.deepEqual(countTexts(trees, rowStates, { rulingCount: 1 }), ['1 waiting on you', '1 running']);
+    assert.deepEqual(countTexts(trees, rowStates), ['1 running']);
+    assert.deepEqual(countTexts([tree('Alpha', node('A-idle'))], states({ roots: [node('A-idle')] })), []);
+    assert.deepEqual(countTexts([], new Map()), [], 'no tasks, no line');
   });
 });
 
@@ -257,7 +260,7 @@ describe('LIN-3833 — the rendered Home In Progress section', () => {
 
   test('a row with nothing to say renders no words span', () => {
     const trees = [{ projectName: 'Alpha', roots: [node('LIN-72', 'started')] }];
-    const rowStates = new Map([['LIN-72', { words: null, rank: 3, needsYou: false, running: false, next: null }]]);
+    const rowStates = new Map([['LIN-72', { words: null, rank: 3, running: false, next: null }]]);
     const html = homeWith(trees, rowStates);
     assert.equal(/data-testid="issue-row-state"/.test(html), false);
   });

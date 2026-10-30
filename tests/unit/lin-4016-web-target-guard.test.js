@@ -1,0 +1,178 @@
+/**
+ * LIN-4016 W5 — Claude Code on the web needs Claude Code: the session entrance refuses `web` on a resolved `opencode`.
+ *
+ * The rule is applied to the RESOLVED harness (after a blank is filled from the workspace defaults), by the one function
+ * in lib/dispatch-targets.js that the offered list reads too, so the list and the refusal cannot disagree. A fresh run is
+ * refused before anything is minted or enqueued. A follow-up keeps its parent's target and is not refused here (the
+ * named gap, pinned so it is deliberate).
+ */
+process.env.NODE_ENV = 'test';
+
+import { test, describe } from 'node:test';
+import assert from 'node:assert/strict';
+import express from 'express';
+import { createDispatchRoutes } from '../../routes/dispatch.js';
+import { WorkspacePreferencesStore } from '../../lib/workspace-preferences.js';
+import { targetRefusalFor, targetsFor } from '../../lib/dispatch-targets.js';
+
+function createMockCollection() {
+  const docs = [];
+  return {
+    async findOne(query) { return docs.find((d) => d._id === query._id) || null; },
+    async updateOne(query, update, options = {}) {
+      let doc = docs.find((d) => d._id === query._id);
+      if (!doc) {
+        if (!options.upsert) return { matchedCount: 0 };
+        doc = { _id: query._id, ...(update.$setOnInsert || {}) };
+        docs.push(doc);
+      }
+      Object.assign(doc, update.$set || {});
+      return { matchedCount: 1 };
+    },
+  };
+}
+
+const PARENT_ID = '6f1c2b1e-0d4a-4c3e-9a8b-1234567890ab';
+
+function buildApp(captured, { workspacePreferencesStore, parent = null } = {}) {
+  const app = express();
+  app.use(express.json());
+  app.use(createDispatchRoutes({
+    workspaceOwnerCheck: async () => ({ status: 'owner' }),
+    dispatchQueueStore: {
+      addItem: async (urlKey, item) => {
+        captured.item = item;
+        return { _id: 'disp-1', dispatchedAt: '2026-10-30T00:00:00.000Z', ...item };
+      },
+      getItemStatus: async (urlKey, id) => (parent && id === parent._id ? parent : null),
+      // A follow-up looks up its parent's grant record: none here, so it resumes plainly (the path under test is the target).
+      getGrantDeclaration: async () => ({ state: 'absent' }),
+    },
+    dispatchTokenStore: {},
+    workspaceFromUrl: (req, res, next) => {
+      // The test token makes the decision panel's model catalog mock (lib/should-mock-ai.js): no socket to openrouter.
+      req.workspace = { urlKey: req.params.urlKey, accessToken: 'test-token' };
+      req.session = { accountId: 'u1', linearUserId: 'u1' };
+      next();
+    },
+    userPreferencesStore: {},
+    harbourFeedbackTokenStore: null,
+    workspacePreferencesStore,
+  }));
+  return app;
+}
+
+async function call(app, method, path, body) {
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise((resolve) => server.once('listening', resolve));
+  const { port } = server.address();
+  try {
+    const opts = { method: method.toUpperCase(), headers: {} };
+    if (body !== undefined) {
+      opts.headers['Content-Type'] = 'application/json';
+      opts.body = JSON.stringify(body);
+    }
+    const res = await fetch(`http://127.0.0.1:${port}${path}`, opts);
+    const text = await res.text();
+    let parsed;
+    try { parsed = JSON.parse(text); } catch { parsed = text; }
+    return { status: res.status, body: parsed };
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+}
+
+const PATH = '/workspace/acme/api/dispatch';
+
+describe('LIN-4016 W5 — the one target rule (lib/dispatch-targets.js)', () => {
+  test('web is refused only under opencode, with the reason; claude-code and the rest are not', () => {
+    assert.match(targetRefusalFor({ target: 'web', harness: 'opencode' }), /Claude Code on the web needs Claude Code/);
+    assert.equal(targetRefusalFor({ target: 'web', harness: 'claude-code' }), null);
+    assert.equal(targetRefusalFor({ target: 'web', harness: null }), null, 'a blank harness is not refused by the rule itself');
+    assert.equal(targetRefusalFor({ target: 'cli', harness: 'opencode' }), null);
+  });
+
+  test('the list a harness offers and the refusal agree: web is not offered under opencode', () => {
+    assert.deepEqual(targetsFor('opencode'), ['cli', 'dash', 'local']);
+    assert.ok(targetsFor('claude-code').includes('web'));
+    for (const target of ['cli', 'web', 'dash', 'local']) {
+      assert.equal(targetsFor('opencode').includes(target), targetRefusalFor({ target, harness: 'opencode' }) === null);
+    }
+  });
+});
+
+describe('LIN-4016 W5 — POST /workspace/:urlKey/api/dispatch refuses web under opencode', () => {
+  test('an explicit opencode harness with target web is refused with a reason, and nothing is enqueued', async () => {
+    const captured = {};
+    const app = buildApp(captured, { workspacePreferencesStore: new WorkspacePreferencesStore({ collection: createMockCollection() }) });
+    const res = await call(app, 'post', PATH, { prompt: 'run me', kind: 'implementation', target: 'web', harness: 'opencode' });
+    assert.equal(res.status, 400, JSON.stringify(res.body));
+    assert.equal(res.body.code, 'TARGET_HARNESS_REFUSED');
+    assert.match(res.body.error, /Claude Code on the web needs Claude Code/);
+    assert.equal(captured.item, undefined, 'a refusal enqueues nothing');
+  });
+
+  test('a blank harness that resolves to opencode from the workspace default is refused too', async () => {
+    const store = new WorkspacePreferencesStore({ collection: createMockCollection() });
+    await store.saveWorkspacePreferences('acme', { dispatchDefaults: { harness: 'opencode' } });
+    const captured = {};
+    const app = buildApp(captured, { workspacePreferencesStore: store });
+    const res = await call(app, 'post', PATH, { prompt: 'run me', kind: 'implementation', target: 'web' });
+    assert.equal(res.status, 400, JSON.stringify(res.body));
+    assert.equal(res.body.code, 'TARGET_HARNESS_REFUSED');
+    assert.equal(captured.item, undefined);
+  });
+
+  test('web under claude-code is accepted', async () => {
+    const captured = {};
+    const app = buildApp(captured, { workspacePreferencesStore: new WorkspacePreferencesStore({ collection: createMockCollection() }) });
+    const res = await call(app, 'post', PATH, { prompt: 'run me', kind: 'implementation', target: 'web', harness: 'claude-code' });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(captured.item.target, 'web');
+  });
+
+  // The named gap, pinned: a follow-up keeps its parent's `web` target and is not refused, so the lineage is not stalled.
+  // A real web parent and a valid UUID, so the request reaches the enqueue (a bad followUpTo fails format and proves nothing).
+  // The abort lane reaches the guarded stage and the enqueue, so this one is a live pin. The cascade expansion and the CI-wake
+  // sweep never reach the guarded stage (the entrance returns first), so they are covered by inspection only: `targetRefusal`
+  // is set only at lib/dispatch-entrance.js, behind isFreshDispatch.
+  test('an abort under opencode with target web is not refused by the entrance rule (only fresh runs are)', async () => {
+    const captured = {};
+    const parent = { _id: PARENT_ID, issueIdentifier: 'LIN-1', target: 'web', harness: 'opencode' };
+    const app = buildApp(captured, { workspacePreferencesStore: new WorkspacePreferencesStore({ collection: createMockCollection() }), parent });
+    const res = await call(app, 'post', PATH, { kind: 'implementation', target: 'web', harness: 'opencode', abort: true, abortTo: PARENT_ID });
+    assert.notEqual(res.body?.code, 'TARGET_HARNESS_REFUSED', JSON.stringify(res.body));
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(captured.item.target, 'web');
+  });
+  test('a follow-up to a web parent under opencode is not refused: it reaches the enqueue with the web target (the named gap, pinned)', async () => {
+    const captured = {};
+    const parent = { _id: PARENT_ID, issueIdentifier: 'LIN-1', target: 'web', harness: 'opencode' };
+    const app = buildApp(captured, { workspacePreferencesStore: new WorkspacePreferencesStore({ collection: createMockCollection() }), parent });
+    const res = await call(app, 'post', PATH, { prompt: 'continue', kind: 'implementation', target: 'web', harness: 'opencode', followUpTo: PARENT_ID });
+    assert.notEqual(res.body?.code, 'TARGET_HARNESS_REFUSED', JSON.stringify(res.body));
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.ok(captured.item, 'the follow-up was enqueued');
+    assert.equal(captured.item.target, 'web');
+    assert.equal(captured.item.followUpTo, PARENT_ID);
+  });
+});
+
+// The browser's Change panel and its POST resolve a blank harness the same way (both see the workspace default when the
+// request names its surface, which Home always does), so the list the panel offers and the refusal cannot disagree.
+describe('LIN-4016 W5 — the panel\'s target list and the entrance\'s refusal resolve a blank harness the same way', () => {
+  test('a blank harness that resolves to opencode from the workspace default: the panel offers no web, and the same blank POST is refused', async () => {
+    const store = new WorkspacePreferencesStore({ collection: createMockCollection() });
+    await store.saveWorkspacePreferences('acme', { dispatchDefaults: { harness: 'opencode' } });
+    const captured = {};
+    const app = buildApp(captured, { workspacePreferencesStore: store });
+    const panel = await call(app, 'get', '/workspace/acme/api/dispatch/decision-panel?promptName=implementation&surface=home');
+    assert.equal(panel.status, 200, JSON.stringify(panel.body));
+    assert.ok(!panel.body.targets.includes('web'), `the panel offered ${JSON.stringify(panel.body.targets)}`);
+    assert.ok(panel.body.targets.includes('cli'));
+    const res = await call(app, 'post', PATH, { prompt: 'run me', kind: 'implementation', target: 'web', surface: 'home' });
+    assert.equal(res.status, 400, JSON.stringify(res.body));
+    assert.equal(res.body.code, 'TARGET_HARNESS_REFUSED');
+    assert.equal(captured.item, undefined);
+  });
+});

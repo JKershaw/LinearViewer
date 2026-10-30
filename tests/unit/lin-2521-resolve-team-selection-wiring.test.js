@@ -30,6 +30,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { renderDashboardAfterRefresh as renderRefreshedDashboard } from '../../lib/dashboard-refresh.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
@@ -112,18 +113,31 @@ describe('LIN-2521 — the refresh-retry chain threads teamId through, never re-
       'must forward the SAME teamId parameter it received, not re-derive one');
   });
 
-  test('renderDashboardAfterRefresh threads teamId into fetchAndPrepareProjects and the resulting selectedTeamId/teams into renderPage', () => {
-    const body = sliceFunction('renderDashboardAfterRefresh',
-      'async function renderDashboardAfterRefresh(workspace, session, teamId, assigneeState, openRouterSource, res) {');
-    assert.doesNotMatch(body, /req\.query/, 'must never read req.query directly — it has no req in scope');
-    assert.match(body, /fetchAndPrepareProjects\(workspace, teamId, null, workspace\.urlKey, \{ slim: true, assigneeName: assigneeState\.resolvedAssigneeName, accountId: session\.accountId, degradeSecondary: true \}\)/,
-      'must pass the received teamId into fetchAndPrepareProjects');
-    // The destructure that captures selectedTeamId/teams off that same call.
-    // LIN-2550 added `appliedAssigneeName` to the same destructure — the
-    // refresh tail needs it to label the assignee selector off the filter the
-    // render actually applied, exactly as the primary route does.
-    assert.match(body, /const \{ trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated, availableAssignees, appliedAssigneeName, degradedSources \} = await fetchAndPrepareProjects/);
-    assert.match(body, /teams,\s*\n\s*selectedTeamId,/, 'renderPage must receive teams/selectedTeamId from the SAME resolved fetch, proving the 401-refresh re-render preserves them');
+  test('renderDashboardAfterRefresh threads teamId into fetchAndPrepareProjects and the resulting selectedTeamId/teams into renderPage', async () => {
+    // Behavioural (LIN-4016): the render tail is lib/dashboard-refresh.js, run here with its reads faked.
+    const workspace = { id: 'ws-1', urlKey: 'acme' };
+    const session = { workspaces: [workspace] };
+    const teams = [{ id: 't1', name: 'One' }, { id: 't2', name: 'Two' }];
+    const fetched = [];
+    const rendered = [];
+    await renderRefreshedDashboard({
+      customPromptsStore: { list: async () => [] },
+      getDeployInfo: () => ({}),
+      getFeatureFlags: () => ({}),
+      getProviderForWorkspace: () => ({ supports: () => false }),
+      fetchAndPrepareProjects: async (...args) => {
+        fetched.push(args);
+        return { trees: [], inProgressTrees: [], recentActivityTrees: [], organizationName: 'acme', teams, selectedTeamId: 't2', showSource: false, truncated: false, availableAssignees: [], appliedAssigneeName: null, degradedSources: [] };
+      },
+      resolveRunControls: async () => ({ runControls: false, runSetup: false }),
+      homeRowStates: async () => null,
+      orderIssuesForSwipe: () => [],
+      renderPage: (trees, inProgressTrees, recentActivityTrees, organizationName, options) => { rendered.push(options); return '<html/>'; },
+    }, { workspace, session, teamId: 't2', assigneeState: { selectedAssignee: 'all', resolvedAssigneeName: null }, openRouterSource: null, res: { send: (html) => html } });
+    assert.equal(fetched.length, 1);
+    assert.equal(fetched[0][1], 't2', 'the received teamId is passed into fetchAndPrepareProjects, not re-derived');
+    assert.equal(rendered[0].selectedTeamId, 't2', 'the selected team comes from the same resolved fetch');
+    assert.deepEqual(rendered[0].teams, teams, 'the team list reaches renderPage from the same resolved fetch, so the 401-refresh re-render preserves it');
   });
 
   test('handleUnauthorizedError accepts teamId and forwards it unchanged to both renderDashboardAfterRefresh and handleTokenRefreshAndRetry, never re-reading req.query', () => {

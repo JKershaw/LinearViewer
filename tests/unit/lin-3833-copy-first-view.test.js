@@ -16,6 +16,7 @@ import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 import { TaskModeStore, copyKindOf } from '../../lib/task-mode-store.js';
 import { renderPage } from '../../lib/render.js';
+import { serverSessions, serverRow } from '../fixtures/task-decision.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
@@ -44,6 +45,8 @@ function makeContainer() {
 
 /** A PromptSection sandbox. `stateBody` is what the state endpoint answers (null for no read). */
 function load({ stateBody = null } = {}) {
+  // LIN-4016: the state body is the server's: its `sessions` carry the decision the browser reads.
+  if (stateBody && stateBody.sessions) stateBody = { ...stateBody, sessions: serverSessions(stateBody.sessions) };
   const calls = { api: [] };
   const window = {
     escapeHtml: (s) => (s == null ? '' : String(s)),
@@ -78,10 +81,13 @@ function load({ stateBody = null } = {}) {
 }
 
 function homeOpts(over = {}) {
+  const issue = over.issue || { id: 'uuid-42', identifier: 'LIN-42', title: 'T', url: '', stateType: 'unstarted' };
   return {
     urlKey: 'acme', surface: 'home', dispatchEnabled: false, runSetup: false, hasAI: true, aiState: 'ok',
     promptMeta: { plan: 'Plan', scoping: 'Scoping', implementation: 'Implementation' },
-    issue: { id: 'uuid-42', identifier: 'LIN-42', title: 'T', url: '', stateType: 'unstarted' },
+    issue,
+    // LIN-4016: the row's decision record, as the server stamps it (the copy-first step and tracker word come from it).
+    row: serverRow({ stateType: issue.stateType }),
     ...over,
   };
 }

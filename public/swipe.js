@@ -862,6 +862,8 @@ function handleAccordionClick(e) {
           // LIN-2944: the card's own one-line ranking reason (buildWhy, stamped
           // server-side) so the shared component can render "why this first".
           why: issue.why,
+          // LIN-4016: the card's decision record (the server stamps it on every card).
+          row: issue.row || null,
           hasAI,
           aiState,
           freeTier,

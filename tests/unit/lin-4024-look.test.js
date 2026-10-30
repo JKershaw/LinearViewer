@@ -2,9 +2,9 @@
  * LIN-4024 step 3 (look), first chunk: a container's opened task runs on the container, the opened task names its
  * stage words, and a task waiting on a ruling shows its question card to the owner.
  *
- * Witnesses: `containerNodeKeysOf` marks the rows that have subtasks and no others; the Home mount hands each row its
- * container flag and the "Another step" stage words, from the page options and the rows a fold fetches (the real
- * `mountHomePromptSections` and `mergeHomeRowOpts` from public/app.js).
+ * Witnesses: `rowDataByNodeKey` marks the rows that have subtasks and no others (LIN-4016: as each row's decision record,
+ * `container`); the Home mount hands each row its record and the "Another step" stage words, from the page options and
+ * the rows a fold fetches (the real `mountHomePromptSections` and `mergeHomeRowOpts` from public/app.js).
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,7 +12,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
-import { containerNodeKeysOf } from '../../lib/task-board-view.js';
+import { rowDataByNodeKey } from '../../lib/task-board-view.js';
 import { nodeKey } from '../../lib/tree.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -32,20 +32,21 @@ const node = (identifier, children = []) => ({
   depth: 0,
 });
 
-describe('containerNodeKeysOf — the rows that have subtasks are the containers', () => {
+describe('rowDataByNodeKey — the rows that have subtasks are the containers', () => {
   test('a row with children is a container, at any depth; a leaf is not', () => {
     const leafChild = node('LIN-3');
     const parent = node('LIN-2', [leafChild]);
     const root = node('LIN-1', [parent]);
-    const keys = containerNodeKeysOf({ inProgressTrees: [{ roots: [root] }], recentActivityTrees: [], projectTrees: [] });
-    assert.deepEqual(keys.sort(), [nodeKey(root.issue), nodeKey(parent.issue)].sort());
-    assert.equal(keys.includes(nodeKey(leafChild.issue)), false);
+    const byKey = rowDataByNodeKey({ inProgressTrees: [{ roots: [root] }], recentActivityTrees: [], projectTrees: [], rowStates: null });
+    assert.equal(byKey[nodeKey(root.issue)].container, true);
+    assert.equal(byKey[nodeKey(parent.issue)].container, true);
+    assert.equal(byKey[nodeKey(leafChild.issue)].container, false);
   });
 
-  test('a project row is read too, and an empty page has none', () => {
+  test('a project row is read too, and an empty page has no rows to record', () => {
     const project = node('LIN-9', [node('LIN-10')]);
-    assert.deepEqual(containerNodeKeysOf({ projectTrees: [{ incomplete: [project], completed: [] }] }), [nodeKey(project.issue)]);
-    assert.deepEqual(containerNodeKeysOf({}), []);
+    assert.equal(rowDataByNodeKey({ projectTrees: [{ incomplete: [project], completed: [] }], rowStates: null })[nodeKey(project.issue)].container, true);
+    assert.deepEqual(rowDataByNodeKey({ rowStates: null }), {});
   });
 });
 
@@ -70,29 +71,31 @@ describe('the Home mount — each opened row gets its container flag and the sta
     return { inits, mount: (rows) => sandbox.mountHomePromptSections({ querySelectorAll: () => rows }) };
   }
 
-  test('a container row is flagged isContainer; a leaf row is not, and the stage words reach both', () => {
+  test('a container row carries container in its record; a leaf row does not, and the stage words reach both', () => {
     const { inits, mount } = mountWith({
-      containerNodeKeys: ['linear:parent'],
+      rowData: { 'linear:parent': { container: true, finished: false, attention: null, copyStep: { label: 'plan', name: 'Plan', why: '' }, trackerWord: 'In progress' } },
       stageWords: { research: 'Research', implementation: 'Build' },
     });
     mount([placeholder('linear:parent', '1'), placeholder('linear:leaf', '2')]);
     const byNode = (key) => inits.find((i) => i.el.dataset.nodeKey === key).opts;
-    assert.equal(byNode('linear:parent').isContainer, true);
-    assert.equal(byNode('linear:leaf').isContainer, false);
+    assert.equal(byNode('linear:parent').row.container, true);
+    assert.equal(byNode('linear:leaf').row, null);
     assert.equal(JSON.stringify(byNode('linear:leaf').stageWords), JSON.stringify({ research: 'Research', implementation: 'Build' }), 'the stage words name each step');
   });
 
   test('a fetched row\'s container flag is merged into the page map before it mounts (mergeHomeRowOpts)', () => {
-    const { inits, mount } = mountWith({ containerNodeKeys: [] });
+    const { inits, mount } = mountWith({ rowData: {} });
     const sandbox = {
-      window: { __HOME_PROMPT_OPTS__: { containerNodeKeys: [] } },
+      window: { __HOME_PROMPT_OPTS__: { rowData: {} } },
     };
     vm.createContext(sandbox);
     vm.runInContext(`${functionSource(APP, 'mergeHomeRowOpts')}\nthis.mergeHomeRowOpts = mergeHomeRowOpts;`, sandbox);
-    sandbox.mergeHomeRowOpts({ containerNodeKeys: ['linear:fetched-parent'] });
-    sandbox.mergeHomeRowOpts({ containerNodeKeys: ['linear:fetched-parent'] });
+    const fetched = { 'linear:fetched-parent': { container: true, finished: false, attention: null, copyStep: { label: 'plan', name: 'Plan', why: '' }, trackerWord: 'In progress' } };
+    sandbox.mergeHomeRowOpts({ rowData: fetched });
+    sandbox.mergeHomeRowOpts({ rowData: fetched });
     // The page map is built inside the vm context, so compare its JSON, not a cross-realm array.
-    assert.equal(JSON.stringify(sandbox.window.__HOME_PROMPT_OPTS__.containerNodeKeys), '["linear:fetched-parent"]', 'merged once, not duplicated');
+    assert.equal(Object.keys(sandbox.window.__HOME_PROMPT_OPTS__.rowData).length, 1, 'merged once, not duplicated');
+    assert.equal(sandbox.window.__HOME_PROMPT_OPTS__.rowData['linear:fetched-parent'].container, true);
     assert.equal(inits.length, 0, 'the merge alone mounts nothing');
     mount([]);
   });

@@ -18,11 +18,16 @@ import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 import { USUAL_STAGES, SPINE } from '../../lib/run-view.js';
 import { buildRowStates, buildTaskPageModel, nextStepOf, waitingForOf, sessionSummaryOf, guessStages } from '../../lib/task-page-loader.js';
-import { focusSubtaskByNodeKey, buildInProgressCountParts } from '../../lib/task-board-view.js';
+import { buildInProgressCountParts } from '../../lib/task-board-view.js';
 import { renderHomeStatus } from '../../lib/render-task-page.js';
+
+// LIN-4016: Home's pill reads the task's decided state, the one /state sends (its own facts, no tracker word).
+const stateOf = (model) => taskStateOf(taskFactsOf({ model, identifier: model.identifier, now: NOW }));
 import { renderPage } from '../../lib/render.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 import { escapeHtml } from '../../lib/utils/html.js';
+import { needsAPerson, taskStateOf, taskFactsOf } from '../../lib/task-state.js';
+import { serverSessions, serverRow } from '../fixtures/task-decision.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
@@ -133,8 +138,8 @@ describe('LIN-4010 — a waiting task is a ruling or a park', () => {
   test('the row: a ruling needs you, a park reads parked and is not counted in "needs you"', () => {
     const roots = [node('LIN-62'), node('LIN-63')];
     const s = states({ roots, loops: { 'LIN-62': [rulingLoop({ issueIdentifier: 'LIN-62' })], 'LIN-63': [parkLoop({ issueIdentifier: 'LIN-63' })] } });
-    assert.equal(s.get('LIN-62').needsYou, true);
-    assert.equal(s.get('LIN-63').needsYou, false);
+    assert.equal(needsAPerson(s.get('LIN-62').state), true);
+    assert.equal(needsAPerson(s.get('LIN-63').state), false);
     assert.equal(s.get('LIN-63').words, 'parked');
     assert.equal(s.get('LIN-63').tone, 'parked');
     // LIN-4024: the count line counts rulings (one open ruling here) and tasks that run or failed; a park is neither.
@@ -148,30 +153,26 @@ describe('LIN-4010 — a waiting task is a ruling or a park', () => {
 
   test('a failed stage still needs a person, whatever the waiting word', () => {
     const s = states({ roots: [node('LIN-64')], loops: { 'LIN-64': [failedLoop('review', { issueIdentifier: 'LIN-64' })] } });
-    assert.equal(s.get('LIN-64').needsYou, true);
+    assert.equal(needsAPerson(s.get('LIN-64').state), true);
     assert.equal(s.get('LIN-64').tone, 'failed');
   });
 });
 
 // ─── containers: the row and the opened task run on the same subtask ─────────
 
-describe('LIN-4010 — a container\'s row names the subtask its opened task runs on', () => {
+describe('LIN-4010 — a container\'s row reads the step its subtask is on', () => {
   const child = () => node('LIN-71', 'unstarted');
 
-  test('an open child and nothing of the container\'s own: the row names the child and its step, and the focus is the child', () => {
+  test('an open child and nothing of the container\'s own: the row reads the child\'s next step', () => {
     const parent = node('LIN-70', 'started', [child()]);
     const s = states({ roots: [parent] });
-    // LIN-4024: the row says its state once; the subtask it runs on is named in runOn, not in the words.
     assert.equal(s.get('LIN-70').words, 'Research next');
-    assert.equal(s.get('LIN-70').focus.identifier, 'LIN-71');
-    assert.equal(s.get('LIN-70').runOn.identifier, 'LIN-71');
     assert.equal(s.get('LIN-70').tone, 'ready');
   });
 
   test('the container\'s own landed work comes first: implementation done, a todo child, no focus (the selector would not defer)', () => {
     const parent = node('LIN-72', 'started', [child()]);
     const s = states({ roots: [parent], loops: { 'LIN-72': [doneLoop('plan', { issueIdentifier: 'LIN-72' }), doneLoop('implementation', { issueIdentifier: 'LIN-72' })] } });
-    assert.equal(s.get('LIN-72').focus, null);
     assert.equal(s.get('LIN-72').words, 'Review next', 'its own trail decides: Review is next, as the selector would have it');
     assert.doesNotMatch(s.get('LIN-72').words, /LIN-71/);
   });
@@ -179,41 +180,26 @@ describe('LIN-4010 — a container\'s row names the subtask its opened task runs
   test('a container whose own stage failed keeps its own failed row, no focus', () => {
     const parent = node('LIN-73', 'started', [child()]);
     const s = states({ roots: [parent], loops: { 'LIN-73': [doneLoop('plan', { issueIdentifier: 'LIN-73' }), failedLoop('plan-review', { issueIdentifier: 'LIN-73' })] } });
-    assert.equal(s.get('LIN-73').focus, null);
     assert.equal(s.get('LIN-73').words, 'Plan review failed');
   });
 
   test('a container with its own session running has no focus', () => {
     const parent = node('LIN-74', 'started', [child()]);
     const s = states({ roots: [parent], loops: { 'LIN-74': [loop({ issueIdentifier: 'LIN-74', kind: 'plan' })] } });
-    assert.equal(s.get('LIN-74').focus, null);
     assert.match(s.get('LIN-74').words, /^Plan running/);
   });
 
-  test('a container whose children are all finished has no focus', () => {
+  test('a container whose children are all finished reads its own tracker state, not a child\'s', () => {
     const parent = node('LIN-75', 'started', [node('LIN-76', 'completed')]);
     const s = states({ roots: [parent] });
-    assert.equal(s.get('LIN-75').focus, null);
+    assert.doesNotMatch(s.get('LIN-75').words, /LIN-76/);
   });
 
   test('a running child names its state on the container row', () => {
     const parent = node('LIN-77', 'started', [node('LIN-78', 'started')]);
     const s = states({ roots: [parent], loops: { 'LIN-78': [loop({ issueIdentifier: 'LIN-78', kind: 'plan' })] } });
-    assert.equal(s.get('LIN-77').focus.identifier, 'LIN-78');
     assert.match(s.get('LIN-77').words, /^Plan running/);
-    assert.equal(s.get('LIN-77').runOn.identifier, 'LIN-78');
     assert.equal(s.get('LIN-77').running, true, 'the count line counts a container whose subtask runs');
-  });
-
-  test('focusSubtaskByNodeKey carries the child\'s id, title, source and task-page link, keyed by the container\'s node key', () => {
-    const parent = node('LIN-79', 'started', [child()]);
-    const rowStates = states({ roots: [parent] });
-    const byKey = focusSubtaskByNodeKey({ urlKey: 'acme', inProgressTrees: [{ roots: [parent] }], rowStates });
-    const entry = Object.values(byKey)[0];
-    assert.equal(entry.identifier, 'LIN-71');
-    assert.equal(entry.id, 'id-LIN-71');
-    assert.match(entry.href, /LIN-71/);
-    assert.equal(Object.keys(byKey).length, 1, 'only the container has an entry');
   });
 });
 
@@ -223,14 +209,14 @@ describe('LIN-4010 — Home\'s state is one line, with no "Harbour:" label', () 
   test('a waiting task reads needs you or parked, by its ruling', () => {
     const ruling = buildTaskPageModel({ identifier: 'LIN-80', loops: [rulingLoop({ issueIdentifier: 'LIN-80' })], ctx: null, enrichLoop, deriveSessionWaiting, now: NOW });
     const park = buildTaskPageModel({ identifier: 'LIN-81', loops: [parkLoop({ issueIdentifier: 'LIN-81' })], ctx: null, enrichLoop, deriveSessionWaiting, now: NOW });
-    assert.match(renderHomeStatus(ruling, { now: NOW }), /data-testid="home-task-status-pill"[^>]*><span class="status-pill__dot" aria-hidden="true"><\/span>needs you</);
-    assert.match(renderHomeStatus(park, { now: NOW }), /needs you|parked/);
-    assert.match(renderHomeStatus(park, { now: NOW }), />parked</);
+    assert.match(renderHomeStatus(ruling, { now: NOW, taskState: stateOf(ruling) }), /data-testid="home-task-status-pill"[^>]*><span class="status-pill__dot" aria-hidden="true"><\/span>needs you</);
+    assert.match(renderHomeStatus(park, { now: NOW, taskState: stateOf(park) }), /needs you|parked/);
+    assert.match(renderHomeStatus(park, { now: NOW, taskState: stateOf(park) }), />parked</);
   });
 
   test('no "Harbour:" label in Home\'s line; the task page keeps its own status', () => {
     const model = buildTaskPageModel({ identifier: 'LIN-82', loops: [], ctx: null, enrichLoop, deriveSessionWaiting, now: NOW });
-    assert.equal(renderHomeStatus(model, { now: NOW }).includes('Harbour:'), false);
+    assert.equal(renderHomeStatus(model, { now: NOW, taskState: stateOf(model) }).includes('Harbour:'), false);
   });
 
   test('sessions.offered carries the reason the box says', () => {
@@ -241,7 +227,7 @@ describe('LIN-4010 — Home\'s state is one line, with no "Harbour:" label', () 
   // LIN-4010 review (finding 1): a running task names its state once, in the running box, so Home's line is left out.
   test('a running task has no Home state line: the running box says it once', () => {
     const model = { status: 'running', sentence: 'Build running for 1s.', sentenceAt: null, sessions: [{ kind: 'implementation', state: 'running' }] };
-    assert.equal(renderHomeStatus(model, { now: NOW }), '');
+    assert.equal(renderHomeStatus(model, { now: NOW, taskState: taskStateOf({ running: { words: 'Build running' } }) }), '');
   });
 
   // LIN-4010 review (finding 2): an idle task's "Last: …" is the Last line under the run box, not a second copy here.
@@ -250,7 +236,7 @@ describe('LIN-4010 — Home\'s state is one line, with no "Harbour:" label', () 
       status: 'idle', sentence: 'No session running. Last: Plan done just now.', sentenceAt: '2026-10-29T10:03:00.000Z',
       sessions: [{ kind: 'plan', state: 'done' }], waitingFor: null,
     };
-    const html = renderHomeStatus(model, { now: NOW });
+    const html = renderHomeStatus(model, { now: NOW, taskState: taskStateOf({}) });
     assert.match(html, /No session running\.</);
     assert.equal(html.includes('Last:'), false);
   });
@@ -259,7 +245,7 @@ describe('LIN-4010 — Home\'s state is one line, with no "Harbour:" label', () 
   // nothing was happening. The run box's "the next step for this task" is the one statement, so Home has no line here.
   test('an idle task with no sessions has no Home state line: the run box says the next step', () => {
     const model = { status: 'idle', sentence: 'No sessions yet.', sentenceAt: null, sessions: [], waitingFor: null };
-    assert.equal(renderHomeStatus(model, { now: NOW }), '');
+    assert.equal(renderHomeStatus(model, { now: NOW, taskState: taskStateOf({}) }), '');
   });
 });
 
@@ -311,7 +297,9 @@ function makeContainer() {
   return container;
 }
 
-function loadClient({ stateBody = null, previewBody = null, presetsBody = [], panelHtml = '' } = {}) {
+function loadClient({ stateBody = null, previewBody = null, presetsBody = [], panelHtml = '', container = false } = {}) {
+  // LIN-4016: the state body is the server's (its `sessions` carry the decision: queued, busy, action and canStop).
+  if (stateBody && stateBody.sessions) stateBody = { ...stateBody, sessions: serverSessions(stateBody.sessions, { container }) };
   const calls = { api: [], dispatch: [], post: [] };
   const window = {
     escapeHtml: (x) => (x == null ? '' : escapeHtml(String(x))),
@@ -359,6 +347,8 @@ const HOME = {
   defaultPromptKeys: ['look-into', 'research', 'plan', 'implementation'],
   morePromptKeys: ['review', 'scoping', 'plan-review'],
   issue: { id: 'uuid-42', identifier: 'LIN-42', title: 'T', url: '', source: 'linear', stateType: 'started' },
+  // LIN-4016: the row's decision record, as the server stamps it.
+  row: serverRow({ stateType: 'started' }),
 };
 const PLAN_NEXT = {
   count: 1, next: { kind: 'plan-review', label: 'Plan review' },
@@ -423,11 +413,12 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
   // the autopilot on it; no subtask's stage is offered, read, or named from Home.
   test('a container: no stage step is offered, the state read is the container\'s own, and its one action is Run to PR', async () => {
     const { PromptSection, calls } = loadClient({
+      container: true,
       stateBody: { status: 'idle', live: false, homeStatusHtml: '<p>idle</p>', sessions: { ...PLAN_NEXT, offered: { kind: 'research', label: 'Research', why: 'usual', failed: false, reason: 'the next step for this task' }, next: { kind: 'research', label: 'Research' } } },
       previewBody: { kind: 'research', harness: 'claude-code', words: {}, sources: {}, group: null },
     });
     const c = makeContainer();
-    PromptSection.init(c, { ...HOME, isContainer: true });
+    PromptSection.init(c, { ...HOME, row: serverRow({ container: true }) });
     await flush(); await flush();
     assert.ok(calls.api.some((u) => u.includes('/api/task/LIN-42/state?issueId=uuid-42')), 'the state read is the container\'s');
     assert.equal(calls.api.some((u) => u.includes('/api/task/LIN-99/')), false, 'no subtask is read');
@@ -443,7 +434,7 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
       stateBody: { status: 'idle', live: false, homeStatusHtml: '<p>OWN-IDLE-LINE</p>', sessions: PLAN_NEXT },
     });
     const c = makeContainer();
-    PromptSection.init(c, { ...HOME, isContainer: true, subtaskNeedsYou: { identifier: 'LIN-99', title: 'Models rows', href: '/workspace/acme/task/LIN-99' } });
+    PromptSection.init(c, { ...HOME, row: serverRow({ container: true, attention: { identifier: 'LIN-99', title: 'Models rows', href: '/workspace/acme/task/LIN-99', state: 'needs-you', lead: 'A subtask needs you', detail: '' } }) });
     await flush(); await flush();
     assert.match(c.innerHTML, /data-testid="opened-task-needs-you">A subtask needs you: <span class="opened-task-needs-you-name">LIN-99 Models rows/);
     assert.equal(c.innerHTML.includes('OWN-IDLE-LINE'), false, 'the parent\'s own idle line is not shown beside it');
@@ -454,7 +445,7 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
       stateBody: { status: 'idle', live: false, homeStatusHtml: '<p>OWN-IDLE-LINE</p>', sessions: PLAN_NEXT },
     });
     const c = makeContainer();
-    PromptSection.init(c, { ...HOME, isContainer: true });
+    PromptSection.init(c, { ...HOME, row: serverRow({ container: true }) });
     await flush(); await flush();
     assert.match(c.innerHTML, /OWN-IDLE-LINE/);
     assert.equal(c.innerHTML.includes('opened-task-needs-you'), false);
@@ -464,7 +455,7 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
   test('copy-first: the Write the prompt button is the primary, and the step line starts with the stage name', async () => {
     const { PromptSection } = loadClient({ stateBody: { status: 'idle', live: false, homeStatusHtml: '<p>No sessions yet.</p>', sessions: { count: 0 } } });
     const c = makeContainer();
-    PromptSection.init(c, { ...HOME, dispatchEnabled: false, issue: { ...HOME.issue, stateType: 'backlog' } });
+    PromptSection.init(c, { ...HOME, dispatchEnabled: false, issue: { ...HOME.issue, stateType: 'backlog' }, row: serverRow({ stateType: 'backlog' }) });
     await flush(); await flush();
     assert.match(c.innerHTML, /class="btn btn--primary opened-task-write" data-testid="opened-task-write"/);
     assert.match(c.innerHTML, /data-testid="opened-task-step"><span class="opened-task-step-name">Scoping<\/span> \u00b7 the first step for a task in Backlog/);
@@ -525,7 +516,7 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
       stateBody: { status: 'running', live: true, homeStatusHtml: '', headerHtml: '', sessions: { count: 1, running, next: null, last: null, offered: null, busy: true, excluded: [] } },
     });
     const c = makeContainer();
-    PromptSection.init(c, { ...HOME, isContainer: true });
+    PromptSection.init(c, { ...HOME, row: serverRow({ container: true }) });
     await flush(); await flush();
     assert.match(c.innerHTML, /href="\/workspace\/acme\/task\/LIN-42"[^>]*data-testid="opened-task-watch"/);
   });
@@ -537,7 +528,7 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
       stateBody: { status: 'running', live: true, homeStatusHtml: '', headerHtml: '', sessions: { count: 1, running, next: null, last: null, offered: null, busy: true, excluded: [] } },
     });
     const c = makeContainer();
-    PromptSection.init(c, { ...HOME, isContainer: true });
+    PromptSection.init(c, { ...HOME, row: serverRow({ container: true }) });
     await flush(); await flush();
     await c.click({ action: 'stop-run' });
     await c.click({ action: 'stop-run-confirm' });
