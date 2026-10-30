@@ -36,7 +36,7 @@ In the [shots/](shots/), magenta numbered markers point at the item with that nu
 
 **1. Three buttons, by how far to go.** **John**
 - *Now:* one main action. A task with subtasks offers only "Run to PR" (the autopilot, stopping when a PR is open). A task without subtasks offers one named step ("Run Research"). As far as the code shows, Home never offers a run all the way to Done. [1](shots/1-home-parent.png) marker 1.
-- *Wanted:* three buttons, "Next step", "Run to PR" and "Run to Done", ordered left to right by trust, so a new project starts on single steps and moves right as confidence grows. Which one is filled is still open (see the end); the proposal is the one this person last used on this workspace, which needs nothing configured.
+- *Wanted:* three buttons, "Next step", "Run to PR" and "Run to Done", ordered left to right by trust, so a new project starts on single steps and moves right as confidence grows. **John:** the filled one is the one this person last used on this workspace, and "Next step" on a workspace that has never run anything. Nothing to configure.
 
 **2. "Next step" never names a step in advance.** **John**
 - *Now:* on a task without subtasks, the button names a step from an estimate ("Run Research"). On a parent, the heading says "Run to PR" and the line under it says "the next step for this task": two answers to one question. [1](shots/1-home-parent.png) marker 2. After a plan review the next step could be Plan again (changes asked for) or Build, and the estimate can't tell which.
@@ -44,7 +44,7 @@ In the [shots/](shots/), magenta numbered markers point at the item with that nu
 
 **3. "Run to PR" and "Run to Done" say what Harbour picked.**
 - *Now:* nothing says whether "Run to PR" on a parent will work on the parent or on one of its subtasks, or where it will stop. [1](shots/1-home-parent.png) marker 3.
-- *Wanted:* before a run, one line: Harbour picks where to start, this task or one of its subtasks. After it starts: what it picked, and where it will stop ("Running to PR · started with Research on LIN-4011").
+- *Wanted:* before a run, one line: Harbour picks where to start, this task or one of its subtasks. Once that is known (the autopilot decides after it starts): what it picked, and where it will stop ("Running to PR · started with Research on LIN-4011"). Until then, say it is deciding.
 
 **4. While anything under a task is running or waiting on you, offer no run that would collide with it.**
 - *Now:* in production, LIN-4033's box says "● idle · No session running." while its row and its subtask say "Close-out running · 5m 57s", and it offers "Run to PR". [4](shots/4-production-4033.png), the LIN-4033 box. Locally, LIN-4008 offers "Run to PR" while both its subtasks wait on rulings. [1](shots/1-home-parent.png) marker 3.
@@ -142,8 +142,7 @@ In the [shots/](shots/), magenta numbered markers point at the item with that nu
 
 ## Still open, for John
 
-1. **How the filled button is chosen** (item 1): the last one used, or Harbour suggesting a move up ("Your last 10 PRs merged clean. Try Run to Done?").
-2. **Which views stay in the bar** (item 25).
+1. **Which views stay in the bar** (item 25). Until John says, keep today's bar.
 
 ## Not ours: for the code rounds
 
