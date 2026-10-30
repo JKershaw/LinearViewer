@@ -320,7 +320,7 @@
       // after-run line stay in the run block.
       const step = runStepOfState(state, opts);
       if (step) html += `<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-step" data-action="run-step-next">Run ${esc(step.label)}</button>`;
-      else if (mainActionOf(state) && mainActionOf(state).kind === 'run-to-pr') html += '<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-task" data-action="go">Run to PR</button>';
+      else if (actionOf(state) && actionOf(state).kind === 'run-to-pr') html += '<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-task" data-action="go">Run to PR</button>';
     } else {
       html += `<button class="opened-task-go" data-testid="opened-task-go" data-rung="run-task" data-action="go">Go</button>`;
     }
@@ -627,17 +627,18 @@
   // LIN-3968: the offered step (`sessions.offered`), so a running stage offers no other step, and a failed stage
   // is offered again. `sessions.next` stays the "comes next" wording after a run.
   // LIN-4024: a container offers no stage step (its one action is Run to PR), whatever a step chosen for this run says.
-  // LIN-4016: a finished task offers no stage step either (the row's record says so; `sessions.action` is /state's, tracker-free).
+  // LIN-4049: a finished task offers no stage step either, because /state's `actions` is empty for it (the server decides).
   function runStepOfState(state, opts) {
-    const action = mainActionOf(state);
+    const action = actionOf(state);
     // Busy (nothing is offered), a container (its one action is Run to PR) or a finished task offers no stage step.
-    if (!action || (opts && opts.row && (opts.row.container || opts.row.finished))) return null;
+    if (!action || (opts && opts.row && opts.row.container)) return null;
     return (state.run && state.run.step) || (action.kind === 'step' ? action.step : null);
   }
-  // LIN-4016: the one main action the server decided (`sessions.action`): a step, Run to PR, or null while busy.
-  function mainActionOf(state) {
+  // LIN-4049: the one action the server decided (`sessions.actions`, which replaces `sessions.action`): a step, Run to PR,
+  // or none while busy, finished, or anything in the subtree runs, is queued or needs you. S2 adds the other reaches.
+  function actionOf(state) {
     const sessions = state.opened && state.opened.sessions;
-    return (sessions && sessions.action) || null;
+    return (sessions && sessions.actions && sessions.actions[0]) || null;
   }
   // LIN-3975 (review finding 1): busy is any session running, queued or waiting on an answer (`sessions.busy`, the server's).
   function stageBusy(state) {
@@ -1228,10 +1229,10 @@
     // task cannot take it: the steps never offered as a next step (`summary.excluded`, retro), and every step once
     // the task is finished. Every other step always fits, so Build and Review stay on the list after a Review
     // session. The rule does not read the stage order. Before the state is read nothing is left out.
-    function stepFits(kind, summary, finished) {
+    function stepFits(kind, summary) {
       if (!summary) return true;
       if ((summary.excluded || []).includes(kind)) return false;
-      if (finished) return false;
+      if (summary.finished) return false;
       return true;
     }
 
@@ -1242,7 +1243,7 @@
       const defaults = opts.defaultPromptKeys || [];
       const more = (opts.morePromptKeys || []).filter((k) => !defaults.includes(k));
       const summary = state.opened && state.opened.sessions;
-      const fits = (k) => stepFits(k, summary, !!(opts.row && opts.row.finished));
+      const fits = (k) => stepFits(k, summary);
       const shownDefaults = defaults.filter(fits);
       const shownMore = more.filter(fits);
       const leftOut = [...defaults, ...more].filter((k) => !fits(k)).length;
@@ -1503,7 +1504,7 @@
       const active = !!(summary.running || state.run.item);
       // LIN-4042: a finished task has nothing to run, so Home's run box names no run for it (no step line, Go or runs-on).
       // The "Another step" list stays, with its count of steps left out (LIN-3833 ruling f9fa6bd7). A run already active keeps its box.
-      if (!active && opts.row && opts.row.finished) {
+      if (!active && summary.finished) {
         return `<div class="opened-task-run" data-run-slot data-testid="opened-task-run">${renderRunMore(step)}${renderStagedProposals()}${renderLastLine()}</div>`;
       }
       if (active) {
@@ -2038,9 +2039,11 @@
     function readTaskState() {
       if (typeof window.api !== 'function') return Promise.resolve(null);
       if (!opts.urlKey || !issue.identifier || !issueId) return Promise.resolve(null);
-      // LIN-4016: a container's own fact rides on the read (`container=1`), so `sessions.action` offers Run to PR.
+      // LIN-4016: a container's own fact rides on the read (`container=1`), so `sessions.actions` offers Run to PR.
       const containerQuery = opts.row && opts.row.container ? '&container=1' : '';
-      const url = `/workspace/${encodeURIComponent(opts.urlKey)}/api/task/${encodeURIComponent(issue.identifier)}/state?issueId=${encodeURIComponent(issueId)}${containerQuery}`;
+      // LIN-4049: the tracker's finished word, advisory: /state can only narrow the box with it, never open it.
+      const finishedQuery = opts.row && opts.row.finished ? '&finished=1' : '';
+      const url = `/workspace/${encodeURIComponent(opts.urlKey)}/api/task/${encodeURIComponent(issue.identifier)}/state?issueId=${encodeURIComponent(issueId)}${containerQuery}${finishedQuery}`;
       return Promise.resolve()
         .then(() => window.api(url, { on401: false }))
         .catch(() => null);

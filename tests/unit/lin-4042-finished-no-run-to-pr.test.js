@@ -1,5 +1,5 @@
 /**
- * LIN-4042 — Home offers no run on a finished task. The server's `sessions.action` (`mainActionOf`) reads /state, which never
+ * LIN-4042 — Home offers no run on a finished task. The server's `sessions.actions` (`actionsOf`, LIN-4049) reads /state, which never
  * reads the tracker, so for a Done task it still says Run to PR. The row record's `finished` is the signal Home has, and the
  * run control must read it: a finished task shows no run (no Run to PR, no step, no runs-on, no Go). Unfinished tasks and
  * tasks with open subtasks keep their Run to PR. The first case fails before the fix (Run to PR was painted for a finished row).
@@ -111,10 +111,10 @@ const HOME = {
   row: rowRecordOf({ stateType: 'started' }),
 };
 
-// The server's decision for a task with nothing running: `action` is what `mainActionOf` chose from /state (tracker-free).
+// The server's decision for a task with nothing running: `actions` is what `actionsOf` chose from /state (tracker-free).
 const stateWith = (sessions) => ({
   status: 'idle', live: false, headerHtml: '', stripHtml: '', homeStatusHtml: '',
-  sessions: { count: 0, next: null, last: null, offered: null, excluded: [], queued: null, busy: false, action: null, canStop: false, running: null, ...sessions },
+  sessions: { count: 0, next: null, last: null, offered: null, excluded: [], queued: null, busy: false, actions: [], canStop: false, running: null, ...sessions },
 });
 
 async function paint(stateBody, opts = {}) {
@@ -130,49 +130,55 @@ const PLAN_OFFER = { kind: 'plan', label: 'Plan', why: 'usual', failed: false, r
 const DONE_ROW = () => rowRecordOf({ stateType: 'completed' });
 
 describe('LIN-4042 — a finished task on Home offers no run', () => {
-  test('a Done task whose server action is Run to PR paints no Run to PR button', async () => {
-    const html = await paint(stateWith({ action: RUN_TO_PR }), { row: DONE_ROW() });
+  test('a Done task whose server says finished and offers no actions paints no Run to PR button', async () => {
+    const html = await paint(stateWith({ finished: true, actions: [] }), { row: DONE_ROW() });
     assert.doesNotMatch(html, /Run to PR/, 'a finished task has nothing to run');
     assert.doesNotMatch(html, /data-action="go"/, 'no go button on a finished task');
     assert.doesNotMatch(html, /data-testid="opened-task-runs-on"/, 'no runs-on line, so no Change for a run');
   });
 
+  // LIN-4049: the browser no longer patches a run from the row record. The server decides `actions` and `finished`.
+  test('a Done row does not hide a run the server offers: the browser follows /state, not row.finished', async () => {
+    const html = await paint(stateWith({ finished: false, actions: [RUN_TO_PR] }), { row: DONE_ROW() });
+    assert.match(html, /Run to PR/, 'the server offered a run, so the browser paints it');
+  });
+
   test('a Done task keeps the Another step list, with its steps counted as left out (LIN-3833 ruling f9fa6bd7)', async () => {
-    const html = await paint(stateWith({ action: RUN_TO_PR }), { row: DONE_ROW() });
+    const html = await paint(stateWith({ finished: true, actions: [] }), { row: DONE_ROW() });
     assert.match(html, /data-testid="run-another"/);
   });
 
   test('a Done task offers no stage step either (the step case stays a guard)', async () => {
-    const html = await paint(stateWith({ offered: PLAN_OFFER, action: { kind: 'step', step: PLAN_OFFER, why: PLAN_OFFER.reason } }), { row: DONE_ROW() });
+    const html = await paint(stateWith({ offered: PLAN_OFFER, finished: true, actions: [] }), { row: DONE_ROW() });
     assert.doesNotMatch(html, /data-action="run-step-next"/);
   });
 
   test('an unfinished task whose server action is Run to PR keeps its Run to PR button', async () => {
-    const html = await paint(stateWith({ action: RUN_TO_PR }), { row: rowRecordOf({ stateType: 'started' }) });
+    const html = await paint(stateWith({ actions: [RUN_TO_PR] }), { row: rowRecordOf({ stateType: 'started' }) });
     assert.match(html, /data-action="go"[^>]*>Run to PR</);
   });
 
   test('a task with open subtasks (a container) keeps its Run to PR button', async () => {
-    const html = await paint(stateWith({ action: RUN_TO_PR }), { row: rowRecordOf({ stateType: 'started', container: true }) });
+    const html = await paint(stateWith({ actions: [RUN_TO_PR] }), { row: rowRecordOf({ stateType: 'started', container: true }) });
     assert.match(html, /data-action="go"[^>]*>Run to PR</);
   });
 
   // Close-out of the review ledger (items 1 and 2): the change's own claims, pinned.
   test('a Done task with a running run keeps its running box and Stop (the early return needs !active)', async () => {
     const running = { loopId: 'loop-1', kind: 'implementation', label: 'Build', state: 'running', since: '2026-10-30T10:00:00.000Z', target: 'local' };
-    const html = await paint(stateWith({ running, busy: true, action: null, canStop: true }), { row: DONE_ROW() });
+    const html = await paint(stateWith({ running, busy: true, finished: true, actions: [], canStop: true }), { row: DONE_ROW() });
     assert.match(html, /data-testid="opened-task-running"/);
     assert.match(html, /data-testid="run-stop"/);
   });
 
   test('a Done task with a queued run keeps its queued box', async () => {
     const queued = { loopId: 'q-1', kind: 'implementation', label: 'Build', state: 'queued', target: 'cli' };
-    const html = await paint(stateWith({ running: queued, queued, busy: true, action: null, canStop: true }), { row: DONE_ROW() });
+    const html = await paint(stateWith({ running: queued, queued, busy: true, finished: true, actions: [], canStop: true }), { row: DONE_ROW() });
     assert.match(html, /data-testid="opened-task-queued"/);
   });
 
   test('a finished container (Done parent with an open subtask) offers no run: a recorded choice (LIN-4042 review ledger 2)', async () => {
-    const html = await paint(stateWith({ action: RUN_TO_PR }), { row: rowRecordOf({ stateType: 'completed', container: true }) });
+    const html = await paint(stateWith({ finished: true, actions: [] }), { row: rowRecordOf({ stateType: 'completed', container: true }) });
     assert.doesNotMatch(html, /data-action="go"/);
     assert.doesNotMatch(html, /Run to PR/);
   });

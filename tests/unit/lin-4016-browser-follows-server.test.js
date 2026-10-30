@@ -1,5 +1,5 @@
 /**
- * LIN-4016 W4 — the browser follows the server. The run control reads the decision the server sent (`sessions.action`,
+ * LIN-4016 W4 — the browser follows the server. The run control reads the decision the server sent (`sessions.actions`,
  * `sessions.canStop`, `sessions.queued`, `sessions.busy`, and the row's record) and paints it. Each case feeds a
  * `/state` body whose decision contradicts what the old browser would have inferred from the other fields (an offered
  * step with no action; a running session that cannot be stopped; a finished row with a tracker type the old list did
@@ -126,7 +126,7 @@ const HOME = {
 // A state body whose sessions say what the server decided: `running`, `queued`, `busy`, `action`, `canStop` as given.
 const stateWith = (sessions) => ({
   status: 'idle', live: false, headerHtml: '', stripHtml: '', homeStatusHtml: '',
-  sessions: { count: 1, next: null, last: null, offered: null, excluded: [], queued: null, busy: false, action: null, canStop: false, running: null, ...sessions },
+  sessions: { count: 1, next: null, last: null, offered: null, excluded: [], queued: null, busy: false, actions: [], canStop: false, running: null, ...sessions },
 });
 
 async function paint(stateBody, opts = {}) {
@@ -141,37 +141,37 @@ const PLAN_OFFER = { kind: 'plan', label: 'Plan', why: 'usual', failed: false, r
 
 describe('LIN-4016 W4 — the run control paints the server\'s decision', () => {
   test('an offered step with action null (busy on the server): no step button and no Run to PR, whatever the offer says', async () => {
-    const html = await paint(stateWith({ offered: PLAN_OFFER, action: null, busy: true }));
+    const html = await paint(stateWith({ offered: PLAN_OFFER, actions: [], busy: true }));
     assert.doesNotMatch(html, /data-action="run-step-next"/, 'busy offers no step button');
     assert.doesNotMatch(html, /Run to PR/, 'busy offers no Run to PR');
   });
 
   test('the server\'s step action is the main button, even with no offer field', async () => {
-    const html = await paint(stateWith({ offered: PLAN_OFFER, action: { kind: 'step', step: PLAN_OFFER, why: PLAN_OFFER.reason } }));
+    const html = await paint(stateWith({ offered: PLAN_OFFER, actions: [{ kind: 'step', step: PLAN_OFFER, why: PLAN_OFFER.reason }] }));
     assert.match(html, /data-action="run-step-next"[^>]*>Run Plan</);
   });
 
   test('a container: the server\'s run-to-pr action is Run to PR and no stage step, even when an offer is set', async () => {
-    const html = await paint(stateWith({ offered: PLAN_OFFER, action: { kind: 'run-to-pr', why: 'a container runs to PR' } }), { row: rowRecordOf({ stateType: 'started', container: true }) });
+    const html = await paint(stateWith({ offered: PLAN_OFFER, actions: [{ kind: 'run-to-pr', why: 'a container runs to PR' }] }), { row: rowRecordOf({ stateType: 'started', container: true }) });
     assert.match(html, /data-action="go"[^>]*>Run to PR</);
     assert.doesNotMatch(html, /run-step-next/);
   });
 
   test('a running session whose canStop is false has no Stop, whatever its target', async () => {
     const running = { loopId: 'loop-1', kind: 'implementation', label: 'Build', state: 'running', since: '2026-10-30T10:00:00.000Z', target: 'cli' };
-    const html = await paint(stateWith({ running, busy: true, action: null, canStop: false }));
+    const html = await paint(stateWith({ running, busy: true, actions: [], canStop: false }));
     assert.doesNotMatch(html, /data-testid="run-stop"/, 'the server says this run cannot be stopped from here');
   });
 
   test('a running session whose canStop is true has Stop', async () => {
     const running = { loopId: 'loop-1', kind: 'implementation', label: 'Build', state: 'running', since: '2026-10-30T10:00:00.000Z', target: 'local' };
-    const html = await paint(stateWith({ running, busy: true, action: null, canStop: true }));
+    const html = await paint(stateWith({ running, busy: true, actions: [], canStop: true }));
     assert.match(html, /data-testid="run-stop"/);
   });
 
   test('a queued run (the server\'s queued) reads queued with Undo, and never as running', async () => {
     const queued = { loopId: 'q-1', kind: 'implementation', label: 'Build', state: 'queued', target: 'cli' };
-    const html = await paint(stateWith({ running: queued, queued, busy: true, action: null, canStop: true }));
+    const html = await paint(stateWith({ running: queued, queued, busy: true, actions: [], canStop: true }));
     assert.match(html, /data-testid="opened-task-queued"/);
     assert.doesNotMatch(html, /data-testid="opened-task-running"/);
   });
@@ -192,7 +192,7 @@ describe('LIN-4016 — the opened task agrees with its row (finished, and a fail
 
   test('a finished row whose last stage failed paints done, not the /state failed pill, and offers no stage', async () => {
     const row = rowRecordOf({ stateType: 'completed', decided: { state: 'done', words: 'done' } });
-    const html = await paint({ ...stateWith({ offered: PLAN_OFFER, action: { kind: 'step', step: PLAN_OFFER, why: PLAN_OFFER.reason } }), homeStatusHtml: FAILED_PILL }, { row });
+    const html = await paint({ ...stateWith({ offered: PLAN_OFFER, finished: true, actions: [] }), homeStatusHtml: FAILED_PILL }, { row });
     assert.match(html, /status-pill--done task-status-pill" data-testid="home-task-status-pill"><span class="status-pill__dot" aria-hidden="true"><\/span>done</);
     assert.doesNotMatch(html, /status-pill--error/, 'the /state failed pill is not painted beside a done row');
     assert.doesNotMatch(html, /data-action="run-step-next"/, 'a finished task offers no stage step');

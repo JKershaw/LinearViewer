@@ -32,6 +32,8 @@ import { renderErrorPage } from '../lib/render.js';
 import { sessionSummaryOf } from '../lib/task-page-loader.js';
 import { rowRecordOf } from '../lib/task-board-view.js';
 import { hasOpenSubtask } from '../lib/task-state.js';
+import { parseSubtreeHint } from '../lib/subtree-index.js';
+import { isTerminalState } from '../lib/providers/state-map.js';
 import { renderTaskQuestion } from '../lib/render-task-page.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
 import { resolveIssueBinding, isValidIssueId } from '../lib/workspace.js';
@@ -138,6 +140,8 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         model.issueId ? `issueId=${encodeURIComponent(model.issueId)}` : null,
         // LIN-4016: a container's own fact, passed back to the state read (the page knows it; the state read does not).
         hasOpenSubtask(model.tracker?.subtasks) ? 'container=1' : null,
+        // LIN-4049: the tracker's own finished word, advisory (it can only narrow the box, never open it).
+        isTerminalState(model.tracker?.state?.type) ? 'finished=1' : null,
       ].filter(Boolean);
       const stateUrl = `/workspace/${encodeURIComponent(workspace.urlKey)}/api/task/${encodeURIComponent(model.identifier)}/state${stateQuery.length ? `?${stateQuery.join('&')}` : ''}`;
       // The run control's options (LIN-3975): the owner's only. The same vocabulary Home's opened task takes.
@@ -180,10 +184,13 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
     if (!isValidIssueId(identifier)) return jsonError(res, 404, 'Task not found');
     const issueId = queryValue(req.query.issueId);
     try {
-      const { model, taskState } = await loader.loadTaskState({
+      // LIN-4049: the subtree the client sends back (validated here; invalid entries are dropped), and the advisory
+      // finished word. Both can only narrow what the box offers.
+      const { model, taskState, rowState, container, overCap } = await loader.loadTaskState({
         urlKey: workspace.urlKey,
         identifier,
         issueId: issueId && isValidIssueId(issueId) ? issueId : null,
+        edges: parseSubtreeHint(queryValue(req.query.subtree)),
       });
       res.set('Cache-Control', 'no-store');
       // LIN-4024: the question card carries an answer box, so only the owner gets one. Whether it shows at all is
@@ -207,7 +214,13 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         stripHtml: renderStageStrip(model, { now: now() }),
         // LIN-3833: the sessions the state block and the run control read (count, last, running).
         // LIN-4016: `container` is the page's own fact, passed back (the row's container rule), never read from the tracker.
-        sessions: sessionSummaryOf(model, { container: req.query.container === '1' }),
+        // LIN-4049: the actions, the finished word and the subtree's row state the box reads (`actions` replaces `action`).
+        sessions: sessionSummaryOf(model, {
+          container: container || req.query.container === '1',
+          finished: req.query.finished === '1',
+          rowState,
+          overCap,
+        }),
         // LIN-4016: the task's own decided state (`taskStateOf`): no tracker word, so done and backlog are not in it.
         taskState,
         // LIN-4024: the question card, for a task waiting on an open ruling only (a parked task has none). The

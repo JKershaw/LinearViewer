@@ -492,7 +492,7 @@ describe('LIN-3833 — "Another step" leaves out only what the task cannot take 
 
   test('a finished task lists no step; every step is left out and counted', async () => {
     const issue = { ...HOME.issue, stateType: 'completed' };
-    const { c } = await mount({ ...LIST, issue }, { opened: { status: 'idle', live: false, headerHtml: '', trackHtml: '', sessions: REVIEWED } });
+    const { c } = await mount({ ...LIST, issue }, { opened: { status: 'idle', live: false, headerHtml: '', trackHtml: '', sessions: { ...REVIEWED, finished: true, actions: [] } } });
     await open(c);
     assert.equal(c.innerHTML.includes('data-testid="run-another-item"'), false);
     assert.match(c.innerHTML, /7 steps left out: they do not fit this task's state\./);

@@ -4,13 +4,13 @@
  * those fields with the same server functions. A test then says what it runs (`running`, `offered`), and the helper
  * completes the rest the way `sessionSummaryOf` does.
  */
-import { mainActionOf } from '../../lib/task-state.js';
+import { actionsOf } from '../../lib/task-state.js';
 import { POLLED_TARGETS } from '../../lib/dispatch-targets.js';
 import { rowRecordOf } from '../../lib/task-board-view.js';
 
 /**
- * A `sessions` block as `/state` sends it: `queued`, `busy`, `action` and `canStop` completed from `running` and
- * `offered` (a field the fixture already sets is kept).
+ * A `sessions` block as `/state` sends it: `queued`, `busy`, `actions`, `finished` and `canStop` completed from `running`,
+ * `offered` and `finished` (a field the fixture already sets is kept).
  *
  * @param {Object} sessions
  * @param {{container?: boolean}} [opts]
@@ -24,7 +24,8 @@ export function serverSessions(sessions, { container = false } = {}) {
     ...sessions,
     queued: sessions.queued !== undefined ? sessions.queued : (running && running.state === 'queued' ? running : null),
     busy,
-    action: sessions.action !== undefined ? sessions.action : mainActionOf({ offered: sessions.offered || null, busy, container }),
+    finished: sessions.finished ?? false,
+    actions: sessions.actions !== undefined ? sessions.actions : actionsOf({ offered: sessions.offered || null, busy, container, finished: !!sessions.finished }),
     canStop: sessions.canStop !== undefined ? sessions.canStop : !!running && POLLED_TARGETS.includes(running.target),
   };
 }

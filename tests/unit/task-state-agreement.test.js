@@ -222,8 +222,10 @@ describe('LIN-4016 W1 — a tracker-decided state: the row and the page-load rec
     assert.equal(s.row.state, 'done');
     assert.deepEqual(rowRecordOf({ stateType: 'completed', decided: s.row }).stateWord, { word: 'done', tone: 'done' });
     assert.equal(rowRecordOf({ stateType: 'completed', decided: s.row }).finished, true, 'a finished task offers no stage step');
-    // /state has no tracker, so it still offers the next stage; the record is what keeps that offer off the finished row.
-    assert.equal(s.summary.action?.kind, 'step');
+    // /state has no tracker, so with no finished word it still offers the next stage (LIN-4049: `actions`). The page and
+    // Home send the record's finished word with the state read, and with it the server offers nothing.
+    assert.equal(s.summary.actions[0]?.kind, 'step');
+    assert.deepEqual(sessionSummaryOf(s.model, { finished: true }).actions, []);
   });
 
   test('a backlog task: the record carries the backlog word the row says', async () => {
