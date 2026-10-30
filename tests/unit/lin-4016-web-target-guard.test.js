@@ -50,7 +50,8 @@ function buildApp(captured, { workspacePreferencesStore, parent = null } = {}) {
     },
     dispatchTokenStore: {},
     workspaceFromUrl: (req, res, next) => {
-      req.workspace = { urlKey: req.params.urlKey };
+      // The test token makes the decision panel's model catalog mock (lib/should-mock-ai.js): no socket to openrouter.
+      req.workspace = { urlKey: req.params.urlKey, accessToken: 'test-token' };
       req.session = { accountId: 'u1', linearUserId: 'u1' };
       next();
     },
