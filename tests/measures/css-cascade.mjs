@@ -8,16 +8,20 @@
 //
 // What it can see: a selector's own winning declarations, per page, theme and media. A different selector of equal
 // specificity that starts to win on the same element is NOT visible here (each selector is read on its own); that is
-// the interference report's job (`--interference`). Specificity is ignored on purpose: the winner for a selector is the
+// the interference report's job (`--flips`). Specificity is ignored on purpose: the winner for a selector is the
 // last rule in cascade order that names it.
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readSheets, normalizeSelector } from '../helpers/css-rules.js';
 
+// Every page's list starts with style.css (the renderers' rule, LIN-4015). The one list that does not is the
+// `['/settings.css']` fragment Plain pages append after the caller's own list (lib/components/plain-page.js).
+const FRAGMENT_LISTS = new Set(['/settings.css']);
+
 // Every distinct literal stylesheet list in the renderers, in first-seen order. Each `stylesheets:` line may hold several
 // arrays (a ternary between two lists); a spread list yields the literal names it does contain.
-export function pageLists(root) {
+export function stylesheetLists(root) {
   const seen = new Map();
   const walk = (dir) => {
     for (const name of readdirSync(dir, { withFileTypes: true })) {
@@ -43,9 +47,17 @@ export function pageLists(root) {
     }
   };
   walk(join(root, 'lib'));
-  // Every page's list starts with style.css (the renderers' rule, LIN-4015): a fragment such as the `['/settings.css']`
-  // in a ternary is not a page. The Plain page with rows is `[...stylesheets, '/settings.css']` with style.css first.
-  const pages = [...seen.values()].filter((names) => names[0] === '/style.css');
+  return [...seen.values()];
+}
+
+// The page lists the cascade is read for. A list that does not start with style.css, other than the Plain fragment, throws:
+// the dead-fallback deletions rest on style.css being first, and a page that forgot it must fail here, not drop out.
+export function pageLists(root) {
+  const all = stylesheetLists(root);
+  const bad = all.filter((names) => names[0] !== '/style.css' && !FRAGMENT_LISTS.has(names.join(' ')));
+  if (bad.length) throw new Error(`css-cascade: stylesheet list(s) not starting with /style.css: ${bad.map((n) => `[${n.join(', ')}]`).join(' ')}`);
+  const pages = all.filter((names) => names[0] === '/style.css');
+  // The Plain page with rows is `[...stylesheets, '/settings.css']` with style.css first.
   if (!pages.some((names) => names.join(' ') === '/style.css /settings.css')) pages.push(['/style.css', '/settings.css']);
   return pages;
 }
@@ -185,21 +197,37 @@ const flatten = (sheets) => {
   return order;
 };
 
+// The property family a declaration belongs to, so a shorthand and its longhands (`border` and `border-color`, `font` and
+// `font-size`) count as one property: a moved rule that sets one can beat an intervening rule that sets the other.
+export function propFamily(prop) {
+  if (/^margin(-|$)/.test(prop)) return 'margin';
+  if (/^padding(-|$)/.test(prop)) return 'padding';
+  if (/^border(-.*)?-radius$/.test(prop)) return 'border-radius';
+  if (/^border(-|$)/.test(prop)) return 'border';
+  if (/^font(-|$)/.test(prop) || prop === 'line-height') return 'font';
+  if (/^background(-|$)/.test(prop)) return 'background';
+  if (/^(gap|row-gap|column-gap|grid)(-|$)/.test(prop)) return 'gap-grid';
+  if (/^(inset|top|right|bottom|left)(-|$)/.test(prop)) return 'inset';
+  return prop;
+}
+
+const familiesOf = (rule) => new Set(rule.decls.map((d) => propFamily(d.prop)));
+
 // Pairs of selectors whose cascade order flips between base and head on one page: a moved rule can pass another
 // rule it used to lose to (or the reverse). Only pairs that could land on one element are worth a hand read, so the
-// result keeps those whose specificity is equal and whose declarations share a property. Selectors that occur more
-// than once on the page are not paired (their order is not one number); the caller checks those by hand.
+// result keeps those whose specificity is equal and whose declarations share a property family. A selector that
+// occurs in several rules is ordered by its last occurrence, the rule that wins ties.
 export function flippedPairs(baseRoot, headRoot, names) {
   const baseOrder = flatten(readSheets(names, join(baseRoot, 'public')));
   const headOrder = flatten(readSheets(names, join(headRoot, 'public')));
-  const once = (order) => {
+  const last = (order) => {
     const m = new Map();
-    for (const e of order) m.set(e.selector, m.has(e.selector) ? null : e);
+    for (const e of order) m.set(e.selector, e);
     return m;
   };
-  const base = once(baseOrder);
-  const head = once(headOrder);
-  const both = [...head.keys()].filter((k) => base.get(k) && head.get(k));
+  const base = last(baseOrder);
+  const head = last(headOrder);
+  const both = [...head.keys()].filter((k) => base.has(k));
   const out = [];
   for (let i = 0; i < both.length; i++) {
     for (let j = i + 1; j < both.length; j++) {
@@ -209,13 +237,14 @@ export function flippedPairs(baseRoot, headRoot, names) {
       if (!flipped) continue;
       const sa = specificity(a).join(',');
       const sb = specificity(b).join(',');
-      const shared = [...new Set(head.get(a).rule.decls.map((d) => d.prop))].filter((p) => head.get(b).rule.decls.some((d) => d.prop === p));
+      const familiesB = familiesOf(head.get(b).rule);
+      const shared = [...familiesOf(head.get(a).rule)].filter((f) => familiesB.has(f));
       if (sa !== sb || shared.length === 0) continue;
       out.push({ a, b, specificity: sa, shared, baseOrder: [base.get(a).index, base.get(b).index], headOrder: [head.get(a).index, head.get(b).index] });
     }
   }
   return out;
-};
+}
 
 // Class sets the source emits on one element, from every literal class attribute and className assignment in the
 // non-test source (lib/, public/*.js). A class that no literal carries, such as one a JavaScript builder joins at run
