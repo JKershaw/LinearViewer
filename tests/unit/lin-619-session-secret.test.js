@@ -28,7 +28,10 @@ const PRODUCTION_ERROR = /SESSION_SECRET/;
 const PUBLISHED_EXAMPLES = [
   'change-this-to-a-random-string',
   'any-random-string-for-sessions',
-  'generate-a-secure-random-string'
+  'generate-a-secure-random-string',
+  'test-secret-for-ci',
+  'test-secret-for-playwright',
+  'your-secret-here'
 ];
 
 function publishedSecretLines(relPath) {
