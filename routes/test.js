@@ -1305,6 +1305,27 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     }
   })
 
+  // LIN-4049: an open task-scan ruling on one task, the decision the opened box reads as needs you. It records an unanswered
+  // scan with one decision, as a real scan would, under the task's canonical (UUID) id. The local fixture supplies it.
+  router.post('/test/seed-task-decision', async (req, res) => {
+    try {
+      const { urlKey = 'test-workspace', issueId, issueIdentifier } = req.body || {}
+      if (!taskDecisionsStore) return res.status(500).json({ error: 'taskDecisionsStore not wired' })
+      const record = await taskDecisionsStore.recordScan({
+        urlKey,
+        issueId,
+        issueIdentifier,
+        issueTitle: `Seeded ${issueIdentifier}`,
+        inputHash: crypto.randomBytes(16).toString('hex'),
+        decision: { decision_id: `dec-${issueIdentifier}`, question: `Which way on ${issueIdentifier}?`, options: [] },
+      })
+      if (!record) return res.status(400).json({ error: 'ruling not recorded (needs a canonical issueId and a urlKey)' })
+      res.json({ ok: true, id: record.id })
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+
   // Endpoint to clear saved chats for testing (LIN-1008)
   router.get('/test/clear-saved-chats', async (req, res) => {
     try {

@@ -1229,10 +1229,13 @@
     // task cannot take it: the steps never offered as a next step (`summary.excluded`, retro), and every step once
     // the task is finished. Every other step always fits, so Build and Review stay on the list after a Review
     // session. The rule does not read the stage order. Before the state is read nothing is left out.
+    // LIN-4049 (review 5): a box the server closes offers no step either. When `actions` is empty and the box has a note
+    // (over the cap or incomplete) or is busy (something in the subtree runs, is queued or needs you), no step is pickable.
     function stepFits(kind, summary) {
       if (!summary) return true;
       if ((summary.excluded || []).includes(kind)) return false;
       if (summary.finished) return false;
+      if (Array.isArray(summary.actions) && summary.actions.length === 0 && (summary.note || summary.busy)) return false;
       return true;
     }
 

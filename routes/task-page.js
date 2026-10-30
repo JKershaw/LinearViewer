@@ -174,6 +174,9 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         now: now(),
         pageOptions,
         promptOpts,
+        // LIN-4049 (review 4, 6): the rolled-up state the pill and the next line read, and the fail-closed sentence.
+        taskState: result.taskState,
+        note: result.note,
       }));
     } catch (error) {
       console.error('Task page error:', error);
@@ -218,7 +221,8 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
       const body = {
         status: model.status,
         live: model.live,
-        headerHtml: renderTaskStatus(model),
+        // LIN-4049 (review 4): the pill reads the rolled-up `taskState`, as Home's opened task does (see renderTaskStatus).
+        headerHtml: renderTaskStatus(model, { now: now(), taskState }),
         // LIN-4010: Home's one-line state (no "Harbour:" label; a waiting task says needs you or parked).
         // LIN-4016: the pill reads `taskState`, the decision Home's row shows.
         homeStatusHtml: renderHomeStatus(model, { now: now(), taskState }),

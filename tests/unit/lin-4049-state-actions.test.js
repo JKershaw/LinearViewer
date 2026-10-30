@@ -230,3 +230,43 @@ describe('LIN-4049 — /state and Home name the same state for the same subtree'
     assert.equal(row.state, 'running');
   });
 });
+
+describe('LIN-4049 — a task-scan decision on a grandchild reaches the parent\'s box (review 3)', () => {
+  // LIN-1 (no sessions) > LIN-2 (no sessions) > LIN-3 (no sessions), and an open task-scan decision on LIN-3 only. The
+  // rulings are read once for the whole subtree, so the parent must read it: it is needs you, and its box offers nothing.
+  const scanOn = (identifier) => ({
+    id: `scan-${identifier}`, urlKey: 'ws', issueId: `id-${identifier}`, issueIdentifier: identifier,
+    decision: { decision_id: `dec-${identifier}`, question: 'Which way?', options: [] },
+    scannedAt: '2026-10-30T10:00:00.000Z', outcome: null, outcomeAt: null,
+  });
+  const edges = [['LIN-1', 'LIN-2', 'unstarted'], ['LIN-2', 'LIN-3', 'unstarted']].map(([parent, child, type]) => ({ parent, child, type }));
+
+  test('the grandchild\'s open decision makes the parent needs you, with no action offered', async () => {
+    const s = stores({});
+    s.taskDecisionsStore.listUnansweredForWorkspaces = async () => { s.reads.rulings += 1; return [scanOn('LIN-3')]; };
+    const loader = createTaskPageLoader({
+      enrichLoop, deriveSessionWaiting, getLoopsForIssue: s.getLoopsForIssue,
+      taskDecisionsStore: s.taskDecisionsStore, shelvedRulingsStore: s.shelvedRulingsStore, now: () => NOW,
+    });
+    const { model, taskState, rowState, container, overCap } = await loader.loadTaskState({ urlKey: 'ws', identifier: 'LIN-1', edges });
+    assert.equal(taskState.state, 'needs-you', 'the grandchild\'s question is the parent\'s');
+    assert.equal(rowState.state, 'needs-you');
+    const summary = sessionSummaryOf(model, { container, rowState, overCap });
+    assert.deepEqual(summary.actions, []);
+    assert.equal(s.reads.rulings, 1, 'the rulings are read once, over the subtree');
+  });
+});
+
+describe('LIN-4049 — a failed grandchild reaches the parent\'s box (review 3, witness (a))', () => {
+  test('LIN-3 fails under LIN-2 under LIN-1: the parent reads failed and names the failed subtask; a failure is offered again, not blocked', async () => {
+    const loops = { 'LIN-3': [failedLoop('LIN-3')] };
+    const edges = [['LIN-1', 'LIN-2', 'unstarted'], ['LIN-2', 'LIN-3', 'unstarted']].map(([parent, child, type]) => ({ parent, child, type }));
+    const { loader } = loaderWith(loops);
+    const { model, taskState, rowState, container, overCap } = await loader.loadTaskState({ urlKey: 'ws', identifier: 'LIN-1', edges });
+    assert.equal(taskState.state, 'failed');
+    assert.equal(taskState.attention.identifier, 'LIN-2', 'the failed subtask named is the child that rolls the failure up');
+    assert.equal(rowState.state, 'failed');
+    // A failed stage does not block the run (`blocksRun`): it is offered again (LIN-3968), so the parent offers Run to PR.
+    assert.deepEqual(sessionSummaryOf(model, { container, rowState, overCap }).actions.map((a) => a.kind), ['run-to-pr']);
+  });
+});

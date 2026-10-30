@@ -193,7 +193,10 @@ describe('task page loader: what it reads', () => {
     const { provider } = spyProvider({ ctx: ctxFor('LIN-50') });
     const { loader } = loaderWith({ getLoops: async (urlKey, id, deps) => { seen.push({ urlKey, id, horizon: deps.horizon }); return []; } });
     await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-50', access: { provider, callScope: 'tok' } });
-    assert.deepEqual(seen, [{ urlKey: 'ws', id: 'LIN-50', horizon: 'all' }]);
+    // LIN-4049 (review 4, 6): the page rolls its state up over its subtree, so each child's stored loops are read too.
+    // The task's own read is still the whole history, and every read is.
+    assert.deepEqual(seen.find(s => s.id === 'LIN-50'), { urlKey: 'ws', id: 'LIN-50', horizon: 'all' });
+    assert.ok(seen.every(s => s.horizon === 'all'), 'every read is the whole history');
   });
 });
 

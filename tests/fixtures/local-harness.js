@@ -68,6 +68,7 @@
  * the server.js roadmap branch was orphaned (roadmap.spec migrated in LIN-409) and
  * deleted in S4 (LIN-390).
  */
+import crypto from 'node:crypto';
 import { LocalStore } from '../../lib/local-store.js';
 import { LocalProvider } from '../../lib/providers/local/index.js';
 import { createMockCollection } from './mock-collection.js';
@@ -126,29 +127,55 @@ export function localSeedId(urlKey, rawId) {
 }
 
 /**
- * LIN-4049 (LIN-4040 S1): the subtree extension of the canonical seed. It adds, on top of `defaultLocalSeed` (left
- * byte-identical, its counts are pinned by the dashboard spec):
- *   - a started parent LOCAL-30 with a chain of three descendants below it (LOCAL-31 > LOCAL-32 > LOCAL-33): a deep
- *     descendant, three levels down;
- *   - an over-cap parent LOCAL-40 (started) with SUBTREE_READ_CAP + 1 Todo children (LOCAL-200 ...): over the read cap, sized
- *     from the cap so it stays over if the cap moves;
- *   - a started parent LOCAL-50 in Local Project whose Todo child LOCAL-51 sits in Local Beta: a subtask in another project.
- * Sessions and rulings are not seeded: the seed route takes projects and issues only (routes/test.js, setLocalSession), so
- * the plan's running-session and ruling cases stay for a seed route that accepts them.
+ * A UUID-shaped id for a seeded issue. The task-decision store keys a scan by a canonical UUID (LIN-2197), so a seeded
+ * task that a ruling is recorded against needs one; the project ids keep the `localSeedId` shape.
  */
-export function subtreeLocalSeed(urlKey = LOCAL_WORKSPACE_URL_KEY) {
-  const base = defaultLocalSeed(urlKey);
-  const id = (rawId) => localSeedId(urlKey, rawId);
-  const issue = ({ identifier, rawId, parent = null, project = 'local-proj-1', type = 'unstarted', name = 'Todo' }) => ({
-    id: id(rawId),
+export function localIssueUuid(urlKey, rawId) {
+  const h = crypto.createHash('sha1').update(`local-issue:${urlKey}:${rawId}`).digest('hex');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-5${h.slice(13, 16)}-a${h.slice(17, 20)}-${h.slice(20, 32)}`;
+}
+
+/** One seeded issue in the subtree shapes. Its id is UUID-shaped; its project is one of the canonical two. */
+function subtreeIssue(urlKey, { identifier, rawId, parent = null, project = 'local-proj-1', type = 'unstarted', name = 'Todo', assignee = null, sortOrder = 0 }) {
+  return {
+    id: localIssueUuid(urlKey, rawId),
     identifier,
     title: `Seeded ${identifier}`,
     description: `Seeded subtree issue ${identifier}`,
-    projectId: id(project),
-    ...(parent ? { parentId: id(parent) } : {}),
-    sortOrder: 0,
+    projectId: localSeedId(urlKey, project),
+    ...(parent ? { parentId: localIssueUuid(urlKey, parent) } : {}),
+    sortOrder,
     state: { name, type },
-  });
+    assignee,
+    url: `/workspace/${urlKey}/issue/${localIssueUuid(urlKey, rawId)}`,
+  };
+}
+
+/** The assignee the viewer is (`?assignee=me`): the local provider's synthetic viewer. */
+export const LOCAL_VIEWER = { name: 'Local User' };
+/** An assignee who is not the viewer. */
+export const OTHER_ASSIGNEE = { name: 'Other User' };
+
+/**
+ * LIN-4049 (LIN-4040 S1): the subtree extension of the canonical seed. It adds, on top of `defaultLocalSeed` (left
+ * byte-identical, its counts are pinned by the dashboard spec):
+ *   - a started parent LOCAL-30 with a chain of three descendants below it (LOCAL-31 > LOCAL-32 > LOCAL-33): a deep
+ *     descendant, three levels down (a leaf that runs, in the specs);
+ *   - an over-cap parent LOCAL-40 (started) with SUBTREE_READ_CAP + 1 Todo children (LOCAL-200 ...): over the read cap, sized
+ *     from the cap so it stays over if the cap moves;
+ *   - a started parent LOCAL-50 in Local Project whose Todo child LOCAL-51 sits in Local Beta: a subtask in another project;
+ *   - a started parent LOCAL-70 whose Todo child LOCAL-71 holds a running session (in the specs);
+ *   - a started parent LOCAL-80 whose Todo child LOCAL-81 is ruled on (a task-scan decision) and whose Todo child LOCAL-82
+ *     is left for the subtask that runs in the specs: the parent's subtasks wait on you;
+ *   - a Backlog parent LOCAL-90 with a started child LOCAL-91 (assigned to the viewer) and a Todo child LOCAL-92 (assigned
+ *     to someone else) whose worker runs (LIN-4008's shape);
+ *   - a started parent LOCAL-100 whose Done child LOCAL-101 has a last stage that failed (review note 1).
+ * Sessions and rulings are seeded by the helpers below, through the production dispatch endpoints and the ruling seed
+ * route, because the seed route itself takes projects and issues only.
+ */
+export function subtreeLocalSeed(urlKey = LOCAL_WORKSPACE_URL_KEY) {
+  const base = defaultLocalSeed(urlKey);
+  const issue = (fields) => subtreeIssue(urlKey, fields);
   const overCap = Array.from({ length: SUBTREE_READ_CAP + 1 }, (_, i) => issue({
     identifier: `LOCAL-${200 + i}`, rawId: `local-issue-over-${i + 1}`, parent: 'local-issue-over-parent',
   }));
@@ -164,8 +191,81 @@ export function subtreeLocalSeed(urlKey = LOCAL_WORKSPACE_URL_KEY) {
       ...overCap,
       issue({ identifier: 'LOCAL-50', rawId: 'local-issue-other-parent', type: 'started', name: 'In Progress' }),
       issue({ identifier: 'LOCAL-51', rawId: 'local-issue-other-child', parent: 'local-issue-other-parent', project: 'local-proj-2' }),
+      issue({ identifier: 'LOCAL-70', rawId: 'local-issue-run-parent', type: 'started', name: 'In Progress' }),
+      issue({ identifier: 'LOCAL-71', rawId: 'local-issue-run-child', parent: 'local-issue-run-parent' }),
+      issue({ identifier: 'LOCAL-80', rawId: 'local-issue-wait-parent', type: 'started', name: 'In Progress' }),
+      issue({ identifier: 'LOCAL-81', rawId: 'local-issue-wait-child', parent: 'local-issue-wait-parent' }),
+      issue({ identifier: 'LOCAL-82', rawId: 'local-issue-wait-other', parent: 'local-issue-wait-parent' }),
+      issue({ identifier: 'LOCAL-90', rawId: 'local-issue-backlog-parent', type: 'backlog', name: 'Backlog' }),
+      issue({ identifier: 'LOCAL-91', rawId: 'local-issue-backlog-started', parent: 'local-issue-backlog-parent', type: 'started', name: 'In Progress', assignee: LOCAL_VIEWER, sortOrder: 1 }),
+      issue({ identifier: 'LOCAL-92', rawId: 'local-issue-backlog-runs', parent: 'local-issue-backlog-parent', assignee: OTHER_ASSIGNEE, sortOrder: 2 }),
+      issue({ identifier: 'LOCAL-100', rawId: 'local-issue-done-parent', type: 'started', name: 'In Progress' }),
+      issue({ identifier: 'LOCAL-101', rawId: 'local-issue-done-child', parent: 'local-issue-done-parent', type: 'completed', name: 'Done' }),
     ],
   };
+}
+
+/**
+ * LIN-4049: a Home-only seed for the specs that open Home's top task. Home's opened box is the server's top task only,
+ * so the started parent must be the only In Progress task: LOCAL-70 with its Todo child LOCAL-71, nothing else.
+ */
+export function homeSubtreeLocalSeed(urlKey = LOCAL_WORKSPACE_URL_KEY) {
+  const base = defaultLocalSeed(urlKey);
+  const issue = (fields) => subtreeIssue(urlKey, fields);
+  return {
+    projects: base.projects.slice(0, 1),
+    issues: [
+      issue({ identifier: 'LOCAL-70', rawId: 'local-issue-run-parent', type: 'started', name: 'In Progress' }),
+      issue({ identifier: 'LOCAL-71', rawId: 'local-issue-run-child', parent: 'local-issue-run-parent' }),
+    ],
+  };
+}
+
+/**
+ * LIN-4049: a dispatch session on one seeded task, through the production dispatch endpoints (the same calls a runner
+ * makes): enqueue, then take it with the runner's token, then end it with a `[done]` or `[failed]` line when `end` is
+ * given. A `queued` session is only enqueued; a `running` one is taken and left open. `page` is the owner's page, so its
+ * session carries the request cookie.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} urlKey
+ * @param {{identifier: string, kind?: string, state?: 'queued'|'running'|'done'|'failed'}} seed
+ * @returns {Promise<string>} the dispatch item id
+ */
+export async function seedSessionOnTask(page, urlKey, { identifier, kind = 'implementation', state = 'running' }) {
+  const token = (await (await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${urlKey}`)).json()).token;
+  const res = await page.request.post(`/workspace/${urlKey}/api/dispatch`, {
+    data: { prompt: `${kind} prompt`, promptName: kind, kind, issueIdentifier: identifier, issueTitle: `Seeded ${identifier}`, target: 'cli' },
+  });
+  if (!res.ok()) throw new Error(`seedSessionOnTask enqueue failed: ${res.status()} ${await res.text()}`);
+  const itemId = (await res.json()).item.id;
+  if (state === 'queued') return itemId;
+  const taken = await page.request.post(`/api/dispatch/take/${itemId}`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!taken.ok()) throw new Error(`seedSessionOnTask take failed: ${taken.status()} ${await taken.text()}`);
+  if (state === 'running') return itemId;
+  const end = state === 'failed' ? '[failed] the stage broke' : '[done] finished';
+  const fb = await page.request.post(`/api/dispatch/feedback/${itemId}`, {
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    data: { message: end },
+  });
+  if (!fb.ok()) throw new Error(`seedSessionOnTask feedback failed: ${fb.status()} ${await fb.text()}`);
+  return itemId;
+}
+
+/**
+ * LIN-4049: an open task-scan ruling on one seeded task (the decision the box reads as needs you). The task must carry
+ * a UUID id, which `subtreeLocalSeed` gives every issue it adds.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} urlKey
+ * @param {{identifier: string, rawId: string}} task
+ */
+export async function seedTaskRuling(page, urlKey, { identifier, rawId }) {
+  const res = await page.request.post('/test/seed-task-decision', {
+    data: { urlKey, issueId: localIssueUuid(urlKey, rawId), issueIdentifier: identifier },
+  });
+  if (!res.ok()) throw new Error(`seedTaskRuling failed: ${res.status()} ${await res.text()}`);
+  return res.json();
 }
 
 // LIN-4024: Home lists a project's open work only when it is not already In Progress or behind a fold. The default
