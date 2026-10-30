@@ -9,6 +9,8 @@
  * container; W2 a blocked first child is skipped by both sides (the blocked facts are synthesised from the fetched
  * relations); W3 a parked first child is named by both (the one behaviour change); W4 one container meaning; W5 one
  * place: `selectFocusSubtask(` appears in lib/ and routes/ only inside the seam's module.
+ * Close-out added the producer witnesses review's ledger named: W4 the Swipe and task-page producers of the container
+ * fact, `sessions.next` silenced for a container, and W1's provider half (the local provider's seed names the row's child).
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,6 +24,14 @@ import { rowDataByNodeKey } from '../../lib/task-board-view.js';
 import { hasOpenSubtask, nextWordsOf } from '../../lib/task-state.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 import { createHomeRowStates } from '../../lib/home-row-states.js';
+import { orderIssuesForSwipe } from '../../lib/task-board-view.js';
+import { sessionSummaryOf, createTaskPageLoader } from '../../lib/task-page-loader.js';
+import { deriveSessionDecisions } from '../../routes/dashboard.js';
+import { createTaskPageRoutes } from '../../routes/task-page.js';
+import { registerProvider } from '../../lib/providers/registry.js';
+import { createLocalProvider } from '../fixtures/local-harness.js';
+// Side-effect import: the shared nav resolves the legacy default provider.
+import '../../lib/providers/linear/index.js';
 
 const NOW = new Date('2026-10-30T10:00:00.000Z');
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -184,5 +194,110 @@ describe('LIN-4039 — W5: one place decides the pick', () => {
     walk(path.join(ROOT, 'lib'));
     walk(path.join(ROOT, 'routes'));
     assert.deepEqual(offenders, [], 'every pick goes through parentNextOf');
+  });
+});
+
+describe('LIN-4039 — W4: the Swipe and task-page producers read the one container meaning', () => {
+  // A Swipe deck over one parent card and its subtask cards; `childType` is the state every subtask is in.
+  const swipeParent = (childTypes) => {
+    const mk = (id, type, over = {}) => ({
+      id, identifier: id.toUpperCase(), title: id, priority: 3, url: '', state: { type, name: type },
+      labels: { nodes: [] }, relations: { nodes: [] }, project: { id: 'p1' }, ...over,
+    });
+    const children = childTypes.map((type, i) => ({ issue: mk(`c${i}`, type, { parent: { id: 'par' } }), children: [], depth: 1, isInProgress: false, projectName: 'P' }));
+    const parent = { issue: mk('par', 'started'), children, depth: 0, isInProgress: true, projectName: 'P' };
+    return orderIssuesForSwipe({
+      projectTrees: [{ project: { id: 'p1', name: 'P' }, incomplete: [parent], completed: [] }],
+      inProgressTrees: [{ projectName: 'P', roots: [parent] }], recentActivityTrees: [], urlKey: 'ws',
+    }).find((card) => card.id === 'par');
+  };
+
+  test('Swipe: a parent card whose subtasks are all completed is not a container; one open subtask makes it one', () => {
+    assert.equal(swipeParent(['completed', 'completed']).row.container, false);
+    assert.equal(swipeParent(['completed', 'unstarted']).row.container, true);
+  });
+
+  const PARENT_CTX = (childStates) => ({
+    issue: { id: 'id-par', identifier: 'LIN-80', title: 'Parent', url: null, state: { name: 'In Progress', type: 'started' }, labels: [], blockedBy: [] },
+    parent: null,
+    children: childStates.map((type, i) => ({ id: `id-c${i}`, identifier: `LIN-8${i + 1}`, title: `Child ${i}`, url: null, state: { name: type, type }, labels: [], blockedBy: [] })),
+    comments: [],
+  });
+  let providerSeq = 0;
+  const taskPageFor = async (ctx) => {
+    const name = `lin-4039-task-page-${++providerSeq}`;
+    registerProvider({
+      name, ui: { inlineEdit: false, inlineCreate: false }, supports: () => true,
+      fetchRecommendationContext: async () => ctx,
+      fetchIssueComments: async () => [], fetchIssueFields: async () => null, fetchProjects: async () => ({ projects: [] }),
+    });
+    const loader = createTaskPageLoader({
+      dispatchStore: {}, agentStatusStore: {}, enrichLoop, deriveSessionWaiting, deriveSessionDecisions,
+      getLoopsForIssue: async () => [], shelvedRulingsStore: null, now: () => NOW,
+    });
+    const router = createTaskPageRoutes({
+      workspaceFromUrl: (req, res, next) => next(), getOpenRouterSource: () => 'env', getDeployInfo: () => ({}),
+      loader, workspaceOwnerCheck: async () => ({ status: 'owner' }), now: () => NOW,
+    });
+    const layer = router.stack.find((l) => l.route?.path === '/workspace/:urlKey/task/:identifier' && l.route.methods.get);
+    const req = {
+      session: { workspaces: [], features: {}, accountId: 'acct-1' },
+      workspace: { urlKey: 'acme', provider: name, accessToken: 'tok' },
+      params: { urlKey: 'acme', identifier: 'LIN-80' }, query: {}, get: () => 'localhost',
+    };
+    const res = { statusCode: 200, body: null, status(c) { this.statusCode = c; return this; }, send(b) { this.body = b; return this; }, set() { return this; } };
+    await layer.route.stack[layer.route.stack.length - 1].handle(req, res, (err) => { if (err) throw err; });
+    assert.equal(res.statusCode, 200);
+    return res.body;
+  };
+  const stateUrlOf = (html) => (html.match(/data-state-url="([^"]*)"/) || [])[1];
+
+  test('task page: an all-done parent passes no container=1 to the state read; one open subtask does', async () => {
+    const done = await taskPageFor(PARENT_CTX(['completed', 'completed']));
+    assert.doesNotMatch(stateUrlOf(done), /container=1/);
+    const open = await taskPageFor(PARENT_CTX(['completed', 'unstarted']));
+    assert.match(stateUrlOf(open), /container=1/);
+  });
+
+  test('task page: the row record the page embeds carries the same container fact', async () => {
+    const container = (html) => html.match(/&quot;container&quot;:(true|false)|"container":(true|false)/);
+    const done = container(await taskPageFor(PARENT_CTX(['completed'])));
+    const open = container(await taskPageFor(PARENT_CTX(['unstarted'])));
+    assert.ok(done && open, 'the page embeds the owner\'s row record');
+    assert.equal(done[1] || done[2], 'false');
+    assert.equal(open[1] || open[2], 'true');
+  });
+});
+
+describe('LIN-4039 — a container\'s own session guess is silenced (surface 3: sessions.next)', () => {
+  const model = { sessions: [], guesses: ['research', 'implementation'] };
+  test('sessionSummaryOf names no next step for a container, and the same model still names one for a leaf', () => {
+    assert.equal(sessionSummaryOf(model, { container: true }).next, null);
+    const leaf = sessionSummaryOf(model, { container: false }).next;
+    assert.equal(leaf.kind, 'research');
+    assert.ok(leaf.label);
+  });
+});
+
+describe('LIN-4039 — W1 (provider half): the seed the provider hands the model starts from the row\'s child', () => {
+  test('all-Todo children under a started parent with a finished Research: the local provider\'s focusedChild is the child the row names', async () => {
+    const { provider, store } = createLocalProvider();
+    await store.seed('ws-4039', {
+      projects: [{ id: 'p1', name: 'Alpha', sortOrder: 1 }],
+      issues: [
+        { id: 'iP', identifier: 'LOCAL-1', title: 'P', projectId: 'p1', state: { name: 'In Progress', type: 'started' } },
+        { id: 'iC1', identifier: 'LOCAL-2', title: 'C-1', projectId: 'p1', parentId: 'iP', state: { name: 'Todo', type: 'unstarted' } },
+        { id: 'iC2', identifier: 'LOCAL-3', title: 'C-2', projectId: 'p1', parentId: 'iP', state: { name: 'Todo', type: 'unstarted' } },
+      ],
+    });
+    const ctx = await provider.fetchRecommendationContext('ws-4039', 'LOCAL-1');
+    // The row, over the same shape: P is started with its Research finished, both children Todo.
+    const c1 = node('LOCAL-2', 'unstarted');
+    const parent = node('LOCAL-1', 'started', [c1, node('LOCAL-3', 'unstarted')]);
+    const researched = loop({ issueIdentifier: 'LOCAL-1', kind: 'research', agentState: 'done', terminalStatus: 'completed', terminalCompletedAt: '2026-10-30T09:30:00.000Z' });
+    const row = states([parent], { 'LOCAL-1': [researched] }).get('LOCAL-1').words;
+    assert.equal(row, 'Next: Research on LOCAL-2');
+    assert.equal(ctx.focusedChild.issue.identifier, 'LOCAL-2');
+    assert.equal(ctx.focusedChild.issue.identifier, row.match(/ on (LOCAL-\d+)$/)?.[1], 'the seed and the row name the same child');
   });
 });
