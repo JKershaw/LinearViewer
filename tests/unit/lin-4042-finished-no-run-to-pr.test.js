@@ -156,4 +156,24 @@ describe('LIN-4042 — a finished task on Home offers no run', () => {
     const html = await paint(stateWith({ action: RUN_TO_PR }), { row: rowRecordOf({ stateType: 'started', container: true }) });
     assert.match(html, /data-action="go"[^>]*>Run to PR</);
   });
+
+  // Close-out of the review ledger (items 1 and 2): the change's own claims, pinned.
+  test('a Done task with a running run keeps its running box and Stop (the early return needs !active)', async () => {
+    const running = { loopId: 'loop-1', kind: 'implementation', label: 'Build', state: 'running', since: '2026-10-30T10:00:00.000Z', target: 'local' };
+    const html = await paint(stateWith({ running, busy: true, action: null, canStop: true }), { row: DONE_ROW() });
+    assert.match(html, /data-testid="opened-task-running"/);
+    assert.match(html, /data-testid="run-stop"/);
+  });
+
+  test('a Done task with a queued run keeps its queued box', async () => {
+    const queued = { loopId: 'q-1', kind: 'implementation', label: 'Build', state: 'queued', target: 'cli' };
+    const html = await paint(stateWith({ running: queued, queued, busy: true, action: null, canStop: true }), { row: DONE_ROW() });
+    assert.match(html, /data-testid="opened-task-queued"/);
+  });
+
+  test('a finished container (Done parent with an open subtask) offers no run: a recorded choice (LIN-4042 review ledger 2)', async () => {
+    const html = await paint(stateWith({ action: RUN_TO_PR }), { row: rowRecordOf({ stateType: 'completed', container: true }) });
+    assert.doesNotMatch(html, /data-action="go"/);
+    assert.doesNotMatch(html, /Run to PR/);
+  });
 });
