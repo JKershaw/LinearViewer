@@ -19,6 +19,8 @@ import { createProxyRoutes } from '../../routes/proxy.js';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { MAX_NAME_LENGTH } from '../../lib/dispatch-validation.js';
 import { registerProvider } from '../../lib/providers/registry.js';
+import { readUnguardedIssue } from '../../lib/dispatch-referent-guard.js';
+import { fingerprintCredential } from '../../lib/credential-diagnostics.js';
 
 const ABORT_TO = '6f1c2a3e-1111-4222-8333-444455556666';
 
@@ -322,5 +324,48 @@ describe('LIN-4036 — a mixed-kind workspace reads the named kind\'s provider',
     assert.equal(jiraCalls.n, 1);
     assert.equal(linearCalls.n, 0);
     assert.equal(captured.item.issueTitle, 'Jira title');
+  });
+});
+
+describe('LIN-4036 — the title read logs a swallowed auth failure (digest only) and fails open', () => {
+  const authError = () => { const e = new Error('bad credential'); e.response = { status: 401 }; return e; };
+
+  async function warnsDuring(fn) {
+    const warns = [];
+    const realWarn = console.warn;
+    console.warn = (...args) => warns.push(args);
+    try { await fn(); } finally { console.warn = realWarn; }
+    return warns;
+  }
+
+  test('an auth error returns null and logs one [dispatch-referent-auth-swallowed] line with no token bytes', async () => {
+    let result;
+    const warns = await warnsDuring(async () => {
+      result = await readUnguardedIssue({
+        provider: { name: 'jira', issueWriteGuard: async () => { throw authError(); } },
+        token: 'dead-jira-token',
+        issueIdentifier: 'ENG-1'
+      });
+    });
+    assert.equal(result, null, 'fail-open: an auth failure is never a refusal');
+    const lines = warns.filter((args) => args[0] === '[dispatch-referent-auth-swallowed]');
+    assert.equal(lines.length, 1);
+    assert.equal(lines[0][1].provider, 'jira');
+    assert.equal(lines[0][1].issueIdentifier, 'ENG-1');
+    assert.equal(lines[0][1].credentialFingerprint, fingerprintCredential('dead-jira-token'));
+    assert.ok(!JSON.stringify(lines[0][1]).includes('dead-jira-token'), 'digest only, never token bytes');
+  });
+
+  test('a non-auth error returns null with no auth line', async () => {
+    let result;
+    const warns = await warnsDuring(async () => {
+      result = await readUnguardedIssue({
+        provider: { name: 'github', issueWriteGuard: async () => { const e = new Error('boom'); e.response = { status: 500 }; throw e; } },
+        token: 'tok',
+        issueIdentifier: '7'
+      });
+    });
+    assert.equal(result, null);
+    assert.equal(warns.filter((args) => args[0] === '[dispatch-referent-auth-swallowed]').length, 0);
   });
 });
