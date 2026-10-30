@@ -76,3 +76,22 @@ test('spacingSites: lists exactly the literal declarations, with their line', ()
   assert.deepEqual(sites.map((s) => [s.file, s.line, s.prop, s.value]), [['public/a.css', 2, 'padding', '4px'], ['public/a.css', 7, 'margin-left', '1rem']]);
   assert.equal(sites.length, measureCss({ 'public/a.css': '.a {\n  padding: 4px;\n  margin: var(--space-1);\n  gap: 0;\n}\n/* x */\n.b { margin-left: 1rem }' }).spacing.literal);
 });
+
+test('rules: style rules count; at-rules, keyframe steps and the @media prelude do not', () => {
+  const r = measureCss({ 'public/a.css': '@font-face { font-family: X; src: url(x) } @media (max-width: 640px) { .a { top: 0 } .b { top: 1px; left: 2px } } @keyframes spin { from { top: 0 } 50% { top: 1px } to { top: 2px } }' });
+  assert.equal(r.rules, 2);
+  assert.equal(r.declarations, 2 + 1 + 2 + 1 + 1 + 1);
+});
+
+test('rules: a reformat lowers lines but not rules or declarations; a within-file repeat is counted once per body', () => {
+  const body = 'a: 1; b: 2; c: 3; d: 4';
+  const packed = `.x { ${body} } .y { ${body} }`;
+  const spread = '.x {\n  a: 1;\n  b: 2;\n  c: 3;\n  d: 4;\n}\n.y {\n  a: 1;\n  b: 2;\n  c: 3;\n  d: 4;\n}\n';
+  const a = m(packed);
+  const b = m(spread);
+  assert.equal(a.rules, b.rules);
+  assert.equal(a.declarations, b.declarations);
+  assert.ok(b.cssLines.total > a.cssLines.total);
+  assert.equal(a.withinFileDupBlocks, 1);
+  assert.equal(m('.x { a: 1; b: 2; c: 3; d: 4 } .y { a: 1; b: 2; c: 3; d: 5 }').withinFileDupBlocks, 0);
+});

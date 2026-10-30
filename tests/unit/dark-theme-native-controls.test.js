@@ -7,9 +7,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { readSheets, appliedDecls } from '../helpers/css-rules.js';
 
 import {
   renderJiraLinkForm,
@@ -20,19 +18,15 @@ import {
 } from '../../lib/render-pages.js';
 import { renderEmailSignInPage, renderEmailRegisterPage } from '../../lib/render-email-auth.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const CSS = readFileSync(join(__dirname, '../../public/style.css'), 'utf8');
-
-function rule(selector) {
-  const esc = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const m = CSS.match(new RegExp(`(?:^|\\n)${esc}\\s*\\{([^}]*)\\}`));
-  assert.ok(m, `rule not found: ${selector}`);
-  return m[1];
-}
-function token(block, name) {
-  const m = block.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6})`));
-  assert.ok(m, `token --${name} missing`);
-  return m[1];
+// The declarations that apply to a selector in style.css (LIN-4015: asked of the helper, not matched as text).
+const STYLE = readSheets(['/style.css']);
+const applied = (selector, options) => appliedDecls(STYLE, selector, options);
+function token(decls, name) {
+  const value = decls.get(`--${name}`);
+  assert.ok(value, `token --${name} missing`);
+  const m = value.match(/^#[0-9a-fA-F]{6}$/);
+  assert.ok(m, `token --${name} is not a six-digit hex: ${value}`);
+  return value;
 }
 function lum(hex) {
   const c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
@@ -46,26 +40,29 @@ function contrast(a, b) {
 
 test('the dark path declares color-scheme: dark', () => {
   // LIN-3980: the landing's own dark remap is gone; it reaches `.theme-dark` too.
-  assert.match(rule('.theme-dark'), /color-scheme:\s*dark/);
+  assert.equal(applied('.theme-dark').get('color-scheme'), 'dark');
 });
 
 test('shared control rule is token-only and carries no layout', () => {
-  const body = rule('.login-input,\nselect.github-repo-select');
-  assert.match(body, /font-family:\s*var\(--font-content\)/);
-  assert.match(body, /color:\s*var\(--fg\)/);
-  assert.match(body, /background:\s*var\(--bg\)/);
-  assert.doesNotMatch(body, /#[0-9a-fA-F]{3,8}\b/);
-  assert.doesNotMatch(body, /\b(width|display|margin|float|position)\s*:/);
+  const body = applied('select.github-repo-select');
+  assert.equal(applied('.login-input').get('font-family'), 'var(--font-content)');
+  // The colour is the semantic --text or its raw --fg alias (LIN-4015 swapped the uses); either is a token.
+  assert.match(applied('.login-input').get('color'), /^var\(--(text|fg)\)$/);
+  assert.equal(applied('.login-input').get('background'), 'var(--bg)');
+  for (const [prop, value] of [...applied('.login-input'), ...body]) {
+    assert.doesNotMatch(value, /#[0-9a-fA-F]{3,8}\b/, `${prop} is a token, not a hex`);
+    assert.doesNotMatch(prop, /^(width|display|margin|float|position)$/);
+  }
 });
 
 test('repo-picker radio is darkened via accent-color, not replaced', () => {
-  assert.match(rule('.repo-picker-row input[type="radio"]'), /accent-color:\s*var\(--brand\)/);
+  assert.equal(applied('.repo-picker-row input[type="radio"]').get('accent-color'), 'var(--brand)');
 });
 
 test('bare shell links use --blue and meet AA in both themes', () => {
-  assert.match(rule('.login-container a:not([class]),\n.error-container a:not([class])'), /color:\s*var\(--blue\)/);
-  const root = rule(':root');
-  const dark = rule('.theme-dark');
+  assert.equal(applied('.login-container a:not([class])').get('color'), 'var(--blue)');
+  const root = applied(':root');
+  const dark = applied('.theme-dark');
   assert.ok(contrast(token(root, 'blue'), token(root, 'bg')) >= 4.5);
   assert.ok(contrast(token(dark, 'blue'), token(dark, 'bg')) >= 4.5);
   // pre-fix UA blue on the dark page
@@ -97,13 +94,12 @@ test('renderers still emit the hooks the CSS targets', () => {
 // which clears AA on the brand fill in both themes (LIN-4009: light --brand is the
 // deep teal #0f766e, so the light ink is white; dark keeps #001512 on --teal).
 test('the hero CTA ink resolves through --on-brand and clears AA on the teal fill', () => {
-  const linear = rule('.landing-ctas .landing-cta-linear');
-  assert.match(linear, /color:\s*var\(--on-brand\)/);
-  assert.doesNotMatch(linear, /color:\s*#/);
-  const onBrand = token(rule(':root'), 'on-brand');
-  const brand = token(rule(':root'), 'brand');
+  const linear = applied('.landing-ctas .landing-cta-linear');
+  assert.equal(linear.get('color'), 'var(--on-brand)');
+  const onBrand = token(applied(':root'), 'on-brand');
+  const brand = token(applied(':root'), 'brand');
   assert.ok(contrast(onBrand, brand) >= 4.5, `light: ${contrast(onBrand, brand).toFixed(2)}:1`);
-  const tealDark = token(rule('.theme-dark'), 'teal');
-  const onBrandDark = token(rule('.theme-dark'), 'on-brand');
+  const tealDark = token(applied('.theme-dark'), 'teal');
+  const onBrandDark = token(applied('.theme-dark'), 'on-brand');
   assert.ok(contrast(onBrandDark, tealDark) >= 4.5, `dark: ${contrast(onBrandDark, tealDark).toFixed(2)}:1`);
 });

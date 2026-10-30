@@ -13,9 +13,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { deriveHeader, relativeAgo } from '../../lib/task-page-loader.js';
 import { renderTaskStatus } from '../../lib/render-task-page.js';
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { readSheets, appliedDecls } from '../helpers/css-rules.js';
 
 const NOW = new Date('2026-10-25T14:00:00.000Z');
 const noWait = { waiting: false, message: null };
@@ -99,11 +97,10 @@ describe('LIN-3991 — the page renders the exact time after the sentence, zoned
 
 // LIN-4009: the time is words, not a machine fact, so it is sans and inline in the sentence's paragraph.
 test('the sentence time is sans, inline and a size down (LIN-4009), not the mono machine-fact face', () => {
-  const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../public/stage-track.css'), 'utf8');
-  const rule = /\.task-sentence-at\s*\{([^}]*)\}/.exec(css);
-  assert.ok(rule, 'expected a .task-sentence-at rule');
-  assert.match(rule[1], /font-family:\s*var\(--font-content\)/);
-  assert.match(rule[1], /font-size:\s*0\.85em/);
-  assert.doesNotMatch(rule[1], /display:\s*block/);
-  assert.doesNotMatch(rule[1], /font-structural/);
+  // What applies to the sentence time on the task page, in its sheet order (LIN-4015: asked of the helper).
+  const rule = appliedDecls(readSheets(['/style.css', '/stage-track.css']), '.task-sentence-at');
+  assert.equal(rule.get('font-family'), 'var(--font-content)');
+  assert.equal(rule.get('font-size'), '0.85em');
+  assert.notEqual(rule.get('display'), 'block');
+  assert.doesNotMatch(rule.get('font-family') ?? '', /font-structural/);
 });

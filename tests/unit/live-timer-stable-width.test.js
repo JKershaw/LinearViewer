@@ -2,42 +2,30 @@
  * LIN-3407 — live timers keep a steady slot so a ticking timer never nudges its
  * neighbour. Pins the shipped CSS: tabular figures plus a min-width slot.
  *
+ * The declarations are asked of the sheets a page loads, in its order (tests/helpers/css-rules.js, LIN-4015).
+ *
  * Run with: node --test tests/unit/live-timer-stable-width.test.js
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { readSheets, appliedDecls } from '../helpers/css-rules.js';
 
-const pub = join(dirname(fileURLToPath(import.meta.url)), '../../public');
-
-/** The declaration blocks whose selector list contains `selector`, joined. */
-function rulesFor(css, selector) {
-  const out = [];
-  const bare = css.replace(/\/\*[\s\S]*?\*\//g, '');
-  for (const m of bare.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
-    if (m[1].split(',').some(s => s.trim() === selector)) out.push(m[2]);
-  }
-  return out.join('\n');
-}
-
-// LIN-3968: the stage track's rules moved to stage-track.css (shared with Home); the task page's own sheet is read too.
-const taskCss = readFileSync(join(pub, 'stage-track.css'), 'utf8') + readFileSync(join(pub, 'task-page.css'), 'utf8');
-const sessCss = readFileSync(join(pub, 'session.css'), 'utf8');
+// LIN-3968: the stage track's rules moved to stage-track.css (shared with Home); the task page loads it after style.css.
+const TASK = readSheets(['/style.css', '/stage-track.css', '/task-page.css']);
+const SESSION = readSheets(['/style.css', '/session.css']);
 
 for (const sel of ['.task-stage-ago', '.task-stage-took']) {
   test(`${sel} has tabular figures and a fixed min-width slot`, () => {
-    const body = rulesFor(taskCss, sel);
-    assert.match(body, /font-variant-numeric:\s*tabular-nums/);
-    assert.match(body, /display:\s*inline-block/);
-    assert.match(body, /min-width:\s*\d+ch/);
+    const applied = appliedDecls(TASK, sel);
+    assert.equal(applied.get('font-variant-numeric'), 'tabular-nums');
+    assert.equal(applied.get('display'), 'inline-block');
+    assert.match(applied.get('min-width'), /^\d+ch$/);
   });
 }
 
 test('run-row "in progress" clock has a fixed slot and the row uses tabular figures', () => {
-  const clock = rulesFor(sessCss, '.sess-run-times [data-testid="session-run-elapsed"]');
-  assert.match(clock, /display:\s*inline-block/);
-  assert.match(clock, /min-width:\s*\d+ch/);
-  assert.match(rulesFor(sessCss, '.sess-run-times'), /font-variant-numeric:\s*tabular-nums/);
+  const clock = appliedDecls(SESSION, '.sess-run-times [data-testid="session-run-elapsed"]');
+  assert.equal(clock.get('display'), 'inline-block');
+  assert.match(clock.get('min-width'), /^\d+ch$/);
+  assert.equal(appliedDecls(SESSION, '.sess-run-times').get('font-variant-numeric'), 'tabular-nums');
 });

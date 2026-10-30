@@ -20,6 +20,7 @@ import { readFileSync } from 'node:fs';
 import express from 'express';
 import { createFlightCompanionRoutes, buildCensusSeedText } from '../../routes/flight-companion.js';
 import { runObserverPass, PASS_INSTANCE_PREFIX } from '../../lib/observer-pass.js';
+import { readSheets, appliedDecls } from '../helpers/css-rules.js';
 
 function readOnlyObserverStateStore(doc) {
   return {
@@ -405,15 +406,13 @@ describe('Flight Companion — LIN-2395 observer report panel (route)', () => {
    * line's register is "a footnote to the list above", not "another finding".
    */
   test('LIN-2645 L1: .fc-obs-stale carries a de-emphasised rule matching its .fc-obs-attention-overflow sibling', () => {
-    const css = readFileSync(new URL('../../public/flight-companion.css', import.meta.url), 'utf8');
-    const ruleOf = (selector) => {
-      const match = css.match(new RegExp(`\\${selector.startsWith('.') ? '.' : ''}${selector.slice(1)}\\s*\\{([^}]*)\\}`));
-      assert.ok(match, `expected a ${selector} rule in public/flight-companion.css`);
-      return match[1].split(';').map((d) => d.trim().replace(/\s+/g, ' ')).filter(Boolean).sort();
-    };
+    // What applies to each selector on the flight-companion page, in its sheet order (LIN-4015: rules are asked of the
+    // helper, so the two selectors may share one list or sit in two rules and the answer is the same).
+    const sheets = readSheets(['/style.css', '/common-actions.css', '/chat.css', '/flight-companion.css']);
+    const declsOf = (selector) => [...appliedDecls(sheets, selector)].map(([prop, value]) => `${prop}: ${value}`).sort();
     assert.deepStrictEqual(
-      ruleOf('.fc-obs-stale'),
-      ruleOf('.fc-obs-attention-overflow'),
+      declsOf('.fc-obs-stale'),
+      declsOf('.fc-obs-attention-overflow'),
       'expected the fossil summary line to take the same de-emphasised register (muted colour, reduced size, 0.6rem rhythm) as the attention-overflow line it sits beside'
     );
   });

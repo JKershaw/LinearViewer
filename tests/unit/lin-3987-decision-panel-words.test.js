@@ -4,25 +4,18 @@
  * own frame, the panel's type and width are its own, a chosen choice is marked by aria-pressed (not bold and underline),
  * and no button of the run block is left without a shared button class.
  *
+ * The CSS is read through tests/helpers/css-rules.js (LIN-4015): what applies to a selector, not how it is written.
+ *
  * Run with: node --test tests/unit/lin-3987-decision-panel-words.test.js
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { renderStyleguide } from '../../lib/render-styleguide.js';
+import { readSheets, appliedDecls, declOf, rulesFor } from '../helpers/css-rules.js';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
-const css = (file) => readFileSync(join(ROOT, 'public', file), 'utf8');
-
-/** The declarations of the first rule whose selector list is exactly `selector` (comments stripped). */
-function ruleBody(sheet, selector) {
-  const text = sheet.replace(/\/\*[\s\S]*?\*\//g, '');
-  const at = text.indexOf(`${selector} {`);
-  assert.ok(at >= 0, `${selector} has a rule`);
-  return text.slice(at + selector.length + 2, text.indexOf('}', at));
-}
+// The sheets the styleguide and Home load, in the order each loads them.
+const STYLEGUIDE = readSheets(['/style.css', '/common-actions.css', '/settings.css', '/styleguide.css']);
+const STYLE = readSheets(['/style.css']);
 
 describe('the styleguide decision-panel samples say words, in frames (LIN-3987)', () => {
   const html = renderStyleguide();
@@ -42,9 +35,9 @@ describe('the styleguide decision-panel samples say words, in frames (LIN-3987)'
   });
 
   test('each sample has its own frame, so it reads apart from the anatomy and the next sample', () => {
-    const frame = ruleBody(css('styleguide.css'), '.sg-decision-sample');
-    assert.match(frame, /border:\s*1px solid/);
-    assert.match(frame, /padding:\s*var\(--space-3\)/);
+    const frame = appliedDecls(STYLEGUIDE, '.sg-decision-sample');
+    assert.match(frame.get('border'), /^1px solid/);
+    assert.equal(frame.get('padding'), 'var(--space-3)');
     assert.equal([...html.matchAll(/class="sg-decision-sample"/g)].length, 2, 'two framed samples');
   });
 
@@ -55,38 +48,39 @@ describe('the styleguide decision-panel samples say words, in frames (LIN-3987)'
 });
 
 describe('the panel owns its type and width (LIN-3987)', () => {
-  const sheet = css('style.css');
-
   test('the panel sets the content face, so its reasons are sans on every page that hosts it', () => {
-    assert.match(ruleBody(sheet, '.decision-panel'), /font-family:\s*var\(--font-content\)/);
+    assert.equal(declOf(STYLE, '.decision-panel', 'font-family'), 'var(--font-content)');
   });
 
   test('the panel is 32rem at most; a phone is narrower, so it fills the width there', () => {
-    assert.match(ruleBody(sheet, '.decision-panel'), /max-width:\s*32rem/);
+    assert.equal(declOf(STYLE, '.decision-panel', 'max-width'), '32rem');
   });
 
   test('the reasons inherit the content face: no rule gives them the structural (mono) face', () => {
-    assert.doesNotMatch(ruleBody(sheet, '.decision-panel-reason'), /font-family/);
-    assert.match(ruleBody(sheet, '.decision-panel-costs'), /font-family:\s*var\(--font-structural\)/, 'prices stay mono');
+    assert.equal(appliedDecls(STYLE, '.decision-panel-reason').has('font-family'), false);
+    assert.equal(declOf(STYLE, '.decision-panel-costs', 'font-family'), 'var(--font-structural)', 'prices stay mono');
   });
 });
 
 describe('a chosen choice is marked by aria-pressed, not bold and underline (LIN-3987)', () => {
-  const sheet = css('style.css');
-
   test('the shared selected rule is scoped to both panels and sits on the .btn form', () => {
-    const text = sheet.replace(/\/\*[\s\S]*?\*\//g, '');
-    assert.match(text, /\.opened-task-change-panel \.btn\[aria-pressed="true"\],\s*\.decision-panel \.btn\[aria-pressed="true"\]\s*\{/);
+    const shared = STYLE.flatMap(sheet => sheet.rules).some(rule => rule.selectors.includes('.opened-task-change-panel .btn[aria-pressed="true"]')
+      && rule.selectors.includes('.decision-panel .btn[aria-pressed="true"]'));
+    assert.ok(shared, 'one rule names both panels\' pressed buttons');
   });
 
   test('the old bold-and-underline mark on a chosen preset or target is gone', () => {
-    assert.doesNotMatch(sheet, /is-chosen/);
-    assert.doesNotMatch(sheet, /text-decoration:\s*underline;\s*}\s*\n\s*\n\s*\.opened-task-change-summary/);
+    assert.equal(rulesFor(STYLE, '.is-chosen', { media: 'any' }).length, 0);
+    const underlined = STYLE.flatMap(sheet => sheet.rules)
+      .filter(rule => rule.decls.some(d => d.prop === 'text-decoration' && d.value === 'underline'))
+      .flatMap(rule => rule.selectors)
+      .filter(selector => /\.opened-task-change|\.decision-panel/.test(selector));
+    assert.deepEqual(underlined, [], 'no panel selector draws an underline');
   });
 
   test('the suggestion buttons no longer draw a link (blue, underlined)', () => {
-    const pick = ruleBody(sheet, '.decision-panel-pick');
-    assert.doesNotMatch(pick, /text-decoration/);
-    assert.doesNotMatch(pick, /color:\s*var\(--blue\)/);
+    const pick = appliedDecls(STYLE, '.decision-panel-pick');
+    assert.equal(pick.has('text-decoration'), false);
+    assert.notEqual(pick.get('color'), 'var(--blue)');
   });
 });
