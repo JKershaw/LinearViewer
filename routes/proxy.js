@@ -1460,7 +1460,9 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
         deferTo: null,
         // LIN-2575: derive the periodical join key from the issue's gate marker
         // (test-mode parity with the live path below).
-        periodicalId: resolvePeriodicalIdFromGateMarker(mockIssue.description)
+        periodicalId: resolvePeriodicalIdFromGateMarker(mockIssue.description),
+        // LIN-4034: this hop's own title, stamped on the row when it is the terminal hop.
+        title: mockIssue.title
       };
     }
 
@@ -1529,7 +1531,9 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       // gate marker. Returned (rather than re-derived by the caller) because the
       // recommendation-derived branch in routes/proxy-dispatch.js holds no issue
       // description — this hop's fetched context is the only place it is in hand.
-      periodicalId: resolvePeriodicalIdFromGateMarker(issue.description)
+      periodicalId: resolvePeriodicalIdFromGateMarker(issue.description),
+      // LIN-4034: this hop's own title. The descent stamps the terminal hop's, never the parent's.
+      title: issue.title
     };
   }
 
