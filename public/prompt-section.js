@@ -1528,12 +1528,18 @@
         + renderStagedProposals() + renderLastLine() + `</div>`;
     }
 
-    // Run a step now: fetch its prompt, then dispatch it with this run's choice (the one press, LIN-3446's
-    // press-time read applies to Go; a step has no live-task gate of its own).
+    // Run a step now: fetch its prompt, then dispatch it with this run's choice. LIN-4049 (plan B2a): like Go, the press
+    // re-reads /state first and stops when the server offers nothing.
     async function runStepNow(step) {
       if (!step || state.run.busy || destroyed) return;
       state.run.busy = true;
       try {
+        const data = await readTaskState();
+        if (destroyed) return;
+        if (offersNoRun(data)) {
+          showRefusedPress(data);
+          return;
+        }
         const prompt = await window.api(`/workspace/${encodeURIComponent(opts.urlKey)}/api/prompt/${issueId}/${encodeURIComponent(step.kind)}${issue.source ? `?source=${encodeURIComponent(issue.source)}` : ''}`, { on401: false });
         if (destroyed) return;
         const c = state.run.choice;
@@ -2061,6 +2067,18 @@
       return !!(data && (data.live === true || data.status === 'waiting'));
     }
 
+    // LIN-4049 (plan B2a): a run press re-reads /state on the poll's own URL (the same subtree hint) and stops when the
+    // server offers nothing, because the subtree may have started a run, queued one or asked for you since the box last
+    // read. The fresh read is painted, so the box shows why. A failed read (null) proceeds, as Go's press read always has.
+    function offersNoRun(data) {
+      const actions = data && data.sessions && data.sessions.actions;
+      return Array.isArray(actions) && actions.length === 0;
+    }
+    function showRefusedPress(data) {
+      state.opened = data;
+      render();
+    }
+
     // Paint the started/running line from the state endpoint and keep reading
     // while the run is in progress.
     function setGoRunning(headerHtml) {
@@ -2151,6 +2169,11 @@
       if (destroyed) return;
       if (goInProgress(data)) { setGoRunning(data.headerHtml); return; }
       if (state.go.status !== 'starting') return;
+      if (offersNoRun(data)) {
+        state.go = { status: 'ready', headerHtml: null, notice: null, noticeLink: null, noticeLinkLabel: null };
+        showRefusedPress(data);
+        return;
+      }
 
       try {
         const kickoff = await window.fetchAutopilotKickoff({
