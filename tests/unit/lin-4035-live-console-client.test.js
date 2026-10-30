@@ -339,8 +339,25 @@ describe('"N new" counts arrivals after the first feed, cumulatively (LIN-4035)'
     api.countActivityArrivals([{ id: 'ev:S', loopId: 'L1', kind: 'working' }], true);
     assert.equal(count(el).textContent, '· 1 new');
     // The status row folds into its derived moment: it leaves, and the derived row (a new id) arrives in the same poll.
-    api.countActivityArrivals([{ id: 'd:L1:m1', loopId: 'L1', kind: 'working', derived: true }], true);
+    api.countActivityArrivals([{ id: 'd:L1:m1', loopId: 'L1', kind: 'working', derived: true, foldedFrom: 'ev:S' }], true);
     assert.equal(count(el).textContent, '· 1 new', 'the same moment, counted once');
+  });
+
+  test('an ownedBy fold (status row with no loopId) is counted once', () => {
+    const { api, el } = loadClient();
+    api.countActivityArrivals([], true);
+    api.countActivityArrivals([{ id: 'ev:S', loopId: null, kind: 'done' }], true);
+    assert.equal(count(el).textContent, '· 1 new');
+    api.countActivityArrivals([{ id: 'd:L1:finished', loopId: 'L1', kind: 'done', derived: true, foldedFrom: 'ev:S' }], true);
+    assert.equal(count(el).textContent, '· 1 new', 'the same moment, counted once');
+  });
+
+  test('a derived row with no foldedFrom counts, even when a same-loop, same-kind row left in the same poll', () => {
+    const { api, el } = loadClient();
+    api.countActivityArrivals([], true);
+    api.countActivityArrivals([{ id: 'ev:S', loopId: 'L1', kind: 'working' }], true);
+    api.countActivityArrivals([{ id: 'd:L1:m1', loopId: 'L1', kind: 'working', derived: true }], true);
+    assert.equal(count(el).textContent, '· 2 new', 'a row that left for another reason does not suppress a real arrival');
   });
 
   test('a derived row with no status row to replace still counts', () => {

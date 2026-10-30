@@ -153,7 +153,6 @@
   let activityBaselined = false;        // the first feed is the baseline and never counts
   let activityNew = 0;
   const activitySeenEver = new Set();   // every event id the page has counted or seen, in insertion order
-  let activityPrev = [];                // the last live feed's events, for the fold rule in countActivityArrivals
 
   const esc = (s) => (window.escapeHtml ? window.escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s));
   const rel = (iso) => (window.relativeTime ? window.relativeTime(iso) : '');
@@ -1544,23 +1543,22 @@
   // baseline, so opening the page never reads as activity, and a chip re-paint
   // (animate false) never counts. The ever-seen set keeps an id that leaves the
   // feed and comes back from being counted twice.
-  // A status row that a derived row covers (lib/live-console.js folds them) leaves
-  // the feed in the same poll the derived row arrives, under a different id. That
-  // moment was counted when the status row came in, so the derived row does not
-  // count again. The match is the same loop and kind, among the rows that left.
+  // A status row that a derived row covers (lib/live-console.js folds them, by
+  // loop or by the run's own record) leaves the feed in the same poll the derived
+  // row arrives, under a different id. The server marks the derived row with
+  // foldedFrom, the id of the status row it replaces. That moment was counted when
+  // the status row came in, so a derived row whose foldedFrom was already seen
+  // does not count again.
   function countActivityArrivals(events, animate) {
     if (!animate) return;
     const baseline = !activityBaselined;
     activityBaselined = true;
-    const current = new Set(events.map(e => e.id));
-    const left = activityPrev.filter(e => !e.derived && e.loopId != null && !current.has(e.id));
     for (const ev of events) {
       if (activitySeenEver.has(ev.id)) continue;
       activitySeenEver.add(ev.id);
-      const replacesCounted = ev.derived && ev.loopId != null && left.some(s => s.loopId === ev.loopId && s.kind === ev.kind);
+      const replacesCounted = ev.foldedFrom != null && activitySeenEver.has(ev.foldedFrom);
       if (!baseline && !replacesCounted) activityNew += 1;
     }
-    activityPrev = events;
     for (const id of activitySeenEver) {
       if (activitySeenEver.size <= ACTIVITY_SEEN_CAP) break;
       activitySeenEver.delete(id);
