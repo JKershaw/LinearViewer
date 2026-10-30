@@ -131,10 +131,11 @@ async function stampDecisionAnswers(workspace, decision, { dispatchQueueStore, t
   return everyStampLanded;
 }
 
-// Normalize a provider write result to `{ success, issue }`. Linear/GitHub
-// return that shape already; the local provider returns a bare canonical issue
-// (or null), so without this a successful local write would read as
-// `success: undefined` and wrongly 502. Mirrors proxy.js's normalizeWritePayload.
+// Normalize a provider write result to `{ success, issue }`. Linear returns that
+// shape already; the local and GitHub providers return a bare canonical issue
+// (or null), so without this a successful write there would read as
+// `success: undefined` and wrongly 502. Mirrors normalizeWritePayload in
+// lib/proxy-graphql-errors.js.
 function normalizeIssueWrite(result) {
   return asWriteEnvelope(result, 'issue');
 }
