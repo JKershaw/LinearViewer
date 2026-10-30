@@ -37,6 +37,28 @@ describe('opened-task run-control text runs (LIN-4024)', () => {
   }
 });
 
+// A written prompt's header on Home (the prompt name, its actions, "generated … · regenerate") drew 10-11px, below the
+// floor, and the first-screen measure never reached it: it measures the opened task before a prompt is written. The
+// sweep holds every absolute font-size in the sheet at 12px or more, so a new rule cannot slip under it either.
+describe('no run-control rule sets an absolute font-size under 12px (LIN-4024)', () => {
+  test('every px or rem font-size in run-control.css is at least 12px (rem at the 16px root)', () => {
+    const below = [];
+    for (const m of RUN_CONTROL.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+      const size = m[2].match(/font-size:\s*([0-9.]+)(px|rem)\s*;/);
+      if (!size) continue;
+      const px = size[2] === 'px' ? Number(size[1]) : Number(size[1]) * 16;
+      if (px < 12) below.push(`${m[1].split('*/').pop().trim()} (${size[1]}${size[2]})`);
+    }
+    assert.deepEqual(below, []);
+  });
+
+  for (const selector of ['.prompt-section .swipe-prompt-header', '.swipe-prompt-actions button,\n.prompt-section .swipe-prompt-change', '.opened-task-generated', '.opened-task-regenerate']) {
+    test(`${selector.replace('\n', ' ')} is 12px`, () => {
+      assert.equal(fontSizeOf(ruleBody(RUN_CONTROL, selector)), '12px');
+    });
+  }
+});
+
 describe('the Change sheet summary and note on a phone (LIN-4024)', () => {
   test('the desktop size is unchanged (0.9em)', () => {
     assert.equal(fontSizeOf(ruleBody(STYLE, '.opened-task-change-summary,\n.opened-task-change-note')), '0.9em');
