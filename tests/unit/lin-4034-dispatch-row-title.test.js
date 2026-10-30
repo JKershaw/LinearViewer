@@ -316,6 +316,16 @@ describe('LIN-4034 — recommend-and-dispatch stamps the title on both arms', ()
     assert.equal(captured.item.issueTitle, mockTitle('TEST-2'));
     assert.notEqual(captured.item.issueTitle, mockTitle('TEST-1'));
   });
+
+  test('descent into a container: a caller title for the parent does not leak onto the child row', async () => {
+    // The caller's title describes the issue it named (TEST-1). The descent moved to TEST-2, so the
+    // row must carry TEST-2's title, not the parent's.
+    const captured = {};
+    const res = await call(buildRecommendApp(captured), 'post', RECOMMEND, { issueIdentifier: 'TEST-1', issueTitle: 'Parent title' });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(captured.item.issueIdentifier, 'TEST-2', 'the descent must have landed on the child for this witness to mean anything');
+    assert.equal(captured.item.issueTitle, mockTitle('TEST-2'));
+  });
 });
 
 describe('LIN-4034 — autopilot kickoff stamps the named issue\'s title', () => {
