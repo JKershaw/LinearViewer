@@ -2683,6 +2683,7 @@ function initNavBar() {
   // (LIN-984 safe by construction). Deliberately NOT wired through the selector
   // dropdown machinery above (no `.nav-dropdown-overlay`, no closeAllSelectors).
   setupNavViewsOverflow(navBar)
+  setupNavStickyHeight(navBar)
 
   // Team option selection (workspace uses form submission)
   if (teamOptions) {
@@ -2846,6 +2847,26 @@ function initNavBar() {
 
     // Save current selection
     setTeamSelection(urlTeam || 'all', urlKey)
+  }
+}
+
+// Measured header clearance (LIN-4037). The pinned `.nav-bar` wraps by content and
+// flags, so its height can pass the static `--nav-sticky-min` floor. This writes the
+// live border-box height to `--nav-bar-h`, which `--nav-sticky-h` takes the max of.
+// It is rounded UP so the token is never below the integer `offsetHeight` the tests
+// compare with. Nothing inside the nav reads the token, so the write cannot feed
+// back into the height it measures.
+function setupNavStickyHeight(navBar) {
+  const root = document.documentElement
+  function write() {
+    root.style.setProperty('--nav-bar-h', `${Math.ceil(navBar.getBoundingClientRect().height)}px`)
+  }
+  write()
+  if (typeof ResizeObserver === 'function') {
+    new ResizeObserver(write).observe(navBar, { box: 'border-box' })
+  } else {
+    // No ResizeObserver: the header only changes height when the viewport does.
+    window.addEventListener('resize', write)
   }
 }
 

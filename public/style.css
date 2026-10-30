@@ -91,10 +91,13 @@
   /* Sticky shared-header clearance (LIN-984). The reserved height used as the
      `scroll-margin-top` for interactive controls so scroll-into-view settles
      them below the pinned `.nav-bar`, and as the offset for page-level fixed
-     controls that must clear the header (e.g. the ship mode toggle). Sized for
-     the tallest wrap of the nav (its rows plus the views row); a phone is taller
-     still, see the 480px block below (LIN-4009). */
-  --nav-sticky-h: 6rem;
+     controls that must clear the header (e.g. the ship mode toggle).
+     `--nav-sticky-min` is the floor per breakpoint and the no-JS fallback. The
+     live header height (`--nav-bar-h`, written by `setupNavStickyHeight` in
+     common.js) wins whenever it is larger, because the header wraps by content
+     and flags, which no static value can track (LIN-4037). */
+  --nav-sticky-min: 6rem;
+  --nav-sticky-h: max(var(--nav-sticky-min), var(--nav-bar-h, 0px));
 
   /* Font-size scale */
   --font-size-sm: 0.85em;
@@ -2440,17 +2443,14 @@ a.wordmark:hover {
 @media (max-width: 640px) {
   /* Mobile sticky-header clearance (LIN-1058). The two-row header is taller at
      ≤640px — this PR's 44px tap targets grow the view-strip row, so the pinned
-     header measures ~122px vs the desktop ~93px. The base `--nav-sticky-h: 6rem`
+     header measures ~122px vs the desktop ~93px. The base `--nav-sticky-min: 6rem`
      (96px) under-shoots, leaving auto-scrolled/anchored/focused controls ~26px
      tucked under the header (a partial mobile regression of the LIN-984 clearance
-     that `scroll-margin-top: var(--nav-sticky-h)` provides). Bump the token here
-     so mobile clearance ≥ the real 122px header; the desktop value is untouched.
-     LIN-2179: the mobile strip below is now a non-wrapping row at every width, so
-     122px is a TRUE bound rather than a margin that depended on the strip staying
-     unwrapped — 124px was previously under-declared against a wrapped 168px header
-     whenever the `⋯ more` toggle spilled onto its own row. */
+     that `scroll-margin-top: var(--nav-sticky-h)` provides). This floor is 124px,
+     the value measured at 122px. A header that wraps taller than the floor (row 1,
+     LIN-4037) is covered by the measured `--nav-bar-h`, not by another static bump. */
   :root {
-    --nav-sticky-h: 7.75rem;  /* 124px ≥ measured 122px mobile header */
+    --nav-sticky-min: 7.75rem;  /* 124px ≥ measured 122px mobile header */
   }
 
   body {
@@ -2768,7 +2768,7 @@ a.wordmark:hover {
      at 320-480px with a team and an assignee selected. 208px (13rem) clears it, so a control scrolled into
      view still lands below the header. */
   :root {
-    --nav-sticky-h: 13rem;
+    --nav-sticky-min: 13rem;
   }
 
   /* Tops, not baselines, decide the LIN-2191 row count: the wordmark and the actions share one line top, so

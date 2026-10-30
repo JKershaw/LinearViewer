@@ -280,3 +280,20 @@ test('the shared nav is pinned (sticky/translucent) with the interception fix (L
   assert.match(block, /scroll-margin-top:\s*var\(--nav-sticky-h\)/);
   assert.doesNotMatch(block, /scroll-padding-top:/);
 });
+
+// LIN-4037: the clearance is the max of a per-breakpoint CSS floor and the measured header height. The floor is
+// declared at three widths under one name, and the token is declared once, so a seventh static bump (a new
+// `--nav-sticky-h` value anywhere) cannot reintroduce the hand-measured pattern that kept missing bands.
+test('--nav-sticky-h is declared once, as the max of the floor and the measured header (LIN-4037)', () => {
+  const css = readFileSync(STYLE_CSS, 'utf8');
+  assert.equal(css.match(/--nav-sticky-h\s*:/g)?.length, 1);
+  assert.match(css, /--nav-sticky-h:\s*max\(var\(--nav-sticky-min\),\s*var\(--nav-bar-h,\s*0px\)\);/);
+  assert.equal(css.match(/^\s*--nav-sticky-min:/gm)?.length, 3);
+});
+
+test('common.js measures the shared header into --nav-bar-h on every page (LIN-4037)', () => {
+  const common = readFileSync(join(__dirname, '../../public/common.js'), 'utf8');
+  assert.match(common, /setupNavStickyHeight\(navBar\)/);
+  assert.match(common, /setProperty\('--nav-bar-h'/);
+  assert.match(common, /new ResizeObserver\(write\)\.observe\(navBar, \{ box: 'border-box' \}\)/);
+});
