@@ -56,6 +56,16 @@ function queryValue(value) {
 }
 
 /**
+ * The hint the page sends with its state read (LIN-4049), or null when the task has no subtasks: a leaf sends none.
+ * `subtree` is the loader's `readSubtree` result; an incomplete read with no edges still goes, so the box fails closed.
+ */
+function hintFor(subtree) {
+  if (!subtree) return null;
+  if (subtree.edges.length === 0 && !subtree.incomplete) return null;
+  return subtree;
+}
+
+/**
  * @param {Object} deps
  * @param {Function} deps.workspaceFromUrl - Workspace resolution middleware.
  * @param {Function} deps.getOpenRouterSource - Footer AI-status source.
@@ -136,10 +146,12 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         ));
       }
       const model = owner ? { ...result.model, proposals: await pendingProposalsOf(workspace.urlKey, result.model) } : result.model;
+      // LIN-4049: the subtree, read once with this page (never on the poll), passed back to the state read as the hint.
+      // A task with no subtasks sends none: the state read then reads it as a leaf.
+      const subtree = hintFor(result.subtree);
       const stateQuery = [
         model.issueId ? `issueId=${encodeURIComponent(model.issueId)}` : null,
-        // LIN-4016: a container's own fact, passed back to the state read (the page knows it; the state read does not).
-        hasOpenSubtask(model.tracker?.subtasks) ? 'container=1' : null,
+        subtree ? `subtree=${encodeURIComponent(JSON.stringify(subtree))}` : null,
         // LIN-4049: the tracker's own finished word, advisory (it can only narrow the box, never open it).
         isTerminalState(model.tracker?.state?.type) ? 'finished=1' : null,
       ].filter(Boolean);
@@ -152,7 +164,7 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
           featureFlags: pageOptions.featureFlags,
           isLocalhost: isLocalhostRequest(req),
         }),
-        row: rowRecordOf({ stateType: model.tracker?.state?.type ?? null, container: hasOpenSubtask(model.tracker?.subtasks) }),
+        row: rowRecordOf({ stateType: model.tracker?.state?.type ?? null, container: hasOpenSubtask(model.tracker?.subtasks), subtree }),
       } : null;
       return res.send(renderTaskPage(model, {
         viewer,
@@ -184,13 +196,15 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
     if (!isValidIssueId(identifier)) return jsonError(res, 404, 'Task not found');
     const issueId = queryValue(req.query.issueId);
     try {
-      // LIN-4049: the subtree the client sends back (validated here; invalid entries are dropped), and the advisory
-      // finished word. Both can only narrow what the box offers.
+      // LIN-4049: the subtree the client sends back. An invalid entry is dropped and the read is then incomplete, so the
+      // box fails closed. The finished word is advisory. Both can only narrow what the box offers.
+      const { edges, incomplete } = parseSubtreeHint(queryValue(req.query.subtree));
       const { model, taskState, rowState, container, overCap } = await loader.loadTaskState({
         urlKey: workspace.urlKey,
         identifier,
         issueId: issueId && isValidIssueId(issueId) ? issueId : null,
-        edges: parseSubtreeHint(queryValue(req.query.subtree)),
+        edges,
+        incomplete,
       });
       res.set('Cache-Control', 'no-store');
       // LIN-4024: the question card carries an answer box, so only the owner gets one. Whether it shows at all is
@@ -216,10 +230,11 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         // LIN-4016: `container` is the page's own fact, passed back (the row's container rule), never read from the tracker.
         // LIN-4049: the actions, the finished word and the subtree's row state the box reads (`actions` replaces `action`).
         sessions: sessionSummaryOf(model, {
-          container: container || req.query.container === '1',
+          container,
           finished: req.query.finished === '1',
           rowState,
           overCap,
+          incomplete,
         }),
         // LIN-4016: the task's own decided state (`taskStateOf`): no tracker word, so done and backlog are not in it.
         taskState,

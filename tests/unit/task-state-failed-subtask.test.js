@@ -76,7 +76,7 @@ describe('LIN-4016 W2 — a parent whose subtask\'s Build failed', () => {
   test('the parent carries the failed subtask as its attention, and the opened task names it as failed, not as needing you', () => {
     const s = statesFor(parent, loops);
     assert.deepEqual(s.get('LIN-P1').attention, {
-      identifier: 'LIN-C9', title: 'Title LIN-C9', state: 'failed', lead: 'A subtask failed', detail: ' · Build failed',
+      identifier: 'LIN-C9', title: null, state: 'failed', lead: 'A subtask failed', detail: ' · Build failed', // LIN-4049: identifier only
       words: 'A subtask failed: LIN-C9 · Build failed',
     });
     const byKey = rowDataByNodeKey({ urlKey: 'acme', inProgressTrees: [{ roots: [parent] }], rowStates: s });

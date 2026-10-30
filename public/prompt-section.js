@@ -1240,6 +1240,9 @@
     // "Show N more". Steps that do not fit the task's state are left out, and the count says how many.
     function renderRunMore(step) {
       const meta = opts.promptMeta || {};
+      // LIN-4049: the plain sentence the server gives when the box offers no run over the subtree (cap or incomplete).
+      const noteSummary = state.opened && state.opened.sessions;
+      const note = noteSummary && noteSummary.note ? `<p class="opened-task-note" data-testid="opened-task-note">${esc(noteSummary.note)}</p>` : '';
       const defaults = opts.defaultPromptKeys || [];
       const more = (opts.morePromptKeys || []).filter((k) => !defaults.includes(k));
       const summary = state.opened && state.opened.sessions;
@@ -1250,7 +1253,7 @@
       // LIN-4010 (H9): a step is named by its stage word (Build, not "implement"); the template name is the fallback.
       const wordOf = (k) => (opts.stageWords && opts.stageWords[k]) || meta[k] || k;
       const item = (k) => `<button class="btn opened-task-another-item" data-action="run-pick" data-kind="${esc(k)}" data-label="${esc(wordOf(k))}" data-testid="run-another-item">${esc(wordOf(k))}</button>`;
-      let html = '<div class="opened-task-more">';
+      let html = `${note}<div class="opened-task-more">`;
       if (step) html += `<button class="btn--quiet opened-task-see" data-action="see-prompt" data-testid="run-see-prompt">See prompt \u2726</button>`;
       html += `<button class="btn--quiet opened-task-another" data-action="run-another" data-testid="run-another" aria-expanded="${state.run.anotherOpen ? 'true' : 'false'}">Another step \u25BE</button>`;
       if (state.run.anotherOpen) {
@@ -2039,11 +2042,13 @@
     function readTaskState() {
       if (typeof window.api !== 'function') return Promise.resolve(null);
       if (!opts.urlKey || !issue.identifier || !issueId) return Promise.resolve(null);
-      // LIN-4016: a container's own fact rides on the read (`container=1`), so `sessions.actions` offers Run to PR.
-      const containerQuery = opts.row && opts.row.container ? '&container=1' : '';
+      // LIN-4049: the subtree the server built for this row, sent back as the hint (`subtree`). A container whose row
+      // carries none sends an incomplete hint, so the box fails closed rather than reading the task as a leaf.
+      const hint = opts.row && opts.row.subtree ? opts.row.subtree : (opts.row && opts.row.container ? { edges: [], incomplete: true } : null);
+      const subtreeQuery = hint ? `&subtree=${encodeURIComponent(JSON.stringify(hint))}` : '';
       // LIN-4049: the tracker's finished word, advisory: /state can only narrow the box with it, never open it.
       const finishedQuery = opts.row && opts.row.finished ? '&finished=1' : '';
-      const url = `/workspace/${encodeURIComponent(opts.urlKey)}/api/task/${encodeURIComponent(issue.identifier)}/state?issueId=${encodeURIComponent(issueId)}${containerQuery}${finishedQuery}`;
+      const url = `/workspace/${encodeURIComponent(opts.urlKey)}/api/task/${encodeURIComponent(issue.identifier)}/state?issueId=${encodeURIComponent(issueId)}${subtreeQuery}${finishedQuery}`;
       return Promise.resolve()
         .then(() => window.api(url, { on401: false }))
         .catch(() => null);

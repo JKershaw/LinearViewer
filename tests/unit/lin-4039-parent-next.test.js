@@ -250,13 +250,19 @@ describe('LIN-4039 — W4: the Swipe and task-page producers read the one contai
     assert.equal(res.statusCode, 200);
     return res.body;
   };
-  const stateUrlOf = (html) => (html.match(/data-state-url="([^"]*)"/) || [])[1];
+  // The attribute is HTML-escaped (`&` arrives as `&amp;`); the state URL is what the page polls, so unescape it.
+  const stateUrlOf = (html) => ((html.match(/data-state-url="([^"]*)"/) || [])[1] || '').replace(/&amp;/g, '&');
 
-  test('task page: an all-done parent passes no container=1 to the state read; one open subtask does', async () => {
+  // LIN-4049: `container=1` is gone. The state read carries the subtree instead, and the container fact is derived from
+  // its open children, so an all-done parent reads as no container and one with an open subtask reads as a container.
+  const subtreeOf = (html) => JSON.parse(decodeURIComponent((stateUrlOf(html).match(/[?&]subtree=([^&]*)/) || [])[1] || 'null'));
+  test('task page: the state read carries the subtree and no container=1; an all-done parent holds only terminal children, one open subtask an open one', async () => {
     const done = await taskPageFor(PARENT_CTX(['completed', 'completed']));
     assert.doesNotMatch(stateUrlOf(done), /container=1/);
+    assert.deepEqual(subtreeOf(done).edges.map(([, , type]) => type), ['completed', 'completed']);
     const open = await taskPageFor(PARENT_CTX(['completed', 'unstarted']));
-    assert.match(stateUrlOf(open), /container=1/);
+    assert.doesNotMatch(stateUrlOf(open), /container=1/);
+    assert.deepEqual(subtreeOf(open).edges.map(([, , type]) => type), ['completed', 'unstarted']);
   });
 
   test('task page: the row record the page embeds carries the same container fact', async () => {

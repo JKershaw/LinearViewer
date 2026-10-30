@@ -80,28 +80,30 @@ function edgesOf(roots) {
 }
 
 describe('LIN-4049 — the hint the client sends back is validated', () => {
-  test('a well-formed entry is kept, in the order sent', () => {
-    const edges = parseSubtreeHint(JSON.stringify([['LIN-1', 'LIN-2', 'started'], ['LIN-2', 'LIN-3', 'unstarted']]));
+  test('a well-formed entry is kept, in the order sent, and the read is complete', () => {
+    const { edges, incomplete } = parseSubtreeHint(JSON.stringify({ edges: [['LIN-1', 'LIN-2', 'started'], ['LIN-2', 'LIN-3', 'unstarted']] }));
+    assert.equal(incomplete, false);
     assert.deepEqual(edges, [
       { parent: 'LIN-1', child: 'LIN-2', type: 'started' },
       { parent: 'LIN-2', child: 'LIN-3', type: 'unstarted' },
     ]);
   });
 
-  test('an invalid identifier or an unknown state type is dropped; the rest is kept', () => {
-    const edges = parseSubtreeHint(JSON.stringify([
+  test('an invalid identifier or an unknown state type is dropped, the rest is kept, and the read is incomplete', () => {
+    const { edges, incomplete } = parseSubtreeHint(JSON.stringify({ edges: [
       ['LIN-1', 'bad id!', 'started'],
       ['LIN-1', 'LIN-2', 'not-a-state'],
       ['LIN-1', 'LIN-3', 'completed'],
-    ]));
+    ] }));
+    assert.equal(incomplete, true, 'a dropped entry may hide a running subtask, so the box fails closed');
     assert.deepEqual(edges, [{ parent: 'LIN-1', child: 'LIN-3', type: 'completed' }]);
   });
 
-  test('a hint that is not JSON, not an array, or not triples yields no edges', () => {
-    assert.deepEqual(parseSubtreeHint('{not json'), []);
-    assert.deepEqual(parseSubtreeHint('{"a":1}'), []);
-    assert.deepEqual(parseSubtreeHint(JSON.stringify([['LIN-1', 'LIN-2']])), []);
-    assert.deepEqual(parseSubtreeHint(undefined), []);
+  test('a hint that is not JSON, has no edges list, or is not triples is incomplete; no parameter is a leaf', () => {
+    assert.deepEqual(parseSubtreeHint('{not json'), { edges: [], incomplete: true });
+    assert.deepEqual(parseSubtreeHint('{"a":1}'), { edges: [], incomplete: true });
+    assert.deepEqual(parseSubtreeHint(JSON.stringify({ edges: [['LIN-1', 'LIN-2']] })), { edges: [], incomplete: true });
+    assert.deepEqual(parseSubtreeHint(undefined), { edges: [], incomplete: false }, 'no subtree is a leaf, not incomplete');
   });
 });
 
@@ -116,7 +118,7 @@ describe('LIN-4049 — the rebuilt subtree has the index\'s shape and child orde
     ];
     const index = buildSubtreeIndex(issues);
     const [indexRoot] = index;
-    const { root, overCap } = subtreeFromHint('LIN-1', parseSubtreeHint(JSON.stringify(edgesOf(index))));
+    const { root, overCap } = subtreeFromHint('LIN-1', parseSubtreeHint(JSON.stringify({ edges: edgesOf(index) })).edges);
     assert.equal(overCap, false);
     assert.deepEqual(shapeOf(root.children), shapeOf(indexRoot.children));
     assert.deepEqual(root.children.map((c) => c.issue.identifier), ['LIN-2', 'LIN-9', 'LIN-10']);
@@ -155,7 +157,8 @@ describe('LIN-4049 — /state rolls the subtree up: a running grandchild blocks 
     assert.equal(container, true);
     const summary = sessionSummaryOf(model, { container, rowState, overCap });
     assert.deepEqual(summary.actions, []);
-    assert.equal(summary.busy, false, 'the task\'s own sessions are not busy; the subtree is');
+    // LIN-4049 (beat 3): busy is the box's busy, which includes the subtree: the browser names no step it cannot run.
+    assert.equal(summary.busy, true, 'the subtree that runs makes the box busy');
     assert.equal(reads.loops.get('LIN-3'), 1, 'the grandchild is read');
   });
 
@@ -209,7 +212,7 @@ describe('LIN-4049 — /state and Home name the same state for the same subtree'
     const loops = { 'LIN-2': [], 'LIN-3': [runningLoop('LIN-3')] };
     const issues = [issue('LIN-1', { type: 'started' }), issue('LIN-2', { parentId: 'id-LIN-1', type: 'unstarted' }), issue('LIN-3', { parentId: 'id-LIN-2', type: 'unstarted' })];
     const index = buildSubtreeIndex(issues);
-    const edges = parseSubtreeHint(JSON.stringify(edgesOf(index)));
+    const { edges } = parseSubtreeHint(JSON.stringify({ edges: edgesOf(index) }));
 
     const { loader } = loaderWith(loops);
     const opened = await loader.loadTaskState({ urlKey: 'ws', identifier: 'LIN-1', edges });

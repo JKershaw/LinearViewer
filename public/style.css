@@ -1742,6 +1742,12 @@ a.wordmark:hover {
   align-items: baseline;
 }
 
+/* LIN-4049: the plain sentence the box gives when it offers no run over the subtree (cap or incomplete). */
+.opened-task-note {
+  margin: 0 0 var(--space-2);
+  color: var(--muted);
+}
+
 .opened-task-another-list {
   display: flex;
   flex-wrap: wrap;

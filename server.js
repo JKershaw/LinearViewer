@@ -3435,7 +3435,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
     // LIN-2944 P1 F3: the deck's front card, over the SAME already-fetched trees —
     // `orderIssuesForSwipe` is pure and adds no provider call. With `?assignee=`,
     // the trees Home shows are already filtered, so the top task is too.
-    const orderedHome = orderIssuesForSwipe({ projectTrees: trees, inProgressTrees, recentActivityTrees, urlKey: workspace.urlKey });
+    const orderedHome = orderIssuesForSwipe({ projectTrees: trees, inProgressTrees, recentActivityTrees, urlKey: workspace.urlKey, subtrees });
     const homeTopTask = orderedHome.find((issue) => !issue.isSeed) || null;
     const seedOnlyHome = orderedHome.length > 0 && orderedHome.every((issue) => issue.isSeed);
     const featureFlags = await requestFeatureFlags(req);
@@ -3449,7 +3449,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       availableAssignees,
       rowStates,
       rulingCount: homeStates?.rulingCount ?? 0,
-      rowData: rowDataByNodeKey({ urlKey: workspace.urlKey, inProgressTrees: homeView.inProgressTrees, recentActivityTrees, projectTrees: homeView.trees, rowStates }),
+      rowData: rowDataByNodeKey({ urlKey: workspace.urlKey, inProgressTrees: homeView.inProgressTrees, recentActivityTrees, projectTrees: homeView.trees, rowStates, subtrees }),
       copyFirstCard: featureFlags.runControls !== true && req.session.copyFirstCardDismissed !== true,
       // LIN-2550: label the selector off the filter the render APPLIED. An
       // unmatched name (a stale `?assignee=` carried across a team change by
@@ -3525,7 +3525,7 @@ app.get('/workspace/:urlKey/api/home-rows', workspaceFromUrl, async (req, res) =
   try {
     // The page's own inputs, so these rows and the page's rows come from one filtered view of the workspace.
     const { trees, inProgressTrees, recentActivityTrees, subtrees, showSource } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true, assigneeName: assigneeState.resolvedAssigneeName, accountId: req.session.accountId });
-    const orderedHome = orderIssuesForSwipe({ projectTrees: trees, inProgressTrees, recentActivityTrees, urlKey: workspace.urlKey });
+    const orderedHome = orderIssuesForSwipe({ projectTrees: trees, inProgressTrees, recentActivityTrees, urlKey: workspace.urlKey, subtrees });
     const homeTopTask = orderedHome.find((issue) => !issue.isSeed) || null;
     const featureFlags = await requestFeatureFlags(req);
     const homeStates = await homeRowStates({ urlKey: workspace.urlKey, subtrees, inProgressTrees, recentActivityTrees, projectTrees: trees, runControls: featureFlags.runControls === true });
@@ -3541,7 +3541,7 @@ app.get('/workspace/:urlKey/api/home-rows', workspaceFromUrl, async (req, res) =
       remaining: rows.remaining,
       // The per-row opts the page carries for its own rows (app.js merges them before the rows mount).
       opts: {
-        rowData: rowDataByNodeKey({ urlKey, inProgressTrees: [], recentActivityTrees: [], projectTrees: rowTree, rowStates: states }),
+        rowData: rowDataByNodeKey({ urlKey, inProgressTrees: [], recentActivityTrees: [], projectTrees: rowTree, rowStates: states, subtrees }),
       },
     });
   } catch (error) {
@@ -3580,14 +3580,14 @@ app.get('/workspace/:urlKey/swipe/:identifier?', workspaceFromUrl, async (req, r
     // each card's "Dispatched Sessions [N]" header (no per-card fetch). Counts
     // are non-critical — a store hiccup must never break the page, so fall back
     // to an empty map.
-    const [{ trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId }, allLoops] = await Promise.all([
+    const [{ trees, inProgressTrees, recentActivityTrees, subtrees, organizationName, teams, selectedTeamId }, allLoops] = await Promise.all([
       fetchAndPrepareProjects(workspace, teamId, null, null, { accountId: req.session.accountId }),
       getLoopsForWorkspace(workspace.urlKey, { dispatchStore: dispatchQueueStore, agentStatusStore, lean: true }).catch(() => [])
     ]);
     const sessionCounts = buildSessionCounts(allLoops);
     const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h));
     const html = renderSwipePage(
-      { projectTrees: trees, inProgressTrees, recentActivityTrees, organizationName },
+      { projectTrees: trees, inProgressTrees, recentActivityTrees, subtrees, organizationName },
       {
         deployInfo,
         urlKey: workspace.urlKey,

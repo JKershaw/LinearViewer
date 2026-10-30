@@ -38,7 +38,7 @@ describe('LIN-3833 subtaskNeedingYouOf — the top task\'s subtask that needs yo
       subtaskNeedingYouOf({ urlKey: 'acme', topTask: TOP, rowStates }),
       {
         identifier: 'LIN-12',
-        title: 'Title LIN-12',
+        title: null, // LIN-4049: the line names the subtask by identifier only, so Home and the opened task agree.
         href: '/workspace/acme/task/LIN-12?source=linear',
         state: 'needs-you',
         lead: 'A subtask needs you',
