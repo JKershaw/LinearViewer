@@ -20,9 +20,13 @@ import { USUAL_STAGES, SPINE } from '../../lib/run-view.js';
 import { buildRowStates, buildTaskPageModel, nextStepOf, waitingForOf, sessionSummaryOf, guessStages } from '../../lib/task-page-loader.js';
 import { buildInProgressCountParts } from '../../lib/task-board-view.js';
 import { renderHomeStatus } from '../../lib/render-task-page.js';
+
+// LIN-4016: Home's pill reads the task's decided state, the one /state sends (its own facts, no tracker word).
+const stateOf = (model) => taskStateOf(taskFactsOf({ model, identifier: model.identifier, now: NOW }));
 import { renderPage } from '../../lib/render.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 import { escapeHtml } from '../../lib/utils/html.js';
+import { needsAPerson, taskStateOf, taskFactsOf } from '../../lib/task-state.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
@@ -133,8 +137,8 @@ describe('LIN-4010 — a waiting task is a ruling or a park', () => {
   test('the row: a ruling needs you, a park reads parked and is not counted in "needs you"', () => {
     const roots = [node('LIN-62'), node('LIN-63')];
     const s = states({ roots, loops: { 'LIN-62': [rulingLoop({ issueIdentifier: 'LIN-62' })], 'LIN-63': [parkLoop({ issueIdentifier: 'LIN-63' })] } });
-    assert.equal(s.get('LIN-62').needsYou, true);
-    assert.equal(s.get('LIN-63').needsYou, false);
+    assert.equal(needsAPerson(s.get('LIN-62').state), true);
+    assert.equal(needsAPerson(s.get('LIN-63').state), false);
     assert.equal(s.get('LIN-63').words, 'parked');
     assert.equal(s.get('LIN-63').tone, 'parked');
     // LIN-4024: the count line counts rulings (one open ruling here) and tasks that run or failed; a park is neither.
@@ -148,7 +152,7 @@ describe('LIN-4010 — a waiting task is a ruling or a park', () => {
 
   test('a failed stage still needs a person, whatever the waiting word', () => {
     const s = states({ roots: [node('LIN-64')], loops: { 'LIN-64': [failedLoop('review', { issueIdentifier: 'LIN-64' })] } });
-    assert.equal(s.get('LIN-64').needsYou, true);
+    assert.equal(needsAPerson(s.get('LIN-64').state), true);
     assert.equal(s.get('LIN-64').tone, 'failed');
   });
 });
@@ -204,14 +208,14 @@ describe('LIN-4010 — Home\'s state is one line, with no "Harbour:" label', () 
   test('a waiting task reads needs you or parked, by its ruling', () => {
     const ruling = buildTaskPageModel({ identifier: 'LIN-80', loops: [rulingLoop({ issueIdentifier: 'LIN-80' })], ctx: null, enrichLoop, deriveSessionWaiting, now: NOW });
     const park = buildTaskPageModel({ identifier: 'LIN-81', loops: [parkLoop({ issueIdentifier: 'LIN-81' })], ctx: null, enrichLoop, deriveSessionWaiting, now: NOW });
-    assert.match(renderHomeStatus(ruling, { now: NOW }), /data-testid="home-task-status-pill"[^>]*><span class="status-pill__dot" aria-hidden="true"><\/span>needs you</);
-    assert.match(renderHomeStatus(park, { now: NOW }), /needs you|parked/);
-    assert.match(renderHomeStatus(park, { now: NOW }), />parked</);
+    assert.match(renderHomeStatus(ruling, { now: NOW, taskState: stateOf(ruling) }), /data-testid="home-task-status-pill"[^>]*><span class="status-pill__dot" aria-hidden="true"><\/span>needs you</);
+    assert.match(renderHomeStatus(park, { now: NOW, taskState: stateOf(park) }), /needs you|parked/);
+    assert.match(renderHomeStatus(park, { now: NOW, taskState: stateOf(park) }), />parked</);
   });
 
   test('no "Harbour:" label in Home\'s line; the task page keeps its own status', () => {
     const model = buildTaskPageModel({ identifier: 'LIN-82', loops: [], ctx: null, enrichLoop, deriveSessionWaiting, now: NOW });
-    assert.equal(renderHomeStatus(model, { now: NOW }).includes('Harbour:'), false);
+    assert.equal(renderHomeStatus(model, { now: NOW, taskState: stateOf(model) }).includes('Harbour:'), false);
   });
 
   test('sessions.offered carries the reason the box says', () => {
@@ -222,7 +226,7 @@ describe('LIN-4010 — Home\'s state is one line, with no "Harbour:" label', () 
   // LIN-4010 review (finding 1): a running task names its state once, in the running box, so Home's line is left out.
   test('a running task has no Home state line: the running box says it once', () => {
     const model = { status: 'running', sentence: 'Build running for 1s.', sentenceAt: null, sessions: [{ kind: 'implementation', state: 'running' }] };
-    assert.equal(renderHomeStatus(model, { now: NOW }), '');
+    assert.equal(renderHomeStatus(model, { now: NOW, taskState: taskStateOf({ running: { words: 'Build running' } }) }), '');
   });
 
   // LIN-4010 review (finding 2): an idle task's "Last: …" is the Last line under the run box, not a second copy here.
@@ -231,7 +235,7 @@ describe('LIN-4010 — Home\'s state is one line, with no "Harbour:" label', () 
       status: 'idle', sentence: 'No session running. Last: Plan done just now.', sentenceAt: '2026-10-29T10:03:00.000Z',
       sessions: [{ kind: 'plan', state: 'done' }], waitingFor: null,
     };
-    const html = renderHomeStatus(model, { now: NOW });
+    const html = renderHomeStatus(model, { now: NOW, taskState: taskStateOf({}) });
     assert.match(html, /No session running\.</);
     assert.equal(html.includes('Last:'), false);
   });
@@ -240,7 +244,7 @@ describe('LIN-4010 — Home\'s state is one line, with no "Harbour:" label', () 
   // nothing was happening. The run box's "the next step for this task" is the one statement, so Home has no line here.
   test('an idle task with no sessions has no Home state line: the run box says the next step', () => {
     const model = { status: 'idle', sentence: 'No sessions yet.', sentenceAt: null, sessions: [], waitingFor: null };
-    assert.equal(renderHomeStatus(model, { now: NOW }), '');
+    assert.equal(renderHomeStatus(model, { now: NOW, taskState: taskStateOf({}) }), '');
   });
 });
 

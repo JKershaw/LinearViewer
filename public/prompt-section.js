@@ -993,9 +993,11 @@
     function renderSubtaskNeedsYou() {
       const sub = opts.subtaskNeedsYou;
       if (!sub || !sub.identifier) return '';
+      // LIN-4016: the words are the server's (`attention`): lead and detail come from it, so a failed subtask reads as
+      // failed and the browser picks no text of its own.
       const name = `${esc(sub.identifier)}${sub.title ? ` ${esc(sub.title)}` : ''}`;
       return `<div class="opened-task-needs-you" data-testid="opened-task-needs-you">`
-        + `A subtask needs you: <span class="opened-task-needs-you-name">${name}</span>`
+        + `${esc(sub.lead || 'A subtask needs you')}: <span class="opened-task-needs-you-name">${name}</span>${esc(sub.detail || '')}`
         + ` <a class="btn btn--quiet opened-task-needs-you-open" data-testid="opened-task-needs-you-open" href="${esc(sub.href || '#')}">Open</a></div>`;
     }
 
@@ -2018,7 +2020,9 @@
     function readTaskState() {
       if (typeof window.api !== 'function') return Promise.resolve(null);
       if (!opts.urlKey || !issue.identifier || !issueId) return Promise.resolve(null);
-      const url = `/workspace/${encodeURIComponent(opts.urlKey)}/api/task/${encodeURIComponent(issue.identifier)}/state?issueId=${encodeURIComponent(issueId)}`;
+      // LIN-4016: a container's own fact rides on the read (`container=1`), so `sessions.action` offers Run to PR.
+      const containerQuery = opts.isContainer ? '&container=1' : '';
+      const url = `/workspace/${encodeURIComponent(opts.urlKey)}/api/task/${encodeURIComponent(issue.identifier)}/state?issueId=${encodeURIComponent(issueId)}${containerQuery}`;
       return Promise.resolve()
         .then(() => window.api(url, { on401: false }))
         .catch(() => null);

@@ -132,8 +132,12 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         ));
       }
       const model = owner ? { ...result.model, proposals: await pendingProposalsOf(workspace.urlKey, result.model) } : result.model;
-      const issueIdQuery = model.issueId ? `?issueId=${encodeURIComponent(model.issueId)}` : '';
-      const stateUrl = `/workspace/${encodeURIComponent(workspace.urlKey)}/api/task/${encodeURIComponent(model.identifier)}/state${issueIdQuery}`;
+      const stateQuery = [
+        model.issueId ? `issueId=${encodeURIComponent(model.issueId)}` : null,
+        // LIN-4016: a container's own fact, passed back to the state read (the page knows it; the state read does not).
+        model.tracker?.subtasks?.length ? 'container=1' : null,
+      ].filter(Boolean);
+      const stateUrl = `/workspace/${encodeURIComponent(workspace.urlKey)}/api/task/${encodeURIComponent(model.identifier)}/state${stateQuery.length ? `?${stateQuery.join('&')}` : ''}`;
       // The run control's options (LIN-3975): the owner's only. The same vocabulary Home's opened task takes.
       const promptOpts = owner ? buildPromptOpts({
         openRouterSource: pageOptions.openRouterSource,
@@ -170,7 +174,7 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
     if (!isValidIssueId(identifier)) return jsonError(res, 404, 'Task not found');
     const issueId = queryValue(req.query.issueId);
     try {
-      const { model } = await loader.loadTaskState({
+      const { model, taskState } = await loader.loadTaskState({
         urlKey: workspace.urlKey,
         identifier,
         issueId: issueId && isValidIssueId(issueId) ? issueId : null,
@@ -189,13 +193,17 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         live: model.live,
         headerHtml: renderTaskStatus(model),
         // LIN-4010: Home's one-line state (no "Harbour:" label; a waiting task says needs you or parked).
-        homeStatusHtml: renderHomeStatus(model, { now: now() }),
+        // LIN-4016: the pill reads `taskState`, the decision Home's row shows.
+        homeStatusHtml: renderHomeStatus(model, { now: now(), taskState }),
         // The owner's and a member's state carries the attempts' run links (LIN-3975); it is a signed-in read.
         trackHtml: renderTaskTrack(model, { now: now(), urlKey: workspace.urlKey, runLinks: true }),
         // LIN-3968: the one-row stage strip Home's opened task pastes; the task page keeps trackHtml.
         stripHtml: renderStageStrip(model, { now: now() }),
         // LIN-3833: the sessions the state block and the run control read (count, last, running).
-        sessions: sessionSummaryOf(model),
+        // LIN-4016: `container` is the page's own fact, passed back (the row's container rule), never read from the tracker.
+        sessions: sessionSummaryOf(model, { container: req.query.container === '1' }),
+        // LIN-4016: the task's own decided state (`taskStateOf`): no tracker word, so done and backlog are not in it.
+        taskState,
         // LIN-4024: the question card, for a task waiting on an open ruling only (a parked task has none). The
         // same renderer as the task page.
         questionHtml,

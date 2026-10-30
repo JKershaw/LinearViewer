@@ -14,6 +14,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { guessStages, nextStepOf, buildTaskStages, deriveHeader, buildRowStates, sessionSummaryOf } from '../../lib/task-page-loader.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
+import { needsAPerson } from '../../lib/task-state.js';
 
 const NOW = new Date('2026-10-25T14:00:00.000Z');
 
@@ -149,7 +150,7 @@ describe('LIN-3968 — row words: a failed stage needs you, and says which stage
   test('a failed Review says "Review failed", counts as needing you, and ranks first', () => {
     const row = states([loop()]).get('LIN-60');
     assert.equal(row.words, 'Review failed');
-    assert.equal(row.needsYou, true);
+    assert.equal(needsAPerson(row.state), true);
     assert.equal(row.rank, 0);
   });
 
@@ -157,13 +158,13 @@ describe('LIN-3968 — row words: a failed stage needs you, and says which stage
     const build = loop({ loopId: 'l0', lineageId: 'l0', kind: 'implementation', agentState: 'complete', terminalStatus: 'done', dispatchedAt: '2026-10-25T12:00:00.000Z' });
     const undone = loop({ historyStatus: 'cancelled', agentState: 'complete', terminalStatus: null, terminalCompletedAt: null, takenAt: null });
     const row = states([build, undone]).get('LIN-60');
-    assert.equal(row.needsYou, false);
+    assert.equal(needsAPerson(row.state), false);
     assert.equal(row.words, 'Review next');
   });
 
   test('a copy-first viewer, who sees no sessions, still gets the tracker word only', () => {
     const row = states([loop()], false).get('LIN-60');
-    assert.equal(row.needsYou, false);
+    assert.equal(needsAPerson(row.state), false);
     assert.equal(row.words, null);
   });
 });

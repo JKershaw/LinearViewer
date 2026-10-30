@@ -18,7 +18,7 @@ const node = (identifier, type, children = []) => ({
   depth: 0,
 });
 const ids = nodes => nodes.map(n => n.issue.identifier);
-const stateFor = (over = {}) => ({ state: 'next', needsYou: false, ...over });
+const stateFor = (over = {}) => ({ state: 'next', ...over });
 const states = entries => new Map(Object.entries(entries));
 const project = (id, incomplete) => ({ project: { id, name: id, collapsed: false }, incomplete, completed: [], completedCount: 0 });
 const inProgress = roots => [{ projectId: 'p', projectName: 'p', roots }];
@@ -34,7 +34,7 @@ describe('In Progress: what shows', () => {
     const view = buildHomeView({
       inProgressTrees: inProgress([parent]),
       trees: [],
-      states: states({ 'LIN-4': stateFor({ needsYou: true, state: 'needs-you' }) }),
+      states: states({ 'LIN-4': stateFor({ state: 'needs-you' }) }),
     });
     const [root] = view.inProgressTrees[0].roots;
     assert.deepEqual(ids(root.children), ['LIN-2', 'LIN-4']);
@@ -49,7 +49,7 @@ describe('In Progress: what shows', () => {
         node('LIN-11', 'completed'),
       ]),
       trees: [],
-      states: states({ 'LIN-11': stateFor({ needsYou: true, state: 'needs-you' }) }),
+      states: states({ 'LIN-11': stateFor({ state: 'needs-you' }) }),
     });
     assert.deepEqual(ids(view.inProgressTrees[0].roots), ['LIN-11']);
   });
@@ -61,7 +61,7 @@ describe('In Progress: what shows', () => {
     const view = buildHomeView({
       inProgressTrees: [],
       trees: [{ project: { id: 'p', name: 'p', collapsed: false }, incomplete, completed, completedCount }],
-      states: states({ 'LIN-90': stateFor({ needsYou: true, state: 'needs-you' }) }),
+      states: states({ 'LIN-90': stateFor({ state: 'needs-you' }) }),
     });
     assert.deepEqual(ids(view.inProgressTrees[0].roots), ['LIN-90']);
     assert.deepEqual(ids(view.trees[0].incomplete), ['LIN-91'], 'LIN-91 is Up next; LIN-90 is shown In Progress only');
@@ -75,7 +75,7 @@ describe('In Progress: what shows', () => {
         ]),
       ]),
       trees: [],
-      states: states({ 'LIN-22': stateFor({ needsYou: true, state: 'needs-you' }) }),
+      states: states({ 'LIN-22': stateFor({ state: 'needs-you' }) }),
     });
     const [root] = view.inProgressTrees[0].roots;
     assert.equal(root.issue.identifier, 'LIN-20');
@@ -90,7 +90,7 @@ describe('In Progress: what shows', () => {
     const view = buildHomeView({
       inProgressTrees: [],
       trees: [project('p', [node('LIN-30', 'unstarted')])],
-      states: states({ 'LIN-30': stateFor({ state: 'failed', needsYou: true, words: 'Build failed' }) }),
+      states: states({ 'LIN-30': stateFor({ state: 'failed', words: 'Build failed' }) }),
     });
     assert.deepEqual(ids(view.inProgressTrees[0].roots), ['LIN-30']);
     assert.deepEqual(view.trees[0].incomplete, [], 'a task In Progress is not repeated under its project');
@@ -155,7 +155,7 @@ test('the inputs are not changed, so the shared trees stay whole', () => {
   const build = () => ({
     inProgressTrees: inProgress([node('LIN-80', 'started', [node('LIN-81', 'unstarted')])]),
     trees: [project('p', [node('LIN-82', 'unstarted'), node('LIN-83', 'backlog')])],
-    states: states({ 'LIN-81': stateFor({ needsYou: true, state: 'needs-you' }) }),
+    states: states({ 'LIN-81': stateFor({ state: 'needs-you' }) }),
   });
   const input = build();
   const before = JSON.stringify(input.trees);

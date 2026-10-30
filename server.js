@@ -157,6 +157,7 @@ import { renderDispatchPage } from './lib/render-dispatch.js'
 import { noJobBody, noJobNoticeOf } from './lib/components/dispatch-no-job.js'
 import { renderSwipePage, orderIssuesForSwipe } from './lib/render-swipe.js'
 import { subtaskNeedingYouByNodeKey, containerNodeKeysOf } from './lib/task-board-view.js'
+import { createHomeRowStates } from './lib/home-row-states.js'
 import { buildHomeView } from './lib/home-view.js'
 import { renderDashboardAfterRefresh as renderRefreshedDashboard } from './lib/dashboard-refresh.js'
 import { homeRowsFor, HOME_ROW_KINDS, HOME_SEARCH_MAX_LENGTH } from './lib/home-rows.js'
@@ -172,8 +173,7 @@ import { createTaskChatRoutes } from './routes/task-chat.js'
 import { createTaskEditRoutes } from './routes/task-edit.js'
 import { createTaskCreateRoutes } from './routes/task-create.js'
 import { createTaskPageRoutes } from './routes/task-page.js'
-import { createTaskPageLoader, buildRowStates } from './lib/task-page-loader.js'
-import { rulingStandingOf } from './lib/unanswered-decisions.js'
+import { createTaskPageLoader } from './lib/task-page-loader.js'
 import { createTaskShareRoutes } from './routes/task-share.js'
 import { createLibraryRouter } from './routes/library.js'
 import { TaskShareStore } from './lib/task-share-store.js'
@@ -3232,6 +3232,14 @@ app.use(createTaskCreateRoutes({ workspaceFromUrl, getOpenRouterSource, getDeplo
 // `deriveSessionWaiting` is injected (a lib/ loader must not import a route),
 // and `enrichLoop` (lib/run-loop-state.js) beside it.
 const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore, agentStatusStore, briefCacheStore, recapCacheStore, readRunEvidence, prStateStore, installationTokenFor, closeOutEventsStore, enrichLoop, deriveSessionWaiting, deriveSessionDecisions, taskDecisionsStore, shelvedRulingsStore })
+// LIN-3833 / LIN-4016: Home's row states, assembled once for all three Home routes (lib/home-row-states.js): one lean
+// loop read for the workspace, grouped by task. A viewer who sees no sessions (copy-first, no `runControls`) reads
+// nothing and gets the tracker words alone. The states cover the Recent and project rows too, so a subtask that needs
+// you is named on any opened row; In Progress's own states win for a task in both. `null` on a store failure, and each
+// caller falls back to plain rows, so a store hiccup never breaks the page.
+const homeRowStates = createHomeRowStates({
+  getLoopsForWorkspace, dispatchStore: dispatchQueueStore, agentStatusStore, taskDecisionsStore, shelvedRulingsStore, enrichLoop, deriveSessionWaiting,
+})
 app.use(createTaskPageRoutes({
   workspaceFromUrl,
   getOpenRouterSource,
@@ -3387,52 +3395,6 @@ async function resolveAssigneeSelection(req, provider, scope) {
   return { selectedAssignee: rawAssignee, resolvedAssigneeName: rawAssignee };
 }
 
-/**
- * LIN-3833: the In Progress row states for Home (`buildRowStates`). One lean loop read for the
- * workspace, grouped by task, the read Swipe makes. A viewer who sees no sessions (copy-first, no
- * `runControls`) reads nothing and gets the tracker words alone. A failure leaves the rows plain:
- * a store hiccup must never break the page.
- * LIN-3833: the states also cover the Recent and project rows, so a subtask that needs you is named on
- * any opened row. In Progress's own states win for a task in both, so its ranking does not change.
- */
-async function homeRowStates({ workspace, inProgressTrees, recentActivityTrees, projectTrees, runControls }) {
-  try {
-    const roots = (inProgressTrees || []).flatMap(({ roots: trees }) => trees);
-    const otherRoots = [
-      ...(recentActivityTrees || []).flatMap(({ roots: trees }) => trees),
-      ...(projectTrees || []).flatMap(({ incomplete = [], completed = [] }) => [...incomplete, ...completed])
-    ];
-    const loopsByIdentifier = new Map();
-    let ruling = null;
-    if (runControls) {
-      const loops = await getLoopsForWorkspace(workspace.urlKey, { dispatchStore: dispatchQueueStore, agentStatusStore, lean: true }).catch(() => []);
-      for (const loop of loops || []) {
-        if (!loop?.issueIdentifier) continue;
-        if (!loopsByIdentifier.has(loop.issueIdentifier)) loopsByIdentifier.set(loop.issueIdentifier, []);
-        loopsByIdentifier.get(loop.issueIdentifier).push(loop);
-      }
-      // LIN-4024: the badge's own reduction over this workspace, so a row, the count line and the badge
-      // agree on what is open. Once per request, over the loops the page already holds.
-      const urlKeys = [workspace.urlKey];
-      ruling = rulingStandingOf({
-        urlKey: workspace.urlKey,
-        loops: loops || [],
-        taskDecisions: await taskDecisionsStore.listUnansweredForWorkspaces(urlKeys),
-        shelvedRulings: await shelvedRulingsStore.listForWorkspaces(urlKeys),
-        newestScanByTask: await taskDecisionsStore.listNewestScanPerTask(urlKeys),
-      }, { now: new Date(), enrichLoop });
-    }
-    const states = buildRowStates({ roots, loopsByIdentifier, enrichLoop, deriveSessionWaiting, sessionsVisible: runControls, ruling });
-    const otherStates = buildRowStates({ roots: otherRoots, loopsByIdentifier, enrichLoop, deriveSessionWaiting, sessionsVisible: runControls, ruling });
-    for (const [identifier, state] of otherStates) {
-      if (!states.has(identifier)) states.set(identifier, state);
-    }
-    return { states, rulingCount: ruling ? ruling.rows.length : 0 };
-  } catch (err) {
-    console.error('Home row states error:', err.message);
-    return null;
-  }
-}
 
 /**
  * Workspace project view - renders the interactive tree view.
@@ -3472,7 +3434,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
     const homeTopTask = orderedHome.find((issue) => !issue.isSeed) || null;
     const seedOnlyHome = orderedHome.length > 0 && orderedHome.every((issue) => issue.isSeed);
     const featureFlags = await requestFeatureFlags(req);
-    const homeStates = await homeRowStates({ workspace, inProgressTrees, recentActivityTrees, projectTrees: trees, runControls: featureFlags.runControls === true });
+    const homeStates = await homeRowStates({ urlKey: workspace.urlKey, inProgressTrees, recentActivityTrees, projectTrees: trees, runControls: featureFlags.runControls === true });
     const rowStates = homeStates?.states ?? null;
     // LIN-4024: Home renders the trimmed view (what needs you, what runs, what is next; the rest behind folds).
     const homeView = buildHomeView({ inProgressTrees, trees, states: rowStates ?? new Map(), topTaskId: homeTopTask ? nodeKey(homeTopTask) : null });
@@ -3562,7 +3524,7 @@ app.get('/workspace/:urlKey/api/home-rows', workspaceFromUrl, async (req, res) =
     const orderedHome = orderIssuesForSwipe({ projectTrees: trees, inProgressTrees, recentActivityTrees, urlKey: workspace.urlKey });
     const homeTopTask = orderedHome.find((issue) => !issue.isSeed) || null;
     const featureFlags = await requestFeatureFlags(req);
-    const homeStates = await homeRowStates({ workspace, inProgressTrees, recentActivityTrees, projectTrees: trees, runControls: featureFlags.runControls === true });
+    const homeStates = await homeRowStates({ urlKey: workspace.urlKey, inProgressTrees, recentActivityTrees, projectTrees: trees, runControls: featureFlags.runControls === true });
     const states = homeStates?.states ?? new Map();
     const rows = homeRowsFor({ kind, projectId, parentId, q, offset, trees, inProgressTrees, states, topTaskId: homeTopTask ? nodeKey(homeTopTask) : null });
     const urlKey = workspace.urlKey;
