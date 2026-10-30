@@ -255,9 +255,11 @@ describe('LIN-4010 — Home\'s state is one line, with no "Harbour:" label', () 
     assert.equal(html.includes('Last:'), false);
   });
 
-  test('an idle task with no sessions keeps its own sentence (no session words are added)', () => {
+  // LIN-4024 (items 9 and 20): "idle · No sessions yet." led the box and, on a parent with work under it, read as if
+  // nothing was happening. The run box's "the next step for this task" is the one statement, so Home has no line here.
+  test('an idle task with no sessions has no Home state line: the run box says the next step', () => {
     const model = { status: 'idle', sentence: 'No sessions yet.', sentenceAt: null, sessions: [], waitingFor: null };
-    assert.match(renderHomeStatus(model, { now: NOW }), /No sessions yet\./);
+    assert.equal(renderHomeStatus(model, { now: NOW }), '');
   });
 });
 
@@ -432,6 +434,30 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
     assert.equal(c.innerHTML.includes('opened-task-on'), false, 'the box names no subtask it runs on');
     assert.match(c.innerHTML, /data-action="go"[^>]*>Run to PR</, 'the one main action is Run to PR');
     assert.equal(c.innerHTML.includes('Run Research'), false, 'no stage step is the main action');
+  });
+
+  // LIN-4024 (item 9): a parent whose subtask needs you says that once. Its own idle line is its own loops only, so beside
+  // "A subtask needs you" it said the task two ways while the row said needs you.
+  test('a container whose subtask needs you states that, and not its own idle line', async () => {
+    const { PromptSection } = loadClient({
+      stateBody: { status: 'idle', live: false, homeStatusHtml: '<p>OWN-IDLE-LINE</p>', sessions: PLAN_NEXT },
+    });
+    const c = makeContainer();
+    PromptSection.init(c, { ...HOME, isContainer: true, subtaskNeedsYou: { identifier: 'LIN-99', title: 'Models rows', href: '/workspace/acme/task/LIN-99' } });
+    await flush(); await flush();
+    assert.match(c.innerHTML, /data-testid="opened-task-needs-you">A subtask needs you: <span class="opened-task-needs-you-name">LIN-99 Models rows/);
+    assert.equal(c.innerHTML.includes('OWN-IDLE-LINE'), false, 'the parent\'s own idle line is not shown beside it');
+  });
+
+  test('a container with no subtask waiting keeps its own line', async () => {
+    const { PromptSection } = loadClient({
+      stateBody: { status: 'idle', live: false, homeStatusHtml: '<p>OWN-IDLE-LINE</p>', sessions: PLAN_NEXT },
+    });
+    const c = makeContainer();
+    PromptSection.init(c, { ...HOME, isContainer: true });
+    await flush(); await flush();
+    assert.match(c.innerHTML, /OWN-IDLE-LINE/);
+    assert.equal(c.innerHTML.includes('opened-task-needs-you'), false);
   });
 
   // LIN-4024 (look): a new user's one action is a solid "Write the prompt", and the step line has no stray leading dot.

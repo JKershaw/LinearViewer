@@ -946,8 +946,12 @@
       if (!opened) return `<div class="opened-task-state" data-state-slot data-testid="opened-task-state"></div>`;
       // LIN-4010 review: Home's line is '' while a task runs (the running box says it), so it is not replaced by the
       // task page's sentence. Only a server that sends no Home line at all falls back to headerHtml.
+      // LIN-4024: a parent whose subtask needs you says that, once. Its own idle line ("No session running.") is the
+      // parent's own loops only, so beside "A subtask needs you" it would say the task two ways, and the row says needs you.
+      const needsYou = renderSubtaskNeedsYou();
+      const ownLine = needsYou && opened.status === 'idle' ? '' : (opened.homeStatusHtml ?? opened.headerHtml ?? '');
       return `<div class="opened-task-state" data-state-slot data-testid="opened-task-state">`
-        + `${opened.homeStatusHtml ?? opened.headerHtml ?? ''}${opened.stripHtml || ''}${renderSubtaskNeedsYou()}${renderQuestionSlot()}</div>`;
+        + `${ownLine}${opened.stripHtml || ''}${needsYou}${renderQuestionSlot()}</div>`;
     }
 
     // LIN-4024: a task waiting on an open ruling shows the question and its answers here (the server sends the card to the
