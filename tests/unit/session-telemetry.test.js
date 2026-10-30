@@ -976,6 +976,68 @@ describe('parseDecision (LIN-2181)', () => {
   });
 });
 
+// LIN-4028: a routing ruling pins the execution fields of the work it governs. The parser keeps
+// `options[].routing` only when it validates, and a decision with no routing is unchanged.
+describe('parseDecision options[].routing (LIN-4028)', () => {
+  const routingMessage = (options) =>
+    `[decision] ${JSON.stringify({
+      decision_id: 'lin4028-test',
+      question: 'Which model runs the writing?',
+      options,
+    })}`;
+
+  test('keeps a valid routing object on its option, with harness, model and effort', () => {
+    const decision = parseDecision(routingMessage([
+      { id: 'opus', label: 'Opus for the rest', routing: { harness: 'claude-code', model: 'opus', effort: 'high' } },
+      { id: 'keep', label: 'Keep the default' },
+    ]));
+    assert.deepEqual(decision.options, [
+      { id: 'opus', label: 'Opus for the rest', routing: { harness: 'claude-code', model: 'opus', effort: 'high' } },
+      { id: 'keep', label: 'Keep the default' },
+    ]);
+  });
+
+  test('a decision whose options carry no routing parses byte-identically to before this field existed', () => {
+    const decision = parseDecision(routingMessage([{ id: 'a', label: 'A', cost: 1 }]));
+    assert.deepEqual(decision, {
+      decision_id: 'lin4028-test',
+      question: 'Which model runs the writing?',
+      options: [{ id: 'a', label: 'A', cost: 1 }],
+    });
+  });
+
+  test('drops an invalid sub-field individually, keeping the valid ones', () => {
+    const decision = parseDecision(routingMessage([
+      { id: 'a', label: 'A', routing: { model: 'opus\x00', effort: 'high' } },
+    ]));
+    assert.deepEqual(decision.options[0].routing, { effort: 'high' });
+  });
+
+  test('drops a sub-field that is not a string, and an over-long one', () => {
+    const decision = parseDecision(routingMessage([
+      { id: 'a', label: 'A', routing: { model: 7, harness: 'x'.repeat(1001), effort: 'max' } },
+    ]));
+    assert.deepEqual(decision.options[0].routing, { effort: 'max' });
+  });
+
+  test('collapses a routing object with no surviving sub-field to absent', () => {
+    const decision = parseDecision(routingMessage([
+      { id: 'a', label: 'A', routing: { model: 'bad\x07' } },
+      { id: 'b', label: 'B', routing: 'opus' },
+      { id: 'c', label: 'C', routing: [] },
+    ]));
+    assert.ok(decision.options.every((o) => !('routing' in o)));
+  });
+
+  test('a routing object on a malformed option does not break its siblings', () => {
+    const decision = parseDecision(routingMessage([
+      { label: 'no id', routing: { model: 'opus' } },
+      { id: 'b', label: 'B', routing: { model: 'sonnet' } },
+    ]));
+    assert.deepEqual(decision.options, [{ id: 'b', label: 'B', routing: { model: 'sonnet' } }]);
+  });
+});
+
 describe('parseDecisions (LIN-2181)', () => {
   test('omitted (empty array) when no kind:"decision" entry exists', () => {
     assert.deepEqual(parseDecisions([]), []);

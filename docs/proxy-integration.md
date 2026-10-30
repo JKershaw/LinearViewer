@@ -1521,6 +1521,12 @@ this read would hand it a cross-workspace view). Read scope is sufficient.
   `record`. So a read-only row never surfaces its declared effect **in** `effect` —
   `declaredEffect` is **not** guaranteed `null` on such a row; it still reports whatever the
   block declared, if anything.
+- **`options[].routing`** (LIN-4028) is an optional, validated `{harness?, model?, effort?}` on a DECISION
+  option, for a choice that is which model or effort the task's work runs on. Only the chosen option's
+  `routing` pins: once a person answers with that `optionId`, every later `recommend-and-dispatch` on the
+  task runs on it, unless its body names its own `model` or `effort`. A comment, a label or a free-text
+  answer pins nothing. Through this API a proxy token can only **suggest** an answer (`suggest-answer`,
+  which names the `optionId`); the stamp that pins is written only by a person's press.
 - **`declaredEffect`** is what the runner's own `DECISION:` block requested, via an optional
   `on_answer: { "effect": "..." }` field — `null` when nothing was declared. This is
   disposition-independent: a read-only row can still carry a non-null `declaredEffect` if the

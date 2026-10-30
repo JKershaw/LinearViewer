@@ -170,6 +170,7 @@ const TABLE = {
   'lib/pipeline-loops.js :: _readLive': [SRV, 2],
   'lib/pipeline-loops.js :: _readHistory': [SRV, 2],
   'lib/recent-runs.js :: read': [SRV, 2],
+  'lib/routing-ruling.js :: read': [SRV, 2], // LIN-4028: the task's routing ruling, read for the pin only; the feedback never leaves the process
   'lib/task-run-facts.js :: readTaskRunFacts': [SRV, 3]
 };
 

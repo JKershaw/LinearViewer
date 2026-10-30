@@ -2280,9 +2280,11 @@ describe('flight-companion.js — LIN-2621 beat 4: decisions as option buttons',
     // `issueIdentifier` fallback), mirroring public/observation.js's
     // rulings-tab precedence, now that the projection carries it for every
     // row — never just the task-bound ones.
+    // LIN-4028: the loop-bound tap also carries the pressed option's id, so the answer stamp
+    // records which option was chosen (a routing ruling pins from that option).
     looseDeepEqual(replyDeliveryCalls[0], {
       urlKey: 'acme', issueId: 'uuid-77', prompt: 'Ship it',
-      decision: { decisionLoopId: 'loop-7', decisionId: 'dec-7' },
+      decision: { decisionLoopId: 'loop-7', decisionId: 'dec-7', optionId: 'yes' },
     });
     assert.strictEqual(apiCalls.length, 0, 'never window.api — postComment is a raw fetch of its own');
   });
@@ -2345,7 +2347,7 @@ describe('flight-companion.js — LIN-2621 beat 4: decisions as option buttons',
     assert.strictEqual(replyDeliveryCalls.length, 2);
     const loopCall = replyDeliveryCalls.find(c => c.issueId === 'uuid-9-loop');
     const taskCall = replyDeliveryCalls.find(c => c.issueId === 'uuid-9-task');
-    looseDeepEqual(loopCall.decision, { decisionLoopId: 'loop-9', decisionId: 'dec-9' });
+    looseDeepEqual(loopCall.decision, { decisionLoopId: 'loop-9', decisionId: 'dec-9', optionId: 'no' });
     assert.strictEqual('taskDecisionId' in loopCall.decision, false, 'the loop-bound tap never carries the task pair');
     looseDeepEqual(taskCall.decision, { taskDecisionId: 'scan-9', taskDecisionIssueId: 'uuid-9-task' });
     assert.strictEqual('decisionLoopId' in taskCall.decision, false, 'the task-bound tap never carries the loop pair');

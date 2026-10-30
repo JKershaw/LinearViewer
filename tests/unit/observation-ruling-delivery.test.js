@@ -218,7 +218,7 @@ function bulkConfirmElements(answer = () => true) {
   };
 }
 
-function makeSandbox({ postComment, dispatchPrompt, deliverReply, api, elements = {}, confirm: confirmImpl } = {}) {
+function makeSandbox({ postComment, dispatchPrompt, deliverReply, api, elements = {}, confirm: confirmImpl, appendOptions } = {}) {
   elements = { ...bulkConfirmElements(confirmImpl), ...elements };
   const sandbox = {
     module: { exports: {} },
@@ -248,7 +248,7 @@ function makeSandbox({ postComment, dispatchPrompt, deliverReply, api, elements 
       // the refusal text NAMES the reason (mid-turn vs indeterminate) rather
       // than asserting an exact string this file doesn't own.
       ChatUI: {
-        appendOptions() {},
+        appendOptions: appendOptions || (() => {}),
         resolveCaption(disposition) {
           if (disposition === 'mid-turn') return 'still running — reply disabled';
           if (disposition === 'indeterminate') return 'no action available yet';
@@ -1475,6 +1475,38 @@ describe('renderRulings — same-workspace, different-loop decision_id collision
 // BOTH a repliable and a mid-turn (non-canReply) row. `suggestedDismissal:
 // null` (the server's shape for both "never suggested" and "withdrawn") must
 // render exactly as today — no banner, no empty container.
+// LIN-4028: pressing an option on the rulings tab must carry the pressed option's id to the answer
+// stamp. A routing ruling pins its model from that option, so a press that drops the id pins nothing.
+describe('renderRulingRow — an option press carries the option id (LIN-4028)', () => {
+  test('a loop-anchored option press posts the pressed option id with the comment and stamp', async () => {
+    let onSelect = null;
+    let capturedExtra = null;
+    const { module } = makeSandbox({
+      postComment: async (urlKey, issueId, body, extra) => { capturedExtra = extra; return { ok: true, status: 201, data: {} }; },
+      dispatchPrompt: async () => ({ id: 'dispatched-1' }),
+      api: nonTerminalHydrateApi(),
+      appendOptions: (li, opts) => { onSelect = opts.onSelect; }
+    });
+    const { renderRulingRow } = module.exports;
+    const row = makeRow({
+      canReply: true,
+      decision: {
+        decision_id: 'd-opt-1',
+        options: [{ id: 'opus', label: 'Opus for the rest' }, { id: 'keep', label: 'Keep the default' }]
+      }
+    });
+    renderRulingRow(row);
+    assert.equal(typeof onSelect, 'function', 'renderRulingRow hands the option row its onSelect');
+
+    onSelect('opus', 'Opus for the rest');
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(capturedExtra.optionId, 'opus');
+    assert.equal(capturedExtra.decisionId, 'd-opt-1');
+  });
+});
+
 describe('renderRulingRow — suggestion banner (LIN-2444 Phase 2)', () => {
   function makeRenderSandbox() {
     const list = new FakeElement('ul');
