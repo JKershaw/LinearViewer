@@ -73,6 +73,7 @@ import { LocalProvider } from '../../lib/providers/local/index.js';
 import { createMockCollection } from './mock-collection.js';
 import { swimSampleProjects, swimSampleIssues } from '../../lib/sample-data/swim-sample-data.js';
 import { testMockData } from '../../lib/sample-data/mock-data.js';
+import { SUBTREE_READ_CAP } from '../../lib/subtree-index.js';
 
 /** urlKey of the seeded local workspace; doubles as its store partition key. */
 export const LOCAL_WORKSPACE_URL_KEY = 'local-workspace';
@@ -122,6 +123,49 @@ export function localDashboardUrl(urlKey = LOCAL_WORKSPACE_URL_KEY) {
  */
 export function localSeedId(urlKey, rawId) {
   return `${urlKey}--${rawId}`;
+}
+
+/**
+ * LIN-4049 (LIN-4040 S1): the subtree extension of the canonical seed. It adds, on top of `defaultLocalSeed` (left
+ * byte-identical, its counts are pinned by the dashboard spec):
+ *   - a started parent LOCAL-30 with a chain of three descendants below it (LOCAL-31 > LOCAL-32 > LOCAL-33): a deep
+ *     descendant, three levels down;
+ *   - an over-cap parent LOCAL-40 (started) with SUBTREE_READ_CAP + 1 Todo children (LOCAL-200 ...): over the read cap, sized
+ *     from the cap so it stays over if the cap moves;
+ *   - a started parent LOCAL-50 in Local Project whose Todo child LOCAL-51 sits in Local Beta: a subtask in another project.
+ * Sessions and rulings are not seeded: the seed route takes projects and issues only (routes/test.js, setLocalSession), so
+ * the plan's running-session and ruling cases stay for a seed route that accepts them.
+ */
+export function subtreeLocalSeed(urlKey = LOCAL_WORKSPACE_URL_KEY) {
+  const base = defaultLocalSeed(urlKey);
+  const id = (rawId) => localSeedId(urlKey, rawId);
+  const issue = ({ identifier, rawId, parent = null, project = 'local-proj-1', type = 'unstarted', name = 'Todo' }) => ({
+    id: id(rawId),
+    identifier,
+    title: `Seeded ${identifier}`,
+    description: `Seeded subtree issue ${identifier}`,
+    projectId: id(project),
+    ...(parent ? { parentId: id(parent) } : {}),
+    sortOrder: 0,
+    state: { name, type },
+  });
+  const overCap = Array.from({ length: SUBTREE_READ_CAP + 1 }, (_, i) => issue({
+    identifier: `LOCAL-${200 + i}`, rawId: `local-issue-over-${i + 1}`, parent: 'local-issue-over-parent',
+  }));
+  return {
+    projects: base.projects,
+    issues: [
+      ...base.issues,
+      issue({ identifier: 'LOCAL-30', rawId: 'local-issue-deep-0', type: 'started', name: 'In Progress' }),
+      issue({ identifier: 'LOCAL-31', rawId: 'local-issue-deep-1', parent: 'local-issue-deep-0' }),
+      issue({ identifier: 'LOCAL-32', rawId: 'local-issue-deep-2', parent: 'local-issue-deep-1' }),
+      issue({ identifier: 'LOCAL-33', rawId: 'local-issue-deep-3', parent: 'local-issue-deep-2' }),
+      issue({ identifier: 'LOCAL-40', rawId: 'local-issue-over-parent', type: 'started', name: 'In Progress' }),
+      ...overCap,
+      issue({ identifier: 'LOCAL-50', rawId: 'local-issue-other-parent', type: 'started', name: 'In Progress' }),
+      issue({ identifier: 'LOCAL-51', rawId: 'local-issue-other-child', parent: 'local-issue-other-parent', project: 'local-proj-2' }),
+    ],
+  };
 }
 
 // LIN-4024: Home lists a project's open work only when it is not already In Progress or behind a fold. The default
