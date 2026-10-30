@@ -1500,6 +1500,11 @@ describe('JiraProvider Step 2 reads (fake client)', () => {
     assert.equal(await provider.issueWriteGuard(scope, 'ENG-999'), null)
   })
 
+  test('issueWriteGuard carries the issue summary as its title, so a dispatch row names the issue (LIN-4036)', async () => {
+    const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+    assert.equal((await provider.issueWriteGuard(scope, 'ENG-1')).title, 'Parent story')
+  })
+
   // LIN-1886 review Blocker 1: this used to pin the RAW ADF object, which broke
   // routes/proxy.js's markdown-string read-modify-write (`applyDescriptionEdit`)
   // — `String(<ADF object>)` is "[object Object]", so append DESTROYED the body.
