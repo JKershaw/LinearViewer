@@ -36,21 +36,23 @@ In the [shots/](shots/), magenta numbered markers point at the item with that nu
 
 **1. Three buttons, by how far to go.** **John**
 - *Now:* one main action. A task with subtasks offers only "Run to PR" (the autopilot, stopping when a PR is open). A task without subtasks offers one named step ("Run Research"). As far as the code shows, Home never offers a run all the way to Done. [1](shots/1-home-parent.png) marker 1.
-- *Wanted:* three buttons, "Next step", "Run to PR" and "Run to Done", ordered left to right by trust. The one this person last used on this workspace is the filled one. That lets a new project start on single steps and move right as confidence grows, with nothing to configure.
+- *Wanted:* three buttons, "Next step", "Run to PR" and "Run to Done", ordered left to right by trust, so a new project starts on single steps and moves right as confidence grows. Which one is filled is still open (see the end); the proposal is the one this person last used on this workspace, which needs nothing configured.
 
 **2. "Next step" never names a step in advance.** **John**
-- *Now:* the step is named from an estimate. Under "Run to PR" the line reads "the next step for this task", which describes neither. [1](shots/1-home-parent.png) marker 2. After a plan review the next step could be Plan again (changes asked for) or Build, and the estimate can't tell which.
+- *Now:* on a task without subtasks, the button names a step from an estimate ("Run Research"). On a parent, the heading says "Run to PR" and the line under it says "the next step for this task": two answers to one question. [1](shots/1-home-parent.png) marker 2. After a plan review the next step could be Plan again (changes asked for) or Build, and the estimate can't tell which.
 - *Wanted:* pressing "Next step" asks the existing recommend call what the step is (and which subtask, if it steps into one), then shows the answer with a confirm: the step, why, Run, or Another step.
 
-**3. "Run to PR" and "Run to Done" say where they start once they start.**
-- *Now:* LIN-4008 offers "Run to PR" while both its subtasks wait on rulings. [1](shots/1-home-parent.png) marker 3. In production, LIN-4033 offers "Run to PR" while one of its subtasks is in close-out. [4](shots/4-production-4033.png), the LIN-4033 box.
+**3. "Run to PR" and "Run to Done" say what Harbour picked.**
+- *Now:* nothing says whether "Run to PR" on a parent will work on the parent or on one of its subtasks, or where it will stop. [1](shots/1-home-parent.png) marker 3.
 - *Wanted:* before a run, one line: Harbour picks where to start, this task or one of its subtasks. After it starts: what it picked, and where it will stop ("Running to PR · started with Research on LIN-4011").
 
-**4. While anything under a task is running, offer no run that would collide with it.**
-- *Now:* in production, LIN-4033's box says "● idle · No session running." while its row and its subtask say "Close-out running · 5m 57s", and it offers "Run to PR". [4](shots/4-production-4033.png).
-- *Wanted:* the box shows what is running, in which mode and where it will stop, with Watch and Stop.
+**4. While anything under a task is running or waiting on you, offer no run that would collide with it.**
+- *Now:* in production, LIN-4033's box says "● idle · No session running." while its row and its subtask say "Close-out running · 5m 57s", and it offers "Run to PR". [4](shots/4-production-4033.png), the LIN-4033 box. Locally, LIN-4008 offers "Run to PR" while both its subtasks wait on rulings. [1](shots/1-home-parent.png) marker 3.
+- *Wanted:* while something runs, the box shows what is running, in which mode and where it will stop, with Watch and Stop. While a subtask waits on you, the box leads with that question (item 11), not a run.
 
 **5. No runner yet: one button, "Write the prompt".** Copy-first is the first rung of the ladder.
+- *Now:* this is close. "✦ Write the prompt" is the one teal button. But the line above it names a step in advance ("Scoping · the first step for a task in Backlog"), from the same estimate as item 2.
+- *Wanted:* the prompt, once written, says which step it is for. Nothing is named before.
 
 **6. Later, optional: the track record that earns the next button.** For example, under "Run to PR": "7 of your last 8 runs to PR merged as they were". The ladder says confidence comes from seeing Harbour be right, and Harbour has the evidence.
 
@@ -84,9 +86,9 @@ In the [shots/](shots/), magenta numbered markers point at the item with that nu
 
 **13. Three sections: Waiting on you, Running and recently moved, Up next.**
 - *Now:* In Progress, then a folded "Recent activity" [1](shots/1-home-parent.png) marker 13. When opened, Recent activity repeats rows from In Progress [4](shots/4-production-4033.png), the foot of the image.
-- *Wanted:* "Running and recently moved" replaces Recent activity: runs that finished, failed or opened a PR since you last looked.
+- *Wanted:* "Running and recently moved" replaces Recent activity: what is running now, and runs that finished, failed or opened a PR since you last looked. "Up next" is a short list of tasks ready to start, each with the three buttons when opened.
 
-**14. The full backlog moves to its own page.** Home becomes a desk, not an index of every project.
+**14. The full backlog moves to its own page,** reached from one link on Home. Home becomes a desk, not an index of every project.
 
 ---
 
