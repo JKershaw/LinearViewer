@@ -151,7 +151,7 @@
    pending runs sit as faint outlines. State by fill + label, never colour only. */
 .lx-session__runs {
   display: flex;
-  gap: 4px;
+  gap: var(--space-1);
   margin-bottom: var(--space-3);
 }
 
@@ -234,7 +234,7 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--muted);
-  padding: 0 0.25rem var(--space-2);
+  padding: 0 var(--space-1) var(--space-2);
   border-bottom: 1px solid var(--line-soft);
   margin-bottom: var(--space-2);
 }
@@ -268,7 +268,7 @@
 
 .lx-swim-block {
   display: inline-block;
-  margin-top: 0.25rem;
+  margin-top: var(--space-1);
   font-family: var(--font-structural);
   font-size: 0.72rem;
   color: var(--amber-dim);
@@ -283,7 +283,7 @@
   display: flex;
   align-items: center;
   gap: 0.5ch;
-  padding: 0.5rem 0.75rem;
+  padding: var(--space-2) var(--space-2h);
   background: var(--card-h);
   border-bottom: 1px solid var(--line);
 }

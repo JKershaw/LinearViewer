@@ -106,13 +106,13 @@ body:has(.ship-page) .nav-bar {
   position: relative;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .ship-rect-empty {
   font-family: var(--font-content);
   font-size: 11px;
-  color: var(--fg-dim);
+  color: var(--muted);
   text-align: center;
   padding: var(--space-3) var(--space-2);
   font-style: italic;
@@ -282,7 +282,7 @@ body:has(.ship-page) .nav-bar {
   padding: 10px 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
   min-width: 220px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
@@ -294,7 +294,7 @@ body:has(.ship-page) .nav-bar {
 .ship-heading-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   font-family: var(--font-structural);
   font-size: 11px;
   color: var(--text);
@@ -328,7 +328,7 @@ body:has(.ship-page) .nav-bar {
   background: none;
   border: 1px dashed var(--line);
   border-radius: var(--radius-sm);
-  padding: 4px 8px;
+  padding: var(--space-1) var(--space-2);
   cursor: pointer;
   margin-top: 2px;
 }
@@ -547,7 +547,7 @@ body:has(.ship-page) .nav-bar {
   left: 50%;
   transform: translate(-50%, -50%);
   font-family: var(--font-content);
-  color: var(--fg-dim);
+  color: var(--muted);
   font-style: italic;
   font-size: 13px;
 }

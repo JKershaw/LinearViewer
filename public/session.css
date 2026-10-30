@@ -60,7 +60,7 @@
 .sess-qcards {
   margin: 0 0 1.25rem;
   display: grid;
-  gap: 0.75rem;
+  gap: var(--space-2h);
 }
 .sess-qcard {
   padding: 0.85rem 1rem;
@@ -135,7 +135,7 @@
 .sess-qcard-actions {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 /* A quiet text button — the card's deliberate "no" is secondary to Answer. */
 .sess-qcard-dismiss {
@@ -177,7 +177,7 @@
 .sess-kv {
   display: grid;
   grid-template-columns: 9rem 1fr;
-  gap: 0.75rem;
+  gap: var(--space-2h);
   padding: 0.4rem 0.8rem;
   border-top: 1px solid var(--line-soft);
   font-family: var(--font-structural);
@@ -213,7 +213,7 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-bottom: 0.4rem;
 }
 .sess-tasks {
@@ -243,7 +243,7 @@
   border-radius: var(--radius-md);
   padding: 0.6rem 0.75rem;
   margin-bottom: 0.6rem;
-  background: var(--card-h, transparent);
+  background: var(--card-h);
   transition: border-color var(--motion-fast) ease;
   /* LIN-1163: the whole card is now the toggle target (session.js), not just
      the head — this cue applies everywhere; interactive descendants (buttons,
@@ -257,7 +257,7 @@
 .sess-run-head {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
   flex-wrap: wrap;
   font-family: var(--font-structural);
   font-size: 0.85rem;
@@ -317,7 +317,7 @@
 .sess-run-times {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: var(--space-2h);
   font-family: var(--font-structural);
   font-size: 0.75rem;
   color: var(--muted);
@@ -377,7 +377,7 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: var(--space-1);
 }
 .sess-ticket {
   display: flex;
@@ -410,7 +410,7 @@
   border-radius: var(--radius-md);
   padding: 0.6rem 0.75rem;
   margin-bottom: 0.6rem;
-  background: var(--card-h, transparent);
+  background: var(--card-h);
 }
 .sess-lineage-runs { list-style: none; margin: 0; padding: 0; }
 .sess-lineage .sess-run {
@@ -445,8 +445,8 @@
   --chat-thread-margin: 0;
   overflow-x: hidden;
   scrollbar-gutter: stable;
-  margin-top: 0.5rem;
-  padding: 0.5rem;
+  margin-top: var(--space-2);
+  padding: var(--space-2);
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-sm);
   background: var(--inset);
@@ -464,8 +464,8 @@
 /* ── Task context (brief / recap) ─────────────────────────────────────────── */
 .sess-ctx-issue {
   display: grid;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
+  gap: var(--space-2h);
+  margin-bottom: var(--space-3);
 }
 @media (min-width: 720px) {
   .sess-ctx-issue { grid-template-columns: 1fr 1fr; }
@@ -527,7 +527,7 @@
   font-weight: 600;
   font-size: 0.8rem;
   color: var(--text);
-  margin-bottom: 0.25rem;
+  margin-bottom: var(--space-1);
 }
 .sess-recap-icon { color: var(--muted); }
 .sess-recap-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; }
@@ -544,9 +544,9 @@
   font-size: 0.7rem;
   color: var(--muted);
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm, 4px);
+  border-radius: var(--radius-sm);
   padding: 0 0.3rem;
-  margin-left: 0.25rem;
+  margin-left: var(--space-1);
 }
 .sess-recap-sub {
   font-family: var(--font-structural);
@@ -561,31 +561,6 @@
 /* ── Human follow-up reply box (LIN-1004, Phase 2) ────────────────────────────
    The page's one interactive surface (rest is a LIN-1003 no-JS snapshot). A
    textarea→POST that injects a plain human follow-up back into the session. */
-.sess-reply-input {
-  width: 100%;
-  box-sizing: border-box;
-  min-height: 4.5rem;
-  resize: vertical;
-  padding: 0.5rem 0.6rem;
-  font-family: var(--font-structural);
-  font-size: 0.85rem;
-  line-height: 1.5;
-  color: var(--text);
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-}
-.sess-reply-input:focus {
-  outline: none;
-  border-color: var(--brand);
-}
-.sess-reply-actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.5rem 0.75rem;
-  margin-top: 0.5rem;
-}
 .sess-reply-feedback {
   font-family: var(--font-structural);
   font-size: 0.78rem;
@@ -614,18 +589,12 @@
 }
 .sess-reply-save:disabled { opacity: 0.5; cursor: default; }
 .sess-reply-save[hidden] { display: none; }
-.sess-reply-note {
-  margin: 0.5rem 0 0;
-  font-family: var(--font-content);
-  font-size: 0.8rem;
-  color: var(--muted);
-}
 
 /* ── Per-run inline reply box (LIN-1133) ──────────────────────────────────
    Scoped within each expanded run card. Textarea + send button + feedback span. */
 .sess-inline-reply {
-  margin-top: 0.5rem;
-  padding-top: 0.5rem;
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
   border-top: 1px solid var(--line-soft);
 }
 .sess-inline-reply-input {
@@ -658,8 +627,8 @@
    Lives in the same actions region as the inline reply box; a pending row
    carries Apply / Decline, a decided row a quiet one-line state. */
 .sess-proposals {
-  margin-top: 0.5rem;
-  padding-top: 0.5rem;
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
   border-top: 1px solid var(--line-soft);
 }
 .sess-proposals-title {
@@ -711,10 +680,9 @@
    reply, and expanded transcript comfortable to read and tap. */
 @media (max-width: 480px) {
   .sess-page { padding: 0 0.75rem 2.5rem; }
-  .sess-kv { grid-template-columns: 6.5rem 1fr; gap: 0.5rem; }
+  .sess-kv { grid-template-columns: 6.5rem 1fr; gap: var(--space-2); }
   .sess-qcard { padding: 0.75rem 0.85rem; }
   .sess-qcard-case-chunk { line-height: 1.5; }
-  .sess-reply-input { min-height: 5.5rem; }
   .sess-inline-reply-input { min-height: 4rem; }
   .sess-run-tx { --chat-thread-max-height: 280px; }
 }

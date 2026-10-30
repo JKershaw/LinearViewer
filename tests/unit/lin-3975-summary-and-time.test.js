@@ -19,9 +19,12 @@ import { timeHtml } from '../../lib/components/time.js';
 import { briefWithoutCurrent, briefCurrentSection, relativeAgo } from '../../lib/task-page-loader.js';
 import { renderTaskDocs, renderTaskPage } from '../../lib/render-task-page.js';
 import { buildPromptOpts } from '../../lib/render-prompt-opts.js';
+import { readSheets, declOf } from '../helpers/css-rules.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const read = (rel) => readFileSync(join(__dirname, '../..', rel), 'utf8');
+// The task page's sheets, in its order (LIN-4015: the grid is asked of the helper, not matched as text).
+const TASK_PAGE = readSheets(['/style.css', '/stage-track.css', '/run-control.css', '/task-page.css']);
 const NOW = new Date('2026-10-26T12:00:00.000Z');
 const TWO_HOURS_AGO = new Date(NOW.getTime() - 2 * 3600_000).toISOString();
 
@@ -245,10 +248,15 @@ describe('LIN-3975 — the description shows without a fold, and the empty brief
   });
 
   test('the quiet line is a named grid row after the PR, not an auto-placed cell that can land above the stages', () => {
-    const css = read('public/task-page.css');
-    assert.match(css, /\.sess-page\.task-page > \.task-context-section--quiet \{ grid-area: quiet; \}/);
-    assert.match(css, /"pr context"\s+"quiet quiet"\s+"docs docs"/);
-    assert.match(css, /\.task-page--quiet-context \{[\s\S]*"stages stages"[\s\S]*"quiet quiet"/);
+    // The wide grid is read as its row sequence, so a reflow or a merged selector list does not change the answer.
+    const wide = { media: '(min-width: 1024px)' };
+    const rowsOf = (areas) => [...areas.matchAll(/"([^"]*)"/g)].map(m => m[1].trim().replace(/\s+/g, ' '));
+    const inOrder = (rows, first, second) => rows.some((row, i) => row === first && rows[i + 1] === second);
+    assert.equal(declOf(TASK_PAGE, '.sess-page.task-page > .task-context-section--quiet', 'grid-area', wide), 'quiet');
+    const page = rowsOf(declOf(TASK_PAGE, '.sess-page.task-page', 'grid-template-areas', wide));
+    assert.ok(inOrder(page, 'pr context', 'quiet quiet') && inOrder(page, 'quiet quiet', 'docs docs'), 'the quiet row sits between the PR and the docs');
+    const quiet = rowsOf(declOf(TASK_PAGE, '.sess-page.task-page.task-page--quiet-context', 'grid-template-areas', wide));
+    assert.ok(quiet.indexOf('stages stages') >= 0 && quiet.indexOf('quiet quiet') > quiet.indexOf('stages stages'), 'the quiet-context layout puts the quiet row after the full-width stages');
   });
 
   test('the Read-all control is wired in the task page client before its first Markdown render', () => {

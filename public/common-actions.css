@@ -16,10 +16,10 @@
   gap: var(--space-2);
 }
 
-/* `.token-label-input` body and focus: style.css, with `.model-select` (LIN-3889). */
+/* `.token-label-input` body and focus: style.css (LIN-3889). */
 
 .token-label-input::placeholder {
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 /* LIN-1448: an ownerless (pre-LIN-1397) token is a live fault, not a neutral
@@ -50,7 +50,7 @@
   transform: translate(-50%, -50%);
   width: min(450px, 90vw);
   background: var(--bg);
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--faint);
   border-radius: 4px;
   box-shadow: var(--shadow-lg);
   z-index: var(--z-overlay);
@@ -62,7 +62,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.75rem;
+  margin-bottom: var(--space-2h);
 }
 
 .token-modal-header strong {
@@ -73,19 +73,19 @@
   background: none;
   border: none;
   font-size: 1.3em;
-  color: var(--fg-dim);
+  color: var(--muted);
   cursor: pointer;
   padding: 0 var(--space-1);
   line-height: 1;
 }
 
 .token-modal-close:hover {
-  color: var(--fg);
+  color: var(--text);
 }
 
 .token-modal p {
   font-size: 0.9em;
-  color: var(--fg-dim);
+  color: var(--muted);
   margin: 0 0 var(--space-2) 0;
 }
 
@@ -94,8 +94,8 @@
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2);
-  background: var(--bg-alt);
-  border: 1px solid var(--fg-vdim);
+  background: var(--inset);
+  border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
 }
 
@@ -104,38 +104,38 @@
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
   word-break: break-all;
-  color: var(--fg);
+  color: var(--text);
 }
 
 .token-copy-btn {
   flex-shrink: 0;
   padding: var(--space-1) var(--space-2);
   background: none;
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
   font-family: var(--font-content);
   font-size: 0.8em;
-  color: var(--fg-dim);
+  color: var(--muted);
   cursor: pointer;
 }
 
 .token-copy-btn:hover {
-  border-color: var(--fg-dim);
-  color: var(--fg);
+  border-color: var(--muted);
+  color: var(--text);
 }
 
 .token-usage-hint {
   margin-top: var(--space-3);
   padding: var(--space-2);
-  background: var(--bg-alt);
+  background: var(--inset);
   border-radius: var(--radius-sm);
   font-size: var(--font-size-sm);
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .token-usage-hint code {
   font-family: var(--font-structural);
-  color: var(--fg);
+  color: var(--text);
 }
 
 .token-usage-hint-code {
@@ -161,13 +161,13 @@
   pointer-events: auto;
   padding: 0.6rem 0.85rem;
   background: var(--bg);
-  border: 1px solid var(--fg-vdim);
-  border-left: 3px solid var(--fg-dim);
+  border: 1px solid var(--faint);
+  border-left: 3px solid var(--muted);
   border-radius: 4px;
   box-shadow: var(--shadow-lg);
   font-family: var(--font-content);
   font-size: 0.9em;
-  color: var(--fg);
+  color: var(--text);
   cursor: pointer;
   opacity: 0;
   transform: translateY(0.5rem);
@@ -198,4 +198,104 @@
   .token-label-input {
     min-width: 100%;
   }
+}
+
+/* The task form select: one body for task-create and task-edit (LIN-4015). */
+select.task-create-input,
+select.task-edit-input {
+  cursor: pointer;
+  padding-right: var(--space-5);
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+                    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 1.05rem) 50%, calc(100% - 0.7rem) 50%;
+  background-size: 0.35rem 0.35rem, 0.35rem 0.35rem;
+  background-repeat: no-repeat;
+}
+
+/* The task form action row: one body for task-create and task-edit (LIN-4015). */
+.task-create-actions,
+.task-edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line);
+}
+
+/* The task form cancel link: one body for task-create and task-edit (LIN-4015). */
+.task-create-cancel,
+.task-edit-cancel {
+  font-family: var(--font-content);
+  font-size: 0.9rem;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+/* The task form label: one body for task-create and task-edit (LIN-4015). */
+.task-create-label,
+.task-edit-label {
+  font-family: var(--font-content);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+/* The task form submit: one body for task-create and task-edit (LIN-4015). */
+.task-create-submit,
+.task-edit-submit {
+  padding: var(--space-2) var(--space-4);
+  font-family: var(--font-content);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand) 40%, transparent);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+/* The actions row of the flight-companion and passage-planner pages: one body (LIN-4015). */
+.flight-companion-actions,
+.passage-planner-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2h);
+  margin-bottom: var(--space-2h);
+}
+
+/* The prompt line of the flight-companion and passage-planner pages: one body (LIN-4015). */
+.flight-companion-prompt,
+.passage-planner-prompt {
+  max-height: 60vh;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  /* The frame the observation card body uses (LIN-3983 PR 2), now owned here. */
+  padding: 0.5rem 0.8rem 0.65rem;
+  border-top: 1px solid var(--line-soft);
+  font-size: 0.84rem;
+}
+
+/* The warning line of collective and task chat: one body (LIN-4015). */
+.collective-warning,
+.task-chat-warning {
+  color: var(--accent);
+  font-size: var(--font-size-sm);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  margin: 0 0 var(--space-3);
+}
+
+/* The conversation head of collective and task chat: one body (LIN-4015). */
+.collective-transcript-head,
+.task-chat-convo-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: var(--space-2);
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
 }

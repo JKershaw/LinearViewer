@@ -17,6 +17,7 @@ import { createLibraryRouter, escapeXml, sitemapEntries } from '../../routes/lib
 import { LISTED_DOCS, START_HERE } from '../../lib/library-metadata.js';
 import { themeSvg, THEME_MARKER, DARK_PALETTE, LIGHT_ONLY } from '../../scripts/lib/figure-theme.mjs';
 import { listFigures, FIGURES_DIR } from '../../scripts/figure-theme.mjs';
+import { readSheets, declOf } from '../helpers/css-rules.js';
 
 const docsRoot = DEFAULT_DOCS_ROOT;
 const papersDir = join(docsRoot, 'papers', 'harbour');
@@ -497,12 +498,13 @@ describe('figure dark-mode theme (LIN-3351)', () => {
   // (the pre-paint script adds theme-dark), so library.css keeps no second
   // body.is-landing copy of the figure rules.
   test('library.css sets the figure color-scheme through the one .theme-dark mechanism, scoped to Library figures', () => {
-    const css = readFileSync(join(import.meta.dirname, '..', '..', 'public', 'library.css'), 'utf8');
-    assert.match(css, /\.library-doc__body img\s*\{\s*color-scheme:\s*light;/);
-    assert.match(css, /\.theme-dark \.library-doc__body img\s*\{\s*color-scheme:\s*dark;/);
-    assert.doesNotMatch(css, /body\.is-landing/);
+    // What applies to the figure selectors, in the Library page's sheet order (LIN-4015: asked of the helper).
+    const sheets = readSheets(['/style.css', '/library.css']);
+    assert.equal(declOf(sheets, '.library-doc__body img', 'color-scheme'), 'light');
+    assert.equal(declOf(sheets, '.theme-dark .library-doc__body img', 'color-scheme'), 'dark');
+    assert.deepEqual(readSheets(['/library.css'])[0].rules.flatMap((rule) => rule.selectors).filter((sel) => sel.includes('body.is-landing')), [], 'library.css keeps no body.is-landing copy');
     // The light-only figure is dimmed on the dark path, by exact src.
-    assert.match(css, /\.theme-dark \.library-doc__body img\[src\$="\/steady-base-menu\/menu-size-vs-risk\.svg"\]\s*\{\s*filter:\s*brightness\(0\.85\)/);
+    assert.equal(declOf(sheets, '.theme-dark .library-doc__body img[src$="/steady-base-menu/menu-size-vs-risk.svg"]', 'filter'), 'brightness(0.85)');
   });
 
   // LIN-3761 — wide tables need their own scroll box (root is overflow-x: clip).

@@ -69,6 +69,38 @@ const declarations = (css, want) => {
 
 const sortedCounts = (map) => Object.fromEntries([...map].sort((a, b) => a[0] - b[0]));
 
+// Rule blocks, declarations and within-file duplicates (LIN-4015). A rule block is an innermost
+// `{ ... }` whose prelude is a style rule: at-rules (`@font-face`) and keyframe steps (`from`, `50%`)
+// are not counted. Nested rules inside `@media` count; the `@media` prelude itself does not. The
+// declarations figure counts every innermost body, at-rules included. Lines fall on a reformat;
+// rules and declarations do not, so the PR reports them beside lines.
+const KEYFRAME_STEP = /^(?:from|to|\d+(?:\.\d+)?%)$/;
+export const ruleCounts = (files) => {
+  let rules = 0;
+  let declarations = 0;
+  const bodiesByFile = {};
+  for (const path of Object.keys(files).sort()) {
+    const css = stripComments(files[path]);
+    bodiesByFile[path] = new Map();
+    for (const m of css.matchAll(/([^{};]*)\{([^{}]*)\}/g)) {
+      const prelude = m[1].trim();
+      const body = m[2].trim();
+      const count = body.split(';').filter((s) => s.trim()).length;
+      declarations += count;
+      if (!prelude.startsWith('@') && !KEYFRAME_STEP.test(prelude)) rules++;
+      if (count < 4) continue;
+      const seen = bodiesByFile[path];
+      seen.set(body, (seen.get(body) || 0) + 1);
+    }
+  }
+  // A body repeated inside one file, counted once per distinct body (the same unit as dupBlocks).
+  const within = new Set();
+  for (const seen of Object.values(bodiesByFile)) {
+    for (const [body, n] of seen) if (n >= 2) within.add(body);
+  }
+  return { rules, declarations, withinFileDupBlocks: within.size };
+};
+
 // files: { 'public/x.css': text }  →  the measures (a pure function of the texts).
 export const measureCss = (files) => {
   const paths = Object.keys(files).sort();
@@ -126,6 +158,7 @@ export const measureCss = (files) => {
 
   return {
     cssLines: { total: lines, files: paths.length, perFile: perFileLines },
+    ...ruleCounts(files),
     spacing,
     fontSize: { declarations: sizeDeclarations, distinct: sizeValues.size, tokens: [...sizeTokens].sort() },
     buttonClasses: { count: buttonClasses.size, names: [...buttonClasses].sort() },

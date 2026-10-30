@@ -7,7 +7,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readSheets, appliedDecls, declOf } from '../helpers/css-rules.js';
 import { modelsBody, savedRowIds } from '../../lib/render-settings-models.js';
 import { emptyTable, effectiveTable, AGENT_JOB_IDS, HARBOUR_JOB_IDS } from '../../lib/model-routing.js';
 import { agentSpendByJob, harbourSpendByJob } from '../../lib/model-routing-spend.js';
@@ -60,9 +60,13 @@ describe('the pending bar (LIN-3952 item 4)', () => {
   });
 
   test('the sticky bar and its phone spacing are in the stylesheet', () => {
-    const css = readFileSync(new URL('../../public/settings.css', import.meta.url), 'utf8');
-    assert.match(css, /\.models-save \{[^}]*position: sticky;[^}]*bottom: 0;[^}]*z-index: 61;/s);
-    assert.match(css, /\.models-save\.is-idle \{\s*display: none;/);
+    // What applies to the Models save bar on the Settings page, in its sheet order (LIN-4015: asked of the helper).
+    const sheets = readSheets(['/style.css', '/settings.css']);
+    const bar = appliedDecls(sheets, '.models-save');
+    assert.equal(bar.get('position'), 'sticky');
+    assert.equal(bar.get('bottom'), '0');
+    assert.equal(bar.get('z-index'), '61');
+    assert.equal(declOf(sheets, '.models-save.is-idle', 'display'), 'none');
   });
 });
 

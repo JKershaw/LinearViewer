@@ -21,7 +21,7 @@
 }
 
 .kpi-subtitle {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: 0.85rem;
   margin-bottom: var(--space-4);
 }
@@ -35,7 +35,7 @@
   font-size: 1.05rem;
   padding-bottom: var(--space-1);
   margin-bottom: var(--space-3);
-  border-bottom: 1px solid var(--fg-vdim);
+  border-bottom: 1px solid var(--faint);
 }
 
 /* The headline ratio. Chrome comes from `.card`; only its type scale is here. */
@@ -51,7 +51,7 @@
   font-size: 2.6rem;
   font-weight: 600;
   line-height: 1.1;
-  color: var(--fg);
+  color: var(--text);
   align-self: flex-start;
   text-decoration: none;
 }
@@ -69,7 +69,7 @@ a.kpi-headline-value:hover {
 .kpi-headline-coverage {
   font-family: var(--font-structural);
   font-size: 0.78rem;
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 /* The headline link's target: keep its heading off the viewport edge. */
@@ -88,7 +88,7 @@ a.kpi-headline-value:hover {
 @media (min-width: 641px) {
   .kpi-cards {
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: 0.75rem;
+    gap: var(--space-2h);
   }
 }
 
@@ -108,13 +108,13 @@ a.kpi-headline-value:hover {
 .kpi-card-label,
 .kpi-card-basis {
   font-family: var(--font-content);
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: 0.78rem;
 }
 
 /* A count the floor hides reads as text, in the same place the number would. */
 [data-hidden] {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-weight: 400;
 }
 
@@ -127,7 +127,7 @@ a.kpi-headline-value:hover {
   font-family: var(--font-structural);
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-bottom: var(--space-2);
   display: flex;
   flex-direction: column;
@@ -160,7 +160,7 @@ a.kpi-headline-value:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--fg-dim);
+  color: var(--muted);
   font-family: var(--font-structural);
   font-size: 0.85rem;
 }
@@ -174,7 +174,7 @@ p.kpi-chart-empty {
 .kpi-mode {
   font-family: var(--font-structural);
   font-size: 0.85rem;
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .kpi-mode-rungs {
@@ -185,7 +185,7 @@ p.kpi-chart-empty {
 }
 
 .kpi-privacy {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: 0.8rem;
   line-height: 1.5;
 }
@@ -209,7 +209,7 @@ p.kpi-chart-empty {
   margin-top: var(--space-2);
   font-family: var(--font-structural);
   font-size: 0.8rem;
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .kpi-numbers summary {
@@ -261,20 +261,20 @@ p.kpi-chart-empty {
 /* The rate/total toggle on the tasks-finished chart. */
 .rate-total-toggle {
   display: flex;
-  gap: var(--space-1, 0.25rem);
-  margin: 0 0 var(--space-2, 0.5rem);
+  gap: var(--space-1);
+  margin: 0 0 var(--space-2);
 }
 .rate-total-toggle button {
   font: inherit;
   font-size: 0.8rem;
-  padding: var(--space-1, 0.25rem) var(--space-2, 0.5rem);
-  color: var(--fg-dim);
+  padding: var(--space-1) var(--space-2);
+  color: var(--muted);
   background: none;
   border: 1px solid currentColor;
   border-radius: 4px;
   cursor: pointer;
 }
 .rate-total-toggle button[aria-pressed="true"] {
-  color: var(--fg);
+  color: var(--text);
   font-weight: 600;
 }

@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readSheets, appliedDecls } from '../helpers/css-rules.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (p) => readFileSync(join(ROOT, p), 'utf8');
@@ -39,12 +40,12 @@ test('no page borrows an obs- class from observation.css: each class its rendere
   }
 });
 
-test('each prompt box keeps the card-body frame in its own sheet', () => {
+test('each prompt box keeps the card-body frame, whichever sheet its rule is in', () => {
+  // What applies to each prompt on its own page, in the page's sheet order (LIN-4015: the rule may be shared by a list).
   const frame = [/padding: 0\.5rem 0\.8rem 0\.65rem/, /border-top: 1px solid var\(--line-soft\)/, /font-size: 0\.84rem/];
-  for (const [prompt, sheet] of [['.flight-companion-prompt', 'public/flight-companion.css'], ['.passage-planner-prompt', 'public/passage-planner.css']]) {
-    const css = read(sheet);
-    const block = css.slice(css.indexOf(`${prompt} {`), css.indexOf('}', css.indexOf(`${prompt} {`)));
-    for (const re of frame) assert.match(block, re, `${prompt} in ${sheet}`);
+  for (const [prompt, page] of [['.flight-companion-prompt', ['/style.css', '/common-actions.css', '/chat.css', '/flight-companion.css']], ['.passage-planner-prompt', ['/style.css', '/common-actions.css', '/passage-planner.css']]]) {
+    const block = [...appliedDecls(readSheets(page), prompt)].map(([prop, value]) => `${prop}: ${value};`).join(' ');
+    for (const re of frame) assert.match(block, re, `${prompt} on its page`);
   }
 });
 

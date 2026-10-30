@@ -9,6 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
+import { readSheets, appliedDecls, declOf, rulesFor } from '../helpers/css-rules.js';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -24,27 +25,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const STYLE_CSS = readFileSync(join(__dirname, '../../public/style.css'), 'utf8');
 
 /**
- * Slice the body of a selector's first rule block (no nested braces in this file).
- *
- * LIN-2247: a plain `css.indexOf(selector)` matches the selector text inside a
- * PRECEDING comment just as readily as the real rule — `.theme-dark` is named in
- * a doc comment at the top of the file, well before the actual `.theme-dark {`
- * rule, so the naive version silently sliced `:root`'s body instead (the next
- * `{` after that comment). `:root` happens to define the same token *names* as
- * `.theme-dark`, so every existing caller kept passing without ever reading the
- * block it claimed to. Requiring the selector be immediately followed by `{`
- * (mirroring how a rule actually opens) fixes that class of false match.
+ * The declarations that apply to a selector in style.css, written back as `prop: value;` text so the token and value
+ * checks below read them as they always did (LIN-4015: asked of the helper, not sliced out of the text). A selector
+ * with no rule throws, so a missing block cannot pass as an empty one.
  */
-function ruleBody(css, selector) {
-  // A few call sites already pass a trailing `{` themselves (to disambiguate a
-  // selector that also appears bare elsewhere) — normalize it away before
-  // re-adding it, so both forms build the same pattern.
-  const bare = selector.replace(/\s*\{\s*$/, '');
-  const re = new RegExp(bare.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*\\{');
-  const m = re.exec(css);
-  assert.notEqual(m, null, `expected ${bare} { ... } in stylesheet`);
-  const open = m.index + m[0].length - 1;
-  return css.slice(open + 1, css.indexOf('}', open));
+const STYLE = readSheets(['/style.css']);
+function ruleBody(selector) {
+  const decls = appliedDecls(STYLE, selector.replace(/\s*\{\s*$/, ''));
+  return [...decls].map(([prop, value]) => `${prop}: ${value};`).join(' ');
 }
 
 // --- Token layer ------------------------------------------------------------
@@ -56,14 +44,14 @@ const SEMANTIC_TOKENS = [
 const STATUS_TOKENS = ['--amber', '--amber-dim', '--slate', '--slate-dim', '--green-dim', '--red-dim'];
 
 test(':root defines the semantic and running-status token layer', () => {
-  const root = ruleBody(STYLE_CSS, ':root');
+  const root = ruleBody(':root');
   for (const token of [...SEMANTIC_TOKENS, ...STATUS_TOKENS, '--focus']) {
     assert.match(root, new RegExp(`${token}\\s*:`), `:root must define ${token}`);
   }
 });
 
 test('.theme-dark re-binds the semantic + status tokens (dark values)', () => {
-  const dark = ruleBody(STYLE_CSS, '.theme-dark');
+  const dark = ruleBody('.theme-dark');
   // Both layers must re-bind in dark so theming a subtree (e.g. the styleguide
   // panel) stays correct, not only when the class sits on <html>.
   for (const token of [...SEMANTIC_TOKENS, ...STATUS_TOKENS, '--focus']) {
@@ -83,8 +71,8 @@ test('the stylesheet has no second dark-token copy (LIN-3980)', () => {
 // LIN-4009: the light primary is the deep teal (one primary colour, white ink passes AA);
 // dark keeps the brighter teal through --teal. The AA pins below check the values.
 test('--brand is the primary in both themes (LIN-4009)', () => {
-  assert.match(ruleBody(STYLE_CSS, ':root'), /--brand:\s*#0f766e\s*;/);
-  assert.match(ruleBody(STYLE_CSS, '.theme-dark'), /--brand:\s*var\(--teal\)/);
+  assert.match(ruleBody(':root'), /--brand:\s*#0f766e\s*;/);
+  assert.match(ruleBody('.theme-dark'), /--brand:\s*var\(--teal\)/);
 });
 
 test('the .theme-amber variant is fully removed', () => {
@@ -105,7 +93,7 @@ test('self-hosts Inter and JetBrains Mono via @font-face (no build step)', () =>
 
 // LIN-4009: the body reads in the content face. A word inherits sans; mono is named on the machine facts.
 test('the body defaults to the content face, not the structural (mono) one (LIN-4009)', () => {
-  assert.match(ruleBody(STYLE_CSS, 'body'), /font-family:\s*var\(--font-content\)/);
+  assert.match(ruleBody('body'), /font-family:\s*var\(--font-content\)/);
 });
 
 // LIN-985 (follow-up to LIN-976/LIN-785): the typography split is `--font-structural`
@@ -192,27 +180,30 @@ test('no S2 primitive suppresses focus with outline:none', () => {
 });
 
 test('primary Button and IconButton meet the 40px touch-target floor', () => {
-  const primary = ruleBody(STYLE_CSS, '.btn--primary');
+  const primary = ruleBody('.btn--primary');
   assert.match(primary, /min-height:\s*40px/, '.btn--primary needs a ≥40px touch target');
-  const iconBtn = ruleBody(STYLE_CSS, '.icon-btn {');
+  const iconBtn = ruleBody('.icon-btn {');
   assert.match(iconBtn, /min-height:\s*40px/, '.icon-btn needs a ≥40px touch target');
   assert.match(iconBtn, /min-width:\s*40px/, '.icon-btn needs a ≥40px touch target');
 });
 
 test('the run-status pill ships a dot + the running/error/queued modifiers on -dim text', () => {
-  assert.match(STYLE_CSS, /\.status-pill__dot\s*\{/);
-  assert.match(STYLE_CSS, /\.status-pill--running\s*\{\s*color:\s*var\(--amber-dim\)/);
-  assert.match(STYLE_CSS, /\.status-pill--error\s*\{\s*color:\s*var\(--red-dim\)/);
-  assert.match(STYLE_CSS, /\.status-pill--queued\s*\{\s*color:\s*var\(--slate-dim\)/);
+  assert.ok(rulesFor(STYLE, '.status-pill__dot').length > 0, 'the dot has its own rule');
+  assert.equal(declOf(STYLE, '.status-pill--running', 'color'), 'var(--amber-dim)');
+  assert.equal(declOf(STYLE, '.status-pill--error', 'color'), 'var(--red-dim)');
+  assert.equal(declOf(STYLE, '.status-pill--queued', 'color'), 'var(--slate-dim)');
   // The dot uses the bright fill token, and the running dot reuses the global
   // pulse keyframe (no new animation machinery).
-  assert.match(STYLE_CSS, /\.status-pill--running\s+\.status-pill__dot\s*\{\s*background:\s*var\(--amber\)/);
-  assert.match(STYLE_CSS, /\.status-pill--running\s+\.status-pill__dot\s*\{[\s\S]*animation:\s*pulse/);
+  assert.equal(declOf(STYLE, '.status-pill--running .status-pill__dot', 'background'), 'var(--amber)');
+  // The pulse sits in a media-gated block (the dot animates only where motion is allowed), so every media is read.
+  const pulses = rulesFor(STYLE, '.status-pill--running .status-pill__dot', { media: 'any' })
+    .some(rule => rule.decls.some(d => d.prop === 'animation' && /\bpulse\b/.test(d.value)));
+  assert.ok(pulses, 'the running dot pulses');
 });
 
 test('--brand-dim is defined in both themes (the §11 AA text companion)', () => {
-  assert.match(ruleBody(STYLE_CSS, ':root'), /--brand-dim\s*:/);
-  assert.match(ruleBody(STYLE_CSS, '.theme-dark'), /--brand-dim\s*:/);
+  assert.match(ruleBody(':root'), /--brand-dim\s*:/);
+  assert.match(ruleBody('.theme-dark'), /--brand-dim\s*:/);
 });
 
 // --- AA verification of the §11 at-risk token pairs -------------------------
@@ -239,8 +230,8 @@ function contrast(fg, bg) {
 }
 /** Resolve a token to a hex, following up to a few `var(--x)` indirections. */
 function resolveToken(themeSelector, name) {
-  const block = ruleBody(STYLE_CSS, themeSelector);
-  const root = ruleBody(STYLE_CSS, ':root');
+  const block = ruleBody(themeSelector);
+  const root = ruleBody(':root');
   let cur = name;
   for (let i = 0; i < 6; i++) {
     const re = new RegExp(`${cur}\\s*:\\s*([^;]+);`);
@@ -332,7 +323,7 @@ test('§11 AA / LIN-1728 F5: the rulings badge text clears AA-normal on its own 
   // Pin the treatment itself, not just the math — a future edit that swaps
   // back to a solid `--amber` fill (the original F5 bug) should fail here
   // even before anyone recomputes contrast.
-  const badge = ruleBody(STYLE_CSS, '.rulings-badge {');
+  const badge = ruleBody('.rulings-badge {');
   assert.match(badge, /color:\s*var\(--amber-dim\)/);
   assert.match(badge, /background:\s*color-mix\(in srgb,\s*var\(--amber\)/);
   assert.doesNotMatch(badge, /color:\s*white/);
@@ -342,7 +333,7 @@ test('§11 note: --faint is structural (non-text), used only for hairlines', () 
   // --faint on --bg is intentionally below the 4.5:1 TEXT bar — it is the
   // box-drawing / hairline colour (non-text, 3:1 bar), so it is NOT asserted as
   // a text pair. This test documents the exemption and guards the intent.
-  const root = ruleBody(STYLE_CSS, ':root');
+  const root = ruleBody(':root');
   assert.match(root, /--faint:\s*var\(--fg-vdim\)/, '--faint maps to the structural hairline token');
 });
 

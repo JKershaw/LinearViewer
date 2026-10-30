@@ -45,10 +45,10 @@
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
   padding: var(--space-2);
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
   background: var(--bg);
-  color: var(--fg);
+  color: var(--text);
   resize: vertical;
   min-height: 3em;
 }
@@ -73,10 +73,10 @@
   font-size: var(--font-size-sm);
   line-height: 1.4;
   padding: var(--space-1) 0.4rem;
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
   background: var(--bg);
-  color: var(--fg);
+  color: var(--text);
   min-width: 12rem;
   flex: 1 1 12rem;
   max-width: 22rem;
@@ -116,7 +116,7 @@
 .dispatch-recents-container .queue-recents-label,
 .dispatch-favorites-container .queue-recents-label {
   font-size: 0.8em;
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-top: var(--space-1);
 }
 
@@ -134,12 +134,12 @@
   align-items: baseline;
   gap: var(--space-2);
   background: none;
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
   padding: 0.3rem var(--space-2);
   font-family: var(--font-content);
   font-size: 0.75em;
-  color: var(--fg-dim);
+  color: var(--muted);
   cursor: pointer;
   text-align: left;
   white-space: pre-wrap;
@@ -170,7 +170,7 @@
   font-family: var(--font-structural);
   font-size: var(--font-size-base);
   line-height: 1;
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .queue-recent-star.is-favorite {
@@ -198,7 +198,7 @@
 
 .queue-list-loading,
 .queue-list-empty {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: 0.9em;
   padding: var(--space-1) 0;
 }
@@ -236,12 +236,12 @@
 .guide-summary {
   font-family: var(--font-content);
   font-size: 0.9em;
-  color: var(--fg-dim);
-  margin: 0 0 0.75rem 0;
+  color: var(--muted);
+  margin: 0 0 var(--space-2h) 0;
 }
 
 .guide-step {
-  color: var(--fg-dim);
+  color: var(--muted);
   min-width: 2ch;
 }
 
@@ -251,16 +251,16 @@
   background: var(--card-h);
   padding: 0.1rem 0.35rem;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--faint);
 }
 
 .guide-desc {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: 0.9em;
 }
 
 .guide-link-line {
-  margin: 0.75rem 0 0 0;
+  margin: var(--space-2h) 0 0 0;
 }
 
 .guide-link {
@@ -278,12 +278,12 @@
    Dispatch History
    ============================================================================= */
 .history-list {
-  margin-top: 0.75rem;
+  margin-top: var(--space-2h);
 }
 
 .history-list-loading,
 .history-list-empty {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: 0.9em;
   padding: var(--space-1) 0;
 }
@@ -291,9 +291,9 @@
 .history-item {
   display: flex;
   align-items: flex-start;
-  gap: 0.75rem;
+  gap: var(--space-2h);
   padding: var(--space-2) 0;
-  border-bottom: 1px solid var(--fg-vdim);
+  border-bottom: 1px solid var(--faint);
   font-size: 0.9em;
 }
 
@@ -316,7 +316,7 @@
 
 .history-name {
   font-family: var(--font-content);
-  color: var(--fg);
+  color: var(--text);
 }
 
 .history-item.expandable {
@@ -326,7 +326,7 @@
 .history-item.expandable .history-name::before {
   content: '\25b6 ';
   font-size: 0.7em;
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .history-item.expandable.expanded .history-name::before {
@@ -337,12 +337,12 @@
   display: none;
   margin-top: 0.35rem;
   padding: 0.4rem var(--space-2);
-  background: var(--bg-alt);
-  border: 1px solid var(--fg-vdim);
+  background: var(--inset);
+  border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
-  color: var(--fg);
+  color: var(--text);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -363,7 +363,7 @@
 
 .history-meta {
   font-size: 0.8em;
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-top: 0.15rem;
 }
 
@@ -375,14 +375,14 @@
 
 .feedback-entry {
   font-size: var(--font-size-sm);
-  color: var(--fg);
+  color: var(--text);
   padding: 0.1rem 0;
   word-break: break-word;
 }
 
 .feedback-prefix {
   font-family: var(--font-structural);
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .feedback-link {
@@ -395,37 +395,37 @@
 }
 
 .feedback-time {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: 0.9em;
 }
 
 /* History refresh button */
 .history-refresh {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: var(--font-size-sm);
   vertical-align: middle;
 }
 
 .history-refresh:hover {
-  color: var(--fg);
+  color: var(--text);
 }
 
 .history-show-more {
   display: block;
-  margin-top: 0.75rem;
+  margin-top: var(--space-2h);
   background: none;
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
   padding: 0.3rem 0.75rem;
   font-family: var(--font-content);
   font-size: var(--font-size-sm);
-  color: var(--fg-dim);
+  color: var(--muted);
   cursor: pointer;
 }
 
 .history-show-more:hover {
-  border-color: var(--fg-dim);
-  color: var(--fg);
+  border-color: var(--muted);
+  color: var(--text);
 }
 
 /* =============================================================================
@@ -443,14 +443,14 @@
   background: var(--card-h);
   padding: 0.1rem 0.35rem;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--faint);
 }
 
 .halt-disclaimer {
   font-family: var(--font-content);
   font-size: var(--font-size-sm);
-  color: var(--fg-dim);
-  margin: 0 0 0.75rem 0;
+  color: var(--muted);
+  margin: 0 0 var(--space-2h) 0;
 }
 
 .halt-disclaimer code {
@@ -459,7 +459,7 @@
   background: var(--card-h);
   padding: 0.1rem 0.35rem;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--faint);
 }
 
 /* The halt component's own button class (lib/components/halt-controls.js), not the shared Button's. */
@@ -488,7 +488,7 @@
 }
 
 .dispatch-no-job .settings-flash {
-  color: var(--fg);
+  color: var(--text);
 }
 
 .dispatch-no-job .settings-flash-error {
@@ -504,16 +504,16 @@
   display: grid;
   gap: var(--space-1);
   font-family: var(--font-content);
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .dispatch-no-job .settings-ask-reason {
   font-family: var(--font-content);
   padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
   background: var(--bg);
-  color: var(--fg);
+  color: var(--text);
   min-width: 0;
 }
 

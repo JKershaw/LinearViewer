@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { renderWorkspaceKpisPage } from '../../lib/render-workspace-kpis.js';
 import { ROLLUP_LOOKBACK_DAYS } from '../../lib/kpi-daily-rollup.js';
+import { readSheets, declOf, rulesFor } from '../helpers/css-rules.js';
 
 const totals = { agentActions: 5, dispatches: 4, autopilotRuns: 1, feedbackNotes: 2 };
 
@@ -173,11 +174,12 @@ test('the empty state hides the trend sections and embeds no data', () => {
 });
 
 test('escalation-kpis.css carries the chart height, empty-note, sparkline and numbers rules', () => {
-  const css = readFileSync(new URL('../../public/escalation-kpis.css', import.meta.url), 'utf8');
-  assert.match(css, /\.kpi-chart-canvas\s*\{[^}]*height:\s*200px/);
-  assert.match(css, /@media \(min-width: 641px\)\s*\{\s*\.kpi-chart-canvas\s*\{\s*height:\s*240px/);
-  for (const rule of ['.kpi-chart-empty', '.kpi-card-spark', '.kpi-numbers-wrap']) assert.ok(css.includes(rule), rule);
-  assert.match(css, /\.kpi-numbers-wrap\s*\{[^}]*overflow-x:\s*auto/);
+  // Asked of the sheet the escalation page loads (LIN-4015): what applies to each selector, not how it is written.
+  const sheets = readSheets(['/style.css', '/common-actions.css', '/escalation-kpis.css']);
+  assert.equal(declOf(sheets, '.kpi-chart-canvas', 'height'), '200px');
+  assert.equal(declOf(sheets, '.kpi-chart-canvas', 'height', { media: '(min-width: 641px)' }), '240px');
+  for (const rule of ['.kpi-chart-empty', '.kpi-card-spark', '.kpi-numbers-wrap']) assert.ok(rulesFor(sheets, rule).length > 0, rule);
+  assert.equal(declOf(sheets, '.kpi-numbers-wrap', 'overflow-x'), 'auto');
 });
 
 // LIN-3713: time to merge, from the forge's own PR times

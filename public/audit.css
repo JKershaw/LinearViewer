@@ -8,41 +8,26 @@
 /* `.dashboard-subtitle` is now a no-style E2E hook (audit.spec.js); canonical
    styling lives in `.page-header__subtitle` (style.css, LIN-462). */
 
-.nav-value-static {
-  font-family: var(--font-content);
-  font-size: 0.9em;
-  color: var(--fg);
-}
-
 /* =============================================================================
    Settings Section
    ============================================================================= */
 .settings-section {
   margin-bottom: var(--space-5);
   padding: var(--space-3);
-  background: var(--bg-alt);
+  background: var(--inset);
   border-radius: 4px;
 }
 
 /* LIN-3889: `.settings-header` (a byte copy of `.section .section-header`) is gone: nothing on
    Audit emits it, and the group title it styled is settings.css's (`.settings-group-title`). */
 
-.settings-item {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.35rem 0;
-  font-family: var(--font-content);
-  font-size: 0.9em;
-}
-
 .settings-label {
-  color: var(--fg-dim);
+  color: var(--muted);
   min-width: 10ch;
 }
 
 .settings-value {
-  color: var(--fg);
+  color: var(--text);
 }
 
 .settings-value.connected {
@@ -50,21 +35,15 @@
 }
 
 .settings-value.env {
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .settings-value.disconnected {
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .settings-value.error {
   color: var(--red);
-}
-
-.model-error {
-  margin-top: var(--space-1);
-  padding-top: var(--space-1);
-  border-top: 1px solid var(--red);
 }
 
 .settings-form {
@@ -75,22 +54,15 @@
 /* LIN-3889: `.settings-link` is style.css's now; Audit emits none. */
 
 /* Model Selector */
-.model-form {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-/* LIN-3889: `.model-select` is style.css's now (with `.token-label-input`); Audit emits none. */
 
 .model-input {
   font-family: var(--font-content);
   font-size: 0.9em;
   padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
   background: var(--bg);
-  color: var(--fg);
+  color: var(--text);
   min-width: 22ch;
 }
 
@@ -100,19 +72,7 @@
 }
 
 .model-input::placeholder {
-  color: var(--fg-dim);
-}
-
-.model-current {
-  margin-top: var(--space-1);
-  padding-top: var(--space-1);
-  border-top: 1px solid var(--fg-vdim);
-}
-
-.model-id {
-  font-family: var(--font-structural);
-  font-size: var(--font-size-sm);
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 /* =============================================================================
@@ -141,12 +101,12 @@
 }
 
 .audit-button:disabled {
-  background: var(--fg-dim);
+  background: var(--muted);
   cursor: not-allowed;
 }
 
 .audit-status {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-family: var(--font-content);
   font-size: 0.9em;
 }
@@ -206,13 +166,13 @@
   font-family: var(--font-structural);
   font-size: 1.5rem;
   font-weight: 600;
-  color: var(--fg);
+  color: var(--text);
 }
 
 .stat-label {
   font-family: var(--font-content);
   font-size: 0.8em;
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-top: var(--space-1);
 }
 
@@ -232,7 +192,7 @@
   font-family: var(--font-content);
   font-size: var(--font-size-base);
   font-weight: 500;
-  color: var(--fg);
+  color: var(--text);
   margin: 0 0 var(--space-2) 0;
 }
 
@@ -242,7 +202,7 @@
 
 /* Muted "nothing here" note. */
 .empty-note {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-family: var(--font-content);
   font-size: 0.9em;
 }
@@ -272,11 +232,11 @@
 }
 
 .queue-label {
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .queue-count {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
 }
@@ -300,12 +260,12 @@
 }
 
 .issues-list .issue-prefix {
-  color: var(--fg-vdim);
+  color: var(--faint);
   flex-shrink: 0;
 }
 
 .issues-list .issue-title {
-  color: var(--fg);
+  color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -314,7 +274,7 @@
 
 /* More link */
 .more-link {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-family: var(--font-content);
   font-size: var(--font-size-sm);
   margin-top: var(--space-1);
@@ -330,7 +290,7 @@
 }
 
 .health-label {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-family: var(--font-content);
   font-size: 0.9em;
 }
@@ -348,7 +308,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--fg);
+  color: var(--text);
 }
 
 .project-row .field-value {
@@ -359,13 +319,13 @@
 }
 
 .project-state {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: var(--font-size-sm);
   min-width: 8ch;
 }
 
 .project-count {
-  color: var(--fg);
+  color: var(--text);
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
   min-width: 5ch;
@@ -374,12 +334,12 @@
 
 /* Timestamp */
 .report-timestamp {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-family: var(--font-content);
   font-size: 0.8em;
   margin-top: var(--space-5);
   padding-top: var(--space-3);
-  border-top: 1px solid var(--fg-vdim);
+  border-top: 1px solid var(--faint);
 }
 
 /* =============================================================================
@@ -403,16 +363,6 @@
 
   .project-row {
     flex-wrap: wrap;
-  }
-
-  .prompt-card-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-1);
-  }
-
-  .prompt-char-count {
-    margin-left: 0;
   }
 
   .prompt-text {

@@ -4,16 +4,16 @@
 
 .effort-population,
 .effort-completeness {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: 0.85rem;
-  margin: 0 0 0.5rem;
+  margin: 0 0 var(--space-2);
 }
 .effort-completeness--incomplete {
   color: var(--amber);
 }
 
 .effort-grid {
-  margin-top: 0.75rem;
+  margin-top: var(--space-2h);
   /* LIN-2830: the kind cards carry the (harness, model, effort) bake-off rows,
      whose fixed tracks below sum to ~792px of content — they cannot fit the
      220px-min cells `.kpi-grid`'s auto-fit hands out (a card measures ~263px
@@ -30,7 +30,7 @@
 
 .effort-card-row {
   display: flex;
-  gap: 0.75rem;
+  gap: var(--space-2h);
   margin: 0.3rem 0;
   flex-wrap: wrap;
 }
@@ -43,7 +43,7 @@
   font-size: 0.62rem;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 .effort-card-metric {
   font-family: var(--font-structural);
@@ -68,7 +68,7 @@
 }
 
 .effort-card-footnote {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: 0.75rem;
   margin-top: 0.4rem;
   border-top: 1px dashed var(--line);
@@ -98,16 +98,16 @@
 .effort-group-rows-head {
   display: grid;
   grid-template-columns: 8.5rem 16rem 5rem 6rem 6rem 5rem auto;
-  gap: 0 0.5rem;
+  gap: 0 var(--space-2);
   font-size: 0.62rem;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 .effort-group-row {
   display: grid;
   grid-template-columns: 8.5rem 16rem 5rem 6rem 6rem 5rem auto;
-  gap: 0 0.5rem;
+  gap: 0 var(--space-2);
   align-items: baseline;
 }
 .effort-group-cell {
@@ -116,7 +116,7 @@
   overflow-wrap: anywhere;
 }
 .effort-group-coverage {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: 0.7rem;
 }
 
@@ -124,13 +124,13 @@
   margin-top: 1.25rem;
 }
 .effort-caption {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: 0.85rem;
   font-style: italic;
 }
 .effort-notes-details summary {
   cursor: pointer;
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: 0.85rem;
 }
 .effort-notes-details ul {

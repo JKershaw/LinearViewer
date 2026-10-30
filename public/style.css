@@ -66,6 +66,7 @@
   /* Spacing scale */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
+  --space-2h: 0.75rem;   /* the half-step between --space-2 and --space-3 (LIN-4015: the biggest gap in the scale) */
   --space-3: 1rem;
   --space-4: 1.5rem;
   --space-5: 2rem;
@@ -272,7 +273,7 @@
   --focus: var(--brand);     /* the house ring: same colour as the brand fill (LIN-4009) */
 
   background: var(--bg);
-  color: var(--fg);
+  color: var(--text);
 }
 
 /* =============================================================================
@@ -299,7 +300,7 @@ body {
   font-size: 16px;
   line-height: 1.6;
   background: var(--bg);
-  color: var(--fg);
+  color: var(--text);
   padding: var(--space-5);
   max-width: 120ch;  /* Optimal reading width */
   margin-left: auto;
@@ -368,9 +369,8 @@ header:not(.page-header) {
   font-weight: 600;
 }
 
-
 h1 {
-  color: var(--fg);
+  color: var(--text);
   font-weight: normal;
   font-family: var(--font-content);
 }
@@ -610,7 +610,7 @@ h1 {
 }
 
 .nav-label {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-family: var(--font-content);
   font-size: 0.9em;
 }
@@ -621,7 +621,7 @@ h1 {
   padding: 0;
   font-family: var(--font-content);
   font-size: 0.9em;
-  color: var(--fg);
+  color: var(--text);
   cursor: pointer;
 }
 
@@ -642,14 +642,14 @@ h1 {
 }
 
 .nav-action {
-  color: var(--fg-dim);
+  color: var(--muted);
   text-decoration: none;
   font-size: 0.9em;
   font-family: var(--font-content);
 }
 
 .nav-action:hover {
-  color: var(--fg);
+  color: var(--text);
 }
 
 /* Button variant of nav-action (e.g. the +local workspace form submit) */
@@ -668,7 +668,7 @@ button.nav-action {
   font-family: var(--font-structural);
   font-weight: 600;
   letter-spacing: 0.01em;
-  color: var(--fg);
+  color: var(--text);
   text-decoration: none;
 }
 
@@ -693,7 +693,7 @@ a.wordmark:hover {
 }
 
 .wordmark-footer {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-weight: 600;
   font-size: 0.95em;
 }
@@ -777,7 +777,7 @@ a.wordmark:hover {
   width: min(400px, 90vw);
   max-height: 70vh;
   background: var(--bg);
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--faint);
   border-radius: 4px;
   box-shadow: var(--shadow-lg);
   z-index: var(--z-overlay);
@@ -792,9 +792,9 @@ a.wordmark:hover {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.75rem var(--space-3);
-  background: var(--bg-muted);
-  border-bottom: 1px solid var(--fg-vdim);
+  padding: var(--space-2h) var(--space-3);
+  background: var(--card);
+  border-bottom: 1px solid var(--faint);
   font-family: var(--font-content);
   font-weight: 500;
 }
@@ -803,13 +803,13 @@ a.wordmark:hover {
   background: none;
   border: none;
   font-size: 1.2em;
-  color: var(--fg-dim);
+  color: var(--muted);
   cursor: pointer;
   padding: 0 var(--space-1);
 }
 
 .queue-panel-close:hover {
-  color: var(--fg);
+  color: var(--text);
 }
 
 .queue-panel-items {
@@ -819,8 +819,8 @@ a.wordmark:hover {
 }
 
 .queue-item {
-  padding: 0.75rem var(--space-3);
-  border-bottom: 1px solid var(--fg-vdim);
+  padding: var(--space-2h) var(--space-3);
+  border-bottom: 1px solid var(--faint);
 }
 
 .queue-item:last-child {
@@ -838,7 +838,7 @@ a.wordmark:hover {
   font-family: var(--font-content);
   font-weight: 500;
   font-size: 0.9em;
-  color: var(--fg);
+  color: var(--text);
   flex: 1;
 }
 
@@ -857,7 +857,7 @@ a.wordmark:hover {
 
 .queue-item-meta {
   font-size: 0.8em;
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-top: var(--space-1);
 }
 
@@ -889,7 +889,7 @@ a.wordmark:hover {
 .queue-item-snippet {
   font-family: var(--font-content);
   font-size: 0.8em;
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-top: var(--space-1);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -924,7 +924,7 @@ a.wordmark:hover {
 .queue-panel-empty {
   padding: var(--space-5) var(--space-3);
   text-align: center;
-  color: var(--fg-dim);
+  color: var(--muted);
   font-family: var(--font-content);
 }
 
@@ -972,7 +972,7 @@ a.wordmark:hover {
 }
 
 .option-prefix {
-  color: var(--fg-vdim);
+  color: var(--faint);
   white-space: pre;
   flex-shrink: 0;
 }
@@ -988,7 +988,7 @@ a.wordmark:hover {
   padding: 0;
   font-family: var(--font-content);
   font-size: 0.9em;
-  color: var(--fg);
+  color: var(--text);
   cursor: pointer;
   text-decoration: none;
   display: inline-flex;
@@ -1016,7 +1016,7 @@ a.wordmark:hover {
 
 .nav-option-add,
 .nav-option-add-local {
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .nav-option-danger {
@@ -1068,7 +1068,7 @@ a.wordmark:hover {
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   padding: var(--space-1) var(--space-2);
-  color: var(--fg);
+  color: var(--text);
   background: var(--bg);
   flex: 1;
   max-width: 40ch;
@@ -1082,18 +1082,18 @@ a.wordmark:hover {
 .search-clear {
   font-family: var(--font-structural);
   font-size: 0.9em;
-  color: var(--fg-dim);
+  color: var(--muted);
   background: none;
   border: none;
   cursor: pointer;
 }
 
 .search-clear:hover {
-  color: var(--fg);
+  color: var(--text);
 }
 
 .search-no-results {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: 0.9em;
   padding: var(--space-2) 0;
 }
@@ -1122,7 +1122,7 @@ a.wordmark:hover {
 
 /* Project name badge shown after issue title in In Progress section */
 .in-progress-project {
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-left: 1ch;
   font-size: 0.9em;
   font-family: var(--font-content);
@@ -1131,7 +1131,7 @@ a.wordmark:hover {
 /* LIN-3833: a task's state words (Build running · 5m, needs you, backlog), right of the title on
    desktop; the phone rule below moves them under it. */
 .row-state {
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-left: auto;
   padding-left: 1ch;
   font-size: 0.9em;
@@ -1168,19 +1168,19 @@ a.wordmark:hover {
 /* LIN-3833: the opened task on Home, state first: the facts line, the state block above the control, the
    one links row. Plain text sizes; the controls below keep their own styles. */
 .opened-task-facts {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: 0.8125rem;
   font-family: var(--font-content);
   padding: 2px 0 6px;
 }
 
 .opened-task-state {
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 
 /* LIN-4024: a task waiting on a ruling shows its question card in the state block (session.css styles the card). */
 .opened-task-question {
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 
 /* LIN-4010: Home's state is one line: the pill and its sentence side by side, wrapping on a phone. */
@@ -1192,10 +1192,10 @@ a.wordmark:hover {
 }
 
 .opened-task-last {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: 0.8125rem;
   font-family: var(--font-content);
-  padding-top: 4px;
+  padding-top: var(--space-1);
 }
 
 .opened-task-links {
@@ -1275,7 +1275,7 @@ a.wordmark:hover {
 /* LIN-4010: Home's stage strip is a row of small chips (they wrap on a phone), not the task page's wide boxes. */
 .opened-task-home .task-strip {
   margin-top: 6px;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .opened-task-home .task-strip-chip {
@@ -1290,7 +1290,7 @@ a.wordmark:hover {
 .opened-task-run {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
   padding: 6px 0 10px;
   font-family: var(--font-content);
 }
@@ -1300,7 +1300,7 @@ a.wordmark:hover {
 .opened-task-next-run {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   padding: 10px 12px;
@@ -1315,7 +1315,7 @@ a.wordmark:hover {
 }
 
 .opened-task-step {
-  color: var(--fg);
+  color: var(--text);
 }
 
 .opened-task-step-name {
@@ -1335,12 +1335,12 @@ a.wordmark:hover {
 .opened-task-step-what,
 .opened-task-step-why {
   margin: 0;
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: 0.8125rem;
 }
 
 .opened-task-step-what {
-  color: var(--fg);
+  color: var(--text);
 }
 
 .opened-task-step-why .opened-task-ask {
@@ -1356,7 +1356,7 @@ a.wordmark:hover {
   border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent);
   border-radius: var(--radius-sm);
   padding: 10px 12px;
-  color: var(--fg);
+  color: var(--text);
 }
 
 .opened-task-running-head {
@@ -1382,35 +1382,25 @@ a.wordmark:hover {
   margin-left: auto;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-}
-
-.opened-task-on {
-  margin: 0;
-  color: var(--fg-dim);
-  font-size: 0.8125rem;
-}
-
-.opened-task-on-open {
-  font-size: 0.8125rem;
+  gap: var(--space-2);
 }
 
 .opened-task-running-next {
   margin: 0;
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: 0.8125rem;
 }
 
 .opened-task-copy-state {
   margin: 0;
-  color: var(--fg);
+  color: var(--text);
 }
 
 .opened-task-runs-on,
 .opened-task-running,
 .opened-task-queued,
 .opened-task-last-copy {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: 0.8125rem;
 }
 
@@ -1471,7 +1461,7 @@ a.wordmark:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 /* The close × is the phone sheet's dismiss; on desktop the panel closes with its Close button. */
@@ -1488,7 +1478,7 @@ a.wordmark:hover {
     border: 0;
     border-radius: 0;
     /* LIN-4010: the choice cards and the decision panel make the sheet taller; Use stays on the first phone screen. */
-    padding: 12px;
+    padding: var(--space-2h);
     overflow-y: auto;
   }
 
@@ -1508,7 +1498,7 @@ a.wordmark:hover {
 }
 
 .opened-task-change-label {
-  color: var(--fg-dim);
+  color: var(--muted);
   min-width: 5.5em;
   font-size: 0.9em;
 }
@@ -1524,7 +1514,7 @@ a.wordmark:hover {
 
 .opened-task-change-summary,
 .opened-task-change-note {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: 0.9em;
   margin: 0;
 }
@@ -1570,7 +1560,7 @@ a.wordmark:hover {
 }
 
 .opened-task-card-what {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: 0.75rem;
 }
 
@@ -1582,7 +1572,7 @@ a.wordmark:hover {
 .opened-task-choose {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .opened-task-choose[hidden] {
@@ -1611,7 +1601,7 @@ a.wordmark:hover {
 .decision-panel-heading {
   margin: 0;
   font-size: 0.9em;
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 /* The spend bar and its visible caption: the caption says what the bar measures. */
@@ -1625,7 +1615,8 @@ a.wordmark:hover {
   font-family: var(--font-structural);
 }
 
-.decision-panel-field {
+.decision-panel-field,
+.settings-field {
   display: grid;
   grid-template-columns: minmax(8ch, 12ch) minmax(0, 1fr);
   align-items: center;
@@ -1641,17 +1632,18 @@ a.wordmark:hover {
 .decision-panel-label {
   font-family: var(--font-content);
   font-size: 0.9em;
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
-.decision-panel-control {
+.decision-panel-control,
+.settings-field-control {
   font-family: var(--font-content);
   font-size: 0.9em;
   padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
   background: var(--bg);
-  color: var(--fg);
+  color: var(--text);
   min-width: 0;
   max-width: 100%;
 }
@@ -1664,7 +1656,7 @@ a.wordmark:hover {
 .decision-panel-hint {
   grid-column: 2;
   font-size: var(--font-size-sm);
-  color: var(--fg-dim);
+  color: var(--muted);
   overflow-wrap: anywhere;
 }
 
@@ -1708,7 +1700,7 @@ a.wordmark:hover {
 }
 
 .decision-panel-reason {
-  color: var(--fg-dim);
+  color: var(--muted);
   overflow-wrap: anywhere;
 }
 
@@ -1719,7 +1711,7 @@ a.wordmark:hover {
   gap: var(--space-1) var(--space-3);
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 /* Where a rate comes from is words, so it takes the content face inside the mono costs line. */
@@ -1732,7 +1724,7 @@ a.wordmark:hover {
   grid-column: 1 / -1;
   margin: 0;
   font-size: var(--font-size-sm);
-  color: var(--fg-dim);
+  color: var(--muted);
   overflow-wrap: anywhere;
 }
 
@@ -1743,7 +1735,7 @@ a.wordmark:hover {
 .opened-task-more {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
   align-items: baseline;
 }
 
@@ -1784,7 +1776,7 @@ a.wordmark:hover {
 
 .opened-task-target {
   margin: 0 0 var(--space-2);
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: 0.9em;
 }
 
@@ -1797,7 +1789,7 @@ a.wordmark:hover {
 
 .opened-task-box-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 /* LIN-3991: Copy and the instruction to paste it share a row, so the instruction sits where the person acts on it. */
@@ -1810,17 +1802,17 @@ a.wordmark:hover {
 
 .opened-task-key-note,
 .opened-task-paste {
-  color: var(--fg-dim);
+  color: var(--muted);
   margin: 0;
 }
 
 .opened-task-confirm {
-  color: var(--fg);
+  color: var(--text);
 }
 
 /* Activity time/kind shown in the Recent activity section */
 .completed-time {
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-left: 1ch;
   font-size: 0.9em;
   font-family: var(--font-content);
@@ -1828,12 +1820,12 @@ a.wordmark:hover {
 
 /* Per-task source flag, shown only when a workspace merges >1 provider (LIN-544) */
 .source-badge {
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-left: 1ch;
   padding: 0 0.5ch;
   font-size: 0.8em;
   font-family: var(--font-content);
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: 3px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -1891,14 +1883,14 @@ a.wordmark:hover {
 }
 
 .project[data-project-type="periodicals"] .periodical-mode {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
   margin-left: 0.75ch;
 }
 
 .project-description {
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-left: 3ch;  /* Indent under project header */
   margin-bottom: var(--space-2);
   word-wrap: break-word;
@@ -1908,7 +1900,7 @@ a.wordmark:hover {
 }
 
 .project-description:hover {
-  color: var(--fg);
+  color: var(--text);
 }
 
 .desc-toggle {
@@ -1939,7 +1931,7 @@ a.wordmark:hover {
   display: flex;
   align-items: baseline;
   min-height: 1.6em;
-  padding: 4px 0;
+  padding: var(--space-1) 0;
 }
 
 /* Parent items (with children) get bolder weight for visual hierarchy */
@@ -1956,7 +1948,7 @@ a.wordmark:hover {
 }
 .state.done { color: var(--green); }
 .state.in-progress { color: var(--yellow); }
-.state.todo { color: var(--fg-dim); }
+.state.todo { color: var(--muted); }
 /* Idle/backlog rides the semantic slate idle token (LIN-850), not a magic
    opacity. --slate-dim is the AA-safe slate text companion. */
 .state.backlog { color: var(--slate-dim); }
@@ -1979,16 +1971,16 @@ a.wordmark:hover {
   overflow-wrap: break-word;
   font-family: var(--font-content);
 }
-.title.done { color: var(--fg-dim); }
+.title.done { color: var(--muted); }
 
 /* Collapse/expand toggle arrow (▼/▶) */
 .toggle {
-  color: var(--fg);
+  color: var(--text);
   cursor: pointer;
   margin-left: 1ch;
   flex-shrink: 0;
   padding: var(--space-1) var(--space-2);
-  margin-right: -0.5rem;
+  margin-right: -var(--space-2);
   font-size: var(--font-size-sm);
 }
 
@@ -1997,7 +1989,7 @@ a.wordmark:hover {
 }
 
 .detail-link {
-  color: var(--fg-dim);
+  color: var(--muted);
   text-decoration: none;
   font-size: 0.8em;
   font-family: var(--font-content);
@@ -2016,7 +2008,7 @@ a.wordmark:hover {
    Content sections start collapsed (hidden) by default.
 */
 .detail-toggle {
-  color: var(--fg-dim);
+  color: var(--muted);
   cursor: pointer;
   font-size: 0.8em;
   font-family: var(--font-content);
@@ -2053,11 +2045,6 @@ a.wordmark:hover {
 }
 
 /* Prompt buttons row within Prompts section */
-.detail-prompts {
-  color: var(--fg-dim);
-  font-size: 0.9em;
-  font-family: var(--font-content);
-}
 
 /* Mobile: larger tap targets for toggles */
 @media (max-width: 640px) {
@@ -2067,15 +2054,15 @@ a.wordmark:hover {
 }
 
 .project-meta {
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-left: 3ch;
-  margin-bottom: 0.75rem;
+  margin-bottom: var(--space-2h);
   font-family: var(--font-content);
 }
 
 /* "Show N completed" toggle link */
 .completed-toggle {
-  color: var(--fg-dim);
+  color: var(--muted);
   cursor: pointer;
   margin-left: 4ch;
   padding: var(--space-2) 0;
@@ -2086,7 +2073,7 @@ a.wordmark:hover {
    text, and so is the done count. They open on a click or Enter, and are buttons to the keyboard. */
 .home-fold,
 .home-done-count {
-  color: var(--fg-dim);
+  color: var(--muted);
   cursor: pointer;
   margin-left: 4ch;
   padding: var(--space-1) 0;
@@ -2104,14 +2091,14 @@ a.wordmark:hover {
 
 /* "+ Add task" link at end of task list */
 .add-task-link {
-  color: var(--fg-dim);
+  color: var(--muted);
   padding: var(--space-1) 0;
   padding-left: 1.5em;
   font-family: var(--font-content);
 }
 
 .add-task-link a {
-  color: var(--fg-dim);
+  color: var(--muted);
   text-decoration: none;
 }
 
@@ -2154,8 +2141,8 @@ a.wordmark:hover {
   top: 0;
   height: 0.9em;  /* Align with middle of first line */
   width: 0.8em;
-  border-left: 1px solid var(--fg-vdim);
-  border-bottom: 1px solid var(--fg-vdim);
+  border-left: 1px solid var(--faint);
+  border-bottom: 1px solid var(--faint);
 }
 
 /* Vertical line continuation for non-last nodes */
@@ -2165,18 +2152,12 @@ a.wordmark:hover {
   left: 0;
   top: 0;
   bottom: 0;
-  border-left: 1px solid var(--fg-vdim);
+  border-left: 1px solid var(--faint);
 }
 
 /* Hover highlighting for issue groups */
 .node:hover > .line {
   background-color: rgba(0, 0, 0, 0.02);
-}
-
-.child-count {
-  color: var(--fg-dim);
-  font-size: 12px;
-  font-family: var(--font-content);
 }
 
 /* =============================================================================
@@ -2198,7 +2179,7 @@ a.wordmark:hover {
 
 .line.expandable:hover .title {
   text-decoration: underline;
-  text-decoration-color: var(--fg-dim);
+  text-decoration-color: var(--muted);
   text-underline-offset: 2px;
 }
 
@@ -2221,7 +2202,7 @@ a.wordmark:hover {
 }
 
 .detail-text {
-  color: var(--fg-dim);
+  color: var(--muted);
   flex: 1;
   min-width: 0;
   word-wrap: break-word;
@@ -2230,7 +2211,7 @@ a.wordmark:hover {
 }
 
 .detail-meta {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: 0.9em;
   flex: 1;
   min-width: 0;
@@ -2245,7 +2226,7 @@ a.wordmark:hover {
    Expandable descriptions with markdown rendering and image support.
 */
 .issue-description {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-family: var(--font-content);
   font-size: 0.9em;
   margin-bottom: var(--space-2);
@@ -2285,8 +2266,10 @@ a.wordmark:hover {
   margin: 0.25em 0;
 }
 
-.issue-description .desc-full-content code {
-  background: var(--bg-muted);
+.issue-description .desc-full-content code,
+.comment-body code,
+.task-edit-preview code {
+  background: var(--card);
   padding: 0.1em 0.3em;
   border-radius: var(--radius-sm);
   font-family: var(--font-structural);
@@ -2294,7 +2277,7 @@ a.wordmark:hover {
 }
 
 .issue-description .desc-full-content pre {
-  background: var(--bg-muted);
+  background: var(--card);
   padding: 0.75em;
   border-radius: 4px;
   overflow-x: auto;
@@ -2306,11 +2289,12 @@ a.wordmark:hover {
   padding: 0;
 }
 
-.issue-description .desc-full-content blockquote {
-  border-left: 3px solid var(--fg-vdim);
+.issue-description .desc-full-content blockquote,
+.task-edit-preview blockquote {
+  border-left: 3px solid var(--faint);
   margin: 0.5em 0;
   padding-left: 1em;
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .issue-description .desc-full-content a {
@@ -2327,7 +2311,7 @@ a.wordmark:hover {
 }
 
 .issue-description .img-error {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-style: italic;
   font-size: var(--font-size-sm);
 }
@@ -2372,13 +2356,13 @@ a.wordmark:hover {
   max-height: 160px;
   width: auto;
   height: auto;
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--faint);
   border-radius: 4px;
   object-fit: cover;
 }
 
 .attachment-item .img-error {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-style: italic;
   font-size: var(--font-size-sm);
   line-height: 1.4;
@@ -2392,7 +2376,7 @@ a.wordmark:hover {
 .comments-loading,
 .comments-error,
 .comments-empty {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-style: italic;
   font-size: 0.9em;
   padding: var(--space-1) 0;
@@ -2408,8 +2392,8 @@ a.wordmark:hover {
 
 .comment {
   margin: var(--space-2) 0;
-  padding: var(--space-2) 0 var(--space-2) 0.75rem;
-  border-left: 2px solid var(--fg-vdim);
+  padding: var(--space-2) 0 var(--space-2) var(--space-2h);
+  border-left: 2px solid var(--faint);
 }
 
 .comment:first-child {
@@ -2417,7 +2401,7 @@ a.wordmark:hover {
 }
 
 .comment-meta {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: var(--font-size-sm);
   margin-bottom: var(--space-1);
   font-family: var(--font-content);
@@ -2426,7 +2410,7 @@ a.wordmark:hover {
 .comment-body {
   font-family: var(--font-content);
   font-size: 0.9em;
-  color: var(--fg);
+  color: var(--text);
 }
 
 .comment-body p {
@@ -2439,14 +2423,6 @@ a.wordmark:hover {
 
 .comment-body p:last-child {
   margin-bottom: 0;
-}
-
-.comment-body code {
-  background: var(--bg-muted);
-  padding: 0.1em 0.3em;
-  border-radius: var(--radius-sm);
-  font-family: var(--font-structural);
-  font-size: 0.9em;
 }
 
 .comment-body a {
@@ -2557,7 +2533,7 @@ a.wordmark:hover {
     display: inline-flex;
     align-items: center;
     min-height: 44px;
-    padding: 0.5rem 0;
+    padding: var(--space-2) 0;
   }
 
   .nav-value {
@@ -2721,8 +2697,8 @@ a.wordmark:hover {
 
   /* Larger tap targets for touch devices (44px minimum recommended) */
   .toggle {
-    padding: var(--space-2) 0.75rem;
-    margin: -0.5rem -0.75rem -0.5rem var(--space-2);
+    padding: var(--space-2) var(--space-2h);
+    margin: -var(--space-2) -var(--space-2h) -var(--space-2) var(--space-2);
     font-size: 1rem;
   }
 
@@ -2733,7 +2709,7 @@ a.wordmark:hover {
   }
 
   .details {
-    padding-left: 0.75rem;
+    padding-left: var(--space-2h);
   }
 
   /* LIN-4010: Home's opened task takes the row's full width on a phone (its content is at least 340px at 390). */
@@ -2750,7 +2726,7 @@ a.wordmark:hover {
 /* Small phones */
 @media (max-width: 400px) {
   body {
-    padding: 0.75rem;
+    padding: var(--space-2h);
     font-size: 13px;
   }
 
@@ -2846,8 +2822,8 @@ a.wordmark:hover {
 .setup-notice {
   margin: var(--space-4) auto;
   max-width: 60ch;
-  padding: 0.75rem var(--space-3);
-  background: var(--bg-muted);
+  padding: var(--space-2h) var(--space-3);
+  background: var(--card);
   border-radius: 4px;
   font-size: 0.85rem;
   line-height: 1.6;
@@ -2855,7 +2831,7 @@ a.wordmark:hover {
 
 .setup-notice p {
   margin: 0;
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .setup-notice code {
@@ -2872,8 +2848,8 @@ a.wordmark:hover {
 .truncation-notice {
   margin: var(--space-4) auto;
   max-width: 60ch;
-  padding: 0.75rem var(--space-3);
-  background: var(--bg-muted);
+  padding: var(--space-2h) var(--space-3);
+  background: var(--card);
   border-radius: 4px;
   font-size: 0.85rem;
   line-height: 1.6;
@@ -2897,14 +2873,14 @@ a.wordmark:hover {
 }
 
 .login-container p {
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-bottom: var(--space-4);
   font-family: var(--font-content);
 }
 
 .login-button {
   display: inline-block;
-  padding: 0.75rem var(--space-4);
+  padding: var(--space-2h) var(--space-4);
   background: var(--brand);  /* product accent (teal, LIN-860) — no more hard-coded purple */
   color: var(--bg);
   text-decoration: none;
@@ -2934,8 +2910,8 @@ a.wordmark:hover {
 .login-button-github,
 .login-button-secondary {
   background: transparent;
-  color: var(--fg);
-  border-color: var(--border);
+  color: var(--text);
+  border-color: var(--line);
 }
 
 .login-button-github:hover,
@@ -2968,10 +2944,10 @@ a.wordmark:hover {
 }
 
 .repo-picker-group-heading {
-  margin: 0 0 0.25rem;
+  margin: 0 0 var(--space-1);
   font-family: var(--font-content);
   font-size: 0.85em;
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .repo-picker-row {
@@ -2988,12 +2964,12 @@ a.wordmark:hover {
 
 .repo-picker-slug {
   font-family: var(--font-structural);  /* machine fact — mono, per the LIN-785 split */
-  color: var(--fg);
+  color: var(--text);
 }
 
 .repo-picker-add-link {
   display: block;
-  margin: 0.5rem 0;
+  margin: var(--space-2) 0;
   font-family: var(--font-content);
   font-size: 0.9em;
   color: var(--brand);
@@ -3010,10 +2986,10 @@ a.wordmark:hover {
   margin: var(--space-2) 0;
   padding: 0.4rem 0.6rem;
   font-family: var(--font-content);
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--bg);
-  color: var(--fg);
+  color: var(--text);
 }
 
 /* LIN-3763: login/error shells left links and native controls at UA defaults
@@ -3025,9 +3001,9 @@ a.wordmark:hover {
 select.github-repo-select {
   font-family: var(--font-content);
   font-size: inherit;
-  color: var(--fg);
+  color: var(--text);
   background: var(--bg);
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   padding: 0.4rem 0.6rem;
 }
@@ -3094,7 +3070,7 @@ body.is-landing {
   font-size: 2.75rem;
   font-weight: normal;
   letter-spacing: -0.02em;
-  color: var(--fg);
+  color: var(--text);
   margin: 0;
 }
 
@@ -3104,7 +3080,7 @@ body.is-landing {
 
 .landing-tagline {
   font-family: var(--font-content);
-  color: var(--fg-dim);
+  color: var(--muted);
   margin: var(--space-2) 0 var(--space-4);
 }
 
@@ -3112,7 +3088,7 @@ body.is-landing {
    visitor reads first, so it takes the text colour, not the dim tagline's. */
 .landing-plain {
   font-family: var(--font-content);
-  color: var(--fg);
+  color: var(--text);
   max-width: 34rem;
   margin: 0 auto var(--space-4);
   line-height: 1.5;
@@ -3123,14 +3099,14 @@ body.is-landing {
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 0.75rem;
+  gap: var(--space-2h);
 }
 
 /* The sign-in buttons are the shared .btn (renderButton), Linear as .btn--primary
    (LIN-3980 outcome 9). `.landing-cta` sets only the hero's size. It is scoped
    under .landing-ctas so it beats .btn's own padding and height. */
 .landing-ctas .landing-cta {
-  padding: 0.75rem 1.5rem;
+  padding: var(--space-2h) var(--space-4);
   font-size: 1.05rem;
 }
 
@@ -3174,11 +3150,11 @@ body.is-landing {
   font-family: var(--font-content);
   font-size: 1.25rem;
   font-weight: 500;
-  color: var(--fg);
+  color: var(--text);
 }
 
 .error-message {
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-bottom: var(--space-5);
   font-family: var(--font-content);
   line-height: 1.5;
@@ -3191,36 +3167,36 @@ body.is-landing {
   display: inline-block;
   margin: 0 auto var(--space-5);
   padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: 4px;
-  background: var(--bg-subtle, rgba(0, 0, 0, 0.02));
+  background: rgba(0, 0, 0, 0.02);
   font-family: var(--font-structural);
   font-size: 0.8rem;
   line-height: 1.6;
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .error-detail-key {
   display: inline-block;
   min-width: 4.5rem;
-  color: var(--fg-muted, var(--fg-dim));
+  color: var(--muted);
   opacity: 0.8;
 }
 
 .error-detail-value {
-  color: var(--fg);
+  color: var(--text);
 }
 
 .error-home-link {
   display: block;
   margin-top: var(--space-3);
-  color: var(--fg-dim);
+  color: var(--muted);
   font-family: var(--font-content);
   font-size: 0.9em;
 }
 
 .error-home-link:hover {
-  color: var(--fg);
+  color: var(--text);
 }
 
 /* =============================================================================
@@ -3234,10 +3210,10 @@ body.is-landing {
 
 /* Prompt container - appears below metadata when label is clicked */
 .prompt-container {
-  margin-top: 0.75rem;
-  padding: 0.75rem;
-  background: var(--bg-muted);
-  border: 1px solid var(--fg-vdim);
+  margin-top: var(--space-2h);
+  padding: var(--space-2h);
+  background: var(--card);
+  border: 1px solid var(--faint);
   border-radius: 4px;
 }
 
@@ -3252,25 +3228,25 @@ body.is-landing {
   font-family: var(--font-content);
   font-weight: 500;
   font-size: 0.9em;
-  color: var(--fg);
+  color: var(--text);
 }
 
 .prompt-copy,
 .prompt-download {
   background: none;
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--faint);
   padding: var(--space-1) var(--space-2);
   font-family: var(--font-content);
   font-size: 0.8em;
-  color: var(--fg-dim);
+  color: var(--muted);
   cursor: pointer;
   border-radius: var(--radius-sm);
 }
 
 .prompt-copy:hover,
 .prompt-download:hover {
-  border-color: var(--fg-dim);
-  color: var(--fg);
+  border-color: var(--muted);
+  color: var(--text);
 }
 
 /* Prompt action buttons container */
@@ -3337,19 +3313,19 @@ body.is-landing {
    to full --fg so the affordance is still distinguishable from rest. */
 .prompt-proxy-toggle {
   background: none;
-  border: 1px solid var(--fg-dim);
+  border: 1px solid var(--muted);
   padding: var(--space-1) var(--space-2);
   font-family: var(--font-content);
   font-size: 0.8em;
-  color: var(--fg-dim);
+  color: var(--muted);
   cursor: pointer;
   border-radius: var(--radius-sm);
   margin-left: var(--space-1);
 }
 
 .prompt-proxy-toggle:hover {
-  border-color: var(--fg);
-  color: var(--fg);
+  border-color: var(--text);
+  color: var(--text);
 }
 
 /* LIN-525 #1: active look is driven by a single body attribute, not a per-button
@@ -3388,10 +3364,10 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   font-family: var(--font-content);
   font-size: 0.8em;
   padding: 0.2rem 0.4rem;
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
   background: var(--bg);
-  color: var(--fg);
+  color: var(--text);
 }
 
 .dispatch-exec-harness-select {
@@ -3410,7 +3386,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 
 .dispatch-exec-model::placeholder,
 .dispatch-exec-model-other::placeholder {
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 /* `other…` free-text escape hatch (LIN-2719) — same control shape as the
@@ -3419,10 +3395,10 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   font-family: var(--font-content);
   font-size: 0.8em;
   padding: 0.2rem 0.4rem;
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
   background: var(--bg);
-  color: var(--fg);
+  color: var(--text);
   min-width: 12ch;
 }
 
@@ -3435,7 +3411,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
    <option> instead), matching the Workspace AI Model pricing hint's convention. */
 .dispatch-exec-model-hint {
   font-size: 0.8em;
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 /* Mobile (LIN-2719): a real <select> replaces the free-text <input list=…>
@@ -3456,10 +3432,10 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   font-family: var(--font-content);
   font-size: 0.8em;
   padding: 0.2rem 0.4rem;
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
   background: var(--bg);
-  color: var(--fg);
+  color: var(--text);
   min-width: 12ch;
 }
 
@@ -3472,7 +3448,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
    what will run" without filling the authorable exec-controls inputs. */
 .dispatch-preset-reflection {
   font-size: 0.8em;
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 /* Empty-picker "create a preset" link (LIN-2719 S3). */
@@ -3485,7 +3461,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
   line-height: 1.5;
-  color: var(--fg);
+  color: var(--text);
   white-space: pre-wrap;
   word-wrap: break-word;
   overflow-wrap: break-word;
@@ -3527,10 +3503,10 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   font-family: var(--font-content);
   font-size: var(--font-size-base);
   font-weight: 600;
-  color: var(--fg);
+  color: var(--text);
   margin: 1em 0 0.5em 0;
   padding-bottom: 0.25em;
-  border-bottom: 1px solid var(--fg-vdim);
+  border-bottom: 1px solid var(--faint);
 }
 
 .prompt-text h1:first-child,
@@ -3543,7 +3519,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   font-family: var(--font-content);
   font-size: 0.95em;
   font-weight: 600;
-  color: var(--fg);
+  color: var(--text);
   margin: 0.75em 0 0.4em 0;
 }
 
@@ -3575,7 +3551,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 /* Code blocks */
 .prompt-text pre {
   background: var(--bg);
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
   padding: 0.75em;
   margin: 0.5em 0;
@@ -3585,7 +3561,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 .prompt-text pre code {
   font-family: var(--font-structural);
   font-size: 0.9em;
-  color: var(--fg);
+  color: var(--text);
   background: none;
   border: none;
   padding: 0;
@@ -3596,7 +3572,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
   background: var(--bg);
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
   padding: 0.1em 0.3em;
 }
@@ -3620,10 +3596,6 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
    More Prompts Inline Expansion
    ============================================================================= */
 
-.more-prompts.hidden {
-  display: none;
-}
-
 /* =============================================================================
    Page Footer
    =============================================================================
@@ -3633,7 +3605,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 .page-footer {
   margin-top: 3rem;
   padding-top: var(--space-3);
-  border-top: 1px solid var(--fg-vdim);
+  border-top: 1px solid var(--faint);
   text-align: center;
   font-family: var(--font-content);
   font-size: var(--font-size-sm);
@@ -3644,28 +3616,27 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 }
 
 .footer-action {
-  color: var(--fg-dim);
+  color: var(--muted);
   text-decoration: none;
 }
 
 .footer-action:hover {
-  color: var(--fg);
+  color: var(--text);
 }
 
 .footer-current {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-weight: bold;
 }
 
 .footer-deploy {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-family: var(--font-structural);
   font-size: 0.9em;
 }
 
-
 .footer-link {
-  color: var(--fg-dim);
+  color: var(--muted);
   text-decoration: none;
 }
 
@@ -3675,12 +3646,12 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 }
 
 .footer-legal {
-  color: var(--fg-dim);
+  color: var(--muted);
   text-decoration: none;
 }
 
 .footer-legal:hover {
-  color: var(--fg);
+  color: var(--text);
 }
 
 .footer-ai-status {
@@ -3692,7 +3663,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 }
 
 .footer-ai-status.env {
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .footer-ai-status.free {
@@ -3700,7 +3671,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 }
 
 .footer-ai-status.disconnected {
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .footer-ai-status:hover {
@@ -3709,19 +3680,19 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 
 /* Workspace model indicator, populated client-side next to the AI status. */
 .footer-ai-model {
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .footer-ai-model:not(:empty)::before {
   content: " · ";
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 /* Mobile adjustments for footer */
 @media (max-width: 640px) {
   .page-footer {
     margin-top: var(--space-5);
-    padding-top: 0.75rem;
+    padding-top: var(--space-2h);
   }
 }
 
@@ -3746,7 +3717,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 
 .section--boxed {
   padding: var(--space-3);
-  background: var(--bg-alt);
+  background: var(--inset);
   border-radius: var(--radius-sm);
 }
 
@@ -3757,8 +3728,8 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   font-family: var(--font-content);
   font-size: var(--font-size-base);
   font-weight: 500;
-  color: var(--fg);
-  margin: 0 0 0.75rem 0;
+  color: var(--text);
+  margin: 0 0 var(--space-2h) 0;
 }
 
 /* Underlined heading — prompts catalog. Additive over .section-header. */
@@ -3766,7 +3737,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   font-size: 1.1em;
   margin-bottom: var(--space-3);
   padding-bottom: var(--space-2);
-  border-bottom: 1px solid var(--fg-vdim);
+  border-bottom: 1px solid var(--faint);
 }
 
 /* =============================================================================
@@ -3781,7 +3752,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
    literal — preserving the prior look byte-for-byte (LIN-461 convention).
    ============================================================================= */
 .page-header__subtitle {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-family: var(--font-content);
   font-size: 0.9em;
   margin-top: var(--space-2);
@@ -3802,26 +3773,26 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 .field {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: var(--space-2h);
   padding: 0.4rem 0;
   font-family: var(--font-content);
   font-size: 0.9em;
 }
 
 .field-label {
-  color: var(--fg-dim);
+  color: var(--muted);
   min-width: 10ch;
   flex-shrink: 0;
 }
 
 .field-value {
-  color: var(--fg);
+  color: var(--text);
 }
 
 /* =============================================================================
    Inline link and text control (LIN-3889)
    One body each. `.settings-link` was byte-identical in settings.css and audit.css; the text
-   control was `.model-select` (settings.css, audit.css) and `.token-label-input` (common-actions.css).
+   control is `.token-label-input` (its body is here, its focus in common-actions.css).
    ============================================================================= */
 .settings-link {
   color: var(--brand-dim);
@@ -3843,7 +3814,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 .task-create-back,
 .task-edit-back {
   display: inline-block;
-  margin: 0.25rem 0 0.5rem;
+  margin: var(--space-1) 0 var(--space-2);
   font-family: var(--font-content);
   font-size: 0.85rem;
   color: var(--muted);
@@ -3853,27 +3824,24 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 .task-create-back:hover,
 .task-edit-back:hover { color: var(--brand); }
 
-.model-select,
 .token-label-input {
   font-family: var(--font-content);
   font-size: 0.9em;
   padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
   background: var(--bg);
-  color: var(--fg);
+  color: var(--text);
   min-width: 18ch;
 }
 
-/* One focus rule for both: the border turns blue on focus, and the default ring is kept for
-   keyboard focus (LIN-786: never kill focus outright). `.model-select:focus` used to remove the
-   outline for every focus, mouse or keyboard; that was the difference, and it is now the fix. */
-.model-select:focus,
+/* The border turns blue on focus, and the default ring is kept for keyboard focus (LIN-786: never
+   kill focus outright). The old `.model-select:focus` rule that removed the outline for every focus,
+   mouse or keyboard, is gone (LIN-3889). */
 .token-label-input:focus {
   border-color: var(--blue);
 }
 
-.model-select:focus:not(:focus-visible),
 .token-label-input:focus:not(:focus-visible) {
   outline: none;
 }
@@ -3904,7 +3872,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 .card {
   margin-bottom: var(--space-3);
   padding: var(--space-3);
-  background: var(--bg-alt);
+  background: var(--inset);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
 }
@@ -3916,8 +3884,8 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 
 .card-accent--in-progress { border-left-color: var(--yellow); }
 .card-accent--done { border-left-color: var(--green); }
-.card-accent--todo { border-left-color: var(--fg-dim); }
-.card-accent--backlog { border-left-color: var(--fg-vdim); }
+.card-accent--todo { border-left-color: var(--muted); }
+.card-accent--backlog { border-left-color: var(--faint); }
 .card-accent--failed { border-left-color: var(--red); }
 
 .card-header {
@@ -3931,13 +3899,13 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 .card-title {
   font-family: var(--font-content);
   font-weight: 500;
-  color: var(--fg);
+  color: var(--text);
 }
 
 .card-meta {
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-left: auto;
 }
 
@@ -3962,8 +3930,8 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   font-family: var(--font-content);
   font-size: var(--font-size-sm);
   line-height: 1.4;
-  color: var(--fg-dim);
-  background: var(--bg-alt);
+  color: var(--muted);
+  background: var(--inset);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-full);
 }
@@ -3977,14 +3945,14 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 /* State color modifiers — same state→token mapping as .card-accent--*. */
 .status-pill--in-progress { color: var(--amber-dim); }
 .status-pill--done { color: var(--green); }
-.status-pill--todo { color: var(--fg-dim); }
+.status-pill--todo { color: var(--muted); }
 /* Idle/backlog on the semantic slate idle token (LIN-850) — the AA-safe slate
    text companion, replacing the too-faint --fg-vdim. */
 .status-pill--backlog { color: var(--slate-dim); }
 .status-pill--failed { color: var(--red); }
 
 /* Neutral, stateless label/tag chip (no state color). */
-.status-pill--tag { color: var(--fg-dim); }
+.status-pill--tag { color: var(--muted); }
 
 /*
    Bare variant (LIN-850) — a box-less status pill that renders pixel-identically
@@ -4169,7 +4137,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
    token the Settings red and teal rows already use. Tinted, not solid: whether Rebuild wants a solid
    fill is an open question in the PR. These sit after `.btn:hover`, so the tint wins on hover too. */
 .btn.btn--red {
-  color: var(--red-dim, var(--red));
+  color: var(--red-dim);
   border-color: var(--red);
 }
 .btn.btn--red:hover { border-color: var(--red); }
@@ -4341,7 +4309,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
    byte-identical rendering. Convergence onto one canonical look is still open.
 */
 .emptyState {
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 /*
@@ -4365,7 +4333,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 /* LIN-3958: the Plain type step is decided once here (decisions 2 and 17), not per page. The title is
    the browser's h2 default (1.5em), made explicit, so it stays 24px at every width. */
 .plain-title {
-  color: var(--fg);
+  color: var(--text);
   font-family: var(--font-content);
   font-size: 1.5rem;
   font-weight: normal;
@@ -4380,11 +4348,11 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 .plain-page > .section > .section-header {
   font-size: var(--font-size-lg);
   font-weight: 600;
-  color: var(--fg);
+  color: var(--text);
 }
 
 .plain-page .section p:not([class]) {
-  margin-bottom: 0.75rem;
+  margin-bottom: var(--space-2h);
 }
 
 /* LIN-3958: one voice on a Plain page. Unclassed prose is the sans face in --fg-dim: paragraphs, the items
@@ -4395,7 +4363,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 .plain-page .section p:not([class]),
 .plain-page .section :is(ul, ol):not([class]) > li,
 .plain-page .section dl:not([class]) > :is(dd, dt) {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-family: var(--font-content);
 }
 
@@ -4434,7 +4402,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
    ========================================================================= */
 .recap-section {
   font-family: var(--font-content);
-  color: var(--fg);
+  color: var(--text);
   font-size: 0.9em;
 }
 
@@ -4448,11 +4416,11 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 
 .recap-status-label {
   font-weight: 600;
-  color: var(--fg);
+  color: var(--text);
 }
 
 .recap-meta {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: var(--font-size-sm);
 }
 
@@ -4462,15 +4430,15 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   font-size: var(--font-size-sm);
   padding: 0.15rem 0.6rem;
   background: transparent;
-  border: 1px solid var(--fg-dim);
+  border: 1px solid var(--muted);
   border-radius: var(--radius-sm);
-  color: var(--fg);
+  color: var(--text);
   cursor: pointer;
 }
 
 .recap-refresh:hover {
-  border-color: var(--fg);
-  background: var(--bg-alt);
+  border-color: var(--text);
+  background: var(--card-h);
 }
 
 .recap-refresh:disabled {
@@ -4479,13 +4447,13 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 }
 
 .recap-placeholder {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-style: italic;
   padding: 0.35rem 0;
 }
 
 .recap-empty {
-  color: var(--fg-dim);
+  color: var(--muted);
   padding: 0.35rem 0;
 }
 
@@ -4498,7 +4466,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   display: inline-flex;
   align-items: center;
   gap: 0.5ch;
-  color: var(--fg-dim);
+  color: var(--muted);
   font-style: normal;
 }
 
@@ -4506,7 +4474,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   display: inline-block;
   width: 0.9em;
   height: 0.9em;
-  border: 2px solid var(--fg-dim);
+  border: 2px solid var(--muted);
   border-top-color: transparent;
   border-radius: 50%;
   animation: recap-spin 0.9s linear infinite;
@@ -4519,11 +4487,11 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 .recap-list {
   list-style: none;
   padding: 0;
-  margin: 0 0 0.75rem 0;
+  margin: 0 0 var(--space-2h) 0;
 }
 
 .recap-section-title {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: var(--font-size-sm);
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -4545,7 +4513,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 }
 
 .recap-marker-done { color: var(--green); }
-.recap-marker-pending { color: var(--fg-dim); }
+.recap-marker-pending { color: var(--muted); }
 .recap-marker-deviation { color: var(--yellow); }
 
 .recap-body {
@@ -4557,13 +4525,13 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 }
 
 .recap-item-title {
-  color: var(--fg);
+  color: var(--text);
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
 
 .recap-item-evidence {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: var(--font-size-sm);
   word-wrap: break-word;
   overflow-wrap: break-word;
@@ -4590,7 +4558,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
    ========================================================================= */
 .context-section {
   font-family: var(--font-content);
-  color: var(--fg);
+  color: var(--text);
   font-size: 0.9em;
 }
 
@@ -4604,11 +4572,11 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 
 .context-status-label {
   font-weight: 600;
-  color: var(--fg);
+  color: var(--text);
 }
 
 .context-hint {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: var(--font-size-sm);
 }
 
@@ -4618,16 +4586,16 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   font-size: var(--font-size-sm);
   padding: 0.15rem 0.6rem;
   background: transparent;
-  border: 1px solid var(--fg-dim);
+  border: 1px solid var(--muted);
   border-radius: var(--radius-sm);
-  color: var(--fg);
+  color: var(--text);
   cursor: pointer;
 }
 
-.context-refresh:hover { border-color: var(--fg); background: var(--bg-alt); }
+.context-refresh:hover { border-color: var(--text); background: var(--card-h); }
 
 .context-placeholder {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-style: italic;
   padding: 0.35rem 0;
 }
@@ -4645,7 +4613,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   display: inline-block;
   width: 0.9em;
   height: 0.9em;
-  border: 2px solid var(--fg-dim);
+  border: 2px solid var(--muted);
   border-top-color: transparent;
   border-radius: 50%;
   animation: recap-spin 0.9s linear infinite;
@@ -4667,7 +4635,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 }
 
 .context-lane-label {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: var(--font-size-sm);
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -4681,7 +4649,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 
 .context-flow-arrow {
   align-self: center;
-  color: var(--fg-dim);
+  color: var(--muted);
   font-weight: 600;
   padding: 0 0.25ch;
 }
@@ -4691,15 +4659,15 @@ a.context-node { text-decoration: none; }
 
 .context-node {
   display: block;
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   padding: 0.3rem 0.55rem;
-  background: var(--bg-alt);
-  color: var(--fg);
+  background: var(--inset);
+  color: var(--text);
   transition: border-color 0.12s ease, background 0.12s ease;
 }
 
-a.context-node:hover { border-color: var(--fg); background: var(--bg); }
+a.context-node:hover { border-color: var(--text); background: var(--bg); }
 
 .context-node-head {
   display: flex;
@@ -4715,7 +4683,7 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
 
 .context-node-title {
   display: block;
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: var(--font-size-sm);
   margin-top: 0.1rem;
   overflow: hidden;
@@ -4725,7 +4693,7 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
 }
 
 .context-node--root {
-  border-color: var(--fg);
+  border-color: var(--text);
   border-width: 2px;
   background: var(--bg);
 }
@@ -4746,7 +4714,7 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
 
 /* Session-context provenance tags (LIN-593): seed / descended / spun-off. */
 .context-node-tag--seed { color: var(--green); border-color: var(--green); }
-.context-node-tag--descended { color: var(--fg-dim); border-color: var(--fg-dim); }
+.context-node-tag--descended { color: var(--muted); border-color: var(--muted); }
 .context-node-tag--spun-off { color: var(--yellow); border-color: var(--yellow); }
 
 /* Session view: a stack of touched-task blocks, each its own bordered panel. */
@@ -4757,13 +4725,13 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
 }
 
 .context-session-task {
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   padding: var(--space-3);
 }
 
 .context-truncated {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: var(--font-size-sm);
   font-style: italic;
   margin-top: var(--space-1);
@@ -4791,7 +4759,7 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
   gap: var(--space-1);
 }
 
-.context-sep { color: var(--fg-dim); padding: 0 0.25ch; }
+.context-sep { color: var(--muted); padding: 0 0.25ch; }
 
 @media (max-width: 600px) {
   .context-flow { flex-direction: column; align-items: stretch; }
@@ -4805,7 +4773,7 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
    ========================================================================= */
 .brief-section {
   font-family: var(--font-content);
-  color: var(--fg);
+  color: var(--text);
   font-size: 0.9em;
 }
 
@@ -4819,11 +4787,11 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
 
 .brief-status-label {
   font-weight: 600;
-  color: var(--fg);
+  color: var(--text);
 }
 
 .brief-meta {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: var(--font-size-sm);
 }
 
@@ -4833,15 +4801,15 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
   font-size: var(--font-size-sm);
   padding: 0.15rem 0.6rem;
   background: transparent;
-  border: 1px solid var(--fg-dim);
+  border: 1px solid var(--muted);
   border-radius: var(--radius-sm);
-  color: var(--fg);
+  color: var(--text);
   cursor: pointer;
 }
 
 .brief-refresh:hover {
-  border-color: var(--fg);
-  background: var(--bg-alt);
+  border-color: var(--text);
+  background: var(--card-h);
 }
 
 .brief-refresh:disabled {
@@ -4850,13 +4818,13 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
 }
 
 .brief-placeholder {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-style: italic;
   padding: 0.35rem 0;
 }
 
 .brief-empty {
-  color: var(--fg-dim);
+  color: var(--muted);
   padding: 0.35rem 0;
 }
 
@@ -4869,7 +4837,7 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
   display: inline-flex;
   align-items: center;
   gap: 0.5ch;
-  color: var(--fg-dim);
+  color: var(--muted);
   font-style: normal;
 }
 
@@ -4877,14 +4845,14 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
   display: inline-block;
   width: 0.9em;
   height: 0.9em;
-  border: 2px solid var(--fg-dim);
+  border: 2px solid var(--muted);
   border-top-color: transparent;
   border-radius: 50%;
   animation: recap-spin 0.9s linear infinite;
 }
 
 .brief-content {
-  color: var(--fg);
+  color: var(--text);
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
@@ -4893,8 +4861,8 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
   font-size: var(--font-size-sm);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--fg-dim);
-  margin: 0.75rem 0 var(--space-1);
+  color: var(--muted);
+  margin: var(--space-2h) 0 var(--space-1);
 }
 
 .brief-content h2:first-child {
@@ -4922,7 +4890,7 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
 
 .scan-section {
   font-family: var(--font-content);
-  color: var(--fg);
+  color: var(--text);
   font-size: 0.9em;
 }
 
@@ -4936,11 +4904,11 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
 
 .scan-status-label {
   font-weight: 600;
-  color: var(--fg);
+  color: var(--text);
 }
 
 .scan-meta {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: var(--font-size-sm);
 }
 
@@ -4950,15 +4918,15 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
   font-size: var(--font-size-sm);
   padding: 0.15rem 0.6rem;
   background: transparent;
-  border: 1px solid var(--fg-dim);
+  border: 1px solid var(--muted);
   border-radius: var(--radius-sm);
-  color: var(--fg);
+  color: var(--text);
   cursor: pointer;
 }
 
 .scan-action:hover {
-  border-color: var(--fg);
-  background: var(--bg-alt);
+  border-color: var(--text);
+  background: var(--card-h);
 }
 
 .scan-action:disabled {
@@ -4967,13 +4935,13 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
 }
 
 .scan-placeholder {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-style: italic;
   padding: 0.35rem 0;
 }
 
 .scan-empty {
-  color: var(--fg-dim);
+  color: var(--muted);
   padding: 0.35rem 0;
 }
 
@@ -4986,7 +4954,7 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
   display: inline-flex;
   align-items: center;
   gap: 0.5ch;
-  color: var(--fg-dim);
+  color: var(--muted);
   font-style: normal;
 }
 
@@ -4994,14 +4962,14 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
   display: inline-block;
   width: 0.9em;
   height: 0.9em;
-  border: 2px solid var(--fg-dim);
+  border: 2px solid var(--muted);
   border-top-color: transparent;
   border-radius: 50%;
   animation: recap-spin 0.9s linear infinite;
 }
 
 .scan-decision {
-  color: var(--fg);
+  color: var(--text);
 }
 
 .scan-decision-question {
@@ -5029,20 +4997,20 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
   font-size: var(--font-size-sm);
   text-align: left;
   padding: 0.2rem 0.6rem;
-  background: var(--bg-alt);
-  border: 1px solid var(--fg-dim);
+  background: var(--inset);
+  border: 1px solid var(--muted);
   border-radius: var(--radius-sm);
-  color: var(--fg);
+  color: var(--text);
   cursor: pointer;
 }
 
 .scan-decision-option-btn:hover {
-  border-color: var(--fg);
+  border-color: var(--text);
 }
 
 .scan-decision-recommended {
   font-size: var(--font-size-sm);
-  color: var(--fg-dim);
+  color: var(--muted);
   font-style: italic;
 }
 
@@ -5059,9 +5027,9 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
   min-height: 3.5em;
   padding: 0.4rem 0.6rem;
   background: var(--bg);
-  border: 1px solid var(--fg-dim);
+  border: 1px solid var(--muted);
   border-radius: var(--radius-sm);
-  color: var(--fg);
+  color: var(--text);
   resize: vertical;
 }
 
@@ -5091,17 +5059,17 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
 
 .scan-dismiss {
   background: transparent;
-  border: 1px solid var(--fg-dim);
-  color: var(--fg);
+  border: 1px solid var(--muted);
+  color: var(--text);
 }
 
 .scan-dismiss:hover {
-  border-color: var(--fg);
-  background: var(--bg-alt);
+  border-color: var(--text);
+  background: var(--card-h);
 }
 
 .scan-outcome-note {
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .scan-outcome-detail {
@@ -5110,7 +5078,7 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
 
 .scan-outcome-detail summary {
   cursor: pointer;
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: var(--font-size-sm);
 }
 
@@ -5120,8 +5088,8 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
 
 /* ==========================================================================
    Dispatched Sessions section (LIN-522) — shared SessionsSection module.
-   Mirrors the swipe view's session styling (public/swipe.css) so the tree
-   view's on-card sessions list reads identically.
+   Swipe's on-card sessions list reads these same rules: swipe.css no longer
+   repeats them (LIN-4015), so the tree view and Swipe read identically.
    ========================================================================== */
 .sessions-section {
   font-family: var(--font-structural);
@@ -5134,23 +5102,23 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
   gap: var(--space-2);
   padding-bottom: 0.4rem;
   margin-bottom: 0.3rem;
-  border-bottom: 1px solid var(--fg-vdim);
+  border-bottom: 1px solid var(--faint);
 }
 
 .sessions-status-label {
   font-weight: 500;
-  color: var(--fg);
+  color: var(--text);
 }
 
 .sessions-count-meta {
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .sessions-refresh {
   margin-left: auto;
   background: none;
   border: none;
-  color: var(--fg-dim);
+  color: var(--muted);
   cursor: pointer;
   font-family: inherit;
   font-size: inherit;
@@ -5158,11 +5126,11 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
 }
 
 .sessions-refresh:hover {
-  color: var(--fg);
+  color: var(--text);
 }
 
 .sessions-empty {
-  color: var(--fg-dim);
+  color: var(--muted);
   padding: var(--space-2) 0;
 }
 
@@ -5171,7 +5139,7 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
 }
 
 .session-entry {
-  border-bottom: 1px solid var(--fg-vdim);
+  border-bottom: 1px solid var(--faint);
   padding: var(--space-2) 0;
 }
 
@@ -5190,7 +5158,7 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
   flex-shrink: 0;
 }
 
-.session-state.state-queued { color: var(--fg-dim); }
+.session-state.state-queued { color: var(--muted); }
 .session-state.state-running { color: var(--green); }
 .session-state.state-waiting { color: var(--yellow); }
 .session-state.state-complete { color: var(--green); }
@@ -5198,25 +5166,25 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
 
 .session-stage {
   font-weight: 500;
-  color: var(--fg);
+  color: var(--text);
 }
 
 .session-prompt-name {
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .session-iteration {
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .session-time {
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-left: auto;
 }
 
 /* LIN-4024: a session's run link, one quiet text link after its time (not a fold toggle, not a button). */
 .session-run-link {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: 0.75rem;
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -5225,7 +5193,7 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
 .session-summary {
   font-family: var(--font-content);
   font-size: 0.9em;
-  color: var(--fg);
+  color: var(--text);
   padding: 0.3rem 0 0 1.25rem;
   line-height: 1.4;
 }
@@ -5235,12 +5203,12 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
 }
 
 .session-feedback-entry {
-  color: var(--fg-dim);
+  color: var(--muted);
   padding: 0.1rem 0;
 }
 
 .session-feedback-time {
-  color: var(--fg-dim);
+  color: var(--muted);
   opacity: 0.7;
 }
 
@@ -5301,7 +5269,7 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
   border-radius: var(--radius-sm);
   padding: 0.02rem 0.35rem;
 }
-.obs-act-idle { background: transparent; padding-left: 0; padding-right: 0; color: var(--fg-dim); }
+.obs-act-idle { background: transparent; padding-left: 0; padding-right: 0; color: var(--muted); }
 
 /* LIN-3983: the shared tab strip (lib/components/tabs.js). One line, no wrap,
    so a label that does not fit scrolls the strip instead of breaking a word

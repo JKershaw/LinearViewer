@@ -6,7 +6,7 @@
  */
 
 /* ── Stages: one bar per stage (LIN-3356) ─────────────────────────────────── */
-.task-stages-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.task-stages-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
 .task-stage { min-width: 0; }
 .task-stage-head {
   display: grid;
@@ -22,7 +22,6 @@
   border-radius: var(--radius-sm);
   cursor: pointer;
 }
-.task-stage-head--ahead { cursor: default; }
 .task-stage-top {
   display: flex;
   flex-wrap: wrap;
@@ -49,7 +48,7 @@
 .task-stage-ago { min-width: 20ch; }
 .task-stage-took { min-width: 16ch; }
 .task-stage-state { margin-left: auto; }
-.task-stage[data-tone="error"] .task-stage-state { color: var(--red-dim, var(--red)); }
+.task-stage[data-tone="error"] .task-stage-state { color: var(--red-dim); }
 .task-stage[data-tone="waiting"] .task-stage-state { color: var(--amber-dim); }
 .task-stage-bar {
   display: block;
@@ -78,15 +77,9 @@
   .task-stage[data-tone="running"] .task-stage-fill { animation: none; width: 60%; }
 }
 /* Still ahead: a grey dotted-out bar, quiet, a guess not a promise. */
-.task-stage--ahead .task-stage-head {
-  background: transparent;
-  border-style: dashed;
-  color: var(--muted);
-}
-.task-stage--ahead .task-stage-bar { background: transparent; border: 1px dashed var(--line); }
 .task-stage-body {
   display: none;
-  padding: 0.5rem 0.75rem 0.25rem;
+  padding: var(--space-2) var(--space-2h) var(--space-1);
   font-family: var(--font-content);
 }
 .task-stage.sess-run--expanded .task-stage-body { display: block; }
@@ -96,7 +89,7 @@
 .task-stage-session-line { font-size: 0.8rem; color: var(--muted); }
 .task-stage-session[data-state="waiting"] .task-stage-session-line { color: var(--amber-dim); }
 .task-stage-message {
-  margin: 0.25rem 0 0;
+  margin: var(--space-1) 0 0;
   font-size: 0.9rem;
   line-height: 1.5;
   white-space: pre-wrap;
@@ -104,7 +97,7 @@
 }
 .task-stage-links {
   list-style: none;
-  margin: 0.25rem 0 0;
+  margin: var(--space-1) 0 0;
   padding: 0;
   font-family: var(--font-structural);
   font-size: 0.8rem;
@@ -112,7 +105,7 @@
 .task-stage-links li { overflow-wrap: anywhere; }
 .task-checkins { margin: 0.4rem 0; font-size: 0.8rem; color: var(--muted); }
 .task-checkins summary { cursor: pointer; }
-.task-checkin-list { list-style: none; margin: 0.3rem 0 0; padding: 0 0 0 0.75rem; border-left: 2px solid var(--line); }
+.task-checkin-list { list-style: none; margin: 0.3rem 0 0; padding: 0 0 0 var(--space-2h); border-left: 2px solid var(--line); }
 .task-checkin { padding: 0.15rem 0; overflow-wrap: anywhere; }
 .task-checkin-message { display: block; color: var(--muted); }
 

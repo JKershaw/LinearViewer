@@ -4,7 +4,7 @@
 // different clocks are identical, so the samples cannot drift between runs.
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readSheets, declOf } from '../helpers/css-rules.js';
 import { renderStyleguide, SETTINGS_PIECES } from '../../lib/render-styleguide.js';
 import { switchRow } from '../../lib/components/settings-row.js';
 
@@ -81,28 +81,32 @@ test('the page is byte-stable across renders (the key row is given a fixed clock
 // items of unclassed lists, and the terms of unclassed definition lists. A classed element keeps its own
 // look, and the page title wears the Plain title class.
 test('Plain prose reaches only unclassed p, list items, dd and dt under .plain-page, and links stay unclassed', () => {
-  const css = readFileSync(new URL('../../public/style.css', import.meta.url), 'utf8');
-  assert.match(css, /\.plain-page \.section p:not\(\[class\]\),\s*\.plain-page \.section :is\(ul, ol\):not\(\[class\]\) > li,\s*\.plain-page \.section dl:not\(\[class\]\) > :is\(dd, dt\)\s*\{/);
-  assert.match(css, /\.plain-page \.section a:not\(\[class\]\)\s*\{/);
-  assert.doesNotMatch(css, /\.plain-page \.section :is\(p, li, dd, dt\)/, 'no classed-reaching prose selector remains');
-  assert.doesNotMatch(css, /\.plain-page \.section [pa]\s*\{/, 'no bare descendant p/a rule remains');
+  // Asked of style.css (LIN-4015): the selectors that carry Plain prose, and no selector that reaches classed prose.
+  const style = readSheets(['/style.css'])[0];
+  const selectors = style.rules.flatMap((rule) => rule.selectors);
+  for (const sel of ['.plain-page .section p:not([class])', '.plain-page .section :is(ul, ol):not([class]) > li', '.plain-page .section dl:not([class]) > :is(dd, dt)']) {
+    assert.ok(selectors.includes(sel), `${sel} carries Plain prose`);
+  }
+  assert.ok(selectors.includes('.plain-page .section a:not([class])'), 'links are unclassed-only');
+  assert.deepEqual(selectors.filter((sel) => sel.startsWith('.plain-page .section :is(p, li, dd, dt)')), [], 'no classed-reaching prose selector remains');
+  assert.deepEqual(selectors.filter((sel) => /^\.plain-page \.section [pa]$/.test(sel)), [], 'no bare descendant p/a rule remains');
 });
 
 // LIN-3958 (review finding 1): with the Plain rules no longer reaching classed prose, the styleguide's own
 // prose classes (the .sg-intro lede and the anatomy labels, which sit in a classed dl) take the sans face here.
 test('the styleguide prose classes take the sans face in styleguide.css', () => {
-  const css = readFileSync(new URL('../../public/styleguide.css', import.meta.url), 'utf8');
-  assert.match(css, /\.styleguide-content \.sg-intro \{[^}]*font-family: var\(--font-content\);/);
-  assert.match(css, /\.sg-settings-anatomy dt,\s*\.sg-settings-anatomy dd \{[^}]*font-family: var\(--font-content\);/);
+  const sheets = readSheets(['/style.css', '/styleguide.css']);
+  assert.equal(declOf(sheets, '.styleguide-content .sg-intro', 'font-family'), 'var(--font-content)');
+  assert.equal(declOf(sheets, '.sg-settings-anatomy dt', 'font-family'), 'var(--font-content)');
+  assert.equal(declOf(sheets, '.sg-settings-anatomy dd', 'font-family'), 'var(--font-content)');
 });
 
 // LIN-3958: both phone roots are rem, not em, so they do not compound. LIN-3956: the Plain sample is
 // .plain-page alone (no .settings-shell wrapper), and .plain-page is the phone root its rows need.
 test('the Plain and Settings phone roots are both rem, so the styleguide sample does not compound', () => {
-  const plainCss = readFileSync(new URL('../../public/style.css', import.meta.url), 'utf8');
-  const settingsCss = readFileSync(new URL('../../public/settings.css', import.meta.url), 'utf8');
-  assert.match(plainCss, /@media \(max-width: 400px\) \{\s*\.plain-page \{\s*font-size: 1rem;\s*\}\s*\}/);
-  assert.match(settingsCss, /\.settings-shell \{[^}]*font-size: 1rem;/);
+  const sheets = readSheets(['/style.css', '/settings.css']);
+  assert.equal(declOf(sheets, '.plain-page', 'font-size', { media: '(max-width: 400px)' }), '1rem');
+  assert.equal(declOf(sheets, '.settings-shell', 'font-size', { media: '(max-width: 760px)' }), '1rem');
   assert.match(renderStyleguide(), /<div class="plain-page sg-settings-sample sg-plain-sample" inert>/);
   assert.match(renderStyleguide(), /<div class="settings-shell sg-settings-sample" inert>/, 'the Settings samples keep their wrapper');
 });

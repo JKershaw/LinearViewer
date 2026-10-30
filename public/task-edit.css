@@ -79,14 +79,6 @@
   min-width: 0;
 }
 
-.task-edit-label {
-  font-family: var(--font-content);
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--muted);
-  letter-spacing: 0.02em;
-}
-
 .task-edit-input {
   width: 100%;
   box-sizing: border-box;
@@ -113,16 +105,6 @@
 }
 
 /* A native select needs its own affordance back once appearance is reset. */
-select.task-edit-input {
-  cursor: pointer;
-  padding-right: 2rem;
-  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
-                    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
-  background-position: calc(100% - 1.05rem) 50%, calc(100% - 0.7rem) 50%;
-  background-size: 0.35rem 0.35rem, 0.35rem 0.35rem;
-  background-repeat: no-repeat;
-}
-
 /* The description is the field people actually came to edit — give it room. */
 .task-edit-textarea {
   min-height: 16rem;
@@ -142,7 +124,7 @@ select.task-edit-input {
 
 .task-edit-desc-tabs {
   display: flex;
-  gap: 0.25rem;
+  gap: var(--space-1);
 }
 
 .task-edit-tab {
@@ -227,16 +209,8 @@ select.task-edit-input {
 
 .task-edit-preview li { margin: 0.25em 0; }
 
-.task-edit-preview code {
-  background: var(--bg-muted);
-  padding: 0.1em 0.3em;
-  border-radius: var(--radius-sm);
-  font-family: var(--font-structural);
-  font-size: 0.9em;
-}
-
 .task-edit-preview pre {
-  background: var(--bg-muted);
+  background: var(--card);
   padding: 0.75em;
   border-radius: var(--radius-sm);
   overflow-x: auto;
@@ -248,13 +222,6 @@ select.task-edit-input {
 .task-edit-preview pre code {
   background: none;
   padding: 0;
-}
-
-.task-edit-preview blockquote {
-  border-left: 3px solid var(--fg-vdim);
-  margin: 0.5em 0;
-  padding-left: 1em;
-  color: var(--fg-dim);
 }
 
 .task-edit-preview a { color: var(--blue); }
@@ -289,27 +256,6 @@ select.task-edit-input {
    Actions
    ============================================================================= */
 
-.task-edit-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-3);
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--line);
-}
-
-.task-edit-submit {
-  padding: 0.5rem var(--space-4);
-  font-family: var(--font-content);
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--brand);
-  background: color-mix(in srgb, var(--brand) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--brand) 40%, transparent);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-
 .task-edit-submit:hover:not(:disabled) {
   background: color-mix(in srgb, var(--brand) 22%, transparent);
 }
@@ -324,12 +270,6 @@ select.task-edit-input {
   cursor: default;
 }
 
-.task-edit-cancel {
-  font-family: var(--font-content);
-  font-size: 0.9rem;
-  color: var(--muted);
-  text-decoration: none;
-}
 .task-edit-cancel:hover { color: var(--text); }
 
 .task-edit-status {

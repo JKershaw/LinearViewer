@@ -24,6 +24,7 @@ import { renderTaskPage, renderNextLine } from '../../lib/render-task-page.js';
 import { buildPromptOpts } from '../../lib/render-prompt-opts.js';
 import { escapeHtml } from '../../lib/utils/html.js';
 import { serverSessions, serverRow } from '../fixtures/task-decision.js';
+import { readSheets } from '../helpers/css-rules.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const read = (rel) => readFileSync(join(__dirname, '../..', rel), 'utf8');
@@ -373,10 +374,10 @@ describe('LIN-3975 — the next-step line says what the page offers, in plain wo
 
 // ─── the stylesheet bound ────────────────────────────────────────────────────
 
-/** The class names a stylesheet defines (every `.name` token outside comments). */
-function classesIn(css) {
-  const bare = css.replace(/\/\*[\s\S]*?\*\//g, '');
-  return new Set([...bare.matchAll(/\.([A-Za-z_][\w-]*)/g)].map((m) => m[1]));
+/** The class names a stylesheet styles: the `.name` tokens in its selectors (LIN-4015: rules are read through the helper). */
+function classesIn(file) {
+  const [sheet] = readSheets([`/${file}`]);
+  return new Set(sheet.rules.flatMap((rule) => rule.selectors).flatMap((sel) => [...sel.matchAll(/\.([A-Za-z_][\w-]*)/g)].map((m) => m[1])));
 }
 
 /** The linked sheets: the classes the task page's stylesheets define. */
@@ -494,9 +495,9 @@ async function everyPhase() {
 describe('LIN-3975 — the run control\'s classes are styled by the sheets the task page links', () => {
   test('static: every class token the component can write is styled by a linked sheet, a swipe-only rule, or a hook', () => {
     const src = read('public/prompt-section.js');
-    const linked = new Set(TASK_SHEETS.flatMap((f) => [...classesIn(read(`public/${f}`))]));
-    const swipe = classesIn(read('public/swipe.css'));
-    const everywhere = new Set(readdirSync(join(__dirname, '../../public')).filter((f) => f.endsWith('.css')).flatMap((f) => [...classesIn(read(`public/${f}`))]));
+    const linked = new Set(TASK_SHEETS.flatMap((f) => [...classesIn(f)]));
+    const swipe = classesIn('swipe.css');
+    const everywhere = new Set(readdirSync(join(__dirname, '../../public')).filter((f) => f.endsWith('.css')).flatMap((f) => [...classesIn(f)]));
     const unclassified = [...classTokensOfSource(src)].filter((t) => !linked.has(t) && !(t in SWIPE_ONLY) && !(t in HOOK));
     assert.deepStrictEqual(unclassified, [], 'a class the component writes must be styled by a linked sheet, or listed with a reason');
     for (const t of Object.keys(SWIPE_ONLY)) {
@@ -507,7 +508,7 @@ describe('LIN-3975 — the run control\'s classes are styled by the sheets the t
   });
 
   test('dynamic: every phase is reached, and every class a phase emits is styled by a linked sheet or is a hook', async () => {
-    const linked = new Set(TASK_SHEETS.flatMap((f) => [...classesIn(read(`public/${f}`))]));
+    const linked = new Set(TASK_SHEETS.flatMap((f) => [...classesIn(f)]));
     const phases = await everyPhase();
     for (const ph of phases) assert.match(ph.html, ph.marker, `the "${ph.name}" phase is reached`);
     const emittedBy = new Map();
@@ -534,9 +535,9 @@ describe('LIN-3975 — the run control\'s classes are styled by the sheets the t
   });
 
   test('run-control.css holds the component\'s moved rules, and swipe.css no longer defines them', () => {
-    const moved = classesIn(read('public/run-control.css'));
+    const moved = classesIn('run-control.css');
     assert.ok(moved.has('opened-task-go') && moved.has('opened-task-ladder') && moved.has('swipe-prompt-header'));
-    const swipe = classesIn(read('public/swipe.css'));
+    const swipe = classesIn('swipe.css');
     for (const c of ['opened-task-go', 'opened-task-ladder', 'opened-task-reasoning', 'swipe-prompt-warning']) {
       assert.equal(swipe.has(c), false, `${c} now lives in run-control.css`);
     }

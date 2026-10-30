@@ -2,19 +2,21 @@
 // deleted `.local-workspace-*` CSS, and the not-found page carrying the shared form each get a witness.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { renderStyleguide } from '../../lib/render-styleguide.js';
 import { renderWorkspaceNotFoundPage } from '../../lib/render-pages.js';
+import { readSheets, declOf, parseSheet } from '../helpers/css-rules.js';
 
-const css = readFileSync(new URL('../../public/style.css', import.meta.url), 'utf8');
+const STYLE = readSheets(['/style.css']);
 
 test('the Plain column rule caps the measure and centres it, and /styleguide never gets the class', () => {
-  assert.match(css, /\.plain-page\.plain-column \{\s*max-width: 40em;\s*margin-inline: auto;\s*\}/);
+  assert.equal(declOf(STYLE, '.plain-page.plain-column', 'max-width'), '40em');
+  assert.equal(declOf(STYLE, '.plain-page.plain-column', 'margin-inline'), 'auto');
   assert.doesNotMatch(renderStyleguide(), /plain-column/);
 });
 
 test('no .local-workspace-* selector remains in style.css (the class is a no-style hook)', () => {
-  assert.doesNotMatch(css, /\.local-workspace-/);
+  const selectors = STYLE.flatMap((sheet) => sheet.rules).flatMap((rule) => rule.selectors);
+  assert.deepEqual(selectors.filter((s) => /\.local-workspace-/.test(s)), []);
 });
 
 test('the workspace-not-found page carries the shared form markup, with no separator', () => {

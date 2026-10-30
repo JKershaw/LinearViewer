@@ -19,9 +19,11 @@ import { dirname, join } from 'node:path';
 import { getViewNavLinks, renderViewNav, partitionViewLinks } from '../../lib/components/view-nav.js';
 import { renderNavBar } from '../../lib/components/navbar.js';
 import { renderPageFooter } from '../../lib/components/footer.js';
+import { readSheets, declOf } from '../helpers/css-rules.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const STYLE_CSS = join(__dirname, '../../public/style.css');
+const STYLE = readSheets(['/style.css']);
 
 // --- tier / flag gating -----------------------------------------------------
 
@@ -239,26 +241,23 @@ test('style.css lays the switcher out as a single non-wrapping scrolling row', (
 });
 
 test('style.css collapses desktop overflow only when JS marks the strip (LIN-1286)', () => {
-  const css = readFileSync(STYLE_CSS, 'utf8');
   // The desktop collapse is GATED on the JS-added `.nav-views--collapsed` class, so
   // the no-JS / everything-fits path keeps the inline `display:contents` fallback and
-  // never over-collapses.
-  assert.match(css, /\.nav-views--collapsed \.nav-views-overflow\s*\{\s*display:\s*none;/);
+  // never over-collapses. Read through the helper (LIN-4015): what applies to each selector.
+  assert.equal(declOf(STYLE, '.nav-views--collapsed .nav-views-overflow', 'display'), 'none');
   // …and reveals the `⋯ more` toggle in that same collapsed state (it is
   // `display:none` at desktop by default).
-  assert.match(css, /\.nav-views--collapsed \.nav-more-toggle\s*\{\s*display:\s*inline-flex;/);
+  assert.equal(declOf(STYLE, '.nav-views--collapsed .nav-more-toggle', 'display'), 'inline-flex');
   // The opened card wins over the collapse-hide (same specificity, later source) so
   // clicking `⋯ more` shows the in-flow card on desktop too.
-  assert.match(css, /\.nav-views--collapsed \.nav-views-overflow--open\s*\{\s*display:\s*flex;/);
+  assert.equal(declOf(STYLE, '.nav-views--collapsed .nav-views-overflow--open', 'display'), 'flex');
 });
 
 test('style.css desktop neutralizer no longer re-inlines a genuinely collapsed group (LIN-1286)', () => {
-  const css = readFileSync(STYLE_CSS, 'utf8');
   // The min-width:641px neutralizer that forced `display:contents` on a persisted
   // `--open` is now scoped to `:not(.nav-views--collapsed)`, so it can't fight the
   // JS-managed desktop collapse (where an open group is a real card, not re-inlined).
-  const block = css.slice(css.indexOf('@media (min-width: 641px)'));
-  assert.match(block, /\.nav-views:not\(\.nav-views--collapsed\) \.nav-views-overflow--open\s*\{\s*display:\s*contents;/);
+  assert.equal(declOf(STYLE, '.nav-views:not(.nav-views--collapsed) .nav-views-overflow--open', 'display', { media: '(min-width: 641px)' }), 'contents');
 });
 
 test('the shared nav is pinned (sticky/translucent) with the interception fix (LIN-984)', () => {

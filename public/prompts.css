@@ -8,12 +8,6 @@
 /* `.prompts-subtitle` is now a no-style E2E hook (prompts-page.spec.js);
    canonical styling lives in `.page-header__subtitle` (style.css, LIN-462). */
 
-.nav-value-static {
-  font-family: var(--font-content);
-  font-size: 0.9em;
-  color: var(--fg);
-}
-
 /* =============================================================================
    Summary Section
    ============================================================================= */
@@ -37,16 +31,16 @@
 }
 
 .stat {
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .stat strong {
-  color: var(--fg);
+  color: var(--text);
   font-weight: 600;
 }
 
 .stat-separator {
-  color: var(--fg-vdim);
+  color: var(--faint);
 }
 
 /* =============================================================================
@@ -58,7 +52,7 @@
    remain here. */
 
 .section-description {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-family: var(--font-content);
   font-size: 0.9em;
   margin-bottom: var(--space-3);
@@ -76,14 +70,14 @@
   font-family: var(--font-content);
   font-size: 0.95em;
   font-weight: 500;
-  color: var(--fg);
-  margin: 0 0 0.75rem 0;
+  color: var(--text);
+  margin: 0 0 var(--space-2h) 0;
   padding-bottom: var(--space-1);
-  border-bottom: 1px solid var(--fg-vdim);
+  border-bottom: 1px solid var(--faint);
 }
 
 .category-count {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-weight: normal;
 }
 
@@ -102,13 +96,13 @@
 .prompt-name {
   font-family: var(--font-content);
   font-weight: 500;
-  color: var(--fg);
+  color: var(--text);
 }
 
 .prompt-label {
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
-  color: var(--fg-dim);
+  color: var(--muted);
   background: rgba(0, 0, 0, 0.05);
   padding: 0.1rem 0.4rem;
   border-radius: var(--radius-sm);
@@ -117,14 +111,14 @@
 .prompt-chars {
   font-family: var(--font-structural);
   font-size: 0.8em;
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-left: auto;
 }
 
 .prompt-description {
   font-family: var(--font-content);
   font-size: var(--font-size-sm);
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-bottom: var(--space-2);
   line-height: 1.4;
 }
@@ -135,7 +129,7 @@
 .prompt-ai-hint {
   font-family: var(--font-content);
   font-size: 0.8em;
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-bottom: var(--space-2);
   padding: var(--space-2);
   background: rgba(0, 0, 0, 0.02);
@@ -153,7 +147,7 @@
 
 .ai-hint-label {
   font-weight: 500;
-  color: var(--fg);
+  color: var(--text);
 }
 
 /* =============================================================================
@@ -162,7 +156,7 @@
 .prompt-signals {
   font-family: var(--font-content);
   font-size: 0.8em;
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-bottom: var(--space-2);
   padding: var(--space-2);
   background: rgba(22, 160, 133, 0.05);
@@ -175,7 +169,7 @@
 
 .signals-label {
   font-weight: 500;
-  color: var(--fg);
+  color: var(--text);
 }
 
 .signals-list {
@@ -215,9 +209,9 @@
   font-family: var(--font-structural);
   font-size: 0.8em;
   line-height: 1.5;
-  color: var(--fg);
+  color: var(--text);
   background: var(--bg);
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--faint);
   border-radius: 4px;
   padding: var(--space-3);
   margin-top: var(--space-2);
@@ -237,15 +231,15 @@
   padding: 0.3rem 0.75rem;
   font-family: var(--font-content);
   font-size: var(--font-size-sm);
-  color: var(--fg);
-  background: var(--bg-muted);
-  border: 1px solid var(--fg-vdim);
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
   cursor: pointer;
 }
 
 .template-copy-btn:hover {
-  background: var(--bg-alt);
+  background: var(--card-h);
 }
 
 /* =============================================================================
@@ -267,8 +261,8 @@
 .meta-prompt-stats {
   font-family: var(--font-content);
   font-size: var(--font-size-sm);
-  color: var(--fg-dim);
-  margin-bottom: 0.75rem;
+  color: var(--muted);
+  margin-bottom: var(--space-2h);
 }
 
 .meta-prompt-text {

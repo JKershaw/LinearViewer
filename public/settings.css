@@ -23,13 +23,6 @@
   margin-bottom: var(--space-5);
 }
 
-.settings-group-subtitle {
-  color: var(--fg-dim);
-  font-family: var(--font-content);
-  font-size: 0.9em;
-  margin: 0 0 var(--space-3) 0;
-}
-
 /* =============================================================================
    Settings Nodes (tree items)
    ============================================================================= */
@@ -51,11 +44,11 @@
 }
 
 .settings-value.env {
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .settings-value.disconnected {
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .settings-value.free-tier {
@@ -75,7 +68,7 @@
 }
 
 .settings-value.consent-pending {
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .consent-notice {
@@ -93,18 +86,12 @@
 
 /* Action buttons: see style.css (.btn--quiet and its tones). `.settings-link` is in style.css (LIN-3889). */
 
-.nav-value-static {
-  font-family: var(--font-content);
-  font-size: 0.9em;
-  color: var(--fg);
-}
-
 /* =============================================================================
    Dispatch defaults (LIN-1095)
 
    The workspace-wide row + ~15 per-prompt-type override rows each pair a harness
    select with a model input. They use their OWN control classes rather than
-   .model-select/.model-input — those are strict single-element selectors
+   .model-input — those are strict single-element selectors
    elsewhere (e.g. tests/e2e/settings.spec.js's model pricing test), and this
    section renders 16 of these controls on the same page. (The free-text "custom
    harness" fallback was removed in LIN-1282.)
@@ -125,7 +112,7 @@
   justify-content: flex-end;
   align-items: center;
   gap: var(--space-2);
-  color: var(--fg);
+  color: var(--text);
 }
 
 .harness-select,
@@ -134,10 +121,10 @@
   font-family: var(--font-content);
   font-size: 0.9em;
   padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
   background: var(--bg);
-  color: var(--fg);
+  color: var(--text);
 }
 
 .harness-select {
@@ -154,7 +141,7 @@
 .dispatch-model-input::placeholder,
 .dispatch-effort-input::placeholder,
 .dispatch-model-input-other::placeholder {
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .dispatch-model-input {
@@ -169,10 +156,10 @@
   font-family: var(--font-content);
   font-size: 0.9em;
   padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
   background: var(--bg);
-  color: var(--fg);
+  color: var(--text);
   min-width: 20ch;
   flex: 1 1 20ch;
 }
@@ -186,7 +173,7 @@
    Workspace AI Model pricing hint's convention above. */
 .dispatch-model-hint {
   font-size: var(--font-size-sm);
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 /* The effort input shares the model input's growth behaviour so the shared row
@@ -205,7 +192,7 @@
   cursor: pointer;
   font-family: var(--font-content);
   font-size: 0.9em;
-  color: var(--fg);
+  color: var(--text);
 }
 
 .dispatch-preset-kind-overrides .dispatch-kind-rows {
@@ -246,10 +233,10 @@
   font-family: var(--font-content);
   font-size: 0.9em;
   padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
   background: var(--bg);
-  color: var(--fg);
+  color: var(--text);
   min-width: 16ch;
   flex: 1 1 16ch;
 }
@@ -277,18 +264,18 @@
   font-size: 0.85rem;
   min-width: 5ch;
   padding: 0.2rem 0.6rem;
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
   cursor: pointer;
   background: var(--bg);
-  color: var(--fg);
+  color: var(--text);
   text-align: center;
 }
 
 /* LIN-3889: the hover was a literal rgba that did not rebind in dark mode (a fix); it is the
    subtle-tint token now, which does. */
 .settings-switch:hover {
-  background: var(--bg-alt);
+  background: var(--card-h);
 }
 
 .settings-switch.toggle-on {
@@ -300,19 +287,7 @@
 }
 
 .settings-switch.toggle-off .toggle-state {
-  color: var(--fg-dim);
-}
-
-.feature-note {
-  font-size: 0.8rem;
-  color: var(--yellow);
-  margin-left: var(--space-1);
-}
-
-.feature-desc {
-  color: var(--fg-dim);
-  font-size: var(--font-size-sm);
-  font-family: var(--font-content);
+  color: var(--muted);
 }
 
 /* =============================================================================
@@ -323,12 +298,12 @@
 
 .provider-scope {
   font-family: var(--font-content);
-  color: var(--fg);
+  color: var(--text);
 }
 
 .provider-token {
   font-family: var(--font-structural);
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .provider-active {
@@ -337,15 +312,6 @@
 }
 
 /* De-emphasized coverage-limitation sub-label (LIN-2357 provider-context disclosure). */
-.field-muted {
-  color: var(--fg-dim);
-  font-size: 0.9em;
-}
-
-.provider-blocked {
-  color: var(--fg-dim);
-  font-style: italic;
-}
 
 .provider-notice-ok .field-value {
   color: var(--green);
@@ -356,7 +322,7 @@
 }
 
 .provider-notice-blocked .field-value {
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 /* Inline save feedback */
@@ -382,10 +348,7 @@
     min-width: 100%;
   }
 
-  .feature-desc {
-    width: 100%;
   }
-}
 
 /* =============================================================================
    LIN-3846: one page per area, built from three kinds of row
@@ -460,7 +423,7 @@
   gap: var(--space-2);
   padding: 0.55rem 0.6rem;
   border-radius: var(--radius-sm);
-  color: var(--fg);
+  color: var(--text);
   text-decoration: none;
   font-family: var(--font-content);
   font-size: 0.95em;
@@ -487,7 +450,7 @@
 }
 
 .settings-state-bad {
-  color: var(--red-dim, var(--red));
+  color: var(--red-dim);
 }
 
 .settings-dot {
@@ -548,7 +511,7 @@
   padding: 0.7rem 0.8rem;
   font-family: var(--font-content);
   font-size: 0.95em;
-  color: var(--fg);
+  color: var(--text);
   text-decoration: none;
   box-sizing: border-box;
   width: 100%;
@@ -633,7 +596,7 @@
 
 .settings-action-red,
 .settings-action-red .settings-row-label {
-  color: var(--red-dim, var(--red));
+  color: var(--red-dim);
 }
 
 .settings-row-action {
@@ -656,7 +619,7 @@
 }
 
 .settings-flash {
-  color: var(--fg);
+  color: var(--text);
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -664,7 +627,7 @@
 }
 
 .settings-flash-error {
-  color: var(--red-dim, var(--red));
+  color: var(--red-dim);
 }
 
 .settings-inline-form {
@@ -689,7 +652,7 @@
   font: inherit;
   padding: 0.3rem 0.8rem;
   background: none;
-  color: var(--fg);
+  color: var(--text);
   border: 1px solid var(--line);
   cursor: pointer;
 }
@@ -769,14 +732,6 @@
    and the filter are the page's own pieces. On a phone the open row is a
    full-screen sheet and nothing scrolls sideways.
    ============================================================================= */
-.settings-field {
-  display: grid;
-  grid-template-columns: minmax(8ch, 12ch) minmax(0, 1fr);
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
 .settings-field[hidden] {
   display: none;
 }
@@ -784,19 +739,7 @@
 .settings-field-label {
   font-family: var(--font-content);
   font-size: 0.9em;
-  color: var(--fg-dim);
-}
-
-.settings-field-control {
-  font-family: var(--font-content);
-  font-size: 0.9em;
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--fg-vdim);
-  border-radius: var(--radius-sm);
-  background: var(--bg);
-  color: var(--fg);
-  min-width: 0;
-  max-width: 100%;
+  color: var(--muted);
 }
 
 .settings-field-control:focus {
@@ -834,7 +777,7 @@
   flex-wrap: wrap;
   align-items: baseline;
   gap: var(--space-1) var(--space-2);
-  color: var(--fg);
+  color: var(--text);
   white-space: nowrap;
 }
 
@@ -869,22 +812,22 @@
 }
 
 .models-fold[open] > .models-fold-summary {
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .settings-filter {
   font-family: var(--font-content);
   font-size: 0.9em;
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-bottom: var(--space-3);
 }
 
 .settings-filter-link {
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .settings-filter-link.is-current {
-  color: var(--fg);
+  color: var(--text);
   text-decoration: underline;
 }
 

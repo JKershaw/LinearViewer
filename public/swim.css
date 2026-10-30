@@ -9,7 +9,7 @@ body:has(.swim-page) {
 }
 
 .swim-page {
-  padding: 0.75rem var(--space-3) var(--space-5);
+  padding: var(--space-2h) var(--space-3) var(--space-5);
 }
 
 /* ==========================================================================
@@ -18,34 +18,34 @@ body:has(.swim-page) {
 
 .swim-settings-panel {
   margin-bottom: var(--space-3);
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: 8px;
-  background: var(--bg-muted);
+  background: var(--card);
 }
 
 .swim-settings-toggle {
   display: block;
   width: 100%;
-  padding: var(--space-2) 0.75rem;
+  padding: var(--space-2) var(--space-2h);
   border: none;
   background: none;
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   font-size: 12px;
-  color: var(--fg-dim);
+  color: var(--muted);
   cursor: pointer;
   text-align: left;
   transition: color 0.15s;
 }
 
 .swim-settings-toggle:hover {
-  color: var(--fg);
+  color: var(--text);
 }
 
 .swim-settings-body {
-  padding: 0 0.75rem 0.75rem;
+  padding: 0 var(--space-2h) var(--space-2h);
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem var(--space-4);
+  gap: var(--space-2h) var(--space-4);
 }
 
 .swim-settings-body.hidden {
@@ -61,7 +61,7 @@ body:has(.swim-page) {
 .swim-setting-label {
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   font-size: 11px;
-  color: var(--fg-dim);
+  color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   white-space: nowrap;
@@ -75,10 +75,10 @@ body:has(.swim-page) {
   padding: var(--space-1) var(--space-2);
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   font-size: 12px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: 4px;
   background: var(--bg);
-  color: var(--fg);
+  color: var(--text);
   cursor: pointer;
 }
 
@@ -93,7 +93,7 @@ body:has(.swim-page) {
 
 .swim-max-lanes-value {
   font-weight: 600;
-  color: var(--fg);
+  color: var(--text);
   min-width: 1.2em;
   display: inline-block;
 }
@@ -124,7 +124,7 @@ body:has(.swim-page) {
      swim.js) is reserved per-lane on .swim-lane-items below — a single
      container padding only protected the first lane, leaving every other
      lane's group label to bleed up into the lane above it (LIN-303). */
-  padding-top: 4px;
+  padding-top: var(--space-1);
 }
 
 .swim-lane {
@@ -141,19 +141,19 @@ body:has(.swim-page) {
   padding: 0.4rem 0.6rem;
   font-family: var(--font-content);
   font-size: 11px;
-  color: var(--fg-dim);
-  border-right: 2px solid var(--border);
+  color: var(--muted);
+  border-right: 2px solid var(--line);
   display: flex;
   align-items: center;
   word-break: break-word;
-  background: var(--bg-muted);
+  background: var(--card);
   border-radius: 4px 0 0 4px;
 }
 
 .swim-lane-items {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   /* Top padding reserves per-lane headroom for group decoration labels drawn
      ~18px above the topmost card (see drawGroupDecorations in swim.js). Without
      it, a group whose parent sits below the first lane has its label and rect
@@ -169,7 +169,7 @@ body:has(.swim-page) {
 .swim-lane-segment {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   flex-shrink: 0;
   flex-wrap: nowrap;
   padding-right: var(--space-4);
@@ -183,8 +183,6 @@ body:has(.swim-page) {
   margin-right: 0;
 }
 
-
-
 /* ==========================================================================
    Task Boxes
    ========================================================================== */
@@ -196,7 +194,7 @@ body:has(.swim-page) {
   align-items: flex-start;
   gap: 0.2rem 0.35rem;
   padding: 0.35rem 0.6rem;
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--bg);
   cursor: pointer;
@@ -208,7 +206,7 @@ body:has(.swim-page) {
 }
 
 .swim-box:hover {
-  background: var(--bg-muted);
+  background: var(--card);
   border-color: var(--border-strong);
   box-shadow: var(--shadow-sm);
 }
@@ -218,7 +216,7 @@ body:has(.swim-page) {
 .swim-box.state-completed { border-left: 3px solid var(--green); }
 .swim-box.state-canceled { border-left: 3px solid var(--green); }
 .swim-box.state-unstarted { border-left: 3px solid var(--fg-mid); }
-.swim-box.state-backlog { border-left: 3px solid var(--border); }
+.swim-box.state-backlog { border-left: 3px solid var(--line); }
 
 /* State indicator in box — colors come from the canonical
    .status-pill--<state> modifiers (public/style.css), mirroring ship.js. */
@@ -235,7 +233,7 @@ body:has(.swim-page) {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
-  color: var(--fg);
+  color: var(--text);
   font-family: var(--font-content);
   font-size: 12px;
 }
@@ -243,7 +241,7 @@ body:has(.swim-page) {
 .swim-box-id {
   width: 100%;
   text-align: right;
-  color: var(--fg-dim);
+  color: var(--muted);
   font-family: var(--font-structural);
   font-size: 9px;
   flex-shrink: 0;
@@ -292,7 +290,7 @@ body:has(.swim-page) {
   width: auto;
   text-align: left;
   font-size: 11px;
-  color: var(--fg);
+  color: var(--text);
 }
 
 /* ==========================================================================
@@ -360,7 +358,7 @@ body:has(.swim-page) {
   z-index: var(--z-sticky);
   width: 320px;
   max-width: 90vw;
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--bg);
   box-shadow: var(--shadow-lg);
@@ -381,12 +379,12 @@ body:has(.swim-page) {
 
 .swim-popover-id {
   font-size: 11px;
-  color: var(--fg-dim);
+  color: var(--muted);
   text-decoration: none;
 }
 
 .swim-popover-id:hover {
-  color: var(--fg);
+  color: var(--text);
   text-decoration: underline;
 }
 
@@ -394,20 +392,20 @@ body:has(.swim-page) {
   border: none;
   background: none;
   font-size: 18px;
-  color: var(--fg-dim);
+  color: var(--muted);
   cursor: pointer;
   padding: 0 var(--space-1);
   line-height: 1;
 }
 
 .swim-popover-close:hover {
-  color: var(--fg);
+  color: var(--text);
 }
 
 .swim-popover-title {
   font-size: 16px;
   font-weight: 700;
-  color: var(--fg);
+  color: var(--text);
   margin-bottom: var(--space-2);
   word-break: break-word;
 }
@@ -419,16 +417,16 @@ body:has(.swim-page) {
 
 .swim-popover-meta {
   font-size: 11px;
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-bottom: var(--space-2);
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-1) 0.75rem;
+  gap: var(--space-1) var(--space-2h);
 }
 
 .swim-popover-desc {
   font-size: 13px;
-  color: var(--fg);
+  color: var(--text);
   line-height: 1.5;
   max-height: 120px;
   overflow-y: auto;
@@ -438,7 +436,7 @@ body:has(.swim-page) {
 
 .swim-popover-link {
   font-size: 11px;
-  color: var(--fg-dim);
+  color: var(--muted);
   text-decoration: none;
   transition: color 0.15s;
 }
@@ -584,7 +582,7 @@ body:has(.swim-page) {
 
 .swim-empty {
   text-align: center;
-  color: var(--fg-dim);
+  color: var(--muted);
   padding: 3rem var(--space-3);
   font-style: italic;
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
@@ -652,7 +650,7 @@ body:has(.swim-page) {
   font-size: 10px;
   line-height: 1.3;
   border-right: none;
-  border-bottom: 2px solid var(--border);
+  border-bottom: 2px solid var(--line);
   border-radius: 4px 4px 0 0;
   justify-content: center;
   text-align: center;
@@ -678,7 +676,7 @@ body:has(.swim-page) {
   gap: 5px;
   padding-right: 0;
   margin-right: 0;
-  padding-bottom: 0.75rem;
+  padding-bottom: var(--space-2h);
   margin-bottom: var(--space-1);
 }
 
@@ -700,7 +698,7 @@ body:has(.swim-page) {
   box-sizing: border-box;
   padding: 0.3rem 0.45rem;
   gap: 0.15rem 0.3rem;
-  border-left: 1px solid var(--border);
+  border-left: 1px solid var(--line);
 }
 
 .swim-page[data-orientation="vertical"] .swim-box-title {
@@ -714,12 +712,12 @@ body:has(.swim-page) {
 }
 
 /* Status accent — top border instead of left border in vertical mode */
-.swim-page[data-orientation="vertical"] .swim-box.state-started { border-left: 1px solid var(--border); border-top: 3px solid var(--yellow); }
-.swim-page[data-orientation="vertical"] .swim-box.state-completed { border-left: 1px solid var(--border); border-top: 3px solid var(--green); }
-.swim-page[data-orientation="vertical"] .swim-box.state-canceled { border-left: 1px solid var(--border); border-top: 3px solid var(--green); }
-.swim-page[data-orientation="vertical"] .swim-box.state-unstarted { border-left: 1px solid var(--border); border-top: 3px solid var(--fg-mid); }
-.swim-page[data-orientation="vertical"] .swim-box.state-backlog { border-left: 1px solid var(--border); border-top: 3px solid var(--border); }
-.swim-page[data-orientation="vertical"] .swim-box.blocked { border-left: 1px solid var(--border); border-top: 3px solid var(--amber); }
+.swim-page[data-orientation="vertical"] .swim-box.state-started { border-left: 1px solid var(--line); border-top: 3px solid var(--yellow); }
+.swim-page[data-orientation="vertical"] .swim-box.state-completed { border-left: 1px solid var(--line); border-top: 3px solid var(--green); }
+.swim-page[data-orientation="vertical"] .swim-box.state-canceled { border-left: 1px solid var(--line); border-top: 3px solid var(--green); }
+.swim-page[data-orientation="vertical"] .swim-box.state-unstarted { border-left: 1px solid var(--line); border-top: 3px solid var(--fg-mid); }
+.swim-page[data-orientation="vertical"] .swim-box.state-backlog { border-left: 1px solid var(--line); border-top: 3px solid var(--line); }
+.swim-page[data-orientation="vertical"] .swim-box.blocked { border-left: 1px solid var(--line); border-top: 3px solid var(--amber); }
 
 /* Compact mode in vertical: full-width chip, ID only (title hidden by base rule) */
 .swim-page[data-orientation="vertical"] .swim-box.compact {
@@ -814,37 +812,24 @@ body:has(.swim-page) {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
   max-width: 920px;
   margin: 0 auto;
   padding: 12px 60px 48px 4px;
 }
 .swim-flow-edges { position: absolute; inset: 0; pointer-events: none; overflow: visible; z-index: 3; }
-.swim-flow-sep { height: 14px; }
 
 /* state bands (In Progress / Todo / Backlog) — the vertical segments */
-.swim-fband { display: flex; flex-direction: column; gap: 8px; }
 .swim-fband-label {
   font-size: 11px;
   letter-spacing: 0.8px;
   text-transform: uppercase;
   font-weight: 700;
-  color: var(--fg-dim);
+  color: var(--muted);
   margin: 10px 2px 0;
 }
-.swim-fband[data-segment="0"] .swim-fband-label { color: var(--amber-dim); }
-.swim-fband[data-segment="3"] .swim-fband-label { color: var(--green); }
 
 /* project = a top-level group box */
-.swim-fproject { margin: 0; }
-.swim-fgroup-label {
-  font-size: 10px;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  font-weight: 700;
-  color: var(--blue);
-  margin-bottom: 2px;
-}
 
 /* nested subtask "blue boxes" — compose the shared `.surface --inset` contract
    (LIN-977 workstream 4). The bespoke translucent brand-alpha depth ladder was
@@ -869,7 +854,7 @@ body:has(.swim-page) {
   max-width: none;
   margin: 0;
   background: var(--bg);
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-top: 3px solid var(--fg-mid);
   border-radius: 7px;
   padding: 11px 13px 12px;
@@ -877,7 +862,7 @@ body:has(.swim-page) {
 }
 .swim-flow .swim-fcard.state-started { border-top-color: var(--yellow); }
 .swim-flow .swim-fcard.state-unstarted { border-top-color: var(--fg-mid); }
-.swim-flow .swim-fcard.state-backlog { border-top-color: var(--border); }
+.swim-flow .swim-fcard.state-backlog { border-top-color: var(--line); }
 .swim-flow .swim-fcard.state-completed,
 .swim-flow .swim-fcard.state-canceled { border-top-color: var(--green); }
 /* Parent/header card in a group — a token-driven raised tint (was a
@@ -890,7 +875,7 @@ body:has(.swim-page) {
 .swim-flow .swim-fcard.state-backlog,
 .swim-flow .swim-fcard.state-completed,
 .swim-flow .swim-fcard.state-canceled,
-.swim-flow .swim-fcard.blocked { border-left: 1px solid var(--border); }
+.swim-flow .swim-fcard.blocked { border-left: 1px solid var(--line); }
 
 .swim-fc-row { display: flex; align-items: baseline; gap: 7px; flex-wrap: nowrap; }
 .swim-flow .swim-box-id {
@@ -898,7 +883,7 @@ body:has(.swim-page) {
   text-align: left;
   font-weight: 700;
   font-size: 11px;
-  color: var(--fg);
+  color: var(--text);
   white-space: nowrap;
   flex: 0 0 auto;
 }
@@ -921,7 +906,7 @@ body:has(.swim-page) {
   padding-left: 22px;
   font-size: 11.5px;
   line-height: 1.4;
-  color: var(--fg-dim);
+  color: var(--muted);
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -933,10 +918,10 @@ body:has(.swim-page) {
   flex-wrap: wrap;
   align-items: center;
   gap: 5px 9px;
-  margin-top: 8px;
+  margin-top: var(--space-2);
   padding-left: 22px;
   font-size: 11px;
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 .swim-fc-who { color: var(--slate-dim); }
 .swim-fc-prio { font-weight: 700; }
@@ -978,7 +963,7 @@ body:has(.swim-page) {
   position: relative;
   --swim-col-w: 264px;
   column-gap: 30px;
-  row-gap: 8px;
+  row-gap: var(--space-2);
   width: max-content;
   max-width: none;
   margin: 0;
@@ -1001,10 +986,10 @@ body:has(.swim-page) {
 .swim-grid .swim-fband-label {
   grid-column: 1 / -1;
   margin: 12px 2px 2px;
-  border-top: 1px solid var(--fg-vdim);
-  padding-top: 8px;
+  border-top: 1px solid var(--faint);
+  padding-top: var(--space-2);
 }
-.swim-fcell { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.swim-fcell { display: flex; flex-direction: column; gap: var(--space-2h); min-width: 0; }
 .swim-grid .swim-fcard,
 .swim-grid .swim-fgroup { width: auto; }
 
@@ -1012,7 +997,7 @@ body:has(.swim-page) {
   .swim-flow.swim-grid { --swim-col-w: 240px; column-gap: 26px; padding: 10px 12px 44px; }
   .swim-fcell { gap: 10px; }
   .swim-fgroup { padding: 8px 8px 9px 9px; border-radius: 8px; }
-  .swim-fgroup-kids { gap: 9px; margin-top: 8px; }
+  .swim-fgroup-kids { gap: 9px; margin-top: var(--space-2); }
 }
 
 /* 390px flow-grid reflow (LIN-977 workstream 3). The default flow board is a

@@ -7,13 +7,10 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
 import { renderPageHeader } from '../../lib/components/page-header.js';
+import { readSheets, appliedDecls, declOf, rulesFor } from '../helpers/css-rules.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const STYLE_CSS = readFileSync(join(__dirname, '../../public/style.css'), 'utf8');
+const STYLE = readSheets(['/style.css']);
 
 test('renderPageHeader emits subtitleHtml raw, under the title', () => {
   const html = renderPageHeader({ title: 'Acme', subtitleHtml: '<span data-tone="running">1 running</span>' });
@@ -31,16 +28,12 @@ test('renderPageHeader without a summary emits no <p>', () => {
 });
 
 test('the page header is left-aligned and every other header keeps the centred look (LIN-4009)', () => {
-  const body = (sel) => {
-    const m = new RegExp(`${sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`).exec(STYLE_CSS);
-    assert.ok(m, `expected ${sel} { ... } in style.css`);
-    return m[1];
-  };
-  assert.match(body('.page-header'), /text-align:\s*left/);
-  assert.match(body('header:not(.page-header)'), /text-align:\s*center/);
-  assert.doesNotMatch(STYLE_CSS, /(^|\n)header\s*\{/, 'the bare header tag rule is gone; the page header owns its own alignment');
+  assert.equal(declOf(STYLE, '.page-header', 'text-align'), 'left');
+  assert.equal(declOf(STYLE, 'header:not(.page-header)', 'text-align'), 'center');
+  assert.deepEqual(rulesFor(STYLE, 'header'), [], 'the bare header tag rule is gone; the page header owns its own alignment');
 });
 
 test('the page title is 24px at weight 600 on desktop (the phone steps keep their own sizes)', () => {
-  assert.match(STYLE_CSS, /\.page-header h1\s*\{[^}]*font-size:\s*1\.5rem[^}]*font-weight:\s*600/);
+  assert.equal(declOf(STYLE, '.page-header h1', 'font-size'), '1.5rem');
+  assert.equal(declOf(STYLE, '.page-header h1', 'font-weight'), '600');
 });

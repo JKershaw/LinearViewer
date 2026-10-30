@@ -18,6 +18,7 @@ import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { readSheets, appliedDecls } from '../helpers/css-rules.js';
 import { FakeElement } from '../fixtures/observation-dom-shim.js';
 import { loadCommonWindow } from '../fixtures/client-common.js';
 import { buildSessionPayload } from '../../routes/dashboard-feed.js';
@@ -739,25 +740,19 @@ describe('the waiting block over the real builder (LIN-3983, step 8)', () => {
 });
 
 describe('the waiting accent is the strongest on the page (LIN-3983, outcome 1)', () => {
-  const CSS = readFileSync(join(__dirname, '../../public/observation.css'), 'utf8');
-  const ruleBody = (selector) => {
-    const escaped = selector.replace(/[.[\]"=]/g, '\\$&');
-    const match = CSS.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`));
-    return match ? match[1] : null;
-  };
+  // The sheets the observation page loads, in order; a rule is asked for by what applies to it (LIN-4015).
+  const OBSERVATION = readSheets(['/style.css', '/observation.css']);
 
   test('a waiting card has its own, thicker accent, and it is not the in-progress amber', () => {
-    const body = ruleBody('.obs-session[data-status="waiting"]');
-    assert.ok(body, 'a waiting-card accent rule exists');
-    assert.match(body, /border-left-width:\s*4px/);
-    assert.doesNotMatch(body, /--amber/);
-    assert.notEqual(ruleBody('.obs-session[data-status="in-progress"]'), null);
+    const body = appliedDecls(OBSERVATION, '.obs-session[data-status="waiting"]');
+    assert.equal(body.get('border-left-width'), '4px');
+    assert.doesNotMatch([...body.values()].join(' '), /--amber/);
+    assert.ok(appliedDecls(OBSERVATION, '.obs-session[data-status="in-progress"]'), 'the in-progress card has a rule');
   });
 
   test('the waiting block is not amber either, so the card that needs a person is not the quietest', () => {
-    const body = ruleBody('.obs-waiting');
-    assert.ok(body, 'the block rule exists');
-    assert.doesNotMatch(body, /--amber/);
-    assert.match(body, /border-left:\s*4px solid var\(--brand\)/);
+    const body = appliedDecls(OBSERVATION, '.obs-waiting');
+    assert.doesNotMatch([...body.values()].join(' '), /--amber/);
+    assert.equal(body.get('border-left'), '4px solid var(--brand)');
   });
 });

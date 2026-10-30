@@ -10,11 +10,11 @@
 
 .passage-planner-experimental {
   color: var(--muted);
-  margin-bottom: 0.75rem;
+  margin-bottom: var(--space-2h);
 }
 
 .passage-planner-steps {
-  margin: 0.5rem 0 0;
+  margin: var(--space-2) 0 0;
   padding-left: 1.25rem;
   color: var(--text);
 }
@@ -23,25 +23,7 @@
   margin: 0.2rem 0;
 }
 
-.passage-planner-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
-}
-
 .passage-planner-feedback {
   color: var(--muted);
   font-size: 0.9em;
-}
-
-.passage-planner-prompt {
-  max-height: 60vh;
-  overflow: auto;
-  white-space: pre-wrap;
-  word-break: break-word;
-  /* The frame the observation card body uses (LIN-3983 PR 2), now owned here. */
-  padding: 0.5rem 0.8rem 0.65rem;
-  border-top: 1px solid var(--line-soft);
-  font-size: 0.84rem;
 }
