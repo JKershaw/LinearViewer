@@ -661,17 +661,20 @@
     // for a tab focus. `runCheck` owns the eligibility gate.
     var lastPolled = main.getAttribute('data-status') || 'idle';
 
-    // LIN-3499: the question card shows exactly while the task is waiting. A
-    // poll that finds it no longer waiting (answered, or the run moved on)
-    // removes it; a poll that finds it newly waiting reloads the page once, since
-    // the card is server-rendered for the owner and the state read carries none.
-    // Both are captured at init, before any markdown renders (LIN-3385). The
-    // owner-widgets marker is the owner signal — no second owner check.
+    // LIN-3499 / LIN-4038: the question card shows exactly while the server says
+    // the owner is being asked, which is `state.questionHtml` (non-empty) — not
+    // the pill's status, which a shelved or bare-blocked wait also carries. A poll
+    // that says no question (answered, shelved, or the run moved on) removes the
+    // card. A poll that says a question while the card is missing reloads the page
+    // once, since the card is server-rendered for the owner and the poll does not
+    // paint it. Both are captured at init, before any markdown renders (LIN-3385).
+    // The owner-widgets marker is the owner signal — no second owner check.
     function syncQuestion(state) {
-      if (questionCard && state.status !== 'waiting') {
+      var asked = typeof state.questionHtml === 'string' && state.questionHtml !== '';
+      if (questionCard && !asked) {
         if (questionCard.parentNode) questionCard.parentNode.removeChild(questionCard);
         questionCard = null;
-      } else if (!questionCard && state.status === 'waiting' && lastPolled !== 'waiting' && isOwnerPage) {
+      } else if (!questionCard && asked && isOwnerPage) {
         var win = doc.defaultView;
         if (win && win.location && typeof win.location.reload === 'function') win.location.reload();
       }

@@ -3,10 +3,12 @@
  * says "waiting for an answer".
  *
  * Pinned here:
- *   - the card is present exactly when the pill says waiting (`model.status`),
- *     for the owner only; a guest and a non-owner get no card and no controls;
+ *   - the card is present exactly when the owner is being asked: the pill says
+ *     waiting AND the wait is on an open ruling (`model.waitingFor` 'ruling').
+ *     A shelved ruling or a bare `[blocked]` reads parked, as on Home (LIN-4038),
+ *     and gets no card. For the owner only; a guest and a non-owner get none;
  *   - it sits OUTSIDE `task-page-answer`, so the poll's repaint cannot wipe a
- *     half-typed answer, and the poll removes it once the task stops waiting;
+ *     half-typed answer, and the poll removes it once the state read's `questionHtml` is empty;
  *   - it is the run page's own markup (`lib/question-card.js`), and the press
  *     goes through the same `window.ReplyDelivery` entry the run page uses.
  *
@@ -20,10 +22,12 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { renderTaskPage, renderTaskStatus } from '../../lib/render-task-page.js';
 import { buildTaskPageModel } from '../../lib/task-page-loader.js';
+import { rulingStandingOf } from '../../lib/unanswered-decisions.js';
 import { enrichLoop, deriveSessionWaiting, deriveSessionDecisions } from '../../routes/dashboard.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const NOW = new Date('2026-10-06T15:00:00.000Z');
+const URL_KEY = 'acme';
 const UUID = '11111111-2222-3333-4444-555555555555';
 const PAGE_OPTIONS = { deployInfo: { version: 't', commit: 't' }, featureFlags: {}, workspaces: [] };
 
@@ -37,20 +41,29 @@ function loop(over = {}) {
     ...over,
   };
 }
-const blocked = (over) => loop({ loopId: 'impl-2', wakeMarker: 'blocked', waitingMessage: '[blocked] which API key?', feedback: [{ message: '[blocked] which API key?' }], ...over });
+// A worker waiting on an open ruling: the `[blocked]` line plus its structured decision.
+const blocked = (over) => loop({
+  loopId: 'impl-2', wakeMarker: 'blocked', waitingMessage: '[blocked] which API key?', feedback: [{ message: '[blocked] which API key?' }],
+  decision: { decision_id: 'd-key', question: 'which API key?' }, ...over,
+});
+// A bare `[blocked]` with no structured decision: the pill says waiting, but the wait reads parked (LIN-4010).
+const bareBlocked = (over) => loop({ loopId: 'impl-2', wakeMarker: 'blocked', waitingMessage: '[blocked] which API key?', feedback: [{ message: '[blocked] which API key?' }], ...over });
 
-function model(loops, over = {}) {
+// The page-load path (LIN-4038): the loader gives the model the workspace's `rulingStandingOf`, so shelves count.
+function model(loops, { shelvedRulings = [], ...over } = {}) {
+  const ruling = rulingStandingOf({ urlKey: URL_KEY, loops, shelvedRulings }, { now: NOW, enrichLoop });
   return buildTaskPageModel({
-    identifier: 'LIN-50', loops, ctx: null, enrichLoop, deriveSessionWaiting, deriveSessionDecisions, now: NOW, ...over,
+    identifier: 'LIN-50', loops, ctx: null, enrichLoop, deriveSessionWaiting, deriveSessionDecisions, ruling, now: NOW, ...over,
   });
 }
 const render = (m, viewer = 'owner') => renderTaskPage(m, {
-  viewer, urlKey: 'acme', binding: { source: 'linear' }, stateUrl: '/s', now: NOW, pageOptions: PAGE_OPTIONS,
+  viewer, urlKey: URL_KEY, binding: { source: 'linear' }, stateUrl: '/s', now: NOW, pageOptions: PAGE_OPTIONS,
 });
 
-describe('the card appears exactly when the pill says waiting', () => {
+describe('the card appears exactly when the owner is being asked (waiting on an open ruling)', () => {
   test('waiting: the owner gets the question and an answer box, outside task-page-answer', () => {
     const m = model([blocked()]);
+    assert.equal(m.waitingFor, 'ruling');
     assert.equal(m.status, 'waiting');
     const html = render(m);
     assert.match(html, /data-testid="task-page-question"/);
@@ -117,6 +130,49 @@ describe('the card appears exactly when the pill says waiting', () => {
   });
 });
 
+describe('a parked wait is not a question on the task page, as on Home (LIN-4038)', () => {
+  const SHELF = (resurfaceAt) => [{ urlKey: URL_KEY, decisionId: 'd-key', resurfaceAt, lapseCount: 1 }];
+
+  test('a shelved ruling, built through the real model path, renders no question card even to the owner', () => {
+    const m = model([blocked()], { shelvedRulings: SHELF('2026-10-07T15:00:00.000Z') });
+    assert.equal(m.status, 'waiting', 'the pill still says waiting');
+    assert.equal(m.waitingFor, 'parked');
+    const html = render(m, 'owner');
+    assert.doesNotMatch(html, /task-page-question|session-question-card/);
+    assert.match(renderTaskStatus(m), /which API key\?/, 'the pill sentence is still shown');
+    const header = renderTaskStatus(m);
+    assert.match(header, /status-pill--queued/, 'the pill is in the queued tone, as Home\'s parked');
+    assert.match(header, />parked</);
+    assert.doesNotMatch(header, /status-pill--needs-you/);
+    assert.match(header, /data-status="waiting"/, 'data-status stays waiting: the client and Go key on it');
+    assert.match(render(m, 'owner'), /Nothing comes next while it is parked\./, 'no card above, so the next line does not point at one');
+    assert.doesNotMatch(render(m, 'owner'), /question above/);
+  });
+
+  test('an open ruling still renders the card', () => {
+    const m = model([blocked()]);
+    assert.equal(m.waitingFor, 'ruling');
+    assert.match(render(m, 'owner'), /data-testid="task-page-question"/);
+    assert.match(renderTaskStatus(m), /status-pill--needs-you/);
+    assert.match(renderTaskStatus(m), />waiting</);
+  });
+
+  test('a shelf that has lapsed (resurfaceAt passed) makes the ruling open again, and the card returns', () => {
+    const m = model([blocked()], { shelvedRulings: SHELF('2026-10-05T15:00:00.000Z') });
+    assert.equal(m.waitingFor, 'ruling');
+    assert.match(render(m, 'owner'), /data-testid="task-page-question"/);
+  });
+
+  test('a bare [blocked] with no structured decision reads parked and renders no card', () => {
+    const m = model([bareBlocked()]);
+    assert.equal(m.status, 'waiting');
+    assert.equal(m.waitingFor, 'parked');
+    assert.doesNotMatch(render(m, 'owner'), /task-page-question|session-question-card/);
+    assert.match(renderTaskStatus(m), /status-pill--queued/);
+    assert.match(renderTaskStatus(m), />parked</);
+  });
+});
+
 describe('only the owner sees controls (hidden, not disabled)', () => {
   test('a guest gets no card and no question markup at all', () => {
     const html = render(model([blocked()]), 'guest');
@@ -142,6 +198,8 @@ const TASK_PAGE_SRC = readFileSync(join(__dirname, '../../public/task-page.js'),
 describe('the poll leaves a half-typed answer alone and removes the card when the wait ends', () => {
   const STATE_URL = '/workspace/acme/api/task/LIN-50/state';
   const statusHtml = (status) => `<div class="task-status" data-testid="task-page-status" data-status="${status}"><p>x</p></div>`;
+  // The state read carries the card as `questionHtml` (LIN-4038): non-empty while the owner is being asked, '' otherwise.
+  const QUESTION_HTML = '<section data-testid="task-page-question"><p>which API key?</p></section>';
 
   function makePage({ withCard = true, owner = true, loadStatus = 'waiting', polls }) {
     const attrs = { 'data-state-url': STATE_URL, 'data-status': loadStatus, 'data-live': 'false', 'data-merge-ready': 'false' };
@@ -204,7 +262,7 @@ describe('the poll leaves a half-typed answer alone and removes the card when th
   });
 
   test('a poll that still says waiting repaints the header but keeps the card and the typed text', async () => {
-    const page = makePage({ polls: [{ status: 'waiting', live: false, headerHtml: statusHtml('waiting') }] });
+    const page = makePage({ polls: [{ status: 'waiting', live: false, headerHtml: statusHtml('waiting'), questionHtml: QUESTION_HTML }] });
     page.timers.shift().fn();
     await flush();
     assert.equal(page.wasRemoved(), false, 'the card stays');
@@ -217,18 +275,34 @@ describe('the poll leaves a half-typed answer alone and removes the card when th
   });
 
   test('a poll that finds the task no longer waiting removes the card', async () => {
-    const page = makePage({ polls: [{ status: 'running', live: true, headerHtml: statusHtml('running') }] });
+    const page = makePage({ polls: [{ status: 'running', live: true, headerHtml: statusHtml('running'), questionHtml: '' }] });
     page.timers.shift().fn();
     await flush();
     assert.equal(page.wasRemoved(), true);
   });
 
-  test('an owner page that becomes waiting reloads once to fetch the card; a page with no owner marker does not', async () => {
-    const own = makePage({ withCard: false, loadStatus: 'running', polls: [{ status: 'waiting', live: false, headerHtml: statusHtml('waiting') }] });
+  test('a poll that says waiting with no question (questionHtml "") removes the card and does not reload (LIN-4038)', async () => {
+    // Shelving the ruling while the page is open: the status is still waiting, but the server says no question.
+    const page = makePage({ polls: [{ status: 'waiting', live: false, headerHtml: statusHtml('waiting'), questionHtml: '' }] });
+    page.timers.shift().fn();
+    await flush();
+    assert.equal(page.wasRemoved(), true, 'the card goes');
+    assert.equal(page.reloads.length, 0, 'no reload for a card that should not be there');
+  });
+
+  test('a waiting-but-parked poll on a page with no card does not reload (LIN-4038)', async () => {
+    const page = makePage({ withCard: false, loadStatus: 'running', polls: [{ status: 'waiting', live: false, headerHtml: statusHtml('waiting'), questionHtml: '' }] });
+    page.timers.shift().fn();
+    await flush();
+    assert.equal(page.reloads.length, 0);
+  });
+
+  test('an owner page that becomes asked reloads once to fetch the card; a page with no owner marker does not', async () => {
+    const own = makePage({ withCard: false, loadStatus: 'running', polls: [{ status: 'waiting', live: false, headerHtml: statusHtml('waiting'), questionHtml: QUESTION_HTML }] });
     own.timers.shift().fn();
     await flush();
     assert.equal(own.reloads.length, 1);
-    const guest = makePage({ withCard: false, owner: false, loadStatus: 'running', polls: [{ status: 'waiting', live: false, headerHtml: statusHtml('waiting') }] });
+    const guest = makePage({ withCard: false, owner: false, loadStatus: 'running', polls: [{ status: 'waiting', live: false, headerHtml: statusHtml('waiting'), questionHtml: QUESTION_HTML }] });
     guest.timers.shift().fn();
     await flush();
     assert.equal(guest.reloads.length, 0);
