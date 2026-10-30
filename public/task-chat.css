@@ -10,17 +10,8 @@
    look is owned by the canonical `.page-header` / `.page-header__subtitle`. */
 
 .task-chat-experimental {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: var(--font-size-sm);
-  margin: 0 0 var(--space-3);
-}
-
-.task-chat-warning {
-  color: var(--accent);
-  font-size: var(--font-size-sm);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: var(--space-2) var(--space-3);
   margin: 0 0 var(--space-3);
 }
 
@@ -40,7 +31,7 @@
 
 .task-chat-label {
   font-family: var(--font-content);
-  color: var(--fg-dim);
+  color: var(--muted);
   min-width: 4rem;
 }
 
@@ -48,10 +39,10 @@
   font-family: var(--font-content);
   font-size: var(--font-size-base);
   padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--bg);
-  color: var(--fg);
+  color: var(--text);
 }
 
 .task-chat-input-wide {
@@ -61,17 +52,8 @@
 
 /* ── Conversation ───────────────────────────────────────────────────────── */
 
-.task-chat-convo-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: var(--space-2);
-  font-family: var(--font-content);
-  font-size: var(--font-size-sm);
-}
-
 .task-chat-active-label {
-  color: var(--fg);
+  color: var(--text);
   font-weight: 500;
 }
 
@@ -79,16 +61,16 @@
   font-family: var(--font-content);
   font-size: var(--font-size-sm);
   padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--bg);
-  color: var(--fg-dim);
+  color: var(--muted);
   cursor: pointer;
 }
 
 .task-chat-reset-btn:hover {
-  background: var(--bg-muted);
-  color: var(--fg);
+  background: var(--card);
+  color: var(--text);
 }
 
 /* Structure (list/flex/scroll), the message bubble (speaker pill + surface
@@ -148,7 +130,7 @@
 .task-chat-saved-count {
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .task-chat-saved-title {

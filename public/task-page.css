@@ -16,12 +16,6 @@
   margin-right: 0.35rem;
 }
 .task-title { font-family: var(--font-content); }
-.task-status {
-  display: flex;
-  align-items: baseline;
-  gap: 0.6rem;
-  flex-wrap: wrap;
-}
 .task-status-pill { flex-shrink: 0; }
 .task-sentence {
   margin: 0;
@@ -36,7 +30,7 @@
 /* The brief's `## Current` paragraph, under the one sentence (LIN-3356). */
 .task-summary {
   flex-basis: 100%;
-  margin: 0.25rem 0 0;
+  margin: var(--space-1) 0 0;
   font-family: var(--font-content);
   font-size: 0.95rem;
   line-height: 1.55;
@@ -51,16 +45,16 @@
    Everything here is the content face; the shared evidence fragment brings no
    styles of its own, so its rows are styled here, scoped to this section. */
 .task-pr-section { font-family: var(--font-content); }
-.task-pr-says { margin: 0 0 0.75rem; }
-.task-pr-lead { margin: 0 0 0.25rem; font-size: 1rem; font-weight: 600; line-height: 1.4; }
+.task-pr-says { margin: 0 0 var(--space-2h); }
+.task-pr-lead { margin: 0 0 var(--space-1); font-size: 1rem; font-weight: 600; line-height: 1.4; }
 .task-pr-detail { margin: 0; font-size: 0.9rem; line-height: 1.5; color: var(--muted); }
-.task-pr-section .rev-closeout { display: grid; gap: 0.5rem; justify-items: start; margin: 0 0 0.75rem; }
+.task-pr-section .rev-closeout { display: grid; gap: var(--space-2); justify-items: start; margin: 0 0 var(--space-2h); }
 .task-pr-section .rev-closeout p { margin: 0; font-size: 0.85rem; color: var(--muted); }
-.task-pr-section .rev-closeout-actions { display: flex; flex-direction: column; align-items: stretch; gap: 0.5rem; width: 100%; }
+.task-pr-section .rev-closeout-actions { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-2); width: 100%; }
 /* The Merge press is the shared primary button (LIN-3975): `btn btn--primary`, set by the task page's close-out box. */
 .task-pr-section .rev-closeout-actions a { font-size: 0.8rem; color: var(--brand-dim); text-align: center; }
 .task-pr-raw { font-size: 0.85rem; overflow-wrap: anywhere; }
-.task-pr-raw .rev-row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.15rem 0; }
+.task-pr-raw .rev-row { display: flex; gap: var(--space-2); flex-wrap: wrap; margin: 0.15rem 0; }
 .task-pr-raw .rev-row-label { color: var(--muted); min-width: 4.5rem; }
 .task-pr-raw .rev-row-body { min-width: 0; }
 .task-pr-raw a { color: var(--brand-dim); }
@@ -82,14 +76,14 @@
 .task-md-more { margin-top: var(--space-2); }
 
 /* ── Brief and recap ─────────────────────────────────────────────────────── */
-.task-context { display: grid; gap: 0.75rem; }
+.task-context { display: grid; gap: var(--space-2h); }
 @media (min-width: 720px) {
   .task-context { grid-template-columns: 1fr 1fr; }
 }
 
 /* ── Task details (closed to start with) ─────────────────────────────────── */
-.task-details { margin: var(--space-4, 1rem) 0; }
-.task-chat-fold { margin-bottom: var(--space-4, 1rem); }
+.task-details { margin: var(--space-4) 0; }
+.task-chat-fold { margin-bottom: var(--space-4); }
 .task-details .sess-v { min-width: 0; overflow-wrap: anywhere; }
 .task-refs { margin-top: 0.6rem; }
 .task-refs-label {
@@ -105,12 +99,12 @@
 .task-ref-state { color: var(--muted); font-size: 0.8rem; }
 
 /* ── Share controls (LIN-3330, owner only) ───────────────────────────────── */
-.task-share { margin: var(--space-4, 1rem) 0; }
+.task-share { margin: var(--space-4) 0; }
 .task-share-head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 .task-share-label { font-family: var(--font-content); color: var(--muted); }
 /* The share buttons are the shared quiet button (`btn btn--quiet`, LIN-3975). */
@@ -119,7 +113,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
   margin-top: 0.6rem;
 }
 .task-share-new-label { font-size: 0.8rem; color: var(--muted); }
@@ -171,7 +165,7 @@
       "docs docs"
       "details details"
       "share share";
-    column-gap: 1.5rem;
+    column-gap: var(--space-4);
     align-items: start;
   }
   .sess-page.task-page > * { grid-column: 1 / -1; }
@@ -209,7 +203,7 @@
 
 /* LIN-3975: a step still ahead is one quiet line, not a dashed box. */
 .task-stage-ahead { list-style: none; padding: var(--space-1) 0; font-size: 0.9rem; color: var(--muted); }
-.task-stage-ahead .task-stage-name { color: var(--fg); }
+.task-stage-ahead .task-stage-name { color: var(--text); }
 /* LIN-3975: an attempt's link to its run page, and the line that says it cannot be opened. */
 .task-stage-run { margin-left: var(--space-2); font-size: 0.85rem; white-space: nowrap; }
 /* LIN-4009: the link is brand, like `.task-page-link`, not the browser's default blue (the unlinked span keeps its muted colour). */

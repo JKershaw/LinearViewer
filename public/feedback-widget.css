@@ -84,7 +84,7 @@
   /* `.nav-action:hover { color: var(--fg) }` (public/style.css) still matches a
      disabled button, so without the second selector the dead control brightens
      under the cursor — reading as interactive at exactly the moment it is not. */
-  color: var(--fg-dim, inherit);
+  color: var(--muted);
 }
 
 /* A pending draft (text not yet sent) gets a subtle marker dot — carried over
@@ -100,8 +100,8 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--yellow, #d4a600);
-  border: 1px solid var(--bg, #fff);
+  background: var(--yellow);
+  border: 1px solid var(--bg);
 }
 
 /* The panel's `bottom` was 60px: clearance for the 32px FAB at its 16px inset,
@@ -112,15 +112,15 @@
   position: fixed;
   right: 16px;
   bottom: 16px;
-  z-index: var(--z-overlay, 1000);
+  z-index: var(--z-overlay);
   width: 340px;
   max-width: calc(100vw - 32px);
-  background: var(--bg, #fff);
-  color: var(--fg, #1a1a1a);
-  border: 1px solid var(--border-strong, #ccc);
-  border-radius: var(--radius-md, 6px);
-  box-shadow: var(--shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.12));
-  font-family: var(--font-content, sans-serif);
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  font-family: var(--font-content);
   overflow: hidden; /* keep the header divider flush to the rounded corners */
 }
 
@@ -133,38 +133,38 @@
   align-items: center;
   justify-content: space-between;
   padding: 10px 14px;
-  background: var(--bg-muted, #f8f9fa);
-  border-bottom: 1px solid var(--border, #ddd);
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
 }
 
 .feedback-popup-title {
-  font-family: var(--font-structural, monospace);
-  font-size: var(--font-size-sm, 0.85em);
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
   font-weight: 600;
   letter-spacing: 0.02em;
 }
 
 .feedback-popup-actions {
   display: flex;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .feedback-min,
 .feedback-close {
   background: none;
   border: none;
-  color: var(--fg-dim, #666);
+  color: var(--muted);
   font-size: 1.1em;
   line-height: 1;
   cursor: pointer;
   padding: 2px 6px;
-  border-radius: var(--radius-sm, 3px);
+  border-radius: var(--radius-sm);
 }
 
 .feedback-min:hover,
 .feedback-close:hover {
-  background: var(--bg-muted, #f8f9fa);
-  color: var(--fg, #1a1a1a);
+  background: var(--card);
+  color: var(--text);
 }
 
 .feedback-popup-body {
@@ -175,12 +175,12 @@
 }
 
 .feedback-label {
-  font-family: var(--font-content, sans-serif);
-  font-size: var(--font-size-sm, 0.85em);
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
   font-weight: 600;
   letter-spacing: 0.02em;
-  color: var(--fg, #1a1a1a);
-  margin-bottom: -4px; /* tuck the label toward the field it names */
+  color: var(--text);
+  margin-bottom: -var(--space-1); /* tuck the label toward the field it names */
 }
 
 .feedback-message,
@@ -188,12 +188,12 @@
 .feedback-file {
   width: 100%;
   box-sizing: border-box;
-  font-family: var(--font-content, sans-serif);
-  font-size: var(--font-size-base, 1em);
-  color: var(--fg, #1a1a1a);
-  background: var(--bg, #fff);
-  border: 1px solid var(--border, #ddd);
-  border-radius: var(--radius-sm, 3px);
+  font-family: var(--font-content);
+  font-size: var(--font-size-base);
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
   padding: 8px 10px;
   transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
@@ -206,7 +206,7 @@
 .feedback-message:focus,
 .feedback-priority:focus {
   outline: none;
-  border-color: var(--brand, #0f766e);
+  border-color: var(--brand);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 8%, transparent);
 }
 
@@ -221,7 +221,7 @@
 
 .feedback-exec-hint {
   font-weight: 400;
-  color: var(--muted, #6b7280);
+  color: var(--muted);
 }
 
 /* Drop zone: a dashed target that wraps the native file input so the whole
@@ -231,16 +231,16 @@
   flex-direction: column;
   gap: 6px;
   padding: 10px;
-  border: 1px dashed var(--border-strong, #ccc);
-  border-radius: var(--radius-sm, 3px);
-  background: var(--bg-muted, #f8f9fa);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--card);
   cursor: pointer;
   transition: border-color 0.12s ease, background 0.12s ease;
 }
 
 /* Active drag-over state — the target lights up so a drop reads as landing. */
 .feedback-drop-over {
-  border-color: var(--brand, #0f766e);
+  border-color: var(--brand);
   border-style: solid;
   background: color-mix(in srgb, var(--brand) 8%, transparent);
 }
@@ -249,33 +249,33 @@
   border: none;
   background: none;
   padding: 0;
-  font-size: var(--font-size-sm, 0.85em);
-  color: var(--fg-dim, #666);
+  font-size: var(--font-size-sm);
+  color: var(--muted);
 }
 
 /* Tidy the browser-default file button into a small, on-brand affordance so the
    drop zone reads as intentional rather than a raw form control (LIN-952). */
 .feedback-drop .feedback-file::file-selector-button {
-  font-family: var(--font-structural, monospace);
-  font-size: var(--font-size-sm, 0.85em);
-  color: var(--fg, #1a1a1a);
-  background: var(--bg, #fff);
-  border: 1px solid var(--border-strong, #ccc);
-  border-radius: var(--radius-sm, 3px);
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
   padding: 4px 10px;
-  margin-right: 8px;
+  margin-right: var(--space-2);
   cursor: pointer;
   transition: background 0.12s ease, border-color 0.12s ease;
 }
 
 .feedback-drop .feedback-file::file-selector-button:hover {
-  background: var(--bg-muted, #f8f9fa);
-  border-color: var(--brand, #0f766e);
+  background: var(--card);
+  border-color: var(--brand);
 }
 
 .feedback-drop-hint {
-  font-size: var(--font-size-sm, 0.85em);
-  color: var(--fg-dim, #666);
+  font-size: var(--font-size-sm);
+  color: var(--muted);
 }
 
 /* Selected-file chip: filename + remove control, shown once a screenshot is
@@ -283,11 +283,11 @@
 .feedback-file-chip {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 8px;
-  border: 1px solid var(--border, #ddd);
-  border-radius: var(--radius-sm, 3px);
-  background: var(--bg-muted, #f8f9fa);
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
 }
 
 .feedback-file-chip[hidden] {
@@ -297,9 +297,9 @@
 .feedback-file-name {
   flex: 1 1 auto;
   min-width: 0;
-  font-family: var(--font-structural, monospace);
-  font-size: var(--font-size-sm, 0.85em);
-  color: var(--fg, #1a1a1a);
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+  color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -307,9 +307,9 @@
 
 .feedback-file-remove {
   flex: 0 0 auto;
-  font-family: var(--font-structural, monospace);
-  font-size: var(--font-size-sm, 0.85em);
-  color: var(--red, #cc0000);
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+  color: var(--red);
   background: none;
   border: none;
   padding: 0;
@@ -322,17 +322,17 @@
 }
 
 .feedback-status {
-  font-size: var(--font-size-sm, 0.85em);
+  font-size: var(--font-size-sm);
   min-height: 1.2em;
-  color: var(--fg-dim, #666);
+  color: var(--muted);
 }
 
 .feedback-status-error {
-  color: var(--red, #cc0000);
+  color: var(--red);
 }
 
 .feedback-status-success {
-  color: var(--green, #16a34a);
+  color: var(--green);
 }
 
 .feedback-popup-foot {
@@ -340,17 +340,17 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   align-items: center;
-  gap: 8px;
-  margin-top: 4px;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
 }
 
 .feedback-submit {
-  font-family: var(--font-structural, monospace);
-  font-size: var(--font-size-sm, 0.85em);
-  color: var(--bg, #fff);
-  background: var(--brand, #0f766e);
-  border: 1px solid var(--brand, #0f766e);
-  border-radius: var(--radius-sm, 3px);
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+  color: var(--bg);
+  background: var(--brand);
+  border: 1px solid var(--brand);
+  border-radius: var(--radius-sm);
   padding: 6px 12px;
   cursor: pointer;
 }
@@ -362,7 +362,7 @@
 /* Save is the primary; triage/autopilot are secondary (outline) so the foot
    reads as one primary action plus its follow-up options (LIN-918, LIN-1037). */
 .feedback-submit-secondary {
-  color: var(--brand-dim, #0f766e);
+  color: var(--brand-dim);
   background: transparent;
 }
 

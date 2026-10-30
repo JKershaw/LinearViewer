@@ -60,14 +60,6 @@
   min-width: 0;
 }
 
-.task-create-label {
-  font-family: var(--font-content);
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--muted);
-  letter-spacing: 0.02em;
-}
-
 .task-create-input {
   width: 100%;
   box-sizing: border-box;
@@ -90,16 +82,6 @@
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 25%, transparent);
 }
 
-select.task-create-input {
-  cursor: pointer;
-  padding-right: 2rem;
-  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
-                    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
-  background-position: calc(100% - 1.05rem) 50%, calc(100% - 0.7rem) 50%;
-  background-size: 0.35rem 0.35rem, 0.35rem 0.35rem;
-  background-repeat: no-repeat;
-}
-
 .task-create-textarea {
   min-height: 10rem;
   resize: vertical;
@@ -109,27 +91,6 @@ select.task-create-input {
 /* =============================================================================
    Actions
    ============================================================================= */
-
-.task-create-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-3);
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--line);
-}
-
-.task-create-submit {
-  padding: 0.5rem var(--space-4);
-  font-family: var(--font-content);
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--brand);
-  background: color-mix(in srgb, var(--brand) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--brand) 40%, transparent);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
 
 .task-create-submit:hover:not(:disabled) {
   background: color-mix(in srgb, var(--brand) 22%, transparent);
@@ -145,12 +106,6 @@ select.task-create-input {
   cursor: default;
 }
 
-.task-create-cancel {
-  font-family: var(--font-content);
-  font-size: 0.9rem;
-  color: var(--muted);
-  text-decoration: none;
-}
 .task-create-cancel:hover { color: var(--text); }
 
 .task-create-status {

@@ -14,7 +14,7 @@
 
 .custom-prompts-count {
   font-size: var(--font-size-sm);
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 /* Section styling is canonical now (.section in style.css, LIN-461); the
@@ -24,7 +24,7 @@
    Empty State
    ============================================================================= */
 .custom-prompts-empty {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: 0.9em;
   padding: var(--space-5) 0;
   text-align: center;
@@ -42,13 +42,13 @@
 .custom-prompt-name {
   font-family: var(--font-content);
   font-weight: 500;
-  color: var(--fg);
+  color: var(--text);
 }
 
 .custom-prompt-preview {
   font-family: var(--font-structural);
   font-size: 0.8em;
-  color: var(--fg-dim);
+  color: var(--muted);
   background: rgba(0, 0, 0, 0.02);
   padding: var(--space-2);
   border-radius: var(--radius-sm);
@@ -76,14 +76,14 @@
 }
 
 .editor-field {
-  margin-bottom: 0.75rem;
+  margin-bottom: var(--space-2h);
 }
 
 .editor-label {
   display: block;
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-bottom: var(--space-1);
 }
 
@@ -93,10 +93,10 @@
   font-family: var(--font-content);
   font-size: 0.9em;
   padding: 0.35rem var(--space-2);
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
   background: var(--bg);
-  color: var(--fg);
+  color: var(--text);
 }
 
 .custom-prompt-name-input:focus {
@@ -110,10 +110,10 @@
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
   padding: var(--space-2);
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
   background: var(--bg);
-  color: var(--fg);
+  color: var(--text);
   resize: vertical;
   min-height: 6em;
 }
@@ -127,7 +127,7 @@
   display: block;
   text-align: right;
   font-size: 0.8em;
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-top: var(--space-1);
 }
 
@@ -141,13 +141,13 @@
    Variable Reference
    ============================================================================= */
 .variable-reference {
-  margin-bottom: 0.75rem;
+  margin-bottom: var(--space-2h);
   font-size: var(--font-size-sm);
 }
 
 .variable-reference summary {
   cursor: pointer;
-  color: var(--fg-dim);
+  color: var(--muted);
   font-family: var(--font-content);
 }
 
@@ -172,7 +172,7 @@
 }
 
 .variable-desc {
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-left: var(--space-2);
 }
 
@@ -181,7 +181,7 @@
    ============================================================================= */
 @media (max-width: 640px) {
   .custom-prompt-editor {
-    padding: 0.75rem;
+    padding: var(--space-2h);
   }
 
   .custom-prompt-name-input,

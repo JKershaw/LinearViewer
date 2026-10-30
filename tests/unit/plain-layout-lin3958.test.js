@@ -31,7 +31,7 @@ test('the shared .section .section-header rule keeps the declarations it had at 
   assert.equal(applied.get('font-size'), 'var(--font-size-base)');
   assert.equal(applied.get('font-weight'), '500');
   oneOf(applied.get('color'), ['var(--fg)', 'var(--text)']);
-  assert.equal(applied.get('margin'), '0 0 0.75rem 0');
+  oneOf(applied.get('margin'), ['0 0 0.75rem 0', '0 0 var(--space-2h) 0']);
 });
 
 test('the Plain root sets no face of its own, so /styleguide labels keep their faces', () => {

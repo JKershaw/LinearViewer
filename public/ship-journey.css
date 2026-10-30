@@ -15,7 +15,7 @@
   font-family: var(--font-content);
   color: var(--muted);
   font-size: 0.85rem;
-  margin: 0.25rem 0 1rem;
+  margin: var(--space-1) 0 var(--space-3);
 }
 
 .sj-coverage {
@@ -30,13 +30,13 @@
   font-family: var(--font-content);
   color: var(--amber-dim);
   font-size: 0.85rem;
-  margin: 0 0 1rem;
+  margin: 0 0 var(--space-3);
 }
 
 .sj-empty {
   font-family: var(--font-content);
   color: var(--muted);
-  padding: 2rem 1rem;
+  padding: var(--space-5) var(--space-3);
   text-align: center;
 }
 
@@ -45,7 +45,7 @@
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  margin: 0.75rem 0 1rem;
+  margin: var(--space-2h) 0 var(--space-3);
 }
 
 .sj-control-btn {

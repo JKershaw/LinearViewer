@@ -1,8 +1,8 @@
 /* Escalation KPIs — operator-facing audit page (LIN-1736). Semantic-token-only
    (dark-safe), mirroring the Rulings card styling in observation.css. */
 
-.kpi-window-form { margin: 0 0 1rem; }
-.kpi-window-form label { font-family: var(--font-structural); font-size: 0.85rem; color: var(--fg-dim); margin-right: 0.4rem; }
+.kpi-window-form { margin: 0 0 var(--space-3); }
+.kpi-window-form label { font-family: var(--font-structural); font-size: 0.85rem; color: var(--muted); margin-right: 0.4rem; }
 
 /* Mirrors the house select treatment (.dispatch-exec-harness-select, style.css)
    with roomier padding — this control submits the form on change, so its hit
@@ -12,10 +12,10 @@
   font-family: var(--font-content);
   font-size: 0.9rem;
   padding: 0.4rem 0.6rem;
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
   background: var(--bg);
-  color: var(--fg);
+  color: var(--text);
 }
 .kpi-window-select:focus {
   outline: none;
@@ -25,7 +25,7 @@
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 0.75rem;
+  gap: var(--space-2h);
 }
 
 .kpi-card {
@@ -39,7 +39,7 @@
 .kpi-card-label {
   font-family: var(--font-structural);
   font-size: 0.8rem;
-  color: var(--fg-dim);
+  color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
@@ -51,17 +51,17 @@
 }
 .kpi-card-sub { color: var(--muted); font-size: 0.82rem; }
 
-.kpi-generated-at { color: var(--fg-dim); font-size: 0.78rem; margin-top: 1rem; }
+.kpi-generated-at { color: var(--muted); font-size: 0.78rem; margin-top: var(--space-3); }
 
 /* Workspace KPIs trend charts (LIN-3711). These rules are copied from
    public/kpis.css on purpose: the workspace page does not load /kpis.css, and a
    canvas with no height rule collapses (the helper turns off maintainAspectRatio). */
-.workspace-kpis-section { min-width: 0; margin-bottom: var(--space-3, 1rem); }
+.workspace-kpis-section { min-width: 0; margin-bottom: var(--space-3); }
 
 .kpi-chart-caption {
   font-size: 0.8rem;
-  color: var(--fg-dim);
-  margin: 0 0 var(--space-2, 0.5rem);
+  color: var(--muted);
+  margin: 0 0 var(--space-2);
 }
 
 .kpi-chart-canvas {
@@ -80,29 +80,29 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--fg-dim);
+  color: var(--muted);
   font-family: var(--font-structural);
   font-size: 0.85rem;
 }
 
 /* Sparkline under a stat card's figure: inline SVG, tokens only. */
-.kpi-card-spark { display: block; margin-top: var(--space-1, 0.25rem); line-height: 0; }
+.kpi-card-spark { display: block; margin-top: var(--space-1); line-height: 0; }
 .kpi-card-spark svg { display: block; max-width: 100%; height: auto; }
 
 /* "Show the numbers": notes, then a table in a wrapper that scrolls on its own
    so the page never does. */
 .kpi-numbers {
-  margin-top: var(--space-2, 0.5rem);
+  margin-top: var(--space-2);
   font-family: var(--font-structural);
   font-size: 0.8rem;
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 .kpi-numbers summary { cursor: pointer; }
-.kpi-numbers-note { margin: var(--space-1, 0.25rem) 0 0; line-height: 1.5; }
-.kpi-numbers-wrap { overflow-x: auto; margin-top: var(--space-2, 0.5rem); }
+.kpi-numbers-note { margin: var(--space-1) 0 0; line-height: 1.5; }
+.kpi-numbers-wrap { overflow-x: auto; margin-top: var(--space-2); }
 .kpi-numbers-wrap table { border-collapse: collapse; width: 100%; }
 .kpi-numbers-wrap th,
-.kpi-numbers-wrap td { padding: 0.15rem var(--space-2, 0.5rem); text-align: right; white-space: nowrap; }
+.kpi-numbers-wrap td { padding: 0.15rem var(--space-2); text-align: right; white-space: nowrap; }
 .kpi-numbers-wrap th:first-child,
 .kpi-numbers-wrap td:first-child { text-align: left; padding-left: 0; }
 .kpi-numbers-wrap th { font-weight: 600; }
@@ -114,20 +114,20 @@
 /* The rate/total toggle on the tasks-finished chart. */
 .rate-total-toggle {
   display: flex;
-  gap: var(--space-1, 0.25rem);
-  margin: 0 0 var(--space-2, 0.5rem);
+  gap: var(--space-1);
+  margin: 0 0 var(--space-2);
 }
 .rate-total-toggle button {
   font: inherit;
   font-size: 0.8rem;
-  padding: var(--space-1, 0.25rem) var(--space-2, 0.5rem);
-  color: var(--fg-dim);
+  padding: var(--space-1) var(--space-2);
+  color: var(--muted);
   background: none;
   border: 1px solid currentColor;
   border-radius: 4px;
   cursor: pointer;
 }
 .rate-total-toggle button[aria-pressed="true"] {
-  color: var(--fg);
+  color: var(--text);
   font-weight: 600;
 }

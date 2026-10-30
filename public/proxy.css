@@ -10,10 +10,10 @@
    rows are `.field` (style.css); the `.proxy-section .line` copy is gone (LIN-3889). */
 
 .proxy-hint {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-family: var(--font-content);
   font-size: var(--font-size-sm);
-  margin: 0 0 0.75rem 0;
+  margin: 0 0 var(--space-2h) 0;
 }
 
 /* The dim-label row converged onto the canonical `.field` component (style.css,
@@ -29,8 +29,8 @@
 .proxy-prompt-controls {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
+  gap: var(--space-2h);
+  margin-bottom: var(--space-2h);
   flex-wrap: wrap;
 }
 
@@ -46,10 +46,10 @@
   font-family: var(--font-content);
   font-size: var(--font-size-sm);
   padding: var(--space-1) 0.4rem;
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
   background: var(--bg);
-  color: var(--fg);
+  color: var(--text);
 }
 
 .proxy-scope-select:focus {
@@ -73,7 +73,7 @@
   font-size: 0.8em;
   white-space: pre-wrap;
   word-break: break-all;
-  color: var(--fg-dim);
+  color: var(--muted);
   margin: 0;
   max-height: 12em;
   overflow-y: auto;
@@ -81,7 +81,7 @@
 }
 
 .proxy-prompt-output.has-prompt {
-  color: var(--fg);
+  color: var(--text);
 }
 
 /* =============================================================================
@@ -90,7 +90,7 @@
 .proxy-examples {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--space-2h);
 }
 
 .proxy-example {
@@ -99,7 +99,7 @@
 }
 
 .proxy-example-label {
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-bottom: var(--space-1);
 }
 
@@ -109,9 +109,9 @@
   font-size: 0.9em;
   padding: 0.4rem 0.6rem;
   background: rgba(0, 0, 0, 0.03);
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
-  color: var(--fg);
+  color: var(--text);
   word-break: break-all;
   white-space: pre-wrap;
 }
@@ -125,7 +125,7 @@
 
 .proxy-events-loading,
 .proxy-events-empty {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: 0.9em;
   padding: var(--space-1) 0;
 }
@@ -133,9 +133,9 @@
 .proxy-event-item {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: var(--space-2h);
   padding: 0.35rem 0;
-  border-bottom: 1px solid var(--fg-vdim);
+  border-bottom: 1px solid var(--faint);
   font-size: var(--font-size-sm);
   font-family: var(--font-content);
 }
@@ -148,12 +148,12 @@
   font-family: var(--font-structural);
   font-weight: 500;
   min-width: 5ch;
-  color: var(--fg);
+  color: var(--text);
 }
 
 .proxy-event-endpoint {
   flex: 1;
-  color: var(--fg);
+  color: var(--text);
   font-family: var(--font-structural);
   min-width: 0;
   overflow: hidden;
@@ -165,7 +165,7 @@
    (LIN-854); the bespoke `.proxy-event-status` color rules are retired. */
 
 .proxy-event-meta {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: var(--font-size-sm);
   white-space: nowrap;
 }
@@ -187,13 +187,13 @@
 
 /* Refresh button */
 .proxy-events-refresh {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: var(--font-size-sm);
   vertical-align: middle;
 }
 
 .proxy-events-refresh:hover {
-  color: var(--fg);
+  color: var(--text);
 }
 
 /* =============================================================================
@@ -201,7 +201,7 @@
    ============================================================================= */
 .proxy-health-loading,
 .proxy-health-empty {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: 0.9em;
   padding: var(--space-1) 0;
 }
@@ -222,13 +222,13 @@
 .proxy-health-label {
   font-family: var(--font-content);
   font-weight: 500;
-  color: var(--fg);
+  color: var(--text);
 }
 
 .proxy-health-meta {
   font-family: var(--font-structural);
   font-size: 0.8em;
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-top: 0.15rem;
 }
 
@@ -243,11 +243,11 @@
   list-style: none;
   cursor: pointer;
   padding: 0.35rem var(--space-2);
-  border: 1px solid var(--fg-vdim);
+  border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
   font-family: var(--font-content);
   font-size: var(--font-size-sm);
-  color: var(--fg-dim);
+  color: var(--muted);
   user-select: none;
   display: flex;
   align-items: center;
@@ -260,7 +260,7 @@
 
 .proxy-collapsible-summary::before {
   content: '▸';
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: 0.8em;
   width: 1ch;
   display: inline-block;
@@ -271,12 +271,12 @@
 }
 
 .proxy-collapsible-summary:hover {
-  color: var(--fg);
-  border-color: var(--fg-dim);
+  color: var(--text);
+  border-color: var(--muted);
 }
 
 .proxy-collapsible-count {
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .proxy-collapsible[open] > .proxy-collapsible-summary {
@@ -302,16 +302,16 @@
 .proxy-events-pager {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: var(--space-2h);
   margin-top: var(--space-2);
   padding-top: var(--space-2);
-  border-top: 1px solid var(--fg-vdim);
+  border-top: 1px solid var(--faint);
   font-family: var(--font-content);
   font-size: var(--font-size-sm);
 }
 
 .proxy-events-pager-info {
-  color: var(--fg-dim);
+  color: var(--muted);
   flex: 1;
   text-align: center;
 }

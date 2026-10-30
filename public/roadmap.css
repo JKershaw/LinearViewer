@@ -883,7 +883,7 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
 }
 
 .roadmap-chat-send:hover {
-  background: var(--bg-muted);
+  background: var(--card);
 }
 
 .roadmap-chat-send:disabled {

@@ -24,18 +24,30 @@ export function pageLists(root) {
       const path = join(dir, name.name);
       if (name.isDirectory()) walk(path);
       else if (name.name.endsWith('.js')) {
-        for (const line of readFileSync(path, 'utf8').split('\n')) {
+        const lines = readFileSync(path, 'utf8').split('\n');
+        // A module may name its list once and pass the name (`stylesheets: STYLESHEETS`): read one-line consts too.
+        const consts = new Map();
+        for (const line of lines) {
+          const c = line.match(/^(?:const|let) ([A-Z_]+) = \[([^\]]*)\];/);
+          if (c) consts.set(c[1], [...c[2].matchAll(/'(\/[^']+\.css)'/g)].map((x) => x[1]));
+        }
+        const add = (names) => {
+          if (names.length && !seen.has(names.join(' '))) seen.set(names.join(' '), names);
+        };
+        for (const line of lines) {
           if (!line.includes('stylesheets:')) continue;
-          for (const m of line.matchAll(/\[([^\[\]]*)\]/g)) {
-            const names = [...m[1].matchAll(/'(\/[^']+\.css)'/g)].map((x) => x[1]);
-            if (names.length && !seen.has(names.join(' '))) seen.set(names.join(' '), names);
-          }
+          for (const m of line.matchAll(/\[([^\[\]]*)\]/g)) add([...m[1].matchAll(/'(\/[^']+\.css)'/g)].map((x) => x[1]));
+          for (const m of line.matchAll(/stylesheets: ([A-Z_]+)\b/g)) if (consts.has(m[1])) add(consts.get(m[1]));
         }
       }
     }
   };
   walk(join(root, 'lib'));
-  return [...seen.values()];
+  // Every page's list starts with style.css (the renderers' rule, LIN-4015): a fragment such as the `['/settings.css']`
+  // in a ternary is not a page. The Plain page with rows is `[...stylesheets, '/settings.css']` with style.css first.
+  const pages = [...seen.values()].filter((names) => names[0] === '/style.css');
+  if (!pages.some((names) => names.join(' ') === '/style.css /settings.css')) pages.push(['/style.css', '/settings.css']);
+  return pages;
 }
 
 const VAR = /var\(\s*(--[\w-]+)\s*(?:,\s*([^()]*(?:\([^()]*\)[^()]*)*))?\)/g;
@@ -205,13 +217,58 @@ export function flippedPairs(baseRoot, headRoot, names) {
   return out;
 };
 
+// Class sets the source emits on one element, from every literal class attribute and className assignment in the
+// non-test source (lib/, public/*.js). A class that no literal carries, such as one a JavaScript builder joins at run
+// time, is unknown here, and an unknown class always counts as possible (see `canLand`).
+export function emittedClassSets(root) {
+  const sets = [];
+  const files = [];
+  const walk = (dir) => {
+    for (const d of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, d.name);
+      if (d.isDirectory()) walk(path);
+      else if (/\.(js|mjs)$/.test(d.name) && !/\.test\./.test(d.name)) files.push(path);
+    }
+  };
+  walk(join(root, 'lib'));
+  for (const d of readdirSync(join(root, 'public'))) if (/\.js$/.test(d)) files.push(join(root, 'public', d));
+  for (const f of files) {
+    const text = readFileSync(f, 'utf8');
+    for (const m of text.matchAll(/class(?:Name)?\s*=\s*\\?["'`]([^"'`\\]*)/g)) {
+      const tokens = m[1].replace(/\$\{[^}]*\}/g, ' ').split(/\s+/).filter((t) => /^-?[_a-zA-Z][\w-]*$/.test(t));
+      if (tokens.length) sets.push(new Set(tokens));
+    }
+  }
+  return sets;
+}
+
+// Could an element carry every class `moved` names and every class `other` names in its last compound? A selector with
+// no class in its last compound (`img`, `button.x` without a class, `:root`) cannot be ruled out: true.
+export function canLand(moved, other, sets, known) {
+  const lastOf = (sel) => sel.split(/\s+|>|\+|~/).filter(Boolean).pop() ?? '';
+  // Two last compounds that name different element types cannot match one element (`code` and `h1`).
+  const tagOf = (compound) => compound.match(/^[a-z][\w-]*/i)?.[0].toLowerCase() ?? null;
+  const tagA = tagOf(lastOf(moved));
+  const tagB = tagOf(lastOf(other));
+  if (tagA && tagB && tagA !== tagB) return false;
+  const need = [...classesOf(moved)];
+  const last = lastOf(other);
+  const otherNeed = [...classesOf(last)];
+  if (!otherNeed.length) return true;
+  if (!need.length) return true;
+  if ([...need, ...otherNeed].some((c) => !known.has(c))) return true;
+  return sets.some((set) => need.every((c) => set.has(c)) && otherNeed.every((c) => set.has(c)));
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (process.argv[2] === '--flips') {
     const [baseRoot, headRoot] = [process.argv[3], process.argv[4]];
     const lists = [...new Set([...pageLists(baseRoot), ...pageLists(headRoot)].map((l) => l.join(' ')))].map((l) => l.split(' '));
     const report = {};
+    const sets = emittedClassSets(headRoot);
+    const known = new Set(sets.flatMap((set) => [...set]));
     for (const names of lists) {
-      const pairs = flippedPairs(baseRoot, headRoot, names);
+      const pairs = flippedPairs(baseRoot, headRoot, names).filter((p) => canLand(p.a, p.b, sets, known) || canLand(p.b, p.a, sets, known));
       if (pairs.length) report[names.join(' ')] = pairs;
     }
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);

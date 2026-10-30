@@ -11,20 +11,20 @@
   /* LIN-3958: the lede is human prose, so the sans face in --fg-dim. The Plain prose rule does not reach it
      (it is classed), so the face is set here. */
   font-family: var(--font-content);
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .sg-name {
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
-  color: var(--fg);
+  color: var(--text);
 }
 
 .sg-value {
   display: block;
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 /* Grid of swatch figures (color / radius / elevation) */
@@ -52,14 +52,14 @@
 .sg-chip--border {
   border-style: solid;
   border-width: 3px;
-  background: var(--bg-muted);
+  background: var(--card);
 }
 
 .sg-box {
   width: 100%;
   height: 3.5rem;
-  background: var(--bg-muted);
-  border: 1px solid var(--border);
+  background: var(--card);
+  border: 1px solid var(--line);
 }
 
 /* Vertical stacks (typography, spacing, glyphs) */
@@ -79,7 +79,7 @@
 .sg-font-sample {
   margin: 0;
   margin-left: 0;
-  color: var(--fg);
+  color: var(--text);
   flex: 1;
 }
 
@@ -103,7 +103,7 @@
 
 .sg-glyph-label {
   font-family: var(--font-content);
-  color: var(--fg);
+  color: var(--text);
   min-width: 8rem;
 }
 
@@ -118,7 +118,7 @@
   width: 9rem;
   padding: var(--space-2);
   background: var(--bg);
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-md);
 }
@@ -126,8 +126,8 @@
 .sg-tree {
   margin-top: var(--space-3);
   font-family: var(--font-structural);
-  color: var(--fg-dim);
-  background: var(--bg-alt);
+  color: var(--muted);
+  background: var(--inset);
   padding: var(--space-3);
   border-radius: var(--radius-md);
 }
@@ -169,8 +169,8 @@
 .sg-theme-panel {
   /* bg/fg come from the .theme-* class (or :root for the default panel). */
   background: var(--bg);
-  color: var(--fg);
-  border: 1px solid var(--border);
+  color: var(--text);
+  border: 1px solid var(--line);
   border-radius: var(--radius-md);
   padding: var(--space-3);
   display: flex;
@@ -181,7 +181,7 @@
 .sg-theme-label {
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
-  color: var(--fg-dim);
+  color: var(--muted);
   margin: 0;
 }
 
@@ -287,7 +287,7 @@
 .sg-settings-anatomy dt,
 .sg-settings-anatomy dd {
   font-family: var(--font-content);
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 .sg-settings-anatomy dd {
@@ -313,7 +313,7 @@
   margin: 0;
   font-family: var(--font-content);
   font-size: var(--font-size-sm);
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 /* LIN-3952: the pending bar sticks to the foot of Models while anything is staged. Its sample sits in a frame, not at the

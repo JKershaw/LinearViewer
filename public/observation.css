@@ -106,7 +106,7 @@
    the feed has presence and card titles get room to breathe without stretching
    to an unreadable line length. The mobile form (480px basis) is unchanged. */
 @media (min-width: 720px) {
-  .obs-page { max-width: 620px; padding-left: 1rem; padding-right: 1rem; }
+  .obs-page { max-width: 620px; padding-left: var(--space-3); padding-right: var(--space-3); }
 }
 
 /* ─── View header — title fused with the live indicator (LIN-927) ───────────── */
@@ -159,13 +159,13 @@
 /* Eyebrow section labels: uppercase, tracked, faint — the mockup's FILTER /
    ACTIVE headers with no container panel (theme §8). */
 .obs-eyebrow {
-  margin: 0 0 0.5rem;
+  margin: 0 0 var(--space-2);
   font-family: var(--font-content);
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 
 /* Active-section eyebrow live running count (LIN-929) — `Active · N running`.
@@ -173,7 +173,7 @@
    fact, so it takes the structural (mono) face per the type split. */
 .obs-active-count-n { font-family: var(--font-structural); }
 
-.obs-controls { display: flex; flex-direction: column; gap: 0.5rem; }
+.obs-controls { display: flex; flex-direction: column; gap: var(--space-2); }
 
 .obs-chips {
   display: flex;
@@ -227,7 +227,7 @@
   text-transform: none;
   letter-spacing: normal;
   font-weight: 500;
-  color: var(--fg-dim);
+  color: var(--muted);
 }
 .obs-rulings-kpis-link:hover { color: var(--brand-dim); }
 
@@ -239,18 +239,18 @@
   border: 1px solid var(--line);
   border-left: 3px solid var(--amber);
   border-radius: var(--radius-lg);
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-2);
   padding: 0.6rem 0.8rem;
   background: var(--raised);
 }
 .obs-ruling-head {
   font-family: var(--font-structural);
   font-size: 0.85rem;
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-bottom: 0.3rem;
 }
-.obs-ruling-issue { font-weight: 600; color: var(--fg); }
-.obs-ruling-ws { color: var(--fg-dim); }
+.obs-ruling-issue { font-weight: 600; color: var(--text); }
+.obs-ruling-ws { color: var(--muted); }
 .obs-ruling-question {
   font-family: var(--font-content);
   font-weight: 500;
@@ -262,7 +262,7 @@
   margin: 0 0 0.3rem;
 }
 .obs-ruling-cost {
-  color: var(--fg-dim);
+  color: var(--muted);
   font-size: 0.82rem;
   font-style: italic;
   margin: 0 0 0.3rem;
@@ -297,14 +297,14 @@
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--fg-dim);
+  color: var(--muted);
   margin: 0 0 0.2rem;
 }
 .obs-ruling-suggestion-reason {
   font-family: var(--font-content);
   font-size: 0.85rem;
   color: var(--text);
-  margin: 0 0 0.25rem;
+  margin: 0 0 var(--space-1);
   overflow-wrap: break-word;
 }
 .obs-ruling-suggestion-meta {
@@ -360,10 +360,10 @@
 .obs-ruling-answer-send:hover { background: color-mix(in srgb, var(--green) 22%, transparent); }
 .obs-ruling-answer-send:disabled { opacity: 0.5; cursor: default; }
 .obs-ruling-dismiss {
-  color: var(--fg-dim);
-  background: color-mix(in srgb, var(--fg-dim) 10%, transparent);
+  color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 10%, transparent);
 }
-.obs-ruling-dismiss:hover { background: color-mix(in srgb, var(--fg-dim) 20%, transparent); }
+.obs-ruling-dismiss:hover { background: color-mix(in srgb, var(--muted) 20%, transparent); }
 .obs-ruling-dismiss:disabled { opacity: 0.5; cursor: default; }
 
 /* Shelve (LIN-1727) — a designed defer, distinct from Dismiss: amber-toned
@@ -396,10 +396,10 @@
    override with the same brand accent .tabs__tab.is-active uses. */
 .obs-ruling-effect-flip {
   margin-top: 0.35rem;
-  color: var(--fg-dim);
-  background: color-mix(in srgb, var(--fg-dim) 10%, transparent);
+  color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 10%, transparent);
 }
-.obs-ruling-effect-flip:hover { background: color-mix(in srgb, var(--fg-dim) 20%, transparent); }
+.obs-ruling-effect-flip:hover { background: color-mix(in srgb, var(--muted) 20%, transparent); }
 .obs-ruling-effect-flip:disabled { opacity: 0.5; cursor: default; }
 .obs-ruling-effect-flip--active {
   color: var(--brand);
@@ -407,10 +407,10 @@
 }
 
 .obs-ruling-keep {
-  color: var(--fg-dim);
-  background: color-mix(in srgb, var(--fg-dim) 10%, transparent);
+  color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 10%, transparent);
 }
-.obs-ruling-keep:hover { background: color-mix(in srgb, var(--fg-dim) 20%, transparent); }
+.obs-ruling-keep:hover { background: color-mix(in srgb, var(--muted) 20%, transparent); }
 .obs-ruling-keep:disabled { opacity: 0.5; cursor: default; }
 
 /* Same 44px-ladder tap-target bump `.detail-toggle` gets at this breakpoint
@@ -434,7 +434,7 @@
 .obs-ruling-bulk-bar {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
   flex-wrap: wrap;
   margin: 0 0 0.6rem;
 }
@@ -467,7 +467,7 @@
   font-family: var(--font-structural);
   font-size: 0.78rem;
   color: var(--muted);
-  margin: 0 0 0.5rem;
+  margin: 0 0 var(--space-2);
 }
 /* Stop mirrors .obs-ruling-shelve's amber caution treatment (:409 above) --
    both halt/pause an otherwise-destructive-reaching action mid-flight,
@@ -514,7 +514,7 @@
   align-items: center;
   gap: 0.4rem;
   margin-top: 0.4rem;
-  padding: 0.5rem;
+  padding: var(--space-2);
   border: 1px dashed var(--line);
   border-radius: var(--radius-sm);
 }
@@ -576,7 +576,7 @@
      error=red, stale=slate) — no 5th colour. */
   border-left: 3px solid var(--line);
   border-radius: var(--radius-lg);
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-2);
   background: var(--raised);
   overflow: hidden;
   /* Quiet affordance polish (LIN-1225): the whole card head is clickable, so a
@@ -869,7 +869,7 @@
 .obs-context-note { margin: 0.2rem 0; font-size: 0.8rem; }
 
 .obs-task {
-  margin: 0.5rem 0;
+  margin: var(--space-2) 0;
   padding-left: 0.55rem;
   border-left: 2px solid var(--line-soft);
 }
@@ -963,7 +963,7 @@ a.obs-task-ident:hover { text-decoration: underline; }
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: 0.5rem;
+  gap: var(--space-2);
   padding: 0.3rem 0;
 }
 .obs-worker::before {
@@ -992,7 +992,7 @@ a.obs-task-ident:hover { text-decoration: underline; }
    above and below and remains continuous across the task block. A group of one
    is never wrapped, so single-run blocks are unchanged. The nested list needs
    its own reset — `.obs-worker-tree`'s does not inherit. */
-.obs-lineage { background: var(--card-h, transparent); border-radius: var(--radius-md); }
+.obs-lineage { background: var(--card-h); border-radius: var(--radius-md); }
 .obs-lineage-runs { list-style: none; margin: 0; padding: 0; }
 
 .obs-worker-node {
@@ -1085,7 +1085,7 @@ a.obs-task-ident:hover { text-decoration: underline; }
    `.segment-bar`/`.obs-progress` bar, which stays untouched. */
 .livebar {
   height: 4px;
-  margin-top: 0.25rem;
+  margin-top: var(--space-1);
   border-radius: var(--radius-sm);
   background: var(--raised);
   overflow: hidden;
@@ -1137,7 +1137,7 @@ a.obs-task-ident:hover { text-decoration: underline; }
   font-size: 0.82rem;
 }
 
-.obs-detail-block { margin: 0.25rem 0; }
+.obs-detail-block { margin: var(--space-1) 0; }
 .obs-detail-text { color: var(--muted); }
 
 /* Activity log (net-new): tool chips + a right-aligned duration column. */
@@ -1145,10 +1145,10 @@ a.obs-task-ident:hover { text-decoration: underline; }
 .obs-act {
   display: flex;
   align-items: baseline;
-  gap: 0.5rem;
+  gap: var(--space-2);
   padding: 0.1rem 0;
 }
-.obs-act-main { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.obs-act-main { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; gap: var(--space-1); }
 .obs-act-dur {
   flex: 0 0 auto;
   margin-left: auto;
@@ -1189,7 +1189,7 @@ a.obs-task-ident:hover { text-decoration: underline; }
 }
 .obs-error-cause { margin: 0; font-size: 0.82rem; color: var(--text); line-height: 1.35; }
 .obs-error-mark { color: var(--red-dim); font-weight: 600; margin-right: 0.2rem; }
-.obs-error-meta { margin: 0.25rem 0 0; display: flex; flex-wrap: wrap; gap: 0.9rem; font-size: 0.78rem; }
+.obs-error-meta { margin: var(--space-1) 0 0; display: flex; flex-wrap: wrap; gap: 0.9rem; font-size: 0.78rem; }
 .obs-error-rt { color: var(--muted); font-family: var(--font-structural); }
 .obs-err-action { color: var(--brand-dim); text-decoration: none; }
 .obs-err-action:hover { text-decoration: underline; }
@@ -1240,7 +1240,7 @@ a.obs-task-ident:hover { text-decoration: underline; }
 /* Archive pagination control (LIN-631). */
 .obs-archive-more {
   display: block;
-  margin: 0.5rem auto 0;
+  margin: var(--space-2) auto 0;
   padding: 0.3rem 0.9rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -1280,12 +1280,12 @@ a.obs-task-ident:hover { text-decoration: underline; }
   font-family: var(--font-structural);
   font-size: 0.78rem;
   color: var(--muted);
-  margin: 0 0 0.5rem;
+  margin: 0 0 var(--space-2);
 }
 .obs-due-row {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
   flex-wrap: wrap;
   padding: 0.4rem 0;
   border-bottom: 1px solid var(--line-soft);
@@ -1305,7 +1305,7 @@ a.obs-task-ident:hover { text-decoration: underline; }
 }
 .obs-due-status { color: var(--muted); }
 .obs-due-row.obs-due-yes .obs-due-status { color: var(--amber); }
-.obs-due-row.obs-due-error .obs-due-status { color: var(--danger, #c0392b); }
+.obs-due-row.obs-due-error .obs-due-status { color: var(--red-dim); }
 .obs-due-retry {
   margin-left: auto;
   padding: 0.15rem 0.6rem;
@@ -1327,7 +1327,7 @@ a.obs-task-ident:hover { text-decoration: underline; }
 .obs-bulk-scan-bar {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
   flex-wrap: wrap;
   margin: 0 0 0.6rem;
 }
@@ -1390,12 +1390,12 @@ a.obs-task-ident:hover { text-decoration: underline; }
 .obs-waiting[hidden] { display: none; }
 .obs-waiting {
   border-left: 4px solid var(--brand);
-  padding-left: 0.75rem;
+  padding-left: var(--space-2h);
   margin-bottom: 1.1rem;
 }
 .obs-waiting-rulings .obs-ruling-select { display: none; }
 .obs-waiting-run {
-  padding: 0.5rem 0;
+  padding: var(--space-2) 0;
   border-bottom: 1px solid var(--line);
   list-style: none;
 }
@@ -1431,7 +1431,7 @@ a.obs-task-ident:hover { text-decoration: underline; }
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-2);
 }
 .obs-filter-btn {
   display: inline-flex;

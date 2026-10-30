@@ -207,7 +207,7 @@
 
 /* Trailing timestamp, used by row/log-style turns. */
 .chat-msg__time {
-  color: var(--fg-dim);
+  color: var(--muted);
   flex-shrink: 0;
   font-size: var(--font-size-sm);
 }
@@ -242,7 +242,7 @@
 .chat-note {
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
-  color: var(--fg-dim);
+  color: var(--muted);
   padding-left: var(--space-2);
   white-space: pre-wrap;
   word-break: break-word;
@@ -253,7 +253,7 @@
 /* A blinking block cursor for a message body still being streamed into. */
 .chat-cursor::after {
   content: '▋';
-  color: var(--fg-vdim);
+  color: var(--faint);
   animation: chat-cursor-blink 1s step-start infinite;
 }
 @keyframes chat-cursor-blink {
@@ -273,7 +273,7 @@
 .chat-options-caption {
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
-  color: var(--fg-dim);
+  color: var(--muted);
   margin-bottom: var(--space-1);
 }
 .chat-options--readonly .chat-options-caption {
@@ -287,7 +287,7 @@
 .chat-option-btn {
   background: var(--card);
   border: 1px solid var(--line);
-  color: var(--fg);
+  color: var(--text);
   padding: 0.3rem var(--space-3);
   font-family: var(--font-content);
   font-size: var(--font-size-sm);
@@ -344,7 +344,7 @@
 .chat-fold {
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
-  color: var(--fg-dim);
+  color: var(--muted);
   padding-left: var(--space-2);
 }
 .chat-tool-row summary,
@@ -360,15 +360,15 @@
 }
 .chat-tool-group[data-has-error] > details > summary,
 .chat-tool-row[data-error] > details > summary {
-  color: var(--red, var(--fg-dim));
+  color: var(--red);
 }
 .chat-tool-body pre {
-  margin: 0.25rem 0;
+  margin: var(--space-1) 0;
   max-height: 14rem;
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-word;
 }
 .chat-fold { padding-left: 0; font-family: inherit; font-size: inherit; color: inherit; }
-.chat-fold > summary { color: var(--fg-dim); font-size: var(--font-size-sm); margin: 0.25rem 0; }
+.chat-fold > summary { color: var(--muted); font-size: var(--font-size-sm); margin: var(--space-1) 0; }
 .chat-task-link { text-decoration: underline; }
