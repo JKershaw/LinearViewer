@@ -35,14 +35,16 @@ async function taskPage(page, identifier, query = '') {
 }
 
 test.describe('LIN-4049 — Home for a parent whose Todo child runs (c)', () => {
-  test('the parent\'s Home row reads running, and the top task offers no run while its subtask runs', async ({ page, localWorkerUrlKey }) => {
+  test('the parent\'s Home row reads running; Home\'s top card is its running subtask, which offers no run', async ({ page, localWorkerUrlKey }) => {
     await seedLocalWorkspace(page, homeSubtreeLocalSeed(localWorkerUrlKey), { urlKey: localWorkerUrlKey, runnerKey: true });
     await seedSessionOnTask(page, localWorkerUrlKey, { identifier: 'LOCAL-71', state: 'running' });
     await page.goto(`/workspace/${URL_KEY}/`);
     await page.waitForLoadState('networkidle');
     // The parent's In Progress row carries the state its subtask runs.
     await expect(page.locator('[data-identifier="LOCAL-70"]').first()).toContainText('running');
-    // Home's opened box is the top task only. For this shape the top task is the running subtask; no run is offered on it.
+    // Home's opened box is its top card, and in this shape the top card is the subtask: the ranking puts the Todo subtask
+    // above its started parent with or without the subtask's session (probe, LIN-4049 review 2). So Home never opens the
+    // parent's own box here; the parent's box is witnessed on its task page in (e). The subtask's box offers no run.
     await expect(page.locator('[data-top-task="1"]')).toHaveAttribute('data-identifier', 'LOCAL-71');
     await expect(page.locator('.opened-task [data-testid="opened-task-go"]'), 'no run while the subtask runs').toHaveCount(0);
   });
@@ -95,13 +97,16 @@ test.describe('LIN-4049 — a Backlog parent with a started child and a running 
     await expect(parent.run).toHaveCount(0);
   });
 
-  test('under ?assignee=me the parent still reads running: the index is built before the filter', async ({ page, localWorkerUrlKey }) => {
+  test('under ?assignee=me the parent still reads running on Home: the index is built before the filter', async ({ page, localWorkerUrlKey }) => {
     await seedLocalWorkspace(page, subtreeLocalSeed(localWorkerUrlKey), { urlKey: localWorkerUrlKey, runnerKey: true });
     await seedSessionOnTask(page, localWorkerUrlKey, { identifier: 'LOCAL-92', state: 'running' });
     // The viewer is assigned to the started child (LOCAL-91), not to the running Todo child (LOCAL-92), which the filter drops.
     await page.goto(`/workspace/${URL_KEY}/?assignee=me`);
     await page.waitForLoadState('networkidle');
     await expect(page.locator('[data-identifier="LOCAL-92"]'), 'the running child is filtered out of the view').toHaveCount(0);
+    // The witness is Home's own row for the parent, the surface the filter applies to. The task page never applies it.
+    await expect(page.locator('[data-identifier="LOCAL-90"]').first(), 'the parent row reads running under the filter').toContainText('running');
+    // The task page's own check, under the same filter, is secondary: it shows the page reads the same subtree.
     const parent = await taskPage(page, 'LOCAL-90', '?assignee=me');
     await expect(parent.pill).toHaveText('running');
     await expect(parent.run).toHaveCount(0);
