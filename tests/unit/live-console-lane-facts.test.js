@@ -136,6 +136,42 @@ describe('lane facts: title, stage, and the words of a wait', () => {
     assert.equal(waits[0].id, 'd:B:waiting');
     assert.equal(waits[0].summary, 'Need a decision on the schema', 'the folded row keeps the status row\'s words');
   });
+
+  test('LIN-4035: a derived row folded by the same run carries foldedFrom, the status row\'s id', () => {
+    const loops = [run({ loopId: 'B', agentState: 'waiting', wakeMarker: 'blocked', wakeAt: at(4), waitingMessage: 'Q?' })];
+    const statusItems = [{
+      id: 'st-b', dispatchId: 'B', taskIdentifier: 'LIN-9', action: 'implementation', status: 'blocked',
+      summary: 'Need a decision on the schema', timestamp: at(2), workspaceUrlKey: 'acme', workspaceName: 'Acme',
+    }];
+    const { events, statusEvents } = buildConsoleEvents({ statusItems, loops, derivedSinceMs: NOW - 86_400_000, superseded: computeSupersededLoopIds(loops) });
+    const wait = events.find(e => e.id === 'd:B:waiting');
+    assert.ok(wait && statusEvents.length === 1);
+    assert.equal(wait.foldedFrom, statusEvents[0].id);
+  });
+
+  test('LIN-4035: a derived row folded by ownedBy (status row with another dispatchId) carries foldedFrom too', () => {
+    const loops = [run({
+      loopId: 'B', agentState: 'waiting', wakeMarker: 'blocked', wakeAt: at(4), waitingMessage: 'Q?',
+      agentTimestamp: at(2), agentAction: 'implementation', agentSummary: 'Need a decision on the schema',
+    })];
+    const statusItems = [{
+      id: 'st-own', dispatchId: 'OTHER', taskIdentifier: 'LIN-9', action: 'implementation', status: 'blocked',
+      summary: 'Need a decision on the schema', timestamp: at(2), workspaceUrlKey: 'acme', workspaceName: 'Acme',
+    }];
+    const { events, statusEvents } = buildConsoleEvents({ statusItems, loops, derivedSinceMs: NOW - 86_400_000, superseded: computeSupersededLoopIds(loops) });
+    const wait = events.find(e => e.id === 'd:B:waiting');
+    assert.ok(wait, 'the derived row is there');
+    assert.equal(events.filter(e => e.kind === 'blocked').length, 1, 'the status row folded away');
+    assert.equal(wait.foldedFrom, statusEvents[0].id, 'the link is the status row\'s id, whichever fold rule matched');
+  });
+
+  test('LIN-4035: a derived row that folded nothing has no foldedFrom', () => {
+    const loops = [run({ loopId: 'B', agentState: 'waiting', wakeMarker: 'blocked', wakeAt: at(4), waitingMessage: 'Q?' })];
+    const { events } = buildConsoleEvents({ statusItems: [], loops, derivedSinceMs: NOW - 86_400_000, superseded: computeSupersededLoopIds(loops) });
+    const wait = events.find(e => e.id === 'd:B:waiting');
+    assert.ok(wait);
+    assert.equal(wait.foldedFrom, undefined);
+  });
 });
 
 describe('the stage walk: a lane says the stage the session is in', () => {

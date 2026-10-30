@@ -27,14 +27,21 @@ async function clearFeed(page, key) {
   await page.request.get(`/test/clear-proxy-events?urlKey=${key}`);
 }
 
+// LIN-4035: the activity section starts collapsed. A spec that reads the stream opens it
+// through the same remembered choice a viewer's browser would hold. Call it before the
+// first navigation to the page; the init script applies to every page load after it.
+async function openActivity(page) {
+  await page.addInitScript(() => { try { window.localStorage.setItem('live-console-activity', 'open'); } catch (_) {} });
+}
+
 // LIN-1588: drive a RUNNING loop that carries a credential identity.
 // `/test/seed-agent-status` forwards tokenId/tokenLabel (widened for this
 // ticket), and the loop reconstruction lifts them onto the loop as
 // agentTokenId/agentTokenLabel — the only way an E2E can produce a non-null
 // agentTokenId, since NODE_ENV=test short-circuits the real 503 path.
-async function seedRunningLoopWithToken(page, key, { task, tokenId = null, tokenLabel = null }) {
+async function seedRunningLoopWithToken(page, key, { task, tokenId = null, tokenLabel = null, issueTitle = `${task} worker` }) {
   const worker = await page.request.post(`/workspace/${key}/api/dispatch`, {
-    data: { prompt: 'implement', promptName: 'implementation', kind: 'implementation', issueIdentifier: task, issueTitle: `${task} worker`, target: 'cli' },
+    data: { prompt: 'implement', promptName: 'implementation', kind: 'implementation', issueIdentifier: task, issueTitle, target: 'cli' },
   });
   expect(worker.status(), `worker seed failed: ${await worker.text()}`).toBe(201);
   const workerId = (await worker.json()).item.id;
@@ -248,6 +255,8 @@ test.describe('Live Console (experimental)', () => {
 
     test('shows the empty states with no activity in a fresh workspace', async ({ page }) => {
       // The poll runs on load; with no agent-status entries both empty states show.
+      // The activity section starts collapsed (LIN-4035), so open it to reach its empty state.
+      await page.getByTestId('live-console-activity-toggle').click();
       await expect(page.locator('#live-console-lanes-empty')).toBeVisible();
       await expect(page.locator('#live-console-stream-empty')).toBeVisible();
     });
@@ -303,6 +312,7 @@ test.describe('Live Console (experimental)', () => {
 
   test.describe('Live data', () => {
     test('renders seeded events with click-through to the task page (no run behind them)', async ({ page }) => {
+      await openActivity(page);
       await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
       await clearFeed(page, URL_KEY);
       await page.request.post('/test/seed-agent-status', {
@@ -325,6 +335,7 @@ test.describe('Live Console (experimental)', () => {
     });
 
     test('a running worker becomes a heartbeat lane and its [evidence] a stream event', async ({ page }) => {
+      await openActivity(page);
       await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
       await clearFeed(page, URL_KEY);
 
@@ -432,6 +443,7 @@ test.describe('Live Console (experimental)', () => {
     });
 
     test('a stale "working" entry drops off the lanes but still shows in the stream', async ({ page }) => {
+      await openActivity(page);
       await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
       await clearFeed(page, URL_KEY);
       const now = Date.now(), min = 60 * 1000;
@@ -452,6 +464,7 @@ test.describe('Live Console (experimental)', () => {
     });
 
     test('"view earlier activity" pages older events into the history region', async ({ page }) => {
+      await openActivity(page);
       await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
       await clearFeed(page, URL_KEY);
 
@@ -479,10 +492,9 @@ test.describe('Live Console (experimental)', () => {
 
       // And the client's "view earlier activity" control drives the same path.
       const moreBtn = page.locator('[data-testid="live-console-more"]');
-      if (await moreBtn.isVisible()) {
-        await moreBtn.click();
-        await expect(page.locator('#live-console-history [data-testid="live-console-event"]').first()).toBeVisible();
-      }
+      await expect(moreBtn).toBeVisible();
+      await moreBtn.click();
+      await expect(page.locator('#live-console-history [data-testid="live-console-event"]').first()).toBeVisible();
     });
   });
 
@@ -1841,6 +1853,7 @@ test.describe('Live Console (experimental)', () => {
     // overlay at any 2px scroll offset. That is what goes red if a future
     // change floats something over this button again.
     test('the "view earlier activity" control never sits under any fixed overlay, at any scroll position', async ({ page }) => {
+      await openActivity(page);
       await page.goto(`/test/set-session?${featuresParam({ liveConsole: true, feedbackWidget: true })}&urlKey=${URL_KEY}`);
       await clearFeed(page, URL_KEY);
       await page.request.post('/test/seed-agent-status', {
@@ -1905,6 +1918,7 @@ test.describe('Live Console (experimental)', () => {
     // checked — a small instance of exactly the claim-without-grounding this
     // ticket family is about, so it is corrected rather than deleted quietly.
     test('the "view earlier activity" label stays on ONE line at 360px (LIN-2296, L2)', async ({ page }) => {
+      await openActivity(page);
       await page.goto(`/test/set-session?${featuresParam({ liveConsole: true, feedbackWidget: true })}&urlKey=${URL_KEY}`);
       await clearFeed(page, URL_KEY);
       await page.request.post('/test/seed-agent-status', {
@@ -1940,6 +1954,7 @@ test.describe('Live Console (experimental)', () => {
     // gate can never match is dead CSS that still reads as a live width
     // constraint on this container.
     test('`.lc-more` reserves nothing, with the widget on', async ({ page }) => {
+      await openActivity(page);
       await page.goto(`/test/set-session?${featuresParam({ liveConsole: true, feedbackWidget: true })}&urlKey=${URL_KEY}`);
       await clearFeed(page, URL_KEY);
       await page.request.post('/test/seed-agent-status', {
@@ -1964,16 +1979,17 @@ test.describe('Live Console (experimental)', () => {
   // scope switch, the bar's keyboard path and the range controls' visible names.
   test.describe('LIN-3977: run links, motion, scope and phone', () => {
     test.beforeEach(async ({ page }) => {
+      await openActivity(page);
       await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
       await clearFeed(page, URL_KEY);
     });
 
-    test('a lane, a timeline bar and a stream row about a run each link to its run page, which returns 200', async ({ page }) => {
+    test('a lane, a timeline bar and a stream row\'s run link each reach the run page, which returns 200', async ({ page }) => {
       await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9301' });
       await page.goto(PAGE_URL);
       const lane = page.locator('[data-testid="live-console-lane"] a.lc-lane-run').first();
       const bar = page.locator('[data-testid="live-console-timeline-bar"] a.lc-timeline-bar-label').first();
-      const row = page.locator('[data-testid="live-console-stream"] [data-testid="live-console-event"] a.lc-event-task').first();
+      const row = page.locator('[data-testid="live-console-stream"] [data-testid="live-console-event"] a.lc-event-run').first();
       const runPath = new RegExp(`^/workspace/${URL_KEY}/observation/session/[^/]+$`);
       for (const link of [lane, bar, row]) {
         await expect(link).toHaveAttribute('href', runPath);
@@ -1981,6 +1997,9 @@ test.describe('Live Console (experimental)', () => {
         const response = await page.request.get(href);
         expect(response.status(), `${href} should open the run`).toBe(200);
       }
+      // The identifier on the same row goes to the task page, not the run (LIN-4035).
+      const task = page.locator('[data-testid="live-console-stream"] [data-testid="live-console-event"] a.lc-event-task').first();
+      await expect(task).toHaveAttribute('href', new RegExp(`^/workspace/${URL_KEY}/task/LIN-9301`));
     });
 
     test('switching reduced motion on while the page is open stops the strip and the lane pulse', async ({ page }) => {
@@ -2084,15 +2103,16 @@ test.describe('Live Console (experimental)', () => {
         await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9310' });
         await page.goto(PAGE_URL);
         await barLink(page).hover();
-        await expect(detail(page)).toContainText('LIN-9310 — Build');
-        await expect(detail(page).locator('a.lc-timeline-detail-link')).toHaveAttribute('href', new RegExp(`/observation/session/`));
+        await expect(detail(page)).toContainText('LIN-9310 · LIN-9310 worker — Build');
+        await expect(detail(page).locator('a.lc-timeline-detail-link').first()).toHaveAttribute('href', new RegExp(`/observation/session/`));
+        await expect(detail(page).locator('a.lc-timeline-detail-task')).toHaveAttribute('href', new RegExp(`/workspace/${URL_KEY}/task/LIN-9310`));
       });
 
       test('focusing a bar by keyboard names it in the detail line', async ({ page }) => {
         await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9311' });
         await page.goto(PAGE_URL);
         await barLink(page).focus();
-        await expect(detail(page)).toContainText('LIN-9311 — Build');
+        await expect(detail(page)).toContainText('LIN-9311 · LIN-9311 worker — Build');
       });
 
       test('a mouse click on a bar opens its run', async ({ page }) => {
@@ -2110,7 +2130,7 @@ test.describe('Live Console (experimental)', () => {
           a.click();
         });
         await touchTap();
-        await expect(detail(page)).toContainText('LIN-9312 — Build');
+        await expect(detail(page)).toContainText('LIN-9312 · LIN-9312 worker — Build');
         expect(page.url(), 'the first tap only reads the bar').toContain(PAGE_URL);
         await Promise.all([page.waitForURL(/\/observation\/session\//), touchTap()]);
       });
@@ -2162,6 +2182,120 @@ test.describe('Live Console (experimental)', () => {
       await expect(strip).toHaveText('Strip');
       await expect(timeline).toBeVisible();
       await expect(timeline).toHaveText('Timeline');
+    });
+  });
+  // LIN-4035: the activity section starts collapsed on every width, opening it shows the
+  // current list with no extra request, the remembered choice survives a reload, and the
+  // stream's identifier, run and title follow the one link rule.
+  test.describe('LIN-4035: activity collapsed, one link rule, the title on the row', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
+      await clearFeed(page, URL_KEY);
+    });
+
+    for (const [label, width] of [['390px', 390], ['1280px', 1280]]) {
+      test(`the activity section is collapsed on load at ${label}, with its heading saying so`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 844 });
+        await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9320' });
+        await page.goto(PAGE_URL);
+        await expect(page.getByTestId('live-console-lane').first()).toBeVisible();
+        await expect(page.getByTestId('live-console-activity-toggle')).toHaveAttribute('aria-expanded', 'false');
+        await expect(page.getByTestId('live-console-activity-body')).toBeHidden();
+        await expect(page.getByTestId('live-console-more')).toBeHidden();
+      });
+    }
+
+    test('opening the section shows the current list with no extra request to the feed', async ({ page }) => {
+      await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9321' });
+      // Register for the first poll before navigating, so it cannot land unseen.
+      const firstPoll = page.waitForResponse(r => r.url().includes('/api/live-console/events'));
+      await page.goto(PAGE_URL);
+      await firstPoll;
+      // The next poll is five seconds away, so the window below holds no poll of its own.
+      const feedRequests = [];
+      page.on('request', (req) => { if (req.url().includes('/api/live-console/events')) feedRequests.push(req.url()); });
+      await page.getByTestId('live-console-activity-toggle').click();
+      await expect(page.getByTestId('live-console-activity-body')).toBeVisible();
+      await expect(page.getByTestId('live-console-event').first()).toBeVisible();
+      await page.waitForTimeout(400);
+      expect(feedRequests, 'opening the section made no request to the events feed').toEqual([]);
+    });
+
+    test('a reload keeps the choice the viewer made, open or closed', async ({ page }) => {
+      await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9322' });
+      await page.goto(PAGE_URL);
+      const toggle = page.getByTestId('live-console-activity-toggle');
+      await toggle.click();
+      await page.reload();
+      await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      await expect(page.getByTestId('live-console-activity-body')).toBeVisible();
+      await toggle.click();
+      await page.reload();
+      await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      await expect(page.getByTestId('live-console-activity-body')).toBeHidden();
+    });
+
+    test('"N new" counts events that arrive after load, and stays hidden until one does', async ({ page }) => {
+      await page.goto(PAGE_URL);
+      await expect(page.getByTestId('live-console-banner')).toBeVisible();
+      const count = page.getByTestId('live-console-activity-new');
+      await expect(count).toBeHidden();
+      await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9323' });
+      await expect(count).toHaveText(/^· [1-9]\d* new$/, { timeout: 12_000 });
+      await page.getByTestId('live-console-activity-toggle').click();
+      await expect(count, 'opening the section does not clear the count').toHaveText(/^· [1-9]\d* new$/);
+    });
+
+    test('a stream row names its task, and its run is a separate "run ↗" link', async ({ page }) => {
+      await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9324' });
+      await page.goto(PAGE_URL);
+      await page.getByTestId('live-console-activity-toggle').click();
+      const row = page.getByTestId('live-console-event').filter({ has: page.locator('a.lc-event-run') }).first();
+      await expect(row.locator('a.lc-event-task')).toHaveAttribute('href', new RegExp(`/workspace/${URL_KEY}/task/LIN-9324`));
+      const run = row.locator('a.lc-event-run');
+      await expect(run).toHaveText('run ↗');
+      await expect(run).toHaveAttribute('href', /\/observation\/session\//);
+    });
+
+    test('the title shows on the stream row at 1280px and is hidden at 390px, while the task link still carries it', async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9325' });
+      await page.goto(PAGE_URL);
+      await page.getByTestId('live-console-activity-toggle').click();
+      const title = page.getByTestId('live-console-event-title').filter({ hasText: 'LIN-9325 worker' }).first();
+      await expect(title).toBeVisible();
+      await page.setViewportSize({ width: 390, height: 844 });
+      await expect(title).toBeHidden();
+      await expect(page.locator('a.lc-event-task', { hasText: 'LIN-9325' }).first()).toHaveAttribute('aria-label', 'LIN-9325 · LIN-9325 worker');
+    });
+
+    test('at 390px a long lane title sits on its own line under the identifier, clamped to two lines', async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      const longTitle = 'Pick the sign-in method and write the migration notes for the team and the people who run the release';
+      await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9326', issueTitle: longTitle });
+      await page.goto(PAGE_URL);
+      const lane = page.getByTestId('live-console-lane').filter({ hasText: 'LIN-9326' });
+      const title = lane.locator('.lc-lane-title');
+      await expect(title).toHaveText(longTitle);
+      const task = await lane.locator('.lc-lane-task').boundingBox();
+      const box = await title.boundingBox();
+      expect(box.y, 'the title starts below the identifier, on its own line').toBeGreaterThanOrEqual(task.y + task.height - 1);
+      expect(box.height, `the title is ${Math.round(box.height)}px tall: more than one line`).toBeGreaterThan(20);
+      expect(box.height, `the title is ${Math.round(box.height)}px tall: clamped to two lines`).toBeLessThan(50);
+    });
+
+    test('every link whose text is a bare identifier goes to a task page: lanes, stream rows and the bar detail', async ({ page }) => {
+      await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9327' });
+      await seedTerminalWorker(page, URL_KEY, { task: 'LIN-9328', message: '[done] shipped' });
+      await page.goto(PAGE_URL);
+      await page.getByTestId('live-console-activity-toggle').click();
+      await page.locator('[data-testid="live-console-timeline-bar"] a.lc-timeline-bar-label').first().hover();
+      await expect(page.getByTestId('live-console-timeline-detail').locator('a.lc-timeline-detail-task')).toHaveCount(1);
+      const hrefs = await page.$$eval('a', (links) => links
+        .filter(a => /^[A-Z][A-Z0-9]*-\d+$/.test(a.textContent.trim()))
+        .map(a => a.getAttribute('href')));
+      expect(hrefs.length, 'the sweep found identifier links to check').toBeGreaterThanOrEqual(3);
+      for (const href of hrefs) expect(href, 'an identifier link goes to the task page').toMatch(/\/task\/LIN-\d+/);
     });
   });
 });

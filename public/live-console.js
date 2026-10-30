@@ -86,6 +86,9 @@
     history: document.getElementById('live-console-history'),
     more: document.getElementById('live-console-more'),
     moreBtn: document.getElementById('live-console-more-btn'),
+    activityToggle: document.getElementById('live-console-activity-toggle'),
+    activityBody: document.getElementById('live-console-activity-body'),
+    activityNew: document.getElementById('live-console-activity-new'),
   };
 
   // ─── State ────────────────────────────────────────────────────────────────
@@ -141,6 +144,15 @@
   let failures = 0;
   let pollTimer = null;
   let tickTimer = null;
+  // LIN-4035: the activity section. One storage key per browser holds the viewer's
+  // open/closed choice; the section starts collapsed unless that choice says open.
+  // "N new" counts arrivals after the first feed, cumulatively for the page session.
+  const ACTIVITY_KEY = 'live-console-activity';
+  const ACTIVITY_SEEN_CAP = 2000;       // bounds the ever-seen set (the page is left open all day)
+  let activityOpen = false;
+  let activityBaselined = false;        // the first feed is the baseline and never counts
+  let activityNew = 0;
+  const activitySeenEver = new Set();   // every event id the page has counted or seen, in insertion order
 
   const esc = (s) => (window.escapeHtml ? window.escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s));
   const rel = (iso) => (window.relativeTime ? window.relativeTime(iso) : '');
@@ -239,22 +251,33 @@
   }
   // LIN-3977: the detail line under the timeline names the bar it shows in words:
   // identifier, stage, ticket progress and check-ins, with the run's own link.
+  // LIN-4035: "ID · title — stage · …". The identifier links to the task page, and
+  // the line ends with both "open run →" and "open task →". Text nodes only, so a
+  // title is never parsed as markup.
+  function detailLink(className, href, text) {
+    const a = document.createElement('a');
+    a.className = className;
+    a.setAttribute('href', href);
+    a.textContent = text;
+    return a;
+  }
   function showBarDetail(div) {
     const el = els.timelineDetail;
     const run = div && div._run;
     if (!el || !run) return;
-    const parts = [`${run.issueIdentifier || '?'} — ${timelineLabel(run)}`];
-    if (run.ticketWalk && run.ticketWalk.length) parts.push(ticketProgressText(run.ticketWalk));
-    if (run.wakeCount > 0) parts.push(`${run.wakeCount} check-ins`);
-    el.textContent = parts.join(' · ');
-    const href = div.firstElementChild && div.firstElementChild.getAttribute('href');
-    if (href) {
-      const open = document.createElement('a');
-      open.className = 'lc-timeline-detail-link';
-      open.setAttribute('href', href);
-      open.textContent = 'open run →';
-      el.append(' ', open);
-    }
+    const identifier = run.issueIdentifier || '?';
+    const stage = timelineLabel(run);
+    const taskHref = window.taskPageHref({ urlKey: run.workspaceUrlKey, identifier: run.issueIdentifier, source: run.issueSource });
+    const runHref = div.firstElementChild && div.firstElementChild.getAttribute('href');
+    const tail = [];
+    if (run.ticketWalk && run.ticketWalk.length) tail.push(ticketProgressText(run.ticketWalk));
+    if (run.wakeCount > 0) tail.push(`${run.wakeCount} check-ins`);
+    el.textContent = '';
+    el.append(taskHref ? detailLink('lc-timeline-detail-task', taskHref, identifier) : identifier);
+    el.append(run.title ? ` · ${run.title} — ${stage}` : ` — ${stage}`);
+    if (tail.length) el.append(` · ${tail.join(' · ')}`);
+    if (runHref) el.append(' ', detailLink('lc-timeline-detail-link', runHref, 'open run →'));
+    if (taskHref) el.append(' ', detailLink('lc-timeline-detail-link', taskHref, 'open task →'));
   }
   function timelineBarNode(run) {
     const div = document.createElement('div');
@@ -1219,6 +1242,7 @@
         <span class="lc-lane-bar" aria-hidden="true"></span>
         <span class="lc-lane-head">
           <a class="lc-lane-task" data-testid="live-console-lane-task" href="#"></a>
+          <span class="lc-lane-title-sep" aria-hidden="true" hidden>·</span>
           <span class="lc-lane-title" data-testid="live-console-lane-title"></span>
           <a class="lc-lane-run" data-testid="live-console-lane-run" href="#" hidden>open run ↗</a>
           <span class="lc-lane-ws"></span>
@@ -1272,9 +1296,14 @@
       task.removeAttribute('href');
       task.removeAttribute('title');
     }
+    // LIN-4035: the lane reads "ID · title". The separator is its own node, so the
+    // title's text stays the title alone, and it hides with the title.
     const title = li.querySelector('.lc-lane-title');
     title.textContent = lane.title || '';
     title.hidden = !lane.title;
+    if (lane.title) title.setAttribute('title', lane.title);
+    else title.removeAttribute('title');
+    li.querySelector('.lc-lane-title-sep').hidden = !lane.title;
     const runHref = window.runPageHref(lane.workspaceUrlKey, lane.sessionId);
     const run = li.querySelector('.lc-lane-run');
     if (runHref) {
@@ -1328,8 +1357,9 @@
   // lane renderer's own consts (CRED_TEXT/CRED_TITLE) are initialised, so a
   // node:vm-sandboxed test can drive `updateLaneNode` directly — including the
   // LIN-3331 task-page link's show/hide-on-repaint path — without a full page.
+  // LIN-4035 adds the stream row's markup and the activity section's state.
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { updateLaneNode };
+    module.exports = { updateLaneNode, eventRowHtml, showBarDetail, readActivityOpen, setActivityOpen, countActivityArrivals };
   }
   function paintLanes(lanes) {
     if (!els.lanes) return;
@@ -1352,18 +1382,26 @@
   }
 
   // ─── Events (immutable; insert new, trim, keep continuity) ──────────────────
-  function eventNode(ev, isNew) {
+  // LIN-4035 (one link rule): the identifier always names the task. It links to the
+  // task page, with the event's own `issueSource` so a mixed-kind workspace opens the
+  // right binding, or it is plain text when there is no task page. The run is a
+  // separate link, labelled "run ↗", when the row has a session. The title is text
+  // only (esc): clipped on desktop, hidden under 560px, and kept in the task link's
+  // title and aria-label either way.
+  function eventRowHtml(ev, isNew) {
     const k = kindOf(ev.kind);
     const cls = 'lc-event' + (isNew && !reducedMotion ? ' lc-event--new' : '');
-    // A row about a run links to its run page; a row with no run links to its task.
-    const runHref = window.runPageHref(ev.workspaceUrlKey, ev.sessionId);
-    const taskHref = runHref ? '' : window.taskPageHref({ urlKey: ev.workspaceUrlKey, identifier: ev.task });
+    const taskHref = ev.task ? window.taskPageHref({ urlKey: ev.workspaceUrlKey, identifier: ev.task, source: ev.issueSource }) : '';
+    const taskLabel = ev.title ? `${ev.task} · ${ev.title}` : ev.task;
     let taskHtml = '';
+    let titleHtml = '';
     if (ev.task) {
-      if (runHref) taskHtml = `<a class="lc-event-task" href="${esc(runHref)}" title="open the run for ${esc(ev.task)}">${esc(ev.task)}</a>`;
-      else if (taskHref) taskHtml = `<a class="lc-event-task" href="${esc(taskHref)}" title="open ${esc(ev.task)} in its task page">${esc(ev.task)}</a>`;
+      if (taskHref) taskHtml = `<a class="lc-event-task" href="${esc(taskHref)}" title="${esc(`open ${taskLabel} in its task page`)}" aria-label="${esc(taskLabel)}">${esc(ev.task)}</a>`;
       else taskHtml = `<span class="lc-event-task">${esc(ev.task)}</span>`;
+      if (ev.title) titleHtml = `<span class="lc-event-title-sep" aria-hidden="true">·</span><span class="lc-event-title" data-testid="live-console-event-title" title="${esc(ev.title)}">${esc(ev.title)}</span>`;
     }
+    const runHref = window.runPageHref(ev.workspaceUrlKey, ev.sessionId);
+    const runHtml = runHref ? `<a class="lc-event-run" href="${esc(runHref)}" title="${esc(`open the run for ${ev.task || 'this activity'}`)}">run ↗</a>` : '';
     // A plain word for what happened (`actionWord`); the raw kind never shows.
     const word = ev.actionWord || ev.action;
     const action = word ? `<span class="lc-event-action">${esc(word)}</span>` : '';
@@ -1377,11 +1415,14 @@
     // LIN-3977: relative time, with the exact local time (zone named) on hover.
     const exact = window.exactLocalTime(ev.iso);
     const when = `<span class="lc-event-time" data-iso="${esc(ev.iso)}" title="${esc(exact)}">${esc(rel(ev.iso))}</span>`;
-    return nodeFromHtml(`<li class="${cls}" data-kind="${esc(ev.kind)}" data-testid="live-console-event">
+    return `<li class="${cls}" data-kind="${esc(ev.kind)}" data-testid="live-console-event">
         <span class="lc-event-glyph" aria-hidden="true">${esc(k.glyph)}</span>
-        <span class="lc-event-body">${taskHtml}${action}${summary}</span>
+        <span class="lc-event-body">${taskHtml}${titleHtml}${action}${summary}${runHtml}</span>
         <span class="lc-event-meta">${ws}${when}</span>
-      </li>`);
+      </li>`;
+  }
+  function eventNode(ev, isNew) {
+    return nodeFromHtml(eventRowHtml(ev, isNew));
   }
 
   function paintStream(events, newIds) {
@@ -1469,12 +1510,69 @@
     }
   }
 
+  // ─── Activity section (LIN-4035) ────────────────────────────────────────────
+  // The choice is per browser, not per workspace. Storage can throw (a private
+  // window, blocked site data), so every read and write is wrapped: a throwing read
+  // falls back to collapsed, and a throwing write leaves the toggle working for the
+  // rest of this page session.
+  function readActivityOpen() {
+    try { return window.localStorage.getItem(ACTIVITY_KEY) === 'open'; }
+    catch (_) { return false; }
+  }
+  function writeActivityOpen(open) {
+    try { window.localStorage.setItem(ACTIVITY_KEY, open ? 'open' : 'closed'); }
+    catch (_) { /* session-only: the toggle still works */ }
+  }
+  function paintActivity() {
+    if (els.activityToggle) els.activityToggle.setAttribute('aria-expanded', String(activityOpen));
+    if (els.activityBody) els.activityBody.hidden = !activityOpen;
+  }
+  // Opening or closing never touches polling, paging or the rendered rows: they
+  // keep running while the section is closed, so opening shows the current list.
+  function setActivityOpen(open) {
+    activityOpen = !!open;
+    paintActivity();
+    writeActivityOpen(activityOpen);
+  }
+  function paintActivityNew() {
+    if (!els.activityNew) return;
+    els.activityNew.hidden = activityNew === 0;
+    els.activityNew.textContent = activityNew > 0 ? `· ${activityNew} new` : '';
+  }
+  // Counts the event ids that arrive after the first feed. The first feed is the
+  // baseline, so opening the page never reads as activity, and a chip re-paint
+  // (animate false) never counts. The ever-seen set keeps an id that leaves the
+  // feed and comes back from being counted twice.
+  // A status row that a derived row covers (lib/live-console.js folds them, by
+  // loop or by the run's own record) leaves the feed in the same poll the derived
+  // row arrives, under a different id. The server marks the derived row with
+  // foldedFrom, the id of the status row it replaces. That moment was counted when
+  // the status row came in, so a derived row whose foldedFrom was already seen
+  // does not count again.
+  function countActivityArrivals(events, animate) {
+    if (!animate) return;
+    const baseline = !activityBaselined;
+    activityBaselined = true;
+    for (const ev of events) {
+      if (activitySeenEver.has(ev.id)) continue;
+      activitySeenEver.add(ev.id);
+      const replacesCounted = ev.foldedFrom != null && activitySeenEver.has(ev.foldedFrom);
+      if (!baseline && !replacesCounted) activityNew += 1;
+    }
+    for (const id of activitySeenEver) {
+      if (activitySeenEver.size <= ACTIVITY_SEEN_CAP) break;
+      activitySeenEver.delete(id);
+    }
+    paintActivityNew();
+  }
+
   // ─── Apply a live feed (shared by poll + chip re-filter) ────────────────────
   function applyFeed(feed, animate) {
     if (firstPaint) { clearSkeleton(); firstPaint = false; }
     const events = Array.isArray(feed.events) ? feed.events : [];
     const newIds = new Set(animate ? events.filter(e => !seenEventIds.has(e.id)).map(e => e.id) : []);
     seenEventIds = new Set(events.map(e => e.id));
+    countActivityArrivals(events, animate);
     liveOldestTs = feed.oldestTs != null ? feed.oldestTs : liveOldestTs;
     liveHasMore = !!feed.hasMore;
     lastServerNow = feed.serverNow || lastServerNow;
@@ -1551,6 +1649,10 @@
   }
 
   if (els.moreBtn) els.moreBtn.addEventListener('click', loadMore);
+  // LIN-4035: the server HTML is collapsed; the viewer's remembered choice opens it here.
+  activityOpen = readActivityOpen();
+  paintActivity();
+  if (els.activityToggle) els.activityToggle.addEventListener('click', () => setActivityOpen(!activityOpen));
   buildChips();
   wireTimelineGestures();
   // LIN-3977: what kind of input the last press was, read by a bar's click (a touch

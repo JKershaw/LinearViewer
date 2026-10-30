@@ -141,6 +141,39 @@
 }
 .lc-section-mark { color: var(--brand); margin-right: 0.3rem; }
 
+/* LIN-4035: the activity heading is a disclosure button, collapsed on every width.
+   The caret turns to show the open state; "N new" counts arrivals since page load. */
+.lc-activity-toggle {
+  display: block;
+  width: 100%;
+  margin: 0 0 0.5rem;
+  padding: 0.2rem 0;
+  background: none;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+}
+.lc-activity-toggle:hover { color: var(--text); }
+.lc-activity-toggle:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.lc-activity-caret {
+  display: inline-block;
+  width: 0.9em;
+  margin-right: 0.15rem;
+  color: var(--brand);
+  transition: transform 0.15s ease;
+}
+.lc-activity-toggle[aria-expanded="true"] .lc-activity-caret { transform: rotate(90deg); }
+.lc-activity-new {
+  margin-left: 0.4rem;
+  color: var(--brand);
+  text-transform: none;
+  letter-spacing: 0;
+}
+/* LIN-4035: explicit, because the UA `hidden` style loses to these display rules
+   (`.lc-more` below is `display:flex`, and no global [hidden] rule exists). */
+.lc-activity-body[hidden],
+.lc-more[hidden] { display: none; }
+
 /* ── Swimlane timeline (LIN-1742 Phase 1 + LIN-1743 Phase 2: zoom/pan) ────── */
 .lc-timeline-section {
   margin-bottom: 1.75rem;
@@ -303,6 +336,15 @@
   font-family: var(--font-structural);
   white-space: nowrap;
 }
+/* LIN-4035: the identifier in the detail line links to the task page. */
+.lc-timeline-detail-task {
+  font-family: var(--font-structural);
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  text-decoration: none;
+}
+.lc-timeline-detail-task:hover { color: var(--brand-dim); text-decoration: underline; }
 .lc-timeline-bar[data-kind="working"] .lc-timeline-bar-label {
   color: rgba(0, 0, 0, 0.82);
   text-shadow: none;
@@ -493,6 +535,8 @@
   white-space: nowrap;
 }
 .lc-lane-title[hidden] { display: none; }
+.lc-lane-title-sep[hidden] { display: none; }
+.lc-lane-title-sep { font-family: var(--font-structural); font-size: 0.8rem; color: var(--muted); }
 .lc-lane-run {
   font-family: var(--font-structural);
   font-size: 0.72rem;
@@ -593,6 +637,28 @@
   text-decoration: none;
 }
 .lc-event-task:hover { color: var(--brand-dim); text-decoration: underline; }
+/* LIN-4035: the row's title is clipped on desktop, and hidden under 560px (see the
+   media block below); the task link carries it for a reader who cannot see it. */
+.lc-event-title-sep { font-family: var(--font-structural); font-size: 0.82rem; color: var(--slate-dim); }
+.lc-event-title {
+  font-family: var(--font-content);
+  font-size: 0.8rem;
+  color: var(--text);
+  min-width: 0;
+  max-width: 28rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* LIN-4035: a run is its own labelled link, apart from the task identifier. */
+.lc-event-run {
+  font-family: var(--font-structural);
+  font-size: 0.72rem;
+  color: var(--brand-dim);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.lc-event-run:hover { text-decoration: underline; }
 .lc-event-action {
   font-family: var(--font-structural);
   font-size: 0.72rem;
@@ -661,6 +727,22 @@
 
 @media (max-width: 560px) {
   .lc-lane-ws { display: none; }
+  /* LIN-4035: the lane header wraps, and the title takes its own line, clamped to
+     two lines, instead of ellipsising beside "open run ↗". */
+  .lc-lane-head { display: flex; flex-wrap: wrap; width: 100%; }
+  .lc-lane-title-sep { display: none; }
+  .lc-lane-title {
+    flex: 0 0 100%;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .lc-lane-title[hidden] { display: none; }
+  /* LIN-4035: the stream row's title is hidden here; the task link carries it. */
+  .lc-event-title-sep, .lc-event-title { display: none; }
   .lc-event { grid-template-columns: auto 1fr; }
   .lc-event-meta { grid-column: 2; }
 
