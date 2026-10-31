@@ -105,6 +105,16 @@ describe('the two exemptions use the shared predicate (drift guard)', () => {
     assert.doesNotMatch(pat, /isTokenRefreshExempt/, 'pat-session.js does not reference isTokenRefreshExempt');
   });
 
+  test('each consumer\'s skip condition is exactly the shared call (no private list in any syntax)', () => {
+    const server = readFileSync(join(__dirname, '../../server.js'), 'utf8');
+    const pat = readFileSync(join(__dirname, '../../lib/pat-session.js'), 'utf8');
+    const m = server.match(/app\.use\(\(req, res, next\) => \{\s*if \((.*)\) \{\s*return next\(\);\s*\}\s*ensureValidToken\(req, res, next\);/);
+    assert.ok(m, 'server.js token-refresh app.use found');
+    assert.equal(m[1], 'isAuthExemptPath(req.path)', 'refresh skip is exactly the shared predicate');
+    const conds = [...pat.matchAll(/if \((.*req\.path.*)\) \{/g)].map(x => x[1]);
+    assert.deepEqual(conds, ["isAuthExemptPath(req.path) || req.path.startsWith('/test/')"], 'PAT skip is exactly the shared predicate plus the /test/ clause');
+  });
+
   test('pat-session keeps no private public-path list: no req.path equality, one startsWith (the /test/ clause)', () => {
     const pat = readFileSync(join(__dirname, '../../lib/pat-session.js'), 'utf8');
     assert.doesNotMatch(pat, /req\.path\s*===/, 'no equality literal on req.path');

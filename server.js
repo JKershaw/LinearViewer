@@ -1573,7 +1573,7 @@ async function ensureValidToken(req, res, next) {
   }
 }
 
-// Apply middleware to all routes except auth and logout
+// Apply middleware to all routes except the `isAuthExemptPath` public paths
 // Note: workspace routes need token refresh too (they access Linear API)
 // The exempt set is `isAuthExemptPath` (public pages too), shared with PAT auto-login (LIN-3346).
 app.use((req, res, next) => {
