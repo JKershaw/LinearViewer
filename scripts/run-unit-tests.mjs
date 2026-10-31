@@ -18,10 +18,26 @@
  * `--test-concurrency` needs Node >= 20.10 and is rejected in NODE_OPTIONS, so
  * it goes on the command line. UNIT_TEST_DRY_RUN=1 prints the argv as JSON
  * instead of spawning (used by tests/unit/run-unit-tests.test.js).
+ *
+ * Credentials (LIN-2369): the suite is handed OPENROUTER_API_KEY and
+ * OPENROUTER_FREE_TIER_KEY set to '' whatever the caller's shell or .env holds,
+ * so no test can reach a live model, and the result does not depend on whether
+ * a key is around. See unitTestEnv.
  */
 import { spawn } from 'node:child_process';
 import { availableParallelism } from 'node:os';
 import { fileURLToPath } from 'node:url';
+
+// Blanked, not deleted: server.js loads .env via dotenv/config, which fills a
+// variable that is unset but never one that is set to ''. Empty is "unset" to
+// the code too (getPaidEnvKey and the free-tier reader trim() to '').
+const OPENROUTER_CREDENTIALS = ['OPENROUTER_API_KEY', 'OPENROUTER_FREE_TIER_KEY'];
+
+export function unitTestEnv(env) {
+  const out = { ...env };
+  for (const name of OPENROUTER_CREDENTIALS) out[name] = '';
+  return out;
+}
 
 export function unitTestConcurrency({ env, cpus }) {
   const override = env.UNIT_TEST_CONCURRENCY;
@@ -58,7 +74,7 @@ function main() {
     console.log(JSON.stringify(args));
     return;
   }
-  const child = spawn(process.execPath, args, { stdio: 'inherit', env: process.env });
+  const child = spawn(process.execPath, args, { stdio: 'inherit', env: unitTestEnv(process.env) });
   child.on('error', (err) => {
     console.error(`[unit] could not start node: ${err.message}`);
     process.exit(1);
