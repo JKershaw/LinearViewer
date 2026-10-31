@@ -13,6 +13,7 @@ import { armKeepalive } from '../lib/http-keepalive.js';
 import { jsonError, keepaliveError, notFound, replyStoreFault } from '../lib/errors.js';
 import { MAX_NAME_LENGTH, DANGEROUS_CHARS_REGEX } from '../lib/issue-write-validation.js';
 import { deriveCompletedAt, deriveWireStatus, deriveWireTerminal, closedProjection } from '../lib/dispatch-terminal.js';
+import { wireStatusOf } from '../lib/dispatch-lineage-status.js';
 import { buildQueuedPollWarning, getConsumerLastSeenAt } from '../lib/consumer-poll-warning.js';
 import { redactSessionItem } from '../lib/dispatch-session-redaction.js';
 import { enterProxyDispatch, enterRecommendDispatch, refuseWithoutStore, rejectAudited } from '../lib/dispatch-entrance.js';
@@ -350,10 +351,11 @@ export function createDispatchRoutes({
 
       const merged = [
         ...queued.map(i => ({ ...i, status: 'queued', completedAt: null, feedbackCount: 0 })),
-        // The reported status is the lineage one (terminal, closed, blocked), else the stored one.
+        // The reported status is the lineage one (terminal, closed, blocked), else the stored one
+        // (LIN-2122: `wireStatusOf`, shared with the Dispatch page's history so they agree).
         ...history.items.map(i => ({
           ...i,
-          status: i.lineage.status || i.status,
+          status: wireStatusOf(i),
           completedAt: i.lineage.completedAt?.toISOString?.() ?? i.lineage.completedAt,
           feedbackCount: i.lineage.feedbackCount
         }))

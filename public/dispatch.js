@@ -1077,33 +1077,52 @@ function renderFeedbackEntries(feedback) {
   return `<div class="feedback-list">${entries}</div>`
 }
 
+/**
+ * The pill for one history row's outcome word (LIN-2122). `outcome` is the word the proxy
+ * list reports for the same dispatch. Only `done` is the green success state; `taken` is
+ * still running or unresolved, so it is in-progress and never green; a failed, aborted or
+ * cancelled run is red. The other words each get their own non-green look and show their
+ * own word. An unknown word is neutral (no state colour, no glyph) and shows its word,
+ * never the `expired` look. Pure: the caller escapes the label.
+ *
+ * @param {string} outcome
+ * @returns {{state: string, char: string}}  `state` '' means the neutral pill
+ */
+function historyOutcomePill(outcome) {
+  const PILLS = {
+    done: { state: 'done', char: '\u2713' }, //        \u2713 green: the only success state
+    taken: { state: 'in-progress', char: '\u25d0' }, // \u25d0 amber: running or unresolved
+    failed: { state: 'failed', char: '\u2715' }, //    \u2715 red
+    aborted: { state: 'failed', char: '\u2715' }, //   \u2715 red
+    cancelled: { state: 'failed', char: '\u2715' }, // \u2715 red
+    blocked: { state: 'in-progress', char: '\u2298' }, // \u2298 amber, held rather than running
+    skipped: { state: 'todo', char: '\u25cb' }, //     \u25cb dim
+    closed: { state: 'backlog', char: '\u25cc' }, //   \u25cc slate
+    expired: { state: 'todo', char: '\u2298' } //      \u2298 dim
+  }
+  // An own-property check, so a word like `constructor` is unknown, not a prototype member.
+  return Object.hasOwn(PILLS, outcome) ? PILLS[outcome] : { state: '', char: '' }
+}
+
 function renderDispatchHistoryList(container, items, total, offset, urlKey) {
   if (items.length === 0 && offset === 0) {
     container.innerHTML = '<div class="history-list-empty">No dispatch history yet</div>'
     return
   }
 
-  // Map each resolved dispatch status onto the shared StatusPill vocabulary
-  // (LIN-853): `state` selects the canonical color token, `char` keeps the
-  // existing per-status glyph. `taken`/`expired`/`cancelled` are the stored
-  // resolutions; `done`/`failed` cover terminal-marker outcomes.
-  const STATUS_PILL = {
-    taken: { state: 'done', char: '\u2713' }, //     \u2713 green
-    done: { state: 'done', char: '\u2713' }, //      \u2713 green
-    failed: { state: 'failed', char: '\u2715' }, //  \u2715 red
-    expired: { state: 'todo', char: '\u2298' }, //   \u2298 dim
-    cancelled: { state: 'failed', char: '\u2715' } // \u2715 red
-  }
-
   const itemsHtml = items.map(item => {
-    const pill = STATUS_PILL[item.status] || STATUS_PILL.expired
+    // LIN-2122: the page shows the outcome word, not the stored `status` (always `taken`
+    // for an archived row). A server that predates `outcome` answers only `status`.
+    const outcome = item.outcome || item.status
+    const pill = historyOutcomePill(outcome)
+    const stateClass = pill.state ? ` status-pill--${pill.state}` : ''
+    const charHtml = pill.char ? `<span class="status-pill__char">${pill.char}</span>` : ''
     // Canonical `.status-pill` markup, hand-mirrored from the server helper
     // lib/components/status-pill.js \u2014 the shared contract is the global CSS
     // class API, which cards can't reach client-side. `history-status` and
-    // `status-<status>` ride alongside as the existing E2E + semantic hooks.
-    const statusPillHtml = `<span class="history-status status-pill status-pill--${pill.state} status-${escapeHtml(item.status)}">`
-      + `<span class="status-pill__char">${pill.char}</span>`
-      + `<span class="status-pill__label">${escapeHtml(item.status)}</span></span>`
+    // `status-<outcome>` ride alongside as the existing E2E + semantic hooks.
+    const statusPillHtml = `<span class="history-status status-pill${stateClass} status-${escapeHtml(outcome)}">`
+      + `${charHtml}<span class="status-pill__label">${escapeHtml(outcome)}</span></span>`
     const issueHtml = item.issueIdentifier
       ? (item.issueUrl
         ? ` <a class="history-issue" href="${escapeHtml(item.issueUrl)}" target="_blank">${escapeHtml(item.issueIdentifier)}</a>`
@@ -1136,7 +1155,7 @@ function renderDispatchHistoryList(container, items, total, offset, urlKey) {
     const feedbackHtml = hasFeedback ? renderFeedbackEntries(item.feedback) : ''
 
     return `
-      <div class="history-item${expandableClass}" data-status="${escapeHtml(item.status)}">
+      <div class="history-item${expandableClass}" data-status="${escapeHtml(outcome)}">
         ${statusPillHtml}
         <div class="history-info">
           <span class="history-name">${escapeHtml(item.promptName || 'Prompt')}</span>${issueHtml}${taskPageHtml}

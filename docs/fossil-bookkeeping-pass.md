@@ -153,8 +153,9 @@ entry is not independently guarded beyond gates 7 and 8.
   `lanes.resolved` and leaves the attention list.
 * The Loop record (`lib/pipeline-loops.js`) and every history read through
   `_formatHistoryItem` — `listHistory`, `getItemStatus`.
-* `GET /workspace/:urlKey/api/dispatch/history` (session auth) returns `listHistory`
-  wholesale, so it carries the field.
+* `GET /workspace/:urlKey/api/dispatch/history` (session auth) returns
+  `listHistoryWithBodies` (`withLineage`, LIN-2122) wholesale, so it carries the field;
+  the stamp never changes `status` or `outcome`.
 * `lib/chat-tools.js` — a second `classifyLoop` consumer. `projectActiveSession`
   (`:833` calls `classifyLoop` per loop) folds the per-loop lanes into two
   human-facing signals: `lifecycle` and `waitingOnHuman` (`:876`,
