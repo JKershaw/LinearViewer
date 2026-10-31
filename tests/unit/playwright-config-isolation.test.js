@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import config from '../../playwright.config.js';
 import visualConfig from '../../playwright.visual.config.js';
+import perfConfig from '../../playwright.perf.config.js';
 import { readFileSync } from 'node:fs';
 
 const source = readFileSync(new URL('../../playwright.config.js', import.meta.url), 'utf8');
@@ -31,5 +32,22 @@ test('the visual-screenshot config webServer is isolated the same way', () => {
   for (const ws of servers) {
     assert.match(ws.command, /(^| )HARBOUR_DATA_DIR=\.\/test-results\/[\w.-]+( |$)/, ws.url);
     assert.match(ws.command, /(^| )MONGODB_URI=( |$)/, `${ws.url} pins MONGODB_URI empty`);
+  }
+});
+
+// LIN-1484: a developer's LINEAR_ACCESS_TOKEN in .env must not PAT-sign the e2e
+// servers in. dotenv never overrides a variable already set, so an empty
+// assignment on each command line wins over .env. Every webServer in every
+// Playwright config is pinned, including the perf config (it spreads the main
+// config, so it inherits the 3001/3002/3003 servers).
+test('every webServer in every Playwright config blanks LINEAR_ACCESS_TOKEN', () => {
+  const servers = [
+    ...config.webServer,
+    ...[].concat(visualConfig.webServer),
+    ...[].concat(perfConfig.webServer),
+  ];
+  assert.ok(servers.length >= 4);
+  for (const ws of servers) {
+    assert.match(ws.command, /(^| )LINEAR_ACCESS_TOKEN=( |$)/, `${ws.url} pins LINEAR_ACCESS_TOKEN empty`);
   }
 });
