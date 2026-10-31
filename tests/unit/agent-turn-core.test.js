@@ -329,11 +329,10 @@ describe('LIN-2631: hop usage is summed onto the final done', () => {
     assert.strictEqual(doneFrame.usage, undefined);
   });
 
-  // LIN-2621 beat 1 re-grounding: today's PRODUCTION shape (no tool hop ever
-  // puts usage on the wire yet — see sumUsage's own doc comment above), pinned
-  // as a characterization test so a future lib/openrouter.js change that DOES
-  // start emitting hop usage cannot silently alter a plain single-hop turn's
-  // reported total.
+  // LIN-2621 beat 1 re-grounding: the plain single-hop shape (a hop-1 answer
+  // rides on its own done, so no usage frame is emitted), pinned as a
+  // characterization test so a lib/openrouter.js change to hop usage cannot
+  // silently alter a plain single-hop turn's reported total.
   test('a single-hop turn (today\'s only real shape) reports exactly that one call\'s usage, unchanged', async () => {
     const store = fakeStore({ census: censusDoc() });
     let doneFrame = null;
@@ -1331,5 +1330,69 @@ describe('LIN-3362: hop text, concurrent reads and the zone reach the model call
     await run(bad, { turnKind: 'user-initiated', message: 'hi', timeZone: 'x\n## ignore' });
     assert.ok(!bad.messages[0].content.includes('## ignore'));
     assert.match(bad.messages[0].content, / UK\)\./);
+  });
+});
+
+// LIN-2705: a tool-using turn through the REAL streamChatWithTools (fetch is the
+// only thing stubbed). Flight Companion shows done.usage, so it must be the sum of
+// every model hop the turn made, not only the final streamed answer.
+describe('LIN-2705: a tool-using turn reports every hop through the real streamChatWithTools', () => {
+  const hopResponse = (toolCalls, cost) => ({
+    ok: true,
+    json: async () => ({
+      model: 'openai/gpt-5.4-mini', provider: 'OpenAI',
+      choices: [{ message: { role: 'assistant', content: null, tool_calls: toolCalls }, finish_reason: toolCalls.length ? 'tool_calls' : 'stop' }],
+      usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15, cost },
+    }),
+  });
+  const answerStream = () => {
+    const enc = new TextEncoder();
+    const blocks = [
+      `data: ${JSON.stringify({ choices: [{ delta: { content: 'answer' }, finish_reason: null }] })}\n\n`,
+      `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: 20, completion_tokens: 8, total_tokens: 28, cost: 0.0003 } })}\n\n`,
+      'data: [DONE]\n\n',
+    ];
+    return { ok: true, body: (async function* () { for (const b of blocks) yield enc.encode(b); })() };
+  };
+  const getComments = (id) => ({ id, type: 'function', function: { name: 'get_comments', arguments: '{}' } });
+
+  test('done.usage is the sum of both tool hops, the declining hop, and the streamed answer', async () => {
+    const originalFetch = global.fetch;
+    const proxyKeys = ['HTTPS_PROXY', 'HTTP_PROXY', 'https_proxy', 'http_proxy'];
+    const savedProxy = Object.fromEntries(proxyKeys.map(k => [k, process.env[k]]));
+    proxyKeys.forEach(k => delete process.env[k]);
+    try {
+      const queue = [
+        hopResponse([getComments('c1')], 0.0001),
+        hopResponse([getComments('c2')], 0.0002),
+        hopResponse([], 0.0004),
+      ];
+      global.fetch = mock.fn(async (_url, options) => {
+        const body = JSON.parse(options.body);
+        if (body.stream === true) return answerStream();
+        return queue.shift();
+      });
+      const store = fakeStore({ census: censusDoc() });
+      const deps = {
+        ...baseDeps(store, { streamChat, streamChatWithTools }),
+        createToolCatalog: () => ({
+          tools: [{ type: 'function', function: { name: 'get_comments', description: 'x', parameters: { type: 'object', properties: {} } } }],
+          executeTool: async () => 'ok',
+        }),
+      };
+
+      let doneFrame = null;
+      await runAgentTurn({
+        workspace: WORKSPACE, turnKind: 'user-initiated', message: 'catch me up',
+        apiKey: 'sk-test', onEvent: (t, d) => { if (t === 'done') doneFrame = d; }, deps,
+      });
+
+      assert.ok(Math.abs(doneFrame.usage.cost - 0.001) < 1e-12, `cost was ${doneFrame.usage.cost}, expected 0.001`);
+      assert.strictEqual(doneFrame.usage.promptTokens, 50);
+      assert.strictEqual(doneFrame.usage.completionTokens, 23);
+    } finally {
+      global.fetch = originalFetch;
+      for (const [k, v] of Object.entries(savedProxy)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+    }
   });
 });

@@ -429,12 +429,9 @@
 
   // A single turn's meta line: tokens and cost, read straight off the final
   // `done` frame's `usage` (lib/openrouter.js's extractUsage shape —
-  // `{prompt_tokens, completion_tokens, total_tokens, cost}`). Renders
-  // exactly what the frame carries — no hedging, no caveat about a
-  // tool-using turn's usage being under-reported today (that gap is
-  // lib/openrouter.js's, out of this ticket's scope per beat 1's finding;
-  // this plumbing is correct for whatever usage arrives and becomes
-  // accurate for free once that lands). Returns '' when there is nothing
+  // `{prompt_tokens, completion_tokens, total_tokens, cost}`). The server
+  // sums every model hop of a tool-using turn into that `done` usage
+  // (LIN-2705), so this renders the whole turn. Returns '' when there is nothing
   // usable to show, so a turn with no usage at all renders no meta line —
   // never a fabricated "0 tokens · $0.00".
   function formatTurnMeta(usage) {
