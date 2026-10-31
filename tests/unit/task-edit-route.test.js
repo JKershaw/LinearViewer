@@ -25,6 +25,7 @@ import { registerProvider } from '../../lib/providers/registry.js';
 import '../../lib/providers/linear/index.js';
 import { JiraProvider } from '../../lib/providers/jira/index.js';
 import { createFakeJiraClient } from '../../lib/providers/jira/fake-client.js';
+import { GitHubProvider } from '../../lib/providers/github/index.js';
 
 const ISSUE = {
   id: '11111111-2222-3333-4444-555555555555',
@@ -44,6 +45,7 @@ let providerSeq = 0;
 function fakeProvider({
   inlineEdit = true,
   priority = true,
+  ui = null, // LIN-2052: a real provider's own ui, when the test needs its exact surface
   supportsStates = true,
   states = async () => [{ id: 'started', name: 'In Progress', position: 2 }],
   fetchIssueFields = async () => ISSUE,
@@ -51,7 +53,7 @@ function fakeProvider({
   const name = `fake-task-edit-${++providerSeq}`;
   registerProvider({
     name,
-    ui: { inlineEdit, priority },
+    ui: ui ?? { inlineEdit, priority },
     supports: (cap) => (cap === 'states' ? supportsStates : true),
     states,
     fetchIssueFields,
@@ -232,6 +234,23 @@ describe('state control degradation', () => {
     assert.strictEqual(res.statusCode, 200);
     assert.ok(/<input[^>]*name="stateId"/.test(res.body), 'degraded to the text input');
     assert.ok(!/<select[^>]*name="stateId"/.test(res.body));
+  });
+});
+
+// LIN-2052: a GitHub-backed task edit has no Priority control, pinned beside the
+// Jira priority pins (the F4 merge pin below and render-task-edit.test.js). The fake
+// provider carries GitHub's REAL ui, so this fails if the GitHub provider stops
+// overriding priority, not just if the renderer changes.
+describe('GitHub-backed task edit hides priority (LIN-2052)', () => {
+  test('the route renders no priority control for a GitHub-bound issue', async () => {
+    const provider = fakeProvider({ ui: { ...new GitHubProvider().ui } });
+    const res = await call({ provider });
+    assert.strictEqual(res.statusCode, 200);
+    assert.ok(res.body.includes('data-testid="task-edit-form"'), 'the edit form still renders');
+    assert.ok(
+      !res.body.includes('data-testid="task-edit-priority"'),
+      'GitHub cannot save priority; a rendered control would be a silent no-op on submit',
+    );
   });
 });
 
