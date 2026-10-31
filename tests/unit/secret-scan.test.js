@@ -10,6 +10,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -428,6 +429,137 @@ describe('LIN-2852 source scan fails closed on unreadable input', () => {
       assert.match(result.errors[0].message, /locked/);
     } finally {
       fs.chmodSync(locked, 0o755);
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+// LIN-2851: the name-based skips for `.env` and `data/` keep local, untracked files out of the scan.
+// Git tracking decides: anything the repo tracks is scanned wherever it lives. A non-Git tree keeps
+// the name-based skips, since it has no tracking to consult.
+describe('LIN-2851 Git tracking decides whether .env and data/ files are scanned', () => {
+  const LEAK = `const k = "${FIXTURE_SECRETS.linearApiKey}";\n`;
+
+  function makeGitTree() {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lin-2851-scan-'));
+    execFileSync('git', ['-C', dir, 'init', '-q']);
+    fs.writeFileSync(path.join(dir, 'ok.js'), 'const a = 1;\n');
+    return dir;
+  }
+
+  function writeFile(dir, rel, content) {
+    fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
+    fs.writeFileSync(path.join(dir, rel), content);
+  }
+
+  test('a tracked .env with a secret is reported', () => {
+    const dir = makeGitTree();
+    try {
+      writeFile(dir, '.env', `API_TOKEN=${FIXTURE_SECRETS.linearApiKey}\n`);
+      execFileSync('git', ['-C', dir, 'add', '-f', '--', '.env']);
+
+      const result = scanDirectory(dir);
+      assert.equal(result.findings.length, 1, `Expected the tracked .env to be reported, got: ${JSON.stringify(result.findings)}`);
+      assert.equal(result.findings[0].filePath, '.env');
+      assert.equal(result.clean, false);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('a tracked file under data/ with a secret is reported', () => {
+    const dir = makeGitTree();
+    try {
+      writeFile(dir, 'data/leak.json', `{"k":"${FIXTURE_SECRETS.linearApiKey}"}\n`);
+      execFileSync('git', ['-C', dir, 'add', '-f', '--', 'data/leak.json']);
+
+      const result = scanDirectory(dir);
+      assert.equal(result.findings.length, 1, `Expected the tracked data/ file to be reported, got: ${JSON.stringify(result.findings)}`);
+      assert.equal(result.findings[0].filePath, 'data/leak.json');
+      assert.equal(result.clean, false);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('a tracked data/ file at any depth is reported, as the committed evidence files are', () => {
+    const dir = makeGitTree();
+    try {
+      const rel = 'docs/reviews/_evidence-2026-10-21/data/live-comparison.json';
+      writeFile(dir, rel, `{"k":"${FIXTURE_SECRETS.linearApiKey}"}\n`);
+      execFileSync('git', ['-C', dir, 'add', '-f', '--', rel]);
+
+      const result = scanDirectory(dir);
+      assert.equal(result.findings.length, 1);
+      assert.equal(result.findings[0].filePath, rel);
+      assert.equal(result.clean, false);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('untracked .env and data/ files stay skipped and are not counted', () => {
+    const dir = makeGitTree();
+    try {
+      writeFile(dir, '.env', LEAK);
+      writeFile(dir, 'data/local.js', LEAK);
+      writeFile(dir, 'nested/data/local.js', LEAK);
+
+      const result = scanDirectory(dir);
+      assert.equal(result.scannedFiles, 1, `Expected only ok.js to count, got ${result.scannedFiles}`);
+      assert.equal(result.findings.length, 0, `Expected untracked local files to stay out, got: ${JSON.stringify(result.findings)}`);
+      assert.deepEqual(result.errors, []);
+      assert.equal(result.clean, true);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('within one data/ folder, the tracked file is scanned and the untracked sibling is skipped', () => {
+    const dir = makeGitTree();
+    try {
+      writeFile(dir, 'data/tracked.js', LEAK);
+      writeFile(dir, 'data/local.js', LEAK);
+      execFileSync('git', ['-C', dir, 'add', '-f', '--', 'data/tracked.js']);
+
+      const result = scanDirectory(dir);
+      assert.equal(result.scannedFiles, 2, `Expected ok.js and data/tracked.js to count, got ${result.scannedFiles}`);
+      assert.equal(result.findings.length, 1);
+      assert.equal(result.findings[0].filePath, 'data/tracked.js');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('an unreadable Git index fails closed instead of skipping tracked .env and data/ files', () => {
+    const dir = makeGitTree();
+    try {
+      writeFile(dir, '.env', LEAK);
+      execFileSync('git', ['-C', dir, 'add', '-f', '--', '.env']);
+      fs.writeFileSync(path.join(dir, '.git', 'index'), 'not a git index');
+
+      const result = scanDirectory(dir);
+      assert.equal(result.clean, false);
+      assert.equal(result.errors.length, 1, `Expected one git-tracking error, got: ${JSON.stringify(result.errors)}`);
+      assert.equal(result.errors[0].type, 'git-tracking');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('a non-Git tree still skips .env and data/ by name', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lin-2851-nogit-'));
+    try {
+      writeFile(dir, 'ok.js', 'const a = 1;\n');
+      writeFile(dir, '.env', LEAK);
+      writeFile(dir, 'data/leak.js', LEAK);
+
+      const result = scanDirectory(dir);
+      assert.equal(result.scannedFiles, 1, `Expected only ok.js to count, got ${result.scannedFiles}`);
+      assert.equal(result.findings.length, 0);
+      assert.deepEqual(result.errors, []);
+      assert.equal(result.clean, true);
+    } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });
