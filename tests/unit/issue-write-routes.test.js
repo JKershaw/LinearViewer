@@ -18,6 +18,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { registerProvider } from '../../lib/providers/registry.js';
+import { renderTaskEditPage } from '../../lib/render-task-edit.js';
 
 const PROVIDER_NAME = 'issue-write-fake';
 const TEAM_UUID = '00000000-0000-0000-0000-0000000000aa';
@@ -580,5 +581,78 @@ describe('symbolic reference resolution (LIN-1556)', () => {
     // attempted, not merely that the write never happened.
     assert.strictEqual(calls.states.length, 0);
     assert.strictEqual(calls.updateIssue.length, 0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The edit page's save, end to end through the markup it ships (LIN-1997).
+// A task whose state is not in the team's list must keep that state on a
+// title-only save, and a deliberate pick from the list must still apply.
+// ---------------------------------------------------------------------------
+describe('PATCH from the task edit page — a state missing from the list (LIN-1997)', () => {
+  const GUARD_TEAM = '00000000-0000-0000-0000-0000000000ee';
+  const LISTED = [
+    { id: 'todo-id', name: 'Todo', type: 'unstarted', position: 1 },
+    { id: 'done-id', name: 'Done', type: 'completed', position: 2 },
+  ];
+  // The task sits in a state the team no longer lists (archived).
+  const ARCHIVED_ISSUE = {
+    id: ISSUE_ID, identifier: ISSUE_ID, title: 'Old title', description: 'body', priority: 2,
+    state: { id: 'archived-id', name: 'Archived', type: 'canceled' },
+  };
+
+  // The value the form's state control submits, read out of the rendered page
+  // exactly as the browser would pick the selected option.
+  function stateSelect(issue, states) {
+    const html = renderTaskEditPage({ issue, states, urlKey: 'acme' });
+    return html.match(/<select[^>]*name="stateId"[^>]*>([\s\S]*?)<\/select>/)[1];
+  }
+
+  function submittedStateId(issue, states) {
+    const select = stateSelect(issue, states);
+    const selected = select.match(/<option value="([^"]*)"[^>]* selected/) || select.match(/<option value="([^"]*)"/);
+    return selected[1];
+  }
+
+  // The value of the option the user would click, by its label.
+  function optionValueFor(issue, states, label) {
+    const options = [...stateSelect(issue, states).matchAll(/<option value="([^"]*)"[^>]*>([^<]*)</g)];
+    const option = options.find((m) => m[2] === label);
+    assert.ok(option, `the page offers a "${label}" option`);
+    return option[1];
+  }
+
+  test('a title-only save submits an empty stateId, and the PATCH leaves the state alone', async () => {
+    const stateId = submittedStateId(ARCHIVED_ISSUE, LISTED);
+    assert.strictEqual(stateId, '', 'the form submits the empty "keep" value, not a listed state');
+
+    const { provider, calls } = makeFakeProvider({
+      issueWriteGuard: () => ({ id: 'iss-1', trashed: false, team: { id: GUARD_TEAM } }),
+      states: () => LISTED,
+    });
+    const { status } = await patchIssue(buildApp({ provider }), ISSUE_ID, { title: 'New title', description: 'body', stateId, priority: 2 });
+
+    assert.strictEqual(status, 200);
+    assert.strictEqual(calls.updateIssue.length, 1);
+    const { input } = calls.updateIssue[0];
+    assert.strictEqual(input.title, 'New title');
+    assert.ok(!('stateId' in input), 'no stateId is written, so the task keeps its state');
+  });
+
+  test('a deliberate pick from the list still reaches the provider as a state change', async () => {
+    const stateId = submittedStateId(ARCHIVED_ISSUE, LISTED);
+    assert.strictEqual(stateId, '');
+    // The user opens the same page and picks Done from the list instead; the
+    // value is read from the option the page renders, not assumed.
+    const picked = optionValueFor(ARCHIVED_ISSUE, LISTED, 'Done');
+    const { provider, calls } = makeFakeProvider({
+      issueWriteGuard: () => ({ id: 'iss-1', trashed: false, team: { id: GUARD_TEAM } }),
+      states: () => LISTED,
+    });
+    const { status } = await patchIssue(buildApp({ provider }), ISSUE_ID, { title: 'Old title', description: 'body', stateId: picked });
+
+    assert.strictEqual(status, 200);
+    assert.strictEqual(picked, 'Done', 'the page submits the state name for a non-UUID id');
+    assert.strictEqual(calls.updateIssue[0].input.stateId, 'done-id', 'the route resolves the submitted name through states()');
   });
 });

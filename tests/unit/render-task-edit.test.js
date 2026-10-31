@@ -219,6 +219,33 @@ describe('renderTaskEditPage — the state control', () => {
     assert.ok(html.includes('<option value="Triage">Triage</option>'));
   });
 
+  // LIN-1997. The task's current state is archived, so the list does not carry
+  // it. The browser selects the first option by default, and a title-only save
+  // would submit that first state. The control must open on an empty leading
+  // option instead, so nothing real is preselected.
+  test('a current state missing from the list opens on an empty leading option, never the first real state (LIN-1997)', () => {
+    const archived = { ...ISSUE, state: { id: 'archived-id', name: 'Archived', type: 'canceled' } };
+    const html = render({ issue: archived, states: LOCAL_STATES });
+    const select = html.match(/<select[^>]*name="stateId"[^>]*>([\s\S]*?)<\/select>/)[1];
+    const options = [...select.matchAll(/<option value="([^"]*)"([^>]*)>/g)];
+    assert.strictEqual(options[0][1], '', 'the leading option carries the empty value');
+    assert.ok(options[0][2].includes(' selected'), 'and it is the selected one');
+    assert.strictEqual(options.filter(m => m[2].includes(' selected')).length, 1, 'exactly one option is selected');
+    assert.ok(!/<option value="(?!")[^"]*"[^>]* selected/.test(select), 'no real state is preselected');
+  });
+
+  test('the unlisted leading option is labelled with the current state name', () => {
+    const archived = { ...ISSUE, state: { id: 'archived-id', name: 'Archived', type: 'canceled' } };
+    const html = render({ issue: archived, states: LOCAL_STATES });
+    assert.ok(html.includes('<option value="" selected>Archived (current)</option>'));
+  });
+
+  test('a current state that IS listed gets no empty leading option', () => {
+    const html = render({ states: LOCAL_STATES });
+    assert.ok(!/<option value="" selected>/.test(html), 'no placeholder when the current state is selectable');
+    assert.ok(!/<select[^>]*name="stateId"[^>]*><option value="">/.test(html));
+  });
+
   // LIN-1886 D2 / LIN-2018. Driven with a CUSTOM Jira workflow status name on
   // purpose, against a REAL per-project states() read (LIN-2018 — previously
   // the fixed synthetic todo/in-progress/done vocabulary): only a real id
