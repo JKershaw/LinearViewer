@@ -560,12 +560,21 @@ export function createReadRoutes({ proxyLimiter, authenticateProxyToken, resolve
     const typedFromHint = nameHint ? relayContentTypeFromName(nameHint) : null;
     const isFileRelay = !!typedFromHint && !typedFromHint.startsWith('image/');
 
+    // LIN-3572: the upstream host's status says something about the workspace
+    // credential only when this relay actually sent that credential. The host
+    // gets it solely on a Linear host for a linear workspace; anything else
+    // (a GitHub asset host, a non-linear workspace) never saw it, so its 401,
+    // 503 or 2xx must not mark it suspect or witness it. `logEvent` gates both
+    // on `skipCredentialHealth`.
+    const relayedCredential = !isGithubAssetHost && providerName === 'linear';
+    const logUpstream = (status) => logEvent(req, endpoint, status, null, { skipCredentialHealth: !relayedCredential });
+
     try {
       // Egress goes through the configured proxy, like every other Linear call.
       const customFetch = (await createProxyFetch()) || fetch;
       const response = await customFetch(fetchUrl, {
         method: 'GET',
-        headers: (!isGithubAssetHost && providerName === 'linear') ? { Authorization: `Bearer ${token}` } : {},
+        headers: relayedCredential ? { Authorization: `Bearer ${token}` } : {},
         redirect: 'error',
       });
 
@@ -573,7 +582,8 @@ export function createReadRoutes({ proxyLimiter, authenticateProxyToken, resolve
         return refuse(400, 'Redirects not allowed');
       }
       if (!response.ok) {
-        return refuse(response.status, 'Failed to fetch attachment');
+        logUpstream(response.status);
+        return jsonError(res, response.status, 'Failed to fetch attachment');
       }
 
       // Admit the bytes: type first, then size (header, then actual body).
@@ -596,7 +606,7 @@ export function createReadRoutes({ proxyLimiter, authenticateProxyToken, resolve
       res.set('Content-Disposition', `attachment; filename="${safeName}"`);
       res.set('X-Content-Type-Options', 'nosniff');
       res.set('Cache-Control', 'private, max-age=3600');
-      logEvent(req, endpoint, 200);
+      logUpstream(200);
       res.send(Buffer.from(bytes));
     } catch (error) {
       if (isRedirectError(error)) {
