@@ -137,15 +137,21 @@ describe('LIN-4039 — W2: a blocked first child is skipped by the row and the s
 
   test('Home\'s own row-state assembly applies the same synthesis: the blocked first child is skipped on the row', async () => {
     const blocker = { ...issue('LIN-56', 'started'), relations: { nodes: [{ type: 'blocks', relatedIssue: { id: 'id-LIN-57' } }] } };
-    const parent = node('LIN-55', 'started', [node('LIN-57', 'unstarted'), node('LIN-58', 'unstarted')]);
+    // LIN-4068: Home's states are gathered over the fetched set (`issues`, one index at every depth), not over forests.
     const homeRowStates = createHomeRowStates({
       getLoopsForWorkspace: async () => [], dispatchStore: null, agentStatusStore: null, taskDecisionsStore: null,
       shelvedRulingsStore: null, enrichLoop, deriveSessionWaiting, now: () => NOW,
       onError: (message) => assert.fail(message),
     });
     const result = await homeRowStates({
-      urlKey: 'ws', inProgressTrees: [{ roots: [parent] }], recentActivityTrees: [],
-      projectTrees: [{ incomplete: [{ issue: blocker, children: [], depth: 0 }], completed: [] }], runControls: true,
+      urlKey: 'ws',
+      issues: [
+        blocker,
+        issue('LIN-55', 'started'),
+        issue('LIN-57', 'unstarted', { parent: { id: 'id-LIN-55' } }),
+        issue('LIN-58', 'unstarted', { parent: { id: 'id-LIN-55' } }),
+      ],
+      runControls: true,
     });
     assert.equal(namedOn(result.states.get('LIN-55').words), 'LIN-58', `row says "${result.states.get('LIN-55').words}"`);
   });

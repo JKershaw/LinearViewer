@@ -59,22 +59,22 @@ describe('LIN-4016 W6 — the count line counts every open ruling in the workspa
   test('a ruling on a task outside the Home filter, a task-less ruling and a ruling with no row are all counted', async () => {
     // Home shows only LIN-1 (the filter); the rulings are on LIN-OUT (outside the filter), on a task with no tracker
     // row at all, and on LIN-1 itself.
-    const homeRoots = [node('LIN-1')];
+    // LIN-4068: the states are gathered over the fetched set Home shows (`issues`), the ruling count over the workspace's loops.
     const assembly = assemblyWith({ loops: [rulingLoop('LIN-OUT'), rulingLoop('LIN-NOROW'), rulingLoop('LIN-1')] });
-    const out = await assembly({ urlKey: 'acme', inProgressTrees: [{ projectName: 'P', roots: homeRoots }], recentActivityTrees: [], projectTrees: [], runControls: true });
+    const out = await assembly({ urlKey: 'acme', issues: [node('LIN-1').issue], runControls: true });
     assert.equal(out.rulingCount, 3, 'the badge\'s unit: one per open ruling in the workspace');
     assert.equal(out.states.has('LIN-OUT'), false, 'a ruling outside the filter has no row here');
   });
 
   test('the same count on an unfiltered Home: the rulings are the same set', async () => {
     const assembly = assemblyWith({ loops: [rulingLoop('LIN-OUT'), rulingLoop('LIN-1')] });
-    const out = await assembly({ urlKey: 'acme', inProgressTrees: [{ projectName: 'P', roots: [node('LIN-1'), node('LIN-OUT')] }], recentActivityTrees: [], projectTrees: [], runControls: true });
+    const out = await assembly({ urlKey: 'acme', issues: [node('LIN-1').issue, node('LIN-OUT').issue], runControls: true });
     assert.equal(out.rulingCount, 2);
   });
 
   test('a viewer who sees no sessions has no ruling read, so no count (the copy-first view)', async () => {
     const assembly = assemblyWith({ loops: [rulingLoop('LIN-1')] });
-    const out = await assembly({ urlKey: 'acme', inProgressTrees: [{ projectName: 'P', roots: [node('LIN-1')] }], recentActivityTrees: [], projectTrees: [], runControls: false });
+    const out = await assembly({ urlKey: 'acme', issues: [node('LIN-1').issue], runControls: false });
     assert.equal(out.rulingCount, 0);
   });
 });
@@ -83,7 +83,7 @@ describe('LIN-4016 W7 — a store failure leaves Home plain: no states, no count
   for (const throwOn of ['listUnansweredForWorkspaces', 'listForWorkspaces']) {
     test(`with ${throwOn} throwing, the assembly returns null, so every Home route falls back to plain rows`, async () => {
       const assembly = assemblyWith({ loops: [rulingLoop('LIN-1')], throwOn });
-      const out = await assembly({ urlKey: 'acme', inProgressTrees: [{ projectName: 'P', roots: [node('LIN-1')] }], recentActivityTrees: [], projectTrees: [], runControls: true });
+      const out = await assembly({ urlKey: 'acme', issues: [node('LIN-1').issue], runControls: true });
       assert.equal(out, null);
     });
   }
@@ -96,7 +96,7 @@ describe('LIN-4016 W7 — a store failure leaves Home plain: no states, no count
       shelvedRulingsStore: { listForWorkspaces: async () => [] },
       enrichLoop, deriveSessionWaiting, now: () => NOW, onError: (message) => seen.push(message),
     });
-    const out = await assembly({ urlKey: 'acme', inProgressTrees: [], recentActivityTrees: [], projectTrees: [], runControls: true });
+    const out = await assembly({ urlKey: 'acme', issues: [], runControls: true });
     assert.equal(out, null);
     assert.deepEqual(seen, ['boom']);
   });

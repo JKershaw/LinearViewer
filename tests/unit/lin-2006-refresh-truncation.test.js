@@ -162,6 +162,8 @@ async function runPrimaryDashboardRoute({ fetchResult }) {
     getFeatureFlags: () => ({}),
     // LIN-3833: the Home row states; these sandboxes render no In Progress rows.
     homeRowStates: async () => null,
+    // LIN-4068: the primary route hands the fetched set to the holder's write gate; this sandbox holds nothing.
+    writeTaskFacts: () => ({ written: false, refusal: 'sandbox' }),
     // LIN-4024: the trimmed Home view the post-401 render builds (server.js); the real one is injected.
     buildHomeView,
     // LIN-3833: the subtasks that need you by row; these sandboxes render no In Progress rows.

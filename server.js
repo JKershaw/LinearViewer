@@ -158,6 +158,7 @@ import { noJobBody, noJobNoticeOf } from './lib/components/dispatch-no-job.js'
 import { renderSwipePage, orderIssuesForSwipe } from './lib/render-swipe.js'
 import { rowDataByNodeKey } from './lib/task-board-view.js'
 import { createHomeRowStates } from './lib/home-row-states.js'
+import { createTaskFactsHolder, createTaskFactsRefresh } from './lib/task-facts-holder.js'
 import { buildHomeView } from './lib/home-view.js'
 import { renderDashboardAfterRefresh as renderRefreshedDashboard } from './lib/dashboard-refresh.js'
 import { homeRowsFor, HOME_ROW_KINDS, HOME_SEARCH_MAX_LENGTH } from './lib/home-rows.js'
@@ -1683,6 +1684,8 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
   // list (F1). Resolving only once, on the primary iteration, costs no extra
   // round trip: every binding already fetches its own team list this loop.
   let resolvedTeamId = teamId;
+  // LIN-4068: whether this fetch read a mock set (`mockOverride` or test-mode data), for the holder's write gate.
+  let stateMock = !!mockOverride;
   // LIN-3774: sources left out because a secondary binding still failed after a
   // re-mint, reported as `{ provider, scope }` for the dashboard notice.
   const degradedSources = [];
@@ -1712,6 +1715,8 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
       const bindingCallScope = getBindingCallScope(binding);
       // Use mock data in test mode to avoid hitting the provider API
       const isTestMode = process.env.NODE_ENV === 'test' && bindingToken === 'test-token';
+      // LIN-4068: a mock set is never held (the write gate refuses it), so the result says whether one was used.
+      if (isTestMode) stateMock = true;
 
       // Fetch teams (primary binding only)
       const bindingTeams = isTestMode
@@ -1784,6 +1789,10 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
   // ancestor context, and the recent-activity feed at once — without touching the
   // shared terminal/glyph helpers, so completed (✓) and duplicate stay visible.
   let issues = mergedIssues.filter(issue => !isHiddenState(issue));
+  // LIN-4068: the set every task's state is gathered over: after the hidden drop, BEFORE the assignee filter, so a
+  // filtered view still sees every descendant. The assignee filter below reassigns `issues`; this array is not changed.
+  // This function writes nothing: its callers hand the result to the holder's write gate (`lib/task-facts-holder.js`).
+  const stateIssues = issues;
 
   // LIN-2525: the assignee filter's available options are the full,
   // team-scoped set — computed BEFORE the assignee filter below narrows
@@ -1879,7 +1888,7 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
       return { project: { ...project, collapsed }, incomplete, completed, completedCount };
     });
 
-  return { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId: resolvedTeamId, periodicalsEnabled, showSource, truncated, availableAssignees, appliedAssigneeName, degradedSources };
+  return { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId: resolvedTeamId, periodicalsEnabled, showSource, truncated, availableAssignees, appliedAssigneeName, degradedSources, stateIssues, stateMock };
 }
 
 /**
@@ -1989,7 +1998,7 @@ async function handleTokenRefreshAndRetry(workspace, session, teamId, assigneeSt
 async function renderDashboardAfterRefresh(workspace, session, teamId, assigneeState, openRouterSource, res) {
   return renderRefreshedDashboard({
     customPromptsStore, getDeployInfo, getFeatureFlags, getProviderForWorkspace, fetchAndPrepareProjects,
-    resolveRunControls, homeRowStates, orderIssuesForSwipe, renderPage
+    resolveRunControls, homeRowStates, orderIssuesForSwipe, renderPage, writeTaskFacts
   }, { workspace, session, teamId, assigneeState, openRouterSource, res });
 }
 
@@ -3247,6 +3256,11 @@ const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore,
 const homeRowStates = createHomeRowStates({
   getLoopsForWorkspace, dispatchStore: dispatchQueueStore, agentStatusStore, taskDecisionsStore, shelvedRulingsStore, enrichLoop, deriveSessionWaiting,
 })
+// LIN-4068 D4: the workspace issue set `/state` and the task page will read, held per urlKey. Home's fetches write it
+// through the holder's gate; only a private route's caller may start a refresh (piece B wires `/state`, the first one).
+const taskFacts = createTaskFactsHolder()
+const refreshTaskFacts = createTaskFactsRefresh({ holder: taskFacts, fetchAndPrepareProjects })
+const writeTaskFacts = (urlKey, fetched) => taskFacts.write(urlKey, fetched)
 app.use(createTaskPageRoutes({
   workspaceFromUrl,
   getOpenRouterSource,
@@ -3432,7 +3446,9 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       customPrompts = (await customPromptsStore.list(workspace.urlKey)).map(p => ({ id: p.id, name: p.name }));
     } catch (e) { /* non-fatal */ }
 
-    const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated, availableAssignees, appliedAssigneeName } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true, assigneeName: assigneeState.resolvedAssigneeName, accountId: req.session.accountId });
+    const fetched = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true, assigneeName: assigneeState.resolvedAssigneeName, accountId: req.session.accountId });
+    const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated, availableAssignees, appliedAssigneeName } = fetched;
+    writeTaskFacts(workspace.urlKey, fetched);
     const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h));
     // LIN-2944 P1 F3: the deck's front card, over the SAME already-fetched trees —
     // `orderIssuesForSwipe` is pure and adds no provider call. With `?assignee=`,
@@ -3441,7 +3457,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
     const homeTopTask = orderedHome.find((issue) => !issue.isSeed) || null;
     const seedOnlyHome = orderedHome.length > 0 && orderedHome.every((issue) => issue.isSeed);
     const featureFlags = await requestFeatureFlags(req);
-    const homeStates = await homeRowStates({ urlKey: workspace.urlKey, inProgressTrees, recentActivityTrees, projectTrees: trees, runControls: featureFlags.runControls === true });
+    const homeStates = await homeRowStates({ urlKey: workspace.urlKey, issues: fetched.stateIssues, runControls: featureFlags.runControls === true });
     const rowStates = homeStates?.states ?? null;
     // LIN-4024: Home renders the trimmed view (what needs you, what runs, what is next; the rest behind folds).
     const homeView = buildHomeView({ inProgressTrees, trees, states: rowStates ?? new Map(), topTaskId: homeTopTask ? nodeKey(homeTopTask) : null });
@@ -3526,11 +3542,14 @@ app.get('/workspace/:urlKey/api/home-rows', workspaceFromUrl, async (req, res) =
   const assigneeState = await resolveAssigneeSelection(req, provider, getWorkspaceCallScope(workspace));
   try {
     // The page's own inputs, so these rows and the page's rows come from one filtered view of the workspace.
-    const { trees, inProgressTrees, recentActivityTrees, showSource } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true, assigneeName: assigneeState.resolvedAssigneeName, accountId: req.session.accountId });
+    const fetched = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true, assigneeName: assigneeState.resolvedAssigneeName, accountId: req.session.accountId });
+    const { trees, inProgressTrees, recentActivityTrees, showSource } = fetched;
+    // LIN-4068: a third caller of the fetch; it holds a complete set through the same gate as Home's page load.
+    writeTaskFacts(workspace.urlKey, fetched);
     const orderedHome = orderIssuesForSwipe({ projectTrees: trees, inProgressTrees, recentActivityTrees, urlKey: workspace.urlKey });
     const homeTopTask = orderedHome.find((issue) => !issue.isSeed) || null;
     const featureFlags = await requestFeatureFlags(req);
-    const homeStates = await homeRowStates({ urlKey: workspace.urlKey, inProgressTrees, recentActivityTrees, projectTrees: trees, runControls: featureFlags.runControls === true });
+    const homeStates = await homeRowStates({ urlKey: workspace.urlKey, issues: fetched.stateIssues, runControls: featureFlags.runControls === true });
     const states = homeStates?.states ?? new Map();
     const rows = homeRowsFor({ kind, projectId, parentId, q, offset, trees, inProgressTrees, states, topTaskId: homeTopTask ? nodeKey(homeTopTask) : null });
     const urlKey = workspace.urlKey;
