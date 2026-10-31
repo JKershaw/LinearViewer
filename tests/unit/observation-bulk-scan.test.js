@@ -648,3 +648,90 @@ test.describe('bulk scan — a per-row error fails one row, not the batch', () =
     assert.deepEqual(calls.map((c) => c.identifier).sort(), ['failing-row', 're-scanned-row'], 'both POSTs were issued');
   });
 });
+
+// LIN-2709: a callback's failure is a notification failure, never a pool
+// failure. Before the fix, runOne called onResult unguarded inside its
+// `finally`, so a throw skipped teardown() and pump(): the remaining items
+// never posted, onTeardown never fired, and bulkScanStop stayed set so the
+// next run was refused as 'run-in-progress'. onResult here throws on EVERY
+// settled item, the worst case, over several batches of the pool.
+test.describe('startBulkScan — a throwing callback cannot stall the run (LIN-2709)', () => {
+  test('a throwing onResult over several items: every item still posts, onTeardown still fires, and a second run starts', async () => {
+    let posted = 0;
+    const sandbox = makeSandbox(async () => { posted++; return { ok: true }; });
+    // Capture console.error so the test proves each callback throw is
+    // REPORTED, not silently swallowed. makeSandbox's console object is the
+    // one the vm context reads, so overriding its method here takes effect.
+    const reported = [];
+    sandbox.console.error = (...args) => { reported.push(args); };
+    const { startBulkScan, BULK_SCAN_CONCURRENCY } = sandbox.module.exports;
+    const N = BULK_SCAN_CONCURRENCY * 3;
+
+    let onResultCalls = 0;
+    let teardownResults = null;
+    const first = startBulkScan(items(N), {
+      onResult: () => { onResultCalls++; throw new Error('onResult boom'); },
+      onTeardown: (results) => { teardownResults = results; }
+    });
+    await flush();
+
+    assert.equal(first.refused, false, 'the first run was accepted');
+    assert.equal(posted, N, `every item must still post despite the throwing onResult — expected ${N}, got ${posted}`);
+    assert.equal(onResultCalls, N, 'onResult was offered every settled item');
+    assert.ok(teardownResults, 'onTeardown must still fire after callback throws');
+    assert.equal(teardownResults.length, N, 'teardown must be handed every settled result');
+    assert.equal(reported.length, N, 'each callback throw is reported via console.error, never silently dropped');
+
+    const second = startBulkScan(items(1), { onTeardown: () => {} });
+    assert.notEqual(second.reason, 'run-in-progress', 'the stopped-by-throw run must not leave bulkScanStop set');
+    assert.equal(second.refused, false, 'a second run must start');
+    await flush();
+    assert.equal(posted, N + 1, 'the second run actually posted its item');
+  });
+
+  test('a throwing onTeardown: the run still settles, its stop pointer is cleared, and a second run starts', async () => {
+    let posted = 0;
+    const sandbox = makeSandbox(async () => { posted++; return { ok: true }; });
+    const reported = [];
+    sandbox.console.error = (...args) => { reported.push(args); };
+    const { startBulkScan, stopBulkScan } = sandbox.module.exports;
+
+    const first = startBulkScan(items(2), {
+      onTeardown: () => { throw new Error('onTeardown boom'); }
+    });
+    await flush();
+
+    assert.equal(first.refused, false, 'the first run was accepted');
+    assert.equal(posted, 2, 'both items posted before teardown ran');
+    assert.equal(reported.length, 1, 'the onTeardown throw is reported once, not silently dropped');
+
+    // The run has already torn down, so this stop is a no-op: it only checks
+    // idempotence. The in-flight stop path is the next test.
+    assert.doesNotThrow(() => stopBulkScan());
+    const second = startBulkScan(items(1), { onTeardown: () => {} });
+    assert.equal(second.refused, false, 'a second run starts after a throwing onTeardown');
+  });
+
+  test('a throwing onTeardown reached through stopBulkScan() mid-flight: stop does not throw into the caller, the throw is reported once, and a second run starts', async () => {
+    // postScan never settles, so the run is genuinely in flight when stopped:
+    // stop() -> teardown() -> onTeardown is the path the Stop button's click
+    // handler takes. Unguarded, the onTeardown throw would escape stopBulkScan().
+    const sandbox = makeSandbox(() => new Promise(() => {}));
+    const reported = [];
+    sandbox.console.error = (...args) => { reported.push(args); };
+    const { startBulkScan, stopBulkScan, BULK_SCAN_CONCURRENCY } = sandbox.module.exports;
+
+    const first = startBulkScan(items(BULK_SCAN_CONCURRENCY + 1), {
+      onTeardown: () => { throw new Error('boom'); }
+    });
+    await flush();
+    assert.equal(first.refused, false, 'the first run was accepted');
+    assert.equal(reported.length, 0, 'nothing reported yet: the run is still in flight');
+
+    assert.doesNotThrow(() => stopBulkScan(), 'stopBulkScan must not throw into the Stop handler');
+    assert.equal(reported.length, 1, 'the onTeardown throw is reported exactly once, not dropped');
+
+    const second = startBulkScan(items(1), { onTeardown: () => {} });
+    assert.equal(second.refused, false, 'the stopped run cleared its stop pointer, so a second run starts');
+  });
+});
