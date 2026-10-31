@@ -746,7 +746,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       const limit = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 100) : DISPATCH_HISTORY_DEFAULT_LIMIT;
       const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
 
-      const result = await dispatchQueueStore.listHistoryWithBodies(workspace.urlKey, { limit, offset });
+      // LIN-2122: `withLineage` adds each row's `outcome`, the same word the proxy list reports
+      // (lib/dispatch-lineage-status.js `wireStatusOf`); `status` stays the stored value.
+      const result = await dispatchQueueStore.listHistoryWithBodies(workspace.urlKey, { limit, offset, withLineage: true });
       // LIN-3384: mask prose-mode bootstrap lines in non-owned prompts.
       res.json({ ...result, items: redactSessionItems(result.items, req.session?.accountId || null) });
     } catch (err) {
