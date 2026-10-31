@@ -1,5 +1,6 @@
 /**
  * scripts/run-unit-tests.mjs (LIN-3605): local concurrency cap, CI unchanged.
+ * scripts/run-unit-tests.mjs (LIN-2369): OpenRouter credentials blanked for the suite.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,7 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { unitTestConcurrency, nodeTestArgs } from '../../scripts/run-unit-tests.mjs';
+import { unitTestConcurrency, unitTestEnv, nodeTestArgs } from '../../scripts/run-unit-tests.mjs';
 
 const script = fileURLToPath(new URL('../../scripts/run-unit-tests.mjs', import.meta.url));
 
@@ -37,6 +38,31 @@ describe('unitTestConcurrency', () => {
     for (const [cpus, want] of [[1, 1], [2, 1], [3, 1], [8, 4], [16, 8]]) {
       assert.equal(unitTestConcurrency({ env: {}, cpus }), want, `cpus=${cpus}`);
     }
+  });
+});
+
+describe('unitTestEnv', () => {
+  test('blanks both OpenRouter credentials when set', () => {
+    const env = unitTestEnv({ OPENROUTER_API_KEY: 'sk-live', OPENROUTER_FREE_TIER_KEY: 'sk-free' });
+    assert.equal(env.OPENROUTER_API_KEY, '');
+    assert.equal(env.OPENROUTER_FREE_TIER_KEY, '');
+  });
+  test('sets both to empty when unset, so dotenv cannot refill them from .env', () => {
+    const env = unitTestEnv({});
+    assert.equal(env.OPENROUTER_API_KEY, '');
+    assert.equal(env.OPENROUTER_FREE_TIER_KEY, '');
+  });
+  test('blanks whitespace-only values too', () => {
+    const env = unitTestEnv({ OPENROUTER_API_KEY: '   ', OPENROUTER_FREE_TIER_KEY: '\t' });
+    assert.equal(env.OPENROUTER_API_KEY, '');
+    assert.equal(env.OPENROUTER_FREE_TIER_KEY, '');
+  });
+  test('leaves every other variable alone and does not mutate its input', () => {
+    const input = { OPENROUTER_API_KEY: 'sk-live', OPENROUTER_API_URL: 'https://example.test', OPENAI_API_KEY: 'x', CI: 'true' };
+    const env = unitTestEnv(input);
+    assert.deepEqual(env, { ...input, OPENROUTER_API_KEY: '', OPENROUTER_FREE_TIER_KEY: '' });
+    assert.equal(input.OPENROUTER_API_KEY, 'sk-live');
+    assert.equal(input.OPENROUTER_FREE_TIER_KEY, undefined);
   });
 });
 
@@ -93,5 +119,31 @@ describe('wrapper spawned (exit code pass-through)', () => {
   });
   test('a passing test file makes the wrapper exit 0', () => {
     assert.equal(runFile('assert.ok(true)').status, 0);
+  });
+});
+
+describe('wrapper spawned (OpenRouter credentials blanked, LIN-2369)', () => {
+  // The probe file asserts what it sees, so the wrapper's exit code is the
+  // witness: 0 only if node --test's child really got the blanked values.
+  test('a test file sees both OpenRouter credentials empty when the parent has them set', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rut-'));
+    try {
+      const file = path.join(dir, 'probe.test.mjs');
+      fs.writeFileSync(file, `import { test } from 'node:test';
+import assert from 'node:assert/strict';
+test('credentials are blank', () => {
+  assert.equal(process.env.OPENROUTER_API_KEY, '');
+  assert.equal(process.env.OPENROUTER_FREE_TIER_KEY, '');
+});
+`);
+      const env = { ...process.env, CI: 'true', OPENROUTER_API_KEY: 'sk-live', OPENROUTER_FREE_TIER_KEY: 'sk-free' };
+      delete env.UNIT_TEST_CONCURRENCY;
+      delete env.UNIT_TEST_DRY_RUN;
+      delete env.NODE_TEST_CONTEXT;
+      const r = spawnSync(process.execPath, [script, file], { env, encoding: 'utf8' });
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

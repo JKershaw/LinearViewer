@@ -55,8 +55,15 @@ jobs:
       # rather than adding a second run. The property is worthless unenforced:
       # the unit suite reached api.linear.app on every run for months while two
       # other instruments reported clean.
-      - name: Run unit tests (hermetic — no live network)
-        run: npm run test:hermetic
+      # LIN-2369: this arm runs WITH dummy OpenRouter credentials present, so
+      # the suite must give the same result as the keyless proxy arm below. The
+      # runner blanks both keys (scripts/run-unit-tests.mjs unitTestEnv), so
+      # this proves the blanking holds: remove it and the offending files reach
+      # openrouter.ai here and the arm goes red. It does not prove each file
+      # tolerates a key reaching it. The value is deliberately not shaped like
+      # an OpenRouter key, so the secret scan does not flag this file.
+      - name: Run unit tests (hermetic — no live network, dummy OpenRouter keys set)
+        run: npm run test:hermetic:keyed
         env:
           CI: true
           MONGODB_TEST_URI: mongodb://localhost:27017
