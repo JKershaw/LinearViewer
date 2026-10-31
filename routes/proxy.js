@@ -36,7 +36,7 @@ import { BYTE_IDENTICAL_ESCALATION_THRESHOLD } from '../lib/rejected-credentials
 import { STAGE_PROVIDER_LANE, STAGE_PROXY_TOKEN } from '../lib/proxy-events.js';
 import { READ_WRITE } from '../lib/proxy-scopes.js';
 import { requireGrant } from '../lib/require-grant.js';
-import { graphqlErrorExtra, graphqlErrorDetail, declaredProviderDisplayName } from '../lib/proxy-graphql-errors.js';
+import { graphqlErrorExtra, graphqlErrorDetail, declaredProviderDisplayName, upstreamErrorStatus } from '../lib/proxy-graphql-errors.js';
 import { deriveTerminalStatus, deriveLifecycleStatus, deriveCompletedAt, harvestAbortedTargets, feedbackWithHarvestedAbort, mergeLineageFeedback } from '../lib/dispatch-terminal.js';
 import { anchorFor as taskCostAnchorFor, buildTaskCost } from '../lib/task-cost.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
@@ -99,7 +99,7 @@ import {
 } from '../lib/proxy-ref-resolver.js';
 import { PartialWriteError } from '../lib/partial-write-error.js';
 import { tokenValidationOptions } from '../lib/consumer-heartbeat-ingest.js';
-import { badRequest, jsonError, keepaliveError, notFound, workspaceUnavailableEnvelope, classifyUpstreamError } from '../lib/errors.js';
+import { badRequest, jsonError, keepaliveError, notFound, workspaceUnavailableEnvelope, classifyUpstreamError, isRateLimited, isEntityNotFoundError } from '../lib/errors.js';
 import { publicOrigin } from '../lib/public-origin.js';
 
 // LIN-1458: which OpenRouter credential source served a request whose token
@@ -1138,31 +1138,46 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   }
 
   /**
-   * Extract the upstream HTTP status from a graphql-request error.
-   * graphql-request stores Linear's response status in err.response.status
-   * and in err.response.errors[].extensions.statusCode.
+   * Map a failed provider call to the proxy's response status. The upstream status is read
+   * by upstreamErrorStatus (lib/proxy-graphql-errors.js) from one of two shapes: Linear's
+   * graphql-request `err.response`, or the numeric `err.status` the Jira, GitHub and GitHub
+   * Projects clients throw (LIN-2040).
    *
    * Maps upstream status to appropriate proxy response status:
-   *  - 401/403 from Linear, TRANSIENT (see isTransientProviderAuthFailure)
+   *  - 401 (either shape), TRANSIENT (see isTransientProviderAuthFailure)
    *    → 503, retryable — our own records believed this credential was
-   *    still live; Linear disagreeing is a stale-serving/rotation-race
+   *    still live; the provider disagreeing is a stale-serving/rotation-race
    *    signature that resolves itself on the next request, not a dead
    *    credential (LIN-2216)
-   *  - 401/403 from Linear, otherwise → 401 (workspace token invalid/expired)
-   *  - 404 from Linear     → 404 (resource not found)
-   *  - 429 from Linear     → 429 (rate limited)
+   *  - 401 otherwise → 401 (workspace token invalid/expired)
+   *  - 403 from Linear → 401 (or 503 when transient, as above)
+   *  - 403 from Jira/GitHub/GitHub Projects → 403: one missing permission, and it
+   *    does not mark the credential suspect. A 403 whose message says "rate limit"
+   *    (GitHub's secondary limit) → 429 instead.
+   *  - 404 → 404 (resource not found)
+   *  - 429 → 429 (rate limited)
+   *  - a Linear not-found in a 200 envelope (isEntityNotFoundError) → 404
    *  - a flagged caller error (extensions.userError) → 400 (see below)
-   *  - anything else       → 500
+   *  - anything else, including every Jira/GitHub 5xx → 500
    */
   function graphqlErrorStatus(err, req) {
     // AbortSignal.timeout() raises a TimeoutError (name === 'TimeoutError')
     // and manual AbortController.abort() raises AbortError.
     if (err.name === 'TimeoutError' || err.name === 'AbortError') return 504;
-    const status = err.response?.status
-      || err.response?.errors?.[0]?.extensions?.statusCode;
+    const { status, shape } = upstreamErrorStatus(err);
+    if (shape === 'status') {
+      if (status === 401) return isTransientProviderAuthFailure(req) ? 503 : 401;
+      if (status === 403) return isRateLimited(err) ? 429 : 403;
+      return status;
+    }
     if (status === 401 || status === 403) return isTransientProviderAuthFailure(req) ? 503 : 401;
     if (status === 404) return 404;
     if (status === 429) return 429;
+    // Linear's "Entity not found" for an issue lookup arrives in an HTTP 200 envelope,
+    // where the statusCode branches above cannot see it. It is a 404 the docs promise,
+    // not a caller error, so it is checked before `userError` (which that envelope also
+    // carries) would turn it into a 400. (LIN-2040)
+    if (isEntityNotFoundError(err)) return 404;
     // Linear reports a CALLER error inside an HTTP 200 GraphQL envelope carrying
     // no `statusCode` at all — e.g. a malformed page cursor:
     //   status: 200, extensions: { code: 'INVALID_INPUT', type: 'invalid input',
@@ -1172,9 +1187,9 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     // "the server broke, back off and retry" about an input only the caller can
     // fix. `userError` is Linear's own explicit "this one is on you" flag, so it
     // maps to 400 on every route, not just /issues: a caller error is a caller
-    // error wherever it lands. Deliberately evaluated LAST, after the four
-    // mappings above have had their say, so this can only refine a would-be 500
-    // — no status this function already returns can move. (LIN-1511)
+    // error wherever it lands. Evaluated after the mappings above, so it can only
+    // refine a would-be 500 (or the not-found 404 just above, which is checked
+    // first). (LIN-1511)
     if (err.response?.errors?.[0]?.extensions?.userError === true) return 400;
     return 500;
   }

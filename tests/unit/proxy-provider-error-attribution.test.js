@@ -127,10 +127,9 @@ describe('graphqlErrorDetail attributes the resolved provider, not a hardcoded L
     assert.doesNotMatch(body.detail, /Linear/);
   });
 
-  // Shaped as err.response.status, not err.status: graphqlErrorStatus only
-  // reads the former (the graphql-request shape) — real non-Linear clients
-  // set err.status instead, which would silently map to 500 and assert the
-  // wrong branch (the plan-review's own finding on this exact point).
+  // Shaped as err.response.status (the graphql-request, Linear shape). The
+  // non-Linear clients throw err.status instead; graphqlErrorStatus reads both
+  // since LIN-2040, and the err.status shape is pinned by lin-2040-proxy-error-status.test.js.
   test('a 429-shaped upstream error (err.response.status): 429 + detail names the provider', async () => {
     const provider = new ThrowingProvider(GITHUB_PROVIDER_NAME, 'GitHub Issues');
     const err = new Error('rate limited');

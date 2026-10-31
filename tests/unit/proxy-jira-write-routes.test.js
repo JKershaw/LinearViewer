@@ -959,15 +959,11 @@ describe('Jira-backed proxy GET /api/proxy/states/:teamId — a getProjectStatus
       throw err;
     };
     const { status, body } = await call(buildApp(), 'GET', '/api/proxy/states/ENG');
-    // Pinned, not assumed: Jira client errors carry `err.status` (client.js),
-    // but graphqlErrorStatus() only recognises Linear's graphql-request shape
-    // (`err.response.status` / `err.response.errors[].extensions.statusCode`) —
-    // so a Jira 403 here does not match ANY of its 401/403/404/429 branches and
-    // falls through to the generic 500, not a clean 401/403. Worth knowing for
-    // an agent calling this route against a Jira workspace; out of this
-    // ticket's scope to change (LIN-2032 is a test-coverage ticket against the
-    // fake client, not a fix), flagged here rather than silently assumed away.
-    assert.equal(status, 500);
+    // LIN-2040: graphqlErrorStatus reads the `err.status` Jira's client sets, so a
+    // missing-permission 403 reaches the agent as 403 (it was a bare 500 — the gap
+    // this block recorded). It is a permission refusal, not a credential failure, so
+    // it does not mark the credential suspect.
+    assert.equal(status, 403);
     assert.equal(body.error, 'Failed to fetch states');
   });
 });

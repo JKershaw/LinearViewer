@@ -8,24 +8,17 @@
  * reach, and `req.resolvedProvider` (the stamp LIN-2351 added) was already
  * correctly populated on this very request and simply not read.
  *
- * WHY THIS IS TESTED NOW, THOUGH IT IS LATENT. Re-derived at HEAD:
- * `graphqlErrorStatus` reads only `err.response.status` /
- * `err.response.errors[0].extensions.statusCode` (the graphql-request shape),
- * while all three non-Linear clients set `err.status` instead
- * (lib/providers/{github,jira,github-projects}/client.js). So a real GitHub or
- * Jira 401 maps to 500 today and never enters this branch — the misattribution
- * is armed, not firing, and no operator is being misled by it right now.
+ * WHY THIS IS TESTED. Before LIN-2040 `graphqlErrorStatus` read only the
+ * graphql-request shape (`err.response`), so a real GitHub or Jira 401, thrown as
+ * `err.status` by lib/providers/{github,jira,github-projects}/client.js, never
+ * entered this branch. LIN-2040 made the mapper read `err.status` too, so that
+ * path is live now: without the attribution below, GitHub and Jira operators
+ * would be told that *Linear* rejected their credentials, in the exact field
+ * LIN-2351 cleaned. The "status shape" tests at the end of this file pin it.
  *
- * That is precisely why it needs a test. The moment anyone normalises the error
- * shape — the obvious fix, tracked separately — this branch would immediately
- * start telling GitHub and Jira operators that *Linear* rejected their
- * credentials, in the exact field LIN-2351 just cleaned, with nothing to catch
- * it: no test asserted this route's 401/503 body at all, which is why CI was
- * green with the misattribution present.
- *
- * These tests therefore reach the branch the way it WILL be reachable, by
- * throwing the graphql-request-shaped error `graphqlErrorStatus` already
- * understands while the resolved provider is a non-Linear one.
+ * The first block reaches the branch with the graphql-request-shaped error
+ * `graphqlErrorStatus` already understood while the resolved provider is a
+ * non-Linear one.
  *
  * BOUNDARY: `code`/`category`/`retryable` are asserted UNCHANGED. The `LINEAR_*`
  * codes are a published, machine-matchable contract (docs/proxy-integration.md);
@@ -47,8 +40,17 @@ import { fingerprintCredential } from '../../lib/credential-diagnostics.js';
 
 const ENDPOINT = '/api/proxy/autopilot/kickoff';
 
-/** The graphql-request-shaped error `graphqlErrorStatus` understands. */
-function upstreamError(status) {
+/**
+ * The error `graphqlErrorStatus` understands. `shape` is the graphql-request envelope
+ * (`response`, Linear) or the numeric `err.status` the Jira/GitHub clients throw (LIN-2040:
+ * that shape is now read, so the same branch is reachable from a non-Linear provider).
+ */
+function upstreamError(status, shape = 'linear') {
+  if (shape === 'status') {
+    const err = new Error('Jira API request failed');
+    err.status = status;
+    return err;
+  }
   const err = new Error('You need to authenticate to access this operation.');
   err.response = { status, errors: [{ message: 'nope', extensions: { statusCode: status } }] };
   return err;
@@ -71,7 +73,7 @@ const credential = (provider, { live = true } = {}) => async () => ({
  * models a failure on a GOAL-ONLY kickoff, which never calls
  * `resolveProviderAccess` at all and so reaches the branch UNSTAMPED.
  */
-function buildApp({ providerName, displayName, live = true, throwOn = 'context' }) {
+function buildApp({ providerName, displayName, live = true, throwOn = 'context', shape = 'linear', upstreamStatus = 401 }) {
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
@@ -96,7 +98,7 @@ function buildApp({ providerName, displayName, live = true, throwOn = 'context' 
       createFields: () => [],
       // The seam the kickoff route reaches upstream through.
       fetchIssueContext: async () => {
-        if (throwOn === 'context') throw upstreamError(401);
+        if (throwOn === 'context') throw upstreamError(upstreamStatus, shape);
         return { issue: { id: 'i1', identifier: 'ENG-1', title: 't' }, comments: [], children: [] };
       },
     },
@@ -105,7 +107,7 @@ function buildApp({ providerName, displayName, live = true, throwOn = 'context' 
     briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore: {
       addItem: async () => {
-        if (throwOn === 'dispatch') throw upstreamError(401);
+        if (throwOn === 'dispatch') throw upstreamError(upstreamStatus, shape);
         return { id: 'd1' };
       },
     },
@@ -240,5 +242,39 @@ describe('LIN-2363 — classifyUpstreamError: attribution without a resolved pro
     assert.equal(named(upstreamError(500)), 'Jira returned a 500 server error.');
     assert.equal(named(new Error('fetch failed')),
       'The connection to Jira closed before a response arrived — usually transient.');
+  });
+});
+
+// LIN-2040 — the err.status shape (Jira/GitHub/GitHub Projects) through the kickoff route.
+describe('LIN-2040 — kickoff relays a provider 401/403/404/429 thrown as err.status', () => {
+  test('a GitHub 401 (err.status) is named GitHub, not Linear, and stays the terminal 401', async () => {
+    const { status, body } = await kickoff(buildApp({ providerName: 'github', displayName: 'GitHub Issues', shape: 'status', live: false }));
+    assert.equal(status, 401, JSON.stringify(body));
+    assert.equal(body.retryable, false);
+    assert.equal(body.code, 'LINEAR_AUTH', 'the published code is untouched (LIN-2351 boundary)');
+    assert.match(body.detail, /^GitHub Issues rejected the request as unauthenticated\.$/);
+  });
+
+  test('a Jira 401 (err.status) with a live credential is the retryable 503, named Jira', async () => {
+    const { status, body } = await kickoff(buildApp({ providerName: 'jira', displayName: 'Jira', shape: 'status', live: true }));
+    assert.equal(status, 503, JSON.stringify(body));
+    assert.equal(body.retryable, true);
+    assert.match(body.detail, /^Jira rejected the request as unauthenticated\.$/);
+  });
+
+  for (const upstreamStatus of [403, 404, 429]) {
+    test(`a Jira ${upstreamStatus} (err.status) is relayed as ${upstreamStatus}, not a bare 500`, async () => {
+      const { status, body } = await kickoff(buildApp({ providerName: 'jira', displayName: 'Jira', shape: 'status', upstreamStatus }));
+      assert.equal(status, upstreamStatus, JSON.stringify(body));
+      assert.equal(body.error, 'Failed to dispatch autopilot kickoff');
+      assert.equal(body.detail, 'Jira API request failed');
+      assert.doesNotMatch(body.detail, /Linear/);
+    });
+  }
+
+  test('a Jira 500 (err.status) stays a bare 500: a provider 5xx never surfaces as 503', async () => {
+    const { status, body } = await kickoff(buildApp({ providerName: 'jira', displayName: 'Jira', shape: 'status', upstreamStatus: 500 }));
+    assert.equal(status, 500, JSON.stringify(body));
+    assert.equal(body.detail, undefined);
   });
 });
