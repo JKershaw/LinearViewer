@@ -9,7 +9,11 @@ import crypto from 'node:crypto';
 // freshly generated, PEM-valid App key.
 const { privateKey: heldKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
 const HELD_GITHUB_PEM = heldKey.export({ type: 'pkcs1', format: 'pem' });
-const UNCONFIGURED_ENV = 'NODE_ENV=test SESSION_SECRET=test-secret-for-playwright OPENROUTER_API_KEY= OPENROUTER_FREE_TIER_KEY= FREE_TIER_HOURLY_LIMIT=1000000 PLAN_FEE_MONTHLY_USD= YAP_BASE_URL=http://localhost:3001/test/yap JIRA_CLIENT_ID=test-jira-client JIRA_CLIENT_SECRET=test-jira-secret JIRA_REDIRECT_URI=http://localhost:3001/auth/jira/oauth/callback JIRA_OAUTH_TEST_BASE=http://localhost:3001/test/atlassian EMAIL_TRANSPORT=capture EMAIL_LINK_ORIGIN= PUBLIC_ORIGIN= MONGODB_URI=';
+// LIN-1484: LINEAR_ACCESS_TOKEN= is pinned empty for every e2e server. A
+// developer's PAT in .env would otherwise sign each server in via
+// lib/pat-session.js, breaking the signed-out specs. dotenv never overrides a
+// variable already set, so the empty assignment here wins over .env.
+const UNCONFIGURED_ENV = 'NODE_ENV=test SESSION_SECRET=test-secret-for-playwright OPENROUTER_API_KEY= OPENROUTER_FREE_TIER_KEY= FREE_TIER_HOURLY_LIMIT=1000000 PLAN_FEE_MONTHLY_USD= YAP_BASE_URL=http://localhost:3001/test/yap JIRA_CLIENT_ID=test-jira-client JIRA_CLIENT_SECRET=test-jira-secret JIRA_REDIRECT_URI=http://localhost:3001/auth/jira/oauth/callback JIRA_OAUTH_TEST_BASE=http://localhost:3001/test/atlassian EMAIL_TRANSPORT=capture EMAIL_LINK_ORIGIN= PUBLIC_ORIGIN= LINEAR_ACCESS_TOKEN= MONGODB_URI=';
 
 export default defineConfig({
   testDir: './tests/e2e',
