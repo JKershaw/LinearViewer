@@ -70,7 +70,10 @@ function linearError(httpStatus, errors = []) {
   return err;
 }
 
-/** Linear's recorded shape for a lookup of a missing entity, in an HTTP 200 envelope. */
+/**
+ * Linear's not-found envelope, hand-shaped: `message` not yet captured verbatim (see the
+ * LIN-2040 ledger); `userPresentableMessage` matches the live proxy detail.
+ */
 function linearNotFoundEnvelope() {
   return linearError(200, [{
     message: 'Entity not found: Issue',
@@ -283,6 +286,16 @@ describe('guards — a non-auth upstream status never becomes a 503/401 or marks
     assert.equal(body.retryable, false);
   });
 
+  test('a Jira 401 on an API-token binding (the never-expires sentinel expiry) is a terminal 401, not the 503 grace', async () => {
+    const provider = new ThrowingProvider(JIRA, 'Jira');
+    provider.error = statusError(401);
+    const { status, body } = await call(buildApp(provider, {
+      resolveWorkspaceAccess: async () => ({ token: 'ws-token', reason: 'ok', provider: JIRA, expiresAt: Number.MAX_SAFE_INTEGER, credentialFingerprint: FINGERPRINT }),
+    }), 'GET', '/api/proxy/me');
+    assert.equal(status, 401, JSON.stringify(body));
+    assert.equal(body.retryable, false);
+  });
+
   test('Linear 200 envelope { statusCode: 403, userError: true } stays 400 and does not mark the credential', async () => {
     const provider = new ThrowingProvider(LINEAR, 'Linear');
     provider.error = linearError(200, [{ message: 'You do not have access to this team', extensions: { statusCode: 403, userError: true } }]);
@@ -303,7 +316,7 @@ describe('guards — a non-auth upstream status never becomes a 503/401 or marks
 });
 
 // ---------------------------------------------------------------------------
-// Linear: the recorded not-found envelope, and the 200-envelope statuses.
+// Linear: the (hand-shaped) not-found envelope, and the 200-envelope statuses.
 // ---------------------------------------------------------------------------
 describe('Linear — a not-found in a 200 envelope is 404; the other envelope statuses map as before (LIN-2040)', () => {
   const NOT_FOUND_ROUTES = [

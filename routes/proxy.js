@@ -33,6 +33,7 @@ import { createProxyFlightCompanionRoutes } from './proxy-flight-companion.js';
 import { createProxyRunnerRoutes } from './proxy-runner.js';
 import { createProxyRunnerPromptRoutes } from './proxy-runner-prompt.js';
 import { BYTE_IDENTICAL_ESCALATION_THRESHOLD } from '../lib/rejected-credentials.js';
+import { SENTINEL_EXPIRY_FLOOR_MS } from '../lib/credential-diagnostics.js';
 import { STAGE_PROVIDER_LANE, STAGE_PROXY_TOKEN } from '../lib/proxy-events.js';
 import { READ_WRITE } from '../lib/proxy-scopes.js';
 import { requireGrant } from '../lib/require-grant.js';
@@ -1149,7 +1150,8 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    *    still live; the provider disagreeing is a stale-serving/rotation-race
    *    signature that resolves itself on the next request, not a dead
    *    credential (LIN-2216)
-   *  - 401 otherwise → 401 (workspace token invalid/expired)
+   *  - 401 otherwise → 401 (workspace token invalid/expired); on the Jira/GitHub shape a
+   *    never-expires sentinel expiry (API token, PAT) is not a live expiry, so it is always this
    *  - 403 from Linear → 401 (or 503 when transient, as above)
    *  - 403 from Jira/GitHub/GitHub Projects → 403: one missing permission, and it
    *    does not mark the credential suspect. A 403 whose message says "rate limit"
@@ -1166,7 +1168,10 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     if (err.name === 'TimeoutError' || err.name === 'AbortError') return 504;
     const { status, shape } = upstreamErrorStatus(err);
     if (shape === 'status') {
-      if (status === 401) return isTransientProviderAuthFailure(req) ? 503 : 401;
+      // A Jira API-token or PAT binding is stamped with the never-expires sentinel
+      // (Number.MAX_SAFE_INTEGER): finite and "in the future", but no real expiry, so its 401
+      // is terminal. Only a real expiry (a GitHub App installation token) earns the grace.
+      if (status === 401) return isTransientProviderAuthFailure(req) && req.resolvedCredentialExpiresAt < SENTINEL_EXPIRY_FLOOR_MS ? 503 : 401;
       if (status === 403) return isRateLimited(err) ? 429 : 403;
       return status;
     }
