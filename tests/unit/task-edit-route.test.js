@@ -237,6 +237,23 @@ describe('state control degradation', () => {
   });
 });
 
+// LIN-2052: a GitHub-backed task edit has no Priority control, pinned beside the
+// Jira priority pins (the F4 merge pin below and render-task-edit.test.js). The fake
+// provider carries GitHub's REAL ui, so this fails if the GitHub provider stops
+// overriding priority, not just if the renderer changes.
+describe('GitHub-backed task edit hides priority (LIN-2052)', () => {
+  test('the route renders no priority control for a GitHub-bound issue', async () => {
+    const provider = fakeProvider({ ui: { ...new GitHubProvider().ui } });
+    const res = await call({ provider });
+    assert.strictEqual(res.statusCode, 200);
+    assert.ok(res.body.includes('data-testid="task-edit-form"'), 'the edit form still renders');
+    assert.ok(
+      !res.body.includes('data-testid="task-edit-priority"'),
+      'GitHub cannot save priority; a rendered control would be a silent no-op on submit',
+    );
+  });
+});
+
 // =============================================================================
 // The merge-resolution pin (LIN-1886 review F4 × LIN-1904)
 // =============================================================================
@@ -254,22 +271,6 @@ describe('state control degradation', () => {
 // So this is that test. It pins the resolution actually taken: `ui` comes from
 // the PER-BINDING provider. The only variable between the two cases below is
 // the `source` query param.
-// LIN-2052: a GitHub-backed task edit has no Priority control, pinned beside the
-// Jira case above. The fake provider carries GitHub's REAL ui, so this fails if the
-// GitHub provider stops overriding priority, not just if the renderer changes.
-describe('GitHub-backed task edit hides priority (LIN-2052)', () => {
-  test('the route renders no priority control for a GitHub-bound issue', async () => {
-    const provider = fakeProvider({ ui: { ...new GitHubProvider().ui } });
-    const res = await call({ provider });
-    assert.strictEqual(res.statusCode, 200);
-    assert.ok(res.body.includes('data-testid="task-edit-form"'), 'the edit form still renders');
-    assert.ok(
-      !res.body.includes('data-testid="task-edit-priority"'),
-      'GitHub cannot save priority; a rendered control would be a silent no-op on submit',
-    );
-  });
-});
-
 describe('ui is read off the ISSUE\'s binding, not the workspace\'s active provider (F4 merge pin)', () => {
   /** A two-binding workspace: active provider honours priority, the secondary one does not. */
   function twoBindingWorkspace() {
