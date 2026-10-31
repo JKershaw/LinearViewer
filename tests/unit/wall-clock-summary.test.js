@@ -2,7 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   bucketOf, decomposeEffort, summarizeSteps, groupBySession, median,
+  BUCKET_OF_KIND,
 } from '../../lib/wall-clock-summary.js';
+import { PROMPT_TEMPLATES } from '../../lib/prompt-template-defs.js';
+
+// LIN-1653: the dispatch meta-kinds that BUCKET_OF_KIND maps but no prompt
+// template generates. Everything else in the map must be a PROMPT_TEMPLATES key.
+const DISPATCH_META_BUCKET_KINDS = ['autopilot', 'wake', 'custom', 'periodical'];
 
 // A realistic heartbeat log (mirrors the live proxy shape verified for LIN-987):
 // onboarding (24s, 0 tools) → active (32s, 7 tools) → waiting (2m, 0 tools — a
@@ -178,4 +184,34 @@ test('median handles empty and even-length arrays', () => {
   assert.equal(median([]), null);
   assert.equal(median([3, 1, 2]), 2);
   assert.equal(median([1, 2, 3, 4]), 2.5);
+});
+
+// ─── LIN-1653: the bucket map covers every prompt template, and a test keeps it so ───
+
+test('every PROMPT_TEMPLATES key has a BUCKET_OF_KIND entry (no template falls through to orchestration)', () => {
+  const missing = Object.keys(PROMPT_TEMPLATES).filter((k) => !Object.hasOwn(BUCKET_OF_KIND, k));
+  assert.deepEqual(missing, [], `template kinds missing from BUCKET_OF_KIND: ${missing.join(', ')}`);
+});
+
+test('every BUCKET_OF_KIND entry is either a PROMPT_TEMPLATES key or a known dispatch meta-kind (no stale entries)', () => {
+  const stale = Object.keys(BUCKET_OF_KIND)
+    .filter((k) => !Object.hasOwn(PROMPT_TEMPLATES, k) && !DISPATCH_META_BUCKET_KINDS.includes(k));
+  assert.deepEqual(stale, [], `BUCKET_OF_KIND keys that match no template or meta-kind: ${stale.join(', ')}`);
+});
+
+test('bug lands in the before-the-diff bucket, not orchestration (its investigation precedes the fix)', () => {
+  assert.equal(bucketOf('bug'), 'before');
+  assert.notEqual(bucketOf('bug'), 'orchestration');
+});
+
+test('LIN-1653: summarizeSteps counts a bug step as before-the-diff worker time, never orchestration', () => {
+  const s = summarizeSteps([
+    { id: 'b1', kind: 'bug', dispatchedAt: '2026-08-01T00:00:00.000Z', completedAt: '2026-08-01T00:10:00.000Z', feedback: [] },
+    { id: 'w1', kind: 'wake', dispatchedAt: '2026-08-01T00:00:00.000Z', completedAt: '2026-08-01T00:10:00.000Z', feedback: [] },
+  ]);
+  assert.equal(s.byBucket.before.steps, 1);
+  assert.equal(s.byBucket.before.wallMs, 10 * 60 * 1000);
+  assert.equal(s.byKind.bug.bucket, 'before');
+  assert.equal(s.byBucket.orchestration.steps, 1, 'only the wake step is orchestration');
+  assert.equal(s.byKind.wake.bucket, 'orchestration');
 });
