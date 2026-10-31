@@ -258,10 +258,10 @@ body itself is the runner-prompt ticket's (LIN-3098); this is only the credentia
 - **Only the workspace owner can mint one.** The server resolves the grants and the owner; the
   client sends only `{ "runner": true }` and `scope`/`label` are ignored. Any body carrying a
   `grants` field is refused `400 GRANTS_NOT_CLIENT_SETTABLE`.
-- **Any signed-in member can list and revoke one.** The Proxy page's "Runner credentials" group
-  shows the waiting bootstrap and the active working token (spent bootstraps hidden) with an
-  hour/minute expiry; revoking either revokes the whole credential lineage (`DELETE
-  /workspace/:urlKey/api/proxy/tokens/{tokenId}`).
+- **Any signed-in member can list them; only the owner can revoke one.** Settings › Agent access
+  lists the waiting bootstrap and the active working token with an hour/minute expiry. Revoking
+  either is owner-only (`403 RUNNER_OWNER_ONLY` for anyone else) and revokes the whole credential
+  lineage (`DELETE /workspace/:urlKey/api/proxy/tokens/{tokenId}`). The Proxy page has no revoke.
 - **Runner routes** (require `take`): `GET /api/proxy/runner/poll`, `POST
   /api/proxy/runner/take/{id}`, `POST /api/proxy/runner/feedback/{id}`. The poll response adds
   `otherConsumerLastSeenAt` — a separate consumer (Simple Dispatcher) seen polling the same
@@ -2799,7 +2799,7 @@ curl -s -X POST -H "$AUTH" -H "Content-Type: application/json" \
 
 - Tokens have 256 bits of entropy (cryptographically secure)
 - Only the SHA-256 hash is stored server-side
-- Tokens can be revoked at any time from the proxy page
+- Tokens can be revoked at any time from Settings › Agent access
 - Each token is scoped to a single workspace
 - Single-use tokens are consumed after first successful request
 - All API calls are logged in the event audit trail (**retained for the life of the project**)
