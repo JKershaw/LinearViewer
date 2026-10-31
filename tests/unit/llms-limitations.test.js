@@ -48,6 +48,13 @@ test('logout destroys the session and returns to the landing page, with no OAuth
   assert.doesNotMatch(m[0], /oauth/i, '/logout must not involve an OAuth flow');
 });
 
+test('PAT mode re-signs in after logout, so the logout line must say it does not stay signed out', () => {
+  const src = read('lib/pat-session.js');
+  assert.match(src, /req\.path === '\/logout'/, 'ensurePATSession must only skip /logout itself');
+  assert.match(src, /LINEAR_ACCESS_TOKEN/);
+  assert.match(limitationsSection(), /PAT mode[^\n]*LINEAR_ACCESS_TOKEN[^\n]*does not stay signed out/);
+});
+
 test('sign-in routes exist for the methods the Limitations line names', () => {
   // GitHub's routes come from a shared factory mounted at its basePath.
   assert.ok(read('routes/auth.js').includes("router.get('/auth/linear'"), 'Linear sign-in route');
@@ -66,5 +73,7 @@ test('expand/collapse state is persisted in localStorage and reset restores defa
 test('team filter is remembered per workspace in localStorage and in server-side account preferences', () => {
   assert.match(read('public/common.js'), /const TEAM_STORAGE_KEY = 'linear-projects-selected-team'/);
   assert.match(read('public/common.js'), /localStorage\.setItem\(teamStorageKey\(urlKey\)/);
-  assert.match(read('lib/account-workspace-store.js'), /selectedTeamByWorkspace/);
+  // Witnesses are the real per-account store and its server.js caller, not a header comment.
+  assert.match(read('lib/user-preferences.js'), /selectedTeamByWorkspace: map/);
+  assert.match(read('server.js'), /userPreferencesStore\.getSelectedTeam\(/);
 });
