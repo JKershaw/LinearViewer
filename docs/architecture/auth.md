@@ -229,8 +229,10 @@ profile (1h bootstrap / 24h working, `lib/proxy-scopes.js`). The owner seam is
 `proxyTokenStore.setOwnerCheck(...)` after `accountWorkspaceStore` exists; unwired, erroring, or a
 corrupt `mergedInto` chain fails closed as `503 OWNER_CHECK_UNAVAILABLE`. Ownership refusals are
 `409 WORKSPACE_OWNER_UNSET` (no owner edge) and `403 GRANT_OWNER_ONLY` (a different account owns
-it); `503 GRANT_OWNERLESS` is a session with no account. Any signed-in member may list and revoke
-runner credentials from the Proxy page, and revoking one revokes its whole lineage. `dispatch` is
+it); `503 GRANT_OWNERLESS` is a session with no account. Any signed-in member may list keys and
+revoke a grant-less one. Only the owner may revoke a runner (grant-bearing) credential, and revoking
+it revokes its whole lineage (`403 RUNNER_OWNER_ONLY` otherwise). Keys are revoked at Settings ›
+Agent access, not the Proxy page ([proxy-integration.md](../proxy-integration.md)). `dispatch` is
 **enforced** on the three enqueue routes (`requireGrant('dispatch')`, LIN-2884 T3 / LIN-3136): the
 runner copy carries it, as do the owner's driver copies (`{ "purpose": "driver" }`, `['dispatch']`
 only, the 48h `worker` profile), the Proxy page's "read-write + dispatch" Agent Prompt

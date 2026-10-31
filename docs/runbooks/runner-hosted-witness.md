@@ -190,8 +190,9 @@ Each is optional. Skip any. Say which you
 did in the comment.
 
 - **Revoke.** After step 5, tap **Revoke**
-  in Runner credentials:
-  https://harbour.cat/workspace/URLKEY/proxy
+  in Settings › Agent access (the owner's
+  account; a member gets 403):
+  https://harbour.cat/workspace/URLKEY/settings/agent-access
   Then tell the runner: `run runner poll`.
   Expect a 401 (credential rejected).
 - **Phone copy.** On your phone (any

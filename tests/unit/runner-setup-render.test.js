@@ -112,8 +112,8 @@ describe('the page\'s states', () => {
     assert.ok(hostile.includes('&lt;script&gt;'));
   });
 
-  test('links to the Runner credentials list, where the credential is revoked', () => {
-    assert.match(render('owner'), /href="\/workspace\/acme\/proxy#proxy-runner-credentials"/);
+  test('links to Settings › Agent access, where the credential is revoked', () => {
+    assert.match(render('owner'), /href="\/workspace\/acme\/settings\/agent-access"/);
   });
 
   test('the page loads the shared common.js (getRunnerBootstrap) and its own script', () => {

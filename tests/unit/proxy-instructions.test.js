@@ -175,6 +175,15 @@ describe('buildInstructions — grants table + take-gated runner section (LIN-31
     assert.match(text, /minted by the workspace OWNER only/);
   });
 
+  test('LIN-3117: runner revoke is owner-only and points at Settings › Agent access, not the Proxy page', () => {
+    const text = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite', grants: ['take', 'dispatch'] });
+    assert.match(text, /Only the workspace owner can revoke a runner credential/);
+    assert.match(text, /403 RUNNER_OWNER_ONLY/);
+    assert.match(text, /Keys are revoked at Settings › Agent access\./);
+    assert.doesNotMatch(text, /Runner credentials/);
+    assert.doesNotMatch(text, /Any signed-in member can revoke/);
+  });
+
   test('a non-take token never sees the runner endpoint section', () => {
     for (const grants of [[], ['dispatch'], undefined]) {
       const text = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite', grants });
