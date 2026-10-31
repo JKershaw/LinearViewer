@@ -116,6 +116,12 @@ describe('named JSON helpers', () => {
     });
   }
 
+  test('each named helper exposes only .json (LIN-3479: the .text wrappers are gone)', () => {
+    for (const helper of [badRequest, unauthorized, notFound, serverError, serviceUnavailable]) {
+      assert.deepEqual(Object.keys(helper), ['json']);
+    }
+  });
+
   test('serverError/serviceUnavailable details become { message } and drop when falsy', () => {
     // Why replies carrying a `detail` key use jsonError, not these helpers.
     const withDetail = fakeRes();
