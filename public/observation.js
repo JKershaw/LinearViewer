@@ -3338,12 +3338,11 @@ function bulkAgreeRow(key, row, li) {
 }
 
 // Bulk-agree entry point — the confirmed, SEQUENTIAL loop over
-// `rulingsSelected`. Deliberately NOT `startBulkScan`/the pool: that pool's
-// defect is structural (`onResult` is called unguarded inside `finally`,
-// BEFORE `teardown()`/`pump()`, so a throwing callback strands the whole
-// run — LIN-2709) and sequencing avoids it BY CONSTRUCTION rather than by a
-// guard, needing no `AbortController`, no teardown, no module-level run
-// pointer. Per-row failure cannot wedge this loop: `bulkAgreeRow` never
+// `rulingsSelected`. Deliberately NOT `startBulkScan`/the pool: the pool now
+// contains a throwing callback (LIN-2709, `notifyBulkScanCallback`), but this
+// loop still needs sequencing — one row awaited at a time (LIN-2792) — and
+// needs no `AbortController`, no teardown, no module-level run pointer.
+// Per-row failure cannot wedge this loop: `bulkAgreeRow` never
 // rejects (its own `.catch` swallows), so this `for…of` always reaches the
 // next key regardless of what happened to the last one. Awaiting each row in
 // turn (LIN-2792) is what keeps this sequential rather than concurrent —
@@ -4370,7 +4369,7 @@ function startBulkScan(items, { onTeardown, onResult } = {}) {
     if (tornDown) return;
     tornDown = true;
     if (bulkScanStop === stop) bulkScanStop = null;
-    if (onTeardown) onTeardown(results);
+    if (onTeardown) notifyBulkScanCallback(onTeardown, results);
   }
 
   /**
@@ -4405,7 +4404,9 @@ function startBulkScan(items, { onTeardown, onResult } = {}) {
       results.push(entry);
       inFlight--;
       settledCount++;
-      if (onResult) onResult(entry);
+      // onResult is a notification, not bookkeeping: notifyBulkScanCallback
+      // contains a throw so it cannot skip teardown() and pump() below (LIN-2709).
+      if (onResult) notifyBulkScanCallback(onResult, entry);
       if (settledCount === total) teardown();
       pump();
     }
@@ -4438,6 +4439,26 @@ function startBulkScan(items, { onTeardown, onResult } = {}) {
  */
 function stopBulkScan() {
   if (bulkScanStop) bulkScanStop();
+}
+
+/**
+ * Invoke one of startBulkScan's caller callbacks (onResult / onTeardown)
+ * without letting its failure reach the pool (LIN-2709). Both callbacks sit
+ * inside the pool's bookkeeping path — onResult runs in runOne's `finally`
+ * ahead of teardown()/pump(), and teardown() runs ahead of stop()'s return.
+ * An unguarded throw there skipped pump(), so the rest of the batch never
+ * posted, onTeardown never fired, and bulkScanStop stayed set until Stop, which
+ * refused the next run as 'run-in-progress'. This matches pumpBasisChecks,
+ * which keeps its job's failure out of the pump (`.catch(() => {})`); the
+ * difference is that a callback throw here is reported to the console, not
+ * dropped, so a real bug stays visible.
+ */
+function notifyBulkScanCallback(fn, arg) {
+  try {
+    fn(arg);
+  } catch (err) {
+    console.error('bulk scan: a result/teardown callback threw; the run continues', err);
+  }
 }
 
 // ─── Bulk scan result classification + row paint (LIN-2701 §B.6) ───────────
