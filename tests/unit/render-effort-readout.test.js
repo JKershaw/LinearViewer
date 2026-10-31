@@ -99,11 +99,13 @@ describe('per-kind cards and markup conventions (D3, S1 sweep)', () => {
 });
 
 describe('R1 (formerly D10) — the effort caption states the truth for the current corpus', () => {
-  test('no session in the corpus reports a realised effort: the caption names LIN-2567 as pending', () => {
+  test('no session in the corpus reports a realised effort: the caption says none of the runs reported one, and names no ticket state', () => {
     const html = render(readoutOver([]));
     assert.match(html, /data-testid="effort-caption-ship-empty"/);
-    assert.match(html, /LIN-2567/);
-    assert.match(html, /does not yet report a realised effort value/);
+    assert.match(html, /none of the runs in this corpus reported a realised effort value/);
+    assert.match(html, /the column fills for any run that does report one/);
+    const caption = /data-testid="effort-caption-ship-empty">([^<]*)</.exec(html)[1];
+    assert.doesNotMatch(caption, /LIN-2567|in progress|pending|lands|tracked separately/, 'the empty caption must not claim anything about a ticket\'s status');
   });
 
   test('a kind whose worker sessions report no effort renders "not reported", never a substituted requested value', () => {
