@@ -143,6 +143,40 @@ describe('renderUpstreamAwareErrorPage', () => {
     assert.ok(html.includes('LINEAR_AUTH'));
   });
 
+  // LIN-3121: the sentence must describe the same cause as the Reason row. Each
+  // case pulls both out of the rendered page and checks them against each other.
+  const pageParts = (html) => ({
+    message: html.match(/<p class="error-message">([^<]*)<\/p>/)?.[1] ?? '',
+    reason: html.match(/<span class="error-detail-key">Reason<\/span> <span class="error-detail-value">([^<]*)<\/span>/)?.[1] ?? '',
+  });
+  const CONNECTION_CLOSED = 'the connection closed before it responded';
+
+  test('503 → sentence says server error, not a closed connection; agrees with Reason', () => {
+    const err = new Error('Linear returned 503');
+    err.response = { status: 503 };
+    const { message, reason } = pageParts(renderUpstreamAwareErrorPage(err, { time: 't' }));
+    assert.ok(reason.includes('returned a 503 server error'), `Reason was: ${reason}`);
+    assert.ok(message.includes('returned a server error'), `message was: ${message}`);
+    assert.ok(!message.includes(CONNECTION_CLOSED), `message still says connection closed: ${message}`);
+  });
+
+  test('429 → sentence says rate-limited, not a closed connection; agrees with Reason', () => {
+    const err = new Error('Too Many Requests');
+    err.response = { status: 429 };
+    const { message, reason } = pageParts(renderUpstreamAwareErrorPage(err, { time: 't' }));
+    assert.ok(reason.includes('rate-limited the request'), `Reason was: ${reason}`);
+    assert.ok(message.includes('limiting how often Harbour can ask'), `message was: ${message}`);
+    assert.ok(!message.includes(CONNECTION_CLOSED), `message still says connection closed: ${message}`);
+  });
+
+  test('connection reset (ECONNRESET) → sentence says connection closed; agrees with Reason', () => {
+    const err = new Error('read ECONNRESET');
+    err.cause = { code: 'ECONNRESET' };
+    const { message, reason } = pageParts(renderUpstreamAwareErrorPage(err, { time: 't' }));
+    assert.ok(reason.includes('closed before a response arrived'), `Reason was: ${reason}`);
+    assert.ok(message.includes(CONNECTION_CLOSED), `message was: ${message}`);
+  });
+
   test('diagnostic is HTML-escaped — no raw markup leaks through', () => {
     const err = new Error('boom');
     err.response = { status: 503 };
