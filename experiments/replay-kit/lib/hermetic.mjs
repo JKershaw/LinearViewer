@@ -10,7 +10,7 @@ import crypto from 'node:crypto';
 
 export const DEFAULT_NOW = '2026-10-01T12:00:00.000Z';
 export const DEFAULT_SCRUB = ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy', 'NO_PROXY', 'no_proxy', 'MONGO', 'DEBUG',
-  'OPENROUTER', 'GITHUB_', 'HARBOUR_', 'DISPATCH_', 'FREE_TIER', 'LINEAR_', 'OBSERVATION_', 'READ_HORIZON', 'KPI', 'NODE_OPTIONS', 'NODE_TEST_CONTEXT'];
+  'OPENROUTER', 'GITHUB_', 'HARBOUR_', 'DISPATCH_', 'FREE_TIER', 'LINEAR_', 'OBSERVATION_', 'READ_HORIZON', 'KPI', 'WEEKLY_BUDGET_', 'NODE_OPTIONS', 'NODE_TEST_CONTEXT'];
 export const PINNED_ENV = { TZ: 'UTC', NODE_ENV: 'test' };
 
 export function pinEnv({ scrub = DEFAULT_SCRUB, extra = {} } = {}) {
