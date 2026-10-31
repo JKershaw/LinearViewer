@@ -247,4 +247,59 @@ describe('GET /api/proxy/attachments/:id — an asset host speaks for the creden
     assert.equal(eventRows.length, 1);
     assert.notEqual(eventRows[0].stage, 'provider-lane', 'the same rule as GitHub: no relayed credential, no provider-lane row');
   });
+
+  // Refusals after the fetch: the relay's own 400/502 about a non-relayed
+  // upstream response is no more evidence about the credential than the host's
+  // status was.
+  test('a GitHub asset-host 200 refused for its content-type (400) is not provider-lane evidence', async () => {
+    const registry = fakeRegistry();
+    const eventRows = [];
+    stubUpstream(GITHUB_HOST, () => fakeResponse({ contentType: 'text/html' }));
+    const status = await getAttachmentStatus(
+      buildApp({ rejectedCredentialRegistry: registry, eventRows }),
+      md(`${GITHUB_HOST}/1/abc.png`),
+    );
+    assert.equal(status, 400, 'the client still sees the relay\'s refusal');
+    assert.equal(eventRows.length, 1);
+    assert.equal(eventRows[0].status, 400);
+    assert.equal(eventRows[0].stage, 'proxy-token');
+    assert.equal(eventRows[0].credentialFingerprint, null);
+    assert.equal(eventRows[0].credentialSource, null);
+  });
+
+  test('a GitHub asset fetch that throws (502) is not provider-lane evidence', async () => {
+    const registry = fakeRegistry();
+    const eventRows = [];
+    stubUpstream(GITHUB_HOST, () => { throw new Error('socket hang up'); });
+    const origError = console.error;
+    console.error = () => {};
+    let status;
+    try {
+      status = await getAttachmentStatus(
+        buildApp({ rejectedCredentialRegistry: registry, eventRows }),
+        md(`${GITHUB_HOST}/1/abc.png`),
+      );
+    } finally {
+      console.error = origError;
+    }
+    assert.equal(status, 502);
+    assert.equal(eventRows.length, 1);
+    assert.equal(eventRows[0].status, 502);
+    assert.equal(eventRows[0].stage, 'proxy-token');
+    assert.equal(eventRows[0].credentialFingerprint, null);
+  });
+
+  test('a Linear-host 200 refused for its content-type on a linear workspace stays provider-lane', async () => {
+    const registry = fakeRegistry();
+    const eventRows = [];
+    stubUpstream(LINEAR_HOST, () => fakeResponse({ contentType: 'text/html' }));
+    const status = await getAttachmentStatus(
+      buildApp({ rejectedCredentialRegistry: registry, eventRows }),
+      md(`${LINEAR_HOST}/abc/screenshot.png`),
+    );
+    assert.equal(status, 400);
+    assert.equal(eventRows.length, 1);
+    assert.equal(eventRows[0].stage, 'provider-lane', 'the credential was relayed, so the row keeps its provider-lane shape');
+    assert.equal(eventRows[0].credentialFingerprint, WS_FINGERPRINT);
+  });
 });
