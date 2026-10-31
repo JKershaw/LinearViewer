@@ -15,6 +15,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isAuthExemptPath } from '../../lib/guest-task-path.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = (rel) => fs.readFileSync(join(ROOT, rel), 'utf8');
@@ -50,7 +51,12 @@ test('logout destroys the session and returns to the landing page, with no OAuth
 
 test('PAT mode re-signs in after logout, so the logout line must say it does not stay signed out', () => {
   const src = read('lib/pat-session.js');
-  assert.match(src, /req\.path === '\/logout'/, 'ensurePATSession must only skip /logout itself');
+  // LIN-3346: the skip list is the one shared predicate (no `req.path === '/logout'` literal any more).
+  // /logout stays exempt, so PAT mode never re-signs in on the logout request itself; every other
+  // non-exempt path (e.g. the landing page) still re-signs in.
+  assert.match(src, /isAuthExemptPath\(req\.path\)/, 'ensurePATSession must skip via the shared predicate');
+  assert.equal(isAuthExemptPath('/logout'), true, '/logout is skipped by ensurePATSession');
+  assert.equal(isAuthExemptPath('/'), false, 'the landing page is not skipped, so PAT re-signs in after logout');
   assert.match(src, /LINEAR_ACCESS_TOKEN/);
   assert.match(limitationsSection(), /PAT mode[^\n]*LINEAR_ACCESS_TOKEN[^\n]*does not stay signed out/);
 });

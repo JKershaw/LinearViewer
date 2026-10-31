@@ -1,6 +1,7 @@
 /**
- * LIN-3330 — lib/guest-task-path.js, the ONE predicate for the two auth-middleware
- * exemptions (the token-refresh `app.use` in server.js and `lib/pat-session.js`).
+ * LIN-3330 / LIN-3346 — lib/guest-task-path.js, the ONE predicate for the two
+ * auth-middleware exemptions (the token-refresh `app.use` in server.js and
+ * `lib/pat-session.js`), `isAuthExemptPath`.
  *
  * A behaviour table with negatives, not a source-literal guard (LIN-3243 review L3).
  *
@@ -11,7 +12,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isGuestTaskPath, isTokenRefreshExempt, isPublicLibraryPath } from '../../lib/guest-task-path.js';
+import { isGuestTaskPath, isPublicLibraryPath, isAuthExemptPath } from '../../lib/guest-task-path.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TOKEN = 'A'.repeat(43);
@@ -28,24 +29,47 @@ describe('isGuestTaskPath', () => {
   }
 });
 
-// LIN-3330 review, ledger 1: the server token-refresh exemption needs a
-// behaviour table, because the source-text drift guard below cannot see the
-// guest clause being defeated (`isGuestTaskPath(req.path) && false` still
-// matched the regex). These cases are the server.js `app.use` skip list.
-describe('isTokenRefreshExempt (server.js token-refresh skip list)', () => {
+// LIN-3346: the ONE shared exemption for PAT auto-login and token refresh.
+// Every public page that must skip session mint/refresh is a yes row, in any
+// case and with one trailing slash (Express routes both). Each no row is a
+// path that must keep minting or refreshing exactly as it does today.
+describe('isAuthExemptPath (shared PAT + refresh exemption, LIN-3346)', () => {
   const yes = [
-    '/auth/login', '/auth/callback',
+    // Prefix exemptions, with their slash.
+    '/auth/', '/auth/login', '/auth/callback', '/AUTH/callback',
+    '/runner-kit/broker.mjs', '/Runner-Kit/broker.mjs',
+    '/t/', '/t/x', `/t/${TOKEN}`, `/t/${TOKEN}/state`, '/T/x', '/T/x/STATE',
+    // Exact public pages, in any case and with one trailing slash.
     '/logout', '/privacy', '/terms', '/styleguide', '/kpis', '/templates',
-    '/t/x', `/t/${TOKEN}`, `/t/${TOKEN}/state`,
-    '/library', '/library/', '/library/ladder', '/Library/x', '/sitemap.xml', '/robots.txt',
+    '/KPIS', '/kpis/', '/Privacy/', '/TEMPLATES', '/templates/',
+    // Archive: digits only, with one optional trailing slash.
+    '/archive/1', '/archive/01', '/archive/1/', '/Archive/1/',
+    // Library, sitemap and robots (isPublicLibraryPath, via the stripped path).
+    '/library', '/library/', '/library/ladder', '/Library/x', '/LIBRARY',
+    '/sitemap.xml', '/sitemap.xml/', '/Sitemap.xml', '/robots.txt', '/robots.txt/',
   ];
-  const no = ['/t', '/test/x', '/s/x', '/workspace/a/', '/workspace/a/api/task/LIN-1/state', '/', '', '/libraryfoo', '/librarian', '/api/library'];
+  const no = [
+    // Landing and session-aware routes: they redirect a signed-in visitor, so
+    // they must keep refreshing and keep PAT auto-login (local-dev entry).
+    '/', '/swipe', '/swipe/x', '/swim', '/ship',
+    // Lookalikes and near-misses of the exempt prefixes.
+    '/t', '/test/x', '/auth', '/kpisx', '/archive', '/archive/x', '/archive/1x',
+    '/libraryfoo', '/librarian', '/api/library', '/library.md', '/s/x',
+    // App paths keep refreshing.
+    '/workspace/a/', '/workspace/a/api/task/LIN-1/state',
+    // Bearer APIs are a different class and stay out.
+    '/api/proxy/x', '/api/dispatch/poll',
+    // Express does not decode or collapse these, so they must not match.
+    '//t/x', '/%74/x', '/t%2Fx',
+    // Non-strings and empties are never exempt.
+    '', null, undefined, 42,
+  ];
 
   for (const path of yes) {
-    test(`exempts ${JSON.stringify(path)}`, () => assert.equal(isTokenRefreshExempt(path), true));
+    test(`exempts ${JSON.stringify(path)}`, () => assert.equal(isAuthExemptPath(path), true));
   }
   for (const path of no) {
-    test(`does NOT exempt ${JSON.stringify(path)}`, () => assert.equal(isTokenRefreshExempt(path), false));
+    test(`does NOT exempt ${JSON.stringify(path)}`, () => assert.equal(isAuthExemptPath(path), false));
   }
 });
 
@@ -65,13 +89,37 @@ describe('isPublicLibraryPath (Library auth exemption)', () => {
 });
 
 describe('the two exemptions use the shared predicate (drift guard)', () => {
-  test('server.js and lib/pat-session.js both call the shared predicate', () => {
+  test('server.js and lib/pat-session.js each import and call isAuthExemptPath(req.path)', () => {
     const server = readFileSync(join(__dirname, '../../server.js'), 'utf8');
     const pat = readFileSync(join(__dirname, '../../lib/pat-session.js'), 'utf8');
-    assert.match(server, /isTokenRefreshExempt\(req\.path\)/, 'server.js token-refresh exemption uses the helper');
-    assert.match(server, /import \{ isTokenRefreshExempt \} from '\.\/lib\/guest-task-path\.js'/, 'server imports the helper');
-    assert.match(pat, /isGuestTaskPath\(req\.path\)/, 'pat-session exemption uses the guest predicate');
-    assert.match(pat, /isPublicLibraryPath\(req\.path\)/, 'pat-session exemption uses the library predicate');
-    assert.match(pat, /import \{ isGuestTaskPath, isPublicLibraryPath \} from '\.\/guest-task-path\.js'/, 'pat-session imports both predicates');
+    assert.match(server, /import \{ isAuthExemptPath \} from '\.\/lib\/guest-task-path\.js'/, 'server.js imports the shared predicate');
+    assert.match(server, /isAuthExemptPath\(req\.path\)/, 'server.js token-refresh exemption calls the shared predicate');
+    assert.match(pat, /import \{ isAuthExemptPath \} from '\.\/guest-task-path\.js'/, 'pat-session imports the shared predicate');
+    assert.match(pat, /isAuthExemptPath\(req\.path\)/, 'pat-session PAT exemption calls the shared predicate');
+  });
+
+  test('the old refresh-only predicate is gone from both consumers', () => {
+    const server = readFileSync(join(__dirname, '../../server.js'), 'utf8');
+    const pat = readFileSync(join(__dirname, '../../lib/pat-session.js'), 'utf8');
+    assert.doesNotMatch(server, /isTokenRefreshExempt/, 'server.js does not reference isTokenRefreshExempt');
+    assert.doesNotMatch(pat, /isTokenRefreshExempt/, 'pat-session.js does not reference isTokenRefreshExempt');
+  });
+
+  test('each consumer\'s skip condition is exactly the shared call (no private list in any syntax)', () => {
+    const server = readFileSync(join(__dirname, '../../server.js'), 'utf8');
+    const pat = readFileSync(join(__dirname, '../../lib/pat-session.js'), 'utf8');
+    const m = server.match(/app\.use\(\(req, res, next\) => \{\s*if \((.*)\) \{\s*return next\(\);\s*\}\s*ensureValidToken\(req, res, next\);/);
+    assert.ok(m, 'server.js token-refresh app.use found');
+    assert.equal(m[1], 'isAuthExemptPath(req.path)', 'refresh skip is exactly the shared predicate');
+    const conds = [...pat.matchAll(/if \((.*req\.path.*)\) \{/g)].map(x => x[1]);
+    assert.deepEqual(conds, ["isAuthExemptPath(req.path) || req.path.startsWith('/test/')"], 'PAT skip is exactly the shared predicate plus the /test/ clause');
+  });
+
+  test('pat-session keeps no private public-path list: no req.path equality, one startsWith (the /test/ clause)', () => {
+    const pat = readFileSync(join(__dirname, '../../lib/pat-session.js'), 'utf8');
+    assert.doesNotMatch(pat, /req\.path\s*===/, 'no equality literal on req.path');
+    const starts = pat.match(/req\.path\.startsWith\(/g) ?? [];
+    assert.equal(starts.length, 1, 'exactly one req.path.startsWith (the PAT-only /test/ clause)');
+    assert.match(pat, /req\.path\.startsWith\('\/test\/'\)/, 'that one startsWith is /test/');
   });
 });
