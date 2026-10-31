@@ -98,6 +98,8 @@ function baseContext(calls, appliedAssigneeName, assigneeState) {
     getFeatureFlags: () => ({}),
     // LIN-3833: the Home row states; these sandboxes render no In Progress rows.
     homeRowStates: async () => null,
+    // LIN-4068: the primary route hands the fetched set to the holder's write gate; this sandbox holds nothing.
+    writeTaskFacts: () => ({ written: false, refusal: 'sandbox' }),
     // LIN-4024: the trimmed Home view the post-401 render builds (server.js); the real one is injected.
     buildHomeView,
     // LIN-3833: the top task's subtask that needs you; these sandboxes render no In Progress rows.
@@ -272,6 +274,6 @@ describe('LIN-2550 — fetchAndPrepareProjects reports what it applied', () => {
   });
 
   test('appliedAssigneeName is returned to the caller', () => {
-    assert.match(SRC, /return \{ trees,[^}]*appliedAssigneeName(, degradedSources)? \};/, 'expected appliedAssigneeName on fetchAndPrepareProjects\'s return — the route cannot correct a label it is never told about');
+    assert.match(SRC, /return \{ trees,[^}]*appliedAssigneeName(, degradedSources)?(, stateIssues, stateMock)? \};/, 'expected appliedAssigneeName on fetchAndPrepareProjects\'s return — the route cannot correct a label it is never told about');
   });
 });

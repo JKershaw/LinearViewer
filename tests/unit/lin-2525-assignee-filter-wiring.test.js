@@ -85,6 +85,7 @@ describe('LIN-2525 — fetchAndPrepareProjects assignee filtering wiring', () =>
     // LIN-2550 appended `appliedAssigneeName` — the filter this call actually
     // applied (null when an unmatched name degraded to unfiltered), which the
     // dashboard routes label the selector off.
-    assert.match(body, /return \{ trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId: resolvedTeamId, periodicalsEnabled, showSource, truncated, availableAssignees, appliedAssigneeName, degradedSources \};/);
+    // LIN-4068 appended `stateIssues` and `stateMock`: the set the holder's write gate reads (fetch writes nothing).
+    assert.match(body, /return \{ trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId: resolvedTeamId, periodicalsEnabled, showSource, truncated, availableAssignees, appliedAssigneeName, degradedSources, stateIssues, stateMock \};/);
   });
 });

@@ -320,7 +320,7 @@
       // after-run line stay in the run block.
       const step = runStepOfState(state, opts);
       if (step) html += `<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-step" data-action="run-step-next">Run ${esc(step.label)}</button>`;
-      else if (mainActionOf(state) && mainActionOf(state).kind === 'run-to-pr') html += '<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-task" data-action="go">Run to PR</button>';
+      else if (mainActionOf(state, opts) && mainActionOf(state, opts).kind === 'run-to-pr') html += '<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-task" data-action="go">Run to PR</button>';
     } else {
       html += `<button class="opened-task-go" data-testid="opened-task-go" data-rung="run-task" data-action="go">Go</button>`;
     }
@@ -629,15 +629,18 @@
   // LIN-4024: a container offers no stage step (its one action is Run to PR), whatever a step chosen for this run says.
   // LIN-4016: a finished task offers no stage step either (the row's record says so; `sessions.action` is /state's, tracker-free).
   function runStepOfState(state, opts) {
-    const action = mainActionOf(state);
+    const action = mainActionOf(state, opts);
     // Busy (nothing is offered), a container (its one action is Run to PR) or a finished task offers no stage step.
     if (!action || (opts && opts.row && (opts.row.container || opts.row.finished))) return null;
     return (state.run && state.run.step) || (action.kind === 'step' ? action.step : null);
   }
   // LIN-4016: the one main action the server decided (`sessions.action`): a step, Run to PR, or null while busy.
-  function mainActionOf(state) {
+  // LIN-4068: before the first `/state` reply the opened box has no sessions, so it takes the row record's action (the
+  // gatherer's decision, the same one `/state` will send), and offers no run the gatherer would not.
+  function mainActionOf(state, opts) {
     const sessions = state.opened && state.opened.sessions;
-    return (sessions && sessions.action) || null;
+    if (sessions) return sessions.action || null;
+    return (opts && opts.row && opts.row.action) || null;
   }
   // LIN-3975 (review finding 1): busy is any session running, queued or waiting on an answer (`sessions.busy`, the server's).
   function stageBusy(state) {
