@@ -751,12 +751,14 @@ describe('deferred index tier (LIN-3811)', () => {
       const db = freshDb();
       const touched = [];
       const spy = { collection: name => { const c = db.collection(name); return { listIndexes: () => { touched.push(name); return c.listIndexes(); }, createIndex: (...a) => { touched.push(name); return c.createIndex(...a); } }; } };
-      scheduleDeferredIndexBuild(spy, { logger: quiet(), delayMs: DELAY });
+      const handle = scheduleDeferredIndexBuild(spy, { logger: quiet(), delayMs: DELAY });
       mock.timers.tick(DELAY - 1);
       await settle();
       assert.deepStrictEqual(touched, [], 'the db is not even read before the delay');
       mock.timers.tick(1);
-      for (let i = 0; i < 5000 && !(await deferredIndexState(db, { logger: quiet() })).every(s => s.built === true); i++) await settle();
+      // Await the build itself, not a budget of event-loop turns: each build does real
+      // file I/O, so under CI load a fixed budget can run out first (LIN-3985).
+      await handle.done;
       assert.ok((await deferredIndexState(db, { logger: quiet() })).every(s => s.built === true), 'all five built after the delay');
     });
 
@@ -775,9 +777,9 @@ describe('deferred index tier (LIN-3811)', () => {
       await db.collection('foreman-status').createIndex(spec.keySpec, { name: 'hand_built_name' });
       const created = [];
       const spy = { collection: name => { const c = db.collection(name); return { listIndexes: () => c.listIndexes(), createIndex: async (k, o) => { created.push(name); return c.createIndex(k, o); } }; } };
-      scheduleDeferredIndexBuild(spy, { logger: quiet(), delayMs: DELAY });
+      const handle = scheduleDeferredIndexBuild(spy, { logger: quiet(), delayMs: DELAY });
       mock.timers.tick(DELAY);
-      for (let i = 0; i < 5000 && created.length < DEFERRED_SPECS.length - 1; i++) await settle();
+      await handle.done;
       assert.ok(!created.includes('foreman-status'));
       assert.strictEqual(created.length, DEFERRED_SPECS.length - 1);
     });
@@ -791,10 +793,12 @@ describe('deferred index tier (LIN-3811)', () => {
       try {
         const failing = { collection: () => ({ listIndexes: () => ({ toArray: async () => [] }), createIndex: async () => { throw new Error('boom'); } }) };
         const broken = { collection: () => { throw new Error('no db'); } };
-        assert.doesNotThrow(() => scheduleDeferredIndexBuild(failing, { logger, delayMs: DELAY }));
-        assert.doesNotThrow(() => scheduleDeferredIndexBuild(broken, { logger, delayMs: DELAY }));
+        const handles = [];
+        assert.doesNotThrow(() => handles.push(scheduleDeferredIndexBuild(failing, { logger, delayMs: DELAY })));
+        assert.doesNotThrow(() => handles.push(scheduleDeferredIndexBuild(broken, { logger, delayMs: DELAY })));
         mock.timers.tick(DELAY);
-        for (let i = 0; i < 20; i++) await settle();
+        await Promise.all(handles.map(h => h.done));
+        await settle();
         assert.ok(logger.lines.warn.some(m => /FAILED .*boom/.test(m)), 'build failure logged');
         assert.ok(logger.lines.warn.some(m => /no db/.test(m)), 'unreadable db logged');
         assert.deepStrictEqual(rejections, []);
@@ -813,6 +817,7 @@ describe('deferred index tier (LIN-3811)', () => {
       mock.timers.tick(DELAY * 3);
       await settle();
       assert.deepStrictEqual(touched, [], 'a cancelled build never reads or builds');
+      assert.strictEqual(await handle.done, null, 'a cancelled build reports itself cancelled');
       assert.ok((await deferredIndexState(db, { logger: quiet() })).every(s => s.built === false));
     });
 
