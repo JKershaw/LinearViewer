@@ -603,11 +603,23 @@ describe('PATCH from the task edit page — a state missing from the list (LIN-1
 
   // The value the form's state control submits, read out of the rendered page
   // exactly as the browser would pick the selected option.
-  function submittedStateId(issue, states) {
+  function stateSelect(issue, states) {
     const html = renderTaskEditPage({ issue, states, urlKey: 'acme' });
-    const select = html.match(/<select[^>]*name="stateId"[^>]*>([\s\S]*?)<\/select>/)[1];
+    return html.match(/<select[^>]*name="stateId"[^>]*>([\s\S]*?)<\/select>/)[1];
+  }
+
+  function submittedStateId(issue, states) {
+    const select = stateSelect(issue, states);
     const selected = select.match(/<option value="([^"]*)"[^>]* selected/) || select.match(/<option value="([^"]*)"/);
     return selected[1];
+  }
+
+  // The value of the option the user would click, by its label.
+  function optionValueFor(issue, states, label) {
+    const options = [...stateSelect(issue, states).matchAll(/<option value="([^"]*)"[^>]*>([^<]*)</g)];
+    const option = options.find((m) => m[2] === label);
+    assert.ok(option, `the page offers a "${label}" option`);
+    return option[1];
   }
 
   test('a title-only save submits an empty stateId, and the PATCH leaves the state alone', async () => {
@@ -630,8 +642,9 @@ describe('PATCH from the task edit page — a state missing from the list (LIN-1
   test('a deliberate pick from the list still reaches the provider as a state change', async () => {
     const stateId = submittedStateId(ARCHIVED_ISSUE, LISTED);
     assert.strictEqual(stateId, '');
-    // The user opens the same page and picks Done from the list instead.
-    const picked = 'done-id';
+    // The user opens the same page and picks Done from the list instead; the
+    // value is read from the option the page renders, not assumed.
+    const picked = optionValueFor(ARCHIVED_ISSUE, LISTED, 'Done');
     const { provider, calls } = makeFakeProvider({
       issueWriteGuard: () => ({ id: 'iss-1', trashed: false, team: { id: GUARD_TEAM } }),
       states: () => LISTED,
@@ -639,6 +652,7 @@ describe('PATCH from the task edit page — a state missing from the list (LIN-1
     const { status } = await patchIssue(buildApp({ provider }), ISSUE_ID, { title: 'Old title', description: 'body', stateId: picked });
 
     assert.strictEqual(status, 200);
-    assert.strictEqual(calls.updateIssue[0].input.stateId, 'done-id');
+    assert.strictEqual(picked, 'Done', 'the page submits the state name for a non-UUID id');
+    assert.strictEqual(calls.updateIssue[0].input.stateId, 'done-id', 'the route resolves the submitted name through states()');
   });
 });
