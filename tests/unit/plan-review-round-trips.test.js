@@ -1130,6 +1130,46 @@ describe('__internal', () => {
   });
 });
 
+// ─── LIN-1653 characterization: an off-spine `bug` row never changes the R0 walk ──
+//
+// `bug` is an investigation that can run beside the plan → plan-review →
+// implementation spine, not on it. Its wall-clock bucket moved out of
+// `orchestration` (LIN-1653), which by itself would pull `bug` rows into this
+// walk's pipeline (`bucketOf(kind) !== 'orchestration'`). Tier C reads the
+// verdict from the NEXT pipeline row, so a `bug` row between a plan-review and
+// its `plan` re-pass would flip "request changes" to "approve". This pins the
+// spine-only answer so the bucket change cannot move any round-trip figure.
+
+describe('LIN-1653 — an off-spine bug row does not enter the R0 walk', () => {
+  const ISO = (m) => `2026-08-01T00:${String(m).padStart(2, '0')}:00.000Z`;
+
+  test('plan-review → bug → plan reads R0 as request-changes from the plan re-pass, not from the bug row', () => {
+    const rows = [
+      row('pr', 'plan-review', 'done', ISO(0), ISO(5)),
+      row('bug', 'bug', 'done', ISO(10), ISO(20)),
+      row('plan2', 'plan', 'done', ISO(30), ISO(40)),
+    ];
+    const result = computeIssueRoundTrips(issue('1', { rows }), { asOf: ASOF });
+    assert.equal(result.R0.row.id, 'pr');
+    assert.equal(result.R0.nextRow.id, 'plan2', 'nextRow must be the plan re-pass, never the bug row');
+    assert.equal(result.R0.verdict, 'request changes');
+    assert.equal(result.R0.tier, 'c');
+    assert.equal(result.roundTrips, 1);
+  });
+
+  test('plan-review → bug → implementation still reads R0 as approve, with the window closing at the implementation row', () => {
+    const rows = [
+      row('pr', 'plan-review', 'done', ISO(0), ISO(5)),
+      row('bug', 'bug', 'done', ISO(10), ISO(20)),
+      row('impl', 'implementation', 'done', ISO(30), ISO(40)),
+    ];
+    const result = computeIssueRoundTrips(issue('2', { rows }), { asOf: ASOF });
+    assert.equal(result.R0.nextRow.id, 'impl');
+    assert.equal(result.R0.verdict, 'approve');
+    assert.equal(result.roundTrips, 0);
+  });
+});
+
 // =============================================================================
 // LIN-1871 — a third round is counted, not just the first
 // =============================================================================

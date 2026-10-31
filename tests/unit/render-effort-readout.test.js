@@ -213,9 +213,9 @@ describe('"what this does not measure" and the anchor-attribution note', () => {
   });
 
   test('discloses the reused walk\'s own kind blindness (B4) — a card without a gate figure is explained', () => {
-    // `pipelineRowsOf` drops rows whose kind buckets as orchestration, and
-    // `bug`/`defer` fall through that map — so they are invisible to the
-    // survival walk while still getting a state-(iv) card here.
+    // `pipelineRowsOf` drops orchestration rows and the off-spine `bug` kind
+    // (LIN-1653), so bug rows are invisible to the survival walk while still
+    // getting a state-(iv) card here.
     assert.match(html, /invisible to survival while still reporting cost, duration and effort/);
   });
 });
