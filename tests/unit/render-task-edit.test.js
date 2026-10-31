@@ -25,6 +25,9 @@ import '../../lib/providers/linear/index.js';
 // emits.
 import { JiraProvider, jiraStatusCategoryToCanonical } from '../../lib/providers/jira/index.js';
 import { createFakeJiraClient } from '../../lib/providers/jira/fake-client.js';
+// LIN-2052: GitHub has no priority to save, so its edit form hides the control the
+// same way Jira's does. Driven off the REAL provider's ui, as the Jira case is.
+import { GitHubProvider } from '../../lib/providers/github/index.js';
 
 const ISSUE = {
   id: '11111111-2222-3333-4444-555555555555',
@@ -291,6 +294,21 @@ describe('renderTaskEditPage — the state control', () => {
     const html = render({ states: [] }); // states() with no teamId now returns [] (LIN-2018)
     assert.ok(html.includes('name="stateId"'));
     assert.ok(html.includes('<input type="text"'), 'degrades to the text input, mirroring every other capability-gated read');
+  });
+
+  // LIN-2052: GitHub's save path never writes priority (its ui.priority is false, so the
+  // control is hidden rather than saved as a silent no-op). Pinned beside the Jira case.
+  test('a GitHub-bound issue hides the priority control, mirroring Jira (LIN-2052)', () => {
+    const html = render({ states: LOCAL_STATES }, { ui: new GitHubProvider().ui });
+    assert.ok(!html.includes('name="priority"'), 'no priority <select> is rendered');
+    assert.ok(!html.includes('data-testid="task-edit-priority"'), 'no priority test hook either');
+    assert.ok(html.includes('name="stateId"'), 'the rest of the form still renders');
+  });
+
+  test('a provider that does not disable priority still shows the control (Linear/Local, LIN-2052)', () => {
+    const html = render({ states: LOCAL_STATES }, { ui: { inlineEdit: true, priority: true } });
+    assert.ok(html.includes('name="priority"'));
+    assert.ok(html.includes('data-testid="task-edit-priority"'));
   });
 });
 

@@ -111,7 +111,7 @@ describe('GitHubProvider capability profile (LIN-178)', () => {
       estimates: false,   // no estimate field
       subtasks: false,    // no hierarchy
       attachments: true,  // issue/comment bodies carry user-content uploads (LIN-771)
-      priority: true,     // abstract default, not overridden (LIN-1886)
+      priority: false,    // overridden: GitHub issues have no priority to save, so the edit form hides it (LIN-2052)
       displayName: 'GitHub Issues', // relabeled from 'GitHub' (LIN-702)
       fixedStates: [      // LIN-2361: GITHUB_STATES, safe to surface synchronously (a fixed static array)
         { id: 'open', name: 'Open', type: 'unstarted', position: 0 },
