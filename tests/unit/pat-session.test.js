@@ -251,12 +251,13 @@ describe('createEnsurePATSession', () => {
         assert.strictEqual(req.session.workspaces, undefined, `no PAT session for ${path}`);
       }
       assert.strictEqual(counting.calls, 0, 'PAT never read the provider for a guest path');
-      // Negative cases: the trailing slash must not sweep these in.
-      for (const path of ['/test/x', '/terms', '/templates', '/t']) {
-        const { req, res } = makeReqRes({ path });
-        await middleware(req, res, () => {});
-      }
-      assert.ok(counting.calls > 0, 'a non-guest path still runs PAT auto-login');
+      // Negative cases, asserted PER PATH: the trailing slash must not sweep
+      // the bare /t in. (LIN-3346: /templates is now exempt, so it is no
+      // longer a negative here; /terms and /test/x are skipped as before.)
+      const before = counting.calls;
+      const { req, res } = makeReqRes({ path: '/t' });
+      await middleware(req, res, () => {});
+      assert.ok(counting.calls > before, '/t still runs PAT auto-login');
     } finally {
       registerProvider(new FakeLinearProvider());
     }
@@ -287,6 +288,43 @@ describe('createEnsurePATSession', () => {
 
       // Negatives, asserted PER PATH: a lookalike must still run auto-login.
       for (const path of ['/libraryfoo', '/librarian']) {
+        const before = counting.calls;
+        const { req, res } = makeReqRes({ path });
+        await middleware(req, res, () => {});
+        assert.ok(counting.calls > before, `${path} still runs PAT auto-login`);
+      }
+    } finally {
+      registerProvider(new FakeLinearProvider());
+    }
+  });
+
+  // LIN-3346: PAT auto-login and token refresh share ONE exemption
+  // (isAuthExemptPath). Before this, PAT's own list lacked /kpis, /templates,
+  // /archive/:n and every non-lowercase spelling, so a signed-out crawler hit
+  // on those minted an operator PAT session (two Linear reads, an account write
+  // and a persisted session row). Each path is asserted PER PATH: a shared
+  // counter would hide one path that still reads.
+  test('skips the public pages /kpis, /templates, /archive/:n and /T/x with zero provider reads (LIN-3346)', async () => {
+    class CountingPublicProvider extends ProviderInterface {
+      constructor() { super(); this.name = 'linear'; this.calls = 0; }
+      async fetchOrganization() { this.calls++; return { id: 'org-1', name: 'Acme', urlKey: 'acme' }; }
+      async fetchViewer() { this.calls++; return { id: 'viewer-1' }; }
+    }
+    const counting = new CountingPublicProvider();
+    registerProvider(counting);
+    try {
+      const middleware = createEnsurePATSession(freshStores());
+      for (const path of ['/kpis', '/templates', '/archive/1', '/T/x', '/KPIS/', '/Archive/1/', '/test/x']) {
+        const before = counting.calls;
+        const { req, res } = makeReqRes({ path });
+        let nextCalled = false;
+        await middleware(req, res, () => { nextCalled = true; });
+        assert.strictEqual(nextCalled, true, `next() called for ${path}`);
+        assert.strictEqual(req.session.workspaces, undefined, `no PAT session for ${path}`);
+        assert.strictEqual(counting.calls, before, `zero provider reads for ${path}`);
+      }
+      // Negatives, asserted PER PATH: these must still run PAT auto-login.
+      for (const path of ['/', '/swipe', '/archive']) {
         const before = counting.calls;
         const { req, res } = makeReqRes({ path });
         await middleware(req, res, () => {});

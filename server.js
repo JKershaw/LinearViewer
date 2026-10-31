@@ -179,7 +179,7 @@ import { createLibraryRouter } from './routes/library.js'
 import { TaskShareStore } from './lib/task-share-store.js'
 import { createWorkspaceRemovalRevoker } from './lib/workspace-removal-revocation.js'
 import { createGuestTaskAccess } from './lib/task-share-access.js'
-import { isTokenRefreshExempt } from './lib/guest-task-path.js'
+import { isAuthExemptPath } from './lib/guest-task-path.js'
 import { createLiveConsoleRoutes } from './routes/live-console.js'
 import { createShipJourneyRoutes } from './routes/ship-journey.js'
 import { createFlightCompanionRoutes } from './routes/flight-companion.js'
@@ -1575,8 +1575,9 @@ async function ensureValidToken(req, res, next) {
 
 // Apply middleware to all routes except auth and logout
 // Note: workspace routes need token refresh too (they access Linear API)
+// The exempt set is `isAuthExemptPath` (public pages too), shared with PAT auto-login (LIN-3346).
 app.use((req, res, next) => {
-  if (isTokenRefreshExempt(req.path)) {
+  if (isAuthExemptPath(req.path)) {
     return next();
   }
   ensureValidToken(req, res, next);
@@ -2437,8 +2438,8 @@ app.get('/templates', (req, res) => {
 // Read-only papers/essays at /library/…, searchable without JS and rendered
 // script-safe (see routes/library.js). Mounted at the root because the router
 // owns full `/library…` paths; its header middleware is scoped to those paths
-// so it cannot touch the rest of the app. `isPublicLibraryPath` (via
-// isTokenRefreshExempt and lib/pat-session.js) exempts these paths from auth.
+// so it cannot touch the rest of the app. `isAuthExemptPath` (which uses
+// `isPublicLibraryPath`, and lib/pat-session.js) exempts these paths from auth.
 app.use(createLibraryRouter())
 
 // =============================================================================
@@ -3262,8 +3263,8 @@ app.use(createTaskPageRoutes({
 // and the PUBLIC guest page at `/t/:token` (+ its stored-data `/t/:token/state`).
 // The guest route reads the owner's task through the EXISTING owner-away
 // credential path (`createGuestTaskAccess` → `resolveWorkspaceAccess`); `/t/` is
-// exempt from PAT auto-login and token refresh via the shared guest-path predicate
-// (`isGuestTaskPath` / `isTokenRefreshExempt` in `lib/guest-task-path.js`).
+// exempt from PAT auto-login and token refresh via the shared predicate
+// (`isAuthExemptPath` in `lib/guest-task-path.js`, which uses `isGuestTaskPath`).
 // Mounted right after the task page, before the proxy default/legacy catch-alls.
 app.use(createTaskShareRoutes({
   taskShareStore,
