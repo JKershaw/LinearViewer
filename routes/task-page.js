@@ -116,6 +116,7 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
       const result = await loader.loadTaskPage({
         urlKey: workspace.urlKey,
         workspaceId: workspace.id,
+        workspace,
         identifier,
         access,
         viewerIsOwner: owner,
@@ -136,8 +137,6 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
       const model = owner ? { ...result.model, proposals: await pendingProposalsOf(workspace.urlKey, result.model) } : result.model;
       const stateQuery = [
         model.issueId ? `issueId=${encodeURIComponent(model.issueId)}` : null,
-        // LIN-4016: a container's own fact, passed back to the state read (the page knows it; the state read does not).
-        hasOpenSubtask(model.tracker?.subtasks) ? 'container=1' : null,
       ].filter(Boolean);
       const stateUrl = `/workspace/${encodeURIComponent(workspace.urlKey)}/api/task/${encodeURIComponent(model.identifier)}/state${stateQuery.length ? `?${stateQuery.join('&')}` : ''}`;
       // The run control's options (LIN-3975): the owner's only. The same vocabulary Home's opened task takes.
@@ -148,7 +147,8 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
           featureFlags: pageOptions.featureFlags,
           isLocalhost: isLocalhostRequest(req),
         }),
-        row: rowRecordOf({ stateType: model.tracker?.state?.type ?? null, container: hasOpenSubtask(model.tracker?.subtasks) }),
+        // LIN-4068: container from the one gather's subtree, not the page's one-level `ctx.children`.
+        row: rowRecordOf({ stateType: model.tracker?.state?.type ?? null, container: result.container ?? hasOpenSubtask(model.tracker?.subtasks) }),
       } : null;
       return res.send(renderTaskPage(model, {
         viewer,
@@ -180,8 +180,9 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
     if (!isValidIssueId(identifier)) return jsonError(res, 404, 'Task not found');
     const issueId = queryValue(req.query.issueId);
     try {
-      const { model, taskState } = await loader.loadTaskState({
+      const { model, stateModel = model, taskState, container = false } = await loader.loadTaskState({
         urlKey: workspace.urlKey,
+        workspace,
         identifier,
         issueId: issueId && isValidIssueId(issueId) ? issueId : null,
       });
@@ -207,7 +208,8 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         stripHtml: renderStageStrip(model, { now: now() }),
         // LIN-3833: the sessions the state block and the run control read (count, last, running).
         // LIN-4016: `container` is the page's own fact, passed back (the row's container rule), never read from the tracker.
-        sessions: sessionSummaryOf(model, { container: req.query.container === '1' }),
+        // LIN-4068: the action, busy and next from the windowed facts the state read; count and last are history.
+        sessions: { ...sessionSummaryOf(stateModel, { container }), count: model.sessions.length, last: sessionSummaryOf(model).last },
         // LIN-4016: the task's own decided state (`taskStateOf`): no tracker word, so done and backlog are not in it.
         taskState,
         // LIN-4024: the question card, for a task waiting on an open ruling only (a parked task has none). The
