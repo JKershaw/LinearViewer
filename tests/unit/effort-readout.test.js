@@ -296,13 +296,14 @@ describe('D10 — ship_empty effort column', () => {
 });
 
 describe('R1 — effort-caption honesty (implementation review 62e30986)', () => {
-  test('no session in the corpus reports a realised effort: the caption still names LIN-2567 as pending', () => {
+  test('no session in the corpus reports a realised effort: the caption says none of the runs reported one, and names no ticket state', () => {
     // fourRowLineageRows/doneRow carry no [usage] telemetry at all.
     const rows = fourRowLineageRows();
     const issueContext = new Map([['LIN-1', { id: 'issue-1', comments: fourRowLineageComments() }]]);
     const readout = computeEffortReadout({ liveRows: [], historyRows: rows, issueContext, asOf: ASOF });
-    assert.match(readout.notes.effortShipEmpty, /does not yet report a realised effort value/);
-    assert.match(readout.notes.effortShipEmpty, /LIN-2567/);
+    assert.match(readout.notes.effortShipEmpty, /none of the runs in this corpus reported a realised effort value/);
+    assert.match(readout.notes.effortShipEmpty, /the column fills for any run that does report one/);
+    assert.doesNotMatch(readout.notes.effortShipEmpty, /LIN-2567|in progress|pending|lands|tracked separately/, 'the empty caption must not claim anything about a ticket\'s status');
   });
 
   test('a session in the corpus reports a realised effort: the caption states what is true instead of a stale universal absence', () => {
