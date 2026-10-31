@@ -1006,7 +1006,14 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     // presence alone (not the value) is the reliable "did this call actually
     // resolve a provider credential" signal; reusing it here avoids a second,
     // request-scoped flag that could drift from the first.
-    const stage = req.resolvedCredentialFingerprint !== undefined ? STAGE_PROVIDER_LANE : STAGE_PROXY_TOKEN;
+    // LIN-3572: a response the relay did not credential (`skipCredentialHealth`)
+    // is not provider-lane evidence in the rows either, or `/credential-health`
+    // and `/credential-trail` would count a GitHub asset host's 401 against the
+    // workspace credential. Such a row lands as proxy-token with no fingerprint
+    // or source, the shape the field docs in lib/proxy-events.js give to any
+    // row that did not carry a provider credential.
+    const credentialRelayed = req.resolvedCredentialFingerprint !== undefined && !skipCredentialHealth;
+    const stage = credentialRelayed ? STAGE_PROVIDER_LANE : STAGE_PROXY_TOKEN;
     proxyEventStore.recordEvent({
       urlKey: req.proxyUrlKey,
       tokenId: req.proxyTokenId,
@@ -1016,11 +1023,11 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       status,
       note,
       stage,
-      credentialFingerprint: req.resolvedCredentialFingerprint ?? null,
+      credentialFingerprint: credentialRelayed ? (req.resolvedCredentialFingerprint ?? null) : null,
       // LIN-3282: how the resolved credential was obtained, persisted at this
       // single write seam for the same reason as the fingerprint above.
       // `undefined` (nothing resolved) and `null` both land as null on the row.
-      credentialSource: req.resolvedCredentialSource ?? null
+      credentialSource: credentialRelayed ? (req.resolvedCredentialSource ?? null) : null
     }).catch(err => console.error('Failed to log proxy event:', err));
   }
 

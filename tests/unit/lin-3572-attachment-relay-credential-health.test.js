@@ -9,8 +9,13 @@
  * GitHub asset host's 401 used to mark a credential the host never saw, and a
  * GitHub 200 used to witness it.
  *
- * These tests drive the real handler over HTTP and observe the registry's
- * markSuspect / witnessAccepted calls. The upstream fetch is stubbed per host.
+ * The same response also wrote a proxy-event row with `stage: 'provider-lane'`
+ * and the credential's fingerprint. `/api/proxy/credential-health` folds those
+ * rows, so a GitHub 401 read as a failing workspace credential there too.
+ *
+ * These tests drive the real handler over HTTP and observe both the registry's
+ * markSuspect / witnessAccepted calls and the proxy-event rows handed to
+ * recordEvent. The upstream fetch is stubbed per host.
  */
 
 process.env.NODE_ENV = 'test';
@@ -23,6 +28,7 @@ import { encodeAttachmentHandle } from '../../lib/proxy-wire.js';
 import { fingerprintCredential } from '../../lib/credential-diagnostics.js';
 import { setProxyFetchImpl } from '../../lib/proxy-fetch.js';
 import { guardNetwork } from '../fixtures/network-guard.js';
+import { providerLaneOccupancy } from '../../lib/proxy-events.js';
 
 const WS_TOKEN = 'ws-linear-token';
 const WS_FINGERPRINT = fingerprintCredential(WS_TOKEN);
@@ -44,7 +50,7 @@ function fakeRegistry() {
   };
 }
 
-function buildApp({ providerName = 'linear', rejectedCredentialRegistry }) {
+function buildApp({ providerName = 'linear', rejectedCredentialRegistry, eventRows }) {
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
@@ -53,7 +59,7 @@ function buildApp({ providerName = 'linear', rejectedCredentialRegistry }) {
         tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'read', createdBy: 'u1',
       }),
     },
-    proxyEventStore: { recordEvent: async () => {} },
+    proxyEventStore: { recordEvent: async (row) => { eventRows.push(row); } },
     resolveWorkspaceAccess: async () => ({
       token: WS_TOKEN,
       reason: 'ok',
@@ -142,40 +148,56 @@ const md = (url) => encodeAttachmentHandle('md', url);
 describe('GET /api/proxy/attachments/:id — an asset host speaks for the credential only if the relay sent it (LIN-3572)', () => {
   test('a GitHub asset-host 401 leaves the credential alone when no Authorization was relayed', async () => {
     const registry = fakeRegistry();
+    const eventRows = [];
     let sawAuthHeader = 'UNSET';
     stubUpstream(GITHUB_HOST, (url, opts) => {
       sawAuthHeader = 'Authorization' in (opts.headers || {});
       return fakeResponse({ ok: false, status: 401 });
     });
     const status = await getAttachmentStatus(
-      buildApp({ rejectedCredentialRegistry: registry }),
+      buildApp({ rejectedCredentialRegistry: registry, eventRows }),
       md(`${GITHUB_HOST}/1/abc.png`),
     );
     assert.equal(status, 401, 'the client still sees the host\'s status');
     assert.equal(sawAuthHeader, false, 'precondition: the workspace credential was not sent to GitHub');
     assert.deepEqual(registry.markSuspectCalls, [], 'a host that never saw the credential must not mark it suspect');
+    assert.equal(eventRows.length, 1);
+    assert.equal(eventRows[0].status, 401);
+    assert.notEqual(eventRows[0].stage, 'provider-lane', 'a host that never saw the credential is not provider-lane evidence in the rows either');
+    assert.equal(eventRows[0].credentialFingerprint, null, 'the row must not attribute a fingerprint the request never carried');
+    assert.equal(eventRows[0].credentialSource, null);
+    // The surface the ticket names: /credential-health folds these rows through
+    // providerLaneOccupancy, so the GitHub 401 must not count as a failed call.
+    const occupancy = providerLaneOccupancy(eventRows.map(r => ({ ...r, timestamp: new Date() })));
+    assert.equal(occupancy.totalCalls, 0, 'a GitHub 401 is not a call against the workspace credential');
+    assert.equal(occupancy.failedCalls, 0);
   });
 
   test('a GitHub asset-host 200 does not witness the credential when no Authorization was relayed', async () => {
     const registry = fakeRegistry();
+    const eventRows = [];
     stubUpstream(GITHUB_HOST, () => fakeResponse({ contentType: 'image/png' }));
     const status = await getAttachmentStatus(
-      buildApp({ rejectedCredentialRegistry: registry }),
+      buildApp({ rejectedCredentialRegistry: registry, eventRows }),
       md(`${GITHUB_HOST}/1/abc.png`),
     );
     assert.equal(status, 200);
     assert.deepEqual(registry.witnessCalls, [], 'a host that never saw the credential cannot prove it is accepted');
+    assert.equal(eventRows.length, 1);
+    assert.notEqual(eventRows[0].stage, 'provider-lane', 'a GitHub 200 must not be counted as provider-lane evidence either');
+    assert.equal(eventRows[0].credentialFingerprint, null);
   });
 
   test('a Linear-host 401 on a linear workspace still marks the relayed credential suspect', async () => {
     const registry = fakeRegistry();
+    const eventRows = [];
     let sawAuth = null;
     stubUpstream(LINEAR_HOST, (url, opts) => {
       sawAuth = opts.headers.Authorization;
       return fakeResponse({ ok: false, status: 401 });
     });
     const status = await getAttachmentStatus(
-      buildApp({ rejectedCredentialRegistry: registry }),
+      buildApp({ rejectedCredentialRegistry: registry, eventRows }),
       md(`${LINEAR_HOST}/abc/screenshot.png`),
     );
     assert.equal(status, 401);
@@ -183,32 +205,46 @@ describe('GET /api/proxy/attachments/:id — an asset host speaks for the creden
     assert.equal(registry.markSuspectCalls.length, 1, 'the credential the relay sent is the one the 401 speaks for');
     assert.equal(registry.markSuspectCalls[0].fp, WS_FINGERPRINT);
     assert.equal(registry.markSuspectCalls[0].opts.reason, 'provider-401');
+    assert.equal(eventRows.length, 1);
+    assert.equal(eventRows[0].status, 401);
+    assert.equal(eventRows[0].stage, 'provider-lane', 'a relayed credential\'s 401 is provider-lane evidence, so credential-health still sees it');
+    assert.equal(eventRows[0].credentialFingerprint, WS_FINGERPRINT);
+    const occupancy = providerLaneOccupancy(eventRows.map(r => ({ ...r, timestamp: new Date() })));
+    assert.equal(occupancy.totalCalls, 1, 'the relayed credential\'s 401 is a call against the workspace credential');
+    assert.equal(occupancy.failedCalls, 1);
   });
 
   test('a Linear-host 200 on a linear workspace still witnesses the relayed credential', async () => {
     const registry = fakeRegistry();
+    const eventRows = [];
     stubUpstream(LINEAR_HOST, () => fakeResponse({ contentType: 'image/png' }));
     const status = await getAttachmentStatus(
-      buildApp({ rejectedCredentialRegistry: registry }),
+      buildApp({ rejectedCredentialRegistry: registry, eventRows }),
       md(`${LINEAR_HOST}/abc/screenshot.png`),
     );
     assert.equal(status, 200);
     assert.deepEqual(registry.witnessCalls, [WS_FINGERPRINT]);
+    assert.equal(eventRows.length, 1);
+    assert.equal(eventRows[0].stage, 'provider-lane');
+    assert.equal(eventRows[0].credentialFingerprint, WS_FINGERPRINT);
   });
 
   test('a non-linear workspace relaying a Linear-hosted 401 sends no credential, so it does not mark it suspect', async () => {
     const registry = fakeRegistry();
+    const eventRows = [];
     let sawAuthHeader = 'UNSET';
     stubUpstream(LINEAR_HOST, (url, opts) => {
       sawAuthHeader = 'Authorization' in (opts.headers || {});
       return fakeResponse({ ok: false, status: 401 });
     });
     const status = await getAttachmentStatus(
-      buildApp({ providerName: 'local', rejectedCredentialRegistry: registry }),
+      buildApp({ providerName: 'local', rejectedCredentialRegistry: registry, eventRows }),
       md(`${LINEAR_HOST}/abc/screenshot.png`),
     );
     assert.equal(status, 401);
     assert.equal(sawAuthHeader, false, 'precondition: a local-bound workspace does not send its credential to Linear\'s CDN');
     assert.deepEqual(registry.markSuspectCalls, [], 'the same rule as GitHub: no relayed credential, no health change');
+    assert.equal(eventRows.length, 1);
+    assert.notEqual(eventRows[0].stage, 'provider-lane', 'the same rule as GitHub: no relayed credential, no provider-lane row');
   });
 });
