@@ -909,7 +909,15 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   // rationale (2026-08-09 incident write-up, honest limits, eviction policy).
   const { recordCredentialResolution, logCredentialRejection } = createCredentialTrail({ registry: rejectedCredentialRegistry });
 
-  function logEvent(req, endpoint, status, note = null, { skipWitness = false } = {}) {
+  function logEvent(req, endpoint, status, note = null, { skipWitness = false, skipCredentialHealth = false } = {}) {
+    // LIN-3572: `skipCredentialHealth` says this response is NOT evidence about
+    // the workspace credential, because the request never carried it (an
+    // asset host the relay sent no Authorization to). Such a response must
+    // neither mark the credential suspect (401/503 below, and the rejection
+    // trail with it) nor witness it (2xx below). The attachment relay is the
+    // only caller that sets it; it is decided per upstream request, not per
+    // route, so the proxy's own provider-lane answers keep their behaviour.
+    //
     // LIN-2236 (L5.2 of the LIN-2231 design): 503 joins 401 here — every 503
     // this proxy returns already IS a workspace-credential resolution failure
     // (workspaceUnavailable's reasons: store_unreachable / session_expired /
@@ -920,7 +928,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     // to the whole "we couldn't resolve one at all" class. No new plumbing —
     // logCredentialRejection's lookup already keys on (urlKey, createdBy),
     // which every call site already has.
-    if (status === 401 || status === 503) {
+    if ((status === 401 || status === 503) && !skipCredentialHealth) {
       logCredentialRejection(req, endpoint);
       // LIN-1980: mark the credential THIS request actually resolved suspect
       // — sourced from `req.resolvedCredentialFingerprint` (stamped at
@@ -943,7 +951,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
         ? 'provider-401'
         : (req.resolvedCredentialFingerprint ? 'provider-503-transient' : 'workspace-503');
       rejectedCredentialRegistry?.markSuspect(req.resolvedCredentialFingerprint, { reason, now: Date.now() });
-    } else if (status >= 200 && status < 300 && req.resolvedCredentialFingerprint && !skipWitness) {
+    } else if (status >= 200 && status < 300 && req.resolvedCredentialFingerprint && !skipWitness && !skipCredentialHealth) {
       // LIN-2109: the positive half of the acceptance witness — a genuine
       // 2xx provider-lane response carrying a resolved fingerprint is the
       // sound proof this credential is accepted by the provider, unlike mere
@@ -998,7 +1006,14 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     // presence alone (not the value) is the reliable "did this call actually
     // resolve a provider credential" signal; reusing it here avoids a second,
     // request-scoped flag that could drift from the first.
-    const stage = req.resolvedCredentialFingerprint !== undefined ? STAGE_PROVIDER_LANE : STAGE_PROXY_TOKEN;
+    // LIN-3572: a response the relay did not credential (`skipCredentialHealth`)
+    // is not provider-lane evidence in the rows either, or `/credential-health`
+    // and `/credential-trail` would count a GitHub asset host's 401 against the
+    // workspace credential. Such a row lands as proxy-token with no fingerprint
+    // or source, the shape the field docs in lib/proxy-events.js give to any
+    // row that did not carry a provider credential.
+    const credentialRelayed = req.resolvedCredentialFingerprint !== undefined && !skipCredentialHealth;
+    const stage = credentialRelayed ? STAGE_PROVIDER_LANE : STAGE_PROXY_TOKEN;
     proxyEventStore.recordEvent({
       urlKey: req.proxyUrlKey,
       tokenId: req.proxyTokenId,
@@ -1008,11 +1023,11 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       status,
       note,
       stage,
-      credentialFingerprint: req.resolvedCredentialFingerprint ?? null,
+      credentialFingerprint: credentialRelayed ? (req.resolvedCredentialFingerprint ?? null) : null,
       // LIN-3282: how the resolved credential was obtained, persisted at this
       // single write seam for the same reason as the fingerprint above.
       // `undefined` (nothing resolved) and `null` both land as null on the row.
-      credentialSource: req.resolvedCredentialSource ?? null
+      credentialSource: credentialRelayed ? (req.resolvedCredentialSource ?? null) : null
     }).catch(err => console.error('Failed to log proxy event:', err));
   }
 

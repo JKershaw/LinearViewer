@@ -219,11 +219,12 @@ describe('refresh_skip/refresh_fail/refresh_success lifecycle-event wiring (LIN-
 
 describe('logEvent/logCredentialRejection widening (LIN-2236, L5.2 — witness, source-grep)', () => {
   test('logEvent treats 401 and 503 identically — both reach logCredentialRejection and markSuspect', () => {
-    const start = PROXY_SRC.indexOf('function logEvent(req, endpoint, status, note = null, { skipWitness = false } = {}) {');
+    const start = PROXY_SRC.indexOf('function logEvent(req, endpoint, status, note = null, { skipWitness = false, skipCredentialHealth = false } = {}) {');
     assert.ok(start >= 0);
     const end = PROXY_SRC.indexOf('\n  }', start);
     const body = PROXY_SRC.slice(start, end);
-    assert.match(body, /if \(status === 401 \|\| status === 503\)/);
+    // LIN-3572 added `&& !skipCredentialHealth` to the guard; the 401/503 pair is unchanged.
+    assert.match(body, /if \(\(status === 401 \|\| status === 503\) && !skipCredentialHealth\)/);
     assert.match(body, /logCredentialRejection\(req, endpoint\)/);
     assert.match(body, /rejectedCredentialRegistry\?\.markSuspect\(/);
   });

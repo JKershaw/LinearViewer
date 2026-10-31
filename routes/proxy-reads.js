@@ -560,34 +560,50 @@ export function createReadRoutes({ proxyLimiter, authenticateProxyToken, resolve
     const typedFromHint = nameHint ? relayContentTypeFromName(nameHint) : null;
     const isFileRelay = !!typedFromHint && !typedFromHint.startsWith('image/');
 
+    // LIN-3572: the upstream host's status says something about the workspace
+    // credential only when this relay actually sent that credential. The host
+    // gets it solely on a Linear host for a linear workspace; anything else
+    // (a GitHub asset host, a non-linear workspace) never saw it, so its 401,
+    // 503 or 2xx must not mark it suspect or witness it. `logEvent` gates both
+    // on `skipCredentialHealth`.
+    const relayedCredential = !isGithubAssetHost && providerName === 'linear';
+    const logUpstream = (status) => logEvent(req, endpoint, status, null, { skipCredentialHealth: !relayedCredential });
+    // Refusals after the fetch are still answers about an upstream request, so
+    // they take the same credential-health gate as the upstream's own status.
+    const refuseUpstream = (status, message) => {
+      logUpstream(status);
+      return jsonError(res, status, message);
+    };
+
     try {
       // Egress goes through the configured proxy, like every other Linear call.
       const customFetch = (await createProxyFetch()) || fetch;
       const response = await customFetch(fetchUrl, {
         method: 'GET',
-        headers: (!isGithubAssetHost && providerName === 'linear') ? { Authorization: `Bearer ${token}` } : {},
+        headers: relayedCredential ? { Authorization: `Bearer ${token}` } : {},
         redirect: 'error',
       });
 
       if (isRedirectStatus(response.status)) {
-        return refuse(400, 'Redirects not allowed');
+        return refuseUpstream(400, 'Redirects not allowed');
       }
       if (!response.ok) {
-        return refuse(response.status, 'Failed to fetch attachment');
+        logUpstream(response.status);
+        return jsonError(res, response.status, 'Failed to fetch attachment');
       }
 
       // Admit the bytes: type first, then size (header, then actual body).
       const upstreamType = response.headers.get('content-type') || '';
       if (!isFileRelay && !upstreamType.startsWith('image/')) {
-        return refuse(400, 'Invalid response: unsupported content-type');
+        return refuseUpstream(400, 'Invalid response: unsupported content-type');
       }
       const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
       if (contentLength > MAX_ATTACHMENT_BYTES) {
-        return refuse(413, 'Attachment too large');
+        return refuseUpstream(413, 'Attachment too large');
       }
       const bytes = await response.arrayBuffer();
       if (bytes.byteLength > MAX_ATTACHMENT_BYTES) {
-        return refuse(413, 'Attachment too large');
+        return refuseUpstream(413, 'Attachment too large');
       }
 
       const rawName = nameHint || urlObj.pathname.split('/').pop() || 'attachment';
@@ -596,14 +612,14 @@ export function createReadRoutes({ proxyLimiter, authenticateProxyToken, resolve
       res.set('Content-Disposition', `attachment; filename="${safeName}"`);
       res.set('X-Content-Type-Options', 'nosniff');
       res.set('Cache-Control', 'private, max-age=3600');
-      logEvent(req, endpoint, 200);
+      logUpstream(200);
       res.send(Buffer.from(bytes));
     } catch (error) {
       if (isRedirectError(error)) {
-        return refuse(400, 'Redirects not allowed');
+        return refuseUpstream(400, 'Redirects not allowed');
       }
       console.error('Proxy attachment relay error:', error.message);
-      refuse(502, 'Failed to fetch attachment');
+      refuseUpstream(502, 'Failed to fetch attachment');
     }
   });
 
