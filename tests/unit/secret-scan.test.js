@@ -11,6 +11,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import {
   shannonEntropy,
@@ -212,16 +213,15 @@ const dummy = "placeholder";
 
   test('scanFile uses repo-relative path when options.filePath is provided (F3)', () => {
     const text = `const apiKey = "${FIXTURE_SECRETS.linearApiKey}";`;
-    const tempFile = path.resolve('temp-planted-secret.js');
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lin-2852-planted-'));
+    const tempFile = path.join(tempDir, 'temp-planted-secret.js');
     fs.writeFileSync(tempFile, text);
     try {
       const findings = scanFile(tempFile, { filePath: 'lib/temp-planted-secret.js' });
       assert.equal(findings.length, 1);
       assert.equal(findings[0].filePath, 'lib/temp-planted-secret.js');
     } finally {
-      if (fs.existsSync(tempFile)) {
-        fs.unlinkSync(tempFile);
-      }
+      fs.rmSync(tempDir, { recursive: true, force: true });
     }
   });
 });
@@ -326,6 +326,110 @@ describe('scanDirectory against repository', () => {
     assert.ok(result.scannedFiles > 1000, `Expected > 1000 files, got ${result.scannedFiles}`);
     assert.equal(result.findings.length, 0, `Expected 0 findings in repo, got: ${JSON.stringify(result.findings)}`);
     assert.equal(result.totalHits, 0);
+    assert.deepEqual(result.errors, [], `Expected no unreadable paths in repo, got: ${JSON.stringify(result.errors)}`);
+    assert.equal(result.clean, true);
+  });
+});
+
+// LIN-2852: a clean source scan means every in-scope file was read. Unreadable files and
+// directories are reported by path and make the result not clean; they are never counted as
+// scanned. chmod cannot stop root from reading, so the unreadable cases are skipped there.
+describe('LIN-2852 source scan fails closed on unreadable input', () => {
+  const isRoot = typeof process.getuid === 'function' && process.getuid() === 0;
+  const unreadableSkip = isRoot ? 'chmod does not block reads as root' : false;
+
+  function makeTempTree() {
+    return fs.mkdtempSync(path.join(os.tmpdir(), 'lin-2852-scan-'));
+  }
+
+  test('scanDirectory counts only files it read: skipped extensions, fixtures and .env are not counted', () => {
+    const dir = makeTempTree();
+    try {
+      fs.writeFileSync(path.join(dir, 'ok.js'), 'const a = 1;\n');
+      fs.writeFileSync(path.join(dir, 'picture.png'), 'not really a png');
+      fs.writeFileSync(path.join(dir, '.env'), `API_TOKEN=${FIXTURE_SECRETS.linearApiKey}\n`);
+      fs.mkdirSync(path.join(dir, 'tests', 'fixtures'), { recursive: true });
+      fs.writeFileSync(path.join(dir, 'tests', 'fixtures', 'planted.js'), `const k = "${FIXTURE_SECRETS.linearApiKey}";\n`);
+
+      const result = scanDirectory(dir);
+      assert.equal(result.scannedFiles, 1, `Expected only ok.js to count, got ${result.scannedFiles}`);
+      assert.equal(result.findings.length, 0);
+      assert.deepEqual(result.errors, []);
+      assert.equal(result.clean, true);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('scanDirectory on a fully readable tree with a planted secret reports it and stays not clean', () => {
+    const dir = makeTempTree();
+    try {
+      fs.writeFileSync(path.join(dir, 'ok.js'), 'const a = 1;\n');
+      fs.writeFileSync(path.join(dir, 'leak.js'), `const k = "${FIXTURE_SECRETS.linearApiKey}";\n`);
+
+      const result = scanDirectory(dir);
+      assert.equal(result.scannedFiles, 2);
+      assert.equal(result.findings.length, 1);
+      assert.equal(result.findings[0].filePath, 'leak.js');
+      assert.deepEqual(result.errors, []);
+      assert.equal(result.clean, false);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('scanFile throws on an unreadable file instead of returning no findings', { skip: unreadableSkip }, () => {
+    const dir = makeTempTree();
+    const locked = path.join(dir, 'locked.js');
+    fs.writeFileSync(locked, `const k = "${FIXTURE_SECRETS.linearApiKey}";\n`);
+    fs.chmodSync(locked, 0o000);
+    try {
+      assert.throws(() => scanFile(locked, { filePath: 'locked.js' }), (err) => err.code === 'EACCES');
+    } finally {
+      fs.chmodSync(locked, 0o644);
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('scanDirectory reports an unreadable file by path, does not count it, and is not clean', { skip: unreadableSkip }, () => {
+    const dir = makeTempTree();
+    const locked = path.join(dir, 'locked.js');
+    fs.writeFileSync(path.join(dir, 'ok.js'), `const k = "${FIXTURE_SECRETS.linearApiKey}";\n`);
+    fs.writeFileSync(locked, 'const a = 1;\n');
+    fs.chmodSync(locked, 0o000);
+    try {
+      const result = scanDirectory(dir);
+      assert.equal(result.clean, false);
+      assert.equal(result.scannedFiles, 1, `Expected only the readable file to count, got ${result.scannedFiles}`);
+      assert.equal(result.findings.length, 1, 'a readable file\'s finding is still reported');
+      assert.equal(result.errors.length, 1);
+      assert.equal(result.errors[0].path, 'locked.js');
+      assert.match(result.errors[0].message, /locked\.js/);
+    } finally {
+      fs.chmodSync(locked, 0o644);
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('scanDirectory reports an unlistable directory by path, skips its contents, and is not clean', { skip: unreadableSkip }, () => {
+    const dir = makeTempTree();
+    const locked = path.join(dir, 'locked');
+    fs.writeFileSync(path.join(dir, 'ok.js'), 'const a = 1;\n');
+    fs.mkdirSync(locked);
+    fs.writeFileSync(path.join(locked, 'inside.js'), `const k = "${FIXTURE_SECRETS.linearApiKey}";\n`);
+    fs.chmodSync(locked, 0o000);
+    try {
+      const result = scanDirectory(dir);
+      assert.equal(result.clean, false);
+      assert.equal(result.scannedFiles, 1, `Expected only ok.js to count, got ${result.scannedFiles}`);
+      assert.equal(result.findings.length, 0);
+      assert.equal(result.errors.length, 1);
+      assert.equal(result.errors[0].path, 'locked');
+      assert.match(result.errors[0].message, /locked/);
+    } finally {
+      fs.chmodSync(locked, 0o755);
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

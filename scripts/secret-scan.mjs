@@ -3,13 +3,14 @@
  * Secret scan CLI over repository source in CI (LIN-2573).
  *
  * Scans the codebase for high-confidence secrets (API keys, private keys, tokens).
- * Fails CI build on any high-confidence match.
+ * Fails CI build on any high-confidence match, and on any in-scope file or directory
+ * that could not be read (LIN-2852): "0 secrets found" must mean every file was looked at.
  *
  * Usage:
  *   node scripts/secret-scan.mjs
  *   npm run secret-scan
  *
- * Exit 0 when clean, exit 1 when secrets detected.
+ * Exit 0 when clean, exit 1 when secrets detected or any path could not be scanned.
  */
 
 import path from 'node:path';
@@ -23,13 +24,22 @@ const start = Date.now();
 const result = scanDirectory(ROOT);
 const elapsed = ((Date.now() - start) / 1000).toFixed(2);
 
-if (result.findings.length > 0) {
-  console.error(`\n[secret-scan] ❌ FAIL: Found ${result.findings.length} secret(s) in source code (${elapsed}s, ${result.scannedFiles} files checked):\n`);
-  for (const f of result.findings) {
-    console.error(`  - [${f.ruleName}] at ${f.filePath}:${f.line}:${f.column}`);
-    console.error(`    Matched: ${f.redacted}`);
+if (!result.clean) {
+  if (result.findings.length > 0) {
+    console.error(`\n[secret-scan] ❌ FAIL: Found ${result.findings.length} secret(s) in source code (${elapsed}s, ${result.scannedFiles} files checked):\n`);
+    for (const f of result.findings) {
+      console.error(`  - [${f.ruleName}] at ${f.filePath}:${f.line}:${f.column}`);
+      console.error(`    Matched: ${f.redacted}`);
+    }
+    console.error('\nPlease remove exposed secrets before committing or merging.\n');
   }
-  console.error('\nPlease remove exposed secrets before committing or merging.\n');
+  if (result.errors.length > 0) {
+    console.error(`\n[secret-scan] ❌ FAIL: ${result.errors.length} path(s) could not be scanned (${elapsed}s, ${result.scannedFiles} files checked). A clean result needs every path read:\n`);
+    for (const e of result.errors) {
+      console.error(`  - [${e.type}] ${e.message}`);
+    }
+    console.error('\nMake the paths readable (or remove them from the checkout) and re-run.\n');
+  }
   process.exit(1);
 } else {
   console.log(`[secret-scan] ✅ PASS: ${result.scannedFiles} files scanned in ${elapsed}s. 0 secrets found.`);
