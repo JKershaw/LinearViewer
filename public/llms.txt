@@ -819,8 +819,8 @@ main.lc-page[data-url-key]                    - page container
 
 ## Limitations
 
-- Read-only view (no editing tasks)
-- Logout requires re-authentication via Linear OAuth
+- Task editing depends on the provider: the Edit link and the task-edit page (`/workspace/{urlKey}/task/{issueId}/edit`) appear only when the provider's `ui.inlineEdit` is true; otherwise the task-edit page redirects to the dashboard and tasks are view-only
+- Logout ends the session and returns to the landing page; signing in again uses whichever methods the server has configured (Linear, GitHub, Jira, or email). In PAT mode (`LINEAR_ACCESS_TOKEN` set) the next visit signs in again automatically, so logout does not stay signed out
 - Expand/collapse state persists in localStorage (reset restores defaults)
-- Team filter selection persists in localStorage across sessions
+- Team filter selection is remembered per workspace: a localStorage cache in the browser plus the account's server-side preferences, so it carries across sessions and devices
 - Landing page (`/`, unauthenticated) is a bespoke Harbour showcase: a brand hero with one plain sentence that says what Harbour does, and the sign-in buttons; fake-data glimpses of real surfaces (observation feed, swim board, grounded prompt); a "try it yourself" callout that repeats the sign-in buttons; a providers strip; a distinct Harbour OS section; the Library and the Archive; and a footer whose `/swipe` and `/swim` links are labelled as previews. It is NOT the project-tree renderer; section blocks carry `[data-testid="landing-{hero,plain,loop,observation,swim,prompt,try,providers,os,library,archive}"]`. The `/swipe` and `/swim` unauthenticated previews still render sample tree data.
