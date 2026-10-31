@@ -705,9 +705,33 @@ test.describe('startBulkScan — a throwing callback cannot stall the run (LIN-2
     assert.equal(posted, 2, 'both items posted before teardown ran');
     assert.equal(reported.length, 1, 'the onTeardown throw is reported once, not silently dropped');
 
-    // stopBulkScan must not throw into the caller, and the pointer must be clear.
+    // The run has already torn down, so this stop is a no-op: it only checks
+    // idempotence. The in-flight stop path is the next test.
     assert.doesNotThrow(() => stopBulkScan());
     const second = startBulkScan(items(1), { onTeardown: () => {} });
     assert.equal(second.refused, false, 'a second run starts after a throwing onTeardown');
+  });
+
+  test('a throwing onTeardown reached through stopBulkScan() mid-flight: stop does not throw into the caller, the throw is reported once, and a second run starts', async () => {
+    // postScan never settles, so the run is genuinely in flight when stopped:
+    // stop() -> teardown() -> onTeardown is the path the Stop button's click
+    // handler takes. Unguarded, the onTeardown throw would escape stopBulkScan().
+    const sandbox = makeSandbox(() => new Promise(() => {}));
+    const reported = [];
+    sandbox.console.error = (...args) => { reported.push(args); };
+    const { startBulkScan, stopBulkScan, BULK_SCAN_CONCURRENCY } = sandbox.module.exports;
+
+    const first = startBulkScan(items(BULK_SCAN_CONCURRENCY + 1), {
+      onTeardown: () => { throw new Error('boom'); }
+    });
+    await flush();
+    assert.equal(first.refused, false, 'the first run was accepted');
+    assert.equal(reported.length, 0, 'nothing reported yet: the run is still in flight');
+
+    assert.doesNotThrow(() => stopBulkScan(), 'stopBulkScan must not throw into the Stop handler');
+    assert.equal(reported.length, 1, 'the onTeardown throw is reported exactly once, not dropped');
+
+    const second = startBulkScan(items(1), { onTeardown: () => {} });
+    assert.equal(second.refused, false, 'the stopped run cleared its stop pointer, so a second run starts');
   });
 });
