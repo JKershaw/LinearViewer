@@ -6,6 +6,8 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { buildSubtreeIndex } from '../../lib/subtree-index.js';
+import { withInverseRelations } from '../../lib/graph-features.js';
 import {
   createTaskFactsHolder, createTaskFactsRefresh, gateRefusalOf,
   SERVE_MAX_AGE_MS, REFRESH_AFTER_MS, ATTEMPT_FLOOR_MS,
@@ -211,6 +213,56 @@ describe('the refresh trigger (LIN-4068 D4, N1, N4)', () => {
     assert.equal(refresh({ urlKey: 'acme', workspace: {}, accountId: null }).reason, 'fresh', 'not refreshed every 60 s for a task that is never in the set');
     c.advance(MIN);
     assert.equal(refresh({ urlKey: 'acme', workspace: {}, accountId: null }).started, true);
+  });
+});
+
+describe('the held index is reused, not built a second time (LIN-4069 review ledger item 6)', () => {
+  test('write(urlKey, fetched, { index }) holds the very index it was handed, and read serves it', () => {
+    const holder = createTaskFactsHolder();
+    const set = [issue('A-1'), issue('A-2', 'started', 'A-1')];
+    const prebuilt = withInverseRelations([buildSubtreeIndex(set)])[0];
+    assert.equal(holder.write('acme', complete(set), { index: prebuilt }).written, true);
+    const held = holder.read('acme', { identifier: 'A-2' });
+    assert.equal(held.complete, true);
+    assert.equal(held.index, prebuilt, 'the same array: no second build');
+  });
+
+  test('with no index (the gather returned null) the holder builds its own, over the same set', () => {
+    const holder = createTaskFactsHolder();
+    holder.write('acme', complete([issue('A-1'), issue('A-2', 'started', 'A-1')]), { index: null });
+    const held = holder.read('acme', { identifier: 'A-2' });
+    assert.equal(held.complete, true);
+    assert.equal(held.index[0].children[0].issue.identifier, 'A-2');
+  });
+
+  test('a refused set writes nothing even when an index is handed in', () => {
+    const holder = createTaskFactsHolder();
+    const set = [issue('A-1')];
+    const prebuilt = withInverseRelations([buildSubtreeIndex(set)])[0];
+    assert.equal(holder.write('acme', complete(set, { truncated: true }), { index: prebuilt }).written, false);
+    assert.deepEqual(holder.read('acme'), { complete: false, reason: 'cold' });
+  });
+
+  test('wiring: each caller writes AFTER its gather and hands the gather\'s index (roots) to the holder', () => {
+    const read = (rel) => readFileSync(new URL(`../../${rel}`, import.meta.url), 'utf8');
+    const server = read('server.js');
+    const refresh = read('lib/dashboard-refresh.js');
+    const check = (src, label) => {
+      const gather = src.indexOf('await homeRowStates(');
+      const write = src.search(/writeTaskFacts\??\.?\(/);
+      assert.ok(gather !== -1 && write !== -1, `${label}: has a gather and a holder write`);
+      assert.ok(gather < write, `${label}: the holder write follows the gather, so it can reuse the gather's index`);
+    };
+    check(refresh, 'dashboard-refresh');
+    assert.match(refresh, /writeTaskFacts\?\.\(workspace\.urlKey, fetched, \{ index: homeStates\?\.roots \?\? null \}\)/);
+    // server.js: Home's page load and /api/home-rows, each in its own route.
+    const routes = [...server.matchAll(/writeTaskFacts\(workspace\.urlKey, fetched, \{ index: homeStates\?\.roots \?\? null \}\)/g)];
+    assert.equal(routes.length, 2, 'Home page load and /api/home-rows both reuse the gather\'s index');
+    assert.ok(!/writeTaskFacts\(workspace\.urlKey, fetched\);/.test(server), 'no write left that builds its own index on the request path');
+    for (const m of routes) {
+      const before = server.slice(0, m.index);
+      assert.ok(before.lastIndexOf('await homeRowStates(') > before.lastIndexOf("app.get('/workspace/"), 'a gather precedes the write in the same route');
+    }
   });
 });
 

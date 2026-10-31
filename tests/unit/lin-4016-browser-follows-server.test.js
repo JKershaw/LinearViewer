@@ -212,3 +212,33 @@ describe('LIN-4016 — the opened task agrees with its row (finished, and a fail
     assert.doesNotMatch(html, /needs you/);
   });
 });
+
+// LIN-4069 (piece A of LIN-4068), review ledger item 2: before the first `/state` reply the opened box has no sessions, so
+// `mainActionOf` takes the row record's action (the gatherer's decision). No other test drove this fallback: ignoring
+// `opts.row.action` left all 488 tests that load prompt-section green (review mutation M4).
+describe('LIN-4069 — before the first /state reply the run control takes the row record\'s action', () => {
+  // `/state` never answers: the box is painted from the row record alone.
+  const PENDING = new Promise(() => {});
+
+  test('the row\'s run-to-pr action shows Run to PR with no sessions yet', async () => {
+    const row = rowRecordOf({ stateType: 'started', decided: { state: 'next', action: { kind: 'run-to-pr', why: 'a container runs to PR' } } });
+    assert.deepEqual(row.action, { kind: 'run-to-pr', why: 'a container runs to PR' });
+    const html = await paint(PENDING, { row });
+    assert.match(html, /data-action="go"[^>]*>Run to PR</);
+  });
+
+  test('a row whose action is null (busy subtree, or finished) shows no run before /state replies', async () => {
+    const row = rowRecordOf({ stateType: 'started', decided: { state: 'running', action: null } });
+    assert.equal(row.action, null);
+    const html = await paint(PENDING, { row });
+    assert.doesNotMatch(html, /Run to PR/);
+    assert.doesNotMatch(html, /run-step-next/);
+    assert.doesNotMatch(html, /data-action="go"/);
+  });
+
+  test('once /state replies, its sessions.action wins over the row\'s (the row only fills the gap before the reply)', async () => {
+    const row = rowRecordOf({ stateType: 'started', decided: { state: 'next', action: { kind: 'run-to-pr', why: 'row' } } });
+    const html = await paint(stateWith({ offered: PLAN_OFFER, action: null, busy: true }), { row });
+    assert.doesNotMatch(html, /Run to PR/, 'the server\'s busy decision removes the row\'s offer');
+  });
+});

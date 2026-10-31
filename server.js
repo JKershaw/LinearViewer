@@ -3260,7 +3260,7 @@ const homeRowStates = createHomeRowStates({
 // through the holder's gate; only a private route's caller may start a refresh (piece B wires `/state`, the first one).
 const taskFacts = createTaskFactsHolder()
 const refreshTaskFacts = createTaskFactsRefresh({ holder: taskFacts, fetchAndPrepareProjects })
-const writeTaskFacts = (urlKey, fetched) => taskFacts.write(urlKey, fetched)
+const writeTaskFacts = (urlKey, fetched, opts) => taskFacts.write(urlKey, fetched, opts)
 app.use(createTaskPageRoutes({
   workspaceFromUrl,
   getOpenRouterSource,
@@ -3448,7 +3448,6 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
 
     const fetched = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true, assigneeName: assigneeState.resolvedAssigneeName, accountId: req.session.accountId });
     const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated, availableAssignees, appliedAssigneeName } = fetched;
-    writeTaskFacts(workspace.urlKey, fetched);
     const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h));
     // LIN-2944 P1 F3: the deck's front card, over the SAME already-fetched trees —
     // `orderIssuesForSwipe` is pure and adds no provider call. With `?assignee=`,
@@ -3458,6 +3457,9 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
     const seedOnlyHome = orderedHome.length > 0 && orderedHome.every((issue) => issue.isSeed);
     const featureFlags = await requestFeatureFlags(req);
     const homeStates = await homeRowStates({ urlKey: workspace.urlKey, issues: fetched.stateIssues, runControls: featureFlags.runControls === true });
+    // LIN-4068: hold the set through the write gate AFTER the gather, handing it the index the gather built (`roots`) so
+    // the request builds it once; with no gather (null) the holder builds its own.
+    writeTaskFacts(workspace.urlKey, fetched, { index: homeStates?.roots ?? null });
     const rowStates = homeStates?.states ?? null;
     // LIN-4024: Home renders the trimmed view (what needs you, what runs, what is next; the rest behind folds).
     const homeView = buildHomeView({ inProgressTrees, trees, states: rowStates ?? new Map(), topTaskId: homeTopTask ? nodeKey(homeTopTask) : null });
@@ -3544,12 +3546,13 @@ app.get('/workspace/:urlKey/api/home-rows', workspaceFromUrl, async (req, res) =
     // The page's own inputs, so these rows and the page's rows come from one filtered view of the workspace.
     const fetched = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true, assigneeName: assigneeState.resolvedAssigneeName, accountId: req.session.accountId });
     const { trees, inProgressTrees, recentActivityTrees, showSource } = fetched;
-    // LIN-4068: a third caller of the fetch; it holds a complete set through the same gate as Home's page load.
-    writeTaskFacts(workspace.urlKey, fetched);
     const orderedHome = orderIssuesForSwipe({ projectTrees: trees, inProgressTrees, recentActivityTrees, urlKey: workspace.urlKey });
     const homeTopTask = orderedHome.find((issue) => !issue.isSeed) || null;
     const featureFlags = await requestFeatureFlags(req);
     const homeStates = await homeRowStates({ urlKey: workspace.urlKey, issues: fetched.stateIssues, runControls: featureFlags.runControls === true });
+    // LIN-4068: a third caller of the fetch; it holds a complete set through the same gate as Home's page load, reusing
+    // the gather's index.
+    writeTaskFacts(workspace.urlKey, fetched, { index: homeStates?.roots ?? null });
     const states = homeStates?.states ?? new Map();
     const rows = homeRowsFor({ kind, projectId, parentId, q, offset, trees, inProgressTrees, states, topTaskId: homeTopTask ? nodeKey(homeTopTask) : null });
     const urlKey = workspace.urlKey;
