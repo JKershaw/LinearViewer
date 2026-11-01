@@ -71,6 +71,8 @@ export function sitemapEntries(catalog) {
   const entries = [
     { path: '/', lastmod: null },
     { path: '/library', lastmod: null },
+    // LIN-4085: the HTML form of the agent guide (the .md form is for agents, not crawlers).
+    { path: '/getting-started', lastmod: null },
   ];
   for (const doc of catalog.docs) {
     // `lastmod` only when the date is a real `YYYY-MM-DD`; omit rather than invent.

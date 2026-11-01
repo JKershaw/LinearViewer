@@ -18,6 +18,8 @@ export const GROUPS = {
   'autopilot kickoff': ['lib/prompts/autopilot-kickoff.js', 'lib/prompts/autopilot-manual.js'],
   'operating manual': ['docs/autopilot-operating-manual.md'],
   'lane + passage prompts': ['docs/worker-lane-prompt.md', 'docs/passage-runner-prompt.md', 'docs/passage-planner-prompt.md', 'docs/runner-prompt.md'],
+  // LIN-4085: the public guide an agent reads before sign-in, and the module that builds it and the landing prompt.
+  'agent onboarding': ['docs/agent-onboarding.md', 'lib/prompts/agent-onboarding.js'],
   'prompt-system.md': ['docs/architecture/prompt-system.md'],
   'CLAUDE.md': ['CLAUDE.md'],
   'proxy instructions': ['lib/proxy-instructions.js'],

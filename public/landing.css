@@ -535,3 +535,46 @@
     grid-template-columns: repeat(4, 1fr);
   }
 }
+
+/* LIN-4085: the agent prompt under the hero sign-in buttons. The prompt is a
+   terminal block like the other glimpses; long lines wrap, so the page never
+   scrolls sideways at 320px. The copy button is added by landing-copy.js. */
+.lx-agent {
+  padding-top: var(--space-4);
+}
+
+.lx-agent__block {
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.lx-agent__text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow-x: auto;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.lx-agent__copy {
+  display: block;
+  margin: var(--space-3) var(--space-3) 0 auto;
+  padding: 0.35rem 0.75rem;
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.lx-agent__copy:hover {
+  border-color: var(--brand);
+}
+
+.lx-agent__copy:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}

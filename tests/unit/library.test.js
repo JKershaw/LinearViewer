@@ -337,7 +337,10 @@ describe('crawler files (LIN-3345)', () => {
     for (const edition of catalog.archiveEditions) {
       assert.ok(locs.includes(`${base}/archive/${edition.n}`), `archive ${edition.n} listed`);
     }
-    assert.equal(locs.length, 2 + catalog.docs.length + catalog.archiveEditions.length);
+    // `/`, `/library`, `/getting-started` (LIN-4085: the HTML form of the agent guide), then the documents and editions.
+    assert.equal(locs.length, 3 + catalog.docs.length + catalog.archiveEditions.length);
+    assert.ok(locs.includes(`${base}/getting-started`), 'the agent guide is listed');
+    assert.ok(!locs.includes(`${base}/getting-started.md`), 'the .md form is for agents, not the sitemap');
 
     // `lastmod` only where the date is a real YYYY-MM-DD.
     const lastmods = [...xml.matchAll(/<lastmod>([^<]+)<\/lastmod>/g)].map(m => m[1]);

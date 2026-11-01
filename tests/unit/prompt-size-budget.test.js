@@ -56,6 +56,8 @@ import { PROMPT_TEMPLATES, generatePrompt } from '../../lib/prompt-templates.js'
 import { buildRouterPrompt } from '../../lib/stage-router.js';
 import { buildSelectorArgs } from '../../lib/openrouter.js';
 import { buildRunnerKickoff } from '../../lib/prompts/runner-kickoff.js';
+import { buildAgentOnboarding, renderLandingAgentPrompt, GUIDE_PATH } from '../../lib/prompts/agent-onboarding.js';
+import { signInDoors } from '../../lib/components/landing-hero.js';
 
 // ─── Ceilings, measured at the freeze (LIN-3203) ─────────────────────────────
 // Each is the surface's UTF-8 byte count on the freeze branch. A ceiling is a
@@ -132,6 +134,13 @@ export const RUNNER_PROMPT_SOURCE_CEILING = 17638; // LIN-3669: +164 (17474), §
 /** Served runner prompt, rendered bytes (buildRunnerKickoff at BASE_URL). */
 export const RUNNER_PROMPT_RENDERED_CEILING = 15953; // LIN-3669: +164 (15789), the same §5 lines rendered; the parent's response to a finished-but-unposted subagent is prose (the parent is a model), the rest of LIN-3669 is code and tests. Earlier: // LIN-3451: at 15789 since the runner kit matched Simple Dispatcher (halt / target / repo / cap)
 
+/** Agent onboarding guide, source bytes (docs/agent-onboarding.md, design notes included). LIN-4085: new file; the served guide is agent-facing prose that must stay wording, not code. Its links and sign-in doors are code-checked in tests/unit/agent-onboarding.test.js. */
+export const AGENT_ONBOARDING_SOURCE_CEILING = 4207; // LIN-4085: new at 4207 (the design notes above the divider and the served guide below it)
+/** Agent onboarding guide, rendered bytes: the largest rendering over the 16 sign-in door and free-tier combinations, at BASE_URL. LIN-4085: new. */
+export const AGENT_ONBOARDING_RENDERED_CEILING = 3207; // LIN-4085: new at 3207 (the all-doors, no-free-tier rendering is the largest)
+/** Landing agent prompt, rendered bytes at BASE_URL (renderLandingAgentPrompt). LIN-4085: new. Copied by a person into their own agent, so it is wording the agent reads, not code. */
+export const LANDING_AGENT_PROMPT_CEILING = 584; // LIN-4085: new at 584 (the copied prompt under the sign-in buttons)
+
 /**
  * The total: the sum of every ceiling above. A PR that raises a ceiling raises
  * THIS number with it, in the same change, and says why in the comment beside the
@@ -150,7 +159,7 @@ export const RUNNER_PROMPT_RENDERED_CEILING = 15953; // LIN-3669: +164 (15789), 
  * LIN-3326 lowered it again (364994 -> 342621): close-out and review shed the authoring
  * bound and the pre-merge risk gates (-22455), less close-out's Scope and Authority line (+82).
  */
-export const FROZEN_TOTAL_BYTES = 323966; // LIN-4021: -4 (323970 -> 323966), review and defs -2 each for the review scope line. LIN-4021: -256 (324226 -> 323970), the four ceilings lowered this pass (defs -181, breakdown -71, implementation -2, routing prompt -2), the exact sum of the ceilings above. LIN-4021: -20583 (344809 -> 324226), the exact sum of the ceilings above, each lowered to its measured size. The total had carried 52 bytes of slack beyond the sum before this change (344809 vs 344757), which this sheds too. Earlier: LIN-3906: +97 (344809), the routing prompt's ceiling +97. Earlier: // LIN-3903: +232 (344480), close-out ceiling +232; review is -12 under its unchanged ceiling. Earlier: // LIN-3279: +1195 (343285), defs +655, close-out +192, retrospective-audit +192, router +156. Earlier: // LIN-3669: +328 (342957), runner prompt source +164 and rendered +164. Earlier: // LIN-3651: +365 (342592), contract source +232 and plan-review rendered +133. Earlier: // LIN-3612: +15 (342577), prompt-templates.js import path. Earlier: // LIN-3615: -22 (342599), net of plan-review -99, review +88, defs -11. Earlier: // LIN-3614: -2 (342601), net of review -521, close-out +520, defs -1. Earlier: // LIN-3378: -20 (342621)
+export const FROZEN_TOTAL_BYTES = 331964; // LIN-4085: +7998 (323966 -> 331964), the three new ceilings above (4207 + 3207 + 584), the agent onboarding guide and its landing prompt. LIN-4021: -4 (323970 -> 323966), review and defs -2 each for the review scope line. LIN-4021: -256 (324226 -> 323970), the four ceilings lowered this pass (defs -181, breakdown -71, implementation -2, routing prompt -2), the exact sum of the ceilings above. LIN-4021: -20583 (344809 -> 324226), the exact sum of the ceilings above, each lowered to its measured size. The total had carried 52 bytes of slack beyond the sum before this change (344809 vs 344757), which this sheds too. Earlier: LIN-3906: +97 (344809), the routing prompt's ceiling +97. Earlier: // LIN-3903: +232 (344480), close-out ceiling +232; review is -12 under its unchanged ceiling. Earlier: // LIN-3279: +1195 (343285), defs +655, close-out +192, retrospective-audit +192, router +156. Earlier: // LIN-3669: +328 (342957), runner prompt source +164 and rendered +164. Earlier: // LIN-3651: +365 (342592), contract source +232 and plan-review rendered +133. Earlier: // LIN-3612: +15 (342577), prompt-templates.js import path. Earlier: // LIN-3615: -22 (342599), net of plan-review -99, review +88, defs -11. Earlier: // LIN-3614: -2 (342601), net of review -521, close-out +520, defs -1. Earlier: // LIN-3378: -20 (342621)
 
 const BASE_URL = 'https://harbour.example';
 
@@ -255,6 +264,31 @@ describe('prompt surfaces stay within their frozen byte budgets (LIN-3203)', () 
       `${RUNNER_PROMPT_RENDERED_CEILING}-byte ceiling. ${OVER_CEILING_FIX}`);
   });
 
+  test('agent onboarding guide source bytes', () => {
+    const actual = Buffer.byteLength(readFileSync(GUIDE_PATH, 'utf8'));
+    assert.ok(actual <= AGENT_ONBOARDING_SOURCE_CEILING,
+      `docs/agent-onboarding.md is ${actual} bytes, ${actual - AGENT_ONBOARDING_SOURCE_CEILING} over its ` +
+      `${AGENT_ONBOARDING_SOURCE_CEILING}-byte ceiling. ${OVER_CEILING_FIX}`);
+  });
+
+  test('agent onboarding guide rendered bytes, over every door and free-tier combination', () => {
+    let actual = 0;
+    for (const githubEnabled of [false, true]) for (const jiraEnabled of [false, true]) for (const emailEnabled of [false, true]) for (const freeTierEnabled of [false, true]) {
+      const doors = signInDoors({ githubEnabled, jiraEnabled, emailEnabled }).map(({ label, href }) => ({ label, href }));
+      actual = Math.max(actual, Buffer.byteLength(buildAgentOnboarding({ baseUrl: BASE_URL, doors, freeTierEnabled })));
+    }
+    assert.ok(actual <= AGENT_ONBOARDING_RENDERED_CEILING,
+      `The agent onboarding guide renders to ${actual} bytes, ${actual - AGENT_ONBOARDING_RENDERED_CEILING} over its ` +
+      `${AGENT_ONBOARDING_RENDERED_CEILING}-byte ceiling. ${OVER_CEILING_FIX}`);
+  });
+
+  test('landing agent prompt rendered bytes', () => {
+    const actual = Buffer.byteLength(renderLandingAgentPrompt({ baseUrl: BASE_URL }));
+    assert.ok(actual <= LANDING_AGENT_PROMPT_CEILING,
+      `The landing agent prompt renders to ${actual} bytes, ${actual - LANDING_AGENT_PROMPT_CEILING} over its ` +
+      `${LANDING_AGENT_PROMPT_CEILING}-byte ceiling. ${OVER_CEILING_FIX}`);
+  });
+
   test('the rendered budget covers exactly the live PROMPT_TEMPLATES key set', () => {
     // A new template without a budget (or a stale budget for a removed one) is a
     // failure: adding a template means giving it a ceiling with its reason beside it.
@@ -275,6 +309,9 @@ describe('prompt surfaces stay within their frozen byte budgets (LIN-3203)', () 
       STAGE_INTENT_SOURCE_CEILING,
       RUNNER_PROMPT_SOURCE_CEILING,
       RUNNER_PROMPT_RENDERED_CEILING,
+      AGENT_ONBOARDING_SOURCE_CEILING,
+      AGENT_ONBOARDING_RENDERED_CEILING,
+      LANDING_AGENT_PROMPT_CEILING,
     ].reduce((sum, n) => sum + n, 0);
     assert.ok(ceilingSum <= FROZEN_TOTAL_BYTES,
       `The ceilings sum to ${ceilingSum} bytes, ${ceilingSum - FROZEN_TOTAL_BYTES} over the frozen total ` +
@@ -304,8 +341,9 @@ describe('every ceiling carries its reason (LIN-3633)', () => {
   const strip = (line) => line.replace(/\bLIN-\d+\b/g, '');
 
   test('the matcher sees every ceiling, so a pass is not vacuous', () => {
-    // Source and rendered keys, router source and rendered, intent, runner source and rendered, the total.
-    const expected = Object.keys(TEMPLATES_SOURCE_CEILINGS).length + Object.keys(TEMPLATES_RENDERED_CEILINGS).length + 5 + 1;
+    // Source and rendered keys, router source and rendered, intent, runner source and rendered, the three
+    // LIN-4085 onboarding ceilings (guide source, guide rendered, landing prompt), the total.
+    const expected = Object.keys(TEMPLATES_SOURCE_CEILINGS).length + Object.keys(TEMPLATES_RENDERED_CEILINGS).length + 5 + 3 + 1;
     assert.equal(ceilingLines(real).length, expected,
       'A ceiling is in a shape the matcher misses (or the matcher over-matches). Keep ceilings as `NAME = <digits>` or `key: <digits>`.');
   });

@@ -134,6 +134,7 @@ import { createProxyDefaultRoute } from './lib/settings-proxy-default.js'
 import { createCopyFirstCardRoute } from './lib/settings-copy-first-card.js'
 import { createMilestoneFunnelRoutes } from './routes/milestone-funnel.js'
 import { createRunnerKitRoutes } from './routes/runner-kit.js'
+import { createGettingStartedRouter } from './routes/getting-started.js'
 import { createTestRoutes, installTestTokenLinearTransport } from './routes/test.js'
 import { createWorkspaceApiRoutes, decisionStampDedupe } from './routes/workspace-api.js'
 import { shouldMockAi } from './lib/should-mock-ai.js'
@@ -2329,7 +2330,7 @@ app.get('/', (req, res) => {
   const setupNotice = (isLocalhost && hasNoAuth) ? 'setup' : null
 
   // Unauthenticated users see the bespoke Harbour showcase landing (LIN-980).
-  const html = renderLandingPage({ origin: requestOriginOrNull(req), deployInfo, setupNotice, githubEnabled: getProvider('github').entryCta.isConfigured(), jiraEnabled: getProvider('jira').entryCta.isConfigured(), emailEnabled: isEmailSignInAvailable(), freeTierEnabled: isFreeTierOffered() })
+  const html = renderLandingPage({ origin: requestOriginOrNull(req), agentOrigin: publicOrigin(req, { safeHost: true }), deployInfo, setupNotice, githubEnabled: getProvider('github').entryCta.isConfigured(), jiraEnabled: getProvider('jira').entryCta.isConfigured(), emailEnabled: isEmailSignInAvailable(), freeTierEnabled: isFreeTierOffered() })
   res.send(html)
 })
 
@@ -3212,6 +3213,9 @@ app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, 
 // LIN-3098 S3: the runner kit (lib/runner-kit/*.mjs), public, for the served
 // runner prompt to fetch and verify against its sha256 pins (routes/runner-kit.js).
 app.use(createRunnerKitRoutes())
+
+// LIN-4085: the public agent onboarding guide, /getting-started (HTML) and /getting-started.md.
+app.use(createGettingStartedRouter())
 
 // Mount workspace API routes (audit, prompts, recommendations, comments, images)
 // LIN-3383: workspace-api, collective, dashboard, task-chat and flight-companion
