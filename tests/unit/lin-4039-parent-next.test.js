@@ -5,7 +5,7 @@
  * hand the model (`focusedChild`, the frontier facts) and the descent's redirect all read it, so they name the same
  * subtask. The model keeps its own `deferTo` (LIN-328); these tests prove the seed agrees, not what the live model picks.
  *
- * Witnesses: W1 an all-Todo parent's row and seed name the same child, and Home's trimmed view still reads it as a
+ * Witnesses: W1 the seed starts from the seam's child, and the row names no child (LIN-4103); Home's trimmed view still reads it as a
  * container; W2 a blocked first child is skipped by both sides (the blocked facts are synthesised from the fetched
  * relations); W3 a parked first child is named by both (the one behaviour change); W4 one container meaning; W5 one
  * place: `selectFocusSubtask(` appears in lib/ and routes/ only inside the seam's module.
@@ -21,7 +21,7 @@ import { buildRowStates } from '../../lib/task-page-loader.js';
 import { parentNextOf, computeFrontierFacts, selectFocusSubtask } from '../../lib/recommendation-facts.js';
 import { withInverseRelations } from '../../lib/graph-features.js';
 import { rowDataByNodeKey } from '../../lib/task-board-view.js';
-import { hasOpenSubtask, nextWordsOf } from '../../lib/task-state.js';
+import { hasOpenSubtask } from '../../lib/task-state.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 import { createHomeRowStates } from '../../lib/home-row-states.js';
 import { orderIssuesForSwipe } from '../../lib/task-board-view.js';
@@ -91,14 +91,14 @@ describe('LIN-4039 — the seam is the picker when nothing of the parent is aske
 });
 
 describe('LIN-4039 — W1: an all-Todo parent\'s row and seed name the same child', () => {
-  test('the row names the child the prompt seed starts from, and the wording says which child', () => {
+  // LIN-4103: the row names no subtask and no step. The seam still decides the prompt seed's child (`parentNextOf`).
+  test('the row names no child (LIN-4103); the prompt seed still starts from the seam\'s child', () => {
     const c1 = node('LIN-21', 'unstarted');
     const c2 = node('LIN-22', 'unstarted');
     const parent = node('LIN-20', 'started', [c1, c2]);
     const s = states([parent]);
-    const row = s.get('LIN-20').words;
-    assert.equal(namedOn(row), 'LIN-21', `row says "${row}"`);
-    assert.match(row, /^Next: Research on LIN-21$/);
+    assert.equal(s.get('LIN-20').words, null, 'the row names no subtask and no step (LIN-4103)');
+    assert.equal(namedOn(s.get('LIN-20').words), null);
     assert.equal(seedOf([c1.issue, c2.issue]), 'LIN-21');
     assert.equal(computeFrontierFacts([c1.issue, c2.issue]).nextChild, 'LIN-21');
   });
@@ -123,7 +123,7 @@ describe('LIN-4039 — W1: an all-Todo parent\'s row and seed name the same chil
   });
 });
 
-describe('LIN-4039 — W2: a blocked first child is skipped by the row and the seed alike', () => {
+describe('LIN-4039 — W2: a blocked first child is skipped by the seed (the row names no child, LIN-4103)', () => {
   test('the blocker sits in the fetched set; its forward relation synthesises the blocked fact on both sides', () => {
     const blocker = { ...issue('LIN-51', 'started'), relations: { nodes: [{ type: 'blocks', relatedIssue: { id: 'id-LIN-52' } }] } };
     const c1 = node('LIN-52', 'unstarted');
@@ -132,11 +132,12 @@ describe('LIN-4039 — W2: a blocked first child is skipped by the row and the s
     const [linked] = withInverseRelations([[parent, { issue: blocker, children: [], depth: 0 }]]);
     const linkedParent = linked[0];
     const s = states([linkedParent, linked[1]]);
-    assert.equal(namedOn(s.get('LIN-50').words), 'LIN-53', `row says "${s.get('LIN-50').words}"`);
+    // LIN-4103: the row names no subtask; the seed (the prompt's child) still skips the blocked one and starts from LIN-53.
+    assert.equal(s.get('LIN-50').words, null, `row says "${s.get('LIN-50').words}"`);
     assert.equal(seedOf(linkedParent.children.map((c) => c.issue)), 'LIN-53');
   });
 
-  test('Home\'s own row-state assembly applies the same synthesis: the blocked first child is skipped on the row', async () => {
+  test('Home\'s own row-state assembly: the row names no child, blocked or not (LIN-4103)', async () => {
     const blocker = { ...issue('LIN-56', 'started'), relations: { nodes: [{ type: 'blocks', relatedIssue: { id: 'id-LIN-57' } }] } };
     // LIN-4068: Home's states are gathered over the fetched set (`issues`, one index at every depth), not over forests.
     const homeRowStates = createHomeRowStates({
@@ -154,7 +155,7 @@ describe('LIN-4039 — W2: a blocked first child is skipped by the row and the s
       ],
       runControls: true,
     });
-    assert.equal(namedOn(result.states.get('LIN-55').words), 'LIN-58', `row says "${result.states.get('LIN-55').words}"`);
+    assert.equal(result.states.get('LIN-55').words, null, `row says "${result.states.get('LIN-55').words}"`);
   });
 
   test('withInverseRelations does not mutate the input nodes', () => {
@@ -173,14 +174,7 @@ describe('LIN-4039 — W3: a parked first child is named by both (the one record
     const s = states([parent], { 'LIN-61': [parkedLoop({ issueIdentifier: 'LIN-61' })] });
     assert.equal(s.get('LIN-61').state, 'parked');
     assert.equal(seedOf([c1.issue, c2.issue]), 'LIN-61');
-    assert.equal(namedOn(s.get('LIN-60').words), 'LIN-61', `row says "${s.get('LIN-60').words}"`);
-  });
-});
-
-describe('LIN-4039 — the wording lives in one function', () => {
-  test('a task\'s own step keeps "<Step> next"; a subtask\'s step names the subtask', () => {
-    assert.equal(nextWordsOf({ next: 'Research' }), 'Research next');
-    assert.equal(nextWordsOf({ next: 'Research', nextOn: 'LIN-71' }), 'Next: Research on LIN-71');
+    assert.equal(s.get('LIN-60').words, null, 'the row names no subtask, parked or not (LIN-4103)');
   });
 });
 
@@ -310,8 +304,8 @@ describe('LIN-4039 — W1 (provider half): the seed the provider hands the model
     const parent = node('LOCAL-1', 'started', [c1, node('LOCAL-3', 'unstarted')]);
     const researched = loop({ issueIdentifier: 'LOCAL-1', kind: 'research', agentState: 'done', terminalStatus: 'completed', terminalCompletedAt: '2026-10-30T09:30:00.000Z' });
     const row = states([parent], { 'LOCAL-1': [researched] }).get('LOCAL-1').words;
-    assert.equal(row, 'Next: Research on LOCAL-2');
+    assert.equal(row, null, 'the row names no subtask (LIN-4103)');
     assert.equal(ctx.focusedChild.issue.identifier, 'LOCAL-2');
-    assert.equal(ctx.focusedChild.issue.identifier, row.match(/ on (LOCAL-\d+)$/)?.[1], 'the seed and the row name the same child');
+    assert.equal(ctx.focusedChild.issue.identifier, 'LOCAL-2', 'the seed starts from the seam\'s child');
   });
 });

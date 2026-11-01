@@ -163,21 +163,23 @@ describe('LIN-4010 — a waiting task is a ruling or a park', () => {
 
 // ─── containers: the row and the opened task run on the same subtask ─────────
 
-describe('LIN-4010 — a container\'s row reads the step its subtask is on', () => {
+// LIN-4103: a container's row names no subtask and no next step. What the subtasks do (running, failed, needs you) is
+// the row's; the step the seam would pick (`parentNextOf`) is still the prompt seed's and the descent's.
+describe('LIN-4010 — a container\'s row says what its subtasks do, never a guessed next step (LIN-4103)', () => {
   const child = () => node('LIN-71', 'unstarted');
 
-  test('an open child and nothing of the container\'s own: the row reads the child\'s next step', () => {
+  test('an open child and nothing of the container\'s own: the row names no subtask and no step', () => {
     const parent = node('LIN-70', 'started', [child()]);
     const s = states({ roots: [parent] });
-    assert.equal(s.get('LIN-70').words, 'Next: Research on LIN-71', 'the row names the subtask it is on (LIN-4039)');
-    assert.equal(s.get('LIN-70').tone, 'ready');
+    assert.equal(s.get('LIN-70').words, null, 'the row does not name LIN-71 or a step on it (LIN-4103)');
+    assert.equal(s.get('LIN-70').tone, 'quiet');
   });
 
-  test('the container\'s own landed work comes first: implementation done, a todo child, no focus (the selector would not defer)', () => {
+  test('the container\'s own landed work with a todo child: the row says nothing, and names no subtask', () => {
     const parent = node('LIN-72', 'started', [child()]);
     const s = states({ roots: [parent], loops: { 'LIN-72': [doneLoop('plan', { issueIdentifier: 'LIN-72' }), doneLoop('implementation', { issueIdentifier: 'LIN-72' })] } });
-    assert.equal(s.get('LIN-72').words, 'Review next', 'its own trail decides: Review is next, as the selector would have it');
-    assert.doesNotMatch(s.get('LIN-72').words, /LIN-71/);
+    assert.equal(s.get('LIN-72').words, null, 'no guessed Review (LIN-4103)');
+    assert.doesNotMatch(String(s.get('LIN-72').words), /LIN-71/);
   });
 
   test('a container whose own stage failed keeps its own failed row, no focus', () => {
@@ -195,7 +197,7 @@ describe('LIN-4010 — a container\'s row reads the step its subtask is on', () 
   test('a container whose children are all finished reads its own tracker state, not a child\'s', () => {
     const parent = node('LIN-75', 'started', [node('LIN-76', 'completed')]);
     const s = states({ roots: [parent] });
-    assert.doesNotMatch(s.get('LIN-75').words, /LIN-76/);
+    assert.equal(s.get('LIN-75').words, null, 'the row names no subtask, finished or not (LIN-4103)');
   });
 
   test('a running child names its state on the container row', () => {

@@ -56,13 +56,15 @@ async function homeOf({ issues, loops }) {
 }
 
 describe('LIN-4069: Home reads the one gather', () => {
-  test('old sessions: a Build that failed 45 days ago reads next on Home, and the box offers the step it names', async () => {
+  // LIN-4103: outside the 30-day window the task reads never run: its row says nothing (no guessed "next").
+  test('old sessions: a Build that failed 45 days ago reads never run on Home, and the box still offers the step it names', async () => {
     const home = await homeOf({
       issues: [issue('T-1', 'started')],
       loops: [done('T-1', 'research', daysAgo(46)), failed('T-1', 'implementation', daysAgo(45))],
     });
     const row = home.states.get('T-1');
-    assert.equal(row.state, 'next');
+    assert.equal(row.state, 'todo');
+    assert.equal(row.words, null);
     assert.equal(row.action.kind, 'step');
     assert.equal(row.action.step.kind, 'research', 'the offer is the step the windowed state names, not Build again');
   });

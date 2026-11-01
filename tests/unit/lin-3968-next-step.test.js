@@ -154,12 +154,13 @@ describe('LIN-3968 — row words: a failed stage needs you, and says which stage
     assert.equal(row.rank, 0);
   });
 
-  test('a cancelled Review does not need you: the row says Review is next', () => {
+  // LIN-4103: a cancelled stage is not a failure and not a guess: it needs no one, and the row says nothing about a next step.
+  test('a cancelled Review does not need you, and the row names no next step', () => {
     const build = loop({ loopId: 'l0', lineageId: 'l0', kind: 'implementation', agentState: 'complete', terminalStatus: 'done', dispatchedAt: '2026-10-25T12:00:00.000Z' });
     const undone = loop({ historyStatus: 'cancelled', agentState: 'complete', terminalStatus: null, terminalCompletedAt: null, takenAt: null });
     const row = states([build, undone]).get('LIN-60');
     assert.equal(needsAPerson(row.state), false);
-    assert.equal(row.words, 'Review next');
+    assert.equal(row.words, null);
   });
 
   test('a copy-first viewer, who sees no sessions, still gets the tracker word only', () => {

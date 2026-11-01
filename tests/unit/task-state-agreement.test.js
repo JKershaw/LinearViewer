@@ -110,7 +110,7 @@ function pillOf(html) {
 
 // Scenarios the tracker does not decide: `/state` must equal the row, on state, words and tone.
 const OWN_SCENARIOS = [
-  { name: 'idle: no sessions yet', loops: [], trackerType: 'started', expect: { state: 'next' } },
+  { name: 'idle: no sessions yet', loops: [], trackerType: 'started', expect: { state: 'todo' } },
   { name: 'running', loops: [loop()], trackerType: 'started', expect: { state: 'running' } },
   { name: 'queued, not behind a ruling', loops: [queuedLoop()], trackerType: 'started', expect: { state: 'queued' } },
   {

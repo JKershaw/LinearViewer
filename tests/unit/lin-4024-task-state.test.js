@@ -75,11 +75,14 @@ describe('taskStateOf — one precedence for the row, the count and the task', (
     assert.equal(s.words, 'Check-in queued');
   });
 
-  test('a parked task reads parked, beats its next step, and a backlog task keeps its backlog word', () => {
-    assert.equal(taskStateOf({ parked: true, next: 'Research' }).words, 'parked');
-    assert.equal(taskStateOf({ trackerWord: 'backlog', next: 'Research' }).words, 'backlog');
-    assert.equal(taskStateOf({ next: 'Research' }).words, 'Research next');
-    assert.equal(taskStateOf({ next: 'Research' }).tone, 'ready');
+  // LIN-4103: there is no guessed next step to beat. A parked task reads parked, a backlog task its backlog word, and a
+  // task with nothing said reads todo with no words and no ready tone.
+  test('a parked task reads parked, a backlog task keeps its backlog word, and a task with nothing said reads nothing', () => {
+    assert.equal(taskStateOf({ parked: true }).words, 'parked');
+    assert.equal(taskStateOf({ trackerWord: 'backlog' }).words, 'backlog');
+    assert.equal(taskStateOf({}).state, 'todo');
+    assert.equal(taskStateOf({}).words, null);
+    assert.equal(taskStateOf({}).tone, 'quiet');
   });
 
   test('a subtask that needs you makes the parent needs you, with the one word', () => {

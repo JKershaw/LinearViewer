@@ -122,7 +122,7 @@ describe('LIN-4070 D1-D3 — the row, /state and the page-load record agree', ()
   const CASES = [
     {
       name: 'old sessions (Build failed 45 days ago)',
-      issues: [issue('LIN-90', 'started')], loops: [failedLoop('LIN-90', 45)], task: 'LIN-90', expect: 'next',
+      issues: [issue('LIN-90', 'started')], loops: [failedLoop('LIN-90', 45)], task: 'LIN-90', expect: 'todo', // LIN-4103: never run, no guessed next
     },
     {
       name: 'a Done subtask whose last run failed',
@@ -193,7 +193,7 @@ describe('LIN-4070 D1-D3 — the row, /state and the page-load record agree', ()
     const { model, taskState } = await loaderOver({ loops: [failedLoop('LIN-90', 45)], holder: holding(issues) })
       .loadTaskState({ urlKey: URL_KEY, identifier: 'LIN-90' });
     assert.equal(model.sessions.length, 1, 'the whole-life history lists the old session');
-    assert.equal(taskState.state, 'next', 'the state reads the 30-day window only');
+    assert.equal(taskState.state, 'todo', 'the state reads the 30-day window only: never run, no guessed next (LIN-4103)');
   });
 
   test('a Done child with a running close-out: its parent reads running (terminal children roll up)', async () => {

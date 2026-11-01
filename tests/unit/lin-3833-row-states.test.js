@@ -3,7 +3,7 @@
  *
  * Witnesses: the words a row says come from the task page's own model (`buildRowStates` over
  * `buildTaskPageModel`); a copy-first viewer (no sessions) gets the tracker words alone; the order is
- * needs you, ready for a next step, running, the rest, with project order breaking ties; the count
+ * needs you, running, the rest, with project order breaking ties (LIN-4103: no ready rank); the count
  * line; and the rendered row carries the words only where it has some, and only In Progress rows.
  */
 import { test, describe } from 'node:test';
@@ -106,10 +106,12 @@ describe('LIN-3833 — the words a row says, from the task page\'s own model', (
     assert.equal(s.get('LIN-55').words, 'done');
   });
 
-  test('a started task with no session is ready for its next step', () => {
+  // LIN-4103: the guessed "Research next" is gone. A never-run task says nothing on its row (no words, no ready tone).
+  test('a started task with no session says nothing: no guessed next step (LIN-4103)', () => {
     const s = states({ roots: [node('LIN-56')] });
-    assert.equal(s.get('LIN-56').words, 'Research next');
-    assert.equal(s.get('LIN-56').next, 'Research');
+    assert.equal(s.get('LIN-56').words, null);
+    assert.equal(s.get('LIN-56').state, 'todo');
+    assert.equal(s.get('LIN-56').next, undefined, 'no next field is carried on the row state');
     assert.equal(s.get('LIN-56').running, false);
   });
 
@@ -131,7 +133,7 @@ describe('LIN-4009 — each row state has its own tone', () => {
     resolvedAt: '2026-10-25T10:02:00.000Z', historyStatus: 'resolved',
   });
 
-  test('needs you, failed, running, queued, ready and quiet are six different tones', () => {
+  test('needs you, failed, running, queued and quiet are five different tones (LIN-4103: no ready tone)', () => {
     const s = states({
       roots: [node('LIN-90'), node('LIN-91'), node('LIN-92'), node('LIN-93'), node('LIN-94'), node('LIN-95', 'backlog')],
       loops: {
@@ -145,7 +147,7 @@ describe('LIN-4009 — each row state has its own tone', () => {
     assert.equal(s.get('LIN-91').tone, 'failed', 'a failed stage is failed, not needs-you');
     assert.equal(s.get('LIN-92').tone, 'running');
     assert.equal(s.get('LIN-93').tone, 'queued', 'a queued session is not running');
-    assert.equal(s.get('LIN-94').tone, 'ready');
+    assert.equal(s.get('LIN-94').tone, 'quiet', 'a never-run task is quiet: nothing is guessed as ready');
     assert.equal(s.get('LIN-95').tone, 'quiet');
   });
 
@@ -196,7 +198,7 @@ describe('LIN-4009 — each row state has its own tone', () => {
 describe('LIN-3833 — In Progress order and its count line', () => {
   const tree = (projectName, ...nodes) => ({ projectName, roots: nodes });
 
-  test('needs you, then ready for a next step, then running, then the rest; project order breaks ties', () => {
+  test('needs you, then running, then the rest (LIN-4103: no ready rank); project order breaks ties', () => {
     const trees = [
       tree('Alpha', node('A-running'), node('A-idle'), node('A-blocked')),
       tree('Beta', node('B-rest', 'backlog'), node('B-idle')),
@@ -209,7 +211,7 @@ describe('LIN-3833 — In Progress order and its count line', () => {
       },
     });
     const order = orderInProgress(trees, rowStates).map(({ node: n }) => n.issue.identifier);
-    assert.deepEqual(order, ['A-blocked', 'A-idle', 'B-idle', 'A-running', 'B-rest']);
+    assert.deepEqual(order, ['A-blocked', 'A-running', 'A-idle', 'B-rest', 'B-idle']);
   });
 
   test('without row states the order is the project order, unchanged', () => {
