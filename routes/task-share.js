@@ -40,6 +40,7 @@ import { isWellFormedTaskShareToken } from '../lib/task-share-store.js';
 import { maskSecretsInHtml } from '../lib/mask-secrets-in-html.js';
 import { resolveOwnerMintRefusal } from '../lib/owner-mint-refusals.js';
 import { readOwnerSeamStatus } from '../lib/workspace-owner.js';
+import { pageStatusOf } from '../lib/task-state.js';
 import {
   renderTaskPage,
   renderTaskStatus,
@@ -262,7 +263,9 @@ export function createTaskShareRoutes({
       // No brief or recap rides here (LIN-3975): the state read has no tracker, so the page-load panels are the only
       // ones shown, and a poll never repaints them.
       const body = {
-        status: model.status,
+        // LIN-4071: the gathered state's status, as the private state reply carries it (no subtask line rides here: a guest
+        // sees no identifier outside the shared task).
+        status: pageStatusOf(taskState),
         live: model.live,
         headerHtml: maskFragment(record, 'state', renderTaskStatus(model, { now: now(), taskState })),
         trackHtml: maskFragment(record, 'state', renderTaskTrack(model, { now: now() })),

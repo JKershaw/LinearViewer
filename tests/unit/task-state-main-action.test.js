@@ -89,8 +89,8 @@ describe('LIN-4016 W3 — the main action on /state: a step for a leaf, Run to P
     assert.equal((await actionOf(failed, { container: true })).kind, 'run-to-pr');
   });
 
-  test('a finished leaf offers no run on /state (LIN-4042): the finished-task guard reaches the route', async () => {
-    assert.equal(await actionOf(finishedPlan, { state: 'completed' }), null);
+  test('a finished leaf offers no run on /state (LIN-4042): the no-run decision reaches the route', async () => {
+    assert.equal((await actionOf(finishedPlan, { state: 'completed' })).kind, 'none');
   });
 });
 

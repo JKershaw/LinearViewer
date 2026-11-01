@@ -4,19 +4,20 @@
  * those fields with the same server functions. A test then says what it runs (`running`, `offered`), and the helper
  * completes the rest the way `sessionSummaryOf` does.
  */
-import { mainActionOf } from '../../lib/task-state.js';
+import { mainActionOf, NO_RUN_ACTION } from '../../lib/task-state.js';
 import { POLLED_TARGETS } from '../../lib/dispatch-targets.js';
 import { rowRecordOf } from '../../lib/task-board-view.js';
+import { isTerminalState } from '../../lib/providers/state-map.js';
 
 /**
  * A `sessions` block as `/state` sends it: `queued`, `busy`, `action` and `canStop` completed from `running` and
  * `offered` (a field the fixture already sets is kept).
  *
  * @param {Object} sessions
- * @param {{container?: boolean}} [opts]
+ * @param {{container?: boolean, noRun?: boolean}} [opts] - `noRun`: the task is finished, so its action is the no-run decision
  * @returns {Object}
  */
-export function serverSessions(sessions, { container = false } = {}) {
+export function serverSessions(sessions, { container = false, noRun = false } = {}) {
   if (!sessions) return sessions;
   const running = sessions.running || null;
   const busy = sessions.busy ?? !!running;
@@ -24,17 +25,23 @@ export function serverSessions(sessions, { container = false } = {}) {
     ...sessions,
     queued: sessions.queued !== undefined ? sessions.queued : (running && running.state === 'queued' ? running : null),
     busy,
-    action: sessions.action !== undefined ? sessions.action : mainActionOf({ offered: sessions.offered || null, busy, container }),
+    action: sessions.action !== undefined ? sessions.action : (noRun ? NO_RUN_ACTION : mainActionOf({ offered: sessions.offered || null, busy, container })),
     canStop: sessions.canStop !== undefined ? sessions.canStop : !!running && POLLED_TARGETS.includes(running.target),
   };
 }
 
 /**
- * A Home row's (or a task page's) decision record, as the server stamps it (`rowRecordOf`), with an optional subtask line.
+ * A Home row's (or a task page's) decision record, as the server stamps it (`rowRecordOf`): the gatherer's action for the
+ * state it is given. A finished task decides the no-run action; a container decides Run to PR as a container (LIN-4071).
+ * The subtask line is not in the record (it is `/state`'s `attention`).
  *
- * @param {{stateType?: string, container?: boolean, attention?: Object|null}} [args]
+ * @param {{stateType?: string, container?: boolean, action?: Object|null}} [args] - `action` overrides the decided action
  * @returns {Object}
  */
-export function serverRow({ stateType = 'started', container = false, attention = null } = {}) {
-  return rowRecordOf({ stateType, container, attention });
+export function serverRow({ stateType = 'started', container = false, action } = {}) {
+  let decided = null;
+  if (action !== undefined) decided = { action };
+  else if (isTerminalState(stateType)) decided = { action: NO_RUN_ACTION };
+  else if (container) decided = { action: mainActionOf({ offered: null, busy: false, container: true }) };
+  return rowRecordOf({ stateType, decided });
 }

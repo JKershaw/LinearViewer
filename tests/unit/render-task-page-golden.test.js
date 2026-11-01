@@ -25,6 +25,7 @@ import { renderTaskPage, renderOwnerControls, renderTaskTrack, renderTaskStatus,
 import { buildPromptOpts } from '../../lib/render-prompt-opts.js';
 import { renderCloseOutBox } from '../../lib/render-run-evidence.js';
 import { buildTaskPageModel } from '../../lib/task-page-loader.js';
+import { gatherTaskStates } from '../../lib/home-row-states.js';
 import { enrichLoop, deriveSessionWaiting, deriveSessionDecisions } from '../../routes/dashboard.js';
 import { buildRunEvidence } from '../../lib/run-evidence.js';
 import { CLOSE_OUT_STATUS, deriveCloseOutState } from '../../lib/run-closeout-state.js';
@@ -151,26 +152,41 @@ const LIN3351_LOOPS = [
   loop({ loopId: 'w9', kind: 'wake', agentState: 'queued', dispatchedAt: T(10, 58), takenAt: null }),
 ];
 
-function model(name) {
-  const base = { identifier: 'LIN-50', enrichLoop, deriveSessionWaiting, deriveSessionDecisions, now: NOW };
+/** Each case's inputs, shared by its page model and its gathered state (LIN-4071: the page is rendered with the state the
+ *  route sends, so the golden pins the same picture production paints). */
+function caseOf(name) {
   switch (name) {
     case 'running-blocked-repeat':
-      return buildTaskPageModel({ ...base, loops: RUNNING_LOOPS, ctx: ctx(), evidence: EVIDENCE,
+      return { loops: RUNNING_LOOPS, ctx: ctx(), evidence: EVIDENCE,
         brief: { brief: '## Current\nThe **review** is running on `PR #41`; the build landed.\n\n## Constraints\n- keep it small', model: 'm', generatedAt: '2026-10-06T09:00:00.000Z' },
-        recap: { recap: { done: [{ item: 'plan', evidence: 'comment' }], pending: [], deviations: [] }, model: 'm', generatedAt: '2026-10-06T09:00:00.000Z' } });
+        recap: { recap: { done: [{ item: 'plan', evidence: 'comment' }], pending: [], deviations: [] }, model: 'm', generatedAt: '2026-10-06T09:00:00.000Z' } };
     case 'waiting':
-      return buildTaskPageModel({ ...base, loops: [done({ loopId: 'plan-1', kind: 'plan' }), loop({ loopId: 'impl-2', wakeMarker: 'blocked', waitingMessage: '[blocked] which API key?', feedback: [{ message: '[blocked] which API key?' }] })], ctx: ctx() });
+      return { loops: [done({ loopId: 'plan-1', kind: 'plan' }), loop({ loopId: 'impl-2', wakeMarker: 'blocked', waitingMessage: '[blocked] which API key?', feedback: [{ message: '[blocked] which API key?' }] })], ctx: ctx() };
     case 'done':
-      return buildTaskPageModel({ ...base, loops: [done({ loopId: 'impl-1' }), loop({ loopId: 'rev-stale', kind: 'review' })], ctx: ctx({ stateType: 'completed', stateName: 'Done' }), evidence: EVIDENCE });
+      return { loops: [done({ loopId: 'impl-1' }), loop({ loopId: 'rev-stale', kind: 'review' })], ctx: ctx({ stateType: 'completed', stateName: 'Done' }), evidence: EVIDENCE };
     case 'settling':
-      return buildTaskPageModel({ ...base, loops: [done({ loopId: 'impl-1' })], ctx: ctx(), evidence: SETTLING_EVIDENCE });
+      return { loops: [done({ loopId: 'impl-1' })], ctx: ctx(), evidence: SETTLING_EVIDENCE };
     case 'lin-3351':
-      return buildTaskPageModel({ ...base, loops: LIN3351_LOOPS, ctx: ctx(), evidence: EVIDENCE });
+      return { loops: LIN3351_LOOPS, ctx: ctx(), evidence: EVIDENCE };
     case 'no-sessions':
-      return buildTaskPageModel({ ...base, loops: [], ctx: ctx({ stateType: 'unstarted', stateName: 'Todo' }) });
+      return { loops: [], ctx: ctx({ stateType: 'unstarted', stateName: 'Todo' }) };
     default:
       throw new Error(name);
   }
+}
+
+function model(name) {
+  return buildTaskPageModel({ identifier: 'LIN-50', enrichLoop, deriveSessionWaiting, deriveSessionDecisions, now: NOW, ...caseOf(name) });
+}
+
+/**
+ * The task's gathered state for a case, as the private route sends it (LIN-4071): the one gatherer (`gatherTaskStates`)
+ * over the case's own issue, its direct subtasks and its loops, so the page's pill and status are the decided ones.
+ */
+function stateOf(name) {
+  const { ctx: c, loops } = caseOf(name);
+  const root = { issue: c.issue, children: c.children.map((child) => ({ issue: child, children: [] })) };
+  return gatherTaskStates({ roots: [root], loops, at: NOW, enrichLoop, deriveSessionWaiting }).states.get('LIN-50');
 }
 
 const CASES = ['running-blocked-repeat', 'waiting', 'done', 'no-sessions', 'lin-3351', 'settling'];
@@ -188,6 +204,7 @@ function render(name, viewer = 'owner') {
     now: NOW,
     pageOptions: PAGE_OPTIONS,
     promptOpts: viewer === 'owner' ? PROMPT_OPTS : null,
+    taskState: stateOf(name),
   });
 }
 
@@ -263,7 +280,7 @@ describe('task page structure', () => {
     assert.match(html, /data-testid="task-page-summary">The review is running on PR #41; the build landed\.</);
     const summary = html.slice(html.indexOf('data-testid="task-page-summary"'), html.indexOf('</p>', html.indexOf('data-testid="task-page-summary"')));
     assert.doesNotMatch(summary, /keep it small|Constraints/, 'only the Current section');
-    assert.doesNotMatch(renderTaskStatus(model('waiting')), /task-page-summary/);
+    assert.doesNotMatch(renderTaskStatus(model('waiting'), { taskState: stateOf('waiting') }), /task-page-summary/);
     assert.doesNotMatch(html, /segment-bar|task-strip/, 'one progress picture: the stage bars');
   });
 
@@ -408,11 +425,18 @@ describe('task page structure', () => {
   });
 
   test('header answers running / waiting / done', () => {
-    assert.match(renderTaskStatus(model('running-blocked-repeat')), /data-status="running"[\s\S]*Review running for 58m\./);
-    assert.match(renderTaskStatus(model('waiting')), /data-status="waiting"[\s\S]*task-page-sentence">which API key\?</, 'the [blocked] marker is not in the sentence');
-    // LIN-3991: the sentence is relative; the exact time sits beside it, outside the sentence.
-    assert.match(renderTaskStatus(model('done'), { now: NOW }), /data-status="done"[\s\S]*task-page-sentence">Finished 3 hours ago\.<span/);
-    assert.match(renderTaskStatus(model('done'), { now: NOW }), /data-testid="task-page-sentence-at" datetime="2026-10-06T12:00:00\.000Z" data-local-time="zoned">6 Oct, 12:00 UTC</);
+    assert.match(renderTaskStatus(model('running-blocked-repeat'), { taskState: stateOf('running-blocked-repeat') }), /data-status="running"[\s\S]*Review running for 58m\./);
+    assert.match(renderTaskStatus(model('waiting'), { taskState: stateOf('waiting') }), /data-status="waiting"[\s\S]*task-page-sentence">which API key\?</, 'the [blocked] marker is not in the sentence');
+    // LIN-4071 (D2): live facts outrank the tracker's finished word, so the `done` fixture's stale running review reads
+    // running here, not done. Its action is still the no-run decision (LIN-4042), so no run is offered.
+    assert.match(renderTaskStatus(model('done'), { now: NOW, taskState: stateOf('done') }), /data-status="running"[\s\S]*Review running for 4h 59m\./);
+    assert.equal(stateOf('done').action.kind, 'none', 'a finished task offers no run, whatever still runs');
+    // LIN-3991: a finished task with nothing running says so, the sentence relative, the exact time beside it.
+    const ended = { ...caseOf('done'), loops: [done({ loopId: 'impl-1' })] };
+    const endedModel = buildTaskPageModel({ identifier: 'LIN-50', enrichLoop, deriveSessionWaiting, deriveSessionDecisions, now: NOW, ...ended });
+    const endedState = gatherTaskStates({ roots: [{ issue: ended.ctx.issue, children: [] }], loops: ended.loops, at: NOW, enrichLoop, deriveSessionWaiting }).states.get('LIN-50');
+    assert.match(renderTaskStatus(endedModel, { now: NOW, taskState: endedState }), /data-status="done"[\s\S]*task-page-sentence">Finished 3 hours ago\.<span/);
+    assert.match(renderTaskStatus(endedModel, { now: NOW, taskState: endedState }), /data-testid="task-page-sentence-at" datetime="2026-10-06T12:00:00\.000Z" data-local-time="zoned">6 Oct, 12:00 UTC</);
     assert.doesNotMatch(render('running-blocked-repeat'), /Tracker details unavailable|data-tracker=/, 'no stored-only remnant');
   });
 });
@@ -424,7 +448,7 @@ describe('data-ready-header (LIN-3448)', () => {
     flag: (html.match(/data-merge-ready="(true|false)"/) || [])[1],
     header: (html.match(/data-ready-header="([^"]*)"/) || [])[1],
   });
-  const opts = (viewer) => ({ viewer, urlKey: 'acme', binding: BINDING, now: NOW, pageOptions: PAGE_OPTIONS });
+  const opts = (viewer, name = 'running-blocked-repeat') => ({ viewer, urlKey: 'acme', binding: BINDING, now: NOW, pageOptions: PAGE_OPTIONS, taskState: stateOf(name) });
 
   test('a ready close-out renders the flag and the ready header HTML, without a summary', () => {
     const { flag, header } = attrs(renderTaskPage(model('running-blocked-repeat'), opts('owner')));
@@ -475,7 +499,7 @@ describe('viewer isolation', () => {
       // present exactly when the run control is absent.
       if (fragments.runControl) {
         assert.ok(stripped.includes(fragments.runControl), 'the owner page carries the run control verbatim');
-        stripped = stripped.replace(fragments.runControl, renderNextLine(model(name)));
+        stripped = stripped.replace(fragments.runControl, renderNextLine(model(name), { taskState: stateOf(name) }));
       }
       assert.equal(stripped, guest);
     });

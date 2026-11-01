@@ -110,14 +110,15 @@ describe('LIN-4039 — W1: an all-Todo parent\'s row and seed name the same chil
     const trimmed = { roots: [{ issue: parent.issue, children: [], depth: 0, more: 2 }] };
     const rowData = rowDataByNodeKey({ urlKey: 'ws', inProgressTrees: [trimmed], recentActivityTrees: [], projectTrees: [], rowStates: s });
     const record = rowData[Object.keys(rowData)[0]];
-    assert.equal(record.container, true, 'the full tree decides container, not the trimmed view');
+    // LIN-4071: the container fact is the gather's; the record carries it as the action it decided (Run to PR, container).
+    assert.equal(record.action?.container, true, 'the full tree decides container, not the trimmed view');
   });
 
   test('a parent whose subtasks are all done is not a container on Home (it offers its own step)', () => {
     const parent = node('LIN-40', 'started', [node('LIN-41', 'completed'), node('LIN-42', 'completed')]);
     const s = states([parent]);
     const rowData = rowDataByNodeKey({ urlKey: 'ws', inProgressTrees: [{ roots: [parent] }], recentActivityTrees: [], projectTrees: [], rowStates: s });
-    assert.equal(rowData[Object.keys(rowData)[0]].container, false);
+    assert.notEqual(rowData[Object.keys(rowData)[0]].action?.container, true, 'not a container: its own step, not Run to PR as a container');
     assert.equal(hasOpenSubtask(parent.children.map((c) => c.issue)), false);
   });
 });
@@ -218,9 +219,9 @@ describe('LIN-4039 — W4: the Swipe and task-page producers read the one contai
     }).find((card) => card.id === 'par');
   };
 
-  test('Swipe: a parent card whose subtasks are all completed is not a container; one open subtask makes it one', () => {
-    assert.equal(swipeParent(['completed', 'completed']).row.container, false);
-    assert.equal(swipeParent(['completed', 'unstarted']).row.container, true);
+  test('Swipe: the card record carries no container flag; the gather decides a container on Home and /state (LIN-4071)', () => {
+    assert.equal('container' in swipeParent(['completed', 'completed']).row, false);
+    assert.equal('container' in swipeParent(['completed', 'unstarted']).row, false);
   });
 
   const PARENT_CTX = (childStates) => ({
@@ -266,13 +267,19 @@ describe('LIN-4039 — W4: the Swipe and task-page producers read the one contai
     assert.doesNotMatch(stateUrlOf(open), /container/);
   });
 
-  test('task page: the row record the page embeds carries the same container fact', async () => {
-    const container = (html) => html.match(/&quot;container&quot;:(true|false)|"container":(true|false)/);
-    const done = container(await taskPageFor(PARENT_CTX(['completed'])));
-    const open = container(await taskPageFor(PARENT_CTX(['unstarted'])));
-    assert.ok(done && open, 'the page embeds the owner\'s row record');
-    assert.equal(done[1] || done[2], 'false');
-    assert.equal(open[1] || open[2], 'true');
+  test('task page: the row record carries no container flag, and no action without a held state (no run is offered)', async () => {
+    // LIN-4071: the page-load record reads the gather's action; with no held set there is no decided state, so none, and the
+    // container fact is the gather's alone (it reaches the browser as the action, never as a flag).
+    const recordOf = (html) => {
+      const m = String(html).match(/data-run-opts="([^"]*)"/);
+      assert.ok(m, 'the owner\'s run control carries the row record');
+      return JSON.parse(m[1].replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')).row;
+    };
+    for (const kids of [['completed'], ['unstarted']]) {
+      const row = recordOf(await taskPageFor(PARENT_CTX(kids)));
+      assert.equal('container' in row, false, `no container flag for children ${kids}`);
+      assert.equal(row.action, null, 'no held state, so no action');
+    }
   });
 });
 

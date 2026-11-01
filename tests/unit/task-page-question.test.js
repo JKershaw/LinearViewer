@@ -22,6 +22,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { renderTaskPage, renderTaskStatus } from '../../lib/render-task-page.js';
 import { buildTaskPageModel } from '../../lib/task-page-loader.js';
+import { gatherTaskStates } from '../../lib/home-row-states.js';
+import { pageStatusOf } from '../../lib/task-state.js';
 import { rulingStandingOf } from '../../lib/unanswered-decisions.js';
 import { enrichLoop, deriveSessionWaiting, deriveSessionDecisions } from '../../routes/dashboard.js';
 
@@ -49,22 +51,35 @@ const blocked = (over) => loop({
 // A bare `[blocked]` with no structured decision: the pill says waiting, but the wait reads parked (LIN-4010).
 const bareBlocked = (over) => loop({ loopId: 'impl-2', wakeMarker: 'blocked', waitingMessage: '[blocked] which API key?', feedback: [{ message: '[blocked] which API key?' }], ...over });
 
+// LIN-4071: each model's gathered state, as the route sends it (the one gatherer over the model's own loops and ruling).
+const STATES = new WeakMap();
+const stateOf = (loops, { shelvedRulings = [], ctx = null }) => {
+  const ruling = rulingStandingOf({ urlKey: URL_KEY, loops, shelvedRulings }, { now: NOW, enrichLoop });
+  const type = ctx?.issue?.state?.type ?? 'started';
+  return gatherTaskStates({ roots: [{ issue: { identifier: 'LIN-50', state: { type } }, children: [] }], loops, ruling, at: NOW, enrichLoop, deriveSessionWaiting }).states.get('LIN-50');
+};
+
 // The page-load path (LIN-4038): the loader gives the model the workspace's `rulingStandingOf`, so shelves count.
 function model(loops, { shelvedRulings = [], ...over } = {}) {
   const ruling = rulingStandingOf({ urlKey: URL_KEY, loops, shelvedRulings }, { now: NOW, enrichLoop });
-  return buildTaskPageModel({
+  const m = buildTaskPageModel({
     identifier: 'LIN-50', loops, ctx: null, enrichLoop, deriveSessionWaiting, deriveSessionDecisions, ruling, now: NOW, ...over,
   });
+  STATES.set(m, stateOf(loops, { shelvedRulings, ctx: over.ctx ?? null }));
+  return m;
 }
 const render = (m, viewer = 'owner') => renderTaskPage(m, {
-  viewer, urlKey: URL_KEY, binding: { source: 'linear' }, stateUrl: '/s', now: NOW, pageOptions: PAGE_OPTIONS,
+  viewer, urlKey: URL_KEY, binding: { source: 'linear' }, stateUrl: '/s', now: NOW, pageOptions: PAGE_OPTIONS, taskState: STATES.get(m) ?? null,
 });
+/** The page's status word and its header, from the model's gathered state. */
+const statusOf = (m) => pageStatusOf(STATES.get(m));
+const headerOf = (m) => renderTaskStatus(m, { now: NOW, taskState: STATES.get(m) ?? null });
 
 describe('the card appears exactly when the owner is being asked (waiting on an open ruling)', () => {
   test('waiting: the owner gets the question and an answer box, outside task-page-answer', () => {
     const m = model([blocked()]);
     assert.equal(m.waitingFor, 'ruling');
-    assert.equal(m.status, 'waiting');
+    assert.equal(statusOf(m), 'waiting');
     const html = render(m);
     assert.match(html, /data-testid="task-page-question"/);
     assert.match(html, /data-testid="session-question-card-input"/);
@@ -94,24 +109,24 @@ describe('the card appears exactly when the owner is being asked (waiting on an 
 
   test('running, idle and done: no card, whatever the viewer', () => {
     for (const m of [model([loop()]), model([]), model([blocked({ terminalStatus: 'done', terminalCompletedAt: '2026-10-06T11:00:00.000Z' })])]) {
-      assert.notEqual(m.status, 'waiting');
+      assert.notEqual(statusOf(m), 'waiting');
       assert.doesNotMatch(render(m), /task-page-question|session-question-card/);
     }
   });
 
-  test('a finished tracker with a loop still [blocked]: the pill says done, so no card (the gate is model.status)', () => {
+  test('a finished tracker with a loop still [blocked]: the live wait outranks the finished word (LIN-4071 D2), so the owner is asked', () => {
     const ctx = { issue: { identifier: 'LIN-50', title: 'T', state: { name: 'Done', type: 'completed' }, comments: [] }, stateTransitions: [] };
     const m = model([blocked()], { ctx });
-    assert.equal(m.status, 'done');
-    assert.equal(m.question, null);
-    assert.doesNotMatch(render(m, 'owner'), /task-page-question|session-question-card/);
+    assert.equal(STATES.get(m).state, 'needs-you', 'the gathered state is the wait, not done');
+    assert.equal(statusOf(m), 'waiting');
+    assert.match(render(m, 'owner'), /data-testid="task-page-question"/);
   });
 
   test('"ready to merge" is also a waiting pill but has no question: no card, no empty section', () => {
     const m = model([loop({ terminalStatus: 'done', terminalCompletedAt: '2026-10-06T11:00:00.000Z', agentState: 'done' })], {
       evidence: { state: { status: 'ready', pr: { number: 41 } }, evidence: null, ledger: null, closeOut: { owner: true, status: 'ready', pr: { number: 41 } } },
     });
-    assert.equal(m.status, 'waiting');
+    assert.ok(m.readyHeader, 'the ready header is set');
     assert.equal(m.question, null);
     assert.doesNotMatch(render(m), /task-page-question/);
   });
@@ -135,12 +150,12 @@ describe('a parked wait is not a question on the task page, as on Home (LIN-4038
 
   test('a shelved ruling, built through the real model path, renders no question card even to the owner', () => {
     const m = model([blocked()], { shelvedRulings: SHELF('2026-10-07T15:00:00.000Z') });
-    assert.equal(m.status, 'waiting', 'the pill still says waiting');
+    assert.equal(statusOf(m), 'waiting', 'the pill still says waiting');
     assert.equal(m.waitingFor, 'parked');
     const html = render(m, 'owner');
     assert.doesNotMatch(html, /task-page-question|session-question-card/);
-    assert.match(renderTaskStatus(m), /which API key\?/, 'the pill sentence is still shown');
-    const header = renderTaskStatus(m);
+    assert.match(headerOf(m), /which API key\?/, 'the pill sentence is still shown');
+    const header = headerOf(m);
     assert.match(header, /status-pill--queued/, 'the pill is in the queued tone, as Home\'s parked');
     assert.match(header, />parked</);
     assert.doesNotMatch(header, /status-pill--needs-you/);
@@ -153,8 +168,8 @@ describe('a parked wait is not a question on the task page, as on Home (LIN-4038
     const m = model([blocked()]);
     assert.equal(m.waitingFor, 'ruling');
     assert.match(render(m, 'owner'), /data-testid="task-page-question"/);
-    assert.match(renderTaskStatus(m), /status-pill--needs-you/);
-    assert.match(renderTaskStatus(m), />waiting</);
+    assert.match(headerOf(m), /status-pill--needs-you/);
+    assert.match(headerOf(m), />waiting</);
   });
 
   test('a shelf that has lapsed (resurfaceAt passed) makes the ruling open again, and the card returns', () => {
@@ -165,11 +180,11 @@ describe('a parked wait is not a question on the task page, as on Home (LIN-4038
 
   test('a bare [blocked] with no structured decision reads parked and renders no card', () => {
     const m = model([bareBlocked()]);
-    assert.equal(m.status, 'waiting');
+    assert.equal(statusOf(m), 'waiting');
     assert.equal(m.waitingFor, 'parked');
     assert.doesNotMatch(render(m, 'owner'), /task-page-question|session-question-card/);
-    assert.match(renderTaskStatus(m), /status-pill--queued/);
-    assert.match(renderTaskStatus(m), />parked</);
+    assert.match(headerOf(m), /status-pill--queued/);
+    assert.match(headerOf(m), />parked</);
   });
 });
 

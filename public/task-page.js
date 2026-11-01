@@ -40,6 +40,9 @@
   var TICK_MS = 1000;
   // LIN-4070: an incomplete reply means the held set is still landing; the next read comes sooner than the usual cadence.
   var INCOMPLETE_MS = 1000;
+  // Fast reads of an incomplete state stop after this many in a row (LIN-4071): the box's own re-read caps at 15 too, so a
+  // held set that never fills costs a bounded burst, then the normal cadence.
+  var INCOMPLETE_LIMIT = 15;
   var OPEN_CLASS = 'sess-run--expanded';
 
   /**
@@ -84,7 +87,8 @@
     var stopped = false;
     var failures = 0;
     var timer = null;
-    var incompleteRetry = false;
+    // An unsettled page (`o.unsettled`: its first render is provisional, LIN-4071) reads again soon, as an incomplete reply does.
+    var incompleteStreak = o.unsettled ? 1 : 0;
 
     function schedule() {
       clearTimer(timer);
@@ -92,7 +96,7 @@
       if (stopped) return;
       var delay = pollDelay(cadenceStatus(current), o.isVisible(), failures);
       if (delay == null) return;
-      if (incompleteRetry) delay = Math.min(delay, INCOMPLETE_MS);
+      if (incompleteStreak > 0 && incompleteStreak <= INCOMPLETE_LIMIT) delay = Math.min(delay, INCOMPLETE_MS);
       timer = setTimer(poll, delay);
     }
 
@@ -104,10 +108,9 @@
         .then(function (state) {
           failures = 0;
           if (state) {
-            // The state endpoint never reports `done` (it can't see the
-            // tracker); keep what the page loaded with otherwise. An incomplete reply carries no status: keep the last
-            // complete one, and read again soon.
-            incompleteRetry = !!state.incomplete;
+            // A complete reply carries the gathered status (LIN-4071: `done` only when the gather says so). An incomplete
+            // reply carries none: keep the last complete one, and read again soon.
+            incompleteStreak = state.incomplete ? incompleteStreak + 1 : 0;
             if (!state.incomplete) current = { status: state.status, live: !!state.live };
             o.apply(state);
           }
@@ -497,8 +500,9 @@
    * it can never report "ready"; while the page is merge-ready and the poll
    * finds nothing running, the authoritative answer is the ready sentence, not
    * whatever header happens to be painted. A polled running/waiting overrides.
-   * A failed poll (LIN-3991) keeps the ready header too: ready outranks failed
-   * in `deriveHeader`, so the load and the poll must agree. Pure.
+   * A failed poll (LIN-3991) keeps the ready header too: the poll's status is the
+   * gathered state's, and a failed stage reads failed on the load as on the poll
+   * (LIN-4071). Pure.
    */
   function paintsReadyHeader(mergeReadyAttr, stateStatus) {
     return mergeReadyAttr === 'true' && (stateStatus === 'idle' || stateStatus === 'failed');
@@ -737,6 +741,9 @@
     }
 
     var initial = { status: main.getAttribute('data-status') || 'idle', live: main.getAttribute('data-live') === 'true' };
+    // LIN-4071: an unsettled page (provisional first render) reads again soon; its painted status is never `done` (the
+    // server sends the gathered word only), so only a complete `done` stops the poll.
+    var unsettled = main.getAttribute('data-settled') === 'false';
     var poller = null;
     if (initial.status !== 'done') {
       poller = createPoller({
@@ -745,6 +752,7 @@
         apply: apply,
         isVisible: function () { return !doc.hidden; },
         initial: initial,
+        unsettled: unsettled,
         onGone: goneHandlerFor(main.getAttribute('data-state-url'), main)
       });
       poller.start();

@@ -23,38 +23,37 @@ const sess = (kind, state, over = {}) => ({
   ...over,
 });
 
-describe('LIN-3991 — the header status reads failed after a failed stage', () => {
+describe('LIN-3991 — the header sentence says the failed stage (the page status is the gather\'s, LIN-4071)', () => {
   test('a failed first and only stage reads failed', () => {
     const header = deriveHeader({ sessions: [sess('review', 'failed', { message: 'tests red' })], waiting: noWait, tracker: null, now: NOW });
-    assert.equal(header.status, 'failed');
     assert.equal(header.sentence, 'Review failed 30 minutes ago: tests red');
   });
 
   test('a cancelled stage (an Undo) is not a failure and does not read failed', () => {
     const header = deriveHeader({ sessions: [sess('review', 'cancelled')], waiting: noWait, tracker: null, now: NOW });
-    assert.notEqual(header.status, 'failed');
+    assert.doesNotMatch(header.sentence, /failed/);
   });
 
   test('a merge-ready task still reads ready over a failed stage, so the first poll agrees with the load', () => {
     const closeOut = { status: 'ready', pr: { number: 41 } };
     const header = deriveHeader({ sessions: [sess('review', 'failed')], waiting: noWait, tracker: null, closeOut, now: NOW });
-    assert.deepEqual(header, { status: 'waiting', sentence: 'Approved. PR #41 is ready to merge.', sentenceAt: null });
+    assert.deepEqual(header, { sentence: 'Approved. PR #41 is ready to merge.', sentenceAt: null });
   });
 
   test('a task with no runs stays idle beside "No sessions yet."', () => {
-    assert.deepEqual(deriveHeader({ sessions: [], waiting: noWait, tracker: null, now: NOW }), { status: 'idle', sentence: 'No sessions yet.', sentenceAt: null });
+    assert.deepEqual(deriveHeader({ sessions: [], waiting: noWait, tracker: null, now: NOW }), { sentence: 'No sessions yet.', sentenceAt: null });
   });
 });
 
 describe('LIN-3991 — the rendered pill says failed, in the error colour', () => {
-  test('the task page pill reads failed with the error colour, on the failed status', () => {
-    const html = renderTaskStatus({ status: 'failed', sentence: 'Review failed 25 Oct: tests red' });
+  test('the task page pill reads failed with the error colour, on the failed state', () => {
+    const html = renderTaskStatus({ sentence: 'Review failed 25 Oct: tests red' }, { taskState: { state: 'failed' } });
     assert.match(html, /data-status="failed"/);
     assert.match(html, /status-pill status-pill--error task-status-pill" data-testid="task-page-status-pill"><span class="status-pill__dot" aria-hidden="true"><\/span>failed</);
   });
 
   test('the idle pill is unchanged for a task with no runs', () => {
-    const html = renderTaskStatus({ status: 'idle', sentence: 'No sessions yet.' });
+    const html = renderTaskStatus({ sentence: 'No sessions yet.' });
     assert.match(html, /status-pill--queued task-status-pill[^>]*>(<span[^>]*><\/span>)idle</);
   });
 });

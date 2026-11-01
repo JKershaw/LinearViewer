@@ -2,9 +2,10 @@
  * LIN-4024 step 3 (look), first chunk: a container's opened task runs on the container, the opened task names its
  * stage words, and a task waiting on a ruling shows its question card to the owner.
  *
- * Witnesses: `rowDataByNodeKey` marks the rows that have subtasks and no others (LIN-4016: as each row's decision record,
- * `container`); the Home mount hands each row its record and the "Another step" stage words, from the page options and
- * the rows a fold fetches (the real `mountHomePromptSections` and `mergeHomeRowOpts` from public/app.js).
+ * Witnesses: `rowDataByNodeKey` decides a container from the gather's row states, and the rows that have subtasks are the
+ * containers and no others (LIN-4071: the container fact is the gather's, and it reaches the browser as the row's decided
+ * action, `container: true`, never as a flag); the Home mount hands each row its record and the "Another step" stage words,
+ * from the page options and the rows a fold fetches (the real `mountHomePromptSections` and `mergeHomeRowOpts` from public/app.js).
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,7 +14,9 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 import { rowDataByNodeKey } from '../../lib/task-board-view.js';
+import { buildRowStates } from '../../lib/task-page-loader.js';
 import { nodeKey } from '../../lib/tree.js';
+import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const APP = readFileSync(join(__dirname, '../../public/app.js'), 'utf8');
@@ -32,25 +35,30 @@ const node = (identifier, children = []) => ({
   depth: 0,
 });
 
+/** The gather's row states over `roots` (the same build Home reads), so a record's container fact is decided, not guessed. */
+const statesOver = (roots) => buildRowStates({ roots, loopsByIdentifier: new Map(), enrichLoop, deriveSessionWaiting, now: new Date('2026-10-31T12:00:00.000Z') });
+/** Whether a row record says it is a container: its decided action is Run to PR as a container (LIN-4071). */
+const isContainer = (record) => record.action?.container === true;
+
 describe('rowDataByNodeKey — the rows that have subtasks are the containers', () => {
   test('a row with children is a container, at any depth; a leaf is not', () => {
     const leafChild = node('LIN-3');
     const parent = node('LIN-2', [leafChild]);
     const root = node('LIN-1', [parent]);
-    const byKey = rowDataByNodeKey({ inProgressTrees: [{ roots: [root] }], recentActivityTrees: [], projectTrees: [], rowStates: null });
-    assert.equal(byKey[nodeKey(root.issue)].container, true);
-    assert.equal(byKey[nodeKey(parent.issue)].container, true);
-    assert.equal(byKey[nodeKey(leafChild.issue)].container, false);
+    const byKey = rowDataByNodeKey({ inProgressTrees: [{ roots: [root] }], recentActivityTrees: [], projectTrees: [], rowStates: statesOver([root]) });
+    assert.equal(isContainer(byKey[nodeKey(root.issue)]), true);
+    assert.equal(isContainer(byKey[nodeKey(parent.issue)]), true);
+    assert.equal(isContainer(byKey[nodeKey(leafChild.issue)]), false);
   });
 
   test('a project row is read too, and an empty page has no rows to record', () => {
     const project = node('LIN-9', [node('LIN-10')]);
-    assert.equal(rowDataByNodeKey({ projectTrees: [{ incomplete: [project], completed: [] }], rowStates: null })[nodeKey(project.issue)].container, true);
+    assert.equal(isContainer(rowDataByNodeKey({ projectTrees: [{ incomplete: [project], completed: [] }], rowStates: statesOver([project]) })[nodeKey(project.issue)]), true);
     assert.deepEqual(rowDataByNodeKey({ rowStates: null }), {});
   });
 });
 
-describe('the Home mount — each opened row gets its container flag and the stage words (public/app.js)', () => {
+describe('the Home mount — each opened row gets its decision record and the stage words (public/app.js)', () => {
   // A row placeholder as the server emits it: identity on data attributes, one per opened task.
   const placeholder = (nodeKeyValue, issueId) => ({
     dataset: { issueId, identifier: `LIN-${issueId}`, title: `Task ${issueId}`, url: '', source: 'linear', stateType: 'started', nodeKey: nodeKeyValue, instanceKey: nodeKeyValue },
@@ -71,14 +79,14 @@ describe('the Home mount — each opened row gets its container flag and the sta
     return { inits, mount: (rows) => sandbox.mountHomePromptSections({ querySelectorAll: () => rows }) };
   }
 
-  test('a container row carries container in its record; a leaf row does not, and the stage words reach both', () => {
+  test('a container row carries its decided action (Run to PR, container) in its record; a leaf row has no record, and the stage words reach both', () => {
     const { inits, mount } = mountWith({
-      rowData: { 'linear:parent': { container: true, finished: false, attention: null, copyStep: { label: 'plan', name: 'Plan', why: '' }, trackerWord: 'In progress' } },
+      rowData: { 'linear:parent': { action: { kind: 'run-to-pr', why: 'a container runs to PR', container: true }, copyStep: { label: 'plan', name: 'Plan', why: '' }, trackerWord: 'In progress' } },
       stageWords: { research: 'Research', implementation: 'Build' },
     });
     mount([placeholder('linear:parent', '1'), placeholder('linear:leaf', '2')]);
     const byNode = (key) => inits.find((i) => i.el.dataset.nodeKey === key).opts;
-    assert.equal(byNode('linear:parent').row.container, true);
+    assert.equal(byNode('linear:parent').row.action.container, true);
     assert.equal(byNode('linear:leaf').row, null);
     assert.equal(JSON.stringify(byNode('linear:leaf').stageWords), JSON.stringify({ research: 'Research', implementation: 'Build' }), 'the stage words name each step');
   });
@@ -90,12 +98,12 @@ describe('the Home mount — each opened row gets its container flag and the sta
     };
     vm.createContext(sandbox);
     vm.runInContext(`${functionSource(APP, 'mergeHomeRowOpts')}\nthis.mergeHomeRowOpts = mergeHomeRowOpts;`, sandbox);
-    const fetched = { 'linear:fetched-parent': { container: true, finished: false, attention: null, copyStep: { label: 'plan', name: 'Plan', why: '' }, trackerWord: 'In progress' } };
+    const fetched = { 'linear:fetched-parent': { action: { kind: 'run-to-pr', why: 'a container runs to PR', container: true }, copyStep: { label: 'plan', name: 'Plan', why: '' }, trackerWord: 'In progress' } };
     sandbox.mergeHomeRowOpts({ rowData: fetched });
     sandbox.mergeHomeRowOpts({ rowData: fetched });
     // The page map is built inside the vm context, so compare its JSON, not a cross-realm array.
     assert.equal(Object.keys(sandbox.window.__HOME_PROMPT_OPTS__.rowData).length, 1, 'merged once, not duplicated');
-    assert.equal(sandbox.window.__HOME_PROMPT_OPTS__.rowData['linear:fetched-parent'].container, true);
+    assert.equal(sandbox.window.__HOME_PROMPT_OPTS__.rowData['linear:fetched-parent'].action.container, true);
     assert.equal(inits.length, 0, 'the merge alone mounts nothing');
     mount([]);
   });

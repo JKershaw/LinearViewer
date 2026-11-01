@@ -32,7 +32,7 @@ import { Router } from 'express';
 import { renderErrorPage } from '../lib/render.js';
 import { sessionSummaryOf } from '../lib/task-page-loader.js';
 import { rowRecordOf } from '../lib/task-board-view.js';
-import { hasOpenSubtask } from '../lib/task-state.js';
+import { pageStatusOf } from '../lib/task-state.js';
 import { isHiddenState } from '../lib/providers/state-map.js';
 import { renderTaskQuestion } from '../lib/render-task-page.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
@@ -169,18 +169,15 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
       // the display-only provisional one, and the row record carries no action, so no run is offered.
       const taskState = result.taskState || null;
       // The run control's options (LIN-3975): the owner's only. The same vocabulary Home's opened task takes.
-      // LIN-4016/LIN-4068: the task's own decision record (container, finished, the gathered action), the one a Home row carries.
+      // LIN-4016/LIN-4068/LIN-4071: the task's own decision record (the gathered action and the copy-first words), the one a
+      // Home row carries. A page with no held state carries no action, so no run is offered.
       const promptOpts = owner ? {
         ...buildPromptOpts({
           openRouterSource: pageOptions.openRouterSource,
           featureFlags: pageOptions.featureFlags,
           isLocalhost: isLocalhostRequest(req),
         }),
-        row: rowRecordOf({
-          stateType: model.tracker?.state?.type ?? null,
-          container: taskState ? taskState.container === true : hasOpenSubtask(model.tracker?.subtasks),
-          decided: taskState,
-        }),
+        row: rowRecordOf({ stateType: model.tracker?.state?.type ?? null, decided: taskState }),
       } : null;
       return res.send(renderTaskPage(model, {
         viewer,
@@ -202,11 +199,10 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
     }
   });
 
-  // Stored data only: dispatch rows, agent status, brief/recap caches. Returns
-  // the header status, the track and the brief/recap panels, rendered by the
-  // same functions as the page. Viewer-blind: the owner controls stay in the
-  // page and are never re-sent. It can't see the tracker, so it never reports
-  // `done`; the client doesn't poll a page that loaded done.
+  // Stored data only: dispatch rows, agent status, brief/recap caches, and the held set's gathered state. Returns the
+  // header status, the track and the brief/recap panels, rendered by the same functions as the page. Viewer-blind: the
+  // owner controls stay in the page and are never re-sent. `status` is the gathered state's projection (`pageStatusOf`,
+  // LIN-4071), so a poll stops only on a complete gathered `done`, never on a page-load word.
   router.get('/workspace/:urlKey/api/task/:identifier/state', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
     const { identifier } = req.params;
@@ -241,7 +237,8 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         ? renderTaskQuestion(model, { urlKey: workspace.urlKey })
         : '';
       const body = {
-        status: model.status,
+        // LIN-4071: the page's status is the gathered state's (the poll stops on a Done task only when the gather says done).
+        status: pageStatusOf(taskState),
         live: model.live,
         // LIN-4070 B: the pill and Home's one-line state read the gathered state, the decision Home's row shows.
         headerHtml: renderTaskStatus(model, { now: now(), taskState }),
@@ -256,6 +253,9 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         sessions: sessionsOfState(model, taskState),
         // LIN-4016: the task's decided state, with its main action (the gather's, LIN-4068).
         taskState,
+        // LIN-4071: the subtask line the opened task names (a subtask that needs you, else a failed one): the gather's words,
+        // so the browser paints the line from `/state`, not from a page-load row.
+        attention: taskState.attention ?? null,
         // LIN-4024: the question card, for a task waiting on an open ruling only (a parked task has none). The
         // same renderer as the task page.
         questionHtml,

@@ -627,20 +627,26 @@
   // LIN-3968: the offered step (`sessions.offered`), so a running stage offers no other step, and a failed stage
   // is offered again. `sessions.next` stays the "comes next" wording after a run.
   // LIN-4024: a container offers no stage step (its one action is Run to PR), whatever a step chosen for this run says.
-  // LIN-4016: a finished task offers no stage step either (the row's record says so; `sessions.action` is /state's, tracker-free).
+  // LIN-4016 / LIN-4071: a step is offered only when the server's one main action says so. Busy (no action), a finished
+  // task (the no-run decision) and a container (Run to PR, `container: true`) offer no stage step, whatever a step chosen
+  // for this run says (LIN-4024). The browser reads the decision; it does not read the tracker's word or the subtree.
   function runStepOfState(state, opts) {
     const action = mainActionOf(state, opts);
-    // Busy (nothing is offered), a container (its one action is Run to PR) or a finished task offers no stage step.
-    if (!action || (opts && opts.row && (opts.row.container || opts.row.finished))) return null;
+    if (!action || action.kind === 'none' || action.container) return null;
     return (state.run && state.run.step) || (action.kind === 'step' ? action.step : null);
   }
-  // LIN-4016: the one main action the server decided (`sessions.action`): a step, Run to PR, or null while busy.
-  // LIN-4068: before the first `/state` reply the opened box has no sessions, so it takes the row record's action (the
-  // gatherer's decision, the same one `/state` will send), and offers no run the gatherer would not.
+  // LIN-4016: the one main action the server decided (`sessions.action`): a step, Run to PR, the no-run decision, or null
+  // while busy. LIN-4068: before the first `/state` reply the opened box has no sessions, so it takes the row record's
+  // action (the gatherer's decision, the same one `/state` will send), and offers no run the gatherer would not.
   function mainActionOf(state, opts) {
     const sessions = state.opened && state.opened.sessions;
     if (sessions) return sessions.action || null;
     return (opts && opts.row && opts.row.action) || null;
+  }
+  // LIN-4071: the no-run decision (a finished task): no step line, no Go, and no step to pick. Busy is not this (it is null).
+  function takesNoRun(state, opts) {
+    const action = mainActionOf(state, opts);
+    return !!action && action.kind === 'none';
   }
   // LIN-3975 (review finding 1): busy is any session running, queued or waiting on an answer (`sessions.busy`, the server's).
   function stageBusy(state) {
@@ -953,18 +959,11 @@
       // LIN-4024: a parent whose subtask needs you says that, once. Its own idle line ("No session running.") is the
       // parent's own loops only, so beside "A subtask needs you" it would say the task two ways, and the row says needs you.
       const subtaskLine = renderSubtaskNeedsYou();
-      // LIN-4016: a row the tracker decides (done, backlog) paints the word its row says. /state has no tracker, so for a
-      // finished task whose last stage failed, its line would say failed beside a done row.
-      const ownLine = opts.row && opts.row.stateWord ? renderRowStateWord(opts.row.stateWord)
-        : (subtaskLine && opened.status === 'idle' ? '' : (opened.homeStatusHtml ?? ''));
+      // LIN-4016 / LIN-4071: the own line is `/state`'s (the gather's pill and sentence, the one the row shows). The server
+      // leaves it out when a subtask names the attention, so the subtask line says it once.
+      const ownLine = opened.homeStatusHtml ?? '';
       return `<div class="opened-task-state" data-state-slot data-testid="opened-task-state">`
         + `${ownLine}${opened.stripHtml || ''}${subtaskLine}${renderQuestionSlot()}</div>`;
-    }
-
-    // LIN-4016: the row's own tracker-decided line (done or backlog), the pill Home's opened task paints in the row's tone.
-    function renderRowStateWord(stateWord) {
-      return `<div class="task-status task-status--home" data-testid="home-task-status">`
-        + `<span class="status-pill status-pill--${esc(stateWord.tone)} task-status-pill" data-testid="home-task-status-pill"><span class="status-pill__dot" aria-hidden="true"></span>${esc(stateWord.word)}</span></div>`;
     }
 
     // LIN-4024: a task waiting on an open ruling shows the question and its answers here (the server sends the card to the
@@ -1002,17 +1001,20 @@
         + `<p class="opened-task-copy-state" data-testid="opened-task-copy-state">${esc(word)}${esc(tail)}</p></div>`;
     }
 
-    // LIN-3833: one line naming a subtask that needs you, with an Open link to its task page. Home passes the
-    // opened row's own subtask, from the same row states as the In Progress rows (run-control viewers only).
+    // LIN-3833 / LIN-4071: one line naming a subtask that needs you (else a failed one), with an Open link to its task page.
+    // The subtask is `/state`'s `attention` (the gather's words); the link is built here from the opened task's own source.
     function renderSubtaskNeedsYou() {
-      const sub = opts.row && opts.row.attention;
+      const sub = state.opened && state.opened.attention;
       if (!sub || !sub.identifier) return '';
       // LIN-4016: the words are the server's (`attention`): lead and detail come from it, so a failed subtask reads as
       // failed and the browser picks no text of its own.
       const name = `${esc(sub.identifier)}${sub.title ? ` ${esc(sub.title)}` : ''}`;
+      const href = window.taskPageHref
+        ? window.taskPageHref({ urlKey: opts.urlKey, identifier: sub.identifier, source: opts.issue && opts.issue.source })
+        : '#';
       return `<div class="opened-task-needs-you" data-testid="opened-task-needs-you">`
         + `${esc(sub.lead || 'A subtask needs you')}: <span class="opened-task-needs-you-name">${name}</span>${esc(sub.detail || '')}`
-        + ` <a class="btn btn--quiet opened-task-needs-you-open" data-testid="opened-task-needs-you-open" href="${esc(sub.href || '#')}">Open</a></div>`;
+        + ` <a class="btn btn--quiet opened-task-needs-you-open" data-testid="opened-task-needs-you-open" href="${esc(href)}">Open</a></div>`;
     }
 
     // Repaint only the state slot (a poll or the mount read). Falls back to a full render when the slot is
@@ -1162,7 +1164,7 @@
     function renderStepLine(step) {
       // LIN-3968: a running stage offers no step; the after-run line names what runs and what comes next. Before
       // the state read lands, the step is not known, so no step is offered either (not "Run to PR").
-      if (!state.run.step && (!state.opened || stageBusy(state))) return '';
+      if (!state.run.step && (!state.opened || stageBusy(state) || takesNoRun(state, opts))) return '';
       let why = 'the next step for this task';
       if (state.run.step) why = 'chosen for this run';
       else if (step && step.reason) why = step.reason;
@@ -1245,7 +1247,7 @@
       const defaults = opts.defaultPromptKeys || [];
       const more = (opts.morePromptKeys || []).filter((k) => !defaults.includes(k));
       const summary = state.opened && state.opened.sessions;
-      const fits = (k) => stepFits(k, summary, !!(opts.row && opts.row.finished));
+      const fits = (k) => stepFits(k, summary, takesNoRun(state, opts));
       const shownDefaults = defaults.filter(fits);
       const shownMore = more.filter(fits);
       const leftOut = [...defaults, ...more].filter((k) => !fits(k)).length;
@@ -1506,7 +1508,7 @@
       const active = !!(summary.running || state.run.item);
       // LIN-4042: a finished task has nothing to run, so Home's run box names no run for it (no step line, Go or runs-on).
       // The "Another step" list stays, with its count of steps left out (LIN-3833 ruling f9fa6bd7). A run already active keeps its box.
-      if (!active && opts.row && opts.row.finished) {
+      if (!active && takesNoRun(state, opts)) {
         return `<div class="opened-task-run" data-run-slot data-testid="opened-task-run">${renderRunMore(step)}${renderStagedProposals()}${renderLastLine()}</div>`;
       }
       if (active) {

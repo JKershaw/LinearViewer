@@ -259,11 +259,11 @@ describe('task page loader: no stored-only fallback', () => {
     assert.deepEqual(await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-50', access: access({ ctx: null }) }), { notFound: true });
   });
 
-  test('the state read never reaches a provider and never reports done', async () => {
+  test('the state read never reaches a provider and never says a tracker word (LIN-4071: the page model carries no status)', async () => {
     const { loader } = loaderWith({ loops: [done()] });
     const { model } = await loader.loadTaskState({ urlKey: 'ws', identifier: 'LIN-50' });
     assert.equal(model.tracker, null, 'not read this time');
-    assert.equal(model.status, 'idle');
+    assert.equal('status' in model, false, 'the ladder word is gone; the state is the gather\'s');
     assert.equal(model.sentence, 'No session running. Last: Build done 4 hours ago.');
   });
 });
@@ -298,29 +298,33 @@ describe('guessStages: the usual stages after the FURTHEST one reached', () => {
   }
 });
 
-describe('deriveHeader: one row per branch, in order done → waiting → running → idle', () => {
+// LIN-4071: deriveHeader writes one sentence per branch; the task's state is the gather's, so these pin the words only.
+// Live facts say their own sentence before a finished task's (D2), so a completed task with a running row says that.
+describe('deriveHeader: one sentence per branch, live facts first, then finished, ready and idle', () => {
   const s = (state, kind, over = {}) => ({ state, kind, loop: { takenAt: '2026-10-06T14:02:00.000Z', dispatchedAt: '2026-10-06T14:00:00.000Z' }, endedAt: '2026-10-06T13:30:00.000Z', ...over });
   const tracker = (type) => ({ state: { name: type, type }, finishedAt: '2026-10-05T12:00:00.000Z' });
   const noWait = { waiting: false, message: null };
   const cases = [
-    ['done (completed), even with a stale running row', { sessions: [s('running', 'review')], waiting: noWait, tracker: tracker('completed') }, 'done', 'Finished 1 day ago.'],
-    ['done (canceled)', { sessions: [], waiting: noWait, tracker: tracker('canceled') }, 'done', 'Cancelled 1 day ago.'],
-    ['done (duplicate): closed work, read as canceled (LIN-276)', { sessions: [], waiting: noWait, tracker: tracker('duplicate') }, 'done', 'Cancelled 1 day ago.'],
-    ['waiting beats running; message cut to one line, marker dropped', { sessions: [s('running', 'review')], waiting: { waiting: true, message: '[blocked] Which API?\nmore detail' }, tracker: tracker('started') }, 'waiting', 'Which API?'],
-    ['running', { sessions: [s('done', 'plan'), s('running', 'implementation')], waiting: noWait, tracker: tracker('started') }, 'running', 'Build running for 58m.'],
-    ['queued only', { sessions: [s('done', 'plan'), s('queued', 'review')], waiting: noWait, tracker: tracker('started') }, 'running', 'Review queued, waiting for a worker.'],
-    ['failed after a session (LIN-3991: the pill reads failed)', { sessions: [s('failed', 'review')], waiting: noWait, tracker: tracker('started') }, 'failed', 'Review failed 1 hour ago.'],
-    ['idle, nothing yet', { sessions: [], waiting: noWait, tracker: tracker('unstarted') }, 'idle', 'No sessions yet.'],
-    ['ready PR with nothing running: waiting on the person', { sessions: [s('done', 'review')], waiting: noWait, tracker: tracker('started'), closeOut: { status: 'ready', pr: { number: 41 } } }, 'waiting', 'Approved. PR #41 is ready to merge.'],
-    ['a running session beats ready', { sessions: [s('done', 'review'), s('running', 'close-out')], waiting: noWait, tracker: tracker('started'), closeOut: { status: 'ready', pr: { number: 41 } } }, 'running', 'Close-out running for 58m.'],
-    ['a not-ready close-out stays idle', { sessions: [s('done', 'review')], waiting: noWait, tracker: tracker('started'), closeOut: { status: 'not-ready', pr: { number: 41 } } }, 'idle', 'No session running. Last: Review done 1 hour ago.'],
-    ['tracker not read (the state endpoint): never done, no suffix', { sessions: [s('done', 'close-out')], waiting: noWait, tracker: null }, 'idle', 'No session running. Last: Close-out done 1 hour ago.'],
-    ['unknown kind falls back to stepKindWord', { sessions: [s('running', 'brand-new-kind')], waiting: noWait, tracker: null }, 'running', 'Brand-new-kind running for 58m.'],
+    ['completed, with a stale running row: the live row says its sentence (LIN-4071 D2)', { sessions: [s('running', 'review')], waiting: noWait, tracker: tracker('completed') }, 'Review running for 58m.'],
+    ['done (completed) with nothing running', { sessions: [], waiting: noWait, tracker: tracker('completed') }, 'Finished 1 day ago.'],
+    ['done (canceled)', { sessions: [], waiting: noWait, tracker: tracker('canceled') }, 'Cancelled 1 day ago.'],
+    ['done (duplicate): closed work, read as canceled (LIN-276)', { sessions: [], waiting: noWait, tracker: tracker('duplicate') }, 'Cancelled 1 day ago.'],
+    ['waiting beats running; message cut to one line, marker dropped', { sessions: [s('running', 'review')], waiting: { waiting: true, message: '[blocked] Which API?\nmore detail' }, tracker: tracker('started') }, 'Which API?'],
+    ['running', { sessions: [s('done', 'plan'), s('running', 'implementation')], waiting: noWait, tracker: tracker('started') }, 'Build running for 58m.'],
+    ['queued only', { sessions: [s('done', 'plan'), s('queued', 'review')], waiting: noWait, tracker: tracker('started') }, 'Review queued, waiting for a worker.'],
+    ['failed after a session (LIN-3991)', { sessions: [s('failed', 'review')], waiting: noWait, tracker: tracker('started') }, 'Review failed 1 hour ago.'],
+    ['nothing yet', { sessions: [], waiting: noWait, tracker: tracker('unstarted') }, 'No sessions yet.'],
+    ['ready PR with nothing running: waiting on the person', { sessions: [s('done', 'review')], waiting: noWait, tracker: tracker('started'), closeOut: { status: 'ready', pr: { number: 41 } } }, 'Approved. PR #41 is ready to merge.'],
+    ['a running session beats ready', { sessions: [s('done', 'review'), s('running', 'close-out')], waiting: noWait, tracker: tracker('started'), closeOut: { status: 'ready', pr: { number: 41 } } }, 'Close-out running for 58m.'],
+    ['a not-ready close-out stays idle', { sessions: [s('done', 'review')], waiting: noWait, tracker: tracker('started'), closeOut: { status: 'not-ready', pr: { number: 41 } } }, 'No session running. Last: Review done 1 hour ago.'],
+    ['tracker not read (the state endpoint): never finished, no suffix', { sessions: [s('done', 'close-out')], waiting: noWait, tracker: null }, 'No session running. Last: Close-out done 1 hour ago.'],
+    ['unknown kind falls back to stepKindWord', { sessions: [s('running', 'brand-new-kind')], waiting: noWait, tracker: null }, 'Brand-new-kind running for 58m.'],
   ];
-  for (const [name, input, status, sentence] of cases) {
+  for (const [name, input, sentence] of cases) {
     test(name, () => {
       const header = deriveHeader({ ...input, now: NOW });
-      assert.deepEqual({ status: header.status, sentence: header.sentence }, { status, sentence });
+      assert.deepEqual(Object.keys(header).sort(), ['sentence', 'sentenceAt'], 'a rung writes a sentence and nothing else');
+      assert.equal(header.sentence, sentence);
     });
   }
 });
@@ -332,7 +336,9 @@ describe('one finished rule: isTerminalState (LIN-3656)', () => {
       const model = buildTaskPageModel({ identifier: 'LIN-50', loops: [], ctx: ctxOf(type), enrichLoop, deriveSessionWaiting, now: NOW });
       assert.equal(model.finished, isTerminalState(type));
       assert.equal(guessStages([], type).length === 0, isTerminalState(type));
-      assert.equal(model.status === 'done', isTerminalState(type));
+      // LIN-4071: the finished sentence is written exactly when the tracker says finished (the ladder's word is gone).
+      const header = deriveHeader({ sessions: [], tracker: { state: { type }, finishedAt: null }, now: NOW });
+      assert.equal(/^(Finished|Cancelled)\b/.test(header.sentence), isTerminalState(type));
     });
   }
 });
@@ -355,12 +361,12 @@ describe('session rows', () => {
     assert.equal(solo.sessions[0].state, 'waiting');
     assert.equal(solo.sessions[0].open, true);
     assert.equal(solo.sessions[0].message, 'need a key', 'marker stripped');
-    assert.equal(solo.status, 'waiting');
+    assert.equal(solo.sentence, 'need a key', 'the wait names its own sentence');
 
     const followed = buildTaskPageModel({ identifier: 'LIN-50', loops: [blocked, done({ loopId: 'f1', followUpTo: 'b1' })], enrichLoop, deriveSessionWaiting, now: NOW });
     assert.equal(followed.sessions[0].state, 'continued', 'superseded: ended when the follow-up took over, not waiting and not running');
     assert.equal(followed.sessions[0].loop.terminalStatus, 'continued', 'the face reads it too');
-    assert.equal(followed.status, 'idle', 'a replied-to block never drives the header');
+    assert.notEqual(followed.sentence, 'need a key', 'a replied-to block never drives the header');
   });
 
   describe('sessionMessage: the [blocked] question shows only while waiting (LIN-3504)', () => {
@@ -699,7 +705,7 @@ describe('briefCurrentSection (LIN-3356)', () => {
 
 describe('deriveReadyHeader: the one owner of the ready-to-merge answer (LIN-3448)', () => {
   const cases = [
-    ['ready with a PR number → the waiting header', { status: 'ready', pr: { number: 41 } }, { status: 'waiting', sentence: 'Approved. PR #41 is ready to merge.', sentenceAt: null }],
+    ['ready with a PR number → the ready sentence', { status: 'ready', pr: { number: 41 } }, { sentence: 'Approved. PR #41 is ready to merge.', sentenceAt: null }],
     ['ready without a PR number → null', { status: 'ready', pr: {} }, null],
     ['ready without a pr → null', { status: 'ready' }, null],
     ['not-ready → null', { status: 'not-ready', pr: { number: 41 } }, null],

@@ -124,7 +124,7 @@ function load({ opened = null, previewFor = () => null, panelFor = serverPanel, 
       return { success: true, item: { id: 'd-1' } };
     },
     fetchAutopilotKickoff: async (args) => { calls.kickoff.push(args); return kickoff; },
-    taskPageHref: () => '/workspace/acme/task/LIN-42',
+    taskPageHref: ({ identifier, source }) => `/workspace/acme/task/${identifier || 'LIN-42'}${source ? `?source=${source}` : ''}`,
     dispatchPrompt: async (args) => { calls.dispatch.push(args); return { success: true, item: { id: 'd-1' } }; },
     ProxyToggle: { isActive: () => true, setActive() {}, maybeAppend: async (raw) => raw },
     renderDispatchDisclosure: () => '',
@@ -161,9 +161,15 @@ const PLAN_NEXT = { count: 1, next: { kind: 'plan', label: 'Plan' }, offered: { 
 
 async function mount(over = {}, loadOver = {}, container = null) {
   // LIN-4016: the server's decision for the row and its sessions (the browser reads these, it decides nothing).
-  const row = over.row || serverRow({ stateType: (over.issue || HOME.issue).stateType, attention: over.subtaskNeedsYou || null });
+  const row = over.row || serverRow({ stateType: (over.issue || HOME.issue).stateType });
   const { subtaskNeedsYou, ...rest } = over;
-  const opened = loadOver.opened && { ...loadOver.opened, sessions: serverSessions(loadOver.opened.sessions, { container: row.container }) };
+  // LIN-4071: the sessions are the server's (the no-run decision for a finished task, Run to PR as a container), and the
+  // subtask line is `/state`'s `attention`, not a row field.
+  const opened = loadOver.opened && {
+    ...loadOver.opened,
+    sessions: serverSessions(loadOver.opened.sessions, { container: row.action?.container === true, noRun: row.action?.kind === 'none' }),
+    attention: subtaskNeedsYou ?? loadOver.opened.attention ?? null,
+  };
   const env = load({ ...loadOver, opened: opened || loadOver.opened });
   over = { ...rest, row };
   const c = container || makeContainer();
@@ -455,7 +461,7 @@ describe('LIN-3833 — a subtask that needs you is named on any opened Home task
   const OPENED = { status: 'idle', live: false, headerHtml: '', trackHtml: '', sessions: PLAN_NEXT };
 
   test('the line names the subtask and its Open button links to its task page', async () => {
-    const { c } = await mount({ subtaskNeedsYou: WAITING }, { opened: OPENED });
+    const { c } = await mount({ subtaskNeedsYou: WAITING, issue: { ...HOME.issue, source: 'linear' } }, { opened: OPENED });
     assert.match(c.innerHTML, /data-testid="opened-task-needs-you"[^>]*>A subtask needs you: <span[^>]*>LIN-22 Waiting child<\/span>/);
     assert.match(c.innerHTML, /data-testid="opened-task-needs-you-open"[^>]*href="\/workspace\/acme\/task\/LIN-22\?source=linear"/);
   });

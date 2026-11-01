@@ -1,12 +1,11 @@
 /**
- * LIN-4042 — Home offers no run on a finished task. The run control reads the row record's `finished` (the tracker's word),
- * and the client must hold that guard whatever body arrives. Unfinished tasks and tasks with open subtasks keep their Run
- * to PR.
+ * LIN-4042 — Home offers no run on a finished task. The gather decides it: a finished task's action is the no-run decision
+ * (`NO_RUN_ACTION`, LIN-4071), on the row record and on `/state`, and the browser paints no run from that decision alone.
+ * Unfinished tasks and tasks with open subtasks keep their Run to PR.
  *
- * REWRITTEN (LIN-4070): the header used to say `/state` never reads the tracker, so a Done task's `sessions.action` was
- * still Run to PR. That is no longer what the server sends: the gather decides a Done task's action (null), and the Done
- * cases now paint the body the real `/state` route returns (tests/fixtures/state-route.js). The explicit client-guard cases
- * below stay: they feed a stale Run to PR body to prove the browser does not paint a run on a finished row even if one arrives.
+ * REWRITTEN (LIN-4070): the Done cases paint the body the real `/state` route returns (tests/fixtures/state-route.js).
+ * REWRITTEN (LIN-4071): the browser's guard on the tracker word (`row.finished`) is gone; the stale-body cases now feed the
+ * server's no-run decision, and a stale Run to PR body is not a case the browser can see, because the server decides it.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,6 +15,7 @@ import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 import { escapeHtml } from '../../lib/utils/html.js';
 import { rowRecordOf } from '../../lib/task-board-view.js';
+import { NO_RUN_ACTION } from '../../lib/task-state.js';
 import { stateBodyOf, stateIssue } from '../fixtures/state-route.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -62,6 +62,7 @@ function makeContainer() {
     contains() { return true; },
     addEventListener(type, fn) { (listeners[type] = listeners[type] || []).push(fn); },
     removeEventListener() {},
+    listenersFor(type) { return listeners[type] || []; },
     async fire(type, target) {
       const el = { dataset: {}, closest: () => null, ...target };
       for (const fn of listeners[type] || []) await fn({ target: el });
@@ -144,20 +145,22 @@ async function paint(stateBody, opts = {}) {
 
 const RUN_TO_PR = { kind: 'run-to-pr', why: 'no stage step is offered, so the run takes it to PR' };
 const PLAN_OFFER = { kind: 'plan', label: 'Plan', why: 'usual', failed: false, reason: 'usually next after Research' };
-const DONE_ROW = () => rowRecordOf({ stateType: 'completed' });
+// LIN-4071: a finished task's action is the gatherer's no-run decision (`kind: 'none'`), not a client guard on the tracker word.
+const NO_RUN = NO_RUN_ACTION;
+const DONE_ROW = () => rowRecordOf({ stateType: 'completed', decided: { action: NO_RUN } });
 
 describe('LIN-4042 — a finished task on Home offers no run', () => {
   test('a Done task paints no Run to PR button, from the body the server really sends (its action is null)', async () => {
     const { body } = await doneBody({ children: [] });
-    assert.equal(body.sessions.action, null, 'the server decides no action for a finished task (LIN-4042)');
+    assert.equal(body.sessions.action.kind, 'none', 'the server decides the no-run action for a finished task (LIN-4042)');
     const html = await paint(body, { row: DONE_ROW() });
     assert.doesNotMatch(html, /Run to PR/, 'a finished task has nothing to run');
     assert.doesNotMatch(html, /data-action="go"/, 'no go button on a finished task');
     assert.doesNotMatch(html, /data-testid="opened-task-runs-on"/, 'no runs-on line, so no Change for a run');
   });
 
-  test('a Done task whose stale body still says Run to PR paints no Run to PR button (the client guard holds)', async () => {
-    const html = await paint(stateWith({ action: RUN_TO_PR }), { row: DONE_ROW() });
+  test('a Done task whose body carries the no-run decision paints no Run to PR button', async () => {
+    const html = await paint(stateWith({ action: NO_RUN }), { row: DONE_ROW() });
     assert.doesNotMatch(html, /Run to PR/, 'a finished task has nothing to run');
     assert.doesNotMatch(html, /data-action="go"/, 'no go button on a finished task');
     assert.doesNotMatch(html, /data-testid="opened-task-runs-on"/, 'no runs-on line, so no Change for a run');
@@ -168,8 +171,8 @@ describe('LIN-4042 — a finished task on Home offers no run', () => {
     assert.match(html, /data-testid="run-another"/);
   });
 
-  test('a Done task offers no stage step either (the step case stays a guard)', async () => {
-    const html = await paint(stateWith({ offered: PLAN_OFFER, action: { kind: 'step', step: PLAN_OFFER, why: PLAN_OFFER.reason } }), { row: DONE_ROW() });
+  test('a Done task offers no stage step either, even when a stale step is offered (the no-run decision wins)', async () => {
+    const html = await paint(stateWith({ offered: PLAN_OFFER, action: NO_RUN }), { row: DONE_ROW() });
     assert.doesNotMatch(html, /data-action="run-step-next"/);
   });
 
@@ -199,15 +202,70 @@ describe('LIN-4042 — a finished task on Home offers no run', () => {
 
   test('a finished container (Done parent with an open subtask) offers no run, from the server body (LIN-4042 review ledger 2)', async () => {
     const { body } = await doneBody({ children: [stateIssue('LIN-43', 'unstarted', { parent: 'LIN-42' })] });
-    assert.equal(body.sessions.action, null, 'a finished container offers no run on /state');
-    const html = await paint(body, { row: rowRecordOf({ stateType: 'completed', container: true }) });
+    assert.equal(body.sessions.action.kind, 'none', 'a finished container offers no run on /state');
+    const html = await paint(body, { row: DONE_ROW() });
     assert.doesNotMatch(html, /data-action="go"/);
     assert.doesNotMatch(html, /Run to PR/);
   });
 
-  test('a finished container whose stale body says Run to PR: the client guard still paints no run (ledger 2)', async () => {
-    const html = await paint(stateWith({ action: RUN_TO_PR }), { row: rowRecordOf({ stateType: 'completed', container: true }) });
+  test('a finished container whose body carries the no-run decision paints no run (ledger 2)', async () => {
+    const html = await paint(stateWith({ action: NO_RUN }), { row: DONE_ROW() });
     assert.doesNotMatch(html, /data-action="go"/);
     assert.doesNotMatch(html, /Run to PR/);
+  });
+});
+
+// LIN-4071 review ledger (M10, M5): the step guard now reads the gatherer's `action` (`container`, `kind: 'none'`), not the
+// retired row fields, so the new consumer needs its own witness. A step is "chosen for this run" by picking one in
+// Another step (`run-pick`); a container or a finished task must still offer no stage step for it.
+describe('LIN-4071 — runStepOfState offers no stage step for a container or a finished task, whatever step was chosen', () => {
+  const CONTAINER_ACTION = { kind: 'run-to-pr', why: 'a container runs to PR', container: true };
+
+  async function paintAndPick(stateBody, opts) {
+    const PromptSection = loadClient({ stateBody });
+    const c = makeContainer();
+    PromptSection.init(c, { ...HOME, ...opts });
+    await flush(); await flush(); await flush();
+    const btn = { dataset: { action: 'run-pick', kind: 'plan', label: 'Plan' }, disabled: false, textContent: '', classList: { add() {}, remove() {} }, closest: (sel) => (/^button/.test(sel) ? btn : null) };
+    for (const fn of c.listenersFor('click')) await fn({ target: btn });
+    await flush(); await flush(); await flush();
+    return c.innerHTML;
+  }
+
+  test('control: a leaf whose action is Run to PR does take the chosen step (the pick reaches the step line and Go)', async () => {
+    const html = await paintAndPick(stateWith({ action: RUN_TO_PR }), { row: rowRecordOf({ stateType: 'started' }) });
+    assert.match(html, /opened-task-step-name[^>]*>Plan</, 'the chosen stage step is the step line');
+    assert.match(html, /data-action="run-step-next"[^>]*>Run Plan</, 'and Go runs it');
+  });
+
+  test('a container (action.container) with a step chosen for this run paints no stage step; Go runs Run to PR', async () => {
+    const html = await paintAndPick(stateWith({ action: CONTAINER_ACTION, offered: PLAN_OFFER }), { row: { ...rowRecordOf({ stateType: 'started' }), action: CONTAINER_ACTION } });
+    assert.doesNotMatch(html, /opened-task-step-name[^>]*>Plan</, 'no stage step line for a container');
+    assert.doesNotMatch(html, /data-action="run-step-next"/, 'Go is not the stage step');
+    assert.match(html, /data-action="go"[^>]*>Run to PR</, 'Go runs Run to PR');
+  });
+
+  test('a finished task (action.kind none) with a step chosen paints no stage step line and no Go', async () => {
+    const html = await paintAndPick(stateWith({ action: NO_RUN, offered: PLAN_OFFER }), { row: DONE_ROW() });
+    assert.doesNotMatch(html, /data-testid="opened-task-step"/, 'the step line is empty');
+    assert.doesNotMatch(html, /data-action="run-step-next"/);
+    assert.doesNotMatch(html, /data-action="go"/);
+  });
+
+  // M5: on the task page the run slot has no early return for a finished task (that one is Home's), so the `kind: 'none'`
+  // check in `runStepOfState` is what keeps a chosen step from becoming a "Run Plan" button on a finished task.
+  test('task page: a finished task (action.kind none) with a step chosen offers no stage step and no Go', async () => {
+    const html = await paintAndPick(stateWith({ action: NO_RUN, offered: PLAN_OFFER }), { surface: 'task', row: DONE_ROW() });
+    assert.doesNotMatch(html, /data-action="run-step-next"/, 'no Run Plan on a finished task');
+    assert.doesNotMatch(html, /data-action="go"/);
+    assert.doesNotMatch(html, /opened-task-step-name[^>]*>Plan</, 'the chosen step is not the step line');
+  });
+
+  test('before the first /state reply, a container row record alone offers no stage step', async () => {
+    const PromptSection = loadClient({ stateBody: new Promise(() => {}) });
+    const c = makeContainer();
+    PromptSection.init(c, { ...HOME, row: { ...rowRecordOf({ stateType: 'started' }), action: CONTAINER_ACTION } });
+    await flush();
+    assert.doesNotMatch(c.innerHTML, /data-action="run-step-next"/);
   });
 });

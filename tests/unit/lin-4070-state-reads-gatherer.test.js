@@ -218,7 +218,7 @@ describe('LIN-4070 D1-D3 — the row, /state and the page-load record agree', ()
     const issues = [issue('LIN-125', 'completed')];
     const { taskState } = await loaderOver({ loops: [], holder: holding(issues) }).loadTaskState({ urlKey: URL_KEY, identifier: 'LIN-125' });
     assert.equal(taskState.state, 'done');
-    assert.equal(taskState.action, null, 'LIN-4042: no run on a finished task');
+    assert.equal(taskState.action.kind, 'none', 'LIN-4042: the no-run decision on a finished task');
     const closing = await loaderOver({ loops: [loop('LIN-125', { kind: 'close-out' })], holder: holding(issues) })
       .loadTaskState({ urlKey: URL_KEY, identifier: 'LIN-125' });
     assert.equal(closing.taskState.state, 'running');
