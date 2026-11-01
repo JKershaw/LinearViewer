@@ -5,8 +5,10 @@
  * `followUpTo` names a stopped run, with a tagged 409 `RUN_STOPPED`. It is
  * decided from recorded aborts only (`isRunStopped`), never the workspace halt:
  * a halt-wide refusal would reject a reply to a finished run the sweep never
- * touched (LIN-4080 adaptation 3). `force: true` does not bypass it (ruling
- * `never`). Abort rows are exempt: stopping a stopped run stays a no-op.
+ * touched (LIN-4080 adaptation 3). `force: true` does not bypass it for a
+ * non-person caller; a person's forced reply is the one exception (ruling
+ * human-force-only, see lin-4080-person-forced-followup). Abort rows are exempt:
+ * stopping a stopped run stays a no-op.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -79,7 +81,7 @@ describe('LIN-4080 W2 — a dispatch into a stopped run is refused RUN_STOPPED',
     );
   });
 
-  test('force:true does NOT bypass RUN_STOPPED (ruling never)', async () => {
+  test('force:true does NOT bypass RUN_STOPPED for a non-person caller', async () => {
     const store = makeStore();
     const run = await autopilot(store);
     await abortRow(store, run._id);
