@@ -1,8 +1,12 @@
 /**
- * LIN-4042 — Home offers no run on a finished task. The server's `sessions.action` (`mainActionOf`) reads /state, which never
- * reads the tracker, so for a Done task it still says Run to PR. The row record's `finished` is the signal Home has, and the
- * run control must read it: a finished task shows no run (no Run to PR, no step, no runs-on, no Go). Unfinished tasks and
- * tasks with open subtasks keep their Run to PR. The first case fails before the fix (Run to PR was painted for a finished row).
+ * LIN-4042 — Home offers no run on a finished task. The run control reads the row record's `finished` (the tracker's word),
+ * and the client must hold that guard whatever body arrives. Unfinished tasks and tasks with open subtasks keep their Run
+ * to PR.
+ *
+ * REWRITTEN (LIN-4070): the header used to say `/state` never reads the tracker, so a Done task's `sessions.action` was
+ * still Run to PR. That is no longer what the server sends: the gather decides a Done task's action (null), and the Done
+ * cases now paint the body the real `/state` route returns (tests/fixtures/state-route.js). The explicit client-guard cases
+ * below stay: they feed a stale Run to PR body to prove the browser does not paint a run on a finished row even if one arrives.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,6 +16,7 @@ import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 import { escapeHtml } from '../../lib/utils/html.js';
 import { rowRecordOf } from '../../lib/task-board-view.js';
+import { stateBodyOf, stateIssue } from '../fixtures/state-route.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
@@ -117,6 +122,18 @@ const stateWith = (sessions) => ({
   sessions: { count: 0, next: null, last: null, offered: null, excluded: [], queued: null, busy: false, action: null, canStop: false, running: null, ...sessions },
 });
 
+/** The `/state` body the server sends for a Done task (`LIN-42`) whose last stage failed, with `children` in its held tree. */
+function doneBody({ children }) {
+  const failed = {
+    loopId: 'f1', lineageId: 'f1', issueIdentifier: 'LIN-42', kind: 'implementation', iteration: 1, source: 'history',
+    historyStatus: 'resolved', agentState: 'failed', dispatchedAt: '2026-10-30T10:00:00.000Z', takenAt: '2026-10-30T10:01:00.000Z',
+    resolvedAt: '2026-10-30T10:02:00.000Z', terminalStatus: 'failed', terminalCompletedAt: '2026-10-30T10:02:00.000Z',
+    wakeMarker: 'pending', waitingMessage: null, feedback: [], telemetry: { runtime: { ms: 1 }, metrics: [], producedArtifacts: [] },
+    followUpTo: null, bookkeeping: null,
+  };
+  return stateBodyOf({ issues: [stateIssue('LIN-42', 'completed'), ...children], loops: [failed], identifier: 'LIN-42' });
+}
+
 async function paint(stateBody, opts = {}) {
   const PromptSection = loadClient({ stateBody });
   const c = makeContainer();
@@ -130,7 +147,16 @@ const PLAN_OFFER = { kind: 'plan', label: 'Plan', why: 'usual', failed: false, r
 const DONE_ROW = () => rowRecordOf({ stateType: 'completed' });
 
 describe('LIN-4042 — a finished task on Home offers no run', () => {
-  test('a Done task whose server action is Run to PR paints no Run to PR button', async () => {
+  test('a Done task paints no Run to PR button, from the body the server really sends (its action is null)', async () => {
+    const { body } = await doneBody({ children: [] });
+    assert.equal(body.sessions.action, null, 'the server decides no action for a finished task (LIN-4042)');
+    const html = await paint(body, { row: DONE_ROW() });
+    assert.doesNotMatch(html, /Run to PR/, 'a finished task has nothing to run');
+    assert.doesNotMatch(html, /data-action="go"/, 'no go button on a finished task');
+    assert.doesNotMatch(html, /data-testid="opened-task-runs-on"/, 'no runs-on line, so no Change for a run');
+  });
+
+  test('a Done task whose stale body still says Run to PR paints no Run to PR button (the client guard holds)', async () => {
     const html = await paint(stateWith({ action: RUN_TO_PR }), { row: DONE_ROW() });
     assert.doesNotMatch(html, /Run to PR/, 'a finished task has nothing to run');
     assert.doesNotMatch(html, /data-action="go"/, 'no go button on a finished task');
@@ -171,7 +197,15 @@ describe('LIN-4042 — a finished task on Home offers no run', () => {
     assert.match(html, /data-testid="opened-task-queued"/);
   });
 
-  test('a finished container (Done parent with an open subtask) offers no run: a recorded choice (LIN-4042 review ledger 2)', async () => {
+  test('a finished container (Done parent with an open subtask) offers no run, from the server body (LIN-4042 review ledger 2)', async () => {
+    const { body } = await doneBody({ children: [stateIssue('LIN-43', 'unstarted', { parent: 'LIN-42' })] });
+    assert.equal(body.sessions.action, null, 'a finished container offers no run on /state');
+    const html = await paint(body, { row: rowRecordOf({ stateType: 'completed', container: true }) });
+    assert.doesNotMatch(html, /data-action="go"/);
+    assert.doesNotMatch(html, /Run to PR/);
+  });
+
+  test('a finished container whose stale body says Run to PR: the client guard still paints no run (ledger 2)', async () => {
     const html = await paint(stateWith({ action: RUN_TO_PR }), { row: rowRecordOf({ stateType: 'completed', container: true }) });
     assert.doesNotMatch(html, /data-action="go"/);
     assert.doesNotMatch(html, /Run to PR/);

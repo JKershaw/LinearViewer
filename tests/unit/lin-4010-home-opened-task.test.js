@@ -21,13 +21,16 @@ import { buildRowStates, buildTaskPageModel, nextStepOf, waitingForOf, sessionSu
 import { buildInProgressCountParts } from '../../lib/task-board-view.js';
 import { renderHomeStatus } from '../../lib/render-task-page.js';
 
-// LIN-4016: Home's pill reads the task's decided state, the one /state sends (its own facts, no tracker word).
+// LIN-4016: Home's pill reads the task's decided state. This helper reads the task's OWN facts; it equals the gather that
+// `/state` sends (lib/home-row-states.js) only for a leaf, which is every fixture that uses it. A container's state is
+// witnessed through the route (lin-4070-state-reads-gatherer.test.js), not here.
 const stateOf = (model) => taskStateOf(taskFactsOf({ model, identifier: model.identifier, now: NOW }));
 import { renderPage } from '../../lib/render.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 import { escapeHtml } from '../../lib/utils/html.js';
 import { needsAPerson, taskStateOf, taskFactsOf } from '../../lib/task-state.js';
 import { serverSessions, serverRow } from '../fixtures/task-decision.js';
+import { stateBodyOf, stateIssue } from '../fixtures/state-route.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
@@ -206,12 +209,14 @@ describe('LIN-4010 — a container\'s row reads the step its subtask is on', () 
 // ─── the state line ──────────────────────────────────────────────────────────
 
 describe('LIN-4010 — Home\'s state is one line, with no "Harbour:" label', () => {
-  test('a waiting task reads needs you or parked, by its ruling', () => {
-    const ruling = buildTaskPageModel({ identifier: 'LIN-80', loops: [rulingLoop({ issueIdentifier: 'LIN-80' })], ctx: null, enrichLoop, deriveSessionWaiting, now: NOW });
-    const park = buildTaskPageModel({ identifier: 'LIN-81', loops: [parkLoop({ issueIdentifier: 'LIN-81' })], ctx: null, enrichLoop, deriveSessionWaiting, now: NOW });
-    assert.match(renderHomeStatus(ruling, { now: NOW, taskState: stateOf(ruling) }), /data-testid="home-task-status-pill"[^>]*><span class="status-pill__dot" aria-hidden="true"><\/span>needs you</);
-    assert.match(renderHomeStatus(park, { now: NOW, taskState: stateOf(park) }), /needs you|parked/);
-    assert.match(renderHomeStatus(park, { now: NOW, taskState: stateOf(park) }), />parked</);
+  // REWRITTEN (LIN-4070): the pill is read from the `/state` body the route sends, not from the model's own facts, so the
+  // words a waiting task reads are the server's (the route reads the held set and the stored loops, as in production).
+  test('a waiting task reads needs you or parked, by its ruling, in the words /state sends', async () => {
+    const ruling = await stateBodyOf({ issues: [stateIssue('LIN-80', 'started')], loops: [rulingLoop({ issueIdentifier: 'LIN-80' })], identifier: 'LIN-80' });
+    const park = await stateBodyOf({ issues: [stateIssue('LIN-81', 'started')], loops: [parkLoop({ issueIdentifier: 'LIN-81' })], identifier: 'LIN-81' });
+    assert.equal(ruling.body.incomplete, undefined, 'the held set is complete');
+    assert.match(ruling.body.homeStatusHtml, /data-testid="home-task-status-pill"[^>]*><span class="status-pill__dot" aria-hidden="true"><\/span>needs you</);
+    assert.match(park.body.homeStatusHtml, />parked</);
   });
 
   test('no "Harbour:" label in Home\'s line; the task page keeps its own status', () => {

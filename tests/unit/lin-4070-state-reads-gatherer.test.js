@@ -2,14 +2,21 @@
  * LIN-4070 (piece B of LIN-4068) — `/state`, the task page, the guest share page and the Sessions fold read the gathered
  * task state through the held set. Witnesses, run through the real readers with an injected fetcher:
  *
- *   1. agreement: one fixture set through the readers (Home's row, `/state`, the page-load record) for the Done-when cases
- *      (old sessions; a Done subtask whose last run failed; a parent with a grandchild running), a Done child with a running
- *      close-out, the D2 guards, and the LIN-4008 shape (a subtask in another project, a running grandchild);
+ *   1. agreement: one fixture set through the readers (Home's row, `/state`, the page-load record, the guest share page's
+ *      pill, the Sessions fold's list) for the Done-when cases (old sessions; a Done subtask whose last run failed; a parent
+ *      with a grandchild running), a Done child with a running close-out, the D2 guards (including the words Home's `/state`
+ *      line paints), and the LIN-4008 shape (a subtask in another project, a running grandchild);
  *   2. no poll reaches a provider: a cold holder answers `incomplete`, the fetcher is never called, no run is offered, and
- *      the private `/state` starts exactly one refresh (a second poll inside the attempt floor starts none);
- *   3. task missing from a warm complete set: no `taskState`, no run, one refresh;
+ *      the private `/state` starts exactly one refresh (a second poll inside the attempt floor starts none); a parent whose
+ *      subtask runs is busy on `/state`, so the box holds its step line back (the opened-box E2E witnesses the same);
+ *   3. task missing from a warm (30 s old) complete set: no `taskState`, no run, exactly one refresh, through the real
+ *      `createTaskFactsRefresh` (no stub);
  *   4. a held entry the page's own tracker read contradicts (review note 2): incomplete, dropped, refresh started;
- *   5. source scans: `container=1` is gone from server code; the loader and the public share router start no refresh.
+ *   5. B2, the guest share route (section 8): a cold or stale holder answers `incomplete` with no state fields and makes no
+ *      credential resolve or provider read; a complete holder paints the pill; a parent with a failed grandchild names no
+ *      grandchild on its state reply or its page;
+ *   6. source scans: `container=1` is gone from server code; the loader and the public share router start no refresh, and
+ *      `server.js` mounts the share router with no refresh function.
  *
  * The Sessions fold's own witnesses (whole life, `historical`, the incomplete read) are in lin-4016-sessions-fold-parked.test.js.
  *
@@ -21,12 +28,18 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createTaskPageLoader } from '../../lib/task-page-loader.js';
+import express from 'express';
 import { createTaskPageRoutes } from '../../routes/task-page.js';
+import { createTaskShareRoutes } from '../../routes/task-share.js';
 import { createTaskFactsRefresh } from '../../lib/task-facts-holder.js';
 import { gatherTaskStates } from '../../lib/home-row-states.js';
 import { rowRecordOf } from '../../lib/task-board-view.js';
+import { renderTaskStatus } from '../../lib/render-task-page.js';
+import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
+import { findRouteLayer } from './lib/route-layer.js';
 import { enrichLoop, deriveSessionWaiting, deriveSessionDecisions } from '../../routes/dashboard.js';
 import { heldTaskFacts, heldLoaderDeps } from '../fixtures/held-task-facts.js';
+import { stateBodyOf, stateIssue } from '../fixtures/state-route.js';
 import { registerProvider } from '../../lib/providers/registry.js';
 import '../../lib/providers/linear/index.js';
 
@@ -123,6 +136,28 @@ describe('LIN-4070 D1-D3 — the row, /state and the page-load record agree', ()
     },
   ];
 
+  // The readers the Done-when names beyond the row, /state and the page record: the guest share page's pill and the
+  // Sessions fold's list (LIN-4070 review). Each runs through its real route; the fold's stores hold the case's own loops.
+  for (const c of CASES) {
+    test(`${c.name}: the share page's pill matches the page, and the Sessions fold lists the whole life /state counts`, async () => {
+      const holder = holding(c.issues);
+      const loader = loaderOver({ loops: c.loops, holder });
+      const ctx = ctxFor(c.issues, c.task);
+      const own = c.loops.filter((l) => l.issueIdentifier === c.task);
+      const { model } = await loader.loadTaskState({ urlKey: URL_KEY, identifier: c.task });
+      const fold = await foldOf({ task: c.task, loops: own, loadTaskState: (args) => loader.loadTaskState(args) });
+      assert.equal(fold.sessions.length, own.length, 'the fold lists every session the task has (the fixture is the witness)');
+      assert.equal(fold.sessions.length, model.sessions.length, 'All N: the fold lists the whole life the state read counts');
+      const page = await loader.loadTaskPage({ urlKey: URL_KEY, identifier: c.task, access: providerAnswering(ctx) });
+      const srv = await shareServer({ holder, loops: c.loops, ctx, task: c.task });
+      try {
+        const share = await (await fetch(`${srv.base}/t/${SHARE_TOKEN}/state`)).json();
+        assert.equal(pillOf(share.headerHtml), pillOf(renderTaskStatus(page.model, { now: NOW, taskState: page.taskState })), 'the guest pill is the page pill');
+        assert.equal(pillOf(share.headerHtml) !== null, true, 'the share pill rendered');
+      } finally { await srv.close(); }
+    });
+  }
+
   for (const c of CASES) {
     test(`${c.name}: Home's row, /state and the page-load record say ${c.expect}`, async () => {
       const holder = holding(c.issues);
@@ -138,6 +173,17 @@ describe('LIN-4070 D1-D3 — the row, /state and the page-load record agree', ()
       assert.deepEqual(row.action, taskState.action, 'the row and /state offer the same action');
     });
   }
+
+  // D2 (LIN-4070): a Done task reads done on every reader, including the words Home\'s /state line paints. Before the fix
+  // the line fell through to the raw status: a Done task whose last run failed read "failed" there, beside a "done" page.
+  test('a Done subtask whose last run failed: Home\'s /state line says done, the page\'s words', async () => {
+    const c = CASES[1];
+    const { body } = await stateBodyOf({ issues: c.issues, loops: c.loops, identifier: c.task });
+    assert.equal(pillOf(body.homeStatusHtml), 'done:done', 'the /state line words the decided state');
+    const page = await loaderOver({ loops: c.loops, holder: holding(c.issues) })
+      .loadTaskPage({ urlKey: URL_KEY, identifier: c.task, access: providerAnswering(ctxFor(c.issues, c.task)) });
+    assert.equal(pillOf(renderTaskStatus(page.model, { now: NOW, taskState: page.taskState })), 'done:done', 'the page says the same');
+  });
 
   test('old sessions: the history still lists the failure, and the state does not re-decide it', async () => {
     const issues = [issue('LIN-90', 'started')];
@@ -192,10 +238,10 @@ describe('LIN-4070 D1-D3 — the row, /state and the page-load record agree', ()
 // ── 2. no poll reaches a provider; the private state read starts one refresh ──
 
 /** The private route over one holder, shared by its loader as server.js shares them. */
-function privateRouter({ holder, refresh }) {
+function privateRouter({ holder, refresh, loops = [] }) {
   return createTaskPageRoutes({
     workspaceFromUrl: (req, res, next) => next(), getOpenRouterSource: () => 'env', getDeployInfo: () => ({}),
-    loader: loaderOver({ loops: [], holder }), workspaceOwnerCheck: async () => ({ status: 'owner' }),
+    loader: loaderOver({ loops, holder }), workspaceOwnerCheck: async () => ({ status: 'owner' }),
     taskFacts: holder, refreshTaskFacts: refresh, now: () => NOW,
   });
 }
@@ -240,16 +286,38 @@ describe('LIN-4070 — no poll calls a provider; the private state read starts o
     assert.equal(taskState, null);
   });
 
-  test('task missing from a warm complete set: no taskState, no run, one refresh started', async () => {
-    const refreshed = [];
-    const router = privateRouter({
-      holder: holding([issue('LIN-150', 'started')]),
-      refresh: (args) => { refreshed.push(args.urlKey); return { started: true, reason: 'started' }; },
+  // The box's busy is the gather's (LIN-4070 D7, found by the opened-box E2E): a parent whose subtask runs is busy, so the
+  // box holds the step line back. A cold reply holds it back too: no step is offered on a state that is not known.
+  test('a parent whose subtask runs: the state reply is busy, so the box offers no step; a cold reply is busy too', async () => {
+    const issues = [issue('LIN-210', 'started'), child('LIN-211', 'LIN-210', 'started')];
+    const router = privateRouter({ holder: holding(issues), refresh: () => ({ started: false, reason: 'fresh' }), loops: [loop('LIN-211')] });
+    const res = await stateCall(router, 'LIN-210');
+    assert.equal(res.jsonBody.taskState.state, 'running');
+    assert.equal(res.jsonBody.sessions.busy, true, 'busy includes the running subtree (the gather\'s busy)');
+    assert.equal(res.jsonBody.sessions.action, null, 'no main action while busy');
+    const cold = privateRouter({ holder: holding(issues, new Date(NOW.getTime() - 10 * 60 * 1000)), refresh: () => ({ started: false, reason: 'fresh' }) });
+    const coldRes = await stateCall(cold, 'LIN-210');
+    assert.equal(coldRes.jsonBody.incomplete, 'cold');
+    assert.equal(coldRes.jsonBody.sessions.busy, true, 'a cold reply holds the step line back');
+  });
+
+  // The real trigger (LIN-4070 review): the set is 30 s old, so it is fresh under the 2-minute age rule. Only the urgent
+  // path of createTaskFactsRefresh starts a fetch here. A stub would hide whether /state asks for it.
+  test('task missing from a warm (30 s old) complete set: no taskState, no run, exactly one refresh starts at once', async () => {
+    const holder = holding([issue('LIN-150', 'started')], new Date(NOW.getTime() - 30 * 1000));
+    const fetched = [];
+    const refresh = createTaskFactsRefresh({
+      holder, fetchAndPrepareProjects: (...args) => { fetched.push(args); return new Promise(() => {}); },
+      now: () => NOW.getTime(), onError() {},
     });
+    const router = privateRouter({ holder, refresh: (args) => refresh(args) });
     const res = await stateCall(router, 'LIN-151');
     assert.equal(res.jsonBody.incomplete, 'task-missing');
-    assert.equal('taskState' in res.jsonBody, false);
-    assert.deepEqual(refreshed, [URL_KEY]);
+    assert.equal('taskState' in res.jsonBody, false, 'no taskState');
+    assert.equal(res.jsonBody.sessions.action, null, 'no run is offered');
+    assert.equal(fetched.length, 1, 'exactly one refresh starts');
+    await stateCall(router, 'LIN-151');
+    assert.equal(fetched.length, 1, 'a second poll inside the attempt floor starts nothing');
   });
 });
 
@@ -322,6 +390,14 @@ describe('LIN-4070 source scans', () => {
     assert.doesNotMatch(source, /fetchAndPrepareProjects|fetchWorkspaceIssues/);
   });
 
+  test('server.js mounts the share router with no refresh function (the router\'s own scan cannot see the wiring)', () => {
+    const server = readFileSync(join(repo, 'server.js'), 'utf8');
+    const start = server.indexOf('app.use(createTaskShareRoutes({');
+    assert.ok(start >= 0, 'the share router is mounted in server.js');
+    const block = server.slice(start, server.indexOf('}))', start));
+    assert.doesNotMatch(block, /refresh/i, 'the share router\'s options name no refresh');
+  });
+
   test('the refresh is called from one place in the private task-page routes, never from a loader or the share route', () => {
     const source = codeOf(readFileSync(join(repo, 'routes', 'task-page.js'), 'utf8'));
     assert.equal((source.match(/refreshTaskFacts\(/g) || []).length, 1, 'one call site: the shared kick helper');
@@ -359,5 +435,111 @@ describe('LIN-4070 — a page load for a task the set lacks refreshes at once wh
 
   test('a canceled task missing from the set: no urgent refresh (it is never in the set)', async () => {
     assert.deepEqual(await pageLoadWith('canceled'), [false]);
+  });
+});
+
+// ── 8. B2: the guest share route reads the held facts only (LIN-4070 review: the route had no witness) ──
+
+const SHARE_TOKEN = 'A'.repeat(43);
+const SHARE_RECORD = {
+  _id: 'share-b2', tokenHash: 'hash-b2', urlKey: URL_KEY, workspaceId: 'ws-1', ownerAccountId: 'acct-1',
+  issueIdentifier: 'LIN-200', issueId: 'id-LIN-200', source: 'linear', createdAt: NOW, revokedAt: null,
+};
+
+/** A provider whose tracker read answers `ctx` and counts each call; `spy.providerCalls` is the witness. */
+function countingAccess(ctx, spy) {
+  const name = `lin-4070-share-${Math.random().toString(36).slice(2)}`;
+  const provider = registerProvider({
+    name, ui: { inlineEdit: false, inlineCreate: false }, supports: () => true,
+    fetchRecommendationContext: async () => { spy.providerCalls += 1; return ctx; },
+    fetchIssueComments: async () => [], fetchIssueFields: async () => null, fetchProjects: async () => ({ projects: [] }),
+  });
+  return { provider, callScope: null };
+}
+
+/**
+ * The guest share router over the real loader, wired the way server.js wires it: the loader gets the holder's read side,
+ * and the router is built with no refresh function at all. `spy` counts credential resolves and provider reads.
+ */
+async function shareServer({ holder, loops = [], ctx = null, task = 'LIN-200' }) {
+  const spy = { guest: 0, providerCalls: 0 };
+  const app = express();
+  const record = { ...SHARE_RECORD, issueIdentifier: task, issueId: `id-${task}` };
+  app.use(createTaskShareRoutes({
+    taskShareStore: { getByToken: async (token) => (token === SHARE_TOKEN ? record : null) },
+    loader: loaderOver({ loops, holder }),
+    workspaceFromUrl: (req, res, next) => next(),
+    workspaceOwnerCheck: async () => ({ status: 'owner' }),
+    guestAccess: async () => { spy.guest += 1; return countingAccess(ctx, spy); },
+    getDeployInfo: () => ({}), now: () => NOW,
+  }));
+  const server = await new Promise((resolve) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
+  return { base: `http://127.0.0.1:${server.address().port}`, spy, close: () => new Promise((r) => server.close(r)) };
+}
+
+/** The pill's tone and label, read from rendered task-status markup (`renderTaskStatus`), or null when there is none. */
+function pillOf(html) {
+  const m = String(html || '').match(/status-pill--(\w+) task-status-pill[\s\S]*?<\/span>([^<]*)<\/span>/);
+  return m ? `${m[1]}:${m[2]}` : null;
+}
+
+/**
+ * The Sessions fold's list for one task, through the real route (`lin-4016` drives it the same way). The stores hold one
+ * dispatch item per loop, so the fold's whole-life read returns the same loops the state read counts.
+ */
+async function foldOf({ task, loops, loadTaskState }) {
+  const items = loops.map((l) => ({ id: l.loopId, kind: l.kind, promptName: l.kind, issueIdentifier: task, dispatchedAt: l.dispatchedAt, status: 'done', target: 'cli' }));
+  const router = createWorkspaceApiRoutes({
+    workspaceFromUrl: (req, res, next) => next(),
+    dispatchQueueStore: { listItems: async () => [], listHistory: async () => ({ items }) },
+    agentStatusStore: { listStatus: async () => ({ items: [] }) },
+    loadTaskState,
+  });
+  const layer = findRouteLayer(router, 'get', '/workspace/:urlKey/api/sessions/:identifier');
+  const req = { workspace: { urlKey: URL_KEY }, params: { urlKey: URL_KEY, identifier: task }, query: {} };
+  const res = { statusCode: 200, jsonBody: null, status(code) { this.statusCode = code; return this; }, json(body) { this.jsonBody = body; return this; } };
+  await layer.route.stack[layer.route.stack.length - 1].handle(req, res, (err) => { if (err) throw err; });
+  return res.jsonBody;
+}
+
+describe('LIN-4070 B2 — /t/:token/state reads the held facts only', () => {
+  test('a cold holder: incomplete with no state fields; no credential resolve, no provider read, no fetch', async () => {
+    const srv = await shareServer({ holder: holding([issue('LIN-200', 'started')], new Date(NOW.getTime() - 10 * 60 * 1000)) });
+    try {
+      const res = await fetch(`${srv.base}/t/${SHARE_TOKEN}/state`);
+      const body = await res.json();
+      assert.equal(res.status, 200);
+      assert.equal(body.incomplete, 'cold');
+      for (const key of ['status', 'live', 'headerHtml']) assert.equal(key in body, false, `no ${key} while incomplete`);
+      assert.equal(srv.spy.guest, 0, 'no credential resolve');
+      assert.equal(srv.spy.providerCalls, 0, 'no provider read');
+    } finally { await srv.close(); }
+  });
+
+  test('a complete holder: the pill and track paint through maskFragment, with no credential resolve and no provider read', async () => {
+    const srv = await shareServer({ holder: holding([issue('LIN-200', 'started')]), loops: [loop('LIN-200')] });
+    try {
+      const body = await (await fetch(`${srv.base}/t/${SHARE_TOKEN}/state`)).json();
+      assert.equal(body.incomplete, undefined);
+      assert.equal(body.status, 'running');
+      assert.match(body.headerHtml, /task-status-pill/);
+      assert.equal(srv.spy.guest, 0);
+      assert.equal(srv.spy.providerCalls, 0);
+    } finally { await srv.close(); }
+  });
+
+  test('N7: a parent with a failed grandchild shares no grandchild identifier on the state reply or the page', async () => {
+    const issues = [issue('LIN-200', 'started'), child('LIN-201', 'LIN-200', 'started'), child('LIN-202', 'LIN-201', 'started')];
+    const loops = [failedLoop('LIN-202', 2)];
+    const ctx = ctxFor(issues, 'LIN-200');
+    const srv = await shareServer({ holder: holding(issues), loops, ctx });
+    try {
+      const state = await (await fetch(`${srv.base}/t/${SHARE_TOKEN}/state`)).text();
+      const page = await (await fetch(`${srv.base}/t/${SHARE_TOKEN}`)).text();
+      assert.match(page, /task-status-pill/, 'the page rendered (so the absence below is not an empty body)');
+      assert.match(state, /task-status-pill/, 'the state reply rendered its pill');
+      assert.doesNotMatch(state, /LIN-202/, 'the state reply names no grandchild');
+      assert.doesNotMatch(page, /LIN-202/, 'the page names no grandchild');
+    } finally { await srv.close(); }
   });
 });

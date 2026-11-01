@@ -56,6 +56,16 @@ function queryValue(value) {
 }
 
 /**
+ * The state poll's `sessions` block (LIN-3833, LIN-4068 D7). The task's own summary, with `action` from the gather and
+ * `busy` widened to a running or queued subtask (the same rollUp the row's action reads), so the opened box holds its
+ * step line back exactly where the row holds its action (LIN-4070, found by the opened-box E2E).
+ */
+function sessionsOfState(model, taskState) {
+  const summary = sessionSummaryOf(model, { container: taskState.container === true });
+  return { ...summary, busy: summary.busy || !!(taskState.running || taskState.queued), action: taskState.action };
+}
+
+/**
  * @param {Object} deps
  * @param {Function} deps.workspaceFromUrl - Workspace resolution middleware.
  * @param {Function} deps.getOpenRouterSource - Footer AI-status source.
@@ -72,12 +82,16 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
   // LIN-4070: the private handlers' only route to the holder. An incomplete read starts the background refresh (the
   // holder's trigger is rate-limited and single-flight), and a read the page's own tracker contradicts drops the stale
   // entry first. Neither is reachable from the loader, which the public guest route shares.
-  // `trackerType` is the page's own tracker read (null on the state poll, which reads no tracker). A task the tracker
-  // says is live and that the set lacks (task-missing) refreshes at once; a hidden (canceled) task does not, as before.
-  const kickTaskFacts = ({ workspace, accountId, result, trackerType = null }) => {
+  // `trackerType` is the page's own tracker read. A task the tracker says is live and that the set lacks (task-missing)
+  // refreshes at once; a hidden (canceled) task does not, as before. The state poll reads no tracker, so it passes no
+  // `trackerType` (undefined) and a task-missing read is urgent there too (LIN-4070 review: the poll alone must start the
+  // one refresh the ticket names). The cost is that a hidden task's open page may refresh once per 60 s attempt floor
+  // rather than once per 2 minutes; the floor and single-flight rules still bound it.
+  const kickTaskFacts = ({ workspace, accountId, result, trackerType = undefined }) => {
     if (!result || !result.incomplete) return;
     if (result.stale && taskFacts) taskFacts.invalidate(workspace.urlKey);
-    const urgent = result.incomplete === 'task-missing' && trackerType !== null && !isHiddenState({ state: { type: trackerType } });
+    const live = trackerType === undefined ? true : trackerType !== null && !isHiddenState({ state: { type: trackerType } });
+    const urgent = result.incomplete === 'task-missing' && live;
     if (refreshTaskFacts) refreshTaskFacts({ urlKey: workspace.urlKey, workspace, accountId, urgent });
   };
 
@@ -209,12 +223,15 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
       // The history facts (count, last, track, strip) are the task's own whole-life read and ride even when the held set is
       // incomplete. The state does not: no `taskState`, no run-offering action, and the reply says why. The browser keeps
       // what it painted and polls on.
+      // LIN-4070 D7 (found by the opened-box E2E): `busy` is the gather's too. A parent whose subtask runs is busy, so the box
+      // holds its step line back; the step line is the one run offer the box paints besides the Go button. A cold reply is
+      // busy as well: no step is offered on a state that is not known (busy hides the step line in the client).
       if (incomplete) {
         return res.json({
           incomplete,
           trackHtml: renderTaskTrack(model, { now: now(), urlKey: workspace.urlKey, runLinks: true }),
           stripHtml: renderStageStrip(model, { now: now() }),
-          sessions: { ...sessionSummaryOf(model), next: null, offered: null, action: null },
+          sessions: { ...sessionSummaryOf(model), next: null, offered: null, busy: true, action: null },
         });
       }
       // LIN-4024: the question card carries an answer box, so only the owner gets one. Whether it shows at all is
@@ -236,7 +253,7 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         stripHtml: renderStageStrip(model, { now: now() }),
         // LIN-3833: the sessions the state block and the run control read (count, last, running). LIN-4068 D7: the
         // action is the gather's (busy includes a running subtree), so it is not recomputed here.
-        sessions: { ...sessionSummaryOf(model, { container: taskState.container === true }), action: taskState.action },
+        sessions: sessionsOfState(model, taskState),
         // LIN-4016: the task's decided state, with its main action (the gather's, LIN-4068).
         taskState,
         // LIN-4024: the question card, for a task waiting on an open ruling only (a parked task has none). The
