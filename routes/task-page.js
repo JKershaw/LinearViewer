@@ -33,6 +33,7 @@ import { renderErrorPage } from '../lib/render.js';
 import { sessionSummaryOf } from '../lib/task-page-loader.js';
 import { rowRecordOf } from '../lib/task-board-view.js';
 import { hasOpenSubtask } from '../lib/task-state.js';
+import { isHiddenState } from '../lib/providers/state-map.js';
 import { renderTaskQuestion } from '../lib/render-task-page.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
 import { resolveIssueBinding, isValidIssueId } from '../lib/workspace.js';
@@ -71,10 +72,13 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
   // LIN-4070: the private handlers' only route to the holder. An incomplete read starts the background refresh (the
   // holder's trigger is rate-limited and single-flight), and a read the page's own tracker contradicts drops the stale
   // entry first. Neither is reachable from the loader, which the public guest route shares.
-  const kickTaskFacts = ({ workspace, accountId, result }) => {
+  // `trackerType` is the page's own tracker read (null on the state poll, which reads no tracker). A task the tracker
+  // says is live and that the set lacks (task-missing) refreshes at once; a hidden (canceled) task does not, as before.
+  const kickTaskFacts = ({ workspace, accountId, result, trackerType = null }) => {
     if (!result || !result.incomplete) return;
     if (result.stale && taskFacts) taskFacts.invalidate(workspace.urlKey);
-    if (refreshTaskFacts) refreshTaskFacts({ urlKey: workspace.urlKey, workspace, accountId });
+    const urgent = result.incomplete === 'task-missing' && trackerType !== null && !isHiddenState({ state: { type: trackerType } });
+    if (refreshTaskFacts) refreshTaskFacts({ urlKey: workspace.urlKey, workspace, accountId, urgent });
   };
 
   // LIN-3975: the chat proposals still pending for this task's runs (the run control stages them). Read for the owner
@@ -131,7 +135,7 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         viewerIsOwner: owner,
         runnerReady: owner && (await requestFeatureFlags(req)).runControls === true,
       });
-      kickTaskFacts({ workspace, accountId: req.session?.accountId ?? null, result });
+      kickTaskFacts({ workspace, accountId: req.session?.accountId ?? null, result, trackerType: result.model?.tracker?.state?.type ?? null });
       if (result.notFound) {
         return res.status(404).send(renderTaskNotFoundPage({ identifier, urlKey: workspace.urlKey }, pageOptions));
       }

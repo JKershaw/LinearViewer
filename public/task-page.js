@@ -38,6 +38,8 @@
   var SLOW_MS = 45000;
   var MAX_BACKOFF_MS = 5 * 60 * 1000;
   var TICK_MS = 1000;
+  // LIN-4070: an incomplete reply means the held set is still landing; the next read comes sooner than the usual cadence.
+  var INCOMPLETE_MS = 1000;
   var OPEN_CLASS = 'sess-run--expanded';
 
   /**
@@ -82,6 +84,7 @@
     var stopped = false;
     var failures = 0;
     var timer = null;
+    var incompleteRetry = false;
 
     function schedule() {
       clearTimer(timer);
@@ -89,6 +92,7 @@
       if (stopped) return;
       var delay = pollDelay(cadenceStatus(current), o.isVisible(), failures);
       if (delay == null) return;
+      if (incompleteRetry) delay = Math.min(delay, INCOMPLETE_MS);
       timer = setTimer(poll, delay);
     }
 
@@ -101,8 +105,10 @@
           failures = 0;
           if (state) {
             // The state endpoint never reports `done` (it can't see the
-            // tracker); keep what the page loaded with otherwise.
-            current = { status: state.status, live: !!state.live };
+            // tracker); keep what the page loaded with otherwise. An incomplete reply carries no status: keep the last
+            // complete one, and read again soon.
+            incompleteRetry = !!state.incomplete;
+            if (!state.incomplete) current = { status: state.status, live: !!state.live };
             o.apply(state);
           }
         }, function (err) {

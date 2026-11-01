@@ -327,3 +327,37 @@ describe('LIN-4070 source scans', () => {
     assert.equal((source.match(/refreshTaskFacts\(/g) || []).length, 1, 'one call site: the shared kick helper');
   });
 });
+
+// ── 7. a live task the held set lacks: the page load refreshes at once; a canceled one never does ──
+
+describe('LIN-4070 — a page load for a task the set lacks refreshes at once when the tracker says it is live', () => {
+  async function pageLoadWith(trackerType) {
+    const issues = [issue('LIN-180', 'started')];
+    const holder = holding(issues);
+    const ctx = ctxFor([issue('LIN-181', trackerType)], 'LIN-181');
+    const refreshed = [];
+    const router = createTaskPageRoutes({
+      workspaceFromUrl: (req, res, next) => next(), getOpenRouterSource: () => 'env', getDeployInfo: () => ({}),
+      loader: loaderOver({ loops: [], holder }), workspaceOwnerCheck: async () => ({ status: 'owner' }), taskFacts: holder,
+      refreshTaskFacts: (args) => { refreshed.push(args.urlKey === URL_KEY ? args.urgent : null); return { started: true, reason: 'started' }; },
+      now: () => NOW,
+    });
+    const access = providerAnswering(ctx);
+    const layer = router.stack.find((l) => l.route?.path === '/workspace/:urlKey/task/:identifier' && l.route.methods.get);
+    const req = {
+      session: { workspaces: [], features: {}, accountId: 'acct-1' }, workspace: { urlKey: URL_KEY, id: 'ws-1', provider: access.provider.name, accessToken: 't' },
+      params: { urlKey: URL_KEY, identifier: 'LIN-181' }, query: {}, get: () => 'localhost',
+    };
+    const res = { statusCode: 200, body: null, status(c) { this.statusCode = c; return this; }, send(b) { this.body = b; return this; }, set() { return this; } };
+    await layer.route.stack[layer.route.stack.length - 1].handle(req, res, (err) => { if (err) throw err; });
+    return refreshed;
+  }
+
+  test('a started task missing from a fresh set: one refresh, started at once (urgent)', async () => {
+    assert.deepEqual(await pageLoadWith('started'), [true]);
+  });
+
+  test('a canceled task missing from the set: no urgent refresh (it is never in the set)', async () => {
+    assert.deepEqual(await pageLoadWith('canceled'), [false]);
+  });
+});
