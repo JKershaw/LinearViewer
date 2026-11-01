@@ -72,7 +72,7 @@ describe('createPoller', () => {
   const { createPoller } = load();
   const STATE_URL = '/workspace/acme/api/task/LIN-50/state?issueId=abc';
 
-  function makePoller({ responses, visible = { value: true }, initial = { status: 'running', live: true }, onGone = null }) {
+  function makePoller({ responses, visible = { value: true }, initial = { status: 'running', live: true }, onGone = null, unsettled = false }) {
     const timers = makeTimers();
     const urls = [];
     const applied = [];
@@ -89,6 +89,7 @@ describe('createPoller', () => {
       isVisible: () => visible.value,
       initial,
       onGone,
+      unsettled,
       setTimer: timers.setTimer,
       clearTimer: timers.clearTimer,
     });
@@ -151,6 +152,38 @@ describe('createPoller', () => {
     const { poller, timers } = makePoller({ responses: [], initial: { status: 'done', live: false } });
     poller.start();
     assert.equal(timers.pending.size, 0);
+  });
+
+  // LIN-4071 review ledger (M6): a provisional first render (`data-settled="false"`) reads again soon, then falls back.
+  test('an unsettled page polls at the incomplete cadence (1 s), not the idle 45 s', () => {
+    const { poller, timers } = makePoller({ responses: [], initial: { status: 'idle', live: false }, unsettled: true });
+    poller.start();
+    assert.deepEqual(timers.delays(), [1000]);
+  });
+
+  test('a settled idle page keeps the 45 s cadence (the unsettled flag is what speeds it up)', () => {
+    const { poller, timers } = makePoller({ responses: [], initial: { status: 'idle', live: false }, unsettled: false });
+    poller.start();
+    assert.deepEqual(timers.delays(), [45000]);
+  });
+
+  test('an unsettled page falls back to the normal cadence after 15 incomplete replies', async () => {
+    const incomplete = Array.from({ length: 15 }, () => ({ incomplete: true }));
+    const { poller, timers } = makePoller({ responses: incomplete, initial: { status: 'idle', live: false }, unsettled: true });
+    poller.start();
+    for (let i = 0; i < 14; i++) {
+      await timers.fireAll();
+      assert.deepEqual(timers.delays(), [1000], `still fast after ${i + 1} incomplete replies`);
+    }
+    await timers.fireAll();
+    assert.deepEqual(timers.delays(), [45000], 'the 15th incomplete reply returns the loop to the idle cadence');
+  });
+
+  test('a complete reply ends the fast poll of an unsettled page', async () => {
+    const { poller, timers } = makePoller({ responses: [{ status: 'waiting', live: false }], initial: { status: 'idle', live: false }, unsettled: true });
+    poller.start();
+    await timers.fireAll();
+    assert.deepEqual(timers.delays(), [45000]);
   });
 
   test('an in-flight poll is not doubled', async () => {

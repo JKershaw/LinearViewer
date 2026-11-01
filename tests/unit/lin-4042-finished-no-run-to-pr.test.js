@@ -62,6 +62,7 @@ function makeContainer() {
     contains() { return true; },
     addEventListener(type, fn) { (listeners[type] = listeners[type] || []).push(fn); },
     removeEventListener() {},
+    listenersFor(type) { return listeners[type] || []; },
     async fire(type, target) {
       const el = { dataset: {}, closest: () => null, ...target };
       for (const fn of listeners[type] || []) await fn({ target: el });
@@ -211,5 +212,60 @@ describe('LIN-4042 — a finished task on Home offers no run', () => {
     const html = await paint(stateWith({ action: NO_RUN }), { row: DONE_ROW() });
     assert.doesNotMatch(html, /data-action="go"/);
     assert.doesNotMatch(html, /Run to PR/);
+  });
+});
+
+// LIN-4071 review ledger (M10, M5): the step guard now reads the gatherer's `action` (`container`, `kind: 'none'`), not the
+// retired row fields, so the new consumer needs its own witness. A step is "chosen for this run" by picking one in
+// Another step (`run-pick`); a container or a finished task must still offer no stage step for it.
+describe('LIN-4071 — runStepOfState offers no stage step for a container or a finished task, whatever step was chosen', () => {
+  const CONTAINER_ACTION = { kind: 'run-to-pr', why: 'a container runs to PR', container: true };
+
+  async function paintAndPick(stateBody, opts) {
+    const PromptSection = loadClient({ stateBody });
+    const c = makeContainer();
+    PromptSection.init(c, { ...HOME, ...opts });
+    await flush(); await flush(); await flush();
+    const btn = { dataset: { action: 'run-pick', kind: 'plan', label: 'Plan' }, disabled: false, textContent: '', classList: { add() {}, remove() {} }, closest: (sel) => (/^button/.test(sel) ? btn : null) };
+    for (const fn of c.listenersFor('click')) await fn({ target: btn });
+    await flush(); await flush(); await flush();
+    return c.innerHTML;
+  }
+
+  test('control: a leaf whose action is Run to PR does take the chosen step (the pick reaches the step line and Go)', async () => {
+    const html = await paintAndPick(stateWith({ action: RUN_TO_PR }), { row: rowRecordOf({ stateType: 'started' }) });
+    assert.match(html, /opened-task-step-name[^>]*>Plan</, 'the chosen stage step is the step line');
+    assert.match(html, /data-action="run-step-next"[^>]*>Run Plan</, 'and Go runs it');
+  });
+
+  test('a container (action.container) with a step chosen for this run paints no stage step; Go runs Run to PR', async () => {
+    const html = await paintAndPick(stateWith({ action: CONTAINER_ACTION, offered: PLAN_OFFER }), { row: { ...rowRecordOf({ stateType: 'started' }), action: CONTAINER_ACTION } });
+    assert.doesNotMatch(html, /opened-task-step-name[^>]*>Plan</, 'no stage step line for a container');
+    assert.doesNotMatch(html, /data-action="run-step-next"/, 'Go is not the stage step');
+    assert.match(html, /data-action="go"[^>]*>Run to PR</, 'Go runs Run to PR');
+  });
+
+  test('a finished task (action.kind none) with a step chosen paints no stage step line and no Go', async () => {
+    const html = await paintAndPick(stateWith({ action: NO_RUN, offered: PLAN_OFFER }), { row: DONE_ROW() });
+    assert.doesNotMatch(html, /data-testid="opened-task-step"/, 'the step line is empty');
+    assert.doesNotMatch(html, /data-action="run-step-next"/);
+    assert.doesNotMatch(html, /data-action="go"/);
+  });
+
+  // M5: on the task page the run slot has no early return for a finished task (that one is Home's), so the `kind: 'none'`
+  // check in `runStepOfState` is what keeps a chosen step from becoming a "Run Plan" button on a finished task.
+  test('task page: a finished task (action.kind none) with a step chosen offers no stage step and no Go', async () => {
+    const html = await paintAndPick(stateWith({ action: NO_RUN, offered: PLAN_OFFER }), { surface: 'task', row: DONE_ROW() });
+    assert.doesNotMatch(html, /data-action="run-step-next"/, 'no Run Plan on a finished task');
+    assert.doesNotMatch(html, /data-action="go"/);
+    assert.doesNotMatch(html, /opened-task-step-name[^>]*>Plan</, 'the chosen step is not the step line');
+  });
+
+  test('before the first /state reply, a container row record alone offers no stage step', async () => {
+    const PromptSection = loadClient({ stateBody: new Promise(() => {}) });
+    const c = makeContainer();
+    PromptSection.init(c, { ...HOME, row: { ...rowRecordOf({ stateType: 'started' }), action: CONTAINER_ACTION } });
+    await flush();
+    assert.doesNotMatch(c.innerHTML, /data-action="run-step-next"/);
   });
 });

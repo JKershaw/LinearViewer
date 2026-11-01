@@ -252,6 +252,35 @@ describe('LIN-4010 — Home\'s state is one line, with no "Harbour:" label', () 
     const model = { status: 'idle', sentence: 'No sessions yet.', sentenceAt: null, sessions: [], waitingFor: null };
     assert.equal(renderHomeStatus(model, { now: NOW, taskState: taskStateOf({}) }), '');
   });
+
+  // LIN-4071 review ledger (M11): the parent's own idle line is withheld by the server when a subtask line (`attention`) is
+  // set, and only then. This rule moved from the browser to `renderHomeStatus` in LIN-4071.
+  describe('the parent\'s own idle line is withheld when a subtask needs attention (LIN-4024 / LIN-4071)', () => {
+    const idleParent = (over = {}) => ({
+      status: 'idle', sentence: 'No session running. Last: Plan done just now.', sentenceAt: '2026-10-29T10:03:00.000Z',
+      sessions: [{ kind: 'plan', state: 'done' }], waitingFor: null, ...over,
+    });
+    const attention = { identifier: 'LIN-2', words: 'needs you' };
+    const withAttention = { state: 'next', attention };
+
+    test('own idle (no wait, not finished, no failed stage) with an attention line: nothing, the subtask line says it once', () => {
+      assert.equal(renderHomeStatus(idleParent(), { now: NOW, taskState: withAttention }), '');
+    });
+
+    test('control: the same parent with no attention paints its idle pill', () => {
+      assert.match(renderHomeStatus(idleParent(), { now: NOW, taskState: { state: 'next', attention: null } }), /data-testid="home-task-status-pill"[^>]*>.*idle/s);
+    });
+
+    test('a failed stage of its own still paints, beside the attention line', () => {
+      const html = renderHomeStatus(idleParent({ nextStep: { failed: true } }), { now: NOW, taskState: withAttention });
+      assert.match(html, /data-testid="home-task-status-pill"/);
+    });
+
+    test('a wait of its own still paints, beside the attention line', () => {
+      const html = renderHomeStatus(idleParent({ waitingFor: { kind: 'ruling' } }), { now: NOW, taskState: withAttention });
+      assert.match(html, /data-testid="home-task-status-pill"/);
+    });
+  });
 });
 
 // ─── a new user's Home ───────────────────────────────────────────────────────
