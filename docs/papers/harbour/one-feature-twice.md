@@ -11,7 +11,7 @@ sources: [docs/reviews/lin-4085-ab-run-2026-11-01.md, docs/reviews/_evidence-202
 
 # One feature, built twice
 
-Harbour was built to make AI agents capable. With today's agents, its more useful job is to make them accountable. On 1 November one feature was built twice, once by a single fast session and once by Harbour's own pipeline, and the two results bear out both halves of that sentence. The fast session built the better feature. It also pushed, as finished work, a flaw that a cheap independent review caught.
+Harbour was built to make AI agents capable. With today's agents, its more useful job is to make them accountable. On 1 November one feature was built twice, once by a single fast session and once by Harbour's own pipeline, and the two results bear out both halves of that sentence. The fast session built the better feature. It also left in a flaw of exactly the kind Harbour's four-minute independent review is there to catch, and a fresh reviewer found it.
 
 ## The moment
 
@@ -21,7 +21,7 @@ He spoke the idea into a Claude Code session meant only for talking it through. 
 
 His first thought was to merge it. His second was that he shouldn't, since it hadn't been through the process Harbour uses for work like this. His third was that it had taken minutes where he expected hours. So he gave Harbour the same words, as a feedback item, set its autopilot going and asked for a comparison.
 
-Some Harbour terms first. Harbour takes a ticket from the team's tracker and runs it to a merged, checked change, and it does that in stages. Each stage is a fresh AI session that reads the ticket and does one job, and the stages run in order. Triage files the ticket. Scoping turns the request into the brief the rest of the run works from. A blocked check asks whether anything needs a person before work goes on. The plan is written, and then plan-review, a second reader, checks it before anyone builds. Implementation builds the change and opens a pull request, which is a proposed change to the code. Review reads that change. Close-out fixes what review asked for, merges, and checks production. Autopilot is the mode in which Harbour runs all of this without a person at each step. When a stage cannot settle a question alone, it raises a ruling, a question for a person whose answer is recorded.
+Some Harbour terms first. Harbour takes a ticket from the team's tracker and runs it to a merged, checked change, and it does that in stages. Each stage is a fresh AI session that reads the ticket and does one job, and the stages run in order. Scoping turns the request into the brief the rest of the run works from. The plan is written, and then plan-review, a second reader, checks it before anyone builds. Implementation builds the change and opens a pull request, which is a proposed change to the code. Review reads that change. Close-out fixes what review asked for, merges, and checks production. Autopilot is the mode in which Harbour runs all of this without a person at each step. When a stage cannot settle a question alone, it raises a ruling, a question for a person whose answer is recorded.
 
 ## Two runs, one request
 
@@ -49,7 +49,7 @@ Harbour's guide came out thin, and the record shows how. The request asked for "
 
 ![The request as it narrowed at each stage of the LIN-4085 run, from the request's own words to review's verdict](figures/one-feature-twice/request-narrowing.svg)
 
-Each stage did its job well against what its ticket said. The intent was lost at the first handoff, and no later stage had the request's own words to check against, because every stage read the narrower ticket. The guide also made three misleading claims, one of them about when a key is needed. It said writing prompts needed a paid model key when the free tier was off, though the template prompts need no AI at all [2].
+Each stage did its job well against what its ticket said. The intent was lost at the first handoff. The request's own words stayed on the ticket, but every later stage checked against scoping's brief and the plan, because that is what each stage is set up to check against. Nothing pointed a judge back at the original. The guide also made three misleading claims, one of them about when a key is needed. It said writing prompts needed a paid model key when the free tier was off, though the template prompts need no AI at all [2].
 
 Harbour's own research points the same way. The held-or-fresh paper studied supervisors, the sessions that watch over a task. It found that no sampled decision rested on a fact that only a session's memory held, and that a fresh step saved money when it read a small, good handoff [5]. Here the handoff was the problem. This is a record problem more than a memory problem. The paper did not study builders, and it did not study requests narrowed at scoping, so here the pattern is plausible rather than proved.
 
@@ -57,7 +57,9 @@ The first fix is cheap. Keep the request as filed on the ticket, give it to ever
 
 ## The idea
 
-Harbour's stages do two jobs that come bundled together. The first is making an agent capable. That means splitting a task into research, plan and build, each a fresh session that does one part well. The second is making it accountable, which means independent judges, rulings, landing with production checks, and a record of every run. The August review of Harbour's lanes, which are long single sessions that work through many tickets, put the tension this way. Harbour's process had been "two layers welded together", judgment on one side and delivery machinery on the other [6].
+John's question at this point was whether a smart agent could simply be faster and better than Harbour, or whether this was an efficiency problem in the pipeline that could be fixed more easily. The answer is both, seen from two sides. The efficiency problem is the capability half of the pipeline, the half a strong agent no longer needs.
+
+Harbour's stages do two jobs that come bundled together. The first is making an agent capable. That means splitting a task into research, plan and build, each a fresh session that does one part well. The second is making it accountable, which means independent judges, rulings, landing with production checks, and a record of every run. The August review of Harbour's lanes, which are long single sessions that work through many tickets, found a related split. Harbour's process had been "two layers welded together", judgment (templates, ledger, checks) on one side and delivery machinery (dispatch, queue, prompts) on the other [6]. That line falls in a slightly different place from the one in this essay, and both point at the bundle as the problem.
 
 With today's agents the first job costs more than it gives. Splitting is what lost the intent in this run, and every hop paid again for orientation. Each worker is a fresh session with no memory of the last [7]. That makes its judgment independent, and it also makes it start cold. In an earlier Harbour sample, about a quarter of a session's weighted tokens went before its first productive call, and more than half of what sessions read while orienting was something an earlier session on the same ticket had already read [8].
 
@@ -65,22 +67,22 @@ The second job still pays. A strong agent working alone built the better product
 
 Harbour already has a shape for one warm session. The stepper drives one session through three to six ordered beats, the parts of one task, and judges each beat before it moves on. It never chains into review, so that review stays a separate session that has not seen the building [9]. The record names the shape it would need *spine and branches*. One builder stays warm from research to fixes, keeping the things records rarely hold, such as dead ends, approaches already ruled out, and a feel for the code. Fresh judges branch off at the gates, after the plan and on the pull request, each given the original request. Judges report and do not converse. Harbour lands the work [1].
 
+John described the same shape as two ideas. One is to save the task's information better. The other is to hold the task in one continuous session that works almost like a cache over the record. The second depends on the first. If the warm session dies, a fresh one has to pick up from the record, so the record has to be complete either way. That is why fixing the record comes first and stands alone [1].
+
 This shape is a proposal and has not been tried. It costs more per step as its history grows, it can keep beliefs the code no longer supports, and it drops one cross-check, a fresh builder distrusting the plan. It is as safe as today's pipeline only if the judges stay fresh and their verdict, not the builder's, decides whether work lands [1].
 
 ## What it means
 
-Building is becoming a commodity, and every vendor's agent is getting better at it. Independence is structural. A model reviewing its own work is still self-review, however good the model is. Verification cost is the gate that Harbour's own ladder has not moved since March [10].
+Building is becoming a commodity, and every vendor's agent is getting better at it. Independence is structural. A model reviewing its own work is still self-review, however good the model is. Harbour's own adoption ladder names verification cost as the gate holding agents back, unchanged since March [10].
 
 So Harbour's value shifts from helping agents do the work toward making their work trustworthy. That means keeping the intent intact, judging independently, landing with proof, measuring across runs, and, as a proposal, accepting work from any builder. The landing page already says it, in the words "keep human intent in command of AI execution" [11]. What would shrink under this reading is the splitting of production across fresh sessions, much of the scaffolding around building prompts, and the number of sessions a single ticket needs.
 
 ## What we don't know yet
 
-- The comparison rests on one task and one blind reviewer, with partial blinding [1][2]. The fast session had John's words and no ticket to read, while Harbour's stages read the ticket as it changed, so the two runs did not start from identical inputs either.
+- Whether the result holds beyond one task and one blind reviewer, with partial blinding, and whether vendors will build independent review into their own agents [1][2]. The fast session had John's words and no ticket to read, while Harbour's stages read the ticket as it changed, so the two runs did not start from identical inputs either.
 - Harbour's cost is an estimate. Stage costs were not measured, and fixing stage cost reporting is an engineering job rather than a question for a paper [1].
-- The fast session's own record puts its guide at about 3,000 words. The count is 3,727, and the essay uses the count [12].
 - Whether the thin guide would have been caught with the original request attached has not been tested. It is the cheapest test of whether the miss was in the record or in the judge.
 - In a replay, a lean pipeline cost a tenth to a twentieth of the full one, and it matched the full one only with hindsight [13]. In Harbour's own backtest of a lighter path for small, low-risk changes, very little escaped the light groups. The full process still caught faults on changes whose paths looked safe, most of them at plan review [14].
-- Vendors may build review into their own agents. This rests on one task and one reviewer, and nothing here shows it holds beyond them.
 
 ## Next
 
@@ -101,7 +103,7 @@ So Harbour's value shifts from helping agents do the work toward making their wo
 7. **The operating manual.** `docs/autopilot-operating-manual-v2.md@27ae64ad:27`. Supports the statement that each worker is a fresh session with no memory of the last. It describes the design. It is not evidence that the design is the best one.
 8. **Starting context.** `docs/papers/harbour/starting-context.md@27ae64ad:30, 33`. Supports the orientation share and the re-finding figure. The orientation share depends on how it is defined, and the sample covers sessions from 31 August to 30 September in both repositories.
 9. **The stepper.** `docs/autopilot-kickoff.md@27ae64ad:276, 292, 311`. Supports the description of one warm session through three to six beats, each judged before the next, and the rule that it does not chain into review. It describes the mechanism and reports no results.
-10. **Where Harbour joins.** `docs/papers/harbour/where-harbour-joins.md@27ae64ad:26`. Supports the statement that verification cost has held at the same rung since 31 March 2026. It is a judgment about one rung, not a measurement of verification cost.
+10. **Where Harbour joins.** `docs/papers/harbour/where-harbour-joins.md@27ae64ad:26`. Supports the statement that the ladder names verification cost as the gate, unchanged since 31 March 2026. It is a judgment about one rung, not a measurement of verification cost.
 11. **The landing page.** `lib/render-landing.js@27ae64ad:334`. Supports the landing title quoted in the essay. A title states a purpose. It does not show what the page does to its readers.
 12. **The fast session's own run record.** [docs/reviews/_evidence-2026-11-01-lin4085/fast-run-record.md](../../reviews/_evidence-2026-11-01-lin4085/fast-run-record.md), verbatim. Supports the session's own account of its run, including the push that came before its own check finished. Its estimate of the guide length, about 3,000 words, is lower than the 3,727 words counted from the commit.
 13. **Replay of a lean pipeline.** `docs/papers/harbour/replay-small-work.md@27ae64ad:27-28`. Supports the tenth-to-a-twentieth cost figure, and the point that the lean pipeline matched only with hindsight. It establishes no correctness result. It is one replay.
