@@ -1,6 +1,6 @@
 # Harbour
 
-> A minimal web app that displays your task tracker's projects and issues as a collapsible tree with a CLI aesthetic. Backed by Linear, GitHub, GitHub Projects, Jira, or a local store.
+> Harbour (harbour.cat) keeps human intent in command of AI execution: a control plane for coding agents that reads your backlog (Linear, GitHub Issues, GitHub Projects, Jira, or a local store), turns the next task into a grounded prompt, dispatches it to an AI agent, and verifies the work landed on real evidence — CI, merges, diffs — not the agent's say-so. Its views include a collapsible issue tree with a CLI aesthetic, described below. Not the CNCF Harbor container registry.
 
 ## Library
 
