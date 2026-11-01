@@ -124,6 +124,7 @@ describe('every link the guide gives resolves to a real route', () => {
     '/auth/github': { file: 'routes/github-auth.js', needle: "basePath: '/auth/github'" },
     '/auth/jira/oauth': { file: 'routes/jira-auth.js', needle: "router.get('/auth/jira/oauth'" },
     '/auth/email': { file: 'routes/email-auth.js', needle: "router.get('/auth/email'" },
+    '/auth/openrouter': { file: 'routes/openrouter-auth.js', needle: "router.get('/auth/openrouter'" },
     '/workspace/<urlKey>/proxy': { file: 'server.js', needle: "app.get('/workspace/:urlKey/proxy'" },
     '/workspace/<urlKey>/runner': { file: 'routes/runner-setup.js', needle: "router.get('/workspace/:urlKey/runner'" },
     '/api/proxy/instructions': { file: 'routes/proxy.js', needle: "router.get('/api/proxy/instructions'" },
@@ -137,12 +138,16 @@ describe('every link the guide gives resolves to a real route', () => {
     return [...out];
   };
 
-  test('each same-origin link is a known route; cross-origin links are none', () => {
+  // The one deliberate external link: the repository's README, for self-hosting.
+  const EXTERNAL = new Set(['https://github.com/JKershaw/LinearViewer']);
+
+  test('each same-origin link is a known route; the only external link is the README', () => {
     const guide = buildAgentOnboarding({ baseUrl: BASE, doors: doorsFor(FLAG_COMBOS[7]), freeTierEnabled: true });
     const links = linksIn(guide);
     assert.ok(links.length > 0, 'the guide has links');
     const paths = new Set();
     for (const link of links) {
+      if (EXTERNAL.has(link)) continue;
       assert.ok(link === BASE || link.startsWith(`${BASE}/`), `a link leaves the deployment origin: ${link}`);
       const path = new URL(link.replace('<urlKey>', 'k')).pathname;
       paths.add(path.replace('/workspace/k/', '/workspace/<urlKey>/'));

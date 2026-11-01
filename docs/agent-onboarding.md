@@ -59,17 +59,22 @@ workspace opens for them. Do not create it for them with an HTTP request. A
 workspace made that way belongs to your cookie jar, and the person will not see
 it in their browser.
 
-Once the person has a local workspace, ask them to open its Proxy page and copy
-the Agent Prompt there, then follow that prompt for the workspace API.
+Once the person has a local workspace, ask them to open its Proxy page,
+`{{BASE_URL}}/workspace/<urlKey>/proxy`, and copy the Agent Prompt there. That
+prompt carries its own token for this workspace. Follow it as it says, under the
+same rules as in path (b).
 
-### (b) A real tracker: use this when the person has one
+### (b) A real tracker: use this when a door below matches the person's tracker
 
-1. The person signs in through one of the doors below. Sign-in is a browser step
-   only the person can complete.
+1. The person signs in through the door for their tracker. Sign-in is a browser
+   step only the person can complete. If no door below fits their tracker, use
+   path (a) and say so to the person.
 2. After sign-in, ask the person to open their workspace's Proxy page,
    `{{BASE_URL}}/workspace/<urlKey>/proxy` (the workspace key is in the address
-   bar once they are signed in), and copy the Agent Prompt there. That prompt
-   carries a token. Use the token only as the prompt tells you.
+   bar once they are signed in), and copy the Agent Prompt there. That prompt is
+   written for you, and it carries a token. Follow it as it says. Treat the token
+   as a secret: do not repeat it in your replies, and do not write it to a file,
+   a log or a commit.
 
 Sign-in doors on this deployment:
 
@@ -85,7 +90,8 @@ yourself.
 ## What only the person can do
 
 - Sign in (OAuth) through any of the doors above.
-- Add an OpenRouter key where prompts need one. {{FREE_TIER_SENTENCE}}
+- Connect an OpenRouter key where prompts need one. The person does this on the
+  Settings page, through the connect link `{{BASE_URL}}/auth/openrouter`. {{FREE_TIER_SENTENCE}}
 - Mint the owner runner key on the runner setup page.
 
 No endpoint exists for these steps, so do not look for one or work around them.
@@ -95,4 +101,4 @@ No endpoint exists for these steps, so do not look for one or work around them.
 - {{BASE_URL}}/llms.txt: navigation and page structure
 - {{BASE_URL}}/api/proxy/instructions: the workspace API catalog (needs a token)
 - {{BASE_URL}}/library: the papers and essays behind Harbour
-- Self-hosting: the README in the Harbour repository. This guide does not cover it.
+- Self-hosting: the README at https://github.com/JKershaw/LinearViewer. This guide does not cover it.
