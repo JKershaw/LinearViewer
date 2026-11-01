@@ -61,7 +61,7 @@ describe('LIN-3991 — every Home state sentence reads relative, with no UTC sta
 describe('LIN-3991 — sentenceAt is the moment the sentence names', () => {
   test('a done task names its finish', () => {
     const header = deriveHeader({ sessions: [], tracker: { state: { name: 'Done', type: 'completed' }, finishedAt: '2026-10-25T11:00:00.000Z' }, waiting: noWait, now: NOW });
-    assert.deepEqual(header, { status: 'done', sentence: 'Finished 3 hours ago.', sentenceAt: '2026-10-25T11:00:00.000Z' });
+    assert.deepEqual(header, { sentence: 'Finished 3 hours ago.', sentenceAt: '2026-10-25T11:00:00.000Z' });
   });
 
   test('a running stage names the latest attempt\'s start, not the first dispatch (LIN-3498)', () => {
@@ -85,12 +85,12 @@ describe('LIN-3991 — sentenceAt is the moment the sentence names', () => {
 
 describe('LIN-3991 — the page renders the exact time after the sentence, zoned, inside its paragraph (LIN-4009)', () => {
   test('a sentence with a moment carries a zoned time element after it', () => {
-    const html = renderTaskStatus({ status: 'failed', sentence: 'Review failed 30 minutes ago', sentenceAt: '2026-10-25T13:30:00.000Z' }, { now: NOW });
+    const html = renderTaskStatus({ sentence: 'Review failed 30 minutes ago', sentenceAt: '2026-10-25T13:30:00.000Z' }, { now: NOW, taskState: { state: 'failed' } });
     assert.match(html, /<p class="task-sentence" data-testid="task-page-sentence">Review failed 30 minutes ago<span class="task-sentence-sep" aria-hidden="true"> · <\/span><time class="task-sentence-at" data-testid="task-page-sentence-at" datetime="2026-10-25T13:30:00\.000Z" data-local-time="zoned">25 Oct, 13:30 UTC<\/time><\/p>/);
   });
 
   test('a sentence with no moment renders no time element', () => {
-    const html = renderTaskStatus({ status: 'waiting', sentence: 'Approved. PR #41 is ready to merge.', sentenceAt: null }, { now: NOW });
+    const html = renderTaskStatus({ sentence: 'Approved. PR #41 is ready to merge.', sentenceAt: null }, { now: NOW, taskState: { state: 'needs-you' } });
     assert.doesNotMatch(html, /task-sentence-at/);
   });
 });

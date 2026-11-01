@@ -79,9 +79,10 @@ describe('LIN-4016 W2 — a parent whose subtask\'s Build failed', () => {
       identifier: 'LIN-C9', title: 'Title LIN-C9', state: 'failed', lead: 'A subtask failed', detail: ' · Build failed',
       words: 'A subtask failed: LIN-C9 · Build failed',
     });
+    // LIN-4071: the attention line is the gather's (`/state` sends it); the Home row record no longer carries it.
     const byKey = rowDataByNodeKey({ urlKey: 'acme', inProgressTrees: [{ roots: [parent] }], rowStates: s });
-    assert.equal(byKey[nodeKey(parent.issue)].attention.words, 'A subtask failed: LIN-C9 · Build failed');
-    assert.doesNotMatch(byKey[nodeKey(parent.issue)].attention.words, /needs you/);
+    assert.equal('attention' in byKey[nodeKey(parent.issue)], false, 'the record carries no subtask line');
+    assert.doesNotMatch(s.get('LIN-P1').attention.words, /needs you/);
   });
 
   test('a child that needs you is named as needing you, not as failed', () => {

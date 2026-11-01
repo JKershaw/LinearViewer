@@ -366,8 +366,8 @@ describe('LIN-3975 — the next-step line says what the page offers, in plain wo
     assert.match(renderNextLine(model()), />Plan comes next\.</);
     assert.match(renderNextLine(model({ nextStep: { kind: 'implementation', label: 'Build', why: 'again', failed: false } })), />Build was cancelled, so it comes next again\.</);
     assert.match(renderNextLine(model({ nextStep: { kind: 'review', label: 'Review', why: 'again', failed: true } })), />Review failed, so it comes next, to run again\.</);
-    assert.match(renderNextLine(model({ nextStep: null, status: 'waiting' })), />Nothing comes next until the question above is answered\./);
-    assert.match(renderNextLine(model({ nextStep: null, status: 'running' })), />A step is running, so nothing else is offered yet\./);
+    assert.match(renderNextLine(model({ nextStep: null, waitingFor: 'ruling' }), { taskState: { state: 'needs-you' } }), />Nothing comes next until the question above is answered\./);
+    assert.match(renderNextLine(model({ nextStep: null }), { taskState: { state: 'running' } }), />A step is running, so nothing else is offered yet\./);
     assert.match(renderNextLine(model({ finished: true, nextStep: null })), />Nothing comes next: this task is finished\./);
   });
 });

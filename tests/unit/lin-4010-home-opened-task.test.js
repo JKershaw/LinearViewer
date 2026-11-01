@@ -124,13 +124,13 @@ describe('LIN-4010 — Plan review is a usual stage, after Plan', () => {
 describe('LIN-4010 — a waiting task is a ruling or a park', () => {
   test('a waiting session with an open ruling is "ruling"', () => {
     const model = buildTaskPageModel({ identifier: 'LIN-60', loops: [rulingLoop({ issueIdentifier: 'LIN-60' })], ctx: null, enrichLoop, deriveSessionWaiting, now: NOW });
-    assert.equal(model.status, 'waiting');
+    assert.equal(stateOf(model).state, 'needs-you', 'the gathered state is the wait');
     assert.equal(model.waitingFor, 'ruling');
   });
 
   test('a waiting session with no structured question is "parked"', () => {
     const model = buildTaskPageModel({ identifier: 'LIN-61', loops: [parkLoop({ issueIdentifier: 'LIN-61' })], ctx: null, enrichLoop, deriveSessionWaiting, now: NOW });
-    assert.equal(model.status, 'waiting');
+    assert.equal(stateOf(model).state, 'parked', 'the gathered state is the park');
     assert.equal(model.waitingFor, 'parked');
   });
 
@@ -434,12 +434,17 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
 
   // LIN-4024 (item 9): a parent whose subtask needs you says that once. Its own idle line is its own loops only, so beside
   // "A subtask needs you" it said the task two ways while the row said needs you.
-  test('a container whose subtask needs you states that, and not its own idle line', async () => {
+  // LIN-4071: the subtask line is `/state`'s `attention`; the parent's own idle line is the server's to leave out (it sends
+  // no `homeStatusHtml` for an otherwise idle parent whose subtask needs attention), so the browser paints what it is sent.
+  test('a container whose subtask needs you states that from /state\'s attention, and paints no own line the server withheld', async () => {
     const { PromptSection } = loadClient({
-      stateBody: { status: 'idle', live: false, homeStatusHtml: '<p>OWN-IDLE-LINE</p>', sessions: PLAN_NEXT },
+      stateBody: {
+        status: 'idle', live: false, homeStatusHtml: '', sessions: PLAN_NEXT,
+        attention: { identifier: 'LIN-99', title: 'Models rows', state: 'needs-you', lead: 'A subtask needs you', detail: '', words: 'A subtask needs you: LIN-99' },
+      },
     });
     const c = makeContainer();
-    PromptSection.init(c, { ...HOME, row: serverRow({ container: true, attention: { identifier: 'LIN-99', title: 'Models rows', href: '/workspace/acme/task/LIN-99', state: 'needs-you', lead: 'A subtask needs you', detail: '' } }) });
+    PromptSection.init(c, { ...HOME, row: serverRow({ container: true }) });
     await flush(); await flush();
     assert.match(c.innerHTML, /data-testid="opened-task-needs-you">A subtask needs you: <span class="opened-task-needs-you-name">LIN-99 Models rows/);
     assert.equal(c.innerHTML.includes('OWN-IDLE-LINE'), false, 'the parent\'s own idle line is not shown beside it');

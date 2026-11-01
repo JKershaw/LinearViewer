@@ -181,7 +181,8 @@ describe('LIN-4016 W4 — the run control paints the server\'s decision', () => 
     const node = (identifier, children = []) => ({ issue: { id: `id-${identifier}`, identifier, title: identifier, source: 'linear', state: { name: 'started', type: 'started' } }, children });
     const parent = node('LIN-P', [node('LIN-C')]);
     const byKey = rowDataByNodeKey({ urlKey: 'acme', inProgressTrees: [{ roots: [parent] }], rowStates: new Map() });
-    assert.equal(byKey[nodeKey(parent.issue)].container, true);
+    // LIN-4071: the record carries the gatherer's action and copy words; the container fact is the gather's (LIN-4039 pins it).
+    assert.ok('action' in byKey[nodeKey(parent.issue)], 'the record carries the action field');
     assert.equal(Object.keys(byKey).length, 2, 'a record for every row, leaves included');
   });
 });
@@ -197,24 +198,25 @@ describe('LIN-4016 — the opened task agrees with its row (finished, and a fail
     const { body } = await stateBodyOf({ issues: [stateIssue('LIN-42', 'completed')], loops: [failedStageLoop('LIN-42')], identifier: 'LIN-42' });
     assert.match(body.homeStatusHtml, /status-pill--done/, 'the server words a finished task done (LIN-4070 D2)');
     assert.doesNotMatch(body.homeStatusHtml, /status-pill--error/);
-    assert.equal(body.sessions.action, null, 'a finished task offers no action (LIN-4042)');
-    const row = rowRecordOf({ stateType: 'completed', decided: { state: 'done', words: 'done' } });
+    assert.equal(body.sessions.action.kind, 'none', 'a finished task offers no action (LIN-4042): the no-run decision');
+    const row = rowRecordOf({ stateType: 'completed', decided: { action: body.sessions.action } });
     const html = await paint(body, { row });
     assert.match(html, /status-pill--done task-status-pill" data-testid="home-task-status-pill"><span class="status-pill__dot" aria-hidden="true"><\/span>done</);
     assert.doesNotMatch(html, /status-pill--error/, 'no failed pill beside a done row');
     assert.doesNotMatch(html, /data-action="run-step-next"/, 'a finished task offers no stage step');
   });
 
-  test('a finished row with no decided word keeps /state\'s own line (the record carries the row word only when the tracker decides it)', async () => {
+  test('a finished row with no decided word keeps /state\'s own line (the record carries no state word: /state says it, LIN-4071)', async () => {
     const row = rowRecordOf({ stateType: 'completed' });
-    assert.equal(row.stateWord, null);
+    assert.equal('stateWord' in row, false, 'the record carries no state word');
     const html = await paint({ ...stateWith({}), homeStatusHtml: FAILED_PILL }, { row });
     assert.match(html, /status-pill--error/);
   });
 
   test('a parent whose subtask failed names it as failed, and does not say it needs a person', async () => {
-    const attention = { identifier: 'C-9', title: null, state: 'failed', lead: 'A subtask failed', detail: ' · Build failed', words: 'A subtask failed: C-9 · Build failed', href: '/workspace/acme/task/C-9' };
-    const html = await paint(stateWith({}), { row: { ...rowRecordOf({ stateType: 'started' }), attention } });
+    // LIN-4071: the subtask line is `/state`'s `attention` (the gather's words); the browser builds the link from the task's source.
+    const attention = { identifier: 'C-9', title: null, state: 'failed', lead: 'A subtask failed', detail: ' · Build failed', words: 'A subtask failed: C-9 · Build failed' };
+    const html = await paint({ ...stateWith({}), attention }, { row: rowRecordOf({ stateType: 'started' }) });
     assert.match(html, /A subtask failed: <span class="opened-task-needs-you-name">C-9<\/span> · Build failed/);
     assert.doesNotMatch(html, /needs you/);
   });

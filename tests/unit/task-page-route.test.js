@@ -212,8 +212,9 @@ describe('GET /workspace/:urlKey/api/task/:identifier/state', () => {
     // LIN-4010: `homeStatusHtml` is Home's one-line state (no "Harbour:" label); the task page keeps `headerHtml`.
     // LIN-4024: `questionHtml` is the question card, for a task waiting on an open ruling only (empty here: a running task).
     // LIN-4016: `taskState` is the task's own decided state (the row's decision, no tracker word); `sessions` gains
-    // `queued`, `action` and `canStop` beside the unchanged fields. The key set is pinned on purpose: change it here.
-    assert.deepEqual(Object.keys(res.jsonBody).sort(), ['headerHtml', 'homeStatusHtml', 'live', 'questionHtml', 'sessions', 'status', 'stripHtml', 'taskState', 'trackHtml']);
+    // `queued`, `action` and `canStop` beside the unchanged fields. LIN-4071: `attention` is the subtask line (null when none),
+    // the gather's words, and `status` is the gathered state's projection. The key set is pinned on purpose: change it here.
+    assert.deepEqual(Object.keys(res.jsonBody).sort(), ['attention', 'headerHtml', 'homeStatusHtml', 'live', 'questionHtml', 'sessions', 'status', 'stripHtml', 'taskState', 'trackHtml']);
     assert.equal(res.jsonBody.taskState.state, 'running', 'the decided state reads the same running session the row would');
     assert.deepEqual(Object.keys(res.jsonBody.sessions).sort(), ['action', 'busy', 'canStop', 'count', 'excluded', 'last', 'next', 'offered', 'queued', 'running']);
     assert.equal(res.jsonBody.questionHtml, '');

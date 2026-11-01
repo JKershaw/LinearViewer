@@ -17,6 +17,7 @@ import { buildRowStates, buildTaskPageModel, createTaskPageLoader, sessionSummar
 import { buildInProgressCountParts, rowRecordOf } from '../../lib/task-board-view.js';
 import { rulingStandingOf } from '../../lib/unanswered-decisions.js';
 import { renderHomeStatus } from '../../lib/render-task-page.js';
+import { pageStatusOf } from '../../lib/task-state.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 import { heldTaskFacts, heldLoaderDeps } from '../fixtures/held-task-facts.js';
 
@@ -171,7 +172,7 @@ describe('LIN-4016 W1 — the states the tracker does not decide read the same o
   test('queued behind an open ruling: the task waits on the ruling, so the model is not live and the summary has no running session (LIN-4024)', async () => {
     const s = await surfacesOf(OWN_SCENARIOS[3]);
     assert.equal(s.model.live, false, 'a queued wake behind a ruling is not live');
-    assert.equal(s.model.status, 'waiting', 'the header reads waiting, so the task page polls at the waiting cadence');
+    assert.equal(pageStatusOf(s.taskState), 'waiting', 'the gathered state reads waiting, so the task page polls at the waiting cadence');
     assert.equal(s.summary.running, null);
     assert.equal(s.summary.queued, null);
     assert.equal(s.summary.busy, true, 'busy stays true: the wake is unended');
@@ -189,7 +190,7 @@ describe('LIN-4016 W1 — the states the tracker does not decide read the same o
   test('queued with no ruling is live and queued, so the task page polls fast', async () => {
     const s = await surfacesOf(OWN_SCENARIOS[2]);
     assert.equal(s.model.live, true);
-    assert.equal(s.model.status, 'running');
+    assert.equal(pageStatusOf(s.taskState), 'running', 'the page status is the gathered running state');
   });
 });
 
@@ -201,7 +202,7 @@ describe('LIN-4016 W1 / LIN-4070 D2 — a tracker-decided state: the row, /state
     assert.equal(s.row.state, 'done');
     assert.equal(s.taskState.state, 'done', '/state reads the same tracker word as the row');
     assert.equal(s.pageModel.finished, true, 'the page-load record reads the same tracker word');
-    assert.equal(s.taskState.action, null, 'a finished task offers no run (LIN-4042)');
+    assert.equal(s.taskState.action.kind, 'none', 'a finished task offers no run (LIN-4042): the no-run decision');
   });
 
   test('a backlog task: the row, /state and the record all say backlog', async () => {
@@ -212,31 +213,32 @@ describe('LIN-4016 W1 / LIN-4070 D2 — a tracker-decided state: the row, /state
 
   // A finished task whose last stage failed (plan decision 2): the tracker decides finished, so the row and /state say
   // done, and the failure is history that rolls nothing up to a parent.
-  test('a finished task whose last stage failed: the row, /state and its record say done', async () => {
+  // LIN-4071: the record carries the action and the copy-first words only; the opened task's pill is `/state`'s (the
+  // gather's), which `renderHomeStatus` paints from the decided state. These pin the pill the box paints.
+  test('a finished task whose last stage failed: the row, /state and the opened task say done, and no run is offered', async () => {
     const s = await surfacesOf({ loops: [failedLoop('implementation')], trackerType: 'completed' });
     assert.equal(s.row.state, 'done');
     assert.equal(s.taskState.state, 'done', '/state reads the tracker word, as the row does');
-    const record = rowRecordOf({ stateType: 'completed', decided: s.taskState });
-    assert.equal(record.finished, true);
-    assert.deepEqual(record.stateWord, { word: 'done', tone: 'done' }, 'the opened task paints the decided word');
+    assert.deepEqual(pillOf(renderHomeStatus(s.pageModel, { taskState: s.taskState })), { word: 'done', tone: 'done' }, 'the opened task paints the decided word');
+    assert.equal(rowRecordOf({ stateType: 'completed', decided: s.taskState }).action.kind, 'none');
   });
 
-  test('a finished task whose last stage succeeded: the row and its record say done, and no step is offered', async () => {
+  test('a finished task whose last stage succeeded: the row and the opened task say done, and no step is offered', async () => {
     const s = await surfacesOf({ loops: [doneLoop('implementation')], trackerType: 'completed' });
     assert.equal(s.row.state, 'done');
-    assert.deepEqual(rowRecordOf({ stateType: 'completed', decided: s.taskState }).stateWord, { word: 'done', tone: 'done' });
-    assert.equal(rowRecordOf({ stateType: 'completed', decided: s.taskState }).finished, true, 'a finished task offers no stage step');
-    // The route sends the gathered action (`taskState.action`, null here), not the summary's own rule (LIN-4068 D7).
-    assert.equal(s.taskState.action, null, '/state offers no step on a finished task');
+    assert.deepEqual(pillOf(renderHomeStatus(s.pageModel, { taskState: s.taskState })), { word: 'done', tone: 'done' });
+    // The route sends the gathered action (`taskState.action`, the no-run decision here), not the summary's own rule (LIN-4068 D7).
+    assert.equal(rowRecordOf({ stateType: 'completed', decided: s.taskState }).action.kind, 'none', 'a finished task offers no stage step');
   });
 
-  test('a backlog task: the record carries the backlog word the row says', async () => {
+  test('a backlog task: the opened task says backlog, the word its row says', async () => {
     const s = await surfacesOf({ loops: [], trackerType: 'backlog' });
-    assert.deepEqual(rowRecordOf({ stateType: 'backlog', decided: s.row }).stateWord, { word: 'backlog', tone: 'backlog' });
+    assert.deepEqual(pillOf(renderHomeStatus(s.pageModel, { taskState: s.taskState })), { word: 'backlog', tone: 'backlog' });
   });
 
-  test('a running task carries no tracker word in its record: the row says running, and the opened task paints /state\'s line', async () => {
+  test('a running task paints no pill on the opened task (the running box says it), and its record carries the gathered action only', async () => {
     const s = await surfacesOf({ loops: [loop()], trackerType: 'started' });
-    assert.equal(rowRecordOf({ stateType: 'started', decided: s.row }).stateWord, null);
+    assert.equal(renderHomeStatus(s.pageModel, { taskState: s.taskState }), '');
+    assert.deepEqual(Object.keys(rowRecordOf({ stateType: 'started', decided: s.row })).sort(), ['action', 'copyStep', 'trackerWord']);
   });
 });

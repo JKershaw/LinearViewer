@@ -139,7 +139,8 @@ describe('LIN-4069: Home reads the one gather', () => {
     const byKey = rowDataByNodeKey({ urlKey: URL_KEY, inProgressTrees, recentActivityTrees: [], projectTrees: [], rowStates: home.states });
     assert.equal(byKey[nodeKey(issues[0])].action, null, 'the parent is busy');
     assert.equal(byKey[nodeKey(issues[2])].action, home.states.get('G-3').action);
-    assert.equal(byKey[nodeKey(issues[0])].container, true);
+    // LIN-4071: the record carries no container flag; a busy parent's action is null, whatever its container fact.
+    assert.equal('container' in byKey[nodeKey(issues[0])], false, 'the record carries no container flag');
   });
 
   test('the index covers every descendant at every depth, including terminal children', () => {
@@ -164,8 +165,8 @@ describe('LIN-4069: a finished task offers no run on Home (LIN-4042)', () => {
       issue('C-9', 'started', 'P-9'),
     ];
     const home = await homeOf({ issues, loops: [] });
-    assert.equal(home.states.get('D-1').action, null, 'a Done leaf offers no run');
-    assert.equal(home.states.get('P-9').action, null, 'a finished container offers no Run to PR');
+    assert.equal(home.states.get('D-1').action.kind, 'none', 'a Done leaf offers no run (the no-run decision)');
+    assert.equal(home.states.get('P-9').action.kind, 'none', 'a finished container offers no Run to PR (the no-run decision)');
     assert.equal(home.states.get('P-9').finished, true);
   });
 });

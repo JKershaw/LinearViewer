@@ -106,19 +106,19 @@ describe('LIN-3968 — the header says what failed, and the state block offers t
 
   test('idle after a failed Review names the failure and its message', () => {
     const input = { sessions: [s('plan', 'done'), s('review', 'failed', { message: 'tests red' })], waiting: noWait, tracker: { state: { name: 'In Progress', type: 'started' }, finishedAt: null } };
-    assert.deepEqual(deriveHeader({ ...input, now: NOW }), { status: 'failed', sentence: 'Review failed 30 minutes ago: tests red', sentenceAt: '2026-10-25T13:30:00.000Z' });
+    assert.deepEqual(deriveHeader({ ...input, now: NOW }), { sentence: 'Review failed 30 minutes ago: tests red', sentenceAt: '2026-10-25T13:30:00.000Z' });
   });
 
   // LIN-3991 changed this: the pill reads failed now (the same predicate as the row and count). It stays
   // off `waiting`, which would suppress Go.
-  test('the status reads failed after a failure, not waiting: waiting would suppress Go', () => {
+  test('the sentence says the failure, not a wait: a wait would suppress Go (the page status is the gather\'s)', () => {
     const input = { sessions: [s('review', 'failed')], waiting: noWait, tracker: null, now: NOW };
-    assert.equal(deriveHeader(input).status, 'failed');
+    assert.match(deriveHeader(input).sentence, /^Review failed/);
   });
 
   test('a running stage says how long it has run, in relative words', () => {
     const input = { sessions: [s('implementation', 'running', { loop: { takenAt: '2026-10-25T13:54:00.000Z', dispatchedAt: '2026-10-25T13:50:00.000Z' } })], waiting: noWait, tracker: null, now: NOW };
-    assert.deepEqual(deriveHeader(input), { status: 'running', sentence: 'Build running for 6m.', sentenceAt: '2026-10-25T13:54:00.000Z' });
+    assert.deepEqual(deriveHeader(input), { sentence: 'Build running for 6m.', sentenceAt: '2026-10-25T13:54:00.000Z' });
   });
 
   test('sessionSummaryOf offers the failed stage again, and nothing while one runs', () => {
