@@ -104,7 +104,8 @@ test.describe('Home: a failed stage is needs-you and offered again (LIN-3968)', 
 
     await expect(chip(block, 'review')).toHaveAttribute('data-state', 'failed');
     await expect(chip(block, 'review')).toHaveAttribute('data-offered', 'true');
-    await expect(chip(block, 'close-out')).not.toHaveAttribute('data-offered', 'true');
+    // LIN-4103: no usual stage is drawn ahead, so Close-out is not on the strip at all.
+    await expect(chip(block, 'close-out')).toHaveCount(0);
     // LIN-4024: a failed task is counted under failed, not waiting on you (only rulings count as waiting).
     await expect(page.locator('[data-testid="in-progress-count"]')).toContainText('1 failed');
     await expect(page.locator('[data-testid="issue-row-state"]').filter({ hasText: 'Review failed' }).first()).toBeVisible();
@@ -114,16 +115,16 @@ test.describe('Home: a failed stage is needs-you and offered again (LIN-3968)', 
 test.describe('Home: a Review that failed as the only stage (LIN-3991)', () => {
   test.use({ viewport: DESKTOP });
 
-  test('the strip starts at the failed stage: Review failed and Close-out, nothing before it', async ({ page }) => {
+  test('the strip starts at the failed stage: Review failed, and no usual stage after it (LIN-4103)', async ({ page }) => {
     await seedTask(page);
     const token = await runnerToken(page);
     await seedSession(page, token, { kind: 'review', feedback: ['[failed] review could not finish'] });
     await gotoHome(page);
     const block = await openTopTask(page);
 
-    await expect(chips(block)).toHaveCount(2);
+    await expect(chips(block)).toHaveCount(1);
     await expect(chip(block, 'review')).toHaveAttribute('data-state', 'failed');
-    await expect(chip(block, 'close-out')).toHaveAttribute('data-state', 'ahead');
+    await expect(chip(block, 'close-out')).toHaveCount(0);
     await expect(chip(block, 'research')).toHaveCount(0);
     await expect(chip(block, 'plan')).toHaveCount(0);
   });
@@ -235,7 +236,7 @@ test.describe('Home: the stage strip is one row and styled (LIN-3968)', () => {
     const block = await openTopTask(page);
 
     const tops = await chips(block).evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().top)));
-    expect(tops.length, 'one chip per stage reached or still ahead').toBeGreaterThanOrEqual(3);
+    expect(tops.length, 'one chip per stage that ran (LIN-4103: no usual stage is drawn ahead)').toBe(2);
     expect(new Set(tops).size, 'all chips share one row').toBe(1);
     // Witness for the shared stylesheet: Home loads stage-track.css, so a chip has its own border (absent unstyled).
     // LIN-3991: the row wraps on a phone, so only the desktop row is pinned to one line here.

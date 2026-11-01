@@ -175,9 +175,29 @@ describe('W-D the opened box names every subtask that needs you, and agrees with
     assert.equal(parent.attention.words, '2 subtasks failed: LIN-54, LIN-55');
   });
 
+  // LIN-4103 beat 4 (witness): the box's line carries every subtask named, so the browser can name and link each one.
+  test('the attention line lists every subtask that needs you, each as a subtask (the browser names each one)', () => {
+    const parent = rollUpRow({}, [childOf('LIN-51', NEEDS_YOU), childOf('LIN-52', NEEDS_YOU), childOf('LIN-53')]);
+    assert.deepEqual(parent.attention.subtasks.map((s) => s.identifier), ['LIN-51', 'LIN-52']);
+  });
+
   test('a single subtask that needs you keeps the line it always had', () => {
     const parent = rollUpRow({}, [childOf('LIN-56', NEEDS_YOU), childOf('LIN-57')]);
     assert.equal(parent.attention.words, 'A subtask needs you: LIN-56');
+  });
+});
+
+// LIN-4103 beat 4 (witness): a queue record is not a run, so neither the row nor the box reads it as running.
+describe('W-G a queue record is not a running run (beat 4)', () => {
+  test('a running queue record leaves its row without a running state', () => {
+    const s = states([node('LIN-88')], { 'LIN-88': [loop({ issueIdentifier: 'LIN-88', kind: 'custom', loopId: 'c1', lineageId: 'c1' })] });
+    assert.notEqual(s.get('LIN-88').state, 'running');
+    assert.equal(s.get('LIN-88').words, null);
+  });
+
+  test('the box has no running session for a queue record', () => {
+    const model = modelOf('LIN-89', [loop({ issueIdentifier: 'LIN-89', kind: 'custom', loopId: 'c2', lineageId: 'c2' })]);
+    assert.equal(sessionSummaryOf(model).running, null);
   });
 });
 

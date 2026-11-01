@@ -106,7 +106,7 @@ test.describe('one shared look (LIN-4009)', () => {
     }
   });
 
-  test('needs you, failed, running and ready rows read differently on Home', async ({ page }) => {
+  test('needs you, failed and running rows read differently on Home; a never-run row says nothing (LIN-4103)', async ({ page }) => {
     await seedTasks(page);
     await seedStates(page);
     await page.goto(`/workspace/${URL_KEY}/`);
@@ -119,12 +119,12 @@ test.describe('one shared look (LIN-4009)', () => {
     const needsYou = await style(TASKS.needsYou);
     const failed = await style(TASKS.failed);
     const running = await style(TASKS.running);
-    const ready = await style(TASKS.ready);
+    // LIN-4103: a never-run row has no state at all (the guessed "ready" tone is gone), so it has no state element.
+    await expect(rowState(page, TASKS.ready)).toHaveCount(0);
 
     expect(needsYou.tone).toBe('needs-you');
     expect(failed.tone).toBe('failed');
     expect(running.tone).toBe('running');
-    expect(ready.tone).toBe('ready');
 
     // Running is the warm hue; the red states are not it.
     expect(running.color).not.toBe(needsYou.color);
@@ -133,8 +133,6 @@ test.describe('one shared look (LIN-4009)', () => {
     expect(needsYou.color).toBe(failed.color);
     expect(Number(needsYou.weight)).toBeGreaterThan(Number(failed.weight));
     expect(needsYou.background).not.toBe(failed.background);
-    // A ready row is the brand, not quiet grey.
-    expect(ready.color).not.toBe(running.color);
   });
 
   test('the count line is the page summary, with its waiting part toned', async ({ page }) => {
