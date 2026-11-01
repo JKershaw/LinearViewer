@@ -394,3 +394,49 @@ describe('LIN-4103 — a parent\'s row, /state, the opened box and the count lin
     assert.equal(typeof s.incomplete, 'string', 'it names why');
   });
 });
+
+// ---------------------------------------------------------------------------------------------------------------------
+// LIN-4104 D1 — busy is its own propagated fact (review note 1). A child whose own stage failed rolls up to `failed`
+// with `running: false`, so a read of the rolled flags hides the running grandchild under it. The parent must still
+// offer no run, on its row and on `/state`, and both must carry the same busy fact.
+// ---------------------------------------------------------------------------------------------------------------------
+
+describe('LIN-4104 D1 — busy over the subtree is not read off the rolled state (a failed node cannot hide a running descendant)', () => {
+  // LIN-90 (parent) → LIN-91 (its own failed stage, so it rolls up to failed) → LIN-92 (the grandchild running or queued).
+  const failedParentTree = (grandchildLoop) => treeNode(TREE_ROOT, 'started', [], [
+    treeNode('LIN-91', 'started', [own('LIN-91', failedLoop, 'implementation')], [
+      treeNode('LIN-92', 'started', [own('LIN-92', grandchildLoop)]),
+    ]),
+    treeNode('LIN-93'),
+  ]);
+
+  for (const [name, grandchildLoop] of [['running', loop], ['queued', queuedLoop]]) {
+    test(`parent whose failed subtask has a ${name} subtask: no run is offered on the row or on /state, and both say busy`, async () => {
+      const s = await treeSurfacesOf(failedParentTree(grandchildLoop));
+      assert.equal(s.row.state, 'failed', 'the parent rolls up to failed, the case that hides the running grandchild');
+      assert.equal(s.row.action?.kind, 'busy', 'the row names the run in flight over a running descendant, and offers none');
+      assert.equal(s.row.action.identifier, 'LIN-92', 'the busy line names the grandchild that runs');
+      assert.ok(s.taskState, 'the held subtree is complete, so /state answers');
+      assert.equal(s.taskState.action?.kind, 'busy', '/state offers no run over a running descendant');
+      assert.equal(s.row.busy, true, 'the row carries busy: the subtree has a running or queued session');
+      assert.equal(s.taskState.busy, true, '/state carries the same busy fact as the row');
+    });
+  }
+});
+
+describe('LIN-4104 D1 — the offer kinds on the row and on /state (answer-first names the subtasks, a finished task offers none)', () => {
+  test('a parent with two subtasks that need you: answer-first names both, on the row and on /state', async () => {
+    const scenario = TREE_SCENARIOS.find((x) => x.name === 'a parent with two subtasks that need you');
+    const s = await treeSurfacesOf(scenario.tree());
+    assert.equal(s.row.action.kind, 'answer-first');
+    assert.deepEqual(s.row.action.identifiers, ['LIN-91', 'LIN-92'], 'the box leads with each question');
+    assert.deepEqual(s.taskState.action, s.row.action, '/state sends the same decision');
+  });
+
+  test('a parent whose only subtask is Done (a finished leaf under it) offers the run control; the Done child offers none', async () => {
+    const scenario = TREE_SCENARIOS.find((x) => x.name === 'a Done child whose last stage failed: it reads done and rolls nothing up');
+    const s = await treeSurfacesOf(scenario.tree());
+    assert.equal(s.rowOf('LIN-91').action.kind, 'none', 'a finished child offers no run (LIN-4042)');
+    assert.equal(s.row.action.kind, 'offer', 'the parent counts open work and offers the run control');
+  });
+});

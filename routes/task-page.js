@@ -56,13 +56,13 @@ function queryValue(value) {
 }
 
 /**
- * The state poll's `sessions` block (LIN-3833, LIN-4068 D7). The task's own summary, with `action` from the gather and
- * `busy` widened to a running or queued subtask (the same rollUp the row's action reads), so the opened box holds its
- * step line back exactly where the row holds its action (LIN-4070, found by the opened-box E2E).
+ * The state poll's `sessions` block (LIN-3833, LIN-4068 D7). The task's own summary, with `action` and `busy` from the
+ * gather. `busy` is the gather's own fact (LIN-4104 D1: own sessions unended, or any subtask's subtree busy), the same one
+ * the row's action reads, so the opened box holds its step line back exactly where the row holds its action.
  */
 function sessionsOfState(model, taskState) {
   const summary = sessionSummaryOf(model, { container: taskState.container === true });
-  return { ...summary, busy: summary.busy || !!(taskState.running || taskState.queued), action: taskState.action };
+  return { ...summary, busy: taskState.busy === true, action: taskState.action };
 }
 
 /**

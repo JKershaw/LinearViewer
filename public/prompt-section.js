@@ -320,7 +320,7 @@
       // after-run line stay in the run block.
       const step = runStepOfState(state, opts);
       if (step) html += `<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-step" data-action="run-step-next">Run ${esc(step.label)}</button>`;
-      else if (mainActionOf(state, opts) && mainActionOf(state, opts).kind === 'run-to-pr') html += '<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-task" data-action="go">Run to PR</button>';
+      else if (runOfferOf(state, opts) && runOfferOf(state, opts).kind === 'offer') html += '<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-task" data-action="go">Run to PR</button>';
     } else {
       html += `<button class="opened-task-go" data-testid="opened-task-go" data-rung="run-task" data-action="go">Go</button>`;
     }
@@ -621,30 +621,26 @@
       <p class="opened-task-key-note">The key lasts 48 hours. Without it, your agent can still do the work, but Harbour won\u2019t see its progress. Turning it off here sets it for every task.</p>`;
   }
 
-  // LIN-3833: the step a run would start, from the state (a step chosen for this run, else the one the
-  // sessions name as next). Shared by the main button (renderGo) and the run block.
-  // LIN-3968: the offered step (`sessions.offered`), so a running stage offers no other step, and a failed stage
-  // is offered again. (LIN-4103 beat 2: the summary carries no guessed next step, so no line names one after a run.)
-  // LIN-4024: a container offers no stage step (its one action is Run to PR), whatever a step chosen for this run says.
-  // LIN-4016 / LIN-4071: a step is offered only when the server's one main action says so. Busy (no action), a finished
-  // task (the no-run decision) and a container (Run to PR, `container: true`) offer no stage step, whatever a step chosen
-  // for this run says (LIN-4024). The browser reads the decision; it does not read the tracker's word or the subtree.
+  // LIN-3833: the step a run would start: a step chosen for this run (`state.run.step`), else the failed stage the offer
+  // names (`action.step`, LIN-3968). Shared by the main button (renderGo) and the run block. LIN-4024: a container offers
+  // no stage step, whatever a step chosen for this run says. Busy, answer-first and a finished task offer none either.
+  // LIN-4104 D3 replaces the offered stage with Next step, at press time.
   function runStepOfState(state, opts) {
-    const action = mainActionOf(state, opts);
-    if (!action || action.kind === 'none' || action.container) return null;
-    return (state.run && state.run.step) || (action.kind === 'step' ? action.step : null);
+    const action = runOfferOf(state, opts);
+    if (!action || action.kind !== 'offer' || action.container) return null;
+    return (state.run && state.run.step) || action.step || null;
   }
-  // LIN-4016: the one main action the server decided (`sessions.action`): a step, Run to PR, the no-run decision, or null
-  // while busy. LIN-4068: before the first `/state` reply the opened box has no sessions, so it takes the row record's
+  // LIN-4104 D1: the one run offer the server decided (`sessions.action`, `runOfferOf`): none (finished), answer-first,
+  // busy, or offer. LIN-4068: before the first `/state` reply the opened box has no sessions, so it takes the row record's
   // action (the gatherer's decision, the same one `/state` will send), and offers no run the gatherer would not.
-  function mainActionOf(state, opts) {
+  function runOfferOf(state, opts) {
     const sessions = state.opened && state.opened.sessions;
     if (sessions) return sessions.action || null;
     return (opts && opts.row && opts.row.action) || null;
   }
   // LIN-4071: the no-run decision (a finished task): no step line, no Go, and no step to pick. Busy is not this (it is null).
   function takesNoRun(state, opts) {
-    const action = mainActionOf(state, opts);
+    const action = runOfferOf(state, opts);
     return !!action && action.kind === 'none';
   }
   // LIN-3975 (review finding 1): busy is any session running, queued or waiting on an answer (`sessions.busy`, the server's).

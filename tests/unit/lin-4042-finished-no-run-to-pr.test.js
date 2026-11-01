@@ -143,7 +143,7 @@ async function paint(stateBody, opts = {}) {
   return c.innerHTML;
 }
 
-const RUN_TO_PR = { kind: 'run-to-pr', why: 'no stage step is offered, so the run takes it to PR' };
+const RUN_TO_PR = { kind: 'offer', why: 'no stage step is offered, so the run takes it to PR' };
 const PLAN_OFFER = { kind: 'plan', label: 'Plan', why: 'usual', failed: false, reason: 'usually next after Research' };
 // LIN-4071: a finished task's action is the gatherer's no-run decision (`kind: 'none'`), not a client guard on the tracker word.
 const NO_RUN = NO_RUN_ACTION;
@@ -219,7 +219,7 @@ describe('LIN-4042 — a finished task on Home offers no run', () => {
 // retired row fields, so the new consumer needs its own witness. A step is "chosen for this run" by picking one in
 // Another step (`run-pick`); a container or a finished task must still offer no stage step for it.
 describe('LIN-4071 — runStepOfState offers no stage step for a container or a finished task, whatever step was chosen', () => {
-  const CONTAINER_ACTION = { kind: 'run-to-pr', why: 'a container runs to PR', container: true };
+  const CONTAINER_ACTION = { kind: 'offer', why: 'a container runs to PR', container: true };
 
   async function paintAndPick(stateBody, opts) {
     const PromptSection = loadClient({ stateBody });

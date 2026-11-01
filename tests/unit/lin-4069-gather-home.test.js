@@ -65,7 +65,7 @@ describe('LIN-4069: Home reads the one gather', () => {
     const row = home.states.get('T-1');
     assert.equal(row.state, 'todo');
     assert.equal(row.words, null);
-    assert.equal(row.action.kind, 'run-to-pr', 'a never-run task offers Run to PR, not a guessed step (LIN-4103)');
+    assert.equal(row.action.kind, 'offer', 'a never-run task offers the run control, not a guessed step (LIN-4103, LIN-4104 D1)');
   });
 
   test('a Done subtask whose last run failed reads done, and its parent rolls nothing up from it', async () => {
@@ -85,7 +85,7 @@ describe('LIN-4069: Home reads the one gather', () => {
     });
     const parent = home.states.get('P-5');
     assert.equal(parent.state, 'running');
-    assert.equal(parent.action, null, 'busy: a running subtree offers nothing (D7)');
+    assert.equal(parent.action?.kind, 'busy', 'busy: a running subtree offers no run, and names what runs (D7, LIN-4104 D1)');
   });
 
   test('three levels under a Backlog parent, a subtask in another project, and an assignee: the grandchild runs and the parent reads running', async () => {
@@ -138,7 +138,7 @@ describe('LIN-4069: Home reads the one gather', () => {
     const home = await homeOf({ issues, loops: [running('G-3', 'implementation', daysAgo(0, 10))] });
     const inProgressTrees = [{ projectName: 'Proj', roots: buildSubtreeIndex(issues) }];
     const byKey = rowDataByNodeKey({ urlKey: URL_KEY, inProgressTrees, recentActivityTrees: [], projectTrees: [], rowStates: home.states });
-    assert.equal(byKey[nodeKey(issues[0])].action, null, 'the parent is busy');
+    assert.equal(byKey[nodeKey(issues[0])].action?.kind, 'busy', 'the parent is busy');
     assert.equal(byKey[nodeKey(issues[2])].action, home.states.get('G-3').action);
     // LIN-4071: the record carries no container flag; a busy parent's action is null, whatever its container fact.
     assert.equal('container' in byKey[nodeKey(issues[0])], false, 'the record carries no container flag');

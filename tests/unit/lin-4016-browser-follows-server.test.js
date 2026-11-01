@@ -148,12 +148,12 @@ describe('LIN-4016 W4 — the run control paints the server\'s decision', () => 
   });
 
   test('the server\'s step action is the main button, even with no offer field', async () => {
-    const html = await paint(stateWith({ offered: PLAN_OFFER, action: { kind: 'step', step: PLAN_OFFER, why: PLAN_OFFER.reason } }));
+    const html = await paint(stateWith({ offered: PLAN_OFFER, action: { kind: 'offer', step: PLAN_OFFER, why: PLAN_OFFER.reason } }));
     assert.match(html, /data-action="run-step-next"[^>]*>Run Plan</);
   });
 
   test('a container: the server\'s run-to-pr action is Run to PR and no stage step, even when an offer is set', async () => {
-    const html = await paint(stateWith({ offered: PLAN_OFFER, action: { kind: 'run-to-pr', why: 'a container runs to PR' } }), { row: rowRecordOf({ stateType: 'started', container: true }) });
+    const html = await paint(stateWith({ offered: PLAN_OFFER, action: { kind: 'offer', why: 'a container runs to PR' } }), { row: rowRecordOf({ stateType: 'started', container: true }) });
     assert.match(html, /data-action="go"[^>]*>Run to PR</);
     assert.doesNotMatch(html, /run-step-next/);
   });
@@ -230,8 +230,8 @@ describe('LIN-4069 — before the first /state reply the run control takes the r
   const PENDING = new Promise(() => {});
 
   test('the row\'s run-to-pr action shows Run to PR with no sessions yet', async () => {
-    const row = rowRecordOf({ stateType: 'started', decided: { state: 'next', action: { kind: 'run-to-pr', why: 'a container runs to PR' } } });
-    assert.deepEqual(row.action, { kind: 'run-to-pr', why: 'a container runs to PR' });
+    const row = rowRecordOf({ stateType: 'started', decided: { state: 'next', action: { kind: 'offer', why: 'a container runs to PR' } } });
+    assert.deepEqual(row.action, { kind: 'offer', why: 'a container runs to PR' });
     const html = await paint(PENDING, { row });
     assert.match(html, /data-action="go"[^>]*>Run to PR</);
   });
@@ -246,8 +246,23 @@ describe('LIN-4069 — before the first /state reply the run control takes the r
   });
 
   test('once /state replies, its sessions.action wins over the row\'s (the row only fills the gap before the reply)', async () => {
-    const row = rowRecordOf({ stateType: 'started', decided: { state: 'next', action: { kind: 'run-to-pr', why: 'row' } } });
+    const row = rowRecordOf({ stateType: 'started', decided: { state: 'next', action: { kind: 'offer', why: 'row' } } });
     const html = await paint(stateWith({ offered: PLAN_OFFER, action: null, busy: true }), { row });
     assert.doesNotMatch(html, /Run to PR/, 'the server\'s busy decision removes the row\'s offer');
+  });
+});
+
+describe('LIN-4104 D1 — the browser draws the offer kind and names no run for answer-first or busy', () => {
+  test('answer-first (a question needs you): no Go, no Run to PR and no step button, whatever the offer says', async () => {
+    const html = await paint(stateWith({ offered: PLAN_OFFER, busy: true, action: { kind: 'answer-first', identifiers: ['LIN-42'], why: 'a question needs you before a run is offered' } }));
+    assert.doesNotMatch(html, /data-action="go"/, 'no Go while a question is open');
+    assert.doesNotMatch(html, /data-action="run-step-next"/, 'no step button while a question is open');
+    assert.doesNotMatch(html, /Run to PR/);
+  });
+
+  test('busy with the run named (kind busy): no Go and no step button, the run line is the box\'s', async () => {
+    const html = await paint(stateWith({ offered: PLAN_OFFER, busy: true, action: { kind: 'busy', identifier: 'LIN-42', words: 'Build running', why: 'x' } }));
+    assert.doesNotMatch(html, /data-action="go"/);
+    assert.doesNotMatch(html, /data-action="run-step-next"/);
   });
 });

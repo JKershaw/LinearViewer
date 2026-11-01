@@ -134,7 +134,7 @@ describe('LIN-3833 — Home\'s prompt options carry the per-row records, and no 
   });
 
   test('a row with a decided action is in the page options, keyed by its row; no subtask line rides with it', () => {
-    const html = fixture({ rowData: { 'linear:row': { action: { kind: 'run-to-pr', why: 'x', container: true }, copyStep: { label: 'plan', name: 'Plan', why: '' }, trackerWord: 'In progress' } } });
+    const html = fixture({ rowData: { 'linear:row': { action: { kind: 'offer', why: 'x', container: true }, copyStep: { label: 'plan', name: 'Plan', why: '' }, trackerWord: 'In progress' } } });
     assert.match(html, /rowData/);
     assert.match(html, /linear:row/);
     assert.doesNotMatch(html, /attention/, 'the subtask line is /state\'s, never a page option');
