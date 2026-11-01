@@ -9,7 +9,8 @@
  *
  * PUBLIC (no session; `/t/` is exempt from PAT auto-login and token refresh):
  *   GET /t/:token        — the guest task page (owner page, controls hidden)
- *   GET /t/:token/state  — stored-data repaint, same JSON as the owner endpoint
+ *   GET /t/:token/state  — held-facts repaint, the owner endpoint's JSON without the owner fields (LIN-4070 B2:
+ *                          it reads the holder only; it is built with no refresh function and starts no fetch)
  *
  * Refusal contract (the plan's request matrix): a malformed token 404s BEFORE
  * any store read; unknown, revoked, owner-changed and (for the page) a
@@ -25,7 +26,7 @@
  * A masker throw fails closed with the usual 503. LIN-3261 still owns the
  * scheduled scan and extra patterns.
  *
- * The 5-second cache holds ONLY the loader's `{model}` result, per
+ * The 5-second cache holds ONLY the loader's page result (`{model}` and the held state, LIN-4070), per
  * `(urlKey, issueIdentifier, source)`, with single-flight so concurrent guests
  * share one tracker read. Failures are never cached, and it sits after every
  * auth check, so a revoke or an owner change takes effect on the next request.
@@ -222,6 +223,8 @@ export function createTaskShareRoutes({
     try {
       body = maskFragment(record, 'page', renderTaskPage(model, {
         viewer: 'guest',
+        // LIN-4070 B: the pill is the gathered state, or the display-only provisional one while the held set is incomplete.
+        taskState: result.taskState || result.provisional || null,
         urlKey: record.urlKey,
         binding: { source: record.source },
         stateUrl: `/t/${encodeURIComponent(token)}/state`,
@@ -244,19 +247,24 @@ export function createTaskShareRoutes({
     const { record } = scoped;
 
     try {
-      // Stored data only: no provider read, no credential resolve. Nothing new is read.
-      const { model } = await loader.loadTaskState({
+      // LIN-4070 B2: held facts only. The loader reads the holder and starts nothing, and this router is built with no
+      // refresh function, so no fetch and no credential resolve can happen on this route.
+      const { model, taskState, incomplete } = await loader.loadTaskState({
         urlKey: record.urlKey,
         identifier: record.issueIdentifier,
         issueId: record.issueId,
       });
       res.set('Cache-Control', 'no-store');
+      // Incomplete: no state fields. The guest page keeps the paint it loaded with; the history track still rides.
+      if (incomplete) {
+        return res.json({ incomplete, trackHtml: maskFragment(record, 'state', renderTaskTrack(model, { now: now() })) });
+      }
       // No brief or recap rides here (LIN-3975): the state read has no tracker, so the page-load panels are the only
       // ones shown, and a poll never repaints them.
       const body = {
         status: model.status,
         live: model.live,
-        headerHtml: maskFragment(record, 'state', renderTaskStatus(model)),
+        headerHtml: maskFragment(record, 'state', renderTaskStatus(model, { now: now(), taskState })),
         trackHtml: maskFragment(record, 'state', renderTaskTrack(model, { now: now() })),
       };
       return res.json(body);

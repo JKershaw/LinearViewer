@@ -38,6 +38,8 @@
   var SLOW_MS = 45000;
   var MAX_BACKOFF_MS = 5 * 60 * 1000;
   var TICK_MS = 1000;
+  // LIN-4070: an incomplete reply means the held set is still landing; the next read comes sooner than the usual cadence.
+  var INCOMPLETE_MS = 1000;
   var OPEN_CLASS = 'sess-run--expanded';
 
   /**
@@ -82,6 +84,7 @@
     var stopped = false;
     var failures = 0;
     var timer = null;
+    var incompleteRetry = false;
 
     function schedule() {
       clearTimer(timer);
@@ -89,6 +92,7 @@
       if (stopped) return;
       var delay = pollDelay(cadenceStatus(current), o.isVisible(), failures);
       if (delay == null) return;
+      if (incompleteRetry) delay = Math.min(delay, INCOMPLETE_MS);
       timer = setTimer(poll, delay);
     }
 
@@ -101,8 +105,10 @@
           failures = 0;
           if (state) {
             // The state endpoint never reports `done` (it can't see the
-            // tracker); keep what the page loaded with otherwise.
-            current = { status: state.status, live: !!state.live };
+            // tracker); keep what the page loaded with otherwise. An incomplete reply carries no status: keep the last
+            // complete one, and read again soon.
+            incompleteRetry = !!state.incomplete;
+            if (!state.incomplete) current = { status: state.status, live: !!state.live };
             o.apply(state);
           }
         }, function (err) {
@@ -680,7 +686,24 @@
       }
     }
 
+    // The track is history (the task's own whole-life read), so it repaints whether or not the state is complete.
+    function repaintTrack(state) {
+      if (trackMount && typeof state.trackHtml === 'string') {
+        var checkIns = openCheckIns(trackMount);
+        trackMount.innerHTML = state.trackHtml;
+        // A repainted track carries its own tap times (LIN-3975): bind them as the page does on load.
+        if (typeof window.initLocalTimes === 'function') window.initLocalTimes(trackMount);
+        restoreCheckIns(trackMount, checkIns);
+      }
+    }
+
     function apply(state) {
+      // LIN-4070: an incomplete read carries no state (the server is still gathering it). The page keeps what it painted,
+      // the poll goes on, and the next complete reply replaces it.
+      if (state.incomplete) {
+        repaintTrack(state);
+        return;
+      }
       // Read the box first: a check may have moved it off `ready` since the
       // last poll, and then the ready header must not be painted.
       syncMergeReady();
@@ -689,13 +712,7 @@
       if (answer && typeof headerHtml === 'string') repaintHeader(answer, headerHtml);
       var painted = answer && answer.querySelector ? answer.querySelector('[data-testid="task-page-status"]') : null;
       var paintedStatus = painted && painted.getAttribute ? painted.getAttribute('data-status') : null;
-      if (trackMount && typeof state.trackHtml === 'string') {
-        var checkIns = openCheckIns(trackMount);
-        trackMount.innerHTML = state.trackHtml;
-        // A repainted track carries its own tap times (LIN-3975): bind them as the page does on load.
-        if (typeof window.initLocalTimes === 'function') window.initLocalTimes(trackMount);
-        restoreCheckIns(trackMount, checkIns);
-      }
+      repaintTrack(state);
       applyOpenMemory(rows(), memory);
       main.setAttribute('data-status', readyHtml ? (paintedStatus || 'waiting') : state.status);
       main.setAttribute('data-live', state.live ? 'true' : 'false');

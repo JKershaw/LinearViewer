@@ -19,9 +19,10 @@
  *
  * The page reads with the session credential, through the issue's own
  * provider-kind source (`?source=`, as the Edit link carries it). The state
- * endpoint
- * reads stored data only and never touches a provider: the client polls it, and
- * a poll must never spend a tracker read or an LLM call.
+ * endpoint reads the held task facts only (LIN-4070): it never touches a
+ * provider, and a poll must never spend a tracker read or an LLM call. A
+ * refresh of the held set is started only here, by the private handlers (the
+ * page load and the state poll), with the request's own workspace and account.
  *
  * The viewer is the owner or a member (LIN-3975). A member reads the page without
  * any owner control; the server still refuses each action a member may not take.
@@ -32,6 +33,7 @@ import { renderErrorPage } from '../lib/render.js';
 import { sessionSummaryOf } from '../lib/task-page-loader.js';
 import { rowRecordOf } from '../lib/task-board-view.js';
 import { hasOpenSubtask } from '../lib/task-state.js';
+import { isHiddenState } from '../lib/providers/state-map.js';
 import { renderTaskQuestion } from '../lib/render-task-page.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
 import { resolveIssueBinding, isValidIssueId } from '../lib/workspace.js';
@@ -54,6 +56,16 @@ function queryValue(value) {
 }
 
 /**
+ * The state poll's `sessions` block (LIN-3833, LIN-4068 D7). The task's own summary, with `action` from the gather and
+ * `busy` widened to a running or queued subtask (the same rollUp the row's action reads), so the opened box holds its
+ * step line back exactly where the row holds its action (LIN-4070, found by the opened-box E2E).
+ */
+function sessionsOfState(model, taskState) {
+  const summary = sessionSummaryOf(model, { container: taskState.container === true });
+  return { ...summary, busy: summary.busy || !!(taskState.running || taskState.queued), action: taskState.action };
+}
+
+/**
  * @param {Object} deps
  * @param {Function} deps.workspaceFromUrl - Workspace resolution middleware.
  * @param {Function} deps.getOpenRouterSource - Footer AI-status source.
@@ -63,9 +75,25 @@ function queryValue(value) {
  * @param {Function} [deps.now] - () → Date
  * @returns {Router}
  */
-export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo, loader, workspaceOwnerCheck = null, runProposalsStore = null, now = () => new Date() }) {
+export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo, loader, workspaceOwnerCheck = null, runProposalsStore = null, taskFacts = null, refreshTaskFacts = null, now = () => new Date() }) {
   if (!loader) throw new Error('task-page routes: loader is required');
   const router = Router();
+
+  // LIN-4070: the private handlers' only route to the holder. An incomplete read starts the background refresh (the
+  // holder's trigger is rate-limited and single-flight), and a read the page's own tracker contradicts drops the stale
+  // entry first. Neither is reachable from the loader, which the public guest route shares.
+  // `trackerType` is the page's own tracker read. A task the tracker says is live and that the set lacks (task-missing)
+  // refreshes at once; a hidden (canceled) task does not, as before. The state poll reads no tracker, so it passes no
+  // `trackerType` (undefined) and a task-missing read is urgent there too (LIN-4070 review: the poll alone must start the
+  // one refresh the ticket names). The cost is that a hidden task's open page may refresh once per 60 s attempt floor
+  // rather than once per 2 minutes; the floor and single-flight rules still bound it.
+  const kickTaskFacts = ({ workspace, accountId, result, trackerType = undefined }) => {
+    if (!result || !result.incomplete) return;
+    if (result.stale && taskFacts) taskFacts.invalidate(workspace.urlKey);
+    const live = trackerType === undefined ? true : trackerType !== null && !isHiddenState({ state: { type: trackerType } });
+    const urgent = result.incomplete === 'task-missing' && live;
+    if (refreshTaskFacts) refreshTaskFacts({ urlKey: workspace.urlKey, workspace, accountId, urgent });
+  };
 
   // LIN-3975: the chat proposals still pending for this task's runs (the run control stages them). Read for the owner
   // only, from the runs the page already links (a run outside the page's read window has no link, so no proposal
@@ -121,6 +149,7 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         viewerIsOwner: owner,
         runnerReady: owner && (await requestFeatureFlags(req)).runControls === true,
       });
+      kickTaskFacts({ workspace, accountId: req.session?.accountId ?? null, result, trackerType: result.model?.tracker?.state?.type ?? null });
       if (result.notFound) {
         return res.status(404).send(renderTaskNotFoundPage({ identifier, urlKey: workspace.urlKey }, pageOptions));
       }
@@ -134,21 +163,24 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         ));
       }
       const model = owner ? { ...result.model, proposals: await pendingProposalsOf(workspace.urlKey, result.model) } : result.model;
-      const stateQuery = [
-        model.issueId ? `issueId=${encodeURIComponent(model.issueId)}` : null,
-        // LIN-4016: a container's own fact, passed back to the state read (the page knows it; the state read does not).
-        hasOpenSubtask(model.tracker?.subtasks) ? 'container=1' : null,
-      ].filter(Boolean);
+      const stateQuery = model.issueId ? [`issueId=${encodeURIComponent(model.issueId)}`] : [];
       const stateUrl = `/workspace/${encodeURIComponent(workspace.urlKey)}/api/task/${encodeURIComponent(model.identifier)}/state${stateQuery.length ? `?${stateQuery.join('&')}` : ''}`;
+      // The page's pill and run control read the gathered state (LIN-4070 B). When the held set is incomplete the pill is
+      // the display-only provisional one, and the row record carries no action, so no run is offered.
+      const taskState = result.taskState || null;
       // The run control's options (LIN-3975): the owner's only. The same vocabulary Home's opened task takes.
-      // LIN-4016: the task's own decision record (container, finished, copy-first step), the same one a Home row carries.
+      // LIN-4016/LIN-4068: the task's own decision record (container, finished, the gathered action), the one a Home row carries.
       const promptOpts = owner ? {
         ...buildPromptOpts({
           openRouterSource: pageOptions.openRouterSource,
           featureFlags: pageOptions.featureFlags,
           isLocalhost: isLocalhostRequest(req),
         }),
-        row: rowRecordOf({ stateType: model.tracker?.state?.type ?? null, container: hasOpenSubtask(model.tracker?.subtasks) }),
+        row: rowRecordOf({
+          stateType: model.tracker?.state?.type ?? null,
+          container: taskState ? taskState.container === true : hasOpenSubtask(model.tracker?.subtasks),
+          decided: taskState,
+        }),
       } : null;
       return res.send(renderTaskPage(model, {
         viewer,
@@ -158,6 +190,7 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         now: now(),
         pageOptions,
         promptOpts,
+        taskState: taskState || result.provisional || null,
       }));
     } catch (error) {
       console.error('Task page error:', error);
@@ -180,35 +213,48 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
     if (!isValidIssueId(identifier)) return jsonError(res, 404, 'Task not found');
     const issueId = queryValue(req.query.issueId);
     try {
-      const { model, taskState } = await loader.loadTaskState({
+      const { model, taskState, incomplete } = await loader.loadTaskState({
         urlKey: workspace.urlKey,
         identifier,
         issueId: issueId && isValidIssueId(issueId) ? issueId : null,
       });
+      kickTaskFacts({ workspace, accountId: req.session?.accountId ?? null, result: { incomplete } });
       res.set('Cache-Control', 'no-store');
+      // The history facts (count, last, track, strip) are the task's own whole-life read and ride even when the held set is
+      // incomplete. The state does not: no `taskState`, no run-offering action, and the reply says why. The browser keeps
+      // what it painted and polls on.
+      // LIN-4070 D7 (found by the opened-box E2E): `busy` is the gather's too. A parent whose subtask runs is busy, so the box
+      // holds its step line back; the step line is the one run offer the box paints besides the Go button. A cold reply is
+      // busy as well: no step is offered on a state that is not known (busy hides the step line in the client).
+      if (incomplete) {
+        return res.json({
+          incomplete,
+          trackHtml: renderTaskTrack(model, { now: now(), urlKey: workspace.urlKey, runLinks: true }),
+          stripHtml: renderStageStrip(model, { now: now() }),
+          sessions: { ...sessionSummaryOf(model), next: null, offered: null, busy: true, action: null },
+        });
+      }
       // LIN-4024: the question card carries an answer box, so only the owner gets one. Whether it shows at all is
       // `renderTaskQuestion`'s gate (LIN-4038: an open ruling only, not a shelved or bare `[blocked]` wait), the same
       // one the page-load card uses, so this read and the page cannot disagree. The poll keys on this string.
       const questionHtml = (await viewerOf(req)) === 'owner'
         ? renderTaskQuestion(model, { urlKey: workspace.urlKey })
         : '';
-      // No brief or recap rides here (LIN-3975): the state read has no tracker, so the page-load panels are
-      // the only ones shown, and a poll never repaints them.
       const body = {
         status: model.status,
         live: model.live,
-        headerHtml: renderTaskStatus(model),
+        // LIN-4070 B: the pill and Home's one-line state read the gathered state, the decision Home's row shows.
+        headerHtml: renderTaskStatus(model, { now: now(), taskState }),
         // LIN-4010: Home's one-line state (no "Harbour:" label; a waiting task says needs you or parked).
-        // LIN-4016: the pill reads `taskState`, the decision Home's row shows.
         homeStatusHtml: renderHomeStatus(model, { now: now(), taskState }),
         // The owner's and a member's state carries the attempts' run links (LIN-3975); it is a signed-in read.
         trackHtml: renderTaskTrack(model, { now: now(), urlKey: workspace.urlKey, runLinks: true }),
         // LIN-3968: the one-row stage strip Home's opened task pastes; the task page keeps trackHtml.
         stripHtml: renderStageStrip(model, { now: now() }),
-        // LIN-3833: the sessions the state block and the run control read (count, last, running).
-        // LIN-4016: `container` is the page's own fact, passed back (the row's container rule), never read from the tracker.
-        sessions: sessionSummaryOf(model, { container: req.query.container === '1' }),
-        // LIN-4016: the task's own decided state (`taskStateOf`): no tracker word, so done and backlog are not in it.
+        // LIN-3833: the sessions the state block and the run control read (count, last, running). LIN-4068 D7: the
+        // action is the gather's (busy includes a running subtree), so it is not recomputed here.
+        sessions: sessionsOfState(model, taskState),
+        // LIN-4016: the task's decided state, with its main action (the gather's, LIN-4068).
         taskState,
         // LIN-4024: the question card, for a task waiting on an open ruling only (a parked task has none). The
         // same renderer as the task page.
