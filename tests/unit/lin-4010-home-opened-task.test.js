@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 import { USUAL_STAGES, SPINE } from '../../lib/run-view.js';
-import { buildRowStates, buildTaskPageModel, nextStepOf, waitingForOf, sessionSummaryOf, guessStages } from '../../lib/task-page-loader.js';
+import { buildRowStates, buildTaskPageModel, nextStepOf, waitingForOf, sessionSummaryOf } from '../../lib/task-page-loader.js';
 import { buildInProgressCountParts } from '../../lib/task-board-view.js';
 import { renderHomeStatus } from '../../lib/render-task-page.js';
 
@@ -100,8 +100,9 @@ describe('LIN-4010 — Plan review is a usual stage, after Plan', () => {
     assert.deepEqual(SPINE, ['plan', 'implementation', 'review', 'close-out']);
   });
 
-  test('after Plan, Home offers Plan review, not Build', () => {
-    assert.equal(nextStepOf([sess('plan', 'done')], 'started').kind, 'plan-review');
+  // LIN-4103 beat 2: after Plan nothing has failed and nothing was undone, so no step is offered (no guessed Plan review).
+  test('after Plan, Home offers nothing: no guessed Plan review (LIN-4103)', () => {
+    assert.equal(nextStepOf([sess('plan', 'done')], 'started'), null);
   });
 
   test('a plan review that failed is offered again', () => {
@@ -109,13 +110,13 @@ describe('LIN-4010 — Plan review is a usual stage, after Plan', () => {
       { kind: 'plan-review', label: 'Plan review', why: 'again', failed: true, reason: 'failed last time, so it runs again' });
   });
 
-  test('a plan review that succeeded moves on to Build (a sent-back plan is not seen here: named in the PR)', () => {
-    assert.equal(nextStepOf([sess('plan', 'done'), sess('plan-review', 'done')], 'started').kind, 'implementation');
-    assert.deepEqual(guessStages([sess('plan', 'done'), sess('plan-review', 'done')], 'started'), ['implementation', 'review', 'close-out']);
+  // LIN-4103 beat 2: a succeeded plan review offers no guessed Build; nothing failed and nothing was undone.
+  test('a plan review that succeeded offers nothing: no guessed Build (LIN-4103)', () => {
+    assert.equal(nextStepOf([sess('plan', 'done'), sess('plan-review', 'done')], 'started'), null);
   });
 
   test('the offer says why, in the server\'s words', () => {
-    assert.equal(nextStepOf([sess('plan', 'done')], 'started').reason, 'usually next after Plan');
+    assert.equal(nextStepOf([sess('plan', 'done')], 'started'), null, 'no offer after Plan, so no reason to give (LIN-4103)');
   });
 });
 
@@ -163,21 +164,23 @@ describe('LIN-4010 — a waiting task is a ruling or a park', () => {
 
 // ─── containers: the row and the opened task run on the same subtask ─────────
 
-describe('LIN-4010 — a container\'s row reads the step its subtask is on', () => {
+// LIN-4103: a container's row names no subtask and no next step. What the subtasks do (running, failed, needs you) is
+// the row's; the step the seam would pick (`parentNextOf`) is still the prompt seed's and the descent's.
+describe('LIN-4010 — a container\'s row says what its subtasks do, never a guessed next step (LIN-4103)', () => {
   const child = () => node('LIN-71', 'unstarted');
 
-  test('an open child and nothing of the container\'s own: the row reads the child\'s next step', () => {
+  test('an open child and nothing of the container\'s own: the row names no subtask and no step', () => {
     const parent = node('LIN-70', 'started', [child()]);
     const s = states({ roots: [parent] });
-    assert.equal(s.get('LIN-70').words, 'Next: Research on LIN-71', 'the row names the subtask it is on (LIN-4039)');
-    assert.equal(s.get('LIN-70').tone, 'ready');
+    assert.equal(s.get('LIN-70').words, null, 'the row does not name LIN-71 or a step on it (LIN-4103)');
+    assert.equal(s.get('LIN-70').tone, 'quiet');
   });
 
-  test('the container\'s own landed work comes first: implementation done, a todo child, no focus (the selector would not defer)', () => {
+  test('the container\'s own landed work with a todo child: the row says nothing, and names no subtask', () => {
     const parent = node('LIN-72', 'started', [child()]);
     const s = states({ roots: [parent], loops: { 'LIN-72': [doneLoop('plan', { issueIdentifier: 'LIN-72' }), doneLoop('implementation', { issueIdentifier: 'LIN-72' })] } });
-    assert.equal(s.get('LIN-72').words, 'Review next', 'its own trail decides: Review is next, as the selector would have it');
-    assert.doesNotMatch(s.get('LIN-72').words, /LIN-71/);
+    assert.equal(s.get('LIN-72').words, null, 'no guessed Review (LIN-4103)');
+    assert.doesNotMatch(String(s.get('LIN-72').words), /LIN-71/);
   });
 
   test('a container whose own stage failed keeps its own failed row, no focus', () => {
@@ -195,7 +198,7 @@ describe('LIN-4010 — a container\'s row reads the step its subtask is on', () 
   test('a container whose children are all finished reads its own tracker state, not a child\'s', () => {
     const parent = node('LIN-75', 'started', [node('LIN-76', 'completed')]);
     const s = states({ roots: [parent] });
-    assert.doesNotMatch(s.get('LIN-75').words, /LIN-76/);
+    assert.equal(s.get('LIN-75').words, null, 'the row names no subtask, finished or not (LIN-4103)');
   });
 
   test('a running child names its state on the container row', () => {
@@ -224,9 +227,9 @@ describe('LIN-4010 — Home\'s state is one line, with no "Harbour:" label', () 
     assert.equal(renderHomeStatus(model, { now: NOW, taskState: stateOf(model) }).includes('Harbour:'), false);
   });
 
-  test('sessions.offered carries the reason the box says', () => {
-    const model = buildTaskPageModel({ identifier: 'LIN-83', loops: [doneLoop('plan', { issueIdentifier: 'LIN-83' })], ctx: null, enrichLoop, deriveSessionWaiting, now: NOW });
-    assert.equal(sessionSummaryOf(model).offered.reason, 'usually next after Plan');
+  test('sessions.offered carries the reason the box says, for a failed step', () => {
+    const model = buildTaskPageModel({ identifier: 'LIN-83', loops: [doneLoop('plan', { issueIdentifier: 'LIN-83' }), failedLoop('plan-review', { issueIdentifier: 'LIN-83' })], ctx: null, enrichLoop, deriveSessionWaiting, now: NOW });
+    assert.equal(sessionSummaryOf(model).offered.reason, 'failed last time, so it runs again');
   });
 
   // LIN-4010 review (finding 1): a running task names its state once, in the running box, so Home's line is left out.
@@ -384,9 +387,10 @@ const HOME = {
   // LIN-4016: the row's decision record, as the server stamps it.
   row: serverRow({ stateType: 'started' }),
 };
+// LIN-4103 beat 2: the box's offer is a failed step (a fact), never a guessed "usually next" one.
 const PLAN_NEXT = {
-  count: 1, next: { kind: 'plan-review', label: 'Plan review' },
-  offered: { kind: 'plan-review', label: 'Plan review', why: 'usual', failed: false, reason: 'usually next after Plan' },
+  count: 2,
+  offered: { kind: 'plan-review', label: 'Plan review', why: 'again', failed: true, reason: 'failed last time, so it runs again' },
   last: { label: 'Plan', state: 'done', at: null }, running: null, busy: false, excluded: [],
 };
 
@@ -402,7 +406,7 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
     const box = c.innerHTML.slice(c.innerHTML.indexOf('data-testid="opened-task-next-run"'));
     const at = (re) => box.search(re);
     const step = at(/opened-task-step-name[^"]*">Plan review/);
-    const why = at(/usually next after Plan/);
+    const why = at(/failed last time, so it runs again/);
     const run = at(/data-testid="opened-task-go"/);
     const runsOn = at(/data-testid="opened-task-runs-on"/);
     assert.ok(step > 0 && why > step && run > why && runsOn > run, `order step ${step}, why ${why}, run ${run}, runs on ${runsOn}`);
@@ -491,13 +495,15 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
   });
 
   // LIN-4024 (look): a new user's one action is a solid "Write the prompt", and the step line has no stray leading dot.
-  test('copy-first: the Write the prompt button is the primary, and the step line starts with the stage name', async () => {
+  // LIN-4103 (Item 5): before the prompt is written, no stage is named on screen; the step line gives the reason only.
+  test('copy-first: the Write the prompt button is the primary, and no stage is named before the prompt is written', async () => {
     const { PromptSection } = loadClient({ stateBody: { status: 'idle', live: false, homeStatusHtml: '<p>No sessions yet.</p>', sessions: { count: 0 } } });
     const c = makeContainer();
     PromptSection.init(c, { ...HOME, dispatchEnabled: false, issue: { ...HOME.issue, stateType: 'backlog' }, row: serverRow({ stateType: 'backlog' }) });
     await flush(); await flush();
     assert.match(c.innerHTML, /class="btn btn--primary opened-task-write" data-testid="opened-task-write"/);
-    assert.match(c.innerHTML, /data-testid="opened-task-step"><span class="opened-task-step-name">Scoping<\/span> \u00b7 the first step for a task in Backlog/);
+    assert.match(c.innerHTML, /data-testid="opened-task-step">the first step for a task in Backlog<\/div>/);
+    assert.doesNotMatch(c.innerHTML, /opened-task-step-name/, 'no stage name is drawn before the prompt is written');
   });
 
   // LIN-4024: a task waiting on a question shows the owner's card in the state block; no card when the server sends none.

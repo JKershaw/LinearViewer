@@ -1148,7 +1148,6 @@ a.wordmark:hover {
 .row-state[data-tone='needs-you'] { color: var(--red-dim); font-weight: 600; background: color-mix(in srgb, var(--red) 8%, transparent); border-radius: var(--radius-sm); }
 .row-state[data-tone='failed'] { color: var(--red-dim); }
 .row-state[data-tone='running'], .row-state[data-tone='queued'] { color: var(--amber-dim); }
-.row-state[data-tone='ready'] { color: var(--brand-dim); }
 .row-state[data-tone='quiet'] { color: var(--muted); }
 /* LIN-4010: a park (waiting with no open ruling) is quiet, not a call on you; it reads apart from needs-you. */
 .row-state[data-tone='parked'] { color: var(--muted); font-style: italic; }

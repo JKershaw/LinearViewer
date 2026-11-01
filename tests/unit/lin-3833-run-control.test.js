@@ -514,12 +514,15 @@ describe('LIN-3991 — a running task says its state once in the opened task', (
     assert.equal(c.innerHTML.split('Build running for 1h.').length - 1, 1, 'the sentence appears once');
   });
 
-  test('the running box says the state once: Running now, the step, Stop and Next; it does not repeat the state sentence', async () => {
-    const { c } = await mount({}, { opened: { status: 'running', live: true, homeStatusHtml: SENTENCE, sessions: { count: 1, next: { kind: 'review', label: 'Review' }, last: null, running } } });
+  // LIN-4103 beat 2: the box names no guessed next step. Its "Next: Review, once Build finishes" line is gone.
+  test('the running box says the state once: Running now, the step and Stop; it names no guessed next step (LIN-4103)', async () => {
+    const { c } = await mount({}, { opened: { status: 'running', live: true, homeStatusHtml: SENTENCE, sessions: { count: 1, last: null, running } } });
     // The box's own markup nests, so read from its opening tag to the end of its Next line.
     const start = c.innerHTML.indexOf('data-testid="opened-task-running"');
-    const line = c.innerHTML.slice(start, c.innerHTML.indexOf('</p></div>', start) + '</p></div>'.length);
-    assert.match(line, /Next: Review, once Build finishes/);
+    // LIN-4103: the box's head ends after its actions (Watch, Stop), the first closing div past that span.
+    const actionsAt = c.innerHTML.indexOf('opened-task-running-actions', start);
+    const line = c.innerHTML.slice(start, c.innerHTML.indexOf('</div>', actionsAt) + '</div>'.length);
+    assert.doesNotMatch(line, /Next:/, 'no guessed next step is named');
     assert.match(line, /data-testid="run-stop"/);
     assert.equal((line.match(/Running now/g) || []).length, 1, 'the state is named once, in the head');
     assert.doesNotMatch(line, /Build running/, 'the box does not repeat the state sentence');

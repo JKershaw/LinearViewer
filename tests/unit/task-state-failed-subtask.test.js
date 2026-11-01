@@ -59,12 +59,13 @@ describe('LIN-4016 W2 — a parent whose subtask\'s Build failed', () => {
   const parent = node('LIN-P1', [node('LIN-C9')]);
   const loops = { 'LIN-C9': [failedBuild({ issueIdentifier: 'LIN-C9' })] };
 
-  test('the child row says Build failed; the parent row says failed, with the same words', () => {
+  // LIN-4103 beat 2: the child says its own failure; the parent rolls the failed subtask up as a count.
+  test('the child row says Build failed; the parent row says failed, as a count ("a subtask failed")', () => {
     const s = statesFor(parent, loops);
     assert.equal(s.get('LIN-C9').state, 'failed');
     assert.equal(s.get('LIN-C9').words, 'Build failed');
     assert.equal(s.get('LIN-P1').state, 'failed');
-    assert.equal(s.get('LIN-P1').words, 'Build failed');
+    assert.equal(s.get('LIN-P1').words, 'a subtask failed');
   });
 
   test('the count line says 1 failed and no waiting-on-you part', () => {

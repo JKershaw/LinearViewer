@@ -20,6 +20,22 @@ const RUNS_PER_KIND = 2;
 // Dispatch refuses a second run of one kind on one issue within minutes, so each seeded run takes an issue of its own.
 const ISSUES = testMockData.issues.map((issue) => issue.identifier);
 
+// LIN-4103 beat 4: a never-run task offers no step (it is offered Run to PR), so a scenario that needs an offered step
+// makes the top task one whose research failed: the failure is the fact that offers that step again.
+async function seedFailedResearchOnTop(page, urlKey) {
+  const identifier = await page.locator('[data-top-task="1"]').first().getAttribute('data-identifier');
+  const { token } = await (await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${urlKey}`)).json();
+  const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  const create = await page.request.post(`/workspace/${urlKey}/api/dispatch`, {
+    data: { prompt: 'research prompt', promptName: 'research', kind: 'research', issueIdentifier: identifier, issueTitle: identifier, target: 'cli' },
+  });
+  expect(create.status(), await create.text()).toBe(201);
+  const itemId = (await create.json()).item.id;
+  expect((await page.request.post(`/api/dispatch/take/${itemId}`, { headers: auth })).status()).toBe(200);
+  expect((await page.request.post(`/api/dispatch/feedback/${itemId}`, { headers: auth, data: { message: '[failed] the research could not finish' } })).status()).toBe(200);
+  return identifier;
+}
+
 /** Home at the workspace's own URL, read to rest. */
 async function gotoHome(page, urlKey) {
   await page.goto(`/workspace/${urlKey}/`);
@@ -78,6 +94,8 @@ async function openChangePanel(page, seedLocal, urlKey) {
   await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, runnerKey: true });
   await resetRuns(page, urlKey);
   await seedPricedRuns(page, urlKey);
+  await gotoHome(page, urlKey);
+  await seedFailedResearchOnTop(page, urlKey);
   await gotoHome(page, urlKey);
   const component = await openTopTask(page);
   await component.locator(RC.change).click();

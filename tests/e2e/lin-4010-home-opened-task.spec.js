@@ -103,9 +103,11 @@ for (const [label, viewport] of [['1280px', DESKTOP], ['390px', PHONE]]) {
       const step = next.locator('.opened-task-step-name');
       const why = next.locator('[data-testid="opened-task-step-why"]');
       const run = next.locator('[data-testid="opened-task-go"]');
-      await expect(step).toHaveText('Plan review');
-      await expect(why).toContainText('usually next after Plan');
-      await expect(run).toContainText('Run Plan review');
+      // LIN-4103 beat 2: after a clean Plan the box names no guessed step and no "usually next" reason; the run goes to PR.
+      await expect(step).toHaveText('Run to PR');
+      await expect(why).toContainText('no stage step is offered, so the run takes it to PR');
+      await expect(why).not.toContainText('usually');
+      await expect(run).toContainText('Run to PR');
 
       // Plan decision 2: the folds row carries the session count from the state read ("Sessions (1)" after one session).
       await expect(block.locator('[data-fold-count="sessions"]')).toHaveText(' (1)');
@@ -254,7 +256,7 @@ for (const [label, viewport] of [['1280px', DESKTOP], ['390px', PHONE]]) {
     test.describe(`the review-shaped Home at ${label}, ${theme} (LIN-4010 review)`, () => {
       test.use({ viewport, isMobile: viewport === PHONE, hasTouch: viewport === PHONE });
 
-      test('one running box with Stop in view, six chips with the minutes only, no sideways scroll, readable text', async ({ page }) => {
+      test('one running box with Stop in view, four chips (the stages that ran) with the minutes only, no sideways scroll, readable text', async ({ page }) => {
         await seedReviewShaped(page);
         const token = await runnerToken(page);
         for (const kind of ['research', 'plan', 'plan-review']) await seedSession(page, token, { kind, feedback: '[done] done it' });
@@ -277,8 +279,9 @@ for (const [label, viewport] of [['1280px', DESKTOP], ['390px', PHONE]]) {
         const stopBox = await box(stop);
         expect(stopBox.y + stopBox.height, 'Stop is on the first screen').toBeLessThanOrEqual(viewport.height);
 
-        // Six chips, one per usual stage; the running one shows its minutes and not the word.
-        await expect(block.locator('[data-testid="task-page-strip-chip"]')).toHaveCount(6);
+        // LIN-4103 beat 2: four chips, one per stage that ran (research, plan, plan-review, the running implementation); no
+        // usual stage is drawn after it. The running one shows its minutes and not the word.
+        await expect(block.locator('[data-testid="task-page-strip-chip"]')).toHaveCount(4);
 
         if (viewport === PHONE) {
           const sideways = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
@@ -310,7 +313,8 @@ test.describe('the state poll repaints the run box without losing a Change draft
     test.setTimeout(90000);
     await seedTask(page);
     const token = await runnerToken(page);
-    await seedSession(page, token, { kind: 'plan', feedback: '[done] planned it' });
+    // LIN-4103 beat 2: a clean Plan offers no step, so the scenario seeds a failed Plan, the fact that offers one.
+    await seedSession(page, token, { kind: 'plan', feedback: '[failed] planning could not finish' });
     await gotoHome(page);
     const block = await openTopTask(page);
 

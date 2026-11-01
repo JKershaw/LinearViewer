@@ -56,11 +56,14 @@ async function actionOf(loops, { container = false, state = 'started' } = {}) {
 describe('LIN-4016 W3 — the main action on /state: a step for a leaf, Run to PR for a container', () => {
   const finishedPlan = [doneLoop('plan', { loopId: 'p1', lineageId: 'p1' })];
 
-  test('a leaf with a step to offer: the step, with the reason the box says', async () => {
-    const action = await actionOf(finishedPlan);
-    assert.equal(action.kind, 'step');
-    assert.ok(action.step.label, 'the step names what runs');
-    assert.equal(action.why, action.step.reason);
+  // LIN-4103 beat 2: a leaf offers a step only when a stage failed (a fact). A clean finished plan offers no guessed step.
+  test('a leaf whose stage failed offers that step, with the reason the box says; a clean leaf offers Run to PR (LIN-4103)', async () => {
+    const failed = await actionOf([doneLoop('plan', { loopId: 'p1', lineageId: 'p1' }), failedLoop('implementation', { loopId: 'i1', lineageId: 'i1' })]);
+    assert.equal(failed.kind, 'step');
+    assert.ok(failed.step.label, 'the step names what runs');
+    assert.equal(failed.why, failed.step.reason);
+    const clean = await actionOf(finishedPlan);
+    assert.equal(clean.kind, 'run-to-pr', 'no guessed step after a clean Plan');
   });
 
   test('the same sessions as a container (an open subtask in the held tree): Run to PR, never a stage', async () => {

@@ -70,14 +70,16 @@ async function bothReads(loops) {
 }
 
 describe('LIN-3975 — the poll and the page name the same next step', () => {
-  test('Build done: both offer Review, and the poll\'s sessions.offered is the page\'s nextStep', async () => {
+  // LIN-4103 beat 2: a Build that is done offers no guessed Review. Nothing failed, so neither the page nor the poll offers
+  // a step, and they still agree on that.
+  test('Build done: neither offers a guessed Review, and the poll agrees with the page that it offers nothing (LIN-4103)', async () => {
     const { page, state } = await bothReads([
       stage('l-plan', 'plan', 'done', 120),
       stage('l-build', 'implementation', 'done', 60),
     ]);
-    assert.equal(page.nextStep.kind, 'review', 'the rule offers Review after Build');
-    assert.equal(sessionSummaryOf(state).offered.kind, page.nextStep.kind, 'the poll names the same step');
-    assert.deepEqual(sessionSummaryOf(state).offered, page.nextStep, 'the same step, reason and failed flag');
+    assert.equal(page.nextStep, null, 'no guessed step after Build');
+    assert.equal(sessionSummaryOf(state).offered, null, 'the poll offers nothing either');
+    assert.deepEqual(sessionSummaryOf(state).offered, page.nextStep, 'the same answer: nothing offered');
   });
 
   test('a failed Review: both say Review again (failed), so the poll never repaints "idle" beside a page that offers it', async () => {

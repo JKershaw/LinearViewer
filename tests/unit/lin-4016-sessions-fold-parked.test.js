@@ -107,17 +107,27 @@ async function foldWordFor(data) {
 
 const waitingSession = { sessionId: 's-1', agentState: 'waiting', stage: 'implementation', dispatchedAt: null, feedback: [] };
 
-describe('LIN-4016 — the Sessions fold paints the word the server decided', () => {
+// LIN-4103 beat 3: the server decides the word a row paints (`sessions[].word`); the fold paints it and decides nothing.
+describe('LIN-4016 — the sessions route decides the word the fold paints', () => {
+  const waitingStores = () => blockedSession();
+  const parked = async (loadTaskState) => (await callRoute(loadTaskState, waitingStores())).jsonBody.sessions[0].word;
+
   test('a waiting session on a parked task reads "parked"', async () => {
-    assert.equal(await foldWordFor({ sessions: [waitingSession], taskParked: true }), 'parked');
+    assert.equal(await parked(async () => ({ taskState: { state: 'parked' } })), 'parked');
   });
 
   test('a waiting session on a ruling still reads "waiting on you"', async () => {
-    assert.equal(await foldWordFor({ sessions: [waitingSession], taskParked: false }), 'waiting on you');
+    assert.equal(await parked(async () => ({ taskState: { state: 'needs-you' } })), 'waiting on you');
   });
 
   test('a running session reads "running" whatever the park flag says', async () => {
-    assert.equal(await foldWordFor({ sessions: [{ ...waitingSession, agentState: 'running' }], taskParked: true }), 'running');
+    const stores = { dispatchQueueStore: { async listItems() { return []; }, async listHistory() { return { items: [item('d-9', 5)] }; } }, agentStatusStore: { async listStatus() { return { items: [] }; } } };
+    const res = await callRoute(async () => ({ taskState: { state: 'parked' } }), stores);
+    assert.equal(res.jsonBody.sessions[0].word, 'running');
+  });
+
+  test('the fold paints the word it is given (the client decides no word)', async () => {
+    assert.equal(await foldWordFor({ sessions: [{ ...waitingSession, word: 'parked' }], taskParked: false }), 'parked');
   });
 });
 

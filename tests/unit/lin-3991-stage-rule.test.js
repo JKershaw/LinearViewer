@@ -11,7 +11,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { guessStages, nextStepOf, buildTaskStages } from '../../lib/task-page-loader.js';
+import { nextStepOf, buildTaskStages } from '../../lib/task-page-loader.js';
 
 const sess = (kind, state, over = {}) => ({
   loopId: `${kind}-${state}-${over.n || 0}`, kind, label: kind, state, open: false,
@@ -20,42 +20,14 @@ const sess = (kind, state, over = {}) => ({
   ...over,
 });
 
-describe('LIN-3991 — guessStages: the stages ahead start at the failed stage', () => {
-  test('a failed Review that was the only stage tried offers Review, then Close-out', () => {
-    assert.deepEqual(guessStages([sess('review', 'failed')], 'started'), ['review', 'close-out']);
-  });
-
-  test('a cancelled Review that was the only stage tried offers Review, then Close-out', () => {
-    assert.deepEqual(guessStages([sess('review', 'cancelled')], 'started'), ['review', 'close-out']);
-  });
-
-  test('a failed Review and a Research done before it still offers Review, then Close-out', () => {
-    const sessions = [sess('research', 'done'), sess('review', 'failed')];
-    assert.deepEqual(guessStages(sessions, 'started'), ['review', 'close-out']);
-  });
-
-  test('a failed Research, the first stage tried, still offers every usual stage', () => {
-    assert.deepEqual(guessStages([sess('research', 'failed')], 'started'), ['research', 'plan', 'plan-review', 'implementation', 'review', 'close-out']);
-  });
-
-  test('nothing before the furthest stage tried is offered, failed or not', () => {
-    const sessions = [sess('plan', 'done'), sess('implementation', 'done'), sess('review', 'failed')];
-    assert.deepEqual(guessStages(sessions, 'started'), ['review', 'close-out']);
-  });
-
-  test('a stage that failed before a later one passed is not offered again: the furthest tried decides', () => {
-    const sessions = [sess('plan', 'failed'), sess('implementation', 'done')];
-    assert.deepEqual(guessStages(sessions, 'started'), ['review', 'close-out']);
-  });
-});
-
 describe('LIN-3991 — the first-failed task reads the same to the next-step rule and the track', () => {
   test('nextStepOf offers the failed Review again, not the stage before it', () => {
     assert.deepEqual(nextStepOf([sess('review', 'failed')], 'started'), { kind: 'review', label: 'Review', why: 'again', failed: true, reason: 'failed last time, so it runs again' });
   });
 
-  test('buildTaskStages lists the failed Review, then Close-out as ahead, and nothing earlier', () => {
+  // LIN-4103 beat 2: the track draws the stage that ran; no usual stage (Close-out) is drawn ahead of it.
+  test('buildTaskStages lists the failed Review and nothing ahead of it (LIN-4103)', () => {
     const stages = buildTaskStages([sess('review', 'failed')], { trackerType: 'started' });
-    assert.deepEqual(stages.map(s => [s.kind, s.state]), [['review', 'failed'], ['close-out', 'ahead']]);
+    assert.deepEqual(stages.map(s => [s.kind, s.state]), [['review', 'failed']]);
   });
 });

@@ -18,6 +18,10 @@ import { getLoopsForIssue, sessionIdByLoop } from '../lib/pipeline-loops.js';
 import { sessionIdOf } from '../lib/live-console.js';
 import { toSessionView } from '../lib/sessions-view.js';
 import { inReadWindow } from '../lib/read-horizon.js';
+import { runSessionsOf } from '../lib/task-page-loader.js';
+import { enrichLoop } from '../lib/run-loop-state.js';
+import { deriveSessionWaiting } from './dashboard-session-state.js';
+import { STAGE_STATE_WORD } from '../lib/run-view.js';
 import { resolveIssueBinding } from '../lib/workspace.js';
 import { resolveStateRef } from '../lib/proxy-ref-resolver.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
@@ -54,6 +58,19 @@ async function defaultMarkDone({ provider, callScope, issueIdentifier }) {
   const states = await provider.states(callScope, teamId);
   const completedId = (states || []).find((state) => state?.type === 'completed')?.id;
   return provider.updateIssue(callScope, issueRef, { stateId: completedId || resolveStateRef(states, 'Done') });
+}
+
+/**
+ * The word a Sessions row paints (LIN-4103 beat 3). The box's word for the run's state, with the two exceptions the product
+ * decided: a waiting run on a parked task is parked (LIN-4016), and a waiting run out of the window is history, unanswered
+ * (LIN-4070 N5). The list paints this word and decides nothing itself.
+ */
+function sessionWordOf(session, taskParked) {
+  if (session.state === 'waiting') {
+    if (session.historical) return 'unanswered';
+    if (taskParked) return 'parked';
+  }
+  return STAGE_STATE_WORD[session.state] || session.state || '';
 }
 
 export function registerSessionsRoutes(router, { workspaceFromUrl, dispatchQueueStore, agentStatusStore, loadTaskState = null }) {
@@ -95,19 +112,28 @@ export function registerSessionsRoutes(router, { workspaceFromUrl, dispatchQueue
       // (LIN-4024). Same lookup as the Live Console, so the link and the console cannot disagree on a run.
       const sessionIds = sessionIdByLoop(loops);
       const at = new Date();
-      // getLoopsForIssue returns oldest-first; reverse for newest-first display. `historical` marks a session older than the
-      // read window: history, not a question (LIN-4070 N5).
-      const sessions = loops.map((loop) => ({
-        ...toSessionView(loop),
-        sessionId: sessionIdOf(loop, sessionIds),
-        historical: !inReadWindow(loop.dispatchedAt, at),
-      })).reverse();
+      // LIN-4103 beat 3: the list is the task's RUNS (`runSessionsOf`: the box's own sessions, queue records out), newest-first.
+      // Each row carries the box's `label` and `state`, so the list and the box name a run the same way. `historical` marks a
+      // run older than the read window: history, not a question (LIN-4070 N5).
+      const loopById = new Map(loops.map((loop) => [loop.loopId, loop]));
+      const runs = runSessionsOf(loops, { enrichLoop, deriveSessionWaiting, now: at }).reverse();
+      const sessions = runs.map((run) => {
+        const loop = loopById.get(run.loopId);
+        return {
+          ...toSessionView(loop),
+          kind: run.kind,
+          label: run.label,
+          state: run.state,
+          sessionId: sessionIdOf(loop, sessionIds),
+          historical: !inReadWindow(loop.dispatchedAt, at),
+        };
+      });
       // LIN-4016: a waiting session reads "parked" on a parked task and "waiting on you" on a ruling. The task's decided
       // state (the gather the row and the page read, LIN-4070) says which, so the fold does not re-derive it. Read only
       // when an in-window session waits: an out-of-window one is history and never a question.
       // The park word is garnish on the list: a failed or incomplete state read leaves `taskParked: false`, with no warning.
       let taskParked = false;
-      if (loadTaskState && sessions.some((s) => s.agentState === 'waiting' && !s.historical)) {
+      if (loadTaskState && sessions.some((s) => s.state === 'waiting' && !s.historical)) {
         try {
           const { taskState } = await loadTaskState({ urlKey: workspace.urlKey, identifier });
           taskParked = taskState?.state === 'parked';
@@ -115,7 +141,10 @@ export function registerSessionsRoutes(router, { workspaceFromUrl, dispatchQueue
           console.warn('Sessions taskParked read failed:', err?.message);
         }
       }
-      res.json({ sessions, taskParked });
+      // The word each row paints is decided here, once: the box's word for its state (`STAGE_STATE_WORD`), with the two
+      // decided exceptions: a waiting run on a parked task reads "parked", and a waiting run out of the window reads "unanswered".
+      const rows = sessions.map((s) => ({ ...s, word: sessionWordOf(s, taskParked) }));
+      res.json({ sessions: rows, taskParked });
     } catch (error) {
       console.error('Sessions GET error:', error);
       jsonError(res, 500, 'Failed to fetch sessions', { message: error.message });

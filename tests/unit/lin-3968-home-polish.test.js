@@ -59,11 +59,12 @@ function chipsOf(html) {
 }
 
 describe('LIN-3968 — the stage strip: one row, one chip per stage', () => {
-  test('a failed Review is the offered step, and Close-out follows it as usual', () => {
+  // LIN-4103 beat 2: the strip shows the stages that ran (done, failed, running, waiting). No usual stage is drawn ahead.
+  test('a failed Review is the offered step, and no usual stage follows it (LIN-4103)', () => {
     const chips = chipsOf(stripOf([sess('plan', 'done'), sess('implementation', 'done'), sess('review', 'failed')]));
-    assert.deepEqual(chips.map(c => c.name), ['Plan', 'Build', 'Review', 'Close-out']);
-    assert.deepEqual(chips.map(c => c.word), ['done', 'done', 'failed', 'usual']);
-    assert.deepEqual(chips.map(c => c.offered), [false, false, true, false]);
+    assert.deepEqual(chips.map(c => c.name), ['Plan', 'Build', 'Review']);
+    assert.deepEqual(chips.map(c => c.word), ['done', 'done', 'failed']);
+    assert.deepEqual(chips.map(c => c.offered), [false, false, true]);
   });
 
   test('while Build runs, its chip says the minutes and no chip is offered', () => {
@@ -74,19 +75,16 @@ describe('LIN-3968 — the stage strip: one row, one chip per stage', () => {
     assert.equal(chips.some(c => c.offered), false, 'no step is offered while a stage runs');
   });
 
-  test('a task with no sessions shows the six usual stages, Research first, the first one offered', () => {
-    const chips = chipsOf(stripOf([]));
-    assert.deepEqual(chips.map(c => c.name), ['Research', 'Plan', 'Plan review', 'Build', 'Review', 'Close-out']);
-    assert.equal(chips[0].word, 'next', 'the first usual stage is the one offered');
-    assert.equal(chips[0].offered, true);
-    assert.deepEqual(chips.slice(1).map(c => c.word), ['usual', 'usual', 'usual', 'usual', 'usual']);
+  test('a task with no sessions draws no chip: nothing ran, and no usual stage is guessed (LIN-4103)', () => {
+    assert.deepEqual(chipsOf(stripOf([])), []);
+    assert.equal(stripOf([]), '');
   });
 
   test('a stage reached more than once is one chip, in the order it was first reached', () => {
     const chips = chipsOf(stripOf([
       sess('plan', 'done', { n: 1 }), sess('implementation', 'done', { n: 1 }), sess('review', 'done', { n: 1 }), sess('implementation', 'done', { n: 2 }),
     ]));
-    assert.deepEqual(chips.map(c => c.name), ['Plan', 'Build', 'Review', 'Close-out']);
+    assert.deepEqual(chips.map(c => c.name), ['Plan', 'Build', 'Review']);
   });
 
   test('no stages, no strip', () => {

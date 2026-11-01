@@ -103,6 +103,22 @@ test.describe('Home first page — the Change panel is a full-screen sheet on a 
 // LIN-3833 (witness: "dispatches once from each source … and shows that the stamped row matches what the control
 // showed"). A run from the default, a preset, and a choice for this run: the control's "Runs on" model is the one
 // the queued row carries, and the row is read back from the store (`/test/dispatch-item`, which returns `row`).
+// LIN-4103 beat 4: a never-run task offers no step (it is offered Run to PR), so a scenario that needs an offered step
+// makes the top task one whose research failed: the failure is the fact that offers that step again.
+async function seedFailedResearchOnTop(page, urlKey) {
+  const identifier = await page.locator('[data-top-task="1"]').first().getAttribute('data-identifier');
+  const { token } = await (await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${urlKey}`)).json();
+  const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  const create = await page.request.post(`/workspace/${urlKey}/api/dispatch`, {
+    data: { prompt: 'research prompt', promptName: 'research', kind: 'research', issueIdentifier: identifier, issueTitle: identifier, target: 'cli' },
+  });
+  expect(create.status(), await create.text()).toBe(201);
+  const itemId = (await create.json()).item.id;
+  expect((await page.request.post(`/api/dispatch/take/${itemId}`, { headers: auth })).status()).toBe(200);
+  expect((await page.request.post(`/api/dispatch/feedback/${itemId}`, { headers: auth, data: { message: '[failed] the research could not finish' } })).status()).toBe(200);
+  return identifier;
+}
+
 test.describe('Home first page — a run from each source stamps the row the control showed (LIN-3833)', () => {
   test('default, preset and chosen for this run', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, runnerKey: true });
@@ -113,6 +129,8 @@ test.describe('Home first page — a run from each source stamps the row the con
     const preset = await page.request.post(`/workspace/${key}/api/dispatch/presets`, { data: { name: 'Careful', model: 'preset-model-careful' } });
     expect(preset.ok()).toBe(true);
 
+    await gotoHome(page, key);
+    await seedFailedResearchOnTop(page, key);
     await gotoHome(page, key);
     let component = await openTopTask(page);
 
