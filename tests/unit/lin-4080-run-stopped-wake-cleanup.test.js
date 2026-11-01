@@ -55,6 +55,23 @@ function wakesTo(collection, historyCollection, runId) {
   return { queued: pick(collection._docs), archived: pick(historyCollection._docs) };
 }
 
+describe('LIN-4080 W1 — acceptance replay of the incident shape', () => {
+  test('autopilot A -> research R -> cascade -> [aborted] on A\'s abort row, R\'s own row and R\'s abort row: no row in queue or history has followUpTo A', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    const a = await autopilot(store);
+    const r = await worker(store, a._id);
+    await store.expandCascadeAborts(URL_KEY, a._id);
+    const abortOf = (id) => [...collection._docs].find(d => d.abort === true && d.abortTo === id);
+
+    await postOn(store, abortOf(a._id), ABORTED);
+    await postOn(store, r, ABORTED);                 // the aborted child's own terminal (LIN-1471 shape)
+    await postOn(store, abortOf(r._id), ABORTED);
+
+    const toA = [...collection._docs, ...historyCollection._docs].filter(d => d.followUpTo === a._id);
+    assert.deepEqual(toA.map(d => `${d.kind}:${d.status}`), [], 'nothing is addressed to the stopped autopilot');
+  });
+});
+
 describe('LIN-4080 W4 — a queued wake of a stopped run is cancelled when its [aborted] lands', () => {
   test('plain abort: the queued wake stays queued until the abort\'s [aborted] lands, then archives as cancelled', async () => {
     const { store, collection, historyCollection } = makeStore();

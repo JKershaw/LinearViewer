@@ -722,6 +722,16 @@ curl -s -X POST "$BASE/api/proxy/dispatch" \
   -d "{\"abort\": true, \"abortTo\": \"$ORIG\"}"
 ```
 
+### A stopped run stays stopped (LIN-4080)
+
+A run is **stopped** once an abort reaches it (a plain abort, a cascade abort, or a workspace halt sweep that lands `[aborted]` on the run). Harbour then keeps it stopped:
+
+- **Nothing new joins it.** A non-abort dispatch whose `sessionId` or `followUpTo` names a stopped run is refused `409 RUN_STOPPED`, and `force: true` does not bypass that. Start a new run instead. Abort rows and fresh dispatches with neither field are unaffected, and a workspace halt does not refuse admission.
+- **Nothing is adopted from it.** The duplicate-dispatch check never hands back a row whose orchestrator run is stopped, so a new run is admitted as its own row.
+- **Its children's terminals do not wake it.** No wake is minted to a stopped parent. A live parent still receives its children's `[aborted]` and `[done]` wakes. A workspace halt of `stop` (never `pause`) blocks wake minting only, and an unreadable halt counts as not halted.
+- **Its queued wakes are cancelled, once the stop lands.** When the `[aborted]` marker lands (on the abort row, or on the run's own row for a halt sweep), each queued wake addressed to the run is removed and archived as `cancelled`. Cancellation is **not** done at enqueue: a `[skipped]` abort is a live, human-continued session whose wakes cannot be restored once cancelled. So a queued wake to the target stays queued until the `[aborted]` lands. The consumer rejects a follow-up to a cancelled session at delivery (LIN-4079), which bounds that window.
+- **A `[skipped]` abort does not stop the run.** It means the session is human-continued and still live.
+
 ### Cascade close (closing a session subtree)
 
 A plain abort closes exactly one session. A **cascade** closes a whole session subtree in
