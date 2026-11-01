@@ -95,6 +95,7 @@ describe('LIN-4080 ruling — the person flag has exactly one set of writers', (
       .map(([file]) => file)
       .sort();
     assert.deepEqual(files, [
+      'lib/chat-tools.js',      // LIN-4080 Task Chat: forwards the route's indication into createDispatchItem (census below)
       'lib/dispatch-entrance.js',
       'lib/dispatch-factory.js',
       'lib/dispatch-store.js',
@@ -127,6 +128,45 @@ describe('LIN-4080 ruling — the person flag has exactly one set of writers', (
     assert.equal(value.operator, '===');
     assert.equal(value.left.name, 'laneName');
     assert.equal(value.right.value, 'session');
+  });
+
+  test('the Task Chat indication is the literal true in routes/task-chat.js, and reaches the factory only as `personTurn === true`', () => {
+    const sources = liveSources();
+    // The indication is a constant set by the Task Chat turn, in one route file only.
+    const routeNames = Object.entries(sources)
+      .filter(([file, source]) => file.startsWith('routes/') && /\bpersonTurn\b/.test(source))
+      .map(([file]) => file);
+    assert.deepEqual(routeNames, ['routes/task-chat.js']);
+    const routeValues = [];
+    (function visit(node) {
+      if (!node || typeof node.type !== 'string') return;
+      if (node.type === 'Property' && node.key?.type === 'Identifier' && node.key.name === 'personTurn') routeValues.push(node.value);
+      for (const key of Object.keys(node)) {
+        const value = node[key];
+        if (Array.isArray(value)) value.forEach(visit); else if (value && typeof value.type === 'string') visit(value);
+      }
+    })(parse(sources['routes/task-chat.js']));
+    assert.equal(routeValues.length, 1, 'one assignment of the indication in the Task Chat turn');
+    assert.equal(routeValues[0].type, 'Literal');
+    assert.equal(routeValues[0].value, true);
+
+    // The factory call in chat-tools takes the flag from the closure value only.
+    const toolsAst = parse(sources['lib/chat-tools.js']);
+    const personOriginatedValues = [];
+    (function visit(node) {
+      if (!node || typeof node.type !== 'string') return;
+      if (node.type === 'Property' && node.key?.type === 'Identifier' && node.key.name === FLAG) personOriginatedValues.push(node.value);
+      for (const key of Object.keys(node)) {
+        const value = node[key];
+        if (Array.isArray(value)) value.forEach(visit); else if (value && typeof value.type === 'string') visit(value);
+      }
+    })(toolsAst);
+    assert.equal(personOriginatedValues.length, 1, 'one assignment of the flag in the Task Chat executor');
+    const [value] = personOriginatedValues;
+    assert.equal(value.type, 'BinaryExpression');
+    assert.equal(value.operator, '===');
+    assert.equal(value.left.name, 'personTurn');
+    assert.equal(value.right.value, true);
   });
 
   test('the session lane is opened only by enterSessionDispatch, and that is called only by the signed-in route', () => {

@@ -637,6 +637,11 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
       await runAgentTurn({
         workspace,
         turnKind: 'user-initiated',
+        // LIN-4080 (ruling lin4080-task-chat-person-force): this turn is the signed-in person's own chat
+        // message, so it is the indication that a forced follow-up here is a human act. A constant, not a
+        // request field: the model cannot set it, and the body cannot either. Only an execute-mode send
+        // reaches the factory, so a run-scoped or propose turn (followUpMode 'propose' below) never uses it.
+        personTurn: true,
         // LIN-3254: a run-scoped turn proposes (and persists via onProposal);
         // an ordinary chat keeps today's execute posture.
         ...(runScoped || propose ? { followUpMode: 'propose', onProposal: persistProposal } : {}),
