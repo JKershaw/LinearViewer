@@ -207,7 +207,7 @@
     }
     const children = task.children || [];
     if (children.length) {
-      bands.push(`<div class="context-rel-group"><div class="context-lane-label">Children</div><div class="context-rel-nodes">${children.map(n => nodeHtml(n)).join('')}${truncationNote(task.childrenTruncated, 'children')}</div></div>`);
+      bands.push(`<div class="context-rel-group"><div class="context-lane-label">Children</div><div class="context-rel-nodes">${children.map(n => nodeHtml(n)).join('')}${task.childrenCapped ? '<div class="context-truncated">More children than are shown here.</div>' : ''}</div></div>`);
     }
     const related = task.related || [];
     if (related.length) {

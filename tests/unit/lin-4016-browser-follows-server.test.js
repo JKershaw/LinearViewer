@@ -14,6 +14,7 @@ import vm from 'node:vm';
 import { escapeHtml } from '../../lib/utils/html.js';
 import { rowRecordOf, rowDataByNodeKey } from '../../lib/task-board-view.js';
 import { nodeKey } from '../../lib/tree.js';
+import { stateBodyOf, stateIssue, failedStageLoop } from '../fixtures/state-route.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
@@ -190,11 +191,17 @@ describe('LIN-4016 W4 — the run control paints the server\'s decision', () => 
 describe('LIN-4016 — the opened task agrees with its row (finished, and a failed subtask)', () => {
   const FAILED_PILL = '<div class="task-status task-status--home" data-testid="home-task-status"><span class="status-pill status-pill--error task-status-pill" data-testid="home-task-status-pill"><span class="status-pill__dot" aria-hidden="true"></span>failed</span></div>';
 
-  test('a finished row whose last stage failed paints done, not the /state failed pill, and offers no stage', async () => {
+  // REWRITTEN (LIN-4070): the body was fabricated with a failed pill, which the server no longer sends for a Done task (the
+  // gather words it done, D2). The body is now the one `/state` returns for a Done task whose last stage failed.
+  test('a finished row whose last stage failed: the server words it done, the box paints done, and offers no stage', async () => {
+    const { body } = await stateBodyOf({ issues: [stateIssue('LIN-42', 'completed')], loops: [failedStageLoop('LIN-42')], identifier: 'LIN-42' });
+    assert.match(body.homeStatusHtml, /status-pill--done/, 'the server words a finished task done (LIN-4070 D2)');
+    assert.doesNotMatch(body.homeStatusHtml, /status-pill--error/);
+    assert.equal(body.sessions.action, null, 'a finished task offers no action (LIN-4042)');
     const row = rowRecordOf({ stateType: 'completed', decided: { state: 'done', words: 'done' } });
-    const html = await paint({ ...stateWith({ offered: PLAN_OFFER, action: { kind: 'step', step: PLAN_OFFER, why: PLAN_OFFER.reason } }), homeStatusHtml: FAILED_PILL }, { row });
+    const html = await paint(body, { row });
     assert.match(html, /status-pill--done task-status-pill" data-testid="home-task-status-pill"><span class="status-pill__dot" aria-hidden="true"><\/span>done</);
-    assert.doesNotMatch(html, /status-pill--error/, 'the /state failed pill is not painted beside a done row');
+    assert.doesNotMatch(html, /status-pill--error/, 'no failed pill beside a done row');
     assert.doesNotMatch(html, /data-action="run-step-next"/, 'a finished task offers no stage step');
   });
 

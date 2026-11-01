@@ -213,6 +213,9 @@ test.describe('Task page, owner view (LIN-3329)', () => {
 
   test('it updates itself, and a repaint keeps the rows the reader opened and the evidence', async ({ page }) => {
     await seedTasks(page, { reviewed: true });
+    // LIN-4070: the held task facts are written by Home's load, the way a user arrives here. Warm them first, so the
+    // first state read is complete, not held for a refresh (the 60 s attempt floor) that another spec's set may need.
+    await page.goto(`/workspace/${URL_KEY}/`);
     const token = await runnerToken(page);
     await seedSession(page, token, { identifier: 'LOCAL-TP1', title: 'A task with a running build', kind: 'plan', feedback: ['[done] planned it'] });
     const buildId = await seedSession(page, token, { identifier: 'LOCAL-TP1', title: 'A task with a running build', kind: 'implementation' });

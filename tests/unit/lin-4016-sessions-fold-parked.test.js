@@ -120,3 +120,35 @@ describe('LIN-4016 — the Sessions fold paints the word the server decided', ()
     assert.equal(await foldWordFor({ sessions: [{ ...waitingSession, agentState: 'running' }], taskParked: true }), 'running');
   });
 });
+
+// LIN-4070 B (the Sessions fold): the whole life, history not a question, and an incomplete read is safe.
+describe('LIN-4070 — the sessions route reads the whole life and words history as history', () => {
+  const oldBlockedSession = () => ({
+    dispatchQueueStore: { async listItems() { return []; }, async listHistory() { return { items: [item('d-old', 60 * 24 * 40)] }; } },
+    agentStatusStore: { async listStatus() { return { items: [{ dispatchId: 'd-old', taskIdentifier: 'LIN-7', status: 'blocked', issueIdentifier: 'LIN-7', timestamp: minutesAgo(60 * 24 * 40 - 1) }] }; } },
+  });
+
+  test('a waiting session older than the read window is history: flagged, listed, and never asked as a question', async () => {
+    const reads = [];
+    const res = await callRoute(async (args) => { reads.push(args); return { taskState: { state: 'parked' } }; }, oldBlockedSession());
+    assert.equal(res.jsonBody.sessions.length, 1, 'the whole life lists it (All N equals the list)');
+    assert.equal(res.jsonBody.sessions[0].historical, true);
+    assert.equal(res.jsonBody.taskParked, false);
+    assert.equal(reads.length, 0, 'no state read: nothing in the window waits');
+  });
+
+  test('an incomplete state read is taskParked: false, with no warning and no throw', async () => {
+    const warnings = [];
+    const original = console.warn;
+    console.warn = (...args) => { warnings.push(args); };
+    try {
+      const res = await callRoute(async () => ({ model: {}, taskState: null, incomplete: 'cold' }), blockedSession());
+      assert.equal(res.statusCode, 200);
+      assert.equal(res.jsonBody.taskParked, false);
+      assert.equal(warnings.length, 0, 'an incomplete read is not a failure');
+    } finally {
+      console.warn = original;
+    }
+  });
+});
+

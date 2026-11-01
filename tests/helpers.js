@@ -229,6 +229,17 @@ export const SELECTORS = {
     stop: '[data-testid="dispatch-halt-stop"]',
     resume: '[data-testid="dispatch-halt-resume"]',
   },
+  /** Home's opened box (LIN-4010, LIN-4070): the box, its running block, its Run control and the top task's marker. */
+  openedTask: {
+    box: '.opened-task',
+    top: '[data-top-task="1"]',
+    /** Home's In Progress line for one task, by its identifier (the line that opens the box). */
+    parentLine: (identifier) => `[data-testid="issue-line"][data-section="in-progress"][data-identifier="${identifier}"]`,
+    running: '[data-testid="opened-task-running"]',
+    runningTitle: '.opened-task-running-title',
+    step: '[data-testid="opened-task-step"]',
+    go: '[data-testid="opened-task-go"]',
+  },
   /**
    * Home's run control and its Change panel (LIN-3833, LIN-3962, LIN-3987). `panel` is the shared decision panel the
    * server renders; `sample(…)` are the /styleguide's two decision samples, which carry their own test ids.

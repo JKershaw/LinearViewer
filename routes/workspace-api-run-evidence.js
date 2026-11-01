@@ -17,6 +17,7 @@ import { readCloseOutChain, closeOutNotReady, closeOutNotReadyRefusal } from '..
 import { getLoopsForIssue, sessionIdByLoop } from '../lib/pipeline-loops.js';
 import { sessionIdOf } from '../lib/live-console.js';
 import { toSessionView } from '../lib/sessions-view.js';
+import { inReadWindow } from '../lib/read-horizon.js';
 import { resolveIssueBinding } from '../lib/workspace.js';
 import { resolveStateRef } from '../lib/proxy-ref-resolver.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
@@ -83,24 +84,33 @@ export function registerSessionsRoutes(router, { workspaceFromUrl, dispatchQueue
     }
 
     try {
+      // LIN-4070 D1: the history is the task's whole life, so "All N" equals this list.
       const loops = await getLoopsForIssue(workspace.urlKey, identifier, {
         dispatchStore: dispatchQueueStore,
         agentStatusStore,
+        horizon: 'all',
         noPrompt: true // toSessionView never reads promptText (LIN-3812)
       });
       // The run's page is keyed by the session id the Live Console uses, so each session carries it for its run link
       // (LIN-4024). Same lookup as the Live Console, so the link and the console cannot disagree on a run.
       const sessionIds = sessionIdByLoop(loops);
-      // getLoopsForIssue returns oldest-first; reverse for newest-first display.
-      const sessions = loops.map((loop) => ({ ...toSessionView(loop), sessionId: sessionIdOf(loop, sessionIds) })).reverse();
+      const at = new Date();
+      // getLoopsForIssue returns oldest-first; reverse for newest-first display. `historical` marks a session older than the
+      // read window: history, not a question (LIN-4070 N5).
+      const sessions = loops.map((loop) => ({
+        ...toSessionView(loop),
+        sessionId: sessionIdOf(loop, sessionIds),
+        historical: !inReadWindow(loop.dispatchedAt, at),
+      })).reverse();
       // LIN-4016: a waiting session reads "parked" on a parked task and "waiting on you" on a ruling. The task's decided
-      // state (the reader its row and opened task use) says which, so the fold does not re-derive it. Read only when a
-      // session waits.
-      // The park word is garnish on the list: a failed task-state read leaves the sessions rendering with `taskParked: false`.
+      // state (the gather the row and the page read, LIN-4070) says which, so the fold does not re-derive it. Read only
+      // when an in-window session waits: an out-of-window one is history and never a question.
+      // The park word is garnish on the list: a failed or incomplete state read leaves `taskParked: false`, with no warning.
       let taskParked = false;
-      if (loadTaskState && sessions.some((s) => s.agentState === 'waiting')) {
+      if (loadTaskState && sessions.some((s) => s.agentState === 'waiting' && !s.historical)) {
         try {
-          taskParked = (await loadTaskState({ urlKey: workspace.urlKey, identifier })).taskState.state === 'parked';
+          const { taskState } = await loadTaskState({ urlKey: workspace.urlKey, identifier });
+          taskParked = taskState?.state === 'parked';
         } catch (err) {
           console.warn('Sessions taskParked read failed:', err?.message);
         }

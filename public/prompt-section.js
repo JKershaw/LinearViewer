@@ -2041,9 +2041,8 @@
     function readTaskState() {
       if (typeof window.api !== 'function') return Promise.resolve(null);
       if (!opts.urlKey || !issue.identifier || !issueId) return Promise.resolve(null);
-      // LIN-4016: a container's own fact rides on the read (`container=1`), so `sessions.action` offers Run to PR.
-      const containerQuery = opts.row && opts.row.container ? '&container=1' : '';
-      const url = `/workspace/${encodeURIComponent(opts.urlKey)}/api/task/${encodeURIComponent(issue.identifier)}/state?issueId=${encodeURIComponent(issueId)}${containerQuery}`;
+      // LIN-4070: the container fact is the server's, from the held set; the read carries no client hint.
+      const url = `/workspace/${encodeURIComponent(opts.urlKey)}/api/task/${encodeURIComponent(issue.identifier)}/state?issueId=${encodeURIComponent(issueId)}`;
       return Promise.resolve()
         .then(() => window.api(url, { on401: false }))
         .catch(() => null);
@@ -2089,7 +2088,7 @@
           return;
         }
         pollFailures = 0;
-        state.opened = data;
+        if (!data.incomplete || !state.opened) state.opened = data;
         paintState();
         if (data.headerHtml) {
           state.go = { status: 'running', headerHtml: data.headerHtml, notice: null, noticeLink: null, noticeLinkLabel: null };
@@ -2484,14 +2483,31 @@
     render();
     // LIN-3833: the mount read is the one state read: it paints the state block (every viewer) and is the
     // Go gate's read below (dispatch-enabled viewers). Best-effort: a failed read leaves the block empty.
+    // LIN-4070: an incomplete read carries no state (the server's held set is cold, or a refresh is landing). It keeps
+    // what was painted; when nothing was, it paints the history it carries. The run control waits for a complete read.
+    function acceptStateRead(data) {
+      if (!data.incomplete || !state.opened) state.opened = data;
+      paintState();
+      // LIN-3968: the run block is repainted from the state at once, so the step is never guessed while the
+      // preview is still out (the preview's answer repaints it again, in refreshRunPreview).
+      if (runControlOn()) { paintRun(); refreshRunPreview(); }
+    }
+    function rereadUntilComplete(attempt) {
+      if (destroyed || attempt > 15) return;
+      setTimeout(function () {
+        if (destroyed) return;
+        readTaskState().then(function (data) {
+          if (destroyed || !data) return;
+          acceptStateRead(data);
+          if (data.incomplete) rereadUntilComplete(attempt + 1);
+        });
+      }, 1000);
+    }
     const mountRead = (opts.urlKey && issueId && issue.identifier && typeof window.api === 'function')
       ? readTaskState().then((data) => {
         if (destroyed || !data) return null;
-        state.opened = data;
-        paintState();
-        // LIN-3968: the run block is repainted from the state at once, so the step is never guessed while the
-        // preview is still out (the preview's answer repaints it again, in refreshRunPreview).
-        if (runControlOn()) { paintRun(); refreshRunPreview(); }
+        acceptStateRead(data);
+        if (data.incomplete) rereadUntilComplete(1);
         return data;
       })
       : null;
