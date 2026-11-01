@@ -40,6 +40,7 @@ import { resolveIssueBinding, isValidIssueId } from '../lib/workspace.js';
 import { jsonError } from '../lib/errors.js';
 import { readOwnerSeamStatus } from '../lib/workspace-owner.js';
 import { buildPromptOpts } from '../lib/render-prompt-opts.js';
+import { readFilledRung } from '../lib/task-mode-store.js';
 import { isLocalhostRequest } from '../lib/public-origin.js';
 import {
   renderTaskPage,
@@ -75,7 +76,7 @@ function sessionsOfState(model, taskState) {
  * @param {Function} [deps.now] - () → Date
  * @returns {Router}
  */
-export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo, loader, workspaceOwnerCheck = null, runProposalsStore = null, taskFacts = null, refreshTaskFacts = null, now = () => new Date() }) {
+export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo, loader, workspaceOwnerCheck = null, runProposalsStore = null, taskFacts = null, refreshTaskFacts = null, taskModeStore = null, accountStore = null, now = () => new Date() }) {
   if (!loader) throw new Error('task-page routes: loader is required');
   const router = Router();
 
@@ -178,6 +179,8 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
           isLocalhost: isLocalhostRequest(req),
         }),
         row: rowRecordOf({ stateType: model.tracker?.state?.type ?? null, decided: taskState }),
+        // LIN-4104 D2: the filled run button, read once for this page load (never on the /state poll).
+        filledRung: await readFilledRung({ taskModeStore, accountStore, accountId: req.session?.accountId ?? null, urlKey: workspace.urlKey }),
       } : null;
       return res.send(renderTaskPage(model, {
         viewer,

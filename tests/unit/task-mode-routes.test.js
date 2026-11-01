@@ -156,7 +156,8 @@ describe('LIN-2942 — session dispatch route, entryRung', () => {
       needs: null,
       act: 'dispatch',
       dispatchId: 'disp-1',
-      surface: null
+      surface: null,
+      reach: 'next-step'
     }]);
     assert.equal(res.body.item.id, store.calls[0].dispatchId);
   });
@@ -478,5 +479,58 @@ describe('LIN-2952 characterization — resolveAccountGroup expansion (via the G
 
     assert.equal(res.status, 200, res.text);
     assert.deepEqual(taskModeStore.captured.query.accountIds, ['stale-session']);
+  });
+});
+
+// LIN-4104 D2: the dispatch records the reach of the ladder press that created it, derived from the body
+// (routes/dispatch.js afterEnqueue → reachOf). The browser never names a reach; the validator is unchanged.
+describe('LIN-4104 D2 — the dispatch records the reach of the press that created it', () => {
+  const AUTOPILOT_BODY = { ...TASK_BODY, kind: 'autopilot', entryRung: 'run-task', stopAt: 'pr', variant: 'standard' };
+
+  test('the Run to PR press (autopilot, stopAt pr) records reach pr', async () => {
+    const store = recordingTaskModeStore();
+    const res = await call(buildDispatchApp({ taskModeStore: store }), 'post', DISPATCH_PATH, AUTOPILOT_BODY);
+    assert.equal(res.status, 201, res.text);
+    assert.equal(store.calls[0].reach, 'pr');
+  });
+
+  test('an autopilot run with no stopAt records reach done (Run to Done, D4)', async () => {
+    const store = recordingTaskModeStore();
+    const { stopAt: _omitted, ...noStop } = AUTOPILOT_BODY;
+    const res = await call(buildDispatchApp({ taskModeStore: store }), 'post', DISPATCH_PATH, noStop);
+    assert.equal(res.status, 201, res.text);
+    assert.equal(store.calls[0].reach, 'done');
+  });
+
+  test('Next step, and Another step (both entryRung run-step), record reach next-step', async () => {
+    const store = recordingTaskModeStore();
+    const res = await call(buildDispatchApp({ taskModeStore: store }), 'post', DISPATCH_PATH, { ...TASK_BODY, entryRung: 'run-step' });
+    assert.equal(res.status, 201, res.text);
+    assert.equal(store.calls[0].reach, 'next-step');
+  });
+
+  test('the reach lands in a real store, and the latest dispatch reads back as the filled rung (Another step fills Next step)', async () => {
+    const harness = createMangoTmpdir('lin-4104-dispatch-reach-');
+    await harness.connect();
+    try {
+      const realStore = new TaskModeStore({ collection: harness.freshDb().collection('task-mode-events') });
+      const app = buildDispatchApp({ taskModeStore: realStore });
+      assert.equal((await call(app, 'post', DISPATCH_PATH, AUTOPILOT_BODY)).status, 201);
+      await new Promise(resolve => setTimeout(resolve, 15));
+      // The reach is stored on the row itself, not only inferred from the rung.
+      const [row] = await realStore.collection.find({ act: 'dispatch' }).toArray();
+      assert.equal(row.reach, 'pr', 'the dispatch row carries its reach');
+      assert.equal((await realStore.lastDispatchReach({ accountIds: ['acct-1'], urlKey: 'acme' })).reach, 'pr');
+      assert.equal((await call(app, 'post', DISPATCH_PATH, { ...TASK_BODY, entryRung: 'run-step' })).status, 201);
+      let last = null;
+      for (let i = 0; i < 50; i++) {
+        last = await realStore.lastDispatchReach({ accountIds: ['acct-1'], urlKey: 'acme' });
+        if (last?.reach === 'next-step') break;
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+      assert.equal(last.reach, 'next-step', 'Another step is a run-step, so it fills Next step');
+    } finally {
+      await harness.close();
+    }
   });
 });

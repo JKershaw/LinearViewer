@@ -153,7 +153,7 @@ describe('LIN-4016 W4 — the run control paints the server\'s decision', () => 
   });
 
   test('a container: the server\'s run-to-pr action is Run to PR and no stage step, even when an offer is set', async () => {
-    const html = await paint(stateWith({ offered: PLAN_OFFER, action: { kind: 'offer', why: 'a container runs to PR' } }), { row: rowRecordOf({ stateType: 'started', container: true }) });
+    const html = await paint(stateWith({ offered: PLAN_OFFER, action: { kind: 'offer', why: 'a container runs to PR' } }), { row: rowRecordOf({ stateType: 'started', container: true }), filledRung: 'pr' });
     assert.match(html, /data-action="go"[^>]*>Run to PR</);
     assert.doesNotMatch(html, /run-step-next/);
   });
@@ -232,7 +232,7 @@ describe('LIN-4069 — before the first /state reply the run control takes the r
   test('the row\'s run-to-pr action shows Run to PR with no sessions yet', async () => {
     const row = rowRecordOf({ stateType: 'started', decided: { state: 'next', action: { kind: 'offer', why: 'a container runs to PR' } } });
     assert.deepEqual(row.action, { kind: 'offer', why: 'a container runs to PR' });
-    const html = await paint(PENDING, { row });
+    const html = await paint(PENDING, { row, filledRung: 'pr' });
     assert.match(html, /data-action="go"[^>]*>Run to PR</);
   });
 
@@ -264,5 +264,46 @@ describe('LIN-4104 D1 — the browser draws the offer kind and names no run for 
     const html = await paint(stateWith({ offered: PLAN_OFFER, busy: true, action: { kind: 'busy', identifier: 'LIN-42', words: 'Build running', why: 'x' } }));
     assert.doesNotMatch(html, /data-action="go"/);
     assert.doesNotMatch(html, /data-action="run-step-next"/);
+  });
+});
+
+// LIN-4104 D2: the filled run button follows the viewer's last dispatch on this workspace (`filledRung`, read once per
+// page load). Next step is the filled default for a workspace with no prior dispatch; Run to Done is drawn disabled until
+// its kickoff lands (D4); a failed stage still names its step (LIN-3968).
+describe('LIN-4104 D2 — the filled run button follows the last dispatch on this workspace', () => {
+  const OFFER = { kind: 'offer', container: false, step: null, why: 'the run control offers the three rungs' };
+
+  test('filled pr (the last dispatch was a Run to PR): the primary button is Run to PR', async () => {
+    const html = await paint(stateWith({ action: OFFER }), { filledRung: 'pr' });
+    assert.match(html, /data-testid="opened-task-go"[^>]*data-action="go"[^>]*>Run to PR</, 'Run to PR is the primary');
+    assert.match(html, /data-filled-rung="pr"/, 'the button says which rung it fills');
+  });
+
+  test('a new workspace with no prior dispatch (filledRung next-step): the primary button is Next step', async () => {
+    const html = await paint(stateWith({ action: OFFER }), { filledRung: 'next-step' });
+    assert.match(html, /data-testid="opened-task-go"[^>]*data-filled-rung="next-step"[^>]*>Next step</, 'Next step is the primary');
+    assert.doesNotMatch(html, /data-testid="opened-task-go"[^>]*>Run to PR</, 'Run to PR is not the primary');
+  });
+
+  test('an unset filledRung is a workspace with no prior dispatch: Next step, the same as next-step', async () => {
+    const html = await paint(stateWith({ action: OFFER }));
+    assert.match(html, /data-testid="opened-task-go"[^>]*data-filled-rung="next-step"[^>]*>Next step</);
+  });
+
+  test('filled done (the last dispatch was a Run to Done): Run to Done is drawn disabled until its kickoff lands (D4), and Run to PR stays available', async () => {
+    const html = await paint(stateWith({ action: OFFER }), { filledRung: 'done' });
+    assert.match(html, /data-testid="opened-task-go"[^>]*data-filled-rung="done"[^>]*disabled[^>]*>Run to Done</, 'Run to Done is the primary, disabled');
+    assert.match(html, /data-testid="opened-task-run-to-pr"[^>]*data-action="go"[^>]*>Run to PR</, 'Run to PR is still offered beside it');
+  });
+
+  test('a failed stage still names its step as the primary, whatever the filled rung (LIN-3968)', async () => {
+    const html = await paint(stateWith({ offered: PLAN_OFFER, action: { ...OFFER, step: PLAN_OFFER } }), { filledRung: 'next-step' });
+    assert.match(html, /data-testid="opened-task-go"[^>]*data-action="run-step-next"[^>]*>Run Plan</);
+  });
+
+  test('Another step is a run-step, so the dispatch it records fills Next step: the rung fills next-step on the next load', async () => {
+    // The server records a run-step as next-step (lin-4104-reach.test.js); the page then paints the Next step primary.
+    const html = await paint(stateWith({ action: OFFER }), { filledRung: 'next-step' });
+    assert.match(html, /data-filled-rung="next-step"/);
   });
 });

@@ -189,6 +189,8 @@ async function runPrimaryDashboardRoute({ fetchResult }) {
     getProviderForWorkspace: () => ({ supports: () => false }),
     getWorkspaceCallScope: () => ({}),
     resolveAssigneeSelection: async () => ({ selectedAssignee: 'all', resolvedAssigneeName: null }),
+    // LIN-4104 D2: the primary route reads the filled run button once per load; a workspace with no dispatch fills Next step.
+    readFilledRung: async () => 'next-step', taskModeStore: null, accountStore: null,
     console: { log() {}, error() {} }
   });
 

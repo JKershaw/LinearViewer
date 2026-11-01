@@ -149,6 +149,8 @@ function load({ opened = null, previewFor = () => null, panelFor = serverPanel, 
 }
 
 const HOME = {
+  // LIN-4104 D2: this file's workspace fills Run to PR (its tests are about that run); the filled rung is pinned in lin-4016.
+  filledRung: 'pr',
   urlKey: 'acme', surface: 'home', dispatchEnabled: true, runSetup: false, hasAI: true, aiState: 'ok', isLocalhost: false,
   promptMeta: { plan: 'Plan', implementation: 'Build', research: 'Research', scoping: 'Scoping', review: 'Review' },
   defaultPromptKeys: ['look-into', 'research', 'plan', 'implementation'],

@@ -155,7 +155,9 @@ describe('db-indexes', () => {
     // getTaskMode reads {accountId: {$in: group}, urlKey, issueIdentifier}
     // sorted by `at`; countByEntryRung reads the whole log sorted by `at`.
     // The log is lifetime-retained, so neither may be a TTL.
-    for (const keySpec of [{ accountId: 1, urlKey: 1, issueIdentifier: 1, at: 1 }, { at: 1 }]) {
+    // LIN-4104 D2: the latest dispatch per account group and workspace reads {accountId: {$in: group}, urlKey} sorted by
+    // `at`, so it needs {accountId, urlKey, at} (lib/task-mode-store.js lastDispatchReach).
+    for (const keySpec of [{ accountId: 1, urlKey: 1, issueIdentifier: 1, at: 1 }, { accountId: 1, urlKey: 1, at: 1 }, { at: 1 }]) {
       const spec = INDEX_SPECS.find(s =>
         s.collection === 'task-mode-events' &&
         JSON.stringify(s.keySpec) === JSON.stringify(keySpec)

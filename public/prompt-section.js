@@ -320,7 +320,7 @@
       // after-run line stay in the run block.
       const step = runStepOfState(state, opts);
       if (step) html += `<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-step" data-action="run-step-next">Run ${esc(step.label)}</button>`;
-      else if (runOfferOf(state, opts) && runOfferOf(state, opts).kind === 'offer') html += '<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-task" data-action="go">Run to PR</button>';
+      else if (runOfferOf(state, opts) && runOfferOf(state, opts).kind === 'offer') html += filledRunButtonsOf(opts);
     } else {
       html += `<button class="opened-task-go" data-testid="opened-task-go" data-rung="run-task" data-action="go">Go</button>`;
     }
@@ -629,6 +629,26 @@
     const action = runOfferOf(state, opts);
     if (!action || action.kind !== 'offer' || action.container) return null;
     return (state.run && state.run.step) || action.step || null;
+  }
+  // LIN-4104 D2: the filled run button, from the viewer's last dispatch on this workspace (`opts.filledRung`, read once per
+  // page load). A workspace with no prior dispatch (unset) fills Next step. Until the recommend step lands (D3), Next step
+  // runs the task to PR, the run this workspace has always had, and says so in its title. Run to Done is drawn disabled
+  // until its kickoff lands (D4). Run to PR stays offered beside any filled button that is not Run to PR.
+  function filledRungOf(opts) {
+    return opts && (opts.filledRung === 'pr' || opts.filledRung === 'done') ? opts.filledRung : 'next-step';
+  }
+  // The words the filled rung names on the step line and the button (LIN-4104 D2).
+  const FILLED_NAME = Object.freeze({ 'next-step': 'Next step', pr: 'Run to PR', done: 'Run to Done' });
+  function filledRunButtonsOf(opts) {
+    const filled = filledRungOf(opts);
+    if (filled === 'pr') {
+      return '<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-task" data-action="go" data-filled-rung="pr">Run to PR</button>';
+    }
+    if (filled === 'done') {
+      return '<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-task" data-filled-rung="done" disabled title="Run to Done lands with its kickoff (LIN-4104 D4)">Run to Done</button>'
+        + '<button class="btn btn--quiet" data-testid="opened-task-run-to-pr" data-rung="run-task" data-action="go">Run to PR</button>';
+    }
+    return '<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-task" data-action="go" data-filled-rung="next-step" title="Next step lands with its recommend call (LIN-4104 D3); until then this runs the task to PR">Next step</button>';
   }
   // LIN-4104 D1: the one run offer the server decided (`sessions.action`, `runOfferOf`): none (finished), answer-first,
   // busy, or offer. LIN-4068: before the first `/state` reply the opened box has no sessions, so it takes the row record's
@@ -1173,9 +1193,10 @@
       if (!state.run.step && (!state.opened || stageBusy(state) || takesNoRun(state, opts))) return '';
       // LIN-4103 beat 2: with no offered step, the line says the server's own words for a run to PR, never "the next step".
       let why = step ? 'the next step for this task' : 'no stage step is offered, so the run takes it to PR';
+      if (!step && filledRungOf(opts) === 'done') why = 'Run to Done starts with its kickoff (LIN-4104 D4)';
       if (state.run.step) why = 'chosen for this run';
       else if (step && step.reason) why = step.reason;
-      const name = step ? esc(step.label) : 'Run to PR';
+      const name = step ? esc(step.label) : FILLED_NAME[filledRungOf(opts)];
       const ask = `<button class="btn opened-task-ask" data-action="ask-harbour" data-testid="run-ask-harbour">\u2726 write prompt</button>`;
       if (!caps.runBox) return `<div class="opened-task-step" data-testid="opened-task-step"><span class="opened-task-step-name">${name}</span> \u00b7 ${esc(why)} ${ask}</div>`;
       const what = !state.run.step && step && state.run.preview && state.run.preview.description

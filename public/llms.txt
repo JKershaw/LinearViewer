@@ -275,7 +275,7 @@ Templates (including `retro`) are available on completed/canceled issues too.
 4. Click any template to load it into the component
 
 ### AI Recommendation Selectors (shared opened-task component)
-- `[data-testid="opened-task-go"]` - Go: one press starts the run (fetches the kickoff and dispatches it, bounded to the PR)
+- `[data-testid="opened-task-go"]` - the filled run button (LIN-4104 D2): its label and `data-filled-rung` (next-step, pr or done) follow the viewer's last dispatch on this workspace; Next step runs the task to PR until its recommend step lands, Run to PR (`opened-task-run-to-pr`) is beside it when it is not the filled one, and Run to Done is drawn disabled until its kickoff lands
 - `[data-testid="opened-task-next-step"]` - ✦ next step (AI-tailored prompt; requires OpenRouter or free tier)
 - `[data-testid="opened-task-primary-reason"]` - plain-words reason when the ✦ action is disabled
 - `[data-testid="opened-task-started"]` - the started/running line shown in the Go slot (carries the task-page link); Go is replaced while a run is live

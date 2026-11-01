@@ -109,13 +109,14 @@ describe('TaskModeStore.record', () => {
     const doc = await store.record(dispatchAct('run-step', 'd-1', { surface: 'swipe' }));
     const [stored] = await db.collection('task-mode-events').find({}).toArray();
     assert.deepStrictEqual(Object.keys(stored).sort(), [
-      '_id', 'accountId', 'act', 'at', 'dispatchId', 'issueId', 'issueIdentifier', 'kind', 'needs', 'ready', 'rung', 'surface', 'urlKey'
+      '_id', 'accountId', 'act', 'at', 'dispatchId', 'issueId', 'issueIdentifier', 'kind', 'needs', 'reach', 'ready', 'rung', 'surface', 'urlKey'
     ]);
     assert.strictEqual(stored._id, doc._id);
     assert.strictEqual(stored.accountId, 'acct-1');
     assert.strictEqual(stored.rung, 'run-step');
     assert.strictEqual(stored.act, 'dispatch');
     assert.strictEqual(stored.dispatchId, 'd-1');
+    assert.strictEqual(stored.reach, null, 'a dispatch recorded without a reach stores null (LIN-4104 D2)');
     assert.strictEqual(stored.needs, null);
     assert.ok(new Date(stored.at).getTime() >= before);
   });

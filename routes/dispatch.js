@@ -32,7 +32,7 @@ import { DISPATCH_DEFAULT_KINDS, deriveDispatchKind, getPromptDescriptionsForAI 
 import { resolveRoutingWithSources } from '../lib/dispatch-factory.js';
 import { getJob } from '../lib/llm-jobs.js';
 import { stageLabel } from '../lib/task-page-loader.js';
-import { SURFACES } from '../lib/task-mode-store.js';
+import { SURFACES, reachOf } from '../lib/task-mode-store.js';
 import { effortNotAppliedForConfig } from '../lib/workspace-preferences.js';
 import { isPositiveInteger } from '../lib/dispatch-fields.js';
 import { enterSessionDispatch, opaqueFieldError } from '../lib/dispatch-entrance.js';
@@ -489,7 +489,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // must: after the body's shape checks, before every read and write).
       ownerGate: (target) => refuseNonOwner(req, res, target),
       // D24: the task-mode record and the Harbour OS spawn stay here, with the route that owns them.
-      afterEnqueue: async ({ item, issueId, issueIdentifier, entryRung, surface, target }) => {
+      afterEnqueue: async ({ item, issueId, issueIdentifier, entryRung, surface, target, kind, stopAt }) => {
         // LIN-2942: the item exists, so record the ladder press that created it, linked by
         // dispatchId. Fire-and-forget: a failed record never fails or delays the dispatch, and the
         // response is the same with or without it. Only a session account can be attributed; without
@@ -508,7 +508,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
               dispatchId: item._id,
               // LIN-2944 P1: the caller's validated surface, or null for the other dispatch callers
               // that pass none.
-              surface: surface !== undefined && surface !== null ? surface : null
+              surface: surface !== undefined && surface !== null ? surface : null,
+              // LIN-4104 D2: the reach of this press (pr / done / next-step), derived from the dispatch body, never the browser.
+              reach: reachOf({ kind, stopAt, entryRung })
             })).catch(err => console.error('Failed to record task-mode dispatch event:', err));
           } catch (err) {
             console.error('Failed to record task-mode dispatch event:', err);
