@@ -1,0 +1,20 @@
+{
+  "ticket": "LIN-4086",
+  "note": "Questions are exactly what a real user would type. No description of Harbour beyond the question text, and no system prompt, is ever sent to the model under test.",
+  "tiers": {
+    "named": [
+      { "id": "named-what-is", "question": "What is harbour.cat?" },
+      { "id": "named-website-do", "question": "What does the website harbour.cat do?" },
+      { "id": "named-heard-of", "question": "Have you heard of harbour.cat? What is it for?" }
+    ],
+    "ambiguous": [
+      { "id": "ambig-ai-dev-tool", "question": "What is Harbour, the AI software development tool?" },
+      { "id": "ambig-control-plane", "question": "Tell me about the Harbour control plane for AI coding agents." },
+      { "id": "ambig-who-makes", "question": "Who makes Harbour, the app for running AI agents on your issue backlog?" }
+    ],
+    "category": [
+      { "id": "cat-verify-evidence", "question": "How can I verify an AI coding agent's work on real evidence rather than its own claims?" },
+      { "id": "cat-linear-dispatch", "question": "What tools dispatch tasks from my Linear backlog to AI coding agents?" }
+    ]
+  }
+}
