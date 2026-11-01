@@ -27,6 +27,7 @@ import { createTaskEditRoutes } from '../../routes/task-edit.js';
 import { createTaskPageLoader } from '../../lib/task-page-loader.js';
 import { enrichLoop, deriveSessionWaiting, deriveSessionDecisions } from '../../routes/dashboard.js';
 import { registerProvider } from '../../lib/providers/registry.js';
+import { heldTaskFacts, heldLoaderDeps } from '../fixtures/held-task-facts.js';
 // Side-effect import: the shared nav resolves the legacy default provider.
 import '../../lib/providers/linear/index.js';
 
@@ -66,7 +67,8 @@ function spyProvider({ read = async () => ISSUE_CTX } = {}) {
   return { name, calls };
 }
 
-function makeLoader({ loops = [STORED_LOOP], calls = null, shelvedRulingsStore = null } = {}) {
+// LIN-4070: the state read is the held set's, so every loader here holds the task's tracker issue (the set `/state` reads).
+function makeLoader({ loops = [STORED_LOOP], calls = null, shelvedRulingsStore = null, issues = [ISSUE_CTX.issue] } = {}) {
   const loader = createTaskPageLoader({
     dispatchStore: {},
     agentStatusStore: {},
@@ -74,8 +76,10 @@ function makeLoader({ loops = [STORED_LOOP], calls = null, shelvedRulingsStore =
     deriveSessionWaiting,
     deriveSessionDecisions,
     getLoopsForIssue: async () => loops,
+    getLoopsForIssues: async () => loops,
     shelvedRulingsStore,
     now: () => NOW,
+    ...heldLoaderDeps(heldTaskFacts({ issues, now: NOW })),
   });
   if (!calls) return loader;
   return {

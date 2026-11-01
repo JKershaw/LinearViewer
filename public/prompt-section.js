@@ -2041,9 +2041,8 @@
     function readTaskState() {
       if (typeof window.api !== 'function') return Promise.resolve(null);
       if (!opts.urlKey || !issue.identifier || !issueId) return Promise.resolve(null);
-      // LIN-4016: a container's own fact rides on the read (`container=1`), so `sessions.action` offers Run to PR.
-      const containerQuery = opts.row && opts.row.container ? '&container=1' : '';
-      const url = `/workspace/${encodeURIComponent(opts.urlKey)}/api/task/${encodeURIComponent(issue.identifier)}/state?issueId=${encodeURIComponent(issueId)}${containerQuery}`;
+      // LIN-4070: the container fact is the server's, from the held set; the read carries no client hint.
+      const url = `/workspace/${encodeURIComponent(opts.urlKey)}/api/task/${encodeURIComponent(issue.identifier)}/state?issueId=${encodeURIComponent(issueId)}`;
       return Promise.resolve()
         .then(() => window.api(url, { on401: false }))
         .catch(() => null);

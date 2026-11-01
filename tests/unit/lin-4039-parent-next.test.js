@@ -258,11 +258,12 @@ describe('LIN-4039 — W4: the Swipe and task-page producers read the one contai
   };
   const stateUrlOf = (html) => (html.match(/data-state-url="([^"]*)"/) || [])[1];
 
-  test('task page: an all-done parent passes no container=1 to the state read; one open subtask does', async () => {
+  // LIN-4070 D5/B: the container fact is the server's, from the held set. The state read takes no client hint.
+  test('task page: the state read carries no container hint, for an all-done parent or one with an open subtask', async () => {
     const done = await taskPageFor(PARENT_CTX(['completed', 'completed']));
-    assert.doesNotMatch(stateUrlOf(done), /container=1/);
+    assert.doesNotMatch(stateUrlOf(done), /container/);
     const open = await taskPageFor(PARENT_CTX(['completed', 'unstarted']));
-    assert.match(stateUrlOf(open), /container=1/);
+    assert.doesNotMatch(stateUrlOf(open), /container/);
   });
 
   test('task page: the row record the page embeds carries the same container fact', async () => {

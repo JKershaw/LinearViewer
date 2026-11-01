@@ -1,6 +1,6 @@
 /**
  * LIN-4069 (LIN-4068 piece A, lifted from LIN-4049): the Linear task-detail read asks for `children(first: 101)`, holds
- * at most 100 direct children, and says `childrenTruncated` when there were more. Linear's default page is 50, so before
+ * at most 100 direct children, and says `childrenCapped` when there were more. Linear's default page is 50, so before
  * this a parent with more children was read short and nothing said so.
  */
 import { test, describe } from 'node:test';
@@ -42,18 +42,18 @@ describe('the Linear detail read fails closed over the subtree cap (LIN-4069)', 
   test('101 children: the list is held to 100 and the read says it is truncated', async () => {
     const { context } = await detailOf(101);
     assert.equal(context.children.length, 100);
-    assert.equal(context.childrenTruncated, true);
+    assert.equal(context.childrenCapped, true);
   });
 
   test('100 children are read whole and are not truncated', async () => {
     const { context } = await detailOf(100);
     assert.equal(context.children.length, 100);
-    assert.equal(context.childrenTruncated, false);
+    assert.equal(context.childrenCapped, false);
   });
 
   test('a leaf reads no children and is not truncated', async () => {
     const { context } = await detailOf(0);
     assert.deepEqual(context.children, []);
-    assert.equal(context.childrenTruncated, false);
+    assert.equal(context.childrenCapped, false);
   });
 });

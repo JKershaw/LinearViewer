@@ -157,7 +157,7 @@ import { renderDispatchPage } from './lib/render-dispatch.js'
 import { noJobBody, noJobNoticeOf } from './lib/components/dispatch-no-job.js'
 import { renderSwipePage, orderIssuesForSwipe } from './lib/render-swipe.js'
 import { rowDataByNodeKey } from './lib/task-board-view.js'
-import { createHomeRowStates } from './lib/home-row-states.js'
+import { createHomeRowStates, gatherTaskStates } from './lib/home-row-states.js'
 import { createTaskFactsHolder, createTaskFactsRefresh } from './lib/task-facts-holder.js'
 import { buildHomeView } from './lib/home-view.js'
 import { renderDashboardAfterRefresh as renderRefreshedDashboard } from './lib/dashboard-refresh.js'
@@ -3248,7 +3248,13 @@ app.use(createTaskCreateRoutes({ workspaceFromUrl, getOpenRouterSource, getDeplo
 // `/task/:identifier` would otherwise swallow `/task/new`.
 // `deriveSessionWaiting` is injected (a lib/ loader must not import a route),
 // and `enrichLoop` (lib/run-loop-state.js) beside it.
-const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore, agentStatusStore, briefCacheStore, recapCacheStore, readRunEvidence, prStateStore, installationTokenFor, closeOutEventsStore, enrichLoop, deriveSessionWaiting, deriveSessionDecisions, taskDecisionsStore, shelvedRulingsStore })
+// LIN-4068 D4: the workspace issue set `/state` and the task page read, held per urlKey. Home's fetches write it through
+// the holder's gate. The loader gets the holder's READ side only; the refresh trigger goes to the private task-page
+// handlers alone (routes/task-page.js), never to the loader the public guest route shares (B2).
+const taskFacts = createTaskFactsHolder()
+const refreshTaskFacts = createTaskFactsRefresh({ holder: taskFacts, fetchAndPrepareProjects })
+const writeTaskFacts = (urlKey, fetched, opts) => taskFacts.write(urlKey, fetched, opts)
+const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore, agentStatusStore, briefCacheStore, recapCacheStore, readRunEvidence, prStateStore, installationTokenFor, closeOutEventsStore, enrichLoop, deriveSessionWaiting, deriveSessionDecisions, taskDecisionsStore, shelvedRulingsStore, taskFacts: { read: taskFacts.read }, gatherTaskStates })
 // LIN-3833 / LIN-4016: Home's row states, assembled once for all three Home routes (lib/home-row-states.js): one lean
 // loop read for the workspace, grouped by task. A viewer who sees no sessions (copy-first, no `runControls`) reads
 // nothing and gets the tracker words alone. The states cover the Recent and project rows too, so a subtask that needs
@@ -3257,11 +3263,6 @@ const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore,
 const homeRowStates = createHomeRowStates({
   getLoopsForWorkspace, dispatchStore: dispatchQueueStore, agentStatusStore, taskDecisionsStore, shelvedRulingsStore, enrichLoop, deriveSessionWaiting,
 })
-// LIN-4068 D4: the workspace issue set `/state` and the task page will read, held per urlKey. Home's fetches write it
-// through the holder's gate; only a private route's caller may start a refresh (piece B wires `/state`, the first one).
-const taskFacts = createTaskFactsHolder()
-const refreshTaskFacts = createTaskFactsRefresh({ holder: taskFacts, fetchAndPrepareProjects })
-const writeTaskFacts = (urlKey, fetched, opts) => taskFacts.write(urlKey, fetched, opts)
 app.use(createTaskPageRoutes({
   workspaceFromUrl,
   getOpenRouterSource,
@@ -3270,7 +3271,10 @@ app.use(createTaskPageRoutes({
   // LIN-3975: the owner or a member is read from the one hoisted owner seam.
   workspaceOwnerCheck,
   // LIN-3975: the chat proposals the run control stages for the owner.
-  runProposalsStore
+  runProposalsStore,
+  // LIN-4070 B: the private handlers' holder and refresh (the only place a refresh is started).
+  taskFacts,
+  refreshTaskFacts,
 }))
 
 // Mount the task share routes (LIN-3330) — the owner mint/list/revoke controls

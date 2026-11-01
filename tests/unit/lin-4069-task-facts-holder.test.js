@@ -106,7 +106,7 @@ describe('the read-only accessor (LIN-4068 D4, B2)', () => {
   test('the read-only holder exposes no way to fetch', () => {
     const c = clock();
     const holder = createTaskFactsHolder({ now: c.now });
-    assert.deepEqual(Object.keys(holder).sort(), ['ageOf', 'read', 'write']);
+    assert.deepEqual(Object.keys(holder).sort(), ['ageOf', 'invalidate', 'read', 'write']);
     const source = readFileSync(new URL('../../lib/task-facts-holder.js', import.meta.url), 'utf8');
     assert.ok(!/fetchWorkspaceIssues/.test(source), 'the holder never uses the active-binding, truncation-blind fetch');
   });

@@ -680,7 +680,24 @@
       }
     }
 
+    // The track is history (the task's own whole-life read), so it repaints whether or not the state is complete.
+    function repaintTrack(state) {
+      if (trackMount && typeof state.trackHtml === 'string') {
+        var checkIns = openCheckIns(trackMount);
+        trackMount.innerHTML = state.trackHtml;
+        // A repainted track carries its own tap times (LIN-3975): bind them as the page does on load.
+        if (typeof window.initLocalTimes === 'function') window.initLocalTimes(trackMount);
+        restoreCheckIns(trackMount, checkIns);
+      }
+    }
+
     function apply(state) {
+      // LIN-4070: an incomplete read carries no state (the server is still gathering it). The page keeps what it painted,
+      // the poll goes on, and the next complete reply replaces it.
+      if (state.incomplete) {
+        repaintTrack(state);
+        return;
+      }
       // Read the box first: a check may have moved it off `ready` since the
       // last poll, and then the ready header must not be painted.
       syncMergeReady();
@@ -689,13 +706,7 @@
       if (answer && typeof headerHtml === 'string') repaintHeader(answer, headerHtml);
       var painted = answer && answer.querySelector ? answer.querySelector('[data-testid="task-page-status"]') : null;
       var paintedStatus = painted && painted.getAttribute ? painted.getAttribute('data-status') : null;
-      if (trackMount && typeof state.trackHtml === 'string') {
-        var checkIns = openCheckIns(trackMount);
-        trackMount.innerHTML = state.trackHtml;
-        // A repainted track carries its own tap times (LIN-3975): bind them as the page does on load.
-        if (typeof window.initLocalTimes === 'function') window.initLocalTimes(trackMount);
-        restoreCheckIns(trackMount, checkIns);
-      }
+      repaintTrack(state);
       applyOpenMemory(rows(), memory);
       main.setAttribute('data-status', readyHtml ? (paintedStatus || 'waiting') : state.status);
       main.setAttribute('data-live', state.live ? 'true' : 'false');

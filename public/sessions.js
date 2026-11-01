@@ -90,7 +90,9 @@
   function renderHomeSession(s, opts) {
     const si = stateIndicator(s.agentState);
     // LIN-4016: a waiting session on a parked task reads parked; on a ruling it reads waiting on you (the server's decision).
-    const stateWord = s.agentState === 'waiting' && opts.taskParked ? 'parked' : (HOME_STATE_WORDS[s.agentState] || s.agentState || '');
+    // LIN-4070 N5: a waiting session older than the read window is history, not a question: it says unanswered.
+    const stateWord = s.agentState === 'waiting' && s.historical ? 'unanswered'
+      : s.agentState === 'waiting' && opts.taskParked ? 'parked' : (HOME_STATE_WORDS[s.agentState] || s.agentState || '');
     const time = relativeTime(s.dispatchedAt);
     const stage = (opts.stageWords && opts.stageWords[s.stage]) || stageLabel(s.stage);
     const summaryHtml = s.agentSummary
