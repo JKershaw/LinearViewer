@@ -138,7 +138,8 @@ describe('the Sessions fold on Home reads as sessions (public/sessions.js)', () 
   }
 
   const SESSION = {
-    loopId: 'l1', iteration: 2, promptName: 'Prompt', stage: 'implementation', agentState: 'running',
+    // LIN-4103 beat 3: the route's row carries the box's label and the word it paints.
+    loopId: 'l1', iteration: 2, promptName: 'Prompt', stage: 'implementation', agentState: 'running', kind: 'implementation', label: 'Build', state: 'running', word: 'running',
     dispatchedAt: '2026-10-29T10:00:00.000Z',
     feedback: [
       { message: '[decision] {"decision_id":"lin4012-rc","question":"Re-dispatch?"}', timestamp: null },

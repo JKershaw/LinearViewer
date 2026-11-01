@@ -164,7 +164,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await expect(page.locator('[data-testid="task-page-sentence"]')).toContainText('which API key should the build use?');
     await expect(page.locator('[data-testid="task-page-sentence"]')).not.toContainText('[blocked]');
     await expect(step(page, 'implementation')).toHaveClass(/sess-run--expanded/);
-    await expect(step(page, 'implementation').locator('[data-testid="task-page-stage-state"]')).toHaveText('waiting for an answer');
+    await expect(step(page, 'implementation').locator('[data-testid="task-page-stage-state"]')).toHaveText('waiting on you');
     await expect(step(page, 'implementation').locator('[data-testid="task-page-session-message"]')).toContainText('which API key should the build use?');
     await noHorizontalScroll(page);
   });

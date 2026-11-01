@@ -405,7 +405,7 @@ describe('B6 sessions line', () => {
     const line = sessionsLine({ stages: states.map(s => mk(s)) });
     assert.match(line, /^11 across 11 stages \(/);
     assert.match(line, /2 done/, 'continued reads as done');
-    for (const w of ['1 running', '1 queued', '1 waiting for an answer', '1 failed', '1 aborted', '1 cancelled', '1 expired', '1 closed', '1 something-new']) assert.ok(line.includes(w), `${w} in "${line}"`);
+    for (const w of ['1 running', '1 queued', '1 waiting on you', '1 failed', '1 aborted', '1 cancelled', '1 expired', '1 closed', '1 something-new']) assert.ok(line.includes(w), `${w} in "${line}"`);
   });
   test('zero stages omits the row (LIN-4103: no usual stage is ever a stage here)', () => {
     assert.equal(sessionsLine({ stages: [] }), null);

@@ -109,9 +109,14 @@ function rulingsFeed({ sessionsFeedCache, mergeLoops, taskDecisionsStore, shelve
       // by design (see openDecisionLoopIds).
       const openLoopIds = [...openDecisionLoopIds(merged)];
 
+      // LIN-4103 beat 3: the badge on a workspace page counts that workspace's rulings (the URL's workspace, by each row's
+      // anchor). `count` stays the all-workspaces count the Rulings tab reads; the badge reads `workspaceCount`.
+      const pageUrlKey = req.params?.urlKey || null;
+      const workspaceCount = rulings.filter((r) => r.anchor?.workspaceUrlKey === pageUrlKey).length;
       keepalive.send(200, {
         workspaces,
         count: rulings.length,
+        workspaceCount,
         rulings,
         openLoopIds,
         generatedAt: new Date().toISOString()

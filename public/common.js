@@ -3078,7 +3078,10 @@ window.updateRulingsBadge = async function updateRulingsBadge(urlKey) {
     const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dashboard/rulings`);
     if (!response.ok) return;
 
-    const { count } = await response.json();
+    // LIN-4103 beat 3: the badge counts the page's own workspace (`workspaceCount`, scoped server-side by the URL); a feed
+    // without it (an older server) falls back to the all-workspaces `count`.
+    const body = await response.json();
+    const count = typeof body.workspaceCount === 'number' ? body.workspaceCount : body.count;
     const badge = document.querySelector(`[data-rulings-badge][data-url-key="${urlKey}"]`);
     if (badge) {
       const countEl = badge.querySelector('.rulings-count');

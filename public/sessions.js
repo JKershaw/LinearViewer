@@ -45,12 +45,6 @@
     return STATE_INDICATORS[agentState] || STATE_INDICATORS.queued;
   }
 
-  // LIN-4024 (look): Home's Sessions fold reads as sessions, not machine output. The state word is a plain word; the
-  // stage is its stage word ("Build", not "impl"); a session's prompt name and iteration are not shown.
-  const HOME_STATE_WORDS = {
-    queued: 'queued', running: 'running', waiting: 'waiting on you', complete: 'done', error: 'failed'
-  };
-
   // Home shows a ruling as the question card in the opened task, so the fold keeps only what a person wrote: a
   // decision's machine lines and its JSON are left out, and a [blocked] tag is dropped from the line it marks.
   function humanFeedback(feedback) {
@@ -89,12 +83,11 @@
 
   function renderHomeSession(s, opts) {
     const si = stateIndicator(s.agentState);
-    // LIN-4016: a waiting session on a parked task reads parked; on a ruling it reads waiting on you (the server's decision).
-    // LIN-4070 N5: a waiting session older than the read window is history, not a question: it says unanswered.
-    const stateWord = s.agentState === 'waiting' && s.historical ? 'unanswered'
-      : s.agentState === 'waiting' && opts.taskParked ? 'parked' : (HOME_STATE_WORDS[s.agentState] || s.agentState || '');
+    // LIN-4103 beat 3: the row paints the server's label and word (the box's own words; the server decides the parked and
+    // unanswered exceptions), so the list and the box name a run the same way. The client decides no word.
+    const stateWord = s.word || '';
     const time = relativeTime(s.dispatchedAt);
-    const stage = (opts.stageWords && opts.stageWords[s.stage]) || stageLabel(s.stage);
+    const stage = s.label || (opts.stageWords && opts.stageWords[s.stage]) || stageLabel(s.stage);
     const summaryHtml = s.agentSummary
       ? `<div class="session-summary">${esc(s.agentSummary)}</div>`
       : '';

@@ -6776,3 +6776,23 @@ describe('POST /api/dashboard/rulings/dismiss — joined-copy stamps (LIN-3959)'
     assert.equal(res.statusCode, 200);
   });
 });
+
+// LIN-4103 beat 3 (witness): the badge is scoped to the workspace its page is on. The feed keeps the all-workspaces count
+// the Rulings tab reads; `workspaceCount` is the count of the rulings whose anchor is in the page's own workspace.
+describe('LIN-4103 beat 3 — the rulings feed counts the page\'s own workspace for the badge', () => {
+  test('workspaceCount is the rulings of the workspace in the URL; count stays the all-workspaces count', async () => {
+    const router = makeRouter({
+      'ws-a': { live: [], history: [decisionItem('a-dec', 'LIN-24', 'd-a')], agentStatus: [] },
+      'ws-b': { live: [], history: [decisionItem('b-dec', 'LIN-25', 'd-b')], agentStatus: [] },
+    });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/rulings');
+    const { req, res } = makeReqRes({
+      session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }, { urlKey: 'ws-b', name: 'Beta' }] },
+      params: { urlKey: 'ws-a' },
+    });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.count, 2, 'the all-workspaces count is unchanged');
+    assert.equal(res.jsonBody.workspaceCount, 1, 'the badge count is the page\'s own workspace');
+  });
+});
