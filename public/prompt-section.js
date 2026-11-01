@@ -2088,7 +2088,7 @@
           return;
         }
         pollFailures = 0;
-        state.opened = data;
+        if (!data.incomplete || !state.opened) state.opened = data;
         paintState();
         if (data.headerHtml) {
           state.go = { status: 'running', headerHtml: data.headerHtml, notice: null, noticeLink: null, noticeLinkLabel: null };
@@ -2483,14 +2483,31 @@
     render();
     // LIN-3833: the mount read is the one state read: it paints the state block (every viewer) and is the
     // Go gate's read below (dispatch-enabled viewers). Best-effort: a failed read leaves the block empty.
+    // LIN-4070: an incomplete read carries no state (the server's held set is cold, or a refresh is landing). It keeps
+    // what was painted; when nothing was, it paints the history it carries. The run control waits for a complete read.
+    function acceptStateRead(data) {
+      if (!data.incomplete || !state.opened) state.opened = data;
+      paintState();
+      // LIN-3968: the run block is repainted from the state at once, so the step is never guessed while the
+      // preview is still out (the preview's answer repaints it again, in refreshRunPreview).
+      if (runControlOn()) { paintRun(); refreshRunPreview(); }
+    }
+    function rereadUntilComplete(attempt) {
+      if (destroyed || attempt > 15) return;
+      setTimeout(function () {
+        if (destroyed) return;
+        readTaskState().then(function (data) {
+          if (destroyed || !data) return;
+          acceptStateRead(data);
+          if (data.incomplete) rereadUntilComplete(attempt + 1);
+        });
+      }, 1000);
+    }
     const mountRead = (opts.urlKey && issueId && issue.identifier && typeof window.api === 'function')
       ? readTaskState().then((data) => {
         if (destroyed || !data) return null;
-        state.opened = data;
-        paintState();
-        // LIN-3968: the run block is repainted from the state at once, so the step is never guessed while the
-        // preview is still out (the preview's answer repaints it again, in refreshRunPreview).
-        if (runControlOn()) { paintRun(); refreshRunPreview(); }
+        acceptStateRead(data);
+        if (data.incomplete) rereadUntilComplete(1);
         return data;
       })
       : null;
