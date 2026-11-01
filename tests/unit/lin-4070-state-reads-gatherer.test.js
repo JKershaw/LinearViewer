@@ -15,7 +15,10 @@
  *   5. B2, the guest share route (section 8): a cold or stale holder answers `incomplete` with no state fields and makes no
  *      credential resolve or provider read; a complete holder paints the pill; a parent with a failed grandchild names no
  *      grandchild on its state reply or its page;
- *   6. source scans: `container=1` is gone from server code; the loader and the public share router start no refresh, and
+ *   6. D4, the first-render pill (section 9): an incomplete private or guest page paints the display-only provisional pill
+ *      (a Done task with a running close-out reads running, a backlog task reads backlog, where the header's own fallback
+ *      says done and idle), and offers no run (the run control's `action` is null; a guest page has no run control);
+ *   7. source scans: `container=1` is gone from server code; the loader and the public share router start no refresh, and
  *      `server.js` mounts the share router with no refresh function.
  *
  * The Sessions fold's own witnesses (whole life, `historical`, the incomplete read) are in lin-4016-sessions-fold-parked.test.js.
@@ -541,5 +544,88 @@ describe('LIN-4070 B2 — /t/:token/state reads the held facts only', () => {
       assert.doesNotMatch(state, /LIN-202/, 'the state reply names no grandchild');
       assert.doesNotMatch(page, /LIN-202/, 'the page names no grandchild');
     } finally { await srv.close(); }
+  });
+});
+
+// ── 9. D4: an incomplete page paints the provisional pill and offers no run (LIN-4070 re-review) ──
+
+/** The private task page's HTML for `task`, through the real route over `holder` and the tracker read `ctx`. */
+async function privatePageHtml({ holder, loops, ctx, task }) {
+  const router = createTaskPageRoutes({
+    workspaceFromUrl: (req, res, next) => next(), getOpenRouterSource: () => 'env', getDeployInfo: () => ({}),
+    loader: loaderOver({ loops, holder }), workspaceOwnerCheck: async () => ({ status: 'owner' }), taskFacts: holder,
+    refreshTaskFacts: () => ({ started: true, reason: 'started' }), now: () => NOW,
+  });
+  const access = providerAnswering(ctx);
+  const layer = router.stack.find((l) => l.route?.path === '/workspace/:urlKey/task/:identifier' && l.route.methods.get);
+  const req = {
+    session: { workspaces: [], features: {}, accountId: 'acct-1' }, workspace: { urlKey: URL_KEY, id: 'ws-1', provider: access.provider.name, accessToken: 't' },
+    params: { urlKey: URL_KEY, identifier: task }, query: {}, get: () => 'localhost',
+  };
+  const res = { statusCode: 200, body: null, status(c) { this.statusCode = c; return this; }, send(b) { this.body = b; return this; }, set() { return this; } };
+  await layer.route.stack[layer.route.stack.length - 1].handle(req, res, (err) => { if (err) throw err; });
+  return res.body;
+}
+
+/** The run control's decision record (`row`) the page hands the browser, read from the mount's `data-run-opts`. */
+function runRowOf(html) {
+  const m = String(html || '').match(/data-run-opts="([^"]*)"/);
+  if (!m) return null;
+  const unescaped = m[1].replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  return JSON.parse(unescaped).row;
+}
+
+describe('LIN-4070 D4 — an incomplete page paints the provisional pill and offers no run', () => {
+  // The provisional pill is the gatherer over the page's own detail read: the tracker's types for the task and its direct
+  // subtasks, and the task's own sessions. (The page load reads no subtask's sessions; the plan's residual says the pill may
+  // differ for one poll on a parent with deep descendants.) Two fixtures tell it from the header's own fallback, which
+  // reads `done` for a Done task whatever runs and `idle` for a backlog one:
+  //   - a Done task with a running close-out: provisional says `running` (the D2 guard), the fallback `done`;
+  //   - a backlog task: provisional says `backlog`, the fallback `idle`.
+  const DONE_RUNNING = [issue('LIN-220', 'completed')];
+  const DONE_RUNNING_LOOPS = [loop('LIN-220')];
+  const BACKLOG = [issue('LIN-221', 'backlog')];
+  const LIVE = [issue('LIN-200', 'started'), child('LIN-201', 'LIN-200', 'started')];
+  const LIVE_LOOPS = [loop('LIN-200')];
+  const cold = (issues) => holding(issues, new Date(NOW.getTime() - 10 * 60 * 1000));
+
+  test('private page, cold holder: a Done task with a running close-out paints running; a backlog task paints backlog', async () => {
+    const running = await privatePageHtml({ holder: cold(DONE_RUNNING), loops: DONE_RUNNING_LOOPS, ctx: ctxFor(DONE_RUNNING, 'LIN-220'), task: 'LIN-220' });
+    assert.equal(pillOf(running), 'running:running', 'the display-only pill is the gather\'s word, not the header\'s `done`');
+    const backlog = await privatePageHtml({ holder: cold(BACKLOG), loops: [], ctx: ctxFor(BACKLOG, 'LIN-221'), task: 'LIN-221' });
+    assert.equal(pillOf(backlog), 'queued:backlog', 'the display-only pill is the gather\'s word, not the header\'s `idle`');
+  });
+
+  test('guest share page, cold holder: a Done task with a running close-out paints running; a backlog task paints backlog', async () => {
+    const paint = async (issues, loops, task) => {
+      const srv = await shareServer({ holder: cold(issues), loops, ctx: ctxFor(issues, task), task });
+      try { return pillOf(await (await fetch(`${srv.base}/t/${SHARE_TOKEN}`)).text()); } finally { await srv.close(); }
+    };
+    assert.equal(await paint(DONE_RUNNING, DONE_RUNNING_LOOPS, 'LIN-220'), 'running:running');
+    assert.equal(await paint(BACKLOG, [], 'LIN-221'), 'queued:backlog');
+  });
+
+  test('private page, cold holder, a live task: the run control carries no action and the page offers no Run to PR', async () => {
+    const html = await privatePageHtml({ holder: cold(LIVE), loops: LIVE_LOOPS, ctx: ctxFor(LIVE, 'LIN-200'), task: 'LIN-200' });
+    assert.equal(pillOf(html)?.startsWith('running:'), true, `the page paints a pill while incomplete, got ${pillOf(html)}`);
+    const row = runRowOf(html);
+    assert.notEqual(row, null, 'the owner page mounts the run control');
+    assert.equal(row.action, null, 'no run is offered while incomplete');
+    assert.doesNotMatch(html, /opened-task-go|Run to PR/);
+  });
+
+  test('guest share page, cold holder, a live task: the page has no run control at all', async () => {
+    const srv = await shareServer({ holder: cold(LIVE), loops: LIVE_LOOPS, ctx: ctxFor(LIVE, 'LIN-200') });
+    try {
+      const html = await (await fetch(`${srv.base}/t/${SHARE_TOKEN}`)).text();
+      assert.match(html, /task-status-pill/, 'the page painted a pill');
+      assert.doesNotMatch(html, /data-run-opts|opened-task-go|Run to PR/);
+    } finally { await srv.close(); }
+  });
+
+  test('control: a complete holder on an idle task does offer an action, so the null above is the incomplete branch', async () => {
+    const issues = [issue('LIN-210', 'started')];
+    const html = await privatePageHtml({ holder: holding(issues), loops: [], ctx: ctxFor(issues, 'LIN-210'), task: 'LIN-210' });
+    assert.notEqual(runRowOf(html)?.action ?? null, null, 'a complete read offers the next action');
   });
 });
