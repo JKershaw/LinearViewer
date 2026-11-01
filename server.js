@@ -448,6 +448,10 @@ const dispatchQueueStore = new DispatchQueueStore({
   wakeShadowCollection,
   ttl: 24 * 60 * 60 // 24 hours
 })
+// LIN-4080: the wake-mint gate reads the operator halt (`stop` only) through this
+// late-bound reader, the single shared WorkspaceHaltStore. A failed read is "not
+// halted" (fail open), so the reader never blocks a feedback write.
+dispatchQueueStore.setHaltReader(urlKey => workspaceHaltStore.getWorkspaceHalt(urlKey))
 
 const dispatchTokenStore = new DispatchTokenStore({
   collection: dispatchTokensCollection,
