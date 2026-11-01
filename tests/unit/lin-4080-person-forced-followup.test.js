@@ -182,3 +182,57 @@ describe('LIN-4080 ruling — the stamp is never taken from the request body', (
     assert.equal('personOriginated' in stored, false);
   });
 });
+
+describe('LIN-4080 ruling — the person stamp reaches the runner (SD\'s LIN-4082 reads it from the item)', () => {
+  async function admitPersonForced(store) {
+    const run = await stoppedRun(store);
+    const item = await dispatch(
+      store,
+      { followUpTo: run._id, rootItemId: run._id, force: true },
+      { personOriginated: true }
+    );
+    return { run, item };
+  }
+
+  test('the poll shape (listItemsWithPrompt -> _formatItem) carries personOriginated: true on the admitted row', async () => {
+    const store = makeStore();
+    const { item } = await admitPersonForced(store);
+
+    const polled = (await store.listItemsWithPrompt(URL_KEY)).find(i => i.id === item._id);
+    assert.ok(polled, 'the admitted row is in the poll');
+    assert.equal(polled.personOriginated, true);
+  });
+
+  test('the take shape (takeItem result) carries personOriginated: true', async () => {
+    const store = makeStore();
+    const { item } = await admitPersonForced(store);
+
+    const taken = await store.takeItem(item._id, URL_KEY);
+    assert.ok(taken, 'the row is taken');
+    assert.equal(taken.personOriginated, true);
+  });
+
+  test('the history shape (_formatHistoryItem, after the take) still carries personOriginated: true', async () => {
+    const store = makeStore();
+    const { item } = await admitPersonForced(store);
+    await store.takeItem(item._id, URL_KEY);
+
+    const { items } = await store.listHistory(URL_KEY, { limit: 50 });
+    const archived = items.find(i => i.id === item._id);
+    assert.ok(archived, 'the taken row is in history');
+    assert.equal(archived.personOriginated, true);
+  });
+
+  test('an ordinary row\'s items (poll, take, history) do NOT carry the key at all', async () => {
+    const store = makeStore();
+    const run = await autopilot(store);
+    const ordinary = await dispatch(store, { followUpTo: run._id, rootItemId: run._id, force: true }, { personOriginated: true });
+
+    const polled = (await store.listItemsWithPrompt(URL_KEY)).find(i => i.id === ordinary._id);
+    assert.equal('personOriginated' in polled, false, 'poll');
+    const taken = await store.takeItem(ordinary._id, URL_KEY);
+    assert.equal('personOriginated' in taken, false, 'take');
+    const archived = (await store.listHistory(URL_KEY, { limit: 50 })).items.find(i => i.id === ordinary._id);
+    assert.equal('personOriginated' in archived, false, 'history');
+  });
+});
