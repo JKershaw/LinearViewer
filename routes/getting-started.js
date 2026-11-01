@@ -60,6 +60,17 @@ const markdown = new Marked({ gfm: true }).use({
 });
 
 /**
+ * The guide's markdown as the HTML form renders it. Exported so the safety of the
+ * renderer (raw HTML escaped, unsafe link targets dropped) is tested directly with
+ * hostile input, since the real guide contains none.
+ * @param {string} md
+ * @returns {string}
+ */
+export function renderGuideHtml(md) {
+  return markdown.parse(md);
+}
+
+/**
  * @param {import('express').Request} req
  * @param {() => object} flagsFor - the deployment flags (injectable for tests)
  * @returns {string} the guide as markdown for this request
@@ -90,7 +101,7 @@ export function createGettingStartedRouter({ flags = deploymentFlags } = {}) {
   });
 
   router.get('/getting-started', (req, res) => {
-    const body = markdown.parse(guideFor(req, flags));
+    const body = renderGuideHtml(guideFor(req, flags));
     const html = renderPage({
       title: 'Getting started with Harbour',
       stylesheets: ['/style.css', '/library.css'],

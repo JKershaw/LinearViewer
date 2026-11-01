@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import express from 'express';
 
-import { createGettingStartedRouter } from '../../routes/getting-started.js';
+import { createGettingStartedRouter, renderGuideHtml } from '../../routes/getting-started.js';
 import { isAuthExemptPath } from '../../lib/guest-task-path.js';
 import { LIBRARY_CSP, MARKDOWN_CSP } from '../../routes/library.js';
 
@@ -96,16 +96,21 @@ describe('GET /getting-started (HTML)', () => {
     }
   });
 
-  test('no javascript: link and no injected script reach the HTML form', async () => {
-    // The guide is ours, but its renderer must still refuse unsafe link schemes and escape raw HTML.
-    const { server, base } = await serve(ALL_DOORS);
-    try {
-      const html = await (await fetch(`${base}/getting-started`)).text();
-      assert.equal(/href="javascript:/i.test(html), false);
-      assert.equal(html.includes('alert('), false);
-    } finally {
-      server.close();
+  test('the HTML renderer drops an unsafe link target and keeps the link text', () => {
+    // Direct call with hostile input: the real guide has none, so a route-level check could never fail.
+    for (const href of ['javascript:alert(1)', 'JaVaScRiPt:alert(1)', 'data:text/html,x', 'vbscript:x', '//evil.example/x']) {
+      const html = renderGuideHtml(`[click me](${href})`);
+      assert.equal(/href=/i.test(html), false, `${href} must not become an href`);
+      assert.ok(html.includes('click me'), 'the link text survives');
     }
+    assert.ok(renderGuideHtml('[ok](https://harbour.cat/x)').includes('href="https://harbour.cat/x"'), 'a safe link still renders');
+  });
+
+  test('the HTML renderer escapes raw HTML instead of passing it through', () => {
+    const html = renderGuideHtml('<script>alert(1)</script>\n\ntext <img src=x onerror=alert(1)>');
+    assert.ok(html.includes('&lt;script&gt;'), 'script tag is escaped');
+    assert.equal(html.includes('<script>'), false);
+    assert.equal(html.includes('<img'), false);
   });
 });
 

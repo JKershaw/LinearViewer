@@ -1,3 +1,4 @@
+import http from 'node:http';
 import { test, expect } from '../fixtures/test-base.js';
 
 // LIN-4085: the agent prompt under the hero sign-in buttons on `/`. Browser witnesses for
@@ -82,5 +83,31 @@ test.describe('Landing agent prompt (LIN-4085)', () => {
     } finally {
       await context.close();
     }
+  });
+
+  // Finding 1 of the LIN-4085 review: the landing prompt is an instruction surface, so the
+  // origin it carries must be the validated one (publicOrigin with safeHost), never raw
+  // Host-derived text. The guide routes have a unit test for this; `/` is wired in server.js
+  // and only a request to the running server can catch a regression there.
+  test('a hostile Host header never reaches the prompt: the canonical origin is used', async ({ baseURL }) => {
+    const { port } = new URL(baseURL);
+    const body = await new Promise((resolve, reject) => {
+      const req = http.request(
+        { host: '127.0.0.1', port, path: '/', method: 'GET', headers: { Host: 'evil.example/<script>alert(1)</script>' } },
+        (res) => {
+          let data = '';
+          res.setEncoding('utf8');
+          res.on('data', (chunk) => { data += chunk; });
+          res.on('end', () => (res.statusCode === 200 ? resolve(data) : reject(new Error(`status ${res.statusCode}`))));
+        },
+      );
+      req.on('error', reject);
+      req.end();
+    });
+    const start = body.indexOf('data-testid="landing-agent-prompt-text"');
+    expect(start, 'the prompt block is on the page').toBeGreaterThan(-1);
+    const block = body.slice(start, body.indexOf('</pre>', start));
+    expect(block).toContain('harbour.cat/getting-started.md');
+    expect(block).not.toContain('evil.example');
   });
 });
