@@ -14,6 +14,8 @@
  */
 import { test, describe, before } from 'node:test';
 import assert from 'node:assert';
+import vm from 'node:vm';
+import { readFileSync } from 'node:fs';
 import { createDashboardRoutes, buildTestSummary, buildTestSessionSummary, deriveSessionStatus, deriveSessionDecisions } from '../../routes/dashboard.js';
 import { createSessionsFeedCache } from '../../lib/sessions-feed-cache.js';
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
@@ -6794,5 +6796,63 @@ describe('LIN-4103 beat 3 — the rulings feed counts the page\'s own workspace 
     assert.equal(res.statusCode, 200);
     assert.equal(res.jsonBody.count, 2, 'the all-workspaces count is unchanged');
     assert.equal(res.jsonBody.workspaceCount, 1, 'the badge count is the page\'s own workspace');
+  });
+
+  // LIN-4103 review item 2: the number painted in the header badge is the page's own workspace, the number its Home count
+  // line shows ("N waiting on you" reads that workspace's rulings only). Distinguishing precondition: a SECOND workspace on
+  // the same session holds a ruling; with one workspace both numbers agree by accident. The client function is the real
+  // shipped one, sliced out of public/common.js and run against the real route's JSON, so a badge that reads the
+  // all-workspaces `count` paints 2 here and fails.
+  test('the badge paints the page\'s own workspace number when a second workspace holds a ruling', async () => {
+    const src = readFileSync(new URL('../../public/common.js', import.meta.url), 'utf8');
+    const start = src.indexOf('window.updateRulingsBadge = async function updateRulingsBadge(');
+    const end = src.indexOf('\n};', start);
+    assert.ok(start !== -1 && end !== -1, 'updateRulingsBadge not found in public/common.js');
+    const slice = src.slice(start, end + 3).replace('window.updateRulingsBadge', 'var updateRulingsBadge');
+
+    const router = makeRouter({
+      'ws-a': { live: [], history: [decisionItem('a-dec', 'LIN-24', 'd-a')], agentStatus: [] },
+      'ws-b': { live: [], history: [decisionItem('b-dec', 'LIN-25', 'd-b'), decisionItem('b-dec2', 'LIN-28', 'd-b2')], agentStatus: [] },
+    });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/rulings');
+    const session = { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }, { urlKey: 'ws-b', name: 'Beta' }] };
+
+    const paint = async (urlKey) => {
+      const { req, res } = makeReqRes({ session, params: { urlKey } });
+      await handler(req, res);
+      assert.equal(res.statusCode, 200);
+      const countEl = { textContent: '' };
+      const hidden = new Set(['hidden']);
+      const badge = { querySelector: () => countEl, classList: { toggle: (c, on) => (on ? hidden.add(c) : hidden.delete(c)) } };
+      const ctx = vm.createContext({
+        fetch: async () => ({ ok: true, json: async () => res.jsonBody }),
+        document: { querySelector: () => badge },
+        console,
+      });
+      vm.runInContext(`${slice}; this.updateRulingsBadge = updateRulingsBadge;`, ctx);
+      await ctx.updateRulingsBadge(urlKey);
+      return { text: countEl.textContent, hidden: hidden.has('hidden'), feedCount: res.jsonBody.count };
+    };
+
+    const a = await paint('ws-a');
+    assert.equal(a.feedCount, 3, 'the all-workspaces count is 3 (this is the number a wrong badge would paint)');
+    assert.equal(String(a.text), '1', 'workspace A\'s badge equals A\'s count line: one ruling');
+    const b = await paint('ws-b');
+    assert.equal(String(b.text), '2', 'workspace B\'s badge equals B\'s count line: two rulings');
+  });
+
+  // LIN-4103 review item 3: the count line reads the 30-day window (`windowedLoops`), so the badge must too. The distinguishing
+  // precondition is a loop-backed ruling in the page's workspace whose loop was dispatched 31 days ago.
+  test('a ruling whose loop was dispatched 31 days ago is outside the 30-day window: the badge does not count it', async () => {
+    const old = new Date(Date.parse(NOW_ISO) - 31 * 24 * 60 * 60 * 1000).toISOString();
+    const inside = new Date(Date.parse(NOW_ISO) - 29 * 24 * 60 * 60 * 1000).toISOString();
+    const stale = { ...decisionItem('a-old', 'LIN-26', 'd-old'), dispatchedAt: old, resolvedAt: old };
+    const fresh = { ...decisionItem('a-new', 'LIN-27', 'd-new'), dispatchedAt: inside, resolvedAt: inside };
+    const router = makeRouter({ 'ws-a': { live: [], history: [stale, fresh], agentStatus: [] } });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/rulings');
+    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] }, params: { urlKey: 'ws-a' } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.workspaceCount, 1, 'only the 29-day-old ruling is in the window, as on the count line');
   });
 });

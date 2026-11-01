@@ -10,6 +10,8 @@
  *   opened-box-owner-{light,dark}-{1280,390}.png  the opened parent: its box names BOTH subtasks that need you
  *   track-owner-{light,dark}-1280.png        the task page's stage track: Plan done, Build failed, no usual stage drawn
  *   sessions-owner-light-1280.png            the Sessions fold: runs only, no Prompt or autopilot records
+ *   copy-first-newuser-{light,dark}-{1280,390}.png  a member with NO runner: the opened never-run task shows the
+ *                                            copy-first line and the Write button, no step name and no "usual" chip
  *
  * Data seam: the local provider (`/test/set-local-session`), since the states need real dispatch rows. The runs and the
  * rulings are written through the public dispatch API the way a runner writes them, as lin-4010 and lin-4024 do.
@@ -23,7 +25,7 @@ const WIDTHS = { 1280: { width: 1280, height: 900 }, 390: { width: 390, height: 
 
 test.describe.configure({ mode: 'serial' });
 
-async function seedTasks(page, urlKey) {
+async function seedTasks(page, urlKey, { runnerKey = true } = {}) {
   await page.goto('/test/clear-local-store');
   for (const route of ['clear-dispatch-queue', 'clear-dispatch-history', 'clear-sessions-feed-cache']) {
     await page.request.get(`/test/${route}?urlKey=${urlKey}`);
@@ -51,7 +53,7 @@ async function seedTasks(page, urlKey) {
   ];
   const resp = await page.request.post('/test/set-local-session', {
     data: {
-      urlKey, runnerKey: true, issues,
+      urlKey, runnerKey, issues,
       projects: [{ id: p, name: 'UI finish', content: 'The pages a new user meets', sortOrder: 0 }],
     },
   });
@@ -182,3 +184,31 @@ test('the Sessions list shows runs only, owner, light, 1280px', async ({ page, l
   await page.addStyleTag({ content: '.nav-bar { position: static !important; }' });
   await page.screenshot({ path: OUT('sessions-owner-light-1280'), fullPage: true });
 });
+
+// A new user with no runner (LIN-4103 review item 6): the copy-first view of a never-run task. Before Write, the line names no
+// step and draws no "usual" chip; the one action is the unnamed Write button.
+for (const theme of ['light', 'dark']) {
+  for (const [label, viewport] of Object.entries(WIDTHS)) {
+    test(`copy-first for a new user with no runner, ${theme}, ${label}px`, async ({ page, localWorkerUrlKey }) => {
+      await seedTasks(page, localWorkerUrlKey, { runnerKey: false });
+      await page.context().clearCookies({ name: 'theme' });
+      if (theme === 'dark') await page.context().addCookies([{ name: 'theme', value: 'dark', url: 'http://localhost:3001' }]);
+      await page.setViewportSize(viewport);
+      await page.goto(`/workspace/${localWorkerUrlKey}/`);
+      await page.waitForLoadState('networkidle');
+      await page.locator('.in-progress-section .line[data-identifier="LOCAL-6"]').first().click();
+      const box = page.locator('[data-testid="opened-task"]').first();
+      await expect(box).toBeVisible();
+      await page.waitForLoadState('networkidle');
+      await expect(box.locator('[data-testid="opened-task-write"]')).toBeVisible();
+      const line = (await box.locator('[data-testid="opened-task-step"]').first().textContent()) || '';
+      expect(line, 'the copy-first line before Write').not.toMatch(/\b(research|plan|build|implementation|review|close-?out)\b/i);
+      await expect(box.locator('[data-testid="opened-task-write"]')).toHaveText(/Write the prompt/);
+      await expect(page.locator('body')).not.toContainText(/usually next|\busual\b/i);
+      await expect(box.locator('.task-page-stage-ahead, [data-stage-ahead]')).toHaveCount(0);
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.addStyleTag({ content: '.nav-bar { position: static !important; }' });
+      await page.screenshot({ path: OUT(`copy-first-newuser-${theme}-${label}`), fullPage: true });
+    });
+  }
+}

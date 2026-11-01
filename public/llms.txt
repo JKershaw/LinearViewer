@@ -52,7 +52,7 @@ The papers and essays behind Harbour are published unauthenticated at `/library`
 Issues are wrapped in nested `.node` containers:
 ```
 .node[data-id="{id}"]           - node container
-  .line[data-id="{id}"]         - task row (keyboard-operable: role=button, tabindex=0, aria-expanded; no arrow glyph, LIN-4010: the project is muted text after the title, and a container's row names its subtask, e.g. `LIN-N · Research next`)
+  .line[data-id="{id}"]         - task row (keyboard-operable: role=button, tabindex=0, aria-expanded; no arrow glyph, LIN-4010: the project is muted text after the title, and a container's row says what its subtasks do, e.g. `1 of 3 running` or `a subtask failed`; a never-run row says nothing (LIN-4103))
   .details[data-details-for]    - details panel (hidden by default; the row's opened task on Home, LIN-3833)
     [data-testid="opened-task"] - the contained block around the opened task, set apart from the rows (LIN-3968)
     [data-testid="opened-task-facts"] - the facts line: ID, project, when it was last updated

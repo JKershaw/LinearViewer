@@ -242,3 +242,155 @@ describe('LIN-4016 W1 / LIN-4070 D2 — a tracker-decided state: the row, /state
     assert.deepEqual(Object.keys(rowRecordOf({ stateType: 'started', decided: s.row })).sort(), ['action', 'copyStep', 'trackerWord']);
   });
 });
+
+// ---------------------------------------------------------------------------------------------------------------------
+// LIN-4103 — the agreement table across a TREE. A parent's row, the count line, the opened box (`/state`'s `attention`)
+// and `/state` itself all draw the one decided state: nothing re-derives it per surface. Each scenario is a small tree
+// of stored loops, run through the same surfaces as above: the row (`buildRowStates`, which the Home gather mirrors),
+// `/state` (`loadTaskState` over a held subtree, the gatherer's answer), and the count line.
+// ---------------------------------------------------------------------------------------------------------------------
+
+const TREE_ROOT = 'LIN-90';
+
+/** A tree node: `{id, type, loops, children}`. `loops` are the node's own stored loops. */
+const treeNode = (id, type = 'started', loops = [], children = []) => ({ id, type, loops, children });
+const own = (id, make, ...args) => make(...args, { issueIdentifier: id, loopId: `${id}-l`, lineageId: `${id}-l` });
+const ownRuling = (id) => rulingLoop({
+  issueIdentifier: id, loopId: `${id}-r`, lineageId: `${id}-r`,
+  decision: { decision_id: `d-${id}`, question: `Which way for ${id}?` },
+});
+
+function flatten(node, parent = null, out = []) {
+  out.push({ node, parent });
+  for (const child of node.children) flatten(child, node, out);
+  return out;
+}
+
+function nodeOf({ id, type, children }, parent = null) {
+  return {
+    issue: {
+      id: `id-${id}`, identifier: id, title: `Title of ${id}`, state: { name: type, type },
+      ...(parent ? { parent: { id: `id-${parent.id}` } } : {}),
+    },
+    children: children.map((child) => nodeOf(child, { id })),
+    depth: 0,
+  };
+}
+
+/** Every surface's answer for one tree: the root's row, `/state`, the box line, and the Home count line. */
+async function treeSurfacesOf(tree, { held = true } = {}) {
+  const flat = flatten(tree);
+  const loopsById = new Map(flat.map(({ node }) => [node.id, node.loops]));
+  const allLoops = flat.flatMap(({ node }) => node.loops);
+  const rootNode = nodeOf(tree);
+  const rowStates = buildRowStates({
+    roots: [rootNode], loopsByIdentifier: loopsById, enrichLoop, deriveSessionWaiting, now: NOW, sessionsVisible: true,
+  });
+  const issues = [];
+  (function collect(n) { issues.push(n.issue); n.children.forEach(collect); })(rootNode);
+  const loader = createTaskPageLoader({
+    dispatchStore: {}, agentStatusStore: {}, enrichLoop, deriveSessionWaiting,
+    getLoopsForIssue: async (_url, id) => loopsById.get(id) || [],
+    getLoopsForIssues: async (_url, ids) => ids.flatMap((id) => loopsById.get(id) || []),
+    now: () => NOW,
+    ...(held
+      ? heldLoaderDeps(heldTaskFacts({ issues, now: NOW }))
+      : heldLoaderDeps(heldTaskFacts({ issues, now: NOW, readAt: new Date(NOW.getTime() + 60 * 60 * 1000) }))),
+  });
+  const { taskState, incomplete } = await loader.loadTaskState({ urlKey: URL_KEY, identifier: tree.id });
+  const rulingCount = rulingStandingOf({ urlKey: URL_KEY, loops: allLoops }, { now: NOW, enrichLoop }).rows.length;
+  return {
+    row: rowStates.get(tree.id),
+    rowOf: (id) => rowStates.get(id),
+    taskState,
+    incomplete,
+    rulingCount,
+    count: buildInProgressCountParts([{ projectName: 'P', roots: [rootNode] }], rowStates, { rulingCount }).map((p) => p.text),
+  };
+}
+
+const TREE_SCENARIOS = [
+  {
+    name: 'a parent with a running grandchild',
+    tree: () => treeNode(TREE_ROOT, 'started', [], [
+      treeNode('LIN-91', 'started', [], [treeNode('LIN-92', 'started', [own('LIN-92', loop)])]),
+      treeNode('LIN-93'),
+    ]),
+    expect: { state: 'running', count: ['1 running'] },
+  },
+  {
+    name: 'a parent with two subtasks that need you',
+    tree: () => treeNode(TREE_ROOT, 'started', [], [
+      treeNode('LIN-91', 'started', [ownRuling('LIN-91')]),
+      treeNode('LIN-92', 'started', [ownRuling('LIN-92')]),
+      treeNode('LIN-93'),
+    ]),
+    expect: { state: 'needs-you', count: ['2 waiting on you'], attention: ['LIN-91', 'LIN-92'] },
+  },
+  {
+    name: 'a parent with one failed open subtask',
+    tree: () => treeNode(TREE_ROOT, 'started', [], [
+      treeNode('LIN-91', 'started', [own('LIN-91', failedLoop, 'implementation')]),
+      treeNode('LIN-92'),
+    ]),
+    expect: { state: 'failed', words: 'a subtask failed', count: ['1 failed'], attention: ['LIN-91'] },
+  },
+  {
+    name: 'a parent with two failed open subtasks',
+    tree: () => treeNode(TREE_ROOT, 'started', [], [
+      treeNode('LIN-91', 'started', [own('LIN-91', failedLoop, 'implementation')]),
+      treeNode('LIN-92', 'started', [own('LIN-92', failedLoop, 'plan')]),
+    ]),
+    expect: { state: 'failed', words: '2 subtasks failed', count: ['1 failed'], attention: ['LIN-91', 'LIN-92'] },
+  },
+  {
+    name: 'a Done child whose last stage failed: it reads done and rolls nothing up',
+    tree: () => treeNode(TREE_ROOT, 'started', [], [
+      treeNode('LIN-91', 'completed', [own('LIN-91', failedLoop, 'implementation')]),
+    ]),
+    expect: { state: 'todo', words: null, count: [], childState: { 'LIN-91': 'done' } },
+  },
+];
+
+describe('LIN-4103 — a parent\'s row, /state, the opened box and the count line agree (the cross-surface table)', () => {
+  for (const scenario of TREE_SCENARIOS) {
+    test(`${scenario.name}: one decided state on every surface`, async () => {
+      const s = await treeSurfacesOf(scenario.tree());
+      assert.ok(s.taskState, 'the held subtree is complete, so /state answers');
+      // The row and /state carry the same decided state, words, tone and box line.
+      assert.equal(s.taskState.state, s.row.state, 'state');
+      assert.equal(s.taskState.words, s.row.words, 'words');
+      assert.equal(s.taskState.tone, s.row.tone, 'tone');
+      assert.deepEqual(s.taskState.attention ?? null, s.row.attention ?? null, 'the opened box line is the row\'s');
+
+      // The expectation is the plan's fixture table, so a surface that agrees on a wrong answer still fails.
+      assert.equal(s.row.state, scenario.expect.state);
+      if ('words' in scenario.expect) assert.equal(s.row.words, scenario.expect.words);
+      assert.deepEqual(s.count, scenario.expect.count, 'the count line');
+      for (const [id, state] of Object.entries(scenario.expect.childState || {})) assert.equal(s.rowOf(id).state, state, `${id}'s own row`);
+
+      // The box names exactly the subtasks whose own rows carry the state it announces.
+      if (scenario.expect.attention) {
+        // One subtask is the line's own `identifier`; several are its `subtasks` list.
+        const line = s.taskState.attention;
+        const named = line.subtasks ? line.subtasks.map((x) => x.identifier) : [line.identifier];
+        assert.deepEqual(named, scenario.expect.attention, 'the box names every subtask');
+        for (const id of named) assert.ok(['needs-you', 'failed'].includes(s.rowOf(id).state), `${id} is a subtask whose own row says so`);
+      } else {
+        assert.equal(s.taskState.attention ?? null, null, 'no subtask line when no subtask needs you or failed');
+      }
+
+      // The count line counts the root's own decided state, and the waiting number is the rulings the surfaces share.
+      assert.equal(s.count.includes('1 running'), s.row.state === 'running');
+      assert.equal(s.count.includes('1 failed'), s.row.state === 'failed');
+      const waiting = s.count.find((t) => t.includes('waiting on you'));
+      assert.equal(waiting ? Number.parseInt(waiting, 10) : 0, s.rulingCount, 'the count line is the ruling count');
+    });
+  }
+
+  test('a cold held set: /state says it has not read yet, and invents no state; the row is the gather\'s alone', async () => {
+    const s = await treeSurfacesOf(TREE_SCENARIOS[1].tree(), { held: false });
+    assert.equal(s.taskState, null, '/state carries no state when the held set is not fresh');
+    assert.equal(typeof s.incomplete, 'string', 'it names why');
+  });
+});
