@@ -2,6 +2,13 @@
 
 > A minimal web app that displays your task tracker's projects and issues as a collapsible tree with a CLI aesthetic. Backed by Linear, GitHub, GitHub Projects, Jira, or a local store.
 
+## Getting started
+
+If a person asked you to set Harbour up for them, read `/getting-started` first. It is written for you, the agent: what to find out, what to check in their repositories and tracker, which steps the person does in their browser, and how to run a first task. It is public, with no session required.
+
+- **As Markdown**: `/getting-started` answers an agent's fetch (`Accept: */*`, none, `text/markdown` or `text/plain` first) with Markdown and a browser with HTML; `/getting-started.md` is always Markdown
+- **The prompt**: the homepage's "Get started" box (`[data-testid="landing-agent-prompt"]`) is the prompt a person pastes into their agent to start; it points here
+
 ## Library
 
 The papers and essays behind Harbour are published unauthenticated at `/library` — a searchable index of every document, no session required.

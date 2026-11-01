@@ -42,6 +42,8 @@ describe('isAuthExemptPath (shared PAT + refresh exemption, LIN-3346)', () => {
     // Exact public pages, in any case and with one trailing slash.
     '/logout', '/privacy', '/terms', '/styleguide', '/kpis', '/templates',
     '/KPIS', '/kpis/', '/Privacy/', '/TEMPLATES', '/templates/',
+    // The getting-started guide and its Markdown form.
+    '/getting-started', '/getting-started/', '/Getting-Started', '/getting-started.md',
     // Archive: digits only, with one optional trailing slash.
     '/archive/1', '/archive/01', '/archive/1/', '/Archive/1/',
     // Library, sitemap and robots (isPublicLibraryPath, via the stripped path).
@@ -55,6 +57,7 @@ describe('isAuthExemptPath (shared PAT + refresh exemption, LIN-3346)', () => {
     // Lookalikes and near-misses of the exempt prefixes.
     '/t', '/test/x', '/auth', '/kpisx', '/archive', '/archive/x', '/archive/1x',
     '/libraryfoo', '/librarian', '/api/library', '/library.md', '/s/x',
+    '/getting-started/x', '/getting-startedx', '/getting', '/getting-started.mdx',
     // App paths keep refreshing.
     '/workspace/a/', '/workspace/a/api/task/LIN-1/state',
     // Bearer APIs are a different class and stay out.

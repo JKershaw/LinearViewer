@@ -1,0 +1,61 @@
+/**
+ * Getting-started page (lib/render-getting-started.js).
+ *
+ * The page rides the Library's reading styles (public/library.css); this adds
+ * only the hand-off box at the top: the prompt a person pastes into their
+ * agent. Semantic tokens only, so `.theme-dark` re-binds it with no rules here.
+ */
+
+/* Capped to the Library's 68ch reading column, so it lines up with the guide. */
+.getting-started__handoff {
+  max-width: 68ch;
+  box-sizing: border-box;
+  margin: 0 0 var(--space-5);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+}
+
+.getting-started__handoff-title {
+  font-family: var(--font-content);
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+}
+
+.getting-started__handoff-note {
+  font-family: var(--font-content);
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--muted);
+  margin: var(--space-2) 0 var(--space-3);
+}
+
+.getting-started__prompt {
+  margin: 0;
+  padding: var(--space-3);
+  font-family: var(--font-structural);
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* At phone widths the Library panel already pads the page, so the box and the
+   prompt inside it take less, leaving the prompt a readable measure. */
+@media (max-width: 640px) {
+  .getting-started__handoff {
+    padding: var(--space-3);
+  }
+
+  .getting-started__prompt {
+    padding: var(--space-2);
+    font-size: 0.8rem;
+  }
+}

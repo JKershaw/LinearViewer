@@ -177,6 +177,7 @@ import { createTaskPageRoutes } from './routes/task-page.js'
 import { createTaskPageLoader } from './lib/task-page-loader.js'
 import { createTaskShareRoutes } from './routes/task-share.js'
 import { createLibraryRouter } from './routes/library.js'
+import { createGettingStartedRouter } from './routes/getting-started.js'
 import { TaskShareStore } from './lib/task-share-store.js'
 import { createWorkspaceRemovalRevoker } from './lib/workspace-removal-revocation.js'
 import { createGuestTaskAccess } from './lib/task-share-access.js'
@@ -2454,6 +2455,15 @@ app.get('/templates', (req, res) => {
 // so it cannot touch the rest of the app. `isAuthExemptPath` (which uses
 // `isPublicLibraryPath`, and lib/pat-session.js) exempts these paths from auth.
 app.use(createLibraryRouter())
+
+// =============================================================================
+// Getting started (public, no auth required)
+// =============================================================================
+// The guide a person's coding agent reads to set Harbour up for them; the
+// homepage hands the person the prompt that points their agent here. HTML for a
+// browser, Markdown for an agent's fetch, and always at /getting-started.md
+// (routes/getting-started.js). `isAuthExemptPath` exempts both paths from auth.
+app.use(createGettingStartedRouter({ getDeployInfo }))
 
 // =============================================================================
 // KPIs Page (public, no auth required, intentionally unlinked)

@@ -220,6 +220,56 @@ test.describe('Landing Page (bespoke showcase)', () => {
   });
 });
 
+// Getting started through your agent: where other software shows an install
+// command, the homepage shows a prompt to paste into a coding agent, which
+// sends the agent to /getting-started (lib/getting-started.js).
+test.describe('Get started with your agent', () => {
+  test('the prompt sits right after the hero, and copy puts exactly it on the clipboard', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.goto('/');
+    const section = page.locator('[data-testid="landing-get-started"]');
+    await expect(section).toBeVisible();
+    const order = await page.evaluate(() => {
+      const start = document.querySelector('[data-testid="landing-get-started"]');
+      const loop = document.querySelector('[data-testid="landing-loop"]');
+      return start.compareDocumentPosition(loop);
+    });
+    expect(order & 4).toBe(4); // the loop FOLLOWS the get-started section
+
+    const prompt = page.locator('[data-testid="landing-agent-prompt"]');
+    await expect(prompt).toContainText('/getting-started');
+    const copy = page.locator('[data-testid="landing-agent-prompt-copy"]');
+    await expect(copy).toBeVisible(); // revealed by /landing.js
+    await copy.click();
+    await expect(copy).toHaveText('copied!');
+    const clipboard = await page.evaluate(() => navigator.clipboard.readText());
+    expect(clipboard).toBe(await prompt.textContent());
+  });
+
+  test('the prompt names this server, and its guide link opens the guide', async ({ page, baseURL }) => {
+    await page.goto('/');
+    await expect(page.locator('[data-testid="landing-agent-prompt"]')).toContainText(`${baseURL}/getting-started`);
+    await page.locator('[data-testid="landing-getting-started-link"]').click();
+    await expect(page).toHaveURL(/\/getting-started$/);
+    await expect(page.locator('[data-testid="getting-started-page"]')).toBeVisible();
+    await expect(page.locator('[data-testid="getting-started-prompt"]')).toContainText(`${baseURL}/getting-started`);
+    await expect(page.locator('[data-testid="getting-started-body"] h1')).toContainText('Getting started with Harbour');
+  });
+
+  test('an agent\'s fetch of /getting-started gets Markdown; /getting-started.md always does', async ({ request, baseURL }) => {
+    const asAgent = await request.get('/getting-started', { headers: { accept: '*/*' } });
+    expect(asAgent.status()).toBe(200);
+    expect(asAgent.headers()['content-type']).toBe('text/markdown; charset=utf-8');
+    const md = await asAgent.text();
+    expect(md.startsWith('# Getting started with Harbour')).toBe(true);
+    expect(md).toContain(`${baseURL}/api/proxy/instructions`);
+    expect(md).not.toContain('{{');
+
+    const asFile = await request.get('/getting-started.md', { headers: { accept: 'text/html' } });
+    expect(asFile.headers()['content-type']).toBe('text/markdown; charset=utf-8');
+  });
+});
+
 // LIN-3345: the footer's Library link reaches the Library from every
 // footer-bearing page.
 test.describe('Footer Library link (LIN-3345)', () => {

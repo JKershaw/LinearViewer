@@ -56,7 +56,8 @@ export function escapeXml(value) {
 /**
  * Every canonical, query-free URL the sitemap lists. The set is derived from
  * the catalog by construction (never hand-written), so it cannot drift from the
- * routes: the two top-level public pages, every served document at its one
+ * routes: the top-level public pages (home, getting started, the Library
+ * index — the getting-started route is routes/getting-started.js), every served document at its one
  * canonical path, and every Archive edition. No `?q=` URL can appear — the loop
  * never builds one.
  *
@@ -70,6 +71,7 @@ export function escapeXml(value) {
 export function sitemapEntries(catalog) {
   const entries = [
     { path: '/', lastmod: null },
+    { path: '/getting-started', lastmod: null },
     { path: '/library', lastmod: null },
   ];
   for (const doc of catalog.docs) {

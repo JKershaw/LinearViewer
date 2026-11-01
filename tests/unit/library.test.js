@@ -330,6 +330,7 @@ describe('crawler files (LIN-3345)', () => {
       assert.ok(!loc.includes('?'), `no query string in loc: ${loc}`);
     }
     assert.ok(locs.includes(`${base}/`));
+    assert.ok(locs.includes(`${base}/getting-started`), 'the getting-started guide is listed');
     assert.ok(locs.includes(`${base}/library`));
     for (const doc of catalog.docs) {
       assert.ok(locs.includes(`${base}/library/${doc.slug}`), `${doc.slug} listed`);
@@ -337,7 +338,7 @@ describe('crawler files (LIN-3345)', () => {
     for (const edition of catalog.archiveEditions) {
       assert.ok(locs.includes(`${base}/archive/${edition.n}`), `archive ${edition.n} listed`);
     }
-    assert.equal(locs.length, 2 + catalog.docs.length + catalog.archiveEditions.length);
+    assert.equal(locs.length, 3 + catalog.docs.length + catalog.archiveEditions.length);
 
     // `lastmod` only where the date is a real YYYY-MM-DD.
     const lastmods = [...xml.matchAll(/<lastmod>([^<]+)<\/lastmod>/g)].map(m => m[1]);

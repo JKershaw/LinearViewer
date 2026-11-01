@@ -318,6 +318,40 @@
 .lx-c-key { color: var(--brand); }
 .lx-c-path { color: var(--amber-dim); }
 
+/* ---- "Get started": the prompt to paste into your agent ------------------ */
+/* The homepage's install command. The terminal box is the shared glimpse; the
+   prompt is real text to copy, so it reads at the content size, not the
+   glimpses' smaller one, and the copy button sits at the right of the bar. */
+.lx-start__box .lx-terminal__bar {
+  flex-wrap: wrap;
+}
+
+/* The section's one action, so it carries the brand colour. */
+.lx-start__copy {
+  margin-left: auto;
+  font-family: var(--font-structural);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--brand);
+}
+
+.lx-start__prompt {
+  font-size: 0.88rem;
+  line-height: 1.65;
+}
+
+.lx-start__note {
+  font-family: var(--font-content);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--muted);
+  margin: var(--space-3) 0 0;
+}
+
+.lx-start__note a {
+  color: var(--brand);
+}
+
 /* ---- "Try it yourself" callout (LIN-1161) --------------------------------- */
 .lx-try__inner {
   padding: var(--space-4);
