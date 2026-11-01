@@ -2,6 +2,11 @@
 
 > A minimal web app that displays your task tracker's projects and issues as a collapsible tree with a CLI aesthetic. Backed by Linear, GitHub, GitHub Projects, Jira, or a local store.
 
+## Getting started (onboarding a person)
+
+- **Onboarding guide for coding agents**: `/getting-started.md` (plain markdown; the agent reads this one) and `/getting-started` (HTML). Public, no session. Read it in full before acting: it says which setup steps only the person can do (signing in, an OpenRouter key, minting a runner key) and which you can do.
+- The landing page (`/`) offers the same guide as a copyable prompt under the sign-in buttons.
+
 ## Library
 
 The papers and essays behind Harbour are published unauthenticated at `/library` — a searchable index of every document, no session required.
