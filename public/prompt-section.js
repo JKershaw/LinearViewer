@@ -645,7 +645,7 @@
       return '<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-task" data-action="go" data-filled-rung="pr">Run to PR</button>';
     }
     if (filled === 'done') {
-      return '<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-task" data-filled-rung="done" disabled title="Run to Done lands with its kickoff (LIN-4104 D4)">Run to Done</button>'
+      return '<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-task" data-action="go-done" data-filled-rung="done">Run to Done</button>'
         + '<button class="btn btn--quiet" data-testid="opened-task-run-to-pr" data-rung="run-task" data-action="go">Run to PR</button>';
     }
     // LIN-4104 D3: Next step is the recommend call, then a confirm (handleRunAction 'next-step'); Run to PR stays beside it.
@@ -1228,7 +1228,7 @@
       // LIN-4103 beat 2: with no offered step, the line says the server's own words for a run to PR, never "the next step".
       let why = step ? 'the next step for this task' : 'no stage step is offered, so the run takes it to PR';
       if (!step && filledRungOf(opts) === 'next-step') why = 'Harbour picks the next step when you press Next step, then asks you to run it';
-      if (!step && filledRungOf(opts) === 'done') why = 'Run to Done starts with its kickoff (LIN-4104 D4)';
+      if (!step && filledRungOf(opts) === 'done') why = 'Harbour picks where to start';
       if (state.run.step) why = 'chosen for this run';
       else if (step && step.reason) why = step.reason;
       const name = step ? esc(step.label) : FILLED_NAME[filledRungOf(opts)];
@@ -1279,7 +1279,7 @@
           actions += ` <button class="btn btn--red opened-task-stop" data-action="stop-run" data-testid="run-stop">Stop</button>`;
         }
         return `<div class="opened-task-running-box" data-testid="opened-task-running">`
-          + `<div class="opened-task-running-head"><span class="opened-task-running-title">Running now</span> \u00b7 `
+          + `<div class="opened-task-running-head"><span class="opened-task-running-title">${esc(summary.runWords || 'Running now')}</span> \u00b7 `
           + `<span class="opened-task-running-step">${esc(running.label || 'step')}</span>${since ? ` \u00b7 started ${esc(since)}` : ''}`
           + `<span class="opened-task-running-actions">${actions}</span></div>${confirm}</div>`;
       }
@@ -1602,6 +1602,14 @@
       const kind = data.sessions.action ? data.sessions.action.kind : null;
       return kind !== 'offer';
     }
+    // The list read (Another step's press): a run in flight or a question open refuses. A finished task still opens its
+    // list (its steps are counted as left out, LIN-4042), so `none` is not stale here.
+    async function listOfferIsStale() {
+      const data = await readTaskState();
+      if (!data || data.incomplete || !data.sessions) return false;
+      const kind = data.sessions.action ? data.sessions.action.kind : null;
+      return kind === 'busy' || kind === 'answer-first';
+    }
     // The refusal a stale press shows, in plain words, beside Go. Nothing is dispatched.
     function refuseStale() {
       state.run.recommend = null;
@@ -1673,6 +1681,17 @@
       } finally {
         state.run.busy = false;
       }
+    }
+
+    // LIN-4104 D4 (the corrective from beat 3): Another step re-reads the offer at its press. A run that started since the render
+    // makes the offer no longer an offer: the list does not open, and the press says so in plain words.
+    async function anotherPress() {
+      if (state.run.busy || destroyed) return;
+      if (await listOfferIsStale()) { refuseStale(); return; }
+      if (destroyed) return;
+      state.run.recommend = null;
+      state.run.anotherOpen = true;
+      paintRun();
     }
 
     // Run a step now: fetch its prompt, then dispatch it with this run's choice (the one press, LIN-3446's
@@ -1842,10 +1861,16 @@
           return true;
         }
         case 'run-another':
-          // LIN-4104 D3: opening the list dispatches nothing, so it opens at once; the offer is re-read when a step is run.
-          state.run.anotherOpen = !state.run.anotherOpen;
-          if (state.run.anotherOpen) state.run.recommend = null;
-          paintRun();
+          // LIN-4104 D4: closing the list needs no read; opening it re-reads the offer first (anotherPress).
+          if (state.run.anotherOpen) {
+            state.run.anotherOpen = false;
+            paintRun();
+          } else {
+            anotherPress();
+          }
+          return true;
+        case 'go-done':
+          startRun('done');
           return true;
         case 'next-step':
           recommendNext();
@@ -2301,7 +2326,7 @@
 
     // The one-press Go: kickoff then dispatch through the shared assemblers,
     // then show that it started. Auto-ignores a second press.
-    async function startRun() {
+    async function startRun(boundary = 'pr') {
       if (!state.go || state.go.status !== 'ready') return;
       state.go = { status: 'starting', headerHtml: null, notice: null, noticeLink: null, noticeLinkLabel: null };
       paintGo();
@@ -2327,7 +2352,7 @@
           urlKey: opts.urlKey,
           issueId,
           source: issue.source || undefined,
-          stopAt: 'pr',
+          stopAt: boundary === 'pr' ? 'pr' : undefined, // LIN-4104 D4: Run to Done sends no stop
           on401: false
         });
         if (destroyed) return;
@@ -2350,11 +2375,11 @@
           presetId: c.presetId,
           proxyForce: true,
           entryRung: 'run-task',
-          stopAt: 'pr',
+          stopAt: boundary === 'pr' ? 'pr' : undefined,
           variant: 'standard',
           surface: opts.surface
         });
-        if (runControlOn()) state.run.item = { id: result && result.item ? result.item.id : null, kind: 'autopilot', label: 'Run to PR', target: c.target || 'cli' };
+        if (runControlOn()) state.run.item = { id: result && result.item ? result.item.id : null, kind: 'autopilot', label: boundary === 'pr' ? 'Run to PR' : 'Run to Done', target: c.target || 'cli' };
         if (destroyed) return;
         // The 201's no-runner warning (routes/dispatch.js) is our own plain-words
         // line, never the server's string (FC call bf44d014).

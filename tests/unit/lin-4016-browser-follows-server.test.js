@@ -290,9 +290,10 @@ describe('LIN-4104 D2 — the filled run button follows the last dispatch on thi
     assert.match(html, /data-testid="opened-task-go"[^>]*data-filled-rung="next-step"[^>]*>Next step</);
   });
 
-  test('filled done (the last dispatch was a Run to Done): Run to Done is drawn disabled until its kickoff lands (D4), and Run to PR stays available', async () => {
+  test('filled done (the last dispatch was a Run to Done): Run to Done is the primary and starts the no-stop kickoff (D4), and Run to PR stays available', async () => {
     const html = await paint(stateWith({ action: OFFER }), { filledRung: 'done' });
-    assert.match(html, /data-testid="opened-task-go"[^>]*data-filled-rung="done"[^>]*disabled[^>]*>Run to Done</, 'Run to Done is the primary, disabled');
+    assert.match(html, /data-testid="opened-task-go"[^>]*data-action="go-done"[^>]*data-filled-rung="done"[^>]*>Run to Done</, 'Run to Done is the primary');
+    assert.doesNotMatch(html, /data-filled-rung="done"[^>]*disabled/, 'and it is enabled');
     assert.match(html, /data-testid="opened-task-run-to-pr"[^>]*data-action="go"[^>]*>Run to PR</, 'Run to PR is still offered beside it');
   });
 
@@ -305,5 +306,24 @@ describe('LIN-4104 D2 — the filled run button follows the last dispatch on thi
     // The server records a run-step as next-step (lin-4104-reach.test.js); the page then paints the Next step primary.
     const html = await paint(stateWith({ action: OFFER }), { filledRung: 'next-step' });
     assert.match(html, /data-filled-rung="next-step"/);
+  });
+});
+
+// LIN-4104 D4 (the corrective from beat 3): Another step re-reads the offer at its press. A run that started between the
+// render and the press makes the offer no longer an offer, so the list does not open, and the press says so in plain words.
+describe('LIN-4104 D4 — Another step re-reads the offer at its press', () => {
+  test('a run starts between render and Another step: the list does not open, and a plain refusal says nothing was started', async () => {
+    const body = stateWith({ action: { kind: 'offer', container: false, step: null, why: 'the run control offers the three rungs' } });
+    const { PromptSection } = loadClient({ stateBody: body });
+    const c = makeContainer();
+    PromptSection.init(c, { ...HOME, filledRung: 'pr' });
+    await flush(); await flush(); await flush();
+    assert.doesNotMatch(c.innerHTML, /data-testid="run-another-item"/, 'the list is closed on the render');
+    // A subtask's run starts after the render: the container's offer is now busy.
+    body.sessions = { ...body.sessions, busy: true, action: { kind: 'busy', identifier: 'LIN-43', words: 'Build running', why: 'x' } };
+    await c.click({ action: 'run-another' });
+    await flush(); await flush(); await flush();
+    assert.doesNotMatch(c.innerHTML, /data-testid="run-another-item"/, 'the list does not open on a stale offer');
+    assert.match(c.innerHTML, /A run started on this task while you were choosing/, 'a plain refusal says nothing was started');
   });
 });

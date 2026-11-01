@@ -170,7 +170,8 @@ const TABLE = {
   'lib/pipeline-loops.js :: _readLive': [SRV, 2],
   'lib/pipeline-loops.js :: _readHistory': [SRV, 2],
   'lib/recent-runs.js :: read': [SRV, 2],
-  'lib/task-run-facts.js :: readTaskRunFacts': [SRV, 3]
+  // LIN-4104 D4: the reads moved into readTaskRunState (readTaskRunFacts is its projection, with no call of its own).
+  'lib/task-run-facts.js :: readTaskRunState': [SRV, 3]
 };
 
 const REDACTOR = /\bredactSessionItems?\s*\(/;

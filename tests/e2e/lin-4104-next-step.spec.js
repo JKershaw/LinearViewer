@@ -154,3 +154,82 @@ test.describe('Home: Next step recommends, then confirms; nothing runs until Run
     expect(posts, 'a stale press dispatches nothing').toEqual([]);
   });
 });
+
+/** A finished autopilot run on the container with no stop (a Run to Done): the workspace's last dispatch reaches done. */
+async function seedFinishedRunToDone(page) {
+  const token = await runnerToken(page);
+  const res = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+    data: { prompt: 'autopilot prompt', promptName: 'Autopilot', kind: 'autopilot', issueIdentifier: TOP, issueTitle: 'Next step container', target: 'cli', entryRung: 'run-task' },
+  });
+  expect(res.status(), `dispatch seed failed: ${await res.text()}`).toBe(201);
+  const itemId = (await res.json()).item.id;
+  const taken = await page.request.post(`/api/dispatch/take/${itemId}`, { headers: { Authorization: `Bearer ${token}` } });
+  expect(taken.status(), `take failed: ${await taken.text()}`).toBe(200);
+  const fb = await page.request.post(`/api/dispatch/feedback/${itemId}`, {
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    data: { message: '[done] ran to the end' },
+  });
+  expect(fb.status(), `feedback failed: ${await fb.text()}`).toBe(200);
+}
+
+test.describe('Home: Another step re-reads the offer, and Run to Done is the no-stop kickoff (LIN-4104 D4)', () => {
+  test.use({ viewport: DESKTOP });
+
+  test('Another step, pressed after a run started on the subtask, does not open the list; it refuses in plain words', async ({ page }) => {
+    await seedTree(page);
+    const posts = recordDispatches(page);
+    await gotoHome(page);
+    const block = await openTopTask(page);
+    await expect(block.locator('[data-testid="run-another"]')).toBeVisible();
+
+    await startSubtaskRun(page);
+    await block.locator('[data-testid="run-another"]').click();
+    await expect(block.locator('[data-testid="opened-task-go-notice"]')).toContainText('started');
+    await expect(block.locator('[data-testid="run-another-item"]')).toHaveCount(0);
+    expect(posts, 'nothing is dispatched').toEqual([]);
+  });
+
+  test('Run to Done starts the autopilot kickoff with no stop, in the query and in the dispatch body', async ({ page }) => {
+    await seedTree(page);
+    await seedFinishedRunToDone(page);
+    const kickoffUrls = [];
+    page.on('request', (req) => { if (/\/api\/autopilot-prompt\//.test(new URL(req.url()).pathname)) kickoffUrls.push(req.url()); });
+    const posts = recordDispatches(page);
+    await gotoHome(page);
+    const block = await openTopTask(page);
+
+    const primary = block.locator('[data-testid="opened-task-go"]');
+    await expect(primary).toHaveText('Run to Done');
+    await expect(primary).toBeEnabled();
+    await primary.click();
+    await expect.poll(() => posts.length, { timeout: 10000 }).toBe(1);
+    expect(kickoffUrls.length, 'the kickoff is fetched').toBe(1);
+    expect(kickoffUrls[0], 'the kickoff query names no stop').not.toMatch(/stopAt/);
+    expect(posts[0].stopAt, 'the dispatch body names no stop').toBeUndefined();
+    expect(posts[0].entryRung).toBe('run-task');
+  });
+});
+
+test.describe('Home: Run to PR is the stop-at-PR kickoff, through the same path (LIN-4104 D4)', () => {
+  test.use({ viewport: DESKTOP });
+
+  test('Run to PR fetches the kickoff with stopAt pr and dispatches it with stopAt pr', async ({ page }) => {
+    await seedTree(page);
+    await seedFinishedRunToDone(page);
+    // Seeding a finished run leaves the workspace on Run to Done; a Run to PR is the quiet button beside it.
+    const kickoffUrls = [];
+    page.on('request', (req) => { if (/\/api\/autopilot-prompt\//.test(new URL(req.url()).pathname)) kickoffUrls.push(req.url()); });
+    const posts = recordDispatches(page);
+    await gotoHome(page);
+    const block = await openTopTask(page);
+
+    const runToPr = block.locator('[data-testid="opened-task-run-to-pr"]');
+    await expect(runToPr).toBeVisible();
+    await runToPr.click();
+    await expect.poll(() => posts.length, { timeout: 10000 }).toBe(1);
+    expect(kickoffUrls.length, 'the kickoff is fetched').toBe(1);
+    expect(kickoffUrls[0], 'the kickoff query names the PR stop').toMatch(/stopAt=pr/);
+    expect(posts[0].stopAt, 'the dispatch body names the PR stop').toBe('pr');
+    expect(posts[0].entryRung).toBe('run-task');
+  });
+});

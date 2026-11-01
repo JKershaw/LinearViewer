@@ -61,9 +61,10 @@ function queryValue(value) {
  * gather. `busy` is the gather's own fact (LIN-4104 D1: own sessions unended, or any subtask's subtree busy), the same one
  * the row's action reads, so the opened box holds its step line back exactly where the row holds its action.
  */
-function sessionsOfState(model, taskState) {
+function sessionsOfState(model, taskState, runWords = null) {
   const summary = sessionSummaryOf(model, { container: taskState.container === true });
-  return { ...summary, busy: taskState.busy === true, action: taskState.action };
+  // LIN-4104 D4: the running line's words, for a Run-control run (null otherwise: the box keeps "Running now").
+  return { ...summary, busy: taskState.busy === true, action: taskState.action, runWords };
 }
 
 /**
@@ -212,7 +213,7 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
     if (!isValidIssueId(identifier)) return jsonError(res, 404, 'Task not found');
     const issueId = queryValue(req.query.issueId);
     try {
-      const { model, taskState, incomplete } = await loader.loadTaskState({
+      const { model, taskState, incomplete, runWords } = await loader.loadTaskState({
         urlKey: workspace.urlKey,
         identifier,
         issueId: issueId && isValidIssueId(issueId) ? issueId : null,
@@ -253,7 +254,7 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         stripHtml: renderStageStrip(model, { now: now() }),
         // LIN-3833: the sessions the state block and the run control read (count, last, running). LIN-4068 D7: the
         // action is the gather's (busy includes a running subtree), so it is not recomputed here.
-        sessions: sessionsOfState(model, taskState),
+        sessions: sessionsOfState(model, taskState, runWords),
         // LIN-4016: the task's decided state, with its main action (the gather's, LIN-4068).
         taskState,
         // LIN-4071: the subtask line the opened task names (a subtask that needs you, else a failed one): the gather's words,

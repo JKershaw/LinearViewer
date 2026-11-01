@@ -421,6 +421,8 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
     PromptSection.init(c, { ...HOME });
     await flush();
     await c.click({ action: 'run-another' });
+    await flush();
+    await flush();
     assert.match(c.innerHTML, /data-testid="run-another-item"[^>]*>Build</);
     assert.doesNotMatch(c.innerHTML, />implement</);
   });
