@@ -86,6 +86,18 @@ describe('LIN-4080 isRunStopped — recorded aborts', () => {
     assert.equal(await store.isRunStopped(URL_KEY, run._id), false);
   });
 
+  test('W6: a cascade where one target gets [skipped] leaves that target not stopped; the root stays stopped', async () => {
+    const store = makeStore();
+    const run = await autopilot(store);
+    const child = await worker(store, run._id);
+    await store.expandCascadeAborts(URL_KEY, run._id);
+    const childAbort = [...store.collection._docs].find(d => d.abort === true && d.abortTo === child._id);
+    await postOn(store, childAbort, '[skipped] human-continued session abc (AWAITING_FOLLOWUP).');
+
+    assert.equal(await store.isRunStopped(URL_KEY, child._id), false, 'the human-continued target is not stopped');
+    assert.equal(await store.isRunStopped(URL_KEY, run._id), true, 'the root of the cascade is still stopped');
+  });
+
   test('[aborted] on the abort row stops the run', async () => {
     const store = makeStore();
     const run = await autopilot(store);
