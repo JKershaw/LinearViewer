@@ -42,6 +42,8 @@ import { isRecommendationEnabled, getRecommendation, getRecommendationStream, ge
 import { resolveChatCredential, isAiUnavailable, checkFreeTierGate, isFlagFreeTier, freeTierRefusalBlock } from '../lib/chat-request.js';
 import { getModelCatalog, isFreeModel } from '../lib/openrouter-catalog.js';
 import { resolveRecommendation, armHopSignal } from '../lib/recommend-recurse.js';
+// LIN-4104 D3: the stage a recommendation names, as the dispatch kind the Next step confirm runs it as.
+import { deriveDispatchKind } from '../lib/prompt-templates.js';
 import { prepareRecommendationInput } from '../lib/recommendation-input.js';
 import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { generateRecap } from '../lib/recap.js';
@@ -54,6 +56,7 @@ import { testMockData } from '../lib/sample-data/mock-data.js';
 import { shouldMockAi } from '../lib/should-mock-ai.js';
 import { sendSSE } from '../lib/sse.js';
 import {
+  MOCK_STAGE_KIND,
   generateMockRecommendation,
   buildMockRecommendationHop,
   planMockDescent,
@@ -101,6 +104,8 @@ function recommendCallOptions({ apiKey, model, session, provider, workspace, ide
 function toHopRecord(ctx, r) {
   return {
     identifier: ctx.issue.identifier,
+    // LIN-4104 D3: the issue's own id, so the Next step confirm dispatches on the terminal issue.
+    issueId: ctx.issue.id,
     // LIN-3968: the target's title rides on `done`, so the copy-first view can say which task the prompt is for.
     title: ctx.issue.title || null,
     reasoning: r.reasoning,
@@ -159,7 +164,8 @@ export function streamMockFixture(res, mockIssue) {
     sendSSE(res, 'done', {
       truncated: false, completionTokens: null,
       issueUrl: terminal.url,
-      identifier: idOf(terminal), title: terminal.title || null, deferredVia, deferTruncated: false
+      identifier: idOf(terminal), title: terminal.title || null, deferredVia, deferTruncated: false,
+      kind: MOCK_STAGE_KIND, issueId: terminal.id
     });
     res.end();
     return;
@@ -169,7 +175,10 @@ export function streamMockFixture(res, mockIssue) {
   openSse(res);
   sendSSE(res, 'phase', { phase: 'fetching_context' });
   sendMockSections(res, mock);
-  sendSSE(res, 'done', { truncated: false, completionTokens: null, issueUrl: mockIssue.url });
+  sendSSE(res, 'done', {
+    truncated: false, completionTokens: null, issueUrl: mockIssue.url,
+    identifier: mockIssue.identifier, title: mockIssue.title || null, kind: MOCK_STAGE_KIND, issueId: mockIssue.id
+  });
   res.end();
 }
 
@@ -272,14 +281,24 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         // multi-chunk assembly assertions hold (LIN-405). The leaf TEST-11 reaches
         // here (children=[]), so mocking only the descent's computeOne would miss it.
         sendMockSections(res, generateMockRecommendation(contextIssue));
-        sendSSE(res, 'done', { truncated: false, completionTokens: null, issueUrl: contextIssue.url });
+        sendSSE(res, 'done', {
+          truncated: false, completionTokens: null, issueUrl: contextIssue.url,
+          identifier: contextIssue.identifier, title: contextIssue.title || null, kind: MOCK_STAGE_KIND, issueId: contextIssue.id
+        });
       } else {
         // Phase 2: a leaf task is true token streaming, with the issue url merged
         // into the final done event so all its data arrives in one event.
-        await getRecommendationStream(
+        // LIN-4104 D3: the leaf's done is held until the call returns its structured answer, so it can name the stage.
+        let leafDone = {};
+        const structured = await getRecommendationStream(
           ...await modelCallArgs(context, { ...call, signal: abort.signal }),
-          (type, data) => emit(type, type === 'done' ? { ...data, issueUrl: contextIssue.url } : data)
+          (type, data) => { if (type === 'done') leafDone = data; else emit(type, data); }
         );
+        emit('done', {
+          ...leafDone, issueUrl: contextIssue.url,
+          identifier: contextIssue.identifier, title: contextIssue.title || null,
+          kind: deriveDispatchKind(structured?.recommendedAction), issueId: contextIssue.id ?? null
+        });
       }
     } catch (error) {
       if (closed) return;
@@ -355,7 +374,12 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       // shipped as a defer. The terminal hop's reasoning already streamed live.
       emit('error', { error: 'Recommendation did not resolve to an actionable task', deferredVia, deferTruncated, deferStopReason });
     } else {
-      emit('done', { truncated: rec.truncated, completionTokens: rec.completionTokens, issueUrl: rec.issueUrl, identifier: rec.identifier, title: rec.title || null, deferredVia, deferTruncated, deferStopReason });
+      emit('done', {
+        truncated: rec.truncated, completionTokens: rec.completionTokens, issueUrl: rec.issueUrl, identifier: rec.identifier, title: rec.title || null,
+        // LIN-4104 D3: the stage the terminal recommendation names, and the issue it is for (a defer may have landed on a subtask).
+        kind: mockAi ? MOCK_STAGE_KIND : deriveDispatchKind(rec.recommendedAction), issueId: rec.issueId ?? null,
+        deferredVia, deferTruncated, deferStopReason
+      });
     }
     // The caller's `finally` ends the response again; the descent has always ended
     // it itself first, and the double end is what a client's socket sees today.

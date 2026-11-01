@@ -282,6 +282,19 @@ describe('routed surfaces: one routing call, then code assembles the stage promp
     const done = events.find(e => e.type === 'done');
     assert.equal(done?.data.identifier, CHILD.identifier);
     assert.equal(done?.data.title, CHILD.title, 'LIN-3968: the target title rides on done for the copy-first line');
+    // LIN-4104 D3: done names the stage the terminal recommendation chose and the issue it is for (the subtask here).
+    assert.equal(done?.data.kind, 'review', 'the stage the routing call named, as a dispatch kind');
+    assert.equal(done?.data.issueId, CHILD.id, 'the subtask the container deferred into, so Run dispatches on it');
+  });
+
+  test('UI stream, leaf: done names the stage and the leaf id, beside its identifier and title (LIN-4104 D3)', async () => {
+    capture();
+    const { text } = await request(buildUiApp({ features: STALE_PREFS }), `/workspace/acme/api/recommend/${LEAF.id}/stream`);
+    const done = sseEvents(text).find(e => e.type === 'done');
+    assert.equal(done?.data.identifier, LEAF.identifier);
+    assert.equal(done?.data.title, LEAF.title);
+    assert.equal(done?.data.kind, 'review', 'the stage the leaf routing call named');
+    assert.equal(done?.data.issueId, LEAF.id, 'the leaf id, so Run dispatches on it');
   });
 
   // LIN-3991: the local provider's route id is an internal id (`proto--i1`); the node's own identifier is

@@ -648,7 +648,9 @@
       return '<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-task" data-filled-rung="done" disabled title="Run to Done lands with its kickoff (LIN-4104 D4)">Run to Done</button>'
         + '<button class="btn btn--quiet" data-testid="opened-task-run-to-pr" data-rung="run-task" data-action="go">Run to PR</button>';
     }
-    return '<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-task" data-action="go" data-filled-rung="next-step" title="Next step lands with its recommend call (LIN-4104 D3); until then this runs the task to PR">Next step</button>';
+    // LIN-4104 D3: Next step is the recommend call, then a confirm (handleRunAction 'next-step'); Run to PR stays beside it.
+    return '<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-step" data-action="next-step" data-filled-rung="next-step">Next step</button>'
+      + '<button class="btn btn--quiet" data-testid="opened-task-run-to-pr" data-rung="run-task" data-action="go">Run to PR</button>';
   }
   // LIN-4104 D1: the one run offer the server decided (`sessions.action`, `runOfferOf`): none (finished), answer-first,
   // busy, or offer. LIN-4068: before the first `/state` reply the opened box has no sessions, so it takes the row record's
@@ -1184,6 +1186,38 @@
         + ` <button class="btn opened-task-change" data-action="change-run" data-testid="run-change">Change</button></div>`;
     }
 
+    // LIN-4104 D3: the Next step confirm. Asking, a refusal in plain words (the recommend call could not run), or the answer:
+    // the stage in words, why (the recommendation's own reasoning, its first part), the task it is for when that is a subtask,
+    // and Run. Nothing is dispatched by drawing it; Run dispatches (runRecommended).
+    // Another step, as the run box draws it, for the confirm (its one place while the confirm is up).
+    function anotherStepButton() {
+      return `<button class="btn--quiet opened-task-another" data-action="run-another" data-testid="run-another" aria-expanded="false">Another step ▾</button>`;
+    }
+    function renderRecommendConfirm(opts, state) {
+      const rec = state.run.recommend || {};
+      if (rec.status === 'asking') {
+        return `<div class="opened-task-next-confirm" data-testid="opened-task-next-confirm"><p class="opened-task-step-why" data-testid="opened-task-next-asking">Harbour is picking the next step…</p>${anotherStepButton()}</div>`;
+      }
+      if (rec.status === 'refused') {
+        return `<div class="opened-task-next-confirm" data-testid="opened-task-next-confirm"><p class="opened-task-step-why" data-testid="opened-task-next-refusal">Harbour can't pick the next step: ${esc(rec.message || 'try again shortly')}</p>${anotherStepButton()}</div>`;
+      }
+      const entry = state.result || {};
+      const target = entry.target || {};
+      const stage = (opts.stageWords && opts.stageWords[target.kind]) || (opts.promptMeta && opts.promptMeta[target.kind]) || 'the next step';
+      const reasoning = String(entry.reasoning || '').trim();
+      const why = reasoning.length > 240 ? `${reasoning.slice(0, 240).trimEnd()}…` : reasoning;
+      const subtask = target.identifier && target.identifier !== issue.identifier;
+      const targetLine = subtask
+        ? `${target.identifier}${target.title ? ` ${target.title}` : ''}, a subtask of ${issue.identifier}.`
+        : `${issue.identifier}${issue.title ? ` ${issue.title}` : ''}.`;
+      return `<div class="opened-task-next-confirm" data-testid="opened-task-next-confirm">`
+        + `<div class="opened-task-step"><span class="opened-task-step-name opened-task-step-name--block" data-testid="opened-task-next-stage">${esc(stage)}</span>`
+        + `<p class="opened-task-step-why" data-testid="opened-task-next-why">${esc(why)}</p>`
+        + `<p class="opened-task-next-target" data-testid="opened-task-next-target">${esc(targetLine)}</p></div>`
+        + `<div class="opened-task-primary"><button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-next-run-confirm" data-rung="run-step" data-action="next-run">Run</button></div>`
+        + `${anotherStepButton()}</div>`;
+    }
+
     // The step line: the name and why it is next. ✦ write prompt writes this step's prompt (it does not replace the why).
     // LIN-4010: the step as one unit: its name, what it does (the first sentence of its own description, from the
     // preview), and why it is next. The why is the server's words (sessions.offered.reason); a chosen step says so.
@@ -1193,6 +1227,7 @@
       if (!state.run.step && (!state.opened || stageBusy(state) || takesNoRun(state, opts))) return '';
       // LIN-4103 beat 2: with no offered step, the line says the server's own words for a run to PR, never "the next step".
       let why = step ? 'the next step for this task' : 'no stage step is offered, so the run takes it to PR';
+      if (!step && filledRungOf(opts) === 'next-step') why = 'Harbour picks the next step when you press Next step, then asks you to run it';
       if (!step && filledRungOf(opts) === 'done') why = 'Run to Done starts with its kickoff (LIN-4104 D4)';
       if (state.run.step) why = 'chosen for this run';
       else if (step && step.reason) why = step.reason;
@@ -1543,16 +1578,101 @@
           + renderGo(opts, state) + renderAfterRun() + (state.run.changeOpen ? renderChangePanel(state.run.preview) : '')
           + renderStagedProposals() + renderRunMore(step) + renderLastLine() + `</div>`;
       }
-      const box = [
-        renderStepLine(step),
-        renderGo(opts, state),
-        renderRunsOn(state.run.preview),
-        state.run.changeOpen ? renderChangePanel(state.run.preview) : '',
-        renderRunMore(step)
-      ];
+      // LIN-4104 D3: while Next step is asking, or has an answer to confirm, the confirm takes the step line and Go's place.
+      const box = state.run.recommend
+        ? [renderRecommendConfirm(opts, state)]
+        : [
+          renderStepLine(step),
+          renderGo(opts, state),
+          renderRunsOn(state.run.preview),
+          state.run.changeOpen ? renderChangePanel(state.run.preview) : '',
+          renderRunMore(step)
+        ];
       return `<div class="opened-task-run" data-run-slot data-testid="opened-task-run">`
         + `<div class="opened-task-next-run" data-testid="opened-task-next-run">${box.join('')}</div>`
         + renderStagedProposals() + renderLastLine() + `</div>`;
+    }
+
+    // LIN-4104 D3: the client's own read of the offer, on the poll's URL, before a press that would dispatch. It answers
+    // true only when the task has a fresh answer and its offer is no longer `offer` (a run started since the render). A
+    // failed or incomplete read is not known, so it does not stop the press: the server's collision guard stands (LIN-4054).
+    async function offerIsStale() {
+      const data = await readTaskState();
+      if (!data || data.incomplete || !data.sessions) return false;
+      const kind = data.sessions.action ? data.sessions.action.kind : null;
+      return kind !== 'offer';
+    }
+    // The refusal a stale press shows, in plain words, beside Go. Nothing is dispatched.
+    function refuseStale() {
+      state.run.recommend = null;
+      state.go = { status: 'ready', headerHtml: null, notice: 'A run started on this task while you were choosing, so nothing was started.', noticeLink: null, noticeLinkLabel: null };
+      paintRun();
+    }
+
+    // LIN-4104 D3: Next step is the existing recommend stream (fetchPrompt('__ai__'), the one call the client makes), then a
+    // confirm. Nothing is dispatched by pressing it. A refusal (no AI configured, a failed stream) is shown in plain words.
+    async function recommendNext() {
+      if (state.run.busy || destroyed) return;
+      state.run.recommend = { status: 'asking' };
+      state.run.anotherOpen = false;
+      state.error = null;
+      paintRun();
+      await fetchPrompt('__ai__');
+      if (destroyed) return;
+      const result = state.result;
+      if (state.error || !result || result.label !== '__ai__' || !result.raw) {
+        state.run.recommend = { status: 'refused', message: state.error || 'no next step came back' };
+      } else {
+        state.run.recommend = { status: 'ready' };
+      }
+      paintRun();
+    }
+
+    // LIN-4104 D3: Run dispatches the recommended prompt on the terminal issue (the subtask, when the recommendation deferred
+    // into one) as a run-step, after the offer re-read: a run that started since the render is refused and nothing is sent.
+    async function runRecommended() {
+      const rec = state.run.recommend;
+      const entry = state.result;
+      if (!rec || rec.status !== 'ready' || !entry || !entry.raw || state.run.busy || destroyed) return;
+      state.run.busy = true;
+      try {
+        if (await offerIsStale()) { refuseStale(); return; }
+        if (destroyed) return;
+        const target = entry.target || {};
+        const terminal = target.issueId && target.identifier
+          ? { id: target.issueId, identifier: target.identifier, title: target.title || null, source: issue.source || undefined }
+          : issue;
+        const c = state.run.choice;
+        const result = await window.dispatchPrompt({
+          urlKey: opts.urlKey,
+          prompt: entry.raw,
+          promptName: 'Next step',
+          kind: target.kind || undefined,
+          issue: terminal,
+          target: c.target || 'cli',
+          model: c.model || undefined,
+          harness: c.harness || undefined,
+          effort: c.effort || undefined,
+          presetId: c.presetId || undefined,
+          appendProxyContext: c.agentAccess !== false,
+          entryRung: 'run-step',
+          surface: opts.surface,
+          on401: false
+        });
+        if (destroyed) return;
+        state.run.recommend = null;
+        state.run.item = { id: result && result.item ? result.item.id : null, kind: target.kind || 'custom', label: 'Next step', target: c.target || 'cli' };
+        state.go = { status: 'started', headerHtml: null, notice: null, noticeLink: null, noticeLinkLabel: null };
+        paintRun();
+        startPoll();
+      } catch (error) {
+        if (destroyed) return;
+        state.run.recommend = null;
+        applyGoRefusal(error);
+        paintRun();
+      } finally {
+        state.run.busy = false;
+      }
     }
 
     // Run a step now: fetch its prompt, then dispatch it with this run's choice (the one press, LIN-3446's
@@ -1561,6 +1681,9 @@
       if (!step || state.run.busy || destroyed) return;
       state.run.busy = true;
       try {
+        // LIN-4104 D3: the offer is re-read before a step dispatches; a run started since the render is refused.
+        if (await offerIsStale()) { refuseStale(); return; }
+        if (destroyed) return;
         const prompt = await window.api(`/workspace/${encodeURIComponent(opts.urlKey)}/api/prompt/${issueId}/${encodeURIComponent(step.kind)}${issue.source ? `?source=${encodeURIComponent(issue.source)}` : ''}`, { on401: false });
         if (destroyed) return;
         const c = state.run.choice;
@@ -1719,8 +1842,16 @@
           return true;
         }
         case 'run-another':
+          // LIN-4104 D3: opening the list dispatches nothing, so it opens at once; the offer is re-read when a step is run.
           state.run.anotherOpen = !state.run.anotherOpen;
+          if (state.run.anotherOpen) state.run.recommend = null;
           paintRun();
+          return true;
+        case 'next-step':
+          recommendNext();
+          return true;
+        case 'next-run':
+          runRecommended();
           return true;
         case 'run-more':
           state.run.moreOpen = true;
@@ -1935,6 +2066,14 @@
       } catch (err) {
         if (err.name === 'AbortError' || destroyed) return;
         container.classList.remove('streaming');
+        // LIN-4104 D3: a Next step ask that fails is a refusal in the run box's confirm, in plain words. The error phase
+        // would replace the run box with the error view, so this ask keeps the run box and says it there.
+        if (label === '__ai__' && state.run.recommend && state.run.recommend.status === 'asking') {
+          state.error = err.message || 'Failed to load prompt';
+          state.run.recommend = { status: 'refused', message: state.error };
+          paintRun();
+          return;
+        }
         enterPhase('error');
         state.error = err.message || 'Failed to load prompt';
         render();
@@ -2030,7 +2169,11 @@
         }
         // LIN-3968: and the task the prompt is for (its title; the containers it was routed through).
         if (type === 'done' && payload.identifier) {
-          target = { identifier: payload.identifier, title: payload.title || null, deferredVia: Array.isArray(payload.deferredVia) ? payload.deferredVia : [] };
+          // LIN-4104 D3: the stage the recommendation names and the issue it is for ride on the target (Run dispatches on it).
+          target = {
+            identifier: payload.identifier, title: payload.title || null, deferredVia: Array.isArray(payload.deferredVia) ? payload.deferredVia : [],
+            kind: payload.kind || null, issueId: payload.issueId || null
+          };
         }
       }
 
@@ -2172,6 +2315,11 @@
       const data = await readTaskState();
       if (destroyed) return;
       if (goInProgress(data)) { setGoRunning(data.headerHtml); return; }
+      // LIN-4104 D3: a run that started since the render (a subtask now busy, say) makes the offer no longer an offer: stop here.
+      if (data && !data.incomplete && data.sessions && (data.sessions.action ? data.sessions.action.kind : null) !== 'offer') {
+        refuseStale();
+        return;
+      }
       if (state.go.status !== 'starting') return;
 
       try {

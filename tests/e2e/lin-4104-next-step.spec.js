@@ -1,0 +1,156 @@
+import { test, expect } from '../fixtures/test-base.js';
+import { localSeedId } from '../fixtures/local-harness.js';
+
+// LIN-4104 D3: Next step is the existing recommend call, then a confirm. Pressing Next step streams the recommendation
+// (the one recommend stream the client already calls) and shows the stage, why and the task it is for; nothing is
+// dispatched until Run, and Run dispatches on the terminal issue (the subtask, when the recommendation deferred into one).
+// The stream is stubbed at the network edge; the rest of the page is real.
+
+const DESKTOP = { width: 1280, height: 900 };
+const TOP = 'LOCAL-H1';
+const CHILD = 'LOCAL-H2';
+let URL_KEY;
+
+test.beforeEach(async ({ page, localWorkerUrlKey }) => {
+  URL_KEY = localWorkerUrlKey;
+  await page.request.get('/test/clear-comment-dedupe');
+  await page.goto('/test/clear-local-store');
+  await page.goto(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
+  await page.goto(`/test/clear-dispatch-history?urlKey=${URL_KEY}`);
+  await page.goto(`/test/clear-agent-status?urlKey=${URL_KEY}`);
+  await page.goto(`/test/clear-observation-sessions?urlKey=${URL_KEY}`);
+  await page.goto(`/test/clear-sessions-feed-cache?urlKey=${URL_KEY}`);
+});
+
+/** One In Progress container (LIN-H1) with one Todo subtask (LIN-H2): the case a recommendation defers into. */
+async function seedTree(page, { runnerKey = true, openRouterConnected = true } = {}) {
+  const id = (raw) => localSeedId(URL_KEY, raw);
+  const resp = await page.request.post('/test/set-local-session', {
+    data: {
+      urlKey: URL_KEY,
+      runnerKey,
+      openRouterConnected,
+      projects: [{ id: id('n-proj'), name: 'Next step project', content: 'A project', sortOrder: 1 }],
+      issues: [
+        { id: id('n-top'), identifier: TOP, title: 'Next step container', description: 'Seeded container', projectId: id('n-proj'), sortOrder: 1, state: { name: 'In Progress', type: 'started' }, url: `/workspace/${URL_KEY}/issue/${id('n-top')}` },
+        { id: id('n-child'), identifier: CHILD, title: 'Write the next step', description: 'Seeded subtask', projectId: id('n-proj'), parentId: id('n-top'), sortOrder: 2, state: { name: 'Todo', type: 'unstarted' }, url: `/workspace/${URL_KEY}/issue/${id('n-child')}` },
+      ],
+    },
+  });
+  expect(resp.ok(), `local seed failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();
+}
+
+async function runnerToken(page) {
+  const resp = await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${URL_KEY}`);
+  return (await resp.json()).token;
+}
+
+/** Enqueue and take a session on the subtask, with no feedback: the subtask is running. */
+async function startSubtaskRun(page) {
+  const token = await runnerToken(page);
+  const res = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+    data: { prompt: 'implementation prompt', promptName: 'implementation', kind: 'implementation', issueIdentifier: CHILD, issueTitle: 'Write the next step', target: 'cli' },
+  });
+  expect(res.status(), `dispatch seed failed: ${await res.text()}`).toBe(201);
+  const itemId = (await res.json()).item.id;
+  const taken = await page.request.post(`/api/dispatch/take/${itemId}`, { headers: { Authorization: `Bearer ${token}` } });
+  expect(taken.status(), `take failed: ${await taken.text()}`).toBe(200);
+}
+
+async function gotoHome(page) {
+  await page.goto(`/workspace/${URL_KEY}/`);
+  await page.waitForLoadState('networkidle');
+}
+
+/** Open the container (TOP) on Home unless it is already open; return the opened-task block. The subtask would be Home's
+ * marked top task, so the container is opened by its own line rather than by the top-task mark. */
+async function openTopTask(page) {
+  const block = page.locator('.opened-task').first();
+  if (!(await block.isVisible())) await page.locator(`[data-testid="issue-line"][data-identifier="${TOP}"]`).first().click();
+  await expect(block).toBeVisible();
+  return block;
+}
+
+/** Record every POST to the session dispatch route: the body of each run the page sends. */
+function recordDispatches(page) {
+  const posts = [];
+  page.on('request', (req) => {
+    if (req.method() === 'POST' && /\/api\/dispatch$/.test(new URL(req.url()).pathname)) posts.push(req.postDataJSON());
+  });
+  return posts;
+}
+
+const sse = (events) => events.map(([type, data]) => `event: ${type}\ndata: ${JSON.stringify(data)}\n\n`).join('');
+
+test.describe('Home: Next step recommends, then confirms; nothing runs until Run (LIN-4104 D3)', () => {
+  test.use({ viewport: DESKTOP });
+
+  test('Next step shows the stage, why and the subtask it is for, dispatches nothing, and Run dispatches on the subtask', async ({ page }) => {
+    await seedTree(page);
+    const posts = recordDispatches(page);
+    // The recommendation defers from the container into its subtask: the terminal issue is the subtask.
+    await page.route('**/api/recommend/*/stream*', (route) => route.fulfill({
+      status: 200,
+      contentType: 'text/event-stream',
+      body: sse([
+        ['phase', { phase: 'reasoning' }],
+        ['delta', { section: 'reasoning', content: 'The subtask is the next concrete step, so the Build stage goes there.' }],
+        ['phase', { phase: 'prompt' }],
+        ['delta', { section: 'prompt', content: 'Write the next step for LOCAL-H2.' }],
+        ['done', { truncated: false, completionTokens: null, issueUrl: null, identifier: CHILD, title: 'Write the next step', deferredVia: [TOP], kind: 'implementation', issueId: localSeedId(URL_KEY, 'n-child') }],
+      ]),
+    }));
+    await gotoHome(page);
+    const block = await openTopTask(page);
+
+    await block.locator('[data-testid="opened-task-go"]').click();
+    const confirm = block.locator('[data-testid="opened-task-next-confirm"]');
+    await expect(confirm).toBeVisible();
+    await expect(confirm).toContainText('Build');
+    await expect(confirm).toContainText('The subtask is the next concrete step');
+    await expect(confirm.locator('[data-testid="opened-task-next-target"]')).toContainText(`${CHILD} Write the next step, a subtask of ${TOP}.`);
+    await expect(confirm.locator('[data-testid="opened-task-next-run-confirm"]')).toBeVisible();
+    await expect(confirm.locator('[data-testid="run-another"]')).toBeVisible();
+    expect(posts, 'nothing is dispatched until Run').toEqual([]);
+
+    await confirm.locator('[data-testid="opened-task-next-run-confirm"]').click();
+    await expect.poll(() => posts.length, { timeout: 10000 }).toBe(1);
+    expect(posts[0].issueIdentifier, 'the run is on the subtask, not the container').toBe(CHILD);
+    expect(posts[0].entryRung, 'a run-step, so the run fills Next step').toBe('run-step');
+  });
+
+  test('a recommend that cannot run (503, no AI configured) shows a refusal in plain words and still offers Another step', async ({ page }) => {
+    await seedTree(page, { openRouterConnected: false });
+    const posts = recordDispatches(page);
+    await page.route('**/api/recommend/*/stream*', (route) => route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'AI recommendation feature is not configured.' }),
+    }));
+    await gotoHome(page);
+    const block = await openTopTask(page);
+
+    await block.locator('[data-testid="opened-task-go"]').click();
+    const refusal = block.locator('[data-testid="opened-task-next-refusal"]');
+    await expect(refusal).toContainText("Harbour can't pick the next step");
+    await expect(refusal).toContainText('AI');
+    await expect(block.locator('[data-testid="run-another"]')).toBeVisible();
+    expect(posts).toEqual([]);
+  });
+
+  test('a run that starts on the subtask between render and press is refused client-side; nothing is dispatched', async ({ page }) => {
+    await seedTree(page);
+    const posts = recordDispatches(page);
+    await gotoHome(page);
+    const block = await openTopTask(page);
+    // The container's own state reads idle, so Run to PR is offered on the render.
+    const runToPr = block.locator('[data-testid="opened-task-run-to-pr"]');
+    await expect(runToPr).toBeVisible();
+
+    // A run starts on the subtask after the render: the container is now busy over its subtree.
+    await startSubtaskRun(page);
+    await runToPr.click();
+    await expect(block.locator('[data-testid="opened-task-go-notice"]')).toContainText('started');
+    expect(posts, 'a stale press dispatches nothing').toEqual([]);
+  });
+});

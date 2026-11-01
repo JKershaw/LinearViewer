@@ -393,3 +393,8 @@
 .opened-task-proposal-why { font-size: 0.9rem; min-width: 0; overflow-wrap: anywhere; }
 .opened-task-proposal-actions { display: inline-flex; gap: var(--space-2); }
 .opened-task-proposal-state { font-size: 0.8rem; color: var(--muted); }
+
+/* LIN-4104 D3: the Next step confirm: the stage, why and the task it is for, then Run and Another step. */
+.opened-task-next-confirm { display: grid; gap: 8px; }
+.opened-task-next-confirm .opened-task-primary { justify-self: start; }
+.opened-task-next-target { margin: 0; color: var(--muted); }
