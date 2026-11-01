@@ -24,16 +24,17 @@ describe('LIN-3833 sessionSummaryOf — the fit inputs for "Another step"', () =
     assert.equal('usual' in summary, false);
   });
 
-  test('the next step is the first guess, whatever stages have run', () => {
-    const sessions = [session('plan', 'done')];
-    const summary = sessionSummaryOf({ sessions, guesses: ['implementation', 'review', 'close-out'] });
-    assert.equal(summary.next.kind, 'implementation');
+  // LIN-4103 beat 2: the summary carries no guessed next step (the usual-stage guess is removed at source), so no
+  // stage that has or has not run is named as next.
+  test('the summary names no next step, whatever stages have run (LIN-4103)', () => {
+    const summary = sessionSummaryOf({ sessions: [session('plan', 'done')] });
+    assert.equal('next' in summary, false);
     assert.equal(summary.count, 1);
   });
 
-  test('a finished task names no next step', () => {
-    const summary = sessionSummaryOf({ sessions: [session('close-out', 'done')], guesses: [] });
-    assert.equal(summary.next, null);
+  test('a finished task names no next step (LIN-4103: the summary has no next field at all)', () => {
+    const summary = sessionSummaryOf({ sessions: [session('close-out', 'done')] });
+    assert.equal('next' in summary, false);
   });
 
   test('the summary copies its lists, so a caller cannot change the shared constants', () => {

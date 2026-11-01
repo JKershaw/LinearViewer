@@ -279,11 +279,10 @@ describe('LIN-4039 — W4: the Swipe and task-page producers read the one contai
 
 describe('LIN-4039 — a container\'s own session guess is silenced (surface 3: sessions.next)', () => {
   const model = { sessions: [], guesses: ['research', 'implementation'] };
-  test('sessionSummaryOf names no next step for a container, and the same model still names one for a leaf', () => {
-    assert.equal(sessionSummaryOf(model, { container: true }).next, null);
-    const leaf = sessionSummaryOf(model, { container: false }).next;
-    assert.equal(leaf.kind, 'research');
-    assert.ok(leaf.label);
+  // LIN-4103 beat 2: the summary carries no guessed next step, for a container or a leaf alike.
+  test('sessionSummaryOf carries no next step, for a container or a leaf (LIN-4103)', () => {
+    assert.equal('next' in sessionSummaryOf(model, { container: true }), false);
+    assert.equal('next' in sessionSummaryOf(model, { container: false }), false);
   });
 });
 

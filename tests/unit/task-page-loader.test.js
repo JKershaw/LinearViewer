@@ -16,7 +16,7 @@
  */
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { createTaskPageLoader, buildTaskPageModel, sessionMessage, buildTaskStages, briefCurrentSection, guessStages, deriveHeader, deriveReadyHeader, fmtWhen } from '../../lib/task-page-loader.js';
+import { createTaskPageLoader, buildTaskPageModel, sessionMessage, buildTaskStages, briefCurrentSection, deriveHeader, deriveReadyHeader, fmtWhen } from '../../lib/task-page-loader.js';
 import { DISPATCH_KINDS } from '../../lib/prompt-templates.js';
 import { ORCHESTRATION_KINDS } from '../../lib/effort-readout.js';
 import { STATE_ORDER } from '../../lib/providers/models.js';
@@ -281,23 +281,6 @@ describe('task page loader: the canonical identifier', () => {
   });
 });
 
-describe('guessStages: the usual stages after the FURTHEST one reached', () => {
-  const k = (...kinds) => kinds.map(kind => ({ kind }));
-  const cases = [
-    ['no sessions → all six', [], null, ['research', 'plan', 'plan-review', 'implementation', 'review', 'close-out']],
-    ['only off-spine kinds → all six', k('triage', 'autopilot'), null, ['research', 'plan', 'plan-review', 'implementation', 'review', 'close-out']],
-    ['after plan → Plan review is next, not Build (LIN-4010)', k('research', 'plan'), 'started', ['plan-review', 'implementation', 'review', 'close-out']],
-    ['after plan review → Build', k('research', 'plan', 'plan-review'), 'started', ['implementation', 'review', 'close-out']],
-    ['review → implementation loop: furthest, not last', k('plan', 'implementation', 'review', 'implementation'), 'started', ['close-out']],
-    ['close-out reached → nothing ahead', k('close-out'), 'started', []],
-    ['tracker completed → none', k('plan'), 'completed', []],
-    ['tracker canceled → none', k(), 'canceled', []],
-  ];
-  for (const [name, sessions, type, expected] of cases) {
-    test(name, () => assert.deepEqual(guessStages(sessions, type), expected));
-  }
-});
-
 // LIN-4071: deriveHeader writes one sentence per branch; the task's state is the gather's, so these pin the words only.
 // Live facts say their own sentence before a finished task's (D2), so a completed task with a running row says that.
 describe('deriveHeader: one sentence per branch, live facts first, then finished, ready and idle', () => {
@@ -335,7 +318,6 @@ describe('one finished rule: isTerminalState (LIN-3656)', () => {
     test(`${type}: finished and guesses follow isTerminalState`, () => {
       const model = buildTaskPageModel({ identifier: 'LIN-50', loops: [], ctx: ctxOf(type), enrichLoop, deriveSessionWaiting, now: NOW });
       assert.equal(model.finished, isTerminalState(type));
-      assert.equal(guessStages([], type).length === 0, isTerminalState(type));
       // LIN-4071: the finished sentence is written exactly when the tracker says finished (the ladder's word is gone).
       const header = deriveHeader({ sessions: [], tracker: { state: { type }, finishedAt: null }, now: NOW });
       assert.equal(/^(Finished|Cancelled)\b/.test(header.sentence), isTerminalState(type));
@@ -617,7 +599,7 @@ describe('buildTaskStages (LIN-3356)', () => {
       sess('co', 'close-out', 'running', 0),
       sess('w9', 'wake', 'queued', 5),
     ]);
-    assert.equal(stages.filter(s => s.state !== 'ahead').length, 1);
+    assert.equal(stages.length, 1);
     assert.deepEqual(stages[0].checkIns.map(c => c.loopId), ['w9']);
     assert.equal(stages[0].endedAt, null);
     assert.equal(stages[0].durationMs, null);
@@ -659,22 +641,23 @@ describe('buildTaskStages (LIN-3356)', () => {
     }
   });
 
-  test('ahead stages follow the guess rule, are marked ahead and carry no id; none once finished', () => {
+  // LIN-4103 beat 2: no usual stage is drawn ahead, on any tracker state; a task with no sessions draws no stage.
+  test('no stage is ahead, on any tracker state; a task with no sessions draws no stage (LIN-4103)', () => {
     const sessions = [sess('p', 'plan', 'done', 0, 3)];
     const open = buildTaskStages(sessions, { trackerType: 'started' });
-    assert.deepEqual(open.filter(s => s.state === 'ahead').map(s => s.kind), guessStages(sessions, 'started'));
-    assert.ok(open.filter(s => s.state === 'ahead').every(s => s.id === undefined));
+    assert.equal(open.some(s => s.state === 'ahead'), false);
+    assert.equal(open.length, 1);
     assert.equal(buildTaskStages(sessions, { trackerType: 'completed' }).some(s => s.state === 'ahead'), false);
-    assert.equal(buildTaskStages([], { trackerType: 'started' }).length, 6, 'a task with no sessions shows the usual six');
+    assert.equal(buildTaskStages([], { trackerType: 'started' }).length, 0, 'nothing ran, so nothing is drawn');
   });
 
-  test('the model carries stages and the brief\'s summary', () => {
+  test('the model carries stages and the brief\'s summary (no ahead stages: nothing ran, nothing is drawn, LIN-4103)', () => {
     const model = buildTaskPageModel({
       identifier: 'LIN-50', loops: [], ctx: ctxFor('LIN-50'), enrichLoop, deriveSessionWaiting, now: NOW,
       brief: { brief: '## Current\nIt is going well.\n\n## Constraints\n- none', model: 'm', generatedAt: null },
     });
     assert.equal(model.summary, 'It is going well.');
-    assert.equal(model.stages.length, 6);
+    assert.equal(model.stages.length, 0);
     const bare = buildTaskPageModel({ identifier: 'LIN-50', loops: [], ctx: ctxFor('LIN-50'), enrichLoop, deriveSessionWaiting, now: NOW });
     assert.equal(bare.summary, null, 'no brief, no paragraph, nothing generated');
   });

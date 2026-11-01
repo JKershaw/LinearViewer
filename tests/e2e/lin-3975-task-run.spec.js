@@ -77,8 +77,8 @@ test.describe('LIN-3975 — the task page moves the task on', () => {
     await page.goto(`/workspace/${URL_KEY}/task/${TASK}`);
     const control = page.locator('[data-testid="task-page-run-control"]');
     await expect(control).toHaveCount(1);
-    // LIN-4010: Plan review is the usual stage after Plan, so it is the step offered next (not Build).
-    await expect(control.locator('[data-testid="opened-task-go"]')).toContainText('Run Plan review');
+    // LIN-4103 beat 2: after a clean Plan nothing is offered as a guessed step; the run goes to PR (no "Run Plan review").
+    await expect(control.locator('[data-testid="opened-task-go"]')).toContainText('Run to PR');
     await expect(page.locator('[data-testid="task-page-next"]')).toHaveCount(0);
   });
 
@@ -93,7 +93,7 @@ test.describe('LIN-3975 — the task page moves the task on', () => {
     await expect(page.locator('[data-testid="task-page-answer"]')).toBeVisible();
     await expect(page.locator('[data-testid="task-page-run-control"]')).toHaveCount(0);
     await expect(page.locator('[data-testid="task-page-share-slot"]')).toHaveCount(0);
-    await expect(page.locator('[data-testid="task-page-next"]')).toContainText('comes next');
+    await expect(page.locator('[data-testid="task-page-next"]')).toContainText('Nothing is queued to run on this task.');
   });
 
   test('an attempt links to its run page, and the run page opens', async ({ page }) => {

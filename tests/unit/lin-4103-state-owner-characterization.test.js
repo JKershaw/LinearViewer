@@ -118,7 +118,8 @@ describe('how a failure is read (the fact that must survive the guess being remo
     const parent = node('LIN-60', 'started', [child]);
     const s = states([parent], { 'LIN-61': [failedLoop('implementation', { issueIdentifier: 'LIN-61' })] });
     assert.equal(s.get('LIN-60').state, 'failed');
-    assert.equal(s.get('LIN-60').words, 'Build failed');
+    // LIN-4103 beat 2: a failed subtask rolls up to its parent as a count ("a subtask failed"); the box still names it.
+    assert.equal(s.get('LIN-60').words, 'a subtask failed');
     assert.equal(s.get('LIN-60').attention.words, 'A subtask failed: LIN-61 · Build failed');
   });
 
@@ -179,7 +180,7 @@ describe('what the states that stay read', () => {
     const own = taskFactsOf({ model: modelOf('LIN-100', []), identifier: 'LIN-100', trackerType: 'started', now: NOW });
     const rolled = rollUpRow(own, [{ identifier: 'LIN-101', title: null, state: 'failed', words: 'Build failed' }]);
     assert.equal(rolled.state, 'failed');
-    assert.equal(rolled.words, 'Build failed');
+    assert.equal(rolled.words, 'a subtask failed');
   });
 });
 

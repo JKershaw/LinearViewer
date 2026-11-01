@@ -265,13 +265,14 @@ describe('task page structure', () => {
     assert.match(html, /9 check-ins|2 check-ins/);
   });
 
-  test('LIN-3975: stages still ahead are one quiet line each, with no bar, no id and no toggle', () => {
+  // LIN-4103 beat 2: the track draws the stages that ran; no usual stage is drawn ahead, and a task with no sessions shows
+  // the "no sessions yet" note alone.
+  test('LIN-4103: the track draws no ahead stage, on any tracker state; no sessions shows the note alone', () => {
     const html = renderTaskTrack(model('running-blocked-repeat'), { now: NOW });
-    assert.match(html, /<li class="task-stage-ahead" data-testid="task-page-stage-ahead" data-state="ahead" data-tone="ahead" data-kind="close-out"><span class="task-stage-name">Close-out<\/span> <span class="task-stage-state">usually next<\/span><\/li>/);
-    assert.doesNotMatch(html.slice(html.indexOf('task-page-stage-ahead')), /task-stage-bar|<button/);
-    assert.doesNotMatch(renderTaskTrack(model('done'), { now: NOW }), /task-page-stage-ahead/, 'none once the tracker says done');
+    assert.doesNotMatch(html, /task-page-stage-ahead|task-stage-ahead|usually next/);
+    assert.doesNotMatch(renderTaskTrack(model('done'), { now: NOW }), /task-page-stage-ahead|usually next/);
     const none = renderTaskTrack(model('no-sessions'), { now: NOW });
-    assert.equal((none.match(/data-testid="task-page-stage-ahead"/g) || []).length, 6, 'the six usual stages, Plan review among them (LIN-4010)');
+    assert.doesNotMatch(none, /task-page-stage-ahead|usually next/);
     assert.match(none, /no sessions yet/);
   });
 

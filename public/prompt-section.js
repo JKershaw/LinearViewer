@@ -553,10 +553,9 @@
     // The AI gate applies to the selector's own write only; a template step needs no AI.
     const gateReason = step.label === '__ai__' ? primaryDisabledReason(opts, state) : null;
     const disabled = gateReason ? ` disabled title="${esc(gateReason)}"` : '';
-    const name = step.name ? `<span class="opened-task-step-name">${esc(step.name)}</span> \u00b7 ` : '';
     const reason = gateReason ? ` <span class="opened-task-primary-reason" data-testid="opened-task-primary-reason">${esc(gateReason)}</span>` : '';
     return renderLastCopySlot(state)
-      + `<div class="opened-task-step" data-testid="opened-task-step">${name}${esc(step.why)}</div>`
+      + `<div class="opened-task-step" data-testid="opened-task-step">${esc(step.why)}</div>`
       // LIN-4024: the copy-first view's one action is the solid primary, so a new user sees what to do first.
       + `<button class="btn btn--primary opened-task-write" data-testid="opened-task-write" data-prompt="${esc(step.label)}"${disabled}>\u2726 Write the prompt</button>${reason}`;
   }
@@ -625,7 +624,7 @@
   // LIN-3833: the step a run would start, from the state (a step chosen for this run, else the one the
   // sessions name as next). Shared by the main button (renderGo) and the run block.
   // LIN-3968: the offered step (`sessions.offered`), so a running stage offers no other step, and a failed stage
-  // is offered again. `sessions.next` stays the "comes next" wording after a run.
+  // is offered again. (LIN-4103 beat 2: the summary carries no guessed next step, so no line names one after a run.)
   // LIN-4024: a container offers no stage step (its one action is Run to PR), whatever a step chosen for this run says.
   // LIN-4016 / LIN-4071: a step is offered only when the server's one main action says so. Busy (no action), a finished
   // task (the no-run decision) and a container (Run to PR, `container: true`) offer no stage step, whatever a step chosen
@@ -1165,7 +1164,8 @@
       // LIN-3968: a running stage offers no step; the after-run line names what runs and what comes next. Before
       // the state read lands, the step is not known, so no step is offered either (not "Run to PR").
       if (!state.run.step && (!state.opened || stageBusy(state) || takesNoRun(state, opts))) return '';
-      let why = 'the next step for this task';
+      // LIN-4103 beat 2: with no offered step, the line says the server's own words for a run to PR, never "the next step".
+      let why = step ? 'the next step for this task' : 'no stage step is offered, so the run takes it to PR';
       if (state.run.step) why = 'chosen for this run';
       else if (step && step.reason) why = step.reason;
       const name = step ? esc(step.label) : 'Run to PR';
@@ -1183,11 +1183,10 @@
       const summary = (state.opened && state.opened.sessions) || {};
       // A queued session is not running yet: it reads as queued (with Undo), like a run queued from here.
       const running = summary.running && !summary.queued ? summary.running : null;
-      const next = summary.next || null;
       if (running && !caps.runBox) {
         // The task page's own line (unchanged): the next step, the confirm, and a text Stop.
         const polled = !!summary.canStop;
-        let html = next ? `Next: ${esc(next.label)}, once ${esc(running.label || 'this')} finishes` : '';
+        let html = '';
         if (state.run.confirmStop) {
           html += ` <span class="opened-task-confirm">Stop this run? The session is cancelled and the task stays where it is.`
             + ` <button class="btn btn--red" data-action="stop-run-confirm" data-testid="run-stop-confirm">Stop</button>`
@@ -1216,11 +1215,10 @@
         } else if (polled) {
           actions += ` <button class="btn btn--red opened-task-stop" data-action="stop-run" data-testid="run-stop">Stop</button>`;
         }
-        const nextLine = next ? `<p class="opened-task-running-next" data-testid="opened-task-running-next">Next: ${esc(next.label)}, once ${esc(running.label || 'this')} finishes</p>` : '';
         return `<div class="opened-task-running-box" data-testid="opened-task-running">`
           + `<div class="opened-task-running-head"><span class="opened-task-running-title">Running now</span> \u00b7 `
           + `<span class="opened-task-running-step">${esc(running.label || 'step')}</span>${since ? ` \u00b7 started ${esc(since)}` : ''}`
-          + `<span class="opened-task-running-actions">${actions}</span></div>${confirm}${nextLine}</div>`;
+          + `<span class="opened-task-running-actions">${actions}</span></div>${confirm}</div>`;
       }
       if (state.run.item || summary.queued) {
         return `<div class="opened-task-queued" data-testid="opened-task-queued">Queued, waiting for a runner`

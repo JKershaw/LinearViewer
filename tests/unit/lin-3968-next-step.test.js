@@ -12,7 +12,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { guessStages, nextStepOf, buildTaskStages, deriveHeader, buildRowStates, sessionSummaryOf } from '../../lib/task-page-loader.js';
+import { nextStepOf, buildTaskStages, deriveHeader, buildRowStates, sessionSummaryOf } from '../../lib/task-page-loader.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 import { needsAPerson } from '../../lib/task-state.js';
 
@@ -25,38 +25,35 @@ const sess = (kind, state, over = {}) => ({
   ...over,
 });
 
-describe('LIN-3968 — guessStages: a failed stage is offered again, not passed over', () => {
-  test('a failed Review is the first step offered, then Close-out', () => {
-    const sessions = [sess('plan', 'done'), sess('implementation', 'done'), sess('review', 'failed')];
-    assert.deepEqual(guessStages(sessions, 'started'), ['review', 'close-out']);
-  });
-
-  test('a Review that failed and then succeeded on retry clears the failure', () => {
+// LIN-4103 beat 2: the failure and the undo are facts from the sessions; the usual-stage guess is removed. A failed stage is
+// offered again, a stage whose latest session was undone is offered again (the LIN-3968 ruling), and nothing else is.
+describe('LIN-3968 — the failed stage is offered again, and a retry clears it (facts, not guesses)', () => {
+  test('a Review that failed and then succeeded on retry clears the failure: nothing is offered', () => {
     const sessions = [sess('plan', 'done'), sess('implementation', 'done'), sess('review', 'failed', { n: 1 }), sess('review', 'done', { n: 2 })];
-    assert.deepEqual(guessStages(sessions, 'started'), ['close-out']);
+    assert.equal(nextStepOf(sessions, 'started'), null);
   });
 
   test('a cancelled stage (an Undo) is offered again, but not as a failure (LIN-3968 ruling, option a)', () => {
     const sessions = [sess('plan', 'done'), sess('implementation', 'done'), sess('review', 'cancelled')];
-    assert.deepEqual(guessStages(sessions, 'started'), ['review', 'close-out'], 'the undone stage is not passed over');
     assert.deepEqual(nextStepOf(sessions, 'started'), { kind: 'review', label: 'Review', why: 'again', failed: false, reason: 'cancelled last time, so it is offered again' });
   });
 
-  test('a cancelled stage run again and done clears it', () => {
+  test('a cancelled stage run again and done clears it: nothing is offered', () => {
     const sessions = [sess('plan', 'done'), sess('implementation', 'done'), sess('review', 'cancelled', { n: 1 }), sess('review', 'done', { n: 2 })];
-    assert.deepEqual(guessStages(sessions, 'started'), ['close-out']);
-    assert.deepEqual(nextStepOf(sessions, 'started'), { kind: 'close-out', label: 'Close-out', why: 'usual', failed: false, reason: 'usually next after Review' });
+    assert.equal(nextStepOf(sessions, 'started'), null);
   });
 
-  test('a closed session is bookkeeping, not a failure (LIN-3364)', () => {
+  test('a closed session is bookkeeping, not a failure (LIN-3364): nothing is offered', () => {
     const sessions = [sess('plan', 'done'), sess('implementation', 'done'), sess('review', 'closed')];
-    assert.deepEqual(guessStages(sessions, 'started'), ['close-out']);
+    assert.equal(nextStepOf(sessions, 'started'), null);
   });
 
   test('aborted and expired count as failed too', () => {
     for (const state of ['aborted', 'expired']) {
       const sessions = [sess('plan', 'done'), sess('implementation', state)];
-      assert.equal(guessStages(sessions, 'started')[0], 'implementation', state);
+      const step = nextStepOf(sessions, 'started');
+      assert.equal(step.kind, 'implementation', state);
+      assert.equal(step.failed, true, state);
     }
   });
 });
@@ -77,8 +74,9 @@ describe('LIN-3968 — nextStepOf: the one offered step', () => {
     assert.equal(nextStepOf([sess('plan', 'done'), sess('implementation', 'waiting')], 'started'), null);
   });
 
-  test('no failure: the first usual stage ahead, not marked as failed', () => {
-    assert.deepEqual(nextStepOf([sess('plan', 'done')], 'started'), { kind: 'plan-review', label: 'Plan review', why: 'usual', failed: false, reason: 'usually next after Plan' });
+  // LIN-4103 beat 2: the usual-stage guess ("usually next after Plan") is gone. A task that ran cleanly is offered nothing.
+  test('no failure and no undo: nothing is offered, not the next usual stage (LIN-4103)', () => {
+    assert.equal(nextStepOf([sess('plan', 'done')], 'started'), null);
   });
 
   test('a finished task offers nothing', () => {
@@ -86,16 +84,16 @@ describe('LIN-3968 — nextStepOf: the one offered step', () => {
   });
 });
 
-describe('LIN-3968 — buildTaskStages: the failed stage stands for the step ahead', () => {
-  test('the failed Review row is not repeated as "usually next"', () => {
-    const stages = buildTaskStages([sess('plan', 'done'), sess('implementation', 'done'), sess('review', 'failed')], { trackerType: 'started' });
-    assert.deepEqual(stages.filter(s => s.state === 'ahead').map(s => s.kind), ['close-out']);
+describe('LIN-3968 — buildTaskStages: the strip draws the stages that ran, and no usual stage ahead of them (LIN-4103)', () => {
+  test('the failed Review is a stage that ran, and no usual stage is drawn after it', () => {
+    const stages = buildTaskStages([sess('plan', 'done'), sess('implementation', 'done'), sess('review', 'failed')]);
+    assert.equal(stages.some(s => s.state === 'ahead'), false);
     assert.equal(stages.find(s => s.kind === 'review').state, 'failed');
   });
 
-  test('the cancelled Review row is not repeated as "usually next" either', () => {
-    const stages = buildTaskStages([sess('plan', 'done'), sess('implementation', 'done'), sess('review', 'cancelled')], { trackerType: 'started' });
-    assert.deepEqual(stages.filter(s => s.state === 'ahead').map(s => s.kind), ['close-out']);
+  test('the cancelled Review is a stage that ran, and no usual stage is drawn after it', () => {
+    const stages = buildTaskStages([sess('plan', 'done'), sess('implementation', 'done'), sess('review', 'cancelled')]);
+    assert.equal(stages.some(s => s.state === 'ahead'), false);
     assert.equal(stages.find(s => s.kind === 'review').state, 'cancelled');
   });
 });

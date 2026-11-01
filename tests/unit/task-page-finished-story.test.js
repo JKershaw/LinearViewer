@@ -407,9 +407,8 @@ describe('B6 sessions line', () => {
     assert.match(line, /2 done/, 'continued reads as done');
     for (const w of ['1 running', '1 queued', '1 waiting for an answer', '1 failed', '1 aborted', '1 cancelled', '1 expired', '1 closed', '1 something-new']) assert.ok(line.includes(w), `${w} in "${line}"`);
   });
-  test('zero stages (ahead guesses only) omits the row', () => {
+  test('zero stages omits the row (LIN-4103: no usual stage is ever a stage here)', () => {
     assert.equal(sessionsLine({ stages: [] }), null);
-    assert.equal(sessionsLine({ stages: [{ state: 'ahead' }] }), null);
   });
   test('check-ins are named separately', () => {
     assert.match(sessionsLine({ stages: [mk('done', { checkIns: [{}, {}] })] }), /^1 across 1 stage \(1 done\), plus 2 check-ins$/);

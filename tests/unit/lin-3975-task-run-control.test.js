@@ -269,8 +269,8 @@ function model(over = {}) {
     finished: false,
     question: null,
     sessions: [],
-    guesses: ['plan'],
-    nextStep: { kind: 'plan', label: 'Plan', why: 'usual', failed: false },
+    // LIN-4103 beat 2: a never-run task offers no guessed step (`nextStep` is the failed stage only, so null here).
+    nextStep: null,
     stages: [],
     summary: null,
     brief: null,
@@ -327,7 +327,7 @@ describe('LIN-3975 — the run control is the owner\'s; everyone else reads the 
   test('a member reads the page with no run control, no owner control, and the next step in the slot', () => {
     const html = page(model(), 'member');
     assert.doesNotMatch(html, /task-page-run-control|task-page-owner-widgets|task-page-share-slot/);
-    assert.match(html, /<p class="task-next" data-testid="task-page-next">Plan comes next\.<\/p>/);
+    assert.match(html, /<p class="task-next" data-testid="task-page-next">Nothing has run on this task yet\.<\/p>/);
   });
 
   test('a guest reads the same as a member: no control, the next step', () => {
@@ -362,8 +362,10 @@ describe('LIN-3975 — the run control is the owner\'s; everyone else reads the 
 });
 
 describe('LIN-3975 — the next-step line says what the page offers, in plain words', () => {
-  test('each state of the next step has its sentence', () => {
-    assert.match(renderNextLine(model()), />Plan comes next\.</);
+  // LIN-4103 beat 2: the line states facts only. A never-run task says so; a failed step comes next to run again.
+  test('each state of the next step has its sentence (facts only, LIN-4103)', () => {
+    assert.match(renderNextLine(model()), />Nothing has run on this task yet\.</);
+    assert.match(renderNextLine(model({ stages: [{ kind: 'research', label: 'Research', state: 'done' }] })), />Nothing is queued to run on this task\.</);
     assert.match(renderNextLine(model({ nextStep: { kind: 'implementation', label: 'Build', why: 'again', failed: false } })), />Build was cancelled, so it comes next again\.</);
     assert.match(renderNextLine(model({ nextStep: { kind: 'review', label: 'Review', why: 'again', failed: true } })), />Review failed, so it comes next, to run again\.</);
     assert.match(renderNextLine(model({ nextStep: null, waitingFor: 'ruling' }), { taskState: { state: 'needs-you' } }), />Nothing comes next until the question above is answered\./);
