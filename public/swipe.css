@@ -825,6 +825,17 @@ body[data-proxy-active="true"] .prompt-section .prompt-proxy-toggle {
   line-height: 1.4;
 }
 
+/* LIN-4120: Home's one link to the backlog page, in the place the project sections were. */
+.home-backlog {
+  margin: var(--space-3) 0;
+  font-family: var(--font-content);
+  font-size: 13px;
+}
+
+.home-backlog a {
+  color: var(--brand);
+}
+
 /* Edit slot (hidden on Swipe until P1 supplies editUrl). */
 .swipe-prompt-edit {
   margin-left: auto;

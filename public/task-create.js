@@ -76,7 +76,7 @@
       });
 
       setStatus('Created. Returning…');
-      window.location.href = '/workspace/' + encodeURIComponent(urlKey) + '/';
+      window.location.href = '/workspace/' + encodeURIComponent(urlKey) + '/backlog';
     } catch (err) {
       setStatus((err && err.message) ? err.message : 'Something went wrong');
       form.dataset.busy = 'false';

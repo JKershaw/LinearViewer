@@ -174,7 +174,7 @@ Visit `http://localhost:3000` and click **Login with Linear** (or, in PAT mode, 
 |--------|--------|
 | Click issue title | Toggle details (description, assignee, dates) |
 | Click ▼ arrow | Collapse/expand child issues |
-| Click project header | Collapse entire project |
+| Click project header (on the backlog page) | Collapse entire project |
 | Click "In Progress" header | Collapse/expand in-progress section |
 | Click "reset" link | Reset all collapse states to default |
 | Visit `/logout` | Sign out |

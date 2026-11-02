@@ -72,7 +72,8 @@ export function createTaskCreateRoutes({ workspaceFromUrl, getOpenRouterSource, 
 
   router.get('/workspace/:urlKey/task/new', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
-    const dashboardHref = `/workspace/${encodeURIComponent(workspace.urlKey)}/`;
+    // LIN-4120: Add task lives on the backlog page, so its redirects and error action return there.
+    const backlogHref = `/workspace/${encodeURIComponent(workspace.urlKey)}/backlog`;
 
     const pageOptions = {
       deployInfo: getDeployInfo(),
@@ -95,7 +96,7 @@ export function createTaskCreateRoutes({ workspaceFromUrl, getOpenRouterSource, 
     // follows. A provider that can't create goes back to the dashboard, not
     // Settings: this is a drill-down page, not a view-tier member.
     if (!provider?.ui?.inlineCreate) {
-      return res.redirect(dashboardHref);
+      return res.redirect(backlogHref);
     }
 
     const requestedTeamId = typeof req.query.teamId === 'string' ? req.query.teamId : '';
@@ -144,7 +145,7 @@ export function createTaskCreateRoutes({ workspaceFromUrl, getOpenRouterSource, 
       return res.status(500).send(renderErrorPage(
         'Something Went Wrong',
         'Could not load the create-task page. Please try again.',
-        { action: 'Back to tasks', actionUrl: dashboardHref }
+        { action: 'Back to tasks', actionUrl: backlogHref }
       ));
     }
   });

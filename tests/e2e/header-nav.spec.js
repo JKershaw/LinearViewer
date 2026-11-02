@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
-import { swimLocalSeed } from '../fixtures/local-harness.js';
+import { swimLocalSeed, withHomeFiller } from '../fixtures/local-harness.js';
 import { nav, featuresParam } from '../helpers.js';
 
 // LIN-978 (UI audit D, keystone): the shared header-level view switcher. The
@@ -314,8 +314,10 @@ test.describe('nav-actions placement (LIN-1149)', () => {
 // point: no prior test locked "the header pins", which is how the regression
 // shipped. Height measured at runtime; no pixel value is hardcoded.
 test.describe('Sticky header pin + clearance (LIN-1068)', () => {
-  test.beforeEach(async ({ seedLocal }) => {
-    await seedLocal(swimLocalSeed, { features: FLAGS, runnerKey: true });
+  // LIN-4120: Home draws no project sections, so the page is made tall enough to scroll by the seed itself. The pins read
+  // only the header, so the seed is the filler alone.
+  test.beforeEach(async ({ seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(withHomeFiller({ projects: [], issues: [] }, localWorkerUrlKey), { features: FLAGS, runnerKey: true });
   });
 
   for (const width of [390, 1280]) {
@@ -799,11 +801,36 @@ test.describe('Pinned header clearance at the measured breach (LIN-4037)', () =>
   const WORST_CASE = DENSITY_FILTER_STATES[3];
   const FEEDBACK_ON = { feedbackWidget: true };
 
-  async function openDashboard(page, urlKey, { width, height = 800, features = {} }) {
+  // LIN-4120: Home draws no project sections, so the Linear worker's Home is short. The describe's Home visits carry
+  // `?team=`, and the server remembers that team per account and workspace; a later spec on this worker key would then
+  // load with the team applied. Visiting `?team=all` on the same key when the describe ends restores the default.
+  test.afterAll(async ({ browser, workerUrlKey }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.goto(`/test/set-session?urlKey=${workerUrlKey}`);
+    await page.goto(`/workspace/${workerUrlKey}/?team=all`);
+    await context.close();
+  });
+
+  // `tall` makes the page taller than the viewport, so the scroll test has room to scroll: a spacer, then a focusable
+  // control below it, appended to <main> after load. It only adds height below Home's content; the header is unchanged.
+  async function openDashboard(page, urlKey, { width, height = 800, features = {}, tall = false }) {
     await page.goto(`/test/set-session?urlKey=${urlKey}${featuresParam(features)}`);
     await page.setViewportSize({ width, height });
     await page.goto(densityUrl(urlKey, WORST_CASE));
     await page.waitForLoadState('networkidle');
+    if (tall) {
+      await page.evaluate(() => {
+        const main = document.querySelector('main');
+        const spacer = document.createElement('div');
+        spacer.style.height = '2000px';
+        const control = document.createElement('button');
+        control.type = 'button';
+        control.textContent = 'Below the fold';
+        control.setAttribute('data-test-scroll-target', '');
+        main.append(control, spacer);
+      });
+    }
   }
 
   // The token as a rendered px height, resolved through a probe so it reflects the cascade the consumers see.
@@ -831,7 +858,7 @@ test.describe('Pinned header clearance at the measured breach (LIN-4037)', () =>
 
     test(`a control scrolled into view at ${width}px settles below the header, not under it`, async ({ page, workerUrlKey }) => {
       // A short viewport, so the dashboard is taller than the screen and has room to scroll.
-      await openDashboard(page, workerUrlKey, { width, height: 400, features: FEEDBACK_ON });
+      await openDashboard(page, workerUrlKey, { width, height: 400, features: FEEDBACK_ON, tall: true });
 
       // A control whose scroll is clamped neither at the page top (it sits more than 200px down the page) nor at the
       // page end (it sits above the last scroll position), so the header clearance alone decides where it lands. The header is read

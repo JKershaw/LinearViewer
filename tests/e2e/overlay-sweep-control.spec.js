@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/test-base.js'
 import { sweepFixedOverlaps, describeHits, expectSweepNotVacuous } from '../fixed-overlay-sweep.js'
+import { withHomeFiller } from '../fixtures/local-harness.js'
 
 // LIN-2298 — the POSITIVE CONTROL for tests/fixed-overlay-sweep.js.
 //
@@ -45,8 +46,9 @@ test.describe('LIN-2298: the overlay sweep can actually detect an overlay', () =
   // width-independent — the target's own geometry moves — so proving it at 360
   // and asserting it at 320/390/430 was a gap the re-review named.
   for (const width of [320, 360, 390, 430]) {
-  test(`reports a fixed overlay placed over the swept target, and stays silent once it is gone (${width}px)`, async ({ page, seedLocal }) => {
-    const { urlKey } = await seedLocal()
+  test(`reports a fixed overlay placed over the swept target, and stays silent once it is gone (${width}px)`, async ({ page, seedLocal, localWorkerUrlKey }) => {
+    // LIN-4120: Home draws no project sections, so the seed makes the page tall enough to scroll the sweep.
+    const { urlKey } = await seedLocal(withHomeFiller({ projects: [], issues: [] }, localWorkerUrlKey))
     await page.setViewportSize({ width, height: 844 })
     await page.goto(`/workspace/${urlKey}/`)
     await page.waitForLoadState('networkidle')
@@ -81,7 +83,7 @@ test.describe('LIN-2298: the overlay sweep can actually detect an overlay', () =
   })
   }
 
-  test('reports EVERY overlay covering the target at an offset, not just the first', async ({ page, seedLocal }) => {
+  test('reports EVERY overlay covering the target at an offset, not just the first', async ({ page, seedLocal, localWorkerUrlKey }) => {
     // The re-review's blocking finding: the sweep used to `break` after the
     // first overlapping overlay in document order. Combined with a call site
     // that filtered a known-benign overlay out of the hits, that made any
@@ -91,7 +93,8 @@ test.describe('LIN-2298: the overlay sweep can actually detect an overlay', () =
     // The Observation acceptance no longer filters anything, so it would fail
     // on the first hit regardless; this is what keeps the helper itself honest
     // if a caller ever does tolerate one overlay again.
-    const { urlKey } = await seedLocal()
+    // LIN-4120: Home draws no project sections, so the seed makes the page tall enough to scroll the sweep.
+    const { urlKey } = await seedLocal(withHomeFiller({ projects: [], issues: [] }, localWorkerUrlKey))
     await page.setViewportSize({ width: 360, height: 844 })
     await page.goto(`/workspace/${urlKey}/`)
     await page.waitForLoadState('networkidle')

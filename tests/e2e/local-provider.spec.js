@@ -123,9 +123,12 @@ test.describe('Local provider (no test-token mock)', () => {
     await form.locator('[data-testid="task-create-submit"]').click();
     await page.waitForLoadState('networkidle');
 
-    // Persisted: read back through the Local provider on the reloaded dashboard,
-    // and it surfaces in the In Progress section (the started state took).
-    await expect(page.locator('.line', { hasText: CREATE_TITLE }).first()).toBeAttached();
+    // Persisted: Add task returns to the backlog page (LIN-4120). The started task is In Progress, which Home shows and the
+    // backlog page leaves out, so it is read back on Home.
+    await expect(page).toHaveURL(/\/backlog$/);
+    // The started state took: the task surfaces in the In Progress section on Home.
+    await page.goto(localDashboardUrl(localWorkerUrlKey));
+    await page.waitForLoadState('networkidle');
     await expect(page.locator('.in-progress-items .line', { hasText: CREATE_TITLE }).first()).toBeAttached();
   });
 
@@ -165,6 +168,11 @@ test.describe('Local provider (no test-token mock)', () => {
     const body = request.postDataJSON();
     expect(body.projectId).toBeFalsy();
 
+    await page.waitForLoadState('networkidle');
+    // LIN-4120: Add task returns to the backlog page. This task has no project and no state the backlog draws, so it is
+    // read back on Home, where the just-created task shows in Recent activity.
+    await expect(page).toHaveURL(/\/backlog$/);
+    await page.goto(localDashboardUrl(localWorkerUrlKey));
     await page.waitForLoadState('networkidle');
     await expect(page.locator('.line', { hasText: CREATE_TITLE }).first()).toBeAttached();
   });

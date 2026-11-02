@@ -35,7 +35,7 @@ import { liveConsoleOn } from '../../lib/run-controls.js';
 import { buildHomeView } from '../../lib/home-view.js';
 import { renderDashboardAfterRefresh } from '../../lib/dashboard-refresh.js';
 import { readHaltForPoll, POLL_HALT_READ_TIMEOUT_MS } from '../../lib/poll-halt.js';
-import { gatherHomePage } from '../../lib/home-pipeline.js';
+import { gatherHomePage, homeRowDataFor } from '../../lib/home-pipeline.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
@@ -186,8 +186,8 @@ async function runPrimaryDashboardRoute({ fetchResult }) {
     writeTaskFacts: () => ({ written: false, refusal: 'sandbox' }),
     // LIN-4024: the trimmed Home view the post-401 render builds (server.js); the real one is injected.
     buildHomeView,
-    // LIN-3833: the subtasks that need you by row; these sandboxes render no In Progress rows.
-        rowDataByNodeKey: () => ({}),
+    // LIN-4120: the route builds Home's rowData through the shared helper (lib/home-pipeline.js), the real one here.
+    homeRowDataFor,
     requestFeatureFlags: async () => ({}),
     resolveRunControls: async () => ({ runControls: false, runSetup: false }),
     // LIN-3977: the post-401 Home render applies the promotion rule (server.js), so the real one is injected.

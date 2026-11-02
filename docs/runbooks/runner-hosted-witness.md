@@ -43,15 +43,16 @@ when you're in the workspace.
   block with its `curl … /api/proxy/token`
   line. The runner leaves any item that
   does, with `credential-in-prose`.
-- **One tiny task.** On the workspace page,
-  tap **+ Add task**. Title: `Say hello`.
+- **One tiny task.** On the backlog page
+  (`/workspace/<urlKey>/backlog`), tap
+  **+ Add task** in the project's header. Title: `Say hello`.
   Description: `Reply with one sentence.
   Change no files.`
 
 ## 1. Get the prompt
 
 1. On the laptop's browser, open the
-   workspace and tap your **Say hello**
+   backlog page and tap your **Say hello**
    task to open it.
 2. Tap **run on my machine ›**. It shows
    as soon as the task opens, and opens
