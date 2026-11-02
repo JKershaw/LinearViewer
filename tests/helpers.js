@@ -222,6 +222,14 @@ export const SELECTORS = {
     hidden: '[data-testid="kpis-hidden"]',
     privacy: '[data-testid="kpis-privacy"]',
   },
+  // LIN-4115: Home's halt banner. The mode attribute is `data-halt-banner-mode` (not `data-halt-mode`, which marks the
+  // Dispatch halt buttons).
+  homeHalt: {
+    banner: '[data-testid="home-halt-banner"]',
+    bannerPause: '[data-testid="home-halt-banner"][data-halt-banner-mode="pause"]',
+    bannerStop: '[data-testid="home-halt-banner"][data-halt-banner-mode="stop"]',
+    dispatchLink: '[data-testid="home-halt-dispatch-link"]'
+  },
   dispatchHalt: {
     status: '[data-testid="dispatch-halt-status"]',
     disclaimer: '[data-testid="dispatch-halt-disclaimer"]',

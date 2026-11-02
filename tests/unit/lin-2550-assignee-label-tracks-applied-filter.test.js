@@ -36,6 +36,7 @@ import vm from 'node:vm';
 import { liveConsoleOn } from '../../lib/run-controls.js';
 import { buildHomeView } from '../../lib/home-view.js';
 import { renderDashboardAfterRefresh } from '../../lib/dashboard-refresh.js';
+import { readHaltForPoll, POLL_HALT_READ_TIMEOUT_MS } from '../../lib/poll-halt.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
@@ -83,6 +84,8 @@ function baseContext(calls, appliedAssigneeName, assigneeState) {
     UUID_REGEX: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
     getDeployInfo: () => ({}),
     getOpenRouterSource: () => null,
+    // LIN-4115: the primary route reads the halt through readHaltForPoll beside its fetch. No halt store here, so null.
+    readHaltForPoll, POLL_HALT_READ_TIMEOUT_MS, workspaceHaltStore: null,
     userPreferencesStore: { setSelectedTeam: async () => {}, getSelectedTeam: async () => null },
     customPromptsStore: { list: async () => [] },
     fetchAndPrepareProjects: async () => fetchResult(appliedAssigneeName),

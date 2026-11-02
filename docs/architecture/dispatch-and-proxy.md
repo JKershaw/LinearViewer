@@ -39,6 +39,7 @@ The four enqueue handlers (`POST /workspace/:urlKey/api/dispatch`, `POST /api/pr
 - `GET /workspace/:urlKey/api/dispatch/halt` - Read the workspace's halt request
 - `POST /workspace/:urlKey/api/dispatch/halt` - Request a pause or stop (LIN-2994)
 - `DELETE /workspace/:urlKey/api/dispatch/halt` - Clear the halt request
+- Home (`GET /workspace/:urlKey/`, and its post-refresh re-render) reads the halt through `readHaltForPoll` for its banner (LIN-4115); a bounded, read-only read that never gates the run buttons.
 
 The runner honours a stored halt (`lib/runner-kit/runner.mjs` `haltAction`: pause leaves fresh
 items, stop sweeps). Set and clear are owner-only (LIN-3398); reading is member-reachable. This

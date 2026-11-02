@@ -794,6 +794,22 @@ body[data-proxy-active="true"] .prompt-section .prompt-proxy-toggle {
   color: var(--brand-dim);
 }
 
+/* LIN-4115: Home's halt banner ("Runs are paused/stopped · cleared on Dispatch ›"), above the onboarding hint.
+   Theme tokens only (--card, --line, --text, --amber-dim), so dark mode needs no extra rule. */
+.home-halt-banner {
+  margin: var(--space-2) 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--amber-dim);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--text);
+  font-family: var(--font-content);
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
 /* LIN-2944 P3: Home's one-line onboarding hint replaces the top-task mark when
    only starter-seed rows remain. F8 palette only (--green-dim). */
 .home-onboarding-hint {

@@ -37,6 +37,7 @@ import { createRejectedCredentialRegistry } from './lib/rejected-credentials.js'
 import { createRefreshOnResolveGate } from './lib/refresh-on-resolve-gate.js'
 import { WorkspacePreferencesStore } from './lib/workspace-preferences.js'
 import { WorkspaceHaltStore } from './lib/workspace-halt.js'
+import { readHaltForPoll, POLL_HALT_READ_TIMEOUT_MS } from './lib/poll-halt.js'
 import { DispatchQueueStore } from './lib/dispatch-store.js'
 import { CustomPromptsStore } from './lib/custom-prompts-store.js'
 import { CollectiveCharactersStore } from './lib/collective-characters-store.js'
@@ -2005,7 +2006,7 @@ async function renderDashboardAfterRefresh(workspace, session, teamId, assigneeS
   return renderRefreshedDashboard({
     customPromptsStore, getDeployInfo, getFeatureFlags, getProviderForWorkspace, fetchAndPrepareProjects,
     resolveRunControls, homeRowStates, orderIssuesForSwipe, renderPage, writeTaskFacts,
-    taskModeStore, accountStore, readFilledRung
+    taskModeStore, accountStore, readFilledRung, workspaceHaltStore
   }, { workspace, session, teamId, assigneeState, openRouterSource, res });
 }
 
@@ -3463,6 +3464,9 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       customPrompts = (await customPromptsStore.list(workspace.urlKey)).map(p => ({ id: p.id, name: p.name }));
     } catch (e) { /* non-fatal */ }
 
+    // LIN-4115: Home's halt read, started beside the fetch and awaited before render. The poll path's bounded read
+    // (lib/poll-halt.js) never rejects: on a timeout or error it falls back to the store's last-known halt.
+    const haltRead = readHaltForPoll(workspaceHaltStore, workspace.urlKey, POLL_HALT_READ_TIMEOUT_MS);
     const fetched = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true, assigneeName: assigneeState.resolvedAssigneeName, accountId: req.session.accountId });
     const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated, availableAssignees, appliedAssigneeName } = fetched;
     const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h));
@@ -3482,11 +3486,13 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
     const rowStates = homeStates?.states ?? null;
     // LIN-4024: Home renders the trimmed view (what needs you, what runs, what is next; the rest behind folds).
     const homeView = buildHomeView({ inProgressTrees, trees, states: rowStates ?? new Map(), topTaskId: homeTopTask ? nodeKey(homeTopTask) : null });
+    const halt = await haltRead;
     const html = renderPage(homeView.trees, homeView.inProgressTrees, recentActivityTrees, organizationName, {
       teams,
       selectedTeamId,
       availableAssignees,
       rowStates,
+      halt,
       rulingCount: homeStates?.rulingCount ?? 0,
       rowData: rowDataByNodeKey({ urlKey: workspace.urlKey, inProgressTrees: homeView.inProgressTrees, recentActivityTrees, projectTrees: homeView.trees, rowStates }),
       copyFirstCard: featureFlags.runControls !== true && req.session.copyFirstCardDismissed !== true,
