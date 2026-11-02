@@ -81,7 +81,7 @@ test('Home on a few thousand tasks: the page is small, draws no project section,
   await seedWorkspace(page);
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/workspace/${URL_KEY}/`);
-  await expect(page.locator('.in-progress-section')).toBeVisible();
+  await expect(page.locator('.running-section')).toBeVisible();
 
   // LIN-4120: Home's HTML is bounded by what needs a person and what runs, not by the number of projects.
   const html = await page.content();
@@ -92,7 +92,7 @@ test('Home on a few thousand tasks: the page is small, draws no project section,
   expect(inlineStyles).toBeLessThan(INLINE_STYLE_CEILING);
   await expect(page.locator('[data-testid="project"]')).toHaveCount(0);
   await expect(page.locator('[data-testid="home-backlog-link"]')).toHaveCount(1);
-  await expect(page.locator('.in-progress-section .title.done')).toHaveCount(0);
+  await expect(page.locator('.running-section .title.done')).toHaveCount(0);
 
   // The backlog page draws every project: its HTML keeps the LIN-4024 ceiling, and no done task is sent except in
   // Recent activity, which is a separate, one-day set.
@@ -122,7 +122,7 @@ test('the state build and the open-ruling reduction are timed on this shape', as
   await seedWorkspace(page);
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/workspace/${URL_KEY}/`);
-  await expect(page.locator('.in-progress-section')).toBeVisible();
+  await expect(page.locator('.running-section')).toBeVisible();
 
   const renderStart = Date.now();
   const render = await page.request.get(`/workspace/${URL_KEY}/`);

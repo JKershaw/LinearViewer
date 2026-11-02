@@ -20,7 +20,7 @@ Platform Projects
 
 ### Views
 
-- **Tree View** - Hierarchical display of projects and nested issues, with an In Progress section across all projects
+- **Tree View** - Hierarchical display of projects and nested issues, with Home's Running and recently moved section across all projects and an Up next list (LIN-4113)
 - **Swipe** - Mobile-first triage, one issue at a time, with an integrated prompt
 - **Swim** - Swim-lane / flow layout showing sequence, parallelism, and dependencies
 - **Roadmap** - Narrative project summary with an at-a-glance digest, recap, and Brief; report history is browsable

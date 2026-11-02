@@ -73,15 +73,15 @@ test('a started parent\'s folded child opens with the parent', async ({ page }) 
   await seedFolds(page);
   await page.goto(`/workspace/${URL_KEY}/`);
 
-  const parentLine = page.locator('.in-progress-section .line[data-identifier="LOCAL-F1"]');
+  const parentLine = page.locator('.running-section .line[data-identifier="LOCAL-F1"]');
   await expect(parentLine).toBeVisible();
   await parentLine.click();
-  const more = page.locator('.in-progress-section [data-home-fetch="more-of-parent"]');
+  const more = page.locator('.running-section [data-home-fetch="more-of-parent"]');
   await expect(more).toBeVisible();
   await expect(more).toContainText('show 1 more');
   await more.click();
-  await expect(page.locator('.in-progress-section .line[data-identifier="LOCAL-F3"]')).toBeVisible();
-  await expect(page.locator('.in-progress-section .line[data-identifier="LOCAL-F4"]')).toHaveCount(0);
+  await expect(page.locator('.running-section .line[data-identifier="LOCAL-F3"]')).toBeVisible();
+  await expect(page.locator('.running-section .line[data-identifier="LOCAL-F4"]')).toHaveCount(0);
 });
 
 test('search finds a Backlog task the page does not hold, and shows it once', async ({ page }) => {

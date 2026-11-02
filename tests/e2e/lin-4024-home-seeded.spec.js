@@ -42,7 +42,7 @@ test('the charter root opens with its own state, one opened task and no box insi
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`/workspace/${URL_KEY}/`);
 
-  const charter = page.locator('.in-progress-section .line[data-identifier="LOCAL-0"]');
+  const charter = page.locator('.running-section .line[data-identifier="LOCAL-0"]');
   await expect(charter).toBeVisible();
   await charter.click();
   const opened = page.locator('[data-testid="opened-task"]').first();
@@ -99,7 +99,7 @@ test('a task waiting on a ruling reads the same on the count line, the row, the 
   await expect(count).not.toContainText('running');
 
   // The row is one state, the same words as the count line.
-  const row = page.locator('.in-progress-section .line[data-identifier="LOCAL-T1"]');
+  const row = page.locator('.running-section .line[data-identifier="LOCAL-T1"]');
   await expect(row.locator('[data-testid="issue-row-state"]')).toContainText('needs you');
 
   // The badge fills from a 5s client poll, so wait for it to settle before comparing it with the summary's number.

@@ -59,20 +59,20 @@ for (const [who, runner] of [['owner', true], ['newuser', false]]) {
         // The top task is in In Progress, once on the page, and not under its project.
         const mark = page.locator('[data-top-task="1"]');
         await expect(mark).toHaveCount(1);
-        await expect(page.locator('.in-progress-section [data-top-task="1"]')).toHaveCount(1);
+        await expect(page.locator('.running-section [data-top-task="1"]')).toHaveCount(1);
         await expect(page.locator('.project [data-top-task="1"]')).toHaveCount(0);
-        await expect(page.locator('.in-progress-section [data-identifier="LOCAL-P2"]')).toHaveCount(1);
+        await expect(page.locator('.running-section [data-identifier="LOCAL-P2"]')).toHaveCount(1);
         await expect(page.locator('[data-identifier="LOCAL-P2"]')).toHaveCount(1);
 
         // The context parent is a Todo, not started: its fold must still reach the open sibling.
-        const parentLine = page.locator('.in-progress-section .line[data-identifier="LOCAL-P1"]');
+        const parentLine = page.locator('.running-section .line[data-identifier="LOCAL-P1"]');
         await expect(parentLine).toBeVisible();
         await parentLine.click();
-        const more = page.locator('.in-progress-section [data-home-fetch="more-of-parent"]');
+        const more = page.locator('.running-section [data-home-fetch="more-of-parent"]');
         await expect(more).toBeVisible();
         await expect(more).toContainText('show 1 more');
         await more.click();
-        await expect(page.locator('.in-progress-section .line[data-identifier="LOCAL-P3"]')).toBeVisible();
+        await expect(page.locator('.running-section .line[data-identifier="LOCAL-P3"]')).toBeVisible();
         await expect(page.locator('[data-identifier="LOCAL-P3"]')).toHaveCount(1);
 
         await page.evaluate(() => window.scrollTo(0, 0));

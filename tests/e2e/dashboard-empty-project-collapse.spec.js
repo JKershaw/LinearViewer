@@ -64,8 +64,8 @@ test.describe('Empty-project default collapse (LIN-2514)', () => {
         expanded: [],
         hideCompleted: [],
         collapsedProjects: [],
-        inProgressCollapsed: false,
-        recentActivityCollapsed: true,
+        runningCollapsed: false,
+        upNextCollapsed: false,
       }));
     });
     await page.reload();

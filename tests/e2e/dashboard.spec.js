@@ -25,27 +25,27 @@ test.describe('Authenticated Dashboard', () => {
     await expect(page.locator('.project-header:has-text("Local Beta")')).toBeVisible();
   });
 
-  test('shows In Progress section with active issues', async ({ page, localWorkerUrlKey }) => {
-    // Should have In Progress section header
-    const inProgressHeader = page.locator('.in-progress-header');
+  test('shows the Running and recently moved section with active issues', async ({ page, localWorkerUrlKey }) => {
+    // LIN-4113: Home's first section is "Running and recently moved" (the In Progress view, then the recent block).
+    const inProgressHeader = page.locator('.running-header');
     await expect(inProgressHeader).toBeVisible();
-    await expect(inProgressHeader).toContainText('In Progress');
+    await expect(inProgressHeader).toContainText('Running and recently moved');
 
     // In Progress: local-issue-1 (started) and local-issue-4 (started) = 2 lines. LIN-4024: the child, local-issue-2,
     // is an unstarted task, so it folds under its started parent ("show 1 more") instead of listing here.
     // LIN-4117: the child is the top task, so it is In Progress under its parent (not folded). It is hidden until the
     // parent opens, and the parent has no fold left: the top task is its only open child.
-    await expect(page.locator('.in-progress-items .line')).toHaveCount(3);
+    await expect(page.locator('.running-items .line')).toHaveCount(3);
 
     // Top-level started items are visible
-    await expect(page.locator('.in-progress-items .line:has-text("Local parent task")')).toBeVisible();
-    await expect(page.locator('.in-progress-items .line:has-text("Second project task")')).toBeVisible();
+    await expect(page.locator('.running-items .line:has-text("Local parent task")')).toBeVisible();
+    await expect(page.locator('.running-items .line:has-text("Second project task")')).toBeVisible();
 
-    const childTask = page.locator('.in-progress-items .line:has-text("Local child task")');
+    const childTask = page.locator('.running-items .line:has-text("Local child task")');
     await expect(childTask).toHaveCount(1);
     await expect(childTask).toBeHidden();
-    await expect(page.locator('.in-progress-items [data-home-fetch="more-of-parent"]')).toHaveCount(0);
-    await expect(page.locator(`.in-progress-items .node[data-id="${localSeedId(localWorkerUrlKey, 'local-issue-2')}"]`)).toHaveCount(1);
+    await expect(page.locator('.running-items [data-home-fetch="more-of-parent"]')).toHaveCount(0);
+    await expect(page.locator(`.running-items .node[data-id="${localSeedId(localWorkerUrlKey, 'local-issue-2')}"]`)).toHaveCount(1);
   });
 
   test('displays correct state indicators', async ({ page, localWorkerUrlKey }) => {
@@ -54,7 +54,7 @@ test.describe('Authenticated Dashboard', () => {
     // below are scoped to the section that holds each row.
 
     // Started issues (local-issue-1, local-issue-4) are In Progress. In Progress is Home's, so this is read there.
-    await expect(page.locator('.in-progress-items .status-pill--bare.status-pill--in-progress')).toHaveCount(2);
+    await expect(page.locator('.running-items .status-pill--bare.status-pill--in-progress')).toHaveCount(2);
 
     // LIN-4119: the project rows and their done count are the backlog page's.
     await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);

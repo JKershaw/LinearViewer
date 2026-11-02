@@ -45,7 +45,7 @@ test.describe('Search Feature', () => {
     await searchInput.fill('Beta');
 
     // Beta's match is In Progress, so its row shows there (LIN-4024: a project lists only its Up next work)
-    await expect(page.locator('.in-progress-section .line', { hasText: 'Beta task in progress' })).toBeVisible();
+    await expect(page.locator('.running-section .line', { hasText: 'Beta task in progress' })).toBeVisible();
 
     // Alpha project should be hidden (no matching issues). Its project section is the backlog page's, searched the same way.
     await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
@@ -63,7 +63,7 @@ test.describe('Search Feature', () => {
     await searchInput.fill('beta');
 
     // The Beta match is still visible (In Progress)
-    await expect(page.locator('.in-progress-section .line', { hasText: 'Beta task in progress' })).toBeVisible();
+    await expect(page.locator('.running-section .line', { hasText: 'Beta task in progress' })).toBeVisible();
   });
 
   test('search matches assignee name', async ({ page }) => {
@@ -74,7 +74,7 @@ test.describe('Search Feature', () => {
     await searchInput.fill('charlie');
 
     // Charlie is assigned to issue-4, the Beta task In Progress
-    await expect(page.locator('.in-progress-section .line', { hasText: 'Beta task in progress' })).toBeVisible();
+    await expect(page.locator('.running-section .line', { hasText: 'Beta task in progress' })).toBeVisible();
   });
 
   test('search matches label name', async ({ page }) => {
@@ -84,7 +84,7 @@ test.describe('Search Feature', () => {
     // Search for label "urgent" - on Beta task in progress
     await searchInput.fill('urgent');
 
-    await expect(page.locator('.in-progress-section .line', { hasText: 'Beta task in progress' })).toBeVisible();
+    await expect(page.locator('.running-section .line', { hasText: 'Beta task in progress' })).toBeVisible();
   });
 
   test('shows no results message for non-matching search', async ({ page }) => {
@@ -173,7 +173,7 @@ test.describe('Search Feature', () => {
     // "Parent task in progress" appears in the in-progress section
     await searchInput.fill('Parent task');
 
-    const ipSection = page.locator('.in-progress-section');
+    const ipSection = page.locator('.running-section');
     await expect(ipSection).not.toHaveClass(/hidden/);
 
     // Now search for something not in progress

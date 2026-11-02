@@ -53,10 +53,10 @@ const workspace = { id: 'ws-1', urlKey: 'acme', name: 'Acme', provider: 'local' 
 const baseOptions = { workspace, urlKey: 'acme', featureFlags: {} };
 
 describe('LIN-4119 — renderPage page mode', () => {
-  test('home is the default page mode: the title is "- Projects" and the In Progress region renders', () => {
+  test('home is the default page mode: the title is "- Projects" and the Running region renders', () => {
     const html = renderPage([projectTree], inProgressTrees, [], 'Acme', baseOptions);
     assert.match(html, /<title>[^<]*- Projects<\/title>/);
-    assert.ok(html.includes('<div class="in-progress-section" role="region" aria-label="In Progress Tasks">'));
+    assert.ok(html.includes('<div class="running-section" role="region" aria-label="Running and recently moved" data-testid="running-section">'));
   });
 
   test('an explicit home page mode renders byte-identically to the default', () => {
@@ -71,13 +71,13 @@ describe('LIN-4119 — renderPage page mode', () => {
     assert.doesNotMatch(html, /<title>[^<]*- Projects<\/title>/);
   });
 
-  test('backlog renders only the project sections: no In Progress and no Recent activity region', () => {
+  test('backlog renders only the project sections: no Running and no recent block', () => {
     const recent = [{ projectName: 'Test Project', roots: [
       { issue: mk({ id: 'r1', identifier: 'T-3', title: 'Shipped', state: { name: 'Done', type: 'completed' }, completedAt: '2020-02-01T00:00:00.000Z' }), children: [], depth: 0, projectName: 'Test Project' },
     ] }];
     const html = renderPage([projectTree], inProgressTrees, recent, 'Acme', { ...baseOptions, pageMode: 'backlog' });
-    assert.ok(!html.includes('in-progress-section'), 'no In Progress region on the backlog page');
-    assert.ok(!html.includes('recent-activity-section'), 'no Recent activity region on the backlog page');
+    assert.ok(!html.includes('running-section'), 'no Running region on the backlog page');
+    assert.ok(!html.includes('running-recent'), 'no recent block on the backlog page');
     assert.ok(html.includes('role="region" aria-label="Projects"'), 'the Projects region renders');
     assert.ok(html.includes('Backlog item'), 'the project\'s own task renders in its section');
   });

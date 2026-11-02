@@ -1111,16 +1111,32 @@ a.wordmark:hover {
    Displays all in-progress issues across projects in a single collapsible list.
    Yellow accent color matches Linear's "started" state.
 */
-.in-progress-section {
+.running-section,
+.up-next-section {
   margin-bottom: var(--space-5);
 }
 
-.in-progress-header {
-  color: var(--amber-dim);
+/* LIN-4113: the two desk section headers share one shape; each keeps its own tone. */
+.running-header,
+.up-next-header {
   font-weight: 600;
   cursor: pointer;
   padding: var(--space-2) 0;
   font-family: var(--font-content);
+}
+
+.running-header { color: var(--amber-dim); }
+.up-next-header { color: var(--slate-dim); }
+
+/* The recent block sits under the Running view, labelled by its window. Its rows are the same rows as Running's. */
+.running-recent {
+  margin-top: var(--space-3);
+}
+
+.running-recent-label {
+  color: var(--muted);
+  font-family: var(--font-content);
+  padding: var(--space-1) 0;
 }
 
 /* Project name badge shown after issue title in In Progress section */
@@ -1839,18 +1855,6 @@ a.wordmark:hover {
    Displays recent task activity (completed/created/edited) across projects in a
    single collapsible list. Green accent color matches Linear's "completed" state.
 */
-.recent-activity-section {
-  margin-bottom: var(--space-5);
-}
-
-.recent-activity-header {
-  color: var(--green-dim);
-  font-weight: 600;
-  cursor: pointer;
-  padding: var(--space-2) 0;
-  font-family: var(--font-content);
-}
-
 /* =============================================================================
    Project Sections
    =============================================================================
@@ -1957,7 +1961,8 @@ a.wordmark:hover {
 
 /* LIN-4024: Home's row glyphs share one size and one box, so ○, ◦ and ◐ sit on the same line whichever list
    the row is in. */
-.in-progress-section .state,
+.running-section .state,
+.up-next-section .state,
 .project .state {
   font-size: 1em;
   line-height: 1;
@@ -2776,11 +2781,8 @@ a.wordmark:hover {
     margin-bottom: var(--space-4);
   }
 
-  .in-progress-section {
-    margin-bottom: var(--space-4);
-  }
-
-  .recent-activity-section {
+  .running-section,
+  .up-next-section {
     margin-bottom: var(--space-4);
   }
 

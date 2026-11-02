@@ -160,12 +160,12 @@ test.describe('LIN-4119 W4 — the /backlog page, its access and its guards', ()
   test('a task in Home\'s In Progress is absent from its /backlog project, and Home shows it In Progress', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(inProgressSeed(localWorkerUrlKey));
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
-    await expect(page.locator('.in-progress-section .line[data-identifier="W4-IP"]')).toHaveCount(1);
+    await expect(page.locator('.running-section .line[data-identifier="W4-IP"]')).toHaveCount(1);
     await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     const section = page.locator(SELECTORS.backlogPage.projects);
     await expect(section.locator('.line[data-identifier="W4-IP"]')).toHaveCount(0);
     await expect(section.locator('.line[data-identifier="W4-TODO"]')).toHaveCount(1);
-    await expect(page.locator(SELECTORS.backlogPage.inProgress)).toHaveCount(0);
+    await expect(page.locator(SELECTORS.backlogPage.running)).toHaveCount(0);
   });
 
   test('signed out, /backlog answers as Home does', async ({ browser, seedLocal, localWorkerUrlKey }) => {

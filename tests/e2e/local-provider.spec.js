@@ -27,7 +27,7 @@ test.describe('Local provider (no test-token mock)', () => {
     // Started issue surfaces in the In Progress section, which is Home's.
     await page.goto(localDashboardUrl(localWorkerUrlKey));
     await page.waitForLoadState('networkidle');
-    await expect(page.locator('.in-progress-items .line:has-text("Local parent task")')).toBeVisible();
+    await expect(page.locator('.running-items .line:has-text("Local parent task")')).toBeVisible();
     // Child issue is in the DOM (hidden until its parent is expanded).
     await expect(page.locator('.line:has-text("Local child task")').first()).toBeAttached();
   });
@@ -129,7 +129,7 @@ test.describe('Local provider (no test-token mock)', () => {
     // The started state took: the task surfaces in the In Progress section on Home.
     await page.goto(localDashboardUrl(localWorkerUrlKey));
     await page.waitForLoadState('networkidle');
-    await expect(page.locator('.in-progress-items .line', { hasText: CREATE_TITLE }).first()).toBeAttached();
+    await expect(page.locator('.running-items .line', { hasText: CREATE_TITLE }).first()).toBeAttached();
   });
 
   // F1a regression pin (LIN-1973 review, PR #1101): before this fix, an
@@ -187,7 +187,7 @@ test.describe('Local provider (no test-token mock)', () => {
 
     // Expand the seeded In Progress parent, then open its Details section (the
     // edit link lives inside the collapsed Details content, beside Comments).
-    await page.locator('.in-progress-items .line', { hasText: 'Local parent task' }).first().click();
+    await page.locator('.running-items .line', { hasText: 'Local parent task' }).first().click();
     await page.locator('.detail-toggle[data-toggle="description"]').first().click();
 
     // One click: the link navigates to the task's own edit page.
@@ -215,7 +215,7 @@ test.describe('Local provider (no test-token mock)', () => {
     await expect(page.locator('.line', { hasText: 'Local parent task' })).toHaveCount(0);
     await expect(page.locator('.line', { hasText: NEW_TITLE }).first()).toBeAttached();
     // State persisted: now Done, so it has left the In Progress section.
-    await expect(page.locator('.in-progress-items .line', { hasText: NEW_TITLE })).toHaveCount(0);
+    await expect(page.locator('.running-items .line', { hasText: NEW_TITLE })).toHaveCount(0);
   });
 
   // LIN-1575: the description field grew a Write/Preview toggle (marked +
@@ -227,7 +227,7 @@ test.describe('Local provider (no test-token mock)', () => {
   // HTML-ified. The seeded description is plain text ("Seeded parent"), so this
   // also proves render/round-trip work for the common no-Markdown-syntax case.
   test('description Preview renders live and saving round-trips the untouched doc unchanged', async ({ page }) => {
-    await page.locator('.in-progress-items .line', { hasText: 'Local parent task' }).first().click();
+    await page.locator('.running-items .line', { hasText: 'Local parent task' }).first().click();
     await page.locator('.detail-toggle[data-toggle="description"]').first().click();
     await page.locator('[data-testid="issue-edit-link"]').first().click();
 
@@ -303,7 +303,7 @@ test.describe('Local provider (no test-token mock)', () => {
   ].join('\n');
 
   test('description Preview renders real Markdown, styles it, and saving from Preview round-trips the raw source', async ({ page }) => {
-    await page.locator('.in-progress-items .line', { hasText: 'Local parent task' }).first().click();
+    await page.locator('.running-items .line', { hasText: 'Local parent task' }).first().click();
     await page.locator('.detail-toggle[data-toggle="description"]').first().click();
     await page.locator('[data-testid="issue-edit-link"]').first().click();
 

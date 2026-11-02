@@ -21,13 +21,13 @@ async function openFolds(page, parentIdentifier = 'FILT-3') {
     await backlog.first().click();
     await expect(page.locator('[data-testid="home-fold-backlog"]')).toHaveCount(0);
   }
-  const parent = page.locator(`.in-progress-section .line[data-identifier="${parentIdentifier}"]`);
+  const parent = page.locator(`.running-section .line[data-identifier="${parentIdentifier}"]`);
   if (await parent.count()) {
     await parent.click();
-    const more = page.locator('.in-progress-section [data-home-fetch="more-of-parent"]').first();
+    const more = page.locator('.running-section [data-home-fetch="more-of-parent"]').first();
     if (await more.count()) {
       await more.click();
-      await expect(page.locator('.in-progress-section [data-home-fetch="more-of-parent"]')).toHaveCount(0);
+      await expect(page.locator('.running-section [data-home-fetch="more-of-parent"]')).toHaveCount(0);
     }
   }
 }
@@ -85,13 +85,13 @@ test.describe('LIN-2529 — assignee filter (local provider, real `me` match)', 
 
     // The matched in-progress parent reaches the In Progress section. Its unstarted subtask is the top task (LIN-4117),
     // so it is In Progress under the parent, hidden until the parent opens, rather than folded behind "show 1 more".
-    await expect(page.locator('.in-progress-items .line')).toHaveCount(2);
-    await expect(page.locator('.in-progress-items .line:has-text("Assigned in-progress parent")')).toBeVisible();
+    await expect(page.locator('.running-items .line')).toHaveCount(2);
+    await expect(page.locator('.running-items .line:has-text("Assigned in-progress parent")')).toBeVisible();
 
-    await page.locator('.in-progress-items .line:has-text("Assigned in-progress parent")').click();
-    const childLine = page.locator('.in-progress-items .line:has-text("Unassigned in-progress subtask")');
+    await page.locator('.running-items .line:has-text("Assigned in-progress parent")').click();
+    const childLine = page.locator('.running-items .line:has-text("Unassigned in-progress subtask")');
     await expect(childLine).toHaveCount(1);
-    const childNode = page.locator(`.in-progress-items .node[data-id="${localSeedId(localWorkerUrlKey, 'filter-ip-child')}"]`);
+    const childNode = page.locator(`.running-items .node[data-id="${localSeedId(localWorkerUrlKey, 'filter-ip-child')}"]`);
     await expect(childNode).not.toHaveClass(/hidden/);
   });
 

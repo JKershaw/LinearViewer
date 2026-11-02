@@ -54,7 +54,7 @@ test.describe('Attachments gallery — task detail (LIN-652)', () => {
 
     // Expand the issue-1 line → lazy-load its detail block. issue-1 is In Progress (LIN-4024: a project lists only its
     // Up next work), so its row and details are in the In Progress section.
-    const inProgress = page.locator('.in-progress-section');
+    const inProgress = page.locator('.running-section');
     const line = inProgress.locator('.line[data-id="issue-1"]');
     await expect(line).toBeVisible();
     await line.click();

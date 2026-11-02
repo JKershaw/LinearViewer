@@ -105,7 +105,7 @@ import { PromptTraceStore } from './lib/prompt-trace-store.js'
 import { getProvider, getProviderForWorkspace, getAllProviders, localProvider } from './lib/providers/index.js' // barrel: owns the five self-registering provider imports (LIN-2010)
 import { createProviderAuthRouter } from './routes/provider-auth-routers.js'
 import { LocalStore } from './lib/local-store.js'
-import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID, PERIODICALS_PROJECT_ID, expandToTreeContext, nodeKey } from './lib/tree.js'
+import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, RECENT_WINDOW_DAYS, NO_PROJECT_ID, PERIODICALS_PROJECT_ID, expandToTreeContext, nodeKey } from './lib/tree.js'
 import { isHiddenState } from './lib/providers/state-map.js'
 import { buildPeriodicalNodes } from './lib/periodicals.js'
 import { renderPage, renderErrorPage, renderUpstreamAwareErrorPage, renderWorkspaceNotFoundPage, homeRowsContext, renderHomeRowsHtml } from './lib/render.js'
@@ -1882,8 +1882,8 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
   // Build in-progress tree with ancestor chains for context
   const inProgressTrees = buildInProgressForest(issues, projects);
 
-  // Build recent activity tree (completed in last 7 days)
-  const recentActivityTrees = buildRecentActivityForest(issues, projects, 1);
+  // Build the recent activity forest: one day of tracker activity (LIN-4113: the window is RECENT_WINDOW_DAYS, lib/tree.js)
+  const recentActivityTrees = buildRecentActivityForest(issues, projects, RECENT_WINDOW_DAYS);
 
   // Build tree structure for each project, separating complete from incomplete
   const trees = projects
@@ -3492,8 +3492,9 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       rowStates,
       halt,
       rulingCount: homeStates?.rulingCount ?? 0,
-      // LIN-4120: Home's rowData is In Progress and Recent only (its project sections are gone).
-      rowData: homeRowDataFor({ pageMode: 'home', urlKey: workspace.urlKey, homeView, recentActivityTrees, rowStates }),
+      // LIN-4113: the desk's recent rows and Up next come from the same view as the rowData below.
+      homeView,
+      rowData: homeRowDataFor({ pageMode: 'home', urlKey: workspace.urlKey, homeView, rowStates }),
       copyFirstCard: featureFlags.runControls !== true && req.session.copyFirstCardDismissed !== true,
       filledRung,
       // LIN-2550: label the selector off the filter the render APPLIED. An
@@ -3590,7 +3591,7 @@ app.get('/workspace/:urlKey/backlog', workspaceFromUrl, async (req, res) => {
       availableAssignees,
       rowStates,
       rulingCount: homeStates?.rulingCount ?? 0,
-      rowData: homeRowDataFor({ pageMode: 'backlog', urlKey: workspace.urlKey, homeView, recentActivityTrees, rowStates }),
+      rowData: homeRowDataFor({ pageMode: 'backlog', urlKey: workspace.urlKey, homeView, rowStates }),
       filledRung,
       // LIN-2550: the same applied-filter gate Home uses, so a stale ?assignee= reads `all`.
       selectedAssignee: appliedAssigneeName ? assigneeState.selectedAssignee : 'all',
@@ -3645,7 +3646,7 @@ app.get('/workspace/:urlKey/api/home-rows', workspaceFromUrl, async (req, res) =
   const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
   const projectId = typeof req.query.project === 'string' ? req.query.project : null;
   const parentId = typeof req.query.parent === 'string' ? req.query.parent : null;
-  if (kind !== 'search' && kind !== 'more-of-parent' && !projectId) return badRequest.json(res, 'home-rows needs a project');
+  if (kind !== 'search' && kind !== 'more-of-parent' && kind !== 'recent' && !projectId) return badRequest.json(res, 'home-rows needs a project');
   if (kind === 'more-of-parent' && !parentId) return badRequest.json(res, 'home-rows needs a parent');
 
   const { teamId } = await resolveTeamSelection(req, workspace);
@@ -3655,7 +3656,7 @@ app.get('/workspace/:urlKey/api/home-rows', workspaceFromUrl, async (req, res) =
     // The page's own inputs, so these rows and the page's rows come from one filtered view of the workspace. The shared
     // gather (lib/home-pipeline.js) builds no view: homeRowsFor builds its own view once, as it always has. The gather
     // is also the third caller of the fetch, so it holds a complete set through the same write gate as Home's page load.
-    const { fetched, trees, inProgressTrees, featureFlags, homeStates, topTaskId } = await gatherHomeInputs(homePipelineDeps(), {
+    const { fetched, trees, inProgressTrees, recentActivityTrees, orderedCards, featureFlags, homeStates, topTaskId } = await gatherHomeInputs(homePipelineDeps(), {
       workspace,
       teamId,
       accountId: req.session.accountId,
@@ -3664,7 +3665,7 @@ app.get('/workspace/:urlKey/api/home-rows', workspaceFromUrl, async (req, res) =
     });
     const { showSource } = fetched;
     const states = homeStates?.states ?? new Map();
-    const rows = homeRowsFor({ kind, projectId, parentId, q, offset, trees, inProgressTrees, states, topTaskId });
+    const rows = homeRowsFor({ kind, projectId, parentId, q, offset, trees, inProgressTrees, recentActivityTrees, orderedCards, states, topTaskId });
     const urlKey = workspace.urlKey;
     const ctx = homeRowsContext({ workspace, urlKey, featureFlags, rowStates: states, showSource });
     const html = renderHomeRowsHtml(rows.nodes, { section: rows.section, parentId: rows.parentId, ctx });

@@ -45,10 +45,11 @@ The papers and essays behind Harbour are published unauthenticated at `/library`
 
 ### Landmarks
 - `main` - main content area
-- `[role="region"][aria-label="In Progress Tasks"]` - in-progress section (rows ranked: needs you, next step, running, the rest; each row's state words are `[data-testid="issue-row-state"]` with `data-tone` = needs-you, failed, running, queued, ready or quiet, LIN-3833, LIN-4009). `[data-testid="in-progress-count"]` is the count line in the page header under the workspace title (LIN-4009)
+- `[data-testid="running-section"][role="region"][aria-label="Running and recently moved"]` - Home's first desk section (LIN-4113), one section for what runs and what just moved. Its header `[data-testid="running-header"]` ("▼ Running and recently moved") collapses the body `.running-body`; the state is saved as `runningCollapsed`. The body has two blocks. The Running view (`[data-testid="running-items"]`) ranks its rows: needs you, next step, running, the rest; each row's state words are `[data-testid="issue-row-state"]` with `data-tone` = needs-you, failed, running, queued, ready or quiet (LIN-3833, LIN-4009). A running or queued Todo task is here too, and a failed task too. The recent block (`[data-testid="running-recent"]`) is labelled "In the last day" (`[data-testid="running-recent-label"]`) and shows the newest 10 recent rows that are not already on Home; the rest sit behind `[data-testid="home-fold-recent"]` ("show N more ▶"), paged 50 at a time. `[data-testid="in-progress-count"]` is the count line in the page header under the workspace title (LIN-4009)
+- `[data-testid="home-up-next-section"][role="region"][aria-label="Up next"]` - Home's second desk section (LIN-4113): at most 5 unstarted tasks across projects, in the front-card order, each with its project badge. Rows are `[data-section="home-up-next"]` and open to the run control like any row (their details wrapper is always present). Header `[data-testid="up-next-header"]` ("▼ Up next") collapses `.up-next-body`, saved as `upNextCollapsed`. A task appears once across Running, the recent rows and Up next
 - `[role="region"][aria-label="Projects"]` - projects section (on the backlog page only; Home draws no project sections, LIN-4120)
 - `[data-testid="home-backlog-link"]` - Home's one link to the backlog page, "Backlog ›" (LIN-4120), in the place the Projects region held. It carries Home's `?assignee=` filter. The seed-only hint's `[data-testid="home-onboarding-backlog-link"]` ("Add your own task") leads there too
-- Backlog page `/workspace/{urlKey}/backlog` (LIN-4119) - the project sections alone, titled "{workspace} - Backlog". No In Progress or Recent region, no view-bar tab marked current. Linked from Home by `home-backlog-link` (LIN-4119, LIN-4120). The team, assignee and search controls work as on Home. Its rowData is the project trees; Home's is In Progress and Recent only.
+- Backlog page `/workspace/{urlKey}/backlog` (LIN-4119) - the project sections alone, titled "{workspace} - Backlog". No Running or Up next region, no view-bar tab marked current. Linked from Home by `home-backlog-link` (LIN-4119, LIN-4120). The team, assignee and search controls work as on Home. Its rowData is the project trees; Home's is the Running view, the recent rows it draws and Up next.
 
 ### Node Container Structure
 Issues are wrapped in nested `.node` containers:
@@ -67,7 +68,7 @@ Issues are wrapped in nested `.node` containers:
       [data-testid="opened-task-progress-key"] - "Let your agent post progress to this task" (copy-first; the account's task-key default)
       [data-testid="home-copy-first-card"] - the first-visit card above Home's list (no runner, not yet dismissed); `home-copy-first-dismiss` ("Got it", the shared button) dismisses it for good.
       [data-testid="home-halt-banner"] - above Home's onboarding hint while the workspace is paused or stopped (`data-halt-banner-mode="pause|stop"`, LIN-4115): "Runs are paused/stopped · cleared on Dispatch ›"; `home-halt-dispatch-link` (the Dispatch link) is for the owner only, a member reads the same sentence as text. The run buttons stay.
-- `[data-home-fetch="{backlog|up-next|more-of-parent}"]` - a Home fold (`[data-testid="home-fold-{kind}"]`, a button): its rows come from `GET /workspace/{urlKey}/api/home-rows?kind=…` and go where the fold sits. On `/backlog` (LIN-4120: Home draws no project folds), a project's Backlog and its Up next overflow sit under the project; a started parent's "N more" sits under its children on Home. Done tasks are never returned.
+- `[data-home-fetch="{backlog|up-next|more-of-parent|recent}"]` - a Home fold (`[data-testid="home-fold-{kind}"]`, a button): its rows come from `GET /workspace/{urlKey}/api/home-rows?kind=…` and go where the fold sits. `recent` (LIN-4113) is Home's "show N more ▶" under the recent block; its rows are the recent rows past the first 10, and it needs no project. On `/backlog` (LIN-4120: Home draws no project folds), a project's Backlog and its Up next overflow sit under the project; a started parent's "N more" sits under its children on Home. Done tasks are never returned, except by `recent`, whose rows are the last day's activity and include tasks completed today.
 - `[data-lazy-results]` - the search rows the server found (`[data-testid="home-search-results"]`), each under its ancestors; the page's own matches stay where they are.
     [data-testid="opened-task-folds"] - the one row of folds (LIN-4010): "Sessions (n) ▶" (run controls only; lazy, `sessions-toggle`; the count from the state read), then Description and Comments. Each body opens under the row.
     .detail-toggle[data-toggle="description"] - "Description ▶" fold: description and metadata, with Edit (`issue-description-toggle`, `issue-edit-link`)
@@ -93,10 +94,10 @@ Toggle behavior:
 - Both sections start collapsed (▶ arrow)
 - Click toggle to expand (▼ arrow) and show content
 - Toggle state is per-issue and does not persist across page loads
-- Same task in different sections (In Progress vs Project) has independent toggles
+- Same task in different sections (Running vs Project) has independent toggles
 
 ### Task Selectors
-The In Progress section (Home) and the Projects sections (`/backlog`) use the same nested structure:
+The Running section (Home) and the Projects sections (`/backlog`) use the same nested structure:
 - `.node[data-id="{id}"]` - node container wrapping line, details, and children
 - `.node > .line` - task row element within a node
 - `.node > .details` - details panel (sibling of .line within same node)
@@ -109,11 +110,11 @@ The In Progress section (Home) and the Projects sections (`/backlog`) use the sa
 - `[data-testid="project"][data-project-name="{name}"]` - project card by name (`[data-testid="project-header"]` on its header)
 - `[data-identifier="{LIN-123}"]` - task by Linear identifier (on .line element)
 - `[data-status="todo|in-progress|done"]` - filter by status
-- `[data-section="in-progress|project"]` - scope to section (expand state is independent per section)
+- `[data-section="in-progress|recent-activity|home-up-next|project"]` - scope to section (expand state is independent per section; `recent-activity` is Home's recent block, `home-up-next` its Up next rows)
 - `[data-parent="{id}"]` - parent ID (on .line element)
 - `[data-depth="{n}"]` - nesting level (0 = top-level, on .line element)
 - `.expandable` - tasks that can be expanded; keyboard-operable controls (role=button, tabindex=0, Enter/Space to toggle, aria-expanded reflects state)
-- `.in-progress-project` - project name badge shown in brackets for In Progress items
+- `.in-progress-project` - project name badge shown after the title of Running, recent and Up next rows
 
 ### Project control line and header Add task (LIN-4119)
 - `[data-testid="project"]` > `[data-testid="project-header"]` > `.project-name` (the arrow and the name, one element) and, beside it, `[data-testid="create-task"]` "+ Add task" (the inline create page link; an external provider's link is `[data-action="create-task"]`). One Add task per real project; a synthetic project (Periodicals, no project) has none.
@@ -200,7 +201,7 @@ One workspace's counts, last 7 and 30 UTC days, plus 30-day trend charts as rate
 - `.detail-toggle[data-toggle="context"]` - Context toggle (nested in Details, lazy relationship diagram: blockers/blocked/parent/children/related). Each task node is `.context-node` with `data-context-nav="LIN-123"`.
 - `.detail-toggle[data-toggle="sessions"]` - Dispatched Sessions toggle (nested in Details, run controls only)
 - `.detail-content[data-content="prompts"]` - Prompts section content (hidden by default)
-- `.in-progress-header` - collapsible section header
+- `.running-header`, `.up-next-header` - Home's collapsible section headers (LIN-4113); each one's body is the sibling `.running-body` / `.up-next-body`
 
 ## Workflow Labels
 
@@ -821,7 +822,7 @@ main.lc-page[data-url-key]                    - page container
 
 ## Common Workflows
 
-1. **Find in-progress tasks**: Look in "In Progress" section at top (displays as tree with subtasks)
+1. **Find in-progress tasks**: Look in the "Running and recently moved" section at top (displays as tree with subtasks). "Up next" below it lists what to start next
 2. **Drill into project**: Click project header to expand, click task to see details
 3. **Expand subtasks**: Click parent task or ▶ arrow to show child tasks (works in both sections)
 4. **Filter by team**: Use team selector in nav bar

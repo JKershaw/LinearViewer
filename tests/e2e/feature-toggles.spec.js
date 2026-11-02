@@ -206,8 +206,8 @@ test.describe('Feature Toggle Settings', () => {
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
-    await page.locator('.in-progress-items .line.expandable').first().click();
-    const component = page.locator('.in-progress-items .prompt-section').first();
+    await page.locator('.running-items .line.expandable').first().click();
+    const component = page.locator('.running-items .prompt-section').first();
     await expect(component).toBeVisible();
     // LIN-3833: a viewer with no runner gets the copy-first step; its "✦ Write the prompt" is always there.
     await expect(component.locator('[data-testid="opened-task-write"]').or(component.locator('[data-testid="opened-task-go"]'))).toBeVisible();
@@ -217,9 +217,9 @@ test.describe('Feature Toggle Settings', () => {
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
-    await page.locator('.in-progress-items .line.expandable').first().click();
+    await page.locator('.running-items .line.expandable').first().click();
     // LIN-3833: the ✦ is "Write the prompt" (copy-first) or the run block's "write prompt" (a viewer who can run).
-    const go = page.locator('.in-progress-items .prompt-section [data-testid="opened-task-write"], .in-progress-items .prompt-section [data-testid="run-ask-harbour"]').first();
+    const go = page.locator('.running-items .prompt-section [data-testid="opened-task-write"], .running-items .prompt-section [data-testid="run-ask-harbour"]').first();
     await expect(go).toBeVisible();
   });
 

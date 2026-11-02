@@ -197,12 +197,12 @@ test.describe('Free Tier UI', () => {
   });
 
   test('shows the ✦ write enabled for free tier users', async ({ page }) => {
-    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
+    const taskLine = page.locator('.running-items .line:has-text("Blocked on external API")');
     await taskLine.click();
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    await expandPromptsSection(page, '.running-items', BLOCKED_ISSUE_ID);
 
     // Free tier acts like having a key: the ✦ next step is runnable.
-    const next = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] [data-testid="opened-task-write"]`);
+    const next = page.locator(`.running-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] [data-testid="opened-task-write"]`);
     await expect(next).toBeVisible();
     await expect(next).toBeEnabled();
   });
@@ -225,11 +225,11 @@ test.describe('Free Tier UI', () => {
     await page.waitForLoadState('networkidle');
     const { limit, remaining } = await readQuota(page, localWorkerUrlKey);
 
-    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
+    const taskLine = page.locator('.running-items .line:has-text("Blocked on external API")');
     await taskLine.click();
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    await expandPromptsSection(page, '.running-items', BLOCKED_ISSUE_ID);
 
-    const component = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .prompt-section`);
+    const component = page.locator(`.running-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .prompt-section`);
     await expect(component.locator('[data-testid="opened-task-run-quota"]'))
       .toHaveText(`${remaining} of ${limit} runs left today`);
 
@@ -257,11 +257,11 @@ test.describe('Free Tier UI', () => {
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
-    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
+    const taskLine = page.locator('.running-items .line:has-text("Blocked on external API")');
     await taskLine.click();
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    await expandPromptsSection(page, '.running-items', BLOCKED_ISSUE_ID);
 
-    const component = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .prompt-section`);
+    const component = page.locator(`.running-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .prompt-section`);
     await expect(component.locator('[data-testid="opened-task-run-quota"]'))
       .toHaveText(`0 of ${limit} runs left today`);
 

@@ -582,7 +582,7 @@ describe('in-progress subtask project tag (LIN-903)', () => {
 // `/llms.txt` (line 32) and consumers depend on — is preserved byte-for-byte.
 //
 // DELIBERATELY NOT ADOPTED: the in-progress and recent-activity regions are
-// bespoke-for-reason — their `.in-progress-header` / `.recent-activity-header`
+// bespoke-for-reason — their `.running-header` / `.up-next-header`
 // are click-to-collapse controls (app.js), not section headings, and their
 // `.tree` bodies are the collapse targets. `renderSection` models a heading +
 // body, not a collapse control, so a swap would break the collapse wiring and
@@ -609,7 +609,7 @@ describe('projects-page section-primitive adoption (LIN-979)', () => {
       'the old hand-rolled bare <section> is gone');
   });
 
-  test('in-progress and recent-activity regions are left bespoke (collapse controls, not renderSection)', () => {
+  test('the Running and recently moved region is left bespoke (collapse control, not renderSection)', () => {
     const trees = buildInProgressForest(
       [mk({ id: 'p', title: 'P', project: { id: 'proj-1' }, state: { name: 'In Progress', type: 'started' } })],
       [{ id: 'proj-1', name: 'Test Project', sortOrder: 1 }]
@@ -619,16 +619,19 @@ describe('projects-page section-primitive adoption (LIN-979)', () => {
     ] }];
     const result = renderPage([projectTree], trees, recent, 'Test', { isLanding: true });
 
-    // Deliberately untouched: still hand-rolled <div> regions with collapse
-    // controls + .tree bodies — NOT wrapped in .section.
-    assert.ok(result.includes('<div class="in-progress-section" role="region" aria-label="In Progress Tasks">'),
-      'in-progress region kept as a bespoke collapsible <div>');
-    assert.ok(result.includes('<div class="in-progress-header">'),
-      'in-progress collapse control (header) intact');
-    assert.ok(result.includes('<div class="recent-activity-section" role="region" aria-label="Recent activity">'),
-      'recent-activity region kept as a bespoke collapsible <div>');
-    assert.ok(!/<section class="section"[^>]*aria-label="In Progress Tasks"/.test(result),
-      'in-progress region was NOT force-fitted onto renderSection');
+    // Deliberately untouched: still a hand-rolled <div> region with a collapse
+    // control + .tree body — NOT wrapped in .section. LIN-4113: the recent rows are
+    // a block inside this region (no separate section any more).
+    assert.ok(result.includes('<div class="running-section" role="region" aria-label="Running and recently moved" data-testid="running-section">'),
+      'running region kept as a bespoke collapsible <div>');
+    assert.ok(result.includes('<div class="running-header" data-testid="running-header">'),
+      'running collapse control (header) intact');
+    assert.ok(result.includes('<div class="running-recent" data-testid="running-recent">'),
+      'recent block sits inside the running region');
+    assert.ok(!result.includes('recent-activity-section'),
+      'the old recent-activity section is gone');
+    assert.ok(!/<section class="section"[^>]*aria-label="Running and recently moved"/.test(result),
+      'running region was NOT force-fitted onto renderSection');
   });
 });
 
@@ -943,11 +946,12 @@ describe('Recent activity section', () => {
 
   const forest = (roots) => [{ projectId: null, projectName: null, roots }];
 
-  test('uses the "Recent activity" label, not "Recently Completed"', () => {
+  test('the recent block is labelled "In the last day", not "Recent activity" or "Recently Completed"', () => {
     const trees = forest([activityNode('a', 'completed', new Date(Date.now() - 3600 * 1000).toISOString())]);
     const html = renderPage([], [], trees, 'Test', { isLanding: true });
-    assert.ok(html.includes('▶ Recent activity'), 'header renamed');
-    assert.ok(html.includes('aria-label="Recent activity"'), 'aria-label renamed');
+    assert.ok(html.includes('data-testid="running-recent-label">In the last day</div>'), 'recent block label renamed (LIN-4113)');
+    assert.ok(html.includes('aria-label="Running and recently moved"'), 'the region carries the desk name');
+    assert.ok(!html.includes('Recent activity'), 'old "Recent activity" label gone');
     assert.ok(!html.includes('Recently Completed'), 'old label gone');
   });
 

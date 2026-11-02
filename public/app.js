@@ -558,10 +558,22 @@ function getDefaultState() {
     expanded: [],
     hideCompleted: [],
     collapsedProjects: [],
-    inProgressCollapsed: false,
-    recentActivityCollapsed: true  // Start collapsed by default
+    // LIN-4113: Home's two desk sections, both open by default. The keys the retired sections stored are ignored,
+    // never read or reused.
+    runningCollapsed: false,
+    upNextCollapsed: false
   }
 }
+
+/**
+ * LIN-4113: Home's desk sections, one entry each. The header and body are siblings inside the section, so a section's
+ * own header finds its body. One keyed handler serves both (click, startup and reset), so the two cannot drift apart.
+ */
+const DESK_SECTIONS = [
+  { key: 'runningCollapsed', header: '.running-header', body: '.running-body' },
+  { key: 'upNextCollapsed', header: '.up-next-header', body: '.up-next-body' },
+]
+const deskSectionOf = header => DESK_SECTIONS.find(section => header.matches(section.header)) ?? null
 
 // DOM helpers
 const show = el => el?.classList.remove('hidden')
@@ -644,13 +656,12 @@ function resetDOM() {
     toggle.textContent = `show ${toggle.dataset.count} completed`
   })
 
-  // Expand in-progress section
-  const inProgressHeader = document.querySelector('.in-progress-header')
-  const inProgressItems = document.querySelector('.in-progress-items')
-  if (inProgressHeader && inProgressHeader.textContent.includes('▶')) {
-    setArrow(inProgressHeader, true)
+  // Expand the desk sections (LIN-4113: Running and recently moved, Up next)
+  for (const section of DESK_SECTIONS) {
+    const header = document.querySelector(section.header)
+    if (header && header.textContent.includes('▶')) setArrow(header, true)
+    show(header?.parentElement?.querySelector(section.body))
   }
-  show(inProgressItems)
 }
 
 function toggleInArray(arr, id) {
@@ -708,28 +719,14 @@ function applyState(state) {
   state.collapsedProjects = state.collapsedProjects || []
   state.expanded = state.expanded || []
   state.hideCompleted = state.hideCompleted || []
-  state.inProgressCollapsed = state.inProgressCollapsed || false
-  state.recentActivityCollapsed = state.recentActivityCollapsed || false
-
-  // Apply in-progress section collapsed state
-  if (state.inProgressCollapsed) {
-    const header = document.querySelector('.in-progress-header')
-    const items = document.querySelector('.in-progress-items')
-    setArrow(header, false)
-    hide(items)
-  }
-
-  // Apply recent activity section collapsed state (always set explicitly since HTML starts collapsed)
-  const recentActivityHeader = document.querySelector('.recent-activity-header')
-  const recentActivityItems = document.querySelector('.recent-activity-items')
-  if (recentActivityHeader && recentActivityItems) {
-    if (state.recentActivityCollapsed) {
-      setArrow(recentActivityHeader, false)
-      hide(recentActivityItems)
-    } else {
-      setArrow(recentActivityHeader, true)
-      show(recentActivityItems)
-    }
+  // LIN-4113: each desk section's collapsed state, set explicitly so a reload paints what the person left.
+  for (const section of DESK_SECTIONS) {
+    state[section.key] = state[section.key] || false
+    const header = document.querySelector(section.header)
+    const body = header?.parentElement?.querySelector(section.body)
+    if (!header || !body) continue
+    setArrow(header, !state[section.key])
+    setHidden(body, state[section.key])
   }
 
   // Expand nodes (shows both children AND details)
@@ -1086,25 +1083,14 @@ function init() {
       return
     }
 
-    // 8. In-progress header click
-    const inProgressHeader = e.target.closest('.in-progress-header')
-    if (inProgressHeader) {
-      state.inProgressCollapsed = !state.inProgressCollapsed
+    // 8. Home's desk section header click (LIN-4113: Running and recently moved, Up next)
+    const deskHeader = e.target.closest('.running-header, .up-next-header')
+    const deskSection = deskHeader ? deskSectionOf(deskHeader) : null
+    if (deskSection) {
+      state[deskSection.key] = !state[deskSection.key]
       persistState(state)
-      const items = document.querySelector('.in-progress-items')
-      setHidden(items, state.inProgressCollapsed)
-      setArrow(inProgressHeader, !state.inProgressCollapsed)
-      return
-    }
-
-    // 9. Recent activity header click
-    const recentActivityHeader = e.target.closest('.recent-activity-header')
-    if (recentActivityHeader) {
-      state.recentActivityCollapsed = !state.recentActivityCollapsed
-      persistState(state)
-      const items = document.querySelector('.recent-activity-items')
-      setHidden(items, state.recentActivityCollapsed)
-      setArrow(recentActivityHeader, !state.recentActivityCollapsed)
+      setHidden(deskHeader.parentElement.querySelector(deskSection.body), state[deskSection.key])
+      setArrow(deskHeader, !state[deskSection.key])
       return
     }
   })
@@ -1853,8 +1839,7 @@ function initSearch() {
     // applyState/resetDOM handle .node visibility by depth but don't touch projects/sections
     // (which are normally never hidden), so we must clean those up explicitly.
     pageOnly('.project.hidden').forEach(p => p.classList.remove('hidden'))
-    document.querySelectorAll('.in-progress-section.hidden').forEach(s => s.classList.remove('hidden'))
-    document.querySelectorAll('.recent-activity-section.hidden').forEach(s => s.classList.remove('hidden'))
+    document.querySelectorAll('.running-section.hidden, .up-next-section.hidden').forEach(s => s.classList.remove('hidden'))
     // Also ensure all .node elements are visible before resetDOM re-applies depth-based visibility,
     // in case search left nodes hidden that resetDOM wouldn't otherwise reach (e.g. in completed sections)
     pageOnly('.node.hidden').forEach(n => n.classList.remove('hidden'))
@@ -1917,24 +1902,15 @@ function initSearch() {
       project.classList.toggle('hidden', !hasMatch)
     })
 
-    // Show/hide in-progress section
-    const ipSection = document.querySelector('.in-progress-section')
-    if (ipSection) {
-      const ipItems = ipSection.querySelector('.in-progress-items')
-      const hasMatch = ipItems?.querySelector('.node:not(.hidden)')
-      ipSection.classList.toggle('hidden', !hasMatch)
-      // Ensure the items container is visible if section has matches
-      if (hasMatch && ipItems) ipItems.classList.remove('hidden')
-    }
-
-    // Show/hide recent activity section
-    const raSection = document.querySelector('.recent-activity-section')
-    if (raSection) {
-      const raItems = raSection.querySelector('.recent-activity-items')
-      const hasMatch = raItems?.querySelector('.node:not(.hidden)')
-      raSection.classList.toggle('hidden', !hasMatch)
-      if (hasMatch && raItems) raItems.classList.remove('hidden')
-    }
+    // Show/hide Home's desk sections (LIN-4113): Running and recently moved, and Up next. A section shows when one of
+    // its rows matches, and its body opens with it.
+    pageOnly('.running-section, .up-next-section').forEach(section => {
+      const sectionBody = section.querySelector('.running-body, .up-next-body')
+      if (!sectionBody) return
+      const hasMatch = sectionBody.querySelector('.node:not(.hidden)')
+      section.classList.toggle('hidden', !hasMatch)
+      if (hasMatch) sectionBody.classList.remove('hidden')
+    })
 
     // Also check completed sections for matches
     pageOnly('[data-completed-for]').forEach(completedSection => {

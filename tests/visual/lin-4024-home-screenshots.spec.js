@@ -93,8 +93,8 @@ for (const user of USERS) {
         // The owner's badge fills from a 5s poll; wait for it so the header reads what the count line says.
         if (user.runnerKey) await expect(page.locator('.rulings-badge .rulings-count')).toHaveText('1', { timeout: 15000 });
         // A subtask's row shows once its parent is open, so the charter is opened first when the row is folded under it.
-        const row = page.locator(`.in-progress-section .line[data-identifier="${user.open}"]`).first();
-        if (!(await row.isVisible())) await page.locator('.in-progress-section .line[data-identifier="LOCAL-1"]').first().click();
+        const row = page.locator(`.running-section .line[data-identifier="${user.open}"]`).first();
+        if (!(await row.isVisible())) await page.locator('.running-section .line[data-identifier="LOCAL-1"]').first().click();
         await row.click();
         await expect(page.locator('[data-testid="opened-task"]').first()).toBeVisible();
         await page.waitForLoadState('networkidle');
