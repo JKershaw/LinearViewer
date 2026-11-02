@@ -32,17 +32,19 @@ test.describe('Authenticated Dashboard', () => {
 
     // In Progress: local-issue-1 (started) and local-issue-4 (started) = 2 lines. LIN-4024: the child, local-issue-2,
     // is an unstarted task, so it folds under its started parent ("show 1 more") instead of listing here.
-    await expect(page.locator('.in-progress-items .line')).toHaveCount(2);
+    // LIN-4117: the child is the top task, so it is In Progress under its parent (not folded). It is hidden until the
+    // parent opens, and the parent has no fold left: the top task is its only open child.
+    await expect(page.locator('.in-progress-items .line')).toHaveCount(3);
 
     // Top-level started items are visible
     await expect(page.locator('.in-progress-items .line:has-text("Local parent task")')).toBeVisible();
     await expect(page.locator('.in-progress-items .line:has-text("Second project task")')).toBeVisible();
 
-    // The child is folded under its parent, and not on the page until the fold opens.
     const childTask = page.locator('.in-progress-items .line:has-text("Local child task")');
-    await expect(childTask).toHaveCount(0);
-    await expect(page.locator('.in-progress-items [data-home-fetch="more-of-parent"]')).toHaveCount(1);
-    await expect(page.locator(`.in-progress-items .node[data-id="${localSeedId(localWorkerUrlKey, 'local-issue-2')}"]`)).toHaveCount(0);
+    await expect(childTask).toHaveCount(1);
+    await expect(childTask).toBeHidden();
+    await expect(page.locator('.in-progress-items [data-home-fetch="more-of-parent"]')).toHaveCount(0);
+    await expect(page.locator(`.in-progress-items .node[data-id="${localSeedId(localWorkerUrlKey, 'local-issue-2')}"]`)).toHaveCount(1);
   });
 
   test('displays correct state indicators', async ({ page }) => {
