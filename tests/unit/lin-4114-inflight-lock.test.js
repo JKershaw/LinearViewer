@@ -75,7 +75,7 @@ async function flush() { for (let i = 0; i < 20; i++) await new Promise((r) => s
  * The comment's outcome is the test's choice (`commentResult`), so the same harness proves success and failure.
  */
 function makeSandbox(cards) {
-  const calls = { comments: 0, other: 0 };
+  const calls = { comments: 0, other: 0, runs: [], hydrates: 0 };
   let release;
   const gate = new Promise((resolve) => { release = resolve; });
   const sandbox = {
@@ -109,8 +109,9 @@ function makeSandbox(cards) {
   sandbox.commentResult = { ok: true, status: 200, data: { success: true, comment: { id: 'c-1' } } };
   vm.createContext(sandbox);
   vm.runInContext(withHarnessModels(COMMON_JS_SRC), sandbox, { filename: 'common.js' });
-  sandbox.window.api = async () => ({});
-  sandbox.window.dispatchPrompt = async () => ({ id: 'run-1' });
+  // The hydrate read (press-time anchor check) answers like a live, open task; a fresh run is recorded, not started.
+  sandbox.window.api = async () => { calls.hydrates++; return { hydrated: true, state: { type: 'started' } }; };
+  sandbox.window.dispatchPrompt = async (req) => { calls.runs.push(req); return { id: 'run-1' }; };
   vm.runInContext(QUESTION_CARDS_JS_SRC, sandbox, { filename: 'question-cards.js' });
   return { sandbox, calls, release };
 }
@@ -175,4 +176,34 @@ test('after failure: the controls come back, so the person can answer again', as
   press(f.optionBtns[1]);
   await flush();
   assert.equal(calls.comments, 2, 'the retry is a second comment, because the first one failed');
+});
+
+/**
+ * LIN-4114 (close-out, review ledger "the `gone`/`dispatch` delivery through the Home card"): a ruling whose loop is gone
+ * (disposition `gone`, effect `dispatch`) is answered with one comment, then ONE fresh run, and the card announces itself
+ * answered once, under the ruling's own key. The card gets no resume follow-up (nothing to resume).
+ */
+test('gone / dispatch: pressing the recommended option writes one comment, starts one fresh run, and announces the card answered once', async () => {
+  const f = makeLiveCard();
+  Object.assign(f.card.dataset, { effect: 'dispatch', disposition: 'gone' });
+  const events = [];
+  f.card.dispatchEvent = (e) => { events.push(e); return true; };
+  const { sandbox, calls, release } = makeSandbox([f.card]);
+  sandbox.module.exports.initQuestionCards();
+
+  press(f.optionBtns[0]); // the recommended (primary) option
+  await flush();
+  release();
+  await flush();
+
+  assert.equal(calls.comments, 1, 'one comment write');
+  assert.equal(calls.runs.length, 1, 'one fresh run through window.dispatchPrompt');
+  assert.equal(calls.other, 0, 'no resume follow-up request: a gone loop has nothing to resume');
+  assert.equal(calls.runs[0].issue.identifier, 'LOCAL-S', 'the run is scoped to the ruling\'s anchor task');
+  assert.match(calls.runs[0].prompt, /Chosen answer: Split the change/, 'the run brief carries the chosen answer');
+  assert.equal(f.feedback.textContent, 'started a new run', 'the card reports a run, not a queued reply');
+  assert.equal(events.length, 1, 'harbour:question-answered is dispatched exactly once');
+  assert.equal(events[0].type, 'harbour:question-answered');
+  assert.equal(events[0].detail.key, sandbox.module.exports.rulingKeyOf(f.card), 'under the ruling\'s own key');
+  assert.equal(events[0].detail.key, 'loop:lp-1|d-opts');
 });
