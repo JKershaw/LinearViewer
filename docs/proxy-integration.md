@@ -1241,10 +1241,11 @@ matching zero rows and returning an authoritative-looking `$0.00`.
   history are **retained for the life of the project**, so older rows still exist;
   this field reports the fixed window the figures are drawn from, not a pruning
   boundary. `appCalls`/`workerSessions` are scoped to that window.
-- **Known limitation**: a lineage spanning two issues (a follow-up filed under a
-  different issue than its parent — already an accepted, documented behavior for the
-  `/dispatch` list route's status/completedAt join) is reported under **both** issues'
-  `/cost` endpoints, not split between them.
+- **One issue per lineage**: a lineage counts under ONE issue, the issue of its
+  earliest non-wake member that carries one. A follow-up filed under another issue
+  counts under its parent's issue; a wake's work counts under its lineage's issue,
+  never the child's; a lineage with no issue counts under no issue (its spend shows
+  only in workspace totals). Each model call is counted once across all issues.
 
 #### Get North Star
 

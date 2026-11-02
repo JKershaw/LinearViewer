@@ -82,6 +82,15 @@ describe('GET /api/proxy/instructions — /cost totalUsd gate prose stays true t
     );
   });
 
+  test('the served catalog states the one-issue-per-lineage rule, and no longer the stale "BOTH issues" limitation (LIN-4147)', async () => {
+    const { text } = await fetchInstructions();
+
+    assert.ok(text.includes('A lineage counts under ONE issue'),
+      'the /cost catalog names the one-issue rule that lib/lineage-membership.js decides');
+    assert.ok(!text.includes('BOTH issues'),
+      'the "reported under BOTH issues" known limitation is gone: a lineage no longer counts under two issues');
+  });
+
   test('the gate in lib/task-cost.js still has exactly the five documented conditions', () => {
     // The other half of the pin: the prose above is only "true" relative to
     // this expression. Read the source rather than re-deriving the gate, so a
