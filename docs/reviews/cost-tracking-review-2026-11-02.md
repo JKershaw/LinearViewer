@@ -24,7 +24,7 @@ This was written from the code and the records, not from earlier tickets. Sectio
    - **Haiku 5.5 sessions (12 of the 77, $57).** A cumulative Haiku 5.5 session always prices to null. That has been true since implementation moved to Haiku on 24 Oct 20:21Z.
    - **Subagent transcripts ($16.5).** They are never read.
 3. **Harbour's own calls are the healthy path.**
-   - Every call that completes is logged with OpenRouter's billed cost: one transport, five call points, all recorded.
+   - Every call that completes is logged with OpenRouter's billed cost: one endpoint (`lib/openrouter.js:27`), five call points, each followed by `recordLlmCall`.
    - Its gaps are attribution and failures, not missing rows: which key paid is not recorded, calls that fail or are aborted part-way leave no row, and issue-less calls are invisible per issue.
 4. **The figures disagree because cost is summed in three lineage engines with different rules,** plus four ways of treating an unpriced call. Two of these are visible in stored records:
    - The per-issue cost route counts a waking parent's whole lineage under every child issue. One autopilot lineage was counted under 7 issues.
@@ -47,7 +47,7 @@ This was written from the code and the records, not from earlier tickets. Sectio
 | P4 | **opencode session** | OpenCode's `GET /session/:id` running total, read before and after the run (`SD:opencode-runner.js:614-648`, `:1322-1341`) | A **delta** per run, with native `costUsd` and `lane:'openrouter'` hard-coded (`SD:opencode-runner.js:586-603`). No 1h cache split, no reasoning tokens. The error and hold paths post nothing (`:1741-1800`, `:803-1060`) | Native cost wins (`lib/session-telemetry.js:471-473`) | Should be **summed** per row. Engine R11 sums; engine R1 keeps only the last entry (§1.4) | As P1 |
 | P5 | **runner-kit** (Harbour's own `lib/runner-kit/runner.mjs`) | Reads the subagent's own `agent-<id>.jsonl`. The model is the one with the **most output tokens** (`lib/runner-kit/runner.mjs:578-613`) | Posted only when the orchestrating model runs `runner usage <agentId>`, as `docs/runner-prompt.md:180` tells it to (`runner.mjs:1189-1203`). The orchestrator's own tokens are never posted. A non-200 response throws, with no retry (`:944-948`) | As P1 (labelled `harness:'claude-code'`, `:60`) | As P1 | As P1 |
 | P6 | **`local` / Harbour OS spawn** | No producer. `lib/harbour-spawn.js:151-193` only passes a token | Not recorded | — | — | — |
-| P7 | **Harbour's own calls** (16 jobs, `lib/llm-jobs.js:64-79`) | OpenRouter only (`lib/openrouter.js:27`), with `usage:{include:true}` (`:1172`, `:1416`, `:1472`, `:1621`, `:2008`) | Five transport points, each followed by `recordLlmCall` (`:1289`, `:1430`, `:1526`, `:1633`, `:2024`) → `llm-call-log` (`lib/llm-call-log.js:55-89`, `server.js:689-693`). Kept for life (`lib/db-indexes.js:48-52`). No row for a non-OK status, an abort or a timeout (`openrouter.js:1177`, `:1323`, `:1537`, `:1653`). No row says which key paid | OpenRouter's billed `usage.cost` (`extractUsage`, `openrouter.js:504-518`). The rate card is never used for these calls | Per call, so no dedupe is needed. Unpriced calls are handled four ways (§1.4) | R2–R8 |
+| P7 | **Harbour's own calls** (16 jobs, `lib/llm-jobs.js:64-79`) | OpenRouter only (`lib/openrouter.js:27`), with `usage:{include:true}` (`:1172`, `:1416`, `:1472`, `:1621`, `:2008`) | One endpoint, five call points, each followed by `recordLlmCall` (`:1289`, `:1430`, `:1526`, `:1633`, `:2024`) → `llm-call-log` (`lib/llm-call-log.js:55-89`, `server.js:689-693`). Kept for life (`lib/db-indexes.js:48-52`). No row for a non-OK status, an abort or a timeout (`openrouter.js:1177`, `:1323`, `:1537`, `:1653`). No row says which key paid | OpenRouter's billed `usage.cost` (`extractUsage`, `openrouter.js:504-518`). The rate card is never used for these calls | Per call, so no dedupe is needed. Unpriced calls are handled four ways (§1.4) | R2–R8 |
 | P8 | **Paid scripts outside the product** (evals, spikes) | Direct `fetch` or `lib/` with no recorder (e.g. `scripts/eval-research-routing.mjs:566`, `scripts/eval/jev-routing-eval.mjs:78`) | Not recorded | — | — | — |
 
 ### 1.2 Pricing
@@ -252,11 +252,11 @@ L2 (Haiku) has no simple fix in today's design. A cumulative total cannot be spl
 
 ### 3.3 What can be deleted
 
-All verified by grep at `d35e8b6e`. Each item lists the only references.
+All verified by grep at `d35e8b6e`. Each item lists all of its references.
 
 | Delete | Evidence |
 |---|---|
-| `lib/plan-fee-config.js` and its test | referenced only by `tests/unit/plan-fee-config.test.js` and `scripts/code-shape/areas.json` |
+| `lib/plan-fee-config.js` and its test | no product import (only `tests/unit/plan-fee-config.test.js:4`); also named in `.env.example:127`, `docs/architecture/configuration.md:37`, `docs/architecture/auth.md:185`, `docs/architecture/source-map.md:255`, `docs/plan-allowance-design.md:18` and `scripts/code-shape/areas.json`, which a deletion must update |
 | `computeWeeklyBudgetGauge` and its constants and env vars (keep `windowedSpend`, which R14 uses) | its only use is `lib/kpi-stats.js:1142`; `toPublicKpis` never emits it; removed from the page by LIN-3703 (`a9f81290`) |
 | The unused parts of `computeTerminalMarkedTaskCost`'s output (cash/unknown lane, in-flight, overhead) | only `pricedTicketCount`, `pricedTicketCostUsd` and the cost shares reach the page (`lib/kpi-stats.js:1206-1210`, `:1304-1313`) |
 | The unused import at `routes/proxy.js:42` | `buildTaskCost` and `taskCostAnchorFor` appear once in that file, on the import line |
@@ -270,7 +270,7 @@ All verified by grep at `d35e8b6e`. Each item lists the only references.
 
 | Class | Bound | Members |
 |---|---|---|
-| Model-call paths | Producers: grep for `usage`/`input_tokens`/`costUsd` across both repos, plus every executor and target. Harbour's own calls: grep for model endpoints and SDKs (one endpoint, `lib/openrouter.js:27`), then every call of its five transports | P1–P8 (§1.1) |
+| Model-call paths | Producers: grep for `usage`/`input_tokens`/`costUsd` across both repos, plus every executor and target. Harbour's own calls: grep for model endpoints and SDKs (one endpoint, `lib/openrouter.js:27`), then every one of its five call points | P1–P8 (§1.1) |
 | Harbour call features | The `feature` values logged, checked against the job registry (`lib/llm-jobs.js:64-79`) and the live routing table (`routing.json`, 16 `harbour-call` jobs) | recommend, task-chat, flight-companion, scan, scan-retire, brief, recap, run-summary, session-summary, run-paragraph, ship-biscuit, roadmap, roadmap-orientation, roadmap-chat, feedback-title, observer-pass |
 | Usage producers in the runner | grep for `kind: 'usage'` | `SD:hook.js:359` (claude-code), `SD:opencode-runner.js:586` (opencode); plus `lib/runner-kit/runner.mjs` in Harbour |
 | Cost readers | grep for `costUsd`, `totalUsd`, `pricedUsd`, `parseUsage`, `computeUsageCostUsd`, `llm-call-log` and `spend` over `lib/`, `routes/`, `server.js`, `public/` and `scripts/`; every hit is classed | R1–R15 (§1.3), plus research scripts |

@@ -12,19 +12,16 @@
  "unpricedMsgs": 0,
  "byModel": {
   "claude-opus-5-5": {
-   "msgs": 1069,
-   "usd": 0
+   "msgs": 1069
   },
   "claude-haiku-5-5": {
-   "msgs": 2681,
-   "usd": 0
+   "msgs": 2681
   },
   "sub:claude-haiku-5-5": {
    "msgs": 29
   },
   "claude-sonnet-5-5": {
-   "msgs": 1821,
-   "usd": 0
+   "msgs": 1821
   },
   "sub:claude-opus-5-5": {
    "msgs": 393

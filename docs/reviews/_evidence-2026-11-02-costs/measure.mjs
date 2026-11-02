@@ -29,7 +29,7 @@ for (const d of fs.readdirSync(ROOT)) {
     const relay = computeUsageCostUsd(toU(sum(p.msgs), p.lastModel));
     if (relay === null) { out.relayNull++; if (/haiku/.test(p.lastModel || '')) out.relayNullHaiku++; } else out.relayUsd += relay;
     const tm = perMessageCost(p.msgs); out.truthMainUsd += tm.c; out.unpricedMsgs += tm.unpriced;
-    for (const m of p.msgs) { const k = m.model; out.byModel[k] ??= { msgs: 0, usd: 0 }; out.byModel[k].msgs++; }
+    for (const m of p.msgs) { const k = m.model; out.byModel[k] ??= { msgs: 0 }; out.byModel[k].msgs++; }
     const subDir = path.join(dir, f.replace(/\.jsonl$/, ''), 'subagents'); let subUsd = 0, nsub = 0;
     if (fs.existsSync(subDir)) for (const sf of fs.readdirSync(subDir)) { if (!sf.endsWith('.jsonl')) continue; nsub++; const sp = parse(path.join(subDir, sf)); const sc = perMessageCost(sp.msgs); subUsd += sc.c; out.unpricedMsgs += sc.unpriced; for (const m of sp.msgs) { out.byModel['sub:' + m.model] ??= { msgs: 0 }; out.byModel['sub:' + m.model].msgs++; } }
     out.subFiles += nsub; if (nsub) out.sessionsWithSub++; out.truthSubUsd += subUsd;
