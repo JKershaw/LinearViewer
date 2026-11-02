@@ -1118,7 +1118,8 @@ a.wordmark:hover {
 
 /* LIN-4113: the two desk section headers share one shape; each keeps its own tone. */
 .running-header,
-.up-next-header {
+.up-next-header,
+.waiting-header {
   font-weight: 600;
   cursor: pointer;
   padding: var(--space-2) 0;
@@ -1127,6 +1128,7 @@ a.wordmark:hover {
 
 .running-header { color: var(--amber-dim); }
 .up-next-header { color: var(--slate-dim); }
+.waiting-header { color: var(--amber-dim); }
 
 /* The recent block sits under the Running view, labelled by its window. Its rows are the same rows as Running's. */
 .running-recent {
@@ -5347,7 +5349,6 @@ a.context-node:hover { border-color: var(--text); background: var(--bg); }
 /* LIN-4114: Home's "Waiting on you" desk section. Its header and body open and close like the other desk sections; the
    card is the shared question card (lib/question-card.js); the task line sits above each card and links to the task page. */
 .waiting-section { margin: 0 0 1rem; }
-.waiting-header { font-family: var(--font-content); font-size: var(--font-size-sm); color: var(--text); padding: 0.25rem 0; cursor: pointer; }
 .waiting-header:focus { outline: 2px solid var(--brand); outline-offset: 2px; }
 .waiting-card { margin: 0.5rem 0; }
 .waiting-task-line { font-family: var(--font-content); font-size: var(--font-size-sm); color: var(--muted); margin-bottom: 0.25rem; }
