@@ -5,6 +5,7 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId, assigneeFilterLocalSeed } from '../fixtures/local-harness.js';
 import { SELECTORS } from '../helpers.js';
+import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 
 const OLD = '2020-01-01T00:00:00Z';
 const STATE_KEY = 'linear-projects-state';
@@ -130,6 +131,8 @@ test.describe('LIN-4119 W3 — the /backlog control line and header Add task (lo
     await expect(name).toHaveText(/^▶/);
     await page.reload();
     await page.waitForLoadState('networkidle');
+    // Review finding 2: the control line (folds and "N done") is hidden by applyState on reload, not just on click.
+    await expect(controlsOf(page, 'Folds A')).toBeHidden();
     await expect(project.locator('[data-testid="project-header"] [data-testid="create-task"]')).toHaveCount(1);
     await expect(project.locator('[data-testid="project-header"] [data-testid="create-task"]')).toBeVisible();
     await expect(name).toHaveText(/^▶/);
@@ -193,12 +196,18 @@ test.describe('LIN-4119 W4 — the /backlog page, its access and its guards', ()
     await expect(page.locator(`${SELECTORS.project('Run project')} [data-testid="opened-task-go"]`).first()).toBeVisible();
   });
 
-  test('a member without a runner (the seeded session is the owner, so no run control) sees the copy-first view', async ({ page, seedLocal, localWorkerUrlKey }) => {
+  test('a non-owner member without a runner sees the copy-first view on /backlog', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(openableSeed(localWorkerUrlKey), { openRouterConnected: true, runnerKey: false });
-    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
-    await page.locator(`${SELECTORS.project('Run project')} .line[data-section="project"]`).first().click();
-    await expect(page.locator(`${SELECTORS.project('Run project')} [data-testid="opened-task-runner-link"]`).first()).toBeVisible();
-    await expect(page.locator(`${SELECTORS.project('Run project')} [data-testid="opened-task-go"]`)).toHaveCount(0);
+    // Review finding 3: a real non-owner session ('foreign' is the fixture's non-owner state), not the seeded owner.
+    await seedWorkspaceOwnership(page, localWorkerUrlKey, 'foreign');
+    try {
+      await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
+      await page.locator(`${SELECTORS.project('Run project')} .line[data-section="project"]`).first().click();
+      await expect(page.locator(`${SELECTORS.project('Run project')} [data-testid="opened-task-runner-link"]`).first()).toBeVisible();
+      await expect(page.locator(`${SELECTORS.project('Run project')} [data-testid="opened-task-go"]`)).toHaveCount(0);
+    } finally {
+      await seedWorkspaceOwnership(page, localWorkerUrlKey, 'owner');
+    }
   });
 
   test('the assignee selector and the search toggle render on /backlog, and choosing an assignee stays on /backlog', async ({ page, seedLocal, localWorkerUrlKey }) => {

@@ -102,6 +102,32 @@ test.describe('Periodicals group', () => {
   // null fields and never passed `issueless: true`. The earlier test only asserts
   // the row *renders* a dispatch container — it never clicks dispatch, which is
   // why this regression slipped through. This test drives the real click path.
+  // LIN-4119 (review finding 1): setArrow rewrites the header's `.project-name`, so the Periodicals header must carry
+  // it too, or the arrow stays ▼ while the rows hide. Collapse, expand and reload-while-collapsed all keep it honest.
+  test('flag ON: the Periodicals header arrow toggles on collapse, expand and reload (LIN-4119)', async ({ page, localWorkerUrlKey }) => {
+    await setPeriodicalsFlag(page, localWorkerUrlKey, true);
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
+    await page.waitForLoadState('networkidle');
+
+    const group = page.locator('[data-project-type="periodicals"]');
+    const name = group.locator('.project-header .project-name');
+    const rows = group.locator('.tree');
+    await expect(name).toHaveText(/^▼/);
+    await expect(rows).toBeVisible();
+
+    await group.locator('.project-header').click();
+    await expect(name).toHaveText(/^▶/);
+    await expect(rows).toBeHidden();
+
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await expect(name).toHaveText(/^▶/);
+
+    await group.locator('.project-header').click();
+    await expect(name).toHaveText(/^▼/);
+    await expect(rows).toBeVisible();
+  });
+
   test('flag ON: clicking dispatch on a Periodical actually queues it', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(workspaceApiLocalSeed, { runnerKey: true });
     await setPeriodicalsFlag(page, localWorkerUrlKey, true);
