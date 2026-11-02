@@ -64,6 +64,7 @@ describe('LIN-4104 D1 — the run offer on /state: offer for a leaf and a contai
     assert.equal(failed.kind, 'offer');
     assert.equal(failed.container, false);
     assert.equal(failed.step.failed, true, 'the offer names the failed stage, a fact from the sessions');
+    assert.equal(failed.why, failed.step.reason, 'the why is the failed stage\'s own reason (kept from the characterization)');
   });
 
   test('a clean finished leaf is an offer, with no guessed step after a clean Plan', async () => {
