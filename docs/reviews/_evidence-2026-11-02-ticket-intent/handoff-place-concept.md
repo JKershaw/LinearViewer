@@ -60,6 +60,17 @@ Readings offered back:
 - **A forecast turns push into pull.** That is the June Surface Assessment problem, solved by proportion rather than by citation. It works as a dial, not a rule.
 - **Caveat:** Theseus's predictions were good on measures and poor on effort, which is the very thing this forecast needs. A backtest could check it: forecast past tickets at their base commit, then read what actually happened.
 
+## Latest turn after that: the task as a point in a ball
+
+John's image: a task is a point inside a ball. The layers around it are code, as seen from the diff, and the change has to reach the surface. Tidying first reconciles the layers, shrinks the job and removes detritus, so the task can push through. By John's estimate Harbour is about 10× more knotted than most human projects, so it will take time for the layers to simplify, and the code will shrink. If each task always leaves the code tidier, the way he always tries to leave fewer tickets than he closes, the code tends towards a settled point. Tasks then get cheaper and easier: "an agent working a simpler project completed work faster."
+
+Readings offered back:
+- **The image fits a known case.** The monospace body's roughly 88 local overrides were literal layers. Coherence's 5× diff size is a thicker shell.
+- **The settled point is steady-base's open question**, answered so far as "it only grows". Asking it again later is the test of whether the curve bends.
+- **"Settled" is a balance, not "small".** Under Lehman's first law change continues. At the settled point, size tracks what the product does rather than its history.
+- **The ticket rule holds because its count is visible daily.** "Adopt-on-next-touch" failed as advice with no count anyone watched. A tidier-each-time direction may need its count, the census and the knots, visible in motion. Visible direction is structure, the half of the forcefield Harbour can hold.
+- **The faster-on-simpler claim can be watched.** Are later Costs tidies faster, with fewer send-backs, as the area simplifies?
+
 ## Open questions worth exploring (not a plan)
 
 - How much of the shape is structure Harbour can hold, and how much is attention that needs a resident?
