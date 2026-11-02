@@ -2091,12 +2091,43 @@ a.wordmark:hover {
   color: var(--brand-dim);
 }
 
-/* "+ Add task" link at end of task list */
+/* LIN-4119: one control line per project. Its folds and done count are inline siblings, and the "·" between them is
+   drawn by the sibling selector, so a fold that is removed or rewritten never leaves a stray or missing separator. */
+.project-controls {
+  margin-left: 4ch;
+  color: var(--muted);
+  font-family: var(--font-content);
+  font-size: 0.9rem;
+}
+
+.project-controls > * {
+  display: inline;
+}
+
+.project-controls .home-fold,
+.project-controls .home-done-count {
+  margin-left: 0;
+}
+
+.project-controls > * + *::before {
+  content: "·";
+  margin: 0 0.5ch;
+  color: var(--muted);
+}
+
+/* "+ Add task" link: in the project header, beside the name (LIN-4119); at the tail of a task list elsewhere */
 .add-task-link {
   color: var(--muted);
   padding: var(--space-1) 0;
   padding-left: 1.5em;
   font-family: var(--font-content);
+}
+
+.project-header .add-task-link {
+  display: inline;
+  padding: 0 0 0 1.5ch;
+  font-size: 0.9rem;
+  font-weight: 400;
 }
 
 .add-task-link a {

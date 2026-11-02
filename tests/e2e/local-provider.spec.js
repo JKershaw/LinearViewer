@@ -20,10 +20,13 @@ test.describe('Local provider (no test-token mock)', () => {
     await page.waitForLoadState('networkidle');
   });
 
-  test('dashboard renders seeded local project + issues from the store', async ({ page }) => {
+  test('dashboard renders seeded local project + issues from the store', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`${localDashboardUrl(localWorkerUrlKey)}backlog`);
     // Project from the seeded LocalStore — not from testMockData.
     await expect(page.locator('.project-header:has-text("Local Project")')).toBeVisible();
-    // Started issue surfaces in the In Progress section.
+    // Started issue surfaces in the In Progress section, which is Home's.
+    await page.goto(localDashboardUrl(localWorkerUrlKey));
+    await page.waitForLoadState('networkidle');
     await expect(page.locator('.in-progress-items .line:has-text("Local parent task")')).toBeVisible();
     // Child issue is in the DOM (hidden until its parent is expanded).
     await expect(page.locator('.line:has-text("Local child task")').first()).toBeAttached();
@@ -81,7 +84,8 @@ test.describe('Local provider (no test-token mock)', () => {
   //      ?projectId=), never a name substitution — proving the LIN-1972
   //      resolveProjectRef exact-id-match-first fix on the path that needs it.
   // ===========================================================================
-  test('the task-create page creates a task through the Session A route and it persists', async ({ page }) => {
+  test('the task-create page creates a task through the Session A route and it persists', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`${localDashboardUrl(localWorkerUrlKey)}backlog`);
     const CREATE_TITLE = 'Created via task-create page';
     const project = page.locator('.project').first();
 

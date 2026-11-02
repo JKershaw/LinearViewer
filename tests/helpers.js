@@ -192,6 +192,15 @@ export const SELECTORS = {
   dispatchSection: (name) => `[data-testid="dispatch-section-${name}"]`,
   /** A project card by name (replaces `.project:has-text(name)`). */
   project: (name) => `[data-testid="project"][data-project-name="${name}"]`,
+  /** LIN-4119: a project's one control line (its Up next and Backlog folds and its done count), on Home and /backlog. */
+  projectControls: (name) => `[data-testid="project"][data-project-name="${name}"] [data-testid="project-controls"]`,
+  /** LIN-4119: a project's Add task link, in its header beside the arrow and name (inline create; external providers use data-action). */
+  projectAddTask: (name) => `[data-testid="project"][data-project-name="${name}"] [data-testid="project-header"] [data-testid="create-task"]`,
+  /** LIN-4119: the backlog page (/workspace/:urlKey/backlog) is the project sections alone: no In Progress region. */
+  backlogPage: {
+    projects: '[role="region"][aria-label="Projects"]',
+    inProgress: '.in-progress-section',
+  },
   /** An issue row by id (pairs the testid with the existing data-id hook). */
   issue: (id) => `[data-testid="issue-line"][data-id="${id}"]`,
   /** Workspace KPIs page (LIN-3689): section, card and empty-state test ids. */

@@ -22,6 +22,11 @@ import { renderPage } from '../../lib/render.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 import { serverSessions, serverRow } from '../fixtures/task-decision.js';
 
+// LIN-4119: the project sections are the backlog page's. A test that asserts them renders through this, which is
+// renderPage in backlog page mode (Home renders no project sections from S3a-3 on).
+const renderBacklogPage = (projectTrees, inProgressTrees, recentActivityTrees, organizationName, options = {}) =>
+  renderPage(projectTrees, inProgressTrees, recentActivityTrees, organizationName, { ...options, pageMode: 'backlog' });
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
 const flush = () => new Promise((r) => setTimeout(r, 0));
@@ -114,7 +119,7 @@ describe('LIN-3968 — a row says its state wherever it sits, not only In Progre
     const rowStates = buildRowStates({
       roots, loopsByIdentifier: new Map([['P-1', [loop()]]]), enrichLoop, deriveSessionWaiting, now: NOW,
     });
-    const html = renderPage([{ project: { id: 'proj-1', name: 'Alpha', content: null }, incomplete: roots, completed: [], completedCount: 0 }], [], [], 'Test', {
+    const html = renderBacklogPage([{ project: { id: 'proj-1', name: 'Alpha', content: null }, incomplete: roots, completed: [], completedCount: 0 }], [], [], 'Test', {
       urlKey: 'acme', workspace: { urlKey: 'acme', provider: 'linear' }, rowStates,
     });
     assert.match(html, /data-testid="issue-row-state">Build running · \d+m</, 'the project row says what runs');

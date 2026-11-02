@@ -50,6 +50,7 @@ describe('W6 (b): the sign-in refresh renders through the shared pipeline, with 
     const writes = [];
     const pipelineCalls = [];
     const sent = [];
+    const pageCalls = [];
     const deps = {
       customPromptsStore: { list: async () => [] },
       getDeployInfo: () => ({ version: 'w6' }),
@@ -59,7 +60,8 @@ describe('W6 (b): the sign-in refresh renders through the shared pipeline, with 
       resolveRunControls: async () => ({ runControls: false }),
       homeRowStates: async () => ({ states: new Map(), roots: homeStatesRoots, rulingCount: 0 }),
       orderIssuesForSwipe,
-      renderPage,
+      // Records the call the refresh makes, so the view it built can be rendered in the page mode that holds sections.
+      renderPage: (...args) => { pageCalls.push(args); return renderPage(...args); },
       writeTaskFacts: (urlKey, fetched, opts) => { writes.push({ urlKey, fetched, opts }); },
       readFilledRung: async () => null,
       taskModeStore: null,
@@ -100,6 +102,11 @@ describe('W6 (b): the sign-in refresh renders through the shared pipeline, with 
     // The page is rendered once, through the view the pipeline built: the In Progress parent and the top task show.
     assert.equal(sent.length, 1, 'the refresh sends exactly one response');
     assert.match(sent[0], /data-identifier="RF-1"/, 'the In Progress parent renders');
-    assert.match(sent[0], /data-project-name="Second project"/, 'the project sections render from the view');
+    // LIN-4119: the refresh's own page (Home) draws no project sections from S3a-3 on; they are the backlog page's. The
+    // view the refresh built is rendered in that page mode here, so the claim (the sections come from the view) holds.
+    assert.equal(pageCalls.length, 1, 'the refresh renders its page once');
+    const [trees, inProgressTrees, recentTrees, orgName, options] = pageCalls[0];
+    const backlog = renderPage(trees, inProgressTrees, recentTrees, orgName, { ...options, pageMode: 'backlog' });
+    assert.match(backlog, /data-project-name="Second project"/, 'the project sections render from the view, on the backlog page');
   });
 });

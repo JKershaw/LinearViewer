@@ -264,7 +264,8 @@ describe('the held index is reused, not built a second time (LIN-4069 review led
     assert.match(refresh, /await gatherPage\(/, 'the refresh gathers through the shared pipeline');
     assert.ok(!/writeTaskFacts\??\.?\(/.test(refresh), 'the refresh calls no write itself; the gather does');
     const routeGathers = [...server.matchAll(/gatherHome(?:Page|Inputs)\(homePipelineDeps\(\)/g)];
-    assert.equal(routeGathers.length, 2, 'Home page load and /api/home-rows each gather through the pipeline');
+    // LIN-4119: the backlog page is the third route that gathers through the pipeline (the write gate is the same).
+    assert.equal(routeGathers.length, 3, 'Home page load, /api/home-rows and the backlog page each gather through the pipeline');
     assert.ok(!/writeTaskFacts\(workspace\.urlKey, fetched\);/.test(server), 'no write left that builds its own index on the request path');
     assert.ok(!/writeTaskFacts\(workspace\.urlKey, fetched\);/.test(pipeline), 'the pipeline has no write that builds its own index');
     for (const m of routeGathers) {

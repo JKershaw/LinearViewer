@@ -13,6 +13,11 @@ import { homeRowsFor, HOME_ROWS_PAGE } from '../../lib/home-rows.js';
 import { renderPage, renderHomeRowsHtml, homeRowsContext } from '../../lib/render.js';
 import { partitionCompleted } from '../../lib/tree.js';
 
+// LIN-4119: the project sections are the backlog page's. A test that asserts them renders through this, which is
+// renderPage in backlog page mode (Home renders no project sections from S3a-3 on).
+const renderBacklogPage = (projectTrees, inProgressTrees, recentActivityTrees, organizationName, options = {}) =>
+  renderPage(projectTrees, inProgressTrees, recentActivityTrees, organizationName, { ...options, pageMode: 'backlog' });
+
 const WORKSPACE = { urlKey: 'ws', name: 'WS', provider: 'linear' };
 const node = (identifier, type, children = [], title = identifier) => ({
   issue: { id: `id-${identifier}`, identifier, title, state: { type }, labels: { nodes: [] } },
@@ -156,11 +161,11 @@ describe('the Home page: the folds, and no done task', () => {
   test('the page holds the Backlog fold with its URL key, the done count, and no completed toggle or --depth style', () => {
     const projectTrees = trees();
     const view = buildHomeView({ inProgressTrees: [], trees: projectTrees, states: states({}) });
-    const html = renderPage(view.trees, view.inProgressTrees, [], 'Org', { urlKey: 'ws', workspace: WORKSPACE, workspaces: [WORKSPACE], featureFlags: {} });
+    const html = renderBacklogPage(view.trees, view.inProgressTrees, [], 'Org', { urlKey: 'ws', workspace: WORKSPACE, workspaces: [WORKSPACE], featureFlags: {} });
 
     assert.match(html, /data-home-fetch="backlog"[^>]*data-url-key="ws"/, 'the Backlog fold opens its rows from this workspace');
     assert.match(html, /data-testid="home-fold-backlog"/);
-    assert.match(html, /show 1 in Backlog/);
+    assert.match(html, /1 backlog ▶/, 'the Backlog fold reads "N backlog" (LIN-4119, feedback item 24)');
     assert.match(html, /data-testid="home-done-count"[^>]*>1 done</, 'done is a count');
     assert.doesNotMatch(html, /Finished work/, 'a done task is not on the page');
     assert.doesNotMatch(html, /data-completed-for/);

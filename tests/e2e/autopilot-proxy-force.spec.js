@@ -76,7 +76,8 @@ async function setPeriodicalsFlag(page, enabled) {
 async function revealPeriodicalAutopilot(page) {
   await setSession(page);
   await setPeriodicalsFlag(page, true);
-  await page.goto(`/workspace/${URL_KEY}/`);
+  // LIN-4119: the Periodicals group is a project section, and the project sections are the backlog page's.
+  await page.goto(`/workspace/${URL_KEY}/backlog`);
   await page.waitForLoadState('networkidle');
 
   const group = page.locator('[data-project-type="periodicals"]');

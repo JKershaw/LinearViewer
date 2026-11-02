@@ -3544,6 +3544,90 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
 // =============================================================================
 
 /**
+ * LIN-4119: the backlog page (`/workspace/:urlKey/backlog`), Home's project sections moved onto their own page. It shares
+ * Home's gather (lib/home-pipeline.js) and renderer (renderPage, page mode `backlog`), so its rows, folds and filters are
+ * Home's. Nothing links here yet (S3a-3 adds Home's link). Its 401 re-renders Home, as every route's does, and its
+ * generic error page retries here.
+ */
+app.get('/workspace/:urlKey/backlog', workspaceFromUrl, async (req, res) => {
+  const workspace = req.workspace
+  const deployInfo = getDeployInfo()
+
+  // LIN-2521: shared persist/restore rule for the team filter, as Home takes it.
+  const { teamId } = await resolveTeamSelection(req, workspace);
+
+  // LIN-2526: the assignee filter the project sections take (provider local reused, as the dashboard does).
+  const provider = getProviderForWorkspace(workspace);
+  const assigneeState = await resolveAssigneeSelection(req, provider, getWorkspaceCallScope(workspace));
+  const canFilterByMe = provider.supports('viewer');
+
+  const openRouterSource = getOpenRouterSource(req);
+
+  try {
+    // Custom prompts feed the page's prompt options (non-blocking, fallback to empty), as Home reads them.
+    let customPrompts = [];
+    try {
+      customPrompts = (await customPromptsStore.list(workspace.urlKey)).map(p => ({ id: p.id, name: p.name }));
+    } catch (e) { /* non-fatal */ }
+
+    // The shared gather and the one view build. No halt read here: the halt banner is Home's.
+    const { fetched, featureFlags, homeStates, rowStates, homeTopTask, homeView } = await gatherHomePage(homePipelineDeps(), {
+      workspace,
+      teamId,
+      accountId: req.session.accountId,
+      assigneeName: assigneeState.resolvedAssigneeName,
+      resolveFlags: () => requestFeatureFlags(req),
+    });
+    const { recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated, availableAssignees, appliedAssigneeName } = fetched;
+    const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h));
+    // LIN-4104 D2: the filled run button, read once for this page load, as Home reads it.
+    const filledRung = await readFilledRung({ taskModeStore, accountStore, accountId: req.session?.accountId ?? null, urlKey: workspace.urlKey });
+    const html = renderPage(homeView.trees, homeView.inProgressTrees, recentActivityTrees, organizationName, {
+      pageMode: 'backlog',
+      teams,
+      selectedTeamId,
+      availableAssignees,
+      rowStates,
+      rulingCount: homeStates?.rulingCount ?? 0,
+      rowData: rowDataByNodeKey({ urlKey: workspace.urlKey, inProgressTrees: homeView.inProgressTrees, recentActivityTrees, projectTrees: homeView.trees, rowStates }),
+      filledRung,
+      // LIN-2550: the same applied-filter gate Home uses, so a stale ?assignee= reads `all`.
+      selectedAssignee: appliedAssigneeName ? assigneeState.selectedAssignee : 'all',
+      canFilterByMe,
+      workspaces: req.session.workspaces,
+      workspace,
+      openRouterSource,
+      deployInfo,
+      urlKey: workspace.urlKey,
+      featureFlags,
+      customPrompts,
+      isLocalhost,
+      showSource,
+      truncated,
+      topTaskId: homeTopTask ? nodeKey(homeTopTask) : null,
+      topTaskWhy: homeTopTask ? homeTopTask.why : [],
+      proxyDefault: req.session.proxyDefault
+    });
+    res.send(html);
+  } catch (error) {
+    console.error('Error fetching backlog:', error);
+
+    // Handle 401 Unauthorized - attempt refresh or remove workspace (re-renders Home, as every route does)
+    if (isAuthError(error)) {
+      return handleUnauthorizedError(workspace, req.session, teamId, assigneeState, openRouterSource, res, error);
+    }
+
+    // Generic error - the same classified error page as Home, retrying this page.
+    const html = renderUpstreamAwareErrorPage(error, {
+      defaultMessage: 'Could not load the backlog. Please try again or re-authenticate.',
+      action: 'Try again',
+      actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/backlog`
+    });
+    res.status(500).send(html);
+  }
+})
+
+/**
  * LIN-4024: the rows a Home fold opens: a project's Backlog, its Up next overflow, a started parent's folded
  * children, or a search. It runs the same fetch, filters and states as the page, so a fetched row is the row the
  * page would have rendered. Done tasks are never returned. Authorisation is the workspace's own, as /api/detail.

@@ -256,10 +256,10 @@ describe('LIN-3774 every fetchAndPrepareProjects call site passes accountId', ()
     const nonDashboard = calls.filter(c => !c.includes('workspace.urlKey'));
     assert.equal(nonDashboard.length, 3);
     for (const c of nonDashboard) assert.match(c, /, null, \{ accountId: req\.session\.accountId \}\)/, `urlKey must stay null: ${c}`);
-    // Each caller hands its session's account to the gather: the Home route and /api/home-rows, and the refresh.
+    // Each caller hands its session's account to the gather: the Home route, /api/home-rows and the LIN-4119 backlog page, and the refresh.
     const server = SERVER_SRC;
     const routeGathers = server.match(/gatherHome(?:Page|Inputs)\(homePipelineDeps\(\), \{\s*workspace,\s*teamId,\s*accountId: req\.session\.accountId,/g) || [];
-    assert.equal(routeGathers.length, 2, 'the Home route and /api/home-rows each pass req.session.accountId to the gather');
+    assert.equal(routeGathers.length, 3, 'the Home route, /api/home-rows and the backlog page each pass req.session.accountId to the gather');
     assert.match(readFileSync(join(__dirname, '../../lib/dashboard-refresh.js'), 'utf8'), /accountId: session\.accountId,/, 'the refresh passes session.accountId to the gather');
   });
 });

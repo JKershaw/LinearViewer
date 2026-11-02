@@ -22,9 +22,13 @@ const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
 const REFRESH_SRC = readFileSync(join(__dirname, '../../lib/dashboard-refresh.js'), 'utf8');
 
 // The Home call site: `const html = renderPage(homeView.trees, ...)` up to the `res.send(html)` that follows it.
+// LIN-4119: the backlog page renders the same trees in page mode `backlog`, which draws no halt banner, so its call is
+// not a Home producer and is not in this scan (its own pin below checks it reads no halt).
 function homeRenderBlocks(src) {
   const starts = [...src.matchAll(/renderPage\(homeView\.trees/g)].map(m => m.index);
-  return starts.map(start => src.slice(start, src.indexOf('res.send(html)', start)));
+  return starts
+    .map(start => src.slice(start, src.indexOf('res.send(html)', start)))
+    .filter(block => !/pageMode:\s*'backlog'/.test(block));
 }
 
 // A `halt` key in the renderPage options that carries the value read by readHaltForPoll:
@@ -61,6 +65,14 @@ describe('LIN-4115 — every Home renderPage call passes halt', () => {
     const blocks = homeRenderBlocks(SERVER_SRC);
     assert.equal(blocks.length, 1, 'one Home render call in server.js');
     assert.match(blocks[0], PASSES_HALT, 'server.js Home renderPage call lacks halt');
+  });
+
+  test('the backlog page renders in page mode backlog and its route reads no halt (it draws no halt banner)', () => {
+    const blocks = [...SERVER_SRC.matchAll(/renderPage\(homeView\.trees/g)].map(m => SERVER_SRC.slice(m.index, SERVER_SRC.indexOf('res.send(html)', m.index)));
+    const backlog = blocks.filter(b => /pageMode:\s*'backlog'/.test(b));
+    assert.equal(backlog.length, 1, 'one backlog render call in server.js');
+    const route = SERVER_SRC.slice(SERVER_SRC.indexOf("app.get('/workspace/:urlKey/backlog'"), SERVER_SRC.indexOf('res.send(html)', SERVER_SRC.indexOf("app.get('/workspace/:urlKey/backlog'")));
+    assert.doesNotMatch(route, /readHaltForPoll\(/, 'the backlog route must not read the halt: its page shows no banner');
   });
 
   test('the refresh tail passes halt to renderPage (a route-only fix would drop the banner after a token refresh)', () => {

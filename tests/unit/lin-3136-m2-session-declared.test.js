@@ -184,7 +184,8 @@ const unescapeHtml = (s) => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replac
 
 /** The rendered periodical container for `periodicalId`, the forced variant or the plain one. */
 function renderedContainer({ forced }) {
-  const html = renderPage([testMockPeriodicalsTree], [], [], 'Test', { isLanding: false, urlKey: 'acme', featureFlags: { proxy: true } });
+  // LIN-4119: the Periodicals group is a project section, which the backlog page holds (Home renders none from S3a-3).
+  const html = renderPage([testMockPeriodicalsTree], [], [], 'Test', { isLanding: false, urlKey: 'acme', featureFlags: { proxy: true }, pageMode: 'backlog' });
   const re = /<div class="prompt-container"([^>]*)><div class="prompt-header"><span class="prompt-name">([^<]*)<\/span>[\s\S]*?<div class="prompt-text">([\s\S]*?)<\/div><\/div>/g;
   for (const m of html.matchAll(re)) {
     const attrs = m[1];

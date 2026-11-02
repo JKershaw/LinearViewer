@@ -523,23 +523,26 @@ async function loadHomeRows(fold) {
     template.innerHTML = data.html
     const nodes = [...template.content.childNodes]
     let mountRoot = fold.parentElement
+    // LIN-4119: a project's folds sit in its control line, so the rows go before the line, not before the fold. A
+    // more-of-parent fold has no line and is its own anchor.
+    const anchor = fold.closest('.project-controls') || fold
     if (fold.dataset.homeFetch === 'more-of-parent') {
       nodes.forEach(node => { if (node.classList?.contains('node')) show(node) })
-      fold.before(...nodes)
+      anchor.before(...nodes)
     } else {
       // A project's rows sit in their own tree, so the project's own open and close show them with the rest.
       mountRoot = document.createElement('div')
       mountRoot.className = 'tree home-fetched'
       mountRoot.append(...nodes)
-      fold.before(mountRoot)
+      anchor.before(mountRoot)
     }
     mountHomePromptSections(mountRoot)
-    bindHomeFolds(fold.parentElement)
+    bindHomeFolds(anchor.parentElement)
     if (data.nextOffset == null) {
       fold.remove()
     } else {
       fold.dataset.offset = String(data.nextOffset)
-      fold.textContent = `show ${data.remaining} more ▶`
+      fold.textContent = foldLabel(fold.dataset.homeFetch, data.remaining)
     }
   } catch (error) {
     console.error('Failed to load Home rows:', error)
@@ -568,6 +571,13 @@ const setArrow = (el, expanded) => {
   if (!el) return
   el.textContent = el.textContent.replace(expanded ? '▶' : '▼', expanded ? '▼' : '▶')
 }
+// LIN-4119: a project's arrow and name are their own element, so setArrow (which rewrites textContent) never reaches the
+// Add task link that sits beside them in the header.
+const projectNameOf = project => project?.querySelector(':scope > .project-header > .project-name') ?? null
+// LIN-4119: a project's control line (its folds and done count) shows as one element.
+const showControlLine = project => project.querySelectorAll(':scope > .project-controls').forEach(show)
+// LIN-4119 (feedback item 24): a fold's wording by kind. A paged fold rewrites itself with it.
+const foldLabel = (kind, remaining) => kind === 'backlog' ? `${remaining} backlog ▶` : `show ${remaining} more ▶`
 
 // Expanded state helpers (expanded is now array of { id, section } objects)
 const isExpanded = (arr, id, section) =>
@@ -618,15 +628,14 @@ function resetDOM() {
 
   // Expand all projects (show content, ▼ arrow)
   document.querySelectorAll('.project').forEach(project => {
-    const header = project.querySelector('.project-header')
-    if (header && header.textContent.includes('▶')) {
-      setArrow(header, true)
+    const name = projectNameOf(project)
+    if (name && name.textContent.includes('▶')) {
+      setArrow(name, true)
     }
     show(project.querySelector('.project-description'))
     show(project.querySelector('.project-meta'))
     show(project.querySelector('.completed-toggle'))
-    show(project.querySelector('.add-task-link'))
-    project.querySelectorAll(':scope > .home-fold').forEach(show)
+    showControlLine(project)
   })
 
   // Hide all completed sections, reset toggle text
@@ -758,11 +767,11 @@ function applyState(state) {
     const project = document.querySelector(`.project[data-id="${projectId}"]`)
     if (!project) return
 
-    const header = project.querySelector('.project-header')
-    setArrow(header, false)
+    setArrow(projectNameOf(project), false)
 
-    // Hide all project content (including .node containers)
-    const children = project.querySelectorAll('.node, .project-description, .project-meta, .completed-toggle, [data-completed-for], .add-task-link, .home-fold')
+    // Hide all project content (including .node containers). LIN-4119: the control line goes as one element, and the
+    // Add task link stays in the header.
+    const children = project.querySelectorAll('.node, .project-description, .project-meta, .completed-toggle, [data-completed-for], .project-controls')
     children.forEach(hide)
   })
 
@@ -890,20 +899,21 @@ function init() {
 
     if (isCollapsed) {
       // Hide all project content (including .node containers)
-      project.querySelectorAll('.node, .project-description, .project-meta, .completed-toggle, [data-completed-for], .add-task-link, .home-fold')
+      project.querySelectorAll('.node, .project-description, .project-meta, .completed-toggle, [data-completed-for], .project-controls')
         .forEach(hide)
     } else {
       // Show project description, meta, and completed toggle
       show(project.querySelector('.project-description'))
       show(project.querySelector('.project-meta'))
       show(project.querySelector('.completed-toggle'))
-      show(project.querySelector('.add-task-link'))
-      project.querySelectorAll(':scope > .home-fold').forEach(show)
+      showControlLine(project)
 
       // Show top-level nodes (but keep them collapsed unless explicitly expanded)
-      // Nodes are inside a .tree wrapper (not the completed one)
-      const incompleteTree = project.querySelector(':scope > .tree:not([data-completed-for])')
-      incompleteTree?.querySelectorAll(':scope > .node').forEach(node => {
+      // Nodes are inside a .tree wrapper (not the completed one). LIN-4119: every incomplete tree, so the rows a fold
+      // fetched (a tree of their own) come back on expand, not only the page's first tree.
+      const incompleteNodes = [...project.querySelectorAll(':scope > .tree:not([data-completed-for])')]
+        .flatMap(tree => [...tree.querySelectorAll(':scope > .node')])
+      incompleteNodes.forEach(node => {
         show(node)
         const nodeId = node.dataset.id
         // Show details and children only if this task is expanded
@@ -934,7 +944,7 @@ function init() {
       }
     }
 
-    setArrow(header, !isCollapsed)
+    setArrow(projectNameOf(project), !isCollapsed)
 
     // LIN-442: when a project is re-expanded, hydrate detail blocks for any of
     // its now-visible expanded nodes.
@@ -1064,6 +1074,10 @@ function init() {
         : `show ${completedToggle.dataset.count} completed`
       return
     }
+
+    // LIN-4119: a click on the header's Add task link is the link's own. It returns before the header branch, so the
+    // project neither collapses nor saves collapsed state before the page navigates.
+    if (e.target.closest('.add-task-link')) return
 
     // 7. Project header click (collapse project)
     const header = e.target.closest('.project-header')

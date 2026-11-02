@@ -29,15 +29,16 @@ test.describe('Jira provider (no test-token mock)', () => {
   });
 
   test('dashboard renders the project container + its issues from the fake backend', async ({ page }) => {
-    // The Jira project itself maps to a canonical project header (named by project name).
+    // The project header, its To Do issue and the done count are the backlog page's.
+    await page.goto(`${DASHBOARD}backlog`);
     await expect(page.locator('.project-header:has-text("Engineering")')).toBeVisible();
-    // Open issues render under it: To Do, and In Progress (LIN-4024: an In Progress task is listed in In Progress).
     await expect(page.locator('.line:has-text("Jira task to do")').first()).toBeAttached();
-    await expect(page.locator('.line:has-text("Jira task in progress")').first()).toBeAttached();
-    // The done issue is counted on its project, never sent to the page (LIN-4024).
     await expect(page.locator('.line:has-text("Jira task shipped")')).toHaveCount(0);
     await expect(page.locator('[data-testid="home-done-count"]').first()).toContainText('1 done');
-    // The unstarted subtask is the top task (LIN-4117), so it is In Progress under its parent, and opens with it.
+    // The In Progress task is the top task (LIN-4117), so it is Home's: In Progress, with its subtask under it, and it opens with it.
+    await page.goto(DASHBOARD);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('.line:has-text("Jira task in progress")').first()).toBeAttached();
     await page.locator('.in-progress-section .line:has-text("Jira task in progress")').first().click();
     await expect(page.locator('.in-progress-section .line:has-text("Subtask of the in-progress task")').first()).toBeVisible();
   });
@@ -49,6 +50,7 @@ test.describe('Jira provider (no test-token mock)', () => {
   // header text, so a double-render would show up as a second "Engineering"
   // row rather than just an extra unrelated line.
   test('the epic does not double-render as an ungrouped "No Project" issue (F1)', async ({ page }) => {
+    await page.goto(`${DASHBOARD}backlog`);
     await expect(page.locator('.project-header:has-text("Engineering")')).toHaveCount(1);
     const noProjectGroup = page.locator('.project[data-id="__no_project__"]');
     await expect(noProjectGroup.locator('.line:has-text("Engineering")')).toHaveCount(0);
@@ -60,6 +62,7 @@ test.describe('Jira provider (no test-token mock)', () => {
   });
 
   test('detail link is provider-aware: "View in Jira" (not Linear) — the ui.displayName trap, rendered', async ({ page }) => {
+    await page.goto(`${DASHBOARD}backlog`);
     // render.js interpolates provider.ui.displayName into the detail link. The
     // detail block is lazy — expand an issue to load it first.
     await page.locator('.line.expandable').first().click();
@@ -68,6 +71,7 @@ test.describe('Jira provider (no test-token mock)', () => {
   });
 
   test('the project "View in Jira" link is a browsable /browse/ URL, never the raw REST resource URL (LIN-1885 beat 2 review finding #4)', async ({ page }) => {
+    await page.goto(`${DASHBOARD}backlog`);
     const projectLink = page.locator('.project-meta .detail-link', { hasText: 'View in Jira' }).first();
     await expect(projectLink).toBeAttached();
     const href = await projectLink.getAttribute('href');
@@ -86,6 +90,7 @@ test.describe('Jira provider (no test-token mock)', () => {
   // drops the `pid=` scoping entirely for Jira rather than pointing it
   // somewhere untrustworthy.
   test('the "+ Add task" link never passes the epic id as Jira\'s pid (F4)', async ({ page }) => {
+    await page.goto(`${DASHBOARD}backlog`);
     const addTaskLink = page.locator('.add-task-link a[data-action="create-task"]').first();
     await expect(addTaskLink).toBeAttached();
     const href = await addTaskLink.getAttribute('href');
@@ -94,6 +99,7 @@ test.describe('Jira provider (no test-token mock)', () => {
   });
 
   test('an issue description renders the ADF→Markdown conversion, not raw ADF JSON', async ({ page }) => {
+    await page.goto(`${DASHBOARD}backlog`);
     await page.locator('.line:has-text("Jira task to do")').first().click();
     // Description/comments are nested inside the collapsed "Details" section
     // (LIN-158) — expand it before looking for either. A short description
@@ -127,7 +133,7 @@ test.describe('Jira provider (no test-token mock)', () => {
 test.describe('Jira provider — team selector (LIN-2018)', () => {
   test('the team selector renders once fetchTeams is non-empty, and the project mapping stays additive', async ({ page }) => {
     await seedJiraWorkspace(page);
-    await page.goto(DASHBOARD);
+    await page.goto(`${DASHBOARD}backlog`);
     await page.waitForLoadState('networkidle');
 
     await expect(page.locator('#team-toggle')).toBeAttached();
@@ -138,7 +144,7 @@ test.describe('Jira provider — team selector (LIN-2018)', () => {
 
   test('selecting the team (?team=<project key>) scopes the dashboard to that project\'s own issues', async ({ page }) => {
     await seedJiraWorkspace(page);
-    await page.goto(`${DASHBOARD}?team=ENG`);
+    await page.goto(`${DASHBOARD}backlog?team=ENG`);
     await page.waitForLoadState('networkidle');
 
     await expect(page.locator('#team-toggle')).toHaveText('Engineering');
@@ -147,7 +153,7 @@ test.describe('Jira provider — team selector (LIN-2018)', () => {
 
   test('an unmatched team ref drops to unscoped (graceful, never a 500/blank page)', async ({ page }) => {
     await seedJiraWorkspace(page);
-    await page.goto(`${DASHBOARD}?team=NOPE`);
+    await page.goto(`${DASHBOARD}backlog?team=NOPE`);
     await page.waitForLoadState('networkidle');
 
     await expect(page.locator('#team-toggle')).toHaveText('all');
@@ -180,7 +186,7 @@ test.describe('Jira provider — empty project', () => {
         },
       }],
     });
-    await page.goto(jiraDashboardUrl(JIRA_WORKSPACE_URL_KEY));
+    await page.goto(`${jiraDashboardUrl(JIRA_WORKSPACE_URL_KEY)}backlog`);
     await page.waitForLoadState('networkidle');
     await expect(page.locator('.project-header:has-text("Empty Epic")')).toBeVisible();
   });
@@ -230,11 +236,16 @@ test.describe('LIN-1890 — a Jira-only session on an OAuth binding', () => {
   });
 
   test('the dashboard renders issues through the OAuth call scope', async ({ page }) => {
+    await page.goto(`${jiraDashboardUrl(JIRA_WORKSPACE_URL_KEY)}backlog`);
     await expect(page.locator('.project-header:has-text("Engineering")')).toBeVisible();
+    // The In Progress task is the top task (LIN-4117), so it is In Progress on Home.
+    await page.goto(jiraDashboardUrl(JIRA_WORKSPACE_URL_KEY));
+    await page.waitForLoadState('networkidle');
     await expect(page.locator('.line:has-text("Jira task in progress")').first()).toBeAttached();
   });
 
   test('the PROMPT leg works — the half with no prior coverage', async ({ page }) => {
+    await page.goto(`${jiraDashboardUrl(JIRA_WORKSPACE_URL_KEY)}backlog`);
     // LIN-3833: the copy-first view writes the step's prompt. A Todo task names Plan, which needs no AI
     // (an In Progress task's write is the AI step, which this Jira-only session does not configure).
     const row = page.locator('.line:has-text("Jira task to do")').first();
@@ -248,6 +259,7 @@ test.describe('LIN-1890 — a Jira-only session on an OAuth binding', () => {
   });
 
   test('the detail surface stays provider-aware for a Jira-only session', async ({ page }) => {
+    await page.goto(`${jiraDashboardUrl(JIRA_WORKSPACE_URL_KEY)}backlog`);
     await page.locator('.line.expandable').first().click();
     await expect(page.locator('.detail-link', { hasText: 'View in Jira' }).first()).toBeAttached();
     await expect(page.locator('.detail-link', { hasText: 'Open in Linear' })).toHaveCount(0);
@@ -274,7 +286,8 @@ test.describe('LIN-1890 — a Jira-only session on an OAuth binding', () => {
 test.describe('Jira provider — browser write lane (LIN-1942)', () => {
   test.beforeEach(async ({ page }) => {
     await seedJiraWorkspace(page);
-    await page.goto(DASHBOARD);
+    // LIN-4119: the write lane edits project rows, which the backlog page holds.
+    await page.goto(`${DASHBOARD}backlog`);
     await page.waitForLoadState('networkidle');
   });
 
@@ -295,7 +308,7 @@ test.describe('Jira provider — browser write lane (LIN-1942)', () => {
     await page.waitForURL(DASHBOARD);
 
     // Read back through a FRESH render, not just the post-save DOM.
-    await page.goto(DASHBOARD);
+    await page.goto(`${DASHBOARD}backlog`);
     await page.waitForLoadState('networkidle');
     // The renamed title is a superstring of the old one ("Jira task to do —
     // edited …"), so the positive assertion below is the meaningful proof of
@@ -320,7 +333,7 @@ test.describe('Jira provider — browser write lane (LIN-1942)', () => {
 
     // Fresh render: the row now carries the "in-progress" status pill and
     // lives under the dashboard's In Progress section — the rendered outcome,
-    // never the fake's internal transition id.
+    // never the fake's internal transition id. In Progress is Home's.
     await page.goto(DASHBOARD);
     await page.waitForLoadState('networkidle');
     const row = page.locator('.in-progress-items .line:has-text("Jira task to do")').first();
@@ -356,7 +369,7 @@ test.describe('Jira provider — browser write lane (LIN-1942)', () => {
     // No persisted change — including the title, per N1 ordering (every
     // refusable check runs before the first write): a fresh dashboard render
     // still shows the original title, never the rejected one.
-    await page.goto(DASHBOARD);
+    await page.goto(`${DASHBOARD}backlog`);
     await page.waitForLoadState('networkidle');
     await expect(page.locator('.line', { hasText: REJECTED_TITLE })).toHaveCount(0);
     await expect(page.locator('.line:has-text("Issue with an underline mark in its description")').first()).toBeAttached();
@@ -435,7 +448,8 @@ test.describe('LIN-2001 — Jira OAuth callback driven as real HTTP', () => {
     // `clientFactory` fake (JiraProvider._clientFor's OAuth arm), proving the
     // seeding call in step 1 covers both the identity probe and this read —
     // no third fake HTTP endpoint required.
-    await page.goto(landed);
+    // LIN-4119: the project header is a project section, which the backlog page holds (the landing above is Home's URL).
+    await page.goto(`${landed}backlog`);
     await page.waitForLoadState('networkidle');
     await expect(page.locator('.project-header:has-text("Engineering")')).toBeVisible();
 

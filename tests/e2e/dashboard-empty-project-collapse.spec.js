@@ -1,10 +1,11 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId } from '../fixtures/local-harness.js';
 
-// LIN-2514: a zero-issue project on the authenticated tree page should render
+// LIN-2514: a zero-issue project on the project page should render
 // collapsed by default (extending the existing default-collapse mechanism —
-// HTML flag -> emitter -> consumer — to the authenticated producer), hide its
-// `+ Add task` control while collapsed, and override any previously-stored
+// HTML flag -> emitter -> consumer — to the authenticated producer), keep its
+// `+ Add task` control in its header while collapsed (LIN-4119: the header holds
+// it, so a collapsed project is still one row), and override any previously-stored
 // collapse state at load time (the storage key is global/not workspace-scoped,
 // so a first-load-only fix would never reach a returning user). A
 // completed-only project must stay open since it still exposes a live
@@ -25,9 +26,9 @@ function emptyProjectSeed(urlKey) {
 }
 
 test.describe('Empty-project default collapse (LIN-2514)', () => {
-  test('empty project starts collapsed and hides add-task; completed-only project stays open', async ({ page, seedLocal, localWorkerUrlKey }) => {
+  test('empty project starts collapsed with + Add task in its header; completed-only project stays open', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(emptyProjectSeed(localWorkerUrlKey));
-    await page.goto(`/workspace/${localWorkerUrlKey}/`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     await page.waitForLoadState('networkidle');
 
     const emptyId = localSeedId(localWorkerUrlKey, 'proj-empty');
@@ -37,10 +38,9 @@ test.describe('Empty-project default collapse (LIN-2514)', () => {
     await expect(emptyProject).toHaveAttribute('data-default-collapsed', 'true');
     await expect(emptyProject.locator('.project-header')).toHaveText(/^▶/);
 
-    // Only the header is visible — this is what catches an add-task-link
-    // regression that a page-height assertion alone would miss (a collapsed
-    // project with a visible add-task-link still occupies two rows).
-    await expect(emptyProject.locator('.add-task-link')).toBeHidden();
+    // Only the header is visible. LIN-4119: the + Add task link is in the header, beside the name, so it is the
+    // header's own visible control and the collapsed project is still one row (the height check below).
+    await expect(emptyProject.locator('[data-testid="project-header"] .add-task-link')).toBeVisible();
     await expect(emptyProject.locator('.project-description')).toBeHidden();
     await expect(emptyProject.locator('.project-meta')).toBeHidden();
     const headerBox = await emptyProject.locator('.project-header').boundingBox();
@@ -73,7 +73,7 @@ test.describe('Empty-project default collapse (LIN-2514)', () => {
 
     const emptyProjectAfterReload = page.locator(`.project[data-id="${emptyId}"]`);
     await expect(emptyProjectAfterReload.locator('.project-header')).toHaveText(/^▶/);
-    await expect(emptyProjectAfterReload.locator('.add-task-link')).toBeHidden();
+    await expect(emptyProjectAfterReload.locator('[data-testid="project-header"] .add-task-link')).toBeVisible();
   });
 
   // Review F1: init() used to spread state.collapsedProjects straight off
@@ -83,7 +83,7 @@ test.describe('Empty-project default collapse (LIN-2514)', () => {
   // every delegated handler (collapse/expand, search, reset) unwired.
   test('legacy/partial stored state does not break page JavaScript', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(emptyProjectSeed(localWorkerUrlKey));
-    await page.goto(`/workspace/${localWorkerUrlKey}/`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     await page.waitForLoadState('networkidle');
 
     // Pre-existing shape from before `collapsedProjects` existed.
@@ -122,7 +122,7 @@ test.describe('Empty-project default collapse (LIN-2514)', () => {
   test('a default-collapsed empty project is not left collapsed after it gains work, despite an unrelated interaction', async ({ page, seedLocal, localWorkerUrlKey }) => {
     const seed = emptyProjectSeed(localWorkerUrlKey);
     await seedLocal(seed);
-    await page.goto(`/workspace/${localWorkerUrlKey}/`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     await page.waitForLoadState('networkidle');
 
     const emptyId = localSeedId(localWorkerUrlKey, 'proj-empty');
@@ -175,7 +175,7 @@ test.describe('Empty-project default collapse (LIN-2514)', () => {
   // control until a full page reload.
   test('Reset view restores + Add task on an expanded project', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(emptyProjectSeed(localWorkerUrlKey));
-    await page.goto(`/workspace/${localWorkerUrlKey}/`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     await page.waitForLoadState('networkidle');
 
     const activeId = localSeedId(localWorkerUrlKey, 'proj-active');
@@ -189,7 +189,7 @@ test.describe('Empty-project default collapse (LIN-2514)', () => {
     // shows up when the control was genuinely hidden beforehand.
     await header.click();
     await expect(header).toHaveText(/^▶/);
-    await expect(addTaskLink).toBeHidden();
+    await expect(addTaskLink).toBeVisible();
 
     await page.locator('.reset-view').click();
 
@@ -204,7 +204,7 @@ test.describe('Empty-project default collapse (LIN-2514)', () => {
   // nothing under it.
   test('closing search restores the empty project\'s collapsed state', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(emptyProjectSeed(localWorkerUrlKey));
-    await page.goto(`/workspace/${localWorkerUrlKey}/`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     await page.waitForLoadState('networkidle');
 
     const emptyId = localSeedId(localWorkerUrlKey, 'proj-empty');
@@ -221,7 +221,7 @@ test.describe('Empty-project default collapse (LIN-2514)', () => {
     await searchInput.press('Escape');
 
     await expect(emptyProject.locator('.project-header')).toHaveText(/^▶/);
-    await expect(emptyProject.locator('.add-task-link')).toBeHidden();
+    await expect(emptyProject.locator('[data-testid="project-header"] .add-task-link')).toBeVisible();
   });
 
   // Review F-A: clearSearchState() applied a DETACHED state object
@@ -236,7 +236,7 @@ test.describe('Empty-project default collapse (LIN-2514)', () => {
   // header click must respond (not be swallowed).
   test('a header click responds immediately after a search round trip following manual expand (F-A)', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(emptyProjectSeed(localWorkerUrlKey));
-    await page.goto(`/workspace/${localWorkerUrlKey}/`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     await page.waitForLoadState('networkidle');
 
     const emptyId = localSeedId(localWorkerUrlKey, 'proj-empty');
@@ -246,7 +246,7 @@ test.describe('Empty-project default collapse (LIN-2514)', () => {
 
     // 1. On load: default-collapsed.
     await expect(header).toHaveText(/^▶/);
-    await expect(addTaskLink).toBeHidden();
+    await expect(addTaskLink).toBeVisible();
 
     // 2. Manually expand the empty project.
     await header.click();
@@ -261,7 +261,7 @@ test.describe('Empty-project default collapse (LIN-2514)', () => {
     await searchInput.fill('active');
     await searchInput.press('Escape');
     await expect(header).toHaveText(/^▶/);
-    await expect(addTaskLink).toBeHidden();
+    await expect(addTaskLink).toBeVisible();
 
     // 4. The very next header click is the load-bearing assertion: under the
     // F-A bug this click was silently swallowed (state.collapsedProjects
@@ -275,15 +275,15 @@ test.describe('Empty-project default collapse (LIN-2514)', () => {
     // handler is now toggling normally rather than merely "unstuck" once.
     await header.click();
     await expect(header).toHaveText(/^▶/);
-    await expect(addTaskLink).toBeHidden();
+    await expect(addTaskLink).toBeVisible();
   });
 
   // Review F4: the manual-toggle half of the .add-task-link wiring
   // (handleProjectHeaderClick's hide/show branches) shipped with zero
   // coverage — mutation-checked in review (removing it left 43 specs green).
-  test('manual collapse hides + Add task, manual re-expand restores it', async ({ page, seedLocal, localWorkerUrlKey }) => {
+  test('manual collapse keeps + Add task in the header; manual re-expand restores the project', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(emptyProjectSeed(localWorkerUrlKey));
-    await page.goto(`/workspace/${localWorkerUrlKey}/`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     await page.waitForLoadState('networkidle');
 
     const activeId = localSeedId(localWorkerUrlKey, 'proj-active');
@@ -296,7 +296,7 @@ test.describe('Empty-project default collapse (LIN-2514)', () => {
 
     await header.click();
     await expect(header).toHaveText(/^▶/);
-    await expect(addTaskLink).toBeHidden();
+    await expect(addTaskLink).toBeVisible();
 
     await header.click();
     await expect(header).toHaveText(/^▼/);

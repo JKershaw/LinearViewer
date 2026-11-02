@@ -76,9 +76,10 @@ describe('LIN-2521 — resolveTeamSelection is the sole req.query.team read site
 
   // LIN-4024: the Home rows route is the sixth team-filterable route. Its rows must match the page's own, so it
   // takes the team and assignee the page takes.
-  test('resolveTeamSelection is called from exactly the six team-filterable routes', () => {
+  // LIN-4119: the backlog page is the seventh. It shows the same project sections, so it filters the same way.
+  test('resolveTeamSelection is called from exactly the seven team-filterable routes', () => {
     const callSites = [...SERVER_SRC.matchAll(/const \{ teamId \} = await resolveTeamSelection\(req, workspace\);/g)];
-    assert.equal(callSites.length, 6, `expected 6 call sites (dashboard, swipe, swim, ship, roadmap, home-rows), found ${callSites.length}`);
+    assert.equal(callSites.length, 7, `expected 7 call sites (dashboard, swipe, swim, ship, roadmap, home-rows, backlog), found ${callSites.length}`);
 
     const routeMarkers = [
       "app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {",
@@ -87,6 +88,7 @@ describe('LIN-2521 — resolveTeamSelection is the sole req.query.team read site
       "app.get('/workspace/:urlKey/ship', workspaceFromUrl, async (req, res) => {",
       "app.get('/workspace/:urlKey/roadmap', workspaceFromUrl, async (req, res) => {",
       "app.get('/workspace/:urlKey/api/home-rows', workspaceFromUrl, async (req, res) => {",
+      "app.get('/workspace/:urlKey/backlog', workspaceFromUrl, async (req, res) => {",
     ];
     for (const marker of routeMarkers) {
       const routeIdx = SERVER_SRC.indexOf(marker);
@@ -98,9 +100,9 @@ describe('LIN-2521 — resolveTeamSelection is the sole req.query.team read site
     }
   });
 
-  test('each of the five routes forwards its OWN resolved teamId into handleUnauthorizedError (never a shared/global one)', () => {
+  test('each of the six routes forwards its OWN resolved teamId into handleUnauthorizedError (never a shared/global one)', () => {
     const calls = [...SERVER_SRC.matchAll(/return handleUnauthorizedError\(workspace, req\.session, teamId, assigneeState, openRouterSource, res, error\);/g)];
-    assert.equal(calls.length, 5, `expected 5 handleUnauthorizedError call sites carrying the route-local teamId, found ${calls.length}`);
+    assert.equal(calls.length, 6, `expected 6 handleUnauthorizedError call sites carrying the route-local teamId (LIN-4119 adds backlog), found ${calls.length}`);
   });
 });
 
@@ -150,16 +152,16 @@ describe('LIN-2521 — the refresh-retry chain threads teamId through, never re-
 });
 
 describe('LIN-2526 — resolveAssigneeSelection is threaded the same way teamId is', () => {
-  test('resolveAssigneeSelection is called from all six team-filterable routes', () => {
+  test('resolveAssigneeSelection is called from all seven team-filterable routes', () => {
     // The dashboard route reuses its own `provider` local (needed separately
     // for canFilterByMe) rather than re-deriving it inline, so it matches a
     // slightly different call shape than the other four routes.
     const genericCallSites = [...SERVER_SRC.matchAll(/const assigneeState = await resolveAssigneeSelection\(req, getProviderForWorkspace\(workspace\), getWorkspaceCallScope\(workspace\)\);/g)];
     const dashboardCallSites = [...SERVER_SRC.matchAll(/const assigneeState = await resolveAssigneeSelection\(req, provider, getWorkspaceCallScope\(workspace\)\);/g)];
     const total = genericCallSites.length + dashboardCallSites.length;
-    assert.equal(total, 6, `expected 6 resolveAssigneeSelection call sites (dashboard, swipe, swim, ship, roadmap, home-rows), found ${total}`);
-    // The dashboard and the Home rows route both reuse their provider local (both need it for the page's own filter).
-    assert.equal(dashboardCallSites.length, 2, 'expected the dashboard and the home-rows route to use the provider-reuse shape');
+    assert.equal(total, 7, `expected 7 resolveAssigneeSelection call sites (dashboard, swipe, swim, ship, roadmap, home-rows, backlog), found ${total}`);
+    // The dashboard, the Home rows route and the backlog page all reuse their provider local (each needs it for the page's own filter).
+    assert.equal(dashboardCallSites.length, 3, 'expected the dashboard, the home-rows route and the backlog page to use the provider-reuse shape');
   });
 
   test('the dashboard route threads resolvedAssigneeName into fetchAndPrepareProjects and selectedAssignee/availableAssignees into renderPage', () => {

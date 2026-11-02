@@ -29,18 +29,24 @@ test.describe('GitHub Projects provider (no test-token mock)', () => {
   });
 
   test('dashboard renders the board container + its items from the fake backend', async ({ page }) => {
-    // The board itself maps to a canonical project header (named by board title).
+    // The board maps to a canonical project header; its To Do item and its done count are the backlog page's (LIN-4024).
+    await page.goto(`${DASHBOARD}backlog`);
     await expect(page.locator('.project-header:has-text("Roadmap")')).toBeVisible();
-    // Board items render under it: the In Progress and Todo items. LIN-4024: the Done item is counted on the project, not sent.
-    await expect(page.locator('.line:has-text("Board task in progress")').first()).toBeAttached();
     await expect(page.locator('.line:has-text("Board task to do")').first()).toBeAttached();
     await expect(page.locator('.line:has-text("Board task shipped")')).toHaveCount(0);
     await expect(page.locator('[data-testid="home-done-count"]').first()).toContainText('1 done');
-    // The draft item (no Status column) surfaces too.
+    // The In Progress item is the top task (LIN-4117), so it is In Progress on Home.
+    await page.goto(DASHBOARD);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('.line:has-text("Board task in progress")').first()).toBeAttached();
+    // The draft item (no Status column) surfaces too. It is a To Do project row, which the backlog page holds.
+    await page.goto(`${DASHBOARD}backlog`);
+    await page.waitForLoadState('networkidle');
     await expect(page.locator('.line:has-text("Draft idea")').first()).toBeAttached();
   });
 
   test('detail link is provider-aware: "View in GitHub Projects" (not Linear)', async ({ page }) => {
+    await page.goto(`${DASHBOARD}backlog`);
     // render.js interpolates provider.ui.displayName into the detail link. The
     // detail block is lazy — expand an issue to load it first.
     await page.locator('.line.expandable').first().click();
@@ -57,7 +63,7 @@ test.describe('GitHub Projects provider — empty board', () => {
       project: { id: 'PVT_e', number: 7, title: 'Empty Board', url: 'https://github.com/orgs/octocat/projects/7', shortDescription: null },
       items: [],
     });
-    await page.goto(githubProjectsDashboardUrl(GITHUB_PROJECTS_WORKSPACE_URL_KEY));
+    await page.goto(`${githubProjectsDashboardUrl(GITHUB_PROJECTS_WORKSPACE_URL_KEY)}backlog`);
     await page.waitForLoadState('networkidle');
 
     // The board container renders as a header...

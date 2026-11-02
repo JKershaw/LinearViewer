@@ -15,7 +15,8 @@ test.describe('Authenticated Dashboard', () => {
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
   });
 
-  test('renders project tree with issues', async ({ page }) => {
+  test('renders project tree with issues', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     // Wait for page to fully load
     await page.waitForLoadState('networkidle');
 
@@ -47,13 +48,17 @@ test.describe('Authenticated Dashboard', () => {
     await expect(page.locator(`.in-progress-items .node[data-id="${localSeedId(localWorkerUrlKey, 'local-issue-2')}"]`)).toHaveCount(1);
   });
 
-  test('displays correct state indicators', async ({ page }) => {
+  test('displays correct state indicators', async ({ page, localWorkerUrlKey }) => {
     // LIN-850: tree-row status glyphs render through the shared status primitive as the box-less bare variant.
     // LIN-4024: each section says its own state. Recent activity lists the just-created tasks too, so the counts
     // below are scoped to the section that holds each row.
 
-    // Started issues (local-issue-1, local-issue-4) are In Progress.
+    // Started issues (local-issue-1, local-issue-4) are In Progress. In Progress is Home's, so this is read there.
     await expect(page.locator('.in-progress-items .status-pill--bare.status-pill--in-progress')).toHaveCount(2);
+
+    // LIN-4119: the project rows and their done count are the backlog page's.
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
+    await page.waitForLoadState('networkidle');
 
     // The Up next task is a project row in Todo.
     await expect(page.locator('.line[data-section="project"] .status-pill--bare.status-pill--todo')).toHaveCount(1);
@@ -109,7 +114,8 @@ test.describe('Authenticated Dashboard', () => {
     await expect(h1).not.toContainText('Harbour');
   });
 
-  test('renders CSS-based tree structure', async ({ page }) => {
+  test('renders CSS-based tree structure', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     // Tree structure is now rendered with CSS pseudo-elements instead of box-drawing characters
     // Verify the .tree container exists and contains nodes
     const treeContainer = page.locator('.project .tree');
