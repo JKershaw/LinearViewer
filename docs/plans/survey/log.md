@@ -53,3 +53,11 @@ Full answers are comments headed "Survey spike 1a" on LIN-4113, LIN-4114, LIN-41
 - **Every builder's "first" is option 2 or 3** (a small complete tidy, or consolidating one decision), with a sized payoff: a third less diff, half the diff, one review round, a day of E2E runs. None asked for a Theseus pass, and none said "just drill", though LIN-4140 said "not very hard".
 - **Tickets got things wrong in a repeated way:** witnesses that couldn't fail ("fails before" impossible; a check over an empty list), stale assumptions ("always `record`", "unprioritised"), and fences that contradict each other ("/backlog unchanged" against "extend the reachability test"). This is the Costs bar's lessons arising independently in the UI area.
 - **Tooling friction is real and specific.** Shared E2E state and a missing "inputs of this page" view. The workshop is part of the place.
+
+## 2 Nov, about 21:55 UTC: an in-flight session touched, and a coordination note
+
+- **One survey follow-up reached a session still at work.** That was LIN-4145 (S3e-0, mid-build). I had picked sessions by "latest implementation dispatch is done" without checking whether the ticket itself was still in flight. It answered (its comment is above) and its build carried on to review, so nothing was blocked. Its live autopilot got one extra wake. **Rule for this run:** follow up only sessions whose ticket is Done and whose lineage autopilot has ended. The UI session ("Rebuilding the UI layer") flagged it, and I messaged it directly.
+- **S3e's (LIN-4139) own run was cut off before this, unrelated to the Survey.** Its autopilot started at about 17:00, waited 4.5 hours for S3e-0, and simple-dispatcher's stall failsafe killed it at 21:30. LIN-4040's autopilot will start a fresh one. It's another "should this session be running?" item: started too early, then killed for waiting.
+- **Coordination with the UI session:**
+  - S4 and S5 stay held until the Survey of S4 is posted on LIN-4150, then I'll ask the UI session to resume. LIN-4040's autopilot owns the run; I won't start a rival.
+  - The UI session will tell me when S3e-0 and S3e land, which is my cue to run the periodicals.
