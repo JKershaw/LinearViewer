@@ -43,7 +43,7 @@ The long argument is the essay `docs/papers/harbour/tasks-are-tasks.md` (v4 is l
   - A piece took 80 to 256 minutes, and the slow ones were mostly fighting the unreliable local browser-test run.
   - The code is tidier where it was aimed (task state has one owner and one set of facts) but not overall. `lib` grew about 1,900 lines and the unit tests about 13,000. New modules were added beside old ones more often than old ones were removed.
 
-  This is tidy-first happening reactively, one discovery at a time.
+  This is tidy-first happening reactively, one discovery at a time. It settles where it is aimed and relocates mass everywhere else. It is the before-picture for Spike 1c.
 - **Costs tidy 5 (LIN-4147, merged as `46b43b3b`, 3 November):**
   - It fixed a live bug with no plan-review rounds. One lineage had been counted under both LIN-4114 and LIN-4139; about $49.50 left those issues. A sweep found 0 lineages under more than one issue.
   - Its one miss shows the monkey's paw. It was guarded on one side ("never under two issues") but not the other ("every issue still gets a figure"), and afterwards 114 of 198 issues showed no lineage, unchecked against before. The bar gained "no issue loses a figure unless named".
@@ -76,7 +76,7 @@ The long argument is the essay `docs/papers/harbour/tasks-are-tasks.md` (v4 is l
 
 **What it returns.** A menu, in sizes, and each option says what it buys *this* task (for example, "the change drops from about 14 files to 4") and what it costs:
 1. **Just drill.** It's often right: narrow tickets land fine even in tangled code. It must always be on the menu.
-2. **A small tidy**, in Beck's sense: minutes, and reversible.
+2. **A small tidy**, in Beck's sense: minutes, and reversible. Small in scope but complete: if it gathers anything, the copies are deleted in the same change. A helper extracted beside its copies is adopt-on-next-touch under a new name. Small is fine; partial isn't.
 3. **Consolidate the decision this task touches.** One authority, with the copies deleted in the same change.
 4. **Theseus the area.** Free the seam, consolidate, rebuild.
 
@@ -88,7 +88,9 @@ The long argument is the essay `docs/papers/harbour/tasks-are-tasks.md` (v4 is l
 
 **How the choice is made.** The Survey recommends; small options just proceed; John is asked only when the large option is recommended. The ruling card with the recommended answer as its main button (LIN-4114) is the natural surface for that.
 
-**Asked twice.** The Survey asks before the task. The builder answers the same question after merge, when nothing is at stake. The gap between the two answers is how the Survey learns, and the pairs are the area's film.
+**Asked twice.** The Survey asks before the task. The builder answers the same question after merge, when nothing is at stake. The Survey doesn't need to be right; it needs to be wrong in a way the after-answer can show. The pairs over time are the area's film, without a viewer.
+
+**Who compares the pairs.** Pairs don't teach anything just by existing. Whoever runs the spikes owns the comparison: John, with Claude or the operator doing the reading. Each comparison ends in a line taken *out* of the Survey's prompt where the after-answers keep contradicting it, or "none, and why". This is Costs' "what did the ticket get wrong? → revise the bar" rhythm. Without it, the pairs become one more report and the Survey grows like every other gate. Removing lines is the smallest part of John's hand that can't yet be lowered.
 
 **Its ancestor** is the Surface Assessment, a verdict grown into a menu.
 
@@ -107,7 +109,7 @@ The long argument is the essay `docs/papers/harbour/tasks-are-tasks.md` (v4 is l
 
 ## Spikes
 
-These are small, read-only first, and judged by looking. Each spike's result is noted here.
+These are small, read-only first, and judged by looking. Each spike's result is noted here. **Spike 2 is the verdict; spikes 1 and 3 are calibration.** Agents explain known outcomes beautifully, and builders defend their detours, so only a forecast made before the clay is touched tests the Survey's claim. That forecast is exactly where the Surface Assessment stood when it misfired. If the Survey only explains afterwards, it is a good reviewer, not a surveyor.
 
 **Spike 0: can we ask a finished session?**
 - simple-dispatcher supports follow-up resume (`claude --resume`, `RESUMING → EXECUTING → COMPLETED`; `docs/session-lifecycle.md`).
@@ -118,7 +120,7 @@ These are small, read-only first, and judged by looking. Each spike's result is 
 - Tickets LIN-4117 to LIN-4145: fresh sessions, a well-mapped area, known outcomes.
 - **1a.** Ask each builder and researcher "why was this difficult, and what would you have done first?" *before* showing them any data.
 - **1b.** Compare their answers with the tangle data (Seams & Tangles, change coupling, census).
-- **1c.** Run a Survey at S3's base commit and see whether it would have predicted the 17 tickets and their prerequisites.
+- **1c.** Run a Survey at S3's base commit, with no access to anything after it (no later tickets, commits or notes), and see whether it would have predicted the 17 tickets and their prerequisites.
 - **Judged by:** whether it names the tangles that actually cost the work, and whether it says "just drill" where the work really was fine.
 
 **Spike 2: forward survey on S4 (LIN-4106).**
@@ -131,10 +133,12 @@ These are small, read-only first, and judged by looking. Each spike's result is 
 - The coherence census is the answer key (`docs/papers/harbour/coherence-as-it-grows-census.json` `knownDecisions`/`twins`, `-exposure.json` `perPr`).
 - The Survey finds the prize only if it names a decision that later caused an escaped defect. The clean tickets check that it stays quiet.
 
+**Independent of the Survey, and cheap:** change review's expectation so that "made the change easy, then made the easy change" is the normal shape of a PR. It is the one change that lets any tidy survive review. It is a prompt change, so it goes through the prompt-size budget with its reason recorded.
+
 **Later, once the Survey earns it:**
 - move the Costs notebook into the repo beside its design note;
 - swap the idle default to one tidying move from that notebook;
-- change the builder's permission and review's expectation together, then watch one live move;
+- widen the builder's permission (find what touches, put it together in its own commit, then cut), then watch one live move;
 - Theseus for the prompts.
 
 Then: just run tasks, tidy as we go, and measure, with cost per lineage over time as the money view.
