@@ -1,0 +1,189 @@
+{
+ "sessions": 77,
+ "mixedModel": 0,
+ "relayNull": 12,
+ "relayNullHaiku": 12,
+ "relayUsd": 164.78823020000002,
+ "truthMainUsd": 221.64176095000005,
+ "truthSubUsd": 16.537226025,
+ "subFiles": 9,
+ "sessionsWithSub": 4,
+ "sideInMain": 0,
+ "unpricedMsgs": 0,
+ "byModel": {
+  "claude-opus-5-5": {
+   "msgs": 1069,
+   "usd": 0
+  },
+  "claude-haiku-5-5": {
+   "msgs": 2681,
+   "usd": 0
+  },
+  "sub:claude-haiku-5-5": {
+   "msgs": 29
+  },
+  "claude-sonnet-5-5": {
+   "msgs": 1821,
+   "usd": 0
+  },
+  "sub:claude-opus-5-5": {
+   "msgs": 393
+  }
+ },
+ "rows": [
+  {
+   "s": "15e40be5",
+   "lastModel": "claude-haiku-5-5",
+   "models": [
+    "claude-haiku-5-5"
+   ],
+   "relay": null,
+   "main": 12.958,
+   "sub": 0,
+   "nsub": 0
+  },
+  {
+   "s": "61f08777",
+   "lastModel": "claude-haiku-5-5",
+   "models": [
+    "claude-haiku-5-5"
+   ],
+   "relay": null,
+   "main": 11.903,
+   "sub": 0,
+   "nsub": 0
+  },
+  {
+   "s": "a5e23758",
+   "lastModel": "claude-opus-5-5",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "relay": 2.2120368,
+   "main": 2.212,
+   "sub": 9.605,
+   "nsub": 4
+  },
+  {
+   "s": "965d31fa",
+   "lastModel": "claude-opus-5-5",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "relay": 2.872591,
+   "main": 2.873,
+   "sub": 6.896,
+   "nsub": 3
+  },
+  {
+   "s": "d53d91c2",
+   "lastModel": "claude-haiku-5-5",
+   "models": [
+    "claude-haiku-5-5"
+   ],
+   "relay": null,
+   "main": 8.249,
+   "sub": 0,
+   "nsub": 0
+  },
+  {
+   "s": "86376720",
+   "lastModel": "claude-haiku-5-5",
+   "models": [
+    "claude-haiku-5-5"
+   ],
+   "relay": null,
+   "main": 6.505,
+   "sub": 0,
+   "nsub": 0
+  },
+  {
+   "s": "9fe754ec",
+   "lastModel": "claude-haiku-5-5",
+   "models": [
+    "claude-haiku-5-5"
+   ],
+   "relay": null,
+   "main": 3.736,
+   "sub": 0,
+   "nsub": 0
+  },
+  {
+   "s": "e9bec43c",
+   "lastModel": "claude-haiku-5-5",
+   "models": [
+    "claude-haiku-5-5"
+   ],
+   "relay": null,
+   "main": 3.722,
+   "sub": 0,
+   "nsub": 0
+  },
+  {
+   "s": "1572c4f1",
+   "lastModel": "claude-haiku-5-5",
+   "models": [
+    "claude-haiku-5-5"
+   ],
+   "relay": null,
+   "main": 2.35,
+   "sub": 0,
+   "nsub": 0
+  },
+  {
+   "s": "4b91a8dc",
+   "lastModel": "claude-haiku-5-5",
+   "models": [
+    "claude-haiku-5-5"
+   ],
+   "relay": null,
+   "main": 2.016,
+   "sub": 0.027,
+   "nsub": 1
+  },
+  {
+   "s": "c7e67d6e",
+   "lastModel": "claude-haiku-5-5",
+   "models": [
+    "claude-haiku-5-5"
+   ],
+   "relay": null,
+   "main": 1.952,
+   "sub": 0,
+   "nsub": 0
+  },
+  {
+   "s": "066fc288",
+   "lastModel": "claude-haiku-5-5",
+   "models": [
+    "claude-haiku-5-5"
+   ],
+   "relay": null,
+   "main": 1.539,
+   "sub": 0.009,
+   "nsub": 1
+  },
+  {
+   "s": "b99d9ae3",
+   "lastModel": "claude-haiku-5-5",
+   "models": [
+    "claude-haiku-5-5"
+   ],
+   "relay": null,
+   "main": 1.311,
+   "sub": 0,
+   "nsub": 0
+  },
+  {
+   "s": "604d9ab2",
+   "lastModel": "claude-haiku-5-5",
+   "models": [
+    "claude-haiku-5-5"
+   ],
+   "relay": null,
+   "main": 0.613,
+   "sub": 0,
+   "nsub": 0
+  }
+ ]
+}
