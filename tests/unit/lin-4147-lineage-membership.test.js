@@ -216,6 +216,33 @@ describe('the cost readers, one synthetic case per changed behaviour (LIN-4147)'
   });
 });
 
+describe('buildTaskCost reports only lineages an own row is a member of (LIN-4147)', () => {
+  test('with no issue filter, a lineage made only of siblings is not reported', () => {
+    const own = formatted({ id: 'own', rootItemId: 'own', issueIdentifier: 'LIN-1', dispatchedAt: hoursAgo(5), feedback: [usage({ cost: 1, at: hoursAgo(5), anchor: 'own' })] });
+    const stranger = formatted({ id: 'S', rootItemId: 'S', issueIdentifier: 'LIN-2', dispatchedAt: hoursAgo(4), feedback: [usage({ cost: 50, at: hoursAgo(4), anchor: 'S' })] });
+    const siblings = new Map([['S', [stranger]]]);
+    const result = buildTaskCost({ ownRows: [own], siblingRowsByAnchor: siblings });
+    assert.equal(result.pricedUsd, 1, 'the sibling-only lineage is another issue\'s read');
+    assert.equal(result.workerSessions.length, 1);
+  });
+});
+
+describe('R9 effort readout: an in-flight earlier member becomes the merge base (LIN-4147)', () => {
+  // Named in the close-out under "Figures that change". A finished wake W is re-pointed into an
+  // in-flight root A: the session is now one lineage, labelled by A's kind and timed from A's dispatch.
+  test('the session takes the earliest member\'s kind and dispatch time, not the wake\'s', () => {
+    const MIN = 60e3;
+    const t0 = Date.parse('2026-11-02T08:00:00.000Z');
+    const at = (min) => new Date(t0 + min * MIN).toISOString();
+    const root = formatted({ id: 'A', rootItemId: 'A', issueIdentifier: 'LIN-1', kind: 'autopilot', dispatchedAt: at(0), feedback: [usage({ cost: 0, at: at(1), anchor: 'A' })] });
+    const wake = formatted({ id: 'W', rootItemId: 'A', issueIdentifier: 'LIN-1', kind: 'wake', dispatchedAt: at(60), feedback: [usage({ cost: 2, at: at(70), anchor: 'A' }), { rootItemId: 'A', message: '[done] landed', timestamp: at(80) }] });
+    const result = buildTaskCost({ ownRows: [wake], siblingRowsByAnchor: new Map([['A', [root]]]), issueIdentifier: 'LIN-1' });
+    assert.equal(result.workerSessions.length, 1);
+    assert.equal(result.workerSessions[0].kind, 'autopilot');
+    assert.equal(result.workerSessions[0].durationMs, 80 * MIN, 'timed from the root\'s dispatch (a wake alone: 20 min)');
+  });
+});
+
 describe('one answer across the readers (LIN-4147)', () => {
   // One fixture, read through every engine in both shapes: a founder with usage, a follow-up under
   // another issue, an abort row, a never-ran row, a wake pointing at an issue-less root, and a

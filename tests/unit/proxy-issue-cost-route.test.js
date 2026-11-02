@@ -352,3 +352,38 @@ describe('GET /api/proxy/issues/:identifier/cost — 30-day read horizon (LIN-31
     assert.ok(summarizeOpts.since.getTime() >= lo && summarizeOpts.since.getTime() <= hi, 'summarizeByIssue since must be ~30d ago');
   });
 });
+
+// LIN-4147: the route must hand the requested issue to buildTaskCost, or /cost applies no issue
+// filter and prices another issue's lineage as well. buildTaskCost's own tests call it directly,
+// so these two drive the route (removing `issueIdentifier: identifier` from the call turns both red).
+describe('GET /api/proxy/issues/:identifier/cost — only lineages that count under the requested issue (LIN-4147)', () => {
+  test('a wake row for LIN-X, re-pointed into an issue-less root, is not priced under LIN-X', async () => {
+    const root = row({ id: 'P', rootItemId: 'P', issueIdentifier: null, kind: 'autopilot', dispatchedAt: '2026-08-01T10:00:00.000Z', feedback: [usageEntry({ costUsd: 7, rootItemId: 'P' })] });
+    const wake = row({ id: 'W', rootItemId: 'P', issueIdentifier: 'LIN-X', kind: 'wake', dispatchedAt: '2026-08-01T11:00:00.000Z', feedback: [usageEntry({ costUsd: 2, rootItemId: 'P', timestamp: '2026-08-01T11:00:00.000Z' })] });
+    const { app } = buildApp({ history: [root, wake] });
+    const { status, body } = await get(app, '/api/proxy/issues/LIN-X/cost');
+    assert.equal(status, 200);
+    assert.equal(body.noLineage, true);
+    assert.equal(body.totalUsd, null);
+    assert.equal(body.pricedUsd, 0);
+    assert.deepEqual(body.workerSessions, []);
+  });
+
+  test('a follow-up under LIN-99 inside a LIN-42 root is priced under LIN-42 only, on both route paths', async () => {
+    const root = row({ id: 'R', rootItemId: 'R', issueIdentifier: 'LIN-42', kind: 'implementation', dispatchedAt: '2026-08-01T10:00:00.000Z', feedback: [usageEntry({ costUsd: 5, rootItemId: 'R' })] });
+    const followUp = row({ id: 'F', rootItemId: 'R', issueIdentifier: 'LIN-99', kind: 'review', dispatchedAt: '2026-08-01T11:00:00.000Z', feedback: [usageEntry({ costUsd: 3, rootItemId: 'R', timestamp: '2026-08-01T11:00:00.000Z' })] });
+    const history = [root, followUp];
+
+    const other = await get(buildApp({ history }).app, '/api/proxy/cost/LIN-99');
+    assert.equal(other.status, 200);
+    assert.equal(other.body.noLineage, true);
+    assert.equal(other.body.totalUsd, null);
+
+    // Control: the founder's issue still gets the whole lineage, so the test is not vacuous.
+    const founder = await get(buildApp({ history }).app, '/api/proxy/issues/LIN-42/cost');
+    assert.equal(founder.body.noLineage, false);
+    // The two rows' usage entries are running totals, so the lineage shows the last one ($3), once.
+    assert.equal(founder.body.pricedUsd, 3);
+    assert.equal(founder.body.workerSessions.length, 1);
+  });
+});
