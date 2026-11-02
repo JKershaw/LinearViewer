@@ -1,0 +1,161 @@
+# The Survey: tidying first, and bringing codebases toward settled
+
+*Working document, started 2 November 2026 by John Kershaw and Claude. It records what we know, what we think, and the spikes we plan. It is updated as the spikes run, and it is a reference, not a spec.*
+
+## Why this exists
+
+Harbour runs coding agents over tickets, and it does the ticket well: requests survive, and about 95% of asks are delivered as written. But a codebase is a place, and nobody lives in it. Each stage answers to its ticket, so the condition of the code that tickets land in belongs to no one. The code only grows: since 1 September there have been 965 commits and +78,900 lines, and about 100 of those commits shrink the code, nearly all of them from tickets whose job was removal. Every later change pays to push through what the earlier ones left.
+
+The aim is to have Harbour bring codebases **toward settled**, its own included. Settled is a balance, not smallness: the code's size tracks what the product does rather than its history. John's image for it is a marble beacon on a trig point. It is not a destination. It is the fixed point every change is surveyed from, and a change moves the place either toward settled or away from it.
+
+The long argument is the essay `docs/papers/harbour/tasks-are-tasks.md` (v4 is live; v5, LIN-4149, is in flight). The evidence behind it is `docs/reviews/_evidence-2026-11-02-ticket-intent/investigation-notes.md`. A handoff for continuing the discussion is in the same folder.
+
+## What we know (from the record)
+
+**The pipeline is faithful to the ticket.**
+- 94% of requests survive word for word.
+- A coverage check of 254 tickets found 94.7% of asks delivered.
+- About 1 ticket in 9 was reduced without a human decision, with no detectable difference between open and concrete asks.
+- The problem isn't a leaky stage.
+
+**Friction is noticed and left.**
+- In about three-quarters of 256 comment threads, agents record friction they saw and left alone.
+- "Improvement noticed, not required" appears 158 times.
+- The builder is the one hand in contact with where a change binds, and its signal is written down with nowhere to collect.
+
+**The code's side (Library shelf):**
+- **`steady-base`.** The code and prompts only grow, fastest at the gates. Fixes land as prose, and 5 of 101 citations ever left the prompts.
+- **`coherence-as-it-grows`.** What grows is the number of places holding one decision. 45% of escaped defects trace to an unreconciled decision (27% among those found by use). A change that touches such a decision is 5× the size and sent back 2.5× as often. "Deletion finishes"; review-and-file, parity tests and helper extraction don't.
+- **`consolidate-then-rebuild`.** On 17 October, eight Theseus tickets all merged, with zero behaviour differences on replay. They cost John two ruling presses.
+
+**What was tried before:**
+- **Periodicals (16).** They are inspectors outside the timeline of tasks: they report, mint tickets and leave. The weekly cadence is "a fallback floor, not a trigger", so Drift & Coherence hasn't run since 23 October.
+- **Passages' maintenance leg.** It budgeted for running the inspectors. John: it missed the point.
+- **The Surface Assessment.** It started in June as "would a refactor make this land better?" (LIN-192), misfired on LIN-391 by inventing a seam nothing called, and was turned to serve the ticket (LIN-397, a necessity gate). The June misfire added structure; what worked in October removed it.
+- **Adopt-on-next-touch.** It was tried, and adoption stayed flat: a new file imported the shared helpers *and* wrote eight raw copies beside them.
+
+**The resident has existed.** For 16 days, 11 to 26 October, one operator session worked with John across four episodes: the coherence loop (LIN-3449), Theseus rounds 1 to 3, the improvement cycles (LIN-3613), and the charter's Theseus loop (LIN-3490). It did the resident's work and survived two compactions. It ended when the frame moved. Continuity of *method* is largely solved (the code-shape kit, the census, the runbook). Continuity of *standing* is not.
+
+**The two live streams John is holding by hand:**
+- **Costs (LIN-3936).** A record ticket works as the area's notebook. It holds the goal: "the only behaviour to preserve is the outcome". The work goes one tidy at a time toward a Theseus rebuild. After each tidy, two questions are asked: did the area get cleaner, and what did the ticket get wrong? A "bar for a Costs ticket" is revised from evidence, and its lines mostly grant freedom or remove things.
+- **UI round 3 (LIN-4040), as of 3 November:**
+  - Five planned groups became 17 tickets. Every extra level was a prerequisite the run discovered mid-flight. Each one was defensible, but together they were slow.
+  - A piece took 80 to 256 minutes, and the slow ones were mostly fighting the unreliable local browser-test run.
+  - The code is tidier where it was aimed (task state has one owner and one set of facts) but not overall. `lib` grew about 1,900 lines and the unit tests about 13,000. New modules were added beside old ones more often than old ones were removed.
+
+  This is tidy-first happening reactively, one discovery at a time.
+
+**Cost is the incentive.**
+- A tidier codebase is cheaper because there is less to do. In Harbour a task takes hours, against minutes in a simple project.
+- The payback depends on traffic: a tidy pays every time its area changes again, so hotspots come first, and untouched mess costs little.
+- The saving is spread out and counterfactual, which is why it only shows in motion.
+- The Costs stream is building the meter: every model call counted once, under the issue its work was for.
+
+## What we think (the concept)
+
+- **The forcefield (John).** His attention holds the shape of the work, the way a hand holds a forcefield in a film. When the hand moves, the shape dissolves. Harbour in operation is the projector, and the shape is best seen in motion and zoomed out, not as stills. The hand turns out to be mostly *continuity*, plus compensating for the pipeline's reading habits. Two parts are genuinely John's: a goal that outranks the implementation, and taste about whether the code has settled.
+- **The drill and the chisel** (from a separate conversation, with Claude on Fable 5.1). Agents are drills: all force, pointed by a ticket, powering through friction. A chisel reads friction as information. "The mess isn't the waste. The thrown-away signal about the mess is."
+- **The material is the memory** (the same conversation). Code kept legible holds what *is*; that is what "textbook style" is for. A small notebook kept with the area holds where we're going and how to move. The ticket keeps only what was done. Understanding persists; the hands stay finite.
+- **The ball (John).** A task is a point inside a ball, and the layers around it are the code its diff has to push through. Tidying first shrinks the radius. If every task leaves the code tidier, it tends toward settled.
+- **The TDD switch (John).** Forecast, then prepare. It is more work and the wrong order, and it pays inside the same ticket. Beck's *Tidy First?* asks the same question, and the question mark is the forecast.
+- **The spine and its offshoot (John).**
+  - The pipeline is the spine.
+  - **The Survey** is an offshoot before the task.
+  - **Periodicals** track the place over time, show where it stands now, and do preventive tidying when idle.
+  - Drilling is always allowed: "you can always just drill."
+
+## The Survey
+
+**What it is.** Before a task starts, the Survey asks **"why is this difficult?"** "Why" names causes, not effort: pinning tests, a decision held in nine places, callers that keep a seam in place. Causes are facts you can act on, whereas Theseus's own predictions were weakest on effort.
+
+**What it returns.** A menu, in sizes, and each option says what it buys *this* task (for example, "the change drops from about 14 files to 4") and what it costs:
+1. **Just drill.** It's often right: narrow tickets land fine even in tangled code. It must always be on the menu.
+2. **A small tidy**, in Beck's sense: minutes, and reversible.
+3. **Consolidate the decision this task touches.** One authority, with the copies deleted in the same change.
+4. **Theseus the area.** Free the seam, consolidate, rebuild.
+
+**What it reads:**
+- the task;
+- the code at the base commit;
+- the periodicals' maps (Seams & Tangles knots, change coupling, the coherence census);
+- the area's notebook.
+
+**How the choice is made.** The Survey recommends; small options just proceed; John is asked only when the large option is recommended. The ruling card with the recommended answer as its main button (LIN-4114) is the natural surface for that.
+
+**Asked twice.** The Survey asks before the task. The builder answers the same question after merge, when nothing is at stake. The gap between the two answers is how the Survey learns, and the pairs are the area's film.
+
+**Its ancestor** is the Surface Assessment, a verdict grown into a menu.
+
+**Its limits:**
+- **It advises; it doesn't gate.** Asked as a gate, it is a judgement question on a broad ask, which is the recipe for plan-review spirals. Use a single pass with no review loop on the menu.
+- **Pull, not push.** It acts in proportion to this task's difficulty, never as "anything could be better".
+
+**Periodicals in this design** stop minting tickets into the queue. They become:
+- the place's film: trend over time, and where it stands now;
+- the Survey's map;
+- the idle-time chisel: when nothing is pending, autopilot's idle slot, which today runs an overdue inspector, runs one tidying move from the fuzziest area's notebook.
+
+**What else it implies:**
+- **Review** must expect "made the change easy, then made the easy change" as the normal shape of a PR, or it reads the tidy as creep.
+- **The pipeline's prompts** are themselves a place nobody lives in: they only grew. Theseus for the prompts would lighten every stage, and every prompt habit it removes is a line the Costs bar can drop.
+
+## Spikes
+
+These are small, read-only first, and judged by looking. Each spike's result is noted here.
+
+**Spike 0: can we ask a finished session?**
+- simple-dispatcher supports follow-up resume (`claude --resume`, `RESUMING → EXECUTING → COMPLETED`; `docs/session-lifecycle.md`).
+- Confirm that a session completed hours ago can be resumed through Harbour with a question, and that its answer can be captured.
+- Fallback: a fresh session reads the ticket's record and diff and answers as that builder. That is weaker evidence.
+
+**Spike 1: retrospective survey of UI round 3.**
+- Tickets LIN-4117 to LIN-4145: fresh sessions, a well-mapped area, known outcomes.
+- **1a.** Ask each builder and researcher "why was this difficult, and what would you have done first?" *before* showing them any data.
+- **1b.** Compare their answers with the tangle data (Seams & Tangles, change coupling, census).
+- **1c.** Run a Survey at S3's base commit and see whether it would have predicted the 17 tickets and their prerequisites.
+- **Judged by:** whether it names the tangles that actually cost the work, and whether it says "just drill" where the work really was fine.
+
+**Spike 2: forward survey on S4 (LIN-4106).**
+- S4 and S5 are on hold as of 3 November.
+- Survey S4 before it starts: its "why is this difficult?" and its menu. Then let S4 run, unchanged or with a chosen option, and compare.
+- It is the only spike where the Survey has to predict rather than explain.
+
+**Spike 3: historical backtest.**
+- Use about ten past tickets that touched a known scattered decision and five that didn't, from June to 8 October, each at its base commit and blind to what came after.
+- The coherence census is the answer key (`docs/papers/harbour/coherence-as-it-grows-census.json` `knownDecisions`/`twins`, `-exposure.json` `perPr`).
+- The Survey finds the prize only if it names a decision that later caused an escaped defect. The clean tickets check that it stays quiet.
+
+**Later, once the Survey earns it:**
+- move the Costs notebook into the repo beside its design note;
+- swap the idle default to one tidying move from that notebook;
+- change the builder's permission and review's expectation together, then watch one live move;
+- Theseus for the prompts.
+
+Then: just run tasks, tidy as we go, and measure, with cost per lineage over time as the money view.
+
+**Run the periodicals when the current round of work ends,** so there is a fresh map for the spikes.
+
+## Cautions
+
+- **Build no new nouns.** No viewer, no notebook as a new ticket type, no periodical inspecting notebooks. That is the accretion reflex in a new coat.
+- **Taste travels by example.** "Textbook style" is a taste, carried by worked examples (Theseus's experiments), not prompt rules.
+- **One area first.** Generalise only when the hand feels lighter there.
+- **Independent hands.** Ask builders before they see each other's answers or the data, or their agreement is echo, not evidence.
+- **Builders defend their detours,** even after merge. Read their answers with that in mind.
+- **Push versus pull.** A step loyal to the place finds something on every task unless it answers to a need: the June misfire.
+- **A new step is a new gate, and gates are where prose collects.** Keep the Survey out of the review loop.
+
+## Open questions
+
+- How much of John's hand is structure Harbour can hold, and how much is attention that needs a resident?
+- Where does each area's notebook live, and who writes to it?
+- How should the forecast weigh traffic (hotspots) against tangle?
+- How do we see the place in motion without building a viewer? The notes and the film may be enough.
+- Name: "Survey" is the current choice.
+
+## Working rules
+
+- Research and writing go through Harbour tickets and autopilot.
+- File tickets only when John asks.
+- Judge by looking; don't build rating schemes.
+- Write tickets at the level of the idea.
