@@ -10,7 +10,7 @@ import { buildRunView, tierOf, SPINE } from '../../lib/run-view.js';
 // a standalone single-step session.
 function loop(overrides = {}) {
   const id = overrides.loopId || 'loop';
-  return {
+  return withUsageFeedback({
     loopId: id,
     lineageId: overrides.lineageId ?? id,
     kind: 'plan',
@@ -24,7 +24,21 @@ function loop(overrides = {}) {
     telemetry: { runtime: { ms: 1000 }, metrics: [], producedArtifacts: [] },
     feedback: [],
     ...overrides,
-  };
+  });
+}
+
+// A run's usage is read from its own `[usage]` feedback entry (LIN-4136), so a loop given
+// `telemetry.usage` here carries that entry instead, and no `telemetry.usage` of its own.
+function withUsageFeedback(loop) {
+  const { usage, ...telemetry } = loop.telemetry || {};
+  if (!usage) return loop;
+  return { ...loop, telemetry, feedback: [...(loop.feedback || []), usageEntry(usage)] };
+}
+
+function usageEntry(usage) {
+  // A null cost is an unpriced run: name a model with no rate, so the parser derives no price.
+  const payload = usage.costUsd === null ? { ...usage, model: 'unpriceable-model-zz', costUsd: undefined } : usage;
+  return { kind: 'usage', message: `[usage] ${JSON.stringify(payload)}`, timestamp: '2026-07-20T10:05:00.000Z' };
 }
 
 function session(loops, overrides = {}) {
@@ -252,7 +266,7 @@ function pricedStage(kind, overrides = {}) {
 }
 
 describe('run-view: cost (honest, never guessed)', () => {
-  test('every lineage priced and cumulative → a header total, and a figure per step', () => {
+  test('every lineage priced → a header total, and a figure per step', () => {
     const view = buildRunView(session([
       pricedStage('plan', { usage: { costUsd: 1.5 } }),
       pricedStage('implementation', { usage: { costUsd: 2.5 } }),
@@ -291,7 +305,7 @@ describe('run-view: cost (honest, never guessed)', () => {
     assert.equal(view.cost.status, 'not-reported');
   });
 
-  test('only the lineage\'s last [usage] counts; earlier rows say "included in the step total"', () => {
+  test('a lineage of snapshots shows its last snapshot; earlier rows say "included in the step total"', () => {
     const r1 = loop({ loopId: 'r1', lineageId: 'R', kind: 'review', telemetry: { runtime: { ms: 1000 }, usage: usage({ costUsd: 5 }) } });
     const r2 = loop({ loopId: 'r2', lineageId: 'R', kind: 'review', followUpTo: 'r1', telemetry: { runtime: { ms: 1000 }, usage: usage({ costUsd: 7 }) } });
     const view = buildRunView(session([r1, r2]));
@@ -305,15 +319,40 @@ describe('run-view: cost (honest, never guessed)', () => {
     assert.equal(byId.r2.usd, 7);
   });
 
-  test('a per-turn harness (opencode) withholds the header total but keeps its as-reported figure', () => {
+  test('a per-turn harness (opencode) figure is the lineage total: the header shows it too', () => {
     const view = buildRunView(session([
       pricedStage('plan', { usage: { harness: 'opencode', costUsd: 1.25 } }),
     ]));
-    assert.equal(view.cost.status, 'not-reported');
-    assert.equal(view.cost.usd, null);
+    assert.equal(view.cost.status, 'total');
+    assert.equal(view.cost.usd, 1.25);
     assert.equal(view.steps[0].cost.status, 'priced');
     assert.equal(view.steps[0].cost.usd, 1.25);
-    assert.equal(view.steps[0].cost.cumulative, false);
+    assert.equal(view.steps[0].cost.label, null, 'no "as reported" qualifier');
+  });
+
+  test('a per-turn lineage of several rows sums its deltas, and the figure sits on the last row', () => {
+    const d1 = loop({ loopId: 'd1', lineageId: 'D', kind: 'implementation', telemetry: { runtime: { ms: 1000 }, usage: usage({ harness: 'opencode', costUsd: 1 }) } });
+    const d2 = loop({ loopId: 'd2', lineageId: 'D', kind: 'implementation', followUpTo: 'd1', telemetry: { runtime: { ms: 1000 }, usage: usage({ harness: 'opencode', costUsd: 2 }) } });
+    const view = buildRunView(session([d1, d2]));
+    assert.equal(view.steps[0].cost.usd, 3);
+    assert.equal(view.steps[0].cost.finalLoopId, 'd2');
+    assert.equal(view.cost.usd, 3);
+  });
+
+  test('a snapshot then a delta in one lineage: the snapshot and the delta both count', () => {
+    const r1 = loop({ loopId: 'r1', lineageId: 'R', kind: 'review', telemetry: { runtime: { ms: 1000 }, usage: usage({ harness: 'claude-code', costUsd: 5 }) } });
+    const r2 = loop({ loopId: 'r2', lineageId: 'R', kind: 'review', followUpTo: 'r1', telemetry: { runtime: { ms: 1000 }, usage: usage({ harness: 'opencode', costUsd: 2 }) } });
+    const view = buildRunView(session([r1, r2]));
+    assert.equal(view.steps[0].cost.usd, 7);
+  });
+
+  test('an unreadable last loop withholds the figure, and never shows the earlier snapshot as priced', () => {
+    const r1 = loop({ loopId: 'r1', lineageId: 'R', kind: 'review', telemetry: { runtime: { ms: 1000 }, usage: usage({ costUsd: 5 }) } });
+    const r2 = loop({ loopId: 'r2', lineageId: 'R', kind: 'review', followUpTo: 'r1', feedback: [{ kind: 'usage', message: '[usage] {not json' }] });
+    const view = buildRunView(session([r1, r2]));
+    assert.equal(view.steps[0].cost.status, 'not-reported');
+    assert.equal(view.steps[0].cost.label, 'not reported');
+    assert.equal(view.cost.status, 'not-reported', 'the header total is withheld too');
   });
 
   test('a payload with no harness is a running total: the header total is shown', () => {

@@ -25,6 +25,7 @@ import {
   deriveRuntime,
   buildRunTelemetry,
   buildSessionTelemetry,
+  readRowUsage,
 } from '../../lib/session-telemetry.js';
 
 describe('parseHeartbeat — real marker shapes', () => {
@@ -1372,5 +1373,47 @@ describe('buildSessionTelemetry', () => {
     assert.equal(t.ticketWalk.length, 2);
     assert.equal(t.ticketWalk[0].state, 'done');
     assert.equal(t.ticketWalk[1].state, 'started');
+  });
+});
+
+// LIN-4136: a row's usage has three states (absent, unreadable, present), and only a run carries
+// `usage`; a session spans lineages and has none of its own.
+// A usage payload with the given input-token count, as a `[usage]` feedback message.
+const usageJson = (inputTokens) => `[usage] ${JSON.stringify({ harness: 'claude-code', model: 'claude-opus-4-8', inputTokens, outputTokens: 1 })}`;
+
+describe('readRowUsage — absent, unreadable and present stay apart (LIN-4136)', () => {
+  test('no usage entry → absent; an entry that does not parse → unreadable; a readable one → present', () => {
+    assert.deepEqual(readRowUsage([]), { state: 'absent', usage: null });
+    assert.deepEqual(readRowUsage([{ kind: 'usage', message: '[usage] {not json' }]).state, 'unreadable');
+    const present = readRowUsage([{ kind: 'usage', message: usageJson(7) }]);
+    assert.equal(present.state, 'present');
+    assert.equal(present.usage.inputTokens, 7);
+  });
+
+  test('an unreadable LAST entry is unreadable, never the earlier readable one', () => {
+    const feedback = [
+      { kind: 'usage', message: usageJson(1) },
+      { kind: 'usage', message: '[usage] {not json' },
+    ];
+    assert.equal(readRowUsage(feedback).state, 'unreadable');
+    assert.equal(parseUsage(feedback), null);
+  });
+});
+
+describe('buildRunTelemetry / buildSessionTelemetry — usage belongs to a run (LIN-4136)', () => {
+  const feedback = [{ kind: 'usage', message: usageJson(9) }];
+
+  test('a run carries its usage', () => {
+    const t = buildRunTelemetry({ dispatchedAt: '2026-07-04T10:00:00.000Z', feedback });
+    assert.equal(t.usage.inputTokens, 9);
+  });
+
+  test('a session carries no usage, even when its loops do', () => {
+    const t = buildSessionTelemetry({
+      dispatchedAt: '2026-07-04T10:00:00.000Z',
+      loops: [{ feedback }, { feedback }],
+    });
+    assert.equal('usage' in t, false);
+    assert.deepEqual(Object.keys(t).sort(), ['metrics', 'producedArtifacts', 'runtime']);
   });
 });

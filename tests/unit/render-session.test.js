@@ -1496,22 +1496,31 @@ describe('render-session: run-page header money (LIN-3250)', () => {
     assert.ok(!/\$\d/.test(html), 'no dollar figure anywhere when the total is withheld');
   });
 
-  test('a total renders only when every lineage is priced and cumulative (claude-code)', () => {
+  test('a total renders only when every lineage is priced', () => {
     const session = fixtureSession();
-    session.loops[0].telemetry.usage = { harness: 'claude-code', model: 'claude-opus-4-8', costUsd: 1.5 };
-    session.loops[1].telemetry.usage = { harness: 'claude-code', model: 'claude-sonnet-4-6', costUsd: 2.5 };
+    session.loops[0].feedback = [usageEntry({ harness: 'claude-code', model: 'claude-opus-4-8', costUsd: 1.5 })];
+    session.loops[1].feedback = [usageEntry({ harness: 'claude-code', model: 'claude-sonnet-4-6', costUsd: 2.5 })];
     const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
     assert.match(html, /data-testid="session-cost"[^>]*>\$4\.00</);
   });
 
-  test('a per-turn harness withholds the header total — no money markup in the header', () => {
+  test('a per-turn harness (opencode) totals like any other lineage: the header shows the sum', () => {
     const session = fixtureSession();
-    session.loops[0].telemetry.usage = { harness: 'opencode', model: 'claude-opus-4-8', costUsd: 1.5 };
-    session.loops[1].telemetry.usage = { harness: 'opencode', model: 'claude-sonnet-4-6', costUsd: 2.5 };
+    session.loops[0].feedback = [usageEntry({ harness: 'opencode', model: 'claude-opus-4-8', costUsd: 1.5 })];
+    session.loops[1].feedback = [usageEntry({ harness: 'opencode', model: 'claude-sonnet-4-6', costUsd: 2.5 })];
     const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
-    assert.ok(!html.includes('data-testid="session-cost"'));
-    const headerBlock = html.slice(html.indexOf('sess-run-header'), html.indexOf('sess-steps'));
-    assert.ok(!/\$\d/.test(headerBlock), 'no money in the header when the total is withheld');
+    assert.match(html, /data-testid="session-cost"[^>]*>\$4\.00</);
+    assert.ok(!html.includes('as reported'), 'no per-turn qualifier anywhere');
+  });
+
+  test('a total is withheld while any lineage is unreadable, and no money is shown for it', () => {
+    const session = fixtureSession();
+    session.loops[0].feedback = [usageEntry({ harness: 'claude-code', model: 'claude-opus-4-8', costUsd: 1.5 })];
+    session.loops[1].feedback = [{ kind: 'usage', message: '[usage] {not json' }];
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+    assert.ok(!html.includes('data-testid="session-cost"'), 'no header money when a lineage is unreadable');
+    assert.match(runBlock(html, 'loop-2'), /data-testid="session-run-cost">not reported</, 'the unreadable run reads not reported');
+    assert.match(runBlock(html, 'loop-1'), /data-testid="session-run-cost">\$1\.50</, 'the readable lineage keeps its own figure');
   });
 
   test('no model identifier string appears anywhere on the page (tier only)', () => {
@@ -1551,7 +1560,7 @@ describe('render-session: run-page header money (LIN-3250)', () => {
 // One loop in the reconstructed-session shape, carrying an optional `[usage]`.
 function costLoop(overrides = {}) {
   const id = overrides.loopId || 'loop';
-  return {
+  return withUsageFeedback({
     loopId: id,
     lineageId: overrides.lineageId ?? id,
     kind: overrides.kind || 'implementation',
@@ -1565,7 +1574,21 @@ function costLoop(overrides = {}) {
     feedback: [],
     telemetry: { runtime: { ms: 1000 }, metrics: [], producedArtifacts: [] },
     ...overrides,
-  };
+  });
+}
+
+// A run's usage is read from its own `[usage]` feedback entry (LIN-4136), so a loop given
+// `telemetry.usage` here carries that entry instead, and no `telemetry.usage` of its own.
+function withUsageFeedback(loop) {
+  const { usage, ...telemetry } = loop.telemetry || {};
+  if (!usage) return loop;
+  return { ...loop, telemetry, feedback: [...(loop.feedback || []), usageEntry(usage)] };
+}
+
+function usageEntry(usage) {
+  // A null cost is an unpriced run: name a model with no rate, so the parser derives no price.
+  const payload = usage.costUsd === null ? { ...usage, model: 'unpriceable-model-zz', costUsd: undefined } : usage;
+  return { kind: 'usage', message: `[usage] ${JSON.stringify(payload)}`, timestamp: '2026-07-04T10:02:00.000Z' };
 }
 
 // ─── LIN-3247: the run-evidence mount (the one seam LIN-2948 lifts out) ───────
@@ -1634,14 +1657,15 @@ describe('render-session: per-row cost wording (LIN-3250 F2)', () => {
     assert.ok(!/\$\d/.test(html));
   });
 
-  test('a per-turn harness figure row carries its "as reported" qualifier, and the header total is withheld', () => {
+  test('a per-turn harness figure is the lineage total, with no "as reported" qualifier', () => {
     const session = fixtureSession({
       loops: [costLoop({ loopId: 'i1', lineageId: 'I', telemetry: { runtime: { ms: 1000 }, model: 'claude-opus-4-8', usage: { harness: 'opencode', model: 'claude-opus-4-8', costUsd: 1.25 } } })],
     });
     const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
-    assert.match(runBlock(html, 'i1'), /session-run-cost">\$1\.25 as reported</);
-    assert.match(stepSummaryText(html), /Build · done · premium · \$1\.25 as reported/);
-    assert.ok(!html.includes('data-testid="session-cost"'), 'per-turn harness withholds the header total');
+    assert.match(runBlock(html, 'i1'), /session-run-cost">\$1\.25</);
+    assert.match(stepSummaryText(html), /Build · done · premium · \$1\.25/);
+    assert.ok(!html.includes('as reported'), 'no per-turn qualifier');
+    assert.match(html, /data-testid="session-cost"[^>]*>\$1\.25</, 'the one lineage is the whole total');
   });
 });
 

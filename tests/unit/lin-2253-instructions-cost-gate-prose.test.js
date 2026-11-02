@@ -11,7 +11,7 @@
  * This is a DOC-VS-CODE consistency pin, not a prose snapshot: it asserts the
  * served text names every condition the code actually gates on, and — the
  * non-vacuity half — that the gate in `lib/task-cost.js` still has exactly
- * those four conditions. If someone adds a fifth condition to the gate without
+ * those five conditions. If someone adds a sixth condition to the gate without
  * documenting it, the second half fails; if someone deletes the `noLineage`
  * clause from the catalog, the first half fails.
  *
@@ -77,24 +77,24 @@ describe('GET /api/proxy/instructions — /cost totalUsd gate prose stays true t
     // the `totalUsd` restatement — the exact clause that went stale.
     assert.match(
       text,
-      /"totalUsd" restates\s+"pricedUsd" plus "appCalls\.costUsd" ONLY when "noLineage" is false AND "unpriced"\s+is empty AND "noTelemetryCount" is 0 AND "appCalls\.unpricedCalls" is 0/,
-      'the totalUsd gate prose names all four conditions, noLineage first'
+      /"totalUsd" restates\s+"pricedUsd" plus "appCalls\.costUsd" ONLY when "noLineage" is false AND "unpriced"\s+is empty AND "noTelemetryCount" is 0 AND "unreadableCount" is 0 AND "appCalls\.unpricedCalls"\s+is 0/,
+      'the totalUsd gate prose names all five conditions, noLineage first'
     );
   });
 
-  test('the gate in lib/task-cost.js still has exactly the four documented conditions', () => {
+  test('the gate in lib/task-cost.js still has exactly the five documented conditions', () => {
     // The other half of the pin: the prose above is only "true" relative to
     // this expression. Read the source rather than re-deriving the gate, so a
     // fifth condition cannot be added while the catalog silently keeps
-    // describing four.
+    // describing five.
     const source = readFileSync(
       fileURLToPath(new URL('../../lib/task-cost.js', import.meta.url)),
       'utf8'
     );
 
     assert.ok(
-      source.includes('const fullyPriced = !noLineage && unpriced.length === 0 && noTelemetryCount === 0 && (appCalls.unpricedCalls || 0) === 0;'),
-      'lib/task-cost.js gates fullyPriced on exactly the four conditions the catalog documents — ' +
+      source.includes('const fullyPriced = !noLineage && unpriced.length === 0 && noTelemetryCount === 0 && unreadableCount === 0 && (appCalls.unpricedCalls || 0) === 0;'),
+      'lib/task-cost.js gates fullyPriced on exactly the five conditions the catalog documents — ' +
       'if this fails, the gate changed and routes/proxy.js\'s /cost catalog prose must change with it'
     );
   });

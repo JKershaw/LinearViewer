@@ -1217,18 +1217,20 @@ matching zero rows and returning an authoritative-looking `$0.00`.
   },
   "unpriced": [],
   "noTelemetryCount": 0,
+  "unreadableCount": 0,
   "window": { "days": 30, "appCallsSince": "2026-07-02T12:00:00Z" }
 }
 ```
 
 - **`pricedUsd`** is the worker-side sum of whatever *is* priceable. **`totalUsd`**
   restates `pricedUsd` plus `appCalls.costUsd` **only** when `unpriced` is empty, AND
-  `noTelemetryCount` is `0`, AND `appCalls.unpricedCalls` is `0` — otherwise `totalUsd`
-  is `null`. This is deliberate: a partial figure must never look complete. `unpriced`
-  lists worker models with no rate-card entry; `noTelemetryCount` counts `taken`
-  dispatches with no usage telemetry at all; `appCalls.unpricedCalls` counts app calls
-  with no recorded cost. All three are surfaced independently so a caller can tell
-  *which* half of the join is uncertain.
+  `noTelemetryCount` is `0`, AND `unreadableCount` is `0`, AND `appCalls.unpricedCalls` is
+  `0` — otherwise `totalUsd` is `null`. This is deliberate: a partial figure must never
+  look complete. `unpriced` lists worker models with no rate-card entry; `noTelemetryCount`
+  counts `taken` dispatches with no usage telemetry at all; `unreadableCount` counts
+  lineages whose usage was posted but does not parse (their figure is unknown, not the
+  last readable one); `appCalls.unpricedCalls` counts app calls with no recorded cost. All
+  are surfaced independently so a caller can tell *which* part of the join is uncertain.
 - **Lineage de-duplication**: a follow-up dispatch resumes the same worker transcript
   and reports a *cumulative* usage snapshot on every Stop, so a task with a follow-up
   chain is counted **once per lineage**, never once per dispatch row — summing rows
