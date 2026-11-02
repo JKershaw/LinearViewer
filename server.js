@@ -1722,6 +1722,7 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
       const bindingCallScope = getBindingCallScope(binding);
       // Use mock data in test mode to avoid hitting the provider API
       const isTestMode = process.env.NODE_ENV === 'test' && bindingToken === 'test-token';
+      if (isTestMode) console.log('[diag-4120] MOCK binding urlKey=' + workspace.urlKey + ' wsId=' + workspace.id + ' provider=' + binding.provider);
       // LIN-4068: a mock set is never held (the write gate refuses it), so the result says whether one was used.
       if (isTestMode) stateMock = true;
 

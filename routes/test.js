@@ -250,6 +250,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   //                               a `-wN` suffix the siblings stay second-workspace
   //                               / workspace-N, keeping the default byte-identical.
   router.get('/test/set-session', async (req, res) => {
+    console.log('[diag-4120] set-session query urlKey=' + req.query.urlKey + ' url=' + req.originalUrl.slice(0, 120));
     const { tokenExpired, noRefreshToken, multiWorkspace, maxWorkspaces, openRouterConnected, freeTierEnabled, features, swimSample, shipSample, patMode, noLinearUser, proxyDefault } = req.query
     // Per-worker key for the first workspace; same `?urlKey=` interface the
     // teardown endpoints already use, with the identical 'test-workspace' default.
@@ -1499,6 +1500,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
 
       await localStore.clear(urlKey);
       await localStore.seed(urlKey, seed);
+      console.log('[diag-4120] set-local-session urlKey=' + urlKey + ' sessionWs=' + JSON.stringify(req.session?.workspaces?.map(w => w.urlKey)));
 
       // LIN-2226: a second local workspace in the SAME session (cross-workspace
       // task-bound coverage, mirroring LIN-1728 F1's two-Linear-workspace
