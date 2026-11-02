@@ -762,6 +762,7 @@ describe('selectLineageMembers (LIN-4137)', () => {
       { id: 'row-a', feedback: [entry('a1', T), entry('a2', T)] },
       { feedback: [entry('keyless', T)] },
       null,
+      'junk',
       { _id: 'row-b', feedback: [entry('b1', T)] },
     ]],
   };
