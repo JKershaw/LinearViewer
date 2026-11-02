@@ -130,22 +130,37 @@ test('W1: the recommended answer is the main button; a press sends its own label
   expect(JSON.stringify(body)).not.toContain('my own words');
 });
 
-test('W3: a double press on one option sends exactly one comment; the card\'s buttons stay off after success', async ({ page }) => {
+test('W3: while an answer is in flight, no button on the card can send a second one (a double press, another option, Answer)', async ({ page }) => {
   await seedTree(page, { runnerKey: true });
   await seedRuling(page, 'LOCAL-S', THREE_OPTIONS);
   await page.goto(`/workspace/${URL_KEY}/`);
 
   const card = page.locator(CARD).first();
+  // Hold the comment write open, so the card is genuinely in flight when the second presses land.
   let comments = 0;
-  page.on('request', req => { if (req.method() === 'POST' && /\/api\/comments\//.test(req.url())) comments++; });
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  await page.route(/\/api\/comments\//, async route => {
+    if (route.request().method() === 'POST') comments++;
+    await gate;
+    await route.continue();
+  });
   const primary = card.locator('.btn--primary');
   await expect(primary, 'the recommended option is the main button').toHaveCount(1, { timeout: 5000 });
-  await primary.dblclick();
-  await expect(card.locator('[data-option-id]').first()).toBeDisabled({ timeout: 5000 });
-  await page.waitForTimeout(2500);
-  expect(comments, 'one comment for two presses').toBe(1);
+  await primary.click();
+  await expect.poll(() => comments, { timeout: 5000 }).toBe(1);
+  // Every control on the card is off while the answer is in flight.
   for (const button of await card.locator('[data-option-id]').all()) await expect(button).toBeDisabled();
+  await expect(card.locator('[data-testid="session-question-card-answer"]')).toBeDisabled();
+  // Second presses are refused: a disabled button takes no click, so force-clicking one must not send a comment.
+  await card.locator('[data-option-id]').nth(1).click({ force: true });
+  await card.locator('[data-testid="session-question-card-answer"]').click({ force: true });
+  await page.waitForTimeout(500);
+  expect(comments, 'one comment for the whole sequence of presses').toBe(1);
+  release();
 });
+// The "stays off after success" half is a unit witness (tests/unit/lin-4114-inflight-lock.test.js): a delivered answer
+// removes the card from Home, so there is no card left here to check.
 
 // ---- witnesses 12, 15: a run-raised ruling answered in place, count line and badge fall ---------------------------
 
@@ -291,15 +306,50 @@ test('W9: no task is drawn twice on Home across its sections, a waiting task inc
   expect(repeats, 'a task is drawn in two places on Home').toEqual([]);
 });
 
-test('W9b: a started waiting task with a running child is the named context row: no card for it, and it is drawn once', async ({ page }) => {
+test('W9b: a started waiting task with a running child is the named context row: its card is in Waiting, the row is drawn once with no state words, and the count and badge match the cards', async ({ page }) => {
   await seedTree(page, { runnerKey: true });
   await seedRuling(page, 'LOCAL-M', THREE_OPTIONS);
   await page.goto(`/workspace/${URL_KEY}/`);
   await expect(page.locator(COUNT)).toContainText('waiting on you');
-  await expect(page.locator(WAIT_CARD, { has: page.locator('[data-testid="waiting-task-line"]', { hasText: 'LOCAL-M' }) })).toHaveCount(0);
+  // One ruling, one card: the card for LOCAL-M is in Waiting.
+  await expect(page.locator(WAIT_CARD, { has: page.locator('[data-testid="waiting-task-line"]', { hasText: 'LOCAL-M' }) })).toHaveCount(1);
+  await expect(page.locator(WAIT_CARD)).toHaveCount(1);
+  // The context row in Running is the only place the task is drawn outside Waiting, and it has no state words.
   const drawn = await page.locator('main [data-identifier="LOCAL-M"]').count();
   expect(drawn).toBe(1);
   await expect(page.locator('main [data-identifier="LOCAL-M"] [data-testid="issue-row-state"]'), 'the context row has no state words').toHaveCount(0);
+  // Count line, badge and cards agree.
+  await expect(page.locator(BADGE)).toHaveText('1', { timeout: 15000 });
+  await expect(page.locator(COUNT)).toContainText('1 waiting on you');
+});
+
+// ---- witness 16 (browser): a viewer without run controls gets no Waiting section, no card and no ruling text -------------
+
+test('W16: a viewer without run controls (a member, or a keyless owner) gets no Waiting section and no question card in the page', async ({ page, seedLocal }) => {
+  // No runner key and no queue token, so the viewer has no run controls. The ruling is a scan-raised one (no dispatch token is
+  // minted, because a live queue token would itself turn run controls on). The header badge is the control that the ruling is
+  // there; the section must be off by the owner gate alone.
+  const issueId = randomUUID();
+  await seedLocal({
+    projects: [],
+    issues: [{
+      id: issueId, identifier: 'SCAN-M1', title: 'Task-bound scan fixture for the member gate',
+      description: `This task is blocked pending an operator decision. (${issueId})`,
+      state: { name: 'In Progress', type: 'started' }, url: `/workspace/${URL_KEY}/issue/${issueId}`,
+    }],
+  }, { runnerKey: false });
+  const scan = await page.request.post(`/workspace/${URL_KEY}/api/scan/${issueId}`);
+  expect(scan.status(), `scan seed failed: ${await scan.text()}`).toBe(200);
+  // The control: the ruling is open in the workspace and this viewer can read it (the rulings API lists it).
+  const rulings = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/rulings`);
+  expect(rulings.status()).toBe(200);
+  expect(await rulings.text(), 'the open ruling exists for this viewer').toContain('SCAN-M1');
+  await page.goto(`/workspace/${URL_KEY}/`);
+  await expect(page.locator(SECTION)).toHaveCount(0);
+  await expect(page.locator('[data-testid="session-question-card"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="waiting-task-line"]')).toHaveCount(0);
+  const html = await page.content();
+  expect(html, 'no Waiting section in the page').not.toContain('data-testid="waiting-on-you"');
 });
 
 // ---- witness 17: search hides the section; collapse persists across a reload; reset opens it ------------------------

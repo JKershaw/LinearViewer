@@ -246,7 +246,7 @@ export function deriveSessionDecisions(enrichedLoops, { now, liveLoops } = {}) {
   );
 }
 
-/** LIN-4114: the predicate lives in lib/run-loop-state.js; re-exported here so every importer keeps its path. */
+/** LIN-4114: the predicate lives in lib/live-anchor.js; re-exported here so every importer keeps its path. */
 export { liveOnAnchor };
 
 /**

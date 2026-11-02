@@ -259,7 +259,7 @@ describe('LIN-4114 witnesses 8-10: a waiting task is placed once, in Waiting, an
     assert.ok(folded.includes('W1C') && folded.includes('X'), `more-of-parent lost a child: ${folded.join(', ')}`);
   });
 
-  test('NEW: a started waiting task with an open child shown below it is the named context row, with no card', () => {
+  test('NEW: a started waiting task with an open child shown below it is the named context row, and its ruling keeps its card in Waiting', () => {
     const input = {
       inProgressTrees: [{ projectId: 'p', projectName: 'p', roots: [node('P', 'started', [node('C', 'started')])] }],
       trees: [project('p', 'p', [node('P', 'started', [node('C', 'started')])])],
@@ -271,9 +271,10 @@ describe('LIN-4114 witnesses 8-10: a waiting task is placed once, in Waiting, an
     };
     const { view, placed, contextRows } = placementsOf(input);
     assert.deepEqual(contextRows, ['P'], 'P stays as a context row');
-    assert.ok(!view.waiting.ids.includes('P'), 'P has no card in Waiting');
-    assert.deepEqual(view.waiting.rows, [], 'and no ruling row for the card');
-    assert.deepEqual([...placed].sort(), ['C'], 'C is placed once, as the drawn child');
+    assert.deepEqual(view.waiting.ids, ['P'], 'P has a card in Waiting');
+    assert.equal(view.waiting.rows.length, 1, 'one ruling row, so one card: the count line and the badge agree with the cards');
+    assert.deepEqual(view.waiting.contextIds, ['P'], 'P is a waiting context row (its row draws no state words)');
+    assert.deepEqual([...placed].sort(), ['C', 'P'], 'P (its card) and C (the drawn child) are each placed once');
   });
 
   test('NEW: a started waiting task with nothing kept below it leaves Running and is in Waiting', () => {
@@ -346,10 +347,11 @@ describe('LIN-4114 witnesses 8-10: a waiting task is placed once, in Waiting, an
       };
       const { view, placed, contextRows } = placementsOf(input);
       assert.ok(view.waiting, `seed ${seed}: the view carries a waiting section`);
+      // One card per ruling, context rows included: the count line and the badge count every row, so every row has a card.
       assert.deepEqual(
         [...view.waiting.ids].sort(),
-        waitingIds.filter(id => !contextRows.includes(id)).sort(),
-        `seed ${seed}: Waiting holds exactly the tasks with an open ruling (the named context row aside)`
+        [...waitingIds].sort(),
+        `seed ${seed}: Waiting holds exactly the tasks with an open ruling, a named context row included`
       );
       const count = new Map();
       for (const id of placed) count.set(id, (count.get(id) || 0) + 1);

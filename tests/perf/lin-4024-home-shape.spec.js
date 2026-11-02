@@ -68,13 +68,34 @@ function seededIssues(id) {
   return issues;
 }
 
-async function seedWorkspace(page) {
+async function seedWorkspace(page, { runnerKey = false } = {}) {
   const id = (raw) => localSeedId(URL_KEY, raw);
   const projects = Array.from({ length: PROJECTS }, (_, p) => ({ id: id(`proj-${p}`), name: `Project ${p}`, content: `Seeded project ${p}`, sortOrder: p }));
   const resp = await page.request.post('/test/set-local-session', {
-    data: { urlKey: URL_KEY, runnerKey: false, projects, issues: seededIssues(id) },
+    data: { urlKey: URL_KEY, runnerKey, projects, issues: seededIssues(id) },
   });
   expect(resp.ok()).toBeTruthy();
+}
+
+/**
+ * LIN-4114 (settle before merge): a worker waiting on a ruling, written through the dispatch API the way a runner writes it
+ * (enqueue, take, `[blocked]` and `[decision]`). The same route the Waiting on you E2E seeds with.
+ */
+async function seedRuling(page, identifier, token) {
+  const res = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+    data: { prompt: 'implementation prompt', promptName: 'implementation', kind: 'implementation', issueIdentifier: identifier, issueTitle: identifier, target: 'cli' },
+  });
+  expect(res.status(), `dispatch seed failed: ${await res.text()}`).toBe(201);
+  const itemId = (await res.json()).item.id;
+  const taken = await page.request.post(`/api/dispatch/take/${itemId}`, { headers: { Authorization: `Bearer ${token}` } });
+  expect(taken.status(), `take failed: ${await taken.text()}`).toBe(200);
+  const feedback = (data) => page.request.post(`/api/dispatch/feedback/${itemId}`, {
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, data,
+  });
+  expect((await feedback({ message: '[blocked] which way?' })).status()).toBe(200);
+  const decision = { options: [{ id: 'ship', label: 'Ship it now' }, { id: 'wait', label: 'Wait for review' }], recommended: 'wait' };
+  const res2 = await feedback({ kind: 'decision', message: JSON.stringify({ decision_id: `d-${identifier}`, question: `Which for ${identifier}?`, ...decision }) });
+  expect(res2.status(), `decision failed: ${await res2.text()}`).toBe(200);
 }
 
 test('Home on a few thousand tasks: the page is small, draws no project section, and the backlog page holds the rest', async ({ page }) => {
@@ -112,6 +133,32 @@ test('Home on a few thousand tasks: the page is small, draws no project section,
   await page.locator('[data-testid="home-fold-backlog"]').first().click();
   await expect.poll(() => backlogRows.count()).toBeGreaterThan(before);
   console.log(`LIN-4024 measure: the first Backlog fold added ${(await backlogRows.count()) - before} rows`);
+});
+
+// LIN-4114 (settle before merge): the Waiting on you section's bytes on this shape with twenty open rulings, one card each.
+// The owner gets the section; the page stays under the same ceiling as the shape without rulings. Twenty is the bound the
+// review asked for: a realistic number of cards, not the empty set above. The open rulings sit on Todo tasks in the
+// seeded tree (a Todo task has index ≡ 0 mod 4 and at least 635 mod 1000).
+test('Home on this shape with twenty open rulings: the Waiting section is owner-only and the page stays under the ceiling', async ({ page }) => {
+  await seedWorkspace(page, { runnerKey: true });
+  const token = (await (await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${URL_KEY}`)).json()).token;
+  const todo = [];
+  for (let i = 0; todo.length < 20 && i < TASKS; i += 1) if (i % 4 === 0 && i % 1000 >= 635) todo.push(`LOCAL-${i}`);
+  for (const identifier of todo) await seedRuling(page, identifier, token);
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`/workspace/${URL_KEY}/`);
+  await expect(page.locator('[data-testid="waiting-on-you"]')).toBeVisible();
+  await expect(page.locator('[data-testid="waiting-on-you"] .waiting-card')).toHaveCount(todo.length);
+  await expect(page.locator('[data-testid="in-progress-count"]')).toContainText(`${todo.length} waiting on you`);
+  await expect(page.locator('.rulings-badge .rulings-count')).toHaveText(String(todo.length), { timeout: 15000 });
+
+  const html = await page.content();
+  const bytes = Buffer.byteLength(html, 'utf8');
+  const inlineStyles = (html.match(/ style="/g) || []).length;
+  console.log(`LIN-4114 measure: home html with ${todo.length} open rulings=${bytes} bytes inlineStyle=${inlineStyles}`);
+  expect(bytes).toBeLessThan(HOME_BYTES_CEILING);
+  expect(inlineStyles).toBeLessThan(INLINE_STYLE_CEILING);
 });
 
 // Witness F (timing): the server's cost for Home's state build (the page render, which builds each row's state and the
