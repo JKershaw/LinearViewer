@@ -47,8 +47,9 @@ function projectWithFolds(overrides = {}) {
   };
 }
 
+// The project sections (and their control line and header Add task) are the backlog page's: pageMode 'backlog'.
 function render(trees, options = {}) {
-  return renderPage(trees, [], [], 'WS', { isLanding: false, urlKey: 'ws', workspaces: [WORKSPACE], workspace: WORKSPACE, featureFlags: {}, ...options });
+  return renderPage(trees, [], [], 'WS', { isLanding: false, urlKey: 'ws', workspaces: [WORKSPACE], workspace: WORKSPACE, featureFlags: {}, pageMode: 'backlog', ...options });
 }
 
 // The control line's direct children are non-nested `<div>`s (folds and the done count), so the line ends at the

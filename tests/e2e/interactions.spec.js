@@ -16,7 +16,8 @@ test.describe('Interactive Features', () => {
     await page.evaluate(() => localStorage.clear());
   });
 
-  test('expands issue details on click', async ({ page }) => {
+  test('expands issue details on click', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     // Find an expandable issue line in project section (not In Progress)
     const project = page.locator('.project').first();
     const issueLine = project.locator('.line.expandable').first();
@@ -34,7 +35,8 @@ test.describe('Interactive Features', () => {
     await expect(details).not.toHaveClass(/hidden/);
   });
 
-  test('collapses issue details on second click', async ({ page }) => {
+  test('collapses issue details on second click', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     const project = page.locator('.project').first();
     const issueLine = project.locator('.line.expandable').first();
     const issueId = await issueLine.getAttribute('data-id');
@@ -49,7 +51,8 @@ test.describe('Interactive Features', () => {
     await expect(details).toHaveClass(/hidden/);
   });
 
-  test('collapses entire project on header click', async ({ page }) => {
+  test('collapses entire project on header click', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     const projectHeader = page.locator('.project-header').first();
     const project = page.locator('.project').first();
 
@@ -86,7 +89,8 @@ test.describe('Interactive Features', () => {
     await expect(inProgressItems).toBeVisible();
   });
 
-  test('a done task is counted on its project, never sent to the page (LIN-4024)', async ({ page }) => {
+  test('a done task is counted on its project, never sent to the page (LIN-4024)', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     // Home no longer renders completed tasks; the project shows how many it holds, and the task is not on the page.
     const doneCount = page.locator('[data-testid="home-done-count"]').first();
     await expect(doneCount).toContainText('1 done');
@@ -95,7 +99,8 @@ test.describe('Interactive Features', () => {
     await expect(page.locator('.completed-toggle')).toHaveCount(0);
   });
 
-  test('reset button restores default state', async ({ page }) => {
+  test('reset button restores default state', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     // Expand something first (use project section, not In Progress)
     const project = page.locator('.project').first();
     const issueLine = project.locator('.line.expandable').first();
@@ -113,7 +118,8 @@ test.describe('Interactive Features', () => {
     await expect(details).toHaveClass(/hidden/);
   });
 
-  test('state persists after page reload', async ({ page }) => {
+  test('state persists after page reload', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     // Expand an issue (use project section, not In Progress)
     const project = page.locator('.project').first();
     const issueLine = project.locator('.line.expandable').first();
@@ -149,7 +155,8 @@ test.describe('Detail Section Toggles', () => {
     await page.evaluate(() => localStorage.clear());
   });
 
-  test('Description fold shows/hides description and metadata', async ({ page }) => {
+  test('Description fold shows/hides description and metadata', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     // Find and expand an issue in project section
     const project = page.locator('.project').first();
     const issueLine = project.locator('.line.expandable').first();
@@ -176,7 +183,8 @@ test.describe('Detail Section Toggles', () => {
     await expect(detailsToggle).toContainText('Description ▶');
   });
 
-  test('the opened task shows its control directly, with no Prompts fold', async ({ page }) => {
+  test('the opened task shows its control directly, with no Prompts fold', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     // LIN-3833: the state-first opened task has no Prompts toggle. Its control is part of the task, shown
     // once the row is open (the marked top task included).
     const project = page.locator('.project').first();
@@ -189,7 +197,8 @@ test.describe('Detail Section Toggles', () => {
     await expect(details.locator('[data-toggle="prompts"]')).toHaveCount(0);
   });
 
-  test('the Description and Comments folds work independently', async ({ page }) => {
+  test('the Description and Comments folds work independently', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     // A non-top issue (the marked top task is the same shape, LIN-3833).
     const project = page.locator('.project').first();
     const issueLine = project.locator('.line.expandable:not([data-top-task="1"])').first();
@@ -244,7 +253,8 @@ test.describe('Detail Section Toggles', () => {
     }
   });
 
-  test('Open in <provider> link remains visible outside folds', async ({ page }) => {
+  test('Open in <provider> link remains visible outside folds', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     // Find and expand an issue with a URL
     const project = page.locator('.project').first();
     const issueLine = project.locator('.line.expandable').first();
@@ -260,7 +270,8 @@ test.describe('Detail Section Toggles', () => {
     await expect(viewLink).toContainText('Open in Local');
   });
 
-  test('Create task affordance is a click-through to the dedicated /task/new page (LIN-1553/LIN-1973)', async ({ page }) => {
+  test('Create task affordance is a click-through to the dedicated /task/new page (LIN-1553/LIN-1973)', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     // The Local provider derives ui.inlineCreate (session-auth createIssue), so
     // render.js replaces the external linear.app deep-link with a link to the
     // dedicated task-create page (no target="_blank", no inline form). The

@@ -445,7 +445,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
       }],
     });
 
-    await page.goto(dashboard);
+    await page.goto(`${dashboard}backlog`);
     await page.waitForLoadState('networkidle');
 
     const jiraNode = page.locator('.node').filter({ has: page.locator('.line:has-text("Jira task to do")') }).first();

@@ -25,19 +25,22 @@ test.describe('GitHub provider (no test-token mock)', () => {
   });
 
   test('dashboard renders the GitHub milestone (→ project) + issues from the fake backend', async ({ page }) => {
-    // Milestone "Sprint 1" maps to a canonical project header.
+    // Milestone "Sprint 1" maps to a canonical project header, and the closed issue is counted on it (LIN-4024): backlog page.
+    await page.goto(`${DASHBOARD}backlog`);
     await expect(page.locator('.project-header:has-text("Sprint 1")')).toBeVisible();
-    // The open issue (mapped to unstarted) is in the DOM under its project.
-    await expect(page.locator('.line:has-text("GitHub open task")').first()).toBeAttached();
-    // The closed/completed issue is counted on its project, never sent to the page (LIN-4024).
     await expect(page.locator('.line:has-text("GitHub shipped task")')).toHaveCount(0);
     await expect(page.locator('[data-testid="home-done-count"]').first()).toContainText('1 done');
+    // The open issue is the top task (LIN-4117), so it is In Progress on Home, not in the project section.
+    await page.goto(DASHBOARD);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('.line:has-text("GitHub open task")').first()).toBeAttached();
   });
 
   test('detail link is provider-aware: "View in GitHub Issues" (not Linear)', async ({ page }) => {
-    // render.js interpolates provider.ui.displayName ('GitHub Issues', LIN-702)
-    // into the link. The detail block is lazy — expand an issue to load it first.
-    await page.locator('.line.expandable').first().click();
+    // LIN-4119: the project's own "View in" link is on the backlog page (the open task is In Progress on Home, which
+    // has no project section to carry it). render.js interpolates provider.ui.displayName ('GitHub Issues', LIN-702).
+    await page.goto(`${DASHBOARD}backlog`);
+    await page.waitForLoadState('networkidle');
     await expect(page.locator('.detail-link', { hasText: 'View in GitHub Issues' }).first()).toBeAttached();
     await expect(page.locator('.detail-link', { hasText: 'Open in Linear' })).toHaveCount(0);
   });
@@ -52,7 +55,7 @@ test.describe('GitHub provider (no test-token mock)', () => {
     expect(body.issue.title).toBe('Created via GitHub provider');
 
     // Reload the dashboard — the read seam surfaces the freshly written issue.
-    await page.goto(DASHBOARD);
+    await page.goto(`${DASHBOARD}backlog`);
     await page.waitForLoadState('networkidle');
     await expect(page.locator('.line:has-text("Created via GitHub provider")').first()).toBeAttached();
   });
@@ -65,7 +68,7 @@ test.describe('GitHub provider (no test-token mock)', () => {
 test.describe('GitHub provider — empty repo (LIN-718)', () => {
   test('a repo with zero issues/milestones still renders its container', async ({ page }) => {
     await seedGitHubWorkspace(page, { milestones: [], issues: [], labels: [] });
-    await page.goto(githubDashboardUrl(GITHUB_WORKSPACE_URL_KEY));
+    await page.goto(`${githubDashboardUrl(GITHUB_WORKSPACE_URL_KEY)}backlog`);
     await page.waitForLoadState('networkidle');
 
     // The repo binding itself renders as a container header (named by slug)...

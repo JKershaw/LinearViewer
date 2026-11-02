@@ -34,7 +34,8 @@ test.describe('Search Feature', () => {
     await expect(searchPanel).toHaveClass(/hidden/);
   });
 
-  test('search filters issues by title keyword', async ({ page }) => {
+  test('search filters issues by title keyword', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
     const searchToggle = page.locator('.search-toggle');
     const searchInput = page.locator('#search-input');
 
@@ -46,7 +47,10 @@ test.describe('Search Feature', () => {
     // Beta's match is In Progress, so its row shows there (LIN-4024: a project lists only its Up next work)
     await expect(page.locator('.in-progress-section .line', { hasText: 'Beta task in progress' })).toBeVisible();
 
-    // Alpha project should be hidden (no matching issues)
+    // Alpha project should be hidden (no matching issues). Its project section is the backlog page's, searched the same way.
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
+    await searchToggle.click();
+    await searchInput.fill('Beta');
     const alphaProject = page.locator('.project[data-id="proj-alpha"]');
     await expect(alphaProject).toHaveClass(/hidden/);
   });
@@ -94,7 +98,8 @@ test.describe('Search Feature', () => {
     await expect(noResults).toContainText('no matching issues');
   });
 
-  test('clear button restores full view', async ({ page }) => {
+  test('clear button restores full view', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     await page.locator('.search-toggle').click();
     const searchInput = page.locator('#search-input');
 
@@ -115,7 +120,8 @@ test.describe('Search Feature', () => {
     await expect(alphaProject).not.toHaveClass(/hidden/);
   });
 
-  test('Escape key closes search and restores view', async ({ page }) => {
+  test('Escape key closes search and restores view', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     await page.locator('.search-toggle').click();
     const searchInput = page.locator('#search-input');
 
@@ -201,7 +207,8 @@ test.describe('Search Feature', () => {
     expect(panelBox.y).toBeGreaterThan(titleBox.y + titleBox.height);
   });
 
-  test('empty search restores view without closing panel', async ({ page }) => {
+  test('empty search restores view without closing panel', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     await page.locator('.search-toggle').click();
     const searchInput = page.locator('#search-input');
 

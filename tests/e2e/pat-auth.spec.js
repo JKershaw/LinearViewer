@@ -59,7 +59,7 @@ test.describe('PAT Authentication Mode', () => {
   })
 
   test('dashboard renders normally in PAT mode', async ({ page }) => {
-    await page.goto(WORKSPACE_URL)
+    await page.goto(`${WORKSPACE_URL}backlog`)
     await page.waitForLoadState('networkidle')
 
     // Should show projects from mock data

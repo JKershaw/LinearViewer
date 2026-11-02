@@ -24,7 +24,7 @@ test.describe('Input Validation', () => {
 
   test('invalid team filter is ignored', async ({ page, localWorkerUrlKey }) => {
     // Invalid team ID should be ignored (not cause error)
-    await page.goto(`${localDashboardUrl(localWorkerUrlKey)}?team=invalid-team-id`);
+    await page.goto(`${localDashboardUrl(localWorkerUrlKey)}backlog?team=invalid-team-id`);
 
     // Page should still load normally
     await expect(page.locator('.nav-bar')).toBeVisible();
@@ -118,7 +118,9 @@ test.describe('Team Filtering', () => {
     // Home rather than in the project section.
     await expect(page.locator('.in-progress-items .line[data-identifier="TEST-13"]')).toBeVisible();
 
-    // Beta should exist but have no issues (empty project)
+    // Beta should exist but have no issues (empty project). Its project section is the backlog page's, under the same filter.
+    await page.goto(`${WORKSPACE_URL}backlog?team=eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee`);
+    await page.waitForLoadState('networkidle');
     await expect(betaProject).toBeVisible();
     await expect(betaProject.locator('.node')).toHaveCount(0);
   });

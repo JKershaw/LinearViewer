@@ -26,6 +26,11 @@ import '../../lib/providers/github/index.js';
 import '../../lib/providers/github-projects/index.js';
 import '../../lib/providers/jira/index.js';
 
+// LIN-4119: the project sections are the backlog page's. A test that asserts them renders through this, which is
+// renderPage in backlog page mode (Home renders no project sections from S3a-3 on).
+const renderBacklogPage = (projectTrees, inProgressTrees, recentActivityTrees, organizationName, options = {}) =>
+  renderPage(projectTrees, inProgressTrees, recentActivityTrees, organizationName, { ...options, pageMode: 'backlog' });
+
 // =============================================================================
 // renderDisplayLabels Tests
 // =============================================================================
@@ -163,7 +168,7 @@ describe('renderPage description rendering', () => {
       };
 
       const projectTree = createProjectTree(issueWithHorizontalRule);
-      const result = renderPage([projectTree], [], [], 'Test', { isLanding: false });
+      const result = renderBacklogPage([projectTree], [], [], 'Test', { isLanding: false });
 
       // Should render as plain text, not as a prompt
       assert.ok(!result.includes('class="prompt-container"') ||
@@ -202,7 +207,7 @@ describe('lazy detail rendering (LIN-442)', () => {
   }
 
   test('authenticated dashboard emits an empty lazy wrapper, not inline detail', () => {
-    const result = renderPage([tree(heavyIssue)], [], [], 'Test', { isLanding: false, urlKey: 'ws' });
+    const result = renderBacklogPage([tree(heavyIssue)], [], [], 'Test', { isLanding: false, urlKey: 'ws' });
 
     // The wrapper is present and flagged lazy, carrying the keys the client fetch needs.
     assert.ok(result.includes('data-lazy="1"'), 'emits a lazy details wrapper');
@@ -323,7 +328,7 @@ describe('expandable row accessibility markup (LIN-566)', () => {
   });
 
   test('periodical rows are keyboard-operable controls', () => {
-    const result = renderPage([testMockPeriodicalsTree], [], [], 'Test', {
+    const result = renderBacklogPage([testMockPeriodicalsTree], [], [], 'Test', {
       isLanding: false,
       urlKey: 'test-workspace'
     });
@@ -340,7 +345,7 @@ describe('expandable row accessibility markup (LIN-566)', () => {
   // run control and needs `runControls` (the periodicals' Dispatch was ungated
   // before).
   test('no flags: both containers render but neither offers Dispatch', () => {
-    const result = renderPage([testMockPeriodicalsTree], [], [], 'Test', {
+    const result = renderBacklogPage([testMockPeriodicalsTree], [], [], 'Test', {
       isLanding: false,
       urlKey: 'test-workspace',
       featureFlags: {}
@@ -352,7 +357,7 @@ describe('expandable row accessibility markup (LIN-566)', () => {
   });
 
   test('run controls: Dispatch renders on both containers', () => {
-    const result = renderPage([testMockPeriodicalsTree], [], [], 'Test', {
+    const result = renderBacklogPage([testMockPeriodicalsTree], [], [], 'Test', {
       isLanding: false,
       urlKey: 'test-workspace',
       featureFlags: { runControls: true }
@@ -384,7 +389,7 @@ describe('add-task link guard (LIN-341)', () => {
   }
 
   test('real project id renders the "+ Add task" link', () => {
-    const result = renderPage([projectTreeWithId('real-project', 'Real')], [], [], 'Test', {
+    const result = renderBacklogPage([projectTreeWithId('real-project', 'Real')], [], [], 'Test', {
       isLanding: false,
       urlKey: 'test-workspace'
     });
@@ -400,7 +405,7 @@ describe('add-task link guard (LIN-341)', () => {
   });
 
   test('__no_project__ suppresses the add-task link (latent bug fixed)', () => {
-    const result = renderPage([projectTreeWithId(NO_PROJECT_ID, 'No Project')], [], [], 'Test', {
+    const result = renderBacklogPage([projectTreeWithId(NO_PROJECT_ID, 'No Project')], [], [], 'Test', {
       isLanding: false,
       urlKey: 'test-workspace'
     });
@@ -408,7 +413,7 @@ describe('add-task link guard (LIN-341)', () => {
   });
 
   test('__periodicals__ suppresses the add-task link', () => {
-    const result = renderPage([testMockPeriodicalsTree], [], [], 'Test', {
+    const result = renderBacklogPage([testMockPeriodicalsTree], [], [], 'Test', {
       isLanding: false,
       urlKey: 'test-workspace'
     });
@@ -423,7 +428,7 @@ describe('add-task link guard (LIN-341)', () => {
   // name reintroduced anywhere on the page (not just the create-task testid)
   // must fail this test.
   test('every removed inline-create-form CSS class/attribute is absent, not just its testid (F2)', () => {
-    const result = renderPage([projectTreeWithId('real-project', 'Real')], [], [], 'Test', {
+    const result = renderBacklogPage([projectTreeWithId('real-project', 'Real')], [], [], 'Test', {
       isLanding: false,
       urlKey: 'test-workspace'
     });
@@ -462,7 +467,7 @@ describe('"+ Add task" across real providers (LIN-1973 F2)', () => {
   }
 
   function renderForProvider(providerName) {
-    return renderPage([projectTreeWithId('real-project', 'Real')], [], [], 'Test', {
+    return renderBacklogPage([projectTreeWithId('real-project', 'Real')], [], [], 'Test', {
       isLanding: false,
       urlKey: 'ws',
       workspaces: [{ id: 'w1', name: 'WS', urlKey: 'ws', provider: providerName }],
@@ -633,7 +638,7 @@ describe('projects-page section-primitive adoption (LIN-979)', () => {
 
 describe('Periodicals group rendering (LIN-341)', () => {
   test('renders the synthetic group with the periodicals colour hook', () => {
-    const result = renderPage([testMockPeriodicalsTree], [], [], 'Test', {
+    const result = renderBacklogPage([testMockPeriodicalsTree], [], [], 'Test', {
       isLanding: false,
       urlKey: 'test-workspace'
     });
@@ -643,7 +648,7 @@ describe('Periodicals group rendering (LIN-341)', () => {
   });
 
   test('the row is dispatchable with kind=periodical and no Linear link', () => {
-    const result = renderPage([testMockPeriodicalsTree], [], [], 'Test', {
+    const result = renderBacklogPage([testMockPeriodicalsTree], [], [], 'Test', {
       isLanding: false,
       urlKey: 'test-workspace',
       featureFlags: { runControls: true }
@@ -657,7 +662,7 @@ describe('Periodicals group rendering (LIN-341)', () => {
   });
 
   test('flag-off parity: omitting the group yields no periodicals markup', () => {
-    const result = renderPage([], [], [], 'Test', {
+    const result = renderBacklogPage([], [], [], 'Test', {
       isLanding: false,
       urlKey: 'test-workspace'
     });
@@ -714,7 +719,7 @@ describe('capability-aware rendering (LIN-177 S3)', () => {
   }
   function renderWithProviderUi(ui) {
     const provider = makeStubProvider(ui);
-    return renderPage([stubTree()], [], [], 'Test', {
+    return renderBacklogPage([stubTree()], [], [], 'Test', {
       isLanding: false,
       urlKey: 'ws',
       workspaces: [{ id: 'w1', name: 'WS', urlKey: 'ws', provider: provider.name }],
@@ -833,18 +838,18 @@ describe('capability-aware rendering (LIN-177 S3)', () => {
     };
     const opts = { isLanding: false, urlKey: 'ws', workspaces: [{ id: 'w1', name: 'WS', urlKey: 'ws' }] };
 
-    const withBadge = renderPage([githubTree], [], [], 'Test', { ...opts, showSource: true });
+    const withBadge = renderBacklogPage([githubTree], [], [], 'Test', { ...opts, showSource: true });
     assert.ok(withBadge.includes('data-testid="issue-source"'), 'source badge present when showSource on');
     assert.ok(withBadge.includes('data-source="github"'), 'badge reflects the issue source');
 
-    const withoutBadge = renderPage([githubTree], [], [], 'Test', { ...opts, showSource: false });
+    const withoutBadge = renderBacklogPage([githubTree], [], [], 'Test', { ...opts, showSource: false });
     assert.ok(!withoutBadge.includes('data-testid="issue-source"'), 'badge suppressed when showSource off (single-provider parity)');
   });
 
   test('truncation notice appears only when truncated is on (LIN-2006)', () => {
     const opts = { isLanding: false, urlKey: 'ws', workspaces: [{ id: 'w1', name: 'WS', urlKey: 'ws' }] };
 
-    const withNotice = renderPage([], [], [], 'Test', { ...opts, truncated: true });
+    const withNotice = renderBacklogPage([], [], [], 'Test', { ...opts, truncated: true });
     assert.ok(withNotice.includes('truncation-notice'), 'notice present when truncated is on');
     // The `truncated` boolean this page receives is sourced ONLY from
     // provider.fetchProjects()'s issues.truncated (jira/index.js:1123) — the
@@ -855,18 +860,18 @@ describe('capability-aware rendering (LIN-177 S3)', () => {
     assert.ok(withNotice.includes('issues could not be loaded'), 'copy names issues specifically');
     assert.ok(!withNotice.includes('projects or issues'), 'copy must not claim project coverage the boolean does not carry');
 
-    const withoutNotice = renderPage([], [], [], 'Test', { ...opts, truncated: false });
+    const withoutNotice = renderBacklogPage([], [], [], 'Test', { ...opts, truncated: false });
     assert.ok(!withoutNotice.includes('truncation-notice'), 'notice suppressed when truncated is off');
 
-    const defaultRender = renderPage([], [], [], 'Test', opts);
+    const defaultRender = renderBacklogPage([], [], [], 'Test', opts);
     assert.ok(!defaultRender.includes('truncation-notice'), 'notice suppressed by default (truncated omitted)');
   });
 
   test('source notice names each degraded source, escapes it, and an empty or absent list is byte-identical (LIN-3774)', () => {
     const opts = { isLanding: false, urlKey: 'ws', workspaces: [{ id: 'w1', name: 'WS', urlKey: 'ws' }] };
-    const baseline = renderPage([], [], [], 'Test', opts);
+    const baseline = renderBacklogPage([], [], [], 'Test', opts);
 
-    const degraded = renderPage([], [], [], 'Test', { ...opts, degradedSources: [{ provider: 'github', scope: 'JKershaw/LinearViewer' }] });
+    const degraded = renderBacklogPage([], [], [], 'Test', { ...opts, degradedSources: [{ provider: 'github', scope: 'JKershaw/LinearViewer' }] });
     assert.ok(degraded.includes('data-testid="dashboard-source-notice"'), 'notice present');
     assert.ok(degraded.includes('data-source="github"'));
     assert.ok(degraded.includes('reconnect GitHub Issues in Settings'), 'display name in both places');
@@ -876,15 +881,15 @@ describe('capability-aware rendering (LIN-177 S3)', () => {
     assert.ok(degraded.includes('Reload to try again'), 'says what the reader can do');
     assert.ok(!degraded.includes('issues could not be loaded'), 'the truncation copy is not reused');
 
-    const escaped = renderPage([], [], [], 'Test', { ...opts, degradedSources: [{ provider: 'github', scope: '<img src=x onerror=alert(1)>' }] });
+    const escaped = renderBacklogPage([], [], [], 'Test', { ...opts, degradedSources: [{ provider: 'github', scope: '<img src=x onerror=alert(1)>' }] });
     assert.ok(!escaped.includes('<img src=x'), 'scope is escaped');
     assert.ok(escaped.includes('&lt;img src=x'));
 
-    const two = renderPage([], [], [], 'Test', { ...opts, degradedSources: [{ provider: 'github', scope: 'a/b' }, { provider: 'github-projects', scope: 'c/d' }] });
+    const two = renderBacklogPage([], [], [], 'Test', { ...opts, degradedSources: [{ provider: 'github', scope: 'a/b' }, { provider: 'github-projects', scope: 'c/d' }] });
     assert.equal(two.split('data-testid="dashboard-source-notice"').length - 1, 2, 'one notice per degraded source');
 
-    assert.equal(renderPage([], [], [], 'Test', { ...opts, degradedSources: [] }), baseline, 'empty list: byte-identical');
-    assert.equal(renderPage([], [], [], 'Test', { ...opts, degradedSources: undefined }), baseline, 'undefined list: byte-identical');
+    assert.equal(renderBacklogPage([], [], [], 'Test', { ...opts, degradedSources: [] }), baseline, 'empty list: byte-identical');
+    assert.equal(renderBacklogPage([], [], [], 'Test', { ...opts, degradedSources: undefined }), baseline, 'undefined list: byte-identical');
     assert.ok(!baseline.includes('dashboard-source-notice'));
   });
 
@@ -893,7 +898,7 @@ describe('capability-aware rendering (LIN-177 S3)', () => {
     // ui keeps all affordances on and displayName 'Linear'. Page-level affordances
     // stay in renderPage; detail-level ones (LIN-442) live in the lazy detail
     // content — assert each on its own surface.
-    const result = renderPage([stubTree()], [], [], 'Test', {
+    const result = renderBacklogPage([stubTree()], [], [], 'Test', {
       isLanding: false,
       urlKey: 'ws',
       workspaces: [{ id: 'w1', name: 'WS', urlKey: 'ws' }],

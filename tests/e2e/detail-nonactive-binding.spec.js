@@ -30,7 +30,7 @@ test.describe('Detail drill-down on a non-active binding (LIN-1903)', () => {
       ],
     });
 
-    await page.goto(dashboard);
+    await page.goto(`${dashboard}backlog`);
     await page.waitForLoadState('networkidle');
 
     // The merged tree renders the Jira row with its own source badge — proof
@@ -115,6 +115,9 @@ test.describe('Sibling id-scoped routes on a non-active (Jira) binding (LIN-1904
     // wrong issue's title.
     // LIN-3833: the copy-first view writes the step. ENG-1 ("Jira task to do") is Todo, so its step is Plan,
     // which needs no AI; the prompt must embed the JIRA issue's own title.
+    // The To Do row is a project row, which the backlog page holds.
+    await page.goto(`${dashboard}backlog`);
+    await page.waitForLoadState('networkidle');
     const todoNode = page.locator('.node').filter({ has: page.locator('.line:has-text("Jira task to do")') }).first();
     await todoNode.locator('.line').first().click();
     const component = todoNode.locator('.prompt-section').first();
@@ -122,6 +125,9 @@ test.describe('Sibling id-scoped routes on a non-active (Jira) binding (LIN-1904
     await component.locator('[data-testid="opened-task-write"]').click();
     await expect(component.locator('[data-prompt-body]')).toContainText('Jira task to do');
 
+    // The Jira row is In Progress (the top task, LIN-4117), so its Comments are read on Home.
+    await page.goto(dashboard);
+    await page.waitForLoadState('networkidle');
     // Comments: expand the nested Comments toggle and assert the JIRA
     // comment body is present — proof the fetch reached the Jira binding's
     // own fetchIssueComments, not local's (which has no knowledge of this id).
@@ -152,7 +158,7 @@ test.describe('Sibling id-scoped routes on a non-active (Jira) binding (LIN-1904
       ],
     });
 
-    await page.goto(dashboard);
+    await page.goto(`${dashboard}backlog`);
     await page.waitForLoadState('networkidle');
 
     const jiraNode = page.locator('.node').filter({ has: page.locator('.line:has-text("Jira task to do")') }).first();
@@ -197,7 +203,8 @@ test.describe('Edit-link → task-edit → PATCH provenance chain, foreign write
       ],
     });
 
-    await page.goto(dashboard);
+    // The GitHub row is a project row here (the local workspace is active), so the backlog page holds it.
+    await page.goto(`${dashboard}backlog`);
     await page.waitForLoadState('networkidle');
 
     const githubNode = page.locator('.node').filter({ has: page.locator('.line:has-text("GitHub open task")') }).first();
@@ -233,6 +240,9 @@ test.describe('Edit-link → task-edit → PATCH provenance chain, foreign write
     // edited title — proof the PATCH landed on the GitHub binding's own issue,
     // not a wrong-target write against the active local workspace.
     await page.waitForURL(dashboard);
+    // The edited GitHub row is a project row here (the local workspace is active), which the backlog page holds.
+    await page.goto(`${dashboard}backlog`);
+    await page.waitForLoadState('networkidle');
     await expect(page.locator(`.line:has-text("${newTitle}")`)).toBeAttached();
   });
 });
@@ -249,7 +259,7 @@ test.describe('Edit-link → task-edit → PATCH provenance chain, foreign write
 test.describe('Recap / Brief / Recommend / Task Chat on a non-active (Jira) binding (LIN-1910)', () => {
   // Shared seed: local active + Jira secondary (openRouterConnected so the AI
   // surfaces render; taskChat on so the Chat deep-link renders).
-  async function seedAndGoto(page, seedLocal) {
+  async function seedAndGoto(page, seedLocal, suffix = '') {
     await page.request.post('/test/set-jira-session', { data: { seed: defaultJiraSeed } });
     const { dashboard } = await seedLocal(null, {
       openRouterConnected: true,
@@ -258,7 +268,8 @@ test.describe('Recap / Brief / Recommend / Task Chat on a non-active (Jira) bind
         { provider: 'jira', scope: JIRA_SITE, credentials: { token: 'jira-api-token', email: 'ada@example.com', tokenExpiresAt: Number.MAX_SAFE_INTEGER } },
       ],
     });
-    await page.goto(dashboard);
+    // LIN-4119: `suffix` ('backlog') opens the project sections' page; the default is Home.
+    await page.goto(`${dashboard}${suffix}`);
     await page.waitForLoadState('networkidle');
   }
 
@@ -295,7 +306,7 @@ test.describe('Recap / Brief / Recommend / Task Chat on a non-active (Jira) bind
   });
 
   test('AI suggest generates a Jira-grounded prompt for a Jira row, not the active binding\'s', async ({ page, seedLocal }) => {
-    await seedAndGoto(page, seedLocal);
+    await seedAndGoto(page, seedLocal, 'backlog');
 
     // ENG-1 ("Jira task to do") is a genuine leaf — no children to descend
     // into — so the mock recommendation resolves in one hop with a prompt
@@ -312,7 +323,7 @@ test.describe('Recap / Brief / Recommend / Task Chat on a non-active (Jira) bind
   });
 
   test('task chat, reached via the dashboard Chat deep-link, answers first-person as the Jira row', async ({ page, seedLocal }) => {
-    await seedAndGoto(page, seedLocal);
+    await seedAndGoto(page, seedLocal, 'backlog');
 
     const jiraNode = page.locator('.node').filter({ has: page.locator('.line:has-text("Jira task to do")') }).first();
     const jiraRow = jiraNode.locator('.line').first();

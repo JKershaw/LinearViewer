@@ -47,14 +47,17 @@ test.describe('Tree view: Brief / Recap / Context leave Home (LIN-522, LIN-3833)
   // LIN-3833 (Q4): the state-first opened task on Home has no Brief, Recap, Scan or Context folds. They stay on
   // Swipe, where the card keeps them.
   for (const section of ['brief', 'recap', 'context']) {
-    test(`${section} is not a fold of the opened task on Home`, async ({ page }) => {
+    test(`${section} is not a fold of the opened task on the backlog page`, async ({ page, localWorkerUrlKey }) => {
+      // LIN-4119: the opened task is a project row, which the backlog page holds.
+      await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
       const details = await openIssueDetails(page);
       await expect(details.locator('.prompt-section')).toBeVisible();
       await expect(details.locator(`.detail-toggle[data-toggle="${section}"]`)).toHaveCount(0);
     });
   }
 
-  test('does not disturb the existing Comments section', async ({ page }) => {
+  test('does not disturb the existing Comments section', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     const details = await openIssueDetails(page);
 
     // Comments still toggles and loads alongside the new sections.
@@ -124,7 +127,7 @@ test.describe('Tree view: Dispatched Sessions (LIN-522)', () => {
   test('sessions toggle shows the empty state for an undispatched issue', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await clearSessions(page, localWorkerUrlKey);
     await seedLocal(defaultLocalSeedWithUpNext(localWorkerUrlKey), { runnerKey: true });
-    await page.goto(`/workspace/${localWorkerUrlKey}/`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     await page.evaluate(() => localStorage.clear());
 
     const details = await openIssueDetails(page, 'LOCAL-5');

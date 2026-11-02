@@ -43,10 +43,11 @@ async function seedFolds(page) {
 
 test('a done task never reaches the page, and the project shows its Backlog as a fold', async ({ page }) => {
   await seedFolds(page);
-  await page.goto(`/workspace/${URL_KEY}/`);
+  // LIN-4119: the project sections are the backlog page's; the fold reads "N backlog" (feedback item 24).
+  await page.goto(`/workspace/${URL_KEY}/backlog`);
 
   const project = page.locator('[data-testid="project"][data-project-name="Folds project"]');
-  await expect(project.locator('[data-testid="home-fold-backlog"]')).toContainText('in Backlog');
+  await expect(project.locator('[data-testid="home-fold-backlog"]')).toContainText('56 backlog');
   await expect(project.locator('[data-testid="home-done-count"]')).toContainText('1 done');
   await expect(page.locator('[data-section="project"][data-identifier="LOCAL-F4"]')).toHaveCount(0);
   await expect(project.locator('[data-identifier^="LOCAL-B"]')).toHaveCount(0);
@@ -54,13 +55,13 @@ test('a done task never reaches the page, and the project shows its Backlog as a
 
 test('the Backlog fold opens a page of rows at a time, and goes when the last page is in', async ({ page }) => {
   await seedFolds(page);
-  await page.goto(`/workspace/${URL_KEY}/`);
+  await page.goto(`/workspace/${URL_KEY}/backlog`);
 
   const project = page.locator('[data-testid="project"][data-project-name="Folds project"]');
   const fold = project.locator('[data-testid="home-fold-backlog"]');
   await fold.click();
   await expect(project.locator('[data-identifier^="LOCAL-B"]')).toHaveCount(50);
-  await expect(fold).toContainText('show 6 more');
+  await expect(fold).toContainText('6 backlog');
 
   await fold.click();
   await expect(project.locator('[data-identifier^="LOCAL-B"]')).toHaveCount(BACKLOG);

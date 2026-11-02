@@ -85,6 +85,8 @@ test.describe('Held connection picker (LIN-3125 Phase 3)', () => {
     // LIN-3382: the new workspace's key is the resolver's `gh-<name>-<6 hex of
     // sha256(provider:scope)>`, no longer the bare repo name.
     await page.waitForURL(/\/workspace\/gh-repo-c-[0-9a-f]{6}\/$/);
+    // LIN-4119: the new workspace's project is a project section, which the backlog page holds.
+    await page.goto(`${page.url()}backlog`);
     await expect(page.locator('.project-header:has-text("octocat/repo-c")')).toBeVisible();
 
     // ---- 3. one connection, all bindings share it, no credentials ----

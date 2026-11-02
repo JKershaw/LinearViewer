@@ -42,7 +42,7 @@ test.describe('Periodicals group', () => {
 
   test('flag OFF: no Periodicals group, behaviour unchanged', async ({ page, localWorkerUrlKey }) => {
     await setPeriodicalsFlag(page, localWorkerUrlKey, false);
-    await page.goto(`/workspace/${localWorkerUrlKey}/`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     await page.waitForLoadState('networkidle');
 
     await expect(page.locator('[data-project-type="periodicals"]')).toHaveCount(0);
@@ -56,7 +56,7 @@ test.describe('Periodicals group', () => {
     // LIN-3849: the Dispatch disclosure is a run control, so the owner needs a runner key.
     await seedLocal(workspaceApiLocalSeed, { runnerKey: true });
     await setPeriodicalsFlag(page, localWorkerUrlKey, true);
-    await page.goto(`/workspace/${localWorkerUrlKey}/`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     await page.waitForLoadState('networkidle');
 
     const group = page.locator('[data-project-type="periodicals"]');
@@ -105,7 +105,7 @@ test.describe('Periodicals group', () => {
   test('flag ON: clicking dispatch on a Periodical actually queues it', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(workspaceApiLocalSeed, { runnerKey: true });
     await setPeriodicalsFlag(page, localWorkerUrlKey, true);
-    await page.goto(`/workspace/${localWorkerUrlKey}/`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     await page.waitForLoadState('networkidle');
 
     const group = page.locator('[data-project-type="periodicals"]');
@@ -146,7 +146,7 @@ test.describe('Periodicals group', () => {
   test('periodical row shows a proxy-forced Mint + Autopilot beside the plain Mint', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(workspaceApiLocalSeed, { runnerKey: true });
     await setPeriodicalsFlag(page, localWorkerUrlKey, true);
-    await page.goto(`/workspace/${localWorkerUrlKey}/`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     await page.waitForLoadState('networkidle');
 
     const group = page.locator('[data-project-type="periodicals"]');
@@ -170,7 +170,7 @@ test.describe('Periodicals group', () => {
     // /fixture:LIN-3136
     await page.request.get(`/test/clear-dispatch-queue?urlKey=${localWorkerUrlKey}`);
     await setPeriodicalsFlag(page, localWorkerUrlKey, true);
-    await page.goto(`/workspace/${localWorkerUrlKey}/`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     await page.waitForLoadState('networkidle');
 
     const group = page.locator('[data-project-type="periodicals"]');
@@ -214,7 +214,7 @@ test.describe('Periodicals group', () => {
     await setPeriodicalsFlag(page, localWorkerUrlKey, true);
     await seedWorkspaceOwnership(page, localWorkerUrlKey, 'foreign');
     try {
-      await page.goto(`/workspace/${localWorkerUrlKey}/`);
+      await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
       await page.waitForLoadState('networkidle');
 
       const group = page.locator('[data-project-type="periodicals"]');

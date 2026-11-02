@@ -59,7 +59,7 @@ test.describe('LIN-2529 — assignee filter (local provider, real `me` match)', 
   });
 
   test('?assignee=me keeps a matched sub-issue\'s unmatched parent in place (ancestor context) and excludes unrelated assignees', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/?assignee=me`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog?assignee=me`);
     await page.waitForLoadState('networkidle');
     await openFolds(page);
 

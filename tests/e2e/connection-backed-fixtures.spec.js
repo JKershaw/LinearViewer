@@ -41,9 +41,12 @@ test.describe('Connection-backed fixture variants (LIN-3124 T27)', () => {
     expect(ws.activeBinding).toEqual({ provider: 'github', scope: GITHUB_REPO });
     expect(ws.hasScalarMirror).toBe(false);
 
-    await page.goto(githubDashboardUrl());
+    await page.goto(`${githubDashboardUrl()}backlog`);
     await page.waitForLoadState('networkidle');
     await expect(page.locator('.project-header:has-text("Sprint 1")')).toBeVisible();
+    // The open task is the top task (LIN-4117), so it is In Progress on Home.
+    await page.goto(githubDashboardUrl());
+    await page.waitForLoadState('networkidle');
     await expect(page.locator('.line:has-text("GitHub open task")').first()).toBeAttached();
   });
 
@@ -54,9 +57,12 @@ test.describe('Connection-backed fixture variants (LIN-3124 T27)', () => {
     expectConnectionBacked(ws.bindings[0], 'github-projects', GITHUB_PROJECTS_BOARD);
     expect(ws.hasScalarMirror).toBe(false);
 
-    await page.goto(githubProjectsDashboardUrl());
+    await page.goto(`${githubProjectsDashboardUrl()}backlog`);
     await page.waitForLoadState('networkidle');
     await expect(page.locator('.project-header:has-text("Roadmap")')).toBeVisible();
+    // The In Progress item is the top task (LIN-4117), so it is In Progress on Home.
+    await page.goto(githubProjectsDashboardUrl());
+    await page.waitForLoadState('networkidle');
     await expect(page.locator('.line:has-text("Board task in progress")').first()).toBeAttached();
   });
 
@@ -67,9 +73,12 @@ test.describe('Connection-backed fixture variants (LIN-3124 T27)', () => {
     expectConnectionBacked(ws.bindings[0], 'jira', JIRA_SITE);
     expect(ws.hasScalarMirror).toBe(false);
 
-    await page.goto(jiraDashboardUrl());
+    await page.goto(`${jiraDashboardUrl()}backlog`);
     await page.waitForLoadState('networkidle');
     await expect(page.locator('.project-header:has-text("Engineering")')).toBeVisible();
+    // The In Progress task is the top task (LIN-4117), so it is In Progress on Home.
+    await page.goto(jiraDashboardUrl());
+    await page.waitForLoadState('networkidle');
     await expect(page.locator('.line:has-text("Jira task in progress")').first()).toBeAttached();
   });
 
@@ -94,7 +103,7 @@ test.describe('Connection-backed fixture variants (LIN-3124 T27)', () => {
     expect(ws.activeBinding).toBeNull();
     expect(ws.hasScalarMirror).toBe(true);
 
-    await page.goto(dashboard);
+    await page.goto(`${dashboard}backlog`);
     await page.waitForLoadState('networkidle');
     const jiraRow = page.locator('.line:has-text("Jira task to do")').first();
     await expect(jiraRow).toBeAttached();
