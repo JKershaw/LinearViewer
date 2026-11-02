@@ -316,6 +316,14 @@ describe('run-view: cost (honest, never guessed)', () => {
     assert.equal(view.steps[0].cost.cumulative, false);
   });
 
+  test('a payload with no harness is a running total: the header total is shown', () => {
+    const view = buildRunView(session([
+      pricedStage('plan', { usage: { harness: undefined, costUsd: 1.25 } }),
+    ]));
+    assert.equal(view.cost.status, 'total');
+    assert.equal(view.cost.usd, 1.25);
+  });
+
   test('never emits 0, a partial sum, or a pricedUsd field', () => {
     const zero = buildRunView(session([pricedStage('plan', { usage: { costUsd: 0 } })]));
     assert.equal(zero.cost.usd, null);

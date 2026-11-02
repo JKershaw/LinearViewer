@@ -19,8 +19,8 @@ const NOW = Date.parse('2026-08-20T12:00:00.000Z');
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_KEY = '2026-08-20';
 
-function usageEntry({ costUsd, at }) {
-  const payload = { harness: 'irrelevant-to-payload-parsing', lane: null };
+function usageEntry({ costUsd, at, harness = 'claude-code' }) {
+  const payload = { harness, lane: null };
   if (costUsd !== undefined) payload.costUsd = costUsd;
   return { kind: 'usage', message: `[usage] ${JSON.stringify(payload)}`, timestamp: at };
 }
@@ -69,8 +69,8 @@ describe('windowedSpend — partial pricing', () => {
     const first = new Date(SINCE + HOUR_MS).toISOString();
     const second = new Date(SINCE + 2 * HOUR_MS).toISOString();
     const rows = [
-      row({ id: 'p1', rootItemId: 'partial', issueIdentifier: 'LIN-5', harness: 'opencode', dispatchedAt: first, feedback: [usageEntry({ costUsd: 2, at: first })] }),
-      row({ id: 'p2', rootItemId: 'partial', issueIdentifier: 'LIN-5', harness: 'opencode', dispatchedAt: second, feedback: [usageEntry({ at: second })] })
+      row({ id: 'p1', rootItemId: 'partial', issueIdentifier: 'LIN-5', harness: 'opencode', dispatchedAt: first, feedback: [usageEntry({ costUsd: 2, at: first, harness: 'opencode' })] }),
+      row({ id: 'p2', rootItemId: 'partial', issueIdentifier: 'LIN-5', harness: 'opencode', dispatchedAt: second, feedback: [usageEntry({ at: second, harness: 'opencode' })] })
     ];
     const result = spendIn(rows);
     assert.equal(result.lineageCount, 1, 'the lineage is in the window');
