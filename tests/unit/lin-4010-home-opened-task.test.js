@@ -378,6 +378,8 @@ function loadClient({ stateBody = null, previewBody = null, presetsBody = [], pa
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 const HOME = {
+  // LIN-4104 D2: this file's workspace fills Run to PR (its tests are about that run); the filled rung is pinned in lin-4016.
+  filledRung: 'pr',
   urlKey: 'acme', surface: 'home', dispatchEnabled: true, runSetup: false, hasAI: true, aiState: 'ok', isLocalhost: false,
   promptMeta: { plan: 'Plan', implementation: 'implement', research: 'Research', scoping: 'Scoping', review: 'Review', 'plan-review': 'plan-review' },
   stageWords: { plan: 'Plan', implementation: 'Build', research: 'Research', scoping: 'Scoping', review: 'Review', 'plan-review': 'Plan review' },
@@ -419,6 +421,8 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
     PromptSection.init(c, { ...HOME });
     await flush();
     await c.click({ action: 'run-another' });
+    await flush();
+    await flush();
     assert.match(c.innerHTML, /data-testid="run-another-item"[^>]*>Build</);
     assert.doesNotMatch(c.innerHTML, />implement</);
   });

@@ -149,6 +149,8 @@ function load({ opened = null, previewFor = () => null, panelFor = serverPanel, 
 }
 
 const HOME = {
+  // LIN-4104 D2: this file's workspace fills Run to PR (its tests are about that run); the filled rung is pinned in lin-4016.
+  filledRung: 'pr',
   urlKey: 'acme', surface: 'home', dispatchEnabled: true, runSetup: false, hasAI: true, aiState: 'ok', isLocalhost: false,
   promptMeta: { plan: 'Plan', implementation: 'Build', research: 'Research', scoping: 'Scoping', review: 'Review' },
   defaultPromptKeys: ['look-into', 'research', 'plan', 'implementation'],
@@ -483,6 +485,8 @@ describe('LIN-3833 — "Another step" leaves out only what the task cannot take 
   };
   const open = async (c) => {
     await c.click({ action: 'run-another' });
+    await flush();
+    await flush();
     await c.click({ action: 'run-more' });
   };
 
@@ -729,4 +733,18 @@ describe('LIN-3992 — the summary names the model the draft holds, without a re
     await flush();
     assert.match(runsOn(c), /^Runs on Claude Sonnet 5\.5 · your runner — chosen for this run, Claude Code, the default$/, runsOn(c));
   });
+});
+
+// LIN-4104 D4: Run to Done is the autopilot kickoff with no stop, in the kickoff's query and in the dispatch body.
+test('LIN-4104 D4: Run to Done dispatches the autopilot kickoff with no stopAt, in the query and the body', async () => {
+  const { c, calls } = await mount({ filledRung: 'done' }, { opened: { status: 'idle', live: false, headerHtml: '', sessions: { count: 0, next: null, last: null, running: null } } });
+  await c.click({ action: 'go-done', rung: 'run-task' });
+  await flush();
+  await flush();
+  assert.equal(calls.kickoff.length, 1, 'the kickoff is fetched once');
+  assert.equal(calls.kickoff[0].stopAt, undefined, 'the kickoff query names no stop (fetchAutopilotKickoff sends nothing for it)');
+  assert.equal(calls.dispatch.length, 1, 'the run is dispatched once');
+  const d = calls.dispatch[0];
+  assert.equal(d.stopAt, undefined, 'the dispatch body names no stop: a run to Done is unbounded');
+  assert.equal(d.entryRung, 'run-task', 'it is still the ladder\'s autopilot press, so it records reach done');
 });

@@ -103,11 +103,12 @@ for (const [label, viewport] of [['1280px', DESKTOP], ['390px', PHONE]]) {
       const step = next.locator('.opened-task-step-name');
       const why = next.locator('[data-testid="opened-task-step-why"]');
       const run = next.locator('[data-testid="opened-task-go"]');
-      // LIN-4103 beat 2: after a clean Plan the box names no guessed step and no "usually next" reason; the run goes to PR.
-      await expect(step).toHaveText('Run to PR');
-      await expect(why).toContainText('no stage step is offered, so the run takes it to PR');
+      // LIN-4103 beat 2: after a clean Plan the box names no guessed step and no "usually next" reason. LIN-4104 D2: a
+      // workspace with no prior dispatch fills Next step; until the recommend step lands it runs the task to PR.
+      await expect(step).toHaveText('Next step');
+      await expect(why).toContainText('Harbour picks the next step when you press Next step');
       await expect(why).not.toContainText('usually');
-      await expect(run).toContainText('Run to PR');
+      await expect(run).toContainText('Next step');
 
       // Plan decision 2: the folds row carries the session count from the state read ("Sessions (1)" after one session).
       await expect(block.locator('[data-fold-count="sessions"]')).toHaveText(' (1)');

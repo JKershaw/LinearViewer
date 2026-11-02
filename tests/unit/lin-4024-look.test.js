@@ -81,7 +81,7 @@ describe('the Home mount — each opened row gets its decision record and the st
 
   test('a container row carries its decided action (Run to PR, container) in its record; a leaf row has no record, and the stage words reach both', () => {
     const { inits, mount } = mountWith({
-      rowData: { 'linear:parent': { action: { kind: 'run-to-pr', why: 'a container runs to PR', container: true }, copyStep: { label: 'plan', name: 'Plan', why: '' }, trackerWord: 'In progress' } },
+      rowData: { 'linear:parent': { action: { kind: 'offer', why: 'a container runs to PR', container: true }, copyStep: { label: 'plan', name: 'Plan', why: '' }, trackerWord: 'In progress' } },
       stageWords: { research: 'Research', implementation: 'Build' },
     });
     mount([placeholder('linear:parent', '1'), placeholder('linear:leaf', '2')]);
@@ -98,7 +98,7 @@ describe('the Home mount — each opened row gets its decision record and the st
     };
     vm.createContext(sandbox);
     vm.runInContext(`${functionSource(APP, 'mergeHomeRowOpts')}\nthis.mergeHomeRowOpts = mergeHomeRowOpts;`, sandbox);
-    const fetched = { 'linear:fetched-parent': { action: { kind: 'run-to-pr', why: 'a container runs to PR', container: true }, copyStep: { label: 'plan', name: 'Plan', why: '' }, trackerWord: 'In progress' } };
+    const fetched = { 'linear:fetched-parent': { action: { kind: 'offer', why: 'a container runs to PR', container: true }, copyStep: { label: 'plan', name: 'Plan', why: '' }, trackerWord: 'In progress' } };
     sandbox.mergeHomeRowOpts({ rowData: fetched });
     sandbox.mergeHomeRowOpts({ rowData: fetched });
     // The page map is built inside the vm context, so compare its JSON, not a cross-realm array.

@@ -113,6 +113,8 @@ function baseContext(calls, appliedAssigneeName, assigneeState) {
     renderUpstreamAwareErrorPage: () => '<error/>',
     resolveTeamSelection: async () => ({ teamId: null }),
     resolveAssigneeSelection: async () => assigneeState,
+    // LIN-4104 D2: the primary route reads the filled run button once per load; a workspace with no dispatch fills Next step.
+    readFilledRung: async () => 'next-step', taskModeStore: null, accountStore: null,
     getProviderForWorkspace: () => ({ supports: () => true }),
     getWorkspaceCallScope: () => ({}),
     console: { log() {}, error() {} }

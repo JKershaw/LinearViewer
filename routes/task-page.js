@@ -40,6 +40,7 @@ import { resolveIssueBinding, isValidIssueId } from '../lib/workspace.js';
 import { jsonError } from '../lib/errors.js';
 import { readOwnerSeamStatus } from '../lib/workspace-owner.js';
 import { buildPromptOpts } from '../lib/render-prompt-opts.js';
+import { readFilledRung } from '../lib/task-mode-store.js';
 import { isLocalhostRequest } from '../lib/public-origin.js';
 import {
   renderTaskPage,
@@ -56,13 +57,14 @@ function queryValue(value) {
 }
 
 /**
- * The state poll's `sessions` block (LIN-3833, LIN-4068 D7). The task's own summary, with `action` from the gather and
- * `busy` widened to a running or queued subtask (the same rollUp the row's action reads), so the opened box holds its
- * step line back exactly where the row holds its action (LIN-4070, found by the opened-box E2E).
+ * The state poll's `sessions` block (LIN-3833, LIN-4068 D7). The task's own summary, with `action` and `busy` from the
+ * gather. `busy` is the gather's own fact (LIN-4104 D1: own sessions unended, or any subtask's subtree busy), the same one
+ * the row's action reads, so the opened box holds its step line back exactly where the row holds its action.
  */
-function sessionsOfState(model, taskState) {
+function sessionsOfState(model, taskState, runWords = null) {
   const summary = sessionSummaryOf(model, { container: taskState.container === true });
-  return { ...summary, busy: summary.busy || !!(taskState.running || taskState.queued), action: taskState.action };
+  // LIN-4104 D4: the running line's words, for a Run-control run (null otherwise: the box keeps "Running now").
+  return { ...summary, busy: taskState.busy === true, action: taskState.action, runWords };
 }
 
 /**
@@ -75,7 +77,7 @@ function sessionsOfState(model, taskState) {
  * @param {Function} [deps.now] - () → Date
  * @returns {Router}
  */
-export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo, loader, workspaceOwnerCheck = null, runProposalsStore = null, taskFacts = null, refreshTaskFacts = null, now = () => new Date() }) {
+export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo, loader, workspaceOwnerCheck = null, runProposalsStore = null, taskFacts = null, refreshTaskFacts = null, taskModeStore = null, accountStore = null, now = () => new Date() }) {
   if (!loader) throw new Error('task-page routes: loader is required');
   const router = Router();
 
@@ -178,6 +180,8 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
           isLocalhost: isLocalhostRequest(req),
         }),
         row: rowRecordOf({ stateType: model.tracker?.state?.type ?? null, decided: taskState }),
+        // LIN-4104 D2: the filled run button, read once for this page load (never on the /state poll).
+        filledRung: await readFilledRung({ taskModeStore, accountStore, accountId: req.session?.accountId ?? null, urlKey: workspace.urlKey }),
       } : null;
       return res.send(renderTaskPage(model, {
         viewer,
@@ -209,7 +213,7 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
     if (!isValidIssueId(identifier)) return jsonError(res, 404, 'Task not found');
     const issueId = queryValue(req.query.issueId);
     try {
-      const { model, taskState, incomplete } = await loader.loadTaskState({
+      const { model, taskState, incomplete, runWords } = await loader.loadTaskState({
         urlKey: workspace.urlKey,
         identifier,
         issueId: issueId && isValidIssueId(issueId) ? issueId : null,
@@ -250,7 +254,7 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         stripHtml: renderStageStrip(model, { now: now() }),
         // LIN-3833: the sessions the state block and the run control read (count, last, running). LIN-4068 D7: the
         // action is the gather's (busy includes a running subtree), so it is not recomputed here.
-        sessions: sessionsOfState(model, taskState),
+        sessions: sessionsOfState(model, taskState, runWords),
         // LIN-4016: the task's decided state, with its main action (the gather's, LIN-4068).
         taskState,
         // LIN-4071: the subtask line the opened task names (a subtask that needs you, else a failed one): the gather's words,

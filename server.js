@@ -98,7 +98,7 @@ import { HarbourCommentsStore } from './lib/harbour-comments-store.js'
 import { SavedChatStore } from './lib/saved-chat-store.js'
 import { RunProposalsStore } from './lib/run-proposals-store.js'
 import { LlmCallLogStore } from './lib/llm-call-log.js'
-import { TaskModeStore } from './lib/task-mode-store.js'
+import { TaskModeStore, readFilledRung } from './lib/task-mode-store.js'
 import { CloseOutEventsStore } from './lib/close-out-events-store.js'
 import { PromptTraceStore } from './lib/prompt-trace-store.js'
 import { getProvider, getProviderForWorkspace, getAllProviders, localProvider } from './lib/providers/index.js' // barrel: owns the five self-registering provider imports (LIN-2010)
@@ -2004,7 +2004,8 @@ async function handleTokenRefreshAndRetry(workspace, session, teamId, assigneeSt
 async function renderDashboardAfterRefresh(workspace, session, teamId, assigneeState, openRouterSource, res) {
   return renderRefreshedDashboard({
     customPromptsStore, getDeployInfo, getFeatureFlags, getProviderForWorkspace, fetchAndPrepareProjects,
-    resolveRunControls, homeRowStates, orderIssuesForSwipe, renderPage, writeTaskFacts
+    resolveRunControls, homeRowStates, orderIssuesForSwipe, renderPage, writeTaskFacts,
+    taskModeStore, accountStore, readFilledRung
   }, { workspace, session, teamId, assigneeState, openRouterSource, res });
 }
 
@@ -3283,6 +3284,9 @@ app.use(createTaskPageRoutes({
   // LIN-4070 B: the private handlers' holder and refresh (the only place a refresh is started).
   taskFacts,
   refreshTaskFacts,
+  // LIN-4104 D2: the owner's filled run button, read once per task page load (never on the /state poll).
+  taskModeStore,
+  accountStore,
 }))
 
 // Mount the task share routes (LIN-3330) — the owner mint/list/revoke controls
@@ -3470,6 +3474,8 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
     const seedOnlyHome = orderedHome.length > 0 && orderedHome.every((issue) => issue.isSeed);
     const featureFlags = await requestFeatureFlags(req);
     const homeStates = await homeRowStates({ urlKey: workspace.urlKey, issues: fetched.stateIssues, runControls: featureFlags.runControls === true });
+    // LIN-4104 D2: the filled run button, read once for this page load (never on the /state poll).
+    const filledRung = await readFilledRung({ taskModeStore, accountStore, accountId: req.session?.accountId ?? null, urlKey: workspace.urlKey });
     // LIN-4068: hold the set through the write gate AFTER the gather, handing it the index the gather built (`roots`) so
     // the request builds it once; with no gather (null) the holder builds its own.
     writeTaskFacts(workspace.urlKey, fetched, { index: homeStates?.roots ?? null });
@@ -3484,6 +3490,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       rulingCount: homeStates?.rulingCount ?? 0,
       rowData: rowDataByNodeKey({ urlKey: workspace.urlKey, inProgressTrees: homeView.inProgressTrees, recentActivityTrees, projectTrees: homeView.trees, rowStates }),
       copyFirstCard: featureFlags.runControls !== true && req.session.copyFirstCardDismissed !== true,
+      filledRung,
       // LIN-2550: label the selector off the filter the render APPLIED. An
       // unmatched name (a stale `?assignee=` carried across a team change by
       // buildFilterUrl, `me` for a viewer with nothing assigned, an old

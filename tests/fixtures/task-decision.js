@@ -4,7 +4,7 @@
  * those fields with the same server functions. A test then says what it runs (`running`, `offered`), and the helper
  * completes the rest the way `sessionSummaryOf` does.
  */
-import { mainActionOf, NO_RUN_ACTION } from '../../lib/task-state.js';
+import { runOfferOf, NO_RUN_ACTION } from '../../lib/task-state.js';
 import { POLLED_TARGETS } from '../../lib/dispatch-targets.js';
 import { rowRecordOf } from '../../lib/task-board-view.js';
 import { isTerminalState } from '../../lib/providers/state-map.js';
@@ -25,7 +25,7 @@ export function serverSessions(sessions, { container = false, noRun = false } = 
     ...sessions,
     queued: sessions.queued !== undefined ? sessions.queued : (running && running.state === 'queued' ? running : null),
     busy,
-    action: sessions.action !== undefined ? sessions.action : (noRun ? NO_RUN_ACTION : mainActionOf({ offered: sessions.offered || null, busy, container })),
+    action: sessions.action !== undefined ? sessions.action : (noRun ? NO_RUN_ACTION : runOfferOf({ busyOn: busy ? { identifier: null, words: null } : null, container, step: sessions.offered || null })),
     canStop: sessions.canStop !== undefined ? sessions.canStop : !!running && POLLED_TARGETS.includes(running.target),
   };
 }
@@ -42,6 +42,6 @@ export function serverRow({ stateType = 'started', container = false, action } =
   let decided = null;
   if (action !== undefined) decided = { action };
   else if (isTerminalState(stateType)) decided = { action: NO_RUN_ACTION };
-  else if (container) decided = { action: mainActionOf({ offered: null, busy: false, container: true }) };
+  else if (container) decided = { action: runOfferOf({ container: true }) };
   return rowRecordOf({ stateType, decided });
 }

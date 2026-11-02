@@ -358,6 +358,8 @@ function mountHomePromptSections(root) {
       promptMeta: page.promptMeta,
       // LIN-4010: the stage words name each step ("Build"), not the template's "implement".
       stageWords: page.stageWords,
+      // LIN-4104 D2: the filled run button, from the viewer's last dispatch on this workspace (read once per page load).
+      filledRung: page.filledRung,
       // LIN-732: a caller-supplied dispatch-disclosure id prefix so the same
       // issue in In Progress AND its project tree gets disjoint panel ids.
       idPrefix: el.dataset.instanceKey || `home-${id}`

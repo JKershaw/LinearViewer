@@ -217,7 +217,7 @@ describe('GET /workspace/:urlKey/api/task/:identifier/state', () => {
     assert.deepEqual(Object.keys(res.jsonBody).sort(), ['attention', 'headerHtml', 'homeStatusHtml', 'live', 'questionHtml', 'sessions', 'status', 'stripHtml', 'taskState', 'trackHtml']);
     assert.equal(res.jsonBody.taskState.state, 'running', 'the decided state reads the same running session the row would');
     // LIN-4103 beat 2: the summary has no `next` field (no guessed step); `offered` is the failed-stage fact only.
-    assert.deepEqual(Object.keys(res.jsonBody.sessions).sort(), ['action', 'busy', 'canStop', 'count', 'excluded', 'last', 'offered', 'queued', 'running']);
+    assert.deepEqual(Object.keys(res.jsonBody.sessions).sort(), ['action', 'busy', 'canStop', 'count', 'excluded', 'last', 'offered', 'queued', 'runWords', 'running']);
     assert.equal(res.jsonBody.questionHtml, '');
     // LIN-4010 review: a running task has no Home line (the running box names it once); the key stays, empty.
     assert.equal(res.jsonBody.homeStatusHtml, '', 'a running task\'s Home line is empty: the running box says it');

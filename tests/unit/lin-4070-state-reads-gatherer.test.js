@@ -233,8 +233,8 @@ describe('LIN-4070 D1-D3 — the row, /state and the page-load record agree', ()
     const loops = [loop('LIN-132', { n: 4 })];
     const { taskState } = await loaderOver({ loops, holder: holding(issues) }).loadTaskState({ urlKey: URL_KEY, identifier: 'LIN-130' });
     assert.equal(taskState.state, 'running');
-    assert.equal(taskState.action, null, 'busy: a running grandchild offers no run (D7)');
-    assert.equal(rowsOf(issues, loops).get('LIN-130').action, null, 'Home offers the same');
+    assert.equal(taskState.action?.kind, 'busy', 'busy: a running grandchild offers no run (D7, LIN-4104 D1)');
+    assert.equal(rowsOf(issues, loops).get('LIN-130').action?.kind, 'busy', 'Home offers the same');
   });
 });
 
@@ -297,7 +297,7 @@ describe('LIN-4070 — no poll calls a provider; the private state read starts o
     const res = await stateCall(router, 'LIN-210');
     assert.equal(res.jsonBody.taskState.state, 'running');
     assert.equal(res.jsonBody.sessions.busy, true, 'busy includes the running subtree (the gather\'s busy)');
-    assert.equal(res.jsonBody.sessions.action, null, 'no main action while busy');
+    assert.equal(res.jsonBody.sessions.action?.kind, 'busy', 'no run offer while busy');
     const cold = privateRouter({ holder: holding(issues, new Date(NOW.getTime() - 10 * 60 * 1000)), refresh: () => ({ started: false, reason: 'fresh' }) });
     const coldRes = await stateCall(cold, 'LIN-210');
     assert.equal(coldRes.jsonBody.incomplete, 'cold');

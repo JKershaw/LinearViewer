@@ -160,3 +160,62 @@ describe('readTaskRunFacts: hopVariant false (the run page)', () => {
     assert.equal((await readTaskRunFacts({ store: s, urlKey: 'ws', issueIdentifier: 'LIN-50', hopVariant: false })).stopAt, 'pr');
   });
 });
+
+// LIN-4104 D4 (review note 3): a found run row and a missing one are different facts. The defaults (stopAt null) are the
+// same for "no row" and "a row with no stop", so the wording reads the found signal, never the stopAt alone.
+import { readTaskRunState, runWordsOf } from '../../lib/task-run-facts.js';
+
+describe('readTaskRunState: found vs not found (LIN-4104 D4)', () => {
+  test('an autopilot row, unbounded (no stopAt): found, stopAt null, its id', async () => {
+    const s = store({ queue: [{ _id: 'run-9', kind: 'autopilot', variant: 'standard' }] });
+    const got = await readTaskRunState({ store: s, urlKey: 'ws', issueIdentifier: 'LIN-50' });
+    assert.equal(got.found, true);
+    assert.equal(got.stopAt, null, 'unbounded');
+    assert.equal(got.runId, 'run-9');
+  });
+
+  test('no run row at all: not found, the same stopAt null', async () => {
+    const s = store({ queue: [{ kind: 'implementation' }] });
+    const got = await readTaskRunState({ store: s, urlKey: 'ws', issueIdentifier: 'LIN-50' });
+    assert.equal(got.found, false);
+    assert.equal(got.runId, null);
+    assert.equal(got.stopAt, null);
+  });
+
+  test('the subtask hop finds the parent run row: found, with its id', async () => {
+    const s = store({
+      queue: [{ kind: 'implementation', sessionId: 'run-1' }],
+      hops: { 'run-1': { _id: 'run-1', kind: 'autopilot', stopAt: 'pr', variant: 'standard' } },
+    });
+    const got = await readTaskRunState({ store: s, urlKey: 'ws', issueIdentifier: 'LIN-51' });
+    assert.equal(got.found, true);
+    assert.equal(got.stopAt, 'pr');
+    assert.equal(got.runId, 'run-1');
+  });
+
+  test('readTaskRunFacts keeps its shape: the projection of readTaskRunState to stopAt and variant', async () => {
+    const s = store({ queue: [{ _id: 'run-9', kind: 'autopilot', stopAt: 'pr', variant: 'standard' }] });
+    assert.deepEqual(await readTaskRunFacts({ store: s, urlKey: 'ws', issueIdentifier: 'LIN-50' }), { stopAt: 'pr', variant: 'standard' });
+  });
+
+  test('a store error is not found (the defaults, found false)', async () => {
+    const got = await readTaskRunState({ store: store({ throws: true }), urlKey: 'ws', issueIdentifier: 'LIN-50' });
+    assert.equal(got.found, false);
+  });
+});
+
+// The running line's words (LIN-4104 D4): "Running to PR · started with <stage> on <id>"; a found unbounded run reads
+// "Running to Done"; only a run row that is not found reads "Harbour is deciding".
+describe('runWordsOf (LIN-4104 D4)', () => {
+  test('found, pr, with the first worker: Running to PR · started with <stage> on <id>', () => {
+    assert.equal(runWordsOf({ found: true, stopAt: 'pr', stage: 'Research', identifier: 'LIN-4011' }), 'Running to PR · started with Research on LIN-4011');
+  });
+  test('found, unbounded: Running to Done (never "deciding")', () => {
+    assert.equal(runWordsOf({ found: true, stopAt: null }), 'Running to Done');
+    assert.equal(runWordsOf({ found: true, stopAt: null, stage: 'Build', identifier: 'LIN-1' }), 'Running to Done · started with Build on LIN-1');
+  });
+  test('not found: Harbour is deciding', () => {
+    assert.equal(runWordsOf({ found: false, stopAt: null }), 'Harbour is deciding');
+    assert.equal(runWordsOf({ found: false, stopAt: 'pr', stage: 'Build', identifier: 'LIN-1' }), 'Harbour is deciding');
+  });
+});

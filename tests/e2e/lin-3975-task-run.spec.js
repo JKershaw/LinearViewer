@@ -77,8 +77,9 @@ test.describe('LIN-3975 — the task page moves the task on', () => {
     await page.goto(`/workspace/${URL_KEY}/task/${TASK}`);
     const control = page.locator('[data-testid="task-page-run-control"]');
     await expect(control).toHaveCount(1);
-    // LIN-4103 beat 2: after a clean Plan nothing is offered as a guessed step; the run goes to PR (no "Run Plan review").
-    await expect(control.locator('[data-testid="opened-task-go"]')).toContainText('Run to PR');
+    // LIN-4103 beat 2: after a clean Plan nothing is offered as a guessed step. LIN-4104 D2: a workspace with no prior dispatch
+    // fills Next step (it runs to PR until the recommend step lands).
+    await expect(control.locator('[data-testid="opened-task-go"]')).toContainText('Next step');
     await expect(page.locator('[data-testid="task-page-next"]')).toHaveCount(0);
   });
 
