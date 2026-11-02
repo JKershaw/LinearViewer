@@ -109,3 +109,42 @@ That's **2 hits, 2 partial, 1 miss.** Diagnosis is strong and concrete: file pat
 - **Added to "where it binds": the test harness itself** (state shared between tests, slow or flaky suites, missing seams). This was LIN-4113's biggest cost, and v0 never looked.
 - **Changed "Will it split, and how many?" to "list the pieces you'd expect it to split into".** A list can be checked against what happened, and v0's count for S3 (2) was far below reality (11).
 - **Removed "Roughly how long will it take?"** Effort is the weakest prediction (Theseus found the same), v0 underestimated S3 by several times, and the number invites false precision. Plan-review rounds and pieces carry the same signal more checkably.
+
+## 2 Nov, about 22:25 UTC: Spike 2 forecasts (Survey v1, committed before the work)
+
+Both are posted on LIN-4150 (22:16). The base is `f6a2c2158`, main at 21:54. **S4 and S5 run with their tickets unchanged**, so the forecast is tested against the drill.
+
+**S4 (LIN-4106): the opened task and task page**
+- **Binds:**
+  - "Last run" words in two raw copies: server `idleRung` in `lib/task-page-loader.js:651`, and browser `renderLastLine` in `public/prompt-section.js:1018`, each with its own age formatter. Both print raw state, and an idle task page shows both.
+  - Two pill tables that disagree: `TASK_PAGE_PILL_FOR_STATE` says `waiting`; Home's `PILL_FOR_TASK_STATE` says `needs you`.
+  - State-line renderers shared with the guest share and the ready header; Home's empty cases pinned by LIN-4010.
+  - The Change drawer is browser-only.
+  - About 7 pins, plus `llms.txt`.
+- **Drill leaves behind:** `idleRung`, `renderLastLine`'s words and age, both pill tables, `renderCopyState`, and the styleguide text ("at least three copies that disagree").
+- **Recommends:** a small tidy first: one `lastRunWords` in the loader, and the two pill tables merged.
+- **Predicts:**
+  - 0 plan-review rounds, plus one course-change note on LIN-4040 (Home's empty cases).
+  - Pieces: (a) the tidy and its unit test, (b) the task-page order, labels and duplicate Last, (c) Home's one line for every case, (d) the drawer in both branches, (e) llms.txt, the styleguide, the golden fixture and screenshots.
+  - Will bite: the guest share changes unreviewed; a server-rendered age goes stale; the Sessions list and the box drift apart if the word table isn't shared.
+
+**S5 (LIN-4107): type**
+- **Binds:**
+  - A four-size test over sheets reaches all of `style.css` (about 339 `font-size` declarations, about 48 distinct), which is LIN-4017's ground.
+  - The em tokens compound.
+  - The phone shrink is one `body` rule plus three copies that undo it.
+  - There is no mono class; mono is inherited from containers.
+  - Six pinned tests, and the styleguide hard-codes the token values.
+- **Drill leaves behind:** the `body` shrink and its undoing copies, the em tokens, the styleguide copy, and about 44 stray literals.
+- **Recommends:** a small tidy first (rem tokens plus a fourth, delete the shrink and its undoing copies), then consolidate the Home and task-page selectors onto the tokens. The witness should be computed sizes at 390px, not a whole-sheet count. LIN-4017 comes second.
+- **Predicts:**
+  - 1 plan-review round, over the scope of the count test.
+  - Pieces: (a) the tokens, (b) the shrink, (c) the selectors, (d) sans for the sessions and answer box, (e) the witness, (f) screenshots.
+  - Will bite: em→rem shifts sizes on pages nobody screenshots.
+
+**What to compare afterwards:**
+- whether these copies show up as friction, rework or a review send-back;
+- whether a copy is left behind and later disagrees;
+- plan-review rounds against the prediction;
+- the pieces against the prediction;
+- the builders' own 1a answers.
