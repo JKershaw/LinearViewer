@@ -108,7 +108,7 @@ function inProgressNodeOf(s, identifier) {
 }
 
 /** Asserts the property: each open task is placed exactly once, the named tasks sit In Progress, each fold matches its count. */
-function assertPlacedOnce(s, { inProgress: mustBeInProgress = [], waiting: mustBeWaiting = [] } = {}) {
+function assertPlacedOnce(s, { inProgress: mustBeInProgress = [], waiting: mustBeWaiting = [], folded: mustBeFolded = [] } = {}) {
   const p = placementsOf(s);
   const placed = [...p.inProgress, ...p.waiting, ...p.upNext, ...p.folds, ...p.parentFolds.flatMap(f => f.all)];
   const count = new Map();
@@ -122,6 +122,11 @@ function assertPlacedOnce(s, { inProgress: mustBeInProgress = [], waiting: mustB
   }
   for (const id of mustBeWaiting) {
     assert.ok(p.waiting.includes(id), `${id} must sit in Waiting on you, not only in a fold`);
+  }
+  // LIN-4145: a named child must sit in its started parent's "N more" fold, not in a project's Up next or Backlog.
+  const parentFolded = p.parentFolds.flatMap(f => f.all);
+  for (const id of mustBeFolded) {
+    assert.ok(parentFolded.includes(id), `${id} must be folded under its parent's "N more", found in: ${JSON.stringify({ upNext: p.upNext, folds: p.folds })}`);
   }
   for (const f of p.parentFolds) {
     assert.equal(f.topLevel.length, f.more, `${f.parent}: its more-of-parent fold must return its ${f.more} folded task(s)`);
@@ -216,5 +221,75 @@ describe('LIN-4117 W2b: every open task Home holds is placed exactly once', () =
       topTaskId: nodeKey({ id: 'T-5' }),
     });
     assertPlacedOnce(s, { inProgress: ['C-2', 'T-5'], waiting: ['R-6'] });
+  });
+});
+
+// LIN-4145: the same property with children in another project. `buildForest` links a child only within its own project,
+// so a cross-project child is a root of its own project's tree; Home must still place it once, under its parent.
+const CROSS_PROJECTS = [{ id: 'pa', name: 'Alpha' }, { id: 'pb', name: 'Beta' }];
+const crossIssue = (identifier, type, { parent = null, project = CROSS_PROJECTS[0] } = {}) => ({
+  id: identifier,
+  identifier,
+  title: identifier,
+  state: { type },
+  parent: parent ? { id: parent } : null,
+  project,
+  labels: { nodes: [] },
+});
+
+/** The project trees and In Progress forest across two projects, shaped the way the app builds them. */
+function crossWorkspaceOf(issues) {
+  const forest = buildForest(issues);
+  const trees = CROSS_PROJECTS.map(project => {
+    const roots = forest.get(project.id)?.roots || [];
+    const { incomplete, completed, completedCount } = partitionCompleted(roots);
+    return { project: { ...project, collapsed: false }, incomplete, completed, completedCount };
+  });
+  return { trees, inProgressTrees: buildInProgressForest(issues, CROSS_PROJECTS) };
+}
+
+function crossScenario({ issues, states = {}, topTaskId = null }) {
+  const { trees, inProgressTrees } = crossWorkspaceOf(issues);
+  const stateMap = new Map(Object.entries(states));
+  const rulingRows = Object.entries(states)
+    .filter(([, state]) => state.state === 'needs-you')
+    .map(([identifier]) => ({ decision: { decision_id: `d-${identifier}`, question: 'Which?' }, decisionCase: [], anchor: { loopId: null, issueId: `id-${identifier}`, issueIdentifier: identifier, workspaceUrlKey: 'w', taskDecisionId: `td-${identifier}` }, disposition: 'task-bound', effect: 'record', canReply: true }));
+  const view = buildHomeView({ inProgressTrees, trees, states: stateMap, topTaskId, rulingRows });
+  return { issues, trees, inProgressTrees, view, states: stateMap, topTaskId, rulingRows };
+}
+
+describe('LIN-4145 reachability: children in another project are placed exactly once', () => {
+  test('a started parent with open cross-project children (Todo and Backlog): both fold under it, and neither repeats in its project', () => {
+    const s = crossScenario({
+      issues: [
+        crossIssue('P-1', 'started'),
+        crossIssue('C-2', 'unstarted', { parent: 'P-1', project: CROSS_PROJECTS[1] }),
+        crossIssue('C-3', 'backlog', { parent: 'P-1', project: CROSS_PROJECTS[1] }),
+      ],
+    });
+    assertPlacedOnce(s, { inProgress: ['P-1'], folded: ['C-2', 'C-3'] });
+  });
+
+  test('a started parent with a started cross-project child and an open cross-project sibling: the child is drawn, the sibling folds', () => {
+    const s = crossScenario({
+      issues: [
+        crossIssue('P-1', 'started'),
+        crossIssue('C-2', 'started', { parent: 'P-1', project: CROSS_PROJECTS[1] }),
+        crossIssue('C-3', 'unstarted', { parent: 'P-1', project: CROSS_PROJECTS[1] }),
+      ],
+    });
+    assertPlacedOnce(s, { inProgress: ['P-1', 'C-2'], folded: ['C-3'] });
+  });
+
+  test('a Todo parent with a cross-project ruling child and an open cross-project sibling: the ruling sits in Waiting on you, the sibling is placed once', () => {
+    const s = crossScenario({
+      issues: [
+        crossIssue('P-1', 'started'),
+        crossIssue('R-2', 'unstarted', { parent: 'P-1', project: CROSS_PROJECTS[1] }),
+        crossIssue('Q-3', 'unstarted', { parent: 'P-1', project: CROSS_PROJECTS[1] }),
+      ],
+      states: { 'R-2': { state: 'needs-you' } },
+    });
+    assertPlacedOnce(s, { waiting: ['R-2'], folded: ['Q-3'] });
   });
 });
