@@ -794,7 +794,7 @@ body[data-proxy-active="true"] .prompt-section .prompt-proxy-toggle {
   color: var(--brand-dim);
 }
 
-/* LIN-4115: Home's halt banner ("Runs are paused/stopped · cleared on Dispatch ›"), above the onboarding hint.
+/* LIN-4115: Home's halt banner, above the onboarding hint (its wording is built in lib/render.js).
    Theme tokens only (--card, --line, --text, --amber-dim), so dark mode needs no extra rule. */
 .home-halt-banner {
   margin: var(--space-2) 0;
