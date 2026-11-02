@@ -72,3 +72,15 @@ describe('W6 (a): buildHomeView( has exactly two production callers', () => {
     );
   });
 });
+
+describe('W6 (c): /api/home-rows gathers inputs only (homeRowsFor builds its view once)', () => {
+  test('the home-rows route calls gatherHomeInputs and never gatherHomePage', () => {
+    const server = readFileSync(join(ROOT, 'server.js'), 'utf8');
+    const start = server.indexOf("app.get('/workspace/:urlKey/api/home-rows'");
+    assert.ok(start >= 0, 'the /api/home-rows route must exist in server.js');
+    const next = server.indexOf('app.get(', start + 1);
+    const route = codeLinesOf(server.slice(start, next === -1 ? undefined : next));
+    assert.match(route, /gatherHomeInputs\(homePipelineDeps\(\)/, '/api/home-rows must gather through gatherHomeInputs');
+    assert.doesNotMatch(route, /gatherHomePage\(/, '/api/home-rows must not use gatherHomePage: it would build the Home view a second time per fold');
+  });
+});
