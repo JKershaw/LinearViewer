@@ -40,7 +40,7 @@ test.describe('The opened task on Home, copy-first (LIN-3833)', () => {
   });
 
   test('a Todo task names its step from its status: Plan, written by "✦ Write the prompt"', async ({ page }) => {
-    const component = await openTaskPrompts(page, '.project', TODO_ISSUE_ID);
+    const component = await openTaskPrompts(page, '.in-progress-items', TODO_ISSUE_ID);
     const write = component.locator('[data-testid="opened-task-write"]');
     await expect(write).toBeVisible();
     await expect(write).toHaveAttribute('data-prompt', 'plan');
@@ -48,21 +48,21 @@ test.describe('The opened task on Home, copy-first (LIN-3833)', () => {
   });
 
   test('the copy action exists only once a prompt is written', async ({ page }) => {
-    const component = await openTaskPrompts(page, '.project', TODO_ISSUE_ID);
+    const component = await openTaskPrompts(page, '.in-progress-items', TODO_ISSUE_ID);
     await expect(component.locator('[data-testid="opened-task-copy"]')).toHaveCount(0);
     await writePrompt(component);
     await expect(component.locator('[data-testid="opened-task-copy"]')).toBeEnabled();
   });
 
   test('the written prompt names the issue identifier, in the bounded box', async ({ page }) => {
-    const component = await openTaskPrompts(page, '.project', TODO_ISSUE_ID);
+    const component = await openTaskPrompts(page, '.in-progress-items', TODO_ISSUE_ID);
     await writePrompt(component);
     await expect(component.locator('.opened-task-box [data-prompt-body]')).toContainText('TEST-');
   });
 
   test('copy button copies the written prompt text', async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-    const component = await openTaskPrompts(page, '.project', TODO_ISSUE_ID);
+    const component = await openTaskPrompts(page, '.in-progress-items', TODO_ISSUE_ID);
     await writePrompt(component);
 
     const copyButton = component.locator('[data-testid="opened-task-copy"]');
@@ -71,7 +71,7 @@ test.describe('The opened task on Home, copy-first (LIN-3833)', () => {
   });
 
   test('LIN-316: download button saves the prompt as a .md file', async ({ page }) => {
-    const component = await openTaskPrompts(page, '.project', TODO_ISSUE_ID);
+    const component = await openTaskPrompts(page, '.in-progress-items', TODO_ISSUE_ID);
     await writePrompt(component);
 
     const downloadButton = component.locator('[data-action="download"]');
@@ -85,7 +85,7 @@ test.describe('The opened task on Home, copy-first (LIN-3833)', () => {
   });
 
   test('Rewrite writes the step again: the view goes back through generating to a fresh prompt', async ({ page }) => {
-    const component = await openTaskPrompts(page, '.project', TODO_ISSUE_ID);
+    const component = await openTaskPrompts(page, '.in-progress-items', TODO_ISSUE_ID);
     await writePrompt(component);
     await component.locator('.opened-task-regenerate').click();
     await expect(component).toHaveAttribute('data-phase', 'fresh');
@@ -93,7 +93,7 @@ test.describe('The opened task on Home, copy-first (LIN-3833)', () => {
   });
 
   test('the copy-first view has the expected structure', async ({ page }) => {
-    const component = await openTaskPrompts(page, '.project', TODO_ISSUE_ID);
+    const component = await openTaskPrompts(page, '.in-progress-items', TODO_ISSUE_ID);
     await writePrompt(component);
     await expect(component.locator('[data-testid="opened-task-copy"]')).toBeVisible();
     await expect(component.locator('[data-prompt-body]')).toBeVisible();

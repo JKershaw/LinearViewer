@@ -37,10 +37,9 @@ test.describe('Jira provider (no test-token mock)', () => {
     // The done issue is counted on its project, never sent to the page (LIN-4024).
     await expect(page.locator('.line:has-text("Jira task shipped")')).toHaveCount(0);
     await expect(page.locator('[data-testid="home-done-count"]').first()).toContainText('1 done');
-    // The unstarted subtask folds under its In Progress parent, and opens with it (native one-level parent/child).
+    // The unstarted subtask is the top task (LIN-4117), so it is In Progress under its parent, and opens with it.
     await page.locator('.in-progress-section .line:has-text("Jira task in progress")').first().click();
-    await page.locator('.in-progress-section [data-home-fetch="more-of-parent"]').first().click();
-    await expect(page.locator('.line:has-text("Subtask of the in-progress task")').first()).toBeAttached();
+    await expect(page.locator('.in-progress-section .line:has-text("Subtask of the in-progress task")').first()).toBeVisible();
   });
 
   // LIN-2011 review finding F1: the epic (ENG-0) used to surface BOTH as the
