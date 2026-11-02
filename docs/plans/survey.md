@@ -44,6 +44,12 @@ The long argument is the essay `docs/papers/harbour/tasks-are-tasks.md` (v4 is l
   - The code is tidier where it was aimed (task state has one owner and one set of facts) but not overall. `lib` grew about 1,900 lines and the unit tests about 13,000. New modules were added beside old ones more often than old ones were removed.
 
   This is tidy-first happening reactively, one discovery at a time.
+- **Costs tidy 5 (LIN-4147, merged as `46b43b3b`, 3 November):**
+  - It fixed a live bug with no plan-review rounds. One lineage had been counted under both LIN-4114 and LIN-4139; about $49.50 left those issues. A sweep found 0 lineages under more than one issue.
+  - Its one miss shows the monkey's paw. It was guarded on one side ("never under two issues") but not the other ("every issue still gets a figure"), and afterwards 114 of 198 issues showed no lineage, unchecked against before. The bar gained "no issue loses a figure unless named".
+  - It also filed LIN-4148, a real bug, despite a buried "list, don't file".
+  - Three of its four product defaults (wakes count under the lineage's issue; no issue means nowhere; a lane counts under its anchor) wait on the per-request ledger. Until then, per-issue cost undercounts work done through autopilot's child tickets, so cost per area or per lineage is the usable money view for the spikes.
+  - Rebuild 1, one cost read for seven surfaces in one PR, is drafted. A checker reshaped it against spiralling: it now lists the surfaces and defines "right". That is a forecast acting on the ticket.
 
 **Cost is the incentive.**
 - A tidier codebase is cheaper because there is less to do. In Harbour a task takes hours, against minutes in a simple project.
