@@ -22,7 +22,6 @@ import {
 } from '../../lib/db-indexes.js';
 import { ProxyEventStore } from '../../lib/proxy-events.js';
 import { PromptTraceStore } from '../../lib/prompt-trace-store.js';
-import { LlmCallLogStore } from '../../lib/llm-call-log.js';
 import { AgentStatusStore } from '../../lib/agent-status-store.js';
 import { TaskShareStore } from '../../lib/task-share-store.js';
 import { recordingCollection } from '../fixtures/mango-tmpdir.js';
@@ -485,9 +484,10 @@ describe('db-indexes', () => {
     // decides it: the index key must be the list's sort key with `urlKey:1`
     // prepended. Change a list's sort or its index spec without the other and
     // this fails — the exact drift that produced the production blocking sort.
-    // The four A2/B paged lists all declare a `urlKey:1,timestamp:-1` key (the
-    // issue-scoped llm-call-log successor is excluded by the `issueIdentifier`
-    // guard).
+    // The three paged lists left below declare a `urlKey:1,timestamp:-1` key.
+    // The llm-call-log `{urlKey,timestamp,_id}` index has the same shape but no
+    // paged list reads it any more (LIN-4129 removed `listCalls`); it stays
+    // declared for the horizon readers and is pinned by the spec-list test above.
     const pagedListSpec = (collection) => (s) =>
       s.collection === collection &&
       s.keySpec.urlKey === 1 &&
@@ -497,7 +497,6 @@ describe('db-indexes', () => {
       { collection: 'proxy-events', make: c => new ProxyEventStore({ collection: c }), list: s => s.listEvents('parity-ws', { limit: 5, offset: 0 }), match: pagedListSpec('proxy-events') },
       { collection: 'proxy-events', make: c => new ProxyEventStore({ collection: c }), list: s => s.listSelfCredentialTrail('parity-ws', 'parity-token', { limit: 5 }), match: pagedListSpec('proxy-events') },
       { collection: 'prompt-traces', make: c => new PromptTraceStore({ collection: c }), list: s => s.listTraces('parity-ws', { limit: 5, offset: 0 }), match: pagedListSpec('prompt-traces') },
-      { collection: 'llm-call-log', make: c => new LlmCallLogStore({ collection: c }), list: s => s.listCalls('parity-ws', { limit: 5, offset: 0 }), match: pagedListSpec('llm-call-log') },
       { collection: 'foreman-status', make: c => new AgentStatusStore({ collection: c }), list: s => s.listStatus('parity-ws', { limit: 5, offset: 0 }), match: pagedListSpec('foreman-status') }
     ];
     for (const { collection, make, list, match } of cases) {
