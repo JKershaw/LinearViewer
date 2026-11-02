@@ -27,8 +27,9 @@ function homeRenderBlocks(src) {
   return starts.map(start => src.slice(start, src.indexOf('res.send(html)', start)));
 }
 
-// A `halt` key in the renderPage options: a shorthand `halt,` or a `halt: <value>,` line.
-const PASSES_HALT = /^\s+halt(?:,|\s*:)/m;
+// A `halt` key in the renderPage options that carries the value read by readHaltForPoll:
+// the shorthand `halt,` or `halt: halt`. A `halt: null` / `halt: undefined` line must not match.
+const PASSES_HALT = /^\s+halt(?:,|\s*:\s*halt\b)/m;
 
 describe('LIN-4115 — both Home producers read the halt through readHaltForPoll', () => {
   test('server.js (the Home route) reads it with the poll path\'s exact call form', () => {
