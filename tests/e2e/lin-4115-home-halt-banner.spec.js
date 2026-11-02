@@ -40,10 +40,6 @@ test.describe('Home halt banner (LIN-4115)', () => {
   // Seeds this worker's workspace, then makes the session its owner. The halt POST is owner-gated, and a
   // run-control page needs a runner (`runner: true`) to show the Next step / Run to PR / Run to Done rungs.
   async function seed(page, seedLocal, { runner = true } = {}) {
-    // A kickoff queued by an earlier spec on this worker's key hides the run button ("busy as a fact"), so start clean.
-    for (const route of ['clear-dispatch-queue', 'clear-dispatch-history', 'clear-task-mode-events']) {
-      await page.request.get(`/test/${route}?urlKey=${WS}`);
-    }
     await seedLocal(workspaceApiLocalSeed, { runnerKey: runner, openRouterConnected: true });
     await seedWorkspaceOwnership(page, WS, 'owner');
   }

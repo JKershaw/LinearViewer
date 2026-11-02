@@ -189,8 +189,7 @@ test.describe('Change is a drawer at desktop width, and Escape closes it (LIN-40
       const { innerWidth } = await page.evaluate(() => ({ innerWidth: window.innerWidth }));
       return b ? innerWidth - Math.round(b.x + b.width) : Infinity;
     }, { message: 'the drawer is within a scrollbar of the window\'s right edge' }).toBeLessThanOrEqual(24);
-    // Polled, not read once: the panel repaints as its choices load (above), so a read can land between two paints.
-    await expect.poll(async () => (await drawer.boundingBox())?.x ?? -1, { message: 'the drawer is in the right half' }).toBeGreaterThan(DESKTOP.width / 2);
+    expect((await drawer.boundingBox()).x, 'the drawer is in the right half').toBeGreaterThan(DESKTOP.width / 2);
 
     // LIN-4010 review: Change is a choice. The default is a card; the decision panel is hidden until "Choose for this run".
     await expect(drawer.locator('[data-testid="run-default"]')).toBeVisible();

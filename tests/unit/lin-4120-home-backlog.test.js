@@ -14,6 +14,8 @@ import { renderTaskCreatePage } from '../../lib/render-task-create.js';
 import { buildHomeView } from '../../lib/home-view.js';
 import { homeRowDataFor } from '../../lib/home-pipeline.js';
 import { nodeKey } from '../../lib/tree.js';
+import { renderDashboardAfterRefresh } from '../../lib/dashboard-refresh.js';
+import { orderIssuesForSwipe } from '../../lib/task-board-view.js';
 
 const URL_KEY = 'ws';
 const WORKSPACE = { urlKey: URL_KEY, name: 'WS', provider: 'linear' };
@@ -86,6 +88,72 @@ describe("LIN-4120: Home's rowData is In Progress and Recent only; the backlog's
     // A Backlog task is folded into a count on the view and fetched when its fold opens (/api/home-rows), so it is not in
     // the page's rowData on either page; the rows the page draws are.
     assert.ok(!(nodeKey(backlog.issue) in backlogData), 'a folded Backlog task is fetched by its fold, not carried in rowData');
+  });
+});
+
+describe('LIN-4120: the backlog rowData covers every row the backlog page draws, and nothing it does not', () => {
+  test('each task row on /backlog has its record, and the In Progress-only task is not carried', () => {
+    const { projectTrees, inProgressTrees, started } = worldTrees();
+    const view = buildHomeView({ inProgressTrees, trees: projectTrees, states: new Map(), topTaskId: null });
+    const html = renderPage(view.trees, view.inProgressTrees, [], 'Org', { urlKey: URL_KEY, workspaces: [WORKSPACE], featureFlags: {}, pageMode: 'backlog' });
+    const data = homeRowDataFor({ pageMode: 'backlog', urlKey: URL_KEY, homeView: view, recentActivityTrees: [], rowStates: null });
+
+    const byIdentifier = new Map(projectTrees[0].incomplete.map(n => [n.issue.identifier, n.issue]));
+    const drawn = [...html.matchAll(/data-identifier="([^"]+)"/g)].map(m => m[1]);
+    assert.ok(drawn.length > 0, 'the backlog page draws task rows');
+    for (const identifier of drawn) {
+      assert.ok(byIdentifier.has(identifier), `${identifier} is a project task`);
+      assert.ok(nodeKey(byIdentifier.get(identifier)) in data, `${identifier} has its row record on /backlog`);
+    }
+    assert.ok(!(nodeKey(started.issue) in data), 'the In Progress task, which /backlog does not draw, carries no record there');
+  });
+});
+
+describe('LIN-4120 W7: the sign-in refresh re-renders Home with the same rowData as Home', () => {
+  test('the refresh draws no project section, and its rowData carries no project-only task', async () => {
+    const { projectTrees, inProgressTrees, started, backlog } = worldTrees();
+    // A second Up next task that is not the top task: Home's view holds it under its project, so only the rowData
+    // helper keeps it off Home. (The first Todo is the top task, which Home promotes into its In Progress region.)
+    const upNext = node({ id: 't2', identifier: 'X-T2', title: 'Also waiting', state: { type: 'unstarted', name: 'Todo' } });
+    projectTrees[0].incomplete.push(upNext);
+    const fetched = {
+      trees: projectTrees, inProgressTrees, recentActivityTrees: [], organizationName: 'Org',
+      teams: [], selectedTeamId: null, showSource: 'local', truncated: false, availableAssignees: [],
+      appliedAssigneeName: null, degradedSources: [], stateIssues: [],
+    };
+    const pageCalls = [];
+    const sent = [];
+    const deps = {
+      customPromptsStore: { list: async () => [] },
+      getDeployInfo: () => ({}),
+      getFeatureFlags: () => ({}),
+      getProviderForWorkspace: () => ({ supports: () => false }),
+      fetchAndPrepareProjects: async () => fetched,
+      resolveRunControls: async () => ({ runControls: false }),
+      homeRowStates: async () => ({ states: new Map(), roots: null, rulingCount: 0 }),
+      orderIssuesForSwipe,
+      renderPage: (...args) => { pageCalls.push(args); return renderPage(...args); },
+      writeTaskFacts: undefined,
+      readFilledRung: undefined,
+    };
+    const session = { accountId: 'acct-w7', workspaces: [WORKSPACE], proxyDefault: true, features: {}, copyFirstCardDismissed: true };
+    const res = { send: (html) => { sent.push(html); return html; } };
+    await renderDashboardAfterRefresh(deps, {
+      workspace: WORKSPACE, session, teamId: null,
+      assigneeState: { resolvedAssigneeName: null, selectedAssignee: 'all' }, openRouterSource: null, res,
+    });
+
+    assert.equal(pageCalls.length, 1, 'the refresh renders its page once');
+    const html = sent[0];
+    assert.equal((html.match(/data-testid="project"/g) || []).length, 0, 'the refresh re-render has no project section');
+    assert.equal((html.match(/data-testid="home-backlog-link"/g) || []).length, 1, 'the refresh re-render has the one Backlog link');
+
+    // The refresh's top task is the Todo task: Home's view promotes it into the In Progress region, so it has a row record
+    // on Home. The project-only Backlog task has none. That is the contrast a project-tree rowData would break.
+    const rowData = pageCalls[0][4].rowData;
+    assert.ok(nodeKey(started.issue) in rowData, 'the In Progress task has its row record after refresh');
+    assert.ok(!(nodeKey(upNext.issue) in rowData), 'a project-only Up next task carries no row record after refresh');
+    assert.ok(!(nodeKey(backlog.issue) in rowData), 'a project-only Backlog task carries no row record after refresh');
   });
 });
 
