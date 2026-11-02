@@ -10,7 +10,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { findTerminalFeedback, deriveTerminalStatus, deriveLifecycleStatus, deriveCompletedAt, isWakeEvent, findWakeEvent, harvestAbortedTargets, feedbackWithHarvestedAbort, mergeLineageFeedback, isLiveParkedWaiter, derivePendingPark } from '../../lib/dispatch-terminal.js';
+import { findTerminalFeedback, deriveTerminalStatus, deriveLifecycleStatus, deriveCompletedAt, isWakeEvent, findWakeEvent, harvestAbortedTargets, feedbackWithHarvestedAbort, mergeLineageFeedback, selectLineageMembers, isLiveParkedWaiter, derivePendingPark } from '../../lib/dispatch-terminal.js';
 
 describe('deriveTerminalStatus', () => {
   test('null when feedback is missing or not an array', () => {
@@ -727,5 +727,79 @@ describe('derivePendingPark (LIN-3661)', () => {
   test('a pending after a resume is a fresh park', () => {
     const entry = { message: '[pending] again' };
     assert.equal(derivePendingPark([{ message: '[pending] a' }, { message: '[working] Session resumed.' }, entry]), entry);
+  });
+});
+
+// ── LIN-4137: the member selection, row by row ──────────────────────────────
+// `mergeLineageFeedback` is `selectLineageMembers` flattened and sorted. The
+// equivalence table runs both over the merge's existing cases; the per-row
+// tests pin what a row-by-row caller (task-cost, LIN-4136) relies on.
+describe('selectLineageMembers (LIN-4137)', () => {
+  const ANCHOR = 'root-1';
+  const SINCE = '2026-08-20T00:00:00.000Z';
+  const T = '2026-08-20T02:00:00.000Z';
+  const entry = (message, timestamp, extra = {}) => ({ message, timestamp, rootItemId: ANCHOR, ...extra });
+  const flattenSorted = (own, siblings, since) => {
+    // The same stable timestamp sort mergeLineageFeedback applies.
+    const ms = v => { const n = v == null ? NaN : new Date(v).getTime(); return Number.isFinite(n) ? n : null; };
+    return selectLineageMembers(own, siblings, ANCHOR, since)
+      .flatMap(m => m.entries)
+      .sort((a, b) => {
+        const at = ms(a?.timestamp); const bt = ms(b?.timestamp);
+        if (at != null && bt != null) return at - bt;
+        if ((at != null) !== (bt != null)) return at != null ? -1 : 1;
+        return 0;
+      });
+  };
+
+  const CASES = {
+    'own only': [[entry('o2', '2026-08-20T03:00:00.000Z'), entry('o1', T)], []],
+    'sibling before and at `since`': [[], [{ _id: 'a', feedback: [entry('before', '2026-08-19T23:59:59.999Z'), entry('at', SINCE)] }]],
+    'wrong or missing anchor': [[], [{ _id: 'a', feedback: [entry('mine', T), entry('other', T, { rootItemId: 'root-2' }), { message: 'untagged', timestamp: T }] }]],
+    'unparseable timestamps (own and sibling)': [[entry('own-junk', 'not-a-date'), entry('own', T)], [{ _id: 'a', feedback: [entry('sib-junk', undefined), entry('sib-ok', T)] }]],
+    'key-order ties across input orders': [[entry('own', T)], [
+      { _id: 'row-c', feedback: [entry('c1', T)] },
+      { id: 'row-a', feedback: [entry('a1', T), entry('a2', T)] },
+      { feedback: [entry('keyless', T)] },
+      null,
+      { _id: 'row-b', feedback: [entry('b1', T)] },
+    ]],
+  };
+
+  for (const [name, [own, siblings]] of Object.entries(CASES)) {
+    test(`flattened and sorted, equals mergeLineageFeedback: ${name}`, () => {
+      assert.deepEqual(flattenSorted(own, siblings, SINCE), mergeLineageFeedback(own, siblings, ANCHOR, SINCE));
+      assert.deepEqual(flattenSorted(own, [...siblings].reverse(), SINCE), mergeLineageFeedback(own, siblings, ANCHOR, SINCE));
+    });
+  }
+
+  test('flattened and sorted, equals mergeLineageFeedback: missing `since` admits no sibling entry', () => {
+    const [own, siblings] = CASES['key-order ties across input orders'];
+    for (const since of [undefined, null, 'not-a-date']) {
+      assert.deepEqual(flattenSorted(own, siblings, since), mergeLineageFeedback(own, siblings, ANCHOR, since), String(since));
+    }
+  });
+
+  test('one member per row: own first (row null), then siblings in row-key order, keyless last, non-objects dropped', () => {
+    const [own, siblings] = CASES['key-order ties across input orders'];
+    const members = selectLineageMembers(own, siblings, ANCHOR, SINCE);
+    assert.deepEqual(members.map(m => m.row && (m.row.id ?? m.row._id ?? 'keyless')), [null, 'row-a', 'row-b', 'row-c', 'keyless']);
+    assert.deepEqual(members.map(m => m.entries.map(e => e.message)), [['own'], ['a1', 'a2'], ['b1'], ['c1'], ['keyless']]);
+    assert.equal(members[1].row, siblings[1], 'the sibling row object itself, not a copy');
+  });
+
+  test('a sibling with no eligible entries is still a member, with no entries', () => {
+    const siblings = [{ _id: 'a', feedback: [entry('before', '2026-08-19T00:00:00.000Z')] }, { _id: 'b' }];
+    const members = selectLineageMembers([], siblings, ANCHOR, SINCE);
+    assert.deepEqual(members.map(m => [m.row?._id ?? null, m.entries.length]), [[null, 0], ['a', 0], ['b', 0]]);
+  });
+
+  test('does not mutate its inputs', () => {
+    const own = [entry('own', T)];
+    const siblings = [{ _id: 'b', feedback: [entry('b1', T)] }, { _id: 'a', feedback: [entry('a1', T)] }];
+    const snapshot = JSON.stringify({ own, siblings });
+    const members = selectLineageMembers(own, siblings, ANCHOR, SINCE);
+    members[0].entries.push(entry('pushed', T));
+    assert.equal(JSON.stringify({ own, siblings }), snapshot);
   });
 });
