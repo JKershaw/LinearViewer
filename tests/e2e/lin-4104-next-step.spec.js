@@ -20,6 +20,8 @@ test.beforeEach(async ({ page, localWorkerUrlKey }) => {
   await page.goto(`/test/clear-agent-status?urlKey=${URL_KEY}`);
   await page.goto(`/test/clear-observation-sessions?urlKey=${URL_KEY}`);
   await page.goto(`/test/clear-sessions-feed-cache?urlKey=${URL_KEY}`);
+  // The filled rung is the last dispatch's reach, kept in the task-mode store (D2): a spec starts with none.
+  await page.goto(`/test/clear-task-mode-events?urlKey=${URL_KEY}`);
 });
 
 /** One In Progress container (LIN-H1) with one Todo subtask (LIN-H2): the case a recommendation defers into. */
@@ -231,5 +233,120 @@ test.describe('Home: Run to PR is the stop-at-PR kickoff, through the same path 
     expect(kickoffUrls[0], 'the kickoff query names the PR stop').toMatch(/stopAt=pr/);
     expect(posts[0].stopAt, 'the dispatch body names the PR stop').toBe('pr');
     expect(posts[0].entryRung).toBe('run-task');
+  });
+});
+
+/** The deferred recommendation the Next step tests stream: the subtask is the terminal issue. */
+async function stubDeferredRecommendation(page) {
+  await page.route('**/api/recommend/*/stream*', (route) => route.fulfill({
+    status: 200,
+    contentType: 'text/event-stream',
+    body: sse([
+      ['phase', { phase: 'reasoning' }],
+      ['delta', { section: 'reasoning', content: 'The subtask is the next concrete step, so the Build stage goes there.' }],
+      ['phase', { phase: 'prompt' }],
+      ['delta', { section: 'prompt', content: 'Write the next step for LOCAL-H2.' }],
+      ['done', { truncated: false, completionTokens: null, issueUrl: null, identifier: CHILD, title: 'Write the next step', deferredVia: [TOP], kind: 'implementation', issueId: localSeedId(URL_KEY, 'n-child') }],
+    ]),
+  }));
+}
+
+test.describe('Home: Next step\'s confirm re-reads the offer before Run (LIN-4104 review finding 2)', () => {
+  test.use({ viewport: DESKTOP });
+
+  test('Run on the confirm, after a run starts on the subtask between the render and the press, is refused; nothing is dispatched', async ({ page }) => {
+    await seedTree(page);
+    const posts = recordDispatches(page);
+    await stubDeferredRecommendation(page);
+    await gotoHome(page);
+    const block = await openTopTask(page);
+
+    await block.locator('[data-testid="opened-task-go"]').click();
+    const confirm = block.locator('[data-testid="opened-task-next-confirm"]');
+    const run = confirm.locator('[data-testid="opened-task-next-run-confirm"]');
+    await expect(run).toBeVisible();
+
+    // A run starts on the subtask after the confirm is drawn: the container is now busy over its subtree.
+    await startSubtaskRun(page);
+    await run.click();
+    await expect(block.locator('[data-testid="opened-task-go-notice"]')).toContainText('started');
+    expect(posts, 'a stale Run on the confirm dispatches nothing').toEqual([]);
+  });
+});
+
+/** A finished autopilot kickoff on the container: `stopAt: 'pr'` makes its reach Run to PR, no stopAt makes it Run to Done. */
+async function seedFinishedRun(page, { stopAt } = {}) {
+  const token = await runnerToken(page);
+  const res = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+    data: { prompt: 'autopilot prompt', promptName: 'Autopilot', kind: 'autopilot', issueIdentifier: TOP, issueTitle: 'Next step container', target: 'cli', entryRung: 'run-task', ...(stopAt ? { stopAt } : {}) },
+  });
+  expect(res.status(), `dispatch seed failed: ${await res.text()}`).toBe(201);
+  const itemId = (await res.json()).item.id;
+  const taken = await page.request.post(`/api/dispatch/take/${itemId}`, { headers: { Authorization: `Bearer ${token}` } });
+  expect(taken.status(), `take failed: ${await taken.text()}`).toBe(200);
+  const fb = await page.request.post(`/api/dispatch/feedback/${itemId}`, {
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    data: { message: '[done] ran to the end' },
+  });
+  expect(fb.status(), `feedback failed: ${await fb.text()}`).toBe(200);
+}
+
+test.describe('Home: the three run rungs are always drawn; only the filled one is primary (LIN-4104 review finding 1)', () => {
+  test.use({ viewport: DESKTOP });
+
+  test('after a Run to PR, Run to PR is filled, Next step and Run to Done are still drawn, and pressing Next step (not filled) asks and dispatches nothing', async ({ page }) => {
+    await seedTree(page);
+    await seedFinishedRun(page, { stopAt: 'pr' });
+    const posts = recordDispatches(page);
+    await stubDeferredRecommendation(page);
+    await gotoHome(page);
+    const block = await openTopTask(page);
+
+    const primary = block.locator('[data-testid="opened-task-go"]');
+    await expect(primary).toHaveText('Run to PR');
+    await expect(primary).toHaveAttribute('data-filled-rung', 'pr');
+    await expect(block.locator('[data-testid="opened-task-run-next-step"]')).toHaveText('Next step');
+    await expect(block.locator('[data-testid="opened-task-run-to-done"]')).toHaveText('Run to Done');
+
+    await block.locator('[data-testid="opened-task-run-next-step"]').click();
+    await expect(block.locator('[data-testid="opened-task-next-confirm"]')).toBeVisible();
+    expect(posts, 'Next step asks; it does not dispatch').toEqual([]);
+  });
+
+  test('after a Run to Done, Run to Done is filled and Next step is still drawn', async ({ page }) => {
+    await seedTree(page);
+    await seedFinishedRun(page);
+    await gotoHome(page);
+    const block = await openTopTask(page);
+
+    await expect(block.locator('[data-testid="opened-task-go"]')).toHaveText('Run to Done');
+    await expect(block.locator('[data-testid="opened-task-run-next-step"]')).toHaveText('Next step');
+    await expect(block.locator('[data-testid="opened-task-run-to-pr"]')).toHaveText('Run to PR');
+  });
+});
+
+test.describe('Home: a running Run to Done reads "Running to Done" (LIN-4104 D4)', () => {
+  test.use({ viewport: DESKTOP });
+
+  test('an unbounded autopilot run with a running worker reads Running to Done, not Harbour is deciding', async ({ page }) => {
+    await seedTree(page);
+    const token = await runnerToken(page);
+    const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    const start = async (body) => {
+      const res = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, { data: { target: 'cli', ...body } });
+      expect(res.status(), `dispatch seed failed: ${await res.text()}`).toBe(201);
+      const itemId = (await res.json()).item.id;
+      expect((await page.request.post(`/api/dispatch/take/${itemId}`, { headers: auth })).status()).toBe(200);
+      return itemId;
+    };
+    // The unbounded autopilot kickoff is the run row (no stopAt); its Build worker names it through sessionId.
+    const anchor = await start({ prompt: 'autopilot prompt', promptName: 'Autopilot', kind: 'autopilot', issueIdentifier: TOP, issueTitle: 'Next step container', entryRung: 'run-task' });
+    await start({ prompt: 'build prompt', promptName: 'Build', kind: 'implementation', issueIdentifier: TOP, issueTitle: 'Next step container', sessionId: anchor });
+    await gotoHome(page);
+    const block = await openTopTask(page);
+
+    const title = block.locator('[data-testid="opened-task-running"] .opened-task-running-title');
+    await expect(title).toContainText('Running to Done');
+    await expect(title).not.toContainText('Harbour is deciding');
   });
 });

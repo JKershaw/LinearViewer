@@ -318,9 +318,12 @@
       // LIN-3833: Home's one main action names what it does: the step the sessions name, else Run to PR.
       // While a stage runs or is queued, no other step is offered as an action (LIN-3968); Stop and the
       // after-run line stay in the run block.
+      // LIN-4104 review finding 1: every offer draws all three rungs. A failed stage (or a step chosen for this run) keeps
+      // its own primary (LIN-3968), so the three rungs are all quiet beside it; otherwise the filled rung is the primary.
       const step = runStepOfState(state, opts);
-      if (step) html += `<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-step" data-action="run-step-next">Run ${esc(step.label)}</button>`;
-      else if (runOfferOf(state, opts) && runOfferOf(state, opts).kind === 'offer') html += filledRunButtonsOf(opts);
+      const offer = runOfferOf(state, opts);
+      if (step) html += `<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-step" data-action="run-step-next">Run ${esc(step.label)}</button>${runRungButtonsOf(null)}`;
+      else if (offer && offer.kind === 'offer') html += runRungButtonsOf(filledRungOf(opts));
     } else {
       html += `<button class="opened-task-go" data-testid="opened-task-go" data-rung="run-task" data-action="go">Go</button>`;
     }
@@ -639,18 +642,26 @@
   }
   // The words the filled rung names on the step line and the button (LIN-4104 D2).
   const FILLED_NAME = Object.freeze({ 'next-step': 'Next step', pr: 'Run to PR', done: 'Run to Done' });
-  function filledRunButtonsOf(opts) {
-    const filled = filledRungOf(opts);
-    if (filled === 'pr') {
-      return '<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-task" data-action="go" data-filled-rung="pr">Run to PR</button>';
-    }
-    if (filled === 'done') {
-      return '<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-task" data-action="go-done" data-filled-rung="done">Run to Done</button>'
-        + '<button class="btn btn--quiet" data-testid="opened-task-run-to-pr" data-rung="run-task" data-action="go">Run to PR</button>';
-    }
-    // LIN-4104 D3: Next step is the recommend call, then a confirm (handleRunAction 'next-step'); Run to PR stays beside it.
-    return '<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-step" data-action="next-step" data-filled-rung="next-step">Next step</button>'
-      + '<button class="btn btn--quiet" data-testid="opened-task-run-to-pr" data-rung="run-task" data-action="go">Run to PR</button>';
+  // LIN-4104 review finding 1: the three rungs in trust order (Next step, Run to PR, Run to Done). Exactly one is primary:
+  // the `filled` rung, which carries `opened-task-go` and `data-filled-rung`. The others are quiet, each with its own testid,
+  // so none of the three is ever hidden. Next step is `opened-task-run-next-step`, not `opened-task-next-step`, which is the
+  // ✦ next-step button renderNextStep draws in the same idle block.
+  // Next step is the recommend call, then a confirm (handleRunAction 'next-step', LIN-4104 D3); Run to Done is the no-stop kickoff (D4).
+  const RUN_RUNGS = Object.freeze({
+    'next-step': { label: 'Next step', rung: 'run-step', action: 'next-step', testid: 'opened-task-run-next-step' },
+    pr: { label: 'Run to PR', rung: 'run-task', action: 'go', testid: 'opened-task-run-to-pr' },
+    done: { label: 'Run to Done', rung: 'run-task', action: 'go-done', testid: 'opened-task-run-to-done' },
+  });
+  const RUN_RUNG_ORDER = Object.freeze(['next-step', 'pr', 'done']);
+  function runRungButtonsOf(filled) {
+    return RUN_RUNG_ORDER.map((name) => {
+      const { label, rung, action, testid } = RUN_RUNGS[name];
+      if (name === filled) {
+        return `<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="${rung}" data-action="${action}" data-filled-rung="${name}">${label}</button>`;
+      }
+      // A quiet button is used alone, not with .btn (decision 6, LIN-3987): .btn:hover would paint a fill over its label.
+      return `<button class="btn--quiet" data-testid="${testid}" data-rung="${rung}" data-action="${action}">${label}</button>`;
+    }).join('');
   }
   // LIN-4104 D1: the one run offer the server decided (`sessions.action`, `runOfferOf`): none (finished), answer-first,
   // busy, or offer. LIN-4068: before the first `/state` reply the opened box has no sessions, so it takes the row record's
@@ -1228,7 +1239,8 @@
       // LIN-4103 beat 2: with no offered step, the line says the server's own words for a run to PR, never "the next step".
       let why = step ? 'the next step for this task' : 'no stage step is offered, so the run takes it to PR';
       if (!step && filledRungOf(opts) === 'next-step') why = 'Harbour picks the next step when you press Next step, then asks you to run it';
-      if (!step && filledRungOf(opts) === 'done') why = 'Harbour picks where to start';
+      // LIN-4104 review finding 1 / D4: a run to PR or to Done starts where Harbour picks, and says so.
+      if (!step && (filledRungOf(opts) === 'pr' || filledRungOf(opts) === 'done')) why = 'Harbour picks where to start';
       if (state.run.step) why = 'chosen for this run';
       else if (step && step.reason) why = step.reason;
       const name = step ? esc(step.label) : FILLED_NAME[filledRungOf(opts)];
@@ -1278,9 +1290,12 @@
         } else if (polled) {
           actions += ` <button class="btn btn--red opened-task-stop" data-action="stop-run" data-testid="run-stop">Stop</button>`;
         }
+        // LIN-4104 review polish: when the run words already name the stage they started with, the step is not said twice.
+        const wordsNameStage = !!summary.runWords && summary.runWords.includes('started with ');
+        const stepPart = wordsNameStage ? '' : ` \u00b7 <span class="opened-task-running-step">${esc(running.label || 'step')}</span>`;
         return `<div class="opened-task-running-box" data-testid="opened-task-running">`
-          + `<div class="opened-task-running-head"><span class="opened-task-running-title">${esc(summary.runWords || 'Running now')}</span> \u00b7 `
-          + `<span class="opened-task-running-step">${esc(running.label || 'step')}</span>${since ? ` \u00b7 started ${esc(since)}` : ''}`
+          + `<div class="opened-task-running-head"><span class="opened-task-running-title">${esc(summary.runWords || 'Running now')}</span>${stepPart}`
+          + `${since ? ` \u00b7 started ${esc(since)}` : ''}`
           + `<span class="opened-task-running-actions">${actions}</span></div>${confirm}</div>`;
       }
       if (state.run.item || summary.queued) {

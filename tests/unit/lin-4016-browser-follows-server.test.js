@@ -84,7 +84,7 @@ function loadClient({ stateBody, container = false }) {
     renderMarkdown: (x) => String(x == null ? '' : x),
     api: async (url) => {
       calls.api.push(url);
-      if (url.includes('/api/task/')) return stateBody;
+      if (url.includes('/api/task/')) return typeof stateBody === 'function' ? stateBody() : stateBody;
       if (url.includes('/api/task-mode/')) return { lastCopy: null };
       if (url.includes('/api/dispatch/preview')) return { kind: 'implementation', harness: 'claude-code', words: {}, sources: {}, group: null, description: '' };
       if (url.includes('/api/dispatch/decision-panel')) return { html: '', words: null, withoutEffort: [], targets: ['cli', 'web'], optionWords: { harness: {}, model: {} } };
@@ -297,6 +297,35 @@ describe('LIN-4104 D2 — the filled run button follows the last dispatch on thi
     assert.match(html, /data-testid="opened-task-run-to-pr"[^>]*data-action="go"[^>]*>Run to PR</, 'Run to PR is still offered beside it');
   });
 
+  // LIN-4104 review finding 1: every offer draws all three rungs in trust order, and only the filled one is primary.
+  for (const filledRung of ['next-step', 'pr', 'done']) {
+    test(`filled ${filledRung}: all three rungs are drawn in trust order, and only the filled one is primary`, async () => {
+      const html = await paint(stateWith({ action: OFFER }), { filledRung });
+      // Whole button elements (opening tag and label), so the label is seen with its tag.
+      const tags = [...html.matchAll(/<button\b[^>]*>[^<]*<\/button>/g)].map((m) => m[0]);
+      const rungTag = (name) => tags.find((tag) => tag.endsWith(`>${name}</button>`));
+      const names = ['Next step', 'Run to PR', 'Run to Done'];
+      const drawn = names.map((n) => tags.findIndex((tag) => tag.endsWith(`>${n}</button>`)));
+      drawn.forEach((at, i) => assert.ok(at >= 0, `${names[i]} is drawn`));
+      assert.deepEqual(drawn, [...drawn].sort((a, b) => a - b), 'in trust order: Next step, Run to PR, Run to Done');
+      const primaries = tags.filter((tag) => /\bbtn--primary\b/.test(tag) && /data-testid="opened-task-go"/.test(tag));
+      assert.equal(primaries.length, 1, 'exactly one primary');
+      assert.match(primaries[0], new RegExp(`data-filled-rung="${filledRung}"`), 'the primary is the filled rung');
+      for (const n of names) {
+        const tag = rungTag(n);
+        if (!tag.includes(`data-filled-rung="${filledRung}"`)) assert.match(tag, /btn--quiet/, `${n} is quiet when it is not the filled rung`);
+      }
+    });
+  }
+
+  test('a failed stage keeps its step as the primary and still draws all three rungs beside it (LIN-3968, finding 1)', async () => {
+    const html = await paint(stateWith({ offered: PLAN_OFFER, action: { ...OFFER, step: PLAN_OFFER } }), { filledRung: 'done' });
+    assert.match(html, /data-testid="opened-task-go"[^>]*data-action="run-step-next"[^>]*>Run Plan</);
+    assert.match(html, />Next step</);
+    assert.match(html, /data-testid="opened-task-run-to-pr"[^>]*>Run to PR</);
+    assert.match(html, /data-testid="opened-task-run-to-done"[^>]*>Run to Done</);
+  });
+
   test('a failed stage still names its step as the primary, whatever the filled rung (LIN-3968)', async () => {
     const html = await paint(stateWith({ offered: PLAN_OFFER, action: { ...OFFER, step: PLAN_OFFER } }), { filledRung: 'next-step' });
     assert.match(html, /data-testid="opened-task-go"[^>]*data-action="run-step-next"[^>]*>Run Plan</);
@@ -306,6 +335,32 @@ describe('LIN-4104 D2 — the filled run button follows the last dispatch on thi
     // The server records a run-step as next-step (lin-4104-reach.test.js); the page then paints the Next step primary.
     const html = await paint(stateWith({ action: OFFER }), { filledRung: 'next-step' });
     assert.match(html, /data-filled-rung="next-step"/);
+  });
+});
+
+// LIN-4104 review finding 2: a step run from Another step re-reads the offer before it fetches or dispatches the step.
+describe('LIN-4104 review finding 2 — a step picked from Another step is refused when its offer is stale', () => {
+  test('a stale press of the picked step fetches no prompt, dispatches nothing, and says a run started', async () => {
+    const OFFER_LEAF = { kind: 'offer', container: false, step: null, why: 'the run control offers the three rungs' };
+    const BUSY = { busy: true, action: { kind: 'busy', identifier: 'LIN-43', words: 'Build running', why: 'x' } };
+    // The page renders the offer; the server answers busy on every read after the pick (a run started since the render).
+    let serverBusy = false;
+    const body = () => stateWith({ action: serverBusy ? BUSY.action : OFFER_LEAF, ...(serverBusy ? { busy: true } : {}) });
+    const { PromptSection, calls } = loadClient({ stateBody: body });
+    const c = makeContainer();
+    PromptSection.init(c, { ...HOME, filledRung: 'pr' });
+    await flush(); await flush(); await flush();
+    await c.click({ action: 'run-another' });
+    await flush(); await flush(); await flush();
+    await c.click({ action: 'run-pick', kind: 'implementation', label: 'Build' });
+    await flush(); await flush(); await flush();
+    assert.match(c.innerHTML, /data-action="run-step-next"/, 'the picked step is the primary');
+    serverBusy = true;
+    calls.api.length = 0;
+    await c.click({ action: 'run-step-next' });
+    await flush(); await flush(); await flush();
+    assert.equal(calls.api.some((u) => u.includes('/api/prompt/')), false, 'no prompt is fetched on a stale press');
+    assert.match(c.innerHTML, /A run started on this task while you were choosing/, 'a plain refusal says nothing was started');
   });
 });
 
