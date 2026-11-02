@@ -149,6 +149,24 @@ test.describe('LIN-4113 (a) — the merged section is bounded', () => {
   });
 });
 
+test.describe('LIN-4139 — each Up next row says why it is there', () => {
+  test('every Up next row carries exactly one up-next-why line in the absolute-date format, and Running rows carry none', async ({ page, seedLocal }) => {
+    await seedLocal(deskSeed(URL_KEY));
+    await page.goto(`/workspace/${URL_KEY}/`);
+    await page.waitForLoadState('networkidle');
+    const rows = page.locator(SELECTORS.homeDesk.upNextRows);
+    const count = await rows.count();
+    expect(count, 'the desk seed has Up next tasks').toBeGreaterThan(0);
+    const why = page.locator(`${SELECTORS.homeDesk.upNext} [data-testid="up-next-why"]`);
+    await expect(why).toHaveCount(count);
+    for (const text of await why.allTextContents()) {
+      expect(text).toMatch(/^(Urgent|High|Medium|Low|No priority) · (added|due) \d{1,2} [A-Z][a-z]{2} \d{4}( · unblocks \d+)?$/);
+    }
+    for (const row of await rows.all()) await expect(row.locator('[data-testid="up-next-why"]')).toHaveCount(1);
+    await expect(page.locator('[data-testid="up-next-why"]'), 'no why line outside Up next').toHaveCount(count);
+  });
+});
+
 test.describe('LIN-4113 (b) — one task, one place', () => {
   test('a Todo task with its own running run and a failed task are in Running, and neither is Up next', async ({ page, seedLocal }) => {
     await seedLocal(deskSeed(URL_KEY), { runnerKey: true });

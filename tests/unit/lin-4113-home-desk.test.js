@@ -292,7 +292,7 @@ describe('Running: which tasks join, and what must stay out', () => {
 
 // ---- Up next ----------------------------------------------------------------------------------------------------
 
-describe('Up next: cross-project, unstarted only, capped at 5, in orderIssuesForSwipe order', () => {
+describe('Up next: cross-project, unstarted only, capped at 5, ranked (LIN-4139)', () => {
   test('the limit is 5 (the ticket cap, read off the module)', () => {
     assert.equal(homeView.UP_NEXT_LIMIT, 5);
   });
@@ -376,7 +376,7 @@ describe('Up next: cross-project, unstarted only, capped at 5, in orderIssuesFor
     assert.deepEqual(ids(view.upNext), ['B', 'A']);
   });
 
-  test('a parent and its child: only one of the two is Up next, whichever comes first in the order (both orders)', () => {
+  test('a parent and its child: only one of the two is Up next, the epic\'s best-ranked task (both orders)', () => {
     // LIN-4139 retarget: the child is the higher-priority task of their one epic, so it is the epic's card in both orders.
     // The point this test pins, that only one of the two appears, is unchanged.
     const trees = [project('p', 'p', [node('PAR-1', 'unstarted', [node('CHD-1', 'unstarted', [], { priority: 2 })], { priority: 4 })])];
@@ -384,6 +384,15 @@ describe('Up next: cross-project, unstarted only, capped at 5, in orderIssuesFor
     assert.deepEqual(ids(parentFirst.upNext), ['CHD-1'], 'parent first: the child is the epic\'s card, the parent is skipped');
     const childFirst = buildHomeView({ inProgressTrees: [], trees, states: states({}), orderedCards: [card('CHD-1'), card('PAR-1')] });
     assert.deepEqual(ids(childFirst.upNext), ['CHD-1'], 'child first: the parent is skipped');
+  });
+
+  test('LIN-4139: a parent and child of equal priority and created date: the tree position decides, in both deck orders', () => {
+    const same = { priority: 2, createdAt: '2026-10-20T09:00:00.000Z', dueDate: null };
+    const trees = [project('p', 'p', [node('PAR-1', 'unstarted', [node('CHD-1', 'unstarted', [], same)], same)])];
+    for (const order of [['PAR-1', 'CHD-1'], ['CHD-1', 'PAR-1']]) {
+      const view = buildHomeView({ inProgressTrees: [], trees, states: states({}), orderedCards: order.map(i => card(i)) });
+      assert.deepEqual(ids(view.upNext), ['PAR-1'], `deck order ${order.join(',')}: the parent is first in the tree`);
+    }
   });
 
   test('Up next does not subtract from /backlog: the project section still lists an Up next task', () => {

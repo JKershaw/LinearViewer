@@ -19,6 +19,8 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildHomeView, UP_NEXT_LIMIT } from '../../lib/home-view.js';
 import { orderIssuesForSwipe } from '../../lib/task-board-view.js';
+import { homeRowsFor } from '../../lib/home-rows.js';
+import { renderHomeRowsHtml, homeRowsContext } from '../../lib/render.js';
 
 // ---- fixtures ----------------------------------------------------------------------------------------------------
 
@@ -317,5 +319,101 @@ describe('LIN-4139: each Up next row says why it is there, in absolute dates', (
     const farFuture = snapshot();
     assert.deepEqual(farFuture, nearNow);
     assert.deepEqual(nearNow, [['CLK-1', 'High · added 20 Oct 2026'], ['CLK-2', 'Medium · added 31 Oct 2026']]);
+  });
+});
+
+// ---- close-out additions (review ledger items 2, 3, 5) -----------------------------------------------------------
+
+describe('LIN-4139 close-out: the rendered why line (ledger 2)', () => {
+  const WORKSPACE = { urlKey: 'ws', name: 'WS', provider: 'linear' };
+  const ctx = homeRowsContext({ workspace: WORKSPACE, urlKey: 'ws', featureFlags: {}, rowStates: null });
+  const WHY_RE = /^(Urgent|High|Medium|Low|No priority) · (added|due) \d{1,2} [A-Z][a-z]{2} \d{4}( · unblocks \d+)?$/;
+  const whyTexts = html => [...html.matchAll(/<span class="up-next-why" data-testid="up-next-why">([^<]*)<\/span>/g)].map(m => m[1]);
+
+  test('[witness] each Up next row renders exactly one up-next-why span carrying the exact text', () => {
+    const trees = [project('p', 'Alpha', [
+      node('R-1', 'unstarted', [], { priority: 2, createdAt: '2026-10-20T09:00:00.000Z', dueDate: null }),
+      node('R-2', 'unstarted', [], { priority: 3, createdAt: '2026-10-21T09:00:00.000Z', dueDate: '2026-11-04' }),
+    ])];
+    const view = up(trees, [card('R-1', { downstreamUnblocks: 2 }), card('R-2')]);
+    const html = renderHomeRowsHtml(view.upNext, { section: 'home-up-next', parentId: 'home-up-next-root', ctx });
+    assert.equal((html.match(/data-testid="up-next-why"/g) || []).length, view.upNext.length, 'one why span per row');
+    assert.deepEqual(whyTexts(html), ['High · added 20 Oct 2026 · unblocks 2', 'Medium · due 4 Nov 2026']);
+    for (const text of whyTexts(html)) assert.match(text, WHY_RE);
+  });
+
+  test('[witness] the why text is HTML-escaped', () => {
+    const trees = [project('p', 'Alpha', [node('R-3', 'unstarted', [], { priority: 2, createdAt: '2026-10-20T09:00:00.000Z' })])];
+    const view = up(trees, ['R-3']);
+    view.upNext[0].why = '<img src=x onerror=alert(1)> & co';
+    const html = renderHomeRowsHtml(view.upNext, { section: 'home-up-next', parentId: 'home-up-next-root', ctx });
+    assert.ok(!html.includes('<img src=x'), 'the raw tag is not in the output');
+    assert.ok(html.includes('&lt;img src=x onerror=alert(1)&gt; &amp; co'));
+  });
+
+  test('[guard] no up-next-why on Running or recent rows, even when a row carries a why', () => {
+    const trees = [project('p', 'Alpha', [node('R-4', 'started', [], { priority: 2 })])];
+    const view = up(trees, []);
+    const running = view.inProgressTrees.flatMap(t => t.roots).concat(trees[0].incomplete);
+    running.forEach(n => { n.why = 'High · added 20 Oct 2026'; });
+    for (const section of ['in-progress', 'recent-activity']) {
+      const html = renderHomeRowsHtml(running, { section, parentId: 'x', ctx });
+      assert.ok(!html.includes('up-next-why'), `${section} rows carry no why line`);
+    }
+  });
+});
+
+describe('LIN-4139 close-out: a Waiting task\'s children are exempt from the one-per-epic cap (ledger 3)', () => {
+  test('[witness] two same-priority children of a Waiting epic are both Up next, beside another epic\'s card', () => {
+    const same = { priority: 2, createdAt: '2026-10-20T09:00:00.000Z', dueDate: null };
+    const trees = [project('p', 'Alpha', [
+      node('W-EPIC', 'started', [
+        node('W-KID-1', 'unstarted', [], same),
+        node('W-KID-2', 'unstarted', [], same),
+      ], { priority: 2 }),
+      node('OTHER', 'unstarted', [], { priority: 3, createdAt: '2026-10-25T09:00:00.000Z', dueDate: null }),
+    ])];
+    const view = buildHomeView({
+      inProgressTrees: [],
+      trees,
+      states: states({}),
+      orderedCards: cardsIn(['W-KID-1', 'W-KID-2', 'OTHER']),
+      rulingRows: [{ anchor: { issueIdentifier: 'W-EPIC' } }],
+    });
+    assert.deepEqual(ids(view.upNext).sort(), ['OTHER', 'W-KID-1', 'W-KID-2']);
+  });
+});
+
+describe('LIN-4139 close-out: the page and /api/home-rows agree (ledger 5)', () => {
+  test('[witness] the recent fold pages exactly view.recent.rest, and a card the ranking moves to Up next is in neither', () => {
+    const recentIds = Array.from({ length: 70 }, (_, i) => `RC-${i + 1}`);
+    const recentForest = [{
+      projectId: null,
+      projectName: null,
+      roots: recentIds.map(identifier => ({
+        issue: { id: identifier, identifier, title: identifier, state: { type: 'unstarted' } },
+        children: [],
+        depth: 0,
+        projectName: 'p',
+        activityKind: 'created',
+      })),
+    }];
+    const trees = [project('p', 'Alpha', [
+      node('RC-15', 'unstarted', [], { priority: 2, createdAt: '2026-10-20T09:00:00.000Z', dueDate: null }),
+    ])];
+    const input = { inProgressTrees: [], trees, recentActivityTrees: recentForest, states: states({}), orderedCards: cardsIn(['RC-15']) };
+    const view = buildHomeView(input);
+    assert.deepEqual(ids(view.upNext), ['RC-15'], 'the ranking puts RC-15 in Up next');
+    const paged = [];
+    let offset = 0;
+    for (;;) {
+      const page = homeRowsFor({ ...input, kind: 'recent', offset });
+      paged.push(...ids(page.nodes));
+      if (page.nextOffset == null) break;
+      offset = page.nextOffset;
+    }
+    assert.deepEqual(paged, ids(view.recent.rest), 'the fold pages exactly the page view\'s rest');
+    assert.ok(!paged.includes('RC-15') && !ids(view.recent.nodes).includes('RC-15'), 'RC-15 is drawn once, in Up next');
+    assert.equal(ids(view.recent.nodes).length + paged.length, 69);
   });
 });
