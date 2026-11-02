@@ -340,3 +340,28 @@ describe('LIN-4145 reachability: children in another project are placed exactly 
     assertPlacedOnceAcrossProjects(s, { inProgress: ['P-1', 'C-2'] });
   });
 });
+
+// LIN-4145 audit: a done child is dropped from a fold and its open children take its place (`openOnly`), so the count must
+// hand them up the same way; it counted the done child as 0, so the fold was smaller than its rows, or not offered at all.
+describe('LIN-4145 audit: a folded done child\'s open children are counted, as the fold returns them', () => {
+  test('a started parent with a done child that has open children: they are counted, folded and placed once', () => {
+    const s = scenario({
+      issues: [issue('S-1', 'started'), issue('D-2', 'completed', 'S-1'), issue('G-3', 'unstarted', 'D-2'), issue('G-4', 'backlog', 'D-2')],
+    });
+    assertPlacedOnce(s, { inProgress: ['S-1'] });
+    assert.equal(inProgressNodeOf(s, 'S-1').more, 2, 'G-3 and G-4 stand in for their done parent D-2');
+  });
+
+  test('the same with the done child in another project: its open children are counted and folded', () => {
+    const s = crossScenario({
+      issues: [
+        crossIssue('P-1', 'started', { project: CROSS_PROJECTS[1] }),
+        crossIssue('D-2', 'completed', { parent: 'P-1' }),
+        crossIssue('X-3', 'unstarted', { parent: 'P-1' }),
+        crossIssue('G-4', 'unstarted', { parent: 'D-2' }),
+        crossIssue('G-5', 'unstarted', { parent: 'D-2' }),
+      ],
+    });
+    assertPlacedOnceAcrossProjects(s, { inProgress: ['P-1'], folded: ['X-3', 'G-4', 'G-5'] });
+  });
+});
