@@ -801,12 +801,15 @@ test.describe('Pinned header clearance at the measured breach (LIN-4037)', () =>
   const WORST_CASE = DENSITY_FILTER_STATES[3];
   const FEEDBACK_ON = { feedbackWidget: true };
 
-  // LIN-4120: the local worker workspace keeps the feature flags this describe seeds (the feedback widget), and a later spec
-  // on the same worker that seeds without flags would inherit them. Reset them when the describe ends.
+  // LIN-4120: this describe's Home visits carry `?team=`, and the server remembers that team per account and workspace.
+  // A later spec on the same worker key would then load with the team applied: the task-facts holder refuses that write,
+  // so its older entry answers `task-missing` and the task's run button stays hidden (lin-4115 on CI). Reset the remembered
+  // team to all, and the feature flags this describe seeds, when the describe ends.
   test.afterAll(async ({ browser, localWorkerUrlKey }) => {
     const context = await browser.newContext();
     const page = await context.newPage();
     await seedLocalWorkspace(page, { projects: [], issues: [] }, { urlKey: localWorkerUrlKey, features: {} });
+    await page.goto(`/workspace/${localWorkerUrlKey}/?team=all`);
     await context.close();
   });
 
