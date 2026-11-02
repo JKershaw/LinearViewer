@@ -348,5 +348,8 @@ test.describe('Home: a running Run to Done reads "Running to Done" (LIN-4104 D4)
     const title = block.locator('[data-testid="opened-task-running"] .opened-task-running-title');
     await expect(title).toContainText('Running to Done');
     await expect(title).not.toContainText('Harbour is deciding');
+    // Review ledger: the run words already name the stage they started with, so the step is not said twice.
+    await expect(title).toContainText('started with ');
+    await expect(block.locator('[data-testid="opened-task-running"] .opened-task-running-step')).toHaveCount(0);
   });
 });

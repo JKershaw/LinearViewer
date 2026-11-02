@@ -318,6 +318,14 @@ describe('LIN-4104 D2 — the filled run button follows the last dispatch on thi
     });
   }
 
+  // LIN-4104 review ledger (D4): before a run to PR or to Done, the step line says Harbour picks where to start.
+  for (const filledRung of ['pr', 'done']) {
+    test(`filled ${filledRung} with no offered step: the step line reads "Harbour picks where to start"`, async () => {
+      const html = await paint(stateWith({ action: OFFER }), { filledRung });
+      assert.match(html, /data-testid="opened-task-step-why"[^>]*>Harbour picks where to start\b/);
+    });
+  }
+
   test('a failed stage keeps its step as the primary and still draws all three rungs beside it (LIN-3968, finding 1)', async () => {
     const html = await paint(stateWith({ offered: PLAN_OFFER, action: { ...OFFER, step: PLAN_OFFER } }), { filledRung: 'done' });
     assert.match(html, /data-testid="opened-task-go"[^>]*data-action="run-step-next"[^>]*>Run Plan</);
