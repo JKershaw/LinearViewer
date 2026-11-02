@@ -47,6 +47,19 @@ Readings the earlier session offered, which John agreed with or built on:
   - the essay's own versions.
 - **The resident may first need a way to watch the film.** Harbour's surfaces show tasks, which are frames. Nothing shows the place changing over time, zoomed out. John pictures the place as fractal: a system diagram at the top (initially just Harbour and Simple Dispatcher), a single function at the bottom, and the tangles in between. The way through is "bubbles popping and forming larger bubbles".
 
+## Latest turn: forecast, then prepare (the TDD switch)
+
+John's newest framing: before the main task starts, **forecast how easy or hard it will be**, then decide how much effort to put into cleaning up. The options run from a small tidy of a few key pieces, through consolidating the decision it touches, to a whole Theseus pass over the area the task sits in.
+
+He feels resistance to the idea, and recognises the feeling: it's how TDD felt when he was made to use it. More work, and the wrong order. Yet he has never looked back, because the benefits landed quickly. He calls this "the same switch, but at the top level, which is now visible with watching it in motion."
+
+Readings offered back:
+- **It is the same lineage.** Beck's *Tidy First?* asks exactly this question, and the question mark is the forecast.
+- **The payoff can land within the same ticket, as TDD's does.** The main change comes out smaller and gets sent back less. Changes touching a scattered decision are 5× the size and sent back 2.5× as often. At the dispatch entrance, consolidating first took the worst function from 63 to 29.
+- **The forecast is the three-body problem, read up front.** How broad is the ask? How tangled is the area (code-shape kit)? Is the goal a judgement or a closed check? Does the ticket touch a known scattered decision (census)?
+- **A forecast turns push into pull.** That is the June Surface Assessment problem, solved by proportion rather than by citation. It works as a dial, not a rule.
+- **Caveat:** Theseus's predictions were good on measures and poor on effort, which is the very thing this forecast needs. A backtest could check it: forecast past tickets at their base commit, then read what actually happened.
+
 ## Open questions worth exploring (not a plan)
 
 - How much of the shape is structure Harbour can hold, and how much is attention that needs a resident?
