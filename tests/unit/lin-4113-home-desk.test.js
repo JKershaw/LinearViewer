@@ -371,13 +371,17 @@ describe('Up next: cross-project, unstarted only, capped at 5, in orderIssuesFor
     const expected = cards.map(x => x.identifier).filter(x => x === 'A' || x === 'B' || x === 'C');
     assert.notDeepEqual(expected, ['A', 'B', 'C'], 'the fixture must make project order differ from the swipe order');
     const view = buildHomeView({ inProgressTrees: [], trees: projectTrees, states: states({}), orderedCards: cards });
-    assert.deepEqual(ids(view.upNext), expected);
+    // LIN-4139 retarget: this is the ranking, not the deck order. C is blocked by open B, so it is not ready; B (High)
+    // ranks above A (Low). The deck order above is still asserted to differ, so the fixture still proves the point.
+    assert.deepEqual(ids(view.upNext), ['B', 'A']);
   });
 
   test('a parent and its child: only one of the two is Up next, whichever comes first in the order (both orders)', () => {
-    const trees = [project('p', 'p', [node('PAR-1', 'unstarted', [node('CHD-1', 'unstarted')])])];
+    // LIN-4139 retarget: the child is the higher-priority task of their one epic, so it is the epic's card in both orders.
+    // The point this test pins, that only one of the two appears, is unchanged.
+    const trees = [project('p', 'p', [node('PAR-1', 'unstarted', [node('CHD-1', 'unstarted', [], { priority: 2 })], { priority: 4 })])];
     const parentFirst = buildHomeView({ inProgressTrees: [], trees, states: states({}), orderedCards: [card('PAR-1'), card('CHD-1')] });
-    assert.deepEqual(ids(parentFirst.upNext), ['PAR-1'], 'parent first: the child is skipped');
+    assert.deepEqual(ids(parentFirst.upNext), ['CHD-1'], 'parent first: the child is the epic\'s card, the parent is skipped');
     const childFirst = buildHomeView({ inProgressTrees: [], trees, states: states({}), orderedCards: [card('CHD-1'), card('PAR-1')] });
     assert.deepEqual(ids(childFirst.upNext), ['CHD-1'], 'child first: the parent is skipped');
   });

@@ -1149,6 +1149,14 @@ a.wordmark:hover {
   font-family: var(--font-content);
 }
 
+/* LIN-4139: an Up next row's "why" line (priority, due or added date, unblocks), muted after the project name. */
+.up-next-why {
+  color: var(--muted);
+  margin-left: 1ch;
+  font-size: 0.9em;
+  font-family: var(--font-content);
+}
+
 /* LIN-3833: a task's state words (Build running · 5m, needs you, backlog), right of the title on
    desktop; the phone rule below moves them under it. */
 .row-state {
@@ -2708,8 +2716,9 @@ a.wordmark:hover {
      title rather than competing for horizontal space (LIN-423). flex-basis:100%
      forces the wrap; order:1 moves it past the toggle so the toggle stays on the
      title's row. The left indent aligns it under the title text (past the state
-     icon). Applies to both In Progress and Recent activity rows. */
-  .in-progress-project {
+     icon). Applies to both In Progress and Recent activity rows. LIN-4139: the Up next "why" line takes the same line. */
+  .in-progress-project,
+  .up-next-why {
     flex-basis: 100%;
     order: 1;
     margin-left: 2.4ch;
