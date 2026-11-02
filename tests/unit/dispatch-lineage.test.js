@@ -247,9 +247,11 @@ describe('groupDispatchLineages (LIN-1957) — the shared extraction', () => {
       }
     ];
     const result = computeTerminalMarkedTaskCost(rows, NOW);
-    assert.strictEqual(result.issueCount, 0,
-      'the wake row must not found attribution — the identifier-less root keeps the lineage in overhead');
-    assert.strictEqual(result.overheadUsd, 30,
-      'the lineage cost stays in overhead exactly as before the wake stamp');
+    assert.strictEqual(result.attributableLineageShare, 0,
+      'the wake row must not found attribution — the identifier-less root keeps the lineage unattributed');
+    assert.strictEqual(result.pricedTicketCount, 0,
+      'the identifier-less lineage never founds a priced ticket');
+    assert.strictEqual(result.pricedTicketCostUsd, null,
+      'the lineage cost stays out of the priced figure exactly as before the wake stamp');
   });
 });

@@ -2,11 +2,11 @@
  * LIN-3852: the five Harbour calls that logged a row no reader could return.
  *
  * Every reader of the call log filters by `urlKey` (lib/llm-call-log.js
- * `listCalls`), and these five call paths passed no `callMeta.urlKey`, so their
+ * `listInHorizon` and the summaries), and these five call paths passed no `callMeta.urlKey`, so their
  * rows were written and never listed: the run summary, the session summary, the
  * session-summary precompute, the run paragraph and the feedback title. Each case
  * drives the real generator with a stubbed fetch (no network, no real key) into a
- * real LlmCallLogStore, then asks `listCalls(urlKey)` for the row and its job id.
+ * real LlmCallLogStore, then asks `listInHorizon(urlKey)` for the row and its job id.
  *
  * Run with: node --test tests/unit/llm-jobs-call-log.test.js
  */
@@ -94,7 +94,7 @@ const TERMINAL_SESSION = {
   loops: [{ loopId: 'sess-1', kind: 'autopilot', issueIdentifier: 'LIN-100', agentState: 'complete', terminalStatus: 'done', terminalCompletedAt: NOW_ISO }]
 };
 
-describe('LIN-3852: every Harbour LLM call writes a row listCalls(urlKey) returns', () => {
+describe('LIN-3852: every Harbour LLM call writes a row listInHorizon(urlKey) returns', () => {
   let harness;
   let store;
   let pending;
@@ -124,20 +124,21 @@ describe('LIN-3852: every Harbour LLM call writes a row listCalls(urlKey) return
     for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
   });
 
-  // The features `listCalls(URL_KEY)` returns: the row is filtered by urlKey, so
+  // The features `listInHorizon(URL_KEY)` returns: the row is filtered by urlKey, so
   // being listed here is the proof the row carried the workspace's urlKey.
   async function featuresListed() {
     await Promise.all(pending);
-    const { items } = await store.listCalls(URL_KEY);
-    return items.map((r) => r.feature);
+    const docs = await store.listInHorizon(URL_KEY);
+    return docs.map((r) => r.feature);
   }
 
   // The `via` marker each listed row carries (LIN-3864): precompute rows say
-  // 'precompute'; on-demand rows carry none, so they read null.
+  // 'precompute'; on-demand rows carry none, so they read null (the raw doc
+  // may omit the field, hence `?? null`).
   async function viaListed() {
     await Promise.all(pending);
-    const { items } = await store.listCalls(URL_KEY);
-    return items.map((r) => r.via);
+    const docs = await store.listInHorizon(URL_KEY);
+    return docs.map((r) => r.via ?? null);
   }
 
   test('run summary', async () => {
