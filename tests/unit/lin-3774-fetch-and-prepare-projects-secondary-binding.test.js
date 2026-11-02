@@ -237,15 +237,29 @@ describe('LIN-3790 fetchAndPrepareProjects — legacy (not connection-backed) se
 });
 
 describe('LIN-3774 every fetchAndPrepareProjects call site passes accountId', () => {
-  test('all six call sites carry accountId; the three non-dashboard sites keep urlKey null', () => {
-    // LIN-4024: the Home rows route is a call site too; it carries the workspace urlKey like the dashboard. LIN-4016:
-    // the post-401 render's call is in lib/dashboard-refresh.js, so the sites are scanned in both files.
-    const sources = SERVER_SRC + readFileSync(join(__dirname, '../../lib/dashboard-refresh.js'), 'utf8');
+  test('every call site carries accountId; the three non-dashboard sites keep urlKey null', () => {
+    // LIN-4118: the Home route, /api/home-rows and the sign-in refresh now fetch through ONE gather, in
+    // lib/home-pipeline.js. That gather is the one dashboard call site, so the sites are scanned in all three files.
+    const pipeline = readFileSync(join(__dirname, '../../lib/home-pipeline.js'), 'utf8');
+    const sources = SERVER_SRC + readFileSync(join(__dirname, '../../lib/dashboard-refresh.js'), 'utf8') + pipeline;
     const calls = [...sources.matchAll(/(?<!function )fetchAndPrepareProjects\((workspace,[^\n]*)/g)].map(m => m[1]);
-    assert.equal(calls.length, 6, `expected 6 call sites, found ${calls.length}`);
-    for (const c of calls) assert.match(c, /accountId: (req\.)?session\.accountId/, c);
+    assert.equal(calls.length, 4, `expected 4 call sites (the shared gather + three non-dashboard reads), found ${calls.length}`);
+    // The gather builds its fetch options once; its accountId rides in that object, so a call that passes `fetchOpts`
+    // is checked against the object literal that the gather builds.
+    const fetchOpts = pipeline.match(/const fetchOpts = \{[^}]*\}/)?.[0] ?? '';
+    for (const c of calls) {
+      if (c.includes('fetchOpts')) assert.match(fetchOpts, /\baccountId,/, `the gather's fetch options carry accountId: ${fetchOpts}`);
+      else assert.match(c, /accountId: (req\.)?session\.accountId/, c);
+    }
+    const dashboard = calls.filter(c => c.includes('workspace.urlKey'));
+    assert.equal(dashboard.length, 1, 'the dashboard fetch is the one shared gather');
     const nonDashboard = calls.filter(c => !c.includes('workspace.urlKey'));
     assert.equal(nonDashboard.length, 3);
     for (const c of nonDashboard) assert.match(c, /, null, \{ accountId: req\.session\.accountId \}\)/, `urlKey must stay null: ${c}`);
+    // Each caller hands its session's account to the gather: the Home route and /api/home-rows, and the refresh.
+    const server = SERVER_SRC;
+    const routeGathers = server.match(/gatherHome(?:Page|Inputs)\(homePipelineDeps\(\), \{\s*workspace,\s*teamId,\s*accountId: req\.session\.accountId,/g) || [];
+    assert.equal(routeGathers.length, 2, 'the Home route and /api/home-rows each pass req.session.accountId to the gather');
+    assert.match(readFileSync(join(__dirname, '../../lib/dashboard-refresh.js'), 'utf8'), /accountId: session\.accountId,/, 'the refresh passes session.accountId to the gather');
   });
 });
