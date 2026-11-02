@@ -229,7 +229,7 @@ describe('LIN-3008 characterization guard: non-lean _buildLoops stays byte-ident
     const result = _buildLoops({ liveItems: [], historyItems: [leanItem], agentStatusEntries: [], now, lean: true });
     const { promptText, feedback, ...leanExpected } = EXPECTED_GOLDEN_LOOP;
     // LIN-4130: `telemetry.usage` is a declared lean/non-lean exemption (the
-    // digest no longer stores a computed price, so a lean loop carries none;
+    // digest stores no computed price, so a lean loop carries none;
     // non-lean prices it at read, asserted by the golden above). Strip it from
     // the expectation on the same footing as promptText/feedback.
     const { usage: _goldenUsage, ...telemetryWithoutUsage } = EXPECTED_GOLDEN_LOOP.telemetry;

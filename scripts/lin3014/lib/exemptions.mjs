@@ -8,7 +8,7 @@
  * non-lean), `telemetry.metrics` (R4-retained subset on lean, full on
  * non-lean), `lineageMetrics` (union of retained subsets on lean), and
  * `telemetry.usage` (LIN-4130: lean loops carry no usage, because the digest
- * no longer stores a computed price; non-lean prices it at read from raw
+ * stores no computed price; non-lean prices it at read from raw
  * feedback).
  *
  * Every OTHER path must be identical between the two builds. The equivalence
