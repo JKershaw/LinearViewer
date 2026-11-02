@@ -10,7 +10,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildHomeView, UP_NEXT_PER_PROJECT } from '../../lib/home-view.js';
-import { PERIODICALS_PROJECT_ID, partitionCompleted } from '../../lib/tree.js';
+import { PERIODICALS_PROJECT_ID, partitionCompleted, nodeKey } from '../../lib/tree.js';
 
 const node = (identifier, type, children = []) => ({
   issue: { id: identifier, identifier, title: identifier, state: { type } },
@@ -101,7 +101,7 @@ describe('In Progress: what shows', () => {
       inProgressTrees: [],
       trees: [project('p', [node('LIN-40', 'backlog'), node('LIN-41', 'unstarted')])],
       states: states({}),
-      topTaskId: 'LIN-40',
+      topTaskId: nodeKey({ id: 'LIN-40' }),
     });
     assert.deepEqual(ids(view.inProgressTrees[0].roots), ['LIN-40']);
   });
@@ -163,4 +163,59 @@ test('the inputs are not changed, so the shared trees stay whole', () => {
   buildHomeView(input);
   assert.equal(JSON.stringify(input.trees), before);
   assert.equal(JSON.stringify(input.inProgressTrees), beforeIP);
+});
+
+// LIN-4117 (S3a-0, identity): callers build the top task's key with nodeKey() (`source:id`, server.js:3484), so the
+// top task is matched by that key only, and never when it is done. A done task with an open ruling still counts.
+describe('LIN-4117 identity: the top task is matched by nodeKey, and never when it is done', () => {
+  // W1: an unstarted top task is In Progress under its nodeKey and is not repeated under its project.
+  test('W1: a nodeKey topTaskId puts an unstarted top task In Progress, out of its project', () => {
+    const view = buildHomeView({
+      inProgressTrees: [],
+      trees: [project('p', [node('LIN-100', 'unstarted'), node('LIN-101', 'unstarted')])],
+      states: states({}),
+      topTaskId: nodeKey({ id: 'LIN-100' }),
+    });
+    assert.deepEqual(ids(view.inProgressTrees[0].roots), ['LIN-100']);
+    assert.deepEqual(ids(view.trees[0].incomplete), ['LIN-101'], 'the top task is not repeated under its project');
+  });
+
+  // W1: a bare identifier is not a top-task key, so it promotes nothing.
+  test('W1: the plain identifier promotes nothing', () => {
+    const view = buildHomeView({
+      inProgressTrees: [],
+      trees: [project('p', [node('LIN-102', 'unstarted'), node('LIN-103', 'unstarted')])],
+      states: states({}),
+      topTaskId: 'LIN-102',
+    });
+    assert.deepEqual(view.inProgressTrees, [], 'a bare identifier must not promote anything');
+    assert.deepEqual(ids(view.trees[0].incomplete), ['LIN-102', 'LIN-103']);
+  });
+
+  // W2: a done top task is never promoted, whether it is named by nodeKey or by identifier.
+  test('W2: a done top task is not promoted, by nodeKey or by identifier', () => {
+    for (const topTaskId of [nodeKey({ id: 'LIN-110' }), 'LIN-110']) {
+      const { incomplete, completed, completedCount } = partitionCompleted([node('LIN-110', 'completed'), node('LIN-111', 'unstarted')]);
+      const view = buildHomeView({
+        inProgressTrees: [],
+        trees: [{ project: { id: 'p', name: 'p', collapsed: false }, incomplete, completed, completedCount }],
+        states: states({}),
+        topTaskId,
+      });
+      assert.deepEqual(view.inProgressTrees, [], `topTaskId ${topTaskId} must not promote a done task`);
+    }
+  });
+
+  // W2 guard: a done task with an open ruling is still promoted through the completed/needsAttention path.
+  test('W2 guard: a done top task with an open ruling is still promoted', () => {
+    const { incomplete, completed, completedCount } = partitionCompleted([node('LIN-120', 'completed'), node('LIN-121', 'unstarted')]);
+    const view = buildHomeView({
+      inProgressTrees: [],
+      trees: [{ project: { id: 'p', name: 'p', collapsed: false }, incomplete, completed, completedCount }],
+      states: states({ 'LIN-120': stateFor({ state: 'needs-you' }) }),
+      topTaskId: nodeKey({ id: 'LIN-120' }),
+    });
+    assert.deepEqual(ids(view.inProgressTrees[0].roots), ['LIN-120']);
+    assert.deepEqual(ids(view.trees[0].incomplete), ['LIN-121']);
+  });
 });
