@@ -191,6 +191,8 @@ test.describe('LIN-4119 W4 — the /backlog page, its access and its guards', ()
 
   test('an owner with a runner sees the run control on an opened /backlog row', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(openableSeed(localWorkerUrlKey), { openRouterConnected: true, runnerKey: true });
+    // States the ownership it needs, as the fixture asks: an earlier spec on this worker may have left another state.
+    await seedWorkspaceOwnership(page, localWorkerUrlKey, 'owner');
     await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     await page.locator(`${SELECTORS.project('Run project')} .line[data-section="project"]`).first().click();
     await expect(page.locator(`${SELECTORS.project('Run project')} [data-testid="opened-task-go"]`).first()).toBeVisible();
