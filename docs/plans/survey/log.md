@@ -63,3 +63,49 @@ Full answers are comments headed "Survey spike 1a" on LIN-4113, LIN-4114, LIN-41
   - The UI session will tell me when S3e-0 and S3e land, which is my cue to run the periodicals.
 - **22:00: the UI operator will keep S4 and S5 held until John tells it directly.** It's a reasonable caution, since resuming dispatches real work and it wanted the word from John rather than a relay. So **Spike 2's forecast will be posted overnight, but S4 runs only after John resumes it in the morning.** The forecast is committed before the work either way, so it remains a genuine prediction.
 - **21:56: John confirmed directly to the UI operator** that a "resume S4" from this session counts. So S4 can run overnight once its Survey is posted on LIN-4150.
+
+## 2 Nov, about 22:20 UTC: Survey v0 results (spikes 1c and 3)
+
+Ten runs, all posted to LIN-4150 between 21:44 and 21:48. Each took about 3 to 5 minutes. Judged by reading each output against the key.
+
+**Spike 3, prize tickets.** Did it name the census decision, or the area the later escape came from?
+
+| Ticket | Key (decision → later escape) | What v0 named | Verdict | Recommended |
+|---|---|---|---|---|
+| LIN-1318 | kickoff-text twin → LIN-1324 (C5: prescribes a standing poll on a wrong assumption about standalone runs) | "One decision ('how does an orchestrator wait?') lives in about seven places", including `autopilot-kickoff.js` and `docs/autopilot-kickoff.md`; "the copies already contradict each other", standalone against dispatched | **hit**: exactly the twin and the standalone-poll area of the escape | consolidate |
+| LIN-1341 | session classification → LIN-1394 (C1: session resolution done independently of the builder) | "Two renderers in two runtimes… share no code"; existing chain walks (`resolveChainRoot`, `resolveFollowUpRoot`) duplicated; consolidate = "export the one walker" | **partial**: it named the scattered resolution, but recommended drilling past it | just drill |
+| LIN-1736 | duration formatting / tolerant timestamp parse → LIN-2291 (C1) | outcome held in two shapes (loop stamps against task-store column), lean loops, retention | **miss** against the census decision (it found a different real two-shape decision) | just drill |
+| LIN-2354 | kickoff-text twin → LIN-2370 and LIN-2371 (C1: client-side copies deferred, still asserting) | "The sentence lives in six places, not two. … Two of them are browser code (`public/common.js`, `public/proxy.js`)" | **strong hit**: it predicted exactly the browser copies that the real work deferred and that escaped. Its drill changes all six copies | just drill (all copies) |
+| LIN-2619 | LANE_KEYS twin (gate ↔ sweep) → LIN-2849 (C1: "a fossilised fleet reads as quiet" again) | "the 7-day figure lives in two files" (gate against sweep); the gate is "zero imports" by design | **partial**: right seam (`flight-companion-gate` ↔ `observer-sweep`), different constant | just drill |
+
+That's **2 hits, 2 partial, 1 miss.** Diagnosis is strong and concrete: file paths, counts of copies, contradictions between them. **The weakness is the menu.** It recommended "just drill" on 4 of 5 prize tickets, three of which went on to an escape of the kind it had half-named. Only on LIN-2354 did its drill reach every copy.
+
+**Spike 3, clean controls.** Did it stay quiet?
+- **LIN-2666 and LIN-1425: just drill.** Quiet. LIN-2666 even named a 7th copy of the resolve-then-gate block and declined to gather it, correctly, as outside the task's pull.
+- **LIN-1282 and LIN-1058: a small tidy first.** One owner for the harness→models lists duplicated across server and browser; the nav height literals in three files. Neither decision is in the census's 33 twins, so this is unjudgeable against the key. Both tidies are pulled by the task: the change is literally a per-harness model link and a taller nav. I'd count them as plausible real findings outside the census, not noise.
+
+**Spike 1c: S3 (LIN-4105) at `4a0d90ee`**, against what actually happened.
+- **Hits:**
+  - "Home is assembled twice … every new input has to land in each copy": its recommended small tidy, "one `buildHomeModel`", became **S3a-1, "one Home pipeline" (LIN-4118)**.
+  - "The shared card is radios plus Answer … switching to buttons also changes the session and task pages" became **S3c-0, the shared question card (LIN-4140)**.
+  - "Ruling rows are thrown away; count line and badge are server-only" is **LIN-4114's after-answer** ("which rulings get a card, in four places").
+  - "Section membership is split … needs one owner" anticipates **LIN-4113 and LIN-4145** (membership, and parent and children).
+  - "Test fan-out is about 21 files" (LIN-4113: about 30).
+  - The halt banner split off (S3d, LIN-4115).
+- **Misses:**
+  - **Scale.** It predicted 2 prerequisite tickets and about 3 sessions. In reality S3 became 11 tickets, at 80 to 256 minutes per piece.
+  - **The cross-project parent and children decision** (S3e-0).
+  - **E2E shared-state flakiness**, the single biggest cost in LIN-4113.
+  - The top-task fix (S3a-0).
+
+**Readings:**
+- v0 explains well and predicts the *shape* well. In 1c, two of its named tidies became real prerequisites.
+- It is weak in exactly two places. First, it under-weighs a copy left behind when it recommends drilling, and C1 escapes *are* copies left behind. Second, it under-predicts scale and time.
+- The 1a builders' biggest cost (test isolation) was invisible to a read-only reader that doesn't run suites.
+
+## Survey v1: what changed and why
+
+- **Added, under "Just drill": "name every copy of each decision you found that drilling would leave unchanged."** A copy left behind is the commonest escaped defect here (C1). v0 found copies, then recommended drilling past them on LIN-1341, LIN-1736 and LIN-2619.
+- **Added to "where it binds": the test harness itself** (state shared between tests, slow or flaky suites, missing seams). This was LIN-4113's biggest cost, and v0 never looked.
+- **Changed "Will it split, and how many?" to "list the pieces you'd expect it to split into".** A list can be checked against what happened, and v0's count for S3 (2) was far below reality (11).
+- **Removed "Roughly how long will it take?"** Effort is the weakest prediction (Theseus found the same), v0 underestimated S3 by several times, and the number invites false precision. Plan-review rounds and pieces carry the same signal more checkably.
