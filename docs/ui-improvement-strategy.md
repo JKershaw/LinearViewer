@@ -95,8 +95,8 @@ ten sections that drift in tokenized colors.
 
 - **"Section" — ~10 implementations:** `settings-section`, `dispatch-section`,
   `proxy-section`, `foreman-section-header`, `roadmap-section-heading`,
-  `custom-prompts-section`, `legal-section`, `in-progress-section`,
-  `recent-activity-section`, plus a generic `section-header` /
+  `custom-prompts-section`, `legal-section`, `running-section`,
+  `up-next-section` (Home's desk, LIN-4113), plus a generic `section-header` /
   `section-description`.
 - **"Card" — 11 implementations:** `prompt-card`, `custom-prompt-card`,
   `foreman-now-card`, `roadmap-milestone-card`, `ship-rect-cards`,

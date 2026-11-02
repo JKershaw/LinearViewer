@@ -21,7 +21,7 @@ import { isTestToken, failureOf, openIssue } from './workspace-api-steps.js';
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 
 // The render sections the lazy detail route whitelists (LIN-732).
-const KNOWN_SECTIONS = ['project', 'in-progress', 'recent-activity'];
+export const KNOWN_SECTIONS = ['project', 'in-progress', 'recent-activity', 'home-up-next'];
 
 /**
  * Register the three issue-read routes, in order: comments, detail, image.

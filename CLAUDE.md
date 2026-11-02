@@ -67,7 +67,7 @@ Test servers in `tests/unit` bind `127.0.0.1` explicitly (`app.listen(0, '127.0.
 ## Key Behaviors
 
 - Unauthenticated users see the landing page (`/`): a plain definition, sign-in buttons and product glimpses, not a project tree
-- In Progress section shows all in-progress issues across projects
+- Home's Running and recently moved section shows the in-progress issues across projects, then the last day's recent rows; Up next lists the next 5 unstarted tasks (LIN-4113)
 - Click issue line → toggle details (description, assignee, dates, labels)
 - Click ▼ arrow → collapse/expand children
 - Click project header (on /backlog) → collapse entire project
