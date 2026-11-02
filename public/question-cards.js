@@ -113,7 +113,9 @@
     // caller-side reimplementation of postDispatch.
     function onPartialFailure(dispatchErr, retryDispatch) {
       var delivered = window.ReplyDelivery.deliveredEffect(opts);
-      var deliveryVerb = delivered === 'dispatch' ? 'start a run' : 'deliver to the session';
+      // LIN-4140: a task-bound answer is always a record, so its failure names
+      // the task, not a session it was never going to reach.
+      var deliveryVerb = delivered === 'dispatch' ? 'start a run' : (opts.taskDecisionId ? 'record on the task' : 'deliver to the session');
       appendYouBubble(thread, prompt);
       textarea.value = '';
       feedback.textContent = 'Recorded on the task. Could not ' + deliveryVerb + ': ' + dispatchErr.message + '. ';
@@ -213,7 +215,7 @@
     if (answerBtn) answerBtn.disabled = true;
     if (feedback) { feedback.textContent = 'dismissing…'; feedback.className = 'sess-qcard-feedback sess-reply-feedback'; }
 
-    window.ReplyDelivery.dismissRuling({
+    var dismissOpts = {
       urlKey: urlKey,
       stampLoopId: card.dataset.stampLoopId,
       stampLoopIds: readStampLoopIds(card),
@@ -224,7 +226,15 @@
       disposition: card.dataset.disposition,
       source: card.dataset.source || undefined,
       prompt: DISMISS_PROMPT
-    }, DISMISS_NOOP_HANDLERS).then(function () {
+    };
+    // LIN-4140: a task-bound card dismisses on the scan route, addressed by the
+    // issue's UUID (data-issue-id), never by its identifier. Absent the scan
+    // attribute, dismissOpts is exactly what it was before.
+    if (card.dataset.taskDecisionId) {
+      dismissOpts.taskDecisionId = card.dataset.taskDecisionId;
+      dismissOpts.taskDecisionIssueId = card.dataset.issueId || '';
+    }
+    window.ReplyDelivery.dismissRuling(dismissOpts, DISMISS_NOOP_HANDLERS).then(function () {
       if (card.parentNode) card.parentNode.removeChild(card);
     }).catch(function (e) {
       if (dismissBtn) dismissBtn.disabled = false;
@@ -284,6 +294,15 @@
           // helper so its comment write / dispatch resolves the issue's provider.
           source: card.dataset.source || undefined
         };
+        // LIN-4140: a scan-raised (task-bound) ruling answers with the scan
+        // decision id and the issue's UUID. Its record-only delivery is decided
+        // in window.ReplyDelivery (deliveredEffect), so `effect` needs no change
+        // here. Absent the attribute, opts gains no keys.
+        var taskDecisionId = card.dataset.taskDecisionId || '';
+        if (taskDecisionId) {
+          opts.taskDecisionId = taskDecisionId;
+          opts.taskDecisionIssueId = card.dataset.issueId || '';
+        }
 
         // The agent brief a `dispatch` answer needs is composed from what the
         // card already renders (question + "why" chunks) through the SAME
@@ -307,7 +326,9 @@
             feedback.className = 'sess-qcard-feedback sess-reply-feedback error';
             return;
           }
-          opts.optionId = chosen ? (chosen.dataset.optionId || null) : null;
+          // LIN-4140: a task-bound answer sends no option id, so its body matches
+          // the Rulings tab's (which never carries one for a scan row).
+          opts.optionId = chosen && !opts.taskDecisionId ? (chosen.dataset.optionId || null) : null;
           opts.prompt = prompt;
           opts.dispatchPrompt = composeDispatch(prompt);
           sendReply(opts, btn, textarea, feedback, thread);
