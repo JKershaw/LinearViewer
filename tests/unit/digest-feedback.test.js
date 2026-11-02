@@ -375,7 +375,14 @@ describe('digestFeedback: no undefined values anywhere (absence convention: null
     const digest = digestFeedback(doc, { now: Date.now() });
     assertNoUndefined(digest);
     assert.equal(digest.kpiUsageEntry, null, 'absent kpi* field must be null, not omitted/undefined');
-    assert.equal(digest.telemetry.usage, null, 'absent optional telemetry field must be null, not omitted/undefined');
+    assert.equal('usage' in digest.telemetry, false, 'the digest carries no usage: no computed price is stored (LIN-4130)');
+  });
+
+  test('a [usage] row writes no telemetry.usage: the computed price is not stored, while the raw kpiUsageEntry fact is kept (LIN-4130)', () => {
+    requireDigestFeedback();
+    const digest = digestFeedback(rawDoc({ feedback: [{ kind: 'usage', message: usageMessage(), timestamp: at(0) }] }), { now: Date.now() });
+    assert.equal('usage' in digest.telemetry, false, 'telemetry.usage must not be written');
+    assert.ok(digest.kpiUsageEntry, 'the raw usage message stays as kpiUsageEntry');
   });
 
   test('a "kitchen sink" feedback array touching every field', () => {
@@ -455,7 +462,6 @@ describe('digestFeedback: loop-facing fields match _buildLoops per-row derivatio
       assert.deepStrictEqual(digest.telemetry.runtime, expected.telemetry.runtime, 'telemetry.runtime must match _buildLoops');
       assert.deepStrictEqual(digest.telemetry.model ?? null, expected.telemetry.model ?? null);
       assert.deepStrictEqual(digest.telemetry.evidence, expected.telemetry.producedArtifacts);
-      assert.deepStrictEqual(digest.telemetry.usage ?? null, expected.telemetry.usage ?? null);
       assert.deepStrictEqual(digest.telemetry.resources ?? null, expected.telemetry.resources ?? null);
       assert.deepStrictEqual(digest.telemetry.ticketMarkers, expected.telemetry.ticketWalk ?? []);
     });

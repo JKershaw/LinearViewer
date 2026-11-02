@@ -43,9 +43,10 @@ test('LIN-3014 compareLoops: identical loops (after exemptions) PASS', () => {
   assert.strictEqual(result.equal, true);
 });
 
-test('LIN-3014 compareLoops: exempt-only differences (promptText/feedback/toolPeak/telemetry.metrics/lineageMetrics) still PASS', () => {
+test('LIN-3014 compareLoops: exempt-only differences (promptText/feedback/toolPeak/telemetry.metrics/lineageMetrics/telemetry.usage) still PASS', () => {
   const lean = baseLoop({ promptText: undefined, feedback: [], toolPeak: 7, telemetry: { metrics: [{ ts: 99 }], runtime: { model: 'x' } }, lineageMetrics: [{ ts: 99 }] });
-  const baseline = baseLoop({ promptText: 'full prompt text', feedback: [{ kind: 'status' }], toolPeak: null, telemetry: { metrics: [{ ts: 1 }, { ts: 2 }], runtime: { model: 'x' } }, lineageMetrics: [{ ts: 1 }] });
+  // LIN-4130: the baseline carries a read-time usage price the lean loop does not.
+  const baseline = baseLoop({ promptText: 'full prompt text', feedback: [{ kind: 'status' }], toolPeak: null, telemetry: { metrics: [{ ts: 1 }, { ts: 2 }], runtime: { model: 'x' }, usage: { harness: 'claude-code', costUsd: 0.01 } }, lineageMetrics: [{ ts: 1 }] });
   const result = compareLoops(lean, baseline);
   assert.strictEqual(result.equal, true, `exempt-only differences must not fail: ${result.message}`);
 });

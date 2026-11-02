@@ -1,15 +1,18 @@
 /**
  * scripts/lin3014/lib/exemptions.mjs (LIN-3014)
  *
- * The 5 loop-output paths where lean and non-lean legitimately differ
+ * The 6 loop-output paths where lean and non-lean legitimately differ
  * (research beat 2, `81a1b99f`, "L-D"; proved complete on real mongod in
  * beat 3, `299efc16`, step 7 B1): `promptText` (LIN-622, absent on lean),
  * `feedback` (`[]` on lean), `toolPeak` (digest value on lean, null on
  * non-lean), `telemetry.metrics` (R4-retained subset on lean, full on
- * non-lean), `lineageMetrics` (union of retained subsets on lean).
+ * non-lean), `lineageMetrics` (union of retained subsets on lean), and
+ * `telemetry.usage` (LIN-4130: lean loops carry no usage, because the digest
+ * no longer stores a computed price; non-lean prices it at read from raw
+ * feedback).
  *
  * Every OTHER path must be identical between the two builds. The equivalence
- * comparator strips exactly these 5 before running `deepStrictEqual` with no
+ * comparator strips exactly these 6 before running `deepStrictEqual` with no
  * normalisation — stripping any more would hide a real regression; stripping
  * fewer would fail on a difference the plan already knows about and accepts.
  */
@@ -18,11 +21,12 @@ export const LOOP_EXEMPTIONS = Object.freeze([
   'feedback',
   'toolPeak',
   'telemetry.metrics',
-  'lineageMetrics'
+  'lineageMetrics',
+  'telemetry.usage'
 ]);
 
 /**
- * The same 5 exemptions, scoped under a session's `loops[]` array — for
+ * The same 6 exemptions, scoped under a session's `loops[]` array — for
  * comparing whole SESSION objects (`{sessionId, loops, telemetry, ...}`)
  * rather than a single loop.
  */

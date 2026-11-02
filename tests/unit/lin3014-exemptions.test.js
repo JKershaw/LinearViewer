@@ -1,7 +1,7 @@
 /**
  * scripts/lin3014/lib/exemptions.mjs (LIN-3014)
  *
- * `stripPaths` removes exactly the loop-output paths exemptions 1-5 name
+ * `stripPaths` removes exactly the loop-output paths exemptions 1-6 name
  * (research beat 2 L-D, proved complete on real mongod in beat 3), without
  * disturbing anything else — over-stripping would hide a real regression,
  * under-stripping would fail on a difference the plan already accepts.
@@ -10,14 +10,14 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import { LOOP_EXEMPTIONS, SESSION_LOOP_EXEMPTIONS, stripPaths } from '../../scripts/lin3014/lib/exemptions.mjs';
 
-test('LIN-3014 stripPaths: removes each of the 5 loop exemptions and leaves everything else intact', () => {
+test('LIN-3014 stripPaths: removes each of the 6 loop exemptions and leaves everything else intact', () => {
   const loop = {
     loopId: 'l1',
     terminalStatus: 'completed',
     promptText: 'the full prompt',
     feedback: [{ kind: 'status', message: 'x' }],
     toolPeak: 4,
-    telemetry: { metrics: [{ ts: 1 }], runtime: { model: 'x' } },
+    telemetry: { metrics: [{ ts: 1 }], runtime: { model: 'x' }, usage: { costUsd: 0.01 }, model: 'm', resources: { peakRssBytes: 1 } },
     lineageMetrics: [{ ts: 1 }]
   };
   const stripped = stripPaths(loop, LOOP_EXEMPTIONS);
@@ -29,6 +29,11 @@ test('LIN-3014 stripPaths: removes each of the 5 loop exemptions and leaves ever
   assert.strictEqual('lineageMetrics' in stripped, false);
   assert.strictEqual('metrics' in stripped.telemetry, false, 'only telemetry.metrics is exempt, not all of telemetry');
   assert.deepStrictEqual(stripped.telemetry.runtime, { model: 'x' }, 'telemetry.runtime must survive — not part of any exemption');
+  // LIN-4130: telemetry.usage is exempt (lean loops carry none), but it is the
+  // only telemetry key removed: a difference in a sibling field still fails.
+  assert.strictEqual('usage' in stripped.telemetry, false, 'telemetry.usage is an exemption (LIN-4130)');
+  assert.strictEqual(stripped.telemetry.model, 'm', 'telemetry.model must survive: a lean/non-lean model difference is not exempt');
+  assert.deepStrictEqual(stripped.telemetry.resources, { peakRssBytes: 1 }, 'telemetry.resources must survive');
 });
 
 test('LIN-3014 stripPaths: does not mutate the original object', () => {
