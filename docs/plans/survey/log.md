@@ -62,3 +62,4 @@ Full answers are comments headed "Survey spike 1a" on LIN-4113, LIN-4114, LIN-41
   - S4 and S5 stay held until the Survey of S4 is posted on LIN-4150, then I'll ask the UI session to resume. LIN-4040's autopilot owns the run; I won't start a rival.
   - The UI session will tell me when S3e-0 and S3e land, which is my cue to run the periodicals.
 - **22:00: the UI operator will keep S4 and S5 held until John tells it directly.** It's a reasonable caution, since resuming dispatches real work and it wanted the word from John rather than a relay. So **Spike 2's forecast will be posted overnight, but S4 runs only after John resumes it in the morning.** The forecast is committed before the work either way, so it remains a genuine prediction.
+- **21:56: John confirmed directly to the UI operator** that a "resume S4" from this session counts. So S4 can run overnight once its Survey is posted on LIN-4150.
