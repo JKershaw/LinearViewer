@@ -610,8 +610,8 @@ describe('collectKpiStats', () => {
 
     const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     // The metric must actually be live (proves the assertion isn't vacuous).
-    assert.equal(stats.terminalMarkedTaskCost.issueCount, 1);
-    assert.equal(stats.terminalMarkedTaskCost.costUsd, 3);
+    assert.equal(stats.terminalMarkedTaskCost.pricedTicketCount, 1);
+    assert.equal(stats.terminalMarkedTaskCost.pricedTicketCostUsd, 3);
 
     const serialized = JSON.stringify(stats);
     assert.ok(!serialized.includes('LIN-PRIVACY-CANARY'), 'issueIdentifier value leaked into the public stats object');

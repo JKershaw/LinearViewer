@@ -486,8 +486,8 @@ describe('db-indexes', () => {
     // this fails — the exact drift that produced the production blocking sort.
     // The three paged lists left below declare a `urlKey:1,timestamp:-1` key.
     // The llm-call-log `{urlKey,timestamp,_id}` index has the same shape but no
-    // paged list reads it any more (LIN-4129 removed `listCalls`); it stays
-    // declared for the horizon readers and is pinned by the spec-list test above.
+    // paged list reads it any more; it stays declared for the horizon readers
+    // and is pinned by the spec-list test above.
     const pagedListSpec = (collection) => (s) =>
       s.collection === collection &&
       s.keySpec.urlKey === 1 &&
