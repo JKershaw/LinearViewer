@@ -2008,7 +2008,7 @@ describe(
     // Extracts only the loop-facing facts the digest is responsible for
     // (terminal/wake/decision/decisionCase/answeredDecisionId/
     // answeredDecisions/withdrawal (LIN-2891/LIN-3034)/telemetry's
-    // parkedWait+runtime+model+usage+resources+ticketWalk) — never raw
+    // parkedWait+runtime+model+resources+ticketWalk) — never raw
     // `feedback`/`promptText`, which legitimately differ between the lean and
     // non-lean shapes for reasons unrelated to this equivalence (LIN-622).
     // Review ledger L6 (PR #1560): the original version of this helper
@@ -2018,14 +2018,15 @@ describe(
     // sides normalize to the SAME coalesced value regardless of whether the
     // key was genuinely present. N4 (omitted vs null must be preserved,
     // never normalized) is exactly the class this witness exists to guard.
-    // Compares `loop.telemetry` AS-IS (destructuring only `metrics` out,
-    // R4's one accepted exemption — it's deliberately retention-trimmed on
-    // lean, full on non-lean, a real and intended difference) so a missing
+    // Compares `loop.telemetry` AS-IS, destructuring out only the two declared
+    // exemptions: `metrics` (R4's accepted exemption — retention-trimmed on
+    // lean, full on non-lean, a real and intended difference) and `usage`
+    // (LIN-4130: lean loops carry none; non-lean prices it at read). So a missing
     // key on one side and a present key on the other is a genuine mismatch,
     // and adds `producedArtifacts`, which the original version omitted
     // entirely.
     function pickLoopFacingFacts(loop) {
-      const { metrics, ...telemetryRest } = loop.telemetry || {};
+      const { metrics, usage, ...telemetryRest } = loop.telemetry || {};
       return {
         terminalStatus: loop.terminalStatus,
         terminalCompletedAt: loop.terminalCompletedAt,

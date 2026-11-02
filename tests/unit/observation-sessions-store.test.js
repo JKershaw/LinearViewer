@@ -93,34 +93,15 @@ test('a v3 doc (pre-LIN-1487) read-misses on both list and point reads so it reb
   const store = new ObservationSessionsStore({ collection });
   await store.upsertSession(URL_KEY, makeSession('S1'));
 
-  // The pin tracks the CURRENT version (LIN-3022 moved it 12 → 13, LIN-2934 moved
-  // it 13 → 14, LIN-2891/LIN-3034 moved it 14 → 15, LIN-2891 F1 moved it 15 → 16
-  // for the decision-aware `withdrawal` derivation, LIN-3094 moved it 17 → 18 for new pricing rows, LIN-3882 moved it 18 → 19 for price-row changes, LIN-3916 moved it 19 → 20 for four more pricing rows); a lingering v3 archive doc
-  // from before LIN-1487 must still miss on both reads.
+  // The pin tracks the CURRENT version. Bumps mark shape or validity changes, and
+  // the history of each is in lib/observation-sessions-store.js. A lingering v3
+  // archive doc from before LIN-1487 must still miss on both reads.
   assert.equal(BUILDER_VERSION, 20, 'this bump-specific pin tracks the current version');
   const doc = collection._docs.find(d => d.type === 'session');
   doc.builderVersion = 3;
 
   assert.equal((await store.findByWorkspace(URL_KEY)).sessions.length, 0, 'list read skips the v3 doc');
   assert.equal(await store.getSession(URL_KEY, 'S1'), null, 'point read misses the v3 doc → route reconstructs');
-});
-
-// LIN-1495: the v4 → v5 bump exists because `telemetry.usage.costUsd` is now
-// derived at build time rather than stored as a permanent null. A v4 doc still
-// matches the SHAPE (the change is a value inside an existing field, not a new
-// key), so without the bump it would keep serving `costUsd: null` until 30-day
-// churn — the exact "—" the derivation exists to replace. Pinning the v4 doc as
-// the target set is what makes this bump load-bearing rather than cosmetic.
-test('a v4 doc (pre-LIN-1495) read-misses on both list and point reads so it rebuilds with a priced costUsd', async () => {
-  const collection = createMockCollection();
-  const store = new ObservationSessionsStore({ collection });
-  await store.upsertSession(URL_KEY, makeSession('S1'));
-
-  const doc = collection._docs.find(d => d.type === 'session');
-  doc.builderVersion = 4;
-
-  assert.equal((await store.findByWorkspace(URL_KEY)).sessions.length, 0, 'list read skips the v4 doc');
-  assert.equal(await store.getSession(URL_KEY, 'S1'), null, 'point read misses the v4 doc → route reconstructs');
 });
 
 // LIN-1766: the v5 → v6 bump exists because `telemetry.usage.lane` is now parsed

@@ -228,13 +228,37 @@ describe('LIN-3008 characterization guard: non-lean _buildLoops stays byte-ident
     leanItem.feedbackDigest.version = 0;
     const result = _buildLoops({ liveItems: [], historyItems: [leanItem], agentStatusEntries: [], now, lean: true });
     const { promptText, feedback, ...leanExpected } = EXPECTED_GOLDEN_LOOP;
+    // LIN-4130: `telemetry.usage` is a declared lean/non-lean exemption (the
+    // digest stores no computed price, so a lean loop carries none;
+    // non-lean prices it at read, asserted by the golden above). Strip it from
+    // the expectation on the same footing as promptText/feedback.
+    const { usage: _goldenUsage, ...telemetryWithoutUsage } = EXPECTED_GOLDEN_LOOP.telemetry;
+    leanExpected.telemetry = telemetryWithoutUsage;
     // The digest's own toolPeak (an always-full-window peak over ALL
     // heartbeats, independent of retention) — 6, the fixture's one heartbeat.
     leanExpected.toolPeak = 6;
     const { promptText: _p, feedback: _f, ...leanActual } = result[0];
     assert.deepStrictEqual(leanActual, leanExpected,
-      'every derived fact (terminal/wake/decision/telemetry/lineage) must be identical between lean and non-lean, only promptText/feedback/toolPeak differ');
+      'every derived fact (terminal/wake/decision/telemetry/lineage) must be identical between lean and non-lean, only promptText/feedback/toolPeak/telemetry.usage differ');
     assert.deepStrictEqual(result[0].feedback, []);
     assert.equal('promptText' in result[0], false);
+    assert.equal('usage' in result[0].telemetry, false, 'a lean loop carries no telemetry.usage (LIN-4130)');
+  });
+
+  test('a stored usage price is never read back: a legacy digest with a wrong usage.costUsd gives a lean loop no usage, and non-lean prices from raw feedback ignoring it (LIN-4130)', () => {
+    const now = new Date(at(120));
+    const legacyItem = goldenHistoryItem();
+    legacyItem.feedbackVersion = 0;
+    legacyItem.feedbackDigest = digestFeedback(legacyItem, { now: now.getTime() });
+    legacyItem.feedbackDigest.version = 0;
+    // A row written before LIN-4130 carried a stored computed price. Make it
+    // deliberately wrong: if any build reads it back, the assertions below fail.
+    legacyItem.feedbackDigest.telemetry.usage = { harness: 'claude-code', model: 'claude-opus-4-8', costUsd: 99 };
+
+    const lean = _buildLoops({ liveItems: [], historyItems: [legacyItem], agentStatusEntries: [], now, lean: true });
+    assert.equal('usage' in lean[0].telemetry, false, 'lean build must not read the stored price');
+
+    const nonLean = _buildLoops({ liveItems: [], historyItems: [legacyItem], agentStatusEntries: [], now, lean: false });
+    assert.equal(nonLean[0].telemetry.usage.costUsd, 0.0055, 'non-lean build prices at read from raw feedback, not the stored 99');
   });
 });
