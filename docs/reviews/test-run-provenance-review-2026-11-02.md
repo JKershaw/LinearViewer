@@ -47,9 +47,9 @@ No full suite was run for this report; the laptop runner was busy.
    - Infra: 2.
    - **A flake turned a PR run red 0 times.** Flakes are real but hidden: Playwright's `retries: 2` absorbs them in 29% of green runs.
 5. **The local-only E2E failures are a test-harness problem, not load or noise.**
-   - Four of the five named specs inherit state another spec left behind on the same worker or server. The fifth sits in a timing window that LIN-4070's re-read loop opened.
+   - Two of the five named specs are confirmed to inherit state another spec left behind (`header-nav`, `ship-biscuit`). Two more most likely inherit an incomplete task-facts cache (`lin-4024-home-seeded`, `lin-3987`). The fifth (`look-alike-controls`) sits in a timing window that LIN-4070's re-read loop opened.
    - Concurrent sessions on the laptop share ports 3001–3003, and the local Playwright config reuses whatever server holds them. One session's specs can therefore run against **another checkout's code**: LIN-4117 got a false all-clear on the four Home specs that CI then failed.
-   - CI never failed on these five specs in the window, apart from two real defects each in `header-nav` and `look-alike-controls`, and three in `lin-3987`.
+   - CI never failed on these five specs in the window except for real defects: two in `look-alike-controls`, three in `lin-3987`, and earlier ones in the `header-nav` file (not its "Pinned header clearance" block, which was added on 10-30 and never failed).
 6. **Recommendation:**
    - Before a push, run the unit suite, the witness specs and the E2E specs the change touches. Then let CI be the full proof.
    - Write that rule into the implementation template once, so it stops being re-decided per task.
@@ -156,6 +156,7 @@ These figures are from the Actions API, paged by week, so they cover the whole w
 - The rate is falling: 34% (10-03 to 10-16), 29% (10-17 to 10-25), 17% (10-26 to 11-02).
 - The worst offender is `dispatch.spec.js` "GET /api/dispatch lists queue items" (25 of the sampled runs).
 - None of the five specs named in the ticket appears among them.
+- Close-out re-checks (2 Nov): that spec failed and passed on retry #1 in run 38911194027 (10-16, green). It did not appear in the 60 most recent green runs, so the rate for this spec is front-loaded in the window and the 25-run count should not be read as current. Recent green runs do still show retry-only passes (for example `lin-4010-home-opened-task` in run 41390408501).
 
 **Main.** Of 489 push runs, main ended red twice:
 - 39313979414: the mongo image on a 6.19 kernel.
@@ -183,9 +184,9 @@ Six more push runs needed a re-run.
 
 | Spec | Cause | Status | In CI over the window |
 |---|---|---|---|
-| `header-nav` "Pinned header clearance" (10 tests, `tests/e2e/header-nav.spec.js:833-877`) | The failure is always "no focusable control with room to scroll" (`Received: null`, :872), not clearance.<br><br>The setup at :803 calls `/test/set-session` with no `runnerKey`, which leaves an earlier spec's runner key in place (`routes/test.js:352-365`). A live key turns run controls on, which hides the copy-first card (`server.js:3496`). That card is the only control that qualifies. | Cause **confirmed**; key-leak trigger a **strong hypothesis**. LIN-4109's diagnosis ("before fonts and layout settle") doesn't fit. | Never failed (added 10-30) |
+| `header-nav` "Pinned header clearance" (10 tests, `tests/e2e/header-nav.spec.js:833-877`) | The failure is always "no focusable control with room to scroll" (`Received: null`, :872), not clearance.<br><br>The setup at :803 calls `/test/set-session` with no `runnerKey`, which leaves an earlier spec's runner key in place (`routes/test.js:352-365`). A live key turns run controls on, which hides the copy-first card (`server.js:3496`). That card is the only control that qualifies. | Cause **confirmed**; key-leak trigger a **strong hypothesis**. LIN-4109's diagnosis ("before fonts and layout settle") doesn't fit. | The clearance block never failed (added 10-30, `46fe95f5`). The file's earlier CI failures were real defects; the spec file itself dates from July (`bdff8ebb`). |
 | `ship-biscuit` "quiet window" | Its setup never clears report history or task snapshots. `roadmap.spec.js:906-909` saves reports for the same `test-workspace-wN` and sorts just before it, so on one worker the "quiet" edition leads with "The roadmap, re-read: 1 item crossed the wire" (saved snapshot). Latent since `40799ca7` (July). | **Confirmed** from the snapshot | Never |
-| `look-alike-controls` (`:151`, `:209`) | LIN-4070 (`f0ac579c`, 11-01) added `rereadUntilComplete` (`public/prompt-section.js:2711-2728`). While the cached task facts are incomplete, it re-reads every 1 s, and each re-read sends `GET …/api/dispatch/preview` inside the spec's 500 ms click window. The cache lives per server process, with no test reset (`lib/task-facts-holder.js:21-25`; `createTestRoutes` isn't given `taskFacts`). | **Strong hypothesis** (LIN-4110) | Failed twice, both real defects (40084503168, 41323197563) |
+| `look-alike-controls` (`:151`, `:209`) | LIN-4070 (`f0ac579c`, 11-01) added `rereadUntilComplete` (`public/prompt-section.js:2711-2728`). While the cached task facts are incomplete, it re-reads every 1 s, and each re-read sends `GET …/api/dispatch/preview` inside the spec's 500 ms click window. The cache lives per server process (one holder, `server.js:3264`), and `createTestRoutes` isn't given `taskFacts`, so no test route resets it. | **Strong hypothesis** (LIN-4110) | Failed twice, both real defects (40084503168, 41323197563) |
 | `lin-4024-home-seeded` (`:92`) | The opened task shows its history but not the question. That is exactly what `/state` returns while the facts are incomplete (`routes/task-page.js:229-235`). Same cache as the row above. | Incomplete reply **confirmed**; why it was incomplete is a hypothesis | Never |
 | `lin-3987-decision-panel` (`:115`) | "no runs in 30 days" instead of "priced": no step was offered, either from the same incomplete state or because the top task moved (LIN-4117). | **Hypothesis** | Failed 3×, all real defects |
 
@@ -197,7 +198,7 @@ Six more push runs needed a re-run.
 
 - **Prompt text that instructs test runs.** Bounded by a grep over `lib/`, `docs/`, `routes/` and `content/` in both repos, by concept (suite, e2e, playwright, `npm test`, CI, green, baseline, flak), then reading each hit.
   - Members are listed in §2.
-  - Dead text: `formatSuccessCriteria` (`lib/prompt-formatters.js:392`) is imported but never called.
+  - Dead text: `formatSuccessCriteria` (`lib/prompt-formatters.js:385`) is imported but never called.
   - `docs/prompt-pipeline/stage-descriptions/*` is superseded and not served.
 - **The six pieces' test runs.** Bounded by every non-wake dispatch item on LIN-4103, 4104, 4115, 4117, 4118 and 4119: 52 items, all fetched.
 - **CI failures.** Bounded by all 1,547 `test.yml` runs from 10-03 to 11-02. Hidden flakes come from a 1-in-5 sample of green runs.
