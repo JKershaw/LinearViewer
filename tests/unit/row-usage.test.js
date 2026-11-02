@@ -5,7 +5,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseUsage, readRowUsage } from '../../lib/session-telemetry.js';
-import { groupDispatchLineages } from '../../lib/dispatch-lineage.js';
+import { groupDispatchLineages, joinCostLineages } from '../../lib/dispatch-lineage.js';
 import { reduceLineageCost, computeTerminalMarkedTaskCost } from '../../lib/terminal-marked-task-cost.js';
 import { buildTaskCost } from '../../lib/task-cost.js';
 import { windowedSpend } from '../../lib/weekly-budget.js';
@@ -88,9 +88,9 @@ describe('row usage: one answer, every reader (LIN-4134, LIN-4136)', () => {
   for (const c of CASES) {
     test(c.name, () => {
       const rows = c.rows;
-      const lineage = groupDispatchLineages(rows).get(rows[0].rootItemId);
+      const lineage = joinCostLineages(rows, groupDispatchLineages(rows)).get(rows[0].rootItemId);
       const reduced = reduceLineageCost(lineage);
-      const spend = windowedSpend(groupDispatchLineages(rows), daysAgo(30).getTime(), NOW.getTime());
+      const spend = windowedSpend(joinCostLineages(rows, groupDispatchLineages(rows)), daysAgo(30).getTime(), NOW.getTime());
       const got = {
         reduceLineageCost: reduced.costUsd,
         computeTerminalMarkedTaskCost: computeTerminalMarkedTaskCost(rows, NOW).pricedTicketCostUsd,

@@ -9,7 +9,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildTaskCost, anchorFor } from '../../lib/task-cost.js';
+import { buildTaskCost } from '../../lib/task-cost.js';
 
 // A `[usage]` feedback entry. `costUsd` is embedded directly in the payload
 // (parseUsagePayload prefers a native cost over deriving one), so tests can
@@ -29,23 +29,6 @@ function row({ id, status = 'taken', dispatchedAt, feedback = [], kind = 'implem
 }
 
 const EMPTY_APP = { calls: 0, costUsd: 0, unpricedCalls: 0, byFeature: [] };
-
-describe('anchorFor', () => {
-  test('prefers the row-level rootItemId', () => {
-    assert.equal(anchorFor({ id: 'a', rootItemId: 'root1', feedback: [] }), 'root1');
-  });
-
-  test('falls back to the first feedback entry carrying rootItemId', () => {
-    assert.equal(
-      anchorFor({ id: 'a', feedback: [{ message: 'x' }, { rootItemId: 'root2' }] }),
-      'root2'
-    );
-  });
-
-  test('falls back to the row id when neither is present (legacy row)', () => {
-    assert.equal(anchorFor({ id: 'a', feedback: [] }), 'a');
-  });
-});
 
 describe('buildTaskCost — lineage de-duplication', () => {
   test('a follow-up chain sharing one rootItemId is counted ONCE, not once per row', () => {

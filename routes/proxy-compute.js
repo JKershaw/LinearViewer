@@ -8,7 +8,8 @@
  */
 import { Router } from 'express';
 import { graphqlErrorExtra, graphqlErrorDetail } from '../lib/proxy-graphql-errors.js';
-import { anchorFor as taskCostAnchorFor, buildTaskCost } from '../lib/task-cost.js';
+import { buildTaskCost } from '../lib/task-cost.js';
+import { anchorOf } from '../lib/lineage-membership.js';
 import { resolveChatCredential, isAiUnavailable } from '../lib/chat-request.js';
 import { resolveRecommendation } from '../lib/recommend-recurse.js';
 import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
@@ -638,7 +639,9 @@ export function createComputeRoutes({
    * `/dispatch` list route: a cross-issue follow-up's usage must still merge
    * into the anchor's single cumulative total, or that lineage would be
    * undercounted here. `buildTaskCost` (lib/task-cost.js) does the actual
-   * lineage-group/merge/sum join; this route only fetches its inputs.
+   * lineage-group/merge/sum join, and reports only the lineages that count
+   * under `:identifier` (lib/lineage-membership.js, LIN-4147); this route only
+   * fetches its inputs.
    */
   router.get(['/api/proxy/issues/:identifier/cost', '/api/proxy/cost/:identifier'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
@@ -678,7 +681,7 @@ export function createComputeRoutes({
       ];
 
       const anchors = [...new Set(
-        ownRows.filter(i => i.status === 'taken').map(taskCostAnchorFor).filter(Boolean)
+        ownRows.filter(i => i.status === 'taken').map(anchorOf).filter(Boolean)
       )];
 
       const siblingRowsByAnchor = new Map();
@@ -703,7 +706,10 @@ export function createComputeRoutes({
         ? await llmCallLogStore.summarizeByIssue(req.proxyUrlKey, identifier, { since })
         : { calls: 0, costUsd: 0, unpricedCalls: 0, byFeature: [] };
 
-      const result = buildTaskCost({ ownRows, siblingRowsByAnchor, appSummary });
+      // LIN-4147: report only the lineages that count under this issue, so a
+      // lineage that belongs to another issue (a wake, a cross-issue follow-up)
+      // is never priced here as well.
+      const result = buildTaskCost({ ownRows, siblingRowsByAnchor, appSummary, issueIdentifier: identifier });
 
       const window = {
         days: READ_HORIZON_DAYS,

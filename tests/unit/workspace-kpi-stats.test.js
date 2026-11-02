@@ -357,7 +357,8 @@ describe('collectWorkspaceKpis daily series (LIN-3711)', () => {
     await seedWorkspace(A, { queued: 1 });
     const { daily } = await run(A);
     assert.equal(sum(daily.done), 0);
-    assert.deepEqual(daily.cost, { perDay: new Array(30).fill(0), pricedCount: 0, lineageCount: 1 });
+    // LIN-4147: a queued row never ran, so it is no cost lineage. It was counted as one (lineageCount 1) before.
+    assert.deepEqual(daily.cost, { perDay: new Array(30).fill(0), pricedCount: 0, lineageCount: 0 });
   });
 });
 
