@@ -160,7 +160,7 @@ describe('the Home page: the folds, and no done task', () => {
 
     assert.match(html, /data-home-fetch="backlog"[^>]*data-url-key="ws"/, 'the Backlog fold opens its rows from this workspace');
     assert.match(html, /data-testid="home-fold-backlog"/);
-    assert.match(html, /show 1 in Backlog/);
+    assert.match(html, /1 backlog ▶/, 'the Backlog fold reads "N backlog" (LIN-4119, feedback item 24)');
     assert.match(html, /data-testid="home-done-count"[^>]*>1 done</, 'done is a count');
     assert.doesNotMatch(html, /Finished work/, 'a done task is not on the page');
     assert.doesNotMatch(html, /data-completed-for/);

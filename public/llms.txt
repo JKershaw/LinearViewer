@@ -114,6 +114,12 @@ Both In Progress and Projects sections use the same nested structure:
 - `.expandable` - tasks that can be expanded; keyboard-operable controls (role=button, tabindex=0, Enter/Space to toggle, aria-expanded reflects state)
 - `.in-progress-project` - project name badge shown in brackets for In Progress items
 
+### Project control line and header Add task (LIN-4119)
+- `[data-testid="project"]` > `[data-testid="project-header"]` > `.project-name` (the arrow and the name, one element) and, beside it, `[data-testid="create-task"]` "+ Add task" (the inline create page link; an external provider's link is `[data-action="create-task"]`). One Add task per real project; a synthetic project (Periodicals, no project) has none.
+- `[data-testid="project-controls"]` - ONE element per project, after its open tree and before its completed section, holding the Up next fold (`[data-testid="home-fold-up-next"]`, "show N more ▶"), the Backlog fold (`[data-testid="home-fold-backlog"]`, "N backlog ▶") and the done count (`[data-testid="home-done-count"]`, "N done"). The "·" between them is drawn by CSS, never text. A project with none of them has no line.
+- Clicking "+ Add task" in a header opens the create page and does not collapse the project or save its collapsed state.
+- Collapsing a project hides its whole control line, including "N done"; expanding brings it back.
+
 ### Traversing the Tree
 - Find node by ID: `.node[data-id="{id}"]`
 - Find node's details: `.node[data-id="{id}"] > .details`
