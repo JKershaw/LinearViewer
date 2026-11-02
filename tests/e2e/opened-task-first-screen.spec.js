@@ -572,8 +572,8 @@ test.describe('LIN-2942 — the ladder records its mode', () => {
 //
 // The first screen (Home) must show the same task the Swipe deck shows first,
 // with the same one-line why. The canonical local seed's front card is TEST-13
-// — a boostable bug in Todo — so it is NOT in Home's In Progress section; its
-// row is in the project tree, and that is where the mark must land.
+// — a boostable bug in Todo. It is Home's top task, so it sits in the In Progress
+// section (LIN-4117), and that is where the mark must land.
 // =============================================================================
 
 test.describe('LIN-2944 P1 — Home top-task mark', () => {
