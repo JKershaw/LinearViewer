@@ -112,11 +112,11 @@ test.describe('Team Filtering', () => {
 
     // Project Alpha has Engineering issues, Project Beta has Design issues
     // With Engineering filter, Beta project should have no visible issues
-    const alphaProject = page.locator('.project[data-id="proj-alpha"]');
     const betaProject = page.locator('.project[data-id="proj-beta"]');
 
-    // Alpha should have issues visible
-    await expect(alphaProject.locator('.node')).not.toHaveCount(0);
+    // Alpha should have issues visible. LIN-4117: its one Engineering task is the top task, so it is In Progress on
+    // Home rather than in the project section.
+    await expect(page.locator('.in-progress-items .line[data-identifier="TEST-13"]')).toBeVisible();
 
     // Beta should exist but have no issues (empty project)
     await expect(betaProject).toBeVisible();

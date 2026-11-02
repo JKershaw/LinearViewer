@@ -79,17 +79,16 @@ test.describe('LIN-2529 — assignee filter (local provider, real `me` match)', 
     await expect(page.locator('.line[data-section="project"][data-identifier="FILT-6"]')).toHaveCount(0);
   });
 
-  test('?assignee=me — In Progress keeps a matched parent, and its unstarted subtask folds under it', async ({ page, localWorkerUrlKey }) => {
+  test('?assignee=me — In Progress keeps a matched parent, and its unstarted subtask (the top task) shows under it', async ({ page, localWorkerUrlKey }) => {
     await page.goto(`/workspace/${localWorkerUrlKey}/?assignee=me`);
     await page.waitForLoadState('networkidle');
 
-    // Only the matched in-progress parent reaches the In Progress section. Its subtask is not started, so it folds
-    // under the parent ("show 1 more") rather than sitting in the In Progress list (LIN-4024).
-    await expect(page.locator('.in-progress-items .line')).toHaveCount(1);
+    // The matched in-progress parent reaches the In Progress section. Its unstarted subtask is the top task (LIN-4117),
+    // so it is In Progress under the parent, hidden until the parent opens, rather than folded behind "show 1 more".
+    await expect(page.locator('.in-progress-items .line')).toHaveCount(2);
     await expect(page.locator('.in-progress-items .line:has-text("Assigned in-progress parent")')).toBeVisible();
-    await expect(page.locator('.in-progress-items .line:has-text("Unassigned in-progress subtask")')).toHaveCount(0);
 
-    await openFolds(page);
+    await page.locator('.in-progress-items .line:has-text("Assigned in-progress parent")').click();
     const childLine = page.locator('.in-progress-items .line:has-text("Unassigned in-progress subtask")');
     await expect(childLine).toHaveCount(1);
     const childNode = page.locator(`.in-progress-items .node[data-id="${localSeedId(localWorkerUrlKey, 'filter-ip-child')}"]`);

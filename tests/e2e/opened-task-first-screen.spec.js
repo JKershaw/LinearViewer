@@ -598,7 +598,8 @@ test.describe('LIN-2944 P1 — Home top-task mark', () => {
 
     expect(homeId).toBe(first.id);
     expect(JSON.parse(homeWhy || '[]')).toEqual(first.why);
-    expect(homeSection).toBe('project');
+    // LIN-4117: the top task is In Progress on Home, and dropped from its project section.
+    expect(homeSection).toBe('in-progress');
   });
 });
 
