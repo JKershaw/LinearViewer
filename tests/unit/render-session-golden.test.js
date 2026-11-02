@@ -79,7 +79,7 @@ function fixtureSession(overrides = {}) {
 
 function costLoop(overrides = {}) {
   const id = overrides.loopId || 'loop';
-  return {
+  return withUsageFeedback({
     loopId: id,
     lineageId: overrides.lineageId ?? id,
     kind: overrides.kind || 'implementation',
@@ -93,7 +93,21 @@ function costLoop(overrides = {}) {
     feedback: [],
     telemetry: { runtime: { ms: 1000 }, metrics: [], producedArtifacts: [] },
     ...overrides,
-  };
+  });
+}
+
+// A run's usage is read from its own `[usage]` feedback entry (LIN-4136), so a loop given
+// `telemetry.usage` here carries that entry instead, and no `telemetry.usage` of its own.
+function withUsageFeedback(loop) {
+  const { usage, ...telemetry } = loop.telemetry || {};
+  if (!usage) return loop;
+  return { ...loop, telemetry, feedback: [...(loop.feedback || []), usageEntry(usage)] };
+}
+
+function usageEntry(usage) {
+  // A null cost is an unpriced run: name a model with no rate, so the parser derives no price.
+  const payload = usage.costUsd === null ? { ...usage, model: 'unpriceable-model-zz', costUsd: undefined } : usage;
+  return { kind: 'usage', message: `[usage] ${JSON.stringify(payload)}`, timestamp: '2026-07-04T10:02:00.000Z' };
 }
 
 const PR_URL = 'https://github.com/acme/widget/pull/12';

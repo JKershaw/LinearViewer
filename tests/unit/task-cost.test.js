@@ -346,3 +346,76 @@ describe('buildTaskCost — effort + durationMs surface (LIN-2615)', () => {
     assert.strictEqual(result.workerSessions[0].durationMs, null);
   });
 });
+
+// LIN-4136: one fold over a lineage's rows. Tokens and cost describe the same counted rows, and an
+// unreadable usage is never replaced by an earlier readable one.
+describe('buildTaskCost — one fold over a lineage\'s rows (LIN-4136)', () => {
+  const at = (hour) => `2026-11-01T${hour}:00:00.000Z`;
+  const payload = (anchor, body) => ({ kind: 'usage', rootItemId: anchor, timestamp: at('10'), message: `[usage] ${JSON.stringify(body)}` });
+  const snapshot = (costUsd, extra = {}) => ({ harness: 'claude-code', model: 'claude-sonnet-5', costUsd, ...extra });
+  const delta = (costUsd, extra = {}) => ({ harness: 'opencode', model: 'claude-sonnet-5', costUsd, ...extra });
+  const UNREADABLE = (anchor) => ({ kind: 'usage', rootItemId: anchor, timestamp: at('10'), message: '[usage] {not json' });
+
+  test('an unreadable last row withholds the lineage figure: the earlier snapshot is not shown as priced', () => {
+    const r1 = row({ id: 'r1', rootItemId: 'A', dispatchedAt: at('09'), feedback: [payload('A', snapshot(5))] });
+    const r2 = row({ id: 'r2', rootItemId: 'A', dispatchedAt: at('10'), feedback: [UNREADABLE('A')] });
+    const cost = buildTaskCost({ ownRows: [r1, r2] });
+    assert.equal(cost.workerSessions.length, 1);
+    assert.equal(cost.workerSessions[0].costUsd, null);
+    assert.equal(cost.workerSessions[0].telemetry, true, 'the run did post usage, so it is not "no telemetry"');
+    assert.equal(cost.unreadableCount, 1);
+    assert.equal(cost.noTelemetryCount, 0);
+    assert.equal(cost.pricedUsd, 0);
+    assert.equal(cost.totalUsd, null);
+  });
+
+  test('an unreadable row that is the only usage: unreadable, not no-telemetry', () => {
+    const r1 = row({ id: 'r1', rootItemId: 'B', dispatchedAt: at('09'), feedback: [UNREADABLE('B')] });
+    const cost = buildTaskCost({ ownRows: [r1] });
+    assert.equal(cost.unreadableCount, 1);
+    assert.equal(cost.noTelemetryCount, 0);
+    assert.equal(cost.totalUsd, null);
+  });
+
+  test('opencode deltas across rows sum, one per row', () => {
+    const r1 = row({ id: 'r1', rootItemId: 'C', dispatchedAt: at('09'), feedback: [payload('C', delta(1))] });
+    const r2 = row({ id: 'r2', rootItemId: 'C', dispatchedAt: at('10'), feedback: [payload('C', delta(2))] });
+    const cost = buildTaskCost({ ownRows: [r1, r2] });
+    assert.equal(cost.workerSessions[0].costUsd, 3);
+    assert.equal(cost.pricedUsd, 3);
+    assert.equal(cost.totalUsd, 3);
+  });
+
+  test('one row with two usage entries counts only its last entry, never their sum', () => {
+    const r1 = row({ id: 'r1', rootItemId: 'D', dispatchedAt: at('09'), feedback: [payload('D', delta(1)), payload('D', delta(2))] });
+    const cost = buildTaskCost({ ownRows: [r1] });
+    assert.equal(cost.workerSessions[0].costUsd, 2);
+  });
+
+  test('a snapshot, then a delta: the snapshot and the delta both count', () => {
+    const r1 = row({ id: 'r1', rootItemId: 'E', dispatchedAt: at('09'), feedback: [payload('E', snapshot(5))] });
+    const r2 = row({ id: 'r2', rootItemId: 'E', dispatchedAt: at('10'), feedback: [payload('E', delta(1))] });
+    const cost = buildTaskCost({ ownRows: [r1, r2] });
+    assert.equal(cost.workerSessions[0].costUsd, 6);
+    assert.equal(cost.pricedUsd, 6);
+  });
+
+  test('the labels come from the lineage\'s last counted row, the row whose figure is shown', () => {
+    const r1 = row({ id: 'r1', rootItemId: 'F', dispatchedAt: at('09'), feedback: [payload('F', snapshot(5, { model: 'claude-haiku-5-5' }))] });
+    const r2 = row({ id: 'r2', rootItemId: 'F', dispatchedAt: at('10'), feedback: [payload('F', delta(1, { effort: 'high' }))] });
+    const [session] = buildTaskCost({ ownRows: [r1, r2] }).workerSessions;
+    assert.equal(session.harness, 'opencode');
+    assert.equal(session.model, 'claude-sonnet-5');
+    assert.equal(session.effort, 'high');
+  });
+
+  test('an unpriced row in a mixed lineage: its model is listed, and the total is withheld', () => {
+    const r1 = row({ id: 'r1', rootItemId: 'G', dispatchedAt: at('09'), feedback: [payload('G', snapshot(5))] });
+    const r2 = row({ id: 'r2', rootItemId: 'G', dispatchedAt: at('10'), feedback: [payload('G', { harness: 'opencode', model: 'mystery-model-zz' })] });
+    const cost = buildTaskCost({ ownRows: [r1, r2] });
+    assert.equal(cost.workerSessions[0].costUsd, null);
+    assert.deepEqual(cost.unpriced, ['mystery-model-zz']);
+    assert.equal(cost.pricedUsd, 0);
+    assert.equal(cost.totalUsd, null);
+  });
+});
