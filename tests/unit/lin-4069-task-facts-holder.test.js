@@ -244,24 +244,32 @@ describe('the held index is reused, not built a second time (LIN-4069 review led
   });
 
   test('wiring: each caller writes AFTER its gather and hands the gather\'s index (roots) to the holder', () => {
+    // LIN-4118: the gather (the homeRowStates read, then the held-facts write) lives in lib/home-pipeline.js. The Home
+    // route, /api/home-rows and the sign-in refresh all reach the write through that one gather.
     const read = (rel) => readFileSync(new URL(`../../${rel}`, import.meta.url), 'utf8');
     const server = read('server.js');
     const refresh = read('lib/dashboard-refresh.js');
+    const pipeline = read('lib/home-pipeline.js');
     const check = (src, label) => {
       const gather = src.indexOf('await homeRowStates(');
       const write = src.search(/writeTaskFacts\??\.?\(/);
       assert.ok(gather !== -1 && write !== -1, `${label}: has a gather and a holder write`);
       assert.ok(gather < write, `${label}: the holder write follows the gather, so it can reuse the gather's index`);
     };
-    check(refresh, 'dashboard-refresh');
-    assert.match(refresh, /writeTaskFacts\?\.\(workspace\.urlKey, fetched, \{ index: homeStates\?\.roots \?\? null \}\)/);
-    // server.js: Home's page load and /api/home-rows, each in its own route.
-    const routes = [...server.matchAll(/writeTaskFacts\(workspace\.urlKey, fetched, \{ index: homeStates\?\.roots \?\? null \}\)/g)];
-    assert.equal(routes.length, 2, 'Home page load and /api/home-rows both reuse the gather\'s index');
+    check(pipeline, 'lib/home-pipeline.js');
+    // The one write, after the gather, with the index the gather built.
+    const writes = [...pipeline.matchAll(/writeTaskFacts\?\.\(workspace\.urlKey, fetched, \{ index: homeStates\?\.roots \?\? null \}\)/g)];
+    assert.equal(writes.length, 1, 'the gather holds the set through the write gate exactly once');
+    // The refresh and both routes reach the write only through the gather, never directly.
+    assert.match(refresh, /await gatherPage\(/, 'the refresh gathers through the shared pipeline');
+    assert.ok(!/writeTaskFacts\??\.?\(/.test(refresh), 'the refresh calls no write itself; the gather does');
+    const routeGathers = [...server.matchAll(/gatherHome(?:Page|Inputs)\(homePipelineDeps\(\)/g)];
+    assert.equal(routeGathers.length, 2, 'Home page load and /api/home-rows each gather through the pipeline');
     assert.ok(!/writeTaskFacts\(workspace\.urlKey, fetched\);/.test(server), 'no write left that builds its own index on the request path');
-    for (const m of routes) {
+    assert.ok(!/writeTaskFacts\(workspace\.urlKey, fetched\);/.test(pipeline), 'the pipeline has no write that builds its own index');
+    for (const m of routeGathers) {
       const before = server.slice(0, m.index);
-      assert.ok(before.lastIndexOf('await homeRowStates(') > before.lastIndexOf("app.get('/workspace/"), 'a gather precedes the write in the same route');
+      assert.ok(before.lastIndexOf("app.get('/workspace/") !== -1 && before.lastIndexOf("app.get('/workspace/") < m.index, 'each gather sits inside its route');
     }
   });
 });

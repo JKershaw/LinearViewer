@@ -35,6 +35,7 @@ import { liveConsoleOn } from '../../lib/run-controls.js';
 import { buildHomeView } from '../../lib/home-view.js';
 import { renderDashboardAfterRefresh } from '../../lib/dashboard-refresh.js';
 import { readHaltForPoll, POLL_HALT_READ_TIMEOUT_MS } from '../../lib/poll-halt.js';
+import { gatherHomePage } from '../../lib/home-pipeline.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
@@ -127,8 +128,23 @@ function slicePrimaryDashboardRouteHandler() {
   return handler;
 }
 
+/**
+ * LIN-4118: the primary route gathers through the shared pipeline (lib/home-pipeline.js) rather than inline. The sandbox
+ * gets the real entry point and the deps factory server.js defines, built from the same stubs the route's own reads use,
+ * so the assertions below still see the route's real output through the real pipeline.
+ */
+function injectPipelineSandbox(context) {
+  context.gatherHomePage = gatherHomePage;
+  context.homePipelineDeps = () => ({
+    fetchAndPrepareProjects: context.fetchAndPrepareProjects,
+    orderIssuesForSwipe: context.orderIssuesForSwipe,
+    homeRowStates: context.homeRowStates,
+    writeTaskFacts: context.writeTaskFacts,
+  });
+}
+
 async function runPrimaryDashboardRoute({ fetchResult }) {
-  const calls = { renderPageOptions: null, renderPageCallCount: 0 };
+  const calls = { renderPageOptions: null, renderPageCallCount: 0, filledRungReads: 0 };
 
   const workspace = { id: 'ws-1', urlKey: 'acme' };
   const req = {
@@ -194,10 +210,11 @@ async function runPrimaryDashboardRoute({ fetchResult }) {
     getWorkspaceCallScope: () => ({}),
     resolveAssigneeSelection: async () => ({ selectedAssignee: 'all', resolvedAssigneeName: null }),
     // LIN-4104 D2: the primary route reads the filled run button once per load; a workspace with no dispatch fills Next step.
-    readFilledRung: async () => 'next-step', taskModeStore: null, accountStore: null,
+    readFilledRung: async () => { calls.filledRungReads++; return 'next-step'; }, taskModeStore: null, accountStore: null,
     console: { log() {}, error() {} }
   });
 
+  injectPipelineSandbox(context);
   const script = `(${slicePrimaryDashboardRouteHandler()})`;
   const handler = vm.runInContext(script, context);
   await handler(req, res);
@@ -229,6 +246,19 @@ test('the primary dashboard route (GET /workspace/:urlKey/) threads truncated:fa
 // LIN-2944 P1 N1 (M12): the refresh route threads Home's top task (id + why)
 // into renderPage, exactly like the primary route. Deleting topTaskId/topTaskWhy
 // from that call left every unit and e2e green (surviving mutant M12).
+// LIN-4104 D2 (LIN-4118 witness): the primary route reads the filled run button exactly once per page load, in the route
+// (not in the shared gather), so the count is one for a load and never more.
+test('the primary dashboard route reads the filled run button once per page load (LIN-4104 D2)', async () => {
+  const calls = await runPrimaryDashboardRoute({
+    fetchResult: {
+      trees: [], inProgressTrees: [], recentActivityTrees: [], organizationName: 'acme',
+      teams: [], selectedTeamId: null, showSource: false, truncated: false
+    }
+  });
+  assert.equal(calls.renderPageCallCount, 1);
+  assert.equal(calls.filledRungReads, 1, 'one read per page load: a second read would double the dispatch-reach query');
+});
+
 test('renderDashboardAfterRefresh threads the top task id + why into renderPage (LIN-2944 P1 N1)', async () => {
   const topTask = { id: 'dupe-1', source: 'repoB', why: ['bug'] };
   const calls = await runRenderDashboardAfterRefresh({

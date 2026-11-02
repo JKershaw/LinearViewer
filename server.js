@@ -161,7 +161,7 @@ import { renderSwipePage, orderIssuesForSwipe } from './lib/render-swipe.js'
 import { rowDataByNodeKey } from './lib/task-board-view.js'
 import { createHomeRowStates, gatherTaskStates } from './lib/home-row-states.js'
 import { createTaskFactsHolder, createTaskFactsRefresh } from './lib/task-facts-holder.js'
-import { buildHomeView } from './lib/home-view.js'
+import { gatherHomeInputs, gatherHomePage } from './lib/home-pipeline.js'
 import { renderDashboardAfterRefresh as renderRefreshedDashboard } from './lib/dashboard-refresh.js'
 import { homeRowsFor, HOME_ROW_KINDS, HOME_SEARCH_MAX_LENGTH } from './lib/home-rows.js'
 import { renderSwimPage } from './lib/render-swim.js'
@@ -3273,6 +3273,9 @@ const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore,
 const homeRowStates = createHomeRowStates({
   getLoopsForWorkspace, dispatchStore: dispatchQueueStore, agentStatusStore, taskDecisionsStore, shelvedRulingsStore, enrichLoop, deriveSessionWaiting,
 })
+// LIN-4118: the server's reads for the shared Home-view gather (lib/home-pipeline.js). Built per call, so each route
+// reads these bindings when it runs.
+const homePipelineDeps = () => ({ fetchAndPrepareProjects, orderIssuesForSwipe, homeRowStates, writeTaskFacts })
 app.use(createTaskPageRoutes({
   workspaceFromUrl,
   getOpenRouterSource,
@@ -3467,25 +3470,20 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
     // LIN-4115: Home's halt read, started beside the fetch and awaited before render. The poll path's bounded read
     // (lib/poll-halt.js) never rejects: on a timeout or error it falls back to the store's last-known halt.
     const haltRead = readHaltForPoll(workspaceHaltStore, workspace.urlKey, POLL_HALT_READ_TIMEOUT_MS);
-    const fetched = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true, assigneeName: assigneeState.resolvedAssigneeName, accountId: req.session.accountId });
-    const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated, availableAssignees, appliedAssigneeName } = fetched;
+    // LIN-4118: the shared gather and the one view build (lib/home-pipeline.js). The flags are read where the gather
+    // reads them (after the top task), through this request. Route-specific reads stay in this route.
+    const { fetched, featureFlags, homeStates, rowStates, homeTopTask, seedOnlyHome, homeView } = await gatherHomePage(homePipelineDeps(), {
+      workspace,
+      teamId,
+      accountId: req.session.accountId,
+      assigneeName: assigneeState.resolvedAssigneeName,
+      resolveFlags: () => requestFeatureFlags(req),
+    });
+    const { recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated, availableAssignees, appliedAssigneeName } = fetched;
     const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h));
-    // LIN-2944 P1 F3: the deck's front card, over the SAME already-fetched trees —
-    // `orderIssuesForSwipe` is pure and adds no provider call. With `?assignee=`,
-    // the trees Home shows are already filtered, so the top task is too.
-    const orderedHome = orderIssuesForSwipe({ projectTrees: trees, inProgressTrees, recentActivityTrees, urlKey: workspace.urlKey });
-    const homeTopTask = orderedHome.find((issue) => !issue.isSeed) || null;
-    const seedOnlyHome = orderedHome.length > 0 && orderedHome.every((issue) => issue.isSeed);
-    const featureFlags = await requestFeatureFlags(req);
-    const homeStates = await homeRowStates({ urlKey: workspace.urlKey, issues: fetched.stateIssues, runControls: featureFlags.runControls === true });
     // LIN-4104 D2: the filled run button, read once for this page load (never on the /state poll).
     const filledRung = await readFilledRung({ taskModeStore, accountStore, accountId: req.session?.accountId ?? null, urlKey: workspace.urlKey });
-    // LIN-4068: hold the set through the write gate AFTER the gather, handing it the index the gather built (`roots`) so
-    // the request builds it once; with no gather (null) the holder builds its own.
-    writeTaskFacts(workspace.urlKey, fetched, { index: homeStates?.roots ?? null });
-    const rowStates = homeStates?.states ?? null;
     // LIN-4024: Home renders the trimmed view (what needs you, what runs, what is next; the rest behind folds).
-    const homeView = buildHomeView({ inProgressTrees, trees, states: rowStates ?? new Map(), topTaskId: homeTopTask ? nodeKey(homeTopTask) : null });
     const halt = await haltRead;
     const html = renderPage(homeView.trees, homeView.inProgressTrees, recentActivityTrees, organizationName, {
       teams,
@@ -3569,18 +3567,19 @@ app.get('/workspace/:urlKey/api/home-rows', workspaceFromUrl, async (req, res) =
   const provider = getProviderForWorkspace(workspace);
   const assigneeState = await resolveAssigneeSelection(req, provider, getWorkspaceCallScope(workspace));
   try {
-    // The page's own inputs, so these rows and the page's rows come from one filtered view of the workspace.
-    const fetched = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true, assigneeName: assigneeState.resolvedAssigneeName, accountId: req.session.accountId });
-    const { trees, inProgressTrees, recentActivityTrees, showSource } = fetched;
-    const orderedHome = orderIssuesForSwipe({ projectTrees: trees, inProgressTrees, recentActivityTrees, urlKey: workspace.urlKey });
-    const homeTopTask = orderedHome.find((issue) => !issue.isSeed) || null;
-    const featureFlags = await requestFeatureFlags(req);
-    const homeStates = await homeRowStates({ urlKey: workspace.urlKey, issues: fetched.stateIssues, runControls: featureFlags.runControls === true });
-    // LIN-4068: a third caller of the fetch; it holds a complete set through the same gate as Home's page load, reusing
-    // the gather's index.
-    writeTaskFacts(workspace.urlKey, fetched, { index: homeStates?.roots ?? null });
+    // The page's own inputs, so these rows and the page's rows come from one filtered view of the workspace. The shared
+    // gather (lib/home-pipeline.js) builds no view: homeRowsFor builds its own view once, as it always has. The gather
+    // is also the third caller of the fetch, so it holds a complete set through the same write gate as Home's page load.
+    const { fetched, trees, inProgressTrees, featureFlags, homeStates, topTaskId } = await gatherHomeInputs(homePipelineDeps(), {
+      workspace,
+      teamId,
+      accountId: req.session.accountId,
+      assigneeName: assigneeState.resolvedAssigneeName,
+      resolveFlags: () => requestFeatureFlags(req),
+    });
+    const { showSource } = fetched;
     const states = homeStates?.states ?? new Map();
-    const rows = homeRowsFor({ kind, projectId, parentId, q, offset, trees, inProgressTrees, states, topTaskId: homeTopTask ? nodeKey(homeTopTask) : null });
+    const rows = homeRowsFor({ kind, projectId, parentId, q, offset, trees, inProgressTrees, states, topTaskId });
     const urlKey = workspace.urlKey;
     const ctx = homeRowsContext({ workspace, urlKey, featureFlags, rowStates: states, showSource });
     const html = renderHomeRowsHtml(rows.nodes, { section: rows.section, parentId: rows.parentId, ctx });

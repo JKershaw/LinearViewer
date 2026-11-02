@@ -37,6 +37,7 @@ import { liveConsoleOn } from '../../lib/run-controls.js';
 import { buildHomeView } from '../../lib/home-view.js';
 import { renderDashboardAfterRefresh } from '../../lib/dashboard-refresh.js';
 import { readHaltForPoll, POLL_HALT_READ_TIMEOUT_MS } from '../../lib/poll-halt.js';
+import { gatherHomePage } from '../../lib/home-pipeline.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
@@ -79,8 +80,23 @@ function fetchResult(appliedAssigneeName) {
   };
 }
 
+/**
+ * LIN-4118: the primary route gathers through the shared pipeline (lib/home-pipeline.js) rather than inline. The sandbox
+ * gets the real entry point and the deps factory server.js defines, built from the same stubs the route's own reads use,
+ * so the assertions below still see the route's real output through the real pipeline.
+ */
+function injectPipelineSandbox(context) {
+  context.gatherHomePage = gatherHomePage;
+  context.homePipelineDeps = () => ({
+    fetchAndPrepareProjects: context.fetchAndPrepareProjects,
+    orderIssuesForSwipe: context.orderIssuesForSwipe,
+    homeRowStates: context.homeRowStates,
+    writeTaskFacts: context.writeTaskFacts,
+  });
+}
+
 function baseContext(calls, appliedAssigneeName, assigneeState) {
-  return {
+  const ctx = {
     UUID_REGEX: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
     getDeployInfo: () => ({}),
     getOpenRouterSource: () => null,
@@ -122,6 +138,8 @@ function baseContext(calls, appliedAssigneeName, assigneeState) {
     getWorkspaceCallScope: () => ({}),
     console: { log() {}, error() {} }
   };
+  injectPipelineSandbox(ctx);
+  return ctx;
 }
 
 async function runPrimaryDashboardRoute({ appliedAssigneeName, assigneeState }) {
