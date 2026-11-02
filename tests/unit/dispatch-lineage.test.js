@@ -6,7 +6,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { harnessOf, usageOf, evidenceCountOf, ticketMarkerEntriesOf, groupDispatchLineages } from '../../lib/dispatch-lineage.js';
+import { usageOf, evidenceCountOf, ticketMarkerEntriesOf, groupDispatchLineages } from '../../lib/dispatch-lineage.js';
 import { computeTerminalMarkedTaskCost } from '../../lib/terminal-marked-task-cost.js';
 
 const NOW = new Date('2026-06-10T12:00:00.000Z');
@@ -18,14 +18,7 @@ function daysAgo(n) {
 // (Session 1 of LIN-1625) — exact siblings of feedbackLen/terminalFeedbackOf
 // above, exported (like categorizeProxyEvent) for direct coverage ahead of
 // their beat 3/4 consumer, which doesn't exist yet.
-describe('harnessOf/usageOf/evidenceCountOf (LIN-1957)', () => {
-  test('harnessOf reads the raw field on either shape, null when absent/non-string', () => {
-    assert.strictEqual(harnessOf({ harness: 'claude-code' }), 'claude-code');
-    assert.strictEqual(harnessOf({ harness: 'opencode', feedback: [] }), 'opencode');
-    assert.strictEqual(harnessOf({}), null);
-    assert.strictEqual(harnessOf({ harness: null }), null);
-  });
-
+describe('usageOf/evidenceCountOf (LIN-1957)', () => {
   test('usageOf takes the LAST kind:usage entry on the find-path feedback[] shape', () => {
     const doc = {
       feedback: [
@@ -88,31 +81,7 @@ describe('groupDispatchLineages (LIN-1957) — the shared extraction', () => {
     timestamp: new Date(NOW.getTime() - days * 24 * 60 * 60 * 1000).toISOString()
   });
 
-  test('harness is captured ONCE from the earliest row only — a later follow-up with a DIFFERENT harness must not change it', () => {
-    // 'orig' dispatched 6 days ago (earlier); 'fu' is a follow-up dispatched
-    // 5 days ago (later, more recent) carrying a DIFFERENT harness. The
-    // approved-plan semantics (beat 2 decision (a)): the lineage's harness is
-    // whatever the earliest row carried, permanently.
-    const rows = [
-      { _id: 'orig', rootItemId: 'orig', harness: 'claude-code', status: 'taken', dispatchedAt: daysAgo(6), feedback: [] },
-      { _id: 'fu', rootItemId: 'orig', followUpTo: 'orig', harness: 'opencode', status: 'taken', dispatchedAt: daysAgo(5), feedback: [] }
-    ];
-    const lineages = groupDispatchLineages(rows);
-    assert.strictEqual(lineages.get('orig').harness, 'claude-code');
-  });
-
-  test('earliest-row-only capture is order-independent — the same result whichever row is processed first', () => {
-    const rows = [
-      { _id: 'orig', rootItemId: 'orig', harness: 'claude-code', status: 'taken', dispatchedAt: daysAgo(6), feedback: [] },
-      { _id: 'fu', rootItemId: 'orig', followUpTo: 'orig', harness: 'opencode', status: 'taken', dispatchedAt: daysAgo(5), feedback: [] }
-    ];
-    const forward = groupDispatchLineages(rows);
-    const reversed = groupDispatchLineages([...rows].reverse());
-    assert.strictEqual(forward.get('orig').harness, 'claude-code');
-    assert.strictEqual(reversed.get('orig').harness, 'claude-code');
-  });
-
-  test('issueIdentifier is captured from the same earliest row as harness', () => {
+  test('issueIdentifier is captured from the earliest row', () => {
     const rows = [
       { _id: 'orig', rootItemId: 'orig', issueIdentifier: 'LIN-1', status: 'taken', dispatchedAt: daysAgo(6), feedback: [] },
       { _id: 'fu', rootItemId: 'orig', followUpTo: 'orig', issueIdentifier: 'LIN-2', status: 'taken', dispatchedAt: daysAgo(5), feedback: [] }
@@ -121,21 +90,18 @@ describe('groupDispatchLineages (LIN-1957) — the shared extraction', () => {
     assert.strictEqual(lineages.get('orig').issueIdentifier, 'LIN-1');
   });
 
-  test('F2 (LIN-1957 review, Request Changes, expected-red): issueIdentifier must be captured from ANY row carrying one, not just the earliest — while harness stays earliest-row-only', () => {
+  test('F2 (LIN-1957 review, Request Changes): issueIdentifier must be captured from ANY row carrying one, not just the earliest', () => {
     // Approved plan, Surface 2: "issueIdentifier — set from any row carrying
     // one." Unlike the pinned test above (which documents today's coupled,
     // buggy behavior), this asserts the plan's actual requirement: a
     // null-identifier earliest row must not blank out a later row's
-    // identifier. harness is a SEPARATE field captured the same two places
-    // today (beat 2 decision (a), explicitly kept as earliest-row-only) — the
-    // fix must decouple the two, not take harness with it.
+    // identifier, whatever a row's requested harness says.
     const rows = [
-      { _id: 'orig', rootItemId: 'orig', harness: 'claude-code', status: 'taken', dispatchedAt: daysAgo(6), feedback: [] }, // earliest row: no issueIdentifier
-      { _id: 'fu', rootItemId: 'orig', followUpTo: 'orig', issueIdentifier: 'LIN-100', harness: 'opencode', status: 'taken', dispatchedAt: daysAgo(5), feedback: [] }
+      { _id: 'orig', rootItemId: 'orig', status: 'taken', dispatchedAt: daysAgo(6), feedback: [] }, // earliest row: no issueIdentifier
+      { _id: 'fu', rootItemId: 'orig', followUpTo: 'orig', issueIdentifier: 'LIN-100', status: 'taken', dispatchedAt: daysAgo(5), feedback: [] }
     ];
     const lineages = groupDispatchLineages(rows);
     assert.strictEqual(lineages.get('orig').issueIdentifier, 'LIN-100', 'plan: "issueIdentifier — set from any row carrying one"');
-    assert.strictEqual(lineages.get('orig').harness, 'claude-code', 'harness must stay earliest-row-only — the fix must not decouple this pin too');
   });
 
   test('rowUsage collects each contributing row\'s own usage entry, rows with none omitted', () => {

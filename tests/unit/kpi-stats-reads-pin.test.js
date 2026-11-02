@@ -155,7 +155,6 @@ const AGGREGATE_SNAPSHOT = [
             abort: 1,
             abortTo: 1,
             issueIdentifier: 1,
-            harness: 1,
             feedbackCount: {
               $cond: [
                 {

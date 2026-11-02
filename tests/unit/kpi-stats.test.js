@@ -19,7 +19,7 @@ import {
   OUTCOME_WINDOW_WEEKS, loadDispatchHistory
 } from '../../lib/kpi-stats.js';
 import {
-  OUTCOME_WINDOW_DAYS, harnessOf, usageOf, evidenceCountOf, ticketMarkerEntriesOf, groupDispatchLineages
+  OUTCOME_WINDOW_DAYS, usageOf, evidenceCountOf, ticketMarkerEntriesOf, groupDispatchLineages
 } from '../../lib/dispatch-lineage.js';
 import { __internal as TERMINAL_INTERNAL } from '../../lib/dispatch-terminal.js';
 import { __internal as SESSION_TELEMETRY_INTERNAL } from '../../lib/session-telemetry.js';
@@ -1526,7 +1526,7 @@ describe('collectKpiStats (aggregation path, real MangoDB)', () => {
   // itself closes that gap, which matters here because this field is new and
   // under active change in this very beat.
 
-  test('harness and issueIdentifier are additive raw passthroughs, via loadDispatchHistory', async () => {
+  test('issueIdentifier is an additive raw passthrough, via loadDispatchHistory', async () => {
     const collections = await realCollections({
       dispatchHistory: [
         { _id: 'h1', rootItemId: 'h1', status: 'taken', dispatchedAt: daysAgo(1), harness: 'opencode', issueIdentifier: 'LIN-42', feedback: [] },
@@ -1535,9 +1535,7 @@ describe('collectKpiStats (aggregation path, real MangoDB)', () => {
     });
     const rows = await loadDispatchHistory(collections.dispatchHistory);
     const byId = Object.fromEntries(rows.map(d => [d._id, d]));
-    assert.strictEqual(harnessOf(byId.h1), 'opencode');
     assert.strictEqual(byId.h1.issueIdentifier, 'LIN-42');
-    assert.strictEqual(harnessOf(byId.h2), null);
     assert.strictEqual(byId.h2.issueIdentifier, undefined);
 
     const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
@@ -1632,9 +1630,19 @@ describe('collectKpiStats (aggregation path, real MangoDB)', () => {
     const aggRows = await loadDispatchHistory(aggCollections.dispatchHistory);
     const foundRows = await loadDispatchHistory(createMockCollection(seed));
 
-    assert.strictEqual(harnessOf(aggRows[0]), harnessOf(foundRows[0]));
     assert.strictEqual(usageOf(aggRows[0]).message, usageOf(foundRows[0]).message);
     assert.strictEqual(evidenceCountOf(aggRows[0]), evidenceCountOf(foundRows[0]));
+  });
+
+  test('the $last and the find path pick the same usage entry when the last one does not parse (LIN-4134)', async () => {
+    const seed = [{ _id: 'u1', rootItemId: 'u1', status: 'taken', dispatchedAt: daysAgo(1), feedback: [
+      { message: '[usage] {"costUsd":1}', timestamp: daysAgo(2).toISOString(), kind: 'usage' },
+      { message: '[usage] {not json', timestamp: daysAgo(1.5).toISOString(), kind: 'usage' }
+    ] }];
+    const aggRows = await loadDispatchHistory((await realCollections({ dispatchHistory: seed })).dispatchHistory);
+    const foundRows = await loadDispatchHistory(createMockCollection(seed));
+    assert.strictEqual(usageOf(aggRows[0]).message, '[usage] {not json');
+    assert.strictEqual(usageOf(foundRows[0]).message, '[usage] {not json');
   });
 });
 

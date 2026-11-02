@@ -20,8 +20,10 @@ const daysAgo = (n) => new Date(NOW.getTime() - n * DAY_MS);
 const doneMarker = (days) => ({ message: '[done] landed it', timestamp: daysAgo(days).toISOString() });
 const skippedMarker = (days) => ({ message: '[skipped] human-continued session (phase)', timestamp: daysAgo(days).toISOString() });
 
-function usageEntry({ costUsd, lane = null, days }) {
-  const payload = { harness: 'irrelevant-to-payload-parsing', lane };
+// `harness` is the REPORTED harness on the payload (LIN-4134); it defaults to claude-code.
+function usageEntry({ costUsd, lane = null, days, harness = 'claude-code' }) {
+  // No reported harness still needs a model: a payload with no recognised field parses to nothing.
+  const payload = harness === null ? { model: 'claude-haiku-5-5', lane } : { harness, lane };
   if (costUsd !== undefined) payload.costUsd = costUsd;
   return { kind: 'usage', message: `[usage] ${JSON.stringify(payload)}`, timestamp: daysAgo(days).toISOString() };
 }
@@ -35,11 +37,11 @@ describe('computeTerminalMarkedTaskCost — the harness-conditional reduce', () 
     const rows = [
       row({
         id: 'a1', issueIdentifier: 'LIN-1', harness: 'opencode', dispatchedAt: daysAgo(3),
-        feedback: [usageEntry({ costUsd: 1.5, lane: 'api', days: 3 }), doneMarker(2.9)]
+        feedback: [usageEntry({ costUsd: 1.5, lane: 'api', days: 3, harness: 'opencode' }), doneMarker(2.9)]
       }),
       row({
         id: 'a2', rootItemId: 'a1', issueIdentifier: 'LIN-1', harness: 'opencode', dispatchedAt: daysAgo(2.5),
-        feedback: [usageEntry({ costUsd: 2.5, lane: 'api', days: 2.5 }), doneMarker(2.4)]
+        feedback: [usageEntry({ costUsd: 2.5, lane: 'api', days: 2.5, harness: 'opencode' }), doneMarker(2.4)]
       })
     ];
     const result = computeTerminalMarkedTaskCost(rows, NOW);
@@ -60,40 +62,6 @@ describe('computeTerminalMarkedTaskCost — the harness-conditional reduce', () 
     assert.equal(result.pricedTicketCostUsd, 5, 'must take the LAST entry (5), not sum (1+5=6)');
   });
 
-  test('unknown (null) harness also takes last-wins, same as claude-code', () => {
-    const rows = [row({
-      id: 'c1', issueIdentifier: 'LIN-3', harness: null, dispatchedAt: daysAgo(1),
-      feedback: [
-        usageEntry({ costUsd: 1, days: 1 }),
-        usageEntry({ costUsd: 3, days: 0.9 }),
-        doneMarker(0.8)
-      ]
-    })];
-    assert.equal(computeTerminalMarkedTaskCost(rows, NOW).pricedTicketCostUsd, 3);
-  });
-
-  test('earliest-row-only harness still governs the reduce: a follow-up implying a different harness does not flip sum vs last-wins', () => {
-    // Lineage's earliest row is claude-code (last-wins governs), even though
-    // the follow-up row's own `harness` field claims opencode. This exercises
-    // the SAME earliest-row-only capture beat 3 pinned at the accumulator
-    // level, now proven to actually govern this module's reduce choice.
-    const rows = [
-      row({
-        id: 'd1', issueIdentifier: 'LIN-4', harness: 'claude-code', dispatchedAt: daysAgo(3),
-        feedback: [usageEntry({ costUsd: 1, days: 3 }), doneMarker(2.9)]
-      }),
-      row({
-        id: 'd2', rootItemId: 'd1', issueIdentifier: 'LIN-4', harness: 'opencode', dispatchedAt: daysAgo(2),
-        feedback: [usageEntry({ costUsd: 10, days: 2 }), doneMarker(1.9)]
-      })
-    ];
-    const result = computeTerminalMarkedTaskCost(rows, NOW);
-    // If harness were re-resolved per row (wrong), the lineage would look
-    // opencode-sourced and sum to 11. Last-wins on the true (earliest-row)
-    // claude-code harness gives 10 (the last entry only).
-    assert.equal(result.pricedTicketCostUsd, 10);
-    assert.equal(result.opencodeSummedShare, 0, 'the lineage never used the sum reduce');
-  });
 });
 
 describe('computeTerminalMarkedTaskCost — unpriced exclusion', () => {
@@ -148,15 +116,15 @@ describe('computeTerminalMarkedTaskCost — F1 (LIN-1957 review, Request Changes
   test('F1b: an opencode lineage with one unpriceable row among priced ones must flag unpriced, not silently sum only the priced rows', () => {
     const r1 = row({
       id: 'f1b-1', rootItemId: 'f1b-1', issueIdentifier: 'LIN-101', harness: 'opencode', dispatchedAt: daysAgo(3),
-      feedback: [usageEntry({ costUsd: 1, lane: 'api', days: 3 })]
+      feedback: [usageEntry({ costUsd: 1, lane: 'api', days: 3, harness: 'opencode' })]
     });
     const r2 = row({
       id: 'f1b-2', rootItemId: 'f1b-1', issueIdentifier: 'LIN-101', harness: 'opencode', dispatchedAt: daysAgo(2),
-      feedback: [usageEntry({ lane: 'api', days: 2 })] // no costUsd, no model — unpriceable
+      feedback: [usageEntry({ lane: 'api', days: 2, harness: 'opencode' })] // no costUsd, no model — unpriceable
     });
     const r3 = row({
       id: 'f1b-3', rootItemId: 'f1b-1', issueIdentifier: 'LIN-101', harness: 'opencode', dispatchedAt: daysAgo(1),
-      feedback: [usageEntry({ costUsd: 2, lane: 'api', days: 1 }), doneMarker(0.9)]
+      feedback: [usageEntry({ costUsd: 2, lane: 'api', days: 1, harness: 'opencode' }), doneMarker(0.9)]
     });
     const result = computeTerminalMarkedTaskCost([r1, r2, r3], NOW);
     // Review repro at PR head: the middle row's failure to price was invisible.
@@ -298,14 +266,14 @@ describe('computeTerminalMarkedTaskCost — disclosure shares', () => {
     assert.equal(result.closeOutLineageShare, 0.5);
   });
 
-  test('unknownHarnessShare reflects issues whose earliest row carries no harness', () => {
+  test('unknownHarnessShare reflects issues whose usage reports no harness (LIN-4134: the reported harness, not the requested one)', () => {
     const known = row({
       id: 'n1', issueIdentifier: 'LIN-18', harness: 'claude-code', dispatchedAt: daysAgo(1),
       feedback: [usageEntry({ costUsd: 1, days: 1 }), doneMarker(0.9)]
     });
     const unknown = row({
-      id: 'n2', issueIdentifier: 'LIN-19', harness: null, dispatchedAt: daysAgo(1),
-      feedback: [usageEntry({ costUsd: 1, days: 1 }), doneMarker(0.9)]
+      id: 'n2', issueIdentifier: 'LIN-19', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [usageEntry({ costUsd: 1, days: 1, harness: null }), doneMarker(0.9)]
     });
     const result = computeTerminalMarkedTaskCost([known, unknown], NOW);
     assert.equal(result.unknownHarnessShare, 0.5);
@@ -314,7 +282,7 @@ describe('computeTerminalMarkedTaskCost — disclosure shares', () => {
   test('opencodeSummedShare reflects issues whose lineage used the sum reduce', () => {
     const opencode = row({
       id: 'o1', issueIdentifier: 'LIN-20', harness: 'opencode', dispatchedAt: daysAgo(1),
-      feedback: [usageEntry({ costUsd: 1, lane: 'api', days: 1 }), doneMarker(0.9)]
+      feedback: [usageEntry({ costUsd: 1, lane: 'api', days: 1, harness: 'opencode' }), doneMarker(0.9)]
     });
     const claude = row({
       id: 'o2', issueIdentifier: 'LIN-21', harness: 'claude-code', dispatchedAt: daysAgo(1),
@@ -342,7 +310,7 @@ describe('computeTerminalMarkedTaskCost — F5 (LIN-1957 review round 2, Request
   test('pricedLineageShare falls when a usage-bearing lineage is only partially priced', () => {
     const partiallyPriced = row({
       id: 'w1', issueIdentifier: 'LIN-209', harness: 'opencode', dispatchedAt: daysAgo(1),
-      feedback: [usageEntry({ costUsd: 2, lane: 'api', days: 1 }), usageEntry({ lane: 'api', days: 0.5 }), doneMarker(0.4)]
+      feedback: [usageEntry({ costUsd: 2, lane: 'api', days: 1, harness: 'opencode' }), usageEntry({ lane: 'api', days: 0.5, harness: 'opencode' }), doneMarker(0.4)]
     });
     const fullyPriced = row({
       id: 'w2', issueIdentifier: 'LIN-210', harness: 'claude-code', dispatchedAt: daysAgo(1),
@@ -395,8 +363,8 @@ describe('computeTerminalMarkedTaskCost — F5 (LIN-1957 review round 2, Request
     const partial = (n) => row({
       id: `z${n}`, issueIdentifier: `LIN-30${n}`, harness: 'opencode', dispatchedAt: daysAgo(1),
       feedback: [
-        usageEntry({ costUsd: 3, lane: 'api', days: 1 }),
-        usageEntry({ lane: 'api', days: 0.7 }), // unpriceable turn
+        usageEntry({ costUsd: 3, lane: 'api', days: 1, harness: 'opencode' }),
+        usageEntry({ lane: 'api', days: 0.7, harness: 'opencode' }), // unpriceable turn
         doneMarker(0.6)
       ]
     });
@@ -602,7 +570,7 @@ describe('computeTerminalMarkedTaskCost — LIN-2418: denominator excludes noLin
     const lane = row({
       id: 'lin2418-lane', issueIdentifier: 'LIN-9000', harness: null, dispatchedAt: daysAgo(2),
       feedback: [
-        usageEntry({ costUsd: 10, days: 1.5 }),
+        usageEntry({ costUsd: 10, days: 1.5, harness: null }),
         ticketMarker('LIN-9000', 'done', 1.2),
         ...laneExtras,
         doneMarker(0.8)
@@ -610,7 +578,7 @@ describe('computeTerminalMarkedTaskCost — LIN-2418: denominator excludes noLin
     });
     const opencodeAnchor = row({
       id: 'lin2418-opencode', issueIdentifier: 'LIN-9001', harness: 'opencode', dispatchedAt: daysAgo(1),
-      feedback: [usageEntry({ costUsd: 5, lane: 'api', days: 0.9 }), doneMarker(0.5)]
+      feedback: [usageEntry({ costUsd: 5, lane: 'api', days: 0.9, harness: 'opencode' }), doneMarker(0.5)]
     });
     return [lane, opencodeAnchor];
   }
@@ -658,7 +626,7 @@ describe('computeTerminalMarkedTaskCost — LIN-2418: denominator excludes noLin
     function buildFleet(m) {
       const opencodeAnchor = row({
         id: 'p1b-opencode', issueIdentifier: 'LIN-9400', harness: 'opencode', dispatchedAt: daysAgo(2),
-        feedback: [usageEntry({ costUsd: 1, lane: 'api', days: 1.9 }), doneMarker(1.8)]
+        feedback: [usageEntry({ costUsd: 1, lane: 'api', days: 1.9, harness: 'opencode' }), doneMarker(1.8)]
       });
       const claudeAnchor = row({
         id: 'p1b-claude', issueIdentifier: 'LIN-9401', harness: 'claude-code', dispatchedAt: daysAgo(2),
@@ -669,7 +637,7 @@ describe('computeTerminalMarkedTaskCost — LIN-2418: denominator excludes noLin
         const id = `LIN-95${String(i).padStart(2, '0')}`;
         unknownAnchors.push(row({
           id: `p1b-unknown-${i}`, issueIdentifier: id, harness: null, dispatchedAt: daysAgo(1),
-          feedback: [usageEntry({ costUsd: 1, days: 0.9 }), doneMarker(0.8)]
+          feedback: [usageEntry({ costUsd: 1, days: 0.9, harness: null }), doneMarker(0.8)]
         }));
       }
       return [opencodeAnchor, claudeAnchor, ...unknownAnchors];
@@ -708,15 +676,15 @@ describe('computeTerminalMarkedTaskCost — LIN-2418: denominator excludes noLin
     // rows under one rootItemId could never disagree on harness).
     const opencodeLineage = row({
       id: 'fold-opencode', rootItemId: 'fold-opencode', issueIdentifier: 'LIN-9600', harness: 'opencode', dispatchedAt: daysAgo(2),
-      feedback: [usageEntry({ costUsd: 1, lane: 'api', days: 1.9 }), doneMarker(1.8)]
+      feedback: [usageEntry({ costUsd: 1, lane: 'api', days: 1.9, harness: 'opencode' }), doneMarker(1.8)]
     });
     const unknownLineage = row({
       id: 'fold-unknown', rootItemId: 'fold-unknown', issueIdentifier: 'LIN-9600', harness: null, dispatchedAt: daysAgo(1),
-      feedback: [usageEntry({ costUsd: 1, days: 0.9 }), doneMarker(0.8)]
+      feedback: [usageEntry({ costUsd: 1, days: 0.9, harness: null }), doneMarker(0.8)]
     });
     const control = row({
       id: 'fold-control', issueIdentifier: 'LIN-9601', harness: null, dispatchedAt: daysAgo(1),
-      feedback: [usageEntry({ costUsd: 1, days: 0.9 }), doneMarker(0.8)]
+      feedback: [usageEntry({ costUsd: 1, days: 0.9, harness: null }), doneMarker(0.8)]
     });
     const result = computeTerminalMarkedTaskCost([opencodeLineage, unknownLineage, control], NOW);
 
@@ -763,7 +731,7 @@ describe('computeTerminalMarkedTaskCost — LIN-2418: denominator excludes noLin
     // false, confident 0.
     const anchors = [0, 1, 2].map(i => row({
       id: `p2b-${i}`, issueIdentifier: `LIN-97${String(i).padStart(2, '0')}`, harness: null, dispatchedAt: daysAgo(1),
-      feedback: [usageEntry({ costUsd: 1, days: 0.9 }), doneMarker(0.8)]
+      feedback: [usageEntry({ costUsd: 1, days: 0.9, harness: null }), doneMarker(0.8)]
     }));
     const result = computeTerminalMarkedTaskCost(anchors, NOW);
 
