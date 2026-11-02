@@ -11,9 +11,12 @@ import { localSeedId } from '../fixtures/local-harness.js';
 const TASKS = 3704;
 const PROJECTS = 11;
 const OLD = '2020-01-01T00:00:00Z';
-// The page's HTML ceiling for this shape (witness D): about 2.4x the measured 124 KB. The pre-LIN-4024 page was several
-// megabytes on this shape (see the PR's measurement), so a regression to it fails by a wide margin.
-const HTML_BYTES_CEILING = 300_000;
+// LIN-4120: Home draws no project sections, so its HTML is the header, In Progress, Recent activity and one Backlog link.
+// Its ceiling is about 100 KB on this shape. The backlog page carries every project, so it keeps the LIN-4024 ceiling:
+// about 2.4x the measured 124 KB. The pre-LIN-4024 page was several megabytes on this shape, so a regression fails by a
+// wide margin on either page.
+const HOME_BYTES_CEILING = 100_000;
+const BACKLOG_BYTES_CEILING = 300_000;
 // Inline style attributes on the page. The rows carry none now (LIN-4024 deleted the --depth attribute).
 const INLINE_STYLE_CEILING = 50;
 
@@ -74,23 +77,32 @@ async function seedWorkspace(page) {
   expect(resp.ok()).toBeTruthy();
 }
 
-test('Home on a few thousand tasks: the page is small, done tasks never reach it, and the Backlog waits for its fold', async ({ page }) => {
+test('Home on a few thousand tasks: the page is small, draws no project section, and the backlog page holds the rest', async ({ page }) => {
   await seedWorkspace(page);
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/workspace/${URL_KEY}/`);
   await expect(page.locator('.in-progress-section')).toBeVisible();
 
+  // LIN-4120: Home's HTML is bounded by what needs a person and what runs, not by the number of projects.
   const html = await page.content();
   const bytes = Buffer.byteLength(html, 'utf8');
-  const rows = await page.locator('[data-testid="issue-line"]').count();
   const inlineStyles = (html.match(/ style="/g) || []).length;
-  console.log(`LIN-4024 measure: html=${bytes} bytes rows=${rows} inlineStyle=${inlineStyles}`);
-  expect(bytes).toBeLessThan(HTML_BYTES_CEILING);
+  console.log(`LIN-4120 measure: home html=${bytes} bytes inlineStyle=${inlineStyles}`);
+  expect(bytes).toBeLessThan(HOME_BYTES_CEILING);
   expect(inlineStyles).toBeLessThan(INLINE_STYLE_CEILING);
-
-  // No done task is sent except in Recent activity, which is a separate, one-day set.
-  await expect(page.locator('[data-section="project"] .title.done')).toHaveCount(0);
+  await expect(page.locator('[data-testid="project"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="home-backlog-link"]')).toHaveCount(1);
   await expect(page.locator('.in-progress-section .title.done')).toHaveCount(0);
+
+  // The backlog page draws every project: its HTML keeps the LIN-4024 ceiling, and no done task is sent except in
+  // Recent activity, which is a separate, one-day set.
+  await page.goto(`/workspace/${URL_KEY}/backlog`);
+  await expect(page.locator('[data-testid="project"]').first()).toBeVisible();
+  const backlogHtml = await page.content();
+  const backlogBytes = Buffer.byteLength(backlogHtml, 'utf8');
+  console.log(`LIN-4120 measure: backlog html=${backlogBytes} bytes`);
+  expect(backlogBytes).toBeLessThan(BACKLOG_BYTES_CEILING);
+  await expect(page.locator('[data-section="project"] .title.done')).toHaveCount(0);
   await expect(page.locator('[data-testid="home-done-count"]').first()).toContainText('done');
 
   // The Backlog is folded: its tasks come in when the fold opens, one page of 50 at a time. (Backlog rows that are the

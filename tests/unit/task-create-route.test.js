@@ -8,7 +8,7 @@
  * tests/unit/task-edit-route.test.js uses for the sibling drill-down page.
  *
  * The branches worth pinning are the ones a happy-path E2E can never reach:
- *   - `ui.inlineCreate` false → redirect to the dashboard (NOT Settings)
+ *   - `ui.inlineCreate` false → redirect to the backlog page (NOT Settings; LIN-4120)
  *   - the gate short-circuits BEFORE any provider read (no round trip)
  *   - team/project/state reads are capability-gated AND try/caught to [] —
  *     the page always 200s, never 500s, over an unavailable option list
@@ -87,9 +87,10 @@ describe('GET /workspace/:urlKey/task/new', () => {
     assert.ok(res.body.includes('data-testid="task-create-form"'));
   });
 
-  test('redirects to the DASHBOARD (not Settings) when ui.inlineCreate is false', async () => {
+  test('redirects to the BACKLOG (not Settings) when ui.inlineCreate is false', async () => {
+    // LIN-4120: Add task lives on the backlog page, so every Add task exit returns there.
     const res = await call({ provider: fakeProvider({ inlineCreate: false }) });
-    assert.strictEqual(res.redirectedTo, '/workspace/acme/');
+    assert.strictEqual(res.redirectedTo, '/workspace/acme/backlog');
     assert.strictEqual(res.body, null, 'no page is rendered for a read-only provider');
   });
 

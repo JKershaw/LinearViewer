@@ -192,6 +192,8 @@ export const SELECTORS = {
   dispatchSection: (name) => `[data-testid="dispatch-section-${name}"]`,
   /** A project card by name (replaces `.project:has-text(name)`). */
   project: (name) => `[data-testid="project"][data-project-name="${name}"]`,
+  /** LIN-4120: Home's one link to the backlog page, in the place the Projects region held. */
+  homeBacklogLink: '[data-testid="home-backlog-link"]',
   /** LIN-4119: a project's one control line (its Up next and Backlog folds and its done count), on Home and /backlog. */
   projectControls: (name) => `[data-testid="project"][data-project-name="${name}"] [data-testid="project-controls"]`,
   /** LIN-4119: a project's Add task link, in its header beside the arrow and name (inline create; external providers use data-action). */

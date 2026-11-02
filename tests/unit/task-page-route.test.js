@@ -283,9 +283,9 @@ describe('route collisions: /task/new and /task/:id/edit', () => {
   test('/task/new is task-create\'s, not a task called "new"', async () => {
     await withApp(async (base, loaderCalls) => {
       const res = await fetch(`${base}/workspace/acme/task/new`, { redirect: 'manual' });
-      // task-create redirects a provider without inline create to the dashboard.
+      // task-create redirects a provider without inline create to the backlog page, where Add task lives (LIN-4120).
       assert.equal(res.status, 302);
-      assert.equal(res.headers.get('location'), '/workspace/acme/');
+      assert.equal(res.headers.get('location'), '/workspace/acme/backlog');
       assert.deepEqual(loaderCalls, [], 'the task page never saw the request');
     });
   });

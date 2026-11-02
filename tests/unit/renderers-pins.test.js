@@ -17,6 +17,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import '../../lib/providers/index.js';
 import { renderPage, renderDetailsContent } from '../../lib/render.js';
+import { buildHomeView } from '../../lib/home-view.js';
 import { orderIssuesForSwipe } from '../../lib/render-swipe.js';
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, nodeKey, PERIODICALS_PROJECT_ID } from '../../lib/tree.js';
 import { starterSeed } from '../../lib/starter-seed.js';
@@ -40,12 +41,17 @@ function homeTrees(issues, projects, { periodicals }) {
   };
 }
 
-/** server.js's Home route: the ordering, its two derivations (1757-1759), and the projection into renderPage (1777-1779). */
+/**
+ * server.js's Home route: the ordering, its two derivations, the one Home view (lib/home-view.js, as gatherHomePage builds
+ * it: LIN-4120), and the projection into renderPage.
+ */
 function renderHome({ trees, inProgressTrees, recentActivityTrees }) {
   const orderedHome = orderIssuesForSwipe({ projectTrees: trees, inProgressTrees, recentActivityTrees, urlKey: URL_KEY });
   const homeTopTask = orderedHome.find((issue) => !issue.isSeed) || null;
   const seedOnlyHome = orderedHome.length > 0 && orderedHome.every((issue) => issue.isSeed);
-  const html = renderPage(trees, inProgressTrees, recentActivityTrees, 'Org', {
+  const topTaskId = homeTopTask ? nodeKey(homeTopTask) : null;
+  const view = buildHomeView({ inProgressTrees, trees, states: new Map(), topTaskId });
+  const html = renderPage(view.trees, view.inProgressTrees, recentActivityTrees, 'Org', {
     urlKey: URL_KEY,
     topTaskId: homeTopTask ? nodeKey(homeTopTask) : null,
     topTaskWhy: homeTopTask ? homeTopTask.why : [],
@@ -76,7 +82,10 @@ describe('LIN-3579 (a): Periodicals rows stay out of Home\'s ordering', () => {
     // The filter works on a copy: the caller's trees still render the Periodicals group.
     assert.equal(world.trees.length, treesBefore);
     assert.ok(world.trees.some((tree) => tree.project.id === PERIODICALS_PROJECT_ID));
-    assert.match(html, /data-project-type="periodicals"/);
+    // LIN-4120: Home draws no project sections; the Periodicals group renders on the backlog page.
+    assert.doesNotMatch(html, /data-project-type="periodicals"/);
+    const backlogHtml = renderPage(world.trees, [], [], 'Org', { urlKey: URL_KEY, pageMode: 'backlog' });
+    assert.match(backlogHtml, /data-project-type="periodicals"/);
   });
 
   test('a seed-only workspace with the Periodicals group still shows the onboarding hint', () => {

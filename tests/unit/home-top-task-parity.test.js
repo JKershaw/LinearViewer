@@ -13,6 +13,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { renderPage } from '../../lib/render.js';
 import { renderSwipePage, orderIssuesForSwipe } from '../../lib/render-swipe.js';
+import { buildHomeView } from '../../lib/home-view.js';
 import { registerProvider } from '../../lib/providers/registry.js';
 import { nodeKey } from '../../lib/tree.js';
 // Side-effect import: the Linear provider self-registers so getProviderForWorkspace
@@ -65,9 +66,15 @@ function markedTop(html) {
   if (!tag) return null;
   const id = (tag.match(/data-id="([^"]+)"/) || [])[1] || null;
   const section = (tag.match(/data-section="([^"]+)"/) || [])[1] || null;
+  const source = (tag.match(/data-source="([^"]+)"/) || [])[1] || null;
   const raw = (tag.match(/data-why="([^"]*)"/) || [])[1];
   const why = raw === undefined ? [] : JSON.parse(raw.replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&amp;/g, '&'));
-  return { id, section, why };
+  return { id, section, source, why };
+}
+
+// LIN-4120: Home renders the trimmed view (lib/home-view.js), as its route does; the top task is promoted into In Progress.
+function homeViewOf({ trees, inProgressTrees, topTaskId }) {
+  return buildHomeView({ inProgressTrees, trees, states: new Map(), topTaskId });
 }
 
 describe('Home/Swipe top-task parity (LIN-2944 P1 F3)', () => {
@@ -124,14 +131,17 @@ describe('Home/Swipe top-task parity (LIN-2944 P1 F3)', () => {
     const ordered = orderIssuesForSwipe(data);
     assert.equal(ordered[0].id, 'i-bug', 'the unstarted bug is the front card');
 
-    const homeHtml = renderPage(data.projectTrees, data.inProgressTrees, data.recentActivityTrees, 'Org', {
+    // LIN-4120: Home draws no project sections, so the unstarted front card is promoted into In Progress and marked there.
+    const view = homeViewOf({ trees: data.projectTrees, inProgressTrees: data.inProgressTrees, topTaskId: nodeKey(ordered[0]) });
+    const homeHtml = renderPage(view.trees, view.inProgressTrees, data.recentActivityTrees, 'Org', {
       urlKey: 'ws', workspaces: [WORKSPACE], featureFlags: {},
       topTaskId: nodeKey(ordered[0]), topTaskWhy: ordered[0].why
     });
     const marked = markedTop(homeHtml);
     assert.ok(marked, 'Home marks the top task');
     assert.equal(marked.id, 'i-bug');
-    assert.equal(marked.section, 'project', 'the mark is on the project-tree row, not in-progress');
+    assert.equal(marked.section, 'in-progress', 'the mark is on the In Progress row: Home draws no project section');
+    assert.equal((homeHtml.match(/data-testid="project"/g) || []).length, 0, 'Home renders no project section');
 
     const swipeFirst = embedded(
       renderSwipePage(data, { urlKey: 'ws', workspaces: [WORKSPACE], featureFlags: {} }),
@@ -250,15 +260,17 @@ describe('LIN-2944 P1 N2: the top-task match is binding-aware', () => {
     const top = ordered.find(c => c.source === 'repoB');
     assert.ok(top, 'repoB card is present');
 
-    const html = renderPage(trees, [], [], 'Org', {
+    // LIN-4120: Home's view promotes the top task into In Progress; the mark follows its binding, not its id.
+    const view = homeViewOf({ trees, inProgressTrees: [], topTaskId: nodeKey(top) });
+    const html = renderPage(view.trees, view.inProgressTrees, [], 'Org', {
       urlKey: 'ws', workspaces: [{ urlKey: 'ws', name: 'WS', provider: 'linear' }], featureFlags: {},
       topTaskId: nodeKey(top), topTaskWhy: top.why
     });
 
     assert.equal((html.match(/data-top-task="1"/g) || []).length, 1, 'exactly one row is marked');
-    const idx = html.indexOf('data-top-task="1"');
-    const before = html.slice(0, idx);
-    assert.ok(before.lastIndexOf('Repo B') > before.lastIndexOf('Repo A'),
-      "the mark is on repoB's row, not repoA's same-id row");
+    // The row's own project label follows the mark (the In Progress row names its project); the mark is on Repo B's row.
+    const rowFromMark = html.slice(html.indexOf('data-top-task="1"'));
+    const rowLabel = (rowFromMark.match(/<span class="in-progress-project">([^<]+)<\/span>/) || [])[1];
+    assert.equal(rowLabel, 'Repo B', "the mark is on repoB's row, not repoA's same-id row");
   });
 });

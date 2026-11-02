@@ -161,7 +161,7 @@ import { renderSwipePage, orderIssuesForSwipe } from './lib/render-swipe.js'
 import { rowDataByNodeKey } from './lib/task-board-view.js'
 import { createHomeRowStates, gatherTaskStates } from './lib/home-row-states.js'
 import { createTaskFactsHolder, createTaskFactsRefresh } from './lib/task-facts-holder.js'
-import { gatherHomeInputs, gatherHomePage } from './lib/home-pipeline.js'
+import { gatherHomeInputs, gatherHomePage, homeRowDataFor } from './lib/home-pipeline.js'
 import { renderDashboardAfterRefresh as renderRefreshedDashboard } from './lib/dashboard-refresh.js'
 import { homeRowsFor, HOME_ROW_KINDS, HOME_SEARCH_MAX_LENGTH } from './lib/home-rows.js'
 import { renderSwimPage } from './lib/render-swim.js'
@@ -3492,7 +3492,8 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       rowStates,
       halt,
       rulingCount: homeStates?.rulingCount ?? 0,
-      rowData: rowDataByNodeKey({ urlKey: workspace.urlKey, inProgressTrees: homeView.inProgressTrees, recentActivityTrees, projectTrees: homeView.trees, rowStates }),
+      // LIN-4120: Home's rowData is In Progress and Recent only (its project sections are gone).
+      rowData: homeRowDataFor({ pageMode: 'home', urlKey: workspace.urlKey, homeView, recentActivityTrees, rowStates }),
       copyFirstCard: featureFlags.runControls !== true && req.session.copyFirstCardDismissed !== true,
       filledRung,
       // LIN-2550: label the selector off the filter the render APPLIED. An
@@ -3589,7 +3590,7 @@ app.get('/workspace/:urlKey/backlog', workspaceFromUrl, async (req, res) => {
       availableAssignees,
       rowStates,
       rulingCount: homeStates?.rulingCount ?? 0,
-      rowData: rowDataByNodeKey({ urlKey: workspace.urlKey, inProgressTrees: homeView.inProgressTrees, recentActivityTrees, projectTrees: homeView.trees, rowStates }),
+      rowData: homeRowDataFor({ pageMode: 'backlog', urlKey: workspace.urlKey, homeView, recentActivityTrees, rowStates }),
       filledRung,
       // LIN-2550: the same applied-filter gate Home uses, so a stale ?assignee= reads `all`.
       selectedAssignee: appliedAssigneeName ? assigneeState.selectedAssignee : 'all',

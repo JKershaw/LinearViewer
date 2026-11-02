@@ -318,6 +318,32 @@ function namespaceLocalSeed(seed, urlKey) {
  * the seeding `urlKey` (the `localWorkerUrlKey` worker fixture) so the seed ids
  * match the scope they're seeded into.
  */
+/**
+ * LIN-4120: adds In Progress work to a seed, so Home is tall enough to scroll and has controls mid-page. Home draws no
+ * project sections now, so a spec that needs a long page seeds that length itself. Each filler parent is started and has
+ * one started child: a parent with children renders as an expandable, focusable row. The filler goes into the seed's
+ * first project (or a new one when the seed has none); the seed's own ids are kept as they are.
+ * @param {{projects?: Array, issues?: Array}} seed - an already-namespaced seed (`localSeedId`)
+ * @param {string} urlKey - the urlKey the seed is namespaced under
+ * @param {number} [parents=20] - filler parents; each brings one child, so the filler is twice this many tasks
+ * @param {{assignee?: string}} [options] - the filler's assignee, when a spec filters Home by one
+ */
+export function withHomeFiller(seed, urlKey, parents = 20, { assignee = null } = {}) {
+  const id = (rawId) => localSeedId(urlKey, rawId);
+  const projects = seed.projects?.length ? seed.projects : [{ id: id('filler-proj'), name: 'Filler project', content: null, sortOrder: 99 }];
+  const projectId = projects[0].id;
+  const filler = [];
+  for (let i = 0; i < parents; i += 1) {
+    const started = (rawId, identifier, title, extra = {}) => ({
+      id: id(rawId), identifier, title, projectId, sortOrder: 1000 + i, createdAt: '2020-01-01T00:00:00Z',
+      state: { name: 'In Progress', type: 'started' }, ...(assignee ? { assignee: { name: assignee } } : {}), ...extra,
+    });
+    filler.push(started(`filler-ip-${i}`, `FILL-${i}`, `Filler in progress ${i}`));
+    filler.push(started(`filler-ipc-${i}`, `FILLC-${i}`, `Filler child ${i}`, { parentId: id(`filler-ip-${i}`) }));
+  }
+  return { ...seed, projects, issues: [...(seed.issues || []), ...filler] };
+}
+
 export function swimLocalSeed(urlKey = LOCAL_WORKSPACE_URL_KEY) {
   return namespaceLocalSeed(
     localSeedFromLinearFixture({ projects: swimSampleProjects, issues: swimSampleIssues }, urlKey),

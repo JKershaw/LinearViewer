@@ -70,7 +70,7 @@ Test servers in `tests/unit` bind `127.0.0.1` explicitly (`app.listen(0, '127.0.
 - In Progress section shows all in-progress issues across projects
 - Click issue line → toggle details (description, assignee, dates, labels)
 - Click ▼ arrow → collapse/expand children
-- Click project header → collapse entire project
+- Click project header (on /backlog) → collapse entire project
 - Click "reset" → restore default collapse state
 - Collapse state persisted in localStorage
 - 401 errors clear session and redirect to landing page

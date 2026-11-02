@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
-import { swimLocalSeed } from '../fixtures/local-harness.js';
+import { swimLocalSeed, withHomeFiller, seedLocalWorkspace } from '../fixtures/local-harness.js';
 import { nav, featuresParam } from '../helpers.js';
 
 // LIN-978 (UI audit D, keystone): the shared header-level view switcher. The
@@ -314,8 +314,10 @@ test.describe('nav-actions placement (LIN-1149)', () => {
 // point: no prior test locked "the header pins", which is how the regression
 // shipped. Height measured at runtime; no pixel value is hardcoded.
 test.describe('Sticky header pin + clearance (LIN-1068)', () => {
-  test.beforeEach(async ({ seedLocal }) => {
-    await seedLocal(swimLocalSeed, { features: FLAGS, runnerKey: true });
+  // LIN-4120: Home draws no project sections, so the page is made tall enough to scroll by the seed itself. The pins read
+  // only the header, so the seed is the filler alone.
+  test.beforeEach(async ({ seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(withHomeFiller({ projects: [], issues: [] }, localWorkerUrlKey), { features: FLAGS, runnerKey: true });
   });
 
   for (const width of [390, 1280]) {
@@ -799,10 +801,29 @@ test.describe('Pinned header clearance at the measured breach (LIN-4037)', () =>
   const WORST_CASE = DENSITY_FILTER_STATES[3];
   const FEEDBACK_ON = { feedbackWidget: true };
 
-  async function openDashboard(page, urlKey, { width, height = 800, features = {} }) {
-    await page.goto(`/test/set-session?urlKey=${urlKey}${featuresParam(features)}`);
-    await page.setViewportSize({ width, height });
-    await page.goto(densityUrl(urlKey, WORST_CASE));
+  // LIN-4120: the local worker workspace keeps the feature flags this describe seeds (the feedback widget), and a later spec
+  // on the same worker that seeds without flags would inherit them. Reset them when the describe ends.
+  test.afterAll(async ({ browser, localWorkerUrlKey }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await seedLocalWorkspace(page, { projects: [], issues: [] }, { urlKey: localWorkerUrlKey, features: {} });
+    await context.close();
+  });
+
+  // LIN-4120: Home draws no project sections, so by default the local worker workspace is seeded tall, with Charlie's
+  // tasks to filter by, and Home is opened there. `tall: false` keeps the Linear session on the Linear worker key, for a
+  // test that reads only the header's own height. The two keys are never mixed: seeding the local store under the Linear
+  // key would leave ownership and runner state behind for the specs that run after this one.
+  async function openDashboard(page, { linear, local }, { width, height = 800, features = {}, tall = true }) {
+    if (tall) {
+      await seedLocalWorkspace(page, withHomeFiller({ projects: [], issues: [] }, local, 20, { assignee: 'Charlie' }), { urlKey: local, features });
+      await page.setViewportSize({ width, height });
+      await page.goto(densityUrl(local, WORST_CASE));
+    } else {
+      await page.goto(`/test/set-session?urlKey=${linear}${featuresParam(features)}`);
+      await page.setViewportSize({ width, height });
+      await page.goto(densityUrl(linear, WORST_CASE));
+    }
     await page.waitForLoadState('networkidle');
   }
 
@@ -821,17 +842,17 @@ test.describe('Pinned header clearance at the measured breach (LIN-4037)', () =>
   }
 
   for (const width of BREACH_WIDTHS) {
-    test(`token clears the measured header at ${width}px with team, assignee and feedback on`, async ({ page, workerUrlKey }) => {
-      await openDashboard(page, workerUrlKey, { width, features: FEEDBACK_ON });
+    test(`token clears the measured header at ${width}px with team, assignee and feedback on`, async ({ page, workerUrlKey, localWorkerUrlKey }) => {
+      await openDashboard(page, { linear: workerUrlKey, local: localWorkerUrlKey }, { width, features: FEEDBACK_ON });
 
       const headerPx = await page.evaluate(() => document.querySelector('.nav-bar').offsetHeight);
       const clearance = await readClearancePx(page);
       expect(clearance, `the sticky clearance (${clearance}px) must cover the ${headerPx}px header at ${width}px`).toBeGreaterThanOrEqual(headerPx);
     });
 
-    test(`a control scrolled into view at ${width}px settles below the header, not under it`, async ({ page, workerUrlKey }) => {
+    test(`a control scrolled into view at ${width}px settles below the header, not under it`, async ({ page, workerUrlKey, localWorkerUrlKey }) => {
       // A short viewport, so the dashboard is taller than the screen and has room to scroll.
-      await openDashboard(page, workerUrlKey, { width, height: 400, features: FEEDBACK_ON });
+      await openDashboard(page, { linear: workerUrlKey, local: localWorkerUrlKey }, { width, height: 400, features: FEEDBACK_ON });
 
       // A control whose scroll is clamped neither at the page top (it sits more than 200px down the page) nor at the
       // page end (it sits above the last scroll position), so the header clearance alone decides where it lands. The header is read
@@ -877,8 +898,8 @@ test.describe('Pinned header clearance at the measured breach (LIN-4037)', () =>
     });
   }
 
-  test('the clearance follows the header on resize, with no reload', async ({ page, workerUrlKey }) => {
-    await openDashboard(page, workerUrlKey, { width: 1024, features: FEEDBACK_ON });
+  test('the clearance follows the header on resize, with no reload', async ({ page, workerUrlKey, localWorkerUrlKey }) => {
+    await openDashboard(page, { linear: workerUrlKey, local: localWorkerUrlKey }, { width: 1024, features: FEEDBACK_ON, tall: false });
     expect(await readClearancePx(page)).toBe(96); // desktop: the floor clears the ~93px header
 
     await page.setViewportSize({ width: 560, height: 800 });
@@ -892,15 +913,15 @@ test.describe('Pinned header clearance at the measured breach (LIN-4037)', () =>
   });
 
   for (const { width, expected } of [{ width: 400, expected: 208 }, { width: 480, expected: 208 }, { width: 1024, expected: 96 }]) {
-    test(`the clearance stays at the static floor at ${width}px where the header already clears it`, async ({ page, workerUrlKey }) => {
-      await openDashboard(page, workerUrlKey, { width });
+    test(`the clearance stays at the static floor at ${width}px where the header already clears it`, async ({ page, workerUrlKey, localWorkerUrlKey }) => {
+      await openDashboard(page, { linear: workerUrlKey, local: localWorkerUrlKey }, { width });
       expect(await readClearancePx(page)).toBe(expected);
     });
   }
 
-  test('with common.js unavailable, the clearance is the CSS floor (no-JS fallback)', async ({ page, workerUrlKey }) => {
+  test('with common.js unavailable, the clearance is the CSS floor (no-JS fallback)', async ({ page, workerUrlKey, localWorkerUrlKey }) => {
     await page.route(/\/common\.js(\?|$)/, route => route.abort());
-    await openDashboard(page, workerUrlKey, { width: 500, features: FEEDBACK_ON });
+    await openDashboard(page, { linear: workerUrlKey, local: localWorkerUrlKey }, { width: 500, features: FEEDBACK_ON });
     expect(await page.evaluate(() => document.documentElement.style.getPropertyValue('--nav-bar-h'))).toBe('');
     expect(await readClearancePx(page)).toBe(124); // 7.75rem floor at ≤640px
   });
