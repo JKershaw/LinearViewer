@@ -51,10 +51,15 @@ The long argument is the essay `docs/papers/harbour/tasks-are-tasks.md` (v4 is l
   - Three of its four product defaults (wakes count under the lineage's issue; no issue means nowhere; a lane counts under its anchor) wait on the per-request ledger. Until then, per-issue cost undercounts work done through autopilot's child tickets, so cost per area or per lineage is the usable money view for the spikes.
   - Rebuild 1, one cost read for seven surfaces in one PR, is drafted. A checker reshaped it against spiralling: it now lists the surfaces and defines "right". That is a forecast acting on the ticket.
 
+**Tidy where the change binds (charter retro, essay v5).** Between 23 and 26 October the charter's tidy moves were clean: `routes/workspace-api.js` went from 3,782 lines to 882, and `routes/dashboard.js` from 3,072 to 872. Yet `routes/` grew overall, the Settings consolidation was copied back out within a day, and `public/prompt-section.js` grew from 1,479 lines to 2,302 while copying rules the server holds. The tidy reached the server while the changes bound in the browser. So the Survey's question is not "what is messy?" but "where does *this* change bind?"
+
+**Authority already exists, up to the cause (essay v5).** Since 4 October, Scope and Authority lines in every building and judging stage's prompt say "its cause is part of the work, wherever it lives". Friction that isn't this task's cause stays out by design. The Survey is about that friction.
+
 **Cost is the incentive.**
 - A tidier codebase is cheaper because there is less to do. In Harbour a task takes hours, against minutes in a simple project.
 - The payback depends on traffic: a tidy pays every time its area changes again, so hotspots come first, and untouched mess costs little.
 - The saving is spread out and counterfactual, which is why it only shows in motion.
+- **The honest version (essay v5).** The record prices size and send-backs: 229 production lines at the median against 45, and send-backs of 0.56 against 0.23. *Within a size band* those changes take no more working hours and escape no more often. "The size *is* the cost", and the measure is partly circular. No trend in the cost of a same-sized change has been shown yet. That is what the Costs meter should eventually show.
 - The Costs stream is building the meter: every model call counted once, under the issue its work was for.
 
 ## What we think (the concept)
@@ -101,11 +106,11 @@ The long argument is the essay `docs/papers/harbour/tasks-are-tasks.md` (v4 is l
 **Periodicals in this design** stop minting tickets into the queue. They become:
 - the place's film: trend over time, and where it stands now;
 - the Survey's map;
-- the idle-time chisel: when nothing is pending, autopilot's idle slot, which today runs an overdue inspector, runs one tidying move from the fuzziest area's notebook.
+- the idle-time chisel. *Correction from essay v5:* autopilot's order is "a goal a person has set, else a periodical reading `due`, else the top of the stack", so a due periodical runs *ahead* of real tasks, not in idle time. A tidying move given that rank would be pushed, not pulled. The rank that fits pull is a new one *under* the stack: no goal set, nothing due, nothing waiting. The order has no such rank today.
 
 **What else it implies:**
 - **Review** must expect "made the change easy, then made the easy change" as the normal shape of a PR, or it reads the tidy as creep.
-- **The pipeline's prompts** are themselves a place nobody lives in: they only grew. Theseus for the prompts would lighten every stage, and every prompt habit it removes is a line the Costs bar can drop.
+- **The pipeline's prompts** are themselves a place nobody lives in. They grew five- to sixfold until October. Since 2 October every prompt surface has been frozen at its byte size. In the first week the total fell from 568,534 bytes to 342,621, through real removals (LIN-3300 deleted the meta-prompt; LIN-3326 shed gates). Since 6 October the freeze has *held* the prompts rather than lightened them, and the total is back to 332,910 after a new surface on 1 November (essay v5). Theseus for the prompts would lighten every stage, and every prompt habit it removes is a line the Costs bar can drop.
 
 ## Spikes
 
@@ -115,6 +120,7 @@ These are small, read-only first, and judged by looking. Each spike's result is 
 - simple-dispatcher supports follow-up resume (`claude --resume`, `RESUMING → EXECUTING → COMPLETED`; `docs/session-lifecycle.md`).
 - Confirm that a session completed hours ago can be resumed through Harbour with a question, and that its answer can be captured.
 - Fallback: a fresh session reads the ticket's record and diff and answers as that builder. That is weaker evidence.
+- *Partly answered by essay v5's research:* a follow-up reaches a session only while the runner still holds it, so older sessions may be gone, and sending one needs the `dispatch` grant (John's or an operator's). Still to confirm: how long the runner holds a session.
 
 **Spike 1: retrospective survey of UI round 3.**
 - Tickets LIN-4117 to LIN-4145: fresh sessions, a well-mapped area, known outcomes.
@@ -137,7 +143,7 @@ These are small, read-only first, and judged by looking. Each spike's result is 
 
 **Later, once the Survey earns it:**
 - move the Costs notebook into the repo beside its design note;
-- swap the idle default to one tidying move from that notebook;
+- add an idle rank under the stack (no goal, nothing due, nothing waiting) that takes one tidying move from that notebook;
 - widen the builder's permission (find what touches, put it together in its own commit, then cut), then watch one live move;
 - Theseus for the prompts.
 
