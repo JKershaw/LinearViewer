@@ -561,7 +561,9 @@ function getDefaultState() {
     // LIN-4113: Home's two desk sections, both open by default. The keys the retired sections stored are ignored,
     // never read or reused.
     runningCollapsed: false,
-    upNextCollapsed: false
+    upNextCollapsed: false,
+    // LIN-4114: Waiting on you, open by default, like the other two desk sections.
+    waitingCollapsed: false
   }
 }
 
@@ -570,10 +572,81 @@ function getDefaultState() {
  * own header finds its body. One keyed handler serves both (click, startup and reset), so the two cannot drift apart.
  */
 const DESK_SECTIONS = [
+  { key: 'waitingCollapsed', header: '.waiting-header', body: '.waiting-body' },
   { key: 'runningCollapsed', header: '.running-header', body: '.running-body' },
   { key: 'upNextCollapsed', header: '.up-next-header', body: '.up-next-body' },
 ]
 const deskSectionOf = header => DESK_SECTIONS.find(section => header.matches(section.header)) ?? null
+
+// LIN-4114: Waiting on you. A card's answer or dismiss bubbles to Home's <main>, and one listener there clears every copy of
+// that ruling's card, rebuilds the count line from the cards left in Waiting, updates the badge, moves focus and says the
+// outcome in a live region. Bound once at startup to elements Harbour renders, never to the document, so a look-alike card
+// in ticket text cannot fire it.
+function initWaitingOnYou() {
+  const main = document.querySelector('main')
+  // Only Home with the section draws anything to listen for: no section, no listener and no live region (the landing,
+  // the backlog and a member's page are unchanged).
+  if (!main || !main.querySelector('[data-testid="waiting-on-you"]')) return
+  const countLine = document.querySelector('[data-testid="in-progress-count"]')
+  const live = document.createElement('div')
+  live.className = 'sr-only'
+  live.setAttribute('role', 'status')
+  live.setAttribute('aria-live', 'polite')
+  live.dataset.testid = 'home-desk-live'
+  main.prepend(live)
+  main.addEventListener(window.QuestionCards?.RULING_GONE_EVENT || 'harbour:question-answered', (e) => {
+    onRulingGone({ main, countLine, live, detail: e.detail || {} })
+  })
+  // The cards are server-rendered: bind their answer, option and dismiss controls now, scoped to the section.
+  if (window.QuestionCards && typeof window.QuestionCards.setDeskRoot === 'function') window.QuestionCards.setDeskRoot(main)
+  const section = main.querySelector('[data-testid="waiting-on-you"]')
+  if (section && window.QuestionCards && typeof window.QuestionCards.initQuestionCards === 'function') {
+    window.QuestionCards.initQuestionCards(section)
+  }
+}
+
+function onRulingGone({ main, countLine, live, detail }) {
+  const key = detail.key
+  if (!key) return
+  const rulingKey = window.QuestionCards?.rulingKeyOf
+  // Every copy of this ruling's card on the page: the Waiting card, a search result, the opened task.
+  main.querySelectorAll('[data-testid="session-question-card"]').forEach(card => {
+    if (!rulingKey || rulingKey(card) !== key) return
+    ;(card.closest('.waiting-card') || card).remove()
+  })
+  // The count line's "N waiting on you" counts the cards left inside Waiting only, one per ruling.
+  const waitingCards = main.querySelectorAll('[data-testid="waiting-on-you"] [data-testid="session-question-card"]').length
+  setWaitingCount(countLine, waitingCards)
+  if (detail.urlKey && typeof window.updateRulingsBadge === 'function') window.updateRulingsBadge(detail.urlKey)
+  const section = main.querySelector('[data-testid="waiting-on-you"]')
+  if (section && waitingCards === 0) section.remove()
+  // Focus: the next waiting card's first option, else the section heading, else the page.
+  const next = section?.isConnected
+    ? (section.querySelector('[data-testid="session-question-card-option"]') || section.querySelector('.waiting-header'))
+    : null
+  if (next) {
+    if (next.classList.contains('waiting-header')) next.setAttribute('tabindex', '-1')
+    next.focus()
+  } else {
+    main.setAttribute('tabindex', '-1')
+    main.focus()
+  }
+  live.textContent = detail.message || 'Answered'
+}
+
+/** The count line's waiting part: "N waiting on you", dropped with its separator at 0; the line goes when nothing is left. */
+function setWaitingCount(countLine, n) {
+  if (!countLine) return
+  const part = [...countLine.querySelectorAll('.in-progress-count__part')].find(el => /waiting on you/.test(el.textContent))
+  if (n > 0) {
+    if (part) part.textContent = `${n} waiting on you`
+  } else if (part) {
+    const sep = [part.nextSibling, part.previousSibling].find(node => node && node.nodeType === Node.TEXT_NODE)
+    if (sep) sep.remove()
+    part.remove()
+  }
+  if (!countLine.querySelector('.in-progress-count__part')) countLine.remove()
+}
 
 // DOM helpers
 const show = el => el?.classList.remove('hidden')
@@ -1084,7 +1157,7 @@ function init() {
     }
 
     // 8. Home's desk section header click (LIN-4113: Running and recently moved, Up next)
-    const deskHeader = e.target.closest('.running-header, .up-next-header')
+    const deskHeader = e.target.closest('.waiting-header, .running-header, .up-next-header')
     const deskSection = deskHeader ? deskSectionOf(deskHeader) : null
     if (deskSection) {
       state[deskSection.key] = !state[deskSection.key]
@@ -1839,7 +1912,7 @@ function initSearch() {
     // applyState/resetDOM handle .node visibility by depth but don't touch projects/sections
     // (which are normally never hidden), so we must clean those up explicitly.
     pageOnly('.project.hidden').forEach(p => p.classList.remove('hidden'))
-    document.querySelectorAll('.running-section.hidden, .up-next-section.hidden').forEach(s => s.classList.remove('hidden'))
+    document.querySelectorAll('.running-section.hidden, .up-next-section.hidden, .waiting-section.hidden').forEach(s => s.classList.remove('hidden'))
     // Also ensure all .node elements are visible before resetDOM re-applies depth-based visibility,
     // in case search left nodes hidden that resetDOM wouldn't otherwise reach (e.g. in completed sections)
     pageOnly('.node.hidden').forEach(n => n.classList.remove('hidden'))
@@ -1874,6 +1947,8 @@ function initSearch() {
     }
 
     searchActive = true
+    // LIN-4114: the Waiting section is hidden while a search is on; its tasks stay findable as search rows.
+    pageOnly('.waiting-section').forEach(section => section.classList.add('hidden'))
 
     // Hide all nodes first
     pageOnly('.node').forEach(n => n.classList.add('hidden'))
@@ -2031,6 +2106,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // initNavBar() runs from common.js's DOMContentLoaded handler (LIN-288);
   // initRulingsBadge() runs from there too now (LIN-1728 review F7)
   initSearch()
+  initWaitingOnYou()
   initPrompts()
   initDispatchDisclosures()
   initQueuePanel()

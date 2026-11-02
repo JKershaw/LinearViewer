@@ -58,7 +58,7 @@ function el(over = {}) {
  * data-* attributes become `dataset` (camelCased, entity-decoded), and the
  * controls the client looks up are fakes whose state the tests read.
  */
-function makeFakeCard(html, { typed = '', checkedOptionId = null } = {}) {
+function makeFakeCard(html, { typed = '' } = {}) {
   const root = html.match(/<div class="sess-qcard" ([^>]*)>/);
   assert.ok(root, 'the rendered card has a root element');
   const dataset = {};
@@ -71,13 +71,14 @@ function makeFakeCard(html, { typed = '', checkedOptionId = null } = {}) {
   const textarea = el({ value: typed });
   const feedback = el();
   const dismissBtn = html.includes('data-testid="session-question-card-dismiss"') ? el() : null;
-  let chosen = null;
-  if (checkedOptionId) {
-    const opt = [...html.matchAll(/data-option-id="([^"]*)" value="([^"]*)"/g)]
-      .find(m => unescapeHtml(m[1]) === checkedOptionId);
-    assert.ok(opt, `option ${checkedOptionId} is rendered`);
-    chosen = el({ dataset: { optionId: checkedOptionId }, value: unescapeHtml(opt[2]) });
-  }
+  // LIN-4114: each option is a button. A press answers with that button's own label (no radio is ticked any more).
+  const optionBtns = [...html.matchAll(/<button [^>]*data-option-id="([^"]*)"[^>]*>([^<]*)<\/button>/g)]
+    .map(m => el({ dataset: { optionId: unescapeHtml(m[1]) }, textContent: unescapeHtml(m[2]) }));
+  const optionBtn = (id) => {
+    const b = optionBtns.find(x => x.dataset.optionId === id);
+    assert.ok(b, `option ${id} is rendered`);
+    return b;
+  };
   const card = el({
     dataset,
     parentNode: { removeChild() { card.removed = true; } },
@@ -88,13 +89,12 @@ function makeFakeCard(html, { typed = '', checkedOptionId = null } = {}) {
         case '.sess-qcard-feedback': return feedback;
         case '[data-testid="session-question-card-dismiss"]': return dismissBtn;
         case '[data-testid="session-question-card-question"]': return questionEl;
-        case '.sess-qcard-option-input:checked': return chosen;
         default: return null;
       }
     },
-    querySelectorAll() { return []; }
+    querySelectorAll(sel) { return sel === '[data-testid="session-question-card-option"]' ? optionBtns : []; }
   });
-  return { card, btn, textarea, feedback, dismissBtn };
+  return { card, btn, textarea, feedback, dismissBtn, optionBtn };
 }
 
 async function flush() { for (let i = 0; i < 10; i++) await new Promise(r => setImmediate(r)); }
@@ -189,10 +189,10 @@ test('GUARD markup: a task-bound row with no issue id does not carry the attribu
 });
 
 test('GUARD client: a loop-backed answer carries no task-decision fields and keeps its chosen option', async () => {
-  const f = makeFakeCard(renderDecisionCard(structuredClone(LOOP_BACKED_ROWS['loop-with-options']), RENDER_OPTS), { typed: '', checkedOptionId: 'opt-a' });
+  const f = makeFakeCard(renderDecisionCard(structuredClone(LOOP_BACKED_ROWS['loop-with-options']), RENDER_OPTS), { typed: '' });
   const h = makeSandbox([f]);
   h.sandbox.module.exports.initQuestionCards();
-  f.btn.click();
+  f.optionBtn('opt-a').click();
   await flush();
   const [comment] = h.commentCalls();
   assert.ok(comment, 'the answer writes its comment');
@@ -235,10 +235,10 @@ test('NEW client: a task-bound free-text answer writes the comment with the scan
 });
 
 test('NEW client: a task-bound option press drops the chosen option id from the body', async () => {
-  const f = makeFakeCard(taskBoundMarkup(), { typed: '', checkedOptionId: 'opt-a' });
+  const f = makeFakeCard(taskBoundMarkup(), { typed: '' });
   const h = makeSandbox([f]);
   h.sandbox.module.exports.initQuestionCards();
-  f.btn.click();
+  f.optionBtn('opt-a').click();
   await flush();
   const [comment] = h.commentCalls();
   assert.ok(comment, 'the press writes its comment');
@@ -349,10 +349,10 @@ test('NEW differential: a task-bound free-text answer sends the same comment req
 
 test('NEW differential: a task-bound option press sends the same comment request as the Rulings tab', async () => {
   const tab = await rulingsTabCommentFor('Yes, ship it');
-  const f = makeFakeCard(taskBoundMarkup(), { typed: '', checkedOptionId: 'opt-a' });
+  const f = makeFakeCard(taskBoundMarkup(), { typed: '' });
   const h = makeSandbox([f]);
   h.sandbox.module.exports.initQuestionCards();
-  f.btn.click();
+  f.optionBtn('opt-a').click();
   await flush();
   const [comment] = h.commentCalls();
   assert.ok(comment, 'the card writes its comment');

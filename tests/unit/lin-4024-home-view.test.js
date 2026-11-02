@@ -12,6 +12,8 @@ import assert from 'node:assert/strict';
 import { buildHomeView, UP_NEXT_PER_PROJECT } from '../../lib/home-view.js';
 import { PERIODICALS_PROJECT_ID, partitionCompleted, nodeKey } from '../../lib/tree.js';
 
+/** LIN-4114: an open ruling's row, as the standing hands it (a needs-you task has one); Home holds it as Waiting on you. */
+const ruling = (identifier) => ({ decision: { decision_id: `d-${identifier}`, question: 'Which?' }, decisionCase: [], anchor: { loopId: null, issueId: `id-${identifier}`, issueIdentifier: identifier, workspaceUrlKey: 'w', taskDecisionId: `td-${identifier}` }, disposition: 'task-bound', effect: 'record', canReply: true });
 const node = (identifier, type, children = []) => ({
   issue: { id: identifier, identifier, title: identifier, state: { type } },
   children,
@@ -24,7 +26,7 @@ const project = (id, incomplete) => ({ project: { id, name: id, collapsed: false
 const inProgress = roots => [{ projectId: 'p', projectName: 'p', roots }];
 
 describe('In Progress: what shows', () => {
-  test('a started parent shows only its started or needs-you children and counts the rest in more', () => {
+  test('a started parent shows only its started children (a Waiting on you child is not a row here) and counts the rest in more', () => {
     const parent = node('LIN-1', 'started', [
       node('LIN-2', 'started'),
       node('LIN-3', 'unstarted'),
@@ -35,14 +37,16 @@ describe('In Progress: what shows', () => {
       inProgressTrees: inProgress([parent]),
       trees: [],
       states: states({ 'LIN-4': stateFor({ state: 'needs-you' }) }),
+      rulingRows: [ruling('LIN-4')],
     });
     const [root] = view.inProgressTrees[0].roots;
-    assert.deepEqual(ids(root.children), ['LIN-2', 'LIN-4']);
+    assert.deepEqual(ids(root.children), ['LIN-2']);
+    assert.deepEqual(view.waiting.ids, ['LIN-4'], 'LIN-4 sits in Waiting on you');
     assert.equal(root.more, 2, 'the two plain Todo children fold into "2 more"');
     assert.equal(root.context, false, 'a started parent is its own reason to show');
   });
 
-  test('a done task with no open ruling is not in the view, and a done task with one is', () => {
+  test('a done task with no open ruling is not in the view, and a done task with one sits in Waiting on you', () => {
     const view = buildHomeView({
       inProgressTrees: inProgress([
         node('LIN-10', 'completed'),
@@ -50,24 +54,27 @@ describe('In Progress: what shows', () => {
       ]),
       trees: [],
       states: states({ 'LIN-11': stateFor({ state: 'needs-you' }) }),
+      rulingRows: [ruling('LIN-11')],
     });
-    assert.deepEqual(ids(view.inProgressTrees[0].roots), ['LIN-11']);
+    assert.deepEqual(view.waiting.ids, ['LIN-11']);
+    assert.ok(!view.inProgressTrees.some(t => t.roots.some(n => n.issue.identifier === 'LIN-10')), 'LIN-10 has no ruling and is not shown');
   });
 
   // Review finding 2: a done root reaches the view through partitionCompleted, which puts it in `completed`, not
   // `incomplete`. The fixture above hands the done task straight to In Progress, which is not where it arrives.
-  test('a done root with an open ruling, built through partitionCompleted, is In Progress and not repeated under its project', () => {
+  test('a done root with an open ruling, built through partitionCompleted, sits in Waiting on you and is not repeated under its project', () => {
     const { incomplete, completed, completedCount } = partitionCompleted([node('LIN-90', 'completed'), node('LIN-91', 'unstarted')]);
     const view = buildHomeView({
       inProgressTrees: [],
       trees: [{ project: { id: 'p', name: 'p', collapsed: false }, incomplete, completed, completedCount }],
       states: states({ 'LIN-90': stateFor({ state: 'needs-you' }) }),
+      rulingRows: [ruling('LIN-90')],
     });
-    assert.deepEqual(ids(view.inProgressTrees[0].roots), ['LIN-90']);
-    assert.deepEqual(ids(view.trees[0].incomplete), ['LIN-91'], 'LIN-91 is Up next; LIN-90 is shown In Progress only');
+    assert.deepEqual(view.waiting.ids, ['LIN-90']);
+    assert.deepEqual(ids(view.trees[0].incomplete), ['LIN-91'], 'LIN-91 is Up next; LIN-90 is shown in Waiting on you only');
   });
 
-  test('a deep Backlog task with an open ruling is In Progress, with its ancestors as context', () => {
+  test('a deep Backlog task with an open ruling sits in Waiting on you; its Backlog ancestors are not In Progress when no open child is shown below them', () => {
     const view = buildHomeView({
       inProgressTrees: inProgress([
         node('LIN-20', 'backlog', [
@@ -76,14 +83,10 @@ describe('In Progress: what shows', () => {
       ]),
       trees: [],
       states: states({ 'LIN-22': stateFor({ state: 'needs-you' }) }),
+      rulingRows: [ruling('LIN-22')],
     });
-    const [root] = view.inProgressTrees[0].roots;
-    assert.equal(root.issue.identifier, 'LIN-20');
-    assert.equal(root.context, true, 'the backlog ancestor is context, not its own row');
-    assert.equal(root.children[0].issue.identifier, 'LIN-21');
-    assert.equal(root.children[0].context, true);
-    assert.equal(root.children[0].children[0].issue.identifier, 'LIN-22');
-    assert.equal(root.children[0].children[0].context, false);
+    assert.deepEqual(view.waiting.ids, ['LIN-22']);
+    assert.deepEqual(view.inProgressTrees, [], 'no open child of LIN-20 is shown below it, so nothing In Progress'); 
   });
 
   test('a failed Todo task is In Progress, and its failed state reaches the view', () => {
@@ -207,15 +210,16 @@ describe('LIN-4117 identity: the top task is matched by nodeKey, and never when 
   });
 
   // W2 guard: a done task with an open ruling is still promoted through the completed/needsAttention path.
-  test('W2 guard: a done top task with an open ruling is still promoted', () => {
+  test('W2 guard: a done top task with an open ruling sits in Waiting on you, and its open sibling is Up next', () => {
     const { incomplete, completed, completedCount } = partitionCompleted([node('LIN-120', 'completed'), node('LIN-121', 'unstarted')]);
     const view = buildHomeView({
       inProgressTrees: [],
       trees: [{ project: { id: 'p', name: 'p', collapsed: false }, incomplete, completed, completedCount }],
       states: states({ 'LIN-120': stateFor({ state: 'needs-you' }) }),
       topTaskId: nodeKey({ id: 'LIN-120' }),
+      rulingRows: [ruling('LIN-120')],
     });
-    assert.deepEqual(ids(view.inProgressTrees[0].roots), ['LIN-120']);
+    assert.deepEqual(view.waiting.ids, ['LIN-120']);
     assert.deepEqual(ids(view.trees[0].incomplete), ['LIN-121']);
   });
 });
