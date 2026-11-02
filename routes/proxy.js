@@ -39,7 +39,6 @@ import { READ_WRITE } from '../lib/proxy-scopes.js';
 import { requireGrant } from '../lib/require-grant.js';
 import { graphqlErrorExtra, graphqlErrorDetail, declaredProviderDisplayName, upstreamErrorStatus } from '../lib/proxy-graphql-errors.js';
 import { deriveTerminalStatus, deriveLifecycleStatus, deriveCompletedAt, harvestAbortedTargets, feedbackWithHarvestedAbort, mergeLineageFeedback } from '../lib/dispatch-terminal.js';
-import { anchorFor as taskCostAnchorFor, buildTaskCost } from '../lib/task-cost.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
 import { validateOpaqueDispatchField, validateSessionId, validateDispatchPayload } from '../lib/dispatch-validation.js';
 // LIN-1552: the issue-write validation rules (length caps, control-char guard,

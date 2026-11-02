@@ -1,0 +1,22 @@
+issues with lineage 229 app {'calls': 2600, 'usd': 51.94594034999999, 'unpriced': 0, 'issues_total_null': 111}
+2026-10-19 {'sessions': 20, 'telemetry': 17, 'priced': 17, 'usd': 42.78}
+2026-10-20 {'sessions': 142, 'telemetry': 142, 'priced': 142, 'usd': 161.86}
+2026-10-21 {'sessions': 58, 'telemetry': 58, 'priced': 58, 'usd': 213.4}
+2026-10-22 {'sessions': 1, 'telemetry': 1, 'priced': 1, 'usd': 6.2}
+2026-10-23 {'sessions': 287, 'telemetry': 286, 'priced': 286, 'usd': 435.34}
+2026-10-24 {'sessions': 267, 'telemetry': 256, 'priced': 249, 'usd': 447.35, 'tel_unpriced': 7, 'm:claude-haiku-5-5': 7}
+2026-10-25 {'sessions': 327, 'telemetry': 324, 'priced': 258, 'usd': 466.09, 'tel_unpriced': 66, 'm:claude-haiku-5-5': 66}
+2026-10-26 {'sessions': 126, 'telemetry': 120, 'priced': 100, 'usd': 197.14, 'tel_unpriced': 20, 'm:claude-haiku-5-5': 20}
+2026-10-29 {'sessions': 69, 'telemetry': 60, 'priced': 47, 'usd': 111.19, 'tel_unpriced': 13, 'm:claude-haiku-5-5': 13}
+2026-10-30 {'sessions': 104, 'telemetry': 102, 'priced': 86, 'usd': 198.99, 'tel_unpriced': 16, 'm:claude-haiku-5-5': 16}
+2026-10-31 {'sessions': 15, 'telemetry': 15, 'priced': 13, 'usd': 28.61, 'tel_unpriced': 2, 'm:claude-haiku-5-5': 2}
+2026-11-01 {'sessions': 80}
+2026-11-02 {'sessions': 42}
+nolineage {'issues': 197}
+roots 1508 roots under >1 issue 11 extra counted usd 127.4
+Counter({'wake': 11})
+defb22a2 wake 15.991617 7 ['LIN-3747', 'LIN-3748', 'LIN-3749', 'LIN-3750', 'LIN-3751', 'LIN-3752']
+2e8da2fb wake 6.3835718 2 ['LIN-4040', 'LIN-4049']
+af9871c7 wake 4.571625 4 ['LIN-4033', 'LIN-4034', 'LIN-4035', 'LIN-4036']
+d213fdbf wake 3.8741056 2 ['LIN-3765', 'LIN-3766']
+3f381e8d wake 2.4926224000000006 4 ['LIN-3765', 'LIN-3766', 'LIN-3767', 'LIN-3768']

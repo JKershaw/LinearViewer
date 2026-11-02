@@ -1,0 +1,9 @@
+Runner host records, read 2026-11-02 ~08:45Z (values never printed; names only)
+
+- Live dispatcher: started Sun 1 Nov 17:09:01 2026 (state/dispatcher.pid), checkout at simple-dispatcher cf6369d.
+- Running dispatcher environment (ps eww, names only): 25 variables; none starts SD_ (no SD_WORKER_USAGE_RELAY).
+- simple-dispatcher/.env (mtime 14 Jul 17:16): keys DISPATCH_API_URL, POLL_INTERVAL_MS, SD_TERMINAL only.
+- state/oplog.jsonl: 80,572 lines, 2026-07-14 .. 2026-11-02; 29,178 "feedback.post" events (Jul-Aug, then 1-2 Nov);
+  grep -c '\[usage\]' = 0; grep -c '\[resources\]' = 0.
+- GET /api/proxy/heartbeats: one consumer (simple-dispatcher, instanceId 5e8d294b57dcc73e).
+- Model-routing log: implementation model sonnet -> claude-haiku-5-5 at 2026-10-24T20:21Z.

@@ -1,0 +1,6 @@
+Source: GET /api/proxy/dispatch?limit=100 then GET /api/proxy/dispatch/{id} for each, read 2026-11-02 ~08:40Z
+rows 100 dispatchedAt range 2026-11-02T03:14:06.783Z -> 2026-11-02T08:38:20.805Z
+usage feedback entries across all rows: 0
+feedback kinds: {None: 123, 'status': 2295, 'heartbeat': 650, 'assistant-text': 1058, 'evidence': 101, 'decision': 1, 'decision-withdrawn': 1}
+rows by (kind,status): {('wake', 'closed'): 58, ('close-out', 'done'): 3, ('wake', 'taken'): 3, ('implementation', 'done'): 8, ('wake', 'done'): 17, ('autopilot', 'taken'): 3, ('implementation', 'taken'): 1, ('review', 'done'): 3, ('research', 'taken'): 2, ('autopilot', 'done'): 1, ('custom', 'done'): 1}
+rows by (harness,model): {(None, None): 78, ('claude-code', 'sonnet'): 7, ('claude-code', 'claude-haiku-5-5'): 9, ('claude-code', 'opus'): 6}

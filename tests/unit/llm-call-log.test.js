@@ -4,13 +4,13 @@
  * Run with: node --test tests/unit/llm-call-log.test.js
  *
  * Covers the append-only record contract: every call is stored with the
- * captured metadata, non-numeric fields are coerced to null, listing is
- * workspace-scoped and newest-first, and recording never throws (fire-and-forget).
+ * captured metadata, non-numeric fields are coerced to null, and recording never
+ * throws (fire-and-forget). Summary reads are covered further down.
  */
 import { test, describe, beforeEach, before, after } from 'node:test';
 import assert from 'node:assert';
 import { LlmCallLogStore } from '../../lib/llm-call-log.js';
-import { createMangoTmpdir, recordingCollection } from '../fixtures/mango-tmpdir.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 
 // Minimal in-memory mock of the MongoDB/MangoDB collection surface.
 function createMockCollection() {
@@ -123,117 +123,6 @@ describe('LlmCallLogStore.record', () => {
     });
     const doc = await flaky.record({ feature: 'recommend' });
     assert.strictEqual(doc.feature, 'recommend'); // returns the doc despite the error
-  });
-});
-
-// LIN-3162 (LIN-3157 A2): listCalls became a database-side paged read
-// (`find({urlKey, timestamp:{$gte:horizon}}).sort({timestamp:-1,_id:-1}).skip().limit()`
-// + `countDocuments`). The old inline double had a `toArray()`-only cursor with
-// no `countDocuments`, so it can no longer serve these reads; they run on a real
-// MangoDB tmpdir instead (the plan's "do not extend the doubles" rule).
-describe('LlmCallLogStore.listCalls (real MangoDB tmpdir, LIN-3162 A2)', () => {
-  const DAY_MS = 24 * 60 * 60 * 1000;
-  let harness;
-  let raw;
-  let collection;
-  let store;
-
-  before(async () => {
-    harness = createMangoTmpdir('lin-3162-llm-calls-');
-    await harness.connect();
-  });
-
-  after(async () => {
-    await harness.close();
-  });
-
-  beforeEach(() => {
-    raw = harness.freshDb().collection('llm-call-log');
-    collection = recordingCollection(raw);
-    store = new LlmCallLogStore({ collection });
-  });
-
-  async function seed({ expiresAt, ...doc }) {
-    const timestamp = doc.timestamp || new Date();
-    const out = { urlKey: 'acme', feature: 'recommend', model: 'm1', ...doc, timestamp };
-    out.expiresAt = expiresAt !== undefined ? expiresAt : new Date(timestamp.getTime() + 30 * DAY_MS);
-    await raw.insertOne(out);
-  }
-
-  test('is workspace-scoped and newest-first', async () => {
-    const now = Date.now();
-    await seed({ _id: 'OLD', feature: 'recommend', timestamp: new Date(now - 2000) });
-    await seed({ _id: 'NEW', feature: 'brief', timestamp: new Date(now) });
-    await seed({ _id: 'OTHER', urlKey: 'other', feature: 'recap', timestamp: new Date(now) });
-
-    const { items, total } = await store.listCalls('acme');
-    assert.strictEqual(total, 2);
-    assert.deepStrictEqual(items.map(i => i.feature), ['brief', 'recommend']);
-    assert.ok(items.every(i => i.model && typeof i.timestamp === 'string'));
-  });
-
-  test('lists each row with its via marker, null when the call carried none (LIN-3864)', async () => {
-    const now = Date.now();
-    await seed({ _id: 'PRE', feature: 'session-summary', via: 'precompute', timestamp: new Date(now) });
-    await seed({ _id: 'DEMAND', feature: 'session-summary', timestamp: new Date(now - 1000) });
-
-    const { items } = await store.listCalls('acme');
-    assert.deepStrictEqual(items.map(i => [i.id, i.via]), [['PRE', 'precompute'], ['DEMAND', null]]);
-  });
-
-  test('honours limit and offset', async () => {
-    for (let i = 0; i < 5; i++) {
-      await seed({ _id: `x${i}`, timestamp: new Date(Date.now() - i * 1000) });
-    }
-    const { items, total } = await store.listCalls('acme', { limit: 2, offset: 1 });
-    assert.strictEqual(total, 5);
-    assert.deepStrictEqual(items.map(i => i.id), ['x1', 'x2']);
-  });
-
-  test('returns empty for unknown workspace or missing urlKey', async () => {
-    await seed({ _id: 'x' });
-    assert.deepStrictEqual(await store.listCalls('nope'), { items: [], total: 0 });
-    assert.deepStrictEqual(await store.listCalls(), { items: [], total: 0 });
-  });
-
-  test('pages in the database: sort().skip().limit() plus countDocuments, no full materialisation (A2)', async () => {
-    for (let i = 0; i < 25; i++) await seed({ _id: `x${i}`, timestamp: new Date(Date.now() - i * 1000) });
-
-    const { items, total } = await store.listCalls('acme', { limit: 5, offset: 10 });
-    const cursor = collection.__record.cursors.at(-1);
-    assert.deepStrictEqual(cursor.sorts, [{ timestamp: -1, _id: -1 }]);
-    assert.deepStrictEqual(cursor.skips, [10]);
-    assert.deepStrictEqual(cursor.limits, [5]);
-    assert.strictEqual(cursor.materialized, 5, 'only the page may be materialised');
-    assert.strictEqual(collection.__record.countDocuments.length, 1, 'total must come from countDocuments');
-    assert.strictEqual(total, 25);
-    assert.strictEqual(items.length, 5);
-  });
-
-  test('has no default horizon bound and pages over full retained history (LIN-3163 B)', async () => {
-    const now = Date.now();
-    await seed({ _id: 'no-stamp', timestamp: new Date(now - 5 * DAY_MS), expiresAt: undefined });
-    await seed({ _id: 'old-live-stamp', timestamp: new Date(now - 40 * DAY_MS), expiresAt: new Date(now + 365 * DAY_MS) });
-
-    const { items, total } = await store.listCalls('acme');
-    const q = collection.__record.finds.at(-1).query;
-    assert.strictEqual(q.timestamp, undefined, 'the default 30-day `since` bound is gone from the paged list');
-    assert.strictEqual(q.expiresAt, undefined, 'the expiry predicate is gone');
-    assert.strictEqual(total, 2, 'the >30d row is listed over the full retained history');
-    assert.deepStrictEqual(items.map(i => i.id), ['no-stamp', 'old-live-stamp']);
-  });
-
-  test('orders same-millisecond rows by _id descending and pages without duplicates (A2)', async () => {
-    const now = Date.now();
-    const ts = new Date(now - 1000);
-    for (const id of ['c', 'a', 'b']) {
-      await seed({ _id: id, timestamp: ts, expiresAt: new Date(now + DAY_MS) });
-    }
-    const p0 = await store.listCalls('acme', { limit: 1, offset: 0 });
-    const p1 = await store.listCalls('acme', { limit: 1, offset: 1 });
-    const p2 = await store.listCalls('acme', { limit: 1, offset: 2 });
-    assert.deepStrictEqual([p0.items[0].id, p1.items[0].id, p2.items[0].id], ['c', 'b', 'a']);
-    assert.strictEqual(new Set([p0.items[0].id, p1.items[0].id, p2.items[0].id]).size, 3);
   });
 });
 

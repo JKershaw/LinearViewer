@@ -11,6 +11,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { computeTerminalMarkedTaskCost } from '../../lib/terminal-marked-task-cost.js';
+import { COST_SHARE_KEYS } from '../../lib/kpi-stats.js';
 
 const NOW = new Date('2026-08-08T12:00:00.000Z');
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -42,9 +43,8 @@ describe('computeTerminalMarkedTaskCost — the harness-conditional reduce', () 
       })
     ];
     const result = computeTerminalMarkedTaskCost(rows, NOW);
-    assert.equal(result.issueCount, 1);
-    assert.equal(result.costUsd, 4);
-    assert.equal(result.cashUsd, 4);
+    assert.equal(result.pricedTicketCount, 1);
+    assert.equal(result.pricedTicketCostUsd, 4);
   });
 
   test('claude-code takes the LAST entry only (last-wins) — summing would double-count the cumulative snapshot', () => {
@@ -57,7 +57,7 @@ describe('computeTerminalMarkedTaskCost — the harness-conditional reduce', () 
       ]
     })];
     const result = computeTerminalMarkedTaskCost(rows, NOW);
-    assert.equal(result.costUsd, 5, 'must take the LAST entry (5), not sum (1+5=6)');
+    assert.equal(result.pricedTicketCostUsd, 5, 'must take the LAST entry (5), not sum (1+5=6)');
   });
 
   test('unknown (null) harness also takes last-wins, same as claude-code', () => {
@@ -69,7 +69,7 @@ describe('computeTerminalMarkedTaskCost — the harness-conditional reduce', () 
         doneMarker(0.8)
       ]
     })];
-    assert.equal(computeTerminalMarkedTaskCost(rows, NOW).costUsd, 3);
+    assert.equal(computeTerminalMarkedTaskCost(rows, NOW).pricedTicketCostUsd, 3);
   });
 
   test('earliest-row-only harness still governs the reduce: a follow-up implying a different harness does not flip sum vs last-wins', () => {
@@ -91,7 +91,7 @@ describe('computeTerminalMarkedTaskCost — the harness-conditional reduce', () 
     // If harness were re-resolved per row (wrong), the lineage would look
     // opencode-sourced and sum to 11. Last-wins on the true (earliest-row)
     // claude-code harness gives 10 (the last entry only).
-    assert.equal(result.costUsd, 10);
+    assert.equal(result.pricedTicketCostUsd, 10);
     assert.equal(result.opencodeSummedShare, 0, 'the lineage never used the sum reduce');
   });
 });
@@ -103,9 +103,9 @@ describe('computeTerminalMarkedTaskCost — unpriced exclusion', () => {
       feedback: [doneMarker(0.9)] // done, but no [usage] entry ever posted
     })];
     const result = computeTerminalMarkedTaskCost(rows, NOW);
-    assert.equal(result.issueCount, 1);
-    assert.equal(result.unpriced, 1);
-    assert.equal(result.costUsd, null, 'must be null, never 0, when nothing is priced');
+    assert.equal(result.attributableLineageShare, 1, 'the one lineage ran and is attributed');
+    assert.equal(result.pricedTicketCount, 0);
+    assert.equal(result.pricedTicketCostUsd, null, 'must be null, never 0, when nothing is priced');
   });
 
   test('a partially-unpriced instance sums only what IS priced and still flags the unpriced issue', () => {
@@ -118,9 +118,8 @@ describe('computeTerminalMarkedTaskCost — unpriced exclusion', () => {
       feedback: [doneMarker(0.9)]
     });
     const result = computeTerminalMarkedTaskCost([priced, unpriced], NOW);
-    assert.equal(result.issueCount, 2);
-    assert.equal(result.unpriced, 1);
-    assert.equal(result.costUsd, 7, 'the priced issue\'s cost must not be zeroed out by the unpriced sibling');
+    assert.equal(result.pricedTicketCount, 1, 'only the fully priced ticket enters the priced population');
+    assert.equal(result.pricedTicketCostUsd, 7, 'the priced issue\'s cost must not be zeroed out by the unpriced sibling');
   });
 });
 
@@ -141,11 +140,9 @@ describe('computeTerminalMarkedTaskCost — F1 (LIN-1957 review, Request Changes
       feedback: [doneMarker(0.9)] // done, but no [usage] entry ever posted
     });
     const result = computeTerminalMarkedTaskCost([priced, neverPriced], NOW);
-    assert.equal(result.issueCount, 1);
-    // Review repro at PR head: { issueCount: 1, costUsd: 6, unpriced: 0 } — the
-    // second lineage's $0 contribution is invisible.
-    assert.equal(result.unpriced, 1, 'the partially-priced issue must be flagged unpriced, not read as fully priced');
-    assert.equal(result.costUsd, null, 'a partially-priced issue\'s partial sum must not be presented as its full cost');
+    // Review repro at PR head: the second lineage's $0 contribution was invisible.
+    assert.equal(result.pricedTicketCount, 0, 'the partially-priced issue must not enter the priced population');
+    assert.equal(result.pricedTicketCostUsd, null, 'a partially-priced issue\'s partial sum must not be presented as its full cost');
   });
 
   test('F1b: an opencode lineage with one unpriceable row among priced ones must flag unpriced, not silently sum only the priced rows', () => {
@@ -162,11 +159,9 @@ describe('computeTerminalMarkedTaskCost — F1 (LIN-1957 review, Request Changes
       feedback: [usageEntry({ costUsd: 2, lane: 'api', days: 1 }), doneMarker(0.9)]
     });
     const result = computeTerminalMarkedTaskCost([r1, r2, r3], NOW);
-    assert.equal(result.issueCount, 1);
-    // Review repro at PR head: { issueCount: 1, costUsd: 3, unpriced: 0 } — the
-    // middle row's failure to price is invisible.
-    assert.equal(result.unpriced, 1, 'a lineage with any unpriceable row must be flagged unpriced');
-    assert.equal(result.costUsd, null, 'a partially-priced lineage\'s partial sum must not be presented as its full cost');
+    // Review repro at PR head: the middle row's failure to price was invisible.
+    assert.equal(result.pricedTicketCount, 0, 'a lineage with any unpriceable row must not enter the priced population');
+    assert.equal(result.pricedTicketCostUsd, null, 'a partially-priced lineage\'s partial sum must not be presented as its full cost');
   });
 });
 
@@ -187,10 +182,10 @@ describe('computeTerminalMarkedTaskCost — F2 (LIN-1957 review, Request Changes
       feedback: [usageEntry({ costUsd: 9, days: 2 }), doneMarker(1.9)]
     });
     const result = computeTerminalMarkedTaskCost([earliestNoId, laterWithId], NOW);
-    // Review repro at PR head: { issueCount: 0, costUsd: null, ... } — the
-    // whole lineage vanishes, numerator and denominator both, with no trace.
-    assert.equal(result.issueCount, 1, 'plan: issueIdentifier must be set from any row carrying one, not just the earliest');
-    assert.equal(result.costUsd, 9);
+    // Review repro at PR head: the whole lineage vanished, numerator and
+    // denominator both, with no trace.
+    assert.equal(result.pricedTicketCount, 1, 'plan: issueIdentifier must be set from any row carrying one, not just the earliest');
+    assert.equal(result.pricedTicketCostUsd, 9);
   });
 });
 
@@ -214,45 +209,7 @@ describe('computeTerminalMarkedTaskCost — F3 (LIN-1957 review, should-fix): ro
     const forward = computeTerminalMarkedTaskCost([earlier, later], NOW);
     const reversed = computeTerminalMarkedTaskCost([later, earlier], NOW);
     // Review repro at PR head: $11 forward vs $2 reversed on this exact shape.
-    assert.equal(forward.costUsd, reversed.costUsd, 'rowUsage order must not change the last-wins result');
-  });
-});
-
-describe('computeTerminalMarkedTaskCost — lane split', () => {
-  test('null lane maps to unknownLaneUsd, never defaulted to subscription', () => {
-    const rows = [row({
-      id: 'g1', issueIdentifier: 'LIN-8', harness: 'claude-code', dispatchedAt: daysAgo(1),
-      feedback: [usageEntry({ costUsd: 4, lane: null, days: 1 }), doneMarker(0.9)]
-    })];
-    const result = computeTerminalMarkedTaskCost(rows, NOW);
-    assert.equal(result.unknownLaneUsd, 4);
-    assert.equal(result.cashUsd, 0, 'a null lane must never land in cashUsd');
-  });
-
-  test('a subscription lane contributes to the API-equivalent total but ZERO marginal cash', () => {
-    const rows = [row({
-      id: 'h1', issueIdentifier: 'LIN-9', harness: 'claude-code', dispatchedAt: daysAgo(1),
-      feedback: [usageEntry({ costUsd: 3, lane: 'subscription', days: 1 }), doneMarker(0.9)]
-    })];
-    const result = computeTerminalMarkedTaskCost(rows, NOW);
-    assert.equal(result.costUsd, 3, 'subscription-lane cost still counts toward the API-equivalent figure');
-    assert.equal(result.cashUsd, 0);
-    assert.equal(result.unknownLaneUsd, 0);
-  });
-
-  test('api and openrouter lanes both land in cashUsd', () => {
-    const rows = [
-      row({
-        id: 'i1', issueIdentifier: 'LIN-10', harness: 'claude-code', dispatchedAt: daysAgo(1),
-        feedback: [usageEntry({ costUsd: 2, lane: 'api', days: 1 }), doneMarker(0.9)]
-      }),
-      row({
-        id: 'i2', issueIdentifier: 'LIN-11', harness: 'claude-code', dispatchedAt: daysAgo(1),
-        feedback: [usageEntry({ costUsd: 3, lane: 'openrouter', days: 1 }), doneMarker(0.9)]
-      })
-    ];
-    const result = computeTerminalMarkedTaskCost(rows, NOW);
-    assert.equal(result.cashUsd, 5);
+    assert.equal(forward.pricedTicketCostUsd, reversed.pricedTicketCostUsd, 'rowUsage order must not change the last-wins result');
   });
 });
 
@@ -272,42 +229,27 @@ describe('computeTerminalMarkedTaskCost — issue-level denominator', () => {
       })
     ];
     const result = computeTerminalMarkedTaskCost(rows, NOW);
-    assert.equal(result.issueCount, 1, 'lineage count is 2, but issue count (the denominator) is 1');
-    assert.equal(result.costUsd, 5, 'both lineages\' cost sums into the one issue');
+    assert.equal(result.pricedTicketCount, 1, 'lineage count is 2, but the ticket count is 1: both lineages deliver the same ticket');
+    assert.equal(result.pricedTicketCostUsd, 5, 'both lineages\' cost sums into the one ticket');
   });
 });
 
 describe('computeTerminalMarkedTaskCost — zero-T degradation', () => {
-  test('an empty instance degrades the metric AND all four shares to null — never NaN, never 0', () => {
+  test('an empty instance degrades every share and the priced figure to null, never NaN, never 0', () => {
     const result = computeTerminalMarkedTaskCost([], NOW);
-    assert.equal(result.issueCount, 0);
-    assert.equal(result.costUsd, null);
-    assert.equal(result.cashUsd, null);
-    assert.equal(result.unknownLaneUsd, null);
-    assert.equal(result.unpriced, 0);
+    // A count is a genuine 0; the figures and the shares over T are null.
+    assert.equal(result.pricedTicketCount, 0);
+    assert.equal(result.pricedTicketCostUsd, null);
     assert.equal(result.closeOutLineageShare, null);
     assert.equal(result.evidenceLinkedShare, null);
     assert.equal(result.opencodeSummedShare, null);
     assert.equal(result.unknownHarnessShare, null);
-    // F4/F5 (gap-beat 2): the two new USD lines and two new coverage shares
-    // must degrade the same way — null, never 0/NaN, when there is nothing
-    // in the category to report.
-    assert.equal(result.inFlightUsd, null);
-    assert.equal(result.overheadUsd, null);
     assert.equal(result.pricedLineageShare, null);
     assert.equal(result.attributableLineageShare, null);
     assert.equal(result.captureRateShare, null);
-    // LIN-2253 (narrowed): the component-fold denominator degrades the same
-    // way — pricedTicketCount is a genuine 0 (a count, like issueCount),
-    // never null; ticketsPerPricedLane (a ratio) is null, never 0/NaN, when
-    // there is nothing to divide by.
-    assert.equal(result.pricedTicketCount, 0);
-    assert.equal(result.ticketsPerPricedLane, null);
-    assert.equal(result.laneLandedCount, 0);
-    assert.equal(result.noLineageCount, 0);
     for (const key of [
-      'costUsd', 'cashUsd', 'unknownLaneUsd', 'closeOutLineageShare', 'evidenceLinkedShare',
-      'opencodeSummedShare', 'unknownHarnessShare', 'inFlightUsd', 'overheadUsd',
+      'pricedTicketCostUsd', 'closeOutLineageShare', 'evidenceLinkedShare',
+      'opencodeSummedShare', 'unknownHarnessShare',
       'pricedLineageShare', 'attributableLineageShare', 'captureRateShare',
       'pricedTicketCount'
     ]) {
@@ -320,8 +262,9 @@ describe('computeTerminalMarkedTaskCost — zero-T degradation', () => {
       id: 'k1', issueIdentifier: 'LIN-13', harness: 'claude-code', dispatchedAt: daysAgo(1), feedback: []
     })];
     const result = computeTerminalMarkedTaskCost(rows, NOW);
-    assert.equal(result.issueCount, 0);
-    assert.equal(result.costUsd, null);
+    assert.equal(result.closeOutLineageShare, null, 'T stays 0, so every share is null');
+    assert.equal(result.pricedTicketCount, 0);
+    assert.equal(result.pricedTicketCostUsd, null);
   });
 });
 
@@ -382,86 +325,6 @@ describe('computeTerminalMarkedTaskCost — disclosure shares', () => {
   });
 });
 
-describe('computeTerminalMarkedTaskCost — F4 (LIN-1957 review round 2, Request Changes): in-flight and overhead spend must be published, not silently invisible', () => {
-  test('inFlightUsd counts windowed spend on an unresolved (no terminal marker) lineage, and does NOT fold into costUsd', () => {
-    const inFlight = row({
-      id: 'p1', issueIdentifier: 'LIN-200', harness: 'claude-code', dispatchedAt: daysAgo(1),
-      feedback: [usageEntry({ costUsd: 50, lane: 'api', days: 1 })] // no terminal marker: still running
-    });
-    const resolved = row({
-      id: 'p2', issueIdentifier: 'LIN-201', harness: 'claude-code', dispatchedAt: daysAgo(2),
-      feedback: [usageEntry({ costUsd: 10, lane: 'api', days: 2 }), doneMarker(1.9)]
-    });
-    const result = computeTerminalMarkedTaskCost([inFlight, resolved], NOW);
-    assert.equal(result.issueCount, 1, 'the in-flight lineage must not enter the T denominator');
-    assert.equal(result.costUsd, 10, 'in-flight spend must never fold into the resolved-task numerator');
-    assert.equal(result.inFlightUsd, 50);
-  });
-
-  test('overheadUsd counts windowed spend on a done, issue-less dispatch (autopilot/Collective/ad-hoc), and does NOT fold into costUsd', () => {
-    const issueLess = row({
-      id: 'q1', issueIdentifier: undefined, kind: 'autopilot', harness: 'claude-code', dispatchedAt: daysAgo(1),
-      feedback: [usageEntry({ costUsd: 30, lane: 'api', days: 1 }), doneMarker(0.9)]
-    });
-    const resolved = row({
-      id: 'q2', issueIdentifier: 'LIN-202', harness: 'claude-code', dispatchedAt: daysAgo(2),
-      feedback: [usageEntry({ costUsd: 10, lane: 'api', days: 2 }), doneMarker(1.9)]
-    });
-    const result = computeTerminalMarkedTaskCost([issueLess, resolved], NOW);
-    assert.equal(result.issueCount, 1, 'the issue-less dispatch must not enter the T denominator');
-    assert.equal(result.costUsd, 10, 'overhead spend must never fold into the resolved-task numerator');
-    assert.equal(result.overheadUsd, 30);
-  });
-
-  test('round 2\'s own reproduction: one resolved issue ($10), one in-flight lineage ($50), one issue-less dispatch ($30) — $80 of $90 must now be visible', () => {
-    const resolved = row({
-      id: 'r1', issueIdentifier: 'LIN-203', harness: 'claude-code', dispatchedAt: daysAgo(3),
-      feedback: [usageEntry({ costUsd: 10, lane: 'api', days: 3 }), doneMarker(2.9)]
-    });
-    const inFlight = row({
-      id: 'r2', issueIdentifier: 'LIN-204', harness: 'claude-code', dispatchedAt: daysAgo(2),
-      feedback: [usageEntry({ costUsd: 50, lane: 'api', days: 2 })]
-    });
-    const issueLess = row({
-      id: 'r3', issueIdentifier: undefined, kind: 'autopilot', harness: 'claude-code', dispatchedAt: daysAgo(1),
-      feedback: [usageEntry({ costUsd: 30, lane: 'api', days: 1 }), doneMarker(0.9)]
-    });
-    const result = computeTerminalMarkedTaskCost([resolved, inFlight, issueLess], NOW);
-    assert.equal(result.issueCount, 1);
-    assert.equal(result.costUsd, 10);
-    assert.equal(result.inFlightUsd, 50);
-    assert.equal(result.overheadUsd, 30);
-    assert.equal(result.costUsd + result.inFlightUsd + result.overheadUsd, 90, 'all $90 of windowed spend is now accounted for across the three published lines');
-  });
-
-  test('an unpriced in-flight lineage is excluded from inFlightUsd, never counted as $0 — degrades to null when it is the only in-flight lineage', () => {
-    const unpricedInFlight = row({
-      id: 's1', issueIdentifier: 'LIN-205', harness: 'claude-code', dispatchedAt: daysAgo(1),
-      feedback: [] // still running, nothing posted yet
-    });
-    const result = computeTerminalMarkedTaskCost([unpricedInFlight], NOW);
-    assert.equal(result.inFlightUsd, null, 'must be null, not 0 — an unpriced lineage is not zero spend');
-  });
-
-  test('a partially-priced (opencode, one unpriceable row) in-flight lineage is excluded from inFlightUsd entirely, not summed from what did price', () => {
-    const partiallyPriced = row({
-      id: 't1', issueIdentifier: 'LIN-206', harness: 'opencode', dispatchedAt: daysAgo(1),
-      feedback: [usageEntry({ costUsd: 4, lane: 'api', days: 1 }), usageEntry({ lane: 'api', days: 0.5 })] // second row unpriceable, still running
-    });
-    const result = computeTerminalMarkedTaskCost([partiallyPriced], NOW);
-    assert.equal(result.inFlightUsd, null, 'a partially-priced in-flight lineage must be excluded wholesale, same fullyPriced discipline as costUsd');
-  });
-
-  test('an unpriced issue-less dispatch is excluded from overheadUsd, never counted as $0', () => {
-    const unpricedOverhead = row({
-      id: 'u1', issueIdentifier: undefined, kind: 'autopilot', harness: 'claude-code', dispatchedAt: daysAgo(1),
-      feedback: [doneMarker(0.9)] // done, but no usage ever posted
-    });
-    const result = computeTerminalMarkedTaskCost([unpricedOverhead], NOW);
-    assert.equal(result.overheadUsd, null, 'must be null, not 0');
-  });
-});
-
 describe('computeTerminalMarkedTaskCost — F5 (LIN-1957 review round 2, Request Changes): declared coverage over the whole lineage population', () => {
   test('pricedLineageShare = fully-priced ÷ usage-bearing lineages — a lineage that never posted usage at all does not count against it', () => {
     const neverPosted = row({
@@ -506,7 +369,7 @@ describe('computeTerminalMarkedTaskCost — F5 (LIN-1957 review round 2, Request
     assert.equal(result.attributableLineageShare, 0.667, '2 of 3 ran lineages carry an issueIdentifier — the in-flight lineage counts toward "ran" too');
   });
 
-  test('a `[skipped]` lineage is benign and counts toward neither ranLineages/attributableLineageShare nor inFlightUsd — same exclusion computeDispatchOutcomes applies', () => {
+  test('a `[skipped]` lineage is benign and counts toward neither ranLineages nor attributableLineageShare — same exclusion computeDispatchOutcomes applies', () => {
     const skipped = row({
       id: 'y1', issueIdentifier: undefined, harness: 'claude-code', dispatchedAt: daysAgo(1),
       feedback: [usageEntry({ costUsd: 999, lane: 'api', days: 1 }), skippedMarker(0.9)]
@@ -517,10 +380,9 @@ describe('computeTerminalMarkedTaskCost — F5 (LIN-1957 review round 2, Request
     });
     const result = computeTerminalMarkedTaskCost([skipped, attributed], NOW);
     assert.equal(result.attributableLineageShare, 1, 'the skipped lineage must not dilute the denominator');
-    assert.equal(result.inFlightUsd, null, 'a skipped lineage\'s spend must not leak into inFlightUsd either');
   });
 
-  test('realistic proportions (round 2 ledger row 6): when most done issues have a partially-priced lineage, costUsd is computed over a visibly small minority of T', () => {
+  test('realistic proportions (round 2 ledger row 6): when most done issues have a partially-priced lineage, the priced figure covers a visibly small minority of T', () => {
     // 5 done, attributable issues. 1 is fully priced. 4 each have ONE
     // unpriceable opencode row alongside a priced one — realistic partial
     // pricing, not "never posted usage at all" (that failure mode is
@@ -540,9 +402,8 @@ describe('computeTerminalMarkedTaskCost — F5 (LIN-1957 review round 2, Request
     });
     const rows = [clean, partial(1), partial(2), partial(3), partial(4)];
     const result = computeTerminalMarkedTaskCost(rows, NOW);
-    assert.equal(result.issueCount, 5, 'T is 5 — the gate does not shrink the denominator');
-    assert.equal(result.unpriced, 4, '4 of 5 issues are excluded from every dollar sum');
-    assert.equal(result.costUsd, 8, 'costUsd is computed over the ONE fully-priced issue — a small-sample figure presented as the headline');
+    assert.equal(result.pricedTicketCount, 1, '4 of 5 tickets are excluded from the priced population');
+    assert.equal(result.pricedTicketCostUsd, 8, 'the priced figure is computed over the ONE fully-priced ticket — a small-sample figure presented as the headline');
     assert.equal(result.pricedLineageShare, 0.2, 'declared coverage makes the small-sample risk visible: only 1 of 5 usage-bearing lineages is fully priced');
     assert.equal(result.attributableLineageShare, 1, 'all 5 ran lineages carry an issueIdentifier in this fixture');
   });
@@ -553,7 +414,7 @@ describe('computeTerminalMarkedTaskCost — F5 (LIN-1957 review round 2, Request
       feedback: [doneMarker(0.9)]
     });
     const result = computeTerminalMarkedTaskCost([neverPosted], NOW);
-    assert.equal(result.issueCount, 1, 'T is non-zero');
+    assert.equal(result.closeOutLineageShare, 0, 'T is non-zero: a real 0, not null');
     assert.equal(result.pricedLineageShare, null, 'usageBearingLineages is 0, so this must degrade to null, not divide-by-zero to NaN or read as 0');
   });
 });
@@ -626,7 +487,7 @@ const ticketMarker = (identifier, state, days) => ({
 });
 
 describe('computeTerminalMarkedTaskCost — LIN-2253: lane-landed, no-lineage tickets', () => {
-  test('a worker-lane lineage\'s OTHER done tickets are counted in T, flagged noLineage, and never priced', () => {
+  test('a worker-lane lineage\'s OTHER done tickets are counted as priced tickets, and the lane\'s spend is never split between them', () => {
     const lane = row({
       id: 'lane1', issueIdentifier: 'LIN-800', harness: 'claude-code', dispatchedAt: daysAgo(2),
       feedback: [
@@ -640,10 +501,8 @@ describe('computeTerminalMarkedTaskCost — LIN-2253: lane-landed, no-lineage ti
     });
     const result = computeTerminalMarkedTaskCost([lane], NOW);
 
-    assert.equal(result.issueCount, 3, 'the anchor plus the two lane-landed tickets');
-    assert.equal(result.noLineageCount, 2);
-    assert.equal(result.unpriced, 2, 'the two no-lineage tickets — the anchor itself IS fully priced');
-    assert.equal(result.costUsd, 12, 'the lane spend stays attributed to the anchor only — no invented per-ticket split');
+    assert.equal(result.pricedTicketCount, 3, 'the anchor plus the two lane-landed tickets');
+    assert.equal(result.pricedTicketCostUsd, 12, 'the lane\'s spend is counted once, not split per landed ticket');
   });
 
   test('a marker in a non-"done" state is never counted as a landed ticket', () => {
@@ -658,11 +517,10 @@ describe('computeTerminalMarkedTaskCost — LIN-2253: lane-landed, no-lineage ti
       ]
     });
     const result = computeTerminalMarkedTaskCost([lane], NOW);
-    assert.equal(result.issueCount, 1, 'blocked/refused tickets never landed — only the anchor counts');
-    assert.equal(result.noLineageCount, 0);
+    assert.equal(result.pricedTicketCount, 1, 'blocked/refused tickets never landed — only the anchor counts');
   });
 
-  test('a lane-landed ticket that ALSO has its own separate lineage is not double-counted or flagged noLineage', () => {
+  test('a lane-landed ticket that ALSO has its own separate lineage is not double-counted', () => {
     const lane = row({
       id: 'lane3', issueIdentifier: 'LIN-820', harness: 'claude-code', dispatchedAt: daysAgo(2),
       feedback: [
@@ -680,9 +538,8 @@ describe('computeTerminalMarkedTaskCost — LIN-2253: lane-landed, no-lineage ti
       feedback: [usageEntry({ costUsd: 3, days: 0.8 }), doneMarker(0.5)]
     });
     const result = computeTerminalMarkedTaskCost([lane, ownLineage], NOW);
-    assert.equal(result.issueCount, 2, 'LIN-820 and LIN-821 — LIN-821 counted once, via its own lineage');
-    assert.equal(result.noLineageCount, 0, 'LIN-821 has a real lineage, so it must not be flagged noLineage');
-    assert.equal(result.costUsd, 11, '8 (LIN-820) + 3 (LIN-821 own lineage) — never LIN-821 counted or priced twice');
+    assert.equal(result.pricedTicketCount, 2, 'LIN-820 and LIN-821 — LIN-821 counted once, though its own lineage and the lane both name it');
+    assert.equal(result.pricedTicketCostUsd, 11, '8 (LIN-820) + 3 (LIN-821 own lineage) — never LIN-821 counted or priced twice');
   });
 
   test('a lane-landed ticket from an UNRESOLVED (non-done) lineage is not counted at all', () => {
@@ -695,21 +552,22 @@ describe('computeTerminalMarkedTaskCost — LIN-2253: lane-landed, no-lineage ti
       ]
     });
     const result = computeTerminalMarkedTaskCost([inFlight], NOW);
-    assert.equal(result.issueCount, 0, 'an unresolved lineage contributes nothing, same as before LIN-2253');
-    assert.equal(result.noLineageCount, 0);
+    assert.equal(result.pricedTicketCount, 0, 'an unresolved lineage contributes nothing, same as before LIN-2253');
+    assert.equal(result.closeOutLineageShare, null, 'and no ticket reaches T');
   });
 
-  test('review fix: a lane-landed ticket whose OWN anchor lineage is still in-flight is NOT flagged noLineage', () => {
+  test('review fix: a lane-landed ticket whose OWN anchor lineage is still in-flight is counted once, through its lane', () => {
     // The adversarial case the LIN-2253 review caught: `issues` is populated
     // ONLY from DONE lineages, so a naive `issues.has(identifier)` check
     // cannot see an in-flight (unresolved) anchor lineage and would
     // misclassify LIN-841 as noLineage — conflating "has a lineage, still
-    // running" (already disclosed via inFlightUsd) with "no lineage at all"
+    // running" (an in-flight disclosure, not this one) with "no lineage at all"
     // (this ticket's actual mechanism).
     const laneA = row({
       id: 'laneA', issueIdentifier: 'LIN-840', harness: 'claude-code', dispatchedAt: daysAgo(2),
       feedback: [
         usageEntry({ costUsd: 5, days: 1.5 }),
+        { kind: 'evidence', message: 'evidence', timestamp: daysAgo(1.4).toISOString() },
         ticketMarker('LIN-840', 'done', 1.2),
         ticketMarker('LIN-841', 'done', 1),
         doneMarker(0.9)
@@ -722,38 +580,11 @@ describe('computeTerminalMarkedTaskCost — LIN-2253: lane-landed, no-lineage ti
       feedback: [usageEntry({ costUsd: 4, days: 0.9 })]
     });
     const result = computeTerminalMarkedTaskCost([laneA, inFlightOwnLineage], NOW);
-    assert.equal(result.issueCount, 1, 'only LIN-840 (the DONE anchor) reaches T — LIN-841\'s own lineage has not resolved yet');
-    assert.equal(result.noLineageCount, 0, 'LIN-841 has a real (in-flight) lineage — must not be flagged noLineage');
-    assert.equal(result.costUsd, 5, 'LIN-841\'s in-flight spend stays out of costUsd (F4 — see inFlightUsd), never folded in nor invented as a noLineage $0');
-    assert.equal(result.inFlightUsd, 4, 'LIN-841\'s own lineage spend is visible via the existing in-flight disclosure, not silently dropped');
-  });
-
-  test('LIN-2325 F2: noLineageCount is always a subset of unpriced, never a disjoint exclusion bucket', () => {
-    // Combine both distinct causes of `unpriced` in one fixture so the
-    // containment is a strict subset, not a coincidental equality:
-    // - two lane-landed tickets with no lineage of their own (noLineage-flagged)
-    // - one separate anchor issue with a real lineage that simply never
-    //   posted usage (unpriced, but NOT noLineage — mirrors the "unpriced
-    //   exclusion" describe block above)
-    const lane = row({
-      id: 'inv-lane', issueIdentifier: 'LIN-900', harness: 'claude-code', dispatchedAt: daysAgo(2),
-      feedback: [
-        usageEntry({ costUsd: 5, days: 1.5 }),
-        ticketMarker('LIN-900', 'done', 1.2),
-        ticketMarker('LIN-901', 'done', 1),
-        ticketMarker('LIN-902', 'done', 0.9),
-        doneMarker(0.8)
-      ]
-    });
-    const neverPriced = row({
-      id: 'inv-unpriced', issueIdentifier: 'LIN-903', harness: 'claude-code', dispatchedAt: daysAgo(1),
-      feedback: [doneMarker(0.9)] // has its own (anchor) lineage, just never priced
-    });
-    const result = computeTerminalMarkedTaskCost([lane, neverPriced], NOW);
-    assert.equal(result.noLineageCount, 2, 'the two lane-landed tickets with no lineage of their own');
-    assert.equal(result.unpriced, 3, 'the two no-lineage tickets PLUS the separately-unpriced anchor');
-    assert.ok(result.unpriced > result.noLineageCount, 'fixture must exercise both unpriced causes, not just noLineage, to make the subset check non-vacuous');
-    assert.ok(result.noLineageCount <= result.unpriced, 'noLineageCount must never exceed unpriced — it is structurally a subset');
+    assert.equal(result.pricedTicketCount, 2, 'LIN-840 and LIN-841 — LIN-841 is counted once, through the lane that landed it');
+    assert.equal(result.pricedTicketCostUsd, 5, 'LIN-841\'s in-flight spend stays out of the priced figure — its own lineage has not resolved, and it is not folded in');
+    // T is one ticket here (LIN-840): LIN-841 has an anchor of its own, so the
+    // lane-landed reconciliation must not add it to T a second time.
+    assert.equal(result.evidenceLinkedShare, 1, 'T is 1: the evidenced anchor is the whole denominator');
   });
 });
 
@@ -762,7 +593,7 @@ describe('computeTerminalMarkedTaskCost — LIN-2418: denominator excludes noLin
   // (LIN-9000) runs on an unknown harness (and also lands N no-lineage
   // extras as its worker-lane ticket walk), plus one separate `opencode`
   // anchor (LIN-9001). Base fleet (N=0) is exactly these two anchors, so
-  // base.issueCount === 2 and base.noLineageCount === 0.
+  // base.pricedTicketCount === 2, one per anchor.
   function buildFleet(n) {
     const laneExtras = [];
     for (let i = 0; i < n; i++) {
@@ -793,8 +624,7 @@ describe('computeTerminalMarkedTaskCost — LIN-2418: denominator excludes noLin
     // simply stops counting lane-landed tickets in T would pass the
     // invariance assertions below and silently undo LIN-2253.
     for (const { n, result } of results) {
-      assert.equal(result.issueCount, base.issueCount + n, `issueCount must grow by N at N=${n}`);
-      assert.equal(result.noLineageCount, n, `noLineageCount must equal N at N=${n}`);
+      assert.equal(result.pricedTicketCount, base.pricedTicketCount + n, `pricedTicketCount must grow by N at N=${n}`);
     }
 
     const [n0, n2, n23] = results;
@@ -852,8 +682,7 @@ describe('computeTerminalMarkedTaskCost — LIN-2418: denominator excludes noLin
       // the LIN-2418 lane-landed one — a "fix" that only re-implements
       // LIN-2418's exclusion cannot satisfy this and the share assertion
       // below at the same time.
-      assert.equal(result.issueCount, 2 + m, `issueCount must grow by M at M=${m}`);
-      assert.equal(result.laneLandedCount, 0, `no lane-landed ticket anywhere in this fixture at M=${m}`);
+      assert.equal(result.pricedTicketCount, 2 + m, `pricedTicketCount must grow by M at M=${m}`);
       assert.equal(result.opencodeSummedShare, 0.5, `opencodeSummedShare must stay truthful (1 of 2 known-harness anchors) at M=${m} — HEAD collapses this to 0.5/0.25/0.04`);
     }
 
@@ -891,7 +720,7 @@ describe('computeTerminalMarkedTaskCost — LIN-2418: denominator excludes noLin
     });
     const result = computeTerminalMarkedTaskCost([opencodeLineage, unknownLineage, control], NOW);
 
-    assert.equal(result.issueCount, 2, 'non-vacuity: two distinct issues, one mixed-lineage and one control');
+    assert.equal(result.pricedTicketCount, 2, 'non-vacuity: two distinct tickets, one mixed-lineage and one control');
     // The mixed issue (LIN-9600) is known-opencode-summed; the control
     // (LIN-9601, harness: null only) is unknown — so the known population is
     // exactly {LIN-9600}, and it is a known true.
@@ -914,8 +743,7 @@ describe('computeTerminalMarkedTaskCost — LIN-2418: denominator excludes noLin
     });
     const result = computeTerminalMarkedTaskCost([bareLane], NOW);
 
-    assert.equal(result.issueCount, 3, 'non-vacuity: the fleet must genuinely contain issues');
-    assert.equal(result.noLineageCount, 3, 'non-vacuity: every issue in T must be noLineage — the point of this fixture');
+    assert.equal(result.closeOutLineageShare, 0, 'non-vacuity: T is 3 (all lane-landed), so this share is a real 0, not null');
 
     // `!== 0` is explicitly not sufficient — the distinction between a
     // genuine 0 and an absent value is the point (the render-side pin went
@@ -929,7 +757,7 @@ describe('computeTerminalMarkedTaskCost — LIN-2418: denominator excludes noLin
     // fleet publishes opencodeSummedShare: 0 — a definite "no approximation
     // anywhere" — beside unknownHarnessShare: 1, two mutually contradictory
     // claims about the same population's provenance. Every issue here has a
-    // real lineage (laneLandedCount must be 0, unlike P2 above), so the old
+    // real lineage (no lane-landed ticket, unlike P2 above), so the old
     // `lineageBearingCount` denominator would have included every one of
     // them and averaged their known-false-by-seed opencodeSummed into a
     // false, confident 0.
@@ -939,32 +767,14 @@ describe('computeTerminalMarkedTaskCost — LIN-2418: denominator excludes noLin
     }));
     const result = computeTerminalMarkedTaskCost(anchors, NOW);
 
-    assert.equal(result.issueCount, 3, 'non-vacuity: the fleet must genuinely contain issues');
-    assert.equal(result.laneLandedCount, 0, 'non-vacuity: every issue has a real lineage — this is NOT the P2 shape');
+    assert.equal(result.pricedTicketCount, 3, 'non-vacuity: three anchored tickets, each with a real lineage — this is NOT the P2 shape');
     assert.equal(result.unknownHarnessShare, 1, 'every declared lineage has no harness — a genuine, known 1');
     assert.equal(result.opencodeSummedShare, null, 'must be null — the system has no known-harness issue to say yes or no about, never a confident 0');
   });
 });
 
-describe('computeTerminalMarkedTaskCost — LIN-2253 (narrowed): laneLandedCount rename', () => {
-  test('laneLandedCount is the canonical field; noLineageCount is a deprecated alias carrying the SAME value for one cycle', () => {
-    const lane = row({
-      id: 'rename-lane', issueIdentifier: 'LIN-950', harness: 'claude-code', dispatchedAt: daysAgo(2),
-      feedback: [
-        usageEntry({ costUsd: 9, days: 1.5 }),
-        ticketMarker('LIN-950', 'done', 1.2),
-        ticketMarker('LIN-951', 'done', 1),
-        doneMarker(0.8)
-      ]
-    });
-    const result = computeTerminalMarkedTaskCost([lane], NOW);
-    assert.equal(result.laneLandedCount, 1, 'LIN-951 is the one lane-landed, no-lineage-of-its-own ticket');
-    assert.equal(result.noLineageCount, result.laneLandedCount, 'the deprecated alias must never drift from the canonical field — same filter, same value');
-  });
-});
-
-describe('computeTerminalMarkedTaskCost — LIN-2253 (narrowed): pricedTicketCount / ticketsPerPricedLane', () => {
-  test('degenerate no-lane regression: with no lanes, pricedTicketCount is byte-identical to the old (issueCount - unpriced) denominator, and ticketsPerPricedLane is 1', () => {
+describe('computeTerminalMarkedTaskCost — LIN-2253 (narrowed): pricedTicketCount', () => {
+  test('degenerate no-lane regression: with no lanes, each anchor is its own one-ticket component', () => {
     const rows = [
       row({
         id: 'deg1', issueIdentifier: 'LIN-960', harness: 'claude-code', dispatchedAt: daysAgo(1),
@@ -976,10 +786,8 @@ describe('computeTerminalMarkedTaskCost — LIN-2253 (narrowed): pricedTicketCou
       })
     ];
     const result = computeTerminalMarkedTaskCost(rows, NOW);
-    assert.equal(result.issueCount, 2);
-    assert.equal(result.unpriced, 0);
-    assert.equal(result.pricedTicketCount, result.issueCount - result.unpriced, 'no lane tickets exist, so every anchor founds its own single-ticket component');
-    assert.equal(result.ticketsPerPricedLane, 1, 'one ticket per one lineage when nothing lands via a lane');
+    assert.equal(result.pricedTicketCount, 2, 'no lane tickets exist, so every anchor founds its own single-ticket component');
+    assert.equal(result.pricedTicketCostUsd, 10);
   });
 
   test('lane pricing: an anchor + 3 lane-landed tickets, all priced through the one lineage, counts all 4 tickets', () => {
@@ -996,7 +804,7 @@ describe('computeTerminalMarkedTaskCost — LIN-2253 (narrowed): pricedTicketCou
     });
     const result = computeTerminalMarkedTaskCost([lane], NOW);
     assert.equal(result.pricedTicketCount, 4, 'the anchor plus its 3 lane-landed tickets — never lane ÷ 1');
-    assert.equal(result.ticketsPerPricedLane, 4, 'one lineage delivered all 4 tickets');
+    assert.equal(result.pricedTicketCostUsd, 20, 'the one lineage\'s cost is counted once across its four tickets');
   });
 
   test('component transitivity: a lane sharing a ticket with a NOT-fully-priced lineage excludes the WHOLE component, not just the unpriced half', () => {
@@ -1016,61 +824,13 @@ describe('computeTerminalMarkedTaskCost — LIN-2253 (narrowed): pricedTicketCou
     });
     const result = computeTerminalMarkedTaskCost([lane, unpricedOwnLineage], NOW);
     assert.equal(result.pricedTicketCount, 0, 'the merged {LIN-980, LIN-981} component has an unpriced member, so NEITHER ticket counts — never a partial numerator over a full-weight denominator');
-    assert.equal(result.ticketsPerPricedLane, null, 'no included component to divide by');
+    assert.equal(result.pricedTicketCostUsd, null, 'no included component to sum over');
   });
 
-  test('reconciliation identity holds exactly on the single-lane degenerate shape (the `:656`-style fixture: a lane-landed ticket that ALSO has its own separate, fully-priced lineage)', () => {
-    const lane = row({
-      id: 'recon-lane', issueIdentifier: 'LIN-990', harness: 'claude-code', dispatchedAt: daysAgo(2),
-      feedback: [
-        usageEntry({ costUsd: 8, days: 1.5 }),
-        ticketMarker('LIN-990', 'done', 1.2),
-        ticketMarker('LIN-991', 'done', 1),
-        doneMarker(0.9)
-      ]
-    });
-    const ownLineage = row({
-      id: 'recon-own991', rootItemId: 'recon-own991', issueIdentifier: 'LIN-991', harness: 'claude-code', dispatchedAt: daysAgo(1),
-      feedback: [usageEntry({ costUsd: 3, days: 0.8 }), doneMarker(0.5)]
-    });
-    const result = computeTerminalMarkedTaskCost([lane, ownLineage], NOW);
-    assert.equal(result.costUsd, 11);
-    assert.equal(result.pricedTicketCount, 2, 'LIN-990 and LIN-991 merge into ONE component (they share LIN-991) — 2 tickets, not double-counted');
-    assert.equal(result.ticketsPerPricedLane, 1, '2 tickets across 2 distinct lineages');
-
-    const oldAnchorRate = result.costUsd / (result.issueCount - result.unpriced);
-    const newRate = result.costUsd / result.pricedTicketCount;
-    assert.equal(newRate * result.ticketsPerPricedLane, oldAnchorRate, 'the reconciliation identity holds exactly in this shape (one anchor, one merged lane-landed ticket, no cross-lineage issue duplication)');
-  });
-
-  test('reconciliation identity does NOT reduce to a simple factor when one issue carries two separate lineages — costUsd equality is the relationship that genuinely generalises', () => {
-    // Same shape as the "issue-level denominator" describe block above
-    // (LIN-12, j1+j2): one issue, two independently-dispatched DONE
-    // lineages, no lane markers at all.
-    const rows = [
-      row({
-        id: 'recon2-j1', issueIdentifier: 'LIN-995', harness: 'claude-code', dispatchedAt: daysAgo(5),
-        feedback: [usageEntry({ costUsd: 2, lane: 'api', days: 5 }), doneMarker(4.9)]
-      }),
-      row({
-        id: 'recon2-j2', rootItemId: 'recon2-j2', issueIdentifier: 'LIN-995', harness: 'claude-code', dispatchedAt: daysAgo(1),
-        feedback: [usageEntry({ costUsd: 3, lane: 'api', days: 1 }), doneMarker(0.9)]
-      })
-    ];
-    const result = computeTerminalMarkedTaskCost(rows, NOW);
-    assert.equal(result.costUsd, 5, 'both lineages sum into the one issue, same as the pre-existing per-issue fold');
-    assert.equal(result.pricedTicketCount, 1, 'both lineages deliver the SAME single ticket (LIN-995) — one ticket, not two');
-    assert.equal(result.ticketsPerPricedLane, 0.5, 'one ticket across two distinct lineages — a real value below 1, not a defect');
-
-    const oldAnchorRate = result.costUsd / (result.issueCount - result.unpriced);
-    const newRate = result.costUsd / result.pricedTicketCount;
-    assert.equal(newRate, oldAnchorRate, 'costUsd/pricedTicketCount happens to equal costUsd/(issueCount-unpriced) here too (1 ticket, 1 fully-priced issue) — the two denominators can coincide numerically even though what they COUNT differs');
-    assert.notEqual(newRate * result.ticketsPerPricedLane, oldAnchorRate, 'but the naive newRate × ticketsPerPricedLane reconciliation does NOT hold here (2.5 vs 5) — the simple factor is conditional on includedLineageCount == oldFullyPricedIssueCount, which this shape breaks (2 lineages, 1 issue)');
-  });
 });
 
 describe('computeTerminalMarkedTaskCost — LIN-2253 review F1 (Request Changes): headline numerator/denominator population parity', () => {
-  test('pricedTicketCostUsd is null (never costUsd\'s leftover) when the only component is excluded — the headline must go dark, not read a stale number', () => {
+  test('pricedTicketCostUsd is null when the only component is excluded — the headline must go dark, not read a stale number', () => {
     const lane = row({
       id: 'f1-blackout-lane', issueIdentifier: 'LIN-9410', harness: 'claude-code', dispatchedAt: daysAgo(2),
       feedback: [
@@ -1086,7 +846,6 @@ describe('computeTerminalMarkedTaskCost — LIN-2253 review F1 (Request Changes)
     });
     const result = computeTerminalMarkedTaskCost([lane, unpricedOwnLineage], NOW);
     assert.equal(result.pricedTicketCount, 0, 'the merged {LIN-9410, LIN-9411} component has an unpriced member, so it is excluded');
-    assert.equal(result.costUsd, 6, 'costUsd (the per-issue fold) still counts LIN-9410\'s own fully-priced anchor issue');
     assert.equal(result.pricedTicketCostUsd, null, 'the headline numerator must be null here — NOT costUsd\'s 6 — there is no included component to attribute it to');
   });
 
@@ -1124,16 +883,10 @@ describe('computeTerminalMarkedTaskCost — LIN-2253 review F1 (Request Changes)
     }
 
     const contaminated = computeTerminalMarkedTaskCost(buildFleet({ contaminated: true }), NOW);
-    // costUsd (per-issue fold): 6 (LIN-9420's own anchor) + 30 (3 clean) = 36.
-    assert.equal(contaminated.costUsd, 36);
     // pricedTicketCount (component fold): the {LIN-9420,LIN-9421} component is
     // excluded (F21's own lineage is unpriced) — only the 3 clean singleton
     // components count.
     assert.equal(contaminated.pricedTicketCount, 3);
-    // The pre-fix bug, reproduced: costUsd(36) / pricedTicketCount(3) =
-    // $12.00 — F20's $6 stayed in the numerator despite its component being
-    // excluded from the denominator, overstating the true $10/ticket rate.
-    assert.equal(contaminated.costUsd / contaminated.pricedTicketCount, 12);
     // The fix: pricedTicketCostUsd sums ONLY the INCLUDED components — the 3
     // clean anchors' $30, never F20's excluded $6 — so the headline reads
     // the true $10.00/ticket rate the clean population actually costs.
@@ -1145,22 +898,12 @@ describe('computeTerminalMarkedTaskCost — LIN-2253 review F1 (Request Changes)
     // component has only ONE member lineage (F20's, fully priced) — the
     // component IS included, contributing both of its tickets.
     assert.equal(control.pricedTicketCount, 5, '{LIN-9420,LIN-9421} (2 tickets) plus 3 clean singletons');
-    assert.equal(control.costUsd, 36, 'same $36 as the contaminated shape — F21 as noLineage contributes $0 either way');
-    // No population mismatch in the control shape: costUsd and
-    // pricedTicketCostUsd cover the SAME included population here, so the
-    // old (buggy) division and the fixed one coincide exactly — proving the
-    // fix changes nothing when there is nothing to fix.
-    assert.equal(control.pricedTicketCostUsd, 36);
-    assert.equal(
-      control.costUsd / control.pricedTicketCount,
-      control.pricedTicketCostUsd / control.pricedTicketCount,
-      'uncontaminated: the old and fixed division must agree exactly'
-    );
+    assert.equal(control.pricedTicketCostUsd, 36, 'uncontaminated: the lane and its three clean anchors are all included');
   });
 });
 
 describe('computeTerminalMarkedTaskCost — LIN-2253 review F4: issue-less overhead lineages must never join a priced component', () => {
-  test('an issue-less DONE lineage with [ticket] markers contributes its spend to overheadUsd only, and its landed tickets never enter pricedTicketCount/pricedTicketCostUsd', () => {
+  test('an issue-less DONE lineage with [ticket] markers never founds or joins a priced component, so its landed tickets never enter pricedTicketCount/pricedTicketCostUsd', () => {
     // The invariant is enforced only by statement ordering in the
     // implementation (the component-eligible push happens strictly after
     // the issue-less `continue`) — this fixture is the regression guard the
@@ -1176,74 +919,9 @@ describe('computeTerminalMarkedTaskCost — LIN-2253 review F4: issue-less overh
       ]
     });
     const result = computeTerminalMarkedTaskCost([bareLane], NOW);
-    assert.equal(result.issueCount, 2, 'both landed tickets still count in T, per the existing ticket-marker walk');
-    assert.equal(result.unpriced, 2, 'both are noLineage — neither is ever fullyPriced');
-    assert.equal(result.laneLandedCount, 2);
-    assert.equal(result.costUsd, null, 'no anchored (issueIdentifier-carrying) lineage exists — nothing enters the per-issue fold');
-    assert.equal(result.overheadUsd, 15, 'the bare lane\'s spend is disclosed as overhead, never priced');
+    assert.equal(result.closeOutLineageShare, 0, 'both landed tickets are in T (a real 0, not null), per the existing ticket-marker walk');
     assert.equal(result.pricedTicketCount, 0, 'the issue-less lineage must never found or join a priced component');
     assert.equal(result.pricedTicketCostUsd, null, 'no included component exists to attribute any cost to');
-  });
-});
-
-describe('computeTerminalMarkedTaskCost — LIN-2423: marker-channel occupancy probe', () => {
-  test('the direct F4 regression: an in-flight (non-done) lineage carrying markers still counts as occupied', () => {
-    // The whole point of computing occupancy ABOVE the `status !== 'done'` gate: a lane that
-    // hasn't finished yet must not read as channel-empty just because it hasn't resolved.
-    const inFlight = row({
-      id: 'occ-inflight', issueIdentifier: 'LIN-9500', harness: 'claude-code', dispatchedAt: daysAgo(0.5),
-      feedback: [
-        ticketMarker('LIN-9500', 'started', 0.4)
-        // no terminal [done]/[failed]/etc — the lineage itself never resolved
-      ]
-    });
-    const result = computeTerminalMarkedTaskCost([inFlight], NOW);
-    assert.equal(result.issueCount, 0, 'unresolved lineages still contribute nothing to T — unchanged by this probe');
-    assert.equal(result.markerOccupiedLineages, 1, 'an in-flight lineage with a marker must count as occupied');
-    assert.equal(result.markerOccupancyShare, 1, 'the only ran lineage is occupied');
-  });
-
-  test('a DONE lineage with zero [ticket] markers does not count as occupied', () => {
-    const noMarkers = row({
-      id: 'occ-none', issueIdentifier: 'LIN-9501', harness: 'claude-code', dispatchedAt: daysAgo(1),
-      feedback: [usageEntry({ costUsd: 1, days: 0.9 }), doneMarker(0.8)]
-    });
-    const result = computeTerminalMarkedTaskCost([noMarkers], NOW);
-    assert.equal(result.markerOccupiedLineages, 0);
-    assert.equal(result.markerOccupancyShare, 0, 'ranLineages is 1 (non-zero), so this is a real 0, not the null zero-ranLineages case');
-  });
-
-  test('markerOccupancyShare denominator is ranLineages — the SAME denominator attributableLineageShare uses', () => {
-    const occupied = row({
-      id: 'occ-a', issueIdentifier: 'LIN-9502', harness: 'claude-code', dispatchedAt: daysAgo(2),
-      feedback: [ticketMarker('LIN-9502', 'done', 1.5), doneMarker(1.4)]
-    });
-    const unoccupied = row({
-      id: 'occ-b', issueIdentifier: 'LIN-9503', harness: 'claude-code', dispatchedAt: daysAgo(1),
-      feedback: [doneMarker(0.9)]
-    });
-    const result = computeTerminalMarkedTaskCost([occupied, unoccupied], NOW);
-    assert.equal(result.markerOccupiedLineages, 1);
-    assert.equal(result.markerOccupancyShare, 0.5, '1 occupied of 2 ran lineages');
-  });
-
-  test('zero ranLineages degrades to count 0 / share null — never a divide-by-zero or a false $0-style zero', () => {
-    const result = computeTerminalMarkedTaskCost([], NOW);
-    assert.equal(result.markerOccupiedLineages, 0);
-    assert.equal(result.markerOccupancyShare, null, 'mirrors asShare\'s null-on-nothing-to-divide-by idiom, never a misleading 0');
-  });
-
-  test('resolves the exact ambiguity this probe exists for: occupancy > 0 while laneLandedCount stays 0 is an honest zero, not a silent channel gap', () => {
-    // Every landed ticket has its own separate lineage here (no lane-landed, no-lineage
-    // tickets at all), so laneLandedCount is a real 0 — but markers ARE flowing through the
-    // channel, which occupancy must show, distinguishing this from a channel-empty defect.
-    const lane = row({
-      id: 'occ-lane', issueIdentifier: 'LIN-9504', harness: 'claude-code', dispatchedAt: daysAgo(2),
-      feedback: [ticketMarker('LIN-9504', 'done', 1.5), doneMarker(1.4)]
-    });
-    const result = computeTerminalMarkedTaskCost([lane], NOW);
-    assert.equal(result.laneLandedCount, 0, 'no lane-landed ticket lacking its own lineage — an honest zero');
-    assert.equal(result.markerOccupiedLineages, 1, 'yet the marker channel is demonstrably non-empty');
   });
 });
 
@@ -1253,5 +931,15 @@ describe('computeTerminalMarkedTaskCost — naming discipline', () => {
     for (const key of Object.keys(result)) {
       assert.ok(!/verif/i.test(key), `field name "${key}" must not reference "verified"`);
     }
+  });
+});
+
+describe('computeTerminalMarkedTaskCost — output contract (LIN-4129)', () => {
+  // Every key here is either published (the /kpis cost block reads windowDays,
+  // pricedTicketCount, pricedTicketCostUsd and COST_SHARE_KEYS) or a shares
+  // denominator's own input. A new field must be published or this test says so.
+  test('the output carries exactly the published keys, and no other', () => {
+    const keys = Object.keys(computeTerminalMarkedTaskCost([], NOW)).sort();
+    assert.deepEqual(keys, ['windowDays', 'pricedTicketCount', 'pricedTicketCostUsd', ...COST_SHARE_KEYS].sort());
   });
 });
