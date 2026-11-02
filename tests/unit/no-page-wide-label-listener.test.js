@@ -123,6 +123,9 @@ const PAGE_SCRIPTS = ['session.js', 'question-cards.js', 'task-page.js', 'close-
 // `file:selector` -> classification. 'captured' = taken before the first
 // markdown render on its page (Rule C pins the order); 'ui-only' = no action.
 const LOOKUP_ALLOW = {
+  // LIN-4114: Home's Waiting on you listener and count line, looked up once in initWaitingOnYou at startup, before any markdown.
+  'app.js:main': 'captured: initWaitingOnYou at startup, before markdown; Harbour\'s own <main>, the listener\'s only binding',
+  'app.js:[data-testid="in-progress-count"]': 'captured: initWaitingOnYou at startup, before markdown; the count line Harbour renders',
   'close-out.js:[data-testid="run-evidence-closeout"]': 'captured: init, before markdown (task-page init calls it first)',
   'session.js:[data-testid="run-evidence-closeout"]': 'captured: initCloseOut / test seam, before renderRunTranscripts',
   'session.js:[data-testid="session-inline-reply"][data-issue-id]': 'captured: initCloseOut / test seam',

@@ -845,14 +845,12 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
 
     const card = page.locator('[data-testid="session-question-card"]');
     await expect(card).toBeVisible();
-    // Choose a declared option (leaving the "own answer" box empty) so the
-    // option id rides the write.
-    await card.locator('[data-testid="session-question-card-option"]').first().click();
-
+    // LIN-4114: a press on a declared option answers at once with its own label and option id (no separate Answer click),
+    // so the option id rides the write. The "own answer" box stays empty.
     const [commentReq, dispatchReq] = await Promise.all([
       page.waitForRequest(r => r.url().includes('/api/comments/') && r.method() === 'POST'),
       page.waitForRequest(r => r.url().includes('/api/dispatch') && r.method() === 'POST'),
-      card.locator('[data-testid="session-question-card-answer"]').click()
+      card.locator('[data-testid="session-question-card-option"]').first().click()
     ]);
 
     const commentBody = commentReq.postDataJSON();

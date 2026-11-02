@@ -5343,3 +5343,24 @@ a.context-node:hover { border-color: var(--text); background: var(--bg); }
   outline-offset: 2px;
   border-radius: 3px;
 }
+
+/* LIN-4114: Home's "Waiting on you" desk section. Its header and body open and close like the other desk sections; the
+   card is the shared question card (lib/question-card.js); the task line sits above each card and links to the task page. */
+.waiting-section { margin: 0 0 1rem; }
+.waiting-header { font-family: var(--font-content); font-size: var(--font-size-sm); color: var(--text); padding: 0.25rem 0; cursor: pointer; }
+.waiting-header:focus { outline: 2px solid var(--brand); outline-offset: 2px; }
+.waiting-card { margin: 0.5rem 0; }
+.waiting-task-line { font-family: var(--font-content); font-size: var(--font-size-sm); color: var(--muted); margin-bottom: 0.25rem; }
+.waiting-task-link { color: var(--text); }
+/* A screen-reader-only live region (LIN-4114): the desk says the outcome of an answer without a visible line. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

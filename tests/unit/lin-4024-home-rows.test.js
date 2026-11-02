@@ -24,6 +24,8 @@ const node = (identifier, type, children = [], title = identifier) => ({
   children,
   depth: 0,
 });
+/** LIN-4114: an open ruling's row, as the standing hands it (a needs-you task has one); Home holds it as Waiting on you. */
+const ruling = (identifier) => ({ decision: { decision_id: `d-${identifier}`, question: 'Which?' }, decisionCase: [], anchor: { loopId: null, issueId: `id-${identifier}`, issueIdentifier: identifier, workspaceUrlKey: 'w', taskDecisionId: `td-${identifier}` }, disposition: 'task-bound', effect: 'record', canReply: true });
 const ids = nodes => nodes.map(n => n.issue.identifier);
 const states = entries => new Map(Object.entries(entries));
 const project = (id, incomplete) => ({ project: { id, name: id, collapsed: false }, incomplete, completed: [], completedCount: 0 });
@@ -77,8 +79,9 @@ describe('homeRowsFor: the rows a fold opens', () => {
       kind: 'backlog', projectId: 'p1', trees: [tree],
       inProgressTrees: inProgress([node('LIN-20', 'backlog')]),
       states: states({ 'LIN-20': { state: 'needs-you' } }),
+      rulingRows: [ruling('LIN-20')],
     });
-    assert.deepEqual(ids(rows.nodes), ['LIN-21'], 'LIN-20 is already on the page, so it is not repeated in the fold');
+    assert.deepEqual(ids(rows.nodes), ['LIN-21'], 'LIN-20 is already on the page (Waiting on you), so it is not repeated in the fold');
   });
 
   test('up next: the unstarted tasks behind the first three, never Backlog or done', () => {

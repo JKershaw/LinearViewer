@@ -32,7 +32,15 @@
   //   3. comment ok, dispatch enqueues  -> today's queued copy + recorded confirmation
   // An issueless run (opts.issueless) skips the comment call entirely and keeps
   // the pre-existing dispatch-only behavior byte-for-byte.
-  function sendReply(opts, btn, textarea, feedback, thread) {
+  // LIN-4114: `cardCtx` is set only by a pinned card: `{ card, controls }`, where `controls` are every button on the card.
+  // While the answer is in flight none of them can start a second one; a failure brings them back; a delivered answer,
+  // or one that landed but did not run (partial), keeps them off. The per-run box passes nothing and is unchanged.
+  function sendReply(opts, btn, textarea, feedback, thread, cardCtx) {
+    var outcome = null;
+    function setControls(disabled) {
+      if (!cardCtx) return;
+      cardCtx.controls.forEach(function (b) { if (b) b.disabled = disabled; });
+    }
     // The pinned question card supplies its own prompt (a choice's label or the
     // typed "own answer"); the per-run reply box reads the textarea. Same flow.
     var prompt = (typeof opts.prompt === 'string' && opts.prompt ? opts.prompt : (textarea.value || '')).trim();
@@ -43,6 +51,7 @@
     }
     var original = btn.textContent;
     btn.disabled = true;
+    setControls(true);
     btn.textContent = 'sending…';
     feedback.innerHTML = '';
     feedback.className = 'sess-reply-feedback';
@@ -55,6 +64,7 @@
     }
 
     function onDispatchOk(note) {
+      outcome = 'success';
       appendYouBubble(thread, prompt);
       textarea.value = '';
       // The success copy matches what actually happened (LIN-3252 F1): a
@@ -82,6 +92,7 @@
         btn.textContent = 'queued ✓';
       }
       feedback.className = 'sess-reply-feedback';
+      if (cardCtx) announceRulingGone(cardCtx.card, feedback.textContent);
     }
 
     // Comment-write failure and issueless-dispatch failure are two distinct
@@ -90,12 +101,22 @@
     // both wire to this same handler here: today's identical "reply failed:
     // ..." copy, zero user-visible change from before the extraction.
     function onDispatchFailed(e) {
+      outcome = 'failed';
       feedback.textContent = 'reply failed: ' + e.message;
       feedback.className = 'sess-reply-feedback error';
       btn.textContent = 'failed';
     }
 
     function restoreButton() {
+      if (cardCtx) {
+        // LIN-4114: only a failure brings the card back. A delivered answer's text stays ("answered ✓"); the card goes.
+        if (outcome !== 'failed') return;
+        setControls(false);
+        setTimeout(function () {
+          if (btn.isConnected && btn.textContent === 'failed') btn.textContent = original;
+        }, 1800);
+        return;
+      }
       setTimeout(function () {
         if (btn.isConnected) {
           btn.textContent = original;
@@ -112,6 +133,7 @@
     // window.ReplyDelivery's own closure over this same opts/prompt — not a
     // caller-side reimplementation of postDispatch.
     function onPartialFailure(dispatchErr, retryDispatch) {
+      outcome = 'partial';
       var delivered = window.ReplyDelivery.deliveredEffect(opts);
       // LIN-4140: a task-bound answer is always a record, so its failure names
       // the task, not a session it was never going to reach.
@@ -131,6 +153,8 @@
         retryDispatch().then(function () {
           feedback.textContent = delivered === 'dispatch' ? 'started a new run' : queuedCopy(true);
           feedback.className = 'sess-reply-feedback';
+          // LIN-4114: a retry that lands delivers the answer, so the card goes like any other delivered answer.
+          if (cardCtx) announceRulingGone(cardCtx.card, feedback.textContent);
         }).catch(function (e2) {
           feedback.textContent = 'Still could not ' + deliveryVerb + ': ' + e2.message + '. ';
           feedback.className = 'sess-reply-feedback error';
@@ -139,8 +163,12 @@
         });
       });
       feedback.appendChild(retryBtn);
-      btn.textContent = original;
-      btn.disabled = false;
+      // LIN-4114: a partial failure already recorded the answer; the only way forward is "Retry delivery", so the
+      // answer buttons stay off here (a second press would write a second comment).
+      if (!cardCtx) {
+        btn.textContent = original;
+        btn.disabled = false;
+      }
     }
 
     // Raw fetch (not window.dispatchPrompt) is deliberate: window.api throws
@@ -162,11 +190,13 @@
       onCommentFailed: onDispatchFailed,
       onDispatchFailed: onDispatchFailed,
       onNoTarget: function () {
+        outcome = 'failed';
         feedback.textContent = 'cannot record a reply: no linked issue';
         feedback.className = 'sess-reply-feedback error';
         btn.textContent = 'failed';
       },
       onNoLinkedIssue: function () {
+        outcome = 'failed';
         feedback.textContent = 'cannot start a fresh run: no linked issue';
         feedback.className = 'sess-reply-feedback error';
         btn.textContent = 'failed';
@@ -174,6 +204,30 @@
       onPartialFailure: onPartialFailure,
       onDispatchOk: onDispatchOk
     }).then(restoreButton);
+  }
+
+  // ── Answered, dismissed: one bubbling event (LIN-4114) ───────────────────────
+  // Fired from inside the card when its answer is delivered (an option press, Answer, a successful Retry delivery) or its
+  // dismiss succeeds. It bubbles to Home's <main>, where one listener clears every copy of the ruling's card (public/app.js).
+  // A dismiss fires BEFORE the card leaves the DOM: a detached node does not bubble.
+  var RULING_GONE_EVENT = 'harbour:question-answered';
+  // Home registers its <main> here at startup (setDeskRoot), so an answer whose card has already left the page still reaches it.
+  var deskRoot = null;
+  // The key every copy of one ruling's card shares: the scan decision id for a task-bound card, else the loop + decision.
+  function rulingKeyOf(card) {
+    var d = card.dataset || {};
+    return d.taskDecisionId ? 'task:' + d.taskDecisionId : 'loop:' + (d.stampLoopId || '') + '|' + (d.decisionId || '');
+  }
+  function announceRulingGone(card, message) {
+    if (!card || typeof CustomEvent !== 'function') return;
+    // A card still on the page bubbles to <main>. A card that left it (a search cleared while its answer was in flight)
+    // cannot bubble, so the desk root takes the event.
+    var target = card.isConnected !== false && typeof card.dispatchEvent === 'function' ? card : deskRoot;
+    if (!target || typeof target.dispatchEvent !== 'function') return;
+    target.dispatchEvent(new CustomEvent(RULING_GONE_EVENT, {
+      bubbles: true,
+      detail: { key: rulingKeyOf(card), urlKey: (card.dataset && card.dataset.urlKey) || '', message: message || '' }
+    }));
   }
 
   // ── Pinned question cards (LIN-3252 S2) ────────────────────────────────────
@@ -235,6 +289,7 @@
       dismissOpts.taskDecisionIssueId = card.dataset.issueId || '';
     }
     window.ReplyDelivery.dismissRuling(dismissOpts, DISMISS_NOOP_HANDLERS).then(function () {
+      announceRulingGone(card, 'Dismissed');
       if (card.parentNode) card.parentNode.removeChild(card);
     }).catch(function (e) {
       if (dismissBtn) dismissBtn.disabled = false;
@@ -266,6 +321,11 @@
           });
         }
         var thread = card.querySelector('[data-testid="session-question-card-thread"]');
+        // LIN-4114: every option is a button; one press answers with its own label. The card's controls are one set, so an
+        // in-flight answer disables all of them (sendReply restores them on a failure only).
+        var optionBtns = Array.prototype.slice.call(card.querySelectorAll('[data-testid="session-question-card-option"]'));
+        var controls = [btn].concat(optionBtns, dismissBtn ? [dismissBtn] : []);
+        var cardCtx = { card: card, controls: controls };
         var issueIdentifier = card.dataset.issueIdentifier || '';
         var decisionId = card.dataset.decisionId || null;
         // LIN-3252 F1: the row's resolved effect, emitted server-side
@@ -317,22 +377,29 @@
           return window.ReplyDelivery.composeDispatchPrompt(row, prompt);
         }
 
+        // Answer sends the typed text only. An empty box says so; a button names its answer, so a press never reads the box.
+        function send(pressed, prompt, optionId) {
+          // LIN-4140: a task-bound answer sends no option id, so its body matches the Rulings tab's (no option id for a scan row).
+          opts.optionId = opts.taskDecisionId ? null : optionId;
+          opts.prompt = prompt;
+          opts.dispatchPrompt = composeDispatch(prompt);
+          sendReply(opts, pressed, textarea, feedback, thread, cardCtx);
+        }
         function submit() {
-          var chosen = card.querySelector('.sess-qcard-option-input:checked');
           var typed = (textarea.value || '').trim();
-          var prompt = typed || (chosen ? chosen.value : '');
-          if (!prompt) {
+          if (!typed) {
             feedback.textContent = 'enter a reply';
             feedback.className = 'sess-qcard-feedback sess-reply-feedback error';
             return;
           }
-          // LIN-4140: a task-bound answer sends no option id, so its body matches
-          // the Rulings tab's (which never carries one for a scan row).
-          opts.optionId = chosen && !opts.taskDecisionId ? (chosen.dataset.optionId || null) : null;
-          opts.prompt = prompt;
-          opts.dispatchPrompt = composeDispatch(prompt);
-          sendReply(opts, btn, textarea, feedback, thread);
+          send(btn, typed, null);
         }
+        optionBtns.forEach(function (optBtn) {
+          optBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            send(optBtn, (optBtn.textContent || '').trim(), optBtn.dataset.optionId || null);
+          });
+        });
 
         btn.addEventListener('click', function (e) { e.preventDefault(); submit(); });
         textarea.addEventListener('keydown', function (e) {
@@ -345,7 +412,7 @@
     }
   }
 
-  var api = { appendYouBubble: appendYouBubble, sendReply: sendReply, dismissQuestionCard: dismissQuestionCard, initQuestionCards: initQuestionCards };
+  var api = { appendYouBubble: appendYouBubble, sendReply: sendReply, dismissQuestionCard: dismissQuestionCard, initQuestionCards: initQuestionCards, rulingKeyOf: rulingKeyOf, RULING_GONE_EVENT: RULING_GONE_EVENT, setDeskRoot: function (el) { deskRoot = el; } };
   if (typeof window !== 'undefined') window.QuestionCards = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })();

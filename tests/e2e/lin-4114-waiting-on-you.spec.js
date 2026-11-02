@@ -21,6 +21,8 @@ import { localSeedId } from '../fixtures/local-harness.js';
 const OLD = '2020-01-01T00:00:00Z';
 const SECTION = '[data-testid="waiting-on-you"]';
 const CARD = `${SECTION} [data-testid="session-question-card"]`;
+// A waiting card's wrapper: the task line and the shared card are its children, so the task filter runs on the wrapper.
+const WAIT_CARD = `${SECTION} .waiting-card`;
 const COUNT = '[data-testid="in-progress-count"]';
 const BADGE = '.rulings-badge .rulings-count';
 
@@ -155,7 +157,7 @@ test('W12: pressing the recommended button answers in place; the card goes, the 
   await expect(page.locator(COUNT)).toContainText('2 waiting on you');
   await expect(page.locator(BADGE)).toHaveText('2', { timeout: 15000 });
 
-  const deep = page.locator(CARD, { has: page.locator('[data-testid="waiting-task-line"]', { hasText: 'LOCAL-D' }) });
+  const deep = page.locator(WAIT_CARD, { has: page.locator('[data-testid="waiting-task-line"]', { hasText: 'LOCAL-D' }) });
   await expect(deep.locator('.btn--primary'), 'the recommended option is the main button').toHaveCount(1, { timeout: 5000 });
   await deep.locator('.btn--primary').click();
   await expect(deep).toHaveCount(0);
@@ -174,7 +176,7 @@ test('W12b: a press on a non-recommended option answers the same way, and the la
   const card = page.locator(CARD).first();
   await card.locator('[data-option-id="ship"]').click();
   await expect(page.locator(SECTION)).toHaveCount(0);
-  await expect(page.locator(COUNT)).not.toContainText('waiting on you');
+  await expect(page.locator(COUNT).filter({ hasText: 'waiting on you' })).toHaveCount(0);
   await expect(page.locator(BADGE)).toHaveText('0', { timeout: 15000 });
 });
 
@@ -192,7 +194,7 @@ test('W13: comment written, run fails: the card stays with "Retry delivery"; aft
     if (failDispatch && route.request().method() === 'POST') return route.fulfill({ status: 500, body: '{"error":"boom"}', contentType: 'application/json' });
     return route.continue();
   });
-  const card = page.locator(CARD, { has: page.locator('[data-testid="waiting-task-line"]', { hasText: 'LOCAL-S' }) });
+  const card = page.locator(WAIT_CARD, { has: page.locator('[data-testid="waiting-task-line"]', { hasText: 'LOCAL-S' }) });
   await card.locator('[data-option-id="a"]').click();
   await expect(card.locator('.sess-reply-retry-delivery')).toBeVisible({ timeout: 15000 });
   await expect(card).toHaveCount(1);
@@ -215,15 +217,15 @@ test('W11: a scan-raised ruling answered by pressing an option closes: the card 
       description: `This task is blocked pending an operator decision. (${issueId})`,
       state: { name: 'In Progress', type: 'started' }, url: `/workspace/${URL_KEY}/issue/${issueId}`,
     }],
-  });
+  }, { runnerKey: true });
   const scan = await page.request.post(`/workspace/${URL_KEY}/api/scan/${issueId}`);
   expect(scan.status(), `scan seed failed: ${await scan.text()}`).toBe(200);
   await page.goto(`/workspace/${URL_KEY}/`);
-  const card = page.locator(CARD, { has: page.locator('[data-testid="waiting-task-line"]', { hasText: 'SCAN-H1' }) });
+  const card = page.locator(WAIT_CARD, { has: page.locator('[data-testid="waiting-task-line"]', { hasText: 'SCAN-H1' }) });
   await expect(card).toHaveCount(1);
   await card.locator('[data-option-id]').first().click();
   await expect(card).toHaveCount(0, { timeout: 15000 });
-  await expect(page.locator(COUNT)).not.toContainText('waiting on you');
+  await expect(page.locator(COUNT).filter({ hasText: 'waiting on you' })).toHaveCount(0);
 });
 
 test('W11b: a scan-raised ruling dismissed on Home closes the same way', async ({ page, seedLocal }) => {
@@ -235,14 +237,14 @@ test('W11b: a scan-raised ruling dismissed on Home closes the same way', async (
       description: `This task is blocked pending an operator decision. (${issueId})`,
       state: { name: 'In Progress', type: 'started' }, url: `/workspace/${URL_KEY}/issue/${issueId}`,
     }],
-  });
+  }, { runnerKey: true });
   const scan = await page.request.post(`/workspace/${URL_KEY}/api/scan/${issueId}`);
   expect(scan.status()).toBe(200);
   await page.goto(`/workspace/${URL_KEY}/`);
-  const card = page.locator(CARD, { has: page.locator('[data-testid="waiting-task-line"]', { hasText: 'SCAN-H2' }) });
+  const card = page.locator(WAIT_CARD, { has: page.locator('[data-testid="waiting-task-line"]', { hasText: 'SCAN-H2' }) });
   await card.locator('[data-testid="session-question-card-dismiss"]').click();
   await expect(card).toHaveCount(0, { timeout: 15000 });
-  await expect(page.locator(COUNT)).not.toContainText('waiting on you');
+  await expect(page.locator(COUNT).filter({ hasText: 'waiting on you' })).toHaveCount(0);
 });
 
 // ---- witness 14: the same ruling twice on a page; search and the opened task are the other copies ------------------
@@ -257,7 +259,7 @@ test('W14: answering a waiting task\'s card inside search removes the Waiting ca
   await page.locator('#search-input').fill('Solo task');
   const results = page.locator('[data-testid="home-search-results"]');
   await expect(results.locator('[data-identifier="LOCAL-S"]').first()).toBeVisible();
-  await expect(page.locator(SECTION)).toHaveCount(0, { timeout: 5000 });
+  await expect(page.locator(SECTION)).toBeHidden({ timeout: 5000 });
   await results.locator('[data-identifier="LOCAL-S"]').first().click();
   const opened = page.locator('[data-testid="opened-task"]').first();
   await opened.locator('[data-option-id="wait"]').click();
@@ -265,7 +267,7 @@ test('W14: answering a waiting task\'s card inside search removes the Waiting ca
 
   await page.locator('#search-input').fill('');
   await expect(page.locator(SECTION)).toHaveCount(0);
-  await expect(page.locator(COUNT)).not.toContainText('waiting on you');
+  await expect(page.locator(COUNT).filter({ hasText: 'waiting on you' })).toHaveCount(0);
   await expect(page.locator(BADGE)).toHaveText('0', { timeout: 15000 });
 });
 
@@ -294,7 +296,7 @@ test('W9b: a started waiting task with a running child is the named context row:
   await seedRuling(page, 'LOCAL-M', THREE_OPTIONS);
   await page.goto(`/workspace/${URL_KEY}/`);
   await expect(page.locator(COUNT)).toContainText('waiting on you');
-  await expect(page.locator(CARD, { has: page.locator('[data-testid="waiting-task-line"]', { hasText: 'LOCAL-M' }) })).toHaveCount(0);
+  await expect(page.locator(WAIT_CARD, { has: page.locator('[data-testid="waiting-task-line"]', { hasText: 'LOCAL-M' }) })).toHaveCount(0);
   const drawn = await page.locator('main [data-identifier="LOCAL-M"]').count();
   expect(drawn).toBe(1);
   await expect(page.locator('main [data-identifier="LOCAL-M"] [data-testid="issue-row-state"]'), 'the context row has no state words').toHaveCount(0);
@@ -318,6 +320,6 @@ test('W17: search hides the section and clearing it restores it; collapsing pers
   await expect(page.locator(`${SECTION} [data-testid="waiting-body"]`)).toBeHidden();
   await page.reload();
   await expect(page.locator(`${SECTION} [data-testid="waiting-body"]`)).toBeHidden();
-  await page.locator('[data-testid="desk-reset"]').click();
+  await page.locator('.reset-view').click();
   await expect(page.locator(`${SECTION} [data-testid="waiting-body"]`)).toBeVisible();
 });

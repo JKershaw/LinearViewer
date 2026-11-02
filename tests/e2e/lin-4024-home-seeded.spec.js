@@ -89,7 +89,7 @@ async function seedRuling(page, identifier) {
   expect(decision.status(), `decision failed: ${await decision.text()}`).toBe(200);
 }
 
-test('a task waiting on a ruling reads the same on the count line, the row, the opened task and the header badge', async ({ page }) => {
+test('a task waiting on a ruling reads the same on the count line, the card, and the header badge', async ({ page }) => {
   await seedSmall(page, { runnerKey: true });
   await seedRuling(page, 'LOCAL-T1');
   await page.goto(`/workspace/${URL_KEY}/`);
@@ -98,19 +98,18 @@ test('a task waiting on a ruling reads the same on the count line, the row, the 
   await expect(count).toContainText('1 waiting on you');
   await expect(count).not.toContainText('running');
 
-  // The row is one state, the same words as the count line.
-  const row = page.locator('.running-section .line[data-identifier="LOCAL-T1"]');
-  await expect(row.locator('[data-testid="issue-row-state"]')).toContainText('needs you');
+  // LIN-4114: the ruling is a card in Waiting on you (not a row in Running), labelled with its task.
+  const card = page.locator('[data-testid="waiting-on-you"] .waiting-card', { has: page.locator('[data-testid="waiting-task-line"]', { hasText: 'LOCAL-T1' }) });
+  await expect(card).toHaveCount(1);
+  await expect(card.locator('[data-testid="session-question-card-question"]')).toContainText('Which API key?');
+  await expect(page.locator('.running-section .line[data-identifier="LOCAL-T1"]')).toHaveCount(0);
 
   // The badge fills from a 5s client poll, so wait for it to settle before comparing it with the summary's number.
   const waiting = (await count.textContent()).match(/(\d+) waiting on you/)[1];
   await expect(page.locator('.rulings-badge .rulings-count')).toHaveText(waiting, { timeout: 15000 });
 
-  // The opened task shows the question on Home, not as raw decision JSON.
-  await row.click();
-  const opened = page.locator('[data-testid="opened-task"]').first();
-  await expect(opened).toContainText('Which API key?');
-  await expect(opened.locator('text=decision_id')).toHaveCount(0);
+  // The question is answered where it is shown, and no raw decision JSON reaches the page.
+  await expect(card.locator('text=decision_id')).toHaveCount(0);
 });
 
 test('search finds a Backlog task the page does not hold, under its ancestors', async ({ page }) => {

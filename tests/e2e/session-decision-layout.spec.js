@@ -187,13 +187,9 @@ test.describe('Decision-bearing waiting-session layout (LIN-2193)', () => {
     }));
     expect(chunkRects[1].top - chunkRects[0].bottom).toBeGreaterThan(0);
 
-    // List reset: a plain <ul> defaults to disc/block; the repair resets it
-    // to a flex chip row with no bullets.
-    const [listStyleType, display] = await optionsList.evaluate(el => {
-      const cs = getComputedStyle(el);
-      return [cs.listStyleType, cs.display];
-    });
-    expect(listStyleType).toBe('none');
+    // LIN-4114: the options are buttons in a labelled group (no list any more), laid out as a flex chip row.
+    const [role, display] = await optionsList.evaluate(el => [el.getAttribute('role'), getComputedStyle(el).display]);
+    expect(role).toBe('group');
     expect(display).toBe('flex');
   });
 

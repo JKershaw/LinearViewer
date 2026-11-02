@@ -230,11 +230,12 @@ describe('the poll leaves a half-typed answer alone and removes the card when th
     // The typed text and the picked option live on controls the CARD owns, so
     // only a repaint of the card (or an ancestor) could wipe them.
     const textarea = { value: 'half a typed answer' };
-    const radio = { checked: true, value: 'b' };
+    // LIN-4114: an option is a button now (no radio to tick); the poll must leave that same button in place.
+    const optionBtn = { dataset: { optionId: 'b' }, textContent: 'Wait for review', disabled: false };
     let removed = false;
     const card = {
       parentNode: { removeChild() { removed = true; } },
-      querySelector: (sel) => (sel === 'textarea' ? textarea : sel === 'input[type="radio"]:checked' ? (radio.checked ? radio : null) : null),
+      querySelector: (sel) => (sel === 'textarea' ? textarea : sel === '[data-testid="session-question-card-option"]' ? optionBtn : null),
     };
     const reloads = [];
     const timers = [];
@@ -267,7 +268,7 @@ describe('the poll leaves a half-typed answer alone and removes the card when th
     };
     vm.runInNewContext(TASK_PAGE_SRC, ctx);
     onReady();
-    return { timers, answer, card, textarea, radio, reloads, inits, wasRemoved: () => removed, cardNode: () => doc.querySelector('[data-testid="task-page-question"]') };
+    return { timers, answer, card, textarea, optionBtn, reloads, inits, wasRemoved: () => removed, cardNode: () => doc.querySelector('[data-testid="task-page-question"]') };
   }
   const flush = async () => { for (let i = 0; i < 6; i++) await Promise.resolve(); };
 
@@ -284,8 +285,8 @@ describe('the poll leaves a half-typed answer alone and removes the card when th
     assert.equal(page.cardNode(), page.card, 'the very same card node, not a re-render');
     assert.equal(page.card.querySelector('textarea'), page.textarea, 'the same textarea object');
     assert.equal(page.textarea.value, 'half a typed answer', 'the typed text survives the poll');
-    assert.equal(page.card.querySelector('input[type="radio"]:checked'), page.radio, 'the same selected option');
-    assert.equal(page.radio.checked, true, 'the selection survives the poll');
+    assert.equal(page.card.querySelector('[data-testid="session-question-card-option"]'), page.optionBtn, 'the same option button, not a re-render');
+    assert.equal(page.optionBtn.disabled, false, 'the option buttons are still live after the poll');
     assert.equal(page.reloads.length, 0);
   });
 

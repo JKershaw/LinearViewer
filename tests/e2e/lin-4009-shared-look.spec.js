@@ -112,11 +112,13 @@ test.describe('one shared look (LIN-4009)', () => {
     await page.goto(`/workspace/${URL_KEY}/`);
     await page.waitForLoadState('networkidle');
 
-    const style = async (identifier) => rowState(page, identifier).evaluate((el) => {
+    const styleOf = (state) => state.evaluate((el) => {
       const cs = getComputedStyle(el);
       return { tone: el.dataset.tone, color: cs.color, weight: cs.fontWeight, background: cs.backgroundColor };
     });
-    const needsYou = await style(TASKS.needsYou);
+    const style = async (identifier) => styleOf(rowState(page, identifier));
+    // LIN-4114: a task with an open ruling is a Waiting on you card; its needs-you state reads on that card's task line.
+    const needsYou = await styleOf(page.locator('[data-testid="waiting-task-line"]', { hasText: TASKS.needsYou }).locator('[data-testid="issue-row-state"]'));
     const failed = await style(TASKS.failed);
     const running = await style(TASKS.running);
     // LIN-4103: a never-run row has no state at all (the guessed "ready" tone is gone), so it has no state element.

@@ -40,8 +40,12 @@ function workspaceOf(issues) {
 function scenario({ issues, states = {}, topTaskId = null }) {
   const { trees, inProgressTrees } = workspaceOf(issues);
   const stateMap = new Map(Object.entries(states));
-  const view = buildHomeView({ inProgressTrees, trees, states: stateMap, topTaskId });
-  return { issues, trees, inProgressTrees, view, states: stateMap, topTaskId };
+  // LIN-4114: a task in the needs-you state has an open ruling, so Home holds its row (the Waiting on you set).
+  const rulingRows = Object.entries(states)
+    .filter(([, state]) => state.state === 'needs-you')
+    .map(([identifier]) => ({ decision: { decision_id: `d-${identifier}`, question: 'Which?' }, decisionCase: [], anchor: { loopId: null, issueId: `id-${identifier}`, issueIdentifier: identifier, workspaceUrlKey: 'w', taskDecisionId: `td-${identifier}` }, disposition: 'task-bound', effect: 'record', canReply: true }));
+  const view = buildHomeView({ inProgressTrees, trees, states: stateMap, topTaskId, rulingRows });
+  return { issues, trees, inProgressTrees, view, states: stateMap, topTaskId, rulingRows };
 }
 
 /** Appends the open identifiers of a node list, depth-first, to `into`. */
@@ -65,6 +69,8 @@ function viewNodesOf(nodes, into = []) {
 /** Where each open task is placed: In Progress, Up next, a Backlog or Up next fold, and each more-of-parent fold. */
 function placementsOf(s) {
   const { view, trees, inProgressTrees, states, topTaskId } = s;
+  // LIN-4114: the Waiting on you set is a place a task can sit in.
+  const waiting = [...view.waiting.ids];
   const inProgress = [];
   for (const tree of view.inProgressTrees) openIdsOf(tree.roots, inProgress);
 
@@ -79,7 +85,7 @@ function placementsOf(s) {
       let offset = 0;
       let page;
       do {
-        page = homeRowsFor({ kind, projectId: tree.project.id, offset, trees, inProgressTrees, states, topTaskId });
+        page = homeRowsFor({ kind, projectId: tree.project.id, offset, trees, inProgressTrees, states, topTaskId, rulingRows: s.rulingRows });
         openIdsOf(page.nodes, folds);
         offset = page.nextOffset;
       } while (offset !== null);
@@ -89,11 +95,11 @@ function placementsOf(s) {
   const parentFolds = viewNodesOf(view.inProgressTrees.flatMap(tree => tree.roots))
     .filter(node => node.more > 0)
     .map(node => {
-      const rows = homeRowsFor({ kind: 'more-of-parent', parentId: node.issue.id, trees, inProgressTrees, states, topTaskId });
+      const rows = homeRowsFor({ kind: 'more-of-parent', parentId: node.issue.id, trees, inProgressTrees, states, topTaskId, rulingRows: s.rulingRows });
       return { parent: node.issue.identifier, more: node.more, topLevel: rows.nodes.map(n => n.issue.identifier), all: openIdsOf(rows.nodes, []) };
     });
 
-  return { inProgress, upNext, folds, parentFolds };
+  return { inProgress, waiting, upNext, folds, parentFolds };
 }
 
 /** The view node for one In Progress identifier, or null when Home does not show it In Progress. */
@@ -102,9 +108,9 @@ function inProgressNodeOf(s, identifier) {
 }
 
 /** Asserts the property: each open task is placed exactly once, the named tasks sit In Progress, each fold matches its count. */
-function assertPlacedOnce(s, { inProgress: mustBeInProgress = [] } = {}) {
+function assertPlacedOnce(s, { inProgress: mustBeInProgress = [], waiting: mustBeWaiting = [] } = {}) {
   const p = placementsOf(s);
-  const placed = [...p.inProgress, ...p.upNext, ...p.folds, ...p.parentFolds.flatMap(f => f.all)];
+  const placed = [...p.inProgress, ...p.waiting, ...p.upNext, ...p.folds, ...p.parentFolds.flatMap(f => f.all)];
   const count = new Map();
   for (const id of placed) count.set(id, (count.get(id) || 0) + 1);
   const open = s.issues.filter(i => !isCompleted(i)).map(i => i.identifier);
@@ -113,6 +119,9 @@ function assertPlacedOnce(s, { inProgress: mustBeInProgress = [] } = {}) {
   }
   for (const id of mustBeInProgress) {
     assert.ok(p.inProgress.includes(id), `${id} must sit In Progress, not only in a fold`);
+  }
+  for (const id of mustBeWaiting) {
+    assert.ok(p.waiting.includes(id), `${id} must sit in Waiting on you, not only in a fold`);
   }
   for (const f of p.parentFolds) {
     assert.equal(f.topLevel.length, f.more, `${f.parent}: its more-of-parent fold must return its ${f.more} folded task(s)`);
@@ -151,12 +160,12 @@ describe('LIN-4117 W2b: every open task Home holds is placed exactly once', () =
     assertPlacedOnce(s, { inProgress: ['T-3'] });
   });
 
-  test('a ruling child under a Todo parent: the ruling sits In Progress, and the parent folds its open siblings', () => {
+  test('a ruling child under a Todo parent: the ruling sits in Waiting on you, and the parent folds its open siblings', () => {
     const s = scenario({
       issues: [issue('P-1', 'unstarted'), issue('R-2', 'unstarted', 'P-1'), issue('Q-3', 'unstarted', 'P-1'), issue('B-4', 'backlog', 'P-1')],
       states: { 'R-2': { state: 'needs-you' } },
     });
-    assertPlacedOnce(s, { inProgress: ['R-2'] });
+    assertPlacedOnce(s, { waiting: ['R-2'] });
   });
 
   test('a failed Todo parent with children: the parent is its own reason to show, and it folds its children', () => {
@@ -176,7 +185,7 @@ describe('LIN-4117 W2b: every open task Home holds is placed exactly once', () =
     assert.equal(inProgressNodeOf(s, 'S-1').context, false);
   });
 
-  test('a started child under a Todo parent with Todo, Backlog, top-task and ruling siblings: the top task and the ruling sit In Progress', () => {
+  test('a started child under a Todo parent with Todo, Backlog, top-task and ruling siblings: the top task sits In Progress and the ruling sits in Waiting on you', () => {
     const s = scenario({
       issues: [
         issue('P-1', 'unstarted'),
@@ -189,11 +198,11 @@ describe('LIN-4117 W2b: every open task Home holds is placed exactly once', () =
       states: { 'R-6': { state: 'needs-you' } },
       topTaskId: nodeKey({ id: 'T-5' }),
     });
-    assertPlacedOnce(s, { inProgress: ['C-2', 'T-5', 'R-6'] });
+    assertPlacedOnce(s, { inProgress: ['C-2', 'T-5'], waiting: ['R-6'] });
     assert.equal(inProgressNodeOf(s, 'P-1').context, true);
   });
 
-  test('the same under a done parent: the top task and the ruling sit In Progress, and the open siblings fold', () => {
+  test('the same under a done parent: the top task sits In Progress, the ruling in Waiting on you, and the open siblings fold', () => {
     const s = scenario({
       issues: [
         issue('D-1', 'completed'),
@@ -206,6 +215,6 @@ describe('LIN-4117 W2b: every open task Home holds is placed exactly once', () =
       states: { 'R-6': { state: 'needs-you' } },
       topTaskId: nodeKey({ id: 'T-5' }),
     });
-    assertPlacedOnce(s, { inProgress: ['C-2', 'T-5', 'R-6'] });
+    assertPlacedOnce(s, { inProgress: ['C-2', 'T-5'], waiting: ['R-6'] });
   });
 });
