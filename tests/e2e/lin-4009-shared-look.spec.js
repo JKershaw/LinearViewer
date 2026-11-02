@@ -85,7 +85,7 @@ async function seedStates(page) {
 
 // Scoped to the In Progress section: the same task also appears under Recent activity and in the opened panel.
 const rowState = (page, identifier) =>
-  page.locator(`.in-progress-section [data-testid="issue-line"][data-identifier="${identifier}"] [data-testid="issue-row-state"]`).first();
+  page.locator(`.running-section [data-testid="issue-line"][data-identifier="${identifier}"] [data-testid="issue-row-state"]`).first();
 
 test.describe('one shared look (LIN-4009)', () => {
   test('a page title is left-aligned on Home, Settings and Live Console', async ({ page }) => {

@@ -39,8 +39,8 @@ test.describe('Jira provider (no test-token mock)', () => {
     await page.goto(DASHBOARD);
     await page.waitForLoadState('networkidle');
     await expect(page.locator('.line:has-text("Jira task in progress")').first()).toBeAttached();
-    await page.locator('.in-progress-section .line:has-text("Jira task in progress")').first().click();
-    await expect(page.locator('.in-progress-section .line:has-text("Subtask of the in-progress task")').first()).toBeVisible();
+    await page.locator('.running-section .line:has-text("Jira task in progress")').first().click();
+    await expect(page.locator('.running-section .line:has-text("Subtask of the in-progress task")').first()).toBeVisible();
   });
 
   // LIN-2011 review finding F1: the epic (ENG-0) used to surface BOTH as the
@@ -336,7 +336,7 @@ test.describe('Jira provider — browser write lane (LIN-1942)', () => {
     // never the fake's internal transition id. In Progress is Home's.
     await page.goto(DASHBOARD);
     await page.waitForLoadState('networkidle');
-    const row = page.locator('.in-progress-items .line:has-text("Jira task to do")').first();
+    const row = page.locator('.running-items .line:has-text("Jira task to do")').first();
     await expect(row).toBeAttached();
     await expect(row.locator('[data-status="in-progress"]')).toBeAttached();
   });

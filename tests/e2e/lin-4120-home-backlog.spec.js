@@ -1,7 +1,11 @@
 // LIN-4120 (S3a-3): Home lets go of the project sections. Witnesses from the approved plan (LIN-4112, Rev 3):
-//   W1  — on Home the top task sits inside the In Progress section (P1).
-//   W5  — Home stays bounded as the backlog grows: Home's HTML barely changes between two fixture sizes, while /backlog
+//   W1  — on Home the top task sits inside the Running section (P1).
+//   W5  — Home stays bounded as the backlog grows: Home's HTML is the same between two fixture sizes, while /backlog
 //         grows. It fails on the pre-S3a-3 tree, which grew Home by about 8.5 KB per 11 projects.
+//         LIN-4113 redefines the Home half. Up next is drawn on Home now, so the old ±256 B rule failed by design
+//         (Up next grew from 2 rows to 5) and would have passed with Up next missing. The new rule: fixture A has five
+//         Todo tasks, both fixtures draw the same five Up next rows, and Home is byte-identical across the eleven extra
+//         projects, because none of their tasks reaches the top five.
 //   W7  — Home has no project sections and one Backlog link, which carries the assignee filter; the onboarding hint
 //         and Add task's back, Cancel and after-create all land on /backlog.
 // Seeded through tests/fixtures/local-harness.js; selectors through tests/helpers.js SELECTORS.
@@ -13,7 +17,8 @@ import { SELECTORS } from '../helpers.js';
 const OLD = '2020-01-01T00:00:00Z';
 const EXTRA_PROJECTS = 11;
 
-// Fixture A: a few projects with an In Progress front card, Up next, Backlog and a done task.
+// Fixture A: a started front card (Running), exactly five Todo tasks across the two projects (Up next's five), a Backlog
+// task and a done task. The five are W5-TODO, W5-T2 and W5-BTODO, W5-BT2, W5-BT3 in project order.
 function seedA(urlKey) {
   const id = (raw) => localSeedId(urlKey, raw);
   return {
@@ -25,14 +30,18 @@ function seedA(urlKey) {
       { id: id('a-front'), identifier: 'W5-FRONT', title: 'W5 front card', projectId: id('proj-a'), sortOrder: 1, createdAt: OLD, state: { name: 'In Progress', type: 'started' } },
       { id: id('a-todo'), identifier: 'W5-TODO', title: 'W5 next up', projectId: id('proj-a'), sortOrder: 2, createdAt: OLD, state: { name: 'Todo', type: 'unstarted' } },
       { id: id('a-backlog'), identifier: 'W5-BL', title: 'W5 backlog', projectId: id('proj-a'), sortOrder: 3, createdAt: OLD, state: { name: 'Backlog', type: 'backlog' } },
+      { id: id('a-todo-2'), identifier: 'W5-T2', title: 'W5 next up two', projectId: id('proj-a'), sortOrder: 4, createdAt: OLD, state: { name: 'Todo', type: 'unstarted' } },
       { id: id('a-done'), identifier: 'W5-DONE', title: 'W5 finished', projectId: id('proj-b'), sortOrder: 1, createdAt: OLD, state: { name: 'Done', type: 'completed' } },
       { id: id('b-todo'), identifier: 'W5-BTODO', title: 'W5 beta next', projectId: id('proj-b'), sortOrder: 2, createdAt: OLD, state: { name: 'Todo', type: 'unstarted' } },
+      { id: id('b-todo-2'), identifier: 'W5-BT2', title: 'W5 beta next two', projectId: id('proj-b'), sortOrder: 3, createdAt: OLD, state: { name: 'Todo', type: 'unstarted' } },
+      { id: id('b-todo-3'), identifier: 'W5-BT3', title: 'W5 beta next three', projectId: id('proj-b'), sortOrder: 4, createdAt: OLD, state: { name: 'Todo', type: 'unstarted' } },
     ],
   };
 }
 
-// Fixture B: A, plus eleven extra projects each with Up next and Backlog tasks, plus more of both in project A. The extra
-// tasks rank below A's front card, so the top task is the same on both fixtures (W5 asserts it before comparing bytes).
+// Fixture B: A, plus eleven extra projects (sort order 10 and up) each with one Todo and one Backlog task, plus more Backlog
+// tasks in project A. The extra Todo tasks rank after project B, so Up next's five are the same as fixture A's. The extra
+// Backlog tasks grow /backlog, not Up next.
 function seedB(urlKey) {
   const id = (raw) => localSeedId(urlKey, raw);
   const base = seedA(urlKey);
@@ -45,11 +54,16 @@ function seedB(urlKey) {
   }
   for (let i = 0; i < 4; i += 1) {
     base.issues.push(
-      { id: id(`a-more-todo-${i}`), identifier: `W5-AT${i}`, title: `W5 more next ${i}`, projectId: id('proj-a'), sortOrder: 20 + i, createdAt: OLD, state: { name: 'Todo', type: 'unstarted' } },
       { id: id(`a-more-bl-${i}`), identifier: `W5-AB${i}`, title: `W5 more backlog ${i}`, projectId: id('proj-a'), sortOrder: 30 + i, createdAt: OLD, state: { name: 'Backlog', type: 'backlog' } },
     );
   }
   return base;
+}
+
+/** The identifiers of the Up next rows a page draws, in order (the row lines, not their details wrappers). */
+function upNextIdsOf(html) {
+  const section = html.slice(html.indexOf('data-testid="home-up-next-section"'), html.indexOf('data-testid="home-backlog-link"'));
+  return [...section.matchAll(/data-testid="issue-line"[^>]*data-identifier="([^"]+)"/g)].map((m) => m[1]);
 }
 
 // A genuine fresh local workspace: POST /workspace/new seeds the starter tasks (LOCAL-1, LOCAL-2) and redirects to Home.
@@ -78,13 +92,13 @@ test.describe('LIN-4120 W1 — the top task stays in In Progress on Home', () =>
     await seedLocal(seedA(localWorkerUrlKey));
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
-    await expect(page.locator('.in-progress-section [data-top-task="1"]')).toHaveCount(1);
+    await expect(page.locator('.running-section [data-top-task="1"]')).toHaveCount(1);
     await expect(page.locator('[data-testid="project"]')).toHaveCount(0);
   });
 });
 
-test.describe('LIN-4120 W5 — Home stays bounded as the backlog grows (CI)', () => {
-  test('Home barely changes between two fixture sizes, while /backlog grows', async ({ page, seedLocal, localWorkerUrlKey }) => {
+test.describe('LIN-4120 W5 — Home stays bounded as the backlog grows (CI; redefined by LIN-4113)', () => {
+  test('Home draws the same five Up next rows and the same bytes across the eleven extra projects, while /backlog grows', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(seedA(localWorkerUrlKey));
     const homeA = await pageHtml(page, `/workspace/${localWorkerUrlKey}/`);
     const backlogA = await pageHtml(page, `/workspace/${localWorkerUrlKey}/backlog`);
@@ -97,11 +111,19 @@ test.describe('LIN-4120 W5 — Home stays bounded as the backlog grows (CI)', ()
     expect(markedId(homeB), 'the top task is the same row on both fixtures').toBe(markedId(homeA));
     expect(markedId(homeA), 'the fixture has a marked top task').not.toBeNull();
 
-    // Home: no project section on either fixture, and the byte length stays within 256 B across the eleven extra projects.
+    // Up next: exactly five rows on both fixtures, and the same five identifiers in the same order. Fixture A has five
+    // Todo tasks; fixture B's eleven extra projects rank after project B, so they never reach the top five.
+    const upNextA = upNextIdsOf(homeA);
+    expect(upNextA, 'fixture A draws five Up next rows').toHaveLength(5);
+    expect(upNextIdsOf(homeB), 'both fixtures draw the same five Up next rows').toEqual(upNextA);
+
+    // Home: no project section on either fixture. Its bytes are identical, not merely close: Running, the recent block
+    // and Up next draw the same rows, and the rowData carries the same five records. The old ±256 B allowance is gone,
+    // because it was a bound on a grown Up next (LIN-4113); a zero delta is now the claim the fixture can make.
     expect(homeA.includes('data-testid="project"')).toBe(false);
     expect(homeB.includes('data-testid="project"')).toBe(false);
-    const delta = Math.abs(Buffer.byteLength(homeB, 'utf8') - Buffer.byteLength(homeA, 'utf8'));
-    expect(delta, `Home grew by ${delta} B across ${EXTRA_PROJECTS} extra projects`).toBeLessThanOrEqual(256);
+    const delta = Buffer.byteLength(homeB, 'utf8') - Buffer.byteLength(homeA, 'utf8');
+    expect(delta, `Home grew by ${delta} B across ${EXTRA_PROJECTS} extra projects, and it should not grow at all`).toBe(0);
 
     // /backlog: the same pair must differ, which shows the extra projects were really seeded and rendered.
     expect(Buffer.byteLength(backlogB, 'utf8')).toBeGreaterThan(Buffer.byteLength(backlogA, 'utf8'));

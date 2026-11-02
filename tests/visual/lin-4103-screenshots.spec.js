@@ -138,7 +138,7 @@ for (const theme of ['light', 'dark']) {
       await page.setViewportSize(viewport);
       await page.goto(`/workspace/${localWorkerUrlKey}/`);
       await page.waitForLoadState('networkidle');
-      const parent = page.locator('.in-progress-section .line[data-identifier="LOCAL-1"]').first();
+      const parent = page.locator('.running-section .line[data-identifier="LOCAL-1"]').first();
       await parent.click();
       const box = page.locator('[data-testid="opened-task"]').first();
       await expect(box).toBeVisible();
@@ -174,7 +174,7 @@ test('the Sessions list shows runs only, owner, light, 1280px', async ({ page, l
   await page.goto(`/workspace/${localWorkerUrlKey}/`);
   await page.waitForLoadState('networkidle');
   // Open LOCAL-11, the task with the plan, the failed build and the queue record, and its own Sessions fold.
-  await page.locator('.in-progress-section .line[data-identifier="LOCAL-11"]').first().click();
+  await page.locator('.running-section .line[data-identifier="LOCAL-11"]').first().click();
   const box = page.locator('[data-testid="opened-task"]').filter({ hasText: 'LOCAL-11' }).first();
   await expect(box).toBeVisible();
   await box.locator('[data-testid="sessions-toggle"]').first().click();
@@ -196,7 +196,7 @@ for (const theme of ['light', 'dark']) {
       await page.setViewportSize(viewport);
       await page.goto(`/workspace/${localWorkerUrlKey}/`);
       await page.waitForLoadState('networkidle');
-      await page.locator('.in-progress-section .line[data-identifier="LOCAL-6"]').first().click();
+      await page.locator('.running-section .line[data-identifier="LOCAL-6"]').first().click();
       const box = page.locator('[data-testid="opened-task"]').first();
       await expect(box).toBeVisible();
       await page.waitForLoadState('networkidle');

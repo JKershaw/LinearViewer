@@ -198,10 +198,36 @@ export const SELECTORS = {
   projectControls: (name) => `[data-testid="project"][data-project-name="${name}"] [data-testid="project-controls"]`,
   /** LIN-4119: a project's Add task link, in its header beside the arrow and name (inline create; external providers use data-action). */
   projectAddTask: (name) => `[data-testid="project"][data-project-name="${name}"] [data-testid="project-header"] [data-testid="create-task"]`,
-  /** LIN-4119: the backlog page (/workspace/:urlKey/backlog) is the project sections alone: no In Progress region. */
+  /** LIN-4119: the backlog page (/workspace/:urlKey/backlog) is the project sections alone: no Running region. */
   backlogPage: {
     projects: '[role="region"][aria-label="Projects"]',
-    inProgress: '.in-progress-section',
+    running: '[data-testid="running-section"]',
+  },
+  /**
+   * LIN-4113: Home's desk. `running` is "Running and recently moved" (the Running view, then the recent block); `recent`
+   * is the block under it labelled "In the last day", with its "show N more" fold; `upNext` is the Up next section, whose
+   * rows are `data-section="home-up-next"` (their own kind, so openedTask.parentLine never matches them).
+   */
+  homeDesk: {
+    running: '[data-testid="running-section"]',
+    runningHeader: '[data-testid="running-header"]',
+    runningItems: '[data-testid="running-items"]',
+    recent: '[data-testid="running-recent"]',
+    recentLabel: '[data-testid="running-recent-label"]',
+    recentItems: '[data-testid="running-recent-items"]',
+    recentFold: '[data-testid="home-fold-recent"]',
+    upNext: '[data-testid="home-up-next-section"]',
+    upNextHeader: '[data-testid="up-next-header"]',
+    upNextItems: '[data-testid="up-next-items"]',
+    /** The line of one Up next row (the row, not its details wrapper). */
+    upNextRow: (identifier) => `[data-testid="home-up-next-section"] [data-testid="issue-line"][data-identifier="${identifier}"]`,
+    upNextRows: '[data-testid="home-up-next-section"] [data-testid="issue-line"][data-section="home-up-next"]',
+    /** Every row line in the recent block: the drawn rows and the rows the fold brought in. */
+    recentLines: '[data-testid="running-recent"] [data-testid="issue-line"]',
+    /** One row of the Running view, by identifier. */
+    runningRow: (identifier) => `[data-testid="running-section"] [data-testid="issue-line"][data-identifier="${identifier}"]`,
+    /** One row of the recent block, by identifier. */
+    recentRow: (identifier) => `[data-testid="running-recent"] [data-testid="issue-line"][data-identifier="${identifier}"]`,
   },
   /** An issue row by id (pairs the testid with the existing data-id hook). */
   issue: (id) => `[data-testid="issue-line"][data-id="${id}"]`,

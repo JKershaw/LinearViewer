@@ -417,7 +417,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
   test('the Home details task-page link navigates to the task page', async ({ page }) => {
     await seedTasks(page);
     await page.goto(`/workspace/${URL_KEY}/`);
-    await page.locator('.in-progress-items .line', { hasText: 'A task with a running build' }).first().click();
+    await page.locator('.running-items .line', { hasText: 'A task with a running build' }).first().click();
     await page.locator('.detail-toggle[data-toggle="description"]').first().click();
 
     const link = page.locator('[data-testid="issue-task-page-link"]').first();

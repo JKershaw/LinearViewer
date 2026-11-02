@@ -116,7 +116,7 @@ test.describe('Team Filtering', () => {
 
     // Alpha should have issues visible. LIN-4117: its one Engineering task is the top task, so it is In Progress on
     // Home rather than in the project section.
-    await expect(page.locator('.in-progress-items .line[data-identifier="TEST-13"]')).toBeVisible();
+    await expect(page.locator('.running-items .line[data-identifier="TEST-13"]')).toBeVisible();
 
     // Beta should exist but have no issues (empty project). Its project section is the backlog page's, under the same filter.
     await page.goto(`${WORKSPACE_URL}backlog?team=eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee`);

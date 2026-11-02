@@ -254,7 +254,7 @@ describe('LIN-3833 — the rendered Home In Progress section', () => {
     // the In Progress section), its parts toned. Assert the text, not the markup around it.
     assert.match(html, /<span class="row-state" data-tone="running" data-testid="issue-row-state">Build running · 5m</);
     const countAt = html.indexOf('data-testid="in-progress-count"');
-    assert.ok(countAt > 0 && countAt < html.indexOf('aria-label="In Progress Tasks"'), 'the count line sits in the page header');
+    assert.ok(countAt > 0 && countAt < html.indexOf('aria-label="Running and recently moved"'), 'the count line sits in the page header');
     const countText = html.slice(html.indexOf('>', countAt) + 1).split('</header>')[0].replace(/<[^>]+>/g, '').trim();
     assert.equal(countText, '1 running');
     assert.match(html, /class="in-progress-count__part" data-tone="running">1 running</);

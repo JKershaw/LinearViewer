@@ -1499,6 +1499,12 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
 
       await localStore.clear(urlKey);
       await localStore.seed(urlKey, seed);
+      // A fresh seed starts with no remembered team for this workspace. A `?team=` load stores its team per account and
+      // workspace (resolveTeamSelection), and a later load with no team param reuses it: a team the seed never had then
+      // refuses every task-facts write for the key (lib/task-facts-holder.js gate), so `/state` cannot see a new task.
+      if (userPreferencesStore && req.session?.accountId) {
+        await userPreferencesStore.setSelectedTeam(req.session.accountId, urlKey, null).catch(() => {});
+      }
 
       // LIN-2226: a second local workspace in the SAME session (cross-workspace
       // task-bound coverage, mirroring LIN-1728 F1's two-Linear-workspace

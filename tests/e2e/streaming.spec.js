@@ -297,9 +297,9 @@ test.describe('Streaming AI Recommendations - UI', () => {
    * (opened-task-write); a viewer who can run has the run block's "✦ write prompt" (run-ask-harbour).
    */
   async function pressGo(page) {
-    await page.locator('.in-progress-items .line:has-text("Blocked on external API")').click();
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-    const component = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .prompt-section`);
+    await page.locator('.running-items .line:has-text("Blocked on external API")').click();
+    await expandPromptsSection(page, '.running-items', BLOCKED_ISSUE_ID);
+    const component = page.locator(`.running-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .prompt-section`);
     await expect(component).toBeVisible();
     const aiPrimary = component.locator('[data-testid="opened-task-write"]').or(component.locator('[data-testid="run-ask-harbour"]'));
     await aiPrimary.click();

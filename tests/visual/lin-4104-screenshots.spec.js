@@ -94,7 +94,7 @@ async function openTask(page, urlKey, identifier, { viewport, theme }) {
   await page.setViewportSize(viewport);
   await page.goto(`/workspace/${urlKey}/`);
   await page.waitForLoadState('networkidle');
-  await page.locator(`.in-progress-section .line[data-identifier="${identifier}"]`).first().click();
+  await page.locator(`.running-section .line[data-identifier="${identifier}"]`).first().click();
   const box = page.locator('[data-testid="opened-task"]').first();
   await expect(box).toBeVisible();
   await page.waitForLoadState('networkidle');

@@ -179,8 +179,10 @@ describe('LIN-4119 — client source pins (public/app.js)', () => {
     // Expand-all, restore and the header click: two through projectNameOf, one through the name it already holds.
     assert.equal(APP_SRC.split('setArrow(projectNameOf(').length - 1, 2, 'restore and the header click');
     assert.equal(APP_SRC.split('setArrow(name, true)').length - 1, 1, 'expand-all');
-    // The in-progress header keeps its own setArrow call; no project site calls it with the header.
-    assert.equal(APP_SRC.split('setArrow(header, ').length - 1, 1, 'only the in-progress section calls setArrow with a header');
+    // LIN-4113: the desk section headers (Running and recently moved, Up next) call setArrow on their own headers, which
+    // hold no Add task link. No project site calls it with a project header: that is the rule this pin keeps.
+    assert.equal(APP_SRC.split('setArrow(header, ').length - 1, 2, 'the desk sections (resetDOM and applyState) call setArrow with their own header');
+    assert.equal(APP_SRC.split('setArrow(deskHeader, ').length - 1, 1, 'the desk click handler');
   });
 
   test('a fetched project row is shown again on expand (the rows the fold fetched are not lost by a collapse)', () => {

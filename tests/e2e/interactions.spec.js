@@ -74,8 +74,8 @@ test.describe('Interactive Features', () => {
   });
 
   test('toggles In Progress section', async ({ page }) => {
-    const inProgressHeader = page.locator('.in-progress-header');
-    const inProgressItems = page.locator('.in-progress-items');
+    const inProgressHeader = page.locator('.running-header');
+    const inProgressItems = page.locator('.running-items');
 
     // Initially visible
     await expect(inProgressItems).toBeVisible();
@@ -222,7 +222,7 @@ test.describe('Detail Section Toggles', () => {
 
   test('same issue in different sections has independent toggles', async ({ page }) => {
     // Find an in-progress issue (appears in both In Progress and Project sections)
-    const inProgressItems = page.locator('.in-progress-items');
+    const inProgressItems = page.locator('.running-items');
     const inProgressLine = inProgressItems.locator('.line.expandable').first();
 
     // Skip if no in-progress issues
@@ -346,7 +346,7 @@ test.describe('Description Expansion (LIN-156)', () => {
 
     test('Comments toggle appears for authenticated users', async ({ page }) => {
       // Find an expandable issue (use project section, first() to avoid duplicates)
-      const issueLine = page.locator('.in-progress-section .line[data-identifier="LOCAL-1"]');
+      const issueLine = page.locator('.running-section .line[data-identifier="LOCAL-1"]');
       await expect(issueLine).toBeVisible();
 
       // Expand the issue to show details
@@ -354,7 +354,7 @@ test.describe('Description Expansion (LIN-156)', () => {
 
       const issueId = await issueLine.getAttribute('data-id');
       // LIN-4024: the seeded parent, which carries the comments, is In Progress (its project row is folded there).
-      const details = page.locator(`.in-progress-section .details[data-details-for="${issueId}"]`);
+      const details = page.locator(`.running-section .details[data-details-for="${issueId}"]`);
 
       // LIN-158: Comments is now nested inside Details, so expand Details first
       const detailsToggle = details.locator('.detail-toggle[data-toggle="description"]');
@@ -369,14 +369,14 @@ test.describe('Description Expansion (LIN-156)', () => {
 
     test('Clicking Comments toggle expands section and loads comments', async ({ page }) => {
       // Find an expandable issue
-      const issueLine = page.locator('.in-progress-section .line[data-identifier="LOCAL-1"]');
+      const issueLine = page.locator('.running-section .line[data-identifier="LOCAL-1"]');
       await expect(issueLine).toBeVisible();
 
       // Expand issue details
       await issueLine.click();
 
       const issueId = await issueLine.getAttribute('data-id');
-      const details = page.locator(`.in-progress-section .details[data-details-for="${issueId}"]`);
+      const details = page.locator(`.running-section .details[data-details-for="${issueId}"]`);
 
       // LIN-158: Comments is now nested inside Details, so expand Details first
       const detailsToggle = details.locator('.detail-toggle[data-toggle="description"]');
@@ -412,13 +412,13 @@ test.describe('Description Expansion (LIN-156)', () => {
     });
 
     test('Comments toggle arrow changes on expand/collapse', async ({ page }) => {
-      const issueLine = page.locator('.in-progress-section .line[data-identifier="LOCAL-1"]');
+      const issueLine = page.locator('.running-section .line[data-identifier="LOCAL-1"]');
       await expect(issueLine).toBeVisible();
 
       await issueLine.click();
 
       const issueId = await issueLine.getAttribute('data-id');
-      const details = page.locator(`.in-progress-section .details[data-details-for="${issueId}"]`);
+      const details = page.locator(`.running-section .details[data-details-for="${issueId}"]`);
 
       // LIN-158: Comments is now nested inside Details, so expand Details first
       const detailsToggle = details.locator('.detail-toggle[data-toggle="description"]');
@@ -439,12 +439,12 @@ test.describe('Description Expansion (LIN-156)', () => {
     });
 
     test('Comments show count after loading', async ({ page }) => {
-      const issueLine = page.locator('.in-progress-section .line[data-identifier="LOCAL-1"]');
+      const issueLine = page.locator('.running-section .line[data-identifier="LOCAL-1"]');
       await expect(issueLine).toBeVisible();
       await issueLine.click();
 
       const issueId = await issueLine.getAttribute('data-id');
-      const details = page.locator(`.in-progress-section .details[data-details-for="${issueId}"]`);
+      const details = page.locator(`.running-section .details[data-details-for="${issueId}"]`);
 
       // LIN-158: Comments is now nested inside Details, so expand Details first
       const detailsToggle = details.locator('.detail-toggle[data-toggle="description"]');

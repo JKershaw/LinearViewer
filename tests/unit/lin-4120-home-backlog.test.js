@@ -63,13 +63,13 @@ describe('LIN-4120: Home draws no project section, and one Backlog link stands i
     assert.match(html, /<a href="\/workspace\/ws\/backlog" data-testid="home-onboarding-backlog-link">Add your own task<\/a>/);
   });
 
-  test('the backlog page draws the project sections, with no Home link and no In Progress region', () => {
+  test('the backlog page draws the project sections, with no Home link and no Running region', () => {
     const { projectTrees, inProgressTrees } = worldTrees();
     const view = buildHomeView({ inProgressTrees, trees: projectTrees, states: new Map(), topTaskId: null });
     const html = renderPage(view.trees, view.inProgressTrees, [], 'Org', { urlKey: URL_KEY, workspaces: [WORKSPACE], featureFlags: {}, pageMode: 'backlog' });
     assert.ok(html.includes('data-testid="project"'), 'the project section is drawn');
     assert.doesNotMatch(html, /data-testid="home-backlog-link"/);
-    assert.doesNotMatch(html, /in-progress-section/);
+    assert.doesNotMatch(html, /running-section/);
   });
 });
 
@@ -110,12 +110,13 @@ describe('LIN-4120: the backlog rowData covers every row the backlog page draws,
 });
 
 describe('LIN-4120 W7: the sign-in refresh re-renders Home with the same rowData as Home', () => {
-  test('the refresh draws no project section, and its rowData carries no project-only task', async () => {
+  test('the refresh draws no project section; rowData carries a record for each drawn Up next row and none for a project-only task outside the top 5 (narrowed by LIN-4113)', async () => {
     const { projectTrees, inProgressTrees, started, backlog } = worldTrees();
-    // A second Up next task that is not the top task: Home's view holds it under its project, so only the rowData
-    // helper keeps it off Home. (The first Todo is the top task, which Home promotes into its In Progress region.)
-    const upNext = node({ id: 't2', identifier: 'X-T2', title: 'Also waiting', state: { type: 'unstarted', name: 'Todo' } });
-    projectTrees[0].incomplete.push(upNext);
+    // LIN-4113 narrowing. Up next is drawn on Home again, so the old "no record" pin is reversed for the rows inside the
+    // Up next top 5: those now carry a record, because the buttons mount through it. A project-only task outside the top 5
+    // still carries none. Six extra Todo tasks make the cap bite, so both halves are exercised.
+    const extra = Array.from({ length: 6 }, (_, i) => node({ id: `tf${i + 1}`, identifier: `X-F${i + 1}`, title: `Far ${i + 1}`, state: { type: 'unstarted', name: 'Todo' } }));
+    projectTrees[0].incomplete.push(...extra);
     const fetched = {
       trees: projectTrees, inProgressTrees, recentActivityTrees: [], organizationName: 'Org',
       teams: [], selectedTeamId: null, showSource: 'local', truncated: false, availableAssignees: [],
@@ -151,8 +152,20 @@ describe('LIN-4120 W7: the sign-in refresh re-renders Home with the same rowData
     // The refresh's top task is the Todo task: Home's view promotes it into the In Progress region, so it has a row record
     // on Home. The project-only Backlog task has none. That is the contrast a project-tree rowData would break.
     const rowData = pageCalls[0][4].rowData;
+    const issueOf = identifier => projectTrees[0].incomplete.find(n => n.issue.identifier === identifier).issue;
+    // The Up next rows the page drew, read from the HTML: the desk's own region, up to the backlog link.
+    const upNextHtml = html.slice(html.indexOf('data-testid="home-up-next-section"'), html.indexOf('data-testid="home-backlog-link"'));
+    const drawn = [...upNextHtml.matchAll(/data-identifier="([^"]+)"/g)].map(m => m[1]);
+    assert.equal(drawn.length, 5, 'Up next draws the cap of 5');
     assert.ok(nodeKey(started.issue) in rowData, 'the In Progress task has its row record after refresh');
-    assert.ok(!(nodeKey(upNext.issue) in rowData), 'a project-only Up next task carries no row record after refresh');
+    for (const identifier of drawn) {
+      assert.ok(nodeKey(issueOf(identifier)) in rowData, `${identifier} is inside the Up next top 5, so it carries its row record`);
+    }
+    const outside = extra.filter(n => !drawn.includes(n.issue.identifier)).map(n => n.issue);
+    assert.ok(outside.length > 0, 'at least one extra project-only task falls outside the top 5');
+    for (const issue of outside) {
+      assert.ok(!(nodeKey(issue) in rowData), `${issue.identifier} is outside the top 5, so it carries no row record after refresh`);
+    }
     assert.ok(!(nodeKey(backlog.issue) in rowData), 'a project-only Backlog task carries no row record after refresh');
   });
 });

@@ -32,8 +32,8 @@ async function seedOwner(page, key, runnerKey) {
 
 async function openTreeTask(page, urlKey) {
   await page.goto(`/workspace/${urlKey}/`);
-  await page.locator(`.in-progress-items [data-testid="issue-line"][data-id="${TASK_ID}"]`).tap();
-  const details = page.locator(`.in-progress-items .details[data-details-for="${TASK_ID}"]`);
+  await page.locator(`.running-items [data-testid="issue-line"][data-id="${TASK_ID}"]`).tap();
+  const details = page.locator(`.running-items .details[data-details-for="${TASK_ID}"]`);
   await expect(details).toBeVisible();
   return details;
 }
@@ -97,8 +97,8 @@ test.describe('run on my machine › on desktop (LIN-3098 S4b)', () => {
   test('tree view and Swipe, no runner key', async ({ page }) => {
     const urlKey = await seedOwner(page, 'runner-entry-desktop', false);
     await page.goto(`/workspace/${urlKey}/`);
-    await page.locator(`.in-progress-items [data-testid="issue-line"][data-id="${TASK_ID}"]`).click();
-    const treeLink = page.locator(`.in-progress-items .details[data-details-for="${TASK_ID}"]`).getByTestId('opened-task-runner-link');
+    await page.locator(`.running-items [data-testid="issue-line"][data-id="${TASK_ID}"]`).click();
+    const treeLink = page.locator(`.running-items .details[data-details-for="${TASK_ID}"]`).getByTestId('opened-task-runner-link');
     await expect(treeLink).toBeInViewport();
     await page.goto(`/workspace/${urlKey}/swipe`);
     await expect(page.locator('#swipe-card').getByTestId('opened-task-runner-link')).toBeInViewport();
