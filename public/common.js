@@ -1120,7 +1120,7 @@ window.ReplyDelivery = (function () {
         onCommentFailed(new Error('cannot record an answer with no linked issue'));
         return Promise.resolve();
       }
-      return postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionLoopIds: opts.decisionLoopIds, decisionId: opts.decisionId, optionId: opts.optionId, source: opts.source }).then(
+      return postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionLoopIds: opts.decisionLoopIds, decisionId: opts.decisionId, optionId: opts.optionId, taskDecisionId: opts.taskDecisionId, taskDecisionIssueId: opts.taskDecisionIssueId, source: opts.source }).then(
         function (commentResult) {
           if (!commentResult.ok) { onCommentFailed(errorFromResult(commentResult)); return; }
           onDispatchOk();
@@ -1148,7 +1148,7 @@ window.ReplyDelivery = (function () {
     // literal built here rather than the rest of `opts`, so this stays the
     // one place a caller's `opts.optionId` (when set) actually reaches
     // `postComment`'s own allowlist.
-    return postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionLoopIds: opts.decisionLoopIds, decisionId: opts.decisionId, optionId: opts.optionId, source: opts.source }).then(function (commentResult) {
+    return postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionLoopIds: opts.decisionLoopIds, decisionId: opts.decisionId, optionId: opts.optionId, taskDecisionId: opts.taskDecisionId, taskDecisionIssueId: opts.taskDecisionIssueId, source: opts.source }).then(function (commentResult) {
       if (!commentResult.ok) {
         onCommentFailed(errorFromResult(commentResult));
         return;
@@ -1191,6 +1191,23 @@ window.ReplyDelivery = (function () {
    * @returns {Promise<void>}
    */
   function dismissRuling(opts, handlers) {
+    // LIN-4140: a scan-raised ruling is dismissed on the scan route, by the
+    // issue's UUID (never an identifier, which would force a provider lookup),
+    // with the scan decision id as the only body field. No follow-up run.
+    if (isTaskBoundOpts(opts)) {
+      if (!opts.taskDecisionIssueId) return Promise.reject(new Error('cannot dismiss a task-bound ruling: no issue id'));
+      return fetch('/workspace/' + encodeURIComponent(opts.urlKey) + '/api/scan/' + encodeURIComponent(opts.taskDecisionIssueId) + '/dismiss' + window.sourceQuery(opts.source), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ id: opts.taskDecisionId })
+      }).then(function (resp) {
+        return resp.json().catch(function () { return {}; }).then(function (data) {
+          if (!resp.ok) throw errorFromResult({ status: resp.status, data: data });
+          return data;
+        });
+      }).then(function () {});
+    }
     // LIN-3959: `stampLoopIds` (the joined row's copies) rides the stamp only.
     var body = { decisionLoopId: opts.stampLoopId || opts.followUpTo, decisionLoopIds: opts.stampLoopIds, decisionId: opts.decisionId };
     return fetch('/workspace/' + encodeURIComponent(opts.urlKey) + '/api/dashboard/rulings/dismiss', {
@@ -1243,6 +1260,12 @@ window.ReplyDelivery = (function () {
   // so the card and the Rulings tab share the SAME fail-closed record path.
   var PRESS_TIME_DOWNGRADE_NOTE = 'the linked task is now closed — recorded instead of starting a run';
   var PRESS_TIME_HYDRATION_FAILURE_NOTE = 'could not confirm the linked task is still open — recorded instead of starting a run';
+
+  // LIN-4140: a card/row that carries a scan decision id is a task-bound ruling.
+  // The one predicate every task-bound branch below reads.
+  function isTaskBoundOpts(opts) {
+    return !!(opts && opts.taskDecisionId);
+  }
 
   function hydrateUrlFor(pageUrlKey, wsUrlKey, identifier) {
     return '/workspace/' + encodeURIComponent(pageUrlKey) + '/api/dashboard/hydrate/' + encodeURIComponent(wsUrlKey) + '/' + encodeURIComponent(identifier);
@@ -1303,7 +1326,9 @@ window.ReplyDelivery = (function () {
    */
   function deliverRulingRecord(opts, handlers) {
     var anchor = { issueId: opts.issueId || null, issueIdentifier: opts.issueIdentifier || null };
-    var recordOn = opts.recordOn || null;
+    // LIN-4140 (plan-review note 1): a scan-raised row is always recorded on its
+    // own anchor, so a stray `record_on` from an older row is ignored here.
+    var recordOn = isTaskBoundOpts(opts) ? null : (opts.recordOn || null);
     var pageUrlKey = opts.pageUrlKey || opts.urlKey;
     var targetContext = (recordOn && opts.issueIdentifier)
       ? window.api(hydrateUrlFor(pageUrlKey, opts.urlKey, opts.issueIdentifier), { on401: false })
@@ -1318,7 +1343,7 @@ window.ReplyDelivery = (function () {
           if (typeof handlers.onNoTarget === 'function') handlers.onNoTarget();
           return;
         }
-        return window.ReplyDelivery.postComment(opts.urlKey, targetId, opts.prompt, { decisionLoopId: opts.decisionLoopId, decisionLoopIds: opts.decisionLoopIds, decisionId: opts.decisionId, optionId: opts.optionId, source: opts.source })
+        return window.ReplyDelivery.postComment(opts.urlKey, targetId, opts.prompt, { decisionLoopId: opts.decisionLoopId, decisionLoopIds: opts.decisionLoopIds, decisionId: opts.decisionId, optionId: opts.optionId, taskDecisionId: opts.taskDecisionId, taskDecisionIssueId: opts.taskDecisionIssueId, source: opts.source })
           .then(function (commentResult) {
             if (!commentResult.ok) { handlers.onCommentFailed(errorFromResult(commentResult)); return; }
             var recordOnNote = resolved.note
@@ -1370,7 +1395,7 @@ window.ReplyDelivery = (function () {
           return deliverRulingRecord(Object.assign({}, opts, { downgradeNote: PRESS_TIME_DOWNGRADE_NOTE }), handlers);
         }
 
-        return window.ReplyDelivery.postComment(opts.urlKey, opts.issueId || opts.issueIdentifier, opts.prompt, { decisionLoopId: opts.decisionLoopId, decisionLoopIds: opts.decisionLoopIds, decisionId: opts.decisionId, optionId: opts.optionId, source: opts.source })
+        return window.ReplyDelivery.postComment(opts.urlKey, opts.issueId || opts.issueIdentifier, opts.prompt, { decisionLoopId: opts.decisionLoopId, decisionLoopIds: opts.decisionLoopIds, decisionId: opts.decisionId, optionId: opts.optionId, taskDecisionId: opts.taskDecisionId, taskDecisionIssueId: opts.taskDecisionIssueId, source: opts.source })
           .then(function (commentResult) {
             if (!commentResult.ok) { handlers.onCommentFailed(errorFromResult(commentResult)); return; }
             function startRun() {
@@ -1412,6 +1437,9 @@ window.ReplyDelivery = (function () {
    * longer say "queued" while a fresh run actually started.
    */
   function deliveredEffect(opts) {
+    // LIN-4140: a scan-raised ruling is never a run. Whatever an older row declares
+    // (`dispatch`, `resume`), its answer is recorded on the task.
+    if (isTaskBoundOpts(opts)) return 'record';
     var effect = opts && opts.effect;
     if (effect === 'resume' && opts.disposition && opts.disposition !== 'resumable') return 'dispatch';
     return effect;
