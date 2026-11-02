@@ -11,6 +11,7 @@
  */
 import { computeSupersededLoopIds } from '../lib/loop-supersede.js';
 import { isTerminalLoop, loopIsWaiting } from '../lib/run-loop-state.js';
+import { liveOnAnchor } from '../lib/live-anchor.js';
 import { collectUnansweredDecisions } from '../lib/unanswered-decisions.js';
 import { findAnchorLoop } from '../lib/session-summary.js';
 import { toEpochMs } from '../lib/utils/time.js';
@@ -245,28 +246,8 @@ export function deriveSessionDecisions(enrichedLoops, { now, liveLoops } = {}) {
   );
 }
 
-/**
- * The ONE "is there a live run on this anchor issue" predicate (LIN-2773 Area 4):
- * the rulings feed and the run page's pinned question card both hand it to
- * `collectUnansweredDecisions` as `liveDispatchOnAnchor`, over the loop set each
- * one holds. No `agentState === 'running'` conjunct, because that would miss
- * `queued` (created, not yet claimed) and `waiting` (parked `blocked` on that
- * very anchor), both of which are live runs on the anchor.
- *
- * LIN-2934 (S4): a null-anchored ruling (`issueIdentifier` itself null — e.g. an
- * identifier-less general-autopilot anchor row, now retained by `_buildLoops`)
- * must never read as "live" just because some UNRELATED general run elsewhere in
- * the set also carries a null identifier. Guard on `issueIdentifier != null`
- * before the scan, so `null === null` can never fire this predicate true.
- *
- * @param {Array<Object>} loops - enriched loops (post-`enrichLoop`)
- * @returns {(issueIdentifier: string|null) => boolean}
- */
-export function liveOnAnchor(loops) {
-  return (issueIdentifier) =>
-    issueIdentifier != null &&
-    loops.some(l => l.issueIdentifier === issueIdentifier && !isTerminalLoop(l));
-}
+/** LIN-4114: the predicate lives in lib/run-loop-state.js; re-exported here so every importer keeps its path. */
+export { liveOnAnchor };
 
 /**
  * Most-relevant activity timestamp for a run, used to sort the merged feed.

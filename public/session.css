@@ -106,20 +106,8 @@
   flex-wrap: wrap;
   gap: 0.4rem;
 }
-.sess-qcard-option-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-family: var(--font-structural);
-  font-size: var(--font-size-sm);
-  padding: 0.15rem 0.5rem;
-  color: var(--text);
-  background: var(--inset);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-.sess-qcard-option-input { accent-color: var(--brand); }
+/* LIN-4114: the options are the shared .btn buttons (lib/question-card.js); the radio rules are gone. */
+.sess-qcard-option { min-height: 32px; }
 .sess-qcard-input {
   width: 100%;
   box-sizing: border-box;

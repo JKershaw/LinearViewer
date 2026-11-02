@@ -162,6 +162,9 @@ function caseOf(name) {
         recap: { recap: { done: [{ item: 'plan', evidence: 'comment' }], pending: [], deviations: [] }, model: 'm', generatedAt: '2026-10-06T09:00:00.000Z' } };
     case 'waiting':
       return { loops: [done({ loopId: 'plan-1', kind: 'plan' }), loop({ loopId: 'impl-2', wakeMarker: 'blocked', waitingMessage: '[blocked] which API key?', feedback: [{ message: '[blocked] which API key?' }] })], ctx: ctx() };
+    case 'open-ruling-recommended':
+      // LIN-4114: an open ruling whose decision names a valid `recommended` option. The card shows that option as the one main button.
+      return { loops: [done({ loopId: 'plan-1', kind: 'plan' }), loop({ loopId: 'impl-2', wakeMarker: 'blocked', waitingMessage: '[blocked] which path?', feedback: [{ message: '[blocked] which path?' }], decision: { decision_id: 'd-rec', question: 'Which path should Harbour take?', options: [{ id: 'ship', label: 'Ship it now' }, { id: 'wait', label: 'Wait for review' }, { id: 'split', label: 'Split the change' }], recommended: 'wait' }, decisionCase: ['Two paths were considered.'], answeredDecisions: [], withdrawal: null })], ctx: ctx() };
     case 'done':
       return { loops: [done({ loopId: 'impl-1' }), loop({ loopId: 'rev-stale', kind: 'review' })], ctx: ctx({ stateType: 'completed', stateName: 'Done' }), evidence: EVIDENCE };
     case 'settling':
@@ -189,7 +192,7 @@ function stateOf(name) {
   return gatherTaskStates({ roots: [root], loops, at: NOW, enrichLoop, deriveSessionWaiting }).states.get('LIN-50');
 }
 
-const CASES = ['running-blocked-repeat', 'waiting', 'done', 'no-sessions', 'lin-3351', 'settling'];
+const CASES = ['running-blocked-repeat', 'waiting', 'done', 'no-sessions', 'lin-3351', 'settling', 'open-ruling-recommended'];
 
 // LIN-3975: the owner's run-control options, as routes/task-page.js builds them (a runner set up, so the run control
 // is the shared PromptSection, not the copy-first view; the copy-first view is covered in its own test).

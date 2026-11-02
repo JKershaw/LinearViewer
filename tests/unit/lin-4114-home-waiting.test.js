@@ -199,20 +199,8 @@ function placementsOf(input) {
   view.inProgressTrees.forEach(t => t.roots.forEach(walk));
   placed.push(...((view.waiting && view.waiting.ids) || []));
   placed.push(...view.upNext.map(n => n.issue.identifier));
-  for (const tree of input.trees) {
-    if (!tree.project) continue;
-    // Up next's overflow is a Home fold. The project Backlog fold is not on Home (it is the /backlog page's list), so it is
-    // not one of the places a Home task must be reached from; a Backlog task is also a recent row, as it was at base.
-    for (const kind of ['up-next']) {
-      let offset = 0;
-      for (;;) {
-        const page = homeRowsFor({ ...input, kind, projectId: tree.project.id, offset });
-        placed.push(...page.nodes.map(x => x.issue.identifier));
-        if (page.nextOffset == null) break;
-        offset = page.nextOffset;
-      }
-    }
-  }
+  // Home draws no project sections (LIN-4120), so the per-project Up next overflow and the project Backlog fold are the
+  // /backlog page's lists, not Home's places. Home's Up next is the flat `view.upNext` above.
   placed.push(...view.recent.nodes.map(n => n.issue.identifier));
   let offset = 0;
   for (;;) {
@@ -259,11 +247,13 @@ describe('LIN-4114 witnesses 8-10: a waiting task is placed once, in Waiting, an
       orderedCards: [card('W1'), card('W1C'), card('U1'), card('X')],
       rulingRows: [ruling('W1')],
     };
-    const upNext = homeRowsFor({ ...input, kind: 'up-next', projectId: 'p', offset: 0 }).nodes.map(n => n.issue.identifier);
+    // The /backlog page's project lists: its Up next (the project's first roots) and that list's overflow fold.
+    const projectUpNext = buildHomeView(input).trees[0].incomplete.map(n => n.issue.identifier);
+    const upNext = [...projectUpNext, ...homeRowsFor({ ...input, kind: 'up-next', projectId: 'p', offset: 0 }).nodes.map(n => n.issue.identifier)];
     const backlog = homeRowsFor({ ...input, kind: 'backlog', projectId: 'p', offset: 0 }).nodes.map(n => n.issue.identifier);
     const folded = homeRowsFor({ ...input, kind: 'more-of-parent', parentId: 'id-S1', offset: 0 }).nodes.map(n => n.issue.identifier);
-    assert.ok(!upNext.includes('W1'), `up-next fold holds W1: ${upNext.join(', ')}`);
-    assert.ok(upNext.includes('W1C'), `up-next fold lost W1's child: ${upNext.join(', ')}`);
+    assert.ok(!upNext.includes('W1'), `project Up next holds W1: ${upNext.join(', ')}`);
+    assert.ok(upNext.includes('W1C'), `project Up next lost W1's child: ${upNext.join(', ')}`);
     assert.ok(!backlog.includes('W1'), 'backlog fold holds W1');
     assert.ok(!folded.includes('W1'), `more-of-parent fold holds W1: ${folded.join(', ')}`);
     assert.ok(folded.includes('W1C') && folded.includes('X'), `more-of-parent lost a child: ${folded.join(', ')}`);

@@ -37,6 +37,8 @@ test.beforeEach(async ({ page, localWorkerUrlKey }) => {
   await page.request.get(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
   await page.request.get(`/test/clear-dispatch-history?urlKey=${URL_KEY}`);
   await page.request.get(`/test/clear-sessions-feed-cache?urlKey=${URL_KEY}`);
+  // TaskDecisionsStore is durable: a scan ruling from an earlier test would otherwise stay on Home (LIN-2212's clear route).
+  await page.request.get(`/test/clear-task-decisions?urlKey=${URL_KEY}`);
 });
 
 /** A small tree: a started charter, a started middle, a Todo task three levels down, and a Todo task on its own. */

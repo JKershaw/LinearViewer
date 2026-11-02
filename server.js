@@ -3665,7 +3665,8 @@ app.get('/workspace/:urlKey/api/home-rows', workspaceFromUrl, async (req, res) =
     });
     const { showSource } = fetched;
     const states = homeStates?.states ?? new Map();
-    const rows = homeRowsFor({ kind, projectId, parentId, q, offset, trees, inProgressTrees, recentActivityTrees, orderedCards, states, topTaskId });
+    // LIN-4114: the same Waiting set the page's view was built with; rows are read only for a viewer with run controls.
+    const rows = homeRowsFor({ kind, projectId, parentId, q, offset, trees, inProgressTrees, recentActivityTrees, orderedCards, states, topTaskId, rulingRows: homeStates?.rulingRows ?? [] });
     const urlKey = workspace.urlKey;
     const ctx = homeRowsContext({ workspace, urlKey, featureFlags, rowStates: states, showSource });
     const html = renderHomeRowsHtml(rows.nodes, { section: rows.section, parentId: rows.parentId, ctx });
