@@ -25,12 +25,12 @@ John's latest framing, which resonated strongly:
 
 Readings the earlier session offered, which John agreed with or built on:
 
-- **The evidence fits the metaphor.** Every time the hand dropped, the shape dissolved:
-  - The Theseus round ended when its operator session did.
-  - The coherence loop (LIN-3449) was parked on 23 October. The count of decisions held in more than one place went from 43 to 54 in the edition after.
-  - Costs paused on 25 October and had to restart from a fresh map.
+- **The evidence fits the metaphor.** Every time the hand moved, the shape dissolved:
+  - For sixteen days, 11 to 26 October, one operator session did the resident's work across four episodes: the coherence loop (LIN-3449), Theseus rounds 1 to 3, the improvement cycles (LIN-3613), and the charter's Theseus loop on the interface (LIN-3490). It survived two compactions. It ended when the frame moved: John turned the charter to the interface. Essay v4 found this. It corrects an earlier reading that the resident ended when its session did.
+  - After the loop was parked on 23 October, the count of decisions held in more than one place went from 43 to 54 in the edition after.
+  - Costs paused on 25 October, when the effort moved to the interface, and had to restart from a fresh map.
 
-  The shape was never missing. What was missing was something to hold it.
+  The shape was never missing. What was missing was something to hold it. v4 puts it this way: continuity of *method* was largely solved, through the code-shape kit, the census and a runbook. Continuity of *standing* was not. No Drift & Coherence report has landed since 23 October, even though it is weekly, because that cadence is a fallback floor, not a trigger.
 - **Frames versus continuity.**
   - Harbour projects frames well: each task is a sharp, correct frame.
   - Passages string frames into a scene.
@@ -95,7 +95,8 @@ The full working, with sources, is in `investigation-notes.md`, in this folder.
   - It has five moves: Find, Own, Free the seam, Consolidate, Rebuild. A replay judge checks behaviour.
   - Each move is predicted, then scored.
   - It distinguishes two kinds of mess: tangled-inside, which rebuild fixes, and scattered-between, which only consolidation fixes. Seven rebuilds in a row left every scattered decision as scattered as before.
-  - An operator session acted as the resident, and the resident ended when the session did.
+  - An operator session acted as the resident. It ended when the frame moved, not when the session did (see above).
+  - Its rule against adopt-later helpers: "Delete in the same change. A helper that callers may adopt later is one more copy."
   - Its annotated reading list already covers much of the outside literature: Lehman, Brand, Parnas, Fowler, Feathers, clone studies.
 - **The coherence loop (LIN-3449).** A session pointed agents at the Drift & Coherence backlog, and it was cleared the same day. Then it was parked and the place decayed again.
 
@@ -109,7 +110,7 @@ The full working, with sources, is in `investigation-notes.md`, in this folder.
 - Classify what the stage proposes as a real fix, partial coverage, or another rule or patch.
 - Include tickets in clean areas, to see whether it stays quiet.
 
-"Make it work, then make it good." A natural later test of the metaphor is to *lower the hand*: let Costs run a tidy or two from its own notes, with John only answering rulings, and see what holds.
+Essay v4's Next gives a concrete version: about ten past tickets that touched a known scattered decision and five that didn't, from June to 8 October. Each is run at its base commit, blind to what came after. The step counts as finding the prize only if it names a decision that later caused an escaped defect. "Make it work, then make it good." A natural later test of the metaphor is to *lower the hand*: let Costs run a tidy or two from its own notes, with John only answering rulings, and see what holds.
 
 ## The live streams (John's hand-held shapes)
 
@@ -131,7 +132,7 @@ The full working, with sources, is in `investigation-notes.md`, in this folder.
 | v1 | LIN-4131 | Read as a report |
 | v2 | LIN-4135 | The argument, with a fresh-reader check built in |
 | v3 | LIN-4138 | Folded in the shelf and the earlier attempts |
-| v4 | LIN-4146 | In flight: Theseus, and the resident existing twice as a session |
+| v4 | LIN-4146 | Merged as `7770ab37`. Adds Theseus and one role across four episodes: method outlives the session, standing doesn't. Weighs inside versus outside the flow, with a middle shape. Fills out "what is different this time", and specifies John's test in Next. |
 
 LIN-4133 holds corrections owed to the earlier essay, `one-feature-twice`.
 
