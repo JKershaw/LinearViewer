@@ -87,6 +87,10 @@ test.describe('Look-alike controls in ticket text answer nothing (LIN-3385)', ()
 
   test.beforeEach(async ({ page, localWorkerUrlKey }) => {
     URL_KEY = localWorkerUrlKey;
+    // An earlier spec's queued run on this worker's key must not reach the task page's controls (run controls read the queue).
+    for (const route of ['clear-dispatch-queue', 'clear-dispatch-history']) {
+      await page.request.get(`/test/${route}?urlKey=${URL_KEY}`);
+    }
     await page.request.get('/test/clear-pr-status');
     await page.request.get('/test/clear-comment-dedupe');
     await page.goto('/test/clear-local-store');
