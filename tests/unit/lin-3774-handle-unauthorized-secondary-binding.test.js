@@ -406,9 +406,10 @@ describe('LIN-3790 handleUnauthorizedError — legacy and refresh-token-kind sec
 });
 
 describe('LIN-3774 handleUnauthorizedError — call-site pins', () => {
-  test('all five routes pass the caught error into the handler', () => {
+  // LIN-4119: the backlog page is the sixth route; it re-renders Home on a 401, as the others do.
+  test('all six routes pass the caught error into the handler', () => {
     const calls = [...SERVER_SRC.matchAll(/return handleUnauthorizedError\(([^)]*)\)/g)].map(m => m[1]);
-    assert.equal(calls.length, 5);
+    assert.equal(calls.length, 6);
     for (const c of calls) assert.match(c, /openRouterSource, res, error$/, c);
   });
 

@@ -146,7 +146,9 @@ describe('source scans (LIN-3692)', () => {
   // under one key over routes/workspace-api.js and routes/workspace-api-*.js (exactly 1: the detail route's
   // localhost read, wherever it sits); the witnesses are the describe at the end of this file.
 
-  const LOCAL_ONLY = { 'lib/dispatch-entrance.js': 1, 'workspace-API unit': 1, 'server.js': 5 };
+  // LIN-4119: server.js gains the backlog route's localhost read (the same `isLocalhost` Home takes for its prompt
+  // options; it builds no URL), so the server.js count is 6.
+  const LOCAL_ONLY = { 'lib/dispatch-entrance.js': 1, 'workspace-API unit': 1, 'server.js': 6 };
 
   test('only publicOrigin, the redirect and the localhost-only reads touch Host or protocol', () => {
     const found = {};
@@ -183,7 +185,8 @@ describe('source scans (LIN-3692), workspace-API unit rule (LIN-3861)', () => {
   const HOST_READ = /req\.protocol|req\.hostname|req\.host\b|get\(['"]host['"]\)|headers\.host|headers\[['"]host|x-forwarded-host/gi;
   const UNIT_KEY = 'workspace-API unit';
 
-  const LOCAL_ONLY = { 'lib/dispatch-entrance.js': 1, [UNIT_KEY]: 1, 'server.js': 5 };
+  // LIN-4119: server.js carries the backlog route's localhost read too (see the scan above): 6.
+  const LOCAL_ONLY = { 'lib/dispatch-entrance.js': 1, [UNIT_KEY]: 1, 'server.js': 6 };
 
   function hostReadProblems(sources) {
     const found = {};
@@ -208,7 +211,7 @@ describe('source scans (LIN-3692), workspace-API unit rule (LIN-3861)', () => {
   const tree = (unit) => ({
     'lib/public-origin.js': 'const a = req.protocol; const b = req.get("host");\n',
     'lib/dispatch-entrance.js': READ,
-    'server.js': READ.repeat(5),
+    'server.js': READ.repeat(6),  // LIN-4119: the live server.js count (see LOCAL_ONLY above)
     ...unit,
   });
 
@@ -233,6 +236,6 @@ describe('source scans (LIN-3692), workspace-API unit rule (LIN-3861)', () => {
   });
 
   test('the other rows stay exact: an extra read in server.js fails', () => {
-    assert.deepStrictEqual(hostReadProblems(tree({ 'routes/workspace-api.js': READ, 'server.js': READ.repeat(6) })), ['server.js: 6 host/protocol reads outside publicOrigin']);
+    assert.deepStrictEqual(hostReadProblems(tree({ 'routes/workspace-api.js': READ, 'server.js': READ.repeat(7) })), ['server.js: 7 host/protocol reads outside publicOrigin']);
   });
 });
