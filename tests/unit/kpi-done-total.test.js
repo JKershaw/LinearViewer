@@ -15,6 +15,9 @@ import { collectWorkspaceKpis } from '../../lib/workspace-kpi-stats.js';
 import { ROLLUP_MARKER_ID, createKpiDailyRollupRun } from '../../lib/kpi-daily-rollup.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 
+// LIN-4178: no founder lookup: the fetched rows stand in for it (the pre-LIN-4178 behaviour).
+const NO_FOUNDERS = async () => [];
+
 const NOW = new Date('2026-06-10T12:00:00.000Z');
 const A = 'ws-alpha';
 const B = 'ws-bravo-secret';
@@ -58,7 +61,7 @@ afterEach(() => { console.warn = originalWarn; });
 
 const row = (urlKey, day, done) => ({ urlKey, day, done, failed: 0, aborted: 0, dispatches: 0 });
 const marker = () => ({ _id: ROLLUP_MARKER_ID, through: '2026-06-09' });
-const publicStats = () => collectKpiStats(publicBag, { now: NOW, milestoneFunnelDeps: {} });
+const publicStats = () => collectKpiStats(publicBag, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: {} });
 const workspaceStats = urlKey => collectWorkspaceKpis({ collections: workspaceBag, urlKey, now: NOW });
 
 /** A collection whose `aggregate` is hidden, so the public read takes the `find` path. */
@@ -210,7 +213,7 @@ describe('a failing read soft-fails to null (LIN-3732)', () => {
 
   test('only a missing handle throws (public)', async () => {
     const { kpiDailyRollup: _omitted, ...without } = publicBag;
-    await assert.rejects(() => collectKpiStats(without, { now: NOW, milestoneFunnelDeps: {} }), TypeError);
+    await assert.rejects(() => collectKpiStats(without, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: {} }), TypeError);
     await assert.rejects(() => loadDoneRollup(undefined), TypeError);
   });
 });

@@ -6,7 +6,8 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { usageOf, evidenceCountOf, ticketMarkerEntriesOf, groupDispatchLineages, joinCostLineages } from '../../lib/dispatch-lineage.js';
+import { usageOf, evidenceCountOf, ticketMarkerEntriesOf, groupDispatchLineages } from '../../lib/dispatch-lineage.js';
+import { groupLineageMembership } from '../../lib/lineage-membership.js';
 import { computeTerminalMarkedTaskCost } from '../../lib/terminal-marked-task-cost.js';
 
 const NOW = new Date('2026-06-10T12:00:00.000Z');
@@ -86,8 +87,8 @@ describe('groupDispatchLineages (LIN-1957) — the shared extraction', () => {
       { _id: 'orig', rootItemId: 'orig', issueIdentifier: 'LIN-1', status: 'taken', dispatchedAt: daysAgo(6), feedback: [] },
       { _id: 'fu', rootItemId: 'orig', followUpTo: 'orig', issueIdentifier: 'LIN-2', status: 'taken', dispatchedAt: daysAgo(5), feedback: [] }
     ];
-    // LIN-4147: a lineage's issue is decided by the shared membership (joinCostLineages), not by groupDispatchLineages.
-    const lineages = joinCostLineages(rows, groupDispatchLineages(rows));
+    // LIN-4147: a lineage's issue is decided by the shared membership (groupLineageMembership), not by groupDispatchLineages.
+    const lineages = groupLineageMembership(rows);
     assert.strictEqual(lineages.get('orig').issueIdentifier, 'LIN-1');
   });
 
@@ -101,7 +102,7 @@ describe('groupDispatchLineages (LIN-1957) — the shared extraction', () => {
       { _id: 'orig', rootItemId: 'orig', status: 'taken', dispatchedAt: daysAgo(6), feedback: [] }, // earliest row: no issueIdentifier
       { _id: 'fu', rootItemId: 'orig', followUpTo: 'orig', issueIdentifier: 'LIN-100', status: 'taken', dispatchedAt: daysAgo(5), feedback: [] }
     ];
-    const lineages = joinCostLineages(rows, groupDispatchLineages(rows));
+    const lineages = groupLineageMembership(rows);
     assert.strictEqual(lineages.get('orig').issueIdentifier, 'LIN-100', 'plan: "issueIdentifier — set from any row carrying one"');
   });
 
@@ -111,8 +112,7 @@ describe('groupDispatchLineages (LIN-1957) — the shared extraction', () => {
       { _id: 'mid', rootItemId: 'orig', followUpTo: 'orig', status: 'taken', dispatchedAt: daysAgo(2), feedback: [] }, // no usage entry
       { _id: 'fu', rootItemId: 'orig', followUpTo: 'orig', status: 'taken', dispatchedAt: daysAgo(1), feedback: [usageMarker(2, 1)] }
     ];
-    const lineages = joinCostLineages(rows, groupDispatchLineages(rows));
-    const rowUsage = lineages.get('orig').rowUsage;
+    const rowUsage = groupLineageMembership(rows).get('orig').members.map(usageOf).filter(Boolean);
     assert.strictEqual(rowUsage.length, 2);
     assert.strictEqual(rowUsage[0].message, '[usage] {"costUsd":1}');
     assert.strictEqual(rowUsage[1].message, '[usage] {"costUsd":2}');

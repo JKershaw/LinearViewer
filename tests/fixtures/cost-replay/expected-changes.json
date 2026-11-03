@@ -1,5 +1,5 @@
 {
-  "note": "LIN-4177: the change list. Each entry names one intended difference from the baseline goldens: a=cap (LIN-4148), b=horizon straddler credited to its true issue, c=true base kind, d=incomplete lineages show no figure. Anything else that differs is a defect (W9). The workerSessions[].dispatchedAt decision is option (ii): the fetched earliest member's time is kept (no entry: no replay line moves).",
+  "note": "LIN-4177: the change list. Each entry names one intended difference from the baseline goldens: a=cap (LIN-4148), b=horizon straddler credited to its true issue, c=true base kind, d=incomplete lineages show no figure. LIN-4178 adds the KPI path and run page: d also reaches S11, S12 and S13 (the same narrow incomplete rule, and the S12/S13 display fixes). Anything else that differs is a defect (W9). The workerSessions[].dispatchedAt decision is option (ii): the fetched earliest member's time is kept (no entry: no replay line moves). The S11 baseline was re-recorded at 9e397e6b over the horizon-filtered rows /kpis actually reads (LIN-4178): the first golden was recorded on unfiltered rows.",
   "changes": [
     {
       "path": "S1.LIN-99.body.workerSessions.P",
@@ -95,6 +95,46 @@
       "path": "S10.perKind.review",
       "change": "c",
       "reason": "st leaves the review kind (c)."
+    },
+    {
+      "path": "S11.pricedTicketCount",
+      "change": "d",
+      "reason": "LIN-4178 (note 1): the done opencode straddler LIN-8 (a founder older than the window, its in-window delta alone) is incomplete under the narrow rule, so its component is no longer priced: one ticket leaves the public count. Named as a public movement (d also reaches S11)."
+    },
+    {
+      "path": "S11.pricedTicketCostUsd",
+      "change": "d",
+      "reason": "As pricedTicketCount: the in-window 0.40 of that straddler leaves the public sum."
+    },
+    {
+      "path": "S12.daily.cost.perDay.26",
+      "change": "d",
+      "reason": "The same straddler's start day (LIN-8, its in-window delta): 0.40 leaves the day, now incomplete (d also reaches S12)."
+    },
+    {
+      "path": "S12.daily.cost.perDay.23",
+      "change": "d",
+      "reason": "A day whose started tasks are all unpriced shows no figure ('-'), not $0.00 (LIN-4178 S12 display fix)."
+    },
+    {
+      "path": "S12.daily.cost.perDay.25",
+      "change": "d",
+      "reason": "As perDay.23: an all-unpriced day shows '-', not $0.00."
+    },
+    {
+      "path": "S12.daily.cost.perDay.28",
+      "change": "d",
+      "reason": "As perDay.23: an all-unpriced day shows '-', not $0.00."
+    },
+    {
+      "path": "S12.daily.cost.pricedCount",
+      "change": "d",
+      "reason": "LIN-8's straddler is incomplete and no longer counts as a priced task (d also reaches S12)."
+    },
+    {
+      "path": "S13.steps.implementation#8",
+      "change": "d",
+      "reason": "The complete $0 lineage 'zr' shows $0.00 on the run page, not 'not reported' (LIN-4178 S13 display fix). Its unpriced and unreadable neighbours still withhold."
     }
   ]
 }

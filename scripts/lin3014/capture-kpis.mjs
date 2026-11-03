@@ -20,6 +20,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 import { EJSON } from 'bson';
 
+// LIN-4178: no founder lookup: the fetched rows stand in for it (the pre-LIN-4178 behaviour).
+
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, '..', '..');
 
@@ -48,13 +50,18 @@ function recordingCollection(name, reads) {
  * @param {Function} collectKpiStats - lib/kpi-stats.js's real export
  * @returns {Object} the captured {op, pipeline|filter/projection} per collection name
  */
-export async function captureKpiReads(collectKpiStats) {
+export async function captureKpiReads(collectKpiStats, lookupFounderRows) {
   const reads = {};
   const collections = Object.fromEntries(
     KPI_STATS_COLLECTION_NAMES.map((name) => [name, recordingCollection(name, reads)])
   );
+  // LIN-4178: the founder lookup is passed (collectKpiStats needs it), over inert collections: its own
+  // read shape is pinned in tests/unit/founder-lookup.test.js, and the recording stubs keep one read per
+  // collection name, so a second read here would overwrite the captured `dispatchHistory` aggregate.
+  const inert = { find: () => ({ toArray: async () => [] }) };
+  const lineageIdentity = rows => lookupFounderRows({ dispatchHistory: inert, dispatchQueue: inert }, rows);
   try {
-    await collectKpiStats(collections, { milestoneFunnelDeps: emptyMilestoneFunnelDeps() });
+    await collectKpiStats(collections, { lineageIdentity, milestoneFunnelDeps: emptyMilestoneFunnelDeps() });
   } catch {
     // Expected: the recording stubs return empty arrays/0, which downstream
     // aggregation/derivation code may not tolerate. Only the READ SHAPES
@@ -99,7 +106,8 @@ async function main() {
     return;
   }
   const { collectKpiStats } = await import(pathToFileURL(join(repoRoot, 'lib', 'kpi-stats.js')));
-  const pick = await captureKpiReads(collectKpiStats);
+  const { lookupFounderRows } = await import(pathToFileURL(join(repoRoot, 'lib', 'founder-lookup.js')));
+  const pick = await captureKpiReads(collectKpiStats, lookupFounderRows);
   for (const [name, read] of Object.entries(pick)) {
     const shape = read?.op === 'aggregate' ? `${read.pipeline.length} stage(s): ${Object.keys(read.pipeline[0] || {})}` : JSON.stringify(read);
     console.log(name, read?.op, shape);

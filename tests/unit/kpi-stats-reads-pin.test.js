@@ -12,6 +12,9 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import { collectKpiStats } from '../../lib/kpi-stats.js';
 
+// LIN-4178: no founder lookup: the fetched rows stand in for it (the pre-LIN-4178 behaviour).
+const NO_FOUNDERS = async () => [];
+
 const NOW = new Date('2026-06-10T12:00:00.000Z');
 
 const NAMES = [
@@ -59,7 +62,7 @@ function recordingCollections({ withAggregate }) {
 
 async function recordReads(opts) {
   const { collections, calls } = recordingCollections(opts);
-  await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: {} });
+  await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: {} });
   return calls;
 }
 

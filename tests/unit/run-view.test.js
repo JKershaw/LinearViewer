@@ -363,10 +363,13 @@ describe('run-view: cost (honest, never guessed)', () => {
     assert.equal(view.cost.usd, 1.25);
   });
 
-  test('never emits 0, a partial sum, or a pricedUsd field', () => {
+  test('never emits a partial sum or a pricedUsd field; a complete $0 is a figure, not "not reported" (LIN-4178)', () => {
+    // LIN-4178: a complete $0 lineage is priced at 0, and the header total is complete (0), not withheld.
     const zero = buildRunView(session([pricedStage('plan', { usage: { costUsd: 0 } })]));
-    assert.equal(zero.cost.usd, null);
-    assert.equal(zero.steps[0].cost.status, 'not-reported');
+    assert.equal(zero.steps[0].cost.status, 'priced');
+    assert.equal(zero.steps[0].cost.usd, 0);
+    assert.equal(zero.cost.status, 'total');
+    assert.equal(zero.cost.usd, 0);
 
     const partial = buildRunView(session([
       pricedStage('plan', { usage: { costUsd: 1.5 } }),
