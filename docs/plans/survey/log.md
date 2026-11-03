@@ -2,7 +2,7 @@
 
 A running log of the overnight run of 2 to 3 November 2026 and after. The newest entries are at the bottom. The plan is `../survey.md`, and the prompt is `prompt.md`.
 
-## Wrap-up so far (3 Nov, 15:25 UTC; S5 still open)
+## Wrap-up (3 Nov, 16:20 UTC; all spikes in)
 
 **Short version.** The Survey works as a *surveyor*, not just a reviewer.
 
@@ -11,7 +11,7 @@ On three live tickets, its forecasts, written before any work, named where the c
 - **LIN-4110 (the flake):** it read the cause from code, warned that the ticket's own fix would weaken the guard, and proposed the seam the builder then built (better placed).
 - **S5 (LIN-4107):** it named the 12px pin collision that became two rulings.
 
-Its misses are one class: things only learned by drawing or running (CSS draw order, phone pixel budgets, test seeding). v2 now asks it to name those.
+Its misses are one class: things only learned by drawing or running (CSS draw order, phone pixel budgets, test seeding, the runtime cascade). That held on S4 and S5 alike. v2 now asks it to name those, and on LIN-4110 that list was exactly the builder's first checks.
 
 | Spike | What it tested | Result |
 |---|---|---|
@@ -21,7 +21,7 @@ Its misses are one class: things only learned by drawing or running (CSS draw or
 | 1c | v0, blind at S3's base | Two named tidies became real prerequisites (LIN-4118, LIN-4140). Scale badly under-forecast (2 prerequisites predicted, 11 tickets actual). |
 | 3 | v0 backtest: 5 prize tickets, 4 clean | 2 hits, 2 partial, 1 miss. Diagnosis strong; it recommended "just drill" past copies it had found (C1 escapes *are* copies left behind). Clean: 2 quiet, 2 small tidies pulled by the task. |
 | 2 | v1 forward on S4 | 0 plan-review rounds (✓). It named 3 copies of "last run" (✓, the builder agreed). A drill leaves the pill tables (✓, became LIN-4159). Home's empty cases (✓, the review's regression). The new word table drift (pending). Missed the CSS grid order, the phone budget, a seeding trap. |
-| 2 | v1 forward on S5 | Named the 12px pin collision (✓, 2 rulings). Recommended deleting the phone shrink (done). Missed the first-screen pin, which is now John's open ruling. |
+| 2 | v1 forward on S5 | Named: the `em` tokens compound (✓); the phone shrink is one global `body` rule (✓); the four-size test over shared sheets "measures the site, not Home", so witness computed sizes per page (✓, the builder's own words and its "what I'd do first"); "there are three tokens" (✓); the 12px pins (✓, rulings). Missed: what depended on the shrink (LIN-3987 first screen, header rows), the runtime cascade (CI red on 3 shards, a bisect). Merged as `048c3319` after John's ruling. |
 | 2b | v2 forward on LIN-4110 | Cause (✓), GET warning (✓), seam (✓, builder generalised it), sibling memo (✓), and its "couldn't check" list was the builder's first verification. The cleanest result. |
 
 **Survey versions.**
@@ -345,3 +345,18 @@ S5 (LIN-4107) has PR #2256 with CI green, after 5 stepper beats plus review. Rev
 - The forecast's "bites later" warned that "em→rem shifts sizes … on pages nobody screenshots" and that the floor tests and the smallest token must agree. Those were the same family, but it **did not name the LIN-3987 first-screen pin**.
 - **S4's builder had named exactly that pin** in its after-answer at 11:05 ("`lin-3987` keeps 'Use for this run' inside 844px with almost no headroom"). It's the kind of claim v2's question 5 now asks for (pixel budgets). S5's forecast was v1, written before either.
 - **Another rule obeyed literally:** the plan's four-size test needed two scope rulings (exempt, exempt-narrow) and a third round of "rulings on 3 open items".
+
+## 3 Nov, about 16:20 UTC: S5 done, and its builder's answer
+
+S5 (LIN-4107) merged as `048c3319` after John's ruling, which dropped LIN-3987's first-screen fit, and is deployed. The builder's answer is on LIN-4107 under "Survey spike 1a".
+- **Where it bound:**
+  - "The type scale lived nowhere": about 48 literal `font-size` values, mostly `em`, in nine shared sheets.
+  - Nothing maps selectors to the pages that render them, so it got the scope wrong twice.
+  - `em` nesting compounded.
+  - One global phone `body` shrink that "header, nav and Change-sheet layouts held only because of".
+  - Pins on literal values and on phone layouts: three rulings mid-build.
+  - "The static unit witness could not see the runtime cascade": CI went red on three E2E shards, then a bisect.
+- **What it would have done first:** "a census on main: computed sizes on every page at 320, 390 and 1280px, with each selector tagged by the pages that render it", plus a pin inventory. Optionally, the nav chrome's own phone size. "Saved roughly half of beats 2 to 4."
+- **What the ticket got wrong:** "four sizes through the existing token set" (three tokens, all `em`); the witness counted shared sheets, so "it measured the site, not Home"; "no phone shrink" was framed as body text when it is a global rule other layouts depend on.
+
+**Against the forecast:** the diagnosis matches nearly point for point. The `em` compounding, the global shrink, the whole-sheet count measuring the site, the witness as computed sizes per page (the forecast's recommendation *is* the builder's "what I'd do first"), and three tokens, not four. The misses are, again, the draw-or-run class: what depended on the shrink, and the runtime cascade.
