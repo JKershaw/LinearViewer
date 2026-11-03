@@ -39,12 +39,12 @@ test.describe('The opened task on Home, copy-first (LIN-3833)', () => {
     await page.waitForLoadState('networkidle');
   });
 
-  test('a Todo task names its step from its status: Plan, written by "✦ Write the prompt"', async ({ page }) => {
+  test('a Todo task names no step before the prompt is written; "✦ Write the prompt" writes Plan', async ({ page }) => {
     const component = await openTaskPrompts(page, '.running-items', TODO_ISSUE_ID);
     const write = component.locator('[data-testid="opened-task-write"]');
     await expect(write).toBeVisible();
     await expect(write).toHaveAttribute('data-prompt', 'plan');
-    await expect(component.locator('[data-testid="opened-task-step"]')).toContainText('the first step for a task in Todo');
+    await expect(component.locator('[data-testid="opened-task-step"]')).toContainText('Write the prompt for this task. The prompt says which step it is for.');
   });
 
   test('the copy action exists only once a prompt is written', async ({ page }) => {
