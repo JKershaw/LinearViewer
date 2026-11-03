@@ -148,3 +148,9 @@ Both are posted on LIN-4150 (22:16). The base is `f6a2c2158`, main at 21:54. **S
 - plan-review rounds against the prediction;
 - the pieces against the prediction;
 - the builders' own 1a answers.
+
+## 3 Nov, about 06:15 UTC: the night's gap, and the morning restart
+
+- **The overnight run stalled after 22:25.** My "resume S4" message to the UI session needed a permission prompt that John only saw in the morning, and I had not booked a further check after it. The session's worker also restarted overnight. So S4 and S5 did not run overnight. S3e (LIN-4139) landed at 23:03 and S3 (LIN-4105) closed at 23:31. A lesson for unattended runs: book the next wake-up *before* any step that might block on a prompt.
+- **06:12: the resume was delivered** after John approved it, and the UI operator is acting on it.
+- **06:15: periodicals kicked off.** A general autopilot run (`86aad1ea`, maxTasks 2) has a goal limited to Seams & Tangles and Drift & Coherence. Both last ran on 23 October.
