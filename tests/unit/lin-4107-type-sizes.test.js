@@ -190,6 +190,7 @@ export const MONO_ALLOWED = Object.freeze([
   // IDs and machine facts (the wordmark is the brand mark, kept mono as its pin in tests/unit/wordmark.test.js says)
   '.wordmark',
   '.task-ident',
+  '.sess-v code',
   '.task-ref-ident',
   '.sess-ticket-ident',
   '.sess-ctx-ident',

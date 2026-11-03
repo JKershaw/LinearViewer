@@ -222,3 +222,17 @@ a.task-stage-run:hover { text-decoration: underline; }
 .task-context-offers, .task-context-none { margin: 0; font-size: var(--font-size-base); color: var(--muted); }
 .task-context-offer + .task-context-offer::before { content: "· "; }
 .task-context-section--quiet .sess-ctx-panel { margin-top: var(--space-2); }
+
+/* LIN-4107 beat 3 addendum (ruling A): a nested element draws a size off the token set in two ways. An em token inside an
+   em-sized parent compounds (13.6px x 0.85 = 11.56px), and the browser's default heading sizes (h2 1.5em, h3 1.17em) are
+   not tokens. Each rule below resets the nested element to inherit (its parent's computed size) or to the lg token, scoped to
+   the task page's selectors. A code span keeps the structural face: Chrome scales the generic monospace family to 13/16 of
+   its parent when the size is inherited, so the face is set with the size. The shared --font-size-* tokens are unchanged,
+   so no other page's sizes move. */
+h1 .task-ident { font-size: inherit; }
+.opened-task-change { font-size: inherit; }
+.task-stage-session-line .task-stage-run { font-size: inherit; }
+.task-ref-list .task-ref-state { font-size: inherit; }
+.sess-v code { font-family: var(--font-structural); font-size: inherit; }
+.task-description .section-header { font-size: var(--font-size-lg); }
+.task-md h2, .task-md h3 { font-size: var(--font-size-lg); }
