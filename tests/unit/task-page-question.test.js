@@ -169,7 +169,7 @@ describe('a parked wait is not a question on the task page, as on Home (LIN-4038
     assert.equal(m.waitingFor, 'ruling');
     assert.match(render(m, 'owner'), /data-testid="task-page-question"/);
     assert.match(headerOf(m), /status-pill--needs-you/);
-    assert.match(headerOf(m), />waiting</);
+    assert.match(headerOf(m), />needs you</);
   });
 
   test('a shelf that has lapsed (resurfaceAt passed) makes the ruling open again, and the card returns', () => {

@@ -377,6 +377,10 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
     // and must never sit beside an ENABLED run-step.
     test('an idle setup notice is cleared once a prompt lands, with dispatch enabled (N3)', async ({ page, seedLocal, localWorkerUrlKey }) => {
       await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, runnerKey: true });
+      // LIN-4040 close-out (review A): the run-step rung is enabled only while the task is offered a run, so no run from an
+      // earlier case may be in flight on the top task when this one loads.
+      await page.request.get(`/test/clear-dispatch-queue?urlKey=${localWorkerUrlKey}`);
+      await page.request.get(`/test/clear-dispatch-history?urlKey=${localWorkerUrlKey}`);
       await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
       await page.waitForLoadState('networkidle');
       await openPrompts(page);
@@ -469,6 +473,12 @@ test.describe('LIN-2942 — the ladder records its mode', () => {
     // proxyDefault:false keeps a copy bare (these cases predate the +proxy default being on for everyone).
     await seedLocal(workspaceApiLocalSeed, { runnerKey: false, proxyDefault: false, ...(options || {}) });
     await page.goto(`/test/clear-task-mode-events?urlKey=${urlKey}`);
+    // LIN-4040 close-out (review A): a case that wants a ready run-step needs the top task offered a run, so an earlier
+    // case's dispatch must not be in flight when the card loads.
+    if (options && options.runnerKey) {
+      await page.request.get(`/test/clear-dispatch-queue?urlKey=${urlKey}`);
+      await page.request.get(`/test/clear-dispatch-history?urlKey=${urlKey}`);
+    }
     await page.goto(`/workspace/${urlKey}/swipe`);
     await page.waitForLoadState('networkidle');
     await openPrompts(page);
