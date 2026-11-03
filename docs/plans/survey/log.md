@@ -233,3 +233,12 @@ The follow-up went to the stepper session (dispatch `1758387e`, idle since 07:46
 ## Railway: S4's deploy
 
 `main` is at `300c811f`, with no commit after it. Railway's deploy waits on green CI, and a re-run of the failed job didn't trigger a new deployment. **The next green commit to `main` will deploy everything, `300c811f` included.** But nothing is merging, because the UI round waits on this deploy (S4's close-out blocks, S5 waits on S4). A small deadlock: a manual redeploy, or any other green merge to `main`, clears it.
+
+## Survey v2: what changed and why (3 Nov, about 11:10 UTC)
+
+- **Added question 5, "What you couldn't check".** The Survey must name its claims that depend on drawing (CSS, layout, pixel budgets), running (timing, parallel load, shared test state) or live data, and say how the builder could check each one early. **Why:** every miss in S4's after-answer was of that class (the CSS grid's drawn order, the 844px phone budget, the seeding trap). A read-only reader can't see them. It can at least say where it's blind, which turns a silent miss into an early check.
+- Nothing removed this round. v1's lines all earned their keep on S4.
+
+## 3 Nov, about 11:10 UTC: Spike 2b, a third forward test on LIN-4110 (the flaky look-alike E2E)
+
+John's idea: fix the flake that cost this morning's deploy, and use it as a Survey test. LIN-4110 was raised to **High** and moved to Todo, with today's evidence posted on it (the failure on `main` at `300c811f` that blocked the Railway deploy, LIN-4106's "known flake", and LIN-4113's E2E shared-state cost). A flaky test is the class the Survey is weakest at, so it's a fair test of v2's question 5.
