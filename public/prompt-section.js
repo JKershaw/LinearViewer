@@ -1015,9 +1015,9 @@
       const sessions = (opened && opened.sessions) || { count: 0, last: null };
       const last = sessions.last;
       if (!(sessions.count && last && !sessions.running)) return '';
-      return `<div class="opened-task-last" data-testid="opened-task-last">Last: ${esc(last.label || 'session')} ${esc(last.state || '')}`
-        + `${last.at ? ` \u00b7 ${esc(formatGeneratedAge(Date.parse(last.at)) || '')}` : ''}`
-        + ` \u00b7 <button class="btn opened-task-all" data-action="all-sessions" data-testid="opened-task-all">All ${sessions.count}</button></div>`;
+      // LIN-4106: the last run is said once, in the state line above the box (the server's sentence). This line keeps only
+      // the way to all of the runs, so it does not repeat the raw state words.
+      return `<div class="opened-task-last" data-testid="opened-task-last"><button class="btn opened-task-all" data-action="all-sessions" data-testid="opened-task-all">All ${sessions.count}</button></div>`;
     }
 
     // LIN-4010: the copy-first state line: the tracker's word, then either nothing (a prompt was copied; "You copied …"
@@ -1433,7 +1433,9 @@
         || (state.run.panelFailed
           ? '<p class="opened-task-change-note" data-testid="run-panel-failed">The choices could not load. Use for this run stays off until they do.</p>'
           : '<p class="opened-task-change-note" data-testid="run-panel-loading">Loading the choices\u2026</p>');
+      // LIN-4106: the drawer names what it is for, then the line that says what the change reaches.
       return `<div class="opened-task-change-panel" data-testid="run-change-panel">`
+        + `<h3 class="opened-task-change-title" data-testid="run-change-heading">Change this run</h3>`
         + `<div class="opened-task-change-head">This run only${panelWords.model ? ` \u00b7 default: ${esc(panelWords.model)}` : ''}`
         + `<button class="btn--quiet opened-task-change-x" data-action="close-change" aria-label="Close" data-testid="run-change-x">\u00d7</button></div>`
         + (caps.runBox
@@ -1451,7 +1453,7 @@
         + `<button class="btn--quiet" data-action="reset-run" data-testid="run-reset">Reset</button>`
         + `<button class="btn--quiet" data-action="close-change">Close</button>`
         + `<a class="opened-task-settings-link" href="/workspace/${encodeURIComponent(opts.urlKey || '')}/settings/models">Settings \u203A Models</a>`
-        + `</div><p class="opened-task-change-note">A change here is for this run only. The default is set in Settings \u203A Models.</p>`
+        + `</div><p class="opened-task-change-note">A change here is for this run only. The default is set in Settings \u203A Models. Runs are listed on <a class="opened-task-settings-link" data-testid="run-dispatch-link" href="/workspace/${encodeURIComponent(opts.urlKey || '')}/dispatch">Dispatch \u203A</a>.</p>`
         + `</div>`;
     }
 

@@ -238,14 +238,16 @@ describe('LIN-4010 — Home\'s state is one line, with no "Harbour:" label', () 
     assert.equal(renderHomeStatus(model, { now: NOW, taskState: taskStateOf({ running: { words: 'Build running' } }) }), '');
   });
 
-  // LIN-4010 review (finding 2): an idle task's "Last: …" is the Last line under the run box, not a second copy here.
-  test('an idle task with sessions says "No session running." on Home; the Last clause is not repeated', () => {
+  // LIN-4010 review (finding 2), REWRITTEN (LIN-4106): an idle task's line is the task page's own sentence, the last run said
+  // once. The separate "No session running." and the raw "Last:" clause are gone from Home.
+  test('an idle task with sessions says the task page\'s sentence on Home; no "No session running." and no raw Last clause', () => {
     const model = {
-      status: 'idle', sentence: 'No session running. Last: Plan done just now.', sentenceAt: '2026-10-29T10:03:00.000Z',
+      status: 'idle', sentence: 'Last run: Plan finished just now · the only run', sentenceAt: '2026-10-29T10:03:00.000Z',
       sessions: [{ kind: 'plan', state: 'done' }], waitingFor: null,
     };
     const html = renderHomeStatus(model, { now: NOW, taskState: taskStateOf({}) });
-    assert.match(html, /No session running\.</);
+    assert.match(html, /data-testid="home-task-sentence"[^>]*>Last run: Plan finished just now · the only run</);
+    assert.equal(html.includes('No session running'), false);
     assert.equal(html.includes('Last:'), false);
   });
 

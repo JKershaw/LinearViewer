@@ -748,3 +748,58 @@ test('LIN-4104 D4: Run to Done dispatches the autopilot kickoff with no stopAt, 
   assert.equal(d.stopAt, undefined, 'the dispatch body names no stop: a run to Done is unbounded');
   assert.equal(d.entryRung, 'run-task', 'it is still the ladder\'s autopilot press, so it records reach done');
 });
+
+// LIN-4106 (beat 3): the Change drawer has a heading, a readable default with its numbers, and links to the house pages;
+// Home's opened box says its last run once, in the state line, with no raw "Last:" words.
+describe('LIN-4106 — the Change drawer: a heading, the default with its numbers, and the house pages', () => {
+  const NUMBERS = { runs: 12, priced: 12, unpriced: 0, noTelemetry: 0, spendUsd: 6.48, typicalUsd: 0.54 };
+  const withNumbers = (q) => ({ ...serverPanel(q), numbers: NUMBERS });
+  const opened = { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT };
+  const openDrawer = async (loadOver = {}) => {
+    const { c } = await mount({}, { opened, previewFor: () => null, ...loadOver });
+    await c.click({ action: 'change-run' });
+    await flush();
+    return c;
+  };
+  const panelOf = (c) => c.innerHTML.slice(c.innerHTML.indexOf('data-testid="run-change-panel"'));
+  const defaultCardOf = (c) => /data-testid="run-default"[^>]*>([\s\S]*?)<\/button>/.exec(c.innerHTML)[1];
+
+  test('the drawer opens with a heading that says what it is for, before the head line', async () => {
+    const panel = panelOf(await openDrawer());
+    assert.match(panel, /<h3 class="opened-task-change-title" data-testid="run-change-heading">Change this run<\/h3>/);
+    assert.ok(panel.indexOf('run-change-heading') < panel.indexOf('This run only'), 'the heading comes first');
+  });
+
+  test('the default choice reads as a choice: "Default for <step>", with the numbers of the last 30 days and the typical cost', async () => {
+    const card = defaultCardOf(await openDrawer({ panelFor: withNumbers }));
+    assert.match(card, /Default for /);
+    assert.match(card, /12 runs in the last 30 days, about \$0\.54 each/);
+  });
+
+  test('the default choice names no machine key: plain words only', async () => {
+    const text = defaultCardOf(await openDrawer({ panelFor: withNumbers })).replace(/<[^>]+>/g, ' ');
+    assert.doesNotMatch(text, /\bclaude-code\b|\bnone\b|\bnull\b|\bundefined\b/, text);
+  });
+
+  test('the drawer links to the house pages it depends on: Settings › Models for the default, Dispatch for the runs', async () => {
+    const panel = panelOf(await openDrawer({ panelFor: withNumbers }));
+    assert.match(panel, /href="\/workspace\/acme\/settings\/models"[^>]*>Settings › Models</);
+    assert.match(panel, /data-testid="run-dispatch-link"[^>]*href="\/workspace\/acme\/dispatch"|href="\/workspace\/acme\/dispatch"[^>]*data-testid="run-dispatch-link"/);
+  });
+
+  test('each house-page link points at a route the server registers', () => {
+    const server = readFileSync(join(__dirname, '..', '..', 'server.js'), 'utf8');
+    const settings = readFileSync(join(__dirname, '..', '..', 'routes', 'settings.js'), 'utf8');
+    assert.match(server, /app\.get\('\/workspace\/:urlKey\/dispatch'/, 'the Dispatch page route');
+    assert.match(settings, /router\.get\('\/workspace\/:urlKey\/settings\/:area'/, 'the settings area route');
+    assert.match(settings, /getArea\('models'\)/, 'the Models area the link opens');
+  });
+});
+
+describe('LIN-4106 — Home\'s opened box says its last run once, in the state line', () => {
+  test('no raw "Last:" clause under the run box; the count button stays', async () => {
+    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT } });
+    assert.equal(/Last: /.test(c.innerHTML), false, 'the raw state words are not repeated under the box');
+    assert.match(c.innerHTML, /data-testid="opened-task-all"/);
+  });
+});
