@@ -7,10 +7,10 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { collectUnansweredDecisions, resolveDisposition, resolveEffect, isDecisionAnswered, isDecisionWithdrawn, buildRulingRef, parseStampLoopIds, MAX_STAMP_LOOP_IDS } from '../../lib/unanswered-decisions.js';
+import { collectUnansweredDecisions, resolveDisposition, resolveEffect, isDecisionAnswered, isDecisionWithdrawn, buildRulingRef, parseStampLoopIds, MAX_STAMP_LOOP_IDS, REAP_INACTIVITY_MS } from '../../lib/unanswered-decisions.js';
 
 const NOW = new Date('2026-08-22T12:00:00.000Z');
-const REAP_INACTIVITY_MS = 21600000; // 6h, mirrors simple-dispatcher's config.js
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 function decision(id, overrides = {}) {
   return { decision_id: id, question: 'Proceed?', ...overrides };
@@ -134,8 +134,16 @@ describe('resolveDisposition (LIN-1728 Revision 3, F8: total mapping)', () => {
     assert.strictEqual(resolveDisposition(l, { now: NOW }), 'resumable');
   });
 
-  test('terminal, well past the reap window → gone', () => {
-    const completedAt = new Date(NOW.getTime() - 1000 * 60 * 60 * 24); // 24h ago
+  test('terminal, 3 days old (inside the 7-day record window) → resumable, offered as a reply that continues', () => {
+    const completedAt = new Date(NOW.getTime() - 3 * DAY_MS);
+    const l = loop({ terminalStatus: 'done', terminalCompletedAt: completedAt.toISOString(), decision: decision('d-1') });
+    const disposition = resolveDisposition(l, { now: NOW });
+    assert.strictEqual(disposition, 'resumable');
+    assert.strictEqual(resolveEffect(l.decision, disposition).effect, 'resume');
+  });
+
+  test('terminal, 8 days old (past the 7-day record window) → gone', () => {
+    const completedAt = new Date(NOW.getTime() - 8 * DAY_MS);
     const l = loop({ terminalStatus: 'done', terminalCompletedAt: completedAt.toISOString() });
     assert.strictEqual(resolveDisposition(l, { now: NOW }), 'gone');
   });
@@ -1219,7 +1227,7 @@ describe('collectUnansweredDecisions — worker/autopilot join (LIN-3959)', () =
   const T_WK = '2026-08-22T10:30:00.000Z';
   const GONE = {
     terminalStatus: 'done',
-    terminalCompletedAt: new Date(NOW.getTime() - 7 * 3600000).toISOString(),
+    terminalCompletedAt: new Date(NOW.getTime() - REAP_INACTIVITY_MS - 3600000).toISOString(), // 1h past the record window → gone
     wakeMarker: null
   };
 

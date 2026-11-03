@@ -23,6 +23,10 @@ import { DismissalSuggestionsStore } from '../../lib/dismissal-suggestions-store
 import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
 import { createSessionsFeedCache } from '../../lib/sessions-feed-cache.js';
 import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
+import { REAP_INACTIVITY_MS } from '../../lib/unanswered-decisions.js';
+
+// A timestamp safely past the record window, so the fixture is `gone` whatever the window is.
+const PAST_REAP_WINDOW_ISO = () => new Date(Date.now() - REAP_INACTIVITY_MS - 24 * 60 * 60 * 1000).toISOString();
 
 const URL_KEY = 'test-workspace';
 const DECISION_ID = 'd-1';
@@ -163,14 +167,14 @@ beforeEach(() => {
 });
 
 /**
- * A `gone` loop — terminal (`[done]`), well past the 6h reap window — that
+ * A `gone` loop — terminal (`[done]`), well past the record reap window — that
  * ALSO declares `on_answer.effect`. Used only by the `liveDispatchOnAnchor`
  * witness below: `gone` (unlike `resumable`) reaches resolveEffect's
  * branch 4, where a declared effect is otherwise honoured, so it is the
  * disposition on which an override is actually observable.
  */
 function goneDecisionItem(id, identifier, decisionId, onAnswerEffect) {
-  const oldIso = new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString(); // 7h ago, past REAP_INACTIVITY_MS (6h)
+  const oldIso = PAST_REAP_WINDOW_ISO(); // past REAP_INACTIVITY_MS (7d)
   const payload = { decision_id: decisionId, question: 'Proceed?', on_answer: { effect: onAnswerEffect } };
   return {
     id, issueIdentifier: identifier, issueTitle: `Title ${identifier}`,
@@ -193,11 +197,11 @@ function liveQueueItem(id, identifier) {
  * with NO `issueIdentifier` at all, retained anchorless by R1's
  * `ANCHOR_KINDS_WITHOUT_ISSUE` (a non-anchor kind with no identifier would
  * still be dropped as malformed; only `autopilot` survives). Terminal, well
- * past the 6h reap window, so disposition is `gone` (never self-matches
+ * past the record reap window, so disposition is `gone` (never self-matches
  * `liveDispatchOnAnchor` the way a live/mid-turn loop would).
  */
 function goneGeneralAnchorItem(id, decisionId, onAnswerEffect) {
-  const oldIso = new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString(); // 7h ago, past REAP_INACTIVITY_MS (6h)
+  const oldIso = PAST_REAP_WINDOW_ISO(); // past REAP_INACTIVITY_MS (7d)
   const payload = { decision_id: decisionId, question: 'Proceed?', on_answer: { effect: onAnswerEffect } };
   return {
     id, kind: 'autopilot', issueIdentifier: null, issueTitle: 'Goal-only run',
