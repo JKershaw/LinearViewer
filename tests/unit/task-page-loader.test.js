@@ -264,7 +264,7 @@ describe('task page loader: no stored-only fallback', () => {
     const { model } = await loader.loadTaskState({ urlKey: 'ws', identifier: 'LIN-50' });
     assert.equal(model.tracker, null, 'not read this time');
     assert.equal('status' in model, false, 'the ladder word is gone; the state is the gather\'s');
-    assert.equal(model.sentence, 'No session running. Last: Build done 4 hours ago.');
+    assert.equal(model.sentence, 'Last run: Build finished 4 hours ago · the only run');
   });
 });
 
@@ -295,12 +295,12 @@ describe('deriveHeader: one sentence per branch, live facts first, then finished
     ['waiting beats running; message cut to one line, marker dropped', { sessions: [s('running', 'review')], waiting: { waiting: true, message: '[blocked] Which API?\nmore detail' }, tracker: tracker('started') }, 'Which API?'],
     ['running', { sessions: [s('done', 'plan'), s('running', 'implementation')], waiting: noWait, tracker: tracker('started') }, 'Build running for 58m.'],
     ['queued only', { sessions: [s('done', 'plan'), s('queued', 'review')], waiting: noWait, tracker: tracker('started') }, 'Review queued, waiting for a worker.'],
-    ['failed after a session (LIN-3991)', { sessions: [s('failed', 'review')], waiting: noWait, tracker: tracker('started') }, 'Review failed 1 hour ago.'],
+    ['failed after a session (LIN-3991)', { sessions: [s('failed', 'review')], waiting: noWait, tracker: tracker('started') }, 'Last run: Review failed 1 hour ago · the only run'],
     ['nothing yet', { sessions: [], waiting: noWait, tracker: tracker('unstarted') }, 'No sessions yet.'],
     ['ready PR with nothing running: waiting on the person', { sessions: [s('done', 'review')], waiting: noWait, tracker: tracker('started'), closeOut: { status: 'ready', pr: { number: 41 } } }, 'Approved. PR #41 is ready to merge.'],
     ['a running session beats ready', { sessions: [s('done', 'review'), s('running', 'close-out')], waiting: noWait, tracker: tracker('started'), closeOut: { status: 'ready', pr: { number: 41 } } }, 'Close-out running for 58m.'],
-    ['a not-ready close-out stays idle', { sessions: [s('done', 'review')], waiting: noWait, tracker: tracker('started'), closeOut: { status: 'not-ready', pr: { number: 41 } } }, 'No session running. Last: Review done 1 hour ago.'],
-    ['tracker not read (the state endpoint): never finished, no suffix', { sessions: [s('done', 'close-out')], waiting: noWait, tracker: null }, 'No session running. Last: Close-out done 1 hour ago.'],
+    ['a not-ready close-out stays idle', { sessions: [s('done', 'review')], waiting: noWait, tracker: tracker('started'), closeOut: { status: 'not-ready', pr: { number: 41 } } }, 'Last run: Review finished 1 hour ago · the only run'],
+    ['tracker not read (the state endpoint): never finished, no suffix', { sessions: [s('done', 'close-out')], waiting: noWait, tracker: null }, 'Last run: Close-out finished 1 hour ago · the only run'],
     ['unknown kind falls back to stepKindWord', { sessions: [s('running', 'brand-new-kind')], waiting: noWait, tracker: null }, 'Brand-new-kind running for 58m.'],
   ];
   for (const [name, input, sentence] of cases) {

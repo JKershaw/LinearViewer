@@ -26,7 +26,7 @@ const sess = (kind, state, over = {}) => ({
 describe('LIN-3991 — the header sentence says the failed stage (the page status is the gather\'s, LIN-4071)', () => {
   test('a failed first and only stage reads failed', () => {
     const header = deriveHeader({ sessions: [sess('review', 'failed', { message: 'tests red' })], waiting: noWait, tracker: null, now: NOW });
-    assert.equal(header.sentence, 'Review failed 30 minutes ago: tests red');
+    assert.equal(header.sentence, 'Last run: Review failed 30 minutes ago: tests red · the only run');
   });
 
   test('a cancelled stage (an Undo) is not a failure and does not read failed', () => {

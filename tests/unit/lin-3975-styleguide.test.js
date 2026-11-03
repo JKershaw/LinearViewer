@@ -26,9 +26,9 @@ test('/styleguide shows each task page piece under its own section', () => {
   }
 });
 
-test('ui-pieces.md records the task page decisions: the Harbour label, the moment, the cut and the once-said PR state', () => {
+test('ui-pieces.md records the task page decisions: the moment, the cut and the once-said PR state', () => {
   const doc = readFileSync(new URL('../../docs/architecture/ui-pieces.md', import.meta.url), 'utf8');
-  assert.match(doc, /labelled "Harbour:"/);
+  assert.doesNotMatch(doc, /labelled "Harbour:"/, 'LIN-4106: the pill carries no Harbour label');
   assert.match(doc, /lib\/components\/time\.js/);
   assert.match(doc, /Read all of it/);
   assert.match(doc, /The PR's state is said once/);
