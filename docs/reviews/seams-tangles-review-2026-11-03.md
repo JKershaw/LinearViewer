@@ -210,6 +210,7 @@ Readiness is judgement on the measured edges; there are no scores. Each line giv
 - **Unmapped files (seams):** 0 (both, HEAD guide).
 - **Unresolved relative imports:** **4**, all in `routes/test.js`: line 14 (`tests/fixtures/local-harness.js`), 20 (`github-harness.js`), 26 (`github-projects-harness.js`), 33 (`jira-harness.js`). Production code importing test fixtures — Drift's half of F8.
 - **Not read by the tool:** browser globals and `scripts:` wiring in `public/` (F6: 52 `window.X =` in `common.js`, 99 across `public/`, 42 non-minified scripts, 32 `scripts:` files); scheduler jobs in `server.js` (not import edges); text contracts with no import edge (`harbour-token-format` mirrored in `lib/secret-scan.js` and `lib/runner-kit/runner.mjs`, Drift's); Simple Dispatcher (CommonJS, out of the tool's reach; `dispatcher.js` has 34 `require(` and 0 `import` in the workspace copy, 33 in 10-23's count; not built).
+- **`experiments/rebuild-rung7/`** (second-read finding, verified): 25 files, **+35,752 / −23** lines in the window, of which 33,486 added lines are tracked generated output under `replay/work/`. `seams.mjs` scopes to `lib/`, `routes/`, `public/` and `server.js`, so the subtree is invisible to the import graph. `scripts/code-shape/areas.json` claims only `^experiments/replay-kit/` among experiments paths, so the subtree is unmapped. The tests in `tests/unit/lin3880-replay-ai-coverage.test.js:19` import from it. Only the tool's exclude list (`scripts/code-shape/code-shape-lib.mjs:17`, `replay/(pinned|work)`) knows it is noise. Cochange counts files, not lines, so it shows up only as file counts (§6).
 - **`scripts/pipeline-churn.mjs`** (LIN-3891) is mapped to Runs by the guide but outside `seams.mjs`'s scope, so the two tools see different file sets under one guide (the research's note; verified by the unmapped breakdown in §6).
 
 ## 6. Change coupling — first reported run (baseline)
@@ -222,7 +223,7 @@ Figures (`cochange-code-015aa4c6-guide-015aa4c6-days60.json`):
 - At `5b32864e` (window 2026-08-24 → 2026-10-23): 808 changes, 343 multi-area, 74 pairs, 4575 unmapped.
 - The windows share about 50 of their 60 days; the movement below is not a clean before/after.
 
-**Unmapped 5123, by top-level directory** (`cochange-015aa4c6-unmapped-by-topdir.json`, same window and guide; its total equals cochange's `unmappedFiles`): `docs` **2875** (`docs/reviews` 2430, `docs/papers` 374, `docs` top-level files 27, others 44), `tests` **1287**, `experiments` **560**, `scripts` **347**, `prototypes` 39, root files 11, `.github` 2, `content` 1, `plans` 1. So the unmapped count is documents (mostly review reports) and tests; whether the guide should claim tests is a **proposal**, not an edit (§9).
+**Unmapped 5123, by top-level directory** (`cochange-015aa4c6-unmapped-by-topdir.json`, same window and guide; its total equals cochange's `unmappedFiles`): `docs` **2875** (`docs/reviews` 2430, `docs/papers` 374, `docs` top-level files 27, others 44), `tests` **1287**, `experiments` **560**, `scripts` **347**, `prototypes` 39, root files 11, `.github` 2, `content` 1, `plans` 1. So the unmapped count is documents (mostly review reports) and tests; whether the guide should claim tests is a **proposal**, not an edit (§7). Within `experiments` (560 files), `experiments/rebuild-rung7/` is the largest single block in the window: 25 files, +35,752 added lines, 33,486 of them tracked `replay/work/` output (second-read finding, §5).
 
 **Top pairs at HEAD, with the `5b32864e` value in brackets:**
 
@@ -249,7 +250,7 @@ Figures (`cochange-code-015aa4c6-guide-015aa4c6-days60.json`):
 - The two windows share about 50 of 60 days, so the movement is directional.
 - One squash-merged PR is one change; large UI rounds (LIN-4040 and the Home rounds) inflate every pair they touch. The Browser+Pages 140 is partly this.
 - Wiring is the single file `server.js`.
-- The guide's `scripts/` and `experiments/` patterns move cochange's counts but are invisible to `seams.mjs` (the guide claims them for change coupling only).
+- The guide claims `scripts/pipeline-churn.mjs` for Runs, and among experiments paths only `experiments/replay-kit/`. `experiments/rebuild-rung7/` is claimed by no area, so its files count as unmapped in cochange and are invisible to `seams.mjs`.
 - Nothing in this section is a score, a threshold, or enforced.
 
 ## 7. Guide edits vs guide proposals
@@ -267,7 +268,9 @@ Figures (`cochange-code-015aa4c6-guide-015aa4c6-days60.json`):
 2. **Route `tree.js` through a single layer** (or retire its re-export; LIN-3922). Move `tree.js` to Task model (P2).
 3. **Give model routing its own area** (P2), with its LLM→Runs edges made explicit rather than hidden inside LLM.
 4. **Split "LLM & prompts"** (10-23 proposal, still applies): model routing and recommendation facts are the two halves that read as different layers.
-5. **Tests in the guide** — whether the guide should claim `tests/` for change coupling is a proposal. Not adopted here; the unmapped breakdown (§6) shows the size (1287 files in the window).
+5. **P3, unmeasured (second-read finding):** map `^experiments/rebuild-[^/]+/` to "Reports & operator tools", the same place as `experiments/replay-kit/`, and measure the cochange delta in a later run. Not run here, so its effect on the pair counts is unknown.
+6. **Hygiene, recorded only, not ticketed:** stop tracking `experiments/rebuild-rung7/replay/work/` (gitignore it and `git rm --cached`). The `pinned/` copy is intentional per that subtree's README, so leave it.
+7. **Tests in the guide** — whether the guide should claim `tests/` for change coupling is a proposal. Not adopted here; the unmapped breakdown (§6) shows the size (1287 files in the window).
 
 ## 8. Existing tickets and follow-ups
 
@@ -307,14 +310,46 @@ Figures (`cochange-code-015aa4c6-guide-015aa4c6-days60.json`):
 
 ## 10. Adversarial Second-Read
 
-**PLACEHOLDER — NOT YET RECORDED.** This section is filled in beat 4, after a fresh-context reader (Tier 1 or Tier 2) answers the question. Until then this report has no second-read, and the report gate needs all three fields in one comment body on LIN-4152 before the task can reach Done.
+- **Tier:** 2 (fresh-context general-purpose sub-agent, not a fork; given only the report path, the evidence directory and the repo root, with no top finding, research or plan).
+- **Question:** "What is the largest item in this window (the 194 commits from `5b32864e14ec02b3c258fa3cf8cc7807eaf0bbb7` to `015aa4c6acbc008d7fa73c32beec1528b7f59511`) that this report missed or misfiled? Check against the source, not just the report; name the item, the evidence (file:line / commits) and what you would change."
+- **Reader's answer (verbatim):**
 
-- **Tier:** TBD (beat 4)
-- **Question:** "what is the largest item in this window that this report missed or misfiled?"
-- **Reader's answer:** TBD (beat 4)
-- Adversarial second-read verdict: TBD
-- Differed from top finding: TBD
-- Disposition: TBD
+> **Answer: the rung-7 replay subtree, `experiments/rebuild-rung7/`, is the largest item in the window that the report misses.** The report never names it, and the guide and seams tool both leave it out.
+>
+> **Size (git, `5b32864e..015aa4c6`)**
+> - `experiments/rebuild-rung7/`: 25 files, +35,752 / −23 lines. Non-docs insertions in the whole window are 131,340, so this is about 27% of them.
+> - The largest commit in the window is `ea4c6f88` (LIN-3880), at +35,041 lines. The next largest is `9f7acff7` (LIN-3846) at +4,011, so this one commit is about nine times bigger. `53250f12` (LIN-3934) adds 969 more.
+> - Most of the volume is generated replay output committed to git: `experiments/rebuild-rung7/replay/work/` is 13 files and +33,486 lines. That includes six 4,673-line `routes/workspace-api.js` copies and a 5,442-line `report.json`.
+>
+> **Why the report misses it**
+> - The report has no mention of rung-7, replay, rebuild, LIN-3880, LIN-3934 or LIN-3881. Those terms return zero hits in `docs/reviews/seams-tangles-review-2026-11-03.md`.
+> - It appears only as part of "`experiments` 560" in the unmapped file counts (§6, line 225). That is a file count, so a 35k-line subtree shows up as one of many files.
+> - `seams.mjs:15` scopes to `^(lib|routes|public)/` plus `server.js`, so the tool cannot see it. The §5 blind-spot list does not name it.
+> - The §6 caveat at line 252 says the guide's "`experiments/` patterns" are invisible to seams. The guide only claims `^experiments/replay-kit/` (`scripts/code-shape/areas.json:45`). Nothing claims `rebuild-rung7`, so it is unmapped.
+> - The tooling already knows the subtree is noise. `scripts/code-shape/code-shape-lib.mjs:17` excludes `replay/(pinned|work)`, and `code-shape-lib.test.mjs:18-22` pins that. The report does not mention it.
+>
+> **Misfiling**
+> - It is an operator experiment that replays `routes/workspace-api.js`. Its natural home is beside `experiments/replay-kit/` under "Reports &amp; operator tools", but the guide pattern is too narrow to catch it.
+> - `tests/unit/lin3880-replay-ai-coverage.test.js:19` imports from `experiments/rebuild-rung7/replay/lib/fakes.mjs`. A test now depends on an experiment directory, and tests are unmapped too.
+>
+> **What I would change in the report**
+> 1. Add a §5 blind-spot bullet and a §6 paragraph. State that `experiments/rebuild-rung7/` is +35,752 lines in 25 files (about 27% of window insertions), that 33,486 of those lines are tracked `replay/work/` output, and that cochange counts files, not lines.
+> 2. Correct the §6 caveat. Only `experiments/replay-kit/` is claimed among experiments paths, and `rebuild-rung7` is claimed by no area.
+> 3. Add a labelled proposal, P3: map `^experiments/rebuild-[^/]+/` to "Reports &amp; operator tools", run it like P1 and P2, and report the cochange delta. Do not edit `areas.json`.
+> 4. Add a hygiene follow-up, not a seam ticket: stop tracking `experiments/rebuild-rung7/replay/work/` (gitignore it and `git rm --cached`). The `pinned/` copy is intentional per the subtree README, so leave it.
+>
+> **Limits**
+> - I did not run P3, so the cochange effect of remapping is unmeasured.
+> - I did not check how many of the 560 unmapped experiments files fall in the 60-day window versus the 194-commit window. My 35,752 figure is the 194-commit window.
+>
+> **Checked and correct**
+> - N1 (the "Other features" catch-all holds 12 files at HEAD): I recomputed first-match over `git ls-files lib routes public server.js` and got the same 12 files the report lists.
+
+- **Judgement (lead reviewer, checked against the source):** the item is real. `git diff --numstat 5b32864e..015aa4c6 -- experiments/rebuild-rung7` gives 25 files, +35,752 / −23; `experiments/rebuild-rung7/replay/work` accounts for +33,486 of those; the report does not name rung-7, replay, LIN-3880 or LIN-3934 (grep returns none); `scripts/code-shape/areas.json` claims only `^experiments/replay-kit/` among experiments paths; `scripts/code-shape/code-shape-lib.mjs:17` excludes `replay/(pinned|work)`; `tests/unit/lin3880-replay-ai-coverage.test.js:19` imports from the subtree. The reader's 27% denominator and the 131,340 total were not re-verified here. Its scope is unmapped file volume, not an area knot, and it does not change any area finding (no pair or knot moves on this evidence). Disposition: fixed in place. Changes made: a §5 blind-spot bullet, the §6 unmapped note and caveat (also corrected a stale `(§9)` cross-reference to `(§7)`), proposals P3 (unmeasured) and the hygiene item in §7 (recorded only, not ticketed), and a ledger row. Not done: P3 was not run, and no ticket was minted for the hygiene item.
+
+Adversarial second-read verdict: DISAGREE
+Differed from top finding: YES
+Disposition: fixed in place
 
 ## 11. Trend ledger
 
@@ -329,6 +364,7 @@ metric:unmapped-files                      | 0                     | -          
 metric:cross-area-import-links(HEAD guide) | 1227 (976 at 5b)      | -          | 976 -> 1227 (+251 code; +3 guide effect at 5b)
 metric:two-way-area-pairs(HEAD guide)      | 12 (11 at 5b)         | -          | 11 -> 12 (new: Other<->Runs, Pages<->Other, LLM<->Other)
 metric:knot-group-size(of 13 areas)        | 9                     | -          | 9 -> 9 (same members at both commits)
+metric:experiments-rebuild-rung7 (unmapped, not measured by seams) | 25 files, +35,752 | new | second-read finding; 33,486 added lines are tracked replay/work output
 metric:lib-to-routes-imports               | 0                     | -          | unchanged
 knot:agents-chat<->runs(chat-tools)        | High                  | grew       | 23/23 -> 27/34 (F1; LLM/Runs+model routing)
 knot:runs<->page-renderers(render-swipe)   | n/a                   | RETIRED    | 7/8 -> closed (server.js:160 only); replaced by knot:runs<->pages(task-page-loader, routes-in-runs)
