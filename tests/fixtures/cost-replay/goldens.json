@@ -40685,6 +40685,60 @@
       }
     }
   },
+  "S2": {
+    "totalCalls": 7,
+    "totalCost": 0.33,
+    "totalTokens": 0,
+    "byFeature": [
+      {
+        "feature": "scan",
+        "calls": 3,
+        "cost": 0.08
+      },
+      {
+        "feature": "proxy-x",
+        "calls": 2,
+        "cost": 0.25
+      },
+      {
+        "feature": "review",
+        "calls": 2,
+        "cost": 0
+      }
+    ],
+    "lastCallAt": "2026-11-02T12:00:00.000Z",
+    "latencyByFeatureModel": []
+  },
+  "S3": {
+    "totalCalls": 7,
+    "totalCost": 0.33,
+    "totalTokens": 0,
+    "byFeature": [
+      {
+        "feature": "scan",
+        "calls": 3,
+        "cost": 0.08
+      },
+      {
+        "feature": "proxy-x",
+        "calls": 2,
+        "cost": 0.25
+      },
+      {
+        "feature": "review",
+        "calls": 2,
+        "cost": 0
+      }
+    ],
+    "lastCallAt": "2026-11-02T12:00:00.000Z",
+    "latencyByFeatureModel": []
+  },
+  "S4": {
+    "calls": 3,
+    "pricedCalls": 2,
+    "meanUsd": 0.04,
+    "unknown": false
+  },
   "S5": {
     "total": 4029,
     "rows": 2000,
@@ -40807,6 +40861,45 @@
     "wake": [],
     "custom": []
   },
+  "S7": [
+    {
+      "id": "proxy-x",
+      "runs": 2,
+      "priced": 2,
+      "unpriced": 0,
+      "noTelemetry": 0,
+      "spendUsd": 0.25,
+      "typicalUsd": 0.125,
+      "models": [
+        "anthropic/claude-sonnet-5"
+      ]
+    },
+    {
+      "id": "review",
+      "runs": 2,
+      "priced": 1,
+      "unpriced": 1,
+      "noTelemetry": 0,
+      "spendUsd": 0,
+      "typicalUsd": 0,
+      "models": [
+        "<synthetic>",
+        "anthropic/claude-sonnet-5"
+      ]
+    },
+    {
+      "id": "scan",
+      "runs": 3,
+      "priced": 2,
+      "unpriced": 1,
+      "noTelemetry": 0,
+      "spendUsd": 0.08,
+      "typicalUsd": 0.04,
+      "models": [
+        "anthropic/claude-sonnet-5"
+      ]
+    }
+  ],
   "S8": [
     {
       "model": "anthropic/claude-sonnet-5",
@@ -41098,6 +41191,1540 @@
       "survivalUnavailable": "This workspace's provider does not serve issue comments, so no gate verdict can be resolved. The survival columns report unavailable rather than zero; cost, duration and effort are unaffected.",
       "gateFieldsUnavailable": "No per-issue description could be read, so plan-review due/honoured are omitted rather than reported as zero (they are derived from description text).",
       "effortShipEmpty": "The effort column is empty: none of the runs in this corpus reported a realised effort value. It reads the SAME telemetry field either way, so the column fills for any run that does report one."
+    }
+  },
+  "S11": {
+    "windowDays": 30,
+    "pricedTicketCount": 9,
+    "pricedTicketCostUsd": 74.28,
+    "closeOutLineageShare": 0,
+    "evidenceLinkedShare": 0,
+    "opencodeSummedShare": 1,
+    "unknownHarnessShare": 0.857,
+    "pricedLineageShare": 0.999,
+    "attributableLineageShare": 1,
+    "captureRateShare": 1
+  },
+  "S12": {
+    "generatedAt": "2026-11-03T12:00:00.000Z",
+    "activity": {
+      "last7": {
+        "agentActions": 0,
+        "dispatches": 21,
+        "autopilotRuns": 0,
+        "feedbackNotes": 38
+      },
+      "last30": {
+        "agentActions": 0,
+        "dispatches": 3139,
+        "autopilotRuns": 0,
+        "feedbackNotes": 6274
+      }
+    },
+    "funnel": {
+      "dispatched": 3139,
+      "taken": 3138,
+      "reported": 3138,
+      "completed": 0,
+      "medianWaitMinutes": 0
+    },
+    "mergeTime": {
+      "n": 0,
+      "medianHours": null,
+      "p90Hours": null
+    },
+    "kinds": [
+      {
+        "label": "implementation",
+        "count": 3136
+      },
+      {
+        "label": "wake",
+        "count": 2
+      },
+      {
+        "label": "review",
+        "count": 1
+      }
+    ],
+    "daily": {
+      "days": [
+        "2026-10-05",
+        "2026-10-06",
+        "2026-10-07",
+        "2026-10-08",
+        "2026-10-09",
+        "2026-10-10",
+        "2026-10-11",
+        "2026-10-12",
+        "2026-10-13",
+        "2026-10-14",
+        "2026-10-15",
+        "2026-10-16",
+        "2026-10-17",
+        "2026-10-18",
+        "2026-10-19",
+        "2026-10-20",
+        "2026-10-21",
+        "2026-10-22",
+        "2026-10-23",
+        "2026-10-24",
+        "2026-10-25",
+        "2026-10-26",
+        "2026-10-27",
+        "2026-10-28",
+        "2026-10-29",
+        "2026-10-30",
+        "2026-10-31",
+        "2026-11-01",
+        "2026-11-02",
+        "2026-11-03"
+      ],
+      "dispatches": [
+        1169,
+        144,
+        144,
+        144,
+        144,
+        144,
+        144,
+        144,
+        144,
+        144,
+        144,
+        144,
+        144,
+        144,
+        71,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        2,
+        4,
+        4,
+        4,
+        3,
+        3
+      ],
+      "autopilotRuns": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "agentActions": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "done": [
+        1169,
+        144,
+        144,
+        144,
+        144,
+        144,
+        144,
+        144,
+        144,
+        144,
+        144,
+        144,
+        144,
+        144,
+        71,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        1,
+        1,
+        1,
+        0,
+        3,
+        4,
+        3,
+        3,
+        1
+      ],
+      "runsByKind": {
+        "weeks": [
+          "2026-10-07",
+          "2026-10-14",
+          "2026-10-21",
+          "2026-10-28"
+        ],
+        "kinds": [
+          {
+            "label": "implementation",
+            "counts": [
+              1008,
+              791,
+              5,
+              19
+            ]
+          },
+          {
+            "label": "wake",
+            "counts": [
+              0,
+              0,
+              1,
+              1
+            ]
+          },
+          {
+            "label": "review",
+            "counts": [
+              0,
+              0,
+              0,
+              1
+            ]
+          }
+        ]
+      },
+      "cost": {
+        "perDay": [
+          12.27,
+          2.88,
+          2.88,
+          2.88,
+          2.88,
+          2.88,
+          2.88,
+          2.88,
+          2.88,
+          2.88,
+          2.88,
+          2.88,
+          2.88,
+          2.88,
+          1.42,
+          0,
+          0,
+          2,
+          0,
+          0.9,
+          1.4,
+          0,
+          0.3,
+          0,
+          2.65,
+          0,
+          1.6,
+          4.3,
+          0,
+          0
+        ],
+        "pricedCount": 3123,
+        "lineageCount": 3129
+      },
+      "doneTotal": null
+    },
+    "stored": {
+      "customPrompts": 0,
+      "roadmapReports": 0,
+      "roadmapReportsCap": 20
+    },
+    "empty": false
+  },
+  "S13": {
+    "runId": "replay-main",
+    "title": "LIN-1",
+    "steps": [
+      {
+        "lineageId": "plain",
+        "kind": "implementation",
+        "status": "done",
+        "terminalStatus": "done",
+        "finished": true,
+        "iteration": null,
+        "model": null,
+        "tier": "not reported",
+        "summary": "implementation · done",
+        "loops": [
+          {
+            "loopId": "plain",
+            "lineageId": "plain",
+            "kind": "implementation",
+            "status": "taken",
+            "terminalStatus": "done",
+            "dispatchedAt": "2026-10-22T12:00:00.000Z",
+            "feedback": [
+              {
+                "kind": "usage",
+                "timestamp": "2026-10-22T12:00:00.000Z",
+                "message": "[usage] {\"model\":\"anthropic/claude-sonnet-5\",\"costUsd\":1.5}"
+              },
+              {
+                "kind": "terminal",
+                "timestamp": "2026-10-22T12:00:00.000Z",
+                "message": "[done] fixture"
+              }
+            ]
+          },
+          {
+            "loopId": "plain-2",
+            "lineageId": "plain",
+            "kind": "implementation",
+            "status": "taken",
+            "terminalStatus": "done",
+            "dispatchedAt": "2026-10-23T12:00:00.000Z",
+            "feedback": [
+              {
+                "kind": "usage",
+                "timestamp": "2026-10-23T12:00:00.000Z",
+                "message": "[usage] {\"model\":\"anthropic/claude-sonnet-5\",\"costUsd\":2}"
+              },
+              {
+                "kind": "terminal",
+                "timestamp": "2026-10-23T12:00:00.000Z",
+                "message": "[done] fixture"
+              }
+            ]
+          }
+        ],
+        "loopCosts": [
+          {
+            "loopId": "plain",
+            "status": "included",
+            "usd": null,
+            "label": "included in the step total"
+          },
+          {
+            "loopId": "plain-2",
+            "status": "figure",
+            "usd": 2,
+            "label": null
+          }
+        ],
+        "cost": {
+          "status": "priced",
+          "usd": 2,
+          "label": null,
+          "finalLoopId": "plain-2"
+        }
+      },
+      {
+        "lineageId": "wakeroot",
+        "kind": "wake",
+        "status": "done",
+        "terminalStatus": "done",
+        "finished": true,
+        "iteration": null,
+        "model": null,
+        "tier": "not reported",
+        "summary": "wake · done",
+        "loops": [
+          {
+            "loopId": "wakeroot",
+            "lineageId": "wakeroot",
+            "kind": "implementation",
+            "status": "taken",
+            "terminalStatus": "done",
+            "dispatchedAt": "2026-10-25T12:00:00.000Z",
+            "feedback": [
+              {
+                "kind": "usage",
+                "timestamp": "2026-10-25T12:00:00.000Z",
+                "message": "[usage] {\"model\":\"anthropic/claude-sonnet-5\",\"costUsd\":1}"
+              },
+              {
+                "kind": "terminal",
+                "timestamp": "2026-10-25T12:00:00.000Z",
+                "message": "[done] fixture"
+              }
+            ]
+          },
+          {
+            "loopId": "wakeroot-w",
+            "lineageId": "wakeroot",
+            "kind": "wake",
+            "status": "taken",
+            "terminalStatus": "done",
+            "dispatchedAt": "2026-10-26T12:00:00.000Z",
+            "feedback": [
+              {
+                "kind": "usage",
+                "timestamp": "2026-10-26T12:00:00.000Z",
+                "message": "[usage] {\"model\":\"anthropic/claude-sonnet-5\",\"costUsd\":1.4}"
+              },
+              {
+                "kind": "terminal",
+                "timestamp": "2026-10-26T12:00:00.000Z",
+                "message": "[done] fixture"
+              }
+            ]
+          }
+        ],
+        "loopCosts": [
+          {
+            "loopId": "wakeroot",
+            "status": "included",
+            "usd": null,
+            "label": "included in the step total"
+          },
+          {
+            "loopId": "wakeroot-w",
+            "status": "figure",
+            "usd": 1.4,
+            "label": null
+          }
+        ],
+        "cost": {
+          "status": "priced",
+          "usd": 1.4,
+          "label": null,
+          "finalLoopId": "wakeroot-w"
+        }
+      },
+      {
+        "lineageId": "xi",
+        "kind": "implementation",
+        "status": "done",
+        "terminalStatus": "done",
+        "finished": true,
+        "iteration": null,
+        "model": null,
+        "tier": "not reported",
+        "summary": "implementation · done",
+        "loops": [
+          {
+            "loopId": "xi",
+            "lineageId": "xi",
+            "kind": "implementation",
+            "status": "taken",
+            "terminalStatus": "done",
+            "dispatchedAt": "2026-10-24T12:00:00.000Z",
+            "feedback": [
+              {
+                "kind": "usage",
+                "timestamp": "2026-10-24T12:00:00.000Z",
+                "message": "[usage] {\"model\":\"anthropic/claude-sonnet-5\",\"costUsd\":0.5}"
+              },
+              {
+                "kind": "terminal",
+                "timestamp": "2026-10-24T12:00:00.000Z",
+                "message": "[done] fixture"
+              }
+            ]
+          },
+          {
+            "loopId": "xi-2",
+            "lineageId": "xi",
+            "kind": "implementation",
+            "status": "taken",
+            "terminalStatus": "done",
+            "dispatchedAt": "2026-11-02T12:00:00.000Z",
+            "feedback": [
+              {
+                "kind": "usage",
+                "timestamp": "2026-11-02T12:00:00.000Z",
+                "message": "[usage] {\"model\":\"anthropic/claude-sonnet-5\",\"costUsd\":0.9}"
+              },
+              {
+                "kind": "terminal",
+                "timestamp": "2026-11-02T12:00:00.000Z",
+                "message": "[done] fixture"
+              }
+            ]
+          }
+        ],
+        "loopCosts": [
+          {
+            "loopId": "xi",
+            "status": "included",
+            "usd": null,
+            "label": "included in the step total"
+          },
+          {
+            "loopId": "xi-2",
+            "status": "figure",
+            "usd": 0.9,
+            "label": null
+          }
+        ],
+        "cost": {
+          "status": "priced",
+          "usd": 0.9,
+          "label": null,
+          "finalLoopId": "xi-2"
+        }
+      },
+      {
+        "lineageId": "st",
+        "kind": "review",
+        "status": "done",
+        "terminalStatus": "done",
+        "finished": true,
+        "iteration": null,
+        "model": null,
+        "tier": "not reported",
+        "summary": "review · done",
+        "loops": [
+          {
+            "loopId": "st",
+            "lineageId": "st",
+            "kind": "implementation",
+            "status": "taken",
+            "terminalStatus": "done",
+            "dispatchedAt": "2026-09-24T12:00:00.000Z",
+            "feedback": [
+              {
+                "kind": "usage",
+                "timestamp": "2026-09-24T12:00:00.000Z",
+                "message": "[usage] {\"model\":\"anthropic/claude-sonnet-5\",\"costUsd\":3}"
+              },
+              {
+                "kind": "terminal",
+                "timestamp": "2026-09-24T12:00:00.000Z",
+                "message": "[done] fixture"
+              }
+            ]
+          },
+          {
+            "loopId": "st-2",
+            "lineageId": "st",
+            "kind": "review",
+            "status": "taken",
+            "terminalStatus": "done",
+            "dispatchedAt": "2026-11-01T12:00:00.000Z",
+            "feedback": [
+              {
+                "kind": "usage",
+                "timestamp": "2026-11-01T12:00:00.000Z",
+                "message": "[usage] {\"model\":\"anthropic/claude-sonnet-5\",\"costUsd\":4}"
+              },
+              {
+                "kind": "terminal",
+                "timestamp": "2026-11-01T12:00:00.000Z",
+                "message": "[done] fixture"
+              }
+            ]
+          }
+        ],
+        "loopCosts": [
+          {
+            "loopId": "st",
+            "status": "included",
+            "usd": null,
+            "label": "included in the step total"
+          },
+          {
+            "loopId": "st-2",
+            "status": "figure",
+            "usd": 4,
+            "label": null
+          }
+        ],
+        "cost": {
+          "status": "priced",
+          "usd": 4,
+          "label": null,
+          "finalLoopId": "st-2"
+        }
+      },
+      {
+        "lineageId": "mx",
+        "kind": "implementation",
+        "status": "done",
+        "terminalStatus": "done",
+        "finished": true,
+        "iteration": null,
+        "model": null,
+        "tier": "not reported",
+        "summary": "implementation · done",
+        "loops": [
+          {
+            "loopId": "mx",
+            "lineageId": "mx",
+            "kind": "implementation",
+            "status": "taken",
+            "terminalStatus": "done",
+            "dispatchedAt": "2026-10-29T12:00:00.000Z",
+            "feedback": [
+              {
+                "kind": "usage",
+                "timestamp": "2026-10-29T12:00:00.000Z",
+                "message": "[usage] {\"model\":\"anthropic/claude-sonnet-5\",\"costUsd\":1}"
+              },
+              {
+                "kind": "terminal",
+                "timestamp": "2026-10-29T12:00:00.000Z",
+                "message": "[done] fixture"
+              }
+            ]
+          },
+          {
+            "loopId": "mx-2",
+            "lineageId": "mx",
+            "kind": "implementation",
+            "status": "taken",
+            "terminalStatus": "done",
+            "dispatchedAt": "2026-10-30T12:00:00.000Z",
+            "feedback": [
+              {
+                "kind": "usage",
+                "timestamp": "2026-10-30T12:00:00.000Z",
+                "message": "[usage] {\"harness\":\"opencode\",\"model\":\"openrouter/qwen-3\",\"costUsd\":0.25}"
+              },
+              {
+                "kind": "terminal",
+                "timestamp": "2026-10-30T12:00:00.000Z",
+                "message": "[done] fixture"
+              }
+            ]
+          },
+          {
+            "loopId": "mx-3",
+            "lineageId": "mx",
+            "kind": "implementation",
+            "status": "taken",
+            "terminalStatus": "done",
+            "dispatchedAt": "2026-10-31T12:00:00.000Z",
+            "feedback": [
+              {
+                "kind": "usage",
+                "timestamp": "2026-10-31T12:00:00.000Z",
+                "message": "[usage] {\"model\":\"anthropic/claude-sonnet-5\",\"costUsd\":1.6}"
+              },
+              {
+                "kind": "terminal",
+                "timestamp": "2026-10-31T12:00:00.000Z",
+                "message": "[done] fixture"
+              }
+            ]
+          }
+        ],
+        "loopCosts": [
+          {
+            "loopId": "mx",
+            "status": "included",
+            "usd": null,
+            "label": "included in the step total"
+          },
+          {
+            "loopId": "mx-2",
+            "status": "included",
+            "usd": null,
+            "label": "included in the step total"
+          },
+          {
+            "loopId": "mx-3",
+            "status": "figure",
+            "usd": 1.85,
+            "label": null
+          }
+        ],
+        "cost": {
+          "status": "priced",
+          "usd": 1.85,
+          "label": null,
+          "finalLoopId": "mx-3"
+        }
+      },
+      {
+        "lineageId": "od",
+        "kind": "implementation",
+        "status": "done",
+        "terminalStatus": "done",
+        "finished": true,
+        "iteration": null,
+        "model": null,
+        "tier": "not reported",
+        "summary": "implementation · done",
+        "loops": [
+          {
+            "loopId": "od",
+            "lineageId": "od",
+            "kind": "implementation",
+            "status": "taken",
+            "terminalStatus": "done",
+            "dispatchedAt": "2026-11-01T12:00:00.000Z",
+            "feedback": [
+              {
+                "kind": "usage",
+                "timestamp": "2026-11-01T12:00:00.000Z",
+                "message": "[usage] {\"harness\":\"opencode\",\"model\":\"openrouter/qwen-3\",\"costUsd\":0.1}"
+              },
+              {
+                "kind": "terminal",
+                "timestamp": "2026-11-01T12:00:00.000Z",
+                "message": "[done] fixture"
+              }
+            ]
+          },
+          {
+            "loopId": "od-2",
+            "lineageId": "od",
+            "kind": "implementation",
+            "status": "taken",
+            "terminalStatus": "done",
+            "dispatchedAt": "2026-11-02T12:00:00.000Z",
+            "feedback": [
+              {
+                "kind": "usage",
+                "timestamp": "2026-11-02T12:00:00.000Z",
+                "message": "[usage] {\"harness\":\"opencode\",\"model\":\"openrouter/qwen-3\",\"costUsd\":0.2}"
+              },
+              {
+                "kind": "terminal",
+                "timestamp": "2026-11-02T12:00:00.000Z",
+                "message": "[done] fixture"
+              }
+            ]
+          }
+        ],
+        "loopCosts": [
+          {
+            "loopId": "od",
+            "status": "included",
+            "usd": null,
+            "label": "included in the step total"
+          },
+          {
+            "loopId": "od-2",
+            "status": "figure",
+            "usd": 0.30000000000000004,
+            "label": null
+          }
+        ],
+        "cost": {
+          "status": "priced",
+          "usd": 0.30000000000000004,
+          "label": null,
+          "finalLoopId": "od-2"
+        }
+      },
+      {
+        "lineageId": "so",
+        "kind": "implementation",
+        "status": "done",
+        "terminalStatus": "done",
+        "finished": true,
+        "iteration": null,
+        "model": null,
+        "tier": "not reported",
+        "summary": "implementation · done",
+        "loops": [
+          {
+            "loopId": "so",
+            "lineageId": "so",
+            "kind": "implementation",
+            "status": "taken",
+            "terminalStatus": "done",
+            "dispatchedAt": "2026-09-26T12:00:00.000Z",
+            "feedback": [
+              {
+                "kind": "usage",
+                "timestamp": "2026-09-26T12:00:00.000Z",
+                "message": "[usage] {\"harness\":\"opencode\",\"model\":\"openrouter/qwen-3\",\"costUsd\":0.7}"
+              },
+              {
+                "kind": "terminal",
+                "timestamp": "2026-09-26T12:00:00.000Z",
+                "message": "[done] fixture"
+              }
+            ]
+          },
+          {
+            "loopId": "so-2",
+            "lineageId": "so",
+            "kind": "implementation",
+            "status": "taken",
+            "terminalStatus": "done",
+            "dispatchedAt": "2026-10-31T12:00:00.000Z",
+            "feedback": [
+              {
+                "kind": "usage",
+                "timestamp": "2026-10-31T12:00:00.000Z",
+                "message": "[usage] {\"harness\":\"opencode\",\"model\":\"openrouter/qwen-3\",\"costUsd\":0.4}"
+              },
+              {
+                "kind": "terminal",
+                "timestamp": "2026-10-31T12:00:00.000Z",
+                "message": "[done] fixture"
+              }
+            ]
+          }
+        ],
+        "loopCosts": [
+          {
+            "loopId": "so",
+            "status": "included",
+            "usd": null,
+            "label": "included in the step total"
+          },
+          {
+            "loopId": "so-2",
+            "status": "figure",
+            "usd": 1.1,
+            "label": null
+          }
+        ],
+        "cost": {
+          "status": "priced",
+          "usd": 1.1,
+          "label": null,
+          "finalLoopId": "so-2"
+        }
+      },
+      {
+        "lineageId": "ur",
+        "kind": "implementation",
+        "status": "done",
+        "terminalStatus": "done",
+        "finished": true,
+        "iteration": null,
+        "model": null,
+        "tier": "not reported",
+        "summary": "implementation · done",
+        "loops": [
+          {
+            "loopId": "ur",
+            "lineageId": "ur",
+            "kind": "implementation",
+            "status": "taken",
+            "terminalStatus": "done",
+            "dispatchedAt": "2026-10-30T12:00:00.000Z",
+            "feedback": [
+              {
+                "kind": "usage",
+                "timestamp": "2026-10-30T12:00:00.000Z",
+                "message": "[usage] {not json"
+              },
+              {
+                "kind": "terminal",
+                "timestamp": "2026-10-30T12:00:00.000Z",
+                "message": "[done] fixture"
+              }
+            ]
+          }
+        ],
+        "loopCosts": [
+          {
+            "loopId": "ur",
+            "status": "not-reported",
+            "usd": null,
+            "label": "not reported"
+          }
+        ],
+        "cost": {
+          "status": "not-reported",
+          "usd": null,
+          "label": "not reported",
+          "finalLoopId": null
+        }
+      },
+      {
+        "lineageId": "hk",
+        "kind": "implementation",
+        "status": "done",
+        "terminalStatus": "done",
+        "finished": true,
+        "iteration": null,
+        "model": null,
+        "tier": "not reported",
+        "summary": "implementation · done",
+        "loops": [
+          {
+            "loopId": "hk",
+            "lineageId": "hk",
+            "kind": "implementation",
+            "status": "taken",
+            "terminalStatus": "done",
+            "dispatchedAt": "2026-10-30T12:00:00.000Z",
+            "feedback": [
+              {
+                "kind": "usage",
+                "timestamp": "2026-10-30T12:00:00.000Z",
+                "message": "[usage] {\"model\":\"anthropic/claude-haiku-5-5\",\"inputTokens\":250000,\"outputTokens\":1000}"
+              },
+              {
+                "kind": "terminal",
+                "timestamp": "2026-10-30T12:00:00.000Z",
+                "message": "[done] fixture"
+              }
+            ]
+          }
+        ],
+        "loopCosts": [
+          {
+            "loopId": "hk",
+            "status": "not-reported",
+            "usd": null,
+            "label": "not reported"
+          }
+        ],
+        "cost": {
+          "status": "not-reported",
+          "usd": null,
+          "label": "not reported",
+          "finalLoopId": null
+        }
+      },
+      {
+        "lineageId": "zr",
+        "kind": "implementation",
+        "status": "done",
+        "terminalStatus": "done",
+        "finished": true,
+        "iteration": null,
+        "model": null,
+        "tier": "not reported",
+        "summary": "implementation · done",
+        "loops": [
+          {
+            "loopId": "zr",
+            "lineageId": "zr",
+            "kind": "implementation",
+            "status": "taken",
+            "terminalStatus": "done",
+            "dispatchedAt": "2026-10-31T12:00:00.000Z",
+            "feedback": [
+              {
+                "kind": "usage",
+                "timestamp": "2026-10-31T12:00:00.000Z",
+                "message": "[usage] {\"model\":\"anthropic/claude-sonnet-5\",\"costUsd\":0}"
+              },
+              {
+                "kind": "terminal",
+                "timestamp": "2026-10-31T12:00:00.000Z",
+                "message": "[done] fixture"
+              }
+            ]
+          }
+        ],
+        "loopCosts": [
+          {
+            "loopId": "zr",
+            "status": "not-reported",
+            "usd": null,
+            "label": "not reported"
+          }
+        ],
+        "cost": {
+          "status": "not-reported",
+          "usd": null,
+          "label": "not reported",
+          "finalLoopId": null
+        }
+      },
+      {
+        "lineageId": "au",
+        "kind": "implementation",
+        "status": "done",
+        "terminalStatus": "done",
+        "finished": true,
+        "iteration": null,
+        "model": null,
+        "tier": "not reported",
+        "summary": "implementation · done",
+        "loops": [
+          {
+            "loopId": "au",
+            "lineageId": "au",
+            "kind": "implementation",
+            "status": "taken",
+            "terminalStatus": "done",
+            "dispatchedAt": "2026-10-28T12:00:00.000Z",
+            "feedback": [
+              {
+                "kind": "usage",
+                "timestamp": "2026-10-28T12:00:00.000Z",
+                "message": "[usage] {\"model\":\"<synthetic>\"}"
+              },
+              {
+                "kind": "terminal",
+                "timestamp": "2026-10-28T12:00:00.000Z",
+                "message": "[done] fixture"
+              }
+            ]
+          }
+        ],
+        "loopCosts": [
+          {
+            "loopId": "au",
+            "status": "not-reported",
+            "usd": null,
+            "label": "not reported"
+          }
+        ],
+        "cost": {
+          "status": "not-reported",
+          "usd": null,
+          "label": "not reported",
+          "finalLoopId": null
+        }
+      },
+      {
+        "lineageId": "ni",
+        "kind": "implementation",
+        "status": "done",
+        "terminalStatus": "done",
+        "finished": true,
+        "iteration": null,
+        "model": null,
+        "tier": "not reported",
+        "summary": "implementation · done",
+        "loops": [
+          {
+            "loopId": "ni",
+            "lineageId": "ni",
+            "kind": "implementation",
+            "status": "taken",
+            "terminalStatus": "done",
+            "dispatchedAt": "2026-10-27T12:00:00.000Z",
+            "feedback": [
+              {
+                "kind": "usage",
+                "timestamp": "2026-10-27T12:00:00.000Z",
+                "message": "[usage] {\"model\":\"anthropic/claude-sonnet-5\",\"costUsd\":0.3}"
+              },
+              {
+                "kind": "terminal",
+                "timestamp": "2026-10-27T12:00:00.000Z",
+                "message": "[done] fixture"
+              }
+            ]
+          }
+        ],
+        "loopCosts": [
+          {
+            "loopId": "ni",
+            "status": "figure",
+            "usd": 0.3,
+            "label": null
+          }
+        ],
+        "cost": {
+          "status": "priced",
+          "usd": 0.3,
+          "label": null,
+          "finalLoopId": "ni"
+        }
+      },
+      {
+        "lineageId": "nu",
+        "kind": "implementation",
+        "status": "done",
+        "terminalStatus": "done",
+        "finished": true,
+        "iteration": null,
+        "model": null,
+        "tier": "not reported",
+        "summary": "implementation · done",
+        "loops": [
+          {
+            "loopId": "nu",
+            "lineageId": "nu",
+            "kind": "implementation",
+            "status": "taken",
+            "terminalStatus": "done",
+            "dispatchedAt": "2026-11-01T12:00:00.000Z",
+            "feedback": [
+              {
+                "kind": "terminal",
+                "timestamp": "2026-11-01T12:00:00.000Z",
+                "message": "[done] fixture"
+              }
+            ]
+          }
+        ],
+        "loopCosts": [
+          {
+            "loopId": "nu",
+            "status": "not-reported",
+            "usd": null,
+            "label": "not reported"
+          }
+        ],
+        "cost": {
+          "status": "not-reported",
+          "usd": null,
+          "label": "not reported",
+          "finalLoopId": null
+        }
+      },
+      {
+        "lineageId": "ln",
+        "kind": "wake",
+        "status": "done",
+        "terminalStatus": "done",
+        "finished": true,
+        "iteration": null,
+        "model": null,
+        "tier": "not reported",
+        "summary": "wake · done",
+        "loops": [
+          {
+            "loopId": "ln",
+            "lineageId": "ln",
+            "kind": "implementation",
+            "status": "taken",
+            "terminalStatus": "done",
+            "dispatchedAt": "2026-10-29T12:00:00.000Z",
+            "feedback": [
+              {
+                "kind": "usage",
+                "timestamp": "2026-10-29T12:00:00.000Z",
+                "message": "[usage] {\"model\":\"anthropic/claude-sonnet-5\",\"costUsd\":0.6}"
+              },
+              {
+                "kind": "terminal",
+                "timestamp": "2026-10-29T12:00:00.000Z",
+                "message": "[done] fixture"
+              }
+            ]
+          },
+          {
+            "loopId": "ln-w",
+            "lineageId": "ln",
+            "kind": "wake",
+            "status": "taken",
+            "terminalStatus": "done",
+            "dispatchedAt": "2026-10-30T12:00:00.000Z",
+            "feedback": [
+              {
+                "kind": "usage",
+                "timestamp": "2026-10-30T12:00:00.000Z",
+                "message": "[usage] {\"model\":\"anthropic/claude-sonnet-5\",\"costUsd\":0.8}"
+              },
+              {
+                "kind": "terminal",
+                "timestamp": "2026-10-30T12:00:00.000Z",
+                "message": "[done] fixture"
+              }
+            ]
+          }
+        ],
+        "loopCosts": [
+          {
+            "loopId": "ln",
+            "status": "included",
+            "usd": null,
+            "label": "included in the step total"
+          },
+          {
+            "loopId": "ln-w",
+            "status": "figure",
+            "usd": 0.8,
+            "label": null
+          }
+        ],
+        "cost": {
+          "status": "priced",
+          "usd": 0.8,
+          "label": null,
+          "finalLoopId": "ln-w"
+        }
+      },
+      {
+        "lineageId": "um",
+        "kind": "implementation",
+        "status": "done",
+        "terminalStatus": "done",
+        "finished": true,
+        "iteration": null,
+        "model": null,
+        "tier": "not reported",
+        "summary": "implementation · done",
+        "loops": [
+          {
+            "loopId": "um",
+            "lineageId": "um",
+            "kind": "implementation",
+            "status": "taken",
+            "terminalStatus": "done",
+            "dispatchedAt": "2026-11-01T12:00:00.000Z",
+            "feedback": [
+              {
+                "kind": "usage",
+                "timestamp": "2026-11-01T12:00:00.000Z",
+                "message": "[usage] {\"model\":\"<synthetic>\",\"inputTokens\":10}"
+              },
+              {
+                "kind": "terminal",
+                "timestamp": "2026-11-01T12:00:00.000Z",
+                "message": "[done] fixture"
+              }
+            ]
+          }
+        ],
+        "loopCosts": [
+          {
+            "loopId": "um",
+            "status": "not-reported",
+            "usd": null,
+            "label": "not reported"
+          }
+        ],
+        "cost": {
+          "status": "not-reported",
+          "usd": null,
+          "label": "not reported",
+          "finalLoopId": null
+        }
+      },
+      {
+        "lineageId": "nss",
+        "kind": "implementation",
+        "status": "done",
+        "terminalStatus": "done",
+        "finished": true,
+        "iteration": null,
+        "model": null,
+        "tier": "not reported",
+        "summary": "implementation · done",
+        "loops": [
+          {
+            "loopId": "nss",
+            "lineageId": "nss",
+            "kind": "implementation",
+            "status": "taken",
+            "terminalStatus": "done",
+            "dispatchedAt": "2026-09-19T12:00:00.000Z",
+            "feedback": [
+              {
+                "kind": "terminal",
+                "timestamp": "2026-09-19T12:00:00.000Z",
+                "message": "[done] fixture"
+              }
+            ]
+          },
+          {
+            "loopId": "nss-2",
+            "lineageId": "nss",
+            "kind": "implementation",
+            "status": "taken",
+            "terminalStatus": "done",
+            "dispatchedAt": "2026-11-02T12:00:00.000Z",
+            "feedback": [
+              {
+                "kind": "terminal",
+                "timestamp": "2026-11-02T12:00:00.000Z",
+                "message": "[done] fixture"
+              }
+            ]
+          }
+        ],
+        "loopCosts": [
+          {
+            "loopId": "nss",
+            "status": "not-reported",
+            "usd": null,
+            "label": "not reported"
+          },
+          {
+            "loopId": "nss-2",
+            "status": "not-reported",
+            "usd": null,
+            "label": "not reported"
+          }
+        ],
+        "cost": {
+          "status": "not-reported",
+          "usd": null,
+          "label": "not reported",
+          "finalLoopId": null
+        }
+      },
+      {
+        "lineageId": "cg",
+        "kind": "implementation",
+        "status": "done",
+        "terminalStatus": "done",
+        "finished": true,
+        "iteration": null,
+        "model": null,
+        "tier": "not reported",
+        "summary": "implementation · done",
+        "loops": [
+          {
+            "loopId": "cg",
+            "lineageId": "cg",
+            "kind": "implementation",
+            "status": "taken",
+            "terminalStatus": "done",
+            "dispatchedAt": "2026-09-14T12:00:00.000Z",
+            "feedback": [
+              {
+                "kind": "usage",
+                "timestamp": "2026-09-14T12:00:00.000Z",
+                "message": "[usage] {\"model\":\"anthropic/claude-sonnet-5\",\"costUsd\":1}"
+              },
+              {
+                "kind": "terminal",
+                "timestamp": "2026-09-14T12:00:00.000Z",
+                "message": "[done] fixture"
+              }
+            ]
+          },
+          {
+            "loopId": "cg-2",
+            "lineageId": "cg",
+            "kind": "implementation",
+            "status": "taken",
+            "terminalStatus": "done",
+            "dispatchedAt": "2026-10-31T12:00:00.000Z",
+            "feedback": [
+              {
+                "kind": "usage",
+                "timestamp": "2026-10-31T12:00:00.000Z",
+                "message": "[usage] {\"model\":\"anthropic/claude-sonnet-5\",\"costUsd\":1.2}"
+              },
+              {
+                "kind": "terminal",
+                "timestamp": "2026-10-31T12:00:00.000Z",
+                "message": "[done] fixture"
+              }
+            ]
+          }
+        ],
+        "loopCosts": [
+          {
+            "loopId": "cg",
+            "status": "included",
+            "usd": null,
+            "label": "included in the step total"
+          },
+          {
+            "loopId": "cg-2",
+            "status": "figure",
+            "usd": 1.2,
+            "label": null
+          }
+        ],
+        "cost": {
+          "status": "priced",
+          "usd": 1.2,
+          "label": null,
+          "finalLoopId": "cg-2"
+        }
+      },
+      {
+        "lineageId": "P",
+        "kind": "implementation",
+        "status": "done",
+        "terminalStatus": "done",
+        "finished": true,
+        "iteration": null,
+        "model": null,
+        "tier": "not reported",
+        "summary": "implementation · done",
+        "loops": [
+          {
+            "loopId": "P",
+            "lineageId": "P",
+            "kind": "implementation",
+            "status": "taken",
+            "terminalStatus": "done",
+            "dispatchedAt": "2026-10-04T12:14:24.000Z",
+            "feedback": [
+              {
+                "kind": "usage",
+                "timestamp": "2026-10-04T12:14:24.000Z",
+                "message": "[usage] {\"model\":\"anthropic/claude-sonnet-5\",\"costUsd\":5}"
+              },
+              {
+                "kind": "terminal",
+                "timestamp": "2026-10-04T12:14:24.000Z",
+                "message": "[done] fixture"
+              }
+            ]
+          },
+          {
+            "loopId": "P-99",
+            "lineageId": "P",
+            "kind": "implementation",
+            "status": "taken",
+            "terminalStatus": "done",
+            "dispatchedAt": "2026-11-03T07:12:00.000Z",
+            "feedback": [
+              {
+                "kind": "usage",
+                "timestamp": "2026-11-03T07:12:00.000Z",
+                "message": "[usage] {\"model\":\"anthropic/claude-sonnet-5\",\"costUsd\":6}"
+              },
+              {
+                "kind": "terminal",
+                "timestamp": "2026-11-03T10:48:00.000Z",
+                "message": "[done] fixture"
+              }
+            ]
+          },
+          {
+            "loopId": "P-42",
+            "lineageId": "P",
+            "kind": "implementation",
+            "status": "taken",
+            "terminalStatus": "done",
+            "dispatchedAt": "2026-11-03T09:36:00.000Z",
+            "feedback": [
+              {
+                "kind": "usage",
+                "timestamp": "2026-11-03T09:36:00.000Z",
+                "message": "[usage] {\"model\":\"anthropic/claude-sonnet-5\",\"costUsd\":7}"
+              },
+              {
+                "kind": "terminal",
+                "timestamp": "2026-11-03T11:02:24.000Z",
+                "message": "[done] fixture"
+              }
+            ]
+          }
+        ],
+        "loopCosts": [
+          {
+            "loopId": "P",
+            "status": "included",
+            "usd": null,
+            "label": "included in the step total"
+          },
+          {
+            "loopId": "P-99",
+            "status": "included",
+            "usd": null,
+            "label": "included in the step total"
+          },
+          {
+            "loopId": "P-42",
+            "status": "figure",
+            "usd": 7,
+            "label": null
+          }
+        ],
+        "cost": {
+          "status": "priced",
+          "usd": 7,
+          "label": null,
+          "finalLoopId": "P-42"
+        }
+      },
+      {
+        "lineageId": "qq",
+        "kind": "implementation",
+        "status": "running",
+        "terminalStatus": null,
+        "finished": false,
+        "iteration": null,
+        "model": null,
+        "tier": "not reported",
+        "summary": "implementation · in progress",
+        "loops": [
+          {
+            "loopId": "qq",
+            "lineageId": "qq",
+            "kind": "implementation",
+            "status": "queued",
+            "terminalStatus": null,
+            "dispatchedAt": "2026-11-03T00:00:00.000Z",
+            "feedback": []
+          }
+        ],
+        "loopCosts": [
+          {
+            "loopId": "qq",
+            "status": "not-reported",
+            "usd": null,
+            "label": "not reported"
+          }
+        ],
+        "cost": {
+          "status": "not-reported",
+          "usd": null,
+          "label": "not reported",
+          "finalLoopId": null
+        }
+      }
+    ],
+    "progress": {
+      "mode": "state",
+      "reached": null,
+      "total": null,
+      "label": "the step's own state"
+    },
+    "next": null,
+    "cost": {
+      "status": "not-reported",
+      "usd": null,
+      "label": "not reported"
+    },
+    "time": {
+      "activeMs": 0,
+      "wall": {
+        "start": null,
+        "end": null,
+        "ms": null
+      }
+    },
+    "waiting": {
+      "active": false,
+      "since": null,
+      "ms": null,
+      "loopId": null
     }
   },
   "mixedHarness": {

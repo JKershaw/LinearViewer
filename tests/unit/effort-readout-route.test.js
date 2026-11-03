@@ -31,7 +31,7 @@ function doneRow({ id, issueIdentifier, kind, dispatchedAt, completedAt, resolve
  * A store fixture that records the options each read received, so the tests
  * can assert what the route actually asked for rather than what it claims.
  */
-function fakeStore({ liveRows = [], historyRows = [], historyTotal } = {}) {
+function fakeStore({ liveRows = [], historyRows = [], historyTotal, identityOnly = [] } = {}) {
   const calls = { listItems: [], listHistory: [] };
   return {
     calls,
@@ -48,7 +48,8 @@ function fakeStore({ liveRows = [], historyRows = [], historyTotal } = {}) {
       const items = limit ? sorted.slice(0, limit) : sorted;
       return { items, total: historyTotal ?? historyRows.length };
     },
-    lineageIdentityRows: stubLineageIdentity(() => [...liveRows, ...historyRows]),
+    // The founder lookup is uncapped: `identityOnly` holds a founder the 200-row read does not return.
+    lineageIdentityRows: stubLineageIdentity(() => [...liveRows, ...historyRows, ...identityOnly]),
   };
 }
 
@@ -299,6 +300,29 @@ describe('D2 — the error split: auth is never a skip, retryable is', () => {
     const { status, body } = await get(buildApp({ store, providerName: name }), '/workspace/ws-1/effort-readout');
     assert.equal(status, 200);
     assert.match(body, /issue read\(s\) skipped/);
+  });
+});
+
+describe('the cost read is wired to the founder lookup (LIN-4177)', () => {
+  test('a straddler whose founder is outside the 200-row read is costed under its true kind on the JSON readout', async () => {
+    // The founder (an implementation, 40 days old) is outside the history read; its in-window follow-up is a review
+    // on another issue, priced at its whole running total. Only the wired route names the lineage's kind.
+    const usageOf = (costUsd) => ({ kind: 'usage', timestamp: '2026-10-30T10:01:00.000Z', message: `[usage] ${JSON.stringify({ model: 'anthropic/claude-sonnet-5', harness: 'claude-code', costUsd })}` });
+    const followUp = { ...doneRow({ id: 'st-2', issueIdentifier: 'LIN-99', kind: 'review', dispatchedAt: '2026-10-30T10:00:00.000Z', completedAt: '2026-10-30T10:05:00.000Z' }), rootItemId: 'st' };
+    followUp.feedback = [usageOf(4), ...followUp.feedback];
+    // A priced implementation of its own, in the read, so the implementation row exists in the population.
+    const own = doneRow({ id: 'impl-1', issueIdentifier: 'LIN-5', kind: 'implementation', dispatchedAt: '2026-10-29T10:00:00.000Z', completedAt: '2026-10-29T10:05:00.000Z' });
+    own.feedback = [usageOf(1), ...own.feedback];
+    const founder = { id: 'st', _id: 'st', rootItemId: 'st', status: 'taken', abort: false, kind: 'implementation', issueIdentifier: 'LIN-42', dispatchedAt: '2026-09-20T10:00:00.000Z', feedback: [] };
+    const store = fakeStore({ historyRows: [followUp, own], identityOnly: [founder] });
+    const { name } = fakeProvider({ comments: [] });
+    const { status, body } = await get(buildApp({ store, providerName: name }), '/workspace/ws-1/api/effort-readout');
+    assert.equal(status, 200);
+    const json = JSON.parse(body);
+    const implementation = json.perKind.find(row => row.kind === 'implementation');
+    assert.ok(implementation, 'an implementation row exists');
+    assert.equal(implementation.costUsd, 5, 'its own $1 plus the straddler\'s $4, under its true kind');
+    assert.equal(implementation.costUnpricedCount, 0);
   });
 });
 

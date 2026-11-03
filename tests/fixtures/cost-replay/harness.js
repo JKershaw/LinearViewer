@@ -1,19 +1,29 @@
 /**
- * LIN-4177: runs every cost surface the replay covers over the fixture corpus (corpus.js) and
- * returns one JSON-stable object. `scripts/cost-replay.mjs` records it as the goldens and checks
- * the current code against them; `tests/unit/cost-replay.test.js` pins the same run.
+ * LIN-4177: runs every cost surface the replay covers (S1 to S13) over the fixture corpus (corpus.js)
+ * and returns one JSON-stable object. `scripts/cost-replay.mjs` records it as the goldens and checks
+ * the current code against them; `tests/unit/cost-read.test.js` pins the run and the change list.
  *
- * The surfaces are called through their real entry points, so the same harness runs against the
- * code before and after the change:
- *  - S1  `/api/proxy/cost/:identifier`, through `createProxyRoutes` (routes/proxy.js) over Express.
- *  - S5  `readModelsHistory` (the 30-day read, capped), then `agentSpendByJob`.
+ * The surfaces are called through their real entry points, so the same harness runs against the code
+ * before and after the change. Every entry point used here exists at the baseline commit (9e397e6b), so
+ * the goldens are recorded there by copying this directory into a worktree (see the plan's baseline rule).
+ *
+ *  - S1  `/api/proxy/cost/:id`, through `createProxyRoutes` (routes/proxy.js) over Express.
+ *  - S2  Settings › Health's workspace calls total: `LlmCallLogStore.summarize` (routes/settings.js).
+ *  - S3  Ship's Biscuit's Weather line: the same `summarize` (routes/ship-biscuit.js).
+ *  - S4  Observation's scan estimate: `summarizeByFeature(urlKey, 'scan')` (routes/dashboard-feed.js).
+ *  - S5  `readModelsHistory` (the 30-day read, capped) and its `identityRows`, then `agentSpendByJob`.
  *  - S6  `typicalByModel` per job (the decision panel's per-model typicals).
+ *  - S7  Settings › Models' Harbour spend per job: `listInHorizon`, then `harbourSpendByJob`.
  *  - S8  `spendByEffectiveModel` over the agent and Harbour-call spend.
  *  - S9  the dispatch decision panel's per-kind read (`agentSpendByJob` + `typicalByModel`, one kind).
  *  - S10 `computeEffortReadout`'s cost columns (200 newest resolved history rows, as the route reads).
+ *  - S11 the public `/kpis` cost per finished ticket: `computeTerminalMarkedTaskCost` (lib/kpi-stats.js).
+ *  - S12 the workspace KPIs' cost per day: `collectWorkspaceKpis` over fake collections (lib/workspace-kpi-stats.js).
+ *  - S13 the run page's per-lineage cost: `buildRunView` over one session's loops (lib/run-view.js).
  *
  * The fake store serves the corpus in the two shapes the real store serves: formatted list rows
- * (`listHistory`, `listItems`) and raw scalar docs (`lineageIdentityRows`, the founder lookup).
+ * (`listHistory`, `listItems`) and raw scalar docs (`lineageIdentityRows`, the founder lookup). The fake
+ * collections answer the filters the production readers send; an operator this fake does not know throws.
  */
 import express from 'express';
 import { createProxyRoutes } from '../../../routes/proxy.js';
@@ -24,11 +34,15 @@ import { computeEffortReadout } from '../../../lib/effort-readout.js';
 import { parseUsage } from '../../../lib/session-telemetry.js';
 import { isRunningTotal } from '../../../lib/row-usage.js';
 import { readHorizonStart } from '../../../lib/read-horizon.js';
+import { computeTerminalMarkedTaskCost } from '../../../lib/terminal-marked-task-cost.js';
+import { collectWorkspaceKpis } from '../../../lib/workspace-kpi-stats.js';
+import { buildRunView } from '../../../lib/run-view.js';
 import { buildCorpus, NOW_MS, REPLAY_ISSUES, REPLAY_JOBS } from './corpus.js';
 
-const URL_KEY = 'acme';
+export const URL_KEY = 'acme';
 const AGENT_JOBS = REPLAY_JOBS.filter(j => j !== 'proxy-x');
 const HARBOUR_JOBS = ['proxy-x'];
+const HARBOUR_JOBS_SPEND = ['proxy-x', 'review', 'scan'];
 
 const iso = (d) => (d instanceof Date ? d.toISOString() : d);
 const toMs = (d) => (d instanceof Date ? d.getTime() : Date.parse(d));
@@ -49,6 +63,37 @@ function scalar(doc) {
     issueIdentifier: doc.issueIdentifier,
     dispatchedAt: doc.dispatchedAt,
   };
+}
+
+/** A value for comparison: a Date or an ISO instant as its epoch ms, anything else as it is. */
+function comparable(value) {
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value)) return Date.parse(value);
+  return value;
+}
+
+/**
+ * Whether a doc matches a Mongo-style filter. Supports equality and the operators the production readers
+ * send ($gte, $gt, $lt, $lte, $in, $ne); any other operator throws, so an unmodelled reader is seen, not
+ * silently answered.
+ */
+export function matches(doc, filter = {}) {
+  return Object.entries(filter).every(([key, cond]) => {
+    const value = comparable(doc[key]);
+    if (cond && typeof cond === 'object' && !(cond instanceof Date) && !Array.isArray(cond)) {
+      return Object.entries(cond).every(([op, arg]) => {
+        const want = comparable(arg);
+        if (op === '$gte') return value !== undefined && value >= want;
+        if (op === '$gt') return value !== undefined && value > want;
+        if (op === '$lt') return value !== undefined && value < want;
+        if (op === '$lte') return value !== undefined && value <= want;
+        if (op === '$in') return arg.includes(doc[key]);
+        if (op === '$ne') return doc[key] !== arg;
+        throw new Error(`cost-replay fake: unsupported operator ${op} on ${key}`);
+      });
+    }
+    return value === comparable(cond);
+  });
 }
 
 /** A fake dispatch store over the corpus: the list reads, plus the founder lookup. */
@@ -93,12 +138,10 @@ export function makeDispatchStore(corpus) {
 }
 
 /** A fake call-log collection: `find(query).toArray()` over the corpus's call docs. */
-function makeCallCollection(corpus) {
+export function makeCallCollection(corpus) {
   return {
     find(query = {}) {
-      let docs = corpus.calls.filter(c => c.urlKey === query.urlKey);
-      if (query.issueIdentifier !== undefined) docs = docs.filter(c => c.issueIdentifier === query.issueIdentifier);
-      if (query.timestamp && query.timestamp.$gte) docs = docs.filter(c => toMs(c.timestamp) >= toMs(query.timestamp.$gte));
+      const docs = corpus.calls.filter(c => matches(c, query));
       return { toArray: async () => docs };
     },
   };
@@ -125,7 +168,8 @@ export function buildCostApp(store, callCollection) {
   return app;
 }
 
-async function getJson(app, path) {
+/** One GET against an app built by `buildCostApp`, on a loopback port. */
+export async function getJson(app, path) {
   const server = app.listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
   const { port } = server.address();
@@ -161,15 +205,70 @@ function mixedHarnessTally(rows) {
   return mixed.sort();
 }
 
-/** Run every replayed surface over a fresh corpus. Pure except for the in-memory fakes. */
-export async function runReplay() {
+/** A fake collection over raw docs: `find` (with a projection, ignored), `countDocuments`, `findOne`. */
+function fakeCollection(docs) {
+  return {
+    find(filter = {}) {
+      return { toArray: async () => docs.filter(d => matches(d, filter)) };
+    },
+    async countDocuments(filter = {}) {
+      return docs.filter(d => matches(d, filter)).length;
+    },
+    async findOne(filter = {}) {
+      return docs.find(d => matches(d, filter)) ?? null;
+    },
+  };
+}
+
+/**
+ * The collections `collectWorkspaceKpis` reads, over the corpus: dispatch history and queue are the
+ * corpus's rows; the proxy, agent-status, report, prompt, close-out and rollup collections are empty.
+ */
+function workspaceKpiCollections(corpus) {
+  return {
+    dispatchQueue: fakeCollection(corpus.queue),
+    dispatchHistory: fakeCollection(corpus.history),
+    proxyEvents: fakeCollection([]),
+    agentStatus: fakeCollection([]),
+    reportHistory: fakeCollection([]),
+    customPrompts: fakeCollection([]),
+    closeOutEvents: fakeCollection([]),
+    kpiDailyRollup: fakeCollection([]),
+  };
+}
+
+/**
+ * The run page's loops for one session: the hand-built corpus rows (the filler exists for S1's cap and
+ * S5's row cap, and is left out here), mapped to the loop fields `buildRunView` reads.
+ */
+function sessionLoops(corpus) {
+  return [...corpus.history, ...corpus.queue]
+    .filter(row => !/^f(42|99)-/.test(row._id))
+    .map(row => ({
+      loopId: row._id,
+      lineageId: row.rootItemId,
+      kind: row.kind,
+      status: row.status,
+      terminalStatus: row.status === 'taken' && !row.abort ? 'done' : null,
+      dispatchedAt: iso(row.dispatchedAt),
+      feedback: row.feedback,
+    }));
+}
+
+/**
+ * Run every replayed surface over a fresh corpus. Pure except for the in-memory fakes. `corpusOverride`
+ * runs the same surfaces over another corpus of the same shape (the S1 = S5 witness uses a sub-selection).
+ */
+export async function runReplay(corpusOverride) {
   const realNow = Date.now;
   Date.now = () => NOW_MS;
   try {
-    const corpus = buildCorpus();
+    const corpus = corpusOverride ?? buildCorpus();
     const store = makeDispatchStore(corpus);
     const callCollection = makeCallCollection(corpus);
     const app = buildCostApp(store, callCollection);
+    const llmStore = new LlmCallLogStore({ collection: callCollection });
+    const now = new Date(NOW_MS);
     const out = {};
 
     // S1: the issue cost route, one request per issue.
@@ -179,10 +278,18 @@ export async function runReplay() {
       out.S1[issue] = { status, body };
     }
 
-    // S5 / S6 / S8 / S9 share the 30-day models read, capped at its own row limit.
+    // S2 / S3: the workspace calls total, read by Health (settings) and by the Biscuit's Weather line.
+    out.S2 = await llmStore.summarize(URL_KEY);
+    out.S3 = await llmStore.summarize(URL_KEY);
+
+    // S4: the scan estimate Observation renders.
+    out.S4 = await llmStore.summarizeByFeature(URL_KEY, 'scan');
+
+    // S5 / S6 / S8 / S9 share the 30-day models read, capped at its own row limit. The read carries the
+    // founder lookup for its own lineages (`identityRows`), exactly as the Models page's route passes it.
     const history = await readModelsHistory(store, URL_KEY);
-    const identityRows = await store.lineageIdentityRows(URL_KEY, { anchors: anchorsOf(history.items) });
-    const callDocs = corpus.calls.filter(c => c.urlKey === URL_KEY && toMs(c.timestamp) >= toMs(readHorizonStart(NOW_MS)));
+    const identityRows = history.identityRows;
+    const callDocs = corpus.calls.filter(c => c.urlKey === URL_KEY && toMs(c.timestamp) >= toMs(readHorizonStart(now)));
 
     const agentSpend = agentSpendByJob(history.items, { jobs: AGENT_JOBS, identityRows });
     out.S5 = {
@@ -194,6 +301,10 @@ export async function runReplay() {
 
     out.S6 = Object.fromEntries(AGENT_JOBS.map(job => [job, typicalByModel(history.items, { job, identityRows })]));
 
+    // S7: Harbour-call spend per job, over the calls in the horizon (the store's own read).
+    const horizonCalls = await llmStore.listInHorizon(URL_KEY);
+    out.S7 = harbourSpendByJob(horizonCalls, { jobs: HARBOUR_JOBS_SPEND });
+
     const harbourSpend = harbourSpendByJob(callDocs, { jobs: HARBOUR_JOBS });
     out.S8 = spendByEffectiveModel([...agentSpend, ...harbourSpend], corpus.effective);
 
@@ -202,7 +313,8 @@ export async function runReplay() {
       typicals: typicalByModel(history.items, { job: kind, identityRows }),
     }]));
 
-    // S10: the effort read-out's cost columns over the 200 newest resolved history rows.
+    // S10: the effort read-out's cost columns over the 200 newest resolved history rows. Its identity is
+    // the founder lookup over every row the page reads (computeWorkspaceEffortReadout's own anchors).
     const liveRows = await store.listItems(URL_KEY, {});
     const historyRows = (await store.listHistory(URL_KEY, { limit: 200 })).items;
     const effortIdentity = await store.lineageIdentityRows(URL_KEY, { anchors: anchorsOf([...liveRows, ...historyRows]) });
@@ -211,14 +323,23 @@ export async function runReplay() {
       historyRows,
       historyTotal: historyRows.length,
       issueContext: new Map(),
-      asOf: new Date(NOW_MS),
+      asOf: now,
       survivalAvailable: false,
       gateFieldsAvailable: false,
       identityRows: effortIdentity,
     });
 
+    // S11: the public KPI's cost per finished ticket, over the workspace's dispatch rows.
+    out.S11 = computeTerminalMarkedTaskCost([...corpus.history, ...corpus.queue], now);
+
+    // S12: the workspace KPIs' cost per day (and the rest of the dashboard's figures).
+    out.S12 = await collectWorkspaceKpis({ collections: workspaceKpiCollections(corpus), urlKey: URL_KEY, now });
+
+    // S13: the run page's loops for one session, grouped by lineage, with each lineage's cost.
+    out.S13 = buildRunView({ sessionId: 'replay-main', seedIssue: 'LIN-1', loops: sessionLoops(corpus) }, { now });
+
     // The mixed-harness tally over the whole 30-day window (uncapped), as the plan asks.
-    const windowRows = (await store.listHistory(URL_KEY, { since: readHorizonStart(NOW_MS) })).items;
+    const windowRows = (await store.listHistory(URL_KEY, { since: readHorizonStart(now) })).items;
     out.mixedHarness = { lineages: mixedHarnessTally(windowRows) };
 
     return JSON.parse(JSON.stringify(out));

@@ -48,7 +48,7 @@ before(async () => {
       userPreferencesStore: { getOpenRouterConsent: async () => null },
       workspacePreferencesStore: fx.preferencesStore,
       llmCallLogStore: { summarize: async () => ({}), listInHorizon: async () => state.callDocs },
-      dispatchStore: { listHistoryWithBodies: async (urlKey, opts) => { state.historyReads.push({ urlKey, opts }); return state.history; }, lineageIdentityRows: stubLineageIdentity(() => state.history.items || []) },
+      dispatchStore: { listHistoryWithBodies: async (urlKey, opts) => { state.historyReads.push({ urlKey, opts }); return state.history; }, lineageIdentityRows: stubLineageIdentity(() => [...(state.history.items || []), ...state.identityOnly]) },
       promptTraceStore: { summarizeProviderContext: async () => ({}) },
       accountStore: { listEmailIdentities: async () => [] },
       requestFeatureFlags: async () => ({}),
@@ -88,7 +88,7 @@ beforeEach(() => {
   // The same wiring as server.js: every halt writer lands in the log through the store's hook.
   haltStore.setOnChange(({ urlKey, from, to, via, setBy, reason }) =>
     logStore.record({ urlKey, setting: 'halt', from, to, reason: reason || 'Changed outside Settings (Dispatch page or API)', actor: { via, ...(setBy ? { id: setBy } : {}) } }));
-  state = { accountId: OWNER, ownerCheck, proxyRows: [], dispatchRows: [], history: { items: [], total: 0 }, historyReads: [], callDocs: [] };
+  state = { accountId: OWNER, ownerCheck, proxyRows: [], dispatchRows: [], history: { items: [], total: 0 }, identityOnly: [], historyReads: [], callDocs: [] };
 });
 
 const post = (path, body) => fetch(`${base}/workspace/alpha/settings/${path}`, {
@@ -354,6 +354,19 @@ describe('the Models page is fed spend by the route (LIN-3855: jobs are ordered 
     assert.doesNotMatch(await models(), /Spend covers the newest/);
     state.history = { items, total: 9 };
     assert.match(await models(), /Spend covers the newest 2 runs in the last 30 days/);
+  });
+
+  test('a straddler is spent under its true job: its founder, outside the 30-day read, names the job (LIN-4177)', async () => {
+    // The in-window follow-up is a review; its founder (40 days old, outside the read) is the implementation the
+    // lineage belongs to. Only the founder lookup carries the founder, so only the wired route can say so.
+    const founder = { id: 'st', status: 'taken', kind: 'implementation', dispatchedAt: '2026-09-20T10:00:00Z', rootItemId: 'st', issueIdentifier: 'LIN-42', feedback: [{ kind: 'usage', timestamp: '2026-09-20T10:01:00Z', message: `[usage] ${JSON.stringify({ model: 'anthropic/claude-sonnet-5', harness: 'claude-code', costUsd: 3 })}` }] };
+    const followUp = { id: 'st-2', status: 'taken', kind: 'review', dispatchedAt: '2026-10-30T10:00:00Z', rootItemId: 'st', issueIdentifier: 'LIN-99', feedback: [{ kind: 'usage', timestamp: '2026-10-30T10:01:00Z', message: `[usage] ${JSON.stringify({ model: 'anthropic/claude-sonnet-5', harness: 'claude-code', costUsd: 4 })}` }] };
+    state.history = { items: [followUp], total: 1 };
+    state.identityOnly = [founder];
+    const html = await models();
+    assert.doesNotMatch(row(html, 'implementation'), /no runs/, 'the straddler is an implementation run');
+    assert.match(row(html, 'implementation'), /\$4\.00/, 'its whole running total is on the implementation job');
+    assert.match(row(html, 'review'), /no runs/, 'the review job does not keep the straddler');
   });
 });
 

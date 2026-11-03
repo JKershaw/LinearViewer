@@ -8,7 +8,7 @@
  *   node scripts/cost-replay.mjs            check: list every path that differs from the goldens
  *
  * The check exits 1 when anything differs. Which differences are intended is pinned separately, by
- * tests/fixtures/cost-replay/expected-changes.json (the change list), in tests/unit/cost-replay.test.js.
+ * tests/fixtures/cost-replay/expected-changes.json (the change list), in tests/unit/cost-read.test.js (W9).
  */
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';

@@ -15,7 +15,9 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { runReplay } from '../fixtures/cost-replay/harness.js';
+import { buildCorpus } from '../fixtures/cost-replay/corpus.js';
 import { diffReplay } from '../fixtures/cost-replay/diff.js';
+import { readCost } from '../../lib/cost-read.js';
 import { formatUsd } from '../../lib/cost-format.js';
 import { DispatchQueueStore, LINEAGE_IDENTITY_PROJECTION, UnboundedHistoryReadError } from '../../lib/dispatch-store.js';
 
@@ -97,6 +99,60 @@ describe('W4: S1 and S5 agree where they can (plan N2)', () => {
   test('S1 still sees the lineages S5 truncated away: the issue is not empty', () => {
     assert.ok(sessions('LIN-42').length > 0);
     assert.ok(sessions('LIN-99').length > 0);
+  });
+});
+
+describe('W3 (record): the incomplete flag is the record\'s on every branch (plan N1)', () => {
+  // A lineage on LIN-50 whose founder (45 days old) is outside the fetch; the in-window follow-up is fetched.
+  const NOW = Date.parse('2026-11-03T12:00:00.000Z');
+  const founderAt = new Date(NOW - 45 * 86400000);
+  const followAt = new Date(NOW - 86400000);
+  const identity = (id, at) => ({ _id: id, rootItemId: 'nf', status: 'taken', abort: false, kind: 'implementation', issueIdentifier: 'LIN-50', dispatchedAt: at });
+  const followRow = (feedback) => ({ _id: 'nf-2', rootItemId: 'nf', status: 'taken', abort: false, kind: 'implementation', issueIdentifier: 'LIN-50', dispatchedAt: followAt, resolvedAt: followAt, feedback });
+  const unreadable = { kind: 'usage', timestamp: followAt.toISOString(), message: '[usage] {not json' };
+  const dropped = [identity('nf', founderAt), identity('nf-2', followAt)];
+
+  test('a no-usage lineage with a dropped true member is incomplete, though its count stays no-telemetry', () => {
+    const { workerSessions, noTelemetryCount } = readCost({ fetchedRows: [followRow([])], identityRows: dropped });
+    assert.equal(noTelemetryCount, 1);
+    assert.equal(workerSessions[0].telemetry, false);
+    assert.equal(workerSessions[0].incomplete, true);
+  });
+
+  test('an unreadable lineage with a dropped true member is incomplete, though its count stays unreadable', () => {
+    const { workerSessions, unreadableCount } = readCost({ fetchedRows: [followRow([unreadable])], identityRows: dropped });
+    assert.equal(unreadableCount, 1);
+    assert.equal(workerSessions[0].incomplete, true);
+  });
+
+  test('guard: a no-usage lineage with nothing dropped is not incomplete', () => {
+    const { workerSessions } = readCost({ fetchedRows: [identity('nf', founderAt)].map(r => ({ ...r, feedback: [] })), identityRows: [identity('nf', founderAt)] });
+    assert.equal(workerSessions[0].incomplete, false);
+  });
+});
+
+describe('W4 (plan N2): S1 = ΣS5 for an issue, on a selection S5 does not truncate', () => {
+  // The lineages whose true issue is `issue`: those whose founder row (the row the lineage is named by) names it.
+  function issueSelection(corpus, issue) {
+    const founders = new Set(corpus.history.filter(r => r._id === r.rootItemId && r.issueIdentifier === issue).map(r => r._id));
+    const keep = row => founders.has(row.rootItemId);
+    return { ...corpus, history: corpus.history.filter(keep), queue: corpus.queue.filter(keep) };
+  }
+  // The issues with no filler lineage: their selection stays under S5's 2000-row cap. LIN-42 and LIN-99 are
+  // over the cap by design (the test above pins that truncation).
+  const ISSUES = ['LIN-1', 'LIN-2', 'LIN-3', 'LIN-6', 'LIN-7', 'LIN-8', 'LIN-9', 'LIN-10', 'LIN-11', 'LIN-12', 'LIN-14', 'LIN-17', 'LIN-18'];
+
+  test('for each issue, S1 pricedUsd equals the sum of S5 spend over the issue\'s lineages', async () => {
+    let withSpend = 0;
+    for (const issue of ISSUES) {
+      const run = await runReplay(issueSelection(buildCorpus(), issue));
+      assert.equal(run.S5.truncated, false, `${issue}: the selection is under S5's cap`);
+      const s5 = run.S5.jobs.reduce((sum, job) => sum + job.spendUsd, 0);
+      const s1 = run.S1[issue].body.pricedUsd;
+      assert.ok(Math.abs(s1 - s5) < 1e-9, `${issue}: S1 pricedUsd ${s1} is not ΣS5 ${s5}`);
+      if (s1 > 0) withSpend += 1;
+    }
+    assert.ok(withSpend > 0, 'some issue carries priced spend, so the agreement is not 0 = 0');
   });
 });
 
