@@ -692,8 +692,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         getModelCatalog({ mock: shouldMockAi(workspace) }).catch(() => [])
       ]);
       // A failed read says so. It never reads as "no runs": that would be a false figure about the store.
-      const spend = history ? agentSpendByJob(history.items, { jobs: [kind] })[0] : null;
-      const typicals = history ? typicalByModel(history.items, { job: kind }) : [];
+      const spend = history ? agentSpendByJob(history.items, { jobs: [kind], identityRows: history.identityRows })[0] : null;
+      const typicals = history ? typicalByModel(history.items, { job: kind, identityRows: history.identityRows }) : [];
       // The blank option stays short (a 390px select clips a long one); what it resolves to reads on a hint line under the field.
       // LIN-3987: what it resolves to is said in words (routingWords), so the hint and the heading never print an id.
       const follow = 'From Models';

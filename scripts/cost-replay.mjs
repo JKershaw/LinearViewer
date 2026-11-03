@@ -28,6 +28,7 @@ if (process.argv.includes('--record')) {
 
 const golden = JSON.parse(await readFile(GOLDENS, 'utf8'));
 const diffs = diffReplay(golden, current);
+console.log(`mixed-harness lineages: ${current.mixedHarness.lineages.length} (${current.mixedHarness.lineages.join(', ') || 'none'})`);
 if (diffs.length === 0) {
   console.log('replay: identical to goldens');
   process.exit(0);

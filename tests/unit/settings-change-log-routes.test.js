@@ -22,6 +22,7 @@ import { projectLegacy, currentValue } from '../../lib/model-routing.js';
 import { getProvider, getProviderForWorkspace } from '../../lib/providers/registry.js';
 import '../../lib/providers/index.js';
 import { memoryCollection, routingFixture } from './helpers/routing-fakes.js';
+import { stubLineageIdentity } from '../fixtures/lineage-identity.js';
 
 const COPY = "Only this workspace's owner can act on its runner.";
 const OWNER = 'acct-owner';
@@ -47,7 +48,7 @@ before(async () => {
       userPreferencesStore: { getOpenRouterConsent: async () => null },
       workspacePreferencesStore: fx.preferencesStore,
       llmCallLogStore: { summarize: async () => ({}), listInHorizon: async () => state.callDocs },
-      dispatchStore: { listHistoryWithBodies: async (urlKey, opts) => { state.historyReads.push({ urlKey, opts }); return state.history; } },
+      dispatchStore: { listHistoryWithBodies: async (urlKey, opts) => { state.historyReads.push({ urlKey, opts }); return state.history; }, lineageIdentityRows: stubLineageIdentity(() => state.history.items || []) },
       promptTraceStore: { summarizeProviderContext: async () => ({}) },
       accountStore: { listEmailIdentities: async () => [] },
       requestFeatureFlags: async () => ({}),

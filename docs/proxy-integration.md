@@ -1226,8 +1226,9 @@ matching zero rows and returning an authoritative-looking `$0.00`.
 
 - **`pricedUsd`** is the worker-side sum of whatever *is* priceable. **`totalUsd`**
   restates `pricedUsd` plus `appCalls.costUsd` **only** when `unpriced` is empty, AND
-  `noTelemetryCount` is `0`, AND `unreadableCount` is `0`, AND `appCalls.unpricedCalls` is
-  `0` — otherwise `totalUsd` is `null`. This is deliberate: a partial figure must never
+  `noTelemetryCount` is `0`, AND `unreadableCount` is `0`, AND no lineage is incomplete
+  (LIN-4177: a lineage whose missing member could change its figure has `costUsd: null`
+  in `workerSessions`), AND `appCalls.unpricedCalls` is `0` — otherwise `totalUsd` is `null`. This is deliberate: a partial figure must never
   look complete. `unpriced` lists worker models with no rate-card entry; `noTelemetryCount`
   counts `taken` dispatches with no usage telemetry at all; `unreadableCount` counts
   lineages whose usage was posted but does not parse (their figure is unknown, not the

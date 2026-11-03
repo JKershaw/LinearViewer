@@ -77,8 +77,8 @@ describe('GET /api/proxy/instructions — /cost totalUsd gate prose stays true t
     // the `totalUsd` restatement — the exact clause that went stale.
     assert.match(
       text,
-      /"totalUsd" restates\s+"pricedUsd" plus "appCalls\.costUsd" ONLY when "noLineage" is false AND "unpriced"\s+is empty AND "noTelemetryCount" is 0 AND "unreadableCount" is 0 AND "appCalls\.unpricedCalls"\s+is 0/,
-      'the totalUsd gate prose names all five conditions, noLineage first'
+      /"totalUsd" restates\s+"pricedUsd" plus "appCalls\.costUsd" ONLY when "noLineage" is false AND "unpriced"\s+is empty AND "noTelemetryCount" is 0 AND "unreadableCount" is 0 AND no lineage is\s+incomplete AND "appCalls\.unpricedCalls"\s+is 0/,
+      'the totalUsd gate prose names all six conditions (LIN-4177 adds the incomplete lineage), noLineage first'
     );
   });
 
@@ -91,20 +91,31 @@ describe('GET /api/proxy/instructions — /cost totalUsd gate prose stays true t
       'the "reported under BOTH issues" known limitation is gone: a lineage no longer counts under two issues');
   });
 
-  test('the gate in lib/task-cost.js still has exactly the five documented conditions', () => {
+  test('the gate in lib/cost-read.js still has exactly the six documented conditions (LIN-4177: incomplete added)', async () => {
+    const { text } = await fetchInstructions();
     // The other half of the pin: the prose above is only "true" relative to
     // this expression. Read the source rather than re-deriving the gate, so a
-    // fifth condition cannot be added while the catalog silently keeps
-    // describing five.
+    // seventh condition cannot be added while the catalog silently keeps
+    // describing six.
     const source = readFileSync(
-      fileURLToPath(new URL('../../lib/task-cost.js', import.meta.url)),
+      fileURLToPath(new URL('../../lib/cost-read.js', import.meta.url)),
       'utf8'
     );
-
-    assert.ok(
-      source.includes('const fullyPriced = !noLineage && unpriced.length === 0 && noTelemetryCount === 0 && unreadableCount === 0 && (appCalls.unpricedCalls || 0) === 0;'),
-      'lib/task-cost.js gates fullyPriced on exactly the five conditions the catalog documents — ' +
-      'if this fails, the gate changed and routes/proxy.js\'s /cost catalog prose must change with it'
+    const gate = source.match(/const fullyPriced = ([\s\S]*?);/);
+    assert.ok(gate, 'lib/cost-read.js still names the fullyPriced gate');
+    const conditions = gate[1].split('&&').map(c => c.replace(/\s+/g, ' ').trim()).sort();
+    assert.deepEqual(conditions, [
+      '!noLineage',
+      '(appCalls.unpricedCalls || 0) === 0',
+      'incompleteCount === 0',
+      'noTelemetryCount === 0',
+      'unpriced.length === 0',
+      'unreadableCount === 0',
+    ].sort(), 'the gate changed: routes/proxy.js\'s /cost catalog prose must change with it');
+    assert.match(
+      text,
+      /no lineage is\s+incomplete/,
+      'the catalog names the incomplete condition the gate now has'
     );
   });
 });

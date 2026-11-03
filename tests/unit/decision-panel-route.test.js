@@ -16,6 +16,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { emptyTable } from '../../lib/model-routing.js';
+import { stubLineageIdentity } from '../fixtures/lineage-identity.js';
 
 // A `[usage]` feedback entry, as the runner posts it. `costUsd` pins a price; omit it to be unpriced.
 function usage({ model = 'claude-sonnet-5', costUsd } = {}) {
@@ -30,7 +31,8 @@ function buildApp({ owner = true, table = emptyTable(), history = [] } = {}) {
   app.use(createDispatchRoutes({
     dispatchQueueStore: {
       addItem: async () => ({ _id: 'disp-1' }),
-      listHistoryWithBodies: async () => ({ items: history, total: history.length })
+      listHistoryWithBodies: async () => ({ items: history, total: history.length }),
+      lineageIdentityRows: stubLineageIdentity(() => history)
     },
     dispatchTokenStore: {},
     workspaceFromUrl: (req, res, next) => {

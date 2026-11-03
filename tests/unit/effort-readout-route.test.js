@@ -13,6 +13,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { createDashboardRoutes } from '../../routes/dashboard.js';
 import { registerProvider } from '../../lib/providers/registry.js';
+import { stubLineageIdentity } from '../fixtures/lineage-identity.js';
 
 before(() => { process.env.NODE_ENV = 'test'; });
 
@@ -47,6 +48,7 @@ function fakeStore({ liveRows = [], historyRows = [], historyTotal } = {}) {
       const items = limit ? sorted.slice(0, limit) : sorted;
       return { items, total: historyTotal ?? historyRows.length };
     },
+    lineageIdentityRows: stubLineageIdentity(() => [...liveRows, ...historyRows]),
   };
 }
 

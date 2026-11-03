@@ -66,6 +66,7 @@ function makeDispatchStore() {
     listItems: async () => [],
     listHistory: async () => ({ items: [], total: 0 }),
     listHistoryLineageRows: async () => ({ items: [], total: 0 }),
+    lineageIdentityRows: async () => [],
     ensureLineageStatus: async () => {},
     getItemStatus: async () => null,
     getItemFeedback: async () => null,

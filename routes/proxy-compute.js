@@ -8,8 +8,8 @@
  */
 import { Router } from 'express';
 import { graphqlErrorExtra, graphqlErrorDetail } from '../lib/proxy-graphql-errors.js';
-import { buildTaskCost } from '../lib/task-cost.js';
-import { anchorOf } from '../lib/lineage-membership.js';
+import { readCost } from '../lib/cost-read.js';
+import { anchorOf, isMember } from '../lib/lineage-membership.js';
 import { resolveChatCredential, isAiUnavailable } from '../lib/chat-request.js';
 import { resolveRecommendation } from '../lib/recommend-recurse.js';
 import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
@@ -638,7 +638,7 @@ export function createComputeRoutes({
    * batch-fetched from history UNSCOPED by issueIdentifier, mirroring the
    * `/dispatch` list route: a cross-issue follow-up's usage must still merge
    * into the anchor's single cumulative total, or that lineage would be
-   * undercounted here. `buildTaskCost` (lib/task-cost.js) does the actual
+   * undercounted here. `readCost` (lib/cost-read.js) does the actual
    * lineage-group/merge/sum join, and reports only the lineages that count
    * under `:identifier` (lib/lineage-membership.js, LIN-4147); this route only
    * fetches its inputs.
@@ -671,18 +671,24 @@ export function createComputeRoutes({
       // is on `dispatchedAt` (listHistory's own `since`) / `timestamp`.
       const since = readHorizonStart();
 
-      const [queued, history] = await Promise.all([
+      // LIN-4177: the lineage's identity (issue, base kind, true members) comes from the founder
+      // lookup: scalar, uncapped and not windowed, so a straddler whose founder is older than the
+      // window still counts under its true issue (LIN-4148). The usage read below keeps its bounds.
+      const [queued, history, ownIdentity] = await Promise.all([
         dispatchQueueStore.listItems(req.proxyUrlKey, { issueIdentifier: identifier, projection: { prompt: 0 } }),
-        dispatchQueueStore.listHistory(req.proxyUrlKey, { issueIdentifier: identifier, since, projection: { prompt: 0 } })
+        dispatchQueueStore.listHistory(req.proxyUrlKey, { issueIdentifier: identifier, since, projection: { prompt: 0 } }),
+        dispatchQueueStore.lineageIdentityRows(req.proxyUrlKey, { issueIdentifier: identifier })
       ]);
       const ownRows = [
         ...queued.map(i => ({ ...i, status: 'queued', feedback: [] })),
         ...history.items
       ];
 
-      const anchors = [...new Set(
-        ownRows.filter(i => i.status === 'taken').map(anchorOf).filter(Boolean)
-      )];
+      // Every lineage this issue is the founder of, by identity: its own member rows, any age.
+      const anchors = [...new Set(ownIdentity.filter(isMember).map(anchorOf).filter(Boolean))];
+      const identityRows = anchors.length
+        ? [...ownIdentity, ...await dispatchQueueStore.lineageIdentityRows(req.proxyUrlKey, { anchors })]
+        : ownIdentity;
 
       const siblingRowsByAnchor = new Map();
       if (anchors.length) {
@@ -706,10 +712,16 @@ export function createComputeRoutes({
         ? await llmCallLogStore.summarizeByIssue(req.proxyUrlKey, identifier, { since })
         : { calls: 0, costUsd: 0, unpricedCalls: 0, byFeature: [] };
 
-      // LIN-4147: report only the lineages that count under this issue, so a
-      // lineage that belongs to another issue (a wake, a cross-issue follow-up)
-      // is never priced here as well.
-      const result = buildTaskCost({ ownRows, siblingRowsByAnchor, appSummary, issueIdentifier: identifier });
+      // LIN-4147 / LIN-4177: report only the lineages whose true issue is this one, and only those
+      // with a member in the window. Fetched usage rows: the siblings, then the own rows (the pool
+      // order the fold has always read).
+      const result = readCost({
+        fetchedRows: [...[...siblingRowsByAnchor.values()].flat(), ...ownRows],
+        identityRows,
+        appSummary,
+        issueIdentifier: identifier,
+        windowStart: since
+      });
 
       const window = {
         days: READ_HORIZON_DAYS,
@@ -717,9 +729,9 @@ export function createComputeRoutes({
       };
 
       logEvent(req, '/api/proxy/cost', 200);
-      // LIN-3855: `telemetry` is for the Models page's spend read; it is stripped here so this
-      // response is byte-identical to what it was before (the key order is the result's own).
-      res.json({ identifier, ...result, workerSessions: result.workerSessions.map(({ telemetry, ...session }) => session), window });
+      // The published keys and their order are unchanged (LIN-4177). `telemetry` and `incomplete`
+      // are internal flags; the wire carries neither.
+      res.json({ identifier, ...result, workerSessions: result.workerSessions.map(({ telemetry, incomplete, ...session }) => session), window });
     } catch (err) {
       logEvent(req, '/api/proxy/cost', 500);
       jsonError(res, 500, 'Failed to compute task cost');
