@@ -199,3 +199,18 @@ The periodicals merged: `seams-tangles-review-2026-11-03.md` (LIN-4152) and `dri
 **D&C's own top process finding repeats the essay.** Item 7, `coherence-loop-stalled`: "No 10-23 follow-up moved. LIN-3449's cycle dispatches children only after a proposal and John's go." All six 23 October follow-ups are still Backlog with no code change. The inspectors report, and nothing with standing acts.
 
 **S4** has been in close-out since 07:52, not yet Done.
+
+## 3 Nov, about 09:30 UTC: S4 merged. The forecast's left-behind copies surfaced within the same run
+
+S4 merged as `300c811f` (PR #2254). Close-out is paused at the deploy (blocked), so the ticket isn't Done yet.
+
+**Against the forecast:**
+- **The disagreeing pill tables became a ticket.** The builder's own final summary lists it as open: "Home says 'needs you' where the task page says 'waiting' for the same state. Product wording, not changed here." Close-out then **filed LIN-4159** for it. The Survey named both tables before the work and said a drill would leave them. One prediction became a follow-up ticket within hours.
+- **"Home's empty cases" was the review's regression.** The forecast said the state-line renderers collide with "what LIN-4010 and LIN-4024 decided" and expected "a course-change note … Home's empty cases". Review found exactly there that removing the `wordOnly` branch brought back "No sessions yet." on Home for `backlog`, which LIN-4024 had removed, with no test covering it. It was fixed before merge (ledger 1).
+- **The second Last copy needed a further fix.** Review ledger 2 changed the browser `renderLastLine` button wording, so the forecast's two copies of the Last words took two passes.
+- **Plan-review rounds: 0** (as forecast). **Review send-backs: 0,** but one review with 6 ledger items, fixed in one commit before merge.
+- **Not yet bitten:** the new `plainRunState` word table beside `STAGE_STATE_WORD`. To watch.
+
+**Reading.** On a live ticket, before the work, Survey v1 named four specific things. One was solved by deletion. One became a filed follow-up (LIN-4159). One was the review's main regression. One is a new copy now on main. That's the first evidence that it's a surveyor, not just a reviewer: these were forecasts, made from the code at `f6a2c2158` before any of this happened.
+
+**1a for S4:** waiting for its lineage to finish (the close-out is blocked at the deploy). The builder session (last beat at 07:28) stays resumable until about 13:28 (the 6-hour reap). If the close-out is still blocked at about 11:30, I'll ask the builder anyway, since it is idle.
