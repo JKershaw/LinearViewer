@@ -412,3 +412,20 @@ All five Surveys finished in about 3 to 4 minutes each. They're kept verbatim in
 - **LIN-4165** already has a PR (simple-dispatcher #302).
 - **LIN-4166 and LIN-4168** have plan-review verdicts.
 - **LIN-4167's ruling** offers only the Actions-secret route (A: a re-run deploy job; B: CI owns every deploy; or no). It found a prior record ("no CI workflow uses a Railway token", the 22 Oct incident) that this would reverse. The host-side route, where the agent's Railway CLI deploys when it sees a green re-run that didn't ship, wasn't offered: the builders don't know the CLI is there.
+
+## 3 Nov, 19:05 UTC: two tickets Done, and the first quiet questions
+
+**John's rulings (18:20 to 18:40):** LIN-4164's clone window is **24 h** (John then cleared space: 180 GB free). LIN-4167 is **"No: keep the manual redeploy after green re-runs"**. John: "it is a sign of grit in the gears, so warrants human attention." That's an outcome the menu doesn't have. Sometimes the difficulty is useful and should stay visible.
+
+**LIN-4166 (quiet follow-up): Done, deployed 18:48** (PR #2258, `7797c306`). Against its forecast:
+- **The forecast advised against the design that shipped.** It said "Not `subscription`: adding `'none'` would overload the enum." The builder extended `subscription` with `'none'` anyway, and plan review approved it. The forecast's worry was leaking into kickoff/recommend validation; the build refuses `'none'` without `followUpTo` and pins the recommend lane with a test. It's a judgement call rather than a miss, and the builder's answer may say why.
+- **The forecast's "bites later" was seen by review and documented, not guarded.** The close-out's design note: "a `none` follow-up to a worker its autopilot is still parked on silences that worker's real terminal; the docs say so." The forecast suggested refusing the flag unless the target row is terminal. We didn't pass the warning on; the pipeline found it by itself, and chose docs over a guard.
+- **The forecast's named follow-on was filed:** "the other follow-up producers can't set the flag (the reply box, chat-tools `send_follow_up`)" became LIN-4174.
+- One plan-review round, as forecast.
+- The close-out left the live check "not run: the close-out token has no dispatch grant".
+
+**LIN-4168 (one test reset): Done** (PR #2259, `42fcf5d1`), about an hour end to end. It was built as the Survey's consolidate: holders register a reset, a census scan fails on an unregistered holder, and the database-backed stores were kept out, as advised. Review found three more holders the census couldn't see, and all three were fixed with the census widened. The forecast said two plan-review rounds; it took one.
+
+**The after-questions, sent 19:03 as LIN-4166's first live use.** Both 1a questions went with `subscription:'none'`, which makes them LIN-4166's live witness. The dispatch read view shows `subscription: null` on both rows. The proxy lane does list the field (`lib/dispatch-entrance.js:415`), so this is probably the read view not showing it. The proof is whether a `kind:'wake'` row appears on the lineage after each answer lands.
+
+**Open ruling for John:** LIN-4165's close-out was stopped by a safety classifier ("probably because I printed other tickets' oplog text"). It asks to finish reading only counts and cursors.
