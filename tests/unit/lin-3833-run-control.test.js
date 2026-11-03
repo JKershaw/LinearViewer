@@ -776,6 +776,22 @@ describe('LIN-4106 — the Change drawer: a heading, the default with its number
     assert.match(card, /12 runs in the last 30 days, about \$0\.54 each/);
   });
 
+  // LIN-4106 (beat 4): pins for the default choice's figures, as the card draws them. The card stays one line on a phone
+  // (Use for this run must stay on the first screen, LIN-3987); its spend and unpriced count are in the decision panel.
+  test('with nothing priced, the card gives the runs and no typical run: never $0', async () => {
+    const panelFor = (q) => ({ ...serverPanel(q), numbers: { runs: 3, priced: 0, unpriced: 3, noTelemetry: 0, spendUsd: 0, typicalUsd: null } });
+    const card = defaultCardOf(await openDrawer({ panelFor }));
+    assert.match(card, /3 runs in the last 30 days/);
+    assert.doesNotMatch(card, /\$0|about/, card);
+  });
+
+  test('the default choice is named in plain words from the preview\'s words, never by its model id', async () => {
+    const previewFor = () => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: 'claude-opus-5-5', harness: 'claude-code', effort: null, sources: { model: 'default', harness: 'default', effort: 'none' } });
+    const card = defaultCardOf(await openDrawer({ previewFor, panelFor: withNumbers }));
+    assert.match(card, /Claude Opus 5\.5/);
+    assert.doesNotMatch(card, /claude-opus-5-5/);
+  });
+
   test('the default choice names no machine key: plain words only', async () => {
     const text = defaultCardOf(await openDrawer({ panelFor: withNumbers })).replace(/<[^>]+>/g, ' ');
     assert.doesNotMatch(text, /\bclaude-code\b|\bnone\b|\bnull\b|\bundefined\b/, text);
