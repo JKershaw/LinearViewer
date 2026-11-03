@@ -292,3 +292,13 @@ LIN-4110 is Done (fixed, reviewed, closed by 12:21). The full answer is on LIN-4
 - **What the forecast didn't name:** the two pollers of one URL, and the 40-parameter wiring line.
 
 **Convergence across hands:** LIN-4113's builder, the LIN-4110 Survey and LIN-4110's builder all name the same thing independently: per-worker-key test state with no single reset. With the census silent on it, it's now the best-attested tangle in the run. The builder's sized payoff ("a third to a half" of the ticket, and two past tickets would have been one fix) makes it a ready candidate for the first Survey-recommended tidy.
+
+## 3 Nov, about 14:40 UTC: S5 waits on John's ruling
+
+S5 (LIN-4107) has PR #2256 with CI green, after 5 stepper beats plus review. Review's verdict is **Needs Discussion** on one product decision, which is now an open ruling for John: "With no phone body shrink, Home's Change sheet puts Use at 1107px on an 844px phone screen (LIN-3987 required it on the first screen). Which holds?"
+
+**Against the forecast (v1, 22:16):**
+- **Partly a match.** The forecast recommended deleting the phone `body` shrink and its undoing copies. The builder did, and this is the bill: the phone layout's first-screen budget.
+- The forecast's "bites later" warned that "em→rem shifts sizes … on pages nobody screenshots" and that the floor tests and the smallest token must agree. Those were the same family, but it **did not name the LIN-3987 first-screen pin**.
+- **S4's builder had named exactly that pin** in its after-answer at 11:05 ("`lin-3987` keeps 'Use for this run' inside 844px with almost no headroom"). It's the kind of claim v2's question 5 now asks for (pixel budgets). S5's forecast was v1, written before either.
+- **Another rule obeyed literally:** the plan's four-size test needed two scope rulings (exempt, exempt-narrow) and a third round of "rulings on 3 open items".
