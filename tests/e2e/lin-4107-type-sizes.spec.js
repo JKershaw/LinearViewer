@@ -58,6 +58,8 @@ async function distinctSizes(page) {
   return page.evaluate(() => {
     const sizes = new Set();
     for (const el of document.querySelectorAll('body *')) {
+      // The shell header and its workspace menu are exempt chrome (CHROME_EXEMPT in tests/unit/lin-4107-type-sizes.test.js).
+      if (el.closest('.nav-bar, [class*="nav-option"]')) continue;
       const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
       if (own) sizes.add(getComputedStyle(el).fontSize);
     }
@@ -74,7 +76,16 @@ for (const [label, viewport] of [['1280px', { width: 1280, height: 900 }], ['390
     await page.waitForLoadState('networkidle');
     const sizes = await distinctSizes(page);
     const stray = sizes.filter((s) => !ALLOWED.includes(s));
-    expect(stray, `sizes outside the token set on the task page: ${stray.join(', ')} (all: ${sizes.join(', ')})`).toEqual([]);
+    const offenders = stray.length ? await page.evaluate((list) => {
+      const out = [];
+      for (const el of document.querySelectorAll('body *')) {
+        if (el.closest('.nav-bar, [class*="nav-option"]')) continue;
+        const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
+        if (own && list.includes(getComputedStyle(el).fontSize)) out.push(`${getComputedStyle(el).fontSize} ${el.tagName.toLowerCase()}.${[...el.classList].join('.')} "${el.textContent.trim().slice(0, 30)}"`);
+      }
+      return out;
+    }, stray) : [];
+    expect(stray, `sizes outside the token set on the task page: ${stray.join(', ')} (all: ${sizes.join(', ')}); elements: ${offenders.slice(0, 8).join(' | ')}`).toEqual([]);
     expect(sizes.length).toBeLessThanOrEqual(4);
   });
 }

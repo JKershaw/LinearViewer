@@ -482,7 +482,7 @@ h1 {
 .nav-view {
   color: var(--muted);
   text-decoration: none;
-  font-size: var(--font-size-base);
+  font-size: 0.9em;
   font-family: var(--font-content);  /* human label — sans */
   flex: 0 0 auto;
   padding: var(--space-1) 0;
@@ -529,7 +529,7 @@ h1 {
   border-bottom: 2px solid transparent;
   padding: var(--space-1) 0;
   font-family: var(--font-structural);  /* ⋯ is structural character */
-  font-size: var(--font-size-base);
+  font-size: 0.9em;
   color: var(--muted);
   cursor: pointer;
 }
@@ -615,7 +615,7 @@ h1 {
 .nav-label {
   color: var(--muted);
   font-family: var(--font-content);
-  font-size: var(--font-size-base);
+  font-size: 0.9em;
 }
 
 .nav-value {
@@ -623,7 +623,7 @@ h1 {
   border: none;
   padding: 0;
   font-family: var(--font-content);
-  font-size: var(--font-size-base);
+  font-size: 0.9em;
   color: var(--text);
   cursor: pointer;
 }
@@ -647,7 +647,7 @@ h1 {
 .nav-action {
   color: var(--muted);
   text-decoration: none;
-  font-size: var(--font-size-base);
+  font-size: 0.9em;
   font-family: var(--font-content);
 }
 
@@ -686,7 +686,7 @@ a.wordmark:hover {
 /* Nav bar: leads the filters; nudge it slightly larger than the label/value
    text and add breathing room before "workspace:". */
 .wordmark-nav {
-  font-size: var(--font-size-base);
+  font-size: 1em;
   margin-right: 1ch;
 }
 
@@ -714,7 +714,7 @@ a.wordmark:hover {
   box-shadow: inset 0 0 0 1px var(--amber);
   border: none;
   border-radius: var(--radius-sm);
-  font-size: var(--font-size-sm);
+  font-size: 0.8em;
   font-family: var(--font-content);
   cursor: pointer;
 }
@@ -754,7 +754,7 @@ a.wordmark:hover {
   text-decoration: none;
   border: 1px solid var(--amber);
   border-radius: var(--radius-sm);
-  font-size: var(--font-size-sm);
+  font-size: 0.8em;
   font-family: var(--font-content);
   cursor: pointer;
 }
@@ -990,7 +990,7 @@ a.wordmark:hover {
   border: none;
   padding: 0;
   font-family: var(--font-content);
-  font-size: var(--font-size-base);
+  font-size: 0.9em;
   color: var(--text);
   cursor: pointer;
   text-decoration: none;
@@ -1067,7 +1067,7 @@ a.wordmark:hover {
 
 .search-input {
   font-family: var(--font-content);  /* the query is machine input — mono */
-  font-size: var(--font-size-base);
+  font-size: 0.9em;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   padding: var(--space-1) var(--space-2);
@@ -1084,7 +1084,7 @@ a.wordmark:hover {
 
 .search-clear {
   font-family: var(--font-structural);
-  font-size: var(--font-size-base);
+  font-size: 0.9em;
   color: var(--muted);
   background: none;
   border: none;
@@ -1097,7 +1097,7 @@ a.wordmark:hover {
 
 .search-no-results {
   color: var(--muted);
-  font-size: var(--font-size-base);
+  font-size: 0.9em;
   padding: var(--space-2) 0;
 }
 
@@ -3778,7 +3778,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 
 /* Underlined heading — prompts catalog. Additive over .section-header. */
 .section .section-header--ruled {
-  font-size: var(--font-size-lg);
+  font-size: 1.1em;
   margin-bottom: var(--space-3);
   padding-bottom: var(--space-2);
   border-bottom: 1px solid var(--faint);
@@ -5375,3 +5375,6 @@ a.context-node:hover { border-color: var(--text); background: var(--bg); }
   white-space: nowrap;
   border: 0;
 }
+
+@media (max-width: 640px) { .nav-bar { font-size: 14px; } .nav-label { font-size: 0.8em; } .wordmark-nav { font-size: 0.85em; } .toggle { font-size: 1rem; } }
+@media (max-width: 400px) { .nav-bar { font-size: 13px; } }

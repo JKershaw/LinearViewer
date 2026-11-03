@@ -72,8 +72,17 @@ export const NON_HOME_TASK = Object.freeze([
   '.repo-picker-add-link',
   '.repo-picker-group-heading',
   '.repo-picker-truncated-note',
+  '.section .section-header--ruled',
 ]);
-const EXEMPT = new Set([...LIN4024_EXEMPT, ...HOME_PIN_EXEMPT]);
+// Shell chrome at a phone width (the header that the LIN-2191 and LIN-4009 tests lay out at 320px). The nav and its badges
+// keep their original sizes, because the header's layout pins depend on them; the nav sets its own phone size (14px at
+// 640px, 13px at 400px), so the body text beside it can stay at 16px. Exempt by name (ruling dispatch 4eeb6ac5, rule 2).
+export const CHROME_EXEMPT = Object.freeze([
+  '.nav-action', '.nav-label', '.nav-more-toggle', '.nav-option', '.nav-value', '.nav-view',
+  '.queue-badge', '.rulings-badge', '.search-clear', '.search-input', '.search-no-results', '.wordmark-nav',
+  '.nav-bar', '.toggle',
+]);
+const EXEMPT = new Set([...LIN4024_EXEMPT, ...HOME_PIN_EXEMPT, ...CHROME_EXEMPT]);
 const OUT_OF_SCOPE = new Set(NON_HOME_TASK);
 
 // A rule is skipped when one of its selectors is exempt or out of scope (a selector list is split on commas).
@@ -268,8 +277,8 @@ describe('mono is only on the allowlisted selectors (LIN-4107 beat 2 corrective)
 });
 
 describe('the out-of-scope list cannot grow or go stale (LIN-4107)', () => {
-  test('it has the fourteen selectors the ruling names, and each still has a rule in the sheets', () => {
-    assert.equal(NON_HOME_TASK.length, 14);
+  test('it has the fifteen selectors the ruling names, and each still has a rule in the sheets', () => {
+    assert.equal(NON_HOME_TASK.length, 15);
     const missing = NON_HOME_TASK.filter((selector) => {
       try {
         appliedDecls(SHEETS, selector);

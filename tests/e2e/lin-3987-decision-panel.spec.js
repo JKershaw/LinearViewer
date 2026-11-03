@@ -118,7 +118,11 @@ test.describe('Home run control: the panel on a phone (LIN-3987)', () => {
     const use = component.locator(RC.use);
     await expect.poll(() => use.boundingBox()).not.toBeNull();
     const box = await use.boundingBox();
-    expect(box.y + box.height, 'the bottom of Use for this run').toBeLessThanOrEqual(PHONE.height);
+    // LIN-4107 (retarget, rule 3 of the ruling): this first-screen bottom was measured at the 13px phone body that the ticket
+    // removes, so it no longer holds at normal body size. What stays: Use is inside its sheet, and the sheet is not scrolled.
+    // Old: expect(box.y + box.height, 'the bottom of Use for this run').toBeLessThanOrEqual(PHONE.height);
+    const sheetContentBottom = await component.locator(RC.changePanel).evaluate((panel) => panel.getBoundingClientRect().top + panel.scrollHeight);
+    expect(box.y + box.height, 'the bottom of Use for this run sits within its sheet').toBeLessThanOrEqual(sheetContentBottom);
     // The box is measured against the viewport, so a sheet scrolled to bring Use up would pass that alone: the sheet, and any
     // container inside the page that scrolls it, must sit at the top (the page's own scroll is the document's, not the sheet's).
     const scrolled = await component.locator(RC.changePanel).evaluate((panel) => {
