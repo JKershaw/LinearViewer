@@ -429,3 +429,20 @@ All five Surveys finished in about 3 to 4 minutes each. They're kept verbatim in
 **The after-questions, sent 19:03 as LIN-4166's first live use.** Both 1a questions went with `subscription:'none'`, which makes them LIN-4166's live witness. The dispatch read view shows `subscription: null` on both rows. The proxy lane does list the field (`lib/dispatch-entrance.js:415`), so this is probably the read view not showing it. The proof is whether a `kind:'wake'` row appears on the lineage after each answer lands.
 
 **Open ruling for John:** LIN-4165's close-out was stopped by a safety classifier ("probably because I printed other tickets' oplog text"). It asks to finish reading only counts and cursors.
+
+## 3 Nov, about 19:15 UTC: LIN-4166 works live, and the two builders' answers
+
+**The quiet follow-up works on real traffic.** Both 1a questions (sent 19:01 with `subscription:'none'`) finished by 19:03 and posted their answers. Neither lineage has a `kind:'wake'` row after them; in round 1 a wake followed every follow-up within seconds. That's the live check LIN-4166's close-out left "not run", done by the first thing that needed it. (The dispatch read view still shows `subscription: null`, so the read view doesn't expose the field. That's minor and not filed.)
+
+**LIN-4166's builder, against the forecast.**
+- *Difficulty:* "It wasn't, much." The forecast said "Difficult? No." It matches.
+- *Where it bound:* kickoff spreads `body`, so a stray `followUpTo` would have passed the new rule. The plan missed it, plan review caught it, and the forecast didn't name it. The builder also found two pinned message tests and a test using `'none'` as its *invalid* example; the forecast named the pinned shape tests but not that one. Then there's the enum repeated in prose (about seven places).
+- *What it would have done first:* a small tidy, making one "has `followUpTo`" predicate in place of four inline copies: "perhaps ten minutes and one way to drift". The forecast named a different hand-written copy (`ROW_KEYS.proxy`) and recommended drilling. Same kind of thing (a copy the drill leaves), different instance.
+- It doesn't say why it chose `subscription` over a new field; research and plan review settled that before the build.
+
+**LIN-4168's builder, against the forecast.**
+- *Difficulty:* "Nothing had a per-key interface": six different key shapes, hidden instances (router default-deps, a module const), and "the census was most of the work" (97 containers classified). The forecast's three hard questions were scope, refill-not-clear and enforcement ("a list, even a central one, is still a list"). The last of these is the one that cost the most. The forecast also flagged the issues memo's key, which the builder moved into a module.
+- *What it would have done first:* "give every in-memory cache one shape, `clear(urlKey)` plus `countFor(urlKey)`, over one key-prefix convention … roughly a third of this diff". That's a *smaller* tidy than the Survey's recommendation, and a different one from the Survey's own "small tidy" (merge the three inline resets). The forecast saw the varied shapes but didn't offer "make them one shape" as the tidy.
+- *What the plan got wrong:* a seam the plan and review both said doesn't save a session does. The census's blind spots (plain objects, `let` caches). Holders missing from the table. "Probe is 0 after reset" contradicts the refill, which is the tension the forecast named.
+
+**Reading across both.** The forecasts got the difficulty level right on both. On LIN-4168 they had the right hard part, enforcement. In both cases the builder's "what I'd have done first" is a uniform-interface tidy: *one predicate* (LIN-4166), *one shape* (LIN-4168). The Survey's menu tends to frame a tidy as gathering copies, and doesn't offer "give these things one interface". It's worth raising in the discussion, not as a prompt change mid-round.
