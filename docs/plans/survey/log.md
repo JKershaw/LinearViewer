@@ -2,6 +2,49 @@
 
 A running log of the overnight run of 2 to 3 November 2026 and after. The newest entries are at the bottom. The plan is `../survey.md`, and the prompt is `prompt.md`.
 
+## Wrap-up so far (3 Nov, 15:25 UTC; S5 still open)
+
+**Short version.** The Survey works as a *surveyor*, not just a reviewer.
+
+On three live tickets, its forecasts, written before any work, named where the change would bind and what a plain build would leave behind. Then it happened:
+- **S4 (LIN-4106):** both left-behind pill tables became LIN-4159, and the review's regression landed where it pointed.
+- **LIN-4110 (the flake):** it read the cause from code, warned that the ticket's own fix would weaken the guard, and proposed the seam the builder then built (better placed).
+- **S5 (LIN-4107):** it named the 12px pin collision that became two rulings.
+
+Its misses are one class: things only learned by drawing or running (CSS draw order, phone pixel budgets, test seeding). v2 now asks it to name those.
+
+| Spike | What it tested | Result |
+|---|---|---|
+| 0 | Can we ask a finished session? | Yes, within simple-dispatcher's 6 h reap window (`REAP_INACTIVITY_MS`). Answers must go to a ticket comment. Each question wakes the lineage's autopilot. |
+| 1a | Builders and researchers: "why was this difficult?" | 7 answers (5 UI round, S4, LIN-4110), all concrete and causal. Every one names a decision held in several places, or shared test state. Each "first" is a small, complete tidy or a consolidation, with a sized payoff (a third to a half of the diff, a review round, a day of E2E). |
+| 1b | Builders against the map | They see different halves. The census catches decisions *spelled* the same; builders catch decisions *meant* the same but spelled differently (parent/children in 3–5 structures, ruling count in 4 places). |
+| 1c | v0, blind at S3's base | Two named tidies became real prerequisites (LIN-4118, LIN-4140). Scale badly under-forecast (2 prerequisites predicted, 11 tickets actual). |
+| 3 | v0 backtest: 5 prize tickets, 4 clean | 2 hits, 2 partial, 1 miss. Diagnosis strong; it recommended "just drill" past copies it had found (C1 escapes *are* copies left behind). Clean: 2 quiet, 2 small tidies pulled by the task. |
+| 2 | v1 forward on S4 | 0 plan-review rounds (✓). It named 3 copies of "last run" (✓, the builder agreed). A drill leaves the pill tables (✓, became LIN-4159). Home's empty cases (✓, the review's regression). The new word table drift (pending). Missed the CSS grid order, the phone budget, a seeding trap. |
+| 2 | v1 forward on S5 | Named the 12px pin collision (✓, 2 rulings). Recommended deleting the phone shrink (done). Missed the first-screen pin, which is now John's open ruling. |
+| 2b | v2 forward on LIN-4110 | Cause (✓), GET warning (✓), seam (✓, builder generalised it), sibling memo (✓), and its "couldn't check" list was the builder's first verification. The cleanest result. |
+
+**Survey versions.**
+- **v0:** the base prompt.
+- **v1:** name the copies a drill leaves behind; look at the test harness; list the pieces; drop the duration guess.
+- **v2:** say what you couldn't check by reading.
+
+Each change came from a specific miss, and v1 dropped one line.
+
+**The best-attested tangle:** per-worker-key test state with no single reset. Three independent hands named it (LIN-4113's builder, the LIN-4110 Survey, LIN-4110's builder: "a third to a half of this ticket"; LIN-4120 and LIN-4110 "would have been the same fix"). The census didn't see it. It's the natural first *acted-on* Survey recommendation.
+
+**Follow-ups surfaced** (not filed): see "Follow-ups the spikes have surfaced" below, plus:
+- LIN-4110 was raised to High and is now fixed.
+- The flake-blocked deploy didn't retry.
+- D&C's "coherence loop stalled" (the 23 Oct follow-ups never moved).
+
+**Caveats.**
+- Three forward tests, all in areas the UI round had just mapped.
+- One rater (me) judged hits.
+- The forecasts' "bites later" items can take days to mature; `plainRunState` is still pending.
+
+---
+
 ## 2 Nov, about 21:35 UTC: Spike 0 (can we ask a finished session?)
 
 - **It works, with limits.** `POST /dispatch` with `followUpTo` resumed LIN-4114's builder session about 45 minutes after it finished.
