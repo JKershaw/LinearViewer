@@ -480,3 +480,19 @@ It also didn't find the builders' one-shape tidies, though LIN-4168's "no single
 **Caveats.** Five tickets, one run each, the same model. open-0 ran 70 minutes after v2. Its rules put LIN-4150 and anything after the base off limits, but the v2 forecasts were sitting there. I didn't check whether any run looked; nothing in the answers suggests it.
 
 **For the discussion.** A shorter, open Survey with no Harbour specifics may be the better default. The question is whether to keep anything from v2: perhaps the "what couldn't you check, and how could the builder check it early" line, which earned its place on LIN-4110 and LIN-4164. On LIN-4165, though, open-0 simply went and checked.
+
+## 3 Nov, about 19:55 UTC: LIN-4165 done, and its builder's answer comes back as feedback
+
+**LIN-4165 is Done** (simple-dispatcher PR #302, then #304, `c3b9ca8`, deployed 18:49). Its own post-deploy live check found a duplicate-post bug: a self-check's text posted again after the flush. A bug cycle in the same lineage fixed it. The close-out's live tally since the restart was 94 assistant-text posts across 14 items, with 0 repeats and 0 failed posts. So **open-0's rate-limit risk hasn't bitten at today's volume.**
+
+**Our tail, eaten twice.** The 1a question to LIN-4165's builder (19:48, `subscription:'none'`) is the first after-question whose words came back *as dispatch feedback*. The `assistant-text` entries carry the session's own replies, including the `[onboarding]` label (the parity v2 asked for). No wake followed. So LIN-4165 and LIN-4166 both work together on their first real use.
+
+**The builder, against both forecasts.**
+- *Difficulty:* "moderately hard, and harder than 'flip a default' suggests". v2 said "Low"; open-0 said "the difficult part is turning it on safely". The worst part was a cursor position collision: the delta path's synthetic append recorded the turn at a position that matched the next real block, so that block would have been dropped by the dedupe. The builder's no-replay test caught it. v2 had named the cursor, but as "starts at 0, replays history", which was a different problem in the same place.
+- *Tests pinning the old shape:* v2 named `assistant-text-relay.test.js` and the ordering pins. That's a hit.
+- *"The plan didn't flag the last-entry readers":* **open-0 named exactly this** ("check every reader that treats the last entry as the status"). v2 named the related Harbour readers.
+- *What it would have done first:* "a single 'post this text with label/marker' helper shared by `postTurnText` and the delta path … roughly a third of the reasoning and diff." Of the one-gate tidy v2 recommended, the builder said "cheap and fine".
+
+**The pattern is now three for three.** All three builders asked so far (LIN-4166, LIN-4168, LIN-4165) named a *one-interface* tidy as what they'd have done first: one predicate, one cache shape, one posting helper. Each saved, by their estimate, between "ten minutes" and "a third of the diff". Neither Survey version offered one. v2 offered "gather copies of a decision", open-0 offered "prepare". The question "which things here do the same job through different interfaces?" is the one nobody asks before the work.
+
+**A loose end, as data.** LIN-4167 is still In Progress. John ruled "no: keep it manual", the ruling was recorded as a comment, and its autopilot had already ended at 18:18. So nothing closed the ticket. A "no" leaves a ticket with no owner. That's a small piece of grit in the gears.
