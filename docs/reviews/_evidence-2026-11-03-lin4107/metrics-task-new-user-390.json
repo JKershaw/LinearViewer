@@ -23,7 +23,7 @@
   },
   "task ident (mono ok)": {
     "selector": ".task-ident",
-    "fontSize": "17px",
+    "fontSize": "20px",
     "fontFamily": "\"JetBrains Mono\"",
     "text": "LOCAL-2"
   },
@@ -35,7 +35,7 @@
     "selector": "[data-testid=\"task-page-run-control\"]",
     "fontSize": "16px",
     "fontFamily": "Inter",
-    "text": "the first step for a task in Todo✦ Write the prompt"
+    "text": "Write the prompt for this task. The prompt says which step i"
   },
   "stage time (figure)": {
     "absent": true,

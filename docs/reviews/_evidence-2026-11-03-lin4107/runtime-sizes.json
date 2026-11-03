@@ -12,19 +12,13 @@
   },
   "task-390": {
     "sizes": {
-      "13.6px": 36,
+      "13.6px": 40,
       "16px": 33,
-      "11.56px": 2,
-      "11.05px": 2,
-      "17px": 1,
-      "20px": 1,
-      "18.72px": 1,
-      "24px": 1
+      "20px": 4
     },
     "families": {
       "Inter": 57,
-      "\"JetBrains Mono\"": 18,
-      "monospace": 2
+      "\"JetBrains Mono\"": 20
     }
   },
   "home-1280": {
@@ -40,19 +34,13 @@
   },
   "task-1280": {
     "sizes": {
-      "13.6px": 36,
+      "13.6px": 40,
       "16px": 33,
-      "11.56px": 2,
-      "11.05px": 2,
-      "17px": 1,
-      "20px": 1,
-      "18.72px": 1,
-      "24px": 1
+      "20px": 4
     },
     "families": {
       "Inter": 57,
-      "\"JetBrains Mono\"": 18,
-      "monospace": 2
+      "\"JetBrains Mono\"": 20
     }
   }
 }
