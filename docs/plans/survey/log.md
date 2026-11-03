@@ -207,6 +207,8 @@ Both are posted on LIN-4150 (22:16). The base is `f6a2c2158`, main at 21:54. **S
 - **A follow-up wakes its lineage's autopilot.** A read-only question shouldn't trigger "a child reached a terminal outcome, resume your cross-check". It needs a way to send a follow-up that wakes no one.
 - **"Should this session be running?"** S3e's autopilot started 4.5 hours before its prerequisite landed, then was killed by the stall failsafe for waiting.
 
+Filed 3 Nov 17:13 UTC as LIN-4164 to LIN-4168 (see Round 2). The fourth wasn't filed this round.
+
 ## 3 Nov, 07:00 UTC: progress
 
 - **Periodicals.** The stack-walk autopilot minted LIN-4152 and LIN-4153 at 06:14 (the review tasks for Drift & Coherence and Seams & Tangles). Both are past research. One is in implementation (the report), the other in plan.
@@ -360,3 +362,26 @@ S5 (LIN-4107) merged as `048c3319` after John's ruling, which dropped LIN-3987's
 - **What the ticket got wrong:** "four sizes through the existing token set" (three tokens, all `em`); the witness counted shared sheets, so "it measured the site, not Home"; "no phone shrink" was framed as body text when it is a global rule other layouts depend on.
 
 **Against the forecast:** the diagnosis matches nearly point for point. The `em` compounding, the global shrink, the whole-sheet count measuring the site, the witness as computed sizes per page (the forecast's recommendation *is* the builder's "what I'd do first"), and three tokens, not four. The misses are, again, the draw-or-run class: what depended on the shrink, and the runtime cascade.
+
+
+## Round 2 (3 Nov, from 17:10 UTC): the plumbing tickets, surveyed and acted on
+
+John's idea: file the follow-ups the spikes surfaced, then run the Survey *on those tickets* and act on what it says. The tickets make asking a builder cheaper; the asking measures the tickets.
+
+**What's new this round:** for the first time we act on the forecast. Where it recommends more than drilling, that option is written onto the ticket before dispatch. Where it says drill, the ticket goes as written. Each forecast is posted to LIN-4150 before dispatch and never edited. The Survey prompt stays at v2 for the whole round. There's no control; John accepted that, since periodicals review the overall state.
+
+**Filed** (Backlog, Medium, written at the level of the idea, before any Survey):
+
+| Ticket | Repo | What |
+|---|---|---|
+| LIN-4164 | simple-dispatcher | Keep finished sessions resumable for a week, not six hours |
+| LIN-4165 | simple-dispatcher, plus Harbour's display | Every text reply a session writes reaches Harbour as dispatch feedback (John widened this from "capture a follow-up's reply": it lets us look inside a running session) |
+| LIN-4166 | Harbour | A follow-up that only asks a question doesn't wake the ticket's autopilot |
+| LIN-4167 | Harbour (and possibly Railway settings) | A green re-run of main's CI deploys without a manual redeploy |
+| LIN-4168 | Harbour | One reset for all of a workspace key's test state (the best-attested tangle from round 1) |
+
+**Order:** LIN-4164 first, because it lifts the six-hour limit that constrains asking the builders. LIN-4165 and LIN-4166 then make asking cheaper and quieter.
+
+**Surveys sent 17:15 UTC** (v2, unchanged; Harbour at `048c3319a`, simple-dispatcher at `cf6369dfd`). The only addition to the usual prefix: where a ticket spans both repos, one line lets the Survey read the other repo at its own base, under the same rules. This is the Survey's first run on simple-dispatcher. Its line "a copy left behind is the commonest escaped defect" was learned on Harbour, so whether it holds there is itself a result.
+
+**Things to hear about in the discussion (John, 17:05):** a builder's after-answer is a second place to find a tidy ("tidy after" as well as "tidy first"); follow-ups to *other* finished sessions, asking what was hard or what a perfect world would feel like, once LIN-4164 lands.
