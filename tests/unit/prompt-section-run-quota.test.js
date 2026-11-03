@@ -147,6 +147,8 @@ function baseOpts(extra = {}) {
     defaultPromptKeys: ['implementation'],
     morePromptKeys: [],
     promptMeta: { implementation: 'Implementation' },
+    // LIN-4040 close-out (review A): the run-step rung is enabled only while the card's offer says `offer`.
+    row: { action: { kind: 'offer', container: false, step: null, why: 'the run control offers the three rungs' } },
     ...extra,
   };
   return { runSetup: !o.dispatchEnabled, ...o };

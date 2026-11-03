@@ -402,6 +402,13 @@
     // count was unreadable — nothing to show, and no limit to claim.
     const { quota, quotaKnown, runsExhausted, runLimitTitle } = runQuotaView(state);
     const runLimited = (rung, text) => `<button class="opened-task-rung opened-task-rung--setup" data-rung="${rung}" disabled title="${runLimitTitle}">${text} <span class="opened-task-setup">${runLimitTitle}</span></button>`;
+    // LIN-4040 close-out (review A): "run this step" is drawn enabled only while the one offer owner (`runOfferOf`) says
+    // `offer`. A run in flight, a question open or a finished task draws it disabled, titled with the offer's own reason.
+    // No offer read yet (neither the state nor the row carries one) offers no run either.
+    const offer = runOfferOf(state, opts);
+    const runOffered = !!offer && offer.kind === 'offer';
+    const runRefusedWhy = (offer && offer.why) || 'no run is offered on this task yet';
+    const runRefused = (rung, text) => `<button class="opened-task-rung opened-task-rung--setup" data-rung="${rung}" disabled title="${esc(runRefusedWhy)}">${text} <span class="opened-task-setup">${esc(runRefusedWhy)}</span></button>`;
     const rungs = [];
     // copy: with no prompt there is nothing to copy, and generating on a press
     // labelled "copy" would spend AI behind a non-AI label. So the idle rung is
@@ -420,6 +427,8 @@
       // runner's subagent can reach Harbour. Every other caller is unchanged.
       if (runsExhausted) {
         rungs.push(runLimited('run-step', 'run this step'));
+      } else if (!runOffered) {
+        rungs.push(runRefused('run-step', 'run this step'));
       } else {
         const force = runnerMarkerSet(opts.urlKey) ? ' data-proxy-force="runner"' : '';
         rungs.push(`<button class="opened-task-rung opened-task-rung--ready" data-rung="run-step" data-action="run-step" data-target="cli"${force}>run this step</button>`);
@@ -634,9 +643,10 @@
     return (state.run && state.run.step) || action.step || null;
   }
   // LIN-4104 D2: the filled run button, from the viewer's last dispatch on this workspace (`opts.filledRung`, read once per
-  // page load). A workspace with no prior dispatch (unset) fills Next step. Until the recommend step lands (D3), Next step
-  // runs the task to PR, the run this workspace has always had, and says so in its title. Run to Done is drawn disabled
-  // until its kickoff lands (D4). Run to PR stays offered beside any filled button that is not Run to PR.
+  // page load). A workspace with no prior dispatch (unset) fills Next step. Next step asks the recommend call what to run and
+  // then asks for a confirm (`next-step` -> recommendNext); Run to PR is the PR-bounded kickoff (`go`); Run to Done is the
+  // kickoff with no stop (`go-done` -> startRun('done')). All three are drawn whenever a run is offered, and Run to PR stays
+  // offered beside any filled button that is not Run to PR.
   function filledRungOf(opts) {
     return opts && (opts.filledRung === 'pr' || opts.filledRung === 'done') ? opts.filledRung : 'next-step';
   }
@@ -2612,6 +2622,15 @@
         // Proxy-context appending is now handled internally by dispatchPrompt()
         // (LIN-1137). Exec controls (LIN-1096) still live in the dispatch options panel.
         const isRunStep = btn.dataset.action === 'run-step';
+        // LIN-4040 close-out (review A): the rung was drawn from a state read that may be old. Re-read the offer first, as
+        // Next step's Run does (runRecommended): a run that started or a question that opened since refuses the press and
+        // nothing is sent. Swipe has no run block, so its refusal shows in the Go slot and the ladder is drawn again.
+        if (isRunStep && await offerIsStale()) {
+          refuseStale();
+          paintGo();
+          btn.textContent = originalText;
+          return;
+        }
         // LIN-3211: the run-step rung sits in the ladder, outside the panel, so
         // `closest` finds nothing there. It reads its own card's panel instead.
         // LIN-3833 (Q1): a blank harness is no longer forced here. The server settles it
@@ -2711,6 +2730,9 @@
       // LIN-3968: the run block is repainted from the state at once, so the step is never guessed while the
       // preview is still out (the preview's answer repaints it again, in refreshRunPreview).
       if (runControlOn()) { paintRun(); refreshRunPreview(); }
+      // LIN-4040 close-out (review A): the ladder's run-step rung follows the offer the read carries (Swipe has no run block
+      // to repaint). Only a ladder already on the card is redrawn; nothing else is rebuilt.
+      if (container.querySelector && container.querySelector('[data-ladder-slot]')) paintLadder();
     }
     function rereadUntilComplete(attempt) {
       if (destroyed || attempt > 15) return;

@@ -194,6 +194,8 @@ function baseOpts(issue, extra = {}) {
     defaultPromptKeys: ['implementation'],
     morePromptKeys: [],
     promptMeta: { implementation: 'Implementation' },
+    // LIN-4040 close-out (review A): the run-step rung is enabled only while the card's offer says `offer`.
+    row: { action: { kind: 'offer', container: false, step: null, why: 'the run control offers the three rungs' } },
     ...extra,
   };
   return { runSetup: !o.dispatchEnabled, ...o };
@@ -307,6 +309,7 @@ describe('N3: proxyForce only on the run-step rung, only where a runner was set 
   test('the stamped rung\'s dispatch carries proxyForce: true', async () => {
     const { container, calls } = await fresh({ localStorage: marked() });
     await container.click(rungDataset(container.innerHTML, 'run-step'));
+    await flush(); // the press re-reads the offer before it dispatches (LIN-4040 close-out, review A)
     assert.equal(calls.dispatch.length, 1);
     assert.equal(calls.dispatch[0].proxyForce, true);
   });
@@ -314,6 +317,7 @@ describe('N3: proxyForce only on the run-step rung, only where a runner was set 
   test('an unstamped rung\'s dispatch is unchanged: proxyForce false for a template prompt', async () => {
     const { container, calls } = await fresh({ localStorage: makeLocalStorage() });
     await container.click(rungDataset(container.innerHTML, 'run-step'));
+    await flush(); // the press re-reads the offer before it dispatches (LIN-4040 close-out, review A)
     assert.equal(calls.dispatch[0].proxyForce, false);
   });
 
