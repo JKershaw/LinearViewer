@@ -576,3 +576,18 @@ Both open-0 runs (kept in `round-3/forecasts.md`) chose a **preparation** for "d
 - **CI is Linux, and the macOS-only witnesses can't run there** (LIN-4171).
 
 These are exactly the essay's "noticed, not required": each builder paid for them, worked around them and moved on. They aren't filed. They're for John.
+
+## 3 Nov, about 22:20 UTC: LIN-4127 done, the first round-3 answer, and LIN-4176 under way
+
+**LIN-4127 is Done** (simple-dispatcher PR #307, `600f1be`). **Its live witness followed the Survey's ordering exactly**: `git pull` on the host, back up `.env`, remove the stopgap line, then show the flag absent and quote the first `[usage]` `feedback.post` after the removal. That's the trap open-0 named ("in the other order usage goes dark again"), avoided by writing the preparation onto the ticket. It is the cleanest case yet of acting on a forecast.
+
+**Its builder, with the round-3 questions** (answered in about 3 minutes):
+- *Difficult?* "It wasn't, as a change … the work went into proving it." There was no reusable way to drive the hook's `main()` in a test (about 100 lines copied), ambient env, and a noisy system suite (4 failures on the branch against 16 on `main`, with different counts).
+- *First:* run both suites on untouched `main` under the same conditions.
+- *Tidy now* (John's new question): a shared `main()`-driving test helper; **one `envFlag(name, defaultOn)` helper**, because "the 'what counts as off' decision only existed because default-on and default-off flags parse differently"; and make the `HARBOUR_DIR` default fail clearly. **That's the third builder to name `HARBOUR_DIR`.**
+- *If the area were how you'd want it* (John's other new question): "a one-word default change plus a roughly 20-line witness test. No parse decision, no copied harness, a short PR." This is the sharpest statement yet of what the mess costs a small ticket: the gap between that sentence and what the ticket became.
+- *What the ticket got wrong:* "Done when" asked an implementation session for a post-merge live witness. "The done criterion and the implementer's remit don't line up", so it should be its own step with a named owner. Close-out did it here, but the builder's point stands.
+
+**Against the forecast:** the polarity decision (named: hit), OpenCode gated by the same flag (named; waived at close-out, with a named monitor), and the witness ordering (named, and followed). Not named: the missing hook test harness, which was the actual cost. The one-interface pattern shows again, this time as the polarity question: open-0 named the *symptom* ("the parse idiom changes what counts as off"), and the builder named the *shape* (one flag helper).
+
+**LIN-4176 (rebuild 1):** research, **two plan-review rounds**, then a breakdown into three subtasks (LIN-4177 in progress, LIN-4178 and LIN-4179 Todo). open-0 suggested "consider two PRs"; it became three. It gave no round count.
