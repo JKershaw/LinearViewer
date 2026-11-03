@@ -385,3 +385,19 @@ John's idea: file the follow-ups the spikes surfaced, then run the Survey *on th
 **Surveys sent 17:15 UTC** (v2, unchanged; Harbour at `048c3319a`, simple-dispatcher at `cf6369dfd`). The only addition to the usual prefix: where a ticket spans both repos, one line lets the Survey read the other repo at its own base, under the same rules. This is the Survey's first run on simple-dispatcher. Its line "a copy left behind is the commonest escaped defect" was learned on Harbour, so whether it holds there is itself a result.
 
 **Things to hear about in the discussion (John, 17:05):** a builder's after-answer is a second place to find a tidy ("tidy after" as well as "tidy first"); follow-ups to *other* finished sessions, asking what was hard or what a perfect world would feel like, once LIN-4164 lands.
+
+## 3 Nov, 17:45 UTC: round 2 forecasts in, options chosen, autopilots started
+
+All five Surveys finished in about 3 to 4 minutes each. They're kept verbatim in `round-2/forecasts.md`.
+
+| Ticket | Recommended | What we did | What to watch for |
+|---|---|---|---|
+| LIN-4164 (reap window) | Small tidy, then drill, in both repos | Wrote the tidy onto the ticket, plus "measure disk first" | The Harbour copy (`lib/unanswered-decisions.js`) and its test are found and reduced; the ordering assertion against `BLOCKED_REAP_MS` comes up (forecast: "the likely plan-review finding"); deploy order (simple-dispatcher before Harbour); **disk** (the Survey read the host as about 92% full with about 467 MB per clone, which may share blocks) |
+| LIN-4165 (all text replies) | Small tidy (one gate), then drill, flag kept as rollback | Wrote it onto the ticket, plus "check whether the host already sets the flag" | The flag might already be on in prod; label and marker parity; cursor seeding (a session in flight posting its whole history); the silent `allow` path; feedback growth with no cap |
+| LIN-4166 (quiet follow-up) | Just drill | Sent as written | The **forecast's "bites later"**: SD repoints a worker's feedback onto its newest follow-up row, so a quiet question to a live worker would swallow its later `[done]`. Also liveness counting a question as an answer to a `[pending]`. We didn't pass either warning on, so whether they bite is a clean test |
+| LIN-4167 (deploy on green re-run) | Just drill | Sent as written (it already says "say what John would need to change") | A prerequisite only John can meet (a Railway token as an Actions secret, plus IDs); the head guard against re-running an old commit; the deploy-SHA footer |
+| LIN-4168 (one test reset) | Consolidate (a per-key reset registry with a guard test) | Wrote it onto the ticket | Two plan-review rounds (scope, then enforcement); "refill, not clear" for task facts; the issues memo is keyed by workspace id, not urlKey |
+
+**Honest note on the method.** Where the Survey said drill, we didn't pass its warnings to the builder, even good ones. That keeps the test clean: if LIN-4166's warning bites, the forecast saw it and the drill didn't. Where we acted, we passed the option and its main reason, not the whole forecast.
+
+**First look at the Survey on simple-dispatcher:** both forecasts read as well grounded as Harbour's. LIN-4165's opening ("it mostly exists") is the sort of finding that changes the size of a ticket before it starts.
