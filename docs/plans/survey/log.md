@@ -272,3 +272,23 @@ John's idea: fix the flake that cost this morning's deploy, and use it as a Surv
 - **Ruling 1** (`lin4107-floor-vs-tokens`): "LIN-4024 pins 12px literals and a phone 0.75rem … the LIN-4107 token test forbids them. Keep the 12px floor by exempting those selectors, or retarget the LIN-4024 pins?" Answered `exempt`, then `exempt-narrow`.
 - **The forecast had named this collision:** "Tests pin today's sizes: `lin-4024-type-floor.test.js` (12px, 0.9em, phone 0.75rem) … The 12px-floor tests and the smallest token must agree." ✓ It predicted a plan-review round over the scope of the count test. The scope question came instead as two rulings.
 - **Still to see:** whether it made the tokens rem, added a fourth token, and deleted the phone shrink with its undoing copies (the forecast's recommended tidy), or drilled past them. The beat-2 report shows `var(--font-size-sm)` 200 times and 8 distinct values left on Home and the task page, with literals exempted by name.
+
+## 3 Nov, about 13:05 UTC: LIN-4110's builder answers (1a)
+
+LIN-4110 is Done (fixed, reviewed, closed by 12:21). The full answer is on LIN-4110 under "Survey spike 1a (bug)".
+- **Where it bound:**
+  - Two readers poll the same `/state` URL at different cadences, and only the CI trace's timing told them apart.
+  - The cause sat in test-harness state: the held set's 60 s floor was in a closure with no reset, and `routes/test.js` was never given the holder.
+  - Wiring meant editing a 40-odd-parameter `createTestRoutes` line.
+  - **"Reset this worker key" has no single home:** the remembered team is reset in `set-local-session` (LIN-4120), the issues memo has its own route, and each spec lists 6 to 8 `clear-*` calls by hand.
+- **What it would have done first:** "a single 'reseed resets this worker key' seam that owns every per-urlKey server cache … LIN-4120 and this ticket would have been the same fix rather than two … saves a third to a half of this ticket."
+- **What the ticket got wrong:** "rare, not reproduced, load-dependent" (it was deterministic, and depended on which spec ran just before); the "filter to non-GET" idea; "wait for the preview to settle".
+
+**Against the forecast:**
+- **Cause: a match.**
+- **The GET warning: a match.**
+- **The seam: a match,** and the builder generalised it (it owns every per-key cache).
+- **The issues-memo sibling: a match.**
+- **What the forecast didn't name:** the two pollers of one URL, and the 40-parameter wiring line.
+
+**Convergence across hands:** LIN-4113's builder, the LIN-4110 Survey and LIN-4110's builder all name the same thing independently: per-worker-key test state with no single reset. With the census silent on it, it's now the best-attested tangle in the run. The builder's sized payoff ("a third to a half" of the ticket, and two past tickets would have been one fix) makes it a ready candidate for the first Survey-recommended tidy.
