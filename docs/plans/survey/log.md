@@ -446,3 +446,15 @@ All five Surveys finished in about 3 to 4 minutes each. They're kept verbatim in
 - *What the plan got wrong:* a seam the plan and review both said doesn't save a session does. The census's blind spots (plain objects, `let` caches). Holders missing from the table. "Probe is 0 after reset" contradicts the refill, which is the tension the forecast named.
 
 **Reading across both.** The forecasts got the difficulty level right on both. On LIN-4168 they had the right hard part, enforcement. In both cases the builder's "what I'd have done first" is a uniform-interface tidy: *one predicate* (LIN-4166), *one shape* (LIN-4168). The Survey's menu tends to frame a tidy as gathering copies, and doesn't offer "give these things one interface". It's worth raising in the discussion, not as a prompt change mid-round.
+
+## 3 Nov, 19:30 UTC: a side arm, the open Survey (open-0)
+
+**Why.** Both builders' "what I'd have done first" was a uniform-interface tidy (one predicate, one shape). v2's menu frames a tidy as gathering copies, and its v2 line "name every copy … the commonest escaped defect" pushes further that way. John: "perhaps our prompt is too guiding?"
+
+**What.** open-0 (in `prompt.md`) keeps the read-only, where-to-stand and no-future rules, and asks one thing: *why will this be difficult, and what, if anything, would you do first?* It has no menu, no checklist and no Harbour specifics, and it's under 500 words. It ran on the same five tickets at the same bases, with the original ticket text (without the "How to go about it" sections added after v2). Sent 19:28 UTC. v2 stays the round's prompt; this is a comparison only.
+
+**What we'll compare.** Does open-0 find the one-shape tidies the builders named? Does it lose what v2's guidance bought: the copy-hunting (the pill tables, Harbour's reap-window copy), the "couldn't check" list (disk, `updateState` timing)? My guess beforehand: each finds things the other misses.
+
+**For the discussion (John, 19:25):** "We want a pretty free form answer, and the temptation will be to specialise for Harbour as that's the shape of the code we're working with." v2 has already drifted that way: its examples are Harbour's (CSS and pixel budgets, browser and server). A Survey that works everywhere would ask the open question and let the codebase answer.
+
+**Also for the discussion:** follow-ups are now cheap and quiet, so the builder question could gain a couple of equally open questions: *tidy after* ("now that it's done, what would you tidy, and why?") and *a perfect world* ("if this area were how you'd want it, what would this ticket have been?"). We should stop well short of a questionnaire.
