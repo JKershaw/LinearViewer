@@ -1,0 +1,474 @@
+{
+ "commit": "015aa4c6acbc008d7fa73c32beec1528b7f59511",
+ "windowStart": "2026-09-03T23:39:41.000Z",
+ "windowEnd": "2026-11-02T23:39:41.000Z",
+ "days": 60,
+ "changes": 899,
+ "shallow": false,
+ "changesTouchingMultipleAreas": 398,
+ "unmappedFiles": 5155,
+ "pairs": [
+  {
+   "areas": [
+    "Front end: browser code",
+    "Front end: server-rendered pages"
+   ],
+   "changes": 140
+  },
+  {
+   "areas": [
+    "Runs & dispatch",
+    "Web routes (pages & workspace API)"
+   ],
+   "changes": 107
+  },
+  {
+   "areas": [
+    "Front end: browser code",
+    "Web routes (pages & workspace API)"
+   ],
+   "changes": 106
+  },
+  {
+   "areas": [
+    "Agent API (proxy)",
+    "Runs & dispatch"
+   ],
+   "changes": 97
+  },
+  {
+   "areas": [
+    "Front end: server-rendered pages",
+    "Web routes (pages & workspace API)"
+   ],
+   "changes": 97
+  },
+  {
+   "areas": [
+    "Web routes (pages & workspace API)",
+    "Wiring (server.js)"
+   ],
+   "changes": 93
+  },
+  {
+   "areas": [
+    "Front end: server-rendered pages",
+    "Runs & dispatch"
+   ],
+   "changes": 86
+  },
+  {
+   "areas": [
+    "Front end: browser code",
+    "Runs & dispatch"
+   ],
+   "changes": 84
+  },
+  {
+   "areas": [
+    "Front end: server-rendered pages",
+    "Wiring (server.js)"
+   ],
+   "changes": 80
+  },
+  {
+   "areas": [
+    "LLM & prompts",
+    "Web routes (pages & workspace API)"
+   ],
+   "changes": 77
+  },
+  {
+   "areas": [
+    "Runs & dispatch",
+    "Wiring (server.js)"
+   ],
+   "changes": 77
+  },
+  {
+   "areas": [
+    "LLM & prompts",
+    "Runs & dispatch"
+   ],
+   "changes": 76
+  },
+  {
+   "areas": [
+    "Agent API (proxy)",
+    "Web routes (pages & workspace API)"
+   ],
+   "changes": 74
+  },
+  {
+   "areas": [
+    "Front end: browser code",
+    "Wiring (server.js)"
+   ],
+   "changes": 74
+  },
+  {
+   "areas": [
+    "Agent API (proxy)",
+    "LLM & prompts"
+   ],
+   "changes": 58
+  },
+  {
+   "areas": [
+    "Auth, accounts & workspaces",
+    "Wiring (server.js)"
+   ],
+   "changes": 57
+  },
+  {
+   "areas": [
+    "Auth, accounts & workspaces",
+    "Web routes (pages & workspace API)"
+   ],
+   "changes": 54
+  },
+  {
+   "areas": [
+    "Front end: browser code",
+    "LLM & prompts"
+   ],
+   "changes": 49
+  },
+  {
+   "areas": [
+    "Agent API (proxy)",
+    "Wiring (server.js)"
+   ],
+   "changes": 48
+  },
+  {
+   "areas": [
+    "Agent API (proxy)",
+    "Front end: browser code"
+   ],
+   "changes": 45
+  },
+  {
+   "areas": [
+    "Auth, accounts & workspaces",
+    "Front end: server-rendered pages"
+   ],
+   "changes": 44
+  },
+  {
+   "areas": [
+    "Other features",
+    "Runs & dispatch"
+   ],
+   "changes": 41
+  },
+  {
+   "areas": [
+    "Platform & plumbing",
+    "Wiring (server.js)"
+   ],
+   "changes": 41
+  },
+  {
+   "areas": [
+    "Front end: server-rendered pages",
+    "LLM & prompts"
+   ],
+   "changes": 40
+  },
+  {
+   "areas": [
+    "Front end: server-rendered pages",
+    "Other features"
+   ],
+   "changes": 40
+  },
+  {
+   "areas": [
+    "Platform & plumbing",
+    "Runs & dispatch"
+   ],
+   "changes": 39
+  },
+  {
+   "areas": [
+    "Other features",
+    "Web routes (pages & workspace API)"
+   ],
+   "changes": 38
+  },
+  {
+   "areas": [
+    "Auth, accounts & workspaces",
+    "Runs & dispatch"
+   ],
+   "changes": 37
+  },
+  {
+   "areas": [
+    "Platform & plumbing",
+    "Web routes (pages & workspace API)"
+   ],
+   "changes": 37
+  },
+  {
+   "areas": [
+    "Front end: browser code",
+    "Other features"
+   ],
+   "changes": 36
+  },
+  {
+   "areas": [
+    "Other features",
+    "Wiring (server.js)"
+   ],
+   "changes": 36
+  },
+  {
+   "areas": [
+    "Agent API (proxy)",
+    "Platform & plumbing"
+   ],
+   "changes": 34
+  },
+  {
+   "areas": [
+    "LLM & prompts",
+    "Wiring (server.js)"
+   ],
+   "changes": 34
+  },
+  {
+   "areas": [
+    "Agent API (proxy)",
+    "Auth, accounts & workspaces"
+   ],
+   "changes": 32
+  },
+  {
+   "areas": [
+    "Agent API (proxy)",
+    "Front end: server-rendered pages"
+   ],
+   "changes": 31
+  },
+  {
+   "areas": [
+    "Auth, accounts & workspaces",
+    "Front end: browser code"
+   ],
+   "changes": 29
+  },
+  {
+   "areas": [
+    "Front end: browser code",
+    "Platform & plumbing"
+   ],
+   "changes": 28
+  },
+  {
+   "areas": [
+    "Front end: server-rendered pages",
+    "Platform & plumbing"
+   ],
+   "changes": 28
+  },
+  {
+   "areas": [
+    "Auth, accounts & workspaces",
+    "Platform & plumbing"
+   ],
+   "changes": 25
+  },
+  {
+   "areas": [
+    "Reports & operator tools",
+    "Runs & dispatch"
+   ],
+   "changes": 23
+  },
+  {
+   "areas": [
+    "Front end: server-rendered pages",
+    "Providers (Linear, GitHub, Jira, local)"
+   ],
+   "changes": 22
+  },
+  {
+   "areas": [
+    "Providers (Linear, GitHub, Jira, local)",
+    "Runs & dispatch"
+   ],
+   "changes": 22
+  },
+  {
+   "areas": [
+    "LLM & prompts",
+    "Platform & plumbing"
+   ],
+   "changes": 21
+  },
+  {
+   "areas": [
+    "Providers (Linear, GitHub, Jira, local)",
+    "Web routes (pages & workspace API)"
+   ],
+   "changes": 20
+  },
+  {
+   "areas": [
+    "Agent API (proxy)",
+    "Other features"
+   ],
+   "changes": 18
+  },
+  {
+   "areas": [
+    "LLM & prompts",
+    "Providers (Linear, GitHub, Jira, local)"
+   ],
+   "changes": 18
+  },
+  {
+   "areas": [
+    "Auth, accounts & workspaces",
+    "LLM & prompts"
+   ],
+   "changes": 17
+  },
+  {
+   "areas": [
+    "Platform & plumbing",
+    "Reports & operator tools"
+   ],
+   "changes": 17
+  },
+  {
+   "areas": [
+    "Reports & operator tools",
+    "Wiring (server.js)"
+   ],
+   "changes": 17
+  },
+  {
+   "areas": [
+    "Agent API (proxy)",
+    "Providers (Linear, GitHub, Jira, local)"
+   ],
+   "changes": 15
+  },
+  {
+   "areas": [
+    "Providers (Linear, GitHub, Jira, local)",
+    "Wiring (server.js)"
+   ],
+   "changes": 15
+  },
+  {
+   "areas": [
+    "Reports & operator tools",
+    "Web routes (pages & workspace API)"
+   ],
+   "changes": 15
+  },
+  {
+   "areas": [
+    "Auth, accounts & workspaces",
+    "Other features"
+   ],
+   "changes": 14
+  },
+  {
+   "areas": [
+    "Front end: server-rendered pages",
+    "Reports & operator tools"
+   ],
+   "changes": 14
+  },
+  {
+   "areas": [
+    "LLM & prompts",
+    "Other features"
+   ],
+   "changes": 14
+  },
+  {
+   "areas": [
+    "Auth, accounts & workspaces",
+    "Providers (Linear, GitHub, Jira, local)"
+   ],
+   "changes": 13
+  },
+  {
+   "areas": [
+    "Front end: browser code",
+    "Providers (Linear, GitHub, Jira, local)"
+   ],
+   "changes": 13
+  },
+  {
+   "areas": [
+    "Front end: browser code",
+    "Reports & operator tools"
+   ],
+   "changes": 13
+  },
+  {
+   "areas": [
+    "Agent API (proxy)",
+    "Reports & operator tools"
+   ],
+   "changes": 11
+  },
+  {
+   "areas": [
+    "Other features",
+    "Platform & plumbing"
+   ],
+   "changes": 11
+  },
+  {
+   "areas": [
+    "Auth, accounts & workspaces",
+    "Reports & operator tools"
+   ],
+   "changes": 9
+  },
+  {
+   "areas": [
+    "LLM & prompts",
+    "Reports & operator tools"
+   ],
+   "changes": 8
+  },
+  {
+   "areas": [
+    "Other features",
+    "Providers (Linear, GitHub, Jira, local)"
+   ],
+   "changes": 7
+  },
+  {
+   "areas": [
+    "Other features",
+    "Reports & operator tools"
+   ],
+   "changes": 7
+  },
+  {
+   "areas": [
+    "Platform & plumbing",
+    "Providers (Linear, GitHub, Jira, local)"
+   ],
+   "changes": 3
+  },
+  {
+   "areas": [
+    "Providers (Linear, GitHub, Jira, local)",
+    "Reports & operator tools"
+   ],
+   "changes": 2
+  }
+ ]
+}
