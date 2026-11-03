@@ -554,3 +554,25 @@ Both open-0 runs (kept in `round-3/forecasts.md`) chose a **preparation** for "d
   *Do first:* settle the polarity in a test, and plan the witness as a procedure.
 
 **What we wrote onto the tickets:** each one's preparation, as advised. One judgement of mine: for LIN-4176, the `/kpis` label question was closed up front ("`/kpis` keeps what it counts today", already out of scope in `costs.md`), rather than left as a ruling that would hold the ticket overnight. Kicked off 21:18.
+
+## 3 Nov, about 21:30 UTC: LIN-4164 done, and its two core builders' answers
+
+**LIN-4164 is Done** (SD `6060e4f`, `0c2bdd4`, `5379817`; Harbour `9e397e6b`). Records are kept 7 days; clone and TMPDIR are pruned at 24 h (John's ruling); a resume re-clones at the same path. The close-out's live checks are "NOT RUN" until a record passes the 24 h clone window, the earliest **about 20:10 UTC on 4 Nov**. *A follow-up sent after that to a session that finished before 20:10 on 3 Nov would be the live re-clone check.* That's the next bit of tail to eat.
+
+**LIN-4171's builder (re-clone on resume).**
+- "The code change itself was not hard." The real bind was elsewhere: whether a failed launch ends visibly FAILED isn't decided in the guard, but by the terminal driver reporting success on the window write. That became LIN-4175.
+- The witness only runs on macOS (`cp -c`), and CI is Linux, so "CI green says nothing about the failure path". That's the draw-or-run class, in a new form.
+- *First:* "read how a launch failure surfaces … about ten minutes of reading". A preparation, like open-0's.
+- Neither forecast named the launch-visibility gap. Both named the split as needing re-clone first.
+
+**LIN-4172's builder (split reap).**
+- "Record and clone die together" lived in one selector loop shared by several invariants (LIN-459, LIN-3585, the clone-root bound, opencode). The cheap skip had to be re-derived.
+- Pins: `blocked-reap`'s strict `>` (**both forecasts named this**). The prompt trim's safety "isn't local" (v2 and open-0 both said to time and think about `sessions.json`). It also found records with no `templateDir` (plan review had flagged that `templateDir` isn't passed on resume).
+- *First:* "extract cleanup eligibility … into a pure selector returning the record and clone candidate sets … roughly a third off the work". **Another one-interface tidy:** four of the five round-2 builders asked named one.
+
+**Friction that recurs across builders, noticed and not required.** Three things came up in more than one answer tonight:
+- **simple-dispatcher's `main` isn't green on the host:** a pre-existing `git-launch-probe` failure, so every result needs a diff against the failing names on base (LIN-4165, LIN-4171, LIN-4172, and the LIN-4127 Survey counted 46 host-caused failures).
+- **`test:system` defaults `HARBOUR_DIR` to `/home/user/LinearViewer`,** and fails with `spawn node ENOENT` on the host (LIN-4165, LIN-4172).
+- **CI is Linux, and the macOS-only witnesses can't run there** (LIN-4171).
+
+These are exactly the essay's "noticed, not required": each builder paid for them, worked around them and moved on. They aren't filed. They're for John.
