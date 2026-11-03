@@ -458,3 +458,25 @@ All five Surveys finished in about 3 to 4 minutes each. They're kept verbatim in
 **For the discussion (John, 19:25):** "We want a pretty free form answer, and the temptation will be to specialise for Harbour as that's the shape of the code we're working with." v2 has already drifted that way: its examples are Harbour's (CSS and pixel budgets, browser and server). A Survey that works everywhere would ask the open question and let the codebase answer.
 
 **Also for the discussion:** follow-ups are now cheap and quiet, so the builder question could gain a couple of equally open questions: *tidy after* ("now that it's done, what would you tidy, and why?") and *a perfect world* ("if this area were how you'd want it, what would this ticket have been?"). We should stop well short of a questionnaire.
+
+## 3 Nov, 19:45 UTC: open-0 against v2 (and against what happened)
+
+All five open-0 runs were posted to LIN-4150 at 432–517 words and are kept in the scratchpad. A short reading per ticket:
+
+| Ticket | What open-0 saw that v2 didn't | What v2 saw that open-0 didn't | Its "what I'd do first" | Against what happened |
+|---|---|---|---|---|
+| LIN-4164 | It made **disk the deciding question**: measure one clone's real cost with `df`, and "that number picks the path", small (raise the constant) or large (the split, which needs re-clone first) | The test-constant tidy (which became LIN-4170) | Measure | It's what happened. Research measured, and the number picked the split with re-clone first. v2 had priced the split as "only if disk bites" |
+| LIN-4165 | It **read the live `.env`** (the flag is off; v2 listed this as "couldn't check"); Harbour's **100/min per-IP feedback rate limit**, which non-terminal posts don't retry, so a burst could starve `[done]`; text arrives only at Stop boundaries, not "as it goes" | The one-gate tidy | An experiment: turn the flag on for one workspace and run one real follow-up | Still in review. Watch for the rate limit |
+| LIN-4166 | A follow-up chained *through* a muted row must still wake; mute all four outcomes; a distinct `nullWakeReason`; who sets the flag | The parked-worker swallow warning; `ROW_KEYS.proxy` | Write the failing store test first | The builder muted all four, tested the chained case, added reason `unsubscribed-follow-up`, and the producers became LIN-4174. Both forecasts advised against `subscription`; the builder used it |
+| LIN-4167 | The **22 Oct record** that CI holds no secrets (the supply-chain review and incident), which the research then also found and the ruling cited | (similar ground) | **Ask John one question: (A) change nothing, or (B) move the deploy into Actions** | **John chose (A).** v2 recommended adding the token step |
+| LIN-4168 | **`taskDoneCache` hidden inside `createDashboardRoutes`**, which the builder named; "there is no single workspace key yet" | The trio-merge tidy | Inventory before code, then a registry pinned by a test | The builder: "nothing had a per-key interface", "the census was most of the work", the dashboard done cache pulled out |
+
+**Reading it.** On these five, the open question did at least as well as v2, and on three it did better: LIN-4164's deciding measurement, LIN-4167's ruling, LIN-4168's hidden holder. It lost v2's tidy recommendations and one sharp warning (LIN-4166's parked worker).
+
+The bigger difference is **what "do first" means.** Asked openly, it never chose a tidy. It chose a *preparation*: measure, experiment, write the failing test, take the inventory, ask John. That's "forecast, then prepare" (the TDD switch), arriving unprompted. v2's menu turns "first" into "which size of tidy".
+
+It also didn't find the builders' one-shape tidies, though LIN-4168's "no single workspace key yet" is close to the builder's "nothing had a per-key interface". So the "make these one shape" gap isn't only the menu's doing.
+
+**Caveats.** Five tickets, one run each, the same model. open-0 ran 70 minutes after v2. Its rules put LIN-4150 and anything after the base off limits, but the v2 forecasts were sitting there. I didn't check whether any run looked; nothing in the answers suggests it.
+
+**For the discussion.** A shorter, open Survey with no Harbour specifics may be the better default. The question is whether to keep anything from v2: perhaps the "what couldn't you check, and how could the builder check it early" line, which earned its place on LIN-4110 and LIN-4164. On LIN-4165, though, open-0 simply went and checked.
