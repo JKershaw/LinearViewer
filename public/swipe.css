@@ -483,7 +483,7 @@ a.swipe-relation-issue:hover {
   font-size: var(--font-size-sm);
   color: var(--muted);
   margin-bottom: 0.3rem;
-  font-family: var(--font-structural);
+  font-family: var(--font-content);
 }
 
 .swipe-comment-body {

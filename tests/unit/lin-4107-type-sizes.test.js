@@ -47,7 +47,12 @@ export const LIN4024_EXEMPT = Object.freeze([
 ]);
 // A Home/task pin outside LIN-4024: the sans sentence time, whose literal 0.85em is pinned by LIN-3991 and LIN-4009. It
 // equals the --font-size-sm token's value, so it adds no size. Exempt by exact name (ruling dispatch 4eeb6ac5).
-export const HOME_PIN_EXEMPT = Object.freeze(['.task-sentence-at']);
+// Home/task selectors kept literal by name (ruling dispatch 4eeb6ac5, standing rule 2):
+//  - .task-sentence-at: the sans sentence time, pinned at 0.85em by LIN-3991 and LIN-4009. Equals the --font-size-sm value.
+//  - .page-header h1: the Home and task-page title, pinned at 1.5rem by LIN-4009 (its phone steps 1.3rem and 1.2rem keep
+//    their own sizes, as the LIN-4009 test names them). Not body text, so the body-text rule does not reach it.
+//  - .page-header__subtitle: the count line under the title, 0.9em. Shared with other pages, so it is kept, not mapped.
+export const HOME_PIN_EXEMPT = Object.freeze(['.task-sentence-at', '.page-header h1', '.page-header__subtitle']);
 
 // Selectors outside Home and the task page (Plain, landing, error and login, the repo picker, the flight-companion and
 // passage-planner prompts, the observation chip). Their rules are left exactly as they were, and the Home/task checks skip
@@ -62,8 +67,6 @@ export const NON_HOME_TASK = Object.freeze([
   '.landing-wordmark',
   '.login-button',
   '.obs-act-chip',
-  '.page-header h1',
-  '.page-header__subtitle',
   '.plain-page',
   '.plain-title',
   '.repo-picker-add-link',
@@ -171,9 +174,11 @@ describe('the LIN-4024 exemption list cannot grow or go stale (LIN-4107)', () =>
     assert.deepEqual(missing, []);
   });
 
-  test('the Home/task pin exemption is exactly the sentence-time selector, and it still has its rule', () => {
-    assert.deepEqual([...HOME_PIN_EXEMPT], ['.task-sentence-at']);
+  test('the Home/task pin exemption is exactly the three named selectors, and each still has its rule', () => {
+    assert.deepEqual([...HOME_PIN_EXEMPT], ['.task-sentence-at', '.page-header h1', '.page-header__subtitle']);
     assert.equal(appliedDecls(SHEETS, '.task-sentence-at').get('font-size'), '0.85em');
+    assert.equal(appliedDecls(SHEETS, '.page-header h1').get('font-size'), '1.5rem');
+    assert.equal(appliedDecls(SHEETS, '.page-header__subtitle').get('font-size'), '0.9em');
   });
 });
 
@@ -217,16 +222,13 @@ export const MONO_ALLOWED = Object.freeze([
   '.search-clear',
   '.sess-run-toggle-icon',
   '.task-ref-glyph',
-  // to review: kept as they were
+  // to review (kept mono, names do not settle it): card meta, a chat fold, key/value rows, a segment bar
   '.card-meta',
-  '.chip',
   '.chat-fold',
-  '.chat-msg--row',
   '.sess-ctx-meta',
   '.sess-kv',
   '.swipe-blocking-issue',
   '.swipe-card-header',
-  '.swipe-comment-header',
   '.swipe-relation-issue',
   '.task-chat-saved-meta',
   '.segment-bar__cell',
@@ -265,8 +267,8 @@ describe('mono is only on the allowlisted selectors (LIN-4107 beat 2 corrective)
 });
 
 describe('the out-of-scope list cannot grow or go stale (LIN-4107)', () => {
-  test('it has the sixteen selectors the ruling names, and each still has a rule in the sheets', () => {
-    assert.equal(NON_HOME_TASK.length, 16);
+  test('it has the fourteen selectors the ruling names, and each still has a rule in the sheets', () => {
+    assert.equal(NON_HOME_TASK.length, 14);
     const missing = NON_HOME_TASK.filter((selector) => {
       try {
         appliedDecls(SHEETS, selector);
