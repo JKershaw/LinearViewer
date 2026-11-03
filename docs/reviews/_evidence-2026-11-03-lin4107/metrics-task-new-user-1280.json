@@ -1,0 +1,44 @@
+{
+  "body": {
+    "selector": "body",
+    "fontSize": "16px",
+    "fontFamily": "Inter",
+    "text": "harbour.cat\n      \n        \n      workspace:\n      Local Wor"
+  },
+  "state sentence": {
+    "selector": "[data-testid=\"task-page-sentence\"]",
+    "fontSize": "16px",
+    "fontFamily": "Inter",
+    "text": "No sessions yet."
+  },
+  "question": {
+    "absent": true,
+    "selector": "[data-testid=\"task-page-question\"]"
+  },
+  "answer box": {
+    "selector": "[data-testid=\"task-page-answer\"]",
+    "fontSize": "16px",
+    "fontFamily": "Inter",
+    "text": "idle\n      No sessions yet."
+  },
+  "task ident (mono ok)": {
+    "selector": ".task-ident",
+    "fontSize": "17px",
+    "fontFamily": "\"JetBrains Mono\"",
+    "text": "LOCAL-2"
+  },
+  "session name": {
+    "absent": true,
+    "selector": ".sess-task"
+  },
+  "run control": {
+    "selector": "[data-testid=\"task-page-run-control\"]",
+    "fontSize": "16px",
+    "fontFamily": "Inter",
+    "text": "the first step for a task in Todo✦ Write the prompt"
+  },
+  "stage time (figure)": {
+    "absent": true,
+    "selector": ".task-stage-time"
+  }
+}

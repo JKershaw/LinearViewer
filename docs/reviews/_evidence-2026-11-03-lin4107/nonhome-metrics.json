@@ -1,0 +1,26 @@
+{
+  "privacy-390": {
+    "bodyFontSize": "16px",
+    "bodyFontFamily": "Inter",
+    "h1FontSize": "19.2px",
+    "h1Text": "Harbour"
+  },
+  "settings-models-390": {
+    "bodyFontSize": "16px",
+    "bodyFontFamily": "Inter",
+    "h1FontSize": "no h1",
+    "h1Text": ""
+  },
+  "privacy-1280": {
+    "bodyFontSize": "16px",
+    "bodyFontFamily": "Inter",
+    "h1FontSize": "24px",
+    "h1Text": "Harbour"
+  },
+  "settings-models-1280": {
+    "bodyFontSize": "16px",
+    "bodyFontFamily": "Inter",
+    "h1FontSize": "no h1",
+    "h1Text": ""
+  }
+}

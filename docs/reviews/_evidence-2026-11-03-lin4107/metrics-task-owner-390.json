@@ -1,0 +1,48 @@
+{
+  "body": {
+    "selector": "body",
+    "fontSize": "16px",
+    "fontFamily": "Inter",
+    "text": "harbour.cat\n      \n        \n      workspace:\n      Local Wor"
+  },
+  "state sentence": {
+    "selector": "[data-testid=\"task-page-sentence\"]",
+    "fontSize": "16px",
+    "fontFamily": "Inter",
+    "text": "the research session was cancelled; re-dispatch it?"
+  },
+  "question": {
+    "selector": "[data-testid=\"task-page-question\"]",
+    "fontSize": "16px",
+    "fontFamily": "Inter",
+    "text": "The research session was cancelled. Re-dispatch it?\n      \n "
+  },
+  "answer box": {
+    "selector": "[data-testid=\"task-page-answer\"]",
+    "fontSize": "16px",
+    "fontFamily": "Inter",
+    "text": "waiting\n      the research session was cancelled; re-dispatc"
+  },
+  "task ident (mono ok)": {
+    "selector": ".task-ident",
+    "fontSize": "17px",
+    "fontFamily": "\"JetBrains Mono\"",
+    "text": "LOCAL-3"
+  },
+  "session name": {
+    "absent": true,
+    "selector": ".sess-task"
+  },
+  "run control": {
+    "selector": "[data-testid=\"task-page-run-control\"]",
+    "fontSize": "16px",
+    "fontFamily": "Inter",
+    "text": "Runs on Claude Code's own model · your runner ChangeAnother "
+  },
+  "stage time (figure)": {
+    "selector": ".task-stage-time",
+    "fontSize": "13.6px",
+    "fontFamily": "Inter",
+    "text": "started 0s ago"
+  }
+}
