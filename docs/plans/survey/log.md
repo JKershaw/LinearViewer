@@ -591,3 +591,18 @@ These are exactly the essay's "noticed, not required": each builder paid for the
 **Against the forecast:** the polarity decision (named: hit), OpenCode gated by the same flag (named; waived at close-out, with a named monitor), and the witness ordering (named, and followed). Not named: the missing hook test harness, which was the actual cost. The one-interface pattern shows again, this time as the polarity question: open-0 named the *symptom* ("the parse idiom changes what counts as off"), and the builder named the *shape* (one flag helper).
 
 **LIN-4176 (rebuild 1):** research, **two plan-review rounds**, then a breakdown into three subtasks (LIN-4177 in progress, LIN-4178 and LIN-4179 Todo). open-0 suggested "consider two PRs"; it became three. It gave no round count.
+
+## 3 Nov, 22:26 UTC: quality-of-life tickets from the builders' friction
+
+**John (22:20):** "Happy for you to file and dispatch a few small tickets to address these quality of life issues as we go … we can continue to use the survey."
+
+Each ticket is a friction that more than one builder paid for and moved past ("noticed, not required"). Two of them are the one-interface tidies the builders named, done on their own:
+
+| Ticket | Friction | Named by |
+|---|---|---|
+| LIN-4180 | `test:system` defaults `HARBOUR_DIR` to a missing path and fails as `spawn node ENOENT` | LIN-4165, LIN-4172 and LIN-4127's builders |
+| LIN-4181 | untouched `main` isn't green on the runner host (46 failures from the host, per the LIN-4127 Survey), so every builder diffs a baseline by hand | LIN-4165, LIN-4171 and LIN-4172's builders |
+| LIN-4182 | each on/off setting parses its env var its own way ("one `envFlag` helper") | LIN-4127's builder (LIN-4165 hit it too) |
+| LIN-4183 | no shared way to drive the Stop hook's `main()` in a test (about 100 lines copied) | LIN-4127's builder |
+
+They were filed at the level of the idea, in simple-dispatcher. Surveyed with open-0 at SD `600f1be1c` (22:26), then acted on as usual. This closes the loop the essay describes: the builders' after-answers become the next tickets.
