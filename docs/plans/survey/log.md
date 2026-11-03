@@ -242,3 +242,12 @@ The follow-up went to the stepper session (dispatch `1758387e`, idle since 07:46
 ## 3 Nov, about 11:10 UTC: Spike 2b, a third forward test on LIN-4110 (the flaky look-alike E2E)
 
 John's idea: fix the flake that cost this morning's deploy, and use it as a Survey test. LIN-4110 was raised to **High** and moved to Todo, with today's evidence posted on it (the failure on `main` at `300c811f` that blocked the Railway deploy, LIN-4106's "known flake", and LIN-4113's E2E shared-state cost). A flaky test is the class the Survey is weakest at, so it's a fair test of v2's question 5.
+- **11:20: LIN-4110 forecast (v2, at `300c811f`), posted on LIN-4150 before the work.**
+  - **Cause, read from the code:** `acceptStateRead` refreshes the run preview on every state read. `rereadUntilComplete` re-reads every 1 s, up to 15 times, so each tick sends a forbidden `GET …/dispatch/preview`. The spec settles on `networkidle` (500 ms), which is shorter than the 1 s tick.
+  - **Shared state:** whether the first read is incomplete depends on the server's single task-facts holder, keyed by urlKey. Each worker reuses its urlKey across files, nothing resets the holder, and its refresh has a 60 s floor. "That is why the spec passes alone and fails in the full suite." It cites `docs/reviews/test-run-provenance-review-2026-11-02.md:189` as reaching the same diagnosis.
+  - **Copies:** the exemption decision is held twice (the sibling `look-alike-dashboard-controls.spec.js` has its own `FORBIDDEN` list and a named GET exemption).
+  - **Warning:** the ticket's own idea, to ignore read-only GETs, would weaken the guard (`/brief`, `/recap` and the fake PR URL are GET look-alikes the spec has to catch).
+  - **Recommends:** a small tidy, a harness seam `/test/reset-task-facts?urlKey=…&warm=1` called in `beforeEach`. `FORBIDDEN` stays untouched.
+  - **Predicts:** 1 plan-review round (2 if someone pushes the product-side gate). Pieces: (a) a deterministic repro, (b) the test route, (c) `beforeEach` plus an "is the first read complete" assertion, (d) optionally the sibling specs.
+  - **Couldn't check (question 5):** whether the first read is really incomplete in CI; the comment's `:209` (at this commit, that line is the Flight Companion test, not the task-page one); `networkidle` against the 1 s tick under load; whether the warm holds across a 4-worker run.
+- **11:27: LIN-4110 autopilot kicked off**, with the ticket unchanged.
