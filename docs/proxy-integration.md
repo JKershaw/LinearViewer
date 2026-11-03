@@ -151,10 +151,12 @@ Three `POST /api/proxy/dispatch` body fields the endpoint reference below does n
   is busy: the runner leaves it unclaimed until the session can take it, rather than failing it
   (LIN-827). Stored and forwarded; the runner owns the behaviour. This is how a note reaches a
   running autopilot; see [Sending a note to a running autopilot](dispatch-integration.md#follow-ups) (LIN-4025).
-- `subscription` (`"terminal-only"` (default) | `"everything"`) — which of this item's events wake
+- `subscription` (`"terminal-only"` (default) | `"everything"` | `"none"`) — which of this item's events wake
   the session named in `sessionId` (LIN-900 §6): `"everything"` wakes it on every report,
   `"terminal-only"` only on DONE/FAILED/BLOCKED and on a leaf worker's PENDING-external
   hand-back (LIN-4027); a child autopilot's pause stays silent on it. Declared on the edge, never inferred.
+  `"none"` (LIN-4166) is follow-up only: with `followUpTo`, a question's own events mint no wake
+  (the answer still lands on that follow-up row). Without `followUpTo` (a fresh dispatch or kickoff) it is a 400.
 
 ### Single-Use Tokens
 

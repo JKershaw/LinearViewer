@@ -133,13 +133,33 @@ describe('LIN-901 — plain /dispatch subscription is declared, not reconstructe
 
   test('rejects an invalid subscription value with 400 (hard enum, no legacy boolean)', async () => {
     const app = buildApp({});
-    for (const bad of ['yes', true, 'all', 'none', 1]) {
+    for (const bad of ['yes', true, 'all', 1]) {
       const res = await call(app, 'post', '/api/proxy/dispatch', {
         prompt: 'do the thing', subscription: bad
       });
       assert.equal(res.status, 400, `subscription:${JSON.stringify(bad)} should be 400, got ${res.status}`);
       assert.match(res.body.error, /subscription must be one of/, 'names the enum in the error');
     }
+  });
+
+  // LIN-4166: 'none' is in the enum but is a follow-up-row value. It is refused on a fresh dispatch
+  // and accepted, and stored as declared, on a follow-up.
+  test("subscription 'none' is refused without followUpTo (LIN-4166)", async () => {
+    const app = buildApp({});
+    const res = await call(app, 'post', '/api/proxy/dispatch', { prompt: 'do the thing', subscription: 'none' });
+    assert.equal(res.status, 400, `expected 400, got ${res.status}`);
+    assert.equal(res.body.error, "subscription 'none' requires followUpTo");
+  });
+
+  test("subscription 'none' is accepted on a follow-up and stored as declared (LIN-4166)", async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const res = await call(app, 'post', '/api/proxy/dispatch', {
+      prompt: 'what made this hard?', followUpTo: FOLLOW_UP_ID, subscription: 'none'
+    });
+    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.equal(captured.item.subscription, 'none');
+    assert.equal(captured.item.followUpTo, FOLLOW_UP_ID);
   });
 });
 
@@ -184,5 +204,20 @@ describe('LIN-901 — /autopilot/kickoff subscription is declared, not reconstru
 
     assert.equal(res.status, 400, `expected 400, got ${res.status}: ${JSON.stringify(res.body)}`);
     assert.match(res.body.error, /subscription must be one of/);
+  });
+
+  // LIN-4166: kickoff has no follow-up. A stray followUpTo in the body must not let 'none' through,
+  // because kickoff clears followUpTo before its checks; the row must not be stored with 'none'.
+  test("kickoff refuses subscription 'none', including with a stray followUpTo (LIN-4166)", async () => {
+    for (const body of [
+      { goal: 'ship LIN-1', subscription: 'none' },
+      { goal: 'ship LIN-1', subscription: 'none', followUpTo: FOLLOW_UP_ID }
+    ]) {
+      const captured = {};
+      const res = await call(buildApp(captured), 'post', '/api/proxy/autopilot/kickoff', body);
+      assert.equal(res.status, 400, `expected 400 for ${JSON.stringify(body)}, got ${res.status}: ${JSON.stringify(res.body)}`);
+      assert.equal(res.body.error, "subscription 'none' requires followUpTo");
+      assert.equal(captured.item, undefined, 'nothing is enqueued');
+    }
   });
 });

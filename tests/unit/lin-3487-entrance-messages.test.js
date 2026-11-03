@@ -166,7 +166,7 @@ describe('LIN-3487 — POST /api/proxy/dispatch entrance messages', () => {
     expect400(await call(buildProxyApp(), PATH, { prompt: 'x', queueIfBusy: 'yes' }, AUTH), 'queueIfBusy must be a boolean');
     expect400(await call(buildProxyApp(), PATH, { prompt: 'x', waitForFollowUps: 'yes' }, AUTH), 'waitForFollowUps must be a boolean');
     expect400(await call(buildProxyApp(), PATH, { prompt: 'x', subscription: 'nope' }, AUTH),
-      'subscription must be one of: everything, terminal-only');
+      'subscription must be one of: everything, terminal-only, none');
   });
   test('cascade must be a boolean', async () => {
     expect400(await call(buildProxyApp(), PATH, { prompt: 'x', cascade: 'yes' }, AUTH), 'cascade must be a boolean');

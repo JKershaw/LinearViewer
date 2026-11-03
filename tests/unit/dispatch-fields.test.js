@@ -179,7 +179,7 @@ describe('RUN_FIELD_RULES', () => {
 
   test('subscription: absent only for undefined; declared levels only; exact message', () => {
     const msg = `subscription must be one of: ${SUBSCRIPTION_LEVELS.join(', ')}`;
-    assert.equal(msg, 'subscription must be one of: everything, terminal-only');
+    assert.equal(msg, 'subscription must be one of: everything, terminal-only, none');
     assert.equal(validateRunField('subscription', undefined), null);
     for (const level of SUBSCRIPTION_LEVELS) assert.equal(validateRunField('subscription', level), null);
     for (const bad of [null, '', 'all', 'EVERYTHING', 1, true]) {

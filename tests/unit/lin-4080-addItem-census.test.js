@@ -26,9 +26,9 @@ const POSITIONS = {
   'lib/dispatch-store.js::expandCascadeAborts':
     'abort rows: exempt from admission (createDispatchItem); their [aborted] landing runs the queued-wake cleanup in addFeedback',
   'lib/dispatch-store.js::_mintWake':
-    'wake rows: gated upstream in addFeedback (parent-stopped) before grant lookup, provisioning and the terminalWakeItems CAS',
+    'wake rows: gated upstream in addFeedback (parent-stopped, LIN-4080; question-only follow-up, LIN-4166) before grant lookup, provisioning and the terminalWakeItems CAS',
   'lib/dispatch-store.js::addFeedback':
-    'the unguarded [pending] wake row: gated upstream in addFeedback (parent-stopped), so it never reaches this write for a stopped parent',
+    'the unguarded [pending] wake row: gated upstream in addFeedback (parent-stopped, LIN-4080; question-only follow-up, LIN-4166), so it never reaches this write for a stopped parent or a subscription:none follow-up',
   'lib/dispatch-factory.js::createDispatchItem':
     'fresh and follow-up dispatches: guardRunStopped refuses a sessionId or followUpTo naming a stopped run (RUN_STOPPED) before any mint'
 };
