@@ -26,6 +26,10 @@ import { DismissalSuggestionsStore } from '../../lib/dismissal-suggestions-store
 import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
 import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
 import { extractEmbeddedData, embeddedDataText } from '../helpers/embedded-data.js';
+import { REAP_INACTIVITY_MS } from '../../lib/unanswered-decisions.js';
+
+// A timestamp safely past the record window (SD's 7-day REAP_INACTIVITY_MS), so the fixture is `gone`.
+const PAST_REAP_WINDOW_ISO = () => new Date(Date.now() - REAP_INACTIVITY_MS - 24 * 60 * 60 * 1000).toISOString();
 
 const NOW_ISO = new Date().toISOString();
 // >24h ago: a session whose last activity is this old falls into Archive under
@@ -193,11 +197,11 @@ function childAutopilotHistoryItem(id, identifier, parentSessionId, ts = NOW_ISO
 /**
  * LIN-2934 (S4): a `gone` GENERAL (goal-only) autopilot anchor — `kind:'autopilot'`
  * with NO `issueIdentifier`, retained anchorless by R1's
- * `ANCHOR_KINDS_WITHOUT_ISSUE`. Terminal, well past the 6h reap window, so
+ * `ANCHOR_KINDS_WITHOUT_ISSUE`. Terminal, well past the 7d record reap window, so
  * disposition is `gone` (never self-matches `liveDispatchOnAnchor`).
  */
 function goneGeneralAnchorItem(id, decisionId, onAnswerEffect) {
-  const oldIso = new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString(); // 7h ago, past REAP_INACTIVITY_MS (6h)
+  const oldIso = PAST_REAP_WINDOW_ISO(); // past REAP_INACTIVITY_MS (7d)
   const payload = { decision_id: decisionId, question: 'Proceed?', on_answer: { effect: onAnswerEffect } };
   return {
     id, kind: 'autopilot', issueIdentifier: null, issueTitle: 'Goal-only run',
@@ -4749,7 +4753,7 @@ describe('GET /observation/session/:sessionId — issue-scoped read, no whole-wo
 // must never trigger a whole-workspace reconstruction (LIN-1021/H12); a cold
 // cache falls back to the session's own loops.
 describe('GET /observation/session/:sessionId — cross-session live anchor (LIN-3260)', () => {
-  const OLD_ISO = new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString(); // 7h ago, past the 6h reap window
+  const OLD_ISO = PAST_REAP_WINDOW_ISO(); // past the 7d record reap window
 
   // A worker whose decision is terminal + reaped (past the reap window) — the
   // `gone` row whose answer would start a fresh run.
