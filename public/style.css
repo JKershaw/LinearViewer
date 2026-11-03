@@ -1458,8 +1458,8 @@ a.wordmark:hover {
   flex-direction: column;
   gap: 6px;
   background: var(--card);
-  /* LIN-4024: the sheet is tighter than the body (its lines at 1.4, its gaps at 6px), so "Use for this run" stays inside a
-     phone's first screen with the 12-13px text (LIN-3987's budget). */
+  /* LIN-4024: the sheet is tighter than the body (its lines at 1.4, its gaps at 6px). LIN-3987's first-screen fit was
+     dropped by LIN-4107 (ruling lin4107-change-sheet-first-screen): "Use for this run" is reached by the sheet's own scroll. */
   line-height: 1.4;
 }
 
@@ -1485,8 +1485,7 @@ a.wordmark:hover {
 }
 
 /* LIN-4106: the drawer's heading is a real heading, drawn at the head line's size so the page's own h3 rule does not enlarge it. */
-/* The panel's flex gap is 6px; the heading takes 4px back so it sits close to the line it titles. That keeps "Use for this
-   run" on the first phone screen (LIN-3987) once the heading is in. */
+/* The panel's flex gap is 6px; the heading takes 4px back so it sits close to the line it titles. */
 .opened-task-change-title {
   margin: 0 0 -4px;
   font-size: inherit;
@@ -1515,7 +1514,7 @@ a.wordmark:hover {
     z-index: 100;
     border: 0;
     border-radius: 0;
-    /* LIN-4010: the choice cards and the decision panel make the sheet taller; Use stays on the first phone screen. */
+    /* LIN-4010: the choice cards and the decision panel make the sheet taller; the sheet scrolls itself, and Use is reached by that scroll (LIN-4107 dropped LIN-3987's first-screen fit). */
     padding: var(--space-2h);
     overflow-y: auto;
   }
