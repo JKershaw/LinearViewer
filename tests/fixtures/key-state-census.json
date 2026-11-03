@@ -28,8 +28,8 @@
     "exception": "connection-refresh-inflight"
   },
   "lib/connection-credential.js::lookups": {
-    "disposition": "global-only",
-    "exception": "connection-credential-caches"
+    "disposition": "registered",
+    "holder": "installation-lookups"
   },
   "lib/connection-credential.js::mintFailures": {
     "disposition": "global-only",
@@ -235,9 +235,29 @@
     "disposition": "global-only",
     "exception": "workspace-token-refresh-inflight"
   },
+  "routes/dashboard.js::sessionsFeedCache": {
+    "disposition": "registered",
+    "holder": "sessions-feed"
+  },
+  "routes/dashboard.js::taskDoneCache": {
+    "disposition": "registered",
+    "holder": "task-done:dashboard"
+  },
   "routes/email-auth.js::emailSendLimiter": {
     "disposition": "global-only",
     "exception": "rate-limiters"
+  },
+  "routes/provider-auth-routers.js::github": {
+    "disposition": "not-state",
+    "why": "An auth-route factory in the provider table, not a container; it holds no per-key state of its own (routes/provider-auth-routers.js)."
+  },
+  "routes/provider-auth-routers.js::jira": {
+    "disposition": "not-state",
+    "why": "An auth-route factory in the provider table, not a container; it holds no per-key state of its own (routes/provider-auth-routers.js)."
+  },
+  "routes/provider-auth-routers.js::linear": {
+    "disposition": "not-state",
+    "why": "An auth-route factory in the provider table, not a container; it holds no per-key state of its own (routes/provider-auth-routers.js)."
   },
   "routes/proxy.js::commentDedupe": {
     "disposition": "global-only",
@@ -250,6 +270,10 @@
   "routes/runner-kit.js::cache": {
     "disposition": "global-only",
     "exception": "runner-kit-cache"
+  },
+  "routes/task-chat.js::createToolCatalog": {
+    "disposition": "not-state",
+    "why": "The chat tool catalog factory; a catalog is built per call site and starts cold (its PR-status cache is the `pr-status-chat-cache` exception)."
   },
   "routes/task-share.js::cache": {
     "disposition": "global-only",

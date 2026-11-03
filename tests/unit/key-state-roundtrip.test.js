@@ -8,13 +8,18 @@
  *
  * Run with: node --test tests/unit/key-state-roundtrip.test.js
  */
-import { test, describe } from 'node:test';
+import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildKeyStateInstances, buildRegistry } from '../fixtures/key-state-instances.js';
 import { workspaceTokenCacheKey } from '../../lib/workspace-token-cache.js';
+import { installAppKey, REPO as LOOKUP_REPO } from '../fixtures/lin-3285-seam.js';
 
 const OWNER = 'owner-acct-1';
-const OTHER_KEY = 'other-key-w1';
+// The neighbour extends the reset key (`rt-key-w1` vs `rt-key-w10`), so a bare `startsWith(urlKey)` clear would drop it too.
+// Every per-key clear must match the exact `${urlKey}::` (or `${workspaceId}|`) prefix; this key is what pins that guard.
+const OTHER_KEY = 'rt-key-w10';
+
+before(installAppKey); // the installation lookups sign an App JWT with a throwaway key
 
 /** The workspace a seam would put in the session for a key: the memo is keyed by its id, so probes need it too. */
 const wsOf = (urlKey, accessToken = 'live-token') => ({ id: `ws-${urlKey}`, urlKey, accessToken });
@@ -29,7 +34,7 @@ function issue(identifier) {
  * nothing; the probe that follows is what tells whether it held anything.
  */
 function fillers(instances, now) {
-  const { taskFacts, workspaceIssuesMemo, sessionsFeedCache, taskDoneCaches, workspaceTokenCache, rejectedCredentialRegistry, refreshOnResolveGate } = instances;
+  const { taskFacts, workspaceIssuesMemo, sessionsFeedCache, taskDoneCaches, workspaceTokenCache, rejectedCredentialRegistry, refreshOnResolveGate, installationTokenFor } = instances;
   return {
     'task-facts': (urlKey) => taskFacts.holder.write(urlKey, { stateIssues: [issue('LIN-OLD')] }),
     'workspace-issues-memo': (urlKey) => workspaceIssuesMemo.set({ id: `ws-${urlKey}`, urlKey }, [issue('LIN-1')]),
@@ -42,6 +47,8 @@ function fillers(instances, now) {
       rejectedCredentialRegistry.shouldAttemptRefresh('fp-1', `${OWNER}:${urlKey}`, now());
     },
     'refresh-on-resolve:cooldown': (urlKey) => refreshOnResolveGate.shouldAttempt(`${OWNER}:${urlKey}`, 'fp-1', now()),
+    // The workspace id the probe and the clear read is `ws-${urlKey}` (wsOf), the same id the memo uses.
+    'installation-lookups': async (urlKey) => { await installationTokenFor({ workspaceId: `ws-${urlKey}`, repo: LOOKUP_REPO }); },
   };
 }
 

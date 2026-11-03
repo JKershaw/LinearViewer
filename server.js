@@ -3278,6 +3278,7 @@ registerKeyStateHolders(keyState, {
   workspaceTokenCache,
   rejectedCredentialRegistry,
   refreshOnResolveGate,
+  installationTokenFor,
 });
 const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore, agentStatusStore, briefCacheStore, recapCacheStore, readRunEvidence, prStateStore, installationTokenFor, closeOutEventsStore, enrichLoop, deriveSessionWaiting, deriveSessionDecisions, taskDecisionsStore, shelvedRulingsStore, taskFacts: { read: taskFacts.read }, gatherTaskStates })
 // LIN-3833 / LIN-4016: Home's row states, assembled once for all three Home routes (lib/home-row-states.js): one lean

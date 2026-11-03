@@ -2,7 +2,7 @@
  * LIN-4168 census: every in-memory container that could hold per-key state is classified, so a holder added later cannot
  * slip past the one per-key reset.
  *
- * tests/fixtures/key-state-scan.js finds the containers (four shapes, documented there). tests/fixtures/key-state-census.json
+ * tests/fixtures/key-state-scan.js finds the containers (five shapes, documented there). tests/fixtures/key-state-census.json
  * says what each one is: `registered` (a holder the reset clears), `global-only` (an exception, with the reason and what
  * clears it), `delegated` (its state lives in another listed container), `database-backed` (a durable store, out of scope),
  * or `not-state` (with the reason). A hit that is not listed fails this test and names file:line. A listed entry whose hit
@@ -93,6 +93,18 @@ describe('the census of per-key containers (LIN-4168)', () => {
     assert.deepEqual(moduleScope.map((h) => [h.shape, h.key]), [['a', 'lib/a.js::cache']]);
     assert.deepEqual(field.map((h) => [h.shape, h.key]), [['b', 'lib/b.js::entries']]);
     assert.deepEqual(instance.map((h) => [h.shape, h.key]), [['d', 'server.js::widgetCache']]);
+  });
+
+  test('a router default-dep factory is its own decision, and only under routes/ (LIN-4168 review fix C)', () => {
+    const src = 'const DEP_DEFAULTS = {\n  sessionsFeedCache: createSessionsFeedCache,\n  // a note\n  taskDoneCache: createTaskDoneCache, // trailing\n  recentLimit: () => 120,\n};\n';
+    assert.deepEqual(
+      scanText('routes/new-router.js', src).map((h) => [h.shape, h.key, h.line]),
+      [['e', 'routes/new-router.js::sessionsFeedCache', 2], ['e', 'routes/new-router.js::taskDoneCache', 4]],
+    );
+    assert.deepEqual(scanText('lib/not-a-router.js', src), [], 'the shape is read in routes/ only');
+    const hidden = scanText('routes/new-router.js', '  ledgerCache: createLedgerCache,\n').map((h) => ({ ...h, file: 'routes/new-router.js' }));
+    const problems = censusProblems({ ...registryInput, hits: [...scanRepo(REPO), ...hidden] });
+    assert.ok(problems.some((p) => p.includes('routes/new-router.js::ledgerCache') && p.includes('routes/new-router.js:1')), problems.join('\n'));
   });
 
   test('a populated constant (a lookup table) is not a container', () => {

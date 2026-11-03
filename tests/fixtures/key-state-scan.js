@@ -2,13 +2,15 @@
  * The census scan for the per-key reset (LIN-4168). Finds the in-memory containers that could hold per-key state, so
  * tests/unit/key-state-census.test.js can require every one to be classified.
  *
- * Four shapes, all read from source text (no parser; the code style keeps them unambiguous):
+ * Five shapes, all read from source text (no parser; the code style keeps them unambiguous):
  *  (a) module-scope:       `const|let|var NAME = new Map|Set|WeakMap(` at column 0 of lib/, routes/ or server.js.
  *  (b) class field:        `this.NAME = new Map|Set|WeakMap(` at any depth.
  *  (c) factory closure:    `  const|let NAME = new Map|Set|WeakMap(` (two spaces) inside an `export function create*`
  *                          body, the closure every factory instance keeps its state in.
  *  (d) factory instance:   `const NAME = create[A-Z]...(` at column 0. An instance's own state is its own hit under
  *                          (a) to (c), so this shape exists to make each instance a decision, not a hidden default.
+ *  (e) router default dep: `    NAME: createFoo,` in routes/ (a DEP_DEFAULTS entry naming a factory). The router builds its own
+ *                          instance when the caller passes none, so a holder can hide there without a declaration anywhere.
  *
  * A hit's key is `file::NAME`. A repeated NAME within one file gets `#2`, `#3`, ... in source order, so a census entry
  * names one container without depending on its line number.
@@ -26,6 +28,7 @@ const RE_FIELD = new RegExp(`this\\.([A-Za-z_$][\\w$]*) \\?\\?= ${CTOR}|this\\.(
 const RE_CLOSURE = new RegExp(`^  (?:const|let) ([A-Za-z_$][\\w$]*) = ${CTOR}`);
 const RE_FACTORY_START = /^(?:export )?function (create\w*)\(/;
 const RE_INSTANCE = /^(?:export )?const ([A-Za-z_$][\w$]*) = create[A-Z]\w*\(/;
+const RE_DEFAULT_DEP = /^\s+([A-Za-z_$][\w$]*): create[A-Z]\w*,?\s*(?:\/\/.*)?$/;
 
 /** Every .js file under the scan roots plus the scan files, as repo-relative posix paths. */
 export function listScanFiles(repoRoot) {
@@ -46,7 +49,7 @@ export function listScanFiles(repoRoot) {
  * Scan one file's text.
  * @param {string} file - repo-relative path, used in the key
  * @param {string} text
- * @returns {Array<{key: string, shape: 'a'|'b'|'c'|'d', name: string, line: number}>}
+ * @returns {Array<{key: string, shape: 'a'|'b'|'c'|'d'|'e', name: string, line: number}>}
  */
 export function scanText(file, text) {
   const lines = text.split('\n');
@@ -59,6 +62,10 @@ export function scanText(file, text) {
 
     let m = RE_INSTANCE.exec(line);
     if (m) { hits.push({ shape: 'd', name: m[1], line: i + 1 }); return; }
+    if (file.startsWith('routes/')) {
+      m = RE_DEFAULT_DEP.exec(line);
+      if (m) { hits.push({ shape: 'e', name: m[1], line: i + 1 }); return; }
+    }
     m = RE_MODULE.exec(line);
     if (m) { hits.push({ shape: 'a', name: m[1], line: i + 1, factory: null }); return; }
     if (factory) {

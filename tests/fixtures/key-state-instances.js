@@ -14,6 +14,8 @@ import { createTaskDoneCache } from '../../lib/task-done-cache.js';
 import { createWorkspaceTokenCache } from '../../lib/workspace-token-cache.js';
 import { createRejectedCredentialRegistry } from '../../lib/rejected-credentials.js';
 import { createRefreshOnResolveGate } from '../../lib/refresh-on-resolve-gate.js';
+import { createInstallationTokenResolver } from '../../lib/connection-credential.js';
+import { fakeGitHub, connection, OWNER as LOOKUP_OWNER, NOW as LOOKUP_NOW } from './lin-3285-seam.js';
 import { createKeyState } from '../../lib/key-state.js';
 import { registerKeyStateHolders } from '../../lib/key-state-holders.js';
 
@@ -24,6 +26,16 @@ import { registerKeyStateHolders } from '../../lib/key-state-holders.js';
  */
 export function buildKeyStateInstances({ fetchAndPrepareProjects = async () => ({ stateIssues: [] }), now = () => Date.now() } = {}) {
   const holder = createTaskFactsHolder({ now });
+  // The repo-installation lookups, over the same fake GitHub the LIN-3285 tests use: any workspace id is owned by LOOKUP_OWNER,
+  // who holds installation inst-1, so a lookup for any `${workspaceId}|acme/widget` is answered and cached.
+  const installationTokenFor = createInstallationTokenResolver({
+    connectionStore: { async readConnectionsByAccountPrefix() { return [connection(LOOKUP_OWNER, 'github', 'inst-1')]; } },
+    resolveCanonicalAccountId: (id) => id,
+    getWorkspaceOwnerAccountId: async () => LOOKUP_OWNER,
+    workspaceOwnerCheck: async () => ({ status: 'owner' }),
+    fetchImpl: fakeGitHub({ clock: () => LOOKUP_NOW }),
+    now: () => LOOKUP_NOW,
+  });
   const refresh = createTaskFactsRefresh({ holder, fetchAndPrepareProjects, now, onError: () => {} });
   return {
     taskFacts: { holder, refresh },
@@ -33,6 +45,7 @@ export function buildKeyStateInstances({ fetchAndPrepareProjects = async () => (
     workspaceTokenCache: createWorkspaceTokenCache({ now }),
     rejectedCredentialRegistry: createRejectedCredentialRegistry({ now }),
     refreshOnResolveGate: createRefreshOnResolveGate({ now }),
+    installationTokenFor,
   };
 }
 
