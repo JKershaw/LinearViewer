@@ -1591,6 +1591,9 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       // minute. The key is per worker, so the set a previous spec left would answer `task-missing` for this seed's tasks
       // until that floor passed. A reseed starts the held set over from the new seed, before any page reads it.
       if (resetTaskFacts) await resetTaskFacts({ urlKey, workspace: localWorkspace, accountId: req.session.accountId ?? null });
+      // LIN-4110: the same class, the other per-key memo. The workspace issue set (30 s) is keyed by the local workspace's
+      // fixed id, so a reseed within the TTL of an earlier spec's fetch would read that spec's set. It is a pure cache.
+      if (clearWorkspaceIssuesMemo) clearWorkspaceIssuesMemo();
 
       // Optionally provision a mock OpenRouter key, mirroring /test/set-session
       // (L93-97). Honored from query (GET) or body (POST). Superset/no-op by
