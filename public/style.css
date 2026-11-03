@@ -1484,6 +1484,16 @@ a.wordmark:hover {
   }
 }
 
+/* LIN-4106: the drawer's heading is a real heading, drawn at the head line's size so the page's own h3 rule does not enlarge it. */
+/* The panel's flex gap is 6px; the heading takes 4px back so it sits close to the line it titles. That keeps "Use for this
+   run" on the first phone screen (LIN-3987) once the heading is in. */
+.opened-task-change-title {
+  margin: 0 0 -4px;
+  font-size: inherit;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
 .opened-task-change-head {
   font-weight: 600;
   display: flex;

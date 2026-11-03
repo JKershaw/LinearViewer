@@ -592,7 +592,7 @@
       foldOpts.onProposed = refreshProposals;
       window.TaskChat.init(chatFold, foldOpts);
     }
-    // The status mount is what the poll repaints; the tracker line beside it is the page-load read's (LIN-3975).
+    // The status mount is what the poll repaints; the stage track beside it (`task-page-track-mount`) is the page-load read's (LIN-3975).
     var answer = doc.querySelector('[data-testid="task-page-answer-status"]');
     var trackMount = doc.querySelector('[data-testid="task-page-track-mount"]');
     var contextMount = doc.querySelector('[data-testid="task-page-context-mount"]');

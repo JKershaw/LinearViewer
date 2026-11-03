@@ -342,22 +342,24 @@ describe('LIN-3975 — the run control is the owner\'s; everyone else reads the 
     assert.match(html, /Nothing comes next: this task is finished\./);
   });
 
-  test('the tracker\'s state sits before the status mount the poll repaints, never inside it', () => {
-    const html = page(model(), 'owner', PROMPT_OPTS);
-    const tracker = html.indexOf('data-testid="task-page-tracker-state"');
-    const mountAt = html.indexOf('data-testid="task-page-answer-status"');
-    const statusAt = html.indexOf('data-testid="task-page-status"');
-    assert.ok(tracker > 0 && mountAt > tracker && statusAt > mountAt);
-    assert.match(html, /Tracker: In Progress/);
+  // LIN-4106 (beat 2): the "Tracker:" line and the "Harbour:" label are gone. One pill and one sentence in the status
+  // mount are the answer's state line; the tracker's own word is in the details block (`task-page-detail-state`).
+  test('the tracker\'s word is not a line above the status; it reads in the details', () => {
+    const details = { identifier: 'LIN-50', issueId: UUID, state: { name: 'In Progress', type: 'started' }, labels: [], createdAt: null, updatedAt: null, firstSessionAt: null, lastSessionAt: null, prUrl: null, headSha: null, url: null };
+    const html = page(model({ details }), 'owner', PROMPT_OPTS);
+    assert.doesNotMatch(html, /data-testid="task-page-tracker-state"/);
+    assert.doesNotMatch(html, /Tracker: In Progress/);
+    assert.match(html, /data-testid="task-page-detail-state"[\s\S]{0,200}In Progress/);
   });
 
-  test('the answer says which state is Harbour\'s: the pill is labelled Harbour, inside the repainted status', () => {
+  test('the answer has one state mark: the pill inside the repainted status, with no Harbour label', () => {
     const html = page(model(), 'owner', PROMPT_OPTS);
-    const label = html.indexOf('data-testid="task-page-harbour-label"');
+    assert.doesNotMatch(html, /task-page-harbour-label/);
+    assert.doesNotMatch(html, />Harbour:</);
     const pill = html.indexOf('data-testid="task-page-status-pill"');
     const statusAt = html.indexOf('data-testid="task-page-status"');
-    assert.ok(label > statusAt && pill > label, 'the Harbour label sits in the status mount, before the pill');
-    assert.match(html, /task-page-harbour-label">Harbour:<\/span>/);
+    assert.ok(statusAt > 0 && pill > statusAt, 'the pill sits in the status mount the poll repaints');
+    assert.equal((html.match(/data-testid="task-page-status-pill"/g) || []).length, 1);
   });
 });
 

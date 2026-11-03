@@ -150,7 +150,9 @@
 }
 
 /* ── Desktop: the stages and the brief side by side (LIN-3356) ────────────────
-   Source order is the phone order (answer, run control, stages, PR, brief/recap, docs, …);
+   Source order is the phone order (answer, ruling card, run control, stages, PR, brief/recap, docs, …);
+   LIN-4106: the ruling card is placed before the run control on desktop too, as the DOM has it ("Runs on" and "Another step"
+   come after the question);
    desktop only places it. A plain column: not sticky, no scroll area of its own.
    LIN-3975: named areas, not row numbers, so the run control (or the next-step line) and a
    question card cannot shift the brief beside the stages. */
@@ -163,8 +165,8 @@
       "back back"
       "header header"
       "answer answer"
-      "run run"
       "question question"
+      "run run"
       "stages context"
       "pr context"
       "quiet quiet"
@@ -192,8 +194,8 @@
       "back back"
       "header header"
       "answer answer"
-      "run run"
       "question question"
+      "run run"
       "stages stages"
       "pr pr"
       "quiet quiet"

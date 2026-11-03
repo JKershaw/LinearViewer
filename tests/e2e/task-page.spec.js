@@ -241,7 +241,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     // repaints the header and the track from stored data.
     await postFeedback(page, token, buildId, '[done] built it');
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-    await expect(page.locator('[data-testid="task-page-sentence"]')).toContainText('No session running. Last: Build done');
+    await expect(page.locator('[data-testid="task-page-sentence"]')).toContainText('Last run: Build finished');
     await expect(step(page, 'implementation').locator('[data-testid="task-page-stage-state"]')).toHaveText('done');
     await expect(step(page, 'plan')).toHaveClass(/sess-run--expanded/, { timeout: 1000 });
     await expect(step(page, 'implementation')).toHaveClass(/sess-run--expanded/);

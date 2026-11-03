@@ -984,7 +984,7 @@
       if (!opened) return `<div class="opened-task-state" data-state-slot data-testid="opened-task-state"></div>`;
       // LIN-4010 review: Home's line is '' while a task runs (the running box says it), so it is not replaced by the
       // task page's sentence.
-      // LIN-4024: a parent whose subtask needs you says that, once. Its own idle line ("No session running.") is the
+      // LIN-4024: a parent whose subtask needs you says that, once. Its own idle line (the last-run sentence) is the
       // parent's own loops only, so beside "A subtask needs you" it would say the task two ways, and the row says needs you.
       const subtaskLine = renderSubtaskNeedsYou();
       // LIN-4016 / LIN-4071: the own line is `/state`'s (the gather's pill and sentence, the one the row shows). The server
@@ -1015,9 +1015,11 @@
       const sessions = (opened && opened.sessions) || { count: 0, last: null };
       const last = sessions.last;
       if (!(sessions.count && last && !sessions.running)) return '';
-      return `<div class="opened-task-last" data-testid="opened-task-last">Last: ${esc(last.label || 'session')} ${esc(last.state || '')}`
-        + `${last.at ? ` \u00b7 ${esc(formatGeneratedAge(Date.parse(last.at)) || '')}` : ''}`
-        + ` \u00b7 <button class="btn opened-task-all" data-action="all-sessions" data-testid="opened-task-all">All ${sessions.count}</button></div>`;
+      // LIN-4106: the last run is said once, in the state line above the box (the server's sentence). This line keeps only
+      // the way to all of the runs, so it does not repeat the raw state words. Plain words, not a bare "All 13" (a count alone
+      // only read after the old last-run clause).
+      const label = sessions.count === 1 ? 'The only run' : `All ${sessions.count} runs`;
+      return `<div class="opened-task-last" data-testid="opened-task-last"><button class="btn opened-task-all" data-action="all-sessions" data-testid="opened-task-all">${label}</button></div>`;
     }
 
     // LIN-4010: the copy-first state line: the tracker's word, then either nothing (a prompt was copied; "You copied …"
@@ -1433,7 +1435,9 @@
         || (state.run.panelFailed
           ? '<p class="opened-task-change-note" data-testid="run-panel-failed">The choices could not load. Use for this run stays off until they do.</p>'
           : '<p class="opened-task-change-note" data-testid="run-panel-loading">Loading the choices\u2026</p>');
+      // LIN-4106: the drawer names what it is for, then the line that says what the change reaches.
       return `<div class="opened-task-change-panel" data-testid="run-change-panel">`
+        + `<h3 class="opened-task-change-title" data-testid="run-change-heading">Change this run</h3>`
         + `<div class="opened-task-change-head">This run only${panelWords.model ? ` \u00b7 default: ${esc(panelWords.model)}` : ''}`
         + `<button class="btn--quiet opened-task-change-x" data-action="close-change" aria-label="Close" data-testid="run-change-x">\u00d7</button></div>`
         + (caps.runBox
@@ -1451,7 +1455,7 @@
         + `<button class="btn--quiet" data-action="reset-run" data-testid="run-reset">Reset</button>`
         + `<button class="btn--quiet" data-action="close-change">Close</button>`
         + `<a class="opened-task-settings-link" href="/workspace/${encodeURIComponent(opts.urlKey || '')}/settings/models">Settings \u203A Models</a>`
-        + `</div><p class="opened-task-change-note">A change here is for this run only. The default is set in Settings \u203A Models.</p>`
+        + `</div><p class="opened-task-change-note">A change here is for this run only. The default is set in Settings \u203A Models. Runs are listed on <a class="opened-task-settings-link" data-testid="run-dispatch-link" href="/workspace/${encodeURIComponent(opts.urlKey || '')}/dispatch">Dispatch \u203A</a>.</p>`
         + `</div>`;
     }
 
