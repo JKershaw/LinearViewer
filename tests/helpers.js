@@ -310,6 +310,35 @@ export const SELECTORS = {
     price: '.decision-panel-price',
     sample: (name) => `[data-testid="sg-decision-${name}"]`,
     sampleFrame: '.sg-decision-sample',
+    /** LIN-4106: the drawer's heading, and its house-page links (Settings › Models, Dispatch ›). */
+    changeHeading: '[data-testid="run-change-heading"]',
+    dispatchLink: '[data-testid="run-dispatch-link"]',
+    settingsModelsLink: '.opened-task-settings-link[href$="/settings/models"]',
+    defaultCard: '[data-testid="run-default"]',
+  },
+  /** LIN-4106: the task page's state line, its answer, the ruling card and the run block, in DOM order. */
+  taskPage: {
+    answer: '[data-testid="task-page-answer"]',
+    pill: '[data-testid="task-page-status-pill"]',
+    sentence: '[data-testid="task-page-sentence"]',
+    question: '[data-testid="task-page-question"]',
+    run: '[data-testid="task-page-run"]',
+    runControl: '[data-testid="task-page-run-control"]',
+    stages: '[data-testid="task-page-track-mount"]',
+    details: '[data-testid="task-page-details"]',
+    detailState: '[data-testid="task-page-detail-state"]',
+    /** The run block's own parts, drawn by the shared run control: "Runs on" and "Another step". */
+    runsOn: '[data-testid="run-on-what"]',
+    another: '[data-testid="run-another"]',
+    harbourLabel: '[data-testid="task-page-harbour-label"]',
+  },
+  /** LIN-4106: Home's opened task has the same state line: one pill and one sentence, and the All-runs button. */
+  homeTaskStatus: {
+    line: '[data-testid="home-task-status"]',
+    pill: '[data-testid="home-task-status-pill"]',
+    sentence: '[data-testid="home-task-sentence"]',
+    allRuns: '[data-testid="opened-task-all"]',
+    lastLine: '[data-testid="opened-task-last"]',
   },
 }
 
