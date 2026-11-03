@@ -1,0 +1,339 @@
+lg (--font-size-lg, 1.25em): 9 selector groups
+base (--font-size-base, 1em): 81 selector groups
+sm (--font-size-sm, 0.85em): 200 selector groups
+inherit: 13 selector groups
+literal (kept, exempt or out of scope): 25 selector groups
+
+## lg
+- .plain-page > .section > .section-header
+- .queue-panel-close
+- .section .section-header--ruled
+- .sess-header h1
+- .swipe-card-title
+- .swipe-header h1
+- .task-description .section-header
+- .task-md h2, .task-md h3
+- .token-modal-close
+## base
+- .brief-section
+- .chat-md code
+- .chat-md h1, .chat-md h2, .chat-md h3, .chat-md h4
+- .chat-md h3, .chat-md h4
+- .comment-body
+- .comments-loading, .comments-error, .comments-empty
+- .completed-time
+- .context-section
+- .decision-panel-control, .settings-field-control
+- .decision-panel-heading
+- .decision-panel-label
+- .decision-panel-suggestions
+- .detail-meta
+- .field
+- .footer-deploy
+- .home-description h1, .home-description h2, .home-description h3
+- .home-fold, .home-done-count
+- .in-progress-project
+- .issue-description
+- .issue-description .desc-full-content code, .comment-body code, .task-edit-preview code
+- .nav-action
+- .nav-label
+- .nav-more-toggle
+- .nav-option
+- .nav-value
+- .nav-view
+- .opened-task-box-actions, .opened-task-progress-key, .opened-task-key-note, .opened-task-paste
+- .opened-task-change-label
+- .opened-task-home .opened-task-step-name
+- .opened-task-proposal-why
+- .opened-task-started .task-sentence
+- .opened-task-target
+- .project-controls
+- .project-header .add-task-link
+- .prompt-name
+- .prompt-text
+- .prompt-text h1, .prompt-text h2
+- .prompt-text h3, .prompt-text h4
+- .prompt-text pre code
+- .queue-item-title
+- .recap-section
+- .row-state
+- .running-section .state, .up-next-section .state, .project .state
+- .scan-section
+- .search-clear
+- .search-input
+- .search-no-results
+- .section .section-header
+- .sess-qcard-case-chunk
+- .sess-qcard-input
+- .sess-qcard-question
+- .sess-qcard-readonly
+- .sess-section > .section-header
+- .session-summary
+- .state
+- .status-pill--bare
+- .swipe-accordion-body
+- .swipe-arrow
+- .swipe-comment-body
+- .swipe-sessions-count
+- .tabs__tab
+- .task-chat-input
+- .task-context-offers, .task-context-none
+- .task-create-cancel, .task-edit-cancel
+- .task-create-submit, .task-edit-submit
+- .task-pr-detail
+- .task-pr-lead
+- .task-sentence
+- .task-stage-ahead
+- .task-stage-message
+- .task-stage-top
+- .task-strip-chip
+- .task-summary
+- .toast
+- .token-label-input
+- .token-modal p
+- .token-modal-header strong
+- .up-next-why
+- .wordmark-footer
+- .wordmark-nav
+- body
+## sm
+- .action-btn, .btn--quiet
+- .attachment-item .img-error
+- .brief-content h2
+- .brief-meta
+- .brief-refresh
+- .btn
+- .card-meta
+- .chat-fold > summary
+- .chat-md table
+- .chat-msg--row
+- .chat-msg__text
+- .chat-msg__time
+- .chat-note
+- .chat-option-btn
+- .chat-option-recommended-label
+- .chat-options-caption
+- .chat-tool-row, .chat-tool-group, .chat-fold
+- .chip
+- .collective-transcript-head, .task-chat-convo-head
+- .collective-warning, .task-chat-warning
+- .comment-meta
+- .context-hint
+- .context-lane-label
+- .context-node-id
+- .context-node-tag
+- .context-node-title
+- .context-refresh
+- .context-truncated
+- .decision-panel-costs
+- .decision-panel-hint
+- .decision-panel-note
+- .detail-link
+- .detail-toggle
+- .dispatch-disclosure
+- .dispatch-exec-harness-select, .dispatch-exec-model
+- .dispatch-exec-model-hint
+- .dispatch-exec-model-other
+- .dispatch-preset-create-link
+- .dispatch-preset-reflection
+- .dispatch-preset-select
+- .home-backlog
+- .home-halt-banner
+- .home-onboarding-hint
+- .issue-description .img-error
+- .opened-task .btn, .opened-task .opened-task-download
+- .opened-task .btn.opened-task-regenerate
+- .opened-task .detail-line, .opened-task .detail-meta
+- .opened-task .detail-link
+- .opened-task .opened-task-card
+- .opened-task-card-what
+- .opened-task-change-panel .btn
+- .opened-task-facts
+- .opened-task-folds .detail-toggle.nested-toggle
+- .opened-task-go
+- .opened-task-go-notice
+- .opened-task-home .task-strip-chip
+- .opened-task-last
+- .opened-task-next-step
+- .opened-task-primary-reason
+- .opened-task-proposal-state
+- .opened-task-proposals-note
+- .opened-task-proxy
+- .opened-task-proxy-faq p
+- .opened-task-reasoning
+- .opened-task-rung
+- .opened-task-runner-link
+- .opened-task-running-next
+- .opened-task-runs-on, .opened-task-running, .opened-task-queued, .opened-task-last-copy
+- .opened-task-started-link, .opened-task-go-notice-link
+- .opened-task-step-what, .opened-task-step-why
+- .opened-task-undo, .opened-task-see, .opened-task-stop, .opened-task-started-link
+- .opened-task-watch
+- .opened-task-why
+- .option-marker
+- .page-footer
+- .project[data-project-type="periodicals"] .periodical-mode
+- .prompt-copy, .prompt-download
+- .prompt-dispatch
+- .prompt-proxy-toggle
+- .prompt-section .swipe-reasoning-content
+- .prompt-section .swipe-reasoning-toggle
+- .prompt-text
+- .prompt-text code
+- .queue-badge
+- .queue-item-chip
+- .queue-item-meta
+- .queue-item-remove
+- .queue-item-snippet
+- .queue-item-warning
+- .recap-item-evidence
+- .recap-meta
+- .recap-refresh
+- .recap-section-title
+- .recap-type
+- .rulings-badge
+- .scan-action
+- .scan-answer-input
+- .scan-answer-submit, .scan-dismiss
+- .scan-decision-option-btn
+- .scan-decision-recommended
+- .scan-meta
+- .scan-outcome-detail summary
+- .segment-bar__cell
+- .sess-back, .task-create-back, .task-edit-back
+- .sess-chip
+- .sess-cred-token
+- .sess-ctx-body
+- .sess-ctx-ident
+- .sess-ctx-meta
+- .sess-ctx-miss
+- .sess-inline-reply-input
+- .sess-kv
+- .sess-proposal-error
+- .sess-proposal-prompt
+- .sess-proposal-state
+- .sess-proposals-title
+- .sess-qcard-dismiss
+- .sess-qcard-if-unanswered
+- .sess-qcard-why-summary
+- .sess-recap-group-head
+- .sess-recap-sub
+- .sess-recap-tag
+- .sess-recap-what
+- .sess-reply-feedback
+- .sess-run-head
+- .sess-run-id
+- .sess-run-kind
+- .sess-run-parked-flag
+- .sess-run-times
+- .sess-run-title
+- .sess-run-toggle-icon
+- .sess-run-waiting-flag
+- .sess-step-summary
+- .sess-task
+- .sess-tasks-label
+- .sess-ticket
+- .sess-tx-link
+- .sess-tx-msg
+- .session-run-link
+- .sessions-section
+- .settings-link
+- .setup-notice
+- .setup-notice code
+- .source-badge
+- .status-pill
+- .swipe-accordion-body code
+- .swipe-accordion-group-label
+- .swipe-accordion-header
+- .swipe-accordion-toggle
+- .swipe-blocking-issue
+- .swipe-card-header
+- .swipe-card-identifier
+- .swipe-card-link
+- .swipe-card-meta
+- .swipe-card-meta-label
+- .swipe-card-meta-value
+- .swipe-card-position
+- .swipe-comment-header
+- .swipe-counter
+- .swipe-filter-select
+- .swipe-label-tag
+- .swipe-prompt-actions .swipe-prompt-copy
+- .swipe-prompt-btn
+- .swipe-prompt-btn-more
+- .swipe-prompt-edit
+- .swipe-prompt-text
+- .swipe-prompt-text code
+- .swipe-prompt-warning
+- .swipe-prompts-cache-hint
+- .swipe-reasoning-content code
+- .swipe-relation-issue
+- .tag
+- .task-chat-empty
+- .task-chat-experimental
+- .task-chat-reset-btn
+- .task-chat-saved-empty, .task-chat-saved-unavailable
+- .task-chat-saved-meta, .task-chat-saved-count
+- .task-checkins
+- .task-create-label, .task-edit-label
+- .task-ident
+- .task-pr-raw
+- .task-pr-section .rev-closeout p
+- .task-pr-section .rev-closeout-actions a
+- .task-ref-list
+- .task-ref-state
+- .task-refs-label
+- .task-share-new-label
+- .task-share-note
+- .task-share-row
+- .task-share-url
+- .task-stage-attempts, .task-stage-state, .task-stage-time
+- .task-stage-links
+- .task-stage-run
+- .task-stage-session-line
+- .toggle
+- .token-copy-btn
+- .token-usage-hint
+- .token-value
+- .truncation-notice
+- .waiting-task-line
+## inherit
+- .chat-fold
+- .desc-toggle
+- .issue-desc-toggle
+- .login-input, select.github-repo-select
+- .opened-task-change
+- .opened-task-change-title
+- .opened-task-runner-line .opened-task-runner-link
+- .sess-v code
+- .sessions-refresh
+- .swipe-card-runner .opened-task-runner-link
+- .task-ref-list .task-ref-state
+- .task-stage-session-line .task-stage-run
+- h1 .task-ident
+## literal
+- .error-details => 0.8rem
+- .error-home-link => 0.9em
+- .error-title => 1.25rem
+- .flight-companion-prompt, .passage-planner-prompt => 0.84rem
+- .landing-ctas .landing-cta => 1.05rem
+- .landing-wordmark => 2.75rem, 2.25rem (max-width:480px)
+- .login-button => 1rem
+- .obs-act-chip => 0.72rem
+- .opened-task-change-summary, .opened-task-change-note => 0.9em, 0.75rem (max-width:640px)
+- .opened-task-generated => 12px
+- .opened-task-other-prompts-label => 12px
+- .opened-task-regenerate => 12px
+- .opened-task-run-quota => 12px
+- .opened-task-setup => 12px
+- .opened-task-setup-notice => 12px
+- .page-header h1 => 1.5rem, 1.3rem (max-width:640px), 1.2rem (max-width:400px)
+- .page-header__subtitle => 0.9em
+- .plain-page => 1rem (max-width:400px)
+- .plain-title => 1.5rem
+- .prompt-section .swipe-prompt-header => 12px
+- .repo-picker-add-link => 0.9em
+- .repo-picker-group-heading => 0.85em
+- .repo-picker-truncated-note => 0.85em
+- .swipe-prompt-actions button, .prompt-section .swipe-prompt-change => 12px
+- .task-sentence-at => 0.85em
