@@ -496,3 +496,38 @@ It also didn't find the builders' one-shape tidies, though LIN-4168's "no single
 **The pattern is now three for three.** All three builders asked so far (LIN-4166, LIN-4168, LIN-4165) named a *one-interface* tidy as what they'd have done first: one predicate, one cache shape, one posting helper. Each saved, by their estimate, between "ten minutes" and "a third of the diff". Neither Survey version offered one. v2 offered "gather copies of a decision", open-0 offered "prepare". The question "which things here do the same job through different interfaces?" is the one nobody asks before the work.
 
 **A loose end, as data.** LIN-4167 is still In Progress. John ruled "no: keep it manual", the ruling was recorded as a comment, and its autopilot had already ended at 18:18. So nothing closed the ticket. A "no" leaves a ticket with no owner. That's a small piece of grit in the gears.
+
+## Round 3 (3 Nov, from 21:00 UTC, overnight): Costs, closing the loop
+
+**John's goal:** "closing the loop on tracking costs and tokens", run overnight through this process.
+
+**The ground.** LIN-3936 is the Costs record (goal: every model call's tokens and cost tracked simply and reliably, in easy-to-maintain code). `docs/plans/costs.md` is the design. The LIN-4126 review maps it. Tidies 1 to 5 gave the pieces one owner each. The review's path from here:
+1. **one cost read that every surface asks** (consolidate the readers);
+2. **the per-request usage ledger** (producers post one record per model request; this prices Haiku 5.5, counts subagents, and lets each call carry its issue, which the product choices after tidy 5 point to).
+
+The "Rebuild 1" drafted on 2 Nov wasn't filed and couldn't be found, so it was rewritten from `costs.md` and the tidy-5 note, against the bar for a Costs ticket (goal, context, this step and why, done when, no how, permission, report-back headings).
+
+**Filed:** **LIN-4176**, "Costs rebuild 1: one cost read that every surface asks" (under LIN-3936). Alongside it, the existing **LIN-4127** (the runner relays worker usage by default; simple-dispatcher).
+
+**How round 3 runs.**
+- **The Survey is open-0, unchanged,** for a second sample before any tuning. Tuning on five tickets would be fitting noise.
+- **Acting on it:** open-0's "do first" is usually a preparation (measure, experiment, inventory, the failing test, ask John). That preparation is written onto the ticket.
+- **The after-question gains John's two,** kept as open as the rest (template below): *what would you tidy now*, and *if this area were how you'd want it, what would this ticket have been?*
+- **The Costs stream's own rhythm continues:** after each step, a note on LIN-3936 (what changed; is the code better; what the ticket got wrong; what still differs), and the bar is revised from evidence.
+- **Next steps come from each report-back:** Rebuild 2 (the ledger) gets written after Rebuild 1 reports.
+
+The round-3 after-question:
+
+```
+A short, read-only follow-up for research (the Survey; see docs/plans/survey.md on branch claude/cool-rubin-6acj5j of LinearViewer). Your build work on {TICKET} is finished ({MERGED}). Please do NOT change any code, branches, pull requests, ticket fields or state. The ONLY thing to write is one new comment on {TICKET}, starting with the heading "## Survey 1a (round 3)". Don't read LIN-4150 or other tickets' Survey comments first.
+
+Looking back from where you stood while doing this work, answer in that comment:
+
+1. Why was this difficult? Where did the change bind, and what did it have to push through or work around to land? If it wasn't difficult, say so plainly.
+2. Before you started, what would you have done first, if anything?
+3. Now that it's done, what would you tidy, and why?
+4. If this area of code were how you'd want it, what would this ticket have been?
+5. What did the ticket (or the plan you were given) get wrong, if anything?
+
+Answer from your own experience of the work, in your own way. Under 450 words.
+```
