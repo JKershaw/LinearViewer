@@ -7,7 +7,7 @@
 //
 // This pins the seam directly, in one file, so it does not depend on which specs a shard runs before which. The condition that
 // tells the fix from its absence: a SECOND reseed inside 60 s of a read on the same key, adding a task the first seed did not
-// have. Red without the `resetTaskFacts` call in routes/test.js (the held set is the old seed's, the floor blocks a refresh).
+// have. Red without the task-facts refill in the per-key reset (lib/key-state-holders.js): the held set is the old seed's, and the floor blocks a refresh.
 
 import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId } from '../fixtures/local-harness.js';

@@ -95,7 +95,7 @@ const uuidForUrlKey = (key) => {
  * @param {Object|null} [options.taskModeStore] - Task-mode event store (LIN-2942), for /test/clear-task-mode-events
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, modelRoutingStore = null, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, resetTaskFacts = null, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, emailTransport = null, commentDedupe = null, decisionStampDedupe = null, taskModeStore = null, taskShareCollection = null, kpiDailyRollupCollection = null }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, modelRoutingStore = null, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, resetKeyState = null, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, emailTransport = null, commentDedupe = null, decisionStampDedupe = null, taskModeStore = null, taskShareCollection = null, kpiDailyRollupCollection = null }) {
   const router = Router();
 
   // ── Connection-backed fixture variants (LIN-3124 PR3 checkpoint F, T27) ────
@@ -230,6 +230,16 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     const working = await proxyTokenStore.exchangeBootstrapToken(bootstrap.token);
     if (!working) throw new Error('runner key exchange failed');
     return { tokenId: working.tokenId };
+  }
+
+  // LIN-4168: every seed seam calls the one per-key reset (lib/key-state.js), once per workspace it puts in the session.
+  // A seam calls it after its seeding and before its session save (or return), so a refill reads the new seed (LIN-4110).
+  // A throwing clear propagates to the seam, which answers 500 (loud); a refill that fails never fails the seam.
+  async function resetSessionKeys(req) {
+    if (!resetKeyState) return;
+    for (const ws of req.session.workspaces || []) {
+      await resetKeyState({ urlKey: ws.urlKey, workspace: ws, accountId: req.session.accountId ?? null });
+    }
   }
 
   // Endpoint to set a test session without going through OAuth flow
@@ -439,6 +449,12 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       delete req.session.shipSample
     }
 
+    try {
+      await resetSessionKeys(req)
+    } catch (err) {
+      return res.status(500).send(`key reset failed: ${err.message}`)
+    }
+
     // Explicitly save session before responding to ensure it's persisted
     req.session.save((err) => {
       if (err) {
@@ -500,6 +516,12 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     const established = await establishAccount(req.session, accountStore, accountWorkspaceStore, 'linear', `test-merge-b-${suffix}`, {}, wsB.id);
     if (established.ok || !established.conflict) {
       return res.status(500).send('fixture setup failed: expected a conflict, got ' + JSON.stringify(established));
+    }
+
+    try {
+      await resetSessionKeys(req);
+    } catch (err) {
+      return res.status(500).send(`key reset failed: ${err.message}`);
     }
 
     return respondToAccountConflict({
@@ -1590,10 +1612,12 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       // LIN-4110: the server holds each workspace's issue set (lib/task-facts-holder.js) and refreshes it at most once a
       // minute. The key is per worker, so the set a previous spec left would answer `task-missing` for this seed's tasks
       // until that floor passed. A reseed starts the held set over from the new seed, before any page reads it.
-      if (resetTaskFacts) await resetTaskFacts({ urlKey, workspace: localWorkspace, accountId: req.session.accountId ?? null });
-      // LIN-4110: the same class, the other per-key memo. The workspace issue set (30 s) is keyed by the local workspace's
-      // fixed id, so a reseed within the TTL of an earlier spec's fetch would read that spec's set. It is a pure cache.
-      if (clearWorkspaceIssuesMemo) clearWorkspaceIssuesMemo();
+      // LIN-4168: the one per-key reset, after the converted extras. The refill reads the session's workspace, so it sees a
+      // converted binding. It covers the task facts (LIN-4110) and the workspace issues memo for this key.
+      if (resetKeyState) {
+        const sessionWorkspace = (req.session.workspaces || []).find((w) => w.urlKey === urlKey) || localWorkspace;
+        await resetKeyState({ urlKey, workspace: sessionWorkspace, accountId: req.session.accountId ?? null });
+      }
 
       // Optionally provision a mock OpenRouter key, mirroring /test/set-session
       // (L93-97). Honored from query (GET) or body (POST). Superset/no-op by
@@ -1742,7 +1766,6 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       // bare-string boot call, and `repo` is the "+ Add task" deep-link default.
       const provider = getProvider('github');
       if (!provider) throw new Error('github provider not registered');
-      for (const k of Object.keys(githubFakeCounters)) githubFakeCounters[k] = 0;
       wrapGithubMethodCounters(provider);
       // LIN-3125 Phase 3: let a spec seed the held picker's scopes. `repos`
       // defaults to the single bound repo (byte-identical to before); the twin
@@ -1787,6 +1810,10 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
         const conversion = await convertFixtureBinding(req, GITHUB_WS_UUID, req.session.workspaces[0].bindings[0]);
         if (!conversion.connectionBacked) throw new Error('connection-backed github fixture did not convert');
       }
+
+      await resetSessionKeys(req);
+      // Zeroed after the reset, so a refill's fetch is not counted; a spec asserts zero right after the seed (lin-3125).
+      for (const k of Object.keys(githubFakeCounters)) githubFakeCounters[k] = 0;
 
       req.session.save(() => res.json({ ok: true, urlKey: GITHUB_WORKSPACE_URL_KEY, repo: GITHUB_REPO, ...(connectionBacked ? { connectionBacked } : {}) }));
     } catch (err) {
@@ -1888,6 +1915,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
         if (!conversion.connectionBacked) throw new Error('connection-backed github-projects fixture did not convert');
       }
 
+      await resetSessionKeys(req);
       req.session.save(() => res.json({ ok: true, urlKey: GITHUB_PROJECTS_WORKSPACE_URL_KEY, board: GITHUB_PROJECTS_BOARD, ...(connectionBacked ? { connectionBacked } : {}) }));
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -2031,6 +2059,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
         if (!conversion.connectionBacked) throw new Error('connection-backed jira fixture did not convert');
       }
 
+      await resetSessionKeys(req);
       req.session.save(() => res.json({ ok: true, urlKey: JIRA_WORKSPACE_URL_KEY, site: JIRA_SITE, ...(connectionBacked ? { connectionBacked } : {}) }));
     } catch (err) {
       res.status(500).json({ error: err.message });

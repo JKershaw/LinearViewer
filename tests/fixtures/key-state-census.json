@@ -1,0 +1,414 @@
+{
+  "lib/brief-cache.js::_map": {
+    "disposition": "database-backed",
+    "why": "In-memory fallback inside InMemoryBriefCacheStore; the durable collection is out of scope."
+  },
+  "lib/chat-tools.js::prStatusCache": {
+    "disposition": "global-only",
+    "exception": "pr-status-chat-cache"
+  },
+  "lib/ci-wake-sweep.js::access": {
+    "disposition": "not-state",
+    "why": "A per-tick memo, cleared at the start of every sweep tick by reset(at)."
+  },
+  "lib/ci-wake-sweep.js::attempts": {
+    "disposition": "global-only",
+    "exception": "ci-wake-sweep-backoff"
+  },
+  "lib/connection-binding.js::byBinding": {
+    "disposition": "global-only",
+    "exception": "process-lifetime-memos"
+  },
+  "lib/connection-binding.js::byWorkspace": {
+    "disposition": "global-only",
+    "exception": "process-lifetime-memos"
+  },
+  "lib/connection-credential.js::inflight": {
+    "disposition": "global-only",
+    "exception": "connection-refresh-inflight"
+  },
+  "lib/connection-credential.js::lookups": {
+    "disposition": "registered",
+    "holder": "installation-lookups"
+  },
+  "lib/connection-credential.js::mintFailures": {
+    "disposition": "global-only",
+    "exception": "connection-credential-caches"
+  },
+  "lib/connection-credential.js::pendingByKey": {
+    "disposition": "global-only",
+    "exception": "connection-credential-caches"
+  },
+  "lib/connection-credential.js::tokens": {
+    "disposition": "global-only",
+    "exception": "connection-credential-caches"
+  },
+  "lib/dispatch-factory.js::dispatchGuardTaskDoneCache": {
+    "disposition": "registered",
+    "holder": "task-done:dispatch-guard"
+  },
+  "lib/dispatch-store.js::_lineageBackfills": {
+    "disposition": "database-backed",
+    "why": "A field of DispatchQueueStore; the store is database-backed and its own /test/clear-* routes reset it."
+  },
+  "lib/github-pr-files.js::prFilesCache": {
+    "disposition": "global-only",
+    "exception": "github-pr-files-cache"
+  },
+  "lib/github-pr-status.js::failOpenPrStatusCache": {
+    "disposition": "global-only",
+    "exception": "pr-status-fail-open"
+  },
+  "lib/github-pr-status.js::seededPrStatus": {
+    "disposition": "global-only",
+    "exception": "pr-status-seeded"
+  },
+  "lib/key-state.js::exceptions": {
+    "disposition": "not-state",
+    "why": "The registry’s own table of exception names."
+  },
+  "lib/key-state.js::holders": {
+    "disposition": "not-state",
+    "why": "The registry’s own table of holder names."
+  },
+  "lib/library.js::cache": {
+    "disposition": "global-only",
+    "exception": "library-cache"
+  },
+  "lib/library.js::seen": {
+    "disposition": "not-state",
+    "why": "Built per call by createSlugger and discarded with the render."
+  },
+  "lib/observation-sessions-materializer.js::backfillInflight": {
+    "disposition": "global-only",
+    "exception": "observation-materializer-inflight"
+  },
+  "lib/observation-sessions-materializer.js::inflight": {
+    "disposition": "global-only",
+    "exception": "observation-materializer-inflight"
+  },
+  "lib/pipeline-loops.js::_warnedMalformedCauses": {
+    "disposition": "global-only",
+    "exception": "process-lifetime-memos"
+  },
+  "lib/pr-state-store.js::prStateSharedCache": {
+    "disposition": "global-only",
+    "exception": "pr-state-shared"
+  },
+  "lib/prompts/agent-onboarding.js::buildAgentOnboarding": {
+    "disposition": "not-state",
+    "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level)."
+  },
+  "lib/prompts/runner-kickoff.js::buildRunnerKickoff": {
+    "disposition": "not-state",
+    "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level)."
+  },
+  "lib/providers/linear/index.js::linearFetch": {
+    "disposition": "not-state",
+    "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level)."
+  },
+  "lib/providers/registry.js::providers": {
+    "disposition": "global-only",
+    "exception": "provider-registry"
+  },
+  "lib/proxy-credential-trail.js::credentialResolutions": {
+    "disposition": "global-only",
+    "exception": "proxy-credential-trail"
+  },
+  "lib/proxy-dedupe.js::entries": {
+    "disposition": "global-only",
+    "exception": "comment-dedupe"
+  },
+  "lib/proxy-dedupe.js::generations": {
+    "disposition": "global-only",
+    "exception": "comment-dedupe"
+  },
+  "lib/recap-cache.js::_map": {
+    "disposition": "database-backed",
+    "why": "In-memory fallback inside InMemoryRecapCacheStore; the durable collection is out of scope."
+  },
+  "lib/refresh-on-resolve-gate.js::lastAttempt": {
+    "disposition": "registered",
+    "holder": "refresh-on-resolve:cooldown"
+  },
+  "lib/rejected-credentials.js::byteIdenticalRejections": {
+    "disposition": "global-only",
+    "exception": "rejected-credentials:fingerprint-maps"
+  },
+  "lib/rejected-credentials.js::entries": {
+    "disposition": "global-only",
+    "exception": "rejected-credentials:fingerprint-maps"
+  },
+  "lib/rejected-credentials.js::rejectionCounts": {
+    "disposition": "global-only",
+    "exception": "rejected-credentials:fingerprint-maps"
+  },
+  "lib/rejected-credentials.js::scopeAttempts": {
+    "disposition": "registered",
+    "holder": "rejected-credentials:scope-attempts"
+  },
+  "lib/rejected-credentials.js::supersessions": {
+    "disposition": "global-only",
+    "exception": "rejected-credentials:fingerprint-maps"
+  },
+  "lib/rejected-credentials.js::witnessed": {
+    "disposition": "global-only",
+    "exception": "rejected-credentials:fingerprint-maps"
+  },
+  "lib/render-run-steps.js::EMPTY_SET": {
+    "disposition": "not-state",
+    "why": "An empty constant, read only; nothing writes to it."
+  },
+  "lib/run-controls.js::memo": {
+    "disposition": "global-only",
+    "exception": "process-lifetime-memos"
+  },
+  "lib/run-paragraph-store.js::_map": {
+    "disposition": "database-backed",
+    "why": "In-memory fallback inside InMemoryRunParagraphStore; the durable collection is out of scope."
+  },
+  "lib/run-summary-cache.js::_map": {
+    "disposition": "database-backed",
+    "why": "In-memory fallback inside InMemoryRunSummaryCacheStore; the durable collection is out of scope."
+  },
+  "lib/run-view.js::EMPTY_SET": {
+    "disposition": "not-state",
+    "why": "An empty constant, read only; nothing writes to it."
+  },
+  "lib/scheduler.js::jobs": {
+    "disposition": "global-only",
+    "exception": "process-lifetime-memos"
+  },
+  "lib/scheduler.js::timers": {
+    "disposition": "global-only",
+    "exception": "process-lifetime-memos"
+  },
+  "lib/session-summary-cache.js::_map": {
+    "disposition": "database-backed",
+    "why": "In-memory fallback inside InMemorySessionSummaryCacheStore; the durable collection is out of scope."
+  },
+  "lib/sessions-feed-cache.js::entries": {
+    "disposition": "registered",
+    "holder": "sessions-feed"
+  },
+  "lib/task-done-cache.js::entries": {
+    "disposition": "registered",
+    "holder": "task-done:dashboard"
+  },
+  "lib/task-facts-holder.js::entries": {
+    "disposition": "registered",
+    "holder": "task-facts"
+  },
+  "lib/task-facts-holder.js::inFlight": {
+    "disposition": "registered",
+    "holder": "task-facts"
+  },
+  "lib/task-facts-holder.js::lastAttemptAt": {
+    "disposition": "registered",
+    "holder": "task-facts"
+  },
+  "lib/unpriced-models.js::seen": {
+    "disposition": "global-only",
+    "exception": "process-lifetime-memos"
+  },
+  "lib/workspace-halt.js::_lastKnownHalt": {
+    "disposition": "database-backed",
+    "why": "A field of WorkspaceHaltStore, coherent only with its own clearWorkspaceHalt; out of scope per the plan."
+  },
+  "lib/workspace-halt.js::_writeGeneration": {
+    "disposition": "database-backed",
+    "why": "A field of WorkspaceHaltStore, coherent only with its own clearWorkspaceHalt; out of scope per the plan."
+  },
+  "lib/workspace-issues-memo.js::entries": {
+    "disposition": "registered",
+    "holder": "workspace-issues-memo"
+  },
+  "lib/workspace-token-cache.js::entries": {
+    "disposition": "registered",
+    "holder": "workspace-token"
+  },
+  "lib/workspace-token-cache.js::tombstones": {
+    "disposition": "registered",
+    "holder": "workspace-token"
+  },
+  "lib/workspace-token-refresh.js::inflight": {
+    "disposition": "global-only",
+    "exception": "workspace-token-refresh-inflight"
+  },
+  "routes/dashboard.js::sessionsFeedCache": {
+    "disposition": "registered",
+    "holder": "sessions-feed"
+  },
+  "routes/dashboard.js::taskDoneCache": {
+    "disposition": "registered",
+    "holder": "task-done:dashboard"
+  },
+  "routes/email-auth.js::emailSendLimiter": {
+    "disposition": "global-only",
+    "exception": "rate-limiters"
+  },
+  "routes/provider-auth-routers.js::github": {
+    "disposition": "not-state",
+    "why": "An auth-route factory in the provider table, not a container; it holds no per-key state of its own (routes/provider-auth-routers.js)."
+  },
+  "routes/provider-auth-routers.js::jira": {
+    "disposition": "not-state",
+    "why": "An auth-route factory in the provider table, not a container; it holds no per-key state of its own (routes/provider-auth-routers.js)."
+  },
+  "routes/provider-auth-routers.js::linear": {
+    "disposition": "not-state",
+    "why": "An auth-route factory in the provider table, not a container; it holds no per-key state of its own (routes/provider-auth-routers.js)."
+  },
+  "routes/proxy.js::commentDedupe": {
+    "disposition": "global-only",
+    "exception": "comment-dedupe"
+  },
+  "routes/proxy.js::commentDedupeGenerations": {
+    "disposition": "delegated",
+    "to": "lib/proxy-dedupe.js::generations"
+  },
+  "routes/runner-kit.js::cache": {
+    "disposition": "global-only",
+    "exception": "runner-kit-cache"
+  },
+  "routes/task-chat.js::createToolCatalog": {
+    "disposition": "not-state",
+    "why": "The chat tool catalog factory; a catalog is built per call site and starts cold (its PR-status cache is the `pr-status-chat-cache` exception)."
+  },
+  "routes/task-share.js::cache": {
+    "disposition": "global-only",
+    "exception": "task-share-cache"
+  },
+  "routes/task-share.js::inflight": {
+    "disposition": "global-only",
+    "exception": "task-share-cache"
+  },
+  "routes/task-share.js::maskLogged": {
+    "disposition": "global-only",
+    "exception": "task-share-cache"
+  },
+  "routes/test.js::yapBuffers": {
+    "disposition": "global-only",
+    "exception": "yap-buffers"
+  },
+  "routes/workspace-api-issue-write.js::decisionStampDedupe": {
+    "disposition": "global-only",
+    "exception": "decision-stamp-dedupe"
+  },
+  "server.js::_workspaceTitleResolver": {
+    "disposition": "not-state",
+    "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level)."
+  },
+  "server.js::connectionAccess": {
+    "disposition": "not-state",
+    "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level)."
+  },
+  "server.js::dashboardTaskDoneCache": {
+    "disposition": "registered",
+    "holder": "task-done:dashboard"
+  },
+  "server.js::emailTransport": {
+    "disposition": "not-state",
+    "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level)."
+  },
+  "server.js::homeRowStates": {
+    "disposition": "not-state",
+    "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level)."
+  },
+  "server.js::installationTokenFor": {
+    "disposition": "delegated",
+    "to": "lib/connection-credential.js::tokens"
+  },
+  "server.js::keyState": {
+    "disposition": "not-state",
+    "why": "The registry itself (lib/key-state.js)."
+  },
+  "server.js::kpiPage": {
+    "disposition": "global-only",
+    "exception": "kpi-cache"
+  },
+  "server.js::listAuthorizedAccountConnectionsFor": {
+    "disposition": "not-state",
+    "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level)."
+  },
+  "server.js::observationMaterializer": {
+    "disposition": "delegated",
+    "to": "lib/observation-sessions-materializer.js::inflight"
+  },
+  "server.js::onTicketWrite": {
+    "disposition": "not-state",
+    "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level)."
+  },
+  "server.js::prStateStore": {
+    "disposition": "delegated",
+    "to": "lib/pr-state-store.js::prStateSharedCache"
+  },
+  "server.js::precomputeRunParagraph": {
+    "disposition": "not-state",
+    "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level)."
+  },
+  "server.js::precomputeSessionSummary": {
+    "disposition": "not-state",
+    "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level)."
+  },
+  "server.js::recordPipelineMerge": {
+    "disposition": "not-state",
+    "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level)."
+  },
+  "server.js::refreshConnectionCredential": {
+    "disposition": "delegated",
+    "to": "lib/connection-credential.js::inflight"
+  },
+  "server.js::refreshOnResolveGate": {
+    "disposition": "registered",
+    "holder": "refresh-on-resolve:cooldown"
+  },
+  "server.js::refreshTaskFacts": {
+    "disposition": "registered",
+    "holder": "task-facts"
+  },
+  "server.js::rejectedCredentialRegistry": {
+    "disposition": "delegated",
+    "to": "lib/rejected-credentials.js::scopeAttempts"
+  },
+  "server.js::resolveWorkspaceUrlKey": {
+    "disposition": "not-state",
+    "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level)."
+  },
+  "server.js::secondaryRemint": {
+    "disposition": "not-state",
+    "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level)."
+  },
+  "server.js::sessionsFeedCache": {
+    "disposition": "registered",
+    "holder": "sessions-feed"
+  },
+  "server.js::taskFacts": {
+    "disposition": "registered",
+    "holder": "task-facts"
+  },
+  "server.js::taskPageLoader": {
+    "disposition": "not-state",
+    "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level)."
+  },
+  "server.js::urlKeyHolderFinder": {
+    "disposition": "not-state",
+    "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level)."
+  },
+  "server.js::workspaceIssuesMemo": {
+    "disposition": "registered",
+    "holder": "workspace-issues-memo"
+  },
+  "server.js::workspaceOwnerCheck": {
+    "disposition": "not-state",
+    "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level)."
+  },
+  "server.js::workspaceRemovalRevoker": {
+    "disposition": "not-state",
+    "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level)."
+  },
+  "server.js::workspaceTokenCache": {
+    "disposition": "registered",
+    "holder": "workspace-token"
+  }
+}

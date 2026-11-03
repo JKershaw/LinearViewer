@@ -161,6 +161,11 @@ import { renderSwipePage, orderIssuesForSwipe } from './lib/render-swipe.js'
 import { rowDataByNodeKey } from './lib/task-board-view.js'
 import { createHomeRowStates, gatherTaskStates } from './lib/home-row-states.js'
 import { createTaskFactsHolder, createTaskFactsRefresh } from './lib/task-facts-holder.js'
+import { createWorkspaceIssuesMemo } from './lib/workspace-issues-memo.js'
+import { createKeyState } from './lib/key-state.js'
+import { registerKeyStateHolders } from './lib/key-state-holders.js'
+import { createTaskDoneCache } from './lib/task-done-cache.js'
+import { dispatchGuardTaskDoneCache } from './lib/dispatch-factory.js'
 import { gatherHomeInputs, gatherHomePage, homeRowDataFor } from './lib/home-pipeline.js'
 import { renderDashboardAfterRefresh as renderRefreshedDashboard } from './lib/dashboard-refresh.js'
 import { homeRowsFor, HOME_ROW_KINDS, HOME_SEARCH_MAX_LENGTH } from './lib/home-rows.js'
@@ -1201,7 +1206,7 @@ if (process.env.NODE_ENV === 'test') {
   // additive, test-only seam so a spec can inject a rejecting aggregate() on
   // the exact two collections /kpis' loaders read, without touching /kpis'
   // own route logic. See routes/test.js's kpis-fail-next-aggregate handler.
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, modelRoutingStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, resetTaskFacts: (args) => resetTaskFactsForTest(args), observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache: (mode) => kpiPage.reset(mode), workspaceHaltStore, emailTransport: emailTransport?.kind === 'capture' ? emailTransport : null, commentDedupe, decisionStampDedupe, taskModeStore, taskShareCollection: db.collection('task_share_links'), kpiDailyRollupCollection }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, modelRoutingStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, resetKeyState: (ctx) => keyState.resetKey(ctx), observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache: (mode) => kpiPage.reset(mode), workspaceHaltStore, emailTransport: emailTransport?.kind === 'capture' ? emailTransport : null, commentDedupe, decisionStampDedupe, taskModeStore, taskShareCollection: db.collection('task_share_links'), kpiDailyRollupCollection }))
 }
 
 // =============================================================================
@@ -3102,7 +3107,7 @@ async function getWorkspaceAccessToken(urlKey, session = null) {
 // cadence so warm drill-ins reuse, but short enough to stay fresh. Keyed by
 // workspace id (urlKey fallback). Bypassed in test mode (deterministic mock).
 const WORKSPACE_ISSUES_MEMO_TTL_MS = 30 * 1000;
-const _workspaceIssuesMemo = new Map(); // key → { issues, cachedAt }
+const workspaceIssuesMemo = createWorkspaceIssuesMemo({ ttlMs: WORKSPACE_ISSUES_MEMO_TTL_MS }); // LIN-4168: a per-key holder, see lib/workspace-issues-memo.js
 
 // Load a workspace's canonical issue set (the dashboard session-context endpoint,
 // LIN-593). Mirrors the Context API's data path: test-token workspaces read the
@@ -3112,16 +3117,11 @@ async function fetchWorkspaceIssues(workspace) {
   const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
   if (isTestMode) return testMockData.issues;
 
-  const memoKey = workspace.id || workspace.urlKey;
-  if (memoKey) {
-    const hit = _workspaceIssuesMemo.get(memoKey);
-    if (hit && Date.now() - hit.cachedAt < WORKSPACE_ISSUES_MEMO_TTL_MS) {
-      return hit.issues;
-    }
-  }
+  const memoised = workspaceIssuesMemo.get(workspace);
+  if (memoised) return memoised;
   const { issues } = await getProviderForWorkspace(workspace).fetchProjects(getWorkspaceCallScope(workspace));
   const result = issues || [];
-  if (memoKey) _workspaceIssuesMemo.set(memoKey, { issues: result, cachedAt: Date.now() });
+  workspaceIssuesMemo.set(workspace, result);
   return result;
 }
 
@@ -3132,7 +3132,7 @@ async function fetchWorkspaceIssues(workspace) {
 // via /test/clear-workspace-issues-memo (routes/test.js) — the same
 // explicit-reset pattern the other `/test/clear-*` routes already use.
 function clearWorkspaceIssuesMemo() {
-  _workspaceIssuesMemo.clear();
+  workspaceIssuesMemo.clearAll();
 }
 
 // LIN-962: the off-session title-resolution glue (session scan → latest-expiring-
@@ -3233,7 +3233,10 @@ app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyToke
 // Mount dashboard routes (experimental combined realtime autopilot dashboard — LIN-509).
 // Merges Mongo-only Loop reads across session.workspaces; Linear is hydrated lazily
 // (drill-down only), never fanned out per poll.
-app.use(createDashboardRoutes({ installationTokenFor, workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, briefCacheStore, recapCacheStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, llmCallLogStore, runProposalsStore, proxyTokenStore, readRunEvidence, prStateStore, workspaceOwnerCheck }))
+// LIN-4168: the dashboard’s touched-task done cache, built here (not by the router’s default) so the key-state registry
+// can reach the same instance the feed reads.
+const dashboardTaskDoneCache = createTaskDoneCache();
+app.use(createDashboardRoutes({ installationTokenFor, workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, taskDoneCache: dashboardTaskDoneCache, runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, briefCacheStore, recapCacheStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, llmCallLogStore, runProposalsStore, proxyTokenStore, readRunEvidence, prStateStore, workspaceOwnerCheck }))
 
 // Mount task-chat routes (experimental "talk to a task" conversation).
 // LIN-2966: taskDecisionsStore + shelvedRulingsStore thread the
@@ -3264,17 +3267,19 @@ app.use(createTaskCreateRoutes({ workspaceFromUrl, getOpenRouterSource, getDeplo
 const taskFacts = createTaskFactsHolder()
 const refreshTaskFacts = createTaskFactsRefresh({ holder: taskFacts, fetchAndPrepareProjects })
 const writeTaskFacts = (urlKey, fetched, opts) => taskFacts.write(urlKey, fetched, opts)
-// LIN-4110: the test harness's reseed (/test/set-local-session) starts the key's held set over from the new seed: the entry
-// a previous spec left (and its refresh floor) would otherwise answer `task-missing` for every task the new seed adds.
-async function resetTaskFactsForTest({ urlKey, workspace, accountId = null }) {
-  const pending = refreshTaskFacts.inFlightFor(urlKey)
-  if (pending) await pending.catch(() => {})
-  taskFacts.invalidate(urlKey)
-  refreshTaskFacts.forget(urlKey)
-  const started = refreshTaskFacts({ urlKey, workspace, accountId, urgent: true })
-  if (started.promise) await started.promise
-  refreshTaskFacts.forget(urlKey)
-}
+// LIN-4168: the one per-key reset. Every seed seam calls it once per workspace it puts in the session. The holders it resets
+// (task facts among them, refilled from the new seed for LIN-4110) are registered in lib/key-state-holders.js.
+const keyState = createKeyState();
+registerKeyStateHolders(keyState, {
+  taskFacts: { holder: taskFacts, refresh: refreshTaskFacts },
+  workspaceIssuesMemo,
+  sessionsFeedCache,
+  taskDoneCaches: { dashboard: dashboardTaskDoneCache, dispatchGuard: dispatchGuardTaskDoneCache },
+  workspaceTokenCache,
+  rejectedCredentialRegistry,
+  refreshOnResolveGate,
+  installationTokenFor,
+});
 const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore, agentStatusStore, briefCacheStore, recapCacheStore, readRunEvidence, prStateStore, installationTokenFor, closeOutEventsStore, enrichLoop, deriveSessionWaiting, deriveSessionDecisions, taskDecisionsStore, shelvedRulingsStore, taskFacts: { read: taskFacts.read }, gatherTaskStates })
 // LIN-3833 / LIN-4016: Home's row states, assembled once for all three Home routes (lib/home-row-states.js): one lean
 // loop read for the workspace, grouped by task. A viewer who sees no sessions (copy-first, no `runControls`) reads
