@@ -11,6 +11,10 @@
  *   task-page-waiting-owner-{light,dark}-{1280,390}.png a worker waiting on a ruling: the card above the run block
  *   opened-box-owner-{light,dark}-{1280,390}.png        Home's opened task: the same one line, All runs, the run box
  *   change-drawer-owner-{light,dark}-{1280,390}.png     the Change drawer: heading, default card, house links
+ *   {task-page,opened-box}-{running,failed,never}-owner-{light,dark}-{1280,390}.png
+ *                                                      a running, a failed and a never-run task (review item 4); the
+ *                                                      failed one reads "Last run: <Stage> failed <when>: <message> · …",
+ *                                                      the never-run one has no Home line
  *   task-page-newuser-{light,dark}-{1280,390}.png       a new user with no runner and no run: the one line, the copy-first run
  *   opened-box-newuser-{light,dark}-1280.png            a new user's Home: the copy-first view, no state line
  *
@@ -25,6 +29,9 @@ const DIR = 'docs/reviews/_evidence-2026-11-03-lin4106';
 const WIDTHS = { 1280: { width: 1280, height: 900 }, 390: { width: 390, height: 844 } };
 const DONE = 'LOCAL-S4A';
 const WAITING = 'LOCAL-S4B';
+const RUNNING = 'LOCAL-S4C';
+const FAILED = 'LOCAL-S4D';
+const NEVER = 'LOCAL-S4E';
 
 test.beforeEach(async ({ page, localWorkerUrlKey }) => {
   await page.request.get('/test/clear-comment-dedupe');
@@ -34,7 +41,7 @@ test.beforeEach(async ({ page, localWorkerUrlKey }) => {
   }
 });
 
-async function seed(page, urlKey, { runnerKey }) {
+async function seed(page, urlKey, { runnerKey, only = null }) {
   const id = (raw) => localSeedId(urlKey, raw);
   const resp = await page.request.post('/test/set-local-session', {
     data: {
@@ -45,7 +52,10 @@ async function seed(page, urlKey, { runnerKey }) {
       issues: [
         { id: id('s4-done'), identifier: DONE, title: 'A task with a plan done', description: 'Seeded task', projectId: id('s4-proj'), sortOrder: 1, state: { name: 'In Progress', type: 'started' }, url: `/workspace/${urlKey}/issue/${id('s4-done')}` },
         { id: id('s4-wait'), identifier: WAITING, title: 'A task waiting on a ruling', description: 'Seeded task', projectId: id('s4-proj'), sortOrder: 2, state: { name: 'In Progress', type: 'started' }, url: `/workspace/${urlKey}/issue/${id('s4-wait')}` },
-      ],
+        { id: id('s4-run'), identifier: RUNNING, title: 'A task with a step running', description: 'Seeded task', projectId: id('s4-proj'), sortOrder: 3, state: { name: 'In Progress', type: 'started' }, url: `/workspace/${urlKey}/issue/${id('s4-run')}` },
+        { id: id('s4-fail'), identifier: FAILED, title: 'A task whose last step failed', description: 'Seeded task', projectId: id('s4-proj'), sortOrder: 4, state: { name: 'In Progress', type: 'started' }, url: `/workspace/${urlKey}/issue/${id('s4-fail')}` },
+        { id: id('s4-never'), identifier: NEVER, title: 'A task nothing has run on', description: 'Seeded task', projectId: id('s4-proj'), sortOrder: 5, state: { name: 'In Progress', type: 'started' }, url: `/workspace/${urlKey}/issue/${id('s4-never')}` },
+      ].filter((issue) => !only || issue.identifier === only),
     },
   });
   expect(resp.ok(), await resp.text()).toBeTruthy();
@@ -161,6 +171,52 @@ for (const theme of ['light', 'dark']) {
       await expect(page.locator('[data-testid="task-page-status-pill"]')).toHaveCount(1);
       await snap(page, `task-page-newuser-${theme}-${viewport}`);
     });
+  }
+}
+
+// Review item 4: a running, a failed and a never-run task, on the task page and in Home's opened box (owner). Each case
+// seeds only its own task, so it is the one Home opens.
+const STATE_CASES = [
+  { name: 'running', identifier: RUNNING, feedback: [], pill: 'running' },
+  { name: 'failed', identifier: FAILED, feedback: ['[failed] the build broke'], pill: 'failed' },
+  { name: 'never', identifier: NEVER, feedback: null, pill: null },
+];
+
+for (const c of STATE_CASES) {
+  for (const theme of ['light', 'dark']) {
+    for (const viewport of [1280, 390]) {
+      const setup = async (page, urlKey) => {
+        await frame(page, urlKey, { viewport, theme });
+        await seed(page, urlKey, { runnerKey: true, only: c.identifier });
+        await seedWorkspaceOwnership(page, urlKey, 'owner');
+        if (c.feedback) await run(page, urlKey, await auth(page, urlKey), c.identifier, 'plan', c.feedback);
+      };
+
+      test(`task page, ${c.name} task, owner, ${theme}, ${viewport}px`, async ({ page, localWorkerUrlKey: urlKey }) => {
+        await setup(page, urlKey);
+        await page.goto(`/workspace/${urlKey}/task/${c.identifier}`);
+        await page.waitForLoadState('networkidle');
+        await expect(page.locator('[data-testid="task-page-status-pill"]')).toHaveCount(1);
+        if (c.name === 'failed') {
+          await expect(page.locator('[data-testid="task-page-sentence"]')).toContainText(/Plan failed .*the build broke/);
+          await expect(page.locator('[data-testid="task-page-status-pill"]')).toContainText('failed');
+        }
+        await snap(page, `task-page-${c.name}-owner-${theme}-${viewport}`);
+      });
+
+      test(`Home's opened box, ${c.name} task, owner, ${theme}, ${viewport}px`, async ({ page, localWorkerUrlKey: urlKey }) => {
+        await setup(page, urlKey);
+        await page.goto(`/workspace/${urlKey}/`);
+        await page.waitForLoadState('networkidle');
+        const box = page.locator('.opened-task').first();
+        if (!(await box.isVisible())) await page.locator('[data-top-task="1"]').click();
+        await expect(box).toBeVisible();
+        // A never-run task has no state line on Home; a running task has none either (the running box says it).
+        if (c.name === 'never') await expect(box.locator('[data-testid="home-task-status"]')).toHaveCount(0);
+        if (c.name === 'failed') await expect(box.locator('[data-testid="home-task-status-pill"]')).toContainText('failed');
+        await snap(page, `opened-box-${c.name}-owner-${theme}-${viewport}`);
+      });
+    }
   }
 }
 

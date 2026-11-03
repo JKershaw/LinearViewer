@@ -818,4 +818,14 @@ describe('LIN-4106 — Home\'s opened box says its last run once, in the state l
     assert.equal(/Last: /.test(c.innerHTML), false, 'the raw state words are not repeated under the box');
     assert.match(c.innerHTML, /data-testid="opened-task-all"/);
   });
+
+  // Review item 2: with "Last: … ·" gone, a bare "All 13" read as a fragment. The button says what it opens, in words.
+  test('the way to the runs is plain words: "The only run" for one, "All N runs" for several', async () => {
+    const label = (html) => /data-testid="opened-task-all">([^<]*)</.exec(html)[1];
+    const one = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT } });
+    assert.equal(label(one.c.innerHTML), 'The only run');
+    assert.match(one.c.innerHTML, /data-action="all-sessions" data-testid="opened-task-all"/, 'the hooks stay');
+    const many = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: { ...PLAN_NEXT, count: 13 } } });
+    assert.equal(label(many.c.innerHTML), 'All 13 runs');
+  });
 });

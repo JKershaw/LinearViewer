@@ -984,7 +984,7 @@
       if (!opened) return `<div class="opened-task-state" data-state-slot data-testid="opened-task-state"></div>`;
       // LIN-4010 review: Home's line is '' while a task runs (the running box says it), so it is not replaced by the
       // task page's sentence.
-      // LIN-4024: a parent whose subtask needs you says that, once. Its own idle line ("No session running.") is the
+      // LIN-4024: a parent whose subtask needs you says that, once. Its own idle line (the last-run sentence) is the
       // parent's own loops only, so beside "A subtask needs you" it would say the task two ways, and the row says needs you.
       const subtaskLine = renderSubtaskNeedsYou();
       // LIN-4016 / LIN-4071: the own line is `/state`'s (the gather's pill and sentence, the one the row shows). The server
@@ -1016,8 +1016,10 @@
       const last = sessions.last;
       if (!(sessions.count && last && !sessions.running)) return '';
       // LIN-4106: the last run is said once, in the state line above the box (the server's sentence). This line keeps only
-      // the way to all of the runs, so it does not repeat the raw state words.
-      return `<div class="opened-task-last" data-testid="opened-task-last"><button class="btn opened-task-all" data-action="all-sessions" data-testid="opened-task-all">All ${sessions.count}</button></div>`;
+      // the way to all of the runs, so it does not repeat the raw state words. Plain words, not a bare "All 13" (a count alone
+      // only read after the old last-run clause).
+      const label = sessions.count === 1 ? 'The only run' : `All ${sessions.count} runs`;
+      return `<div class="opened-task-last" data-testid="opened-task-last"><button class="btn opened-task-all" data-action="all-sessions" data-testid="opened-task-all">${label}</button></div>`;
     }
 
     // LIN-4010: the copy-first state line: the tracker's word, then either nothing (a prompt was copied; "You copied …"

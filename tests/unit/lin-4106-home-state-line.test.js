@@ -63,6 +63,21 @@ describe('LIN-4106 — Home\'s idle line is the server\'s sentence, with no "No 
     assert.equal(renderHomeStatus(idleOpened({ status: 'running' }), { now: NOW, taskState: { state: 'running', attention: null } }), '');
   });
 
+  // Review item 1: removing the task page's word-only branch brought "backlog · No sessions yet." back on Home, which
+  // LIN-4024 (items 9 and 20) had removed. Home's backlog task with no runs keeps the pill and says no sentence.
+  test('a backlog task with no sessions keeps its pill and says no "No sessions yet." on Home', () => {
+    const model = { status: 'backlog', sentence: 'No sessions yet.', sentenceAt: null, sessions: [], waitingFor: null };
+    const html = renderHomeStatus(model, { now: NOW, taskState: { state: 'backlog', attention: null } });
+    assert.match(html, /data-testid="home-task-status-pill"[^>]*>.*backlog/s, 'the backlog pill stays');
+    assert.equal(html.includes('No sessions yet'), false, 'no sentence beside it');
+    assert.equal(sentenceOf(html, 'home-task-sentence'), '');
+  });
+
+  test('a backlog task that has runs, and a finished task, keep their sentences on Home', () => {
+    const withRuns = { status: 'backlog', sentence: SENTENCE, sentenceAt: AT, sessions: [{ kind: 'plan', state: 'done' }], waitingFor: null };
+    assert.equal(sentenceOf(renderHomeStatus(withRuns, { now: NOW, taskState: { state: 'backlog', attention: null } }), 'home-task-sentence'), SENTENCE);
+  });
+
   test('a parent whose subtask needs attention still withholds its own line: the subtask line says it once', () => {
     const html = renderHomeStatus(idleOpened(), { now: NOW, taskState: { state: 'next', attention: { identifier: 'LIN-2', words: 'needs you' } } });
     assert.equal(html, '');
