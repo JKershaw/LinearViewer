@@ -508,7 +508,7 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
     PromptSection.init(c, { ...HOME, dispatchEnabled: false, issue: { ...HOME.issue, stateType: 'backlog' }, row: serverRow({ stateType: 'backlog' }) });
     await flush(); await flush();
     assert.match(c.innerHTML, /class="btn btn--primary opened-task-write" data-testid="opened-task-write"/);
-    assert.match(c.innerHTML, /data-testid="opened-task-step">the first step for a task in Backlog<\/div>/);
+    assert.match(c.innerHTML, /data-testid="opened-task-step">Write the prompt for this task\. The prompt says which step it is for\.<\/div>/);
     assert.doesNotMatch(c.innerHTML, /opened-task-step-name/, 'no stage name is drawn before the prompt is written');
   });
 

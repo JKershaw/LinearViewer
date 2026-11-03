@@ -1,0 +1,42 @@
+{
+  "body": {
+    "selector": "body",
+    "fontSize": "16px",
+    "fontFamily": "Inter",
+    "text": "harbour.cat\n      \n        \n      workspace:\n      Local Wor"
+  },
+  "row title": {
+    "selector": "[data-testid=\"issue-line\"] .issue-title, [data-testid=\"issue-line\"]",
+    "fontSize": "16px",
+    "fontFamily": "Inter",
+    "text": "◐Charter: Home and the task page read in plain wordsUI finis"
+  },
+  "opened task box": {
+    "selector": ".opened-task",
+    "fontSize": "16px",
+    "fontFamily": "Inter",
+    "text": "LOCAL-1 · UI finishIn progress · No prompt copied from here "
+  },
+  "opened task state line": {
+    "selector": "[data-testid=\"opened-task-sentence\"], [data-testid=\"opened-task-state\"]",
+    "fontSize": "16px",
+    "fontFamily": "Inter",
+    "text": "In progress · No prompt copied from here yet."
+  },
+  "opened task fold count (N sessions)": {
+    "absent": true,
+    "selector": ".opened-task-fold-count"
+  },
+  "run control filled button": {
+    "absent": true,
+    "selector": "[data-testid=\"opened-task-go\"]"
+  },
+  "generated line (mono ok?)": {
+    "absent": true,
+    "selector": ".opened-task-generated"
+  },
+  "Count line part": {
+    "absent": true,
+    "selector": ".in-progress-count__part"
+  }
+}

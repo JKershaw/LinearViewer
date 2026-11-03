@@ -72,7 +72,7 @@
 .token-modal-close {
   background: none;
   border: none;
-  font-size: 1.3em;
+  font-size: var(--font-size-lg);
   color: var(--muted);
   cursor: pointer;
   padding: 0 var(--space-1);
@@ -84,7 +84,7 @@
 }
 
 .token-modal p {
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
   color: var(--muted);
   margin: 0 0 var(--space-2) 0;
 }
@@ -114,7 +114,7 @@
   border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
   font-family: var(--font-content);
-  font-size: 0.8em;
+  font-size: var(--font-size-sm);
   color: var(--muted);
   cursor: pointer;
 }
@@ -166,7 +166,7 @@
   border-radius: 4px;
   box-shadow: var(--shadow-lg);
   font-family: var(--font-content);
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
   color: var(--text);
   cursor: pointer;
   opacity: 0;
@@ -227,7 +227,7 @@ select.task-edit-input {
 .task-create-cancel,
 .task-edit-cancel {
   font-family: var(--font-content);
-  font-size: 0.9rem;
+  font-size: var(--font-size-base);
   color: var(--muted);
   text-decoration: none;
 }
@@ -236,7 +236,7 @@ select.task-edit-input {
 .task-create-label,
 .task-edit-label {
   font-family: var(--font-content);
-  font-size: 0.85rem;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   color: var(--muted);
   letter-spacing: 0.02em;
@@ -247,7 +247,7 @@ select.task-edit-input {
 .task-edit-submit {
   padding: var(--space-2) var(--space-4);
   font-family: var(--font-content);
-  font-size: 0.95rem;
+  font-size: var(--font-size-base);
   font-weight: 600;
   color: var(--brand);
   background: color-mix(in srgb, var(--brand) 12%, transparent);

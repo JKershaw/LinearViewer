@@ -94,8 +94,8 @@ function homeOpts(over = {}) {
 
 describe('LIN-3833 — the copy-first step comes from the task\'s status alone', () => {
   for (const [stateType, label, text] of [
-    ['unstarted', 'plan', 'the first step for a task in Todo'],
-    ['backlog', 'scoping', 'the first step for a task in Backlog'],
+    ['unstarted', 'plan', 'Write the prompt for this task. The prompt says which step it is for.'],
+    ['backlog', 'scoping', 'Write the prompt for this task. The prompt says which step it is for.'],
     ['started', '__ai__', 'Generate the next prompt for this task'],
   ]) {
     test(`${stateType} → "Write the prompt" for ${label}`, async () => {

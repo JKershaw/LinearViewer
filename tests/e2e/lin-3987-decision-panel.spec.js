@@ -112,23 +112,48 @@ test.describe('Home run control: the panel on a phone (LIN-3987)', () => {
 
   test.afterEach(async ({ page, localWorkerUrlKey }) => resetRuns(page, localWorkerUrlKey));
 
-  test('with Claude Code in force and priced runs that report no model, Use for this run is inside the first screen', async ({ page, seedLocal, localWorkerUrlKey }) => {
+  // LIN-4107 (owner ruling lin4107-change-sheet-first-screen, option a): LIN-3987's first-screen fit is dropped. It held only
+  // at the 13px phone body that LIN-4107 removes (at 16px, Use ends near 1107px on an 844px screen). On a phone the Change
+  // panel is a fixed sheet with its own scroll (position fixed, overflow auto), so the page scroll cannot reach Use; the
+  // sheet's own scroll is the one route. What this pin keeps: scrolling the sheet brings Use fully into view, a tap at its
+  // centre lands on Use, and nothing else moves (the page behind and every container around the sheet stay where they were).
+  test('with Claude Code in force and priced runs that report no model, Use for this run is reached by the sheet\'s own scroll', async ({ page, seedLocal, localWorkerUrlKey }) => {
     const component = await openChangePanel(page, seedLocal, localWorkerUrlKey);
     await expect(component.locator(RC.numbers)).toContainText('priced');
     const use = component.locator(RC.use);
     await expect.poll(() => use.boundingBox()).not.toBeNull();
+    const pageScrollBefore = await page.evaluate(() => window.scrollY);
+    // A script can set scrollTop on a sheet a person cannot scroll (overflow hidden), so the sheet must be one a person can.
+    const overflowY = await component.locator(RC.changePanel).evaluate((panel) => getComputedStyle(panel).overflowY);
+    expect(['auto', 'scroll'], 'the sheet scrolls for a person (overflow-y auto or scroll)').toContain(overflowY);
+    // Scroll the sheet only (not scrollIntoView, which would also move the page or any container around the sheet) so the
+    // bottom of Use sits just inside the screen.
+    await component.locator(RC.changePanel).evaluate((panel, useSelector) => {
+      const use = panel.querySelector(useSelector);
+      const needed = use.getBoundingClientRect().bottom - window.innerHeight + 8;
+      if (needed > 0) panel.scrollTop += needed;
+    }, RC.use);
     const box = await use.boundingBox();
-    expect(box.y + box.height, 'the bottom of Use for this run').toBeLessThanOrEqual(PHONE.height);
-    // The box is measured against the viewport, so a sheet scrolled to bring Use up would pass that alone: the sheet, and any
-    // container inside the page that scrolls it, must sit at the top (the page's own scroll is the document's, not the sheet's).
+    expect(box.y, 'the top of Use for this run, after the sheet scroll').toBeGreaterThanOrEqual(0);
+    expect(box.y + box.height, 'the bottom of Use for this run, after the sheet scroll').toBeLessThanOrEqual(PHONE.height);
+    // In view by its box is not enough: a sheet that clips its content (overflow hidden, a fixed height) or an overlay would
+    // leave Use's box in place but cover it. The point at Use's centre must be Use itself, or inside it.
+    const hit = await use.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return Boolean(at && (at === el || el.contains(at)));
+    });
+    expect(hit, 'a tap at the centre of Use for this run lands on Use').toBe(true);
+    // Only the sheet scrolled: the page behind it did not move, and no container around the sheet scrolled.
+    expect(await page.evaluate(() => window.scrollY), 'the page behind the sheet did not move').toBe(pageScrollBefore);
     const scrolled = await component.locator(RC.changePanel).evaluate((panel) => {
       const tops = [];
-      for (let el = panel; el && el !== document.body && el !== document.documentElement; el = el.parentElement) {
+      for (let el = panel.parentElement; el && el !== document.body && el !== document.documentElement; el = el.parentElement) {
         tops.push({ el: el.getAttribute('data-testid') || el.className || el.tagName, scrollTop: el.scrollTop });
       }
       return tops.filter((t) => t.scrollTop !== 0);
     });
-    expect(scrolled, 'the sheet, and the containers around it, are not scrolled').toEqual([]);
+    expect(scrolled, 'the containers around the sheet are not scrolled').toEqual([]);
   });
 });
 

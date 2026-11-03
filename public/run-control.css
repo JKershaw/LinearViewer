@@ -53,7 +53,7 @@
 
 .swipe-prompt-text {
   padding: var(--space-2) 0 0;
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   line-height: 1.6;
   max-height: 400px;
   overflow-y: auto;
@@ -64,7 +64,7 @@
 .swipe-prompt-warning {
   margin-top: var(--space-2);
   padding: 0.4rem 0.6rem;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   line-height: 1.4;
   color: #8a5a00;
   background: #fff6e0;
@@ -121,7 +121,7 @@
 .opened-task-why {
   margin: 0.15rem 0 var(--space-2);
   font-family: var(--font-content);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   line-height: 1.4;
   color: var(--muted);
 }
@@ -148,7 +148,7 @@
      on the blue fill in BOTH themes without a new colour value. */
   color: var(--bg);
   font-family: var(--font-content);
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   cursor: pointer;
   transition: filter 0.15s, background 0.15s, border-color 0.15s;
@@ -167,7 +167,7 @@
 
 .opened-task-primary-reason {
   font-family: var(--font-content);
-  font-size: 0.8125rem;
+  font-size: var(--font-size-sm);
   line-height: 1.4;
   color: var(--amber-dim);
 }
@@ -195,7 +195,7 @@
   background: var(--raised);
   color: var(--text);
   font-family: var(--font-content);
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   cursor: pointer;
 }
 
@@ -223,7 +223,7 @@
 .opened-task-started .task-sentence {
   margin: 0;
   font-family: var(--font-content);
-  font-size: 0.95rem;
+  font-size: var(--font-size-base);
   line-height: 1.4;
   color: var(--text);
 }
@@ -231,7 +231,7 @@
 .opened-task-started-link,
 .opened-task-go-notice-link {
   font-family: var(--font-content);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   color: var(--brand);
   text-decoration: none;
 }
@@ -239,7 +239,7 @@
 .opened-task-go-notice {
   flex-basis: 100%;
   font-family: var(--font-content);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   line-height: 1.4;
   color: var(--amber-dim);
 }
@@ -273,7 +273,7 @@
   background: var(--raised);
   color: var(--text);
   font-family: var(--font-content);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
@@ -329,7 +329,7 @@
 
 /* "generated 2h ago · regenerate" — an age fact (mono) plus an action. 12px, the floor (LIN-4024; was 10px). */
 .opened-task-generated {
-  font-family: var(--font-structural);
+  font-family: var(--font-content);
   font-size: 12px;
   color: var(--muted);
   white-space: nowrap;
@@ -364,7 +364,7 @@
   border-radius: var(--radius-sm);
   background: var(--card);
   font-family: var(--font-content);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   line-height: 1.5;
   color: var(--muted);
   max-height: 300px;
@@ -387,12 +387,12 @@
 /* LIN-3975: a chat proposal staged for the run control. A row is one line; Apply is the shared primary button,
    Decline the quiet one. A settled row keeps one quiet word. */
 .opened-task-proposals { margin-top: var(--space-2); }
-.opened-task-proposals-note { margin: 0 0 var(--space-1); font-size: 0.8rem; color: var(--muted); }
+.opened-task-proposals-note { margin: 0 0 var(--space-1); font-size: var(--font-size-sm); color: var(--muted); }
 .opened-task-proposal-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); }
 .opened-task-proposal { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
-.opened-task-proposal-why { font-size: 0.9rem; min-width: 0; overflow-wrap: anywhere; }
+.opened-task-proposal-why { font-size: var(--font-size-base); min-width: 0; overflow-wrap: anywhere; }
 .opened-task-proposal-actions { display: inline-flex; gap: var(--space-2); }
-.opened-task-proposal-state { font-size: 0.8rem; color: var(--muted); }
+.opened-task-proposal-state { font-size: var(--font-size-sm); color: var(--muted); }
 
 /* LIN-4104 D3: the Next step confirm: the stage, why and the task it is for, then Run and Another step. */
 .opened-task-next-confirm { display: grid; gap: 8px; }

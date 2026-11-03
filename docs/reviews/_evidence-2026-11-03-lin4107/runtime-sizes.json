@@ -1,0 +1,46 @@
+{
+  "home-390": {
+    "sizes": {
+      "16px": 35,
+      "13.6px": 17,
+      "19.2px": 1
+    },
+    "families": {
+      "Inter": 38,
+      "\"JetBrains Mono\"": 15
+    }
+  },
+  "task-390": {
+    "sizes": {
+      "13.6px": 40,
+      "16px": 33,
+      "20px": 4
+    },
+    "families": {
+      "Inter": 57,
+      "\"JetBrains Mono\"": 20
+    }
+  },
+  "home-1280": {
+    "sizes": {
+      "16px": 35,
+      "13.6px": 17,
+      "24px": 1
+    },
+    "families": {
+      "Inter": 38,
+      "\"JetBrains Mono\"": 15
+    }
+  },
+  "task-1280": {
+    "sizes": {
+      "13.6px": 40,
+      "16px": 33,
+      "20px": 4
+    },
+    "families": {
+      "Inter": 57,
+      "\"JetBrains Mono\"": 20
+    }
+  }
+}
