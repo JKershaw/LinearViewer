@@ -531,3 +531,26 @@ Looking back from where you stood while doing this work, answer in that comment:
 
 Answer from your own experience of the work, in your own way. Under 450 words.
 ```
+
+## 3 Nov, 21:18 UTC: round 3 forecasts, acted on, autopilots started
+
+Both open-0 runs (kept in `round-3/forecasts.md`) chose a **preparation** for "do first", as in round 2.
+
+- **LIN-4176 (rebuild 1):** "'One read' has to answer different questions over different populations": per issue, per job over 30 days, the newest N rows with no time bound, by lineage start day, by `[done]` lineage, per loop group. "That is the real design work." It also named:
+  - three input shapes (formatted rows, the KPI Mongo projection, loops);
+  - the call log's second attribution rule;
+  - `summarize` still folding null to 0;
+  - before/after proof that drifts to live data without captured fixtures (tidy 3's lesson);
+  - the tidy-5 baseline (114 of 198 issues with no lineage);
+  - LIN-4148 surviving any shared read that keeps a row cap;
+  - about 15 readers, "unlikely to review in one sitting as one PR".
+
+  *Do first:* a reader table plus each surface's output captured on one fixed set of rows as the "before". Then settle "in period", LIN-4148 and the `/kpis` label up front.
+- **LIN-4127 (usage relay default on):** it *ran the unit suite* with and without the change (46 host-caused failures either way; +1, the test the ticket rewrites). It named:
+  - the parse idiom flipping `''` and garbage to *on*, against a test that says *off*;
+  - OpenCode gated by the same flag;
+  - a **witness ordering trap**: the host's `.env` already sets the stopgap `=1`, so the witness means removing a line that keeps usage flowing. Merge, pull, *then* remove it, or usage goes dark again.
+
+  *Do first:* settle the polarity in a test, and plan the witness as a procedure.
+
+**What we wrote onto the tickets:** each one's preparation, as advised. One judgement of mine: for LIN-4176, the `/kpis` label question was closed up front ("`/kpis` keeps what it counts today", already out of scope in `costs.md`), rather than left as a ruling that would hold the ticket overnight. Kicked off 21:18.
