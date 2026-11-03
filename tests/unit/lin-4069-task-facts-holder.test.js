@@ -189,6 +189,24 @@ describe('the refresh trigger (LIN-4068 D4, N1, N4)', () => {
     assert.equal(refresh({ urlKey: 'acme', workspace: {}, accountId: null }).started, true);
   });
 
+  // LIN-4110: the test harness's reseed forgets one key's floor (and only that key's), so a reseeded workspace refreshes
+  // at once instead of answering task-missing until a previous spec's attempt is a minute old.
+  test('forget(urlKey) clears that key\'s attempt floor only; inFlightFor names the running refresh', async () => {
+    const c = clock();
+    const holder = createTaskFactsHolder({ now: c.now });
+    const refresh = createTaskFactsRefresh({ holder, fetchAndPrepareProjects: fetchDouble(), now: c.now, onError: () => {} });
+    const first = refresh({ urlKey: 'acme', workspace: {}, accountId: null });
+    assert.equal(refresh.inFlightFor('acme'), first.promise);
+    await first.promise;
+    assert.equal(refresh.inFlightFor('acme'), null);
+    await refresh({ urlKey: 'other', workspace: {}, accountId: null }).promise;
+    c.advance(1000);
+    assert.equal(refresh({ urlKey: 'acme', workspace: {}, accountId: null, urgent: true }).reason, 'attempt-floor');
+    refresh.forget('acme');
+    assert.equal(refresh({ urlKey: 'acme', workspace: {}, accountId: null, urgent: true }).started, true);
+    assert.equal(refresh({ urlKey: 'other', workspace: {}, accountId: null, urgent: true }).reason, 'attempt-floor');
+  });
+
   test('a poll every 10 s for an hour on an open page makes 30 provider reads (one per 2 minutes), not 360', async () => {
     const c = clock();
     const holder = createTaskFactsHolder({ now: c.now });
