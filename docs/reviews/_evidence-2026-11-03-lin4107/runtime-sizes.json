@@ -1,0 +1,58 @@
+{
+  "home-390": {
+    "sizes": {
+      "16px": 35,
+      "13.6px": 17,
+      "19.2px": 1
+    },
+    "families": {
+      "Inter": 38,
+      "\"JetBrains Mono\"": 15
+    }
+  },
+  "task-390": {
+    "sizes": {
+      "13.6px": 36,
+      "16px": 33,
+      "11.56px": 2,
+      "11.05px": 2,
+      "17px": 1,
+      "20px": 1,
+      "18.72px": 1,
+      "24px": 1
+    },
+    "families": {
+      "Inter": 57,
+      "\"JetBrains Mono\"": 18,
+      "monospace": 2
+    }
+  },
+  "home-1280": {
+    "sizes": {
+      "16px": 35,
+      "13.6px": 17,
+      "24px": 1
+    },
+    "families": {
+      "Inter": 38,
+      "\"JetBrains Mono\"": 15
+    }
+  },
+  "task-1280": {
+    "sizes": {
+      "13.6px": 36,
+      "16px": 33,
+      "11.56px": 2,
+      "11.05px": 2,
+      "17px": 1,
+      "20px": 1,
+      "18.72px": 1,
+      "24px": 1
+    },
+    "families": {
+      "Inter": 57,
+      "\"JetBrains Mono\"": 18,
+      "monospace": 2
+    }
+  }
+}
