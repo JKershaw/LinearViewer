@@ -185,3 +185,17 @@ S4 (LIN-4106) built in four stepper beats plus one corrective beat (beat 3, the 
 **Early reading.** The forecast's specific claims held on the branch: no plan-review round, two copies of the Last words, a drift risk from a new word table, and two disagreeing pill tables left behind. The builder solved the one copy it was made to face, by deletion, and created or left the others. Whether these become friction later (a send-back, a disagreement on screen, a follow-up fix) is the next thing to watch. The builder's own after-answer will be asked once S4 is Done.
 
 **Periodicals.** Drift & Coherence (LIN-4153) is Done. Its corrective beat parented three new follow-ups under LIN-3449, the coherence loop. Its title notes that the 23 October follow-ups never landed, which is the inspectors-without-standing pattern again. Seams & Tangles (LIN-4152) is in close-out (PR #2252). Both reports will feed the map once merged.
+
+## 3 Nov, about 08:45 UTC: the fresh map, and a first look at 1b (builders against the map)
+
+The periodicals merged: `seams-tangles-review-2026-11-03.md` (LIN-4152) and `drift-coherence-review-2026-11-03.md` (LIN-4153, about 27k words).
+
+**Builders' named tangles against the new census (1b, first pass):**
+- **LIN-4140, "is this task-bound?" asked four ways.** The census has it: G0118, "repeated comparison disposition == 'task-bound'", **grown**, ruled *borderline*. The builder and the census agree; the builder's account is sharper ("I added two of these four").
+- **"Running or queued" inline checks** (G0148, real, `home-view:59`, `render-task-page:245/283`, `task-state:143`). This is close to S4's forecast area: state words and pill tables in `render-task-page`.
+- **Parent and children in three to five structures** (LIN-4139 and LIN-4145, the strongest builder signal), **ruling cards in four places** (LIN-4114), and **E2E shared state** (LIN-4113): **not found** in the D&C census or Seams & Tangles on a first grep. Seams & Tangles does show a related `parentNextOf` edge growing Providers→LLM 1→4, but that is a different seam.
+- **Reading.** The census, built from repeated literals and comparisons, catches decisions that are *spelled* the same way twice. Builders find decisions that are *meant* the same way but spelled differently (five "parent" structures with different rules; four places computing the ruling count). **The two instruments see different halves.** That's a case for the Survey to read both: the map for spelled copies, and builders' after-answers for meant copies. The after-answers find things the map can't.
+
+**D&C's own top process finding repeats the essay.** Item 7, `coherence-loop-stalled`: "No 10-23 follow-up moved. LIN-3449's cycle dispatches children only after a proposal and John's go." All six 23 October follow-ups are still Backlog with no code change. The inspectors report, and nothing with standing acts.
+
+**S4** has been in close-out since 07:52, not yet Done.
