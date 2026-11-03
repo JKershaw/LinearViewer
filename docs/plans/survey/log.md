@@ -650,3 +650,14 @@ All four open-0 runs are in `round-3/forecasts.md`. Two of them ran the suite th
 - `durationMs` stays on the read, because the S1 wire must not change.
 
 The replay's change list carries both. That's the "capture each surface's output as the before" preparation earning its keep: a measured comparison settled a design choice overnight without waiting for John.
+
+## 3 Nov, 23:50 UTC: progress
+
+- **LIN-4177 (rebuild 1, piece 1) is Done**: merged and deployed as `10b2c82f` (PR #2261). Goldens are recorded for surfaces S1–S13.
+- **LIN-4178 (piece 2)** is in review (PR #2262). Its course corrections show the golden replay at work:
+  - S11's golden had been recorded on unfiltered rows when production reads only the 30-day horizon, so it was re-recorded on production's input.
+  - An incomplete opencode straddler is no longer priced.
+  - S12 keeps today's population. Moving its window would need John's ruling, so it's **noted for the morning, not raised as a ruling**.
+  - The founder lookup was timed on a real mongod at 20k, 80k and 200k lineages, with a narrowed fallback ready.
+  - Four old reducers were deleted, and an all-unpriced `$0.00` now shows as `-`.
+- **LIN-4181** posted its baseline table: A, a workspace clone (1 failure, the git-probe precondition); B, `/tmp` (4 failures plus 704 leaks); C, `TMPDIR` in `state/` (119 failures). This **confirms the Survey's table almost exactly** (1 / 4 / 119). The "46" can't be traced: no location gives it. In the system suite, the 4 failures are the same ones LIN-4180's builder saw. A PR revision is in progress (#309).
