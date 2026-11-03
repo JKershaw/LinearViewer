@@ -1,0 +1,33 @@
+{
+ "commit": "015aa4c6acbc008d7fa73c32beec1528b7f59511",
+ "guide": "docs/reviews/_evidence-2026-11-03/areas-015aa4c6.json",
+ "windowStart": "2026-09-03T23:39:41.000Z",
+ "windowEnd": "2026-11-02T23:39:41.000Z",
+ "days": 60,
+ "changes": 899,
+ "distinctUnmappedFiles": 5123,
+ "unmappedByTopDir": {
+  "docs": 2875,
+  "tests": 1287,
+  "experiments": 560,
+  "scripts": 347,
+  "prototypes": 39,
+  "(root)": 11,
+  ".github": 2,
+  "content": 1,
+  "plans": 1
+ },
+ "unmappedDocsBySubdir": {
+  "docs/reviews": 2430,
+  "docs/papers": 374,
+  "docs (top-level file)": 27,
+  "docs/architecture": 9,
+  "docs/prompt-pipeline": 8,
+  "docs/archive": 8,
+  "docs/runbooks": 7,
+  "docs/plans": 6,
+  "docs/incidents": 4,
+  "docs/community-answers": 2
+ },
+ "note": "Distinct paths across the window that no area in the guide claims. Compare distinctUnmappedFiles with cochange.mjs unmappedFiles for the same commit, guide and days."
+}
