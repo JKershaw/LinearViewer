@@ -63,3 +63,121 @@ Settle the polarity question (point 1) and write it into the test before touchin
 
 ---
 
+
+# Quality-of-life forecasts (Survey open-0, verbatim from LIN-4150)
+
+Posted 3 Nov about 22:30 UTC, before any work began.
+
+## Survey open-0: LIN-4180 @ 600f1be1c
+
+**Cause.** `test/system/harness/harbour.js:16` defaults `HARBOUR_DIR` to `/home/user/LinearViewer`, then runs `spawn('node', ['server.js'], { cwd })` with no `'error'` listener. If the cwd is missing, Node reports `spawn node ENOENT` and names the binary, not the directory. I reproduced this. The fix is small, but these points make it harder than one line:
+
+1. **Two copies of the default.** `test/system/mutation/run-mutations.js:21` has its own copy, and `test/system/README.md:18` and `docs/testing-and-ci.md:15` repeat the path. Fix one and the others drift, so resolve the path in one shared helper.
+2. **More than one way to fail.** A directory with no `server.js`, or a checkout with no `node_modules`, makes the child exit at once. But `waitForServer` doesn't watch for the child's `exit`, so it polls for 45s and then dumps logs. "Found but not runnable" needs a plain message too.
+3. **The message would print about 24 times.** `node --test` runs the 25 files as parallel child processes, and each boots its own Harbour. One pre-flight (`--test-global-setup` works on Node 25, or a pre-step in the npm script) says it once. That's a change to how the runner is wired, not just the harness.
+4. **Finding a checkout automatically has traps.** On the runner host the layout is `<workspace>/simple-dispatcher` next to `<workspace>/LinearViewer`, and that sibling has `server.js` and `node_modules`. So the sibling works, with four catches:
+   - **Worktrees.** A builder in a `/tmp` worktree has no sibling, so resolve from the parent of `git rev-parse --git-common-dir`, not `__dirname`.
+   - **The leak trap.** `test/leak-trap.js` fails the run for any *read* under `/tmp` outside the run root, so probing for candidates inside a test child can break the run. Probe in the runner parent or the pre-flight.
+   - **The mutation runner.** It edits Harbour source (`lib/dispatch-wake.js`) and then reverts it. Pointed at a discovered sibling that is a live working copy, it would edit that copy. I'd keep it on an explicit `HARBOUR_DIR` only.
+   - **Which commit.** The sibling is at whatever commit its own task left it. Print the resolved path and its `HEAD` so each result can be traced to a commit.
+5. **No test covers it.** CI runs only `npm test` (`ci.yml:5`). Make the resolver a pure function with a unit test in `test/*.test.js`, or the fix itself goes untested.
+
+**What I'd do first.** Write `test/system/harness/harbour-dir.js`: `resolveHarbourDir({ env, root, exists })`. It tries, in order:
+1. `HARBOUR_DIR`. If it's set and wrong, report that; don't fall through to the next candidate.
+2. The sibling of the main checkout.
+3. `~/LinearViewer` (`deploy/provision.sh:373`).
+4. `/home/user/LinearViewer`.
+
+A candidate must contain `server.js`, and a missing `node_modules` gets its own message. On failure, list every path tried and end with `set HARBOUR_DIR=/path/to/LinearViewer`. Unit-test it, then wire it into `harbour.js`, the pre-flight and `run-mutations.js` (explicit only). Last, add the `'error'` listener and the `exit` race in `startHarbour` as a backstop.
+
+
+
+---
+
+## Survey open-0: LIN-4181 @ 600f1be1c
+
+**Why it'll be hard: the failure count depends on where you run from, not on the commit.** I ran `npm test` three times at 600f1be1c on this host, all in the same hour:
+
+| Seat | Fail | Leak-trap rows |
+|---|---|---|
+| Workspace clone (`~/development/simple-dispatcher-workspaces/<id>/simple-dispatcher`) | **1** | 0 |
+| Worktree at `/tmp/survey-open-LIN-4181` | **4** | 704 `shared` |
+| Worktree with `TMPDIR` inside its own `state/` | **119** | 8,912 `state` |
+
+None is 46, so the 3 Nov baseline came from an unrecorded location. Until that's fixed, "clean" is a moving target.
+
+**Causes (all in the test harness, not the product):**
+
+1. **Clone root follows the checkout's location.** `config.js:1029` defaults `WORKSPACE_CLONE_ROOT` to a folder next to the checkout. From `/tmp` that's `/private/tmp/simple-dispatcher-workspaces`, which the leak trap counts as shared temp. That's all 704 rows (`cycle-cost-witness.test.js:190`, `resources-host-sampler.test.js`, `dispatcher-terminal-retry-dep.test.js:123`). From the production checkout `~/development/simple-dispatcher`, the same default points at the *live* clone root. `test/isolate-run.js` pins only `SD_STATE_DIR` and `TMPDIR`.
+2. **This host puts the session TMPDIR inside the production checkout's `state/`** (`TMPDIR=/Users/autopilot/development/simple-dispatcher/state/session-tmp/<session>`). `isolate-run.js` makes its run root under that TMPDIR. `leak-trap.js classify()` checks `state` before it checks the run root, so every write a test makes in its own sandbox counts as a state leak. That's the 119 row (simulated in the worktree), and what a run inside `~/development/simple-dispatcher` gets. I'd guess the 46 sits on this axis. The fake-opencode failures only appeared in this row, so they're probably not a separate cause.
+3. **A test that checks the host rather than the code.** `git-launch-probe.test.js:123` fails from every location, with the message "the host git shim may have been repaired since this ticket was written". It asserts that the host's fault still exists. This is the ticket's "can't run here, say why" case: check the precondition and `t.skip(reason)` when it doesn't hold. The injected-`execFn` cases still cover the probe logic.
+
+**Guardrails.** Don't widen the shared roots or exempt paths per test; keep `leak-trap.test.js` and `isolate-run.test.js` green. For (2), keep the run root out of `state/` rather than exempting it in `classify`, which would hide real writes to `state/`.
+
+**Not checked:** the system suite. Its main-vs-branch difference may be (1) again: a clone and the main checkout see different paths. Check that before calling it flaky.
+
+**What I'd do first:**
+1. Reproduce this table, add the 3 Nov location, and post it on LIN-4181 as the baseline, naming where builders should run.
+2. In `test/isolate-run.js`, pin `WORKSPACE_CLONE_ROOT` into the run root and refuse a run root inside `STATE_DIR`. That one file should clear most failures everywhere.
+3. Turn `git-launch-probe.test.js:123` into a skip that states its reason.
+4. Then re-run everything, system suite included.
+
+
+
+---
+
+## Survey open-0: LIN-4182 @ 600f1be1c
+
+**Short version:** the rule itself is easy. The risk is in where the helper lives, and in the urge to tidy things beyond the ticket.
+
+**What's there.** There are 16 hand-rolled on/off parsers, not only the ones in `config.js`:
+- `config.js`: 11 module-level constants (`LAUNCH_BREAKER_ENABLED` :830, `AUTO_PAUSE_ENABLED` :855, `CLOSE_WINDOW_ON_DONE` :1274, `ZERO_TOOL_DONE_GUARD`, `ASSISTANT_TEXT_RELAY`, `TOOL_ACTIVITY_RELAY`, `OPENCODE_TELEMETRY_RELAY`, `WORKER_USAGE_RELAY`, `RESOURCE_RELAY`, `TICKET_MARKER_RELAY`, `HOST_HEARTBEAT`), plus two parsers that take a parameter: `SD_ALLOW_ROOT` (:398) and `SD_SKIP_GIT_PROBE` (:484).
+- Outside it: `oplog.js:33` (`SD_OPLOG`), `resource-metrics.js:40` (`SD_RESOURCE_METRICS`), and `instance-guard.js:129` `isTruthy` (`SD_SKIP_INSTANCE_GUARD`).
+- `SD_REAP_LEFTOVER_CLAUDE` (:1284) takes `off` or `log`, so it is not an on/off flag. Its comment says `on` must never mean anything. Leave it out, and say so.
+
+**The good news.** The two idioms already follow one rule: only the word for the opposite of the default changes anything. Unset, empty, whitespace and garbage all give the default. Default-on flags look for `0|false|no|off`; default-off flags look for `1|true|yes|on`. Both are trimmed and case-insensitive. So `flag(raw, default)` can keep today's behaviour exactly, with no odd-value change to name. Tests already pin both halves: `worker-usage-relay.test.js:82` (garbage → on) and `tool-activity-relay.test.js:72` (garbage → off). The trap is a "smarter" helper that recognises both word sets, or warns and falls back. For a default-on flag, that changes what garbage means, and LIN-4127 chose its meaning on purpose.
+
+**Why it's harder than it looks:**
+1. **Where the helper lives.** `oplog.js`, `resource-metrics.js` and `instance-guard.js` deliberately don't require `config.js`. Requiring `config.js` runs `loadEnv()` at load time. If they import the helper from `config.js`, they pick up `.env` loading as a side effect, and `SD_OPLOG=0` in `.env` could start working where today it may not, depending on which module loads first. That would be an unnamed behaviour change. Put the helper in a dependency-free leaf module, the way `state-dir.js` is.
+2. **Two call shapes.** `rootSkipPermissionsRefusal`, `gitLaunchProbe` and the instance guard take the raw value as a parameter so tests can inject it. The helper has to parse a raw value, not only read `process.env[name]`.
+3. **Test isolation is partial.** `test/helpers/fresh-config.js` clears only `SD_*_RELAY` keys. A re-require test of `CLOSE_WINDOW_ON_DONE`, `HOST_HEARTBEAT` or the breaker flags sees whatever the host has set. Test the pure function directly.
+4. **Leave alone:** `load-env.js` keeps quotes and inline comments (`SD_X="0"` reads as garbage, so the default), and it refills empty keys from `.env`. Different seam: mention them, don't fix them here.
+5. **Comments to update.** About a dozen comments say things like "same idiom as CLOSE_WINDOW_ON_DONE (copied verbatim)". Change them in the same commit, or they'll send readers looking for copies that are gone.
+
+**What I'd do first.** Write one table-driven characterisation test against the current code. It should take all 16 sites through `1/0/true/false/yes/no/on/off` in mixed case and padded, plus `''`, `'   '`, `garbage` and unset, and record what each returns. Then add `parseFlag(raw, default)` in a leaf module, swap the sites over one at a time, and keep that table green. If no row changes, there's nothing to name, and the PR can say so.
+
+
+
+---
+
+## Survey open-0: LIN-4183 @ 600f1be1c
+
+**Why it's harder than "extract a function"**
+
+1. **It isn't one copy; it's 17 copies that have drifted.** At 600f1be1c, 17 test files drive `hook.js` `main()` with the same pieces: a `fs.readSync` stdin mock, a `workspaces.json` stub, `globalThis.fetch`, a no-op `process.exit`, and an `updateState` seed. About 11 are close to `decision-emission.test.js` (they have a `MODULES` list and a fetch that returns 200 OK). The rest have diverged in ways the tests depend on:
+   - `MODULES` lists differ. Some include `../refusal`, `decision-withdrawal` adds `../dispatcher`, and 5 files have no list.
+   - `close-on-done-runtime` and `hook-done-post-runtime` hold fetch on a promise and call `main()` *without awaiting it*, so they can read state mid-flight.
+   - `completion-unconfirmed-reaper-handoff` runs reapers after `main()`.
+   - `tool-activity-relay-hold` sets up more than one Stop.
+
+   A helper shaped only like `decision-emission` will fit about two thirds of these. The rest need seams: a fetch override, a way to start `main()` without awaiting it, and extra modules to reload.
+
+2. **Setup order matters because of state read at require time.** `hook.js:16` reads the relay and timing flags out of `config` when it loads, and `hook.js:29` captures `HOOK_STARTED_AT`. `config` loads `.env` (LIN-3234). So the helper has to: set env, stub `loadEnv`, clear the require cache, and only then `require('../hook')`. If it gets the order wrong, tests still pass on CI and fail on a machine whose `.env` sets a relay flag. `test/helpers/fresh-config.js` (`isolateRelayEnv`, `stubLoadEnv`) already solves part of this and should be built on, not copied a second time.
+
+3. **Global patching under two preloaded traps.** `npm test` preloads `isolate-run.js` (the leak trap, which fails on temp files outside the run root) and `state-cache-trap.js`. A helper that runs fine under bare `node --test` can still fail under `npm test`. Cleanup has to undo every patch in reverse; a missed restore leaks into the next test.
+
+4. **"Keep checking what they check today" is easy to break without noticing.** A mechanical migration can drop small but load-bearing details while every test stays green. Examples: `executingWindow: { refire: true }` in close-on-done, which exempts the session from the zero-tool guard; whether a tool-activity line is seeded; `selfCheckAsked`.
+
+**What I'd do first**
+
+- Before touching anything, record each of the 17 files' test names and pass counts as a baseline to diff against.
+- Write `test/helpers/stop-hook.js` from `decision-emission`'s `setup()`, built on `fresh-config`. It should take `{ env, session, transcript, fetch, extraModules }` and return `{ runStop, startStop, posts, stateFile, oplogFile, cleanup }`. `startStop` returns the un-awaited promise for the mid-flight cases.
+- Migrate `decision-emission` and `worker-usage-default` (the LIN-4127 copy) first. Next, the other nine that match closely. Last, `close-on-done-runtime`, as the proof that the fetch override and `startStop` seams are enough.
+- Leave `stalled-verify-early-refire-runtime` alone. It has a `MODULES` list but never drives the hook.
+
+**Sizing:** the smallest complete version is the helper plus the ~11 near-identical files. Bringing the 5 divergent ones in is where the seams get tested; if one of them needs a flag that exists only for it, leave that file as it is.
+
+
+
+---
+

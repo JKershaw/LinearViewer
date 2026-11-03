@@ -606,3 +606,28 @@ Each ticket is a friction that more than one builder paid for and moved past ("n
 | LIN-4183 | no shared way to drive the Stop hook's `main()` in a test (about 100 lines copied) | LIN-4127's builder |
 
 They were filed at the level of the idea, in simple-dispatcher. Surveyed with open-0 at SD `600f1be1c` (22:26), then acted on as usual. This closes the loop the essay describes: the builders' after-answers become the next tickets.
+
+## 3 Nov, 22:40 UTC: the quality-of-life forecasts, acted on
+
+All four open-0 runs are in `round-3/forecasts.md`. Two of them ran the suite themselves. All four "do first" steps were preparations again: a resolver with a unit test, a baseline table, a characterisation table, a pass-count baseline.
+
+- **LIN-4180 (system suite can't find Harbour):**
+  - It reproduced the `spawn node ENOENT`. The default is copied in the mutation runner and two docs. "Found but can't run" waits 45 s. The message would print about 24 times, because the files run in parallel.
+  - On finding a checkout automatically: worktrees, the leak trap, and the **mutation runner**, which edits Harbour's source and reverts it, so it must stay on an explicit `HARBOUR_DIR` and never touch a live sibling.
+  - *First:* a pure `resolveHarbourDir` with a unit test.
+- **LIN-4181 (clean main on the host):**
+  - **It corrected the ticket.** At one commit, in one hour, the failure count was 1 (workspace clone), 4 (`/tmp` worktree) or 119 (`TMPDIR` inside `state/`, which is where this host puts session temp). "None is 46, so the 3 Nov baseline came from an unrecorded location." I took the 46 from the LIN-4127 Survey and put it on the ticket. The Survey on that very ticket showed the number depends on where you stand.
+  - Causes: the test isolation doesn't pin the workspace clone root, the run root can sit inside `state/`, and one test asserts that the host's git fault *still exists*.
+  - *First:* the baseline table, posted on the ticket.
+- **LIN-4182 (one on/off parser):**
+  - 16 parsers, some outside `config.js`. "The two idioms already follow one rule", so a plain `parseFlag(raw, default)` keeps today's behaviour exactly.
+  - Two traps. A "smarter" helper would change garbage for default-on flags. And importing the helper from `config.js` would make modules that deliberately avoid it start loading `.env`, an unnamed behaviour change.
+  - *First:* a characterisation table across all 16 sites.
+- **LIN-4183 (one Stop-hook test driver):**
+  - "It isn't one copy; it's 17 copies that have drifted." About two thirds match, and the rest need seams (an un-awaited start, a fetch override).
+  - Require-time ordering matters. The helper has to restore every patch under two preloaded traps. It's "easy to break without noticing" (a refire exemption, a seeded tool line).
+  - *First:* a baseline of names and pass counts, then migrate the close copies first.
+
+**What we did:** wrote each preparation onto its ticket. **Staggered:** LIN-4180 and LIN-4181 kicked off at 22:38. LIN-4182 and LIN-4183 stay in Backlog until LIN-4181 lands, because both lean on the test isolation it fixes, and a clean baseline makes their own before/after comparisons honest.
+
+**On the forecasts' size:** LIN-4182 and LIN-4183 each found the ticket's "copies" to be several times more numerous than the ticket implied (16 parsers, not "each flag in `config.js`"; 17 drifting copies, not "each test copies"). That's the census the builders said they'd have wanted first, done before the work.
