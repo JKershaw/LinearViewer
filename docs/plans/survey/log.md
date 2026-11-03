@@ -631,3 +631,22 @@ All four open-0 runs are in `round-3/forecasts.md`. Two of them ran the suite th
 **What we did:** wrote each preparation onto its ticket. **Staggered:** LIN-4180 and LIN-4181 kicked off at 22:38. LIN-4182 and LIN-4183 stay in Backlog until LIN-4181 lands, because both lean on the test isolation it fixes, and a clean baseline makes their own before/after comparisons honest.
 
 **On the forecasts' size:** LIN-4182 and LIN-4183 each found the ticket's "copies" to be several times more numerous than the ticket implied (16 parsers, not "each flag in `config.js`"; 17 drifting copies, not "each test copies"). That's the census the builders said they'd have wanted first, done before the work.
+
+## 3 Nov, about 23:10 UTC: LIN-4180 done, and its builder's answer; LIN-4176's own calls
+
+**LIN-4180 is Done** (SD PR #308, `0992f39`). The Survey's warning was kept: the mutation runner is explicit-only. Close-out exercised it against a *throwaway copy* of Harbour, so no live checkout was edited.
+
+**Its builder (round-3 questions):**
+- *Difficult?* "Mostly it wasn't … the plan was accurate." It bound at module-load ordering in the mutation runner and at the leak-trap contract. "The real cost was something else": once Harbour was found, 4 of 117 system tests failed against the sibling, and proving they fail on `main` too "took longer than the change itself".
+- *First:* run the system suite on `main` before touching anything. **That's the third builder tonight whose "first" is "take the baseline"** (LIN-4127, LIN-4180, and LIN-4181's Survey made it the whole first step).
+- *Tidy now:* an unused export, splitting the pure resolver from the fs probe, a matching commit line, and a docs sentence on relative paths. All small.
+- *If the area were how you'd want it:* "the system suite would have one entry point that owns its environment from the start: where Harbour is, and which Harbour. Then this ticket would have been one line." And: "the suite should declare which Harbour it needs, so 'found' and 'the right version' aren't two different things."
+- *What the ticket got wrong:* "'it runs' was true, but running isn't passing."
+
+**Against the forecast:** the Survey said to "print the resolved path and its `HEAD` so each result can be traced to a commit". The builder: "the plan printed the commit because nothing defines the right version. That turned out to matter at once." That's a hit, and it opened the next question (which Harbour?). The Survey's "say it once, not 24 times", the explicit-only mutation runner, and the unit-tested pure resolver all landed as advised.
+
+**LIN-4176 (rebuild 1):** piece 1 (LIN-4177, PR #2261) is in re-review. The builder made two calls the plan hadn't, measured them on the replay, and recorded them on LIN-4176 rather than raising a ruling:
+- a straddling session's time stays the earliest fetched member's, because the founder's time would have turned a 68 s mean duration into about 24 h;
+- `durationMs` stays on the read, because the S1 wire must not change.
+
+The replay's change list carries both. That's the "capture each surface's output as the before" preparation earning its keep: a measured comparison settled a design choice overnight without waiting for John.
