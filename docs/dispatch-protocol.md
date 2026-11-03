@@ -132,7 +132,7 @@ A dispatch MUST record, on the edge, at minimum:
 | Field | Meaning | Required |
 |---|---|---|
 | **parent** | The single node this edge reports to (§7). | yes |
-| **subscription** | Enum: `everything` \| `terminal-only`. Declared by the dispatcher at dispatch time. | yes |
+| **subscription** | Enum: `everything` \| `terminal-only`. Declared by the dispatcher at dispatch time. `none` (LIN-4166) is a follow-up-row value, not an edge declaration: a follow-up with `followUpTo` whose own events mint no wake. It sits outside the matrix above and is refused without `followUpTo`. | yes |
 
 - `subscription` **replaces the boolean `subscribe`** and its derived companions. A dispatcher
   MUST NOT reconstruct subscription intent from incidental fields (e.g. "has a sessionId");

@@ -143,6 +143,22 @@ describe('LIN-901 — recommend-and-dispatch subscription is declared, not recon
     assert.match(res.body.error, /subscription must be one of/);
   });
 
+  // LIN-4166 — `none` is follow-up only. This lane builds its step input from
+  // {...body}, so a body without followUpTo must hit the entrance rule here too.
+  test("subscription:'none' without followUpTo is rejected with 400 and dispatches nothing (LIN-4166)", async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
+      issueIdentifier: 'TEST-1',
+      kind: 'implementation',
+      subscription: 'none'
+    });
+
+    assert.equal(res.status, 400, `expected 400, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.equal(res.body.error, "subscription 'none' requires followUpTo");
+    assert.equal(captured.item, undefined, 'nothing is dispatched on a refused none');
+  });
+
   // LIN-1118 — sessionId is an opaque string here too. This route had NO negative
   // sessionId coverage before; without it the relaxation reads as removing the
   // guard rather than replacing it.
