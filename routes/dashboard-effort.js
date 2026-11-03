@@ -12,6 +12,7 @@ import { keepaliveError, classifyUpstreamError, isAuthError } from '../lib/error
 import { renderUpstreamAwareErrorPage, renderErrorPage } from '../lib/render-pages.js';
 import { resolveIssueBinding } from '../lib/workspace.js';
 import { computeEffortReadout, eligibleIssueIdentifiers } from '../lib/effort-readout.js';
+import { anchorOf } from '../lib/lineage-membership.js';
 import { renderEffortReadoutPage } from '../lib/render-effort-readout.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
@@ -159,6 +160,10 @@ async function computeWorkspaceEffortReadout(workspace, { now }, { dispatchQueue
     dispatchQueueStore.listHistory(urlKey, { limit: EFFORT_READOUT_HISTORY_LIMIT, projection: { prompt: 0 } }),
   ]);
   const historyRows = history.items || [];
+  // LIN-4177: the founder lookup for every lineage these rows belong to (scalar, uncapped), so the cost read
+  // names a lineage by its true issue and kind even when its founder is older than the 200-row read.
+  const anchors = [...new Set([...liveRows, ...historyRows].map(anchorOf).filter(Boolean))];
+  const identityRows = await dispatchQueueStore.lineageIdentityRows(urlKey, { anchors });
 
   // The issues the survival walk will actually score — derived through the
   // SAME population rule the compute layer uses, so the set fetched and the
@@ -180,6 +185,7 @@ async function computeWorkspaceEffortReadout(workspace, { now }, { dispatchQueue
     skipped,
     survivalAvailable,
     gateFieldsAvailable,
+    identityRows,
   });
 }
 

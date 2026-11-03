@@ -7,12 +7,14 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readModelsHistory, MODELS_HISTORY_CAP } from '../../lib/model-routing-history.js';
+import { stubLineageIdentity } from '../fixtures/lineage-identity.js';
 
 function fakeStore(items = []) {
   const calls = [];
   return {
     calls,
-    listHistoryWithBodies: async (urlKey, opts) => { calls.push({ urlKey, opts }); return { items, total: items.length }; }
+    listHistoryWithBodies: async (urlKey, opts) => { calls.push({ urlKey, opts }); return { items, total: items.length }; },
+    lineageIdentityRows: stubLineageIdentity(() => items)
   };
 }
 
@@ -42,6 +44,6 @@ describe('readModelsHistory: one window and one cap for both pages', () => {
   });
 
   test('no store answers an empty read, never a throw', async () => {
-    assert.deepEqual(await readModelsHistory(null, 'acme'), { items: [], total: 0 });
+    assert.deepEqual(await readModelsHistory(null, 'acme'), { items: [], total: 0, identityRows: [] });
   });
 });

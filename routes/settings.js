@@ -290,7 +290,7 @@ export function createSettingsRouter(deps) {
       // The Models page reads the effective table (above) and its spend: the dispatch history and the call log,
       // one read each for the 30-day window. A read that fails shows an empty spend, never a page error.
       const [history, callDocs, log, presets] = await Promise.all([
-        safeRead(() => readModelsHistory(dispatchStore, workspace.urlKey), { items: [], total: 0 }),
+        safeRead(() => readModelsHistory(dispatchStore, workspace.urlKey), { items: [], total: 0, identityRows: [] }),
         safeRead(() => (llmCallLogStore?.listInHorizon ? llmCallLogStore.listInHorizon(workspace.urlKey) : []), []),
         modelRoutingStore.getLog(workspace.urlKey, { limit: 50 }),
         modelRoutingStore.listPresets(workspace.urlKey)
@@ -302,7 +302,7 @@ export function createSettingsRouter(deps) {
       // its effective model), so it is set here, after the spend is read.
       states.models = getArea('models').state({
         ...stateCtx,
-        modelsSummary: summariseSpend(spendByEffectiveModel([...agentSpendByJob(history.items, { jobs: AGENT_JOB_IDS }), ...harbourSpendByJob(callDocs, { jobs: HARBOUR_JOB_IDS })], effective.jobs), getModelDisplayName, { width: STATE_MAX_LENGTH })
+        modelsSummary: summariseSpend(spendByEffectiveModel([...agentSpendByJob(history.items, { jobs: AGENT_JOB_IDS, identityRows: history.identityRows }), ...harbourSpendByJob(callDocs, { jobs: HARBOUR_JOB_IDS })], effective.jobs), getModelDisplayName, { width: STATE_MAX_LENGTH })
       });
       try {
         dispatchPresets = dispatchPresetsStore ? await dispatchPresetsStore.list(workspace.urlKey) : [];
@@ -319,9 +319,9 @@ export function createSettingsRouter(deps) {
         freeTierModel: openRouterSource === 'free' ? resolveFreeTierModel() : null,
         table,
         effective,
-        agentSpend: agentSpendByJob(history.items, { jobs: AGENT_JOB_IDS }),
+        agentSpend: agentSpendByJob(history.items, { jobs: AGENT_JOB_IDS, identityRows: history.identityRows }),
         // LIN-3962: each agent job's typical cost per model, for the decision panel's suggested models.
-        agentTypicals: Object.fromEntries(AGENT_JOB_IDS.map((id) => [id, typicalByModel(history.items, { job: id })])),
+        agentTypicals: Object.fromEntries(AGENT_JOB_IDS.map((id) => [id, typicalByModel(history.items, { job: id, identityRows: history.identityRows })])),
         harbourSpend: harbourSpendByJob(callDocs, { jobs: HARBOUR_JOB_IDS }),
         coverage: { windowRuns: history.items.length, capped: history.total > history.items.length },
         presets,

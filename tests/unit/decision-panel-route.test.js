@@ -16,6 +16,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { emptyTable } from '../../lib/model-routing.js';
+import { stubLineageIdentity } from '../fixtures/lineage-identity.js';
 
 // A `[usage]` feedback entry, as the runner posts it. `costUsd` pins a price; omit it to be unpriced.
 function usage({ model = 'claude-sonnet-5', costUsd } = {}) {
@@ -24,13 +25,16 @@ function usage({ model = 'claude-sonnet-5', costUsd } = {}) {
 }
 const taken = (kind, id, feedback) => ({ id, status: 'taken', kind, dispatchedAt: '2026-10-20T10:00:00Z', feedback });
 
-function buildApp({ owner = true, table = emptyTable(), history = [] } = {}) {
+// `identity` is the founder lookup's source; it defaults to the history rows, and a test that needs a founder
+// outside the read passes it here (LIN-4177: the lookup is uncapped, the history read is windowed).
+function buildApp({ owner = true, table = emptyTable(), history = [], identity = history } = {}) {
   const app = express();
   app.use(express.json());
   app.use(createDispatchRoutes({
     dispatchQueueStore: {
       addItem: async () => ({ _id: 'disp-1' }),
-      listHistoryWithBodies: async () => ({ items: history, total: history.length })
+      listHistoryWithBodies: async () => ({ items: history, total: history.length }),
+      lineageIdentityRows: stubLineageIdentity(() => identity)
     },
     dispatchTokenStore: {},
     workspaceFromUrl: (req, res, next) => {
@@ -95,6 +99,23 @@ describe('GET /api/dispatch/decision-panel: the numbers are the derived kind\'s 
     assert.equal(body.numbers.priced, 0);
     assert.match(body.html, /unknown/);
     assert.doesNotMatch(body.html, /\$0\.00/);
+  });
+});
+
+describe('GET /api/dispatch/decision-panel: a straddler is judged by its true kind (LIN-4177)', () => {
+  // The lineage's founder is an implementation, 40 days old, outside the 30-day read; its in-window follow-up is a
+  // review. The founder is in the lookup only, so the implementation figure has the straddler only when the
+  // panel's read is wired to the lookup (routes/dispatch.js), and the review figure has none.
+  const founder = { id: 'st', _id: 'st', rootItemId: 'st', status: 'taken', abort: false, kind: 'implementation', issueIdentifier: 'LIN-42', dispatchedAt: '2026-09-20T10:00:00Z', feedback: [] };
+  const followUp = { id: 'st-2', _id: 'st-2', rootItemId: 'st', status: 'taken', abort: false, kind: 'review', issueIdentifier: 'LIN-99', dispatchedAt: '2026-10-30T10:00:00Z', feedback: [usage({ costUsd: 4 })] };
+
+  test('the implementation figure counts the straddler at its whole total; the review figure does not', async () => {
+    const app = buildApp({ history: [followUp], identity: [founder, followUp] });
+    const implementation = await get(app, `${PANEL}?promptName=implementation`);
+    assert.equal(implementation.body.numbers.runs, 1);
+    assert.equal(implementation.body.numbers.spendUsd, 4);
+    const review = await get(app, `${PANEL}?promptName=review`);
+    assert.equal(review.body.numbers.runs, 0);
   });
 });
 

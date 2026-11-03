@@ -1,0 +1,100 @@
+{
+  "note": "LIN-4177: the change list. Each entry names one intended difference from the baseline goldens: a=cap (LIN-4148), b=horizon straddler credited to its true issue, c=true base kind, d=incomplete lineages show no figure. Anything else that differs is a defect (W9). The workerSessions[].dispatchedAt decision is option (ii): the fetched earliest member's time is kept (no entry: no replay line moves).",
+  "changes": [
+    {
+      "path": "S1.LIN-99.body.workerSessions.P",
+      "change": "a",
+      "reason": "Cap variant (LIN-4148): P's founder is on LIN-42; LIN-99 is a follow-up. P is credited to LIN-42 only."
+    },
+    {
+      "path": "S1.LIN-42.body.workerSessions.st",
+      "change": "b",
+      "reason": "Horizon straddler (LIN-4148): st's founder is on LIN-42 and is older than the window; the in-window follow-up is on LIN-99. st is credited to LIN-42."
+    },
+    {
+      "path": "S1.LIN-99.body.workerSessions.st",
+      "change": "b",
+      "reason": "The same straddler leaves LIN-99."
+    },
+    {
+      "path": "S1.LIN-42.body.pricedUsd",
+      "change": "a/b",
+      "reason": "LIN-42 gains st's 4.00 (b)."
+    },
+    {
+      "path": "S1.LIN-42.body.totalUsd",
+      "change": "a/b",
+      "reason": "As pricedUsd: LIN-42's total gains st's 4.00 (b)."
+    },
+    {
+      "path": "S1.LIN-99.body.pricedUsd",
+      "change": "a/b",
+      "reason": "LIN-99 loses P's 7.00 (a) and st's 4.00 (b)."
+    },
+    {
+      "path": "S1.LIN-99.body.totalUsd",
+      "change": "a/b",
+      "reason": "As pricedUsd for LIN-99."
+    },
+    {
+      "path": "S1.LIN-8.body.pricedUsd",
+      "change": "d",
+      "reason": "LIN-8's opencode founder is older than the window and dropped; the in-window opencode delta alone was a silent partial. It is now incomplete, so it is not priced."
+    },
+    {
+      "path": "S1.LIN-8.body.totalUsd",
+      "change": "d",
+      "reason": "Incomplete: null, not the partial 0.40."
+    },
+    {
+      "path": "S1.LIN-8.body.workerSessions.so.costUsd",
+      "change": "d",
+      "reason": "The incomplete lineage shows no figure."
+    },
+    {
+      "path": "S5.jobs.implementation",
+      "change": "c/d",
+      "reason": "st's true base kind is implementation (c): it moves from review. so is now incomplete, so it is unpriced here (d)."
+    },
+    {
+      "path": "S5.jobs.review",
+      "change": "c",
+      "reason": "st's true base kind is implementation, not review (c)."
+    },
+    {
+      "path": "S6.implementation",
+      "change": "c/d",
+      "reason": "Typical cost per model: st joins sonnet's runs (c); so leaves qwen's priced runs (d)."
+    },
+    {
+      "path": "S6.review",
+      "change": "c",
+      "reason": "st leaves review (c)."
+    },
+    {
+      "path": "S8",
+      "change": "c/d",
+      "reason": "Priced spend by effective model: st's 4.00 moves from opus (review) to sonnet (implementation) (c); so's 0.40 leaves the priced sum (d)."
+    },
+    {
+      "path": "S9.implementation",
+      "change": "c/d",
+      "reason": "Decision panel's implementation job: as S5 and S6 (c, d)."
+    },
+    {
+      "path": "S9.review",
+      "change": "c",
+      "reason": "Decision panel's review job: st leaves it (c)."
+    },
+    {
+      "path": "S10.perKind.implementation",
+      "change": "b/c/d",
+      "reason": "Effort read-out, implementation kind: st is a session of this kind (b, c); so is incomplete, its cost is unpriced (d)."
+    },
+    {
+      "path": "S10.perKind.review",
+      "change": "c",
+      "reason": "st leaves the review kind (c)."
+    }
+  ]
+}

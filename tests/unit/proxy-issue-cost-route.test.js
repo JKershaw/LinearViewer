@@ -15,8 +15,20 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { createProxyRoutes, LINEAGE_QUERY_LIMIT } from '../../routes/proxy.js';
 import { LlmCallLogStore } from '../../lib/llm-call-log.js';
+import { stubLineageIdentity } from '../fixtures/lineage-identity.js';
 
-const T1 = '2026-08-01T10:00:00.000Z';
+// LIN-4177: the route reads only the 30-day window, and its activity rule counts a lineage only with a
+// member in it. Fixture times sit two days back (the UTC day), so they are in the window the store would
+// have served. `ts('HH:MM')` is that day at that time.
+const FIXTURE_DAY_MS = (() => {
+  const d = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+})();
+const ts = (hm) => {
+  const [h, m] = hm.split(':').map(Number);
+  return new Date(FIXTURE_DAY_MS + (h * 60 + m) * 60 * 1000).toISOString();
+};
+const T1 = ts('10:00');
 
 function usageEntry({ model = 'anthropic/claude-sonnet-5', costUsd, effort, timestamp = T1, rootItemId } = {}) {
   const payload = { model };
@@ -72,9 +84,10 @@ function buildApp({ queued = [], history = [], dispatchQueueStore: dispatchQueue
     return opts.issueIdentifier ? queued.filter(r => r.issueIdentifier === opts.issueIdentifier) : queued;
   };
 
+  const lineageIdentityRows = stubLineageIdentity(() => [...queued, ...history]);
   const dispatchQueueStore = dispatchQueueStoreOverride === null
     ? null
-    : (dispatchQueueStoreOverride || { listItems, listHistory });
+    : (dispatchQueueStoreOverride || { listItems, listHistory, lineageIdentityRows });
 
   const app = express();
   app.use(express.json());
@@ -202,8 +215,8 @@ describe('GET /api/proxy/issues/:identifier/cost — store wiring', () => {
     // A cross-issue follow-up sharing the same rootItemId, filed under a
     // DIFFERENT issue — must still be fetched and merged for cost correctness.
     const crossIssueSibling = row({
-      id: 'row-2', issueIdentifier: 'LIN-99', dispatchedAt: '2026-08-01T10:10:00.000Z',
-      feedback: [usageEntry({ costUsd: 9, timestamp: '2026-08-01T10:20:00.000Z', rootItemId: 'root-1' })]
+      id: 'row-2', issueIdentifier: 'LIN-99', dispatchedAt: ts('10:10'),
+      feedback: [usageEntry({ costUsd: 9, timestamp: ts('10:20'), rootItemId: 'root-1' })]
     });
     const { app, historyCalls, body: _unused } = buildApp({ history: [ownRow, crossIssueSibling] });
     const { status, body } = await get(app, '/api/proxy/issues/LIN-42/cost');
@@ -272,7 +285,7 @@ describe('GET /api/proxy/issues/:identifier/cost — response shape', () => {
       history: [row({
         feedback: [
           usageEntry({ costUsd: 4.9, effort: 'high' }),
-          { kind: 'status', timestamp: '2026-08-01T10:05:00.000Z', message: '[done] finished' }
+          { kind: 'status', timestamp: ts('10:05'), message: '[done] finished' }
         ]
       })]
     });
@@ -358,8 +371,8 @@ describe('GET /api/proxy/issues/:identifier/cost — 30-day read horizon (LIN-31
 // so these two drive the route (removing `issueIdentifier: identifier` from the call turns both red).
 describe('GET /api/proxy/issues/:identifier/cost — only lineages that count under the requested issue (LIN-4147)', () => {
   test('a wake row for LIN-X, re-pointed into an issue-less root, is not priced under LIN-X', async () => {
-    const root = row({ id: 'P', rootItemId: 'P', issueIdentifier: null, kind: 'autopilot', dispatchedAt: '2026-08-01T10:00:00.000Z', feedback: [usageEntry({ costUsd: 7, rootItemId: 'P' })] });
-    const wake = row({ id: 'W', rootItemId: 'P', issueIdentifier: 'LIN-X', kind: 'wake', dispatchedAt: '2026-08-01T11:00:00.000Z', feedback: [usageEntry({ costUsd: 2, rootItemId: 'P', timestamp: '2026-08-01T11:00:00.000Z' })] });
+    const root = row({ id: 'P', rootItemId: 'P', issueIdentifier: null, kind: 'autopilot', dispatchedAt: ts('10:00'), feedback: [usageEntry({ costUsd: 7, rootItemId: 'P' })] });
+    const wake = row({ id: 'W', rootItemId: 'P', issueIdentifier: 'LIN-X', kind: 'wake', dispatchedAt: ts('11:00'), feedback: [usageEntry({ costUsd: 2, rootItemId: 'P', timestamp: ts('11:00') })] });
     const { app } = buildApp({ history: [root, wake] });
     const { status, body } = await get(app, '/api/proxy/issues/LIN-X/cost');
     assert.equal(status, 200);
@@ -370,8 +383,8 @@ describe('GET /api/proxy/issues/:identifier/cost — only lineages that count un
   });
 
   test('a follow-up under LIN-99 inside a LIN-42 root is priced under LIN-42 only, on both route paths', async () => {
-    const root = row({ id: 'R', rootItemId: 'R', issueIdentifier: 'LIN-42', kind: 'implementation', dispatchedAt: '2026-08-01T10:00:00.000Z', feedback: [usageEntry({ costUsd: 5, rootItemId: 'R' })] });
-    const followUp = row({ id: 'F', rootItemId: 'R', issueIdentifier: 'LIN-99', kind: 'review', dispatchedAt: '2026-08-01T11:00:00.000Z', feedback: [usageEntry({ costUsd: 3, rootItemId: 'R', timestamp: '2026-08-01T11:00:00.000Z' })] });
+    const root = row({ id: 'R', rootItemId: 'R', issueIdentifier: 'LIN-42', kind: 'implementation', dispatchedAt: ts('10:00'), feedback: [usageEntry({ costUsd: 5, rootItemId: 'R' })] });
+    const followUp = row({ id: 'F', rootItemId: 'R', issueIdentifier: 'LIN-99', kind: 'review', dispatchedAt: ts('11:00'), feedback: [usageEntry({ costUsd: 3, rootItemId: 'R', timestamp: ts('11:00') })] });
     const history = [root, followUp];
 
     const other = await get(buildApp({ history }).app, '/api/proxy/cost/LIN-99');

@@ -47,6 +47,7 @@ import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cach
 import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
 import { guardNetwork } from '../fixtures/network-guard.js';
 import { enumerateRoutes, sampleUrl, appAround, request, makeCanary, SAMPLE_UUID } from './lib/entrance-route-sweep.js';
+import { stubLineageIdentity } from '../fixtures/lineage-identity.js';
 
 const NOW_ISO = new Date().toISOString();
 const WORKER_ID = '22222222-3333-4444-8555-666666666666';
@@ -119,6 +120,7 @@ function buildWorld({ bootCanary, promptCanary, extend } = {}) {
   const dispatchQueueStore = {
     async listItems() { reads.push('listItems'); return []; },
     async listHistory() { reads.push('listHistory'); return { items: withFreshDigests(rows.map(r => ({ ...r }))) }; },
+    lineageIdentityRows: stubLineageIdentity(() => rows),
     async getItemStatus(_urlKey, id) { reads.push('getItemStatus'); return withFreshDigests(rows.filter(r => r.id === id).map(r => ({ ...r })))[0] || null; },
     async addItem(_urlKey, fields) { return { _id: 'added-item', id: 'added-item', ...fields }; },
     async getGrantDeclaration() { return null; },
