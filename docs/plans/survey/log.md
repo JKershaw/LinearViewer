@@ -251,3 +251,24 @@ John's idea: fix the flake that cost this morning's deploy, and use it as a Surv
   - **Predicts:** 1 plan-review round (2 if someone pushes the product-side gate). Pieces: (a) a deterministic repro, (b) the test route, (c) `beforeEach` plus an "is the first read complete" assertion, (d) optionally the sibling specs.
   - **Couldn't check (question 5):** whether the first read is really incomplete in CI; the comment's `:209` (at this commit, that line is the Flight Companion test, not the task-page one); `networkidle` against the 1 s tick under load; whether the warm holds across a 4-worker run.
 - **11:27: LIN-4110 autopilot kicked off**, with the ticket unchanged.
+
+## 3 Nov, about 12:15 UTC: LIN-4110's investigation against its v2 forecast, and S5 under way
+
+**LIN-4110** was investigated and fixed in under 20 minutes (PR #2255, `1d497704`, not merged). Against the forecast it posted at 11:20:
+
+| Forecast (v2, before the work) | Builder found |
+|---|---|
+| Cause: the single task-facts holder per urlKey is shared by every spec in a worker, never reset, with a 60 s refresh floor, so the first read is incomplete and re-reads fire the forbidden preview | **The same cause, confirmed:** "the server's held task-facts set … outlives `/test/set-local-session`. Every spec in a Playwright worker uses the same key … the refresh's 60 s attempt floor." Reproduced deterministically; the CI trace shows `task-missing`, then the re-read preview 19 ms later, inside the 500 ms wait ✓ |
+| Warning: the ticket's "ignore read-only GETs" would weaken the guard (`/brief`, `/recap`, the fake PR URL) | "**Ignoring GETs is rejected:** several guards … are GET-only signals … `fake-pr-state-url`, `/brief?`, `/recap?`" ✓ |
+| Fix: a harness seam that resets and warms the holder, with `FORBIDDEN` untouched | The same seam, placed better: `/test/set-local-session` now restarts the key's held set, so it fixes **the whole class** for every spec, not just this one; the spec's assertions are unchanged ✓ (the builder improved on the forecast) |
+| Bites later: the 30 s issues memo (`routes/test.js:1674`) can miss the seed | Sibling noted: "`_workspaceIssuesMemo` … 30 s … the same class" ✓ |
+| Consolidate option: preview only on a complete read or a changed step | Product note: "re-fires an identical preview read on each of up to 15 re-reads … previewing only when the step/choice changes" ✓ |
+| Couldn't check (q5): whether the first read is really incomplete in CI | The builder checked it from the CI trace: both `/state` bodies were `task-missing`. **That is exactly the early check q5 told it to make** ✓ |
+| `:209` in the comment is the wrong line at this commit | The builder used the task-page test, `lin-3975-task-run` followed by `look-alike-controls`. Consistent with it. |
+
+**Reading.** This is the cleanest forward result yet. The flake was a "you'd only know by running it" problem, and the Survey still got the cause right from reading alone. Its question-5 list was the set of things the builder then verified. The builder improved on the fix (fixing it at the reseed, for the whole class), which is the right relationship: the Survey points, and the builder decides.
+
+**S5 (LIN-4107, type)** started at 11:47. A stepper run, in beat 2.
+- **Ruling 1** (`lin4107-floor-vs-tokens`): "LIN-4024 pins 12px literals and a phone 0.75rem … the LIN-4107 token test forbids them. Keep the 12px floor by exempting those selectors, or retarget the LIN-4024 pins?" Answered `exempt`, then `exempt-narrow`.
+- **The forecast had named this collision:** "Tests pin today's sizes: `lin-4024-type-floor.test.js` (12px, 0.9em, phone 0.75rem) … The 12px-floor tests and the smallest token must agree." ✓ It predicted a plan-review round over the scope of the count test. The scope question came instead as two rulings.
+- **Still to see:** whether it made the tokens rem, added a fourth token, and deleted the phone shrink with its undoing copies (the forecast's recommended tidy), or drilled past them. The beat-2 report shows `var(--font-size-sm)` 200 times and 8 distinct values left on Home and the task page, with literals exempted by name.
