@@ -20,7 +20,9 @@ import { computeTerminalMarkedTaskCost } from '../../lib/terminal-marked-task-co
 import { windowedSpend } from '../../lib/weekly-budget.js';
 import { groupDispatchLineages } from '../../lib/dispatch-lineage.js';
 import { fmtUsd } from '../../lib/render-run-steps.js';
-import { runReplay } from '../fixtures/cost-replay/harness.js';
+import { collectKpiStats, toPublicKpis } from '../../lib/kpi-stats.js';
+import { lookupFounderRows } from '../../lib/founder-lookup.js';
+import { runReplay, matches } from '../fixtures/cost-replay/harness.js';
 
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = new Date('2026-11-03T12:00:00.000Z');
@@ -169,5 +171,63 @@ describe('the founder lookup stays off the public path', () => {
     assert.doesNotMatch(source, /from '\.\/founder-lookup\.js'/, 'no import of the lookup module');
     assert.doesNotMatch(source, /lookupFounderRows\(/, 'no call of the lookup');
     assert.match(source, /lineageIdentity/, 'the lookup arrives as an injected dependency');
+  });
+});
+
+describe('the /kpis founder wiring (LIN-4178 review finding 2): the production lookup reaches the public cost figure', () => {
+  // A raw collection that answers the filters the production reads send (`matches`, the replay's filter model).
+  const collection = (docs) => ({
+    find: (filter = {}) => ({ toArray: async () => docs.filter(doc => matches(doc, filter)) }),
+    countDocuments: async (filter = {}) => docs.filter(doc => matches(doc, filter)).length,
+    findOne: async () => null,
+  });
+  const raw = (fields) => ({ urlKey: 'acme', status: 'taken', abort: false, ...fields });
+  // Founder `st` on LIN-42, 40 days old: outside the 30-day horizon, so only the lookup can return it. Its in-window
+  // follow-up `st-2` is on LIN-99 and carries the cost the public card sums; `oth` is an unrelated done lineage on LIN-99.
+  const HISTORY = [
+    raw({ _id: 'st', rootItemId: 'st', issueIdentifier: 'LIN-42', kind: 'implementation', dispatchedAt: ago(40), feedback: [usage({ model: SONNET, costUsd: 3 }, ago(40))] }),
+    raw({ _id: 'st-2', rootItemId: 'st', issueIdentifier: 'LIN-99', kind: 'close-out', dispatchedAt: ago(2), followUpTo: 'st', feedback: [usage({ model: SONNET, costUsd: 4 }, ago(2)), done(ago(2))] }),
+    raw({ _id: 'oth', rootItemId: 'oth', issueIdentifier: 'LIN-99', kind: 'implementation', dispatchedAt: ago(5), feedback: [usage({ model: SONNET, costUsd: 1 }, ago(5)), done(ago(5))] }),
+  ];
+  const QUEUE = [];
+  // The same bag the server hands collectKpiStats, every collection empty but the two dispatch ones.
+  const bag = () => {
+    const empty = () => collection([]);
+    return {
+      sessions: empty(), userPreferences: empty(), workspacePreferences: empty(), customPrompts: empty(),
+      localIssues: empty(), dispatchTokens: empty(), proxyTokens: empty(), proxyEvents: empty(), agentStatus: empty(),
+      freeTier: empty(), recapCache: empty(), briefCache: empty(), reportHistory: empty(), kpiDailyRollup: empty(),
+      dispatchHistory: collection(HISTORY), dispatchQueue: collection(QUEUE),
+    };
+  };
+
+  test('with the lookup, the straddler is credited to LIN-42: the card counts two tickets and sums the cost once', async () => {
+    const seen = [];
+    const lineageIdentity = async rows => {
+      const found = await lookupFounderRows({ dispatchHistory: collection(HISTORY), dispatchQueue: collection(QUEUE) }, rows);
+      seen.push(...found);
+      return found;
+    };
+    const stats = await collectKpiStats(bag(), { lineageIdentity, now: NOW, milestoneFunnelDeps: {} });
+    assert.ok(seen.some(row => row._id === 'st'), 'the lookup returned the founder, which the horizon did not fetch');
+    assert.equal(stats.terminalMarkedTaskCost.pricedTicketCount, 2, 'LIN-42 and LIN-99');
+    assert.equal(stats.terminalMarkedTaskCost.pricedTicketCostUsd, 5, '4.00 (the straddler) + 1.00, each once');
+  });
+
+  test('without the lookup the same rows read the straddler as LIN-99: one ticket (the difference the wiring makes)', async () => {
+    const stats = await collectKpiStats(bag(), { lineageIdentity: async () => [], now: NOW, milestoneFunnelDeps: {} });
+    assert.equal(stats.terminalMarkedTaskCost.pricedTicketCount, 1);
+    assert.equal(stats.terminalMarkedTaskCost.pricedTicketCostUsd, 5);
+  });
+
+  test('the public page carries no identifier the lookup supplied', async () => {
+    const lineageIdentity = rows => lookupFounderRows({ dispatchHistory: collection(HISTORY), dispatchQueue: collection(QUEUE) }, rows);
+    const stats = await collectKpiStats(bag(), { lineageIdentity, now: NOW, milestoneFunnelDeps: {} });
+    assert.doesNotMatch(JSON.stringify(toPublicKpis(stats)), /LIN-42|LIN-99/);
+  });
+
+  test('server.js wires the lookup over the same two collections the test mirrors', async () => {
+    const server = await readFile(fileURLToPath(new URL('../../server.js', import.meta.url)), 'utf8');
+    assert.match(server, /lineageIdentity: rows => lookupFounderRows\(\{ dispatchHistory: dispatchHistoryCollection, dispatchQueue: dispatchQueueCollection \}, rows\)/);
   });
 });
