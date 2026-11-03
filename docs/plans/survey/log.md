@@ -169,3 +169,19 @@ Both are posted on LIN-4150 (22:16). The base is `f6a2c2158`, main at 21:54. **S
 - **Periodicals.** The stack-walk autopilot minted LIN-4152 and LIN-4153 at 06:14 (the review tasks for Drift & Coherence and Seams & Tangles). Both are past research. One is in implementation (the report), the other in plan.
 - **S4 (LIN-4106)** started at 06:14 as a *stepper* run, going straight to implementation beats: beat 1 "re-ground, baseline, branch", then beat 2 "task page state line + ruling first". There has been no plan-review round so far, which matches the forecast's "0 rounds". Still unknown: whether it builds the forecast's tidy (one `lastRunWords`, one pill table) or drills past the copies.
 - **S5 (LIN-4107)** is still Todo and will run after S4.
+
+## 3 Nov, about 07:55 UTC: Spike 2, first read of S4 against its forecast
+
+S4 (LIN-4106) built in four stepper beats plus one corrective beat (beat 3, the drawer default), then went to review on PR #2254 at `850b5353`. It is not merged yet.
+
+| Forecast (Survey v1, 22:16, before the work) | What the drill did |
+|---|---|
+| 0 plan-review rounds | **0.** It went straight to implementation beats. ✓ |
+| "Last run" words in two raw copies (server `idleRung`, browser `renderLastLine`); an idle page shows both | **Resolved by deleting one.** The browser line now keeps only the "All N" button, and the server sentence is the one statement ("Last run: Build finished … · all N runs"). Deletion finishes. ✓ The forecast named the copies, and the builder closed them the cheap way. |
+| "If the word table isn't the one shared table, the Sessions list and the box drift apart" | **Happened.** The new `plainRunState` in `task-page-loader.js` ("finished", "failed", "was cancelled") is a fresh word table beside `STAGE_STATE_WORD` in `lib/run-view.js`, which the task page's own stage list still reads ("done" and so on). A new copy of the decision, as predicted. |
+| Two pill tables disagree: `TASK_PAGE_PILL_FOR_STATE` says `waiting`, Home's `PILL_FOR_TASK_STATE` says `needs you`; the drill leaves both | **Left behind, as predicted.** Both tables are still there on the branch (`render-task-page.js:111` `'needs-you' → label 'waiting'`, `:124` `→ 'needs you'`). |
+| Pieces: (a) the tidy, (b) the task page, (c) Home, (d) the drawer, (e) llms.txt, styleguide, golden, screenshots | Beats: state line and ruling first (b plus part of c); opened box and drawer (d), plus a corrective; E2E, screenshots, PR (e). **No separate tidy (a)**, since it drilled, as the ticket asked. |
+
+**Early reading.** The forecast's specific claims held on the branch: no plan-review round, two copies of the Last words, a drift risk from a new word table, and two disagreeing pill tables left behind. The builder solved the one copy it was made to face, by deletion, and created or left the others. Whether these become friction later (a send-back, a disagreement on screen, a follow-up fix) is the next thing to watch. The builder's own after-answer will be asked once S4 is Done.
+
+**Periodicals.** Drift & Coherence (LIN-4153) is Done. Its corrective beat parented three new follow-ups under LIN-3449, the coherence loop. Its title notes that the 23 October follow-ups never landed, which is the inspectors-without-standing pattern again. Seams & Tangles (LIN-4152) is in close-out (PR #2252). Both reports will feed the map once merged.
