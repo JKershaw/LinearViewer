@@ -163,3 +163,9 @@ Both are posted on LIN-4150 (22:16). The base is `f6a2c2158`, main at 21:54. **S
 - **Follow-up answers aren't captured from the reply.** Today a follow-up has to post its answer as a ticket comment. Capturing the session's reply text in the dispatch feedback would make asking a session cheap and clean.
 - **A follow-up wakes its lineage's autopilot.** A read-only question shouldn't trigger "a child reached a terminal outcome, resume your cross-check". It needs a way to send a follow-up that wakes no one.
 - **"Should this session be running?"** S3e's autopilot started 4.5 hours before its prerequisite landed, then was killed by the stall failsafe for waiting.
+
+## 3 Nov, 07:00 UTC: progress
+
+- **Periodicals.** The stack-walk autopilot minted LIN-4152 and LIN-4153 at 06:14 (the review tasks for Drift & Coherence and Seams & Tangles). Both are past research. One is in implementation (the report), the other in plan.
+- **S4 (LIN-4106)** started at 06:14 as a *stepper* run, going straight to implementation beats: beat 1 "re-ground, baseline, branch", then beat 2 "task page state line + ruling first". There has been no plan-review round so far, which matches the forecast's "0 rounds". Still unknown: whether it builds the forecast's tidy (one `lastRunWords`, one pill table) or drills past the copies.
+- **S5 (LIN-4107)** is still Todo and will run after S4.
