@@ -52,6 +52,9 @@ export function buildCorpus() {
   const row = ({ root, id, issue = null, kind = 'implementation', at, resolvedAt, status = 'taken', abort = false, feedback = [], harness }) => {
     seq += 1;
     const _id = id ?? `d${String(seq).padStart(5, '0')}`;
+    // A ran row ends with a terminal marker (`[done]`), so the effort population (S10) settles it.
+    const end = resolvedAt ?? at;
+    const terminal = status === 'taken' && !abort ? [{ kind: 'terminal', timestamp: end.toISOString(), message: '[done] fixture' }] : [];
     return {
       _id,
       urlKey: 'acme',
@@ -64,8 +67,8 @@ export function buildCorpus() {
       target: 'cli',
       harness: harness ?? null,
       dispatchedAt: at,
-      resolvedAt: resolvedAt ?? at,
-      feedback,
+      resolvedAt: end,
+      feedback: [...feedback, ...terminal],
     };
   };
 
