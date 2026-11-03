@@ -300,7 +300,7 @@ html {
    which name their face explicitly, so a word never inherits it. Terminal character stays in the structure. */
 body {
   font-family: var(--font-content);
-  font-size: 16px;
+  font-size: var(--font-size-base);
   line-height: 1.6;
   background: var(--bg);
   color: var(--text);
@@ -482,7 +482,7 @@ h1 {
 .nav-view {
   color: var(--muted);
   text-decoration: none;
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
   font-family: var(--font-content);  /* human label — sans */
   flex: 0 0 auto;
   padding: var(--space-1) 0;
@@ -529,7 +529,7 @@ h1 {
   border-bottom: 2px solid transparent;
   padding: var(--space-1) 0;
   font-family: var(--font-structural);  /* ⋯ is structural character */
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
   color: var(--muted);
   cursor: pointer;
 }
@@ -615,7 +615,7 @@ h1 {
 .nav-label {
   color: var(--muted);
   font-family: var(--font-content);
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
 }
 
 .nav-value {
@@ -623,7 +623,7 @@ h1 {
   border: none;
   padding: 0;
   font-family: var(--font-content);
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
   color: var(--text);
   cursor: pointer;
 }
@@ -647,7 +647,7 @@ h1 {
 .nav-action {
   color: var(--muted);
   text-decoration: none;
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
   font-family: var(--font-content);
 }
 
@@ -686,7 +686,7 @@ a.wordmark:hover {
 /* Nav bar: leads the filters; nudge it slightly larger than the label/value
    text and add breathing room before "workspace:". */
 .wordmark-nav {
-  font-size: 1em;
+  font-size: var(--font-size-base);
   margin-right: 1ch;
 }
 
@@ -698,7 +698,7 @@ a.wordmark:hover {
 .wordmark-footer {
   color: var(--muted);
   font-weight: 600;
-  font-size: 0.95em;
+  font-size: var(--font-size-base);
 }
 
 /* Queue badge in nav bar */
@@ -714,7 +714,7 @@ a.wordmark:hover {
   box-shadow: inset 0 0 0 1px var(--amber);
   border: none;
   border-radius: var(--radius-sm);
-  font-size: 0.8em;
+  font-size: var(--font-size-sm);
   font-family: var(--font-content);
   cursor: pointer;
 }
@@ -754,7 +754,7 @@ a.wordmark:hover {
   text-decoration: none;
   border: 1px solid var(--amber);
   border-radius: var(--radius-sm);
-  font-size: 0.8em;
+  font-size: var(--font-size-sm);
   font-family: var(--font-content);
   cursor: pointer;
 }
@@ -805,7 +805,7 @@ a.wordmark:hover {
 .queue-panel-close {
   background: none;
   border: none;
-  font-size: 1.2em;
+  font-size: var(--font-size-lg);
   color: var(--muted);
   cursor: pointer;
   padding: 0 var(--space-1);
@@ -840,7 +840,7 @@ a.wordmark:hover {
 .queue-item-title {
   font-family: var(--font-content);
   font-weight: 500;
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
   color: var(--text);
   flex: 1;
 }
@@ -850,7 +850,7 @@ a.wordmark:hover {
   border: none;
   color: var(--red);
   cursor: pointer;
-  font-size: 0.8em;
+  font-size: var(--font-size-sm);
   padding: 0;
 }
 
@@ -859,7 +859,7 @@ a.wordmark:hover {
 }
 
 .queue-item-meta {
-  font-size: 0.8em;
+  font-size: var(--font-size-sm);
   color: var(--muted);
   margin-top: var(--space-1);
 }
@@ -891,7 +891,7 @@ a.wordmark:hover {
 
 .queue-item-snippet {
   font-family: var(--font-content);
-  font-size: 0.8em;
+  font-size: var(--font-size-sm);
   color: var(--muted);
   margin-top: var(--space-1);
   overflow: hidden;
@@ -907,7 +907,7 @@ a.wordmark:hover {
 }
 
 .queue-item-chip {
-  font-size: 0.7em;
+  font-size: var(--font-size-sm);
 }
 
 .queue-item-flag {
@@ -919,7 +919,7 @@ a.wordmark:hover {
    warning text token defined for both themes (see the status-palette block
    above), reused here rather than a new color. */
 .queue-item-warning {
-  font-size: 0.8em;
+  font-size: var(--font-size-sm);
   color: var(--amber-dim);
   margin-top: var(--space-1);
 }
@@ -990,7 +990,7 @@ a.wordmark:hover {
   border: none;
   padding: 0;
   font-family: var(--font-content);
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
   color: var(--text);
   cursor: pointer;
   text-decoration: none;
@@ -1067,7 +1067,7 @@ a.wordmark:hover {
 
 .search-input {
   font-family: var(--font-structural);  /* the query is machine input — mono */
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   padding: var(--space-1) var(--space-2);
@@ -1084,7 +1084,7 @@ a.wordmark:hover {
 
 .search-clear {
   font-family: var(--font-structural);
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
   color: var(--muted);
   background: none;
   border: none;
@@ -1097,7 +1097,7 @@ a.wordmark:hover {
 
 .search-no-results {
   color: var(--muted);
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
   padding: var(--space-2) 0;
 }
 
@@ -1145,7 +1145,7 @@ a.wordmark:hover {
 .in-progress-project {
   color: var(--muted);
   margin-left: 1ch;
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
   font-family: var(--font-content);
 }
 
@@ -1153,7 +1153,7 @@ a.wordmark:hover {
 .up-next-why {
   color: var(--muted);
   margin-left: 1ch;
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
   font-family: var(--font-content);
 }
 
@@ -1163,7 +1163,7 @@ a.wordmark:hover {
   color: var(--muted);
   margin-left: auto;
   padding-left: 1ch;
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
   font-family: var(--font-content);
   white-space: nowrap;
 }
@@ -1197,7 +1197,7 @@ a.wordmark:hover {
    one links row. Plain text sizes; the controls below keep their own styles. */
 .opened-task-facts {
   color: var(--muted);
-  font-size: 0.8125rem;
+  font-size: var(--font-size-sm);
   font-family: var(--font-content);
   padding: 2px 0 6px;
 }
@@ -1221,7 +1221,7 @@ a.wordmark:hover {
 
 .opened-task-last {
   color: var(--muted);
-  font-size: 0.8125rem;
+  font-size: var(--font-size-sm);
   font-family: var(--font-content);
   padding-top: var(--space-1);
 }
@@ -1257,11 +1257,11 @@ a.wordmark:hover {
   margin-top: 0;
   padding: 0;
   border-left: 0;
-  font-size: 0.8125rem;
+  font-size: var(--font-size-sm);
 }
 
 .opened-task .detail-link {
-  font-size: 0.8125rem;
+  font-size: var(--font-size-sm);
   margin-top: 0;
 }
 
@@ -1269,13 +1269,13 @@ a.wordmark:hover {
    the 13px body to about 11px. Download is a button without the .btn class, and it sits beside Rewrite at the same size. */
 .opened-task .btn,
 .opened-task .opened-task-download {
-  font-size: 0.8125rem;
+  font-size: var(--font-size-sm);
 }
 
 /* LIN-4024: the description fold's metadata line (identifier, assignee, labels) is body-sized text, not em-compounded. */
 .opened-task .detail-line,
 .opened-task .detail-meta {
-  font-size: 0.8125rem;
+  font-size: var(--font-size-sm);
 }
 
 /* LIN-4024: a child row's opened task takes the Home column's full width. Each tree level indents the row by 1.5em,
@@ -1296,7 +1296,7 @@ a.wordmark:hover {
 .home-description h1,
 .home-description h2,
 .home-description h3 {
-  font-size: 1em;
+  font-size: var(--font-size-base);
   margin: 0.4em 0 0.2em;
 }
 
@@ -1309,7 +1309,7 @@ a.wordmark:hover {
 .opened-task-home .task-strip-chip {
   flex: 0 1 auto;
   padding: 0 6px;
-  font-size: 0.75rem;
+  font-size: var(--font-size-sm);
   border-radius: 999px;
 }
 
@@ -1357,14 +1357,14 @@ a.wordmark:hover {
 }
 
 .opened-task-home .opened-task-step-name {
-  font-size: 1rem;
+  font-size: var(--font-size-base);
 }
 
 .opened-task-step-what,
 .opened-task-step-why {
   margin: 0;
   color: var(--muted);
-  font-size: 0.8125rem;
+  font-size: var(--font-size-sm);
 }
 
 .opened-task-step-what {
@@ -1403,7 +1403,7 @@ a.wordmark:hover {
 }
 
 .opened-task-watch {
-  font-size: 0.8125rem;
+  font-size: var(--font-size-sm);
 }
 
 .opened-task-running-actions {
@@ -1416,7 +1416,7 @@ a.wordmark:hover {
 .opened-task-running-next {
   margin: 0;
   color: var(--muted);
-  font-size: 0.8125rem;
+  font-size: var(--font-size-sm);
 }
 
 .opened-task-copy-state {
@@ -1429,7 +1429,7 @@ a.wordmark:hover {
 .opened-task-queued,
 .opened-task-last-copy {
   color: var(--muted);
-  font-size: 0.8125rem;
+  font-size: var(--font-size-sm);
 }
 
 .opened-task-ask,
@@ -1447,7 +1447,7 @@ a.wordmark:hover {
 .opened-task-see,
 .opened-task-stop,
 .opened-task-started-link {
-  font-size: 0.8125rem;
+  font-size: var(--font-size-sm);
 }
 
 .opened-task-change-panel {
@@ -1464,7 +1464,7 @@ a.wordmark:hover {
 }
 
 .opened-task-change-panel .btn {
-  font-size: 0.75rem;
+  font-size: var(--font-size-sm);
 }
 
 /* LIN-4010: on Home and on desktop, Change is a side drawer, so it does not push the rest of Home down. The phone
@@ -1522,7 +1522,6 @@ a.wordmark:hover {
 
   .opened-task-change-x {
     display: inline-block;
-    font-size: 1.4em;
     line-height: 1;
     padding: 4px 10px;
   }
@@ -1538,7 +1537,7 @@ a.wordmark:hover {
 .opened-task-change-label {
   color: var(--muted);
   min-width: 5.5em;
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
 }
 
 /* LIN-3987: a chosen choice (a preset, a Runs on target, a suggestion) is marked by aria-pressed, one look in both
@@ -1587,7 +1586,7 @@ a.wordmark:hover {
 /* LIN-4024: a card's two short lines sit tighter than the body's 1.6 (the .btn base sets its own line-height, hence the
    .opened-task scope), so the chooser stays inside a 390px first screen. */
 .opened-task .opened-task-card {
-  font-size: 0.75rem;
+  font-size: var(--font-size-sm);
   line-height: 1.3;
   padding: 2px 10px;
   gap: 0;
@@ -1599,7 +1598,7 @@ a.wordmark:hover {
 
 .opened-task-card-what {
   color: var(--muted);
-  font-size: 0.75rem;
+  font-size: var(--font-size-sm);
 }
 
 /* "Choose for this run" is a toggle; the decision panel it reveals stays in the same element, hidden until then. */
@@ -1638,7 +1637,7 @@ a.wordmark:hover {
 
 .decision-panel-heading {
   margin: 0;
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
   color: var(--muted);
 }
 
@@ -1669,14 +1668,14 @@ a.wordmark:hover {
 
 .decision-panel-label {
   font-family: var(--font-content);
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
   color: var(--muted);
 }
 
 .decision-panel-control,
 .settings-field-control {
   font-family: var(--font-content);
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
   padding: var(--space-1) var(--space-2);
   border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
@@ -1710,7 +1709,7 @@ a.wordmark:hover {
   margin: 0;
   padding: 0;
   list-style: none;
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
 }
 
 /* One suggestion: the button (its name) and its costs on one line, the reason on the line under it (LIN-3987). The
@@ -1815,14 +1814,14 @@ a.wordmark:hover {
 .opened-task-target {
   margin: 0 0 var(--space-2);
   color: var(--muted);
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
 }
 
 .opened-task-box-actions,
 .opened-task-progress-key,
 .opened-task-key-note,
 .opened-task-paste {
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
 }
 
 .opened-task-box-actions {
@@ -1852,7 +1851,7 @@ a.wordmark:hover {
 .completed-time {
   color: var(--muted);
   margin-left: 1ch;
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
   font-family: var(--font-content);
 }
 
@@ -1861,7 +1860,7 @@ a.wordmark:hover {
   color: var(--muted);
   margin-left: 1ch;
   padding: 0 0.5ch;
-  font-size: 0.8em;
+  font-size: var(--font-size-sm);
   font-family: var(--font-content);
   border: 1px solid var(--line);
   border-radius: 3px;
@@ -1969,7 +1968,7 @@ a.wordmark:hover {
 .state {
   flex-shrink: 0;
   margin-right: 0.5ch;
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
   opacity: 0.85;
 }
 .state.done { color: var(--green); }
@@ -1984,7 +1983,7 @@ a.wordmark:hover {
 .running-section .state,
 .up-next-section .state,
 .project .state {
-  font-size: 1em;
+  font-size: var(--font-size-base);
   line-height: 1;
   width: 1.2ch;
   text-align: center;
@@ -2018,7 +2017,7 @@ a.wordmark:hover {
 .detail-link {
   color: var(--muted);
   text-decoration: none;
-  font-size: 0.8em;
+  font-size: var(--font-size-sm);
   font-family: var(--font-content);
   display: inline-block;
   margin-top: 0.3rem;
@@ -2037,7 +2036,7 @@ a.wordmark:hover {
 .detail-toggle {
   color: var(--muted);
   cursor: pointer;
-  font-size: 0.8em;
+  font-size: var(--font-size-sm);
   font-family: var(--font-content);
   padding: var(--space-1) 0;
   display: block;
@@ -2105,7 +2104,7 @@ a.wordmark:hover {
   margin-left: 4ch;
   padding: var(--space-1) 0;
   font-family: var(--font-content);
-  font-size: 0.9rem;
+  font-size: var(--font-size-base);
 }
 
 .home-done-count {
@@ -2122,7 +2121,7 @@ a.wordmark:hover {
   margin-left: 4ch;
   color: var(--muted);
   font-family: var(--font-content);
-  font-size: 0.9rem;
+  font-size: var(--font-size-base);
 }
 
 .project-controls > * {
@@ -2151,7 +2150,7 @@ a.wordmark:hover {
 .project-header .add-task-link {
   display: inline;
   padding: 0 0 0 1.5ch;
-  font-size: 0.9rem;
+  font-size: var(--font-size-base);
   font-weight: 400;
 }
 
@@ -2270,7 +2269,7 @@ a.wordmark:hover {
 
 .detail-meta {
   color: var(--muted);
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
   flex: 1;
   min-width: 0;
   word-wrap: break-word;
@@ -2286,7 +2285,7 @@ a.wordmark:hover {
 .issue-description {
   color: var(--muted);
   font-family: var(--font-content);
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
   margin-bottom: var(--space-2);
 }
 
@@ -2331,7 +2330,7 @@ a.wordmark:hover {
   padding: 0.1em 0.3em;
   border-radius: var(--radius-sm);
   font-family: var(--font-structural);
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
 }
 
 .issue-description .desc-full-content pre {
@@ -2436,7 +2435,7 @@ a.wordmark:hover {
 .comments-empty {
   color: var(--muted);
   font-style: italic;
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
   padding: var(--space-1) 0;
 }
 
@@ -2467,7 +2466,7 @@ a.wordmark:hover {
 
 .comment-body {
   font-family: var(--font-content);
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
   color: var(--text);
 }
 
@@ -2510,7 +2509,6 @@ a.wordmark:hover {
 
   body {
     padding: var(--space-3);
-    font-size: 14px;
   }
 
   /* Mobile nav: compact horizontal layout */
@@ -2553,14 +2551,12 @@ a.wordmark:hover {
      and the part that cannot truncate, so a step down here buys the most room
      for the least loss. */
   .nav-label {
-    font-size: 0.8em;
   }
 
   /* The flex `gap` above already separates the brand from the first selector;
      the base rule's extra margin is a second separator paid for twice. */
   .wordmark-nav {
     margin-right: 0;
-    font-size: 0.85em;
   }
 
   .nav-actions {
@@ -2707,7 +2703,6 @@ a.wordmark:hover {
   }
 
   h1 {
-    font-size: 1.3rem;
   }
 
   .page-header h1 {
@@ -2755,7 +2750,6 @@ a.wordmark:hover {
   .toggle {
     padding: var(--space-2) var(--space-2h);
     margin: -var(--space-2) -var(--space-2h) -var(--space-2) var(--space-2);
-    font-size: 1rem;
   }
 
   .completed-toggle {
@@ -2783,7 +2777,6 @@ a.wordmark:hover {
 @media (max-width: 400px) {
   body {
     padding: var(--space-2h);
-    font-size: 13px;
   }
 
   header {
@@ -2791,7 +2784,6 @@ a.wordmark:hover {
   }
 
   h1 {
-    font-size: 1.2rem;
   }
 
   .page-header h1 {
@@ -2878,7 +2870,7 @@ a.wordmark:hover {
   padding: var(--space-2h) var(--space-3);
   background: var(--card);
   border-radius: 4px;
-  font-size: 0.85rem;
+  font-size: var(--font-size-sm);
   line-height: 1.6;
 }
 
@@ -2891,7 +2883,7 @@ a.wordmark:hover {
   background: var(--bg);
   padding: 0.1rem 0.3rem;
   border-radius: 2px;
-  font-size: 0.8rem;
+  font-size: var(--font-size-sm);
 }
 
 .setup-notice a {
@@ -2904,7 +2896,7 @@ a.wordmark:hover {
   padding: var(--space-2h) var(--space-3);
   background: var(--card);
   border-radius: 4px;
-  font-size: 0.85rem;
+  font-size: var(--font-size-sm);
   line-height: 1.6;
 }
 
@@ -3280,7 +3272,7 @@ body.is-landing {
 .prompt-name {
   font-family: var(--font-content);
   font-weight: 500;
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
   color: var(--text);
 }
 
@@ -3290,7 +3282,7 @@ body.is-landing {
   border: 1px solid var(--faint);
   padding: var(--space-1) var(--space-2);
   font-family: var(--font-content);
-  font-size: 0.8em;
+  font-size: var(--font-size-sm);
   color: var(--muted);
   cursor: pointer;
   border-radius: var(--radius-sm);
@@ -3316,7 +3308,7 @@ body.is-landing {
   border: 1px solid var(--brand-dim);
   padding: var(--space-1) var(--space-2);
   font-family: var(--font-content);
-  font-size: 0.8em;
+  font-size: var(--font-size-sm);
   color: var(--brand-dim);
   cursor: pointer;
   border-radius: var(--radius-sm);
@@ -3343,7 +3335,7 @@ body.is-landing {
   border: 1px solid var(--brand-dim);
   padding: var(--space-1) var(--space-2);
   font-family: var(--font-content);
-  font-size: 0.8em;
+  font-size: var(--font-size-sm);
   color: var(--brand-dim);
   cursor: pointer;
   border-radius: var(--radius-sm);
@@ -3369,7 +3361,7 @@ body.is-landing {
   border: 1px solid var(--muted);
   padding: var(--space-1) var(--space-2);
   font-family: var(--font-content);
-  font-size: 0.8em;
+  font-size: var(--font-size-sm);
   color: var(--muted);
   cursor: pointer;
   border-radius: var(--radius-sm);
@@ -3415,7 +3407,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 .dispatch-exec-harness-select,
 .dispatch-exec-model {
   font-family: var(--font-content);
-  font-size: 0.8em;
+  font-size: var(--font-size-sm);
   padding: 0.2rem 0.4rem;
   border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
@@ -3446,7 +3438,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
    select it sits beside; .hidden (above) toggles it on the `other…` sentinel. */
 .dispatch-exec-model-other {
   font-family: var(--font-content);
-  font-size: 0.8em;
+  font-size: var(--font-size-sm);
   padding: 0.2rem 0.4rem;
   border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
@@ -3463,7 +3455,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 /* Free-marker hint line (LIN-2719) — never option text (data-free rides the
    <option> instead), matching the Workspace AI Model pricing hint's convention. */
 .dispatch-exec-model-hint {
-  font-size: 0.8em;
+  font-size: var(--font-size-sm);
   color: var(--muted);
 }
 
@@ -3483,7 +3475,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
    rendered client-side into .dispatch-preset-picker-container. */
 .dispatch-preset-select {
   font-family: var(--font-content);
-  font-size: 0.8em;
+  font-size: var(--font-size-sm);
   padding: 0.2rem 0.4rem;
   border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
@@ -3500,13 +3492,13 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 /* Read-only resolved-selection reflection (LIN-2719 S4) — "so it is clear
    what will run" without filling the authorable exec-controls inputs. */
 .dispatch-preset-reflection {
-  font-size: 0.8em;
+  font-size: var(--font-size-sm);
   color: var(--muted);
 }
 
 /* Empty-picker "create a preset" link (LIN-2719 S3). */
 .dispatch-preset-create-link {
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
 }
 
 /* Prompt text - monospace, preserves formatting */
@@ -3531,7 +3523,6 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   }
 
   .prompt-text {
-    font-size: 0.8em;
     max-height: 300px;
   }
 }
@@ -3546,7 +3537,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 /* Shared markdown container styles */
 .prompt-text {
   font-family: var(--font-content);
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
   line-height: 1.5;
 }
 
@@ -3570,7 +3561,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 .prompt-text h3,
 .prompt-text h4 {
   font-family: var(--font-content);
-  font-size: 0.95em;
+  font-size: var(--font-size-base);
   font-weight: 600;
   color: var(--text);
   margin: 0.75em 0 0.4em 0;
@@ -3613,7 +3604,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 
 .prompt-text pre code {
   font-family: var(--font-structural);
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
   color: var(--text);
   background: none;
   border: none;
@@ -3685,7 +3676,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 .footer-deploy {
   color: var(--muted);
   font-family: var(--font-structural);
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
 }
 
 .footer-link {
@@ -3787,7 +3778,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 
 /* Underlined heading — prompts catalog. Additive over .section-header. */
 .section .section-header--ruled {
-  font-size: 1.1em;
+  font-size: var(--font-size-lg);
   margin-bottom: var(--space-3);
   padding-bottom: var(--space-2);
   border-bottom: 1px solid var(--faint);
@@ -3829,7 +3820,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   gap: var(--space-2h);
   padding: 0.4rem 0;
   font-family: var(--font-content);
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
 }
 
 .field-label {
@@ -3869,7 +3860,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   display: inline-block;
   margin: var(--space-1) 0 var(--space-2);
   font-family: var(--font-content);
-  font-size: 0.85rem;
+  font-size: var(--font-size-sm);
   color: var(--muted);
   text-decoration: none;
 }
@@ -3879,7 +3870,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 
 .token-label-input {
   font-family: var(--font-content);
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
   padding: var(--space-1) var(--space-2);
   border: 1px solid var(--faint);
   border-radius: var(--radius-sm);
@@ -4023,7 +4014,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   background: none;
   border: none;
   border-radius: 0;
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
   line-height: inherit;
   margin-right: 0.5ch;
   opacity: 0.85;
@@ -4288,7 +4279,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   justify-content: center;
   min-width: 0;
   font-family: var(--font-structural);
-  font-size: 0.7em;
+  font-size: var(--font-size-sm);
   color: var(--bg);
   background: var(--faint);
 }
@@ -4456,7 +4447,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 .recap-section {
   font-family: var(--font-content);
   color: var(--text);
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
 }
 
 .recap-header {
@@ -4592,7 +4583,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 
 .recap-type {
   display: inline-block;
-  font-size: 0.75em;
+  font-size: var(--font-size-sm);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 0.05rem 0.4rem;
@@ -4612,7 +4603,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 .context-section {
   font-family: var(--font-content);
   color: var(--text);
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
 }
 
 .context-header {
@@ -4756,7 +4747,7 @@ a.context-node:hover { border-color: var(--text); background: var(--bg); }
 }
 
 .context-node-tag {
-  font-size: 0.7em;
+  font-size: var(--font-size-sm);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--green);
@@ -4827,7 +4818,7 @@ a.context-node:hover { border-color: var(--text); background: var(--bg); }
 .brief-section {
   font-family: var(--font-content);
   color: var(--text);
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
 }
 
 .brief-header {
@@ -4944,7 +4935,7 @@ a.context-node:hover { border-color: var(--text); background: var(--bg); }
 .scan-section {
   font-family: var(--font-content);
   color: var(--text);
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
 }
 
 .scan-header {
@@ -5238,14 +5229,14 @@ a.context-node:hover { border-color: var(--text); background: var(--bg); }
 /* LIN-4024: a session's run link, one quiet text link after its time (not a fold toggle, not a button). */
 .session-run-link {
   color: var(--muted);
-  font-size: 0.75rem;
+  font-size: var(--font-size-sm);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 .session-summary {
   font-family: var(--font-content);
-  font-size: 0.9em;
+  font-size: var(--font-size-base);
   color: var(--text);
   padding: 0.3rem 0 0 1.25rem;
   line-height: 1.4;
@@ -5279,7 +5270,7 @@ a.context-node:hover { border-color: var(--text); background: var(--bg); }
 .opened-task-runner-link {
   display: inline-block;
   margin-top: 2px;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 /* LIN-3968: Home's runner line is one run of prose and link, so it is a block, not the flex detail line (flex
@@ -5303,7 +5294,7 @@ a.context-node:hover { border-color: var(--text); background: var(--bg); }
   background: var(--raised);
   color: var(--text);
   font-family: var(--font-content);
-  font-size: 0.8125rem;
+  font-size: var(--font-size-sm);
 }
 
 .opened-task-runner-link:hover,
@@ -5349,7 +5340,7 @@ a.context-node:hover { border-color: var(--text); background: var(--bg); }
   display: inline-flex;
   align-items: center;
   font-family: var(--font-content);
-  font-size: 0.9rem;
+  font-size: var(--font-size-base);
   font-weight: 600;
   color: var(--muted);
   cursor: pointer;

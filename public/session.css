@@ -28,7 +28,7 @@
 }
 .sess-header h1 {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: var(--font-size-lg);
   font-family: var(--font-content);
   overflow-wrap: anywhere;
 }
@@ -42,7 +42,7 @@
    `renderSection` `h2.section-header`. */
 .sess-section > .section-header {
   font-family: var(--font-content);
-  font-size: 1.05rem;
+  font-size: var(--font-size-base);
   font-weight: 600;
   letter-spacing: 0.01em;
   color: var(--text);
@@ -75,13 +75,13 @@
   margin: 0;
   font-family: var(--font-content);
   font-weight: 600;
-  font-size: 0.95rem;
+  font-size: var(--font-size-base);
   color: var(--text);
 }
 .sess-qcard-why-summary {
   cursor: pointer;
   font-family: var(--font-content);
-  font-size: 0.85rem;
+  font-size: var(--font-size-sm);
   color: var(--muted);
 }
 .sess-qcard-case {
@@ -92,7 +92,7 @@
 .sess-qcard-case-chunk {
   margin: 0;
   font-family: var(--font-structural);
-  font-size: 0.9rem;
+  font-size: var(--font-size-base);
   line-height: 1.5;
   color: var(--text);
   white-space: pre-wrap;
@@ -112,7 +112,7 @@
   width: 100%;
   box-sizing: border-box;
   font-family: var(--font-structural);
-  font-size: 0.9rem;
+  font-size: var(--font-size-base);
   padding: 0.4rem 0.5rem;
   color: var(--text);
   background: var(--card);
@@ -131,7 +131,7 @@
   border: none;
   padding: 0.15rem 0.25rem;
   font-family: var(--font-content);
-  font-size: 0.8rem;
+  font-size: var(--font-size-sm);
   color: var(--muted);
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -142,13 +142,13 @@
 .sess-qcard-readonly {
   margin: 0;
   font-family: var(--font-content);
-  font-size: 0.9rem;
+  font-size: var(--font-size-base);
   color: var(--muted);
 }
 .sess-qcard-if-unanswered {
   margin: 0;
   font-family: var(--font-content);
-  font-size: 0.8rem;
+  font-size: var(--font-size-sm);
   color: var(--muted);
 }
 
@@ -169,7 +169,7 @@
   padding: 0.4rem 0.8rem;
   border-top: 1px solid var(--line-soft);
   font-family: var(--font-structural);
-  font-size: 0.85rem;
+  font-size: var(--font-size-sm);
 }
 .sess-kv:first-child { border-top: none; }
 .sess-k {
@@ -197,7 +197,7 @@
 .sess-tasks-label {
   display: block;
   font-family: var(--font-content);
-  font-size: 0.7rem;
+  font-size: var(--font-size-sm);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -210,8 +210,8 @@
   gap: 0.4rem;
 }
 .sess-task {
-  font-family: var(--font-structural);
-  font-size: 0.8rem;
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
   padding: 0.15rem 0.5rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -248,14 +248,14 @@
   gap: var(--space-2);
   flex-wrap: wrap;
   font-family: var(--font-structural);
-  font-size: 0.85rem;
+  font-size: var(--font-size-sm);
 }
 .sess-run-iter { color: var(--muted); }
 .sess-run-ident { color: var(--text); font-weight: 600; }
 .sess-run-kind {
   color: var(--muted);
   font-family: var(--font-content);
-  font-size: 0.8rem;
+  font-size: var(--font-size-sm);
 }
 /* ── Collapsed-run "waiting for input" flag (LIN-1163 item 5) ─────────────
    Visible on the card face (inside the always-shown head) even while the run
@@ -263,7 +263,7 @@
    family — same vocabulary as the session-level waiting banner. */
 .sess-run-waiting-flag {
   font-family: var(--font-content);
-  font-size: 0.75rem;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   color: var(--amber-dim);
   white-space: nowrap;
@@ -275,7 +275,7 @@
    stalled tail instead of it hiding behind a healthy-looking heartbeat). */
 .sess-run-parked-flag {
   font-family: var(--font-content);
-  font-size: 0.75rem;
+  font-size: var(--font-size-sm);
   color: var(--slate-dim);
   white-space: nowrap;
 }
@@ -287,7 +287,7 @@
 .sess-run-head[role="button"]:hover { color: var(--brand); }
 .sess-run-toggle-icon {
   font-family: var(--font-structural);
-  font-size: 0.72rem;
+  font-size: var(--font-size-sm);
   color: var(--muted);
   transition: transform 0.15s ease;
   flex-shrink: 0;
@@ -298,7 +298,7 @@
 .sess-run--expanded > .sess-run-body { display: block; }
 .sess-run-title {
   font-family: var(--font-content);
-  font-size: 0.85rem;
+  font-size: var(--font-size-sm);
   color: var(--text);
   margin: 0.2rem 0;
 }
@@ -307,7 +307,7 @@
   flex-wrap: wrap;
   gap: var(--space-2h);
   font-family: var(--font-structural);
-  font-size: 0.75rem;
+  font-size: var(--font-size-sm);
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
@@ -329,7 +329,7 @@
    deliberate read. */
 .sess-chip {
   font-family: var(--font-structural);
-  font-size: 0.72rem;
+  font-size: var(--font-size-sm);
   padding: 0.1rem 0.45rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
@@ -349,7 +349,7 @@
 .sess-cred[data-state="dead"] { color: var(--red-dim); font-weight: 600; }
 .sess-cred-token {
   font-family: var(--font-structural);
-  font-size: 0.72rem;
+  font-size: var(--font-size-sm);
   color: var(--slate-dim);
 }
 .sess-chip--cred[data-state="ok"] { color: var(--green-dim); border-color: var(--green-dim); }
@@ -372,7 +372,7 @@
   align-items: baseline;
   flex-wrap: wrap;
   gap: 0.4rem;
-  font-size: 0.8rem;
+  font-size: var(--font-size-sm);
 }
 .sess-ticket-ident {
   font-family: var(--font-structural);
@@ -444,10 +444,10 @@
    sizing (marked + DOMPurify output, fed from the escaped data-feedback JSON). */
 .sess-tx-msg {
   font-family: var(--font-structural);
-  font-size: 0.82rem;
+  font-size: var(--font-size-sm);
   line-height: 1.5;
 }
-.sess-tx-link { font-size: 0.82rem; }
+.sess-tx-link { font-size: var(--font-size-sm); }
 
 /* ── Task context (brief / recap) ─────────────────────────────────────────── */
 .sess-ctx-issue {
@@ -471,10 +471,10 @@
   margin-bottom: 0.4rem;
 }
 .sess-ctx-kind { font-family: var(--font-content); font-weight: 600; color: var(--text); }
-.sess-ctx-ident { font-family: var(--font-structural); font-size: 0.78rem; color: var(--muted); overflow-wrap: anywhere; }
+.sess-ctx-ident { font-family: var(--font-structural); font-size: var(--font-size-sm); color: var(--muted); overflow-wrap: anywhere; }
 .sess-ctx-body {
   font-family: var(--font-structural);
-  font-size: 0.8rem;
+  font-size: var(--font-size-sm);
   line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
@@ -490,13 +490,13 @@
 .sess-ctx-meta {
   margin-top: 0.4rem;
   font-family: var(--font-structural);
-  font-size: 0.72rem;
+  font-size: var(--font-size-sm);
   color: var(--muted);
 }
 .sess-ctx-miss {
   margin: 0;
   font-family: var(--font-content);
-  font-size: 0.82rem;
+  font-size: var(--font-size-sm);
   color: var(--muted);
 }
 
@@ -513,7 +513,7 @@
 .sess-recap-group-head {
   font-family: var(--font-content);
   font-weight: 600;
-  font-size: 0.8rem;
+  font-size: var(--font-size-sm);
   color: var(--text);
   margin-bottom: var(--space-1);
 }
@@ -522,14 +522,14 @@
 .sess-recap-item { display: grid; gap: 0.1rem; }
 .sess-recap-what {
   font-family: var(--font-content);
-  font-size: 0.82rem;
+  font-size: var(--font-size-sm);
   line-height: 1.4;
   color: var(--text);
   overflow-wrap: anywhere;
 }
 .sess-recap-tag {
   font-family: var(--font-structural);
-  font-size: 0.7rem;
+  font-size: var(--font-size-sm);
   color: var(--muted);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -538,7 +538,7 @@
 }
 .sess-recap-sub {
   font-family: var(--font-structural);
-  font-size: 0.75rem;
+  font-size: var(--font-size-sm);
   line-height: 1.4;
   color: var(--muted);
   word-break: break-word;
@@ -551,7 +551,7 @@
    textarea→POST that injects a plain human follow-up back into the session. */
 .sess-reply-feedback {
   font-family: var(--font-structural);
-  font-size: 0.78rem;
+  font-size: var(--font-size-sm);
   color: var(--muted);
 }
 .sess-reply-feedback.error { color: var(--red); }
@@ -592,7 +592,7 @@
   resize: vertical;
   padding: 0.4rem 0.5rem;
   font-family: var(--font-structural);
-  font-size: 0.82rem;
+  font-size: var(--font-size-sm);
   line-height: 1.5;
   color: var(--text);
   background: var(--card);
@@ -621,7 +621,7 @@
 }
 .sess-proposals-title {
   font-family: var(--font-structural);
-  font-size: 0.72rem;
+  font-size: var(--font-size-sm);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--muted);
@@ -643,7 +643,7 @@
 }
 .sess-proposal-prompt {
   font-family: var(--font-content);
-  font-size: 0.85rem;
+  font-size: var(--font-size-sm);
   color: var(--text);
   word-break: break-word;
 }
@@ -653,12 +653,12 @@
 }
 .sess-proposal-state {
   font-family: var(--font-structural);
-  font-size: 0.75rem;
+  font-size: var(--font-size-sm);
   color: var(--muted);
 }
 .sess-proposal-error {
   font-family: var(--font-structural);
-  font-size: 0.75rem;
+  font-size: var(--font-size-sm);
   color: var(--amber);
 }
 
@@ -682,7 +682,7 @@
 .sess-heading-title { font-family: var(--font-content); }
 .sess-run-id {
   font-family: var(--font-structural);
-  font-size: 0.8rem;
+  font-size: var(--font-size-sm);
   font-weight: 400;
   color: var(--muted);
 }
@@ -699,7 +699,7 @@
 .sess-step { margin-bottom: var(--space-4); }
 .sess-step-summary {
   font-family: var(--font-content);
-  font-size: 0.8rem;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   color: var(--text);
   margin-bottom: 0.35rem;
