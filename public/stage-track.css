@@ -99,7 +99,7 @@
   list-style: none;
   margin: var(--space-1) 0 0;
   padding: 0;
-  font-family: var(--font-structural);
+  font-family: var(--font-content);
   font-size: var(--font-size-sm);
 }
 .task-stage-links li { overflow-wrap: anywhere; }

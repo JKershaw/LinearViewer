@@ -240,7 +240,7 @@
 /* A dim, non-bubble log line (e.g. a tool-call breadcrumb) — provenance, not a
    conversational turn, so it is deliberately quieter than .chat-msg. */
 .chat-note {
-  font-family: var(--font-structural);
+  font-family: var(--font-content);
   font-size: var(--font-size-sm);
   color: var(--muted);
   padding-left: var(--space-2);
@@ -271,7 +271,7 @@
   margin: var(--space-2) 0;
 }
 .chat-options-caption {
-  font-family: var(--font-structural);
+  font-family: var(--font-content);
   font-size: var(--font-size-sm);
   color: var(--muted);
   margin-bottom: var(--space-1);

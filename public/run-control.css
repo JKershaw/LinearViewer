@@ -329,7 +329,7 @@
 
 /* "generated 2h ago · regenerate" — an age fact (mono) plus an action. 12px, the floor (LIN-4024; was 10px). */
 .opened-task-generated {
-  font-family: var(--font-structural);
+  font-family: var(--font-content);
   font-size: 12px;
   color: var(--muted);
   white-space: nowrap;

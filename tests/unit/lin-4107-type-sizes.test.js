@@ -177,6 +177,93 @@ describe('the LIN-4024 exemption list cannot grow or go stale (LIN-4107)', () =>
   });
 });
 
+// Every selector on the sheets Home and the task page load that may keep --font-structural (mono). Mono is for IDs and
+// figures (LIN-4040 D7; LIN-4107 item 23). The entries are grouped by the reason mono is kept. Entries under "to review"
+// were kept as they were because their names do not settle whether they show a fact; they are a list for the reviewer, not
+// a decision. Listed by hand, so a new mono selector fails until it is added here with its reason.
+export const MONO_ALLOWED = Object.freeze([
+  // IDs and machine facts (the wordmark is the brand mark, kept mono as its pin in tests/unit/wordmark.test.js says)
+  '.wordmark',
+  '.task-ident',
+  '.task-ref-ident',
+  '.sess-ticket-ident',
+  '.sess-ctx-ident',
+  '.sess-run-id',
+  '.sess-cred-token',
+  '.task-share-url',
+  '.context-node-id',
+  '.footer-deploy',
+  '.chat-tool-row',
+  '.chat-tool-group',
+  // figures
+  '.tag__count',
+  '.swipe-counter',
+  '.sess-run-times',
+  '.task-chat-saved-count',
+  '.task-share-when',
+  // code spans (literal text)
+  '.comment-body code',
+  '.issue-description .desc-full-content code',
+  '.prompt-text code',
+  '.prompt-text pre code',
+  '.swipe-accordion-body code',
+  '.swipe-prompt-text code',
+  '.swipe-reasoning-content code',
+  '.task-chat-warning code',
+  '.task-edit-preview code',
+  // glyphs (structural characters)
+  '.nav-view-current::before',
+  '.nav-more-toggle',
+  '.search-clear',
+  '.sess-run-toggle-icon',
+  '.task-ref-glyph',
+  // to review: kept as they were
+  '.card-meta',
+  '.chip',
+  '.chat-fold',
+  '.chat-msg--row',
+  '.sess-ctx-meta',
+  '.sess-kv',
+  '.swipe-blocking-issue',
+  '.swipe-card-header',
+  '.swipe-comment-header',
+  '.swipe-relation-issue',
+  '.task-chat-saved-meta',
+  '.segment-bar__cell',
+  // other pages (not Home or the task page): left as they were
+  '.landing-wordmark',
+  '.error-details',
+  '.obs-act-chip',
+  '.repo-picker-slug',
+  '.project[data-project-type="periodicals"] .periodical-mode',
+  '.token-value',
+  '.token-usage-hint code',
+  '.decision-panel-figures',
+  '.decision-panel-costs',
+]);
+const MONO_SET = new Set(MONO_ALLOWED);
+
+describe('mono is only on the allowlisted selectors (LIN-4107 beat 2 corrective)', () => {
+  const structural = new Set();
+  for (const sheet of SHEETS) {
+    for (const rule of sheet.rules) {
+      for (const d of rule.decls) {
+        if (d.prop === 'font-family' && /var\(--font-structural\)/.test(d.value)) {
+          for (const s of rule.selectors) structural.add(s);
+        }
+      }
+    }
+  }
+
+  test('every selector that sets the structural (mono) face is on the allowlist', () => {
+    assert.deepEqual([...structural].filter((s) => !MONO_SET.has(s)), []);
+  });
+
+  test('every allowlisted selector still sets the structural face (a stale entry fails)', () => {
+    assert.deepEqual(MONO_ALLOWED.filter((s) => !structural.has(s)), []);
+  });
+});
+
 describe('the out-of-scope list cannot grow or go stale (LIN-4107)', () => {
   test('it has the sixteen selectors the ruling names, and each still has a rule in the sheets', () => {
     assert.equal(NON_HOME_TASK.length, 16);

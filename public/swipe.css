@@ -557,7 +557,7 @@ a.swipe-relation-issue:hover {
    ========================================================================== */
 
 .swipe-accordion-body .prompt-section {
-  font-family: var(--font-structural);
+  font-family: var(--font-content);
 }
 
 /* Cache hint appended to the closed accordion header */

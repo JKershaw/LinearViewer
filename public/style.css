@@ -1066,7 +1066,7 @@ a.wordmark:hover {
 }
 
 .search-input {
-  font-family: var(--font-structural);  /* the query is machine input — mono */
+  font-family: var(--font-content);  /* the query is machine input — mono */
   font-size: var(--font-size-base);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -3503,7 +3503,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 
 /* Prompt text - monospace, preserves formatting */
 .prompt-text {
-  font-family: var(--font-structural);
+  font-family: var(--font-content);
   font-size: var(--font-size-sm);
   line-height: 1.5;
   color: var(--text);
@@ -5136,7 +5136,7 @@ a.context-node:hover { border-color: var(--text); background: var(--bg); }
    repeats them (LIN-4015), so the tree view and Swipe read identically.
    ========================================================================== */
 .sessions-section {
-  font-family: var(--font-structural);
+  font-family: var(--font-content);
   font-size: var(--font-size-sm);
 }
 
