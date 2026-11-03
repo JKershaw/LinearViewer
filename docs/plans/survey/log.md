@@ -401,3 +401,14 @@ All five Surveys finished in about 3 to 4 minutes each. They're kept verbatim in
 **Honest note on the method.** Where the Survey said drill, we didn't pass its warnings to the builder, even good ones. That keeps the test clean: if LIN-4166's warning bites, the forecast saw it and the drill didn't. Where we acted, we passed the option and its main reason, not the whole forecast.
 
 **First look at the Survey on simple-dispatcher:** both forecasts read as well grounded as Harbour's. LIN-4165's opening ("it mostly exists") is the sort of finding that changes the size of a ticket before it starts.
+
+## 3 Nov, 18:15 UTC: half an hour in
+
+- **John on disk (17:50):** the filesystem shares unedited files between clones, and most of the host's used space is personal data. Fine for tonight.
+- **LIN-4164's research measured disk and changed the shape of the ticket.** Real disk per finished session is about 45–50 MB, not the 467 MB `du` shows (the Survey's caveat about shared blocks was right). But at 130–240 sessions a day, a week of clones is still 44–80 GB against 77 GB free, so it doesn't fit. The plan took the option the Survey priced as "large, only worth it if disk bites": **keep the record for 7 days, drop the clone at 6 h, and re-clone at the same path on resume**. It spiked `claude --resume` across a deleted and recreated cwd, and it works.
+  - **Question 5 paid off twice.** The Survey's unchecked list said to measure disk first and to "time `updateState` on a 1,000-record fixture". Research did both. The second found `sessions.json` growing about 20× (57–98 ms per read, parse and write), mostly from `dispatchedPrompt`, which a resume always overwrites. It's cleared at clone reap.
+  - The plan was approved in one round, as forecast ("one round, two at most"). The ordering assertion against `BLOCKED_REAP_MS` came up, as forecast. The tidy is its own first subtask (LIN-4170). Harbour's copy is the last subtask (LIN-4173), gated on simple-dispatcher's deploy: the forecast's "deploy order".
+  - **Ruling for John:** the clone window (6 h recommended, or 24 h for about 8 GB more at peak).
+- **LIN-4165** already has a PR (simple-dispatcher #302).
+- **LIN-4166 and LIN-4168** have plan-review verdicts.
+- **LIN-4167's ruling** offers only the Actions-secret route (A: a re-run deploy job; B: CI owns every deploy; or no). It found a prior record ("no CI workflow uses a Railway token", the 22 Oct incident) that this would reverse. The host-side route, where the agent's Railway CLI deploys when it sees a green re-run that didn't ship, wasn't offered: the builders don't know the CLI is there.
