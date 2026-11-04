@@ -975,3 +975,32 @@ Each session went back to a fresh worktree at its own base and read nothing late
 - This is a second pass in the same session, with its own forecast in view, so question 3 invites revision.
 - The answers are hypothetical: the tickets are done. Whether the middle option pays has to be tested forward.
 - Cost: each answer took about 18k output tokens and re-read about 2M cached tokens.
+
+## 4 Nov, about 08:00 UTC: closing the gap, and a backtest of the global offshoot
+
+**John's question:** what would it take, using the pieces we have, for tasks to finish with a cleaner codebase than they started with? He suggested another offshoot from the Survey offshoot, looking at the global picture.
+
+**The proposed loop:**
+1. open-0 (local).
+2. A **global offshoot**: a second agent that looks at the codebase as a place, not at the task. Agents drill, so each view gets its own voice.
+3. The step-back, fed by both, sets out the range and chooses. The choice, and what it should leave behind, go onto the ticket.
+4. The build.
+5. A **per-task place change** at merge (map and census at base vs merge; it reports, never gates). If the place got worse, the tidy-after is pulled in the same lineage.
+6. A tally of the broad options by area. When a second task names the same one, it's pulled.
+7. The Costs meter shows the payback.
+
+"Cleaner" is read at the level of the whole codebase, not in lines:
+- no new module without a home on the map;
+- no unnamed new two-way area link;
+- fewer places per decision;
+- copies deleted;
+- big units no bigger.
+
+**Backtest first.** We know the place outcome for three tickets. The global offshoot (v0, `docs/plans/survey/global-offshoot-prompt.md`) runs at each ticket's own base, with the future off limits.
+
+**What counts as a hit, written before dispatch:**
+- **LIN-4176 @ `9e397e6be`:** it says the consolidated cost read will be a new owner with no home on the area map, imported from many areas. Or it says the read will sit between Runs and LLM and be read back by them, the two-way risk. Naming either is a hit. Saying "cost has no home" without saying what the task will do about it is half.
+- **LIN-4168 @ `048c3319a`:** it says the registry will be a new holder with no home, or that the composition root (`server.js`) or the test router grows. A hit is naming what the obvious way adds and where it lands, not just that the state has no owner.
+- **LIN-4195 @ `723052153`:** it says the per-request store and intake add another module beside `dispatch-store` and the cost read, with Runs ↔ Costs crossings, or that the snapshot path will run alongside it. A hit is a prediction about the place, not about the figure.
+
+**A miss** is an answer that only restates the task's local difficulty, which would make it the drill by other means again.
