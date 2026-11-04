@@ -1,0 +1,51 @@
+{
+ "window": "9b2955cc..5334c81a",
+ "productionTouchingFirstParentCommits": 163,
+ "netDP": 4172,
+ "netCodeLines": 9856,
+ "classes": {
+  "feature": {
+   "commits": 133,
+   "dDP": 3893,
+   "dCodeLines": 8948
+  },
+  "relocation": {
+   "commits": 26,
+   "dDP": 709,
+   "dCodeLines": 2314
+  },
+  "retirement": {
+   "commits": 4,
+   "dDP": -430,
+   "dCodeLines": -1406
+  }
+ },
+ "classRule": "keyword on subject: retirement = subject matches retire|remove|delete|drop and dDP<0; relocation = subject matches move|split|extract|rebuild|flat|one <noun>|shared piece|untangle; else feature. Keyword-classified: boundary is judgement, see report section 1.",
+ "relocationCommitsWithZeroDP": 11,
+ "retirements": [
+  [
+   "d738a767",
+   -49,
+   -154,
+   "LIN-3848: remove the nine settings switches that do nothing or are superseded (#2082)"
+  ],
+  [
+   "2c836676",
+   -319,
+   -1039,
+   "LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)"
+  ],
+  [
+   "0fa361af",
+   -5,
+   -8,
+   "LIN-3479: remove the unused .text error helpers and textError (#2207)"
+  ],
+  [
+   "30db2052",
+   -57,
+   -205,
+   "LIN-4129: remove cost code that nothing reads (#2234)"
+  ]
+ ]
+}

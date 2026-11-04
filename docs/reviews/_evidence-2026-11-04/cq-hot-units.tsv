@@ -1,0 +1,35 @@
+# Named hot units, base vs head (same measurement as shape.mjs --functions; incl = inclusive DP; "-" = not present at that SHA)
+repo	file	unit	base	head
+LinearViewer	lib/runner-kit/runner.mjs	runCommand	L901 span=309 cyc=132 cond=94 nest=4 incl=142	L1026 span=326 cyc=136 cond=98 nest=4 incl=147
+LinearViewer	lib/runner-kit/runner.mjs	waitLoop	L1274 span=85 cyc=48 cond=43 nest=6 incl=50	L1417 span=85 cyc=48 cond=43 nest=6 incl=50
+LinearViewer	lib/render.js	renderPage	L199 span=83 cyc=45 cond=41 nest=0 incl=44	L264 span=137 cyc=79 cond=67 nest=0 incl=79
+LinearViewer	lib/dispatch-store.js	addFeedback	L2336 span=399 cyc=60 cond=48 nest=4 incl=59	L3229 span=448 cyc=67 cond=53 nest=4 incl=66
+LinearViewer	public/prompt-section.js	<module>/λ@12	L12 span=1468 cyc=1 cond=1 nest=0 incl=338	L12 span=2856 cyc=1 cond=1 nest=0 incl=954
+LinearViewer	public/prompt-section.js	init	L633 span=826 cyc=11 cond=11 nest=2 incl=222	L853 span=1994 cyc=18 cond=17 nest=2 incl=770
+LinearViewer	lib/unanswered-decisions.js	collectUnansweredDecisions|reduceUnansweredDecisions	L450 span=269 cyc=63 cond=44 nest=3 incl=69	L712 span=248 cyc=62 cond=46 nest=4 incl=68
+LinearViewer	lib/agent-turn.js	runAgentTurn	L176 span=406 cyc=60 cond=57 nest=3 incl=71	L167 span=423 cyc=61 cond=57 nest=3 incl=72
+LinearViewer	lib/run-closeout-state.js	deriveCloseOutState	L148 span=209 cyc=48 cond=44 nest=3 incl=47	L148 span=209 cyc=48 cond=44 nest=3 incl=47
+LinearViewer	lib/ci-wake-sweep.js	sweepOneWorkspace	L271 span=142 cyc=52 cond=42 nest=4 incl=60	L271 span=149 cyc=54 cond=44 nest=4 incl=63
+LinearViewer	lib/connection-credential.js	convertToConnectionBacked	L1251 span=125 cyc=46 cond=42 nest=4 incl=49	L1267 span=125 cyc=46 cond=42 nest=4 incl=49
+LinearViewer	lib/ship-biscuit.js	buildEditionModel	L343 span=117 cyc=52 cond=49 nest=3 incl=58	L344 span=119 cyc=53 cond=49 nest=3 incl=59
+LinearViewer	lib/pipeline-churn.js	classifyTicket	-	L195 span=168 cyc=87 cond=74 nest=4 incl=144
+LinearViewer	lib/chat-tools.js	createChatToolCatalog	L1299 span=723 cyc=35 cond=31 nest=1 incl=154	L1300 span=729 cyc=36 cond=32 nest=1 incl=155
+LinearViewer	routes/dashboard.js	createDashboardRoutes	L507 span=2533 cyc=29 cond=23 nest=0 incl=467	L251 span=621 cyc=7 cond=1 nest=0 incl=101
+LinearViewer	routes/workspace-api.js	createWorkspaceApiRoutes	L833 span=2950 cyc=12 cond=12 nest=0 incl=417	L201 span=706 cyc=14 cond=14 nest=0 incl=99
+LinearViewer	routes/workspace-api-roadmap.js	createRoadmapRoutes	L65 span=809 cyc=1 cond=1 nest=0 incl=122	L70 span=813 cyc=1 cond=1 nest=0 incl=122
+LinearViewer	routes/workspace-api-scan.js	registerScanRoutes	-	L95 span=592 cyc=1 cond=1 nest=0 incl=63
+LinearViewer	routes/workspace-api-issue-write.js	registerIssueWriteRoutes	-	L252 span=514 cyc=2 cond=2 nest=0 incl=83
+LinearViewer	routes/workspace-api-feedback.js	registerFeedbackRoutes	-	L191 span=377 cyc=1 cond=1 nest=0 incl=70
+LinearViewer	routes/proxy.js	createProxyRoutes	L489 span=1126 cyc=19 cond=19 nest=0 incl=124	L490 span=1179 cyc=22 cond=22 nest=0 incl=139
+LinearViewer	routes/settings.js	sendSettingsPage	-	L200 span=193 cyc=38 cond=25 nest=2 incl=40
+LinearViewer	lib/errors.js	describeSourceFailure	-	L374 span=48 cyc=32 cond=23 nest=2 incl=32
+LinearViewer	public/observation.js	renderRulingRow	L1968 span=241 cyc=26 cond=22 nest=2 incl=33	L2265 span=268 cyc=31 cond=26 nest=2 incl=38
+LinearViewer	public/observation.js	renderRulings	L1713 span=123 cyc=29 cond=24 nest=3 incl=30	L1990 span=129 cyc=35 cond=30 nest=3 incl=36
+LinearViewer	lib/render-task-page.js	renderTaskPullRequest	L411 span=46 cyc=37 cond=27 nest=2 incl=36	L558 span=49 cyc=38 cond=28 nest=2 incl=37
+LinearViewer	lib/task-page-loader.js	createTaskPageLoader	L784 span=210 cyc=14 cond=14 nest=1 incl=56	L1223 span=313 cyc=21 cond=21 nest=1 incl=89
+LinearViewer	scripts/code-shape/census-core.mjs	runCensus	-	-
+simple-dispatcher	opencode-runner.js	runOpenCode	L1076 span=768 cyc=132 cond=116 nest=6 incl=181	L1130 span=792 cyc=134 cond=118 nest=6 incl=184
+simple-dispatcher	reapers.js	runStallFailsafe	L1715 span=950 cyc=99 cond=86 nest=5 incl=162	L1888 span=993 cyc=108 cond=91 nest=5 incl=177
+simple-dispatcher	dispatcher.js	processPolledItem	L693 span=793 cyc=110 cond=88 nest=3 incl=113	L730 span=851 cyc=122 cond=100 nest=3 incl=125
+simple-dispatcher	dispatcher.js	runOnce	L1597 span=520 cyc=83 cond=72 nest=5 incl=113	L1693 span=520 cyc=82 cond=71 nest=5 incl=112
+simple-dispatcher	hook.js	main	L1579 span=609 cyc=90 cond=67 nest=3 incl=111	L1725 span=582 cyc=92 cond=69 nest=3 incl=104

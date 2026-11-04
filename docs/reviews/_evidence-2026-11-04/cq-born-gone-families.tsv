@@ -1,0 +1,107 @@
+# Born and gone production files, 9b2955cc -> 5334c81a (same include regex and area guide)
+# born 83 files, DP 3188; gone 6 files, DP 406
+kind	file	DP	code	worst_fn	worst_cyc	nesting
+gone	lib/next-run.js	219	498	-	-	-
+gone	lib/plan-fee-config.js	3	6	-	-	-
+gone	lib/render-next-run.js	15	83	-	-	-
+gone	lib/task-cost.js	39	72	-	-	-
+gone	public/next-run.js	110	383	-	-	-
+gone	routes/next-run.js	20	130	-	-	-
+born	lib/pipeline-churn.js	222	274	classifyTicket	87	4
+born	lib/home-view.js	161	352	upNextOf	20	3
+born	lib/render-settings-models.js	132	339	modelsBody	25	2
+born	routes/workspace-api-issue-write.js	129	356	registerIssueWriteRoutes/λ@298	27	4
+born	routes/dashboard-feed.js	128	381	buildSessionPayload	22	3
+born	lib/model-routing.js	126	293	tableFromPreferences	14	2
+born	routes/settings.js	110	385	sendSettingsPage	38	3
+born	lib/task-state.js	105	178	taskStateOf	35	2
+born	lib/components/decision-panel.js	94	211	numbersHtml	16	2
+born	routes/workspace-api-feedback.js	93	316	registerFeedbackRoutes/λ@419	31	4
+born	lib/cost-read.js	87	255	readCost	29	3
+born	routes/dashboard-summaries.js	75	239	handleSessionSummary	14	2
+born	routes/workspace-api-scan.js	74	331	registerScanRoutes/λ@227	17	3
+born	lib/render-settings-workspace.js	73	167	runningBody	29	2
+born	lib/model-routing-store.js	71	216	ensureMigrated	13	3
+born	lib/task-order.js	70	167	issueToCard	13	3
+born	routes/workspace-api-run-evidence.js	70	233	registerRunEvidenceRoutes/λ@32	17	3
+born	lib/settings-keys.js	58	69	buildKeyList	24	2
+born	lib/task-board-view.js	58	154	orderIssuesForSwipe	11	2
+born	lib/workspace-change-log.js	53	122	summarizeWorkspaceEntry	9	1
+born	routes/dashboard-session-state.js	47	108	peakToolCount	9	2
+born	lib/close-out-merges.js	46	109	recordPipelineMerge	21	2
+born	lib/components/settings-row.js	46	59	drillRow	14	1
+born	routes/dashboard-rulings.js	46	212	rulingWrite/λ@152	9	2
+born	lib/dispatch-lineage-status.js	44	113	recomputeLineageRows	19	4
+born	lib/home-rows.js	42	99	homeRowsFor	17	3
+born	lib/request-usage-intake.js	38	103	judgeRecord	23	2
+born	public/decision-panel.js	33	73	sync	13	2
+born	routes/proxy-model-routing.js	33	137	writeHandler/λ@152	11	2
+born	lib/model-routing-spend.js	32	88	typicalByModel	7	2
+born	lib/render-settings-you.js	32	144	accountBody	14	1
+born	lib/task-facts-holder.js	32	74	gateRefusalOf	8	1
+born	routes/dashboard-effort.js	30	157	groupBySource	11	2
+born	routes/dashboard-drilldown.js	29	103	hydrate/λ@119	15	2
+born	lib/connection-secondary-remint.js	26	63	isSecondaryRenewable	6	2
+born	public/settings-models.js	25	72	<module>/λ@13/λ@64	10	1
+born	lib/components/settings-ask.js	24	39	askInPlace	25	1
+born	routes/workspace-api-issue-read.js	24	121	registerIssueReadRoutes/λ@149	17	3
+born	lib/model-routing-edit.js	23	58	stagedChanges	13	3
+born	lib/request-usage-store.js	23	79	upsertOpFor	10	2
+born	lib/run-controls.js	23	59	resolveRunControls	9	1
+born	lib/components/plain-page.js	22	59	renderPlainPage	9	1
+born	routes/workspace-api-steps.js	22	53	openIssue	13	1
+born	lib/dispatch-session-read.js	21	37	pointReadSession	17	2
+born	lib/key-state.js	21	43	resetKey	8	2
+born	lib/settings-areas.js	21	94	AREAS.state	6	1
+born	lib/workspace-issues-memo.js	21	30	countFor	8	1
+born	routes/settings-model.js	20	74	createSettingsModelRoutes/λ@64	11	2
+born	lib/cost-format.js	18	18	formatUsd	13	2
+born	lib/home-row-states.js	18	45	gatherTaskStates	8	2
+born	lib/model-routing-validate.js	18	34	readPatch	16	4
+born	routes/dashboard-kpis.js	18	104	unansweredAgeRow	5	1
+born	lib/components/model-change-lines.js	16	34	valueWords	7	2
+born	lib/components/settings-group.js	16	20	group	9	0
+born	lib/lineage-membership.js	16	40	groupLineageMembership	9	2
+born	lib/row-usage.js	15	44	foldLineageUsage	7	2
+born	public/cost-format.js	15	19	formatUsd	13	2
+born	lib/prompts/agent-onboarding.js	14	60	build	8	2
+born	lib/components/dispatch-no-job.js	13	49	noJobBody	9	1
+born	lib/components/settings-frame.js	13	36	renderSettingsNav/λ@12/λ@13	6	0
+born	lib/dashboard-refresh.js	13	63	renderDashboardAfterRefresh	14	1
+born	lib/model-routing-harnesses.js	13	91	isModelRunnableOn	7	1
+born	lib/model-routing-summary.js	12	20	summariseRouting	6	1
+born	lib/founder-lookup.js	11	28	lookupFounderRows	12	4
+born	lib/components/halt-controls.js	10	46	haltControls	8	1
+born	lib/components/tabs.js	10	19	renderTabs	7	1
+born	lib/home-pipeline.js	10	58	gatherHomeInputs	8	1
+born	lib/subtree-index.js	10	40	buildSubtreeIndex	7	2
+born	lib/components/time.js	8	11	timeHtml	9	1
+born	lib/key-state-holders.js	8	83	refill	5	1
+born	lib/ruling-standing.js	8	15	readRulingStanding	9	0
+born	lib/components/head-meta.js	7	21	socialPreviewTags	6	1
+born	lib/components/settings-key-row.js	7	26	keyRow	8	0
+born	public/landing-copy.js	7	41	copy	4	1
+born	lib/components/settings-spend-bar.js	6	5	spendBar	7	0
+born	lib/vendor-assets.js	6	27	createVendorAssetsRouter	4	1
+born	routes/workspace-api-audit.js	5	24	registerAuditRoutes/λ@24	6	2
+born	routes/getting-started.js	4	82	createGettingStartedRouter	3	1
+born	lib/settings-copy-first-card.js	3	23	createCopyFirstCardRoute/λ@22	4	2
+born	lib/harbour-token-format.js	2	11	mintHarbourToken	3	1
+born	lib/live-anchor.js	2	6	liveOnAnchor/λ@17	2	0
+born	lib/model-routing-history.js	1	10	readModelsHistory	2	1
+born	lib/llm-jobs.js	0	60	agent	1	0
+# family totals (decision points, file sums): family	base	head	delta
+dashboard (routes/dashboard*.js)	551	492	-59
+workspace-api (routes|lib/workspace-api*)	739	755	+16
+proxy (routes/proxy*, lib/proxy*)	1492	1556	+64
+dispatch-store	385	561	+176
+render.js	209	337	+128
+task-page-loader	283	424	+141
+render-task-page	254	335	+81
+live-console (lib + public)	564	771	+207
+observation (public)	791	918	+127
+prompt-section	338	954	+616
+runner.mjs	492	524	+32
+errors.js	55	97	+42
+server.js	369	342	-27
+Home/task-state family (born)	0	520	+520

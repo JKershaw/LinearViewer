@@ -1,0 +1,64 @@
+{
+ "method": "scripts/code-shape/shape.mjs --functions; LinearViewer include ^(server\\.js$|(lib|routes|public)/.*\\.[cm]?js$) with the HEAD area guide (areas-guide-head-5334c81a.json; areas do not change totals); simple-dispatcher with --areas {\"areas\":[]} and the default include. Calibration: 9b2955cc and bb1da78e must reproduce the 10-20 totals.",
+ "calibration_10_20_expected": {
+  "lv_9b2955cc": {
+   "files": 459,
+   "codeLines": 97121,
+   "decisionPoints": 28252,
+   "unitsOverCyc10": 752,
+   "span200": 90,
+   "cyc50": 10,
+   "cyc30": 76
+  },
+  "sd_bb1da78e": {
+   "files": 55,
+   "codeLines": 13159,
+   "decisionPoints": 4970,
+   "unitsOverCyc10": 139,
+   "span200": 9,
+   "cyc50": 11,
+   "cyc30": 28
+  }
+ },
+ "lv-9b2955cc": {
+  "files": 459,
+  "codeLines": 97121,
+  "decisionPoints": 28252,
+  "unitsOverCyc10": 752,
+  "span200": 90,
+  "cyc50": 10,
+  "cyc30": 76,
+  "maxNesting": 7
+ },
+ "lv-5334c81a": {
+  "files": 536,
+  "codeLines": 106977,
+  "decisionPoints": 32424,
+  "unitsOverCyc10": 856,
+  "span200": 108,
+  "cyc50": 11,
+  "cyc30": 95,
+  "maxNesting": 7
+ },
+ "sd-bb1da78e": {
+  "files": 55,
+  "codeLines": 13159,
+  "decisionPoints": 4970,
+  "unitsOverCyc10": 139,
+  "span200": 9,
+  "cyc50": 11,
+  "cyc30": 28,
+  "maxNesting": 6
+ },
+ "sd-67ff5c3b": {
+  "files": 63,
+  "codeLines": 14456,
+  "decisionPoints": 5451,
+  "unitsOverCyc10": 152,
+  "span200": 9,
+  "cyc50": 11,
+  "cyc30": 31,
+  "maxNesting": 6
+ },
+ "calibration_reproduced": true
+}

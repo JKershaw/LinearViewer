@@ -1,0 +1,15 @@
+# Export usage classes, same method at both SHAs (method: every exported name of the production slice, matched as a whole identifier token against every other lib/routes/public/server.js/scripts/tests file at that commit; replay copies excluded)
+# This is NOT the 10-20 method (which reported fully dead 15, test-only 113); compare base to head within this table only.
+9b2955cc exports 2087 unusedAnywhere 10 usedInternallyOnly 120 testOnly 423 live 1534
+UNUSED lib/brief.js DEFAULT_BRIEF_MODEL
+UNUSED lib/harbour-spawn.js isHarbourAvailable
+UNUSED lib/liveness-alarm-store.js LIVENESS_ALARM_COLLECTION
+UNUSED lib/llm-jobs.js jobsOnSurface
+UNUSED lib/prompt-templates.js getPromptCategory
+UNUSED lib/prompt-templates.js isInReadyQueue
+UNUSED lib/prompt-templates.js getAllPromptsByCategory
+UNUSED lib/recap.js DEFAULT_RECAP_MODEL
+UNUSED lib/run-summary.js DEFAULT_RUN_SUMMARY_MODEL
+UNUSED lib/scan.js DEFAULT_SCAN_MODEL
+UNUSED lib/wake-shadow.js WAKE_SHADOW_COLLECTION
+{"sha": "5334c81a", "exports": 2549, "unusedAnywhere": 11, "usedInternallyOnly": 139, "testOnly": 481, "live": 1918}
