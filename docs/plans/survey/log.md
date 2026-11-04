@@ -764,3 +764,13 @@ LIN-4195's plan was **approved in one plan-review round** and split into seven p
 Seven pieces in a strict chain is a long night's work. Piece 2 needs piece 1 *deployed*, and piece 3 needs live traffic. The morning may find it part-way, which is fine: each piece is verified before the next starts.
 
 **LIN-4196** (mutation runner copy): plan review done, building.
+
+## 4 Nov, 03:00 UTC: the mutation runner's baseline finds the fake score the Survey predicted
+
+**LIN-4196** (PR #313, head `ffc7493`, CI green; `npm test` 3923 pass, 0 fail): `npm run test:mutation` now copies both working trees into a private root and mutates only the copies. Killers are pinned to the Harbour copy, and Ctrl-C cleans up: the interrupt witness at about 4 s exited 130 with both source trees unchanged by content hash.
+
+**The baseline pass the Survey asked for found a real problem straight away.** The real gate stops at its baseline: `test/system/harbour-halt.test.js` ("a follow-up to a session the stop cancelled is not relaunched") fails on the *unmutated* copy, as it does on `main`. The builder: "The old runner on `main` would have counted that red killer as a kill for every mutant." **That's the Survey's "fake 100%", confirmed:** the mutation score the suite has been reporting was, at least for that killer, measuring a broken test rather than the suite's strength.
+
+**Ruling for John (LIN-4196), blocking the merge:** merge with a recorded waiver and re-run the gate for a score once LIN-2995's halt test is green (recommended), or hold the PR until then. My read: merge-waive. The new runner is strictly more honest than the old one, and holding it keeps the old, fake-scoring runner on `main`.
+
+**Rebuild 2:** piece 0 (LIN-4197, the corpus and baseline goldens, runner PR #312 plus a Harbour PR) is Done. Piece 1 (LIN-4198, Harbour intake, store and per-record pricing) has started.
