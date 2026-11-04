@@ -550,6 +550,52 @@ describe('POST /workspace/:urlKey/api/comments/:issueId — settled-ruling guard
     assert.ok(settled.has('loop-1'));
   });
 
+  // LIN-4241 review finding (blocking): the primary stamp lands on the first attempt,
+  // the copy stamp fails, so the response is 201 and the dedupe key stays unset. The
+  // identical-text retry must stamp the copy and be accepted (200 deduped). It must
+  // NOT be refused as "already settled elsewhere": the primary is settled only by this
+  // request's own earlier stamp. Stateful store: the copy fails exactly once.
+  test('LIN-4241 retry witness: primary landed + copy failed on attempt 1 → identical-text retry is 200 deduped (not 409), stamps the copy, writes no further comment', async () => {
+    const { provider, calls: providerCalls } = makeFakeProvider();
+    const settled = new Set();
+    const stamps = [];
+    let copyFailuresLeft = 1;
+    const store = {
+      async isDecisionSettled(itemId) { return settled.has(itemId); },
+      async markDecisionAnswered(itemId) {
+        stamps.push(itemId);
+        if (itemId === 'copy-1' && copyFailuresLeft > 0) {
+          copyFailuresLeft -= 1;
+          return null; // the copy stamp fails: no matching item
+        }
+        if (settled.has(itemId)) return { success: false, alreadySettled: true };
+        settled.add(itemId);
+        return { success: true, feedbackCount: 1 };
+      },
+    };
+    const app = buildApp({ provider, dispatchQueueStore: store });
+    const payload = { body: 'answer to a joined ruling — copy stamp fails once', decisionLoopId: 'loop-1', decisionLoopIds: ['copy-1'], decisionId: 'd-1' };
+
+    const first = await postComment(app, ISSUE_ID, payload);
+    assert.strictEqual(first.status, 201, 'first attempt: comment written, primary stamped, copy failed');
+    assert.deepStrictEqual(stamps, ['loop-1', 'copy-1'], 'first attempt stamped the primary, then the failing copy');
+    assert.ok(settled.has('loop-1'));
+    assert.ok(!settled.has('copy-1'));
+
+    const retry = await postComment(app, ISSUE_ID, payload);
+    assert.strictEqual(retry.status, 200, 'the retry is accepted: the primary was settled by this request\'s own stamp, not elsewhere');
+    assert.strictEqual(retry.body.code, undefined);
+    assert.strictEqual(retry.body.deduped, true, 'the comment write is still deduped');
+    assert.ok(settled.has('copy-1'), 'the retry stamps the copy');
+    assert.deepStrictEqual(stamps, ['loop-1', 'copy-1', 'loop-1', 'copy-1'], 'the retry re-attempts the primary (already stamped, lands) and the copy');
+    assert.strictEqual(providerCalls.createComment.length, 1, 'the retry writes no second comment');
+
+    const third = await postComment(app, ISSUE_ID, payload);
+    assert.strictEqual(third.status, 200);
+    assert.strictEqual(third.body.deduped, true);
+    assert.strictEqual(stamps.length, 4, 'once every stamp has landed, a further identical retry does not stamp again');
+  });
+
   test('a scan (task-bound) row already answered or dismissed is refused 409 ruling-settled before the comment', async () => {
     for (const outcome of ['answered', 'dismissed']) {
       const { provider, calls: providerCalls } = makeFakeProvider();

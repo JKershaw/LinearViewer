@@ -49,6 +49,15 @@ import { isTestToken, refuseCapability } from './workspace-api-steps.js';
 // rather than being treated as a retry forever.
 export const decisionStampDedupe = createDedupeCache();
 
+// LIN-4241: whether THIS dedupe `key`'s primary decision stamp has landed. It is a
+// second marker in `decisionStampDedupe` under a derived key (the key is a hex
+// sha256, so `:primary` cannot collide), not a container of its own: the LIN-3198
+// reset seam clears `decisionStampDedupe` together with the comment cache, so this
+// marker is cleared with them. A first attempt can stamp the primary and then fail
+// a copy, so the primary is settled by this request's own write. An identical-text
+// retry must not read that as "answered elsewhere".
+const primaryStampKey = (key) => `${key}:primary`;
+
 // LIN-4241: a non-empty id string (the settled-ruling pre-check's guard; the same
 // test `stampDecisionAnswers` applies to its own pairs).
 const givenString = (v) => typeof v === 'string' && v !== '';
@@ -62,15 +71,19 @@ const givenString = (v) => typeof v === 'string' && v !== '';
  * malformed/partial client payload, never a half-stamp attempt) and never
  * throw — failure is logged only, mirroring the pre-LIN-2208 inline code.
  *
- * @returns {Promise<{landed: boolean, settledElsewhere: boolean}>} `landed` is
+ * @returns {Promise<{landed: boolean, settledElsewhere: boolean, primaryLanded: boolean}>} `landed` is
  *   true iff every REQUESTED stamp (only the pairs actually present in `decision`)
  *   succeeded — the signal LIN-2208's dedupe bypass uses to decide whether a later
  *   identical-text retry still needs to try again. `settledElsewhere` (LIN-4241) is
  *   true when the PRIMARY loop's decision, or the task row, was already answered or
  *   dismissed by an earlier write: the caller refuses with 409 `ruling-settled`
  *   and starts no run. A copy already stamped counts as landed, not as settled.
+ *   `primaryLanded` (LIN-4241) is true when the primary loop stamp landed on THIS call.
+ *   `primaryAlreadyLanded` (an option) says this request's own primary stamp landed on
+ *   an earlier attempt for the same dedupe key. The primary then reads as landed, not
+ *   settled, when it reports `alreadySettled`.
  */
-async function stampDecisionAnswers(workspace, decision, { dispatchQueueStore, taskDecisionsStore, sessionsFeedCache = null }) {
+async function stampDecisionAnswers(workspace, decision, { dispatchQueueStore, taskDecisionsStore, sessionsFeedCache = null, primaryAlreadyLanded = false }) {
   const given = givenString;
   const d = decision || {};
   const { urlKey } = workspace;
@@ -87,7 +100,9 @@ async function stampDecisionAnswers(workspace, decision, { dispatchQueueStore, t
   if (given(d.decisionLoopId) && given(d.decisionId)) {
     const loopIds = [...new Set([d.decisionLoopId, ...(parseStampLoopIds(d.decisionLoopIds) ?? [])])];
     for (const loopId of loopIds) {
+      const isPrimary = loopId === d.decisionLoopId;
       attempts.push({
+        primary: isPrimary,
         failure: 'Decision-answer stamp failed:',
         // LIN-2792: `optionId` rides this stamp with an undefined `outcome` (never
         // reached for a dismissal, so it cannot leak onto one) — the 5th argument
@@ -96,12 +111,14 @@ async function stampDecisionAnswers(workspace, decision, { dispatchQueueStore, t
           const stamp = await dispatchQueueStore.markDecisionAnswered(loopId, urlKey, d.decisionId, undefined, d.optionId);
           if (stamp?.alreadySettled) {
             // LIN-4241: this loop's decision already carries an answer or dismissal.
-            // A copy already stamped has landed, so it does not count as settled. Only
-            // the PRIMARY's settled state refuses the request, and it has not landed
-            // for this request either.
-            return loopId === d.decisionLoopId
-              ? { landed: false, settledElsewhere: true, notApplied: null }
-              : { landed: true, settledElsewhere: false, notApplied: null };
+            // A copy already stamped has landed, so it does not count as settled. For
+            // the PRIMARY: when this request's own earlier attempt stamped it (the
+            // dedupe key's primary landed, then a copy failed), it has landed. Only a
+            // primary that another write settled refuses the request.
+            if (!isPrimary) return { landed: true, settledElsewhere: false, notApplied: null };
+            return primaryAlreadyLanded
+              ? { landed: true, settledElsewhere: false, notApplied: null }
+              : { landed: false, settledElsewhere: true, notApplied: null };
           }
           return stamp
             ? { landed: true, settledElsewhere: false, notApplied: null }
@@ -135,10 +152,12 @@ async function stampDecisionAnswers(workspace, decision, { dispatchQueueStore, t
 
   let everyStampLanded = true;
   let settledElsewhere = false;
+  let primaryLanded = false;
   for (const attempt of attempts) {
     try {
       const outcome = await attempt.run();
       if (outcome.settledElsewhere) settledElsewhere = true;
+      if (attempt.primary && outcome.landed) primaryLanded = true;
       if (!outcome.landed) {
         if (outcome.notApplied) console.error(outcome.notApplied);
         everyStampLanded = false;
@@ -154,7 +173,7 @@ async function stampDecisionAnswers(workspace, decision, { dispatchQueueStore, t
       everyStampLanded = false;
     }
   }
-  return { landed: everyStampLanded, settledElsewhere };
+  return { landed: everyStampLanded, settledElsewhere, primaryLanded };
 }
 
 // Normalize a provider write result to `{ success, issue }`. Linear returns that
@@ -395,8 +414,17 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQue
     // loop just stays "unanswered" until a later attempt succeeds — LIN-2208
     // is what makes an identical-text retry one such later attempt).
     // Resolves true when the stamp found the ruling already answered or dismissed (LIN-4241).
-    const stampAnswers = async () => {
-      const { landed, settledElsewhere } = await stampDecisionAnswers(workspace, req.body || {}, { dispatchQueueStore, taskDecisionsStore, sessionsFeedCache });
+    // `isRetry` is set only on the dedupe-hit path, where this key's earlier attempt
+    // may have stamped the primary (LIN-4241). A fresh write never reads that marker.
+    const stampAnswers = async ({ isRetry = false } = {}) => {
+      const primaryAlreadyLanded = isRetry && decisionStampDedupe.get(primaryStampKey(key)) === true;
+      const { landed, settledElsewhere, primaryLanded } = await stampDecisionAnswers(workspace, req.body || {}, {
+        dispatchQueueStore,
+        taskDecisionsStore,
+        sessionsFeedCache,
+        primaryAlreadyLanded
+      });
+      if (primaryLanded) decisionStampDedupe.set(primaryStampKey(key), true);
       if (landed) decisionStampDedupe.set(key, true);
       return settledElsewhere;
     };
@@ -545,10 +573,12 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQue
         // stamp attempt once one has already landed (the pre-existing "a
         // deduped resubmission does not re-stamp" success-path coverage).
         // LIN-4241: when this key's own stamp has not landed yet, the retry still
-        // stamps the copies. If the PRIMARY is settled by a write (a race this
-        // request lost, or its own earlier primary stamp), the retry must not answer
-        // 200: the client would dispatch a run for a settled ruling. It answers 409.
-        const settledElsewhere = !decisionStampDedupe.get(key) && await stampAnswers();
+        // stamps the copies. If the PRIMARY is settled by ANOTHER write (a race this
+        // request lost), the retry must not answer 200: the client would dispatch a
+        // run for a settled ruling. It answers 409. A primary this key's own earlier
+        // attempt stamped is not "elsewhere" (primaryStampKey): it reads as
+        // landed, so the retry completes the copies and answers 200.
+        const settledElsewhere = !decisionStampDedupe.get(key) && await stampAnswers({ isRetry: true });
 
         // Dedupe-hit ledger repair (LIN-2649 S1, F2): a dedupe hit means the
         // ORIGINAL create's own ledger-record attempt may have failed
