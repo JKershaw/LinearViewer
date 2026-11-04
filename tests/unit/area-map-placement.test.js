@@ -16,6 +16,18 @@ function areaOf(path) {
 }
 
 describe('code-shape area map placement (LIN-3729)', () => {
+  // LIN-4201: the cost code gets a real area. The one read, the snapshot fold, the lineage membership and the founder lookup
+  // sit in Runs & dispatch beside the request-usage modules (the record fold and the loader); without their names they fell
+  // through to the catch-all `^lib/` in "Other features". The workspace KPIs page cache sits with the page's read.
+  test('the cost read and its folds land in Runs & dispatch, beside request-usage-*', () => {
+    for (const path of ['lib/cost-read.js', 'lib/row-usage.js', 'lib/lineage-membership.js', 'lib/founder-lookup.js',
+      'lib/request-usage-fold.js', 'lib/request-usage-loader.js']) {
+      assert.strictEqual(areaOf(path), 'Runs & dispatch', path);
+    }
+    assert.strictEqual(areaOf('lib/workspace-kpis-cache.js'), 'Reports & operator tools');
+    assert.strictEqual(areaOf('lib/workspace-kpi-stats.js'), 'Reports & operator tools');
+  });
+
   test('the three relabelled files land in their owning areas', () => {
     assert.strictEqual(areaOf('lib/proxy-fetch.js'), 'Platform & plumbing');
     assert.strictEqual(areaOf('lib/openrouter-key-resolver.js'), 'Auth, accounts & workspaces');
