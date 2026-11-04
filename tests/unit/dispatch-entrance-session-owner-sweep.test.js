@@ -32,7 +32,7 @@ import assert from 'node:assert/strict';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { enumerateRoutes, sampleUrl, appAround, request, makeSpy, SAMPLE_UUID } from './lib/entrance-route-sweep.js';
 
-const ROUTE_COUNT = 29; // LIN-3962 adds the decision panel beside the preview
+const ROUTE_COUNT = 30; // LIN-3962 adds the decision panel beside the preview; LIN-4198 adds POST /api/dispatch/usage/:itemId
 const COPY = "Only this workspace's owner can act on its runner.";
 const OWNER = 'acct-owner';
 const MEMBER = 'acct-member';
@@ -153,7 +153,10 @@ const TABLE = {
   'POST /api/dispatch/broker-token': { verdict: 'dispatch-token', reason: 'LIN-3135 refire broker: dispatch token only; no credential is a 401', probes: [{ body: {} }] },
   'POST /api/dispatch/take/:itemId': { verdict: 'dispatch-token', reason: 'runner take: dispatch token only; no credential is a 401', probes: [{ body: {} }] },
   'POST /api/dispatch/heartbeat': { verdict: 'dispatch-token', reason: 'LIN-1952 consumer heartbeat: no credential is a 401 and nothing is written; the handler writes only to the new consumer-heartbeats store, never to runner or session state', probes: [{ body: {} }] },
-  'POST /api/dispatch/feedback/:itemId': { verdict: 'feedback-token', reason: 'runner feedback: single-use Harbour OS feedback token or dispatch token; no credential is a 401', probes: [{ body: { message: 'm' } }] }
+  'POST /api/dispatch/feedback/:itemId': { verdict: 'feedback-token', reason: 'runner feedback: single-use Harbour OS feedback token or dispatch token; no credential is a 401', probes: [{ body: { message: 'm' } }] },
+  // LIN-4198: consumer dispatch token only. The single-use Harbour OS feedback token is not accepted here, because
+  // its first successful call would spend it and a runner posts usage in batches against one item.
+  'POST /api/dispatch/usage/:itemId': { verdict: 'dispatch-token', reason: 'LIN-4198 usage intake: consumer dispatch token only (no single-use Harbour OS token); no credential is a 401', probes: [{ body: { records: [] } }] }
 };
 
 describe('LIN-3601 session-owner sweep — routes/dispatch.js', () => {

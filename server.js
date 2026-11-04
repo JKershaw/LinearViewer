@@ -131,6 +131,7 @@ import { ConsumerHeartbeatStore } from './lib/consumer-heartbeat-store.js'
 import { createTaskModeRoutes } from './routes/task-mode.js'
 import { createPipelineMergeRecorder, createSessionWorkspaceIdResolver } from './lib/close-out-merges.js'
 import { createProxyRoutes, commentDedupe } from './routes/proxy.js'
+import { requestUsageStoreFor } from './lib/request-usage-intake.js'
 import { createProxyDefaultRoute } from './lib/settings-proxy-default.js'
 import { createCopyFirstCardRoute } from './lib/settings-copy-first-card.js'
 import { createMilestoneFunnelRoutes } from './routes/milestone-funnel.js'
@@ -844,6 +845,8 @@ const observerStateStore = new ObserverStateStore({ collection: observerStateCol
 // 15 min expiry, cap 20 per workspace. Written by POST /api/dispatch/heartbeat
 // and POST /api/proxy/runner/heartbeat, read by GET /api/proxy/heartbeats.
 const consumerHeartbeatStore = new ConsumerHeartbeatStore({ collection: db.collection('consumer-heartbeats') })
+// LIN-4198: per-request usage records (POST .../usage). Built by lib/request-usage-intake.js so this file never names the collection.
+const requestUsageStore = requestUsageStoreFor(db)
 
 // Read-only shadow action log (LIN-2132, P1-5): logs what the sweep's
 // diagnosis WOULD have relayed, in the incumbent's own marker/comment
@@ -2564,7 +2567,7 @@ function workspaceFromUrl(req, res, next) {
 }
 
 // Mount dispatch routes (requires workspaceFromUrl middleware)
-app.use(createDispatchRoutes({ installationTokenFor, dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, workspaceOwnerCheck, getWorkspaceAccessToken, fetchIssueContext, workspaceHaltStore, sessionsFeedCache, taskModeStore, freeTierStore, accountStore, consumerHeartbeatStore }))
+app.use(createDispatchRoutes({ installationTokenFor, dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, workspaceOwnerCheck, getWorkspaceAccessToken, fetchIssueContext, workspaceHaltStore, sessionsFeedCache, taskModeStore, freeTierStore, accountStore, consumerHeartbeatStore, requestUsageStore }))
 
 // Task-mode routes (LIN-2942): the ladder's client-side press record and the
 // per-account per-task mode read.
@@ -3214,7 +3217,7 @@ const recordPipelineMerge = createPipelineMergeRecorder({
   installationTokenFor,
   resolveWorkspaceId: createSessionWorkspaceIdResolver({ sessionsCollection })
 })
-app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore, workspaceOwnerCheck, modelRoutingStore, livenessAlarmStore, onTicketWrite, recordPipelineMerge, consumerHeartbeatStore }))
+app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore, workspaceOwnerCheck, modelRoutingStore, livenessAlarmStore, onTicketWrite, recordPipelineMerge, consumerHeartbeatStore, requestUsageStore }))
 
 // LIN-3098 S3: the runner kit (lib/runner-kit/*.mjs), public, for the served
 // runner prompt to fetch and verify against its sha256 pins (routes/runner-kit.js).

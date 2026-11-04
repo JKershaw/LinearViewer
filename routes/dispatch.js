@@ -62,6 +62,7 @@ import { planOf, quotaAnswer } from '../lib/plan-allowance.js';
 import { resolveAccountGroup } from '../lib/account-group.js';
 import { redactSessionItem, redactSessionItems } from '../lib/dispatch-session-redaction.js';
 import { publicOrigin } from '../lib/public-origin.js';
+import { postUsage } from '../lib/request-usage-intake.js';
 
 // Directory for Harbour OS dispatch prompt staging files. The OS tmp dir is
 // shared between the Node server and the Harbour OS terminal that reads the
@@ -279,7 +280,7 @@ const queryText = (value) => (typeof value === 'string' && value.trim() ? value 
  *   closed with OWNER_CHECK_UNAVAILABLE. Never consulted on the verify path.
  * @returns {Router} Express router with dispatch routes
  */
-export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, provider: injectedProvider = null, getWorkspaceAccessToken = null, fetchIssueContext = null, workspaceHaltStore = null, haltReadTimeoutMs = POLL_HALT_READ_TIMEOUT_MS, sessionsFeedCache = null, workspaceOwnerCheck = null, taskModeStore = null, freeTierStore = null, accountStore = null, consumerHeartbeatStore = null, closeOut = null, installationTokenFor = null }) {
+export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, provider: injectedProvider = null, getWorkspaceAccessToken = null, fetchIssueContext = null, workspaceHaltStore = null, haltReadTimeoutMs = POLL_HALT_READ_TIMEOUT_MS, sessionsFeedCache = null, workspaceOwnerCheck = null, taskModeStore = null, freeTierStore = null, accountStore = null, consumerHeartbeatStore = null, closeOut = null, installationTokenFor = null, requestUsageStore = null }) {
   const router = Router();
 
   // =========================================================================
@@ -1647,6 +1648,40 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       res.json(result);
     } catch (err) {
       return reportFailure(res, 'Feedback error:', err, 'Failed to post feedback');
+    }
+  });
+
+  /**
+   * POST /api/dispatch/usage/:itemId (LIN-4198, D3): per-request usage records for a taken item.
+   * The shared intake is lib/request-usage-intake.js; the runner-token twin is
+   * POST /api/proxy/runner/usage/:id in routes/proxy-runner.js.
+   *
+   * Consumer dispatch token only, deliberately NOT the single-use Harbour OS feedback
+   * token. This is the one place this route departs from feedback's token auth, and it is
+   * a reasoned choice, not an oversight: feedback accepts that token first, and the token
+   * is spent by its first successful call, while a runner posts usage in batches against
+   * the same item, so the second batch would be refused. The refusal (401) leaves the token
+   * unspent. Pinned by tests/unit/lin-4198-usage-routes.test.js and stated in
+   * docs/architecture/dispatch-and-proxy.md (the endpoint list). Ownership is the feedback
+   * rule (`status:'taken'`, taken by this token), so a 404 means "not your taken item".
+   */
+  router.post('/api/dispatch/usage/:itemId', feedbackLimiter, authenticateDispatchToken, async (req, res) => {
+    const { itemId } = req.params;
+    if (!UUID_REGEX.test(itemId)) {
+      return badRequest.json(res, 'Invalid item ID format');
+    }
+    try {
+      const outcome = await postUsage({
+        dispatchQueueStore,
+        store: requestUsageStore,
+        itemId,
+        urlKey: req.dispatchUrlKey,
+        tokenLabel: req.dispatchTokenLabel,
+        body: req.body
+      });
+      return res.status(outcome.status).json(outcome.body);
+    } catch (err) {
+      return reportFailure(res, 'Usage error:', err, 'Failed to post usage');
     }
   });
 

@@ -107,9 +107,11 @@ describe('INVENTORY completeness (Done-when 5)', () => {
     assert.deepStrictEqual(missingFrom(without), ['workspace-halt']);
   });
 
-  test('the universe is the 56 names the plan bounded (funnel-events retired by LIN-3632 is not in it)', () => {
+  // LIN-4198 adds one INDEX_SPECS collection (the per-request usage store), so the bound moves 56 -> 57.
+  // Bump it only when a collection is added, with its ticket here, never to make a drift pass.
+  test('the universe is the 57 names the plan bounded (funnel-events retired by LIN-3632 is not in it)', () => {
     const universe = collectionUniverse();
-    assert.strictEqual(universe.size, 56);
+    assert.strictEqual(universe.size, 57);
     assert.ok(!universe.has('funnel-events'));
     assert.ok(!INVENTORY.some((r) => r.collection === 'funnel-events'), 'LIN-3632: no lib module may name the retired collection');
   });
