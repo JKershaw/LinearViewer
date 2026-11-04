@@ -1,0 +1,78 @@
+## 015aa4c6 (015aa4c6-guide-015aa4c6)  files=528 unresolved=4 parseFailures=0 unmapped=0 crossLinks=1227 pairs=12 groups=[9]
+  Agent API (proxy) <-> LLM & prompts: 37/4
+  Agent API (proxy) <-> Providers (Linear, GitHub, Jira, local): 20/3
+  Agent API (proxy) <-> Runs & dispatch: 42/10
+  Auth, accounts & workspaces <-> Front end: server-rendered pages: 14/11
+  Auth, accounts & workspaces <-> LLM & prompts: 4/3
+  Auth, accounts & workspaces <-> Providers (Linear, GitHub, Jira, local): 12/1
+  Front end: server-rendered pages <-> Other features: 2/6
+  Front end: server-rendered pages <-> Runs & dispatch: 13/8
+  LLM & prompts <-> Other features: 1/1
+  LLM & prompts <-> Providers (Linear, GitHub, Jira, local): 11/4
+  LLM & prompts <-> Runs & dispatch: 27/34
+  Other features <-> Runs & dispatch: 6/12
+## 015aa4c6 (015aa4c6-guide-5334c81a)  files=528 unresolved=4 parseFailures=0 unmapped=0 crossLinks=1227 pairs=12 groups=[9]
+  Agent API (proxy) <-> LLM & prompts: 37/4
+  Agent API (proxy) <-> Providers (Linear, GitHub, Jira, local): 20/3
+  Agent API (proxy) <-> Runs & dispatch: 42/10
+  Auth, accounts & workspaces <-> Front end: server-rendered pages: 14/11
+  Auth, accounts & workspaces <-> LLM & prompts: 4/3
+  Auth, accounts & workspaces <-> Providers (Linear, GitHub, Jira, local): 12/1
+  Front end: server-rendered pages <-> Other features: 2/6
+  Front end: server-rendered pages <-> Runs & dispatch: 13/8
+  LLM & prompts <-> Other features: 1/1
+  LLM & prompts <-> Providers (Linear, GitHub, Jira, local): 11/4
+  LLM & prompts <-> Runs & dispatch: 27/34
+  Other features <-> Runs & dispatch: 6/12
+## 5334c81a (5334c81a-guide-015aa4c6)  files=536 unresolved=4 parseFailures=0 unmapped=0 crossLinks=1262 pairs=12 groups=[9]
+  Agent API (proxy) <-> LLM & prompts: 37/4
+  Agent API (proxy) <-> Providers (Linear, GitHub, Jira, local): 20/3
+  Agent API (proxy) <-> Runs & dispatch: 41/10
+  Auth, accounts & workspaces <-> Front end: server-rendered pages: 14/11
+  Auth, accounts & workspaces <-> LLM & prompts: 4/3
+  Auth, accounts & workspaces <-> Providers (Linear, GitHub, Jira, local): 12/1
+  Front end: server-rendered pages <-> Other features: 8/6
+  Front end: server-rendered pages <-> Runs & dispatch: 13/8
+  LLM & prompts <-> Other features: 4/3
+  LLM & prompts <-> Providers (Linear, GitHub, Jira, local): 11/4
+  LLM & prompts <-> Runs & dispatch: 26/34
+  Other features <-> Runs & dispatch: 9/15
+## 5334c81a (5334c81a-guide-5334c81a)  files=536 unresolved=4 parseFailures=0 unmapped=0 crossLinks=1262 pairs=12 groups=[9]
+  Agent API (proxy) <-> LLM & prompts: 37/4
+  Agent API (proxy) <-> Providers (Linear, GitHub, Jira, local): 20/3
+  Agent API (proxy) <-> Runs & dispatch: 42/10
+  Auth, accounts & workspaces <-> Front end: server-rendered pages: 14/11
+  Auth, accounts & workspaces <-> LLM & prompts: 4/3
+  Auth, accounts & workspaces <-> Providers (Linear, GitHub, Jira, local): 12/1
+  Front end: server-rendered pages <-> Other features: 8/6
+  Front end: server-rendered pages <-> Runs & dispatch: 13/8
+  LLM & prompts <-> Other features: 4/2
+  LLM & prompts <-> Providers (Linear, GitHub, Jira, local): 11/4
+  LLM & prompts <-> Runs & dispatch: 26/35
+  Other features <-> Runs & dispatch: 9/15
+## 015aa4c6 P1b (015aa4c6-guide-proposal-P1b-placed-17)  files=528 unresolved=4 parseFailures=0 unmapped=0 crossLinks=1210 pairs=12 groups=[8]
+  Agent API (proxy) <-> LLM & prompts: 37/4
+  Agent API (proxy) <-> Providers (Linear, GitHub, Jira, local): 20/3
+  Agent API (proxy) <-> Runs & dispatch: 43/10
+  Auth, accounts & workspaces <-> Front end: server-rendered pages: 14/11
+  Auth, accounts & workspaces <-> LLM & prompts: 4/3
+  Auth, accounts & workspaces <-> Providers (Linear, GitHub, Jira, local): 12/1
+  Front end: server-rendered pages <-> Runs & dispatch: 15/8
+  Front end: server-rendered pages <-> Task model: 5/2
+  LLM & prompts <-> Providers (Linear, GitHub, Jira, local): 11/4
+  LLM & prompts <-> Runs & dispatch: 28/34
+  LLM & prompts <-> Task model: 2/1
+  Runs & dispatch <-> Task model: 4/3
+## 5334c81a P1b (5334c81a-guide-proposal-P1b-placed-17)  files=536 unresolved=4 parseFailures=0 unmapped=0 crossLinks=1239 pairs=12 groups=[8]
+  Agent API (proxy) <-> LLM & prompts: 37/4
+  Agent API (proxy) <-> Providers (Linear, GitHub, Jira, local): 20/3
+  Agent API (proxy) <-> Runs & dispatch: 44/10
+  Auth, accounts & workspaces <-> Front end: server-rendered pages: 14/11
+  Auth, accounts & workspaces <-> LLM & prompts: 4/3
+  Auth, accounts & workspaces <-> Providers (Linear, GitHub, Jira, local): 12/1
+  Front end: server-rendered pages <-> Runs & dispatch: 15/8
+  Front end: server-rendered pages <-> Task model: 5/2
+  LLM & prompts <-> Providers (Linear, GitHub, Jira, local): 11/4
+  LLM & prompts <-> Runs & dispatch: 29/36
+  LLM & prompts <-> Task model: 2/1
+  Runs & dispatch <-> Task model: 4/3

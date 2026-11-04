@@ -1,0 +1,68 @@
+file edges: 015 = 1995  5334 = 2028  added 44  removed 11
+ADDED (cross-area only):
+  + lib/components/decision-panel.js -> lib/cost-format.js | Front end: server-rend -> Other features
+  + lib/cost-read.js -> lib/dispatch-terminal.js | Other features -> Runs & dispatch
+  + lib/cost-read.js -> lib/llm-call-log.js | Other features -> LLM & prompts
+  + lib/cost-read.js -> lib/session-telemetry.js | Other features -> Runs & dispatch
+  + lib/cost-read.js -> lib/utils/time.js | Other features -> Platform & plumbing
+  + lib/effort-readout.js -> lib/cost-read.js | Runs & dispatch -> Other features
+  + lib/effort-readout.js -> lib/lineage-membership.js | Runs & dispatch -> Other features
+  + lib/founder-lookup.js -> lib/dispatch-store.js | Other features -> Runs & dispatch
+  + lib/model-routing-history.js -> lib/lineage-membership.js | LLM & prompts -> Other features
+  + lib/model-routing-spend.js -> lib/cost-read.js | LLM & prompts -> Other features
+  + lib/render-effort-readout.js -> lib/cost-format.js | Front end: server-rend -> Other features
+  + lib/render-kpis.js -> lib/cost-format.js | Front end: server-rend -> Other features
+  + lib/render-run-steps.js -> lib/cost-format.js | Front end: server-rend -> Other features
+  + lib/render-settings.js -> lib/cost-format.js | Front end: server-rend -> Other features
+  + lib/render-workspace-kpis.js -> lib/cost-format.js | Front end: server-rend -> Other features
+  + lib/request-usage-intake.js -> lib/errors.js | Runs & dispatch -> Platform & plumbing
+  + lib/request-usage-intake.js -> lib/lineage-membership.js | Runs & dispatch -> Other features
+  + lib/request-usage-intake.js -> lib/model-pricing.js | Runs & dispatch -> LLM & prompts
+  + lib/run-view.js -> lib/cost-read.js | Runs & dispatch -> Other features
+  + lib/ship-biscuit.js -> lib/cost-format.js | LLM & prompts -> Other features
+  + lib/terminal-marked-task-cost.js -> lib/cost-read.js | Runs & dispatch -> Other features
+  + lib/terminal-marked-task-cost.js -> lib/utils/time.js | Runs & dispatch -> Platform & plumbing
+  + lib/weekly-budget.js -> lib/cost-read.js | Runs & dispatch -> Other features
+  + lib/weekly-budget.js -> lib/utils/time.js | Runs & dispatch -> Platform & plumbing
+  + lib/workspace-kpi-stats.js -> lib/cost-read.js | Reports & operator too -> Other features
+  + lib/workspace-kpi-stats.js -> lib/founder-lookup.js | Reports & operator too -> Other features
+  + routes/dashboard-effort.js -> lib/lineage-membership.js | Web routes (pages & wo -> Other features
+  + routes/dashboard-feed.js -> lib/model-routing-spend.js | Web routes (pages & wo -> LLM & prompts
+  + routes/proxy-compute.js -> lib/cost-read.js | Agent API (proxy) -> Other features
+  + routes/proxy-runner.js -> lib/request-usage-intake.js | Agent API (proxy) -> Runs & dispatch
+  + routes/settings.js -> lib/cost-read.js | Web routes (pages & wo -> Other features
+  + routes/ship-biscuit.js -> lib/cost-read.js | Web routes (pages & wo -> Other features
+  + routes/ship-biscuit.js -> lib/read-horizon.js | Web routes (pages & wo -> Platform & plumbing
+  + server.js -> lib/dispatch-factory.js | Wiring (server.js) -> Runs & dispatch
+  + server.js -> lib/founder-lookup.js | Wiring (server.js) -> Other features
+  + server.js -> lib/key-state-holders.js | Wiring (server.js) -> Other features
+  + server.js -> lib/key-state.js | Wiring (server.js) -> Other features
+  + server.js -> lib/request-usage-intake.js | Wiring (server.js) -> Runs & dispatch
+  + server.js -> lib/task-done-cache.js | Wiring (server.js) -> Runs & dispatch
+  + server.js -> lib/workspace-issues-memo.js | Wiring (server.js) -> Auth, accounts & works
+REMOVED (cross-area only):
+  - lib/model-routing-spend.js -> lib/task-cost.js | LLM & prompts -> Runs & dispatch
+  - lib/run-view.js -> lib/row-usage.js | Runs & dispatch -> Other features
+  - lib/task-cost.js -> lib/lineage-membership.js | Runs & dispatch -> Other features
+  - lib/task-cost.js -> lib/row-usage.js | Runs & dispatch -> Other features
+  - routes/proxy-compute.js -> lib/task-cost.js | Agent API (proxy) -> Runs & dispatch
+intra-area added/removed: 4 6
+same file edge, changed area label: 0
+directed area-pair deltas (HEAD guide), |delta|>=1:
+  Front end: server-rendered -> Other features                2 ->    8  (+6)
+  Runs & dispatch            -> Platform & plumbing          55 ->   58  (+3)
+  Web routes (pages & worksp -> Other features                3 ->    6  (+3)
+  Wiring (server.js)         -> Runs & dispatch              41 ->   44  (+3)
+  Other features             -> Runs & dispatch               6 ->    9  (+3)
+  LLM & prompts              -> Other features                1 ->    4  (+3)
+  Runs & dispatch            -> Other features               12 ->   15  (+3)
+  Wiring (server.js)         -> Other features                5 ->    8  (+3)
+  Reports & operator tools   -> Other features                0 ->    2  (+2)
+  Web routes (pages & worksp -> Platform & plumbing          54 ->   55  (+1)
+  Other features             -> LLM & prompts                 1 ->    2  (+1)
+  Other features             -> Platform & plumbing           2 ->    3  (+1)
+  Wiring (server.js)         -> Auth, accounts & workspace   47 ->   48  (+1)
+  Web routes (pages & worksp -> LLM & prompts                82 ->   83  (+1)
+  Agent API (proxy)          -> Other features                1 ->    2  (+1)
+  Runs & dispatch            -> LLM & prompts                34 ->   35  (+1)
+  LLM & prompts              -> Runs & dispatch              27 ->   26  (-1)
