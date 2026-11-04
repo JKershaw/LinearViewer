@@ -296,7 +296,9 @@ describe('census: nothing outside the store reads the collection', () => {
     // LIN-4200 (beat 3): the D13 volume and timing measurement; read-only against production, scratch writes only on a local mongod.
     'scripts/lin-4200-d13-volume-timing.mjs',
     'tests/unit/lin-4198-request-usage-store.test.js',
-    'tests/unit/lin-4198-request-usage-mongod.test.js'
+    'tests/unit/lin-4198-request-usage-mongod.test.js',
+    // LIN-4212: the wake-posted lineage witnesses drive the store and the shared intake (both allowed) against real mongod.
+    'tests/unit/lin-4212-wake-records-stranded.test.js'
   ]);
   const SCANNED_DIRS = ['lib', 'routes', 'scripts', 'tests', 'server.js'];
   const SKIP = new Set(['node_modules', 'experiments', 'public']);
