@@ -250,3 +250,18 @@ test('the embedded series carries doneTotal for the script, so the script holds 
   assert.match(html, /__WORKSPACE_KPI_DATA__/);
   assert.ok(html.includes('"doneTotal":{"since":"2026-03-03"'));
 });
+
+test('LIN-4178: a started day with no priced task is "-", a day with a priced $0 is $0.00, a priced day is its figure', () => {
+  // Day 0 has no figure (its one started task is unpriced), day 1 a complete $0, day 2 a priced $2.50.
+  const perDay = series();
+  perDay[0] = null;
+  perDay[1] = 0;
+  perDay[2] = 2.5;
+  const html = render(stats({ daily: daily({ cost: { perDay, pricedCount: 2, lineageCount: 3 } }) }));
+  const costTable = html.slice(html.indexOf('data-testid="workspace-kpis-table-cost"'));
+  const cells = [...costTable.matchAll(/<td>([^<]*)<\/td><td>([^<]*)<\/td>/g)].map(m => m[2]);
+  assert.equal(cells[0], '-', 'an unpriced started day has no figure');
+  assert.equal(cells[1], '$0.00', 'a complete zero is shown as $0.00');
+  assert.equal(cells[2], '$2.50');
+  assert.doesNotMatch(costTable.slice(0, costTable.indexOf('</table>')), /<td>\$0\.00<\/td><td>\$0\.00<\/td><td>\$0\.00<\/td>/, 'not every day reads $0.00');
+});

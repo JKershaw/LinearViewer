@@ -12,7 +12,8 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { windowedSpend } from '../../lib/weekly-budget.js';
-import { groupDispatchLineages, joinCostLineages } from '../../lib/dispatch-lineage.js';
+import { groupDispatchLineages } from '../../lib/dispatch-lineage.js';
+import { lineageRecords } from '../../lib/cost-read.js';
 
 const SINCE = Date.parse('2026-08-20T06:00:00.000Z');
 const NOW = Date.parse('2026-08-20T12:00:00.000Z');
@@ -30,7 +31,7 @@ function row({ id, rootItemId = id, issueIdentifier, harness = 'claude-code', di
 }
 
 function spendIn(rows, sinceMs = SINCE, nowMs = NOW) {
-  return windowedSpend(joinCostLineages(rows, groupDispatchLineages(rows)), sinceMs, nowMs);
+  return windowedSpend(lineageRecords({ fetchedRows: rows, identityRows: [], outcomes: groupDispatchLineages(rows) }), sinceMs, nowMs);
 }
 
 describe('windowedSpend — window bounds', () => {

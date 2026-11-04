@@ -41195,12 +41195,12 @@
   },
   "S11": {
     "windowDays": 30,
-    "pricedTicketCount": 9,
-    "pricedTicketCostUsd": 74.28,
+    "pricedTicketCount": 11,
+    "pricedTicketCostUsd": 79.88,
     "closeOutLineageShare": 0,
     "evidenceLinkedShare": 0,
     "opencodeSummedShare": 1,
-    "unknownHarnessShare": 0.857,
+    "unknownHarnessShare": 0.824,
     "pricedLineageShare": 0.999,
     "attributableLineageShare": 1,
     "captureRateShare": 1

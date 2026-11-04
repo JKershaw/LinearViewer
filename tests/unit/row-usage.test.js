@@ -5,12 +5,16 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseUsage, readRowUsage } from '../../lib/session-telemetry.js';
-import { groupDispatchLineages, joinCostLineages } from '../../lib/dispatch-lineage.js';
-import { reduceLineageCost, computeTerminalMarkedTaskCost } from '../../lib/terminal-marked-task-cost.js';
+import { groupDispatchLineages } from '../../lib/dispatch-lineage.js';
+import { computeTerminalMarkedTaskCost } from '../../lib/terminal-marked-task-cost.js';
+import { lineageRecords, lineageFigure } from '../../lib/cost-read.js';
 import { buildTaskCost } from '../../lib/task-cost.js';
 import { windowedSpend } from '../../lib/weekly-budget.js';
 import { buildRunView } from '../../lib/run-view.js';
 import { foldLineageUsage } from '../../lib/row-usage.js';
+
+// LIN-4178: the lineage records of the one cost read (joinCostLineages is gone).
+const lineageRecordsOf = rows => lineageRecords({ fetchedRows: rows, identityRows: [], outcomes: groupDispatchLineages(rows) });
 
 const NOW = new Date('2026-11-02T12:00:00.000Z');
 const daysAgo = (n) => new Date(NOW.getTime() - n * 24 * 60 * 60 * 1000);
@@ -88,11 +92,11 @@ describe('row usage: one answer, every reader (LIN-4134, LIN-4136)', () => {
   for (const c of CASES) {
     test(c.name, () => {
       const rows = c.rows;
-      const lineage = joinCostLineages(rows, groupDispatchLineages(rows)).get(rows[0].rootItemId);
-      const reduced = reduceLineageCost(lineage);
-      const spend = windowedSpend(joinCostLineages(rows, groupDispatchLineages(rows)), daysAgo(30).getTime(), NOW.getTime());
+      const lineage = lineageRecordsOf(rows).find(record => record.anchor === rows[0].rootItemId);
+      const reduced = lineageFigure(lineage);
+      const spend = windowedSpend(lineageRecordsOf(rows), daysAgo(30).getTime(), NOW.getTime());
       const got = {
-        reduceLineageCost: reduced.costUsd,
+        lineageFigure: reduced.costUsd,
         computeTerminalMarkedTaskCost: computeTerminalMarkedTaskCost(rows, NOW).pricedTicketCostUsd,
         buildTaskCost: buildTaskCost({ ownRows: rows }).workerSessions[0].costUsd,
         windowedSpend: spend.pricedCount ? [...spend.byDay.values()].reduce((a, b) => a + b, 0) : null

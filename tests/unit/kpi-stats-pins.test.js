@@ -11,6 +11,9 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { collectKpiStats, FREE_TIER_WINDOW_DAYS } from '../../lib/kpi-stats.js';
 
+// LIN-4178: no founder lookup: the fetched rows stand in for it (the pre-LIN-4178 behaviour).
+const NO_FOUNDERS = async () => [];
+
 const NOW = new Date('2026-06-10T12:00:00.000Z');
 const TODAY = '2026-06-10';
 const YESTERDAY = '2026-06-09';
@@ -30,7 +33,7 @@ async function freeTierOf(freeTierDocs) {
   ];
   const collections = Object.fromEntries(names.map(name => [name, mockCollection()]));
   collections.freeTier = mockCollection(freeTierDocs);
-  const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: {} });
+  const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: {} });
   return stats.freeTier;
 }
 

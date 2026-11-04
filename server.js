@@ -151,6 +151,7 @@ import { renderKpisPage } from './lib/render-kpis.js'
 import { createWorkspaceKpisRoutes } from './routes/workspace-kpis.js'
 import { renderTemplatesPage } from './lib/render-templates.js'
 import { collectKpiStats, toPublicKpis } from './lib/kpi-stats.js'
+import { lookupFounderRows } from './lib/founder-lookup.js'
 import { createKpiPage } from './lib/kpi-page.js'
 import { renderSettingsPage } from './lib/render-settings.js'
 import { renderPromptsPage } from './lib/render-prompts.js'
@@ -2491,6 +2492,9 @@ const kpiPage = createKpiPage({
     kpiDailyRollup: kpiDailyRollupCollection
   }, {
     dbBackend: process.env.MONGODB_URI ? 'mongodb' : 'mangodb',
+    // LIN-4178: the founder lookup over the raw dispatch collections (batched per urlKey). The public
+    // path gets its output only; the query lives in lib/founder-lookup.js.
+    lineageIdentity: rows => lookupFounderRows({ dispatchHistory: dispatchHistoryCollection, dispatchQueue: dispatchQueueCollection }, rows),
     // LIN-2952: the milestone-funnel aggregate's own deps (stores + the dispatch
     // collections), passed in OPTIONS so the aggregate never re-reads through
     // `collections.dispatchHistory`.

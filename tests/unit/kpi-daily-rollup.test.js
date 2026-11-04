@@ -16,6 +16,9 @@ import {
 } from '../../lib/kpi-daily-rollup.js';
 import { collectKpiStats } from '../../lib/kpi-stats.js';
 
+// LIN-4178: no founder lookup: the fetched rows stand in for it (the pre-LIN-4178 behaviour).
+const NO_FOUNDERS = async () => [];
+
 // Tuesday 2026-10-20, 13:00 UTC. The read horizon starts 2026-09-20T13:00Z, so the first whole day is 2026-09-21.
 const NOW = Date.parse('2026-10-20T13:00:00.000Z');
 const FIRST = '2026-09-21';
@@ -347,7 +350,7 @@ describe('agreement with the public page (collectKpiStats)', () => {
     const collections = Object.fromEntries(names.map((n) => [n, stub()]));
     collections.dispatchHistory = history;
     collections.dispatchQueue = stub(queueRows);
-    const stats = await collectKpiStats(collections, { now: new Date(NOW), milestoneFunnelDeps: {} });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: new Date(NOW), milestoneFunnelDeps: {} });
     const axis = stats.proxyCategories.days;
     assert.ok(Array.isArray(axis) && axis.length === 30);
 

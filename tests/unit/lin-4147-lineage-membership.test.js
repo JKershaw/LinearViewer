@@ -15,10 +15,14 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { anchorOf, groupLineageMembership, isMember } from '../../lib/lineage-membership.js';
-import { groupDispatchLineages, joinCostLineages } from '../../lib/dispatch-lineage.js';
+import { groupDispatchLineages } from '../../lib/dispatch-lineage.js';
+import { lineageRecords } from '../../lib/cost-read.js';
 import { buildTaskCost } from '../../lib/task-cost.js';
 import { computeTerminalMarkedTaskCost } from '../../lib/terminal-marked-task-cost.js';
 import { windowedSpend } from '../../lib/weekly-budget.js';
+
+// LIN-4178: the lineage records of the one cost read (joinCostLineages is gone).
+const lineageRecordsOf = rows => lineageRecords({ fetchedRows: rows, identityRows: [], outcomes: groupDispatchLineages(rows) });
 
 const NOW = new Date('2026-11-02T12:00:00.000Z');
 const WINDOW_START = Date.parse('2026-10-31T00:00:00.000Z');
@@ -163,7 +167,7 @@ describe('the cost readers, one synthetic case per changed behaviour (LIN-4147)'
   test('a never-ran lineage is no cost lineage: it is counted in neither the window\'s lineageCount nor its priced count', () => {
     const queued = kpiShape(formatted({ id: 'Q', rootItemId: 'Q', issueIdentifier: 'LIN-Q', status: 'queued', dispatchedAt: hoursAgo(5) }));
     const rows = [queued];
-    const spend = windowedSpend(joinCostLineages(rows, groupDispatchLineages(rows)), WINDOW_START, NOW.getTime());
+    const spend = windowedSpend(lineageRecordsOf(rows), WINDOW_START, NOW.getTime());
     assert.equal(spend.lineageCount, 0);
     assert.equal(spend.pricedCount, 0);
   });
@@ -174,7 +178,7 @@ describe('the cost readers, one synthetic case per changed behaviour (LIN-4147)'
       feedback: [usage({ cost: 4, at: hoursAgo(7.9), anchor: 'FD' }), finished(hoursAgo(7.8))] }));
     const cancelled = kpiShape(formatted({ id: 'CE', rootItemId: 'FD', issueIdentifier: 'LIN-Z', status: 'cancelled', dispatchedAt: hoursAgo(30) }));
     const rows = [founder, cancelled];
-    const spend = windowedSpend(joinCostLineages(rows, groupDispatchLineages(rows)), WINDOW_START, NOW.getTime());
+    const spend = windowedSpend(lineageRecordsOf(rows), WINDOW_START, NOW.getTime());
     assert.equal(spend.pricedCount, 1);
     assert.deepEqual([...spend.byDay.keys()], ['2026-11-02']);
     assert.equal(spend.byDay.get('2026-11-02'), 4);
@@ -292,7 +296,7 @@ describe('one answer across the readers (LIN-4147)', () => {
   test('the workspace-wide read of the cost engines agrees on the lineage count (every reader, both shapes)', () => {
     const allCost = buildTaskCost({ ownRows: rows, siblingRowsByAnchor: new Map() });
     const kpiRows = rows.map(kpiShape);
-    const spend = windowedSpend(joinCostLineages(kpiRows, groupDispatchLineages(kpiRows)), WINDOW_START, NOW.getTime());
+    const spend = windowedSpend(lineageRecordsOf(kpiRows), WINDOW_START, NOW.getTime());
     // Every lineage that ran and is not skipped, with a start in the window. The queued row is not one.
     assert.equal(allCost.workerSessions.length, spend.lineageCount);
     assert.equal(allCost.workerSessions.length, 3, 'A, P and WR: the queued Q is not a member, so it is no lineage');

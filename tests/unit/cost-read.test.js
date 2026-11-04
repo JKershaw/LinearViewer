@@ -202,12 +202,44 @@ describe('formatUsd (plan: one formatter)', () => {
   });
 });
 
-describe('W9: every replay difference is on the change list', () => {
-  test('the diff against the goldens is exactly the named changes', async () => {
+describe('W9: every replay difference is on the change list, and every listed change happened', () => {
+  const covers = (path, change) => path === change.path || path.startsWith(`${change.path}.`);
+
+  test('the diff against the goldens is exactly the named changes: no unlisted difference', async () => {
     const changes = JSON.parse(await readFile(CHANGES, 'utf8')).changes;
     const diffs = diffReplay(golden, current);
-    const unlisted = diffs.filter(path => !changes.some(c => path === c.path || path.startsWith(`${c.path}.`)));
+    const unlisted = diffs.filter(path => !changes.some(c => covers(path, c)));
     assert.deepEqual(unlisted, []);
+  });
+
+  // LIN-4178 review finding 1: the check above only forbids unexpected differences. A listed change that did not
+  // happen (a reverted fix) left every test green, so each entry must also name a difference the replay shows.
+  test('every listed change is a real difference: no entry that did not happen', async () => {
+    const changes = JSON.parse(await readFile(CHANGES, 'utf8')).changes;
+    const diffs = diffReplay(golden, current);
+    const didNotHappen = changes.filter(c => !diffs.some(d => covers(d, c))).map(c => c.path);
+    assert.deepEqual(didNotHappen, []);
+  });
+});
+
+describe('the S11, S12 and S13 movements, pinned to their after-values (LIN-4178 review finding 1)', () => {
+  test('S11: the done opencode straddler LIN-8 is no longer priced (11 tickets to 10)', () => {
+    assert.equal(current.S11.pricedTicketCount, 10);
+    assert.equal(current.S11.pricedTicketCostUsd, 79.48);
+  });
+
+  test('S12: an all-unpriced started day shows no figure, not $0.00; LIN-8 leaves day 26 and the priced count', () => {
+    for (const day of [23, 25, 28]) assert.equal(current.S12.daily.cost.perDay[day], null, `perDay[${day}] is no figure`);
+    assert.equal(current.S12.daily.cost.perDay[26], 1.2);
+    assert.equal(current.S12.daily.cost.pricedCount, 3122);
+  });
+
+  test('S13: a complete $0 lineage is priced at 0; its unpriced neighbour still withholds', () => {
+    const zr = current.S13.steps.find(s => s.lineageId === 'zr');
+    assert.deepEqual(zr.cost, { status: 'priced', usd: 0, label: null, finalLoopId: 'zr' });
+    const hk = current.S13.steps.find(s => s.lineageId === 'hk');
+    assert.equal(hk.cost.status, 'not-reported');
+    assert.equal(hk.cost.usd, null);
   });
 });
 

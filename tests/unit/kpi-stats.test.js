@@ -24,6 +24,9 @@ import {
 import { __internal as TERMINAL_INTERNAL } from '../../lib/dispatch-terminal.js';
 import { __internal as SESSION_TELEMETRY_INTERNAL } from '../../lib/session-telemetry.js';
 
+// LIN-4178: no founder lookup: the fetched rows stand in for it (the pre-LIN-4178 behaviour).
+const NO_FOUNDERS = async () => [];
+
 // Minimal in-memory mock of the collection surface kpi-stats uses:
 // find({}).toArray() and countDocuments({} | simple equality filter).
 // LIN-3161: `find()` honours equality and `$gte`/`$gt`/`$lt`/`$lte` bounds so
@@ -123,7 +126,7 @@ describe('categorizeProxyEvent', () => {
 
 describe('collectKpiStats', () => {
   test('returns all-zero stats for an empty instance', async () => {
-    const stats = await collectKpiStats(buildCollections(), { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(buildCollections(), { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
 
     assert.strictEqual(stats.totals.workspaces, 0);
     assert.strictEqual(stats.totals.users, 0);
@@ -162,7 +165,7 @@ describe('collectKpiStats', () => {
       ])
     });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.strictEqual(stats.totals.workspaces, 4); // acme, globex, initech, hooli
     // M is genuinely unknowable (no workspace registry read) — a basis
     // string, not a coverage share, is the honest disclosure (LIN-2325 F4).
@@ -181,7 +184,7 @@ describe('collectKpiStats', () => {
       ])
     });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.strictEqual(stats.totals.activeSessions, 2);
   });
 
@@ -199,7 +202,7 @@ describe('collectKpiStats', () => {
       ])
     });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     const last = ACTIVITY_WINDOW_DAYS - 1;
 
     assert.strictEqual(stats.proxyCategories.orienting[last], 2);
@@ -229,7 +232,7 @@ describe('collectKpiStats', () => {
       ])
     });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     const lastHour = HOURLY_WINDOW_HOURS - 1;
 
     assert.strictEqual(stats.proxyCategoriesHourly.orienting[lastHour], 2);
@@ -258,7 +261,7 @@ describe('collectKpiStats', () => {
       ])
     });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.strictEqual(stats.totals.autopilotRuns, 2);
     assert.deepStrictEqual(stats.dispatchKinds[0], { label: 'autopilot', count: 2 });
     assert.deepStrictEqual(stats.dispatchKinds[1], { label: 'implementation', count: 2 });
@@ -276,7 +279,7 @@ describe('collectKpiStats', () => {
     ));
     const collections = buildCollections({ dispatchHistory: createMockCollection(docs) });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.strictEqual(stats.dispatchKinds.length, 8);
     assert.strictEqual(stats.dispatchKindsOtherCount, 3);
   });
@@ -291,7 +294,7 @@ describe('collectKpiStats', () => {
       ])
     });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.strictEqual(stats.dispatchByDay.days.length, ACTIVITY_WINDOW_DAYS);
 
     const research = stats.dispatchByDay.kinds.find(k => k.label === 'research');
@@ -313,7 +316,7 @@ describe('collectKpiStats', () => {
     docs.push({ _id: 'h-extra', kind: 'a', status: 'taken', dispatchedAt: daysAgo(1) });
 
     const collections = buildCollections({ dispatchHistory: createMockCollection(docs) });
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
 
     const labels = stats.dispatchByDay.kinds.map(k => k.label);
     assert.strictEqual(labels.length, 6); // top 5 + other
@@ -345,7 +348,7 @@ describe('collectKpiStats', () => {
       ])
     });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.deepStrictEqual(stats.funnel, { dispatched: 5, taken: 3, reported: 2, completed: 1, reportedIsLowerBound: true, completedIsLowerBound: true });
     // A non-reporting agent is structurally indistinguishable from an
     // incomplete task, so reported/completed can only ever undercount the
@@ -368,7 +371,7 @@ describe('collectKpiStats', () => {
       ])
     });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.strictEqual(stats.vanity.medianQueueToTakeMinutes, 30);
   });
 
@@ -382,7 +385,7 @@ describe('collectKpiStats', () => {
       ])
     });
 
-    const stats = await collectKpiStats(collections, {
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS,
       now: new Date('1970-01-10T00:00:00.000Z'),
       milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS
     });
@@ -402,7 +405,7 @@ describe('collectKpiStats', () => {
       ])
     });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.deepStrictEqual(stats.stepOutcomes, { completed: 2, failed: 1, blocked: 1, other: 2 });
   });
 
@@ -418,7 +421,7 @@ describe('collectKpiStats', () => {
       ])
     });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.deepStrictEqual(stats.proxyStatus, { ok: 3, clientError: 1, serverError: 1 });
     // Tied counts break alphabetically for deterministic output
     assert.deepStrictEqual(stats.topEndpoints[0], { label: '/api/proxy/issues/:id', count: 2 });
@@ -435,7 +438,7 @@ describe('collectKpiStats', () => {
     ));
     const collections = buildCollections({ proxyEvents: createMockCollection(events) });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.strictEqual(stats.topEndpoints.length, 8);
     assert.strictEqual(stats.topEndpointsOtherCount, 2);
   });
@@ -455,7 +458,7 @@ describe('collectKpiStats', () => {
       ])
     });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.strictEqual(stats.hourOfDay[3], 3);
     assert.strictEqual(stats.hourOfDay[11], 1);
     assert.strictEqual(stats.hourOfDay.reduce((a, b) => a + b, 0), 4);
@@ -471,7 +474,7 @@ describe('collectKpiStats', () => {
       ])
     });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.strictEqual(stats.freeTier.days.length, FREE_TIER_WINDOW_DAYS);
     assert.strictEqual(stats.freeTier.counts[FREE_TIER_WINDOW_DAYS - 2], 6);
   });
@@ -485,7 +488,7 @@ describe('collectKpiStats', () => {
         { _id: 'absent' }
       ])
     });
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.strictEqual(stats.totals.activeTokens, 3);
   });
 
@@ -502,7 +505,7 @@ describe('collectKpiStats', () => {
       customPrompts: createMockCollection([{ urlKey: 'acme', name: 'My prompt', template: 'do {{thing}}' }])
     });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.strictEqual(stats.totals.aiSummaries, 3);
     assert.strictEqual(stats.totals.activeTokens, 3);
     assert.strictEqual(stats.totals.localIssues, 2);
@@ -564,7 +567,7 @@ describe('collectKpiStats', () => {
       }])
     };
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps });
     const serialized = JSON.stringify(stats);
 
     // The aggregate actually ran and counted — proves the leak assertions aren't
@@ -608,7 +611,7 @@ describe('collectKpiStats', () => {
       }])
     });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     // The metric must actually be live (proves the assertion isn't vacuous).
     assert.equal(stats.terminalMarkedTaskCost.pricedTicketCount, 1);
     assert.equal(stats.terminalMarkedTaskCost.pricedTicketCostUsd, 3);
@@ -633,7 +636,7 @@ describe('collectKpiStats — 30-day window exclusions (LIN-1846)', () => {
       ])
     });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.strictEqual(stats.totals.dispatches, 1);
     assert.strictEqual(stats.totals.autopilotRuns, 0);
     assert.deepStrictEqual(stats.dispatchKinds, [{ label: 'research', count: 1 }]);
@@ -647,7 +650,7 @@ describe('collectKpiStats — 30-day window exclusions (LIN-1846)', () => {
       ])
     });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.strictEqual(stats.totals.feedbackNotes, 2);
   });
 
@@ -663,7 +666,7 @@ describe('collectKpiStats — 30-day window exclusions (LIN-1846)', () => {
       ])
     });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.strictEqual(stats.totals.agentActions, 2); // 1 proxy event + 1 agent-status report
   });
 
@@ -679,7 +682,7 @@ describe('collectKpiStats — 30-day window exclusions (LIN-1846)', () => {
       ])
     });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.deepStrictEqual(stats.funnel, { dispatched: 1, taken: 1, reported: 1, completed: 1, reportedIsLowerBound: true, completedIsLowerBound: true });
   });
 
@@ -700,7 +703,7 @@ describe('collectKpiStats — 30-day window exclusions (LIN-1846)', () => {
       ])
     });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.deepStrictEqual(stats.funnel, { dispatched: 1, taken: 1, reported: 1, completed: 1, reportedIsLowerBound: true, completedIsLowerBound: true });
   });
 
@@ -712,7 +715,7 @@ describe('collectKpiStats — 30-day window exclusions (LIN-1846)', () => {
       ])
     });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.deepStrictEqual(stats.stepOutcomes, { completed: 1, failed: 0, blocked: 0, other: 0 });
   });
 
@@ -728,7 +731,7 @@ describe('collectKpiStats — 30-day window exclusions (LIN-1846)', () => {
       ])
     });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.strictEqual(stats.hourOfDay[3], 1);
     assert.strictEqual(stats.hourOfDay[11], 1);
     assert.strictEqual(stats.hourOfDay.reduce((a, b) => a + b, 0), 2);
@@ -758,7 +761,7 @@ describe('collectKpiStats — 30-day window exclusions (LIN-1846)', () => {
       ])
     });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.strictEqual(stats.totals.dispatches, 0);
     assert.deepStrictEqual(stats.dispatchKinds, []);
     assert.deepStrictEqual(stats.funnel, { dispatched: 0, taken: 0, reported: 0, completed: 0, reportedIsLowerBound: true, completedIsLowerBound: true });
@@ -787,7 +790,7 @@ describe('collectKpiStats — hourly proxy siblings for the 24h toggle (LIN-1846
       ])
     });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.deepStrictEqual(stats.proxyStatusHourly, { ok: 2, clientError: 0, serverError: 1 });
     assert.deepStrictEqual(stats.topEndpointsHourly[0], { label: '/api/proxy/me', count: 2 });
     // The 30h-old event still lands in the 30d fields, not the hourly ones
@@ -808,7 +811,7 @@ describe('collectKpiStats — hourly proxy siblings for the 24h toggle (LIN-1846
     ];
     const collections = buildCollections({ proxyEvents: createMockCollection(events) });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.strictEqual(stats.topEndpoints.length, 8, '10 distinct endpoints over 30d, cut to top 8');
     assert.strictEqual(stats.topEndpointsOtherCount, 2, '2 of the 10 distinct 30d endpoints are dropped');
     assert.strictEqual(stats.topEndpointsHourly.length, 4, 'only the 4 recent endpoints fall inside 24h');
@@ -842,7 +845,7 @@ describe('PROXY_FIELDS keeps the free-text note out of the unauthenticated read 
     const proxyEvents = createProjectionSpy([
       { method: 'GET', endpoint: '/api/proxy/me', status: 200, timestamp: daysAgo(0), urlKey: 'acme', note: 'SENSITIVE-NOTE-BREADCRUMB' }
     ]);
-    await collectKpiStats(buildCollections({ proxyEvents }), { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    await collectKpiStats(buildCollections({ proxyEvents }), { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
 
     const projection = proxyEvents._calls.at(-1)?.options?.projection;
     assert.ok(projection, 'the proxy-event read must be projected, not a raw find({})');
@@ -856,7 +859,7 @@ describe('PROXY_FIELDS keeps the free-text note out of the unauthenticated read 
     const proxyEvents = createProjectionSpy([
       { method: 'GET', endpoint: '/api/proxy/me', status: 200, timestamp: daysAgo(0), urlKey: 'acme', note: 'SENSITIVE-NOTE-BREADCRUMB' }
     ]);
-    const stats = await collectKpiStats(buildCollections({ proxyEvents }), { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(buildCollections({ proxyEvents }), { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.ok(!JSON.stringify(stats).includes('SENSITIVE-NOTE-BREADCRUMB'), 'proxy event note leaked');
   });
 });
@@ -1053,7 +1056,7 @@ describe('loadProxyBins (via collectKpiStats — no direct export exists) — ag
       find() { findCalls++; return { toArray: async () => [] }; }
     };
     const collections = buildCollections({ proxyEvents });
-    await assert.rejects(() => collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS }), /boom/);
+    await assert.rejects(() => collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS }), /boom/);
     assert.strictEqual(findCalls, 0, 'proxyEvents.find({}) must never be called after an aggregation failure');
   });
 });
@@ -1093,7 +1096,7 @@ describe('collectKpiStats — grouping extraction (LIN-1957)', () => {
     // extracted helper's consumer end-to-end via collectKpiStats.
     const stats = await collectKpiStats(buildCollections({
       dispatchHistory: createMockCollection(outcomeSeed())
-    }), { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    }), { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.strictEqual(stats.dispatchOutcomes.done, 2);
     assert.strictEqual(stats.dispatchOutcomes.failed, 1);
     assert.strictEqual(stats.dispatchOutcomes.aborted, 1);
@@ -1107,7 +1110,7 @@ describe('collectKpiStats — dispatch outcomes (find path)', () => {
     const stats = await collectKpiStats(buildCollections({
       dispatchHistory: createMockCollection(history),
       dispatchQueue: createMockCollection(queue)
-    }), { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    }), { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     return stats.dispatchOutcomes;
   }
 
@@ -1222,7 +1225,7 @@ describe('collectKpiStats — dispatch outcomes (find path)', () => {
       dispatchHistory: createMockCollection([
         { _id: 'h1', urlKey: 'secret-workspace', status: 'taken', rootItemId: 'h1', dispatchedAt: daysAgo(1), feedback: [marker('[done] MARKER-FREE-TEXT-TAIL', 0)] }
       ])
-    }), { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    }), { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
 
     const serialized = JSON.stringify(stats);
     assert.strictEqual(stats.dispatchOutcomes.done, 1, 'the marker was read');
@@ -1287,7 +1290,7 @@ describe('collectKpiStats (aggregation path, real MangoDB)', () => {
       ]
     });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     const last = ACTIVITY_WINDOW_DAYS - 1;
 
     assert.strictEqual(stats.proxyCategories.orienting[last], 2);
@@ -1315,7 +1318,7 @@ describe('collectKpiStats (aggregation path, real MangoDB)', () => {
       ]
     });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     const lastHour = HOURLY_WINDOW_HOURS - 1;
     assert.strictEqual(stats.proxyCategoriesHourly.orienting[lastHour], 2);
     assert.strictEqual(stats.proxyCategoriesHourly.reporting[lastHour - 5], 1);
@@ -1335,7 +1338,7 @@ describe('collectKpiStats (aggregation path, real MangoDB)', () => {
       ]
     });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.deepStrictEqual(stats.proxyStatus, { ok: 3, clientError: 1, serverError: 1 });
     assert.deepStrictEqual(stats.topEndpoints[0], { label: '/api/proxy/issues/:id', count: 2 });
     assert.deepStrictEqual(stats.topEndpoints[1], { label: '/api/proxy/me', count: 2 });
@@ -1358,7 +1361,7 @@ describe('collectKpiStats (aggregation path, real MangoDB)', () => {
       ]
     });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.deepStrictEqual(stats.proxyStatusHourly, { ok: 2, clientError: 0, serverError: 1 });
     assert.deepStrictEqual(stats.topEndpointsHourly[0], { label: '/api/proxy/me', count: 2 });
     // The 30h-old event still lands in the 30d fields, not the hourly ones
@@ -1381,7 +1384,7 @@ describe('collectKpiStats (aggregation path, real MangoDB)', () => {
       ]
     });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.strictEqual(stats.hourOfDay[3], 3);
     assert.strictEqual(stats.hourOfDay[11], 1);
     assert.strictEqual(stats.hourOfDay.reduce((a, b) => a + b, 0), 4);
@@ -1405,7 +1408,7 @@ describe('collectKpiStats (aggregation path, real MangoDB)', () => {
       ]
     });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     // h1 reported (2 feedback) + h2 reported (linked step) → reported: 2
     assert.deepStrictEqual(stats.funnel, { dispatched: 5, taken: 3, reported: 2, completed: 1, reportedIsLowerBound: true, completedIsLowerBound: true });
     assert.strictEqual(stats.totals.feedbackNotes, 2); // only h1's two notes, counted via $size
@@ -1432,7 +1435,7 @@ describe('collectKpiStats (aggregation path, real MangoDB)', () => {
       ]
     });
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     const serialized = JSON.stringify(stats);
     assert.ok(!serialized.includes('secret-workspace'), 'workspace urlKey leaked');
     assert.ok(!serialized.includes('CONFIDENTIAL-FEEDBACK-BODY'), 'feedback content leaked');
@@ -1443,7 +1446,7 @@ describe('collectKpiStats (aggregation path, real MangoDB)', () => {
 
   test('derives the outcome slices in-DB, matching the find path exactly', async () => {
     const collections = await realCollections({ dispatchHistory: outcomeSeed() });
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
 
     assert.strictEqual(stats.dispatchOutcomes.done, 2);
     assert.strictEqual(stats.dispatchOutcomes.failed, 1);
@@ -1458,10 +1461,10 @@ describe('collectKpiStats (aggregation path, real MangoDB)', () => {
     // absorbed at a single helper. This pins that the abort harvest, the F1
     // guard, lineage grouping and weekly bucketing all agree across the two.
     const seed = outcomeSeed();
-    const aggregated = await collectKpiStats(await realCollections({ dispatchHistory: seed }), { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const aggregated = await collectKpiStats(await realCollections({ dispatchHistory: seed }), { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     const found = await collectKpiStats(
       buildCollections({ dispatchHistory: createMockCollection(seed) }),
-      { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS }
+      { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS }
     );
 
     assert.deepStrictEqual(aggregated.dispatchOutcomes, found.dispatchOutcomes);
@@ -1538,7 +1541,7 @@ describe('collectKpiStats (aggregation path, real MangoDB)', () => {
     assert.strictEqual(byId.h1.issueIdentifier, 'LIN-42');
     assert.strictEqual(byId.h2.issueIdentifier, undefined);
 
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.ok(stats, 'collectKpiStats must not choke on the new fields'); // not surfaced yet — beat 3/4 wires the consumer
   });
 
@@ -1666,7 +1669,7 @@ describe('collectKpiStats — 30-day read horizon bounds (LIN-3161 / LIN-3157 A1
 
   test('loadProxyBins aggregation gets a leading $match on timestamp, before $group', async () => {
     const { collection, getPipeline } = recordingAggregate();
-    await collectKpiStats(buildCollections({ proxyEvents: collection }), { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    await collectKpiStats(buildCollections({ proxyEvents: collection }), { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     const pipeline = getPipeline();
     assert.deepStrictEqual(pipeline[0], { $match: { timestamp: { $gte: HORIZON_START } } });
     assert.ok(pipeline[1] && pipeline[1].$group, 'the existing $group must follow the leading $match');
@@ -1674,7 +1677,7 @@ describe('collectKpiStats — 30-day read horizon bounds (LIN-3161 / LIN-3157 A1
 
   test('loadDispatchHistory aggregation gets a leading $match on dispatchedAt (not resolvedAt), before $project', async () => {
     const { collection, getPipeline } = recordingAggregate();
-    await collectKpiStats(buildCollections({ dispatchHistory: collection }), { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    await collectKpiStats(buildCollections({ dispatchHistory: collection }), { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     const pipeline = getPipeline();
     assert.deepStrictEqual(pipeline[0], { $match: { dispatchedAt: { $gte: HORIZON_START } } });
     assert.ok(pipeline[1] && pipeline[1].$project, 'the existing $project must follow the leading $match');
@@ -1685,7 +1688,7 @@ describe('collectKpiStats — 30-day read horizon bounds (LIN-3161 / LIN-3157 A1
     const historyFilters = [];
     const proxyEvents = { find(f) { proxyFilters.push(f); return { toArray: async () => [] }; } };
     const dispatchHistory = { find(f) { historyFilters.push(f); return { toArray: async () => [] }; } };
-    await collectKpiStats(buildCollections({ proxyEvents, dispatchHistory }), { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    await collectKpiStats(buildCollections({ proxyEvents, dispatchHistory }), { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
 
     assert.deepStrictEqual(proxyFilters[0], { timestamp: { $gte: HORIZON_START } });
     assert.deepStrictEqual(historyFilters[0], { dispatchedAt: { $gte: HORIZON_START } });
@@ -1705,7 +1708,7 @@ describe('collectKpiStats — 30-day read horizon bounds (LIN-3161 / LIN-3157 A1
         return { toArray: async () => docs.filter(d => !gte || d.timestamp >= gte) };
       }
     };
-    const stats = await collectKpiStats(buildCollections({ agentStatus }), { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(buildCollections({ agentStatus }), { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
 
     assert.deepStrictEqual(recordedFilter, { timestamp: { $gte: HORIZON_START } });
     assert.strictEqual(stats.totals.workspaces, 1, 'only the in-window workspace counts');
@@ -1724,7 +1727,7 @@ describe('collectKpiStats — 30-day read horizon bounds (LIN-3161 / LIN-3157 A1
         { dispatchId: 'd2', action: 'plan', status: 'failed', timestamp: daysAgo(2) }
       ])
     });
-    const stats = await collectKpiStats(collections, { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
 
     assert.deepStrictEqual(stats.stepOutcomes, { completed: 1, failed: 1, blocked: 0, other: 0 });
     // Both dispatches were reported against (any in-window agent-status row
@@ -1746,15 +1749,15 @@ describe('collectKpiStats — 30-day read horizon bounds (LIN-3161 / LIN-3157 A1
  */
 describe('LIN-2952 characterization — collectKpiStats option contract', () => {
   test('dbBackend defaults to null and a supplied label passes through to vanity', async () => {
-    const defaulted = await collectKpiStats(buildCollections(), { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const defaulted = await collectKpiStats(buildCollections(), { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.strictEqual(defaulted.vanity.dbBackend, null);
 
-    const labelled = await collectKpiStats(buildCollections(), { now: NOW, dbBackend: 'mongodb', milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const labelled = await collectKpiStats(buildCollections(), { lineageIdentity: NO_FOUNDERS, now: NOW, dbBackend: 'mongodb', milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.strictEqual(labelled.vanity.dbBackend, 'mongodb');
   });
 
   test('the work funnel stays under `funnel` with its pinned shape', async () => {
-    const stats = await collectKpiStats(buildCollections(), { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(buildCollections(), { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.deepStrictEqual(stats.funnel, {
       dispatched: 0, taken: 0, reported: 0, completed: 0,
       reportedIsLowerBound: true, completedIsLowerBound: true
@@ -1764,7 +1767,7 @@ describe('LIN-2952 characterization — collectKpiStats option contract', () => 
 
 describe('LIN-2952 — milestoneFunnel aggregate key', () => {
   test('is present, and the pinned work funnel key is unchanged', async () => {
-    const stats = await collectKpiStats(buildCollections(), { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    const stats = await collectKpiStats(buildCollections(), { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
     assert.deepStrictEqual(stats.funnel, {
       dispatched: 0, taken: 0, reported: 0, completed: 0,
       reportedIsLowerBound: true, completedIsLowerBound: true
@@ -1774,7 +1777,7 @@ describe('LIN-2952 — milestoneFunnel aggregate key', () => {
 
   test('R3 (LIN-3002, LIN-3501): a throwing funnel dep reads no-signal, but the mode store still rejects collectKpiStats', async () => {
     const throwingAccountStore = { collection: { find() { throw new Error('boom'); } } };
-    const stats = await collectKpiStats(buildCollections(), {
+    const stats = await collectKpiStats(buildCollections(), { lineageIdentity: NO_FOUNDERS,
       now: NOW,
       milestoneFunnelDeps: { ...NO_MILESTONE_FUNNEL_DEPS, accountStore: throwingAccountStore }
     });
@@ -1784,7 +1787,7 @@ describe('LIN-2952 — milestoneFunnel aggregate key', () => {
     }
 
     await assert.rejects(
-      collectKpiStats(buildCollections(), {
+      collectKpiStats(buildCollections(), { lineageIdentity: NO_FOUNDERS,
         now: NOW,
         milestoneFunnelDeps: { ...NO_MILESTONE_FUNNEL_DEPS, taskModeStore: { countByEntryRung: async () => { throw new Error('boom'); } } }
       }),
@@ -1794,7 +1797,7 @@ describe('LIN-2952 — milestoneFunnel aggregate key', () => {
 
   test('L2: collectKpiStats requires the milestoneFunnelDeps object', async () => {
     await assert.rejects(
-      collectKpiStats(buildCollections(), { now: NOW }),
+      collectKpiStats(buildCollections(), { lineageIdentity: NO_FOUNDERS, now: NOW }),
       /milestoneFunnelDeps is required/
     );
   });
@@ -1807,7 +1810,7 @@ describe('collectKpiStats — weekly slices and daily series (LIN-3710)', () => 
     return collectKpiStats(buildCollections({
       dispatchHistory: createMockCollection(history),
       dispatchQueue: createMockCollection(queue)
-    }), { now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
+    }), { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
   }
   const row = (id, started, feedback, extra = {}) =>
     ({ _id: id, rootItemId: id, status: 'taken', dispatchedAt: daysAgo(started), feedback, ...extra });
