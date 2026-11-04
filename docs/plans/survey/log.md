@@ -728,3 +728,19 @@ Written against the bar, with rebuild 1's lesson folded in: "Done when" now says
 *Do first:* decide where records live and what Harbour accepts, and ship it accepted but unread; then the transcript corpus with the hard cases; then the runner; then the read, last.
 
 **Acted on:** all of that went onto the ticket, plus "park a piece rather than guess; John answers rulings in the morning". Kicked off 01:27.
+
+## 4 Nov, about 01:40 UTC: one more quality-of-life ticket, LIN-4196 (the mutation runner gets its own Harbour)
+
+The mutation runner edits a Harbour checkout's source. That has now cost a Survey warning (LIN-4180), a by-hand throwaway copy (LIN-4180's close-out), a ruling for John and "not a routine check" (LIN-4182). Filed at the level of the idea: *any builder can run it at any time without risk to any checkout*.
+
+**Its Survey (open-0; told not to run the mutation runner):**
+- **The natural place for the copy gives false kills:** killers and the Harbour they boot run under the leak trap, so a copy in shared temp could make every killer "kill" for reasons unrelated to the mutant.
+- Killers inherit the operator's `HARBOUR_DIR`.
+- About 58 of 60 mutants edit the *dispatcher* checkout in place too, reverted only in a `finally` with no SIGINT handler.
+- Copy the working tree, not `HEAD`.
+- The runner does everything at require time, so it can't be unit-tested.
+- *First:* **a baseline pass.** Run each killer once against the unmutated copy and require a pass, "or any failure from the environment counts as a kill … a fake 100%". Done means: baseline green, score unchanged, and the original tree's checksum identical before and after a run, Ctrl-C included.
+
+**Acted on:** all of that went onto the ticket, with "decide early, and say which" on the dispatcher-checkout scope. Kicked off 01:40.
+
+**A note on the Survey's reach:** this is the fourth ticket where open-0 found that the thing being protected (a guard, a score, a baseline) could be *silently* wrong. LIN-4181's guard was made vacuous by an env pin. LIN-4178's change list allowed and never required. LIN-4180's "it runs" wasn't "it passes". Here, a mutation score could be fake. A pattern for the discussion: *does the check you're relying on actually fail when it should?*

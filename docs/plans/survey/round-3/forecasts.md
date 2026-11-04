@@ -205,3 +205,24 @@ Read at Harbour `723052153`, runner `cc2650a6d`.
 2. Build a transcript corpus covering Haiku over 100k, a subagent, mixed models, a `<synthetic>` tail, a session killed before Stop, and one resumed across the deploy. Record "before" by running today's runner fold over it, with a change list that must see every listed difference.
 3. Only then switch the runner, and the read last.
 
+
+# LIN-4196 forecast (open-0)
+
+## Survey open-0: LIN-4196 @ cc2650a6d
+
+**Why it will be harder than "copy the dir"**
+
+1. **The natural place for the copy can give false kills.** `runKiller` (`run-mutations.js:656`) starts `node --require ./test/isolate-run.js --test <killer>`. That child becomes isolate-run's *runner parent*: it makes its own `sd-test-run-*` root and points TMPDIR at it. NODE_OPTIONS carries it into `node server.js`, so Harbour runs under the leak trap too. Any read under /tmp, /private/tmp or the original tmpdir that is outside *that killer's* run root is a violation, and a violation fails the file (`leak-trap.js:8-22`). Put the copy in `os.tmpdir()`/mkdtemp, the obvious choice, and Harbour's own reads may fail every Harbour-booting killer, giving "killed ✓" for reasons unrelated to the mutant. The copy probably belongs outside the shared temp roots: beside the checkout (as LIN-4181 did for WORKSPACE_CLONE_ROOT) or in a gitignored dir in the repo, since repo paths are exempt.
+
+2. **The killer has to be pointed at the copy.** `runKiller` passes no env, so it inherits the operator's `HARBOUR_DIR`. Mutate the copy without overriding that for the killer, and the original gets booted. Both Harbour mutants (`lib/dispatch-wake.js`, lines 117-134) then survive. That one fails loudly, at least.
+
+3. **Scope: the dispatcher checkout is edited in place too.** About 58 of the ~60 mutants edit ROOT, the checkout the runner is in. The revert is only a `finally`. With no SIGINT handler, a Ctrl-C during the synchronous `execFileSync` leaves a mutant in the source. The title says Harbour only, but "without risk to any checkout" covers this one as well, so decide early. Copying the dispatcher as well is a bigger job (killers run with `cwd: ROOT` and `./test/...` preloads).
+
+4. **What goes into the copy.** Harbour runs as plain `node server.js` with no build step. Copy the working tree, not `git archive HEAD`, or uncommitted Harbour changes stop being what gets checked. `server.js` loads `dotenv/config`, so whether `.env` is copied changes Harbour's env. Leave `data/` out.
+
+5. **As written, it can't be tested.** The runner locates Harbour, may `process.exit`, and calls `main()` all at require time. Proving "the original is never touched" needs the copy step pulled out into a function with injectable paths, the way `harbour-locate.js` works. Also: `harbour-locate.test.js:210-233` bans the default-path literals in `test/system/mutation/`, and :113 pins `discover: false`. Now that the source is no longer edited, it's tempting to relax that to discovery. That is a behaviour change, so either say so or leave it alone.
+
+**What I'd do first**
+
+Add a **baseline pass** before any mutant: run each distinct killer once against the unmutated copy and require it to pass. Today any failure from the environment counts as a kill: the leak trap, a clash on the fixed ports (4123, 4145…), or the wrong HARBOUR_DIR. A baseline turns trap 1 into a loud error instead of a fake 100%. Then build the copy step against it. Done means: baseline green, score unchanged, and a checksum of the original Harbour tree identical before and after a run, including one interrupted with Ctrl-C.
+
