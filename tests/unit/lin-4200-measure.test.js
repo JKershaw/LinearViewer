@@ -25,9 +25,9 @@ function row({ id, rootItemId, usage, usageAt = SNAP_AT, dispatchedAt = '2026-11
 }
 
 /** A request record as the intake stores it (identity, metadata, and the five token fields). */
-function rec({ requestId, at, agent = 'main', model = HAIKU, input = 0, output = 0, cacheRead = 0, cacheWrite = 0 }) {
+function rec({ requestId, at, agent = 'main', model = HAIKU, input = 0, output = 0, cacheRead = 0, cacheWrite = 0, updatedAt = at }) {
   return {
-    requestId, rootItemId: 'L1', agent, model, harness: 'claude-code', at,
+    requestId, rootItemId: 'L1', agent, model, harness: 'claude-code', at, updatedAt,
     inputTokens: input, outputTokens: output, cacheCreationInputTokens: cacheWrite,
     cacheCreation1hInputTokens: 0, cacheReadInputTokens: cacheRead
   };
@@ -110,6 +110,58 @@ describe('to-the-cent subset', () => {
     assert.equal(r.recordsAfterSnapshot, true);
     assert.equal(r.tailExcessTokens.inputTokens, 200);
     assert.equal(r.tailExcessTokens.outputTokens, 20);
+  });
+});
+
+describe('same-Stop race (the final request missed by the snapshot walk)', () => {
+  test('a gap that is exactly the last record, led by the snapshot by 0.2 s, is the race', () => {
+    // The snapshot (06:00:00.000) covers m1 only. m2 first lines at 05:59:59.800, posted at 06:00:00.100:
+    // the snapshot walked before m2's line reached disk.
+    const r = classify(
+      [row({ id: 'a', rootItemId: 'L1', usage: SNAP })],
+      [
+        rec({ requestId: 'm1', at: '2026-11-04T05:40:00.000Z', input: 1000, output: 500 }),
+        rec({ requestId: 'm2', at: '2026-11-04T05:59:59.800Z', updatedAt: '2026-11-04T06:00:00.100Z', input: 200, output: 130 })
+      ]
+    );
+    assert.equal(r.toCent, true);
+    assert.equal(r.agrees, false);
+    assert.equal(r.sameStopRace, true);
+  });
+
+  test('a gap whose final line led the snapshot by a minute is NOT the race (unexplained)', () => {
+    const r = classify(
+      [row({ id: 'a', rootItemId: 'L1', usage: SNAP })],
+      [
+        rec({ requestId: 'm1', at: '2026-11-04T05:40:00.000Z', input: 1000, output: 500 }),
+        rec({ requestId: 'm2', at: '2026-11-04T05:59:00.000Z', updatedAt: '2026-11-04T06:00:00.100Z', input: 200, output: 130 })
+      ]
+    );
+    assert.equal(r.agrees, false);
+    assert.equal(r.sameStopRace, false);
+  });
+
+  test('a gap that is NOT exactly the last record is not the race, even when posted close in time', () => {
+    const r = classify(
+      [row({ id: 'a', rootItemId: 'L1', usage: SNAP })],
+      [
+        rec({ requestId: 'm1', at: '2026-11-04T05:40:00.000Z', input: 1000, output: 500 }),
+        rec({ requestId: 'm2', at: '2026-11-04T05:59:59.800Z', updatedAt: '2026-11-04T06:00:00.100Z', input: 200, output: 130 }),
+        rec({ requestId: 'm3', at: '2026-11-04T05:59:00.000Z', updatedAt: '2026-11-04T06:00:00.100Z', input: 0, output: 7 })
+      ]
+    );
+    assert.equal(r.agrees, false);
+    assert.equal(r.sameStopRace, false);
+  });
+});
+
+describe('pre-deploy requests', () => {
+  test('a record whose first line predates the deploy is counted as pre-deploy', () => {
+    const r = classify(
+      [row({ id: 'a', rootItemId: 'L1', usage: SNAP })],
+      [rec({ requestId: 'old', at: '2026-11-04T04:20:00.000Z', input: 1000, output: 500 })]
+    );
+    assert.equal(r.preDeployRecords, 1);
   });
 });
 

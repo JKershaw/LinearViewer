@@ -291,6 +291,8 @@ describe('census: nothing outside the store reads the collection', () => {
     'lib/request-usage-intake.js',
     'lib/db-indexes.js',
     'lib/account-erasure.js',
+    // LIN-4200 (piece 3): the one-off measurement reads request-usage with find() only, never writes.
+    'scripts/lin-4200-measure-records-vs-snapshots.mjs',
     'tests/unit/lin-4198-request-usage-store.test.js',
     'tests/unit/lin-4198-request-usage-mongod.test.js'
   ]);

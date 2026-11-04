@@ -7,6 +7,9 @@
  *  - the to-the-cent subset: priced snapshot, no subagents, one model, last record <= last snapshot.
  *    Agreement = the five integer token sums are equal AND the cost difference is under half a cent.
  *    A disagreement is listed with its per-field diff; it needs an explanation or it blocks piece 4.
+ *    A disagreement whose gap is exactly the lineage's last record, whose first line leads the last snapshot
+ *    by at most 2 s, is the SAME-STOP RACE (the snapshot walked the transcript before the final request reached disk). It is
+ *    reported as its own class, not as agreement and not as unexplained.
  *  - the records-after-last-snapshot set (L4/L5 tail): records >= snapshot per token field expected;
  *    the excess is reported (tokens, and dollars when both sides price).
  *  - the D7 residue: lineages where the record token sum is below the snapshot on any token field.
@@ -48,6 +51,9 @@ export const TOKEN_FIELDS = Object.freeze([
 
 const SYNTHETIC_MODEL = '<synthetic>';
 const CENT_EPSILON = 0.005;
+// The final line's first-seen time may lead the snapshot by at most this much. Chosen AFTER the first live run
+// (every race observed led by 0.19-0.45 s); disclosed in the LIN-4200 report, not fitted to the outcome.
+const RACE_WINDOW_MS = 2000;
 const DEPLOY_MS = Date.parse('2026-11-04T04:59:21Z');
 const LONG_CONTEXT_THRESHOLD = 100000;
 
@@ -152,6 +158,27 @@ export function classifyLineage({ lineage, records }) {
     agrees = tokensEqual && costDiff !== null && Math.abs(costDiff) < CENT_EPSILON;
   }
 
+  // The same-Stop race: the snapshot walked the transcript before the lineage's final request reached
+  // disk. The gap is exactly that one request, and its first line led the snapshot by at most RACE_WINDOW_MS.
+  // Reported as its own class, never as agreement and never as an unexplained gap.
+  const lastRecord = records.length > 0
+    ? [...records].sort((a, b) => (msOf(a.at) ?? 0) - (msOf(b.at) ?? 0))[records.length - 1]
+    : null;
+  // The race is about the final line's timing vs the snapshot walk: the line was written moments before the
+  // snapshot was taken. Its post time is not used: a later flush may post it seconds after the snapshot.
+  const lastRecordAtMs = lastRecord ? msOf(lastRecord.at) : null;
+  const gapIsLastRecord = tokenDiff !== null && lastRecord !== null
+    && TOKEN_FIELDS.every(f => tokenDiff[f] === tokenValue(lastRecord, f));
+  const lagMs = lastRecordAtMs !== null && snapshotAtMs !== null ? snapshotAtMs - lastRecordAtMs : null;
+  const sameStopRace = toCent && agrees === false && gapIsLastRecord && lagMs !== null
+    && lagMs >= 0 && lagMs <= RACE_WINDOW_MS;
+  // Requests whose first transcript line predates the deploy: a lineage resumed across it, or a pre-deploy
+  // transcript the first post walked.
+  const preDeployRecords = records.filter(record => {
+    const ms = msOf(record.at);
+    return ms !== null && ms < DEPLOY_MS;
+  }).length;
+
   const recordsAfterSnapshot = recordBacked && snapshotAtMs !== null && lastRecordMs > snapshotAtMs;
   const d7Residue = recordBacked && tokenDiff !== null && TOKEN_FIELDS.some(f => tokenDiff[f] < 0);
   const tailExcessTokens = recordsAfterSnapshot && tokenDiff ? tokenDiff : null;
@@ -172,6 +199,9 @@ export function classifyLineage({ lineage, records }) {
     snapshotAt: snapshotAtMs === null ? null : new Date(snapshotAtMs).toISOString(),
     toCent,
     agrees,
+    sameStopRace,
+    lagMs,
+    preDeployRecords,
     tokenDiff,
     costDiff,
     recordsAfterSnapshot,
@@ -266,8 +296,7 @@ export function oplogCounters(lines, sinceMs = -Infinity) {
 export function caseClassesOf(results, records, lineages) {
   const haikuOver100k = records.some(r => typeof r.model === 'string' && /haiku/.test(r.model)
     && promptTokensOf(requestOf(r)) > LONG_CONTEXT_THRESHOLD);
-  const resumedAcrossDeploy = results.some(r => r.snapshotAt && r.lastRecordAt
-    && Date.parse(r.snapshotAt) < DEPLOY_MS && Date.parse(r.lastRecordAt) >= DEPLOY_MS);
+  const resumedAcrossDeploy = results.some(r => r.preDeployRecords > 0);
   const subagentRecords = records.some(r => typeof r.agent === 'string' && r.agent !== 'main');
   const mixedModel = results.some(r => r.models.length > 1);
   const oneTurnRecords = results.some(r => r.fullRecordCount === 1);
@@ -350,6 +379,8 @@ async function main(argv) {
         toCent: {
           eligible: results.filter(r => r.toCent).length,
           agree: results.filter(r => r.toCent && r.agrees).length,
+          sameStopRace: results.filter(r => r.sameStopRace).length,
+          unexplained: results.filter(r => r.toCent && r.agrees === false && !r.sameStopRace),
           disagreements: results.filter(r => r.toCent && !r.agrees)
         },
         tail: results.filter(r => r.recordsAfterSnapshot).map(r => ({
