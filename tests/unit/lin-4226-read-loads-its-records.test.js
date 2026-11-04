@@ -250,9 +250,15 @@ describe('census (LIN-4226): one load per read entry, and no preloaded records',
     assert.deepEqual(hitsOf(files, /\.(forAnchors|forRows)\s*\(/), []);
   });
 
-  // Fails at HEAD: requestRows is the preloaded-array shape the change removes.
-  test('no production code names requestRows', () => {
-    const files = scannedFiles().filter(({ path: file }) => !file.startsWith('tests/'));
+  // Fails at HEAD: requestRows is the preloaded-array shape the change removes. Counts identifiers only: the guard
+  // that rejects the old key names it inside a string literal, which is not a caller passing rows.
+  test('no production code passes requestRows (identifiers; a string literal in a guard is not one)', () => {
+    const stripStrings = (text) => text.split('\n')
+      .map(line => line.replace(/'(?:\\.|[^'\\])*'/g, "''").replace(/`(?:\\.|[^`\\])*`/g, '``'))
+      .join('\n');
+    const files = scannedFiles()
+      .filter(({ path: file }) => !file.startsWith('tests/'))
+      .map(({ path: file, text }) => ({ path: file, text: stripStrings(text) }));
     assert.deepEqual(hitsOf(files, /\brequestRows\b/), []);
   });
 
