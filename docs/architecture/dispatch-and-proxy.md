@@ -66,15 +66,17 @@ Items expire after 24 hours. Tokens are workspace-scoped. New dispatch tokens ex
 Feedback is append-only, **retained for the life of the project**, and requires strict token ownership.
 
 **Per-request usage (LIN-4198, piece 1 of LIN-4195).** A model request is one record in the
-`request-usage` collection (`lib/request-usage-store.js`), keyed `{urlKey, rootItemId, requestId}`
-(unique; `{urlKey, rootItemId}` declared beside it in `lib/db-indexes.js`, see the note there). Intake is
+`request-usage` collection (`lib/request-usage-store.js`), upserted on `{urlKey, rootItemId, requestId}`
+(unique; the stamp is part of the upsert key, so a request posted under two anchors is two documents until the
+read folds them). Intake is
 `lib/request-usage-intake.js`, shared by `POST /api/dispatch/usage/:itemId` and `POST /api/proxy/runner/usage/:id`.
-- **Identity and metadata**: `rootItemId` is taken from the taken row through `anchorOf` and is never read from
-  the body. `itemId` and `issueIdentifier` are stored from that row. Metadata (`harness`, `model`, `effort`,
-  `lane`, `agent`, `at`) is set once, on insert.
+- **Identity and metadata**: `rootItemId` is the posting row's anchor at post time (through `anchorOf`), stored as
+  an **informational stamp**: nothing reads by it (LIN-4212). It is never read from the body. `itemId` and
+  `issueIdentifier` are stored from that row. Metadata (`harness`, `model`, `effort`, `lane`, `agent`, `at`) is set
+  once, on insert.
 - **Counts grow only**: the five token counters and an optional native `costUsd` are merged with `$max`, so a
   repost of a streamed message grows the record and a smaller repost never shrinks it. Reposting the same request
-  leaves one document.
+  under the same stamp leaves one document; the read folds documents split across stamps (LIN-4212).
 - **Limits**: at most 100 records per call (a larger call is refused whole, 400). A record is judged on its own:
   a missing `requestId`, an over-long id, a non-finite or negative number, or a prompt size over 2,000,000 tokens
   (input + cache-read + cache-write) is rejected with a reason, and the rest of the call still applies. A record
@@ -83,8 +85,20 @@ Feedback is append-only, **retained for the life of the project**, and requires 
   record's own prompt size through the tier rates, whatever `harness` says (a cumulative-total guard does not apply
   to a single request). A finite native `costUsd` on the record wins over the read-time price (the same precedence
   as `lib/session-telemetry.js`).
-- **Readers**: nothing reads the collection yet except the intake route and `listForAnchors` (a minimal projection);
-  `listForAnchors` has no caller until the cost read in piece 4.
+- **Lineage read (LIN-4212).** A record belongs to the lineage its posting row **currently** belongs to. A wake row
+  is minted with its own id as anchor and re-pointed to its lineage root at its first tagged feedback, so a stamp
+  taken before that latch names an anchor no row carries any more. `listForAnchors(urlKey, anchors)` therefore
+  resolves the member rows itself, from `dispatch-history` (`rootItemId` in `anchors`, no status or `isMember`
+  filter, so a posting row always counts); reads the records by `{urlKey, itemId}` (index in `lib/db-indexes.js`);
+  relabels each record to its row's current anchor; drops a record whose `itemId` has no member row (no fallback
+  to the stamp: that could double count a re-pointed row); and folds to one record per `requestId` (earliest
+  document's metadata, `$max` on the counts, latest `updatedAt`). No migration: the stored stamps are never rewritten.
+- **History dependency.** The read is only as complete as `dispatch-history`: `dispatch-history` is not pruned on
+  its own (the expiry delete was removed, `lib/dispatch-store.js:1591-1595`, LIN-3163). A row deleted by account
+  erasure or the test-only `clearHistory` takes its records out of every read.
+- **Readers**: the intake route, and `listForAnchors` (a minimal projection). The LIN-4200 measurement scripts
+  (`scripts/lin-4200-measure-records-vs-snapshots.mjs`, `scripts/lin-4200-d13-volume-timing.mjs`) call it, read-only.
+  The cost read (LIN-4201) is the next caller.
 
 A dispatch item may carry an optional `followUpTo` field (the `id` of an earlier dispatch) to resume that
 session as a follow-up instead of starting fresh (cli/web only, same workspace; LIN-415). Harbour

@@ -10,11 +10,12 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { lineageRecords } from '../../lib/cost-read.js';
 import {
-  classifyLineage, modelsOf, oplogCounters, orphanAnchors, sharesOf, tokenSums, recordCostUsd,
+  classifyLineage, modelsOf, oplogCounters, requestRecordAudit, readWorkspace, sharesOf, tokenSums, recordCostUsd,
   oplogCrossCheck, parseFlushes
 } from '../../scripts/lin-4200-measure-records-vs-snapshots.mjs';
 
 const HAIKU = 'claude-haiku-5-5';
+const NOW_ISO = '2026-11-04T05:00:00.000Z';
 const SNAP_AT = '2026-11-04T06:00:00.000Z';
 
 /** A dispatch row carrying one `[usage]` snapshot (a running total, claude-code). */
@@ -210,11 +211,74 @@ describe('classes and shares', () => {
     assert.equal(modelsOf([rec({ requestId: 's', at: '2026-11-04T05:40:00.000Z', model: '<synthetic>' })]).size, 0);
   });
 
-  test('orphan records are those whose anchor has no member row', () => {
-    const docs = [{ rootItemId: 'L1' }, { rootItemId: 'L9' }, { rootItemId: 'L9' }];
-    const orphans = orphanAnchors(docs, new Set(['L1']));
-    assert.equal(orphans.get('L9'), 2);
-    assert.equal(orphans.has('L1'), false);
+  test('orphan records are those whose itemId has no posting row in dispatch-history (not the stamp)', () => {
+    const a = requestRecordAudit({
+      usageDocs: [
+        { itemId: 'row-a', rootItemId: 'row-a', requestId: 'm1' },
+        { itemId: 'ghost', rootItemId: 'L9', requestId: 'm2' },
+        { itemId: 'ghost', rootItemId: 'L9', requestId: 'm3' }
+      ],
+      postingRows: [{ _id: 'row-a', rootItemId: 'L1', kind: 'implementation' }],
+      folded: [], lineages: []
+    });
+    assert.equal(a.orphanRecords, 2);
+    assert.equal(a.orphanPostingRows, 1);
+    assert.deepEqual(a.orphans, [{ itemId: 'ghost', stamp: 'L9', records: 2 }]);
+  });
+
+  test('a stranded wake record is not an orphan; a wake-stamped record is counted as informational; a re-post split is reported raw and not after the read', () => {
+    // W is a wake latched to L1. m1 was posted before the latch (stamp W) and re-posted after it (stamp L1): a split.
+    // m2 was posted before the latch and never re-posted: stranded under W, reachable through its posting row.
+    const a = requestRecordAudit({
+      usageDocs: [
+        { itemId: 'W', rootItemId: 'W', requestId: 'm1' },
+        { itemId: 'W', rootItemId: 'L1', requestId: 'm1' },
+        { itemId: 'W', rootItemId: 'W', requestId: 'm2' }
+      ],
+      postingRows: [{ _id: 'W', rootItemId: 'L1', kind: 'wake' }],
+      folded: [{ rootItemId: 'L1', requestId: 'm1' }, { rootItemId: 'L1', requestId: 'm2' }],
+      lineages: [{ members: [{ kind: 'implementation' }] }]
+    });
+    assert.equal(a.orphanRecords, 0, 'a record whose posting row exists is never an orphan');
+    assert.equal(a.stampedAtWakeId, 2, 'the two pre-latch records carry the wake id as their stamp');
+    assert.equal(a.splitRequests, 1);
+    assert.equal(a.splitRawDocs, 1, 'the raw split is reported before the read');
+    assert.equal(a.duplicateAfterRead, 0, 'the loader folds the split: no duplicate after the read');
+    assert.equal(a.phantomLineages, 0);
+  });
+
+  test('a lineage whose only member is a wake is a phantom lineage; a repeated (root, requestId) after the read is counted', () => {
+    const a = requestRecordAudit({
+      usageDocs: [],
+      postingRows: [],
+      folded: [{ rootItemId: 'L1', requestId: 'm1' }, { rootItemId: 'L1', requestId: 'm1' }],
+      lineages: [{ members: [{ kind: 'wake' }] }, { members: [{ kind: 'implementation' }, { kind: 'wake' }] }]
+    });
+    assert.equal(a.phantomLineages, 1, 'a wake-only lineage is phantom; a lineage with a real member is not');
+    assert.equal(a.duplicateAfterRead, 1);
+  });
+
+  test('readWorkspace only reads: every collection call is a find, and no write method is ever invoked', async () => {
+    const writes = [];
+    const canned = {
+      'request-usage': [{ urlKey: 'ws', itemId: 'row-a', rootItemId: 'row-a', requestId: 'm1', at: NOW_ISO, updatedAt: NOW_ISO, inputTokens: 1 }],
+      'dispatch-history': [{ _id: 'row-a', urlKey: 'ws', rootItemId: 'row-a', kind: 'implementation', status: 'taken', abort: false, dispatchedAt: NOW_ISO }],
+      'dispatch-queue': []
+    };
+    const WRITE_METHODS = ['insertOne', 'insertMany', 'updateOne', 'updateMany', 'replaceOne', 'deleteOne', 'deleteMany', 'bulkWrite', 'findOneAndUpdate', 'findOneAndDelete', 'findOneAndReplace', 'createIndex', 'drop'];
+    const collection = (name) => {
+      const handle = {
+        find: () => ({ toArray: async () => canned[name] ?? [] })
+      };
+      for (const method of WRITE_METHODS) handle[method] = async () => { writes.push(`${name}.${method}`); throw new Error(`write refused: ${name}.${method}`); };
+      return handle;
+    };
+    const db = { collection };
+    const { records, postingRows } = await readWorkspace(db, 'ws', new Date('2026-11-04T00:00:00Z'));
+    assert.deepEqual(writes, []);
+    assert.equal(postingRows.length, 1);
+    assert.equal(records.length, 1, 'the record side is the loader, and it returns the record under its posting row');
+    assert.equal(records[0].rootItemId, 'row-a');
   });
 
   test('shares are token-weighted over the priced lineages', () => {

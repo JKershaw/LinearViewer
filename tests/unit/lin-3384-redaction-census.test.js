@@ -165,6 +165,9 @@ const TABLE = {
   'lib/observation-sessions-materializer.js :: _collectSessionIssues': [SRV, 7],
   'lib/observation-sessions-materializer.js :: _sessionsTouchingIssue': [SRV, 2],
   'lib/kpi-daily-rollup.js :: oldestDayOf': [PRJ, 1], // LIN-3724: raw history find projecting `dispatchedAt` only (backfill operator script)
+  // LIN-4212: the lineage member read is a raw dispatch-history find projecting `{_id, rootItemId}` only; the
+  // records it keys on come from request-usage and carry no session, token or prompt field (LIST_PROJECTION).
+  'lib/request-usage-store.js :: listForAnchors': [PRJ, 1],
   // LIN-3812: the loop builders' reads (lean default or the named whole-document pair); the digest
   // self-heal's raw historyCollection.find moved into the store with it
   'lib/pipeline-loops.js :: _readLive': [SRV, 2],

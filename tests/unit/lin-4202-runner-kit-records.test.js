@@ -224,7 +224,10 @@ describe('LIN-4202 re-posting against the real intake and store changes nothing 
 
   /** postUsage with a real store and a taken row whose anchor is ANCHOR. */
   async function world() {
-    const store = requestUsageStoreFor(client.db(`lin4202_${n++}`));
+    const db = client.db(`lin4202_${n++}`);
+    const store = requestUsageStoreFor(db);
+    // LIN-4212: the loader reads the posting row from dispatch-history (its anchor is ANCHOR).
+    await db.collection('dispatch-history').insertOne({ _id: ITEM, urlKey: 'acme', rootItemId: ANCHOR, status: 'taken', abort: false });
     await store.collection.createIndex({ urlKey: 1, rootItemId: 1, requestId: 1 }, { unique: true });
     const dispatchQueueStore = { readTakenForUsage: async () => ({ _id: ITEM, rootItemId: ANCHOR, status: 'taken' }) };
     const send = async (batch) => {

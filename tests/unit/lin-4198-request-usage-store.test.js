@@ -15,7 +15,7 @@ import { join, relative, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 import {
-  RequestUsageStore, REQUEST_USAGE_COLLECTION, USAGE_TOKEN_FIELDS, LIST_PROJECTION, upsertOpFor
+  RequestUsageStore, REQUEST_USAGE_COLLECTION, HISTORY_COLLECTION, USAGE_TOKEN_FIELDS, LIST_PROJECTION, upsertOpFor
 } from '../../lib/request-usage-store.js';
 import { INDEX_SPECS, tierOf, sameKeySpec } from '../../lib/db-indexes.js';
 import { INVENTORY } from '../../lib/account-erasure.js';
@@ -45,14 +45,15 @@ const harness = createMangoTmpdir('lin-4198-usage-');
 before(() => harness.connect());
 after(() => harness.close());
 
-let db, raw, store;
+let db, raw, history, store;
 beforeEach(async () => {
   db = harness.freshDb();
   raw = db.collection(REQUEST_USAGE_COLLECTION);
+  history = db.collection(HISTORY_COLLECTION);
   // The two declared specs, as ensureIndexes would build them.
   await raw.createIndex({ urlKey: 1, rootItemId: 1, requestId: 1 }, { unique: true });
   await raw.createIndex({ urlKey: 1, rootItemId: 1 });
-  store = new RequestUsageStore({ collection: raw });
+  store = new RequestUsageStore({ collection: raw, historyCollection: history });
 });
 
 const docsOf = async (filter = {}) => raw.find(filter).toArray();
@@ -133,7 +134,7 @@ describe('RequestUsageStore.upsertRecords — the upsert contract', () => {
   test('an empty batch is a no-op and sends nothing', async () => {
     let sent = 0;
     const fake = { bulkWrite: async () => { sent++; } };
-    const s = new RequestUsageStore({ collection: fake });
+    const s = new RequestUsageStore({ collection: fake, historyCollection: {} });
     assert.deepEqual(await s.upsertRecords({ urlKey: 'ws-a', rootItemId: 'r', itemId: 'i', records: [], now: NOW }), { upserted: 0 });
     assert.equal(sent, 0);
   });
@@ -179,7 +180,7 @@ describe('upsertRecords — the E11000 retry for concurrent first inserts', () =
         if (attempts === 1) throw dupError();
       }
     };
-    const s = new RequestUsageStore({ collection: fake });
+    const s = new RequestUsageStore({ collection: fake, historyCollection: {} });
     const r = record('m', { inputTokens: 1 });
     const out = await s.upsertRecords({ urlKey: 'ws-a', rootItemId: 'r', itemId: 'i', records: [r, record('n')], now: NOW });
     assert.equal(attempts, 2);
@@ -191,7 +192,7 @@ describe('upsertRecords — the E11000 retry for concurrent first inserts', () =
   test('a second E11000 propagates', async () => {
     let attempts = 0;
     const fake = { bulkWrite: async () => { attempts++; throw dupError(); } };
-    const s = new RequestUsageStore({ collection: fake });
+    const s = new RequestUsageStore({ collection: fake, historyCollection: {} });
     await assert.rejects(s.upsertRecords({ urlKey: 'ws-a', rootItemId: 'r', itemId: 'i', records: [record('m')], now: NOW }), /E11000/);
     assert.equal(attempts, 2);
   });
@@ -200,7 +201,7 @@ describe('upsertRecords — the E11000 retry for concurrent first inserts', () =
     let attempts = 0;
     const err = Object.assign(new Error('boom'), { writeErrors: [{ code: 11000 }, { code: 121 }] });
     const fake = { bulkWrite: async () => { attempts++; throw err; } };
-    const s = new RequestUsageStore({ collection: fake });
+    const s = new RequestUsageStore({ collection: fake, historyCollection: {} });
     await assert.rejects(s.upsertRecords({ urlKey: 'ws-a', rootItemId: 'r', itemId: 'i', records: [record('m')], now: NOW }), /boom/);
     assert.equal(attempts, 1);
   });
@@ -208,7 +209,7 @@ describe('upsertRecords — the E11000 retry for concurrent first inserts', () =
   test('a plain error propagates without a retry', async () => {
     let attempts = 0;
     const fake = { bulkWrite: async () => { attempts++; throw new Error('network'); } };
-    const s = new RequestUsageStore({ collection: fake });
+    const s = new RequestUsageStore({ collection: fake, historyCollection: {} });
     await assert.rejects(s.upsertRecords({ urlKey: 'ws-a', rootItemId: 'r', itemId: 'i', records: [record('m')], now: NOW }), /network/);
     assert.equal(attempts, 1);
   });
@@ -216,6 +217,12 @@ describe('upsertRecords — the E11000 retry for concurrent first inserts', () =
 
 describe('listForAnchors — the one loader', () => {
   beforeEach(async () => {
+    // LIN-4212: the member rows the loader resolves from dispatch-history (the posting rows of the records below).
+    await history.insertMany([
+      { _id: 'item-1', urlKey: 'ws-a', rootItemId: 'root-1', status: 'taken', abort: false },
+      { _id: 'item-2', urlKey: 'ws-a', rootItemId: 'root-2', status: 'taken', abort: false },
+      { _id: 'item-3', urlKey: 'ws-b', rootItemId: 'root-1', status: 'taken', abort: false }
+    ]);
     await store.upsertRecords({ urlKey: 'ws-a', rootItemId: 'root-1', itemId: 'item-1', issueIdentifier: 'LIN-1', records: [
       record('a1', { inputTokens: 10 }, { costUsd: 0.01 }),
       record('a2', { outputTokens: 5 })
@@ -241,34 +248,38 @@ describe('listForAnchors — the one loader', () => {
     assert.deepEqual(await store.listForAnchors('ws-a', [null, '', 7]), []);
   });
 
-  test('projects only the fields the read needs: no itemId, issueIdentifier, updatedAt or _id', async () => {
+  test('projects only the fields the read needs: no issueIdentifier or _id (itemId for the relabel, updatedAt for coverage, LIN-4212)', async () => {
     const [row] = await store.listForAnchors('ws-a', ['root-1']);
-    assert.equal('itemId' in row, false);
+    assert.equal('itemId' in row, true, 'the read keys on the posting row, so itemId is returned');
+    assert.equal('updatedAt' in row, true, 'the post-time coverage read needs updatedAt');
     assert.equal('issueIdentifier' in row, false);
-    assert.equal('updatedAt' in row, false);
     assert.equal('_id' in row, false);
     assert.equal('urlKey' in row, false, 'urlKey is the query key, not returned');
-    for (const f of ['rootItemId', 'requestId', 'harness', 'model', 'effort', 'lane', 'agent', 'at', ...USAGE_TOKEN_FIELDS]) {
+    for (const f of ['rootItemId', 'requestId', 'itemId', 'updatedAt', 'harness', 'model', 'effort', 'lane', 'agent', 'at', ...USAGE_TOKEN_FIELDS]) {
       assert.ok(f in row, `${f} is needed by the read`);
     }
   });
 
   test('the projection constant names exactly the fields above', () => {
     const included = Object.entries(LIST_PROJECTION).filter(([, v]) => v === 1).map(([k]) => k).sort();
-    assert.deepEqual(included, ['agent', 'at', 'costUsd', 'effort', 'harness', 'lane', 'model', 'requestId', 'rootItemId', ...USAGE_TOKEN_FIELDS].sort());
+    assert.deepEqual(included, ['agent', 'at', 'costUsd', 'effort', 'harness', 'itemId', 'lane', 'model', 'requestId', 'rootItemId', 'updatedAt', ...USAGE_TOKEN_FIELDS].sort());
     assert.equal(LIST_PROJECTION._id, 0);
   });
 });
 
 describe('registers', () => {
-  test('both index specs are declared on request-usage, the unique key and the lookup together, at boot tier', () => {
+  test('the three index specs are declared on request-usage at boot tier: the unique key, the {urlKey, rootItemId} lookup (unread, LIN-4217), and the {urlKey, itemId} read key (LIN-4212)', () => {
     const specs = INDEX_SPECS.filter((s) => s.collection === REQUEST_USAGE_COLLECTION);
     const unique = specs.find((s) => sameKeySpec(s.keySpec, { urlKey: 1, rootItemId: 1, requestId: 1 }));
     const lookup = specs.find((s) => sameKeySpec(s.keySpec, { urlKey: 1, rootItemId: 1 }));
+    const byItem = specs.find((s) => sameKeySpec(s.keySpec, { urlKey: 1, itemId: 1 }));
     assert.ok(unique && unique.options.unique === true, 'the unique upsert key');
     assert.ok(lookup && !lookup.options.unique, 'the {urlKey, rootItemId} lookup');
+    assert.ok(byItem && !byItem.options.unique, 'the {urlKey, itemId} read key');
+    assert.equal(specs.length, 3);
     assert.equal(tierOf(unique), 'boot');
     assert.equal(tierOf(lookup), 'boot');
+    assert.equal(tierOf(byItem), 'boot');
   });
 
   test('the collection is in account erasure as a workspace row (Full wipe deletes it, no account field)', () => {
@@ -296,7 +307,13 @@ describe('census: nothing outside the store reads the collection', () => {
     // LIN-4200 (beat 3): the D13 volume and timing measurement; read-only against production, scratch writes only on a local mongod.
     'scripts/lin-4200-d13-volume-timing.mjs',
     'tests/unit/lin-4198-request-usage-store.test.js',
-    'tests/unit/lin-4198-request-usage-mongod.test.js'
+    'tests/unit/lin-4198-request-usage-mongod.test.js',
+    // LIN-4212: the wake-posted lineage witnesses drive the store and the shared intake (both allowed) against real mongod.
+    'tests/unit/lin-4212-wake-records-stranded.test.js',
+    // LIN-4212: the redaction census names the store as a classified call site (a table key); it reads nothing itself.
+    'tests/unit/lin-3384-redaction-census.test.js',
+    // LIN-4212 (beat 3): the measure script's tests name the collection in a fake database; they read nothing from the store.
+    'tests/unit/lin-4200-measure.test.js'
   ]);
   const SCANNED_DIRS = ['lib', 'routes', 'scripts', 'tests', 'server.js'];
   const SKIP = new Set(['node_modules', 'experiments', 'public']);
@@ -368,11 +385,16 @@ describe('LIN-4198 registers: code-shape area, source map, endpoint catalogue, a
     assert.match(doc, /Auth deviation from feedback, on purpose/);
     assert.match(doc, /largest|\$max/);
     assert.match(doc, /No stored price/);
-    assert.match(doc, /nothing reads the collection yet except the intake route and `listForAnchors`/);
+    assert.match(doc, /the intake route, and `listForAnchors`/);
+    // LIN-4212: the read rule, the informational stamp and the history dependency are stated in the doc.
+    assert.match(doc, /A record belongs to the lineage its posting row \*\*currently\*\* belongs to/);
+    assert.match(doc, /\*\*informational stamp\*\*: nothing reads by it/);
+    assert.match(doc, /no fallback\s+to the stamp/);
+    assert.match(doc, /`dispatch-history` is not pruned on\s+its own/);
   });
 
   test('the db-indexes reason on the lookup index says why it is kept beside the unique key', () => {
     const idx = read('lib/db-indexes.js');
-    assert.match(idx, /the unique key prefix also serves it, and the planner prefers this smaller index/);
+    assert.match(idx, /kept until LIN-4217 retires it/);
   });
 });

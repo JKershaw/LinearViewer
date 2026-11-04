@@ -249,13 +249,15 @@ describe('postUsage — the shared flow', () => {
 });
 
 describe('requestUsageStoreFor — the app builds the store on the collection the schema names', () => {
-  test('it opens the collection the store module names, on the given database, and wraps it as the store', () => {
+  test('it opens the collections the store names (request-usage, and dispatch-history for the member read), on the given database, and wraps them as the store', () => {
     const names = [];
     const handle = { fake: true };
-    const db = { collection: (name) => { names.push(name); return handle; } };
+    const historyHandle = { fake: 'history' };
+    const db = { collection: (name) => { names.push(name); return name === 'dispatch-history' ? historyHandle : handle; } };
     const store = requestUsageStoreFor(db);
-    assert.deepEqual(names, [REQUEST_USAGE_COLLECTION]);
+    assert.deepEqual(names, [REQUEST_USAGE_COLLECTION, 'dispatch-history']);
     assert.equal(store.collection, handle, 'the store writes through the handle it was given');
+    assert.equal(store.historyCollection, historyHandle, 'the loader reads members from dispatch-history');
     assert.equal(typeof store.upsertRecords, 'function');
     assert.equal(typeof store.listForAnchors, 'function');
   });

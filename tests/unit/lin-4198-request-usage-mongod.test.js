@@ -58,7 +58,7 @@ describe(
       raw = db.collection(REQUEST_USAGE_COLLECTION);
       await raw.createIndex({ urlKey: 1, rootItemId: 1, requestId: 1 }, { unique: true });
       await raw.createIndex({ urlKey: 1, rootItemId: 1 });
-      store = new RequestUsageStore({ collection: raw });
+      store = new RequestUsageStore({ collection: raw, historyCollection: db.collection('dispatch-history') });
     });
 
     after(async () => {

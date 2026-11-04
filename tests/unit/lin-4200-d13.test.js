@@ -8,8 +8,17 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   percentileOf, distributionOf, bucketCountsOf, summarizeExplain, fitLinear, projectMs,
-  steadyStateRecordsOf, sumRecordsByLineage, hostPortOf, assertScratchTarget
+  steadyStateRecordsOf, sumRecordsByLineage, hostPortOf, assertScratchTarget, deltaPctOf
 } from '../../scripts/lin-4200-d13-volume-timing.mjs';
+
+describe('timing delta', () => {
+  test('deltaPctOf is the percentage change from the stamped base to the loader (positive = slower)', () => {
+    assert.equal(deltaPctOf(100, 105), 5);
+    assert.equal(deltaPctOf(200, 150), -25);
+    assert.equal(deltaPctOf(0, 5), null, 'a zero base has no delta');
+    assert.equal(deltaPctOf(null, 5), null);
+  });
+});
 
 describe('volume distribution', () => {
   test('nearest-rank percentiles', () => {
