@@ -46,7 +46,7 @@ before(async () => {
       getDeployInfo: () => ({}),
       userPreferencesStore: { getOpenRouterConsent: async () => null },
       workspacePreferencesStore: fx.preferencesStore,
-      llmCallLogStore: { summarize: async () => ({}) },
+      llmCallLogStore: { listInHorizon: async () => state.callDocs },
       promptTraceStore: { summarizeProviderContext: async () => ({}) },
       accountStore: { listEmailIdentities: async () => [] },
       requestFeatureFlags: async () => ({}),
@@ -82,7 +82,7 @@ beforeEach(() => {
   // Names resolve at read time (server.js does the same): an account that still exists has a name.
   const names = { [OWNER]: 'Ada', 'acct-other': 'Grace' };
   logStore = new WorkspaceChangeLogStore({ collection: memoryCollection(), resolveActorName: async (id) => names[id] || null });
-  state = { accountId: OWNER, proxyRows: [], dispatchRows: [] };
+  state = { accountId: OWNER, proxyRows: [], dispatchRows: [], callDocs: [] };
 });
 
 const row = (over) => ({
@@ -146,5 +146,18 @@ describe('the change-log route passes the clock through', () => {
       const html = await (await fetch(`${base}/workspace/alpha/settings/agent-access`)).text();
       assert.match(html, /expires in 2d/);
     });
+  });
+});
+
+describe('Settings › Health reads the calls through cost-read (LIN-4179, change d)', () => {
+  test('a null call cost shows as "not priced" in the Cost row, never as $0', async () => {
+    state.callDocs = [
+      { feature: 'review', cost: 0.33, timestamp: new Date(), totalTokens: 10 },
+      { feature: 'scan', cost: null, timestamp: new Date(), totalTokens: 5 }
+    ];
+    const res = await fetch(`${base}/workspace/alpha/settings/health`);
+    assert.equal(res.status, 200);
+    const html = await res.text();
+    assert.match(html, /Cost<[\s\S]*?\$0\.3300, 1 not priced/);
   });
 });
